@@ -1,4 +1,5 @@
 export { ToolInputError } from './errors'
+export { createCapabilityToken, verifyCapabilityToken, type CapabilityTokenOptions } from './capability'
 export {
   authenticateToolRequest,
   readToolArgs,
