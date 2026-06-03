@@ -67,6 +67,16 @@
       "types": "./dist/integrations/index.d.ts",
       "import": "./dist/integrations/index.js",
       "default": "./dist/integrations/index.js"
+    },
+    "./web": {
+      "types": "./dist/web/index.d.ts",
+      "import": "./dist/web/index.js",
+      "default": "./dist/web/index.js"
+    },
+    "./redact": {
+      "types": "./dist/redact/index.d.ts",
+      "import": "./dist/redact/index.js",
+      "default": "./dist/redact/index.js"
     }
   },
   "scripts": {

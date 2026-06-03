@@ -12,6 +12,8 @@ export default defineConfig({
     'crypto/index': 'src/crypto/index.ts',
     'stream/index': 'src/stream/index.ts',
     'integrations/index': 'src/integrations/index.ts',
+    'web/index': 'src/web/index.ts',
+    'redact/index': 'src/redact/index.ts',
   },
   format: ['esm'],
   dts: true,
