@@ -23,7 +23,7 @@ Corollary — **extend, never duplicate.** Before writing anything that complete
 | Subpath | Owns (app-shell) | Composes (peer/structural) |
 |---|---|---|
 | `/tools` | structured agent→app side channel (`submit_proposal`/`schedule_followup`/`render_ui`/`add_citation`): OpenAI defs, MCP-server builder (`buildHttpMcpServer`/`buildAppToolMcpServer`), HTTP route handler, runtime executor, capability auth, `ToolInputError` | — |
-| `/runtime` | `streamAppToolLoop`/`runAppToolLoop` (bounded turn tool-loop) + `resolveTangleModelConfig` | ⚠️ turn-loop is a contribute-down candidate to agent-runtime |
+| `/runtime` | `streamAppToolLoop`/`runAppToolLoop` (bounded turn tool-loop) + `resolveTangleModelConfig` + `toLoopEvents`/`createOpenAICompatStreamTurn` (sandbox-free browser/edge copilot adapter — OpenAI-compat stream → LoopEvents, fragmented tool-calls assembled) | ⚠️ turn-loop is a contribute-down candidate to agent-runtime; the OpenAI-compat adapter only maps stream shape (no HTTP client — see `examples/browser-copilot.md`) |
 | `/eval` | `producedFromToolEvents` (side-channel→`RuntimeEventLike` bridge) + `createTokenRecallChecker` | **re-exports** agent-eval's `verifyCompletion`/`extractProducedState`/`weightedComposite`/`createLlmCorrectnessChecker` |
 | `/integrations` | hub `/exec` client + `resolveIntegrationAction` + `invokeIntegrationHub` (wiring) | peer-dep `@tangle-network/agent-integrations` (the engine/catalog) |
 | `/tangle` | app-registration consent URL + cached broker-token provider | structural `TangleAppsClient` (from agent-integrations) |
