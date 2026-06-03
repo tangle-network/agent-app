@@ -9,6 +9,8 @@ export default defineConfig({
     'runtime/index': 'src/runtime/index.ts',
     'eval/index': 'src/eval/index.ts',
     'billing/index': 'src/billing/index.ts',
+    'crypto/index': 'src/crypto/index.ts',
+    'stream/index': 'src/stream/index.ts',
   },
   format: ['esm'],
   dts: true,

@@ -50,6 +50,16 @@
       "types": "./dist/billing/index.d.ts",
       "import": "./dist/billing/index.js",
       "default": "./dist/billing/index.js"
+    },
+    "./crypto": {
+      "types": "./dist/crypto/index.d.ts",
+      "import": "./dist/crypto/index.js",
+      "default": "./dist/crypto/index.js"
+    },
+    "./stream": {
+      "types": "./dist/stream/index.d.ts",
+      "import": "./dist/stream/index.js",
+      "default": "./dist/stream/index.js"
     }
   },
   "scripts": {
