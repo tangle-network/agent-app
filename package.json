@@ -1,8 +1,20 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "packageManager": "pnpm@10.33.4",
-  "description": "Shared application-shell framework for Tangle agent products: the structured agent\u2192app tool side channel (proposals, follow-ups, generated UI, citations), domain-seamed so each product supplies its own persistence and types.",
+  "description": "Application-shell framework for Tangle agent products: a bounded tool loop, the structured agent→app tool side channel, integration-hub client, per-workspace billing, and crypto — composed over the Tangle agent substrate through typed seams.",
+  "keywords": [
+    "tangle",
+    "ai-agent",
+    "agent-framework",
+    "llm",
+    "tool-calling",
+    "mcp",
+    "openai",
+    "approval-workflow",
+    "cloudflare-workers",
+    "eval"
+  ],
   "homepage": "https://github.com/tangle-network/agent-app#readme",
   "repository": {
     "type": "git",
