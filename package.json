@@ -30,6 +30,11 @@
       "types": "./dist/delegation/index.d.ts",
       "import": "./dist/delegation/index.js",
       "default": "./dist/delegation/index.js"
+    },
+    "./tangle": {
+      "types": "./dist/tangle/index.d.ts",
+      "import": "./dist/tangle/index.js",
+      "default": "./dist/tangle/index.js"
     }
   },
   "scripts": {

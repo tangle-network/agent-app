@@ -8,3 +8,4 @@
  */
 export * from './tools/index'
 export * from './delegation/index'
+export * from './tangle/index'
