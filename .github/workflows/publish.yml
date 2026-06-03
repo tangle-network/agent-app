@@ -55,12 +55,19 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
 
+      # OIDC trusted publishing needs npm CLI >= 11.5.1; Node 22 ships npm 10.x,
+      # which sends the publish PUT UNAUTHENTICATED → registry 404. Upgrade first.
+      # We publish with `npm publish` (not `pnpm publish`): npm performs the OIDC
+      # id-token → registry-token exchange the trusted-publisher entry expects.
+      # Safe here because agent-app has no `workspace:` protocol deps to leak
+      # (peers are plain version ranges). The package ships only ./dist.
+      - run: npm install -g npm@latest
+      - run: npm --version
+
       # Idempotent: re-running a tag whose npm version is already published must
       # not fail. Auth is npm OIDC trusted publishing (no NPM_TOKEN) — the
-      # id-token: write permission lets the runner mint the short-lived OIDC
-      # token npm exchanges for publish rights + Sigstore provenance.
-      # agent-app peer-deps the substrate (agent-integrations / agent-eval) — those
-      # are NOT bundled, so the published package carries only ./dist.
+      # id-token: write permission lets npm mint the short-lived OIDC token it
+      # exchanges for publish rights + Sigstore provenance.
       - name: Publish to npm (skip if already published)
         run: |
           NAME=$(node -p "require('./package.json').name")
@@ -68,7 +75,7 @@ jobs:
           if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
             echo "$NAME@$VERSION already on registry; skipping publish"
           else
-            pnpm publish --no-git-checks --access public --provenance || {
+            npm publish --provenance --access public || {
               echo "::error::npm publish failed. Verify the trusted publisher entry exists at https://www.npmjs.com/package/@tangle-network/agent-app/access (workflow=publish.yml)."
               exit 1
             }
