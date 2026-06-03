@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "packageManager": "pnpm@10.33.4",
   "description": "Shared application-shell framework for Tangle agent products: the structured agent\u2192app tool side channel (proposals, follow-ups, generated UI, citations), domain-seamed so each product supplies its own persistence and types.",
   "homepage": "https://github.com/tangle-network/agent-app#readme",
