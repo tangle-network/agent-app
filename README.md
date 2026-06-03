@@ -12,11 +12,11 @@ Everything here is **domain-seamed**: the generic mechanism lives in the package
 |---|---|---|
 | `@tangle-network/agent-app/tools` | ✅ **shipped + tested** | The structured agent→app tool side channel — `submit_proposal` (approval-gated), `schedule_followup`, `render_ui`, `add_citation`. OpenAI tool defs, MCP-server builder, HTTP route handler, agent-runtime executor, capability auth. Replaces brittle fenced `:::` blocks with validated tool calls. Seam: `AppToolHandlers` + `AppToolTaxonomy`. |
 | `@tangle-network/agent-app/delegation` | ✅ **shipped + tested** | The agent-runtime "driven loop" MCP (`delegate_research` / `delegate_code` / `delegation_status` …) for multi-step work that runs to completion in its own agent-driver sandbox. Optional; opt in by spreading into the profile `mcp` map. |
-| `@tangle-network/agent-app/tangle` | ▢ next | Tangle login (SSO) + the developer self-service **app-registration → broker-token** flow (wraps `@tangle-network/agent-integrations` `TangleAppsClient`: register app → consent → `sk-tan-broker-` token → hub exec). Provides a `verifyToken`/broker-bearer source the `/tools` auth seam consumes. |
-| `@tangle-network/agent-app/runtime` | ▢ next | Adapter over `@tangle-network/agent-runtime`: the chat turn (`runChatThroughRuntime` shape) wired to the app tools + delegation + integration-invoke, with the readiness/knowledge seam generalized out of the legal/insurance fork. |
-| `@tangle-network/agent-app/eval` | ▢ next | Generic eval scaffold over `@tangle-network/agent-eval`: the canonical runner + completion oracle + scoring rubric as a templated harness, with the persona/taxonomy/judge-rubric as seams. (Insurance's `tests/eval/canonical.ts` is the reference to generalize.) |
+| `@tangle-network/agent-app/tangle` | ✅ **shipped + tested** | Tangle login (SSO) + the developer self-service **app-registration → broker-token** flow: `buildConsentUrl` (one-time user consent) + `createBrokerTokenProvider` (caches/auto-refreshes the `sk-tan-broker-` token per durable grant, shares in-flight mints). Structural (depends on the minter contract; pass the concrete `TangleAppsClient` from `@tangle-network/agent-integrations`). |
+| `@tangle-network/agent-app/runtime` | ✅ **shipped + tested** | `runAppToolLoop` — the bounded multi-turn tool loop every app's chat runtime hand-rolls: stream a turn → collect tool calls → dispatch → fold results back → re-run, capped. Substrate-free via a `streamTurn` seam (wrap any backend / `runAgentTaskStream`) + an `executeToolCall` seam (route to integration + app-tool executors). |
+| `@tangle-network/agent-app/eval` | ✅ **shipped + tested** | The inline completion gate: `producedFromToolEvents` (bridge `/tools` produced events), `verifyCompletion` (per-requirement `satisfiedBy` gate), `tokenRecallChecker` (deterministic content check), `weightedScore`. For full campaigns/traces/LLM-judge use `@tangle-network/agent-eval`; this composes with it. |
 
-✅ = built, typechecked, unit-tested, builds. ▢ = designed, not yet built.
+✅ = built, typechecked, unit-tested, builds. All five modules done — 39 tests.
 
 ## `/tools` usage (the shipped module)
 

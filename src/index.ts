@@ -9,3 +9,5 @@
 export * from './tools/index'
 export * from './delegation/index'
 export * from './tangle/index'
+export * from './runtime/index'
+export * from './eval/index'
