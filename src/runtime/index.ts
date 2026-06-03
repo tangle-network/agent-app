@@ -17,13 +17,15 @@ export * from './openai-stream'
  * the model and the executors.
  *
  * LAYERING NOTE: this turn-level tool-dispatch loop is a generic RUNTIME
- * capability (it makes sense without this app's side channel — the seams are
- * callbacks, no agent-app types). agent-runtime today has `runAgentTaskStream`
- * (one turn) + `runLoop` (delegated refine/fanout), but NOT a turn-level
- * tool-dispatch loop — so this fills a real gap. It is a CANDIDATE to contribute
- * down into `@tangle-network/agent-runtime` (additive export, no fleet bump);
- * when that lands + publishes, this becomes a thin re-export. Kept here until
- * then because it's substrate-free and shipping (insurance consumes it).
+ * capability. It has been CONTRIBUTED DOWN and MERGED into
+ * `@tangle-network/agent-runtime` as `runToolLoop` / `streamToolLoop` (PR #137),
+ * but is not yet PUBLISHED (agent-runtime main is ahead of its last npm release;
+ * cutting that release is the agent-runtime maintainer's call). TERMINAL STATE:
+ * the moment agent-runtime publishes a version carrying #137, bump the
+ * `@tangle-network/agent-runtime` peer-dep here and replace the bodies below with
+ * a thin re-export — `streamAppToolLoop = streamToolLoop`, `runAppToolLoop =
+ * runToolLoop` (types alias 1:1; `AppToolOutcome` ≡ `ToolCallOutcome`). Kept
+ * substrate-free + shipping until then so consumers aren't blocked on the release.
  */
 import type { AppToolOutcome } from '../tools/types'
 
