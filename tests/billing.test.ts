@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { createWorkspaceKeyManager, type KeyProvisioner, type WorkspaceKeyStore, type KeyCrypto, type WorkspaceKeyRecord } from '../src/billing/index'
+import {
+  createWorkspaceKeyManager,
+  createPlatformBalanceManager,
+  type KeyProvisioner,
+  type WorkspaceKeyStore,
+  type KeyCrypto,
+  type WorkspaceKeyRecord,
+  type PlatformBillingClient,
+  type PlanLimit,
+} from '../src/billing/index'
 
 /** In-memory store + fake tcloud + reversible crypto so the manager's
  *  mint/rotate/rollover/usage logic is exercised with no DB or network. */
@@ -123,5 +132,104 @@ describe('createWorkspaceKeyManager', () => {
     const h = harness()
     const mgr = createWorkspaceKeyManager({ ...h, defaultBudgetUsd: 100, now: () => T0 })
     expect(await mgr.getUsage('nope')).toBeNull()
+  })
+})
+
+type Plan = 'free' | 'pro' | 'enterprise'
+const PLAN_LIMITS: Record<Plan, PlanLimit> = {
+  free: { monthlyBalanceUsd: 2, concurrency: 1, overageAllowed: false },
+  pro: { monthlyBalanceUsd: 100, concurrency: Number.POSITIVE_INFINITY, overageAllowed: true },
+  enterprise: { monthlyBalanceUsd: 500, concurrency: Number.POSITIVE_INFINITY, overageAllowed: true },
+}
+
+function billingClient(overrides: Partial<PlatformBillingClient<Plan>> = {}): { client: PlatformBillingClient<Plan>; deducts: any[] } {
+  const deducts: any[] = []
+  const client: PlatformBillingClient<Plan> = {
+    async resolveIdentity(userId) {
+      if (userId === 'unlinked') return null
+      if (userId === 'linked-no-key') return { platformUserId: 'p-nokey', apiKey: null }
+      return { platformUserId: `p-${userId}`, apiKey: `key-${userId}` }
+    },
+    async getPlan() {
+      return 'pro'
+    },
+    async getBalance() {
+      return { balance: 50, lifetimeSpent: 10 }
+    },
+    async getUsageByProduct() {
+      return [{ product: 'tax-agent', totalSpent: 7.5, count: 3 }]
+    },
+    async deduct(input) {
+      deducts.push(input)
+    },
+    ...overrides,
+  }
+  return { client, deducts }
+}
+
+describe('createPlatformBalanceManager (shared-platform-balance)', () => {
+  it('resolves plan + balance for a linked user', async () => {
+    const { client } = billingClient()
+    const mgr = createPlatformBalanceManager({ client, planLimits: PLAN_LIMITS, freePlan: 'free', productSlug: 'tax-agent' })
+    const state = await mgr.getState('u1')
+    expect(state).toMatchObject({ platformUserId: 'p-u1', plan: 'pro', remainingBalanceUsd: 50, lifetimeSpentUsd: 10, monthlyBalanceUsd: 100, overageAllowed: true })
+  })
+
+  it('fails CLOSED for an unlinked user (free plan, zero balance, no allow)', async () => {
+    const { client } = billingClient()
+    const mgr = createPlatformBalanceManager({ client, planLimits: PLAN_LIMITS, freePlan: 'free', productSlug: 'tax-agent' })
+    const state = await mgr.getState('unlinked')
+    expect(state).toMatchObject({ platformUserId: null, plan: 'free', remainingBalanceUsd: 0 })
+    const gate = await mgr.canStartBillableTurn('unlinked')
+    expect(gate.allowed).toBe(false)
+  })
+
+  it('linked-without-key falls to free with zero balance (never reads empty key)', async () => {
+    const { client } = billingClient()
+    const mgr = createPlatformBalanceManager({ client, planLimits: PLAN_LIMITS, freePlan: 'free', productSlug: 'tax-agent' })
+    const state = await mgr.getState('linked-no-key')
+    expect(state).toMatchObject({ platformUserId: 'p-nokey', plan: 'free', remainingBalanceUsd: 0 })
+  })
+
+  it('gates a billable turn: overage plan allowed even at zero balance', async () => {
+    const { client } = billingClient({ async getBalance() { return { balance: 0, lifetimeSpent: 0 } } })
+    const mgr = createPlatformBalanceManager({ client, planLimits: PLAN_LIMITS, freePlan: 'free', productSlug: 'tax-agent' })
+    const gate = await mgr.canStartBillableTurn('u1') // pro → overage
+    expect(gate.allowed).toBe(true)
+  })
+
+  it('gates a billable turn: no-overage plan blocked at zero, allowed with balance', async () => {
+    const free = billingClient({ async getPlan() { return 'free' }, async getBalance() { return { balance: 0, lifetimeSpent: 0 } } })
+    const mgrA = createPlatformBalanceManager({ client: free.client, planLimits: PLAN_LIMITS, freePlan: 'free', productSlug: 'tax-agent' })
+    expect((await mgrA.canStartBillableTurn('u1')).allowed).toBe(false)
+
+    const withBal = billingClient({ async getPlan() { return 'free' }, async getBalance() { return { balance: 1.5, lifetimeSpent: 0 } } })
+    const mgrB = createPlatformBalanceManager({ client: withBal.client, planLimits: PLAN_LIMITS, freePlan: 'free', productSlug: 'tax-agent' })
+    expect((await mgrB.canStartBillableTurn('u1')).allowed).toBe(true)
+  })
+
+  it('deducts against the platform user id', async () => {
+    const { client, deducts } = billingClient()
+    const mgr = createPlatformBalanceManager({ client, planLimits: PLAN_LIMITS, freePlan: 'free', productSlug: 'tax-agent' })
+    await mgr.deduct('u1', { amountUsd: 0.42, type: 'turn', description: 'chat', referenceId: 'sess-1' })
+    expect(deducts).toEqual([{ platformUserId: 'p-u1', amountUsd: 0.42, type: 'turn', description: 'chat', referenceId: 'sess-1' }])
+  })
+
+  it('deduct throws for an unlinked user', async () => {
+    const { client } = billingClient()
+    const mgr = createPlatformBalanceManager({ client, planLimits: PLAN_LIMITS, freePlan: 'free', productSlug: 'tax-agent' })
+    await expect(mgr.deduct('unlinked', { amountUsd: 1, type: 't', description: 'd', referenceId: 'r' })).rejects.toThrow(/platform-linked/)
+  })
+
+  it('aggregates product usage for the configured slug', async () => {
+    const { client } = billingClient()
+    const mgr = createPlatformBalanceManager({ client, planLimits: PLAN_LIMITS, freePlan: 'free', productSlug: 'tax-agent' })
+    expect(await mgr.getProductUsage('u1')).toEqual({ spentUsd: 7.5, transactionCount: 3 })
+  })
+
+  it('product usage is zero for an unlinked user', async () => {
+    const { client } = billingClient()
+    const mgr = createPlatformBalanceManager({ client, planLimits: PLAN_LIMITS, freePlan: 'free', productSlug: 'tax-agent' })
+    expect(await mgr.getProductUsage('unlinked')).toEqual({ spentUsd: 0, transactionCount: 0 })
   })
 })
