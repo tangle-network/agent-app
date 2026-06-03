@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { runAppToolLoop, type LoopEvent, type LoopToolCall } from '../src/runtime/index'
+import { runAppToolLoop, streamAppToolLoop, type LoopEvent, type LoopToolCall, type StreamLoopYield } from '../src/runtime/index'
 import type { AppToolOutcome } from '../src/tools/index'
 
 /** A scripted model: each entry is the events for one turn. */
@@ -107,5 +107,83 @@ describe('runAppToolLoop', () => {
     })
     expect(r.toolResults[0]!.outcome).toEqual({ ok: false, code: 'executor_error', message: 'db down' })
     expect(r.finalText).toBe('noted the failure')
+  })
+})
+
+// Raw event type a streaming consumer (e.g. insurance's runtime) would map.
+type Raw = { type: 'text_delta'; text: string } | { type: 'tool_call'; toolName: string; toolCallId?: string; args: Record<string, unknown> }
+
+describe('streamAppToolLoop', () => {
+  const opts = {
+    extractText: (e: Raw) => (e.type === 'text_delta' ? e.text : ''),
+    extractToolCall: (e: Raw): LoopToolCall | null => (e.type === 'tool_call' ? { toolName: e.toolName, toolCallId: e.toolCallId, args: e.args } : null),
+    isExecutableTool: (n: string) => n === 'submit_proposal',
+  }
+
+  it('yields every raw event + each tool_result, drives the loop, folds results back', async () => {
+    let turn = 0
+    const streamTurn = async function* (messages: Array<{ role: string; content: string }>): AsyncIterable<Raw> {
+      turn++
+      if (!messages.some((m) => m.content.includes('Tool results'))) {
+        yield { type: 'text_delta', text: 'Routing. ' }
+        yield { type: 'tool_call', toolName: 'submit_proposal', toolCallId: 'p1', args: { type: 'propose_swap', title: 'A' } }
+        return
+      }
+      yield { type: 'text_delta', text: 'Done.' }
+    }
+    const yields: StreamLoopYield<Raw>[] = []
+    const exec: AppToolOutcome[] = []
+    for await (const item of streamAppToolLoop<Raw>({
+      systemPrompt: 's', userMessage: 'u', streamTurn, ...opts,
+      executeToolCall: async () => { const o: AppToolOutcome = { ok: true, result: { proposalId: 'prop-1' } }; exec.push(o); return o },
+    })) {
+      yields.push(item)
+    }
+    const events = yields.filter((y) => y.kind === 'event')
+    const results = yields.filter((y) => y.kind === 'tool_result')
+    expect(events.length).toBe(3) // 2 turn-1 events + 1 turn-2 event
+    expect(results.length).toBe(1)
+    expect(results[0]).toMatchObject({ kind: 'tool_result', toolName: 'submit_proposal', label: 'submit_proposal', outcome: { ok: true } })
+    expect(exec).toHaveLength(1)
+    expect(turn).toBe(2)
+  })
+
+  it('emits a single capped signal when the model never stops calling tools', async () => {
+    const streamTurn = async function* (): AsyncIterable<Raw> {
+      yield { type: 'tool_call', toolName: 'submit_proposal', args: { type: 'propose_swap', title: 'x' } }
+    }
+    const yields: StreamLoopYield<Raw>[] = []
+    for await (const item of streamAppToolLoop<Raw>({
+      systemPrompt: 's', userMessage: 'u', maxToolTurns: 2, streamTurn, ...opts,
+      executeToolCall: async () => ({ ok: true, result: {} }),
+    })) {
+      yields.push(item)
+    }
+    const capped = yields.filter((y) => y.kind === 'capped')
+    expect(capped).toHaveLength(1)
+    expect((capped[0] as { pending: number }).pending).toBe(1)
+  })
+
+  it('passes a custom labelFor through to the tool_result (e.g. an integration hub path)', async () => {
+    const streamTurn = async function* (messages: Array<{ role: string; content: string }>): AsyncIterable<Raw> {
+      if (!messages.some((m) => m.content.includes('Tool results'))) {
+        yield { type: 'tool_call', toolName: 'gmail_send', args: {} }
+        return
+      }
+      yield { type: 'text_delta', text: 'ok' }
+    }
+    const yields: StreamLoopYield<Raw>[] = []
+    for await (const item of streamAppToolLoop<Raw>({
+      systemPrompt: 's', userMessage: 'u', streamTurn,
+      extractText: opts.extractText,
+      extractToolCall: opts.extractToolCall,
+      isExecutableTool: (n) => n === 'gmail_send',
+      labelFor: () => 'gmail.messages.send',
+      executeToolCall: async () => ({ ok: true, result: { id: 'm1' } }),
+    })) {
+      yields.push(item)
+    }
+    const result = yields.find((y) => y.kind === 'tool_result')
+    expect((result as { label: string }).label).toBe('gmail.messages.send')
   })
 })

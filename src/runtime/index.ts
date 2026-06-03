@@ -44,7 +44,7 @@ export interface ToolLoopResult {
 export interface AppToolLoopOptions {
   systemPrompt: string
   userMessage: string
-  priorMessages?: Array<{ role: 'user' | 'assistant'; content: string }>
+  priorMessages?: Array<{ role: string; content: string }>
   /** Stream one model turn over the running message list. The app wraps its
    *  backend here. */
   streamTurn: (messages: Array<{ role: string; content: string }>) => AsyncIterable<LoopEvent>
@@ -131,4 +131,91 @@ export async function runAppToolLoop(opts: AppToolLoopOptions): Promise<ToolLoop
   }
 
   return { finalText, toolResults, turns, cappedOut: false }
+}
+
+// ── Streaming variant ──────────────────────────────────────────────────────
+//
+// `runAppToolLoop` is awaitable — perfect for tests and drain-only callers. A
+// real chat runtime instead needs to STREAM each model event to the client (SSE)
+// AND record telemetry per event as it happens. `streamAppToolLoop` is the same
+// bounded loop as an async generator: it yields every raw turn event (the app
+// maps + telemetries + re-emits it) and every executed tool result (same), while
+// owning the loop control flow (collect → stop/dispatch → fold → re-run, capped).
+// `Raw` is the app's own runtime-event type — this package stays substrate-free.
+
+export type StreamLoopYield<Raw> =
+  | { kind: 'event'; event: Raw }
+  | { kind: 'tool_result'; toolName: string; toolCallId?: string; label: string; outcome: AppToolOutcome }
+  | { kind: 'capped'; pending: number }
+
+export interface StreamAppToolLoopOptions<Raw> {
+  systemPrompt: string
+  userMessage: string
+  priorMessages?: Array<{ role: string; content: string }>
+  /** Stream one model turn (the app wraps its backend / runAgentTaskStream). */
+  streamTurn: (messages: Array<{ role: string; content: string }>) => AsyncIterable<Raw>
+  /** Text contribution of a raw event, '' if none — used to record the
+   *  assistant's turn so the next turn has its context. */
+  extractText: (event: Raw) => string
+  /** The tool call a raw event represents, or null. */
+  extractToolCall: (event: Raw) => LoopToolCall | null
+  /** Which tool names are executable here (others pass through, unexecuted). */
+  isExecutableTool: (toolName: string) => boolean
+  /** Execute one call — the app routes to its integration / app-tool executor. */
+  executeToolCall: (call: LoopToolCall) => Promise<AppToolOutcome>
+  maxToolTurns?: number
+  renderResult?: (label: string, outcome: AppToolOutcome) => string
+  labelFor?: (call: LoopToolCall) => string
+}
+
+/**
+ * The streaming bounded tool loop. Yields `event` for each raw turn event and
+ * `tool_result` for each executed tool; emits a single `capped` when it stops at
+ * the turn limit with calls still pending. The app drives telemetry + UI
+ * emission off the yielded items.
+ */
+export async function* streamAppToolLoop<Raw>(opts: StreamAppToolLoopOptions<Raw>): AsyncGenerator<StreamLoopYield<Raw>, void, unknown> {
+  const maxTurns = opts.maxToolTurns ?? DEFAULT_MAX_TOOL_TURNS
+  const render = opts.renderResult ?? defaultRender
+  const labelFor = opts.labelFor ?? ((c: LoopToolCall) => c.toolName)
+
+  const messages: Array<{ role: string; content: string }> = [
+    { role: 'system', content: opts.systemPrompt },
+    ...(opts.priorMessages ?? []),
+    { role: 'user', content: opts.userMessage },
+  ]
+
+  for (let toolTurn = 0; ; toolTurn++) {
+    let turnText = ''
+    const pending: LoopToolCall[] = []
+
+    for await (const event of opts.streamTurn([...messages])) {
+      yield { kind: 'event', event }
+      turnText += opts.extractText(event)
+      const call = opts.extractToolCall(event)
+      if (call && opts.isExecutableTool(call.toolName)) pending.push(call)
+    }
+
+    if (pending.length === 0) return
+    if (toolTurn >= maxTurns) {
+      yield { kind: 'capped', pending: pending.length }
+      return
+    }
+
+    if (turnText.trim()) messages.push({ role: 'assistant', content: turnText })
+
+    const lines: string[] = []
+    for (const call of pending) {
+      let outcome: AppToolOutcome
+      try {
+        outcome = await opts.executeToolCall(call)
+      } catch (err) {
+        outcome = { ok: false, code: 'executor_error', message: err instanceof Error ? err.message : String(err) }
+      }
+      const label = labelFor(call)
+      yield { kind: 'tool_result', toolName: call.toolName, toolCallId: call.toolCallId, label, outcome }
+      lines.push(render(label, outcome))
+    }
+    messages.push({ role: 'user', content: `Tool results:\n${lines.join('\n')}` })
+  }
 }
