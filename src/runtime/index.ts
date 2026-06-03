@@ -14,6 +14,15 @@ export * from './model'
  * backend / `runAgentTaskStream` it uses) and `executeToolCall` (routing to its
  * integration + app-tool executors). This package owns the LOOP; the app owns
  * the model and the executors.
+ *
+ * LAYERING NOTE: this turn-level tool-dispatch loop is a generic RUNTIME
+ * capability (it makes sense without this app's side channel — the seams are
+ * callbacks, no agent-app types). agent-runtime today has `runAgentTaskStream`
+ * (one turn) + `runLoop` (delegated refine/fanout), but NOT a turn-level
+ * tool-dispatch loop — so this fills a real gap. It is a CANDIDATE to contribute
+ * down into `@tangle-network/agent-runtime` (additive export, no fleet bump);
+ * when that lands + publishes, this becomes a thin re-export. Kept here until
+ * then because it's substrate-free and shipping (insurance consumes it).
  */
 import type { AppToolOutcome } from '../tools/types'
 
