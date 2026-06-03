@@ -20,5 +20,5 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   target: 'es2022',
-  external: ['@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog'],
+  external: ['@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog', '@tangle-network/agent-eval'],
 })

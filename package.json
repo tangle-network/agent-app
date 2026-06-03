@@ -92,9 +92,11 @@
     "tsup": "^8.0.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0",
-    "@tangle-network/agent-integrations": "^0.32.0"
+    "@tangle-network/agent-integrations": "^0.32.0",
+    "@tangle-network/agent-eval": "^0.70.0"
   },
   "peerDependencies": {
-    "@tangle-network/agent-integrations": ">=0.32.0"
+    "@tangle-network/agent-integrations": ">=0.32.0",
+    "@tangle-network/agent-eval": ">=0.50.0"
   }
 }
