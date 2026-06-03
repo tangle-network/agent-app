@@ -5,6 +5,7 @@ import {
   isAppToolName,
   createAppToolRuntimeExecutor,
   handleAppToolRequest,
+  buildHttpMcpServer,
   buildAppToolMcpServer,
   type AppToolHandlers,
   type AppToolTaxonomy,
@@ -196,6 +197,18 @@ describe('buildAppToolMcpServer', () => {
     })
     expect(noThread.url).toBe('https://app.example/api/tools/render-ui')
     expect(noThread.headers['X-Agent-App-Thread-Id']).toBeUndefined()
+  })
+
+  it('buildHttpMcpServer omits workspace/thread headers when empty (user-scoped bridge like integration_invoke)', () => {
+    const s = buildHttpMcpServer({
+      path: '/api/tools/integration-invoke', baseUrl: 'https://app.example/', token: 'tok',
+      ctx: { userId: 'u1', workspaceId: '', threadId: null }, description: 'hub bridge',
+      headerNames: { userId: 'X-Insurance-User-Id', workspaceId: 'X-Insurance-Workspace-Id', threadId: 'X-Insurance-Thread-Id' },
+    })
+    expect(s.url).toBe('https://app.example/api/tools/integration-invoke')
+    expect(s.headers['X-Insurance-User-Id']).toBe('u1')
+    expect(s.headers['X-Insurance-Workspace-Id']).toBeUndefined()
+    expect(s.headers['X-Insurance-Thread-Id']).toBeUndefined()
   })
 
   it('honors custom header names + paths', () => {

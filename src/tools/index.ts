@@ -19,9 +19,11 @@ export { dispatchAppTool, outcomeStatus, type DispatchOptions } from './dispatch
 export { createAppToolRuntimeExecutor, type AppToolRuntimeExecutor, type RuntimeExecutorOptions } from './runtime'
 export { handleAppToolRequest, type HandleToolRequestOptions } from './http'
 export {
+  buildHttpMcpServer,
   buildAppToolMcpServer,
   DEFAULT_APP_TOOL_PATHS,
   type AppToolMcpServer,
+  type BuildHttpMcpServerOptions,
   type BuildMcpServerOptions,
 } from './mcp'
 export type {

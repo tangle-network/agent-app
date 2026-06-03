@@ -1,3 +1,4 @@
+export * from './model'
 /**
  * The bounded agent tool-loop — the mechanism every app's chat runtime
  * hand-rolls on top of `@tangle-network/agent-runtime`.

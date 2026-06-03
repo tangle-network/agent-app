@@ -8,6 +8,7 @@ export default defineConfig({
     'tangle/index': 'src/tangle/index.ts',
     'runtime/index': 'src/runtime/index.ts',
     'eval/index': 'src/eval/index.ts',
+    'billing/index': 'src/billing/index.ts',
   },
   format: ['esm'],
   dts: true,

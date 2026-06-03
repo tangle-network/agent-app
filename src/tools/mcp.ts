@@ -23,8 +23,9 @@ export interface AppToolMcpServer {
   metadata: { description: string }
 }
 
-export interface BuildMcpServerOptions {
-  tool: AppToolName
+export interface BuildHttpMcpServerOptions {
+  /** Route path on the app the sandbox POSTs to (e.g. `/api/tools/propose`). */
+  path: string
   /** App base URL the sandbox reaches back to (no trailing slash required). */
   baseUrl: string
   /** Per-user capability token, baked into the Authorization header. */
@@ -33,30 +34,54 @@ export interface BuildMcpServerOptions {
   /** Tool description the model sees. */
   description: string
   headerNames?: ToolHeaderNames
-  paths?: Partial<Record<AppToolName, string>>
 }
 
 /**
- * Build one app-tool MCP server entry for a turn. The capability token + the
- * user/workspace/thread ids ride in server-set headers (never tool args), so
- * the model can't forge identity or target another workspace. The `ctx`'s
- * `threadId` is omitted from headers when null.
+ * Build ONE HTTP MCP server entry — the generic agent→app bridge. The
+ * capability token + the user/workspace/thread ids ride in server-set headers
+ * (never tool args), so the model can't forge identity or target another
+ * workspace. Workspace/thread headers are omitted when their `ctx` value is
+ * empty/null (e.g. an integration-invoke bridge that's user-scoped only). Used
+ * directly for non-app-tool bridges (integration_invoke) and via
+ * {@link buildAppToolMcpServer} for the four app tools.
  */
-export function buildAppToolMcpServer(opts: BuildMcpServerOptions): AppToolMcpServer {
+export function buildHttpMcpServer(opts: BuildHttpMcpServerOptions): AppToolMcpServer {
   const base = opts.baseUrl.replace(/\/+$/, '')
-  const path = opts.paths?.[opts.tool] ?? DEFAULT_APP_TOOL_PATHS[opts.tool]
   const h = opts.headerNames ?? DEFAULT_HEADER_NAMES
   return {
     transport: 'http',
-    url: `${base}${path}`,
+    url: `${base}${opts.path}`,
     headers: {
       Authorization: `Bearer ${opts.token}`,
       [h.userId]: opts.ctx.userId,
-      [h.workspaceId]: opts.ctx.workspaceId,
+      ...(opts.ctx.workspaceId ? { [h.workspaceId]: opts.ctx.workspaceId } : {}),
       ...(opts.ctx.threadId ? { [h.threadId]: opts.ctx.threadId } : {}),
       'Content-Type': 'application/json',
     },
     enabled: true,
     metadata: { description: opts.description },
   }
+}
+
+export interface BuildMcpServerOptions {
+  tool: AppToolName
+  baseUrl: string
+  token: string
+  ctx: AppToolContext
+  description: string
+  headerNames?: ToolHeaderNames
+  paths?: Partial<Record<AppToolName, string>>
+}
+
+/** Build one of the four app-tool MCP servers — a thin wrapper over
+ *  {@link buildHttpMcpServer} that maps the tool name to its route path. */
+export function buildAppToolMcpServer(opts: BuildMcpServerOptions): AppToolMcpServer {
+  return buildHttpMcpServer({
+    path: opts.paths?.[opts.tool] ?? DEFAULT_APP_TOOL_PATHS[opts.tool],
+    baseUrl: opts.baseUrl,
+    token: opts.token,
+    ctx: opts.ctx,
+    description: opts.description,
+    headerNames: opts.headerNames,
+  })
 }

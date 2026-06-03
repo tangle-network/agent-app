@@ -45,6 +45,11 @@
       "types": "./dist/eval/index.d.ts",
       "import": "./dist/eval/index.js",
       "default": "./dist/eval/index.js"
+    },
+    "./billing": {
+      "types": "./dist/billing/index.d.ts",
+      "import": "./dist/billing/index.js",
+      "default": "./dist/billing/index.js"
     }
   },
   "scripts": {
