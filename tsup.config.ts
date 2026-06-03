@@ -11,10 +11,12 @@ export default defineConfig({
     'billing/index': 'src/billing/index.ts',
     'crypto/index': 'src/crypto/index.ts',
     'stream/index': 'src/stream/index.ts',
+    'integrations/index': 'src/integrations/index.ts',
   },
   format: ['esm'],
   dts: true,
   sourcemap: true,
   clean: true,
   target: 'es2022',
+  external: ['@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog'],
 })

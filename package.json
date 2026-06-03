@@ -1,7 +1,7 @@
 {
   "name": "@tangle-network/agent-app",
   "version": "0.1.0",
-  "description": "Shared application-shell framework for Tangle agent products: the structured agent→app tool side channel (proposals, follow-ups, generated UI, citations), domain-seamed so each product supplies its own persistence and types.",
+  "description": "Shared application-shell framework for Tangle agent products: the structured agent\u2192app tool side channel (proposals, follow-ups, generated UI, citations), domain-seamed so each product supplies its own persistence and types.",
   "homepage": "https://github.com/tangle-network/agent-app#readme",
   "repository": {
     "type": "git",
@@ -14,7 +14,9 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -60,6 +62,11 @@
       "types": "./dist/stream/index.d.ts",
       "import": "./dist/stream/index.js",
       "default": "./dist/stream/index.js"
+    },
+    "./integrations": {
+      "types": "./dist/integrations/index.d.ts",
+      "import": "./dist/integrations/index.js",
+      "default": "./dist/integrations/index.js"
     }
   },
   "scripts": {
@@ -74,6 +81,10 @@
     "@types/node": "^25.6.0",
     "tsup": "^8.0.0",
     "typescript": "^5.7.0",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "@tangle-network/agent-integrations": "^0.32.0"
+  },
+  "peerDependencies": {
+    "@tangle-network/agent-integrations": ">=0.32.0"
   }
 }

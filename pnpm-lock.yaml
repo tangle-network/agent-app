@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@tangle-network/agent-integrations':
+        specifier: ^0.32.0
+        version: 0.32.0
       '@types/node':
         specifier: ^25.6.0
         version: 25.9.1
@@ -329,6 +332,11 @@ packages:
     resolution: {integrity: sha512-tkuFxhvKO/HlGd0VsINF6vHSYH8AF8W0TcNxKDK6JZmrehngFj78pToc8iemtnvwilDjs2G/qSzYFhe9U8q+fw==}
     cpu: [x64]
     os: [win32]
+
+  '@tangle-network/agent-integrations@0.32.0':
+    resolution: {integrity: sha512-YSUmHIBM98rrC/6I9xJFY8UBgGsiup1ZeflGxAqjh00RNtSnrwb7fWjHTEKXgTk+zxF07O0fYIQsjv/eL3gsMg==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
@@ -896,6 +904,8 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.61.0':
     optional: true
+
+  '@tangle-network/agent-integrations@0.32.0': {}
 
   '@types/chai@5.2.3':
     dependencies:
