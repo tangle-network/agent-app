@@ -1,0 +1,49 @@
+{
+  "name": "@tangle-network/agent-app",
+  "version": "0.1.0",
+  "description": "Shared application-shell framework for Tangle agent products: the structured agent→app tool side channel (proposals, follow-ups, generated UI, citations), domain-seamed so each product supplies its own persistence and types.",
+  "homepage": "https://github.com/tangle-network/agent-app#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tangle-network/agent-app.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tangle-network/agent-app/issues"
+  },
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./tools": {
+      "types": "./dist/tools/index.d.ts",
+      "import": "./dist/tools/index.js",
+      "default": "./dist/tools/index.js"
+    },
+    "./delegation": {
+      "types": "./dist/delegation/index.d.ts",
+      "import": "./dist/delegation/index.js",
+      "default": "./dist/delegation/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "prepare": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
