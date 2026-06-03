@@ -61,6 +61,11 @@
       "import": "./dist/eval/index.js",
       "default": "./dist/eval/index.js"
     },
+    "./knowledge": {
+      "types": "./dist/knowledge/index.d.ts",
+      "import": "./dist/knowledge/index.js",
+      "default": "./dist/knowledge/index.js"
+    },
     "./billing": {
       "types": "./dist/billing/index.d.ts",
       "import": "./dist/billing/index.js",
