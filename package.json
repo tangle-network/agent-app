@@ -71,6 +71,11 @@
       "import": "./dist/config/index.js",
       "default": "./dist/config/index.js"
     },
+    "./knowledge-loop": {
+      "types": "./dist/knowledge-loop/index.d.ts",
+      "import": "./dist/knowledge-loop/index.js",
+      "default": "./dist/knowledge-loop/index.js"
+    },
     "./preset-cloudflare": {
       "types": "./dist/preset-cloudflare/index.d.ts",
       "import": "./dist/preset-cloudflare/index.js",
@@ -116,15 +121,26 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@tangle-network/agent-eval": "^0.70.0",
+    "@tangle-network/agent-integrations": "^0.32.0",
+    "@tangle-network/agent-knowledge": "^1.5.2",
     "@types/node": "^25.6.0",
     "tsup": "^8.0.0",
     "typescript": "^5.7.0",
-    "vitest": "^3.0.0",
-    "@tangle-network/agent-integrations": "^0.32.0",
-    "@tangle-network/agent-eval": "^0.70.0"
+    "vitest": "^3.0.0"
   },
   "peerDependencies": {
+    "@tangle-network/agent-eval": ">=0.50.0",
     "@tangle-network/agent-integrations": ">=0.32.0",
-    "@tangle-network/agent-eval": ">=0.50.0"
+    "@tangle-network/agent-knowledge": ">=1.5.0",
+    "@tangle-network/agent-runtime": ">=0.21.0"
+  },
+  "peerDependenciesMeta": {
+    "@tangle-network/agent-knowledge": {
+      "optional": true
+    },
+    "@tangle-network/agent-runtime": {
+      "optional": true
+    }
   }
 }
