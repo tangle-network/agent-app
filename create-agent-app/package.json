@@ -1,0 +1,25 @@
+{
+  "name": "create-agent-app",
+  "version": "0.1.0",
+  "description": "Scaffold a new Tangle agent product on @tangle-network/agent-app: a filled agent.config skeleton, a wired chat route over the Cloudflare preset, an empty knowledge/ dir, and the agent-followable breadcrumb docs (AGENTS.md / CUSTOMIZE.md / KNOWLEDGE.md).",
+  "keywords": [
+    "tangle",
+    "ai-agent",
+    "agent-framework",
+    "scaffold",
+    "create",
+    "cloudflare-workers"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "create-agent-app": "./index.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "template"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}

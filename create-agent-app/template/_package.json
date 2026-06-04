@@ -1,0 +1,29 @@
+{
+  "name": "__PACKAGE_NAME__",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "knowledge:ingest": "node scripts/knowledge-ingest.mjs"
+  },
+  "dependencies": {
+    "@tangle-network/agent-app": "__AGENT_APP_VERSION__"
+  },
+  "peerDependencies": {
+    "@tangle-network/agent-eval": ">=0.50.0",
+    "@tangle-network/agent-integrations": ">=0.32.0"
+  },
+  "devDependencies": {
+    "@tangle-network/agent-eval": "^0.70.0",
+    "@tangle-network/agent-integrations": "^0.32.0",
+    "@types/node": "^25.6.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0",
+    "wrangler": "^4.0.0"
+  }
+}

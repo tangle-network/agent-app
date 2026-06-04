@@ -9,6 +9,9 @@ export default defineConfig({
     'runtime/index': 'src/runtime/index.ts',
     'eval/index': 'src/eval/index.ts',
     'knowledge/index': 'src/knowledge/index.ts',
+    'knowledge-loop/index': 'src/knowledge-loop/index.ts',
+    'config/index': 'src/config/index.ts',
+    'preset-cloudflare/index': 'src/preset-cloudflare/index.ts',
     'billing/index': 'src/billing/index.ts',
     'crypto/index': 'src/crypto/index.ts',
     'stream/index': 'src/stream/index.ts',
@@ -21,5 +24,5 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   target: 'es2022',
-  external: ['@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog', '@tangle-network/agent-eval'],
+  external: ['@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog', '@tangle-network/agent-eval', '@tangle-network/agent-knowledge', '@tangle-network/agent-runtime'],
 })
