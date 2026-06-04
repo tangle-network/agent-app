@@ -10,6 +10,7 @@ export default defineConfig({
     'eval/index': 'src/eval/index.ts',
     'knowledge/index': 'src/knowledge/index.ts',
     'knowledge-loop/index': 'src/knowledge-loop/index.ts',
+    'harness/index': 'src/harness/index.ts',
     'config/index': 'src/config/index.ts',
     'preset-cloudflare/index': 'src/preset-cloudflare/index.ts',
     'billing/index': 'src/billing/index.ts',
