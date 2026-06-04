@@ -1,6 +1,6 @@
 # agent-app — agent working notes
 
-`@tangle-network/agent-app` is the shared **application-shell framework** for Tangle agent products (insurance, tax, legal, creative, gtm, agent-builder). The substrate packages are the *engine*; this is the *shell* those products otherwise fork-duplicate. insurance-agent is the reference consumer and is **100% on agent-app** for shell mechanism.
+`@tangle-network/agent-app` is the shared **application-shell framework** for Tangle agent products. The substrate packages are the *engine*; this is the *shell* those products otherwise fork-duplicate. A reference consumer is **100% on agent-app** for shell mechanism.
 
 ## The one rule (this governs every change)
 
@@ -44,4 +44,4 @@ tsup (ESM + d.ts), vitest, tsc. Every change keeps tests green. **No `Co-Authore
 2. Domain-seam it (typed config; no product import).
 3. Wire `tsup.config.ts` + `package.json` `exports` + `src/index.ts`.
 4. Real tests (the seam exercised with a fake; the engine path verified against the real engine where it composes one).
-5. Prove it on insurance-agent (the reference consumer) — it stays green.
+5. Prove it on a reference consumer — it stays green.

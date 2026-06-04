@@ -10,10 +10,10 @@ import type { KnowledgeRequirementSpec as KnowledgeSpecSource } from '../src/kno
 import type { TangleModelConfig as ModelConfigSource } from '../src/runtime/index'
 
 const minimal: AgentAppConfig = {
-  identity: { name: 'WinFinance Ops Partner', persona: 'A licensed agency ops partner.' },
-  taxonomy: { proposalTypes: ['propose_swap', 'contact_lead'], regulatedTypes: ['propose_swap'] },
+  identity: { name: 'Acme Ops Partner', persona: 'A licensed agency ops partner.' },
+  taxonomy: { proposalTypes: ['recommend', 'contact'], regulatedTypes: ['recommend'] },
   knowledge: { sources: [], requirements: [] },
-  integrations: { enabled: ['shurens'] },
+  integrations: { enabled: ['salesforce'] },
 }
 
 describe('AgentAppConfig contract', () => {
@@ -39,18 +39,18 @@ describe('AgentAppConfig contract', () => {
     }
     const cfg = defineAgentApp({
       identity: {
-        name: 'WinFinance',
+        name: 'Acme',
         persona: 'persona',
         systemPromptFragments: ['workflow A', 'hard rule B'],
         disclaimers: { compliance: 'A certified human approves every regulated step.' },
       },
-      taxonomy: { proposalTypes: ['propose_swap'], regulatedTypes: ['propose_swap'] },
+      taxonomy: { proposalTypes: ['recommend'], regulatedTypes: ['recommend'] },
       knowledge: {
         sources: [{ uri: 'vault://regulation', kind: 'regulation' }, { uri: 'https://example.com' }],
         requirements: [requirement],
         loop: { goal: 'ground every premium', minConfidence: 0.8, freshness: '7d' },
       },
-      integrations: { enabled: ['shurens', 'lead-crm'] },
+      integrations: { enabled: ['salesforce', 'gmail'] },
       ui: { generatedUi: true },
       delegation: { enabled: true },
       model,
@@ -63,7 +63,7 @@ describe('AgentAppConfig contract', () => {
     expect(cfg.identity.systemPromptFragments).toEqual(['workflow A', 'hard rule B'])
     expect(cfg.identity.disclaimers?.compliance).toContain('certified human')
     expect(cfg.ui?.generatedUi).toBe(true)
-    expect(cfg.integrations.enabled).toEqual(['shurens', 'lead-crm'])
+    expect(cfg.integrations.enabled).toEqual(['salesforce', 'gmail'])
     expect(cfg.knowledge.sources.map((s) => s.uri)).toEqual(['vault://regulation', 'https://example.com'])
   })
 

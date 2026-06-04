@@ -83,8 +83,8 @@ export function createFieldCrypto(key: string | (() => string)): { encrypt(s: st
  *
  * The derivation parameters (salt, iterations) are PARAMETERS — a product pins
  * its own so the derived key bytes stay stable for data already at rest. The
- * default salt/iterations match the historical tax-agent contract, but any
- * product supplies its own via {@link DeriveKeyOptions}.
+ * defaults are a sensible baseline; any product supplies its own via
+ * {@link DeriveKeyOptions}.
  */
 
 export interface DeriveKeyOptions {

@@ -44,7 +44,7 @@ export type { KnowledgeRequirementSpec, SatisfiedByRule, TangleModelConfig }
  * never baked into agent-app (a domain value, per the layering contract).
  */
 export interface AgentIdentityConfig {
-  /** Product/agent name, e.g. `"WinFinance Ops Partner"`. Shown to the user and
+  /** Product/agent name, e.g. `"Acme Support Copilot"`. Shown to the user and
    *  available to the system-prompt builder. */
   name: string
   /** One-paragraph persona statement — the agent's role, voice, and remit. The
@@ -68,7 +68,7 @@ export interface AgentIdentityConfig {
  */
 export interface AgentTaxonomyConfig {
   /** Every proposal type this product can emit, e.g.
-   *  `['propose_swap', 'contact_lead', 'policy_change']`. The closed allow-list
+   *  `['recommend', 'contact', 'escalate']`. The closed allow-list
    *  the tool layer validates a `submit_proposal` call against. */
   proposalTypes: string[]
   /** The subset of `proposalTypes` that is regulated → cannot execute without a
@@ -125,7 +125,7 @@ export interface AgentKnowledgeConfig {
 /**
  * Which integrations the product enables, as data. `enabled` lists
  * `@tangle-network/agent-integrations` catalog kinds the product connects
- * (e.g. `['shurens', 'lead-crm', 'whatsapp']`); the integration hub resolves
+ * (e.g. `['salesforce', 'gmail', 'whatsapp']`); the integration hub resolves
  * each to a connector. Strings, not connector objects — agent-app bakes no
  * catalog value.
  */
@@ -188,10 +188,10 @@ export interface AgentAppConfig {
  * import { defineAgentApp } from '@tangle-network/agent-app/config'
  *
  * export const config = defineAgentApp({
- *   identity: { name: 'WinFinance', persona: '…' },
- *   taxonomy: { proposalTypes: ['propose_swap'], regulatedTypes: ['propose_swap'] },
+ *   identity: { name: 'Acme Ops', persona: '…' },
+ *   taxonomy: { proposalTypes: ['recommend', 'contact'], regulatedTypes: ['recommend'] },
  *   knowledge: { sources: [], requirements: [] },
- *   integrations: { enabled: ['shurens'] },
+ *   integrations: { enabled: ['salesforce'] },
  * })
  * ```
  */

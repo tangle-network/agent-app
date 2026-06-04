@@ -89,22 +89,22 @@ describe('PRESET_MIGRATION_SQL', () => {
 describe('createPresetToolHandlers', () => {
   it('submit_proposal writes a pending proposals row and dedupes on (workspace, title)', async () => {
     const handlers = createPresetToolHandlers({ db: env.db, vault: kv })
-    const first = await handlers.submitProposal({ type: 'propose_swap', title: 'Swap policy A', description: 'why' }, ctx)
+    const first = await handlers.submitProposal({ type: 'recommend', title: 'Proposal A', description: 'why' }, ctx)
     expect(first.deduped).toBe(false)
 
     const row = env.raw.prepare(`SELECT * FROM proposals WHERE id = ?`).get(first.proposalId) as Record<string, unknown>
     expect(row).toMatchObject({
       workspace_id: 'ws1',
       thread_id: 't1',
-      type: 'propose_swap',
-      title: 'Swap policy A',
+      type: 'recommend',
+      title: 'Proposal A',
       description: 'why',
       status: 'pending',
       created_by: 'u1',
     })
 
     // Same (workspace, title) → dedupe to the existing row, no second insert.
-    const again = await handlers.submitProposal({ type: 'propose_swap', title: 'Swap policy A' }, ctx)
+    const again = await handlers.submitProposal({ type: 'recommend', title: 'Proposal A' }, ctx)
     expect(again).toEqual({ proposalId: first.proposalId, deduped: true })
     const count = env.raw.prepare(`SELECT count(*) AS n FROM proposals`).get() as { n: number }
     expect(count.n).toBe(1)
@@ -135,10 +135,10 @@ describe('createPresetToolHandlers', () => {
 
   it('add_citation persists a citation artifact + knowledge row', async () => {
     const handlers = createPresetToolHandlers({ db: env.db, vault: kv })
-    const r = await handlers.addCitation({ path: 'regulation/5741.md', quote: 'a human must advise', label: 'Insurance Law' }, ctx)
-    expect(r.path.startsWith('citations/insurance-law-')).toBe(true)
+    const r = await handlers.addCitation({ path: 'docs/policy.md', quote: 'a human reviews first', label: 'Policy Doc' }, ctx)
+    expect(r.path.startsWith('citations/policy-doc-')).toBe(true)
     const body = JSON.parse(kv.store.get(r.path)!)
-    expect(body).toEqual({ sourcePath: 'regulation/5741.md', quote: 'a human must advise', label: 'Insurance Law' })
+    expect(body).toEqual({ sourcePath: 'docs/policy.md', quote: 'a human reviews first', label: 'Policy Doc' })
     expect((env.raw.prepare(`SELECT count(*) AS n FROM knowledge WHERE kind='citation'`).get() as { n: number }).n).toBe(1)
   })
 })
@@ -147,19 +147,19 @@ describe('createD1KnowledgeStateAccessor', () => {
   it('config reads a dot-path; count scopes to workspace + statusIn', async () => {
     // Seed: one pending proposal in ws1, one in ws2, one approved in ws1.
     const handlers = createPresetToolHandlers({ db: env.db, vault: kv })
-    await handlers.submitProposal({ type: 'propose_swap', title: 'A' }, ctx)
-    await handlers.submitProposal({ type: 'propose_swap', title: 'B' }, { ...ctx, workspaceId: 'ws2' })
+    await handlers.submitProposal({ type: 'recommend', title: 'A' }, ctx)
+    await handlers.submitProposal({ type: 'recommend', title: 'B' }, { ...ctx, workspaceId: 'ws2' })
     env.raw.prepare(`UPDATE proposals SET status='approved' WHERE title='A'`).run()
-    await handlers.submitProposal({ type: 'propose_swap', title: 'C' }, ctx) // pending in ws1
+    await handlers.submitProposal({ type: 'recommend', title: 'C' }, ctx) // pending in ws1
 
     const accessor = createD1KnowledgeStateAccessor({
       db: env.db,
       workspaceId: 'ws1',
-      config: { agency: { licensed: true, agents: ['peleg'] }, empty: [] },
+      config: { agency: { licensed: true, agents: ['alice'] }, empty: [] },
     })
 
     expect(accessor.config('agency.licensed')).toBe(true)
-    expect(accessor.config('agency.agents')).toEqual(['peleg'])
+    expect(accessor.config('agency.agents')).toEqual(['alice'])
     expect(accessor.config('agency.missing')).toBeUndefined()
 
     // ws1 total proposals = 2 (A approved + C pending); ws2's B is excluded.
@@ -203,7 +203,7 @@ describe('createD1KnowledgeStateAccessor', () => {
 
     // The default handler writes the row...
     const handlers = createPresetToolHandlers({ db: env.db, vault: kv })
-    await handlers.submitProposal({ type: 'propose_swap', title: 'Swap A' }, ctx)
+    await handlers.submitProposal({ type: 'recommend', title: 'Proposal A' }, ctx)
 
     // ...and the SAME declarative rule now resolves satisfied — no handler-specific glue.
     const after = await deriveSignals(specs, accessor)
