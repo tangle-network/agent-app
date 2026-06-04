@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   createWorkspaceKeyManager,
   createPlatformBalanceManager,
+  createTcloudKeyProvisioner,
   type KeyProvisioner,
   type WorkspaceKeyStore,
   type KeyCrypto,
@@ -231,5 +232,30 @@ describe('createPlatformBalanceManager (shared-platform-balance)', () => {
     const { client } = billingClient()
     const mgr = createPlatformBalanceManager({ client, planLimits: PLAN_LIMITS, freePlan: 'free', productSlug: 'acme-agent' })
     expect(await mgr.getProductUsage('unlinked')).toEqual({ spentUsd: 0, transactionCount: 0 })
+  })
+})
+
+describe('createTcloudKeyProvisioner — typed adapter (no consumer cast)', () => {
+  it('maps a tcloud-shaped client onto KeyProvisioner, null budgets → undefined', async () => {
+    // A stand-in with the real SDK's narrow types (product union, number|null).
+    const tcloud = {
+      createKey: async (opts: { name: string; product?: 'router' | 'sandbox'; budgetUsd?: number; expiresAt?: string }) => ({
+        id: 'key_1',
+        key: 'sk-child',
+        prefix: 'sk',
+        name: opts.name,
+        product: opts.product ?? null,
+        budgetUsd: opts.budgetUsd ?? null,
+        budgetRemaining: opts.budgetUsd ?? null,
+      }),
+      getKey: async (_id: string) => ({ id: _id, budgetUsd: null as number | null, budgetSpent: 3, expiresAt: null as string | null }),
+      revokeKey: async (_id: string) => undefined,
+    }
+    const provisioner = createTcloudKeyProvisioner(tcloud)
+    const created = await provisioner.createKey({ name: 'ws-1', product: 'router', budgetUsd: 5, expiresAt: '2030-01-01T00:00:00Z' })
+    expect(created).toEqual({ id: 'key_1', key: 'sk-child' })
+    const info = await provisioner.getKey('key_1')
+    expect(info).toEqual({ budgetUsd: undefined, budgetSpent: 3, expiresAt: null })
+    await expect(provisioner.revokeKey('key_1')).resolves.toBeUndefined()
   })
 })
