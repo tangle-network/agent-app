@@ -15,12 +15,57 @@
  * SDK is the provisioner a product passes in; it is not a dependency here.
  */
 
-/** The key-provisioning operations this needs — the `@tangle-network/tcloud`
- *  SDK's `TCloudClient` satisfies it structurally; pass it in. */
+/** The key-provisioning operations the key manager needs. Wire it from the
+ *  platform via {@link createTcloudKeyProvisioner} rather than casting. */
 export interface KeyProvisioner {
   createKey(input: { name: string; product: string; budgetUsd: number; expiresAt: string }): Promise<{ id?: string; key?: string }>
   revokeKey(keyId: string): Promise<unknown>
   getKey(keyId: string): Promise<{ budgetUsd?: number; budgetSpent?: number; expiresAt?: string | null }>
+}
+
+/**
+ * The subset of the `@tangle-network/tcloud` `TCloudClient` the provisioner uses
+ * — declared with METHOD syntax so the real client (whose `product` is a narrow
+ * union and whose budgets are `number | null`) is assignable bivariantly. The
+ * real SDK client satisfies this; pass it straight in.
+ */
+export interface TcloudKeyClient {
+  createKey(opts: {
+    name: string
+    product?: string
+    budgetUsd?: number
+    expiresAt?: string
+    parentKeyId?: string
+    allowedModels?: string[]
+    rpmLimit?: number
+  }): Promise<{ id: string; key: string }>
+  getKey(id: string): Promise<{ budgetUsd?: number | null; budgetSpent?: number; expiresAt?: string | null }>
+  revokeKey(id: string): Promise<unknown>
+}
+
+/**
+ * Adapt the tcloud SDK client to {@link KeyProvisioner} — the typed seam that
+ * replaces the `as unknown as KeyProvisioner` cast every consumer otherwise
+ * repeats. The platform already exposes child-key minting (parent→child key,
+ * per-key USD budget, expiry); this maps its shapes (`product` union,
+ * `number | null` budgets) onto the manager's contract (`null → undefined`).
+ */
+export function createTcloudKeyProvisioner(client: TcloudKeyClient): KeyProvisioner {
+  return {
+    createKey: async (input) => {
+      const created = await client.createKey(input)
+      return { id: created.id, key: created.key }
+    },
+    revokeKey: (keyId) => client.revokeKey(keyId),
+    getKey: async (keyId) => {
+      const info = await client.getKey(keyId)
+      return {
+        budgetUsd: info.budgetUsd ?? undefined,
+        budgetSpent: info.budgetSpent ?? undefined,
+        expiresAt: info.expiresAt ?? null,
+      }
+    },
+  }
 }
 
 /** A stored child-key record (the app's row, shape-normalized). */
