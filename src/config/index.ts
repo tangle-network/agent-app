@@ -142,6 +142,16 @@ export interface AgentUiConfig {
   generatedUi?: boolean
 }
 
+/** Background-agent / delegated-loop capability, as data. */
+export interface AgentDelegationConfig {
+  /** When true, the app's own agent may spawn `delegate_research` /
+   *  `delegate_code` loops that run to completion in their OWN sandbox and
+   *  return the artifact (the `../delegation` driven-loop MCP). Sandbox-path
+   *  ONLY — the browser/edge path ignores it. Wired via the existing
+   *  `buildDelegationMcpServer`; never reimplemented. */
+  enabled?: boolean
+}
+
 /**
  * The declarative domain surface of a Tangle agent product.
  *
@@ -162,6 +172,8 @@ export interface AgentAppConfig {
   integrations: AgentIntegrationsConfig
   /** UI capability flags. Optional. */
   ui?: AgentUiConfig
+  /** Background-agent / delegated-loop capability (sandbox path). Optional. */
+  delegation?: AgentDelegationConfig
   /** The resolved model config (`../runtime`'s `TangleModelConfig`). Omit to
    *  resolve from env at boot via `resolveTangleModelConfig`. */
   model?: TangleModelConfig
@@ -300,6 +312,14 @@ export const agentAppConfigJsonSchema = {
       description: 'UI capability flags.',
       properties: {
         generatedUi: { type: 'boolean', description: 'Whether the agent may emit generated UI.' },
+      },
+    },
+    delegation: {
+      type: 'object',
+      additionalProperties: false,
+      description: 'Background-agent / delegated-loop capability (sandbox path).',
+      properties: {
+        enabled: { type: 'boolean', description: 'Whether the agent may spawn delegate_research/delegate_code loops.' },
       },
     },
     model: {

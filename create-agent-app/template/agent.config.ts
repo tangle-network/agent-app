@@ -106,6 +106,15 @@ export const config = defineAgentApp({
     generatedUi: true,
   },
 
+  // DELEGATION — may the agent spawn background research/code loops that run to
+  // completion in their own sandbox (delegate_research / delegate_code)? Optional,
+  // sandbox-path only. Flip to true, then spread `delegationMcpForConfig(config,
+  // { apiKey: env.TANGLE_API_KEY, forwardEnv: env })` from
+  // '@tangle-network/agent-app/delegation' into your sandbox profile's mcp map.
+  delegation: {
+    enabled: false,
+  },
+
   // MODEL — omit to resolve from env (TANGLE_API_KEY) at boot via
   // resolveTangleModelConfig. Pin here only if you need a fixed model.
 })

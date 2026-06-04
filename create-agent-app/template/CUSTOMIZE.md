@@ -64,6 +64,16 @@ Discovery: **Which CRMs / data sources / messaging channels does the workflow to
 - [ ] Only if the house preset can't persist your data: override a single handler in
       `src/agent-app.ts`. Default to the preset; do not fork the shell.
 
+## ⑤b Delegation (optional) — `agent.config.ts` → `delegation`
+
+Discovery: **Should the agent spawn background research/code loops in their own sandbox?**
+
+- [ ] Leave `delegation.enabled: false` unless the agent does long multi-step research or
+      document generation that should run to completion out-of-band.
+- [ ] If enabled (sandbox path only): spread `delegationMcpForConfig(config, { apiKey:
+      env.TANGLE_API_KEY, forwardEnv: env })` from `@tangle-network/agent-app/delegation`
+      into your sandbox profile's `mcp` map. Never reimplement the loop — the module is the seam.
+
 ## ⑥ Ingest — `pnpm knowledge:ingest`
 
 Discovery: **Did the loop pick up exactly the docs and sources I expect?**

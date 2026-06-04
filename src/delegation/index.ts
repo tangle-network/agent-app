@@ -70,3 +70,22 @@ export function buildDelegationMcpServer(opts: BuildDelegationOptions): Delegati
     metadata: { surface: 'delegation:dispatch', tools: DELEGATION_TOOLS },
   }
 }
+
+/**
+ * Config-driven wiring: returns the delegation MCP entry keyed under
+ * {@link DELEGATION_MCP_SERVER_KEY} when the product's `config.delegation.enabled`
+ * is true (and a platform key is available), else an empty object. Spread the
+ * result directly into the sandbox profile's `mcp` map — this is the seam
+ * `agent.config.delegation` flows through, so a coding agent toggles background
+ * agents/loops by flipping one boolean, never by wiring the MCP by hand.
+ *
+ *   const mcp = { ...rest, ...delegationMcpForConfig(config, { apiKey: env.TANGLE_API_KEY, forwardEnv: env }) }
+ */
+export function delegationMcpForConfig(
+  config: { delegation?: { enabled?: boolean } },
+  opts: BuildDelegationOptions,
+): Record<string, DelegationMcpServer> {
+  if (!config.delegation?.enabled) return {}
+  const server = buildDelegationMcpServer(opts)
+  return server ? { [DELEGATION_MCP_SERVER_KEY]: server } : {}
+}
