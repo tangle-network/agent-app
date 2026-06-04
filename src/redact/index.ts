@@ -1,25 +1,38 @@
 /**
- * PII redaction for production trace payloads.
+ * PII redaction — two complementary modes.
  *
- * The chat-trace emission sites pass tool args + results — and at one
- * point the LLM span carried the system prompt + user message verbatim
- * — through the wire. Anything that lands in the ingestion store is
- * also fair game for the analyst-loop's LLM prompts, so personal
- * identifiers MUST be stripped before they leave the request path.
+ * 1. ONE-WAY scrub (`redactForIngestion`): for production trace payloads. Tool
+ *    args + results (and once, the LLM span's prompt) cross the wire into the
+ *    ingestion store, which also feeds the analyst-loop's LLM prompts, so
+ *    personal identifiers MUST be stripped before they leave the request path.
+ *    Destructive — the original is gone, replaced by a sentinel.
  *
- * Discipline:
- *   - Match cheap, deterministic patterns at the string level (SSN, EIN).
- *   - Match well-known sensitive object keys (case-insensitive) and
- *     replace the value, never the key, so the shape of the object
- *     remains debuggable.
- *   - Recurse arrays + plain objects only; pass through everything else
- *     unchanged (numbers, booleans, null, undefined, functions, etc).
- *   - NEVER throw — a redaction failure must not crash the chat handler.
- *     Unrecognized inputs round-trip as-is.
+ * 2. REVERSIBLE redaction (`buildRedactedDocument` / `revealSpan`): for the UI.
+ *    A document is split into text + redacted segments; each redacted original
+ *    is kept ENCRYPTED (via a caller-supplied `encrypt` seam → `agent-app/crypto`)
+ *    so a viewer can reveal a single span on demand, gated by an authorization
+ *    callback and an audit hook. The mask is presentation; the original is
+ *    recoverable by an authorized reveal, not lost.
+ *
+ * Discipline: cheap deterministic string patterns + well-known sensitive object
+ * keys (value replaced, key kept, so the shape stays debuggable); recurse arrays
+ * + plain objects only; NEVER throw on the one-way path.
  */
 
-const SSN_PATTERN = /\d{3}-\d{2}-\d{4}/
-const EIN_PATTERN = /\d{2}-\d{7}/
+/** A named PII pattern. `pattern` is matched case-insensitively at the string
+ *  level; keep it non-global (global instances are derived where needed). */
+export interface RedactionPattern {
+  kind: string
+  pattern: RegExp
+}
+
+/** The default deterministic patterns. Extend via the `extraPatterns` /
+ *  `patterns` options rather than forking this module (the seam that lets a
+ *  product add e.g. a credit-card matcher without a local copy). */
+export const DEFAULT_REDACTION_PATTERNS: readonly RedactionPattern[] = [
+  { kind: 'ssn', pattern: /\d{3}-\d{2}-\d{4}/ },
+  { kind: 'ein', pattern: /\d{2}-\d{7}/ },
+]
 
 const SENSITIVE_KEYS = new Set([
   'ssn',
@@ -33,9 +46,16 @@ const SENSITIVE_KEYS = new Set([
   'phone',
 ])
 
-function redactString(value: string): string {
-  if (SSN_PATTERN.test(value)) return '[REDACTED:ssn]'
-  if (EIN_PATTERN.test(value)) return '[REDACTED:ein]'
+export interface RedactForIngestionOptions {
+  /** Extra patterns appended to {@link DEFAULT_REDACTION_PATTERNS} for the
+   *  string-level scrub (e.g. credit-card). Additive — defaults still apply. */
+  extraPatterns?: readonly RedactionPattern[]
+}
+
+function redactString(value: string, patterns: readonly RedactionPattern[]): string {
+  for (const { kind, pattern } of patterns) {
+    if (pattern.test(value)) return `[REDACTED:${kind}]`
+  }
   return value
 }
 
@@ -45,19 +65,146 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return proto === Object.prototype || proto === null
 }
 
-export function redactForIngestion(value: unknown): unknown {
-  if (typeof value === 'string') return redactString(value)
-  if (Array.isArray(value)) return value.map(redactForIngestion)
-  if (isPlainObject(value)) {
-    const out: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(value)) {
-      if (SENSITIVE_KEYS.has(k.toLowerCase())) {
-        out[k] = '[REDACTED:field]'
-        continue
+/**
+ * One-way PII scrub for telemetry/ingestion. Backward-compatible: called with no
+ * options it behaves exactly as before (SSN/EIN strings + sensitive object keys
+ * → sentinels). `extraPatterns` lets a product add matchers (e.g. credit-card)
+ * without forking this module.
+ */
+export function redactForIngestion(value: unknown, options: RedactForIngestionOptions = {}): unknown {
+  const patterns = options.extraPatterns
+    ? [...DEFAULT_REDACTION_PATTERNS, ...options.extraPatterns]
+    : DEFAULT_REDACTION_PATTERNS
+  const walk = (v: unknown): unknown => {
+    if (typeof v === 'string') return redactString(v, patterns)
+    if (Array.isArray(v)) return v.map(walk)
+    if (isPlainObject(v)) {
+      const out: Record<string, unknown> = {}
+      for (const [k, val] of Object.entries(v)) {
+        out[k] = SENSITIVE_KEYS.has(k.toLowerCase()) ? '[REDACTED:field]' : walk(val)
       }
-      out[k] = redactForIngestion(v)
+      return out
     }
-    return out
+    return v
   }
-  return value
+  return walk(value)
+}
+
+// ── Reversible document redaction (the UI path) ─────────────────────────────
+
+/** A detected PII span in a source string. */
+export interface RedactionSpan {
+  /** Stable within a document (index-derived) — used for reveal + audit. */
+  id: string
+  kind: string
+  start: number
+  end: number
+  text: string
+}
+
+/**
+ * Find non-overlapping PII spans in `text`. Matches every pattern, sorts by
+ * position, and drops overlaps (first match wins). Deterministic — no ids that
+ * vary per call.
+ */
+export function detectSpans(
+  text: string,
+  patterns: readonly RedactionPattern[] = DEFAULT_REDACTION_PATTERNS,
+): RedactionSpan[] {
+  const raw: Array<{ kind: string; start: number; end: number; text: string }> = []
+  for (const { kind, pattern } of patterns) {
+    const g = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`)
+    for (const m of text.matchAll(g)) {
+      if (m.index === undefined || m[0].length === 0) continue
+      raw.push({ kind, start: m.index, end: m.index + m[0].length, text: m[0] })
+    }
+  }
+  raw.sort((a, b) => a.start - b.start || b.end - a.end)
+  const spans: RedactionSpan[] = []
+  let cursor = -1
+  let i = 0
+  for (const s of raw) {
+    if (s.start < cursor) continue // overlaps an earlier (higher-priority) span
+    spans.push({ id: `span-${i++}`, ...s })
+    cursor = s.end
+  }
+  return spans
+}
+
+/** A redacted document segment: literal text, or a masked span with the
+ *  original kept ENCRYPTED for an authorized reveal. */
+export type RedactedDocSegment =
+  | { type: 'text'; text: string }
+  | { type: 'redacted'; id: string; kind: string; cipher: string }
+
+export interface RedactedDocument {
+  segments: RedactedDocSegment[]
+}
+
+export interface BuildRedactedDocumentOptions {
+  /** Encrypt one original span value. Wire it to `agent-app/crypto`
+   *  (`encryptWithKey` / `createFieldCrypto`). The cipher is what's stored. */
+  encrypt: (plaintext: string) => string | Promise<string>
+  /** Patterns to detect (default: {@link DEFAULT_REDACTION_PATTERNS}). */
+  patterns?: readonly RedactionPattern[]
+}
+
+/**
+ * Split `text` into text + redacted segments, encrypting each redacted span's
+ * original. The result carries NO plaintext PII — only the masked structure and
+ * ciphertext — so it is safe to ship to a client; reveal happens server-side via
+ * {@link revealSpan}.
+ */
+export async function buildRedactedDocument(
+  text: string,
+  options: BuildRedactedDocumentOptions,
+): Promise<RedactedDocument> {
+  const spans = detectSpans(text, options.patterns)
+  const segments: RedactedDocSegment[] = []
+  let pos = 0
+  for (const span of spans) {
+    if (span.start > pos) segments.push({ type: 'text', text: text.slice(pos, span.start) })
+    segments.push({ type: 'redacted', id: span.id, kind: span.kind, cipher: await options.encrypt(span.text) })
+    pos = span.end
+  }
+  if (pos < text.length) segments.push({ type: 'text', text: text.slice(pos) })
+  return { segments }
+}
+
+export interface RevealSpanOptions {
+  /** Decrypt a span cipher. Wire to `agent-app/crypto` (`decryptWithKey`). */
+  decrypt: (cipher: string) => string | Promise<string>
+  /** Authorization gate — return false to deny the reveal (fail-closed). */
+  canReveal: (segment: { id: string; kind: string }) => boolean | Promise<boolean>
+  /** Audit hook — invoked only on a granted reveal (the caller records who/when). */
+  onReveal?: (segment: { id: string; kind: string }) => void | Promise<void>
+}
+
+export interface RevealResult {
+  ok: boolean
+  value?: string
+  /** `not_found` | `forbidden` when `ok` is false. */
+  reason?: string
+}
+
+/**
+ * Reveal one redacted span's original, gated + audited. Fail-closed: an unknown
+ * id or a denied `canReveal` returns `{ ok: false }` and never decrypts; a
+ * granted reveal decrypts, fires `onReveal` for the audit trail, and returns the
+ * value.
+ */
+export async function revealSpan(
+  doc: RedactedDocument,
+  spanId: string,
+  options: RevealSpanOptions,
+): Promise<RevealResult> {
+  const seg = doc.segments.find((s): s is Extract<RedactedDocSegment, { type: 'redacted' }> =>
+    s.type === 'redacted' && s.id === spanId,
+  )
+  if (!seg) return { ok: false, reason: 'not_found' }
+  const allowed = await options.canReveal({ id: seg.id, kind: seg.kind })
+  if (!allowed) return { ok: false, reason: 'forbidden' }
+  const value = await options.decrypt(seg.cipher)
+  if (options.onReveal) await options.onReveal({ id: seg.id, kind: seg.kind })
+  return { ok: true, value }
 }
