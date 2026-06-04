@@ -37,7 +37,7 @@ describe('runAppToolLoop', () => {
       const sawResults = messages.some((m) => m.content.includes('Tool results'))
       if (!sawResults) {
         yield { type: 'text', text: 'Routing. ' } as LoopEvent
-        yield { type: 'tool_call', call: { toolName: 'submit_proposal', toolCallId: 'p1', args: { type: 'propose_swap', title: 'Swap A' } } } as LoopEvent
+        yield { type: 'tool_call', call: { toolName: 'submit_proposal', toolCallId: 'p1', args: { type: 'recommend', title: 'Proposal A' } } } as LoopEvent
         return
       }
       yield { type: 'text', text: 'Routed for approval.' } as LoopEvent
@@ -94,7 +94,7 @@ describe('runAppToolLoop', () => {
     const streamTurn = async function* (messages: Array<{ role: string; content: string }>) {
       turn++
       if (!messages.some((m) => m.content.includes('Tool results'))) {
-        yield { type: 'tool_call', call: { toolName: 'submit_proposal', args: { type: 'propose_swap', title: 'X' } } } as LoopEvent
+        yield { type: 'tool_call', call: { toolName: 'submit_proposal', args: { type: 'recommend', title: 'X' } } } as LoopEvent
         return
       }
       yield { type: 'text', text: 'noted the failure' } as LoopEvent
@@ -110,7 +110,7 @@ describe('runAppToolLoop', () => {
   })
 })
 
-// Raw event type a streaming consumer (e.g. insurance's runtime) would map.
+// Raw event type a streaming consumer (e.g. a product's runtime) would map.
 type Raw = { type: 'text_delta'; text: string } | { type: 'tool_call'; toolName: string; toolCallId?: string; args: Record<string, unknown> }
 
 describe('streamAppToolLoop', () => {
@@ -126,7 +126,7 @@ describe('streamAppToolLoop', () => {
       turn++
       if (!messages.some((m) => m.content.includes('Tool results'))) {
         yield { type: 'text_delta', text: 'Routing. ' }
-        yield { type: 'tool_call', toolName: 'submit_proposal', toolCallId: 'p1', args: { type: 'propose_swap', title: 'A' } }
+        yield { type: 'tool_call', toolName: 'submit_proposal', toolCallId: 'p1', args: { type: 'recommend', title: 'A' } }
         return
       }
       yield { type: 'text_delta', text: 'Done.' }
@@ -150,7 +150,7 @@ describe('streamAppToolLoop', () => {
 
   it('emits a single capped signal when the model never stops calling tools', async () => {
     const streamTurn = async function* (): AsyncIterable<Raw> {
-      yield { type: 'tool_call', toolName: 'submit_proposal', args: { type: 'propose_swap', title: 'x' } }
+      yield { type: 'tool_call', toolName: 'submit_proposal', args: { type: 'recommend', title: 'x' } }
     }
     const yields: StreamLoopYield<Raw>[] = []
     for await (const item of streamAppToolLoop<Raw>({

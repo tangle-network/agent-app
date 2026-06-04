@@ -27,14 +27,14 @@ describe('toLoopEvents', () => {
       toLoopEvents(
         chunks(
           { choices: [{ delta: { tool_calls: [{ index: 0, id: 'call_1', function: { name: 'submit_proposal' } }] } }] },
-          { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '{"type":"prop' } }] } }] },
-          { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: 'ose_swap","title":"X"}' } }] } }] },
+          { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '{"type":"reco' } }] } }] },
+          { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: 'mmend","title":"X"}' } }] } }] },
           { choices: [{ delta: {}, finish_reason: 'tool_calls' }] },
         ),
       ),
     )
     expect(evs).toEqual([
-      { type: 'tool_call', call: { toolCallId: 'call_1', toolName: 'submit_proposal', args: { type: 'propose_swap', title: 'X' } } },
+      { type: 'tool_call', call: { toolCallId: 'call_1', toolName: 'submit_proposal', args: { type: 'recommend', title: 'X' } } },
     ])
   })
 

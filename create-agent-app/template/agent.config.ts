@@ -44,8 +44,8 @@ export const config = defineAgentApp({
   //    CANNOT execute without a named certified approver — this is the
   //    human-in-the-loop invariant. Keep regulated steps regulated.
   taxonomy: {
-    proposalTypes: ['contact_lead', 'client_outreach', 'policy_change'],
-    regulatedTypes: ['policy_change'],
+    proposalTypes: ['recommend', 'contact', 'escalate'],
+    regulatedTypes: ['escalate'],
   },
 
   // ③ KNOWLEDGE — what must the agent KNOW before it acts, and where does it learn?
@@ -96,7 +96,7 @@ export const config = defineAgentApp({
   //    kinds. Reads run immediately; writes return approval-required → a proposal.
   integrations: {
     enabled: [
-      // 'lead-crm',
+      // 'salesforce',
       // 'whatsapp',
     ],
   },

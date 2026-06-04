@@ -13,8 +13,8 @@ import {
 } from '../src/tools/index'
 
 const taxonomy: AppToolTaxonomy = {
-  proposalTypes: ['propose_swap', 'contact_lead', 'research', 'other'],
-  regulatedTypes: ['propose_swap', 'contact_lead'],
+  proposalTypes: ['recommend', 'contact', 'research', 'other'],
+  regulatedTypes: ['recommend', 'contact'],
 }
 
 /** In-memory handlers — a fake "product" so the generic layer is exercised
@@ -63,7 +63,7 @@ describe('buildAppToolOpenAITools', () => {
     const tools = buildAppToolOpenAITools(taxonomy)
     expect(tools.map((t) => t.function.name)).toEqual(['submit_proposal', 'schedule_followup', 'render_ui', 'add_citation'])
     const proposal = tools[0]!.function.parameters as { properties: { type: { enum: string[] } } }
-    expect(proposal.properties.type.enum).toEqual(['propose_swap', 'contact_lead', 'research', 'other'])
+    expect(proposal.properties.type.enum).toEqual(['recommend', 'contact', 'research', 'other'])
   })
 })
 
@@ -84,12 +84,12 @@ describe('createAppToolRuntimeExecutor', () => {
     const produced: AppToolProducedEvent[] = []
     const exec = createAppToolRuntimeExecutor({ handlers, taxonomy, ctx, onProduced: (e) => produced.push(e) })
 
-    const out = await exec({ toolName: 'submit_proposal', args: { type: 'propose_swap', title: 'Swap A', description: 'body' } })
+    const out = await exec({ toolName: 'submit_proposal', args: { type: 'recommend', title: 'Proposal A', description: 'body' } })
 
     expect(out).toEqual({ ok: true, result: { status: 'queued_for_approval', proposalId: 'prop-1', deduped: false, regulated: true } })
     expect(calls.submitProposal).toHaveLength(1)
     expect((calls.submitProposal[0] as { ctx: unknown }).ctx).toEqual(ctx)
-    expect(produced).toEqual([{ type: 'proposal_created', proposalId: 'prop-1', title: 'Swap A', status: 'pending' }])
+    expect(produced).toEqual([{ type: 'proposal_created', proposalId: 'prop-1', title: 'Proposal A', status: 'pending' }])
   })
 
   it('labels a non-regulated proposal type as regulated:false', async () => {
@@ -137,7 +137,7 @@ describe('handleAppToolRequest', () => {
 
   it('authenticates, dispatches, and returns a structured success', async () => {
     const { handlers } = fakeHandlers()
-    const res = await handleAppToolRequest(req(goodHeaders, { args: { type: 'propose_swap', title: 'Swap A' } }), {
+    const res = await handleAppToolRequest(req(goodHeaders, { args: { type: 'recommend', title: 'Proposal A' } }), {
       tool: 'submit_proposal', handlers, taxonomy, verifyToken: okToken, message: (r) => `queued ${(r as { proposalId: string }).proposalId}`,
     })
     expect(res.status).toBe(200)
@@ -147,7 +147,7 @@ describe('handleAppToolRequest', () => {
 
   it('rejects a token minted for another user (anti-impersonation)', async () => {
     const { handlers, calls } = fakeHandlers()
-    const res = await handleAppToolRequest(req({ ...goodHeaders, Authorization: 'Bearer tok:attacker' }, { args: { type: 'propose_swap', title: 'x' } }), {
+    const res = await handleAppToolRequest(req({ ...goodHeaders, Authorization: 'Bearer tok:attacker' }, { args: { type: 'recommend', title: 'x' } }), {
       tool: 'submit_proposal', handlers, taxonomy, verifyToken: okToken,
     })
     expect(res.status).toBe(401)
@@ -203,22 +203,22 @@ describe('buildAppToolMcpServer', () => {
     const s = buildHttpMcpServer({
       path: '/api/tools/integration-invoke', baseUrl: 'https://app.example/', token: 'tok',
       ctx: { userId: 'u1', workspaceId: '', threadId: null }, description: 'hub bridge',
-      headerNames: { userId: 'X-Insurance-User-Id', workspaceId: 'X-Insurance-Workspace-Id', threadId: 'X-Insurance-Thread-Id' },
+      headerNames: { userId: 'X-Product-User-Id', workspaceId: 'X-Product-Workspace-Id', threadId: 'X-Product-Thread-Id' },
     })
     expect(s.url).toBe('https://app.example/api/tools/integration-invoke')
-    expect(s.headers['X-Insurance-User-Id']).toBe('u1')
-    expect(s.headers['X-Insurance-Workspace-Id']).toBeUndefined()
-    expect(s.headers['X-Insurance-Thread-Id']).toBeUndefined()
+    expect(s.headers['X-Product-User-Id']).toBe('u1')
+    expect(s.headers['X-Product-Workspace-Id']).toBeUndefined()
+    expect(s.headers['X-Product-Thread-Id']).toBeUndefined()
   })
 
   it('honors custom header names + paths', () => {
     const s = buildAppToolMcpServer({
       tool: 'submit_proposal', baseUrl: 'https://x', token: 't',
       ctx: { userId: 'u', workspaceId: 'w', threadId: null }, description: 'd',
-      headerNames: { userId: 'X-Insurance-User-Id', workspaceId: 'X-Insurance-Workspace-Id', threadId: 'X-Insurance-Thread-Id' },
+      headerNames: { userId: 'X-Product-User-Id', workspaceId: 'X-Product-Workspace-Id', threadId: 'X-Product-Thread-Id' },
       paths: { submit_proposal: '/api/tools/propose' },
     })
-    expect(s.headers['X-Insurance-User-Id']).toBe('u')
+    expect(s.headers['X-Product-User-Id']).toBe('u')
     expect(s.url).toBe('https://x/api/tools/propose')
   })
 })

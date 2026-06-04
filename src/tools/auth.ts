@@ -3,7 +3,7 @@ import type { AppToolContext } from './types'
 /**
  * Header names carrying the server-set per-turn context + the capability token.
  * Defaults are product-neutral (`X-Agent-App-*`); a product that already ships
- * a header convention (e.g. `X-Insurance-User-Id`) passes its own.
+ * a header convention (e.g. `X-Acme-User-Id`) passes its own.
  */
 export interface ToolHeaderNames {
   userId: string
