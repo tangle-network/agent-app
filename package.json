@@ -66,6 +66,11 @@
       "import": "./dist/knowledge/index.js",
       "default": "./dist/knowledge/index.js"
     },
+    "./config": {
+      "types": "./dist/config/index.d.ts",
+      "import": "./dist/config/index.js",
+      "default": "./dist/config/index.js"
+    },
     "./billing": {
       "types": "./dist/billing/index.d.ts",
       "import": "./dist/billing/index.js",

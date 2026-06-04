@@ -9,6 +9,7 @@ export default defineConfig({
     'runtime/index': 'src/runtime/index.ts',
     'eval/index': 'src/eval/index.ts',
     'knowledge/index': 'src/knowledge/index.ts',
+    'config/index': 'src/config/index.ts',
     'billing/index': 'src/billing/index.ts',
     'crypto/index': 'src/crypto/index.ts',
     'stream/index': 'src/stream/index.ts',
