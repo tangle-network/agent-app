@@ -1,0 +1,22 @@
+name = "__PACKAGE_NAME__"
+main = "src/worker.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# The house Cloudflare stack the preset composes: D1 + KV.
+# Run `wrangler d1 create __PACKAGE_NAME__` and paste the database_id; create a
+# KV namespace and paste its id. Then run the preset migration (see CUSTOMIZE.md ⑥).
+
+[[d1_databases]]
+binding = "DB"
+database_name = "__PACKAGE_NAME__"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[[kv_namespaces]]
+binding = "VAULT"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# Model resolves from env via resolveTangleModelConfig (TANGLE_API_KEY / MODEL_NAME).
+# Put secrets in .dev.vars locally; `wrangler secret put` for production.
+[vars]
+MODEL_NAME = "REPLACE_WITH_MODEL"
