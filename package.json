@@ -71,6 +71,11 @@
       "import": "./dist/config/index.js",
       "default": "./dist/config/index.js"
     },
+    "./preset-cloudflare": {
+      "types": "./dist/preset-cloudflare/index.d.ts",
+      "import": "./dist/preset-cloudflare/index.js",
+      "default": "./dist/preset-cloudflare/index.js"
+    },
     "./billing": {
       "types": "./dist/billing/index.d.ts",
       "import": "./dist/billing/index.js",
