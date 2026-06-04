@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@tangle-network/agent-runtime':
+        specifier: '>=0.21.0'
+        version: 0.25.2(@tangle-network/agent-knowledge@1.5.2(typescript@5.9.3))(typescript@5.9.3)
     devDependencies:
       '@tangle-network/agent-eval':
         specifier: ^0.70.0
