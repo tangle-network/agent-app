@@ -13,6 +13,26 @@ const enc = (s: string) => btoa(s)
 const dec = (c: string) => atob(c)
 const CARD: RedactionPattern = { kind: 'credit-card', pattern: /\d{4}-\d{4}-\d{4}-\d{4}/ }
 
+// A Luhn-validated card candidate (13–19 digits, optional separators) — the
+// shape tax-agent uses, exercising the `validate` predicate seam.
+const luhn = (s: string): boolean => {
+  const d = s.replace(/[^0-9]/g, '')
+  if (d.length < 13 || d.length > 19) return false
+  let sum = 0
+  let alt = false
+  for (let i = d.length - 1; i >= 0; i--) {
+    let n = d.charCodeAt(i) - 48
+    if (alt) {
+      n *= 2
+      if (n > 9) n -= 9
+    }
+    sum += n
+    alt = !alt
+  }
+  return sum % 10 === 0
+}
+const LUHN_CARD: RedactionPattern = { kind: 'cc', pattern: /\b(?:\d[ -]?){13,19}\b/, validate: luhn }
+
 describe('redactForIngestion (one-way) — unchanged behavior', () => {
   it('scrubs SSN/EIN strings + sensitive object keys, recurses, passes through the rest', () => {
     expect(redactForIngestion('123-45-6789')).toBe('[REDACTED:ssn]')
@@ -32,6 +52,24 @@ describe('redactForIngestion (one-way) — unchanged behavior', () => {
   it('extraPatterns extends the scrub without forking (the de-fork seam)', () => {
     expect(redactForIngestion('4111-1111-1111-1111')).toBe('4111-1111-1111-1111') // not a default pattern
     expect(redactForIngestion('4111-1111-1111-1111', { extraPatterns: [CARD] })).toBe('[REDACTED:credit-card]')
+  })
+
+  it('validate predicate fires only on matches that pass (Luhn card) — tax-agent contract', () => {
+    const opts = { extraPatterns: [LUHN_CARD] }
+    // Luhn-valid Visa test number, dashed and spaced → collapses.
+    expect(redactForIngestion('Card: 4111-1111-1111-1111', opts)).toBe('[REDACTED:cc]')
+    expect(redactForIngestion('Card: 4111 1111 1111 1111 expiry...', opts)).toBe('[REDACTED:cc]')
+    // 16-digit Luhn-INVALID sequence must pass through (no false positive).
+    expect(redactForIngestion('orderId: 1234567890123456', opts)).toBe('orderId: 1234567890123456')
+  })
+
+  it('extraSensitiveKeys adds key names the defaults miss (snake_case api_key)', () => {
+    expect(
+      redactForIngestion(
+        { api_key: 'sk-snake', apiKey: 'sk-camel', safe: 'kept' },
+        { extraSensitiveKeys: ['api_key'] },
+      ),
+    ).toEqual({ api_key: '[REDACTED:field]', apiKey: '[REDACTED:field]', safe: 'kept' })
   })
 })
 
@@ -53,6 +91,11 @@ describe('detectSpans', () => {
     const spans = detectSpans('pay 4111-1111-1111-1111 now', [CARD])
     expect(spans).toHaveLength(1)
     expect(spans[0]!.kind).toBe('credit-card')
+  })
+
+  it('skips matches that fail a validate predicate (Luhn)', () => {
+    expect(detectSpans('pay 4111 1111 1111 1111 now', [LUHN_CARD])).toHaveLength(1)
+    expect(detectSpans('order 1234567890123456 here', [LUHN_CARD])).toHaveLength(0)
   })
 })
 

@@ -24,6 +24,11 @@
 export interface RedactionPattern {
   kind: string
   pattern: RegExp
+  /** Optional predicate over each match — the pattern fires only when it returns
+   *  true. For matches a regex alone can't decide (e.g. a Luhn check on a
+   *  card-number candidate). When set, the value is scanned globally and the
+   *  first match that passes wins; when absent, a plain `pattern.test` decides. */
+  validate?: (match: string) => boolean
 }
 
 /** The default deterministic patterns. Extend via the `extraPatterns` /
@@ -50,11 +55,21 @@ export interface RedactForIngestionOptions {
   /** Extra patterns appended to {@link DEFAULT_REDACTION_PATTERNS} for the
    *  string-level scrub (e.g. credit-card). Additive — defaults still apply. */
   extraPatterns?: readonly RedactionPattern[]
+  /** Extra sensitive object-key names (case-insensitive) added to the built-in
+   *  set, e.g. the snake_case `api_key` an intake form uses. Additive. */
+  extraSensitiveKeys?: readonly string[]
 }
 
 function redactString(value: string, patterns: readonly RedactionPattern[]): string {
-  for (const { kind, pattern } of patterns) {
-    if (pattern.test(value)) return `[REDACTED:${kind}]`
+  for (const { kind, pattern, validate } of patterns) {
+    if (!validate) {
+      if (pattern.test(value)) return `[REDACTED:${kind}]`
+      continue
+    }
+    const g = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`)
+    for (const m of value.matchAll(g)) {
+      if (m[0].length > 0 && validate(m[0])) return `[REDACTED:${kind}]`
+    }
   }
   return value
 }
@@ -75,13 +90,16 @@ export function redactForIngestion(value: unknown, options: RedactForIngestionOp
   const patterns = options.extraPatterns
     ? [...DEFAULT_REDACTION_PATTERNS, ...options.extraPatterns]
     : DEFAULT_REDACTION_PATTERNS
+  const sensitiveKeys = options.extraSensitiveKeys
+    ? new Set([...SENSITIVE_KEYS, ...options.extraSensitiveKeys.map((k) => k.toLowerCase())])
+    : SENSITIVE_KEYS
   const walk = (v: unknown): unknown => {
     if (typeof v === 'string') return redactString(v, patterns)
     if (Array.isArray(v)) return v.map(walk)
     if (isPlainObject(v)) {
       const out: Record<string, unknown> = {}
       for (const [k, val] of Object.entries(v)) {
-        out[k] = SENSITIVE_KEYS.has(k.toLowerCase()) ? '[REDACTED:field]' : walk(val)
+        out[k] = sensitiveKeys.has(k.toLowerCase()) ? '[REDACTED:field]' : walk(val)
       }
       return out
     }
@@ -112,10 +130,11 @@ export function detectSpans(
   patterns: readonly RedactionPattern[] = DEFAULT_REDACTION_PATTERNS,
 ): RedactionSpan[] {
   const raw: Array<{ kind: string; start: number; end: number; text: string }> = []
-  for (const { kind, pattern } of patterns) {
+  for (const { kind, pattern, validate } of patterns) {
     const g = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`)
     for (const m of text.matchAll(g)) {
       if (m.index === undefined || m[0].length === 0) continue
+      if (validate && !validate(m[0])) continue
       raw.push({ kind, start: m.index, end: m.index + m[0].length, text: m[0] })
     }
   }
