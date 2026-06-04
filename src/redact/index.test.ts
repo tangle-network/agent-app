@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   redactForIngestion,
   detectSpans,
+  maskSpans,
   buildRedactedDocument,
   revealSpan,
   type RedactionPattern,
@@ -70,6 +71,43 @@ describe('redactForIngestion (one-way) — unchanged behavior', () => {
         { extraSensitiveKeys: ['api_key'] },
       ),
     ).toEqual({ api_key: '[REDACTED:field]', apiKey: '[REDACTED:field]', safe: 'kept' })
+  })
+
+  it("stringMode 'mask-spans' preserves surrounding text (analyst-loop path)", () => {
+    // Default collapses the whole string; mask-spans replaces only the match.
+    expect(redactForIngestion('ssn 123-45-6789 on file')).toBe('[REDACTED:ssn]')
+    expect(redactForIngestion('ssn 123-45-6789 on file', { stringMode: 'mask-spans' })).toBe(
+      'ssn [REDACTED:ssn] on file',
+    )
+    // Two spans of different kinds in one string, both masked in place.
+    expect(
+      redactForIngestion('ssn 123-45-6789 ein 12-3456789 end', { stringMode: 'mask-spans' }),
+    ).toBe('ssn [REDACTED:ssn] ein [REDACTED:ein] end')
+  })
+
+  it('does not infinite-loop on a circular reference (cycle guard)', () => {
+    const node: Record<string, unknown> = { ssn: '123-45-6789', note: 'keep' }
+    node.self = node // cycle
+    const out = redactForIngestion(node) as Record<string, unknown>
+    expect(out.ssn).toBe('[REDACTED:field]') // sensitive key
+    expect(out.note).toBe('keep')
+    expect(out.self).toBeDefined() // cycle broken, did not throw/hang
+  })
+})
+
+describe('maskSpans (standalone substring masking)', () => {
+  it('replaces each PII span in place, leaves the rest', () => {
+    expect(maskSpans('call 123-45-6789 now')).toBe('call [REDACTED:ssn] now')
+    expect(maskSpans('nothing here')).toBe('nothing here')
+  })
+
+  it('honors a validate predicate (Luhn card, substring)', () => {
+    // The LUHN_CARD pattern's trailing `[ -]?` greedily consumes the separator
+    // after the last digit, so the matched span includes the following space —
+    // maskSpans replaces exactly what detectSpans matched.
+    expect(maskSpans('card 4111 1111 1111 1111 ok', [LUHN_CARD])).toBe('card [REDACTED:cc]ok')
+    // Luhn-invalid → not matched → untouched.
+    expect(maskSpans('order 1234567890123456 ok', [LUHN_CARD])).toBe('order 1234567890123456 ok')
   })
 })
 
