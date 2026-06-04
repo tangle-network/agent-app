@@ -58,6 +58,16 @@ export interface RedactForIngestionOptions {
   /** Extra sensitive object-key names (case-insensitive) added to the built-in
    *  set, e.g. the snake_case `api_key` an intake form uses. Additive. */
   extraSensitiveKeys?: readonly string[]
+  /**
+   * How a matched string is rewritten:
+   * - `'collapse'` (default) — the whole string becomes `[REDACTED:<kind>]` on
+   *   the first matching pattern. Safest for telemetry: nothing of the original
+   *   survives.
+   * - `'mask-spans'` — only the matched substrings are replaced (each with
+   *   `[REDACTED:<kind>]`), preserving surrounding text. Use when a downstream
+   *   reader needs the non-PII context (e.g. an analyst loop reading prose).
+   */
+  stringMode?: 'collapse' | 'mask-spans'
 }
 
 function redactString(value: string, patterns: readonly RedactionPattern[]): string {
@@ -72,6 +82,29 @@ function redactString(value: string, patterns: readonly RedactionPattern[]): str
     }
   }
   return value
+}
+
+/**
+ * Replace only the PII substrings in `text`, preserving everything around them
+ * (the `mask-spans` string mode). Built on {@link detectSpans} so matching,
+ * non-overlap, and `validate` predicates behave identically to the reversible
+ * path. Each span becomes `[REDACTED:<kind>]`.
+ */
+export function maskSpans(
+  text: string,
+  patterns: readonly RedactionPattern[] = DEFAULT_REDACTION_PATTERNS,
+): string {
+  const spans = detectSpans(text, patterns)
+  if (spans.length === 0) return text
+  let out = ''
+  let pos = 0
+  for (const s of spans) {
+    if (s.start > pos) out += text.slice(pos, s.start)
+    out += `[REDACTED:${s.kind}]`
+    pos = s.end
+  }
+  if (pos < text.length) out += text.slice(pos)
+  return out
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -93,10 +126,24 @@ export function redactForIngestion(value: unknown, options: RedactForIngestionOp
   const sensitiveKeys = options.extraSensitiveKeys
     ? new Set([...SENSITIVE_KEYS, ...options.extraSensitiveKeys.map((k) => k.toLowerCase())])
     : SENSITIVE_KEYS
+  const maskString =
+    options.stringMode === 'mask-spans'
+      ? (s: string) => maskSpans(s, patterns)
+      : (s: string) => redactString(s, patterns)
+  // Cycle guard: a payload with a circular reference would otherwise recurse
+  // forever. On re-encountering an object/array, return it untouched to break
+  // the cycle (the same value was already redacted on its first visit).
+  const seen = new WeakSet<object>()
   const walk = (v: unknown): unknown => {
-    if (typeof v === 'string') return redactString(v, patterns)
-    if (Array.isArray(v)) return v.map(walk)
+    if (typeof v === 'string') return maskString(v)
+    if (Array.isArray(v)) {
+      if (seen.has(v)) return v
+      seen.add(v)
+      return v.map(walk)
+    }
     if (isPlainObject(v)) {
+      if (seen.has(v)) return v
+      seen.add(v)
       const out: Record<string, unknown> = {}
       for (const [k, val] of Object.entries(v)) {
         out[k] = sensitiveKeys.has(k.toLowerCase()) ? '[REDACTED:field]' : walk(val)
