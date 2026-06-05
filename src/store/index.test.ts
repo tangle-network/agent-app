@@ -69,3 +69,19 @@ describe('createInMemoryKV (portable vault backend)', () => {
     expect(await kv.get('k')).toBe('v')
   })
 })
+
+describe('createInMemoryKV — metadata surface', () => {
+  it('put with metadata + getWithMetadata round-trips value and metadata', async () => {
+    const kv = createInMemoryKV()
+    await kv.put('vault:w:secret.md', 'cipher', { metadata: { encrypted: true, hasPII: true } })
+    expect(await kv.get('vault:w:secret.md')).toBe('cipher')
+    const res = await kv.getWithMetadata('vault:w:secret.md')
+    expect(res.value).toBe('cipher')
+    expect(res.metadata).toEqual({ encrypted: true, hasPII: true })
+  })
+
+  it('getWithMetadata on a missing key returns null/null', async () => {
+    const kv = createInMemoryKV()
+    expect(await kv.getWithMetadata('nope')).toEqual({ value: null, metadata: null })
+  })
+})

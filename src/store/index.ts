@@ -86,9 +86,22 @@ export interface KVListResult {
   cursor?: string
 }
 
+export interface KVPutOptions {
+  expiration?: number
+  expirationTtl?: number
+  metadata?: unknown
+}
+
+export interface KVGetWithMetadataResult {
+  value: string | null
+  metadata: unknown | null
+}
+
 export interface KVStore {
   get(key: string): Promise<string | null>
-  put(key: string, value: string): Promise<void>
+  /** Read a value with its stored metadata (e.g. the vault's encrypted/hasPII flags). */
+  getWithMetadata(key: string): Promise<KVGetWithMetadataResult>
+  put(key: string, value: string, options?: KVPutOptions): Promise<void>
   delete(key: string): Promise<void>
   list(options?: { prefix?: string; cursor?: string; limit?: number }): Promise<KVListResult>
 }
@@ -99,13 +112,19 @@ export interface KVStore {
  * (no real pagination needed in-process). Seed with `initial` entries if useful.
  */
 export function createInMemoryKV(initial?: Record<string, string>): KVStore {
-  const store = new Map<string, string>(initial ? Object.entries(initial) : [])
+  const store = new Map<string, { value: string; metadata: unknown }>(
+    initial ? Object.entries(initial).map(([k, v]) => [k, { value: v, metadata: null }]) : [],
+  )
   return {
     async get(key) {
-      return store.has(key) ? (store.get(key) as string) : null
+      return store.get(key)?.value ?? null
     },
-    async put(key, value) {
-      store.set(key, value)
+    async getWithMetadata(key) {
+      const entry = store.get(key)
+      return { value: entry?.value ?? null, metadata: entry?.metadata ?? null }
+    },
+    async put(key, value, options) {
+      store.set(key, { value, metadata: options?.metadata ?? null })
     },
     async delete(key) {
       store.delete(key)
