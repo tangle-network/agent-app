@@ -8,6 +8,7 @@ export default defineConfig({
     'tangle/index': 'src/tangle/index.ts',
     'runtime/index': 'src/runtime/index.ts',
     'eval/index': 'src/eval/index.ts',
+    'eval-campaign/index': 'src/eval-campaign/index.ts',
     'knowledge/index': 'src/knowledge/index.ts',
     'knowledge-loop/index': 'src/knowledge-loop/index.ts',
     'harness/index': 'src/harness/index.ts',
