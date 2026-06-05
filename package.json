@@ -61,6 +61,11 @@
       "import": "./dist/eval/index.js",
       "default": "./dist/eval/index.js"
     },
+    "./eval-campaign": {
+      "types": "./dist/eval-campaign/index.d.ts",
+      "import": "./dist/eval-campaign/index.js",
+      "default": "./dist/eval-campaign/index.js"
+    },
     "./knowledge": {
       "types": "./dist/knowledge/index.d.ts",
       "import": "./dist/knowledge/index.js",
@@ -131,7 +136,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@tangle-network/agent-eval": "^0.70.0",
+    "@tangle-network/agent-eval": "^0.81.0",
     "@tangle-network/agent-integrations": "^0.32.0",
     "@tangle-network/agent-knowledge": "^1.5.2",
     "@types/node": "^25.6.0",
@@ -140,7 +145,7 @@
     "vitest": "^3.0.0"
   },
   "peerDependencies": {
-    "@tangle-network/agent-eval": ">=0.50.0",
+    "@tangle-network/agent-eval": ">=0.81.0",
     "@tangle-network/agent-integrations": ">=0.32.0",
     "@tangle-network/agent-knowledge": ">=1.5.0",
     "@tangle-network/agent-runtime": ">=0.21.0"
