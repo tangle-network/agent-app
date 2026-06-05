@@ -71,3 +71,52 @@ export function createDatabaseProvider<DB extends object>(
     },
   }
 }
+
+// ── KV store port (the vault backend) ───────────────────────────────────────
+//
+// The vault (workspace files) is a key/value store. In production it's a
+// Cloudflare `KVNamespace`; the portable inner shell injects an in-memory (or
+// other) implementation. This is the subset of the KV API the vault uses —
+// `KVNamespace` satisfies it structurally, so prod passes the binding unchanged,
+// and `createInMemoryKV()` supplies the portable adapter for sandbox/eval.
+
+export interface KVListResult {
+  keys: { name: string }[]
+  list_complete: boolean
+  cursor?: string
+}
+
+export interface KVStore {
+  get(key: string): Promise<string | null>
+  put(key: string, value: string): Promise<void>
+  delete(key: string): Promise<void>
+  list(options?: { prefix?: string; cursor?: string; limit?: number }): Promise<KVListResult>
+}
+
+/**
+ * In-memory {@link KVStore} — the portable vault backend for sandbox/eval runs.
+ * Backed by a Map; `list` returns all prefix-matched keys in one complete page
+ * (no real pagination needed in-process). Seed with `initial` entries if useful.
+ */
+export function createInMemoryKV(initial?: Record<string, string>): KVStore {
+  const store = new Map<string, string>(initial ? Object.entries(initial) : [])
+  return {
+    async get(key) {
+      return store.has(key) ? (store.get(key) as string) : null
+    },
+    async put(key, value) {
+      store.set(key, value)
+    },
+    async delete(key) {
+      store.delete(key)
+    },
+    async list(options) {
+      const prefix = options?.prefix ?? ''
+      const keys = [...store.keys()]
+        .filter((k) => k.startsWith(prefix))
+        .sort()
+        .map((name) => ({ name }))
+      return { keys, list_complete: true }
+    },
+  }
+}
