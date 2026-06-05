@@ -19,6 +19,7 @@ export default defineConfig({
     'integrations/index': 'src/integrations/index.ts',
     'web/index': 'src/web/index.ts',
     'redact/index': 'src/redact/index.ts',
+    'store/index': 'src/store/index.ts',
   },
   format: ['esm'],
   dts: true,
