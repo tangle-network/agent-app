@@ -90,7 +90,10 @@ if (result.gate.decision === 'ship') await ship(result.winnerSurface)
 | `mutationPrimitives` | gepaDriver's own | your optimization levers (additive directives) |
 | `driver` | `gepaDriver` | pass `evolutionaryDriver({ mutator })` for blind addendum rotation |
 | `gate` | `defaultProductionGate` (Δ 0.05) | `paretoSignificanceGate` for multi-objective; tune `deltaThreshold` for your rubric scale |
-| `budget` | 3 gens × pop 2, 0.25 holdout | raise for deeper search |
+| `budget` | 3 gens × pop 2, 0.25 holdout | `budget.reps` (replicates → tighter CIs), `budget.promoteTopK`, `budget.holdoutScenarios` (explicit split), `budget.dollars` (cost cap) |
+| `expectUsage` | **`'assert'`** | the fail-loud backend-integrity guard. Leave at `'assert'` for real runs (a stub cell throws); set `'off'` ONLY for a deterministic offline/replay run |
+| `labeledStore` | off | capture every artifact + judge score (the dataset you ship + few-shot corpus); set `captureSource` (default `'eval-run'`) |
+| `analyzeGeneration` | — | the per-generation findings producer (EYES→HANDS) — plug a trace-analyst / HALO to refresh `ctx.findings` each round |
 | `runDir` | `mem://…` (non-durable) | a real path to persist provenance + spans |
 | `hostedTenant` | off | ship eval-run events to a hosted orchestrator |
 | `collectWorkerRecords` | — | return the per-call `RunRecord`s your agent accumulated → real backend-integrity verdict |
