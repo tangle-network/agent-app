@@ -1,5 +1,6 @@
 export * from './model'
 export * from './openai-stream'
+export * from './agent'
 /**
  * The bounded agent tool-loop — the mechanism every app's chat runtime
  * hand-rolls on top of `@tangle-network/agent-runtime`.
