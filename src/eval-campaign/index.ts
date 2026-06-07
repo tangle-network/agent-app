@@ -104,6 +104,16 @@ export function buildEnsembleJudge<TArtifact, TScenario extends Scenario, D exte
   }
 }
 
+// ── Trust gate — the after-gate ("is this result allowed to be believed") ────
+// One level up from `aggregateJudgeVerdicts`: it audits the raters ACROSS items
+// and reports whether the composites are believable before a lift is reported.
+export {
+  trustVerdicts,
+  type TrustItem,
+  type TrustThresholds,
+  type TrustVerdict,
+} from './trust-gate'
+
 // ── Curated re-exports — the one eval import for a product loop ──────────────
 // The loop engine + gates + drivers + the ensemble reducer, so a product wires
 // its self-improvement loop from a single module instead of reaching across
