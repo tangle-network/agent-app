@@ -13,6 +13,7 @@ Held by both the orchestrator (`improve-conductor`) and the builder (`eval-archi
 
 1. **Refuse to optimize if CV(metric) > the target delta.** If the run-to-run noise is bigger than the effect you're paying to move, the metric *cannot* validate the change — raise reps or fix the metric first. Do not tune against noise.
 2. **Refuse to report a lift over INCOMPLETE or UNPAIRED evidence.** Every held-out scenario must have a non-errored cell on *both* the baseline and the candidate side. Below the paired-n floor (≥3), the run is **invalid**, not a verdict. A lift computed over survivors is worse than no number.
+   > **Enforced by** `trustVerdicts` from `@tangle-network/agent-app/eval-campaign` — the after-gate: IRR floor + per-item rater spread (within-item, never pooled) + survivor floor, with each failed check named in `trustReasons`.
 3. **Every metric ties to a product-value claim** — "if this number moves, *this* user-visible outcome moves with it." No claim → it's a proxy → don't optimize it.
 4. **Below the data threshold of real outcomes, refuse to optimize** — state N and say why. You cannot improve what you have not yet observed enough of.
 
