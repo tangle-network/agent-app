@@ -67,11 +67,19 @@ describe('resolveUserTangleExecutionKey', () => {
     })).resolves.toEqual({ apiKey: 'sk-local', source: 'local-env' })
   })
 
-  it('fails loud when local development has no env key', async () => {
+  it('falls back to the app-provided user key when local development has no env key', async () => {
     await expect(resolveUserTangleExecutionKey({
       environment: 'development',
       env: {},
-      getUserApiKey: async () => 'sk-user',
+      getUserApiKey: async () => ' sk-user ',
+    })).resolves.toEqual({ apiKey: 'sk-user', source: 'user' })
+  })
+
+  it('fails loud when local development has no env key or user key', async () => {
+    await expect(resolveUserTangleExecutionKey({
+      environment: 'development',
+      env: {},
+      getUserApiKey: async () => null,
     })).rejects.toMatchObject({
       code: 'local_tangle_api_key_required',
       status: 503,
@@ -80,6 +88,14 @@ describe('resolveUserTangleExecutionKey', () => {
 
   it('uses the app-provided user key in deployed environments', async () => {
     await expect(resolveUserTangleExecutionKey({
+      env: { TANGLE_API_KEY: 'sk-env-ignored' },
+      getUserApiKey: async () => ' sk-user ',
+    })).resolves.toEqual({ apiKey: 'sk-user', source: 'user' })
+  })
+
+  it('uses the app-provided user key in test environments', async () => {
+    await expect(resolveUserTangleExecutionKey({
+      environment: 'test',
       env: { TANGLE_API_KEY: 'sk-env-ignored' },
       getUserApiKey: async () => ' sk-user ',
     })).resolves.toEqual({ apiKey: 'sk-user', source: 'user' })
@@ -116,6 +132,32 @@ describe('resolveUserTangleExecutionKey', () => {
       })
     }
   })
+
+  it('recognizes serialized execution-key errors from another realm', () => {
+    const error = {
+      name: 'TangleExecutionKeyError',
+      message: 'Connect your Tangle account before invoking this agent.',
+      code: 'tangle_account_not_connected',
+      status: 401,
+    }
+
+    expect(isTangleExecutionKeyError(error)).toBe(true)
+    expect(tangleExecutionKeyHttpError(error)).toEqual({
+      status: 401,
+      body: {
+        error: 'Connect your Tangle account before invoking this agent.',
+        code: 'tangle_account_not_connected',
+      },
+    })
+  })
+
+  it('does not recognize structural execution-key errors without a message', () => {
+    expect(isTangleExecutionKeyError({
+      name: 'TangleExecutionKeyError',
+      code: 'tangle_account_not_connected',
+      status: 401,
+    })).toBe(false)
+  })
 })
 
 describe('isTangleBillingEnforcementDisabled', () => {
@@ -127,6 +169,7 @@ describe('isTangleBillingEnforcementDisabled', () => {
   it('defaults billing enforcement on outside local development', () => {
     expect(isTangleBillingEnforcementDisabled({ env: { APP_ENV: 'production' } })).toBe(false)
     expect(isTangleBillingEnforcementDisabled({ env: { APP_ENV: 'staging' } })).toBe(false)
+    expect(isTangleBillingEnforcementDisabled({ env: { APP_ENV: 'test' } })).toBe(false)
     expect(isTangleBillingEnforcementDisabled({ env: {} })).toBe(false)
   })
 

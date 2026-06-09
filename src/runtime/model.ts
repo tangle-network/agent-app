@@ -89,6 +89,10 @@ function trimOrNull(value: string | null | undefined): string | null {
   return trimmed ? trimmed : null
 }
 
+function isTangleExecutionKeyErrorCode(value: unknown): value is TangleExecutionKeyErrorCode {
+  return value === 'local_tangle_api_key_required' || value === 'tangle_account_not_connected'
+}
+
 export class TangleExecutionKeyError extends Error {
   readonly code: TangleExecutionKeyErrorCode
   readonly status: number
@@ -107,7 +111,8 @@ export function isTangleExecutionKeyError(error: unknown): error is TangleExecut
       typeof error === 'object'
       && error !== null
       && (error as { name?: unknown }).name === 'TangleExecutionKeyError'
-      && typeof (error as { code?: unknown }).code === 'string'
+      && typeof (error as { message?: unknown }).message === 'string'
+      && isTangleExecutionKeyErrorCode((error as { code?: unknown }).code)
       && typeof (error as { status?: unknown }).status === 'number'
     )
 }
@@ -171,15 +176,18 @@ export async function resolveUserTangleExecutionKey(
   if (environment === 'development') {
     const apiKey = trimOrNull(env.TANGLE_API_KEY)
     if (apiKey) return { apiKey, source: 'local-env' }
-    throw new TangleExecutionKeyError(
-      'local_tangle_api_key_required',
-      'TANGLE_API_KEY is required for local Tangle model execution.',
-      503,
-    )
   }
 
   const apiKey = trimOrNull(await opts.getUserApiKey())
   if (apiKey) return { apiKey, source: 'user' }
+
+  if (environment === 'development') {
+    throw new TangleExecutionKeyError(
+      'local_tangle_api_key_required',
+      'TANGLE_API_KEY or a linked Tangle account is required for local Tangle model execution.',
+      503,
+    )
+  }
 
   throw new TangleExecutionKeyError(
     'tangle_account_not_connected',
