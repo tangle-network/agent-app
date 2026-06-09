@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "packageManager": "pnpm@10.33.4",
   "description": "Application-shell framework for Tangle agent products: a bounded tool loop, the structured agent\u2192app tool side channel, integration-hub client, per-workspace billing, and crypto \u2014 composed over the Tangle agent substrate through typed seams.",
   "keywords": [
