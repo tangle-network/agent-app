@@ -32,6 +32,30 @@ Corollary — **extend, never duplicate.** Before writing anything that complete
 | `/delegation` | the agent-runtime driven-loop MCP server entry (opt-in) | — |
 | `/crypto` `/web` `/redact` `/stream` | AES-GCM field crypto · web boundary utils (body/context/rate-limit/headers) · PII redaction · SSE normalization + turn identity | — |
 
+## Agent-native principles (products on the sandbox)
+
+The sandbox runs full agent harnesses — skills, tools, sub-agents, MCP, bash, python — invoked through prompts. Products built on agent-app coordinate UI, durability, approvals, and billing **around** the agent. They never do the agent's work for it, and agent-app must never make it easy to.
+
+1. **Intelligence and tooling live in the agent; durability and money live in the platform.** Reasoning, tool selection, installation, evidence gathering, content production → a prompt to an agent session. Surviving restarts, gating spend, pausing for approval → platform code (product or this shell).
+2. **Prompts state intents, never implementations.** No shell commands, CLI flags, or install scripts inside system prompts, plan steps, or directives. Name the outcome and the evidence path; the executing agent chooses tools at execution time.
+3. **No domain logic in execution infrastructure.** Engines, dispatchers, and schedulers must not pattern-match intents or embed per-vertical scripts. Vertical knowledge belongs in prompt directives and product content, the layers the agent reads. (Shell corollary of the engine/shell rule: domain is a parameter, never baked.)
+4. **Don't rebuild harness or platform primitives.** The sandbox SDK already provides durable *session* execution: `dispatchPrompt({ detach: true })` runs the turn server-side after the caller disconnects, `findCompletedTurn(turnId)` is the idempotent completion check, `_sessionStatus`/`_sessionResult` poll lifecycle, and the session gateway mints read-only JWTs so browsers attach to live streams without the product worker. Autonomous/queue work must dispatch detached and poll — never hold an SSE stream open in a worker to learn that a session finished. What the SDK does NOT provide is multi-step *orchestration* (sequencing, gates, budgets, schedules) — that is the legitimate product/shell layer.
+5. **Gate actions, not mechanics.** Approvals attach to what an action does (spend, publish, vault writes) classified from intent — not to literal commands.
+
+### Choosing a session transport (product agent vs eval agent)
+
+Three callers, three transports — picking wrong is how durability bugs and overbuilt workers happen:
+
+| Caller | Transport | Why |
+| --- | --- | --- |
+| **Interactive product turn** (chat, copilot) | `streamPrompt` held open for the turn; session-gateway read JWT for the browser to attach directly | A user is watching; worker lifetime ≈ turn length. The gateway replays buffered events on reconnect, so a dropped tab or worker restart loses nothing. |
+| **Autonomous product work** (missions, queues, crons, scheduled jobs) | `dispatchPrompt({ detach: true })` + poll (`findCompletedTurn` / `_sessionStatus`) from a durable driver (CF Workflows, DO alarm, queue consumer) | No consumer exists and workers die in minutes. The platform executes the turn server-side; deterministic session/turn ids make crash re-dispatch a lookup, not a second agent run. Never hold an SSE stream open in a worker to learn that a session finished. |
+| **Eval agent** (agent-eval loops, self-improve, CI) | `streamPrompt` / `runLoop` in a long-lived process | The harness IS the consumer and outlives the run; durability machinery adds nothing — reproducibility comes from scenarios and seeds, and a failed run is re-run, not resumed. |
+
+`agent-runtime` stays durability-free on purpose: it must run identically in a local eval process, CI, and a sandbox. Durable *session* execution is the sandbox platform's job; durable *orchestration* (sequencing, gates, budgets, schedules) is the product/shell layer above it.
+
+The test for new code: *"Could the agent in the sandbox do this itself if we told it the intent?"* If yes, write the prompt, not the wrapper.
+
 ## Develop
 
 ```bash
