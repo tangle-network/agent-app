@@ -4,6 +4,11 @@ import {
   verifySignedSsoState,
   createTangleSsoHandlers,
   TangleSsoUserCreateError,
+  createHubProxyRoutes,
+  isTangleBearerMissingError,
+  TangleBearerMissingError,
+  type HubClientLike,
+  type HubProxyContext,
   type TangleSsoAccountStore,
   type TangleSsoAuthClient,
   type TangleSsoExchangeResult,
@@ -253,5 +258,158 @@ describe('createTangleSsoHandlers — callback', () => {
       },
     })
     await expect(startThenCallback(h)).rejects.toThrow('db down')
+  })
+})
+
+// ── Hub proxy routes ────────────────────────────────────────────────────────
+
+function fakeHubClient(overrides: Partial<HubClientLike> = {}): HubClientLike {
+  return {
+    catalog: async () => ({ providers: ['p1'] }),
+    listConnections: async () => [{ id: 'conn_1' }],
+    revokeConnection: async (id) => ({ connection: id, revokedGrants: 1 }),
+    startAuth: async () => ({ authorizationUrl: 'https://id.example/oauth', state: 'st_1' }),
+    listHealthchecks: async () => [{ ok: true }],
+    ...overrides,
+  }
+}
+
+function hubHarness(overrides: Partial<HubProxyContext> = {}) {
+  const ctx: HubProxyContext = {
+    requireUserId: async () => 'u_1',
+    getBearer: async () => 'sk-tan-bearer',
+    createHubClient: () => fakeHubClient(),
+    ...overrides,
+  }
+  return createHubProxyRoutes(ctx)
+}
+
+const GET = (path = '/x') => ({ request: new Request(`https://my.app${path}`) })
+
+describe('createHubProxyRoutes — success shapes', () => {
+  it('catalog wraps the platform result', async () => {
+    const res = await hubHarness().catalog(GET())
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ catalog: { providers: ['p1'] } })
+  })
+
+  it('connections wraps the list', async () => {
+    const res = await hubHarness().connections(GET())
+    expect(await res.json()).toEqual({ connections: [{ id: 'conn_1' }] })
+  })
+
+  it('healthchecks wraps the list', async () => {
+    const res = await hubHarness().healthchecks(GET())
+    expect(await res.json()).toEqual({ healthchecks: [{ ok: true }] })
+  })
+
+  it('connectionDelete passes the platform result through verbatim', async () => {
+    const res = await hubHarness().connectionDelete({
+      request: new Request('https://my.app/x', { method: 'DELETE' }),
+      params: { connectionId: 'conn_9' },
+    })
+    expect(await res.json()).toEqual({ connection: 'conn_9', revokedGrants: 1 })
+  })
+
+  it('authStart returns the authorization url + state', async () => {
+    const res = await hubHarness().authStart({
+      request: new Request('https://my.app/x', {
+        method: 'POST',
+        body: JSON.stringify({ providerId: 'google', connectorId: 'gmail', returnUrl: 'https://my.app/r' }),
+      }),
+    })
+    expect(await res.json()).toEqual({ authorizationUrl: 'https://id.example/oauth', state: 'st_1' })
+  })
+})
+
+describe('createHubProxyRoutes — method + body validation', () => {
+  it('connectionDelete 405s on non-DELETE', async () => {
+    const res = await hubHarness().connectionDelete({
+      request: new Request('https://my.app/x', { method: 'POST' }),
+      params: { connectionId: 'c' },
+    })
+    expect(res.status).toBe(405)
+  })
+
+  it('authStart 405s on non-POST', async () => {
+    const res = await hubHarness().authStart(GET())
+    expect(res.status).toBe(405)
+  })
+
+  it('authStart 400s on invalid JSON', async () => {
+    const res = await hubHarness().authStart({
+      request: new Request('https://my.app/x', { method: 'POST', body: 'not-json' }),
+    })
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'Invalid JSON body' })
+  })
+
+  it('authStart 400s on missing fields', async () => {
+    const res = await hubHarness().authStart({
+      request: new Request('https://my.app/x', { method: 'POST', body: JSON.stringify({ providerId: 'g' }) }),
+    })
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'providerId, connectorId, and returnUrl are required' })
+  })
+})
+
+describe('createHubProxyRoutes — error mapping', () => {
+  it('maps a missing bearer to 412 tangle_link_required', async () => {
+    const routes = hubHarness({
+      getBearer: async (userId) => {
+        throw new TangleBearerMissingError(userId)
+      },
+    })
+    const res = await routes.catalog(GET())
+    expect(res.status).toBe(412)
+    expect(await res.json()).toEqual({ error: 'tangle_link_required' })
+  })
+
+  it('recognizes a structurally-faked bearer error from another module instance', async () => {
+    const foreign = Object.assign(new Error('No Tangle platform link for user u_1'), {
+      name: 'TangleBearerMissingError',
+      userId: 'u_1',
+    })
+    expect(isTangleBearerMissingError(foreign)).toBe(true)
+    const routes = hubHarness({
+      getBearer: async () => {
+        throw foreign
+      },
+    })
+    expect((await routes.connections(GET())).status).toBe(412)
+  })
+
+  it('maps a PlatformHubError-shaped error to its status + code', async () => {
+    const hubErr = Object.assign(new Error('upstream rejected'), { name: 'PlatformHubError', status: 502, code: 'bad_gateway' })
+    const routes = hubHarness({
+      createHubClient: () =>
+        fakeHubClient({
+          catalog: async () => {
+            throw hubErr
+          },
+        }),
+    })
+    const res = await routes.catalog(GET())
+    expect(res.status).toBe(502)
+    expect(await res.json()).toEqual({ error: 'upstream rejected', code: 'bad_gateway' })
+  })
+
+  it('rethrows unknown errors', async () => {
+    const routes = hubHarness({
+      getBearer: async () => {
+        throw new Error('db down')
+      },
+    })
+    await expect(routes.catalog(GET())).rejects.toThrow('db down')
+  })
+
+  it('propagates the auth throw untouched (e.g. a redirect Response)', async () => {
+    const redirect = new Response(null, { status: 302, headers: { Location: '/login' } })
+    const routes = hubHarness({
+      requireUserId: async () => {
+        throw redirect
+      },
+    })
+    await expect(routes.catalog(GET())).rejects.toBe(redirect)
   })
 })
