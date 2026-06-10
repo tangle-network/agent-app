@@ -119,6 +119,46 @@ describe('createAppToolRuntimeExecutor', () => {
     expect(out).toMatchObject({ ok: true, result: { regulated: false } })
   })
 
+  it('needsApproval predicate overrides regulatedTypes and stamps args.regulated for the handler', async () => {
+    const seen: Array<{ type: string; regulated?: boolean }> = []
+    const handlers: AppToolHandlers = {
+      ...fakeHandlers().handlers,
+      async submitProposal(args) {
+        seen.push({ type: args.type, regulated: args.regulated })
+        return { proposalId: 'p1', deduped: false }
+      },
+    }
+    // 'research' is NOT in regulatedTypes, but the predicate gates by title
+    const exec = createAppToolRuntimeExecutor({
+      handlers,
+      taxonomy,
+      ctx,
+      needsApproval: async (_type, args) => args.title.includes('prod'),
+    })
+    const gated = await exec({ toolName: 'submit_proposal', args: { type: 'research', title: 'prod deploy notes' } })
+    expect(gated).toMatchObject({ ok: true, result: { regulated: true } })
+    const free = await exec({ toolName: 'submit_proposal', args: { type: 'recommend', title: 'sandbox idea' } })
+    expect(free).toMatchObject({ ok: true, result: { regulated: false } })
+    expect(seen).toEqual([
+      { type: 'research', regulated: true },
+      { type: 'recommend', regulated: false },
+    ])
+  })
+
+  it('a throwing needsApproval predicate fails closed to approval required', async () => {
+    const { handlers } = fakeHandlers()
+    const exec = createAppToolRuntimeExecutor({
+      handlers,
+      taxonomy,
+      ctx,
+      needsApproval: () => {
+        throw new Error('policy backend down')
+      },
+    })
+    const out = await exec({ toolName: 'submit_proposal', args: { type: 'research', title: 'x' } })
+    expect(out).toMatchObject({ ok: true, result: { regulated: true } })
+  })
+
   it('rejects an invalid proposal type and a missing title before calling the handler', async () => {
     const { handlers, calls } = fakeHandlers()
     const exec = createAppToolRuntimeExecutor({ handlers, taxonomy, ctx })

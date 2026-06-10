@@ -335,6 +335,17 @@ export interface ChatToolCallInfo {
   id: string
   name: string
   status: 'running' | 'done' | 'error'
+  /** The tool outcome (`{ok, result}` shape). When `result.status` is
+   *  'queued_for_approval' the chip renders the approval state. */
+  result?: unknown
+}
+
+/** Extract `{proposalId, status}` from a tool outcome when it is a proposal
+ *  awaiting human approval; null otherwise. */
+export function pendingApprovalOf(call: ChatToolCallInfo): { proposalId: string } | null {
+  const outcome = call.result as { ok?: boolean; result?: { status?: string; proposalId?: string } } | undefined
+  if (!outcome?.ok || outcome.result?.status !== 'queued_for_approval' || !outcome.result.proposalId) return null
+  return { proposalId: outcome.result.proposalId }
 }
 
 export interface ChatUiMessage extends ChatMessageMetrics {
@@ -357,27 +368,68 @@ export interface ChatMessagesProps {
   agentLabel?: string
   /** Render the trailing "agent is thinking" row. */
   loading?: boolean
+  /** Approve/Reject handlers for proposals awaiting approval. When omitted the
+   *  chip still shows "awaiting approval" but without action buttons. */
+  approval?: ProposalApprovalHandlers
 }
 
-function ToolChips({ toolCalls }: { toolCalls: ChatToolCallInfo[] }) {
+export interface ProposalApprovalHandlers {
+  onApprove: (proposalId: string, toolCallId: string) => void | Promise<void>
+  onReject: (proposalId: string, toolCallId: string) => void | Promise<void>
+}
+
+function ToolChips({ toolCalls, approval }: { toolCalls: ChatToolCallInfo[]; approval?: ProposalApprovalHandlers }) {
   return (
     <div className="mt-2 flex flex-col gap-1">
-      {toolCalls.map((tc) => (
-        <div
-          key={tc.id}
-          className={`inline-flex w-fit items-center gap-2 rounded-md px-2.5 py-1 text-xs ${
-            tc.status === 'running'
-              ? 'bg-yellow-500/10 text-yellow-700'
-              : tc.status === 'error'
-                ? 'bg-red-500/10 text-red-700'
-                : 'bg-green-500/10 text-green-700'
-          }`}
-        >
-          <span className="font-mono opacity-70">{tc.status === 'running' ? '⚡' : tc.status === 'error' ? '✗' : '✓'}</span>
-          <span className="font-medium">{tc.name}</span>
-          <span className="opacity-60">{tc.status === 'running' ? 'running…' : tc.status === 'error' ? 'failed' : 'done'}</span>
-        </div>
-      ))}
+      {toolCalls.map((tc) => {
+        const pending = tc.status === 'done' ? pendingApprovalOf(tc) : null
+        if (pending) {
+          return (
+            <div
+              key={tc.id}
+              className="inline-flex w-fit items-center gap-2 rounded-md bg-amber-500/10 px-2.5 py-1 text-xs text-amber-700"
+            >
+              <span className="font-mono opacity-70">⏸</span>
+              <span className="font-medium">{tc.name}</span>
+              <span className="opacity-60">awaiting approval</span>
+              {approval && (
+                <span className="ml-1 inline-flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => approval.onApprove(pending.proposalId, tc.id)}
+                    className="rounded bg-green-600/90 px-2 py-0.5 text-[11px] font-semibold text-white transition hover:bg-green-600"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => approval.onReject(pending.proposalId, tc.id)}
+                    className="rounded border border-border bg-card px-2 py-0.5 text-[11px] font-medium text-foreground transition hover:bg-accent/30"
+                  >
+                    Reject
+                  </button>
+                </span>
+              )}
+            </div>
+          )
+        }
+        return (
+          <div
+            key={tc.id}
+            className={`inline-flex w-fit items-center gap-2 rounded-md px-2.5 py-1 text-xs ${
+              tc.status === 'running'
+                ? 'bg-yellow-500/10 text-yellow-700'
+                : tc.status === 'error'
+                  ? 'bg-red-500/10 text-red-700'
+                  : 'bg-green-500/10 text-green-700'
+            }`}
+          >
+            <span className="font-mono opacity-70">{tc.status === 'running' ? '⚡' : tc.status === 'error' ? '✗' : '✓'}</span>
+            <span className="font-medium">{tc.name}</span>
+            <span className="opacity-60">{tc.status === 'running' ? 'running…' : tc.status === 'error' ? 'failed' : 'done'}</span>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -396,6 +448,7 @@ export function ChatMessages({
   userLabel = 'User',
   agentLabel = 'Agent',
   loading,
+  approval,
 }: ChatMessagesProps) {
   const renderBody = renderMarkdown ?? ((content: string) => <p className="whitespace-pre-wrap">{content}</p>)
   const lastIsUser = messages[messages.length - 1]?.role === 'user'
@@ -428,7 +481,7 @@ export function ChatMessages({
               </details>
             )}
             <div className="text-base leading-[1.75]">{renderBody(msg.content)}</div>
-            {msg.toolCalls && msg.toolCalls.length > 0 && <ToolChips toolCalls={msg.toolCalls} />}
+            {msg.toolCalls && msg.toolCalls.length > 0 && <ToolChips toolCalls={msg.toolCalls} approval={approval} />}
             {renderExtras?.(msg)}
           </div>
         ),

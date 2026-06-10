@@ -11,6 +11,11 @@ import type {
 export interface DispatchOptions {
   handlers: AppToolHandlers
   taxonomy: AppToolTaxonomy
+  /** Per-call approval policy. When provided it OVERRIDES the static
+   *  `taxonomy.regulatedTypes` membership check, so products can gate by
+   *  cost threshold, environment, or first-use instead of always/never.
+   *  Fail-closed: a predicate that throws counts as "approval required". */
+  needsApproval?: (type: string, args: { title: string; description: string | null }, ctx: AppToolContext) => boolean | Promise<boolean>
   /** Called at the real side-effect site for proposals (proposal_created) and
    *  generated views (artifact) so a consumer's completion oracle credits
    *  persisted state. Omit when produced state isn't tracked. */
@@ -44,8 +49,17 @@ export async function dispatchAppTool(
       }
       if (!title) return { ok: false, code: 'missing_title', message: 'title is required.' }
       const description = rawArgs.description == null ? null : String(rawArgs.description)
-      const r = await opts.handlers.submitProposal({ type, title, description }, ctx)
-      const regulated = opts.taxonomy.regulatedTypes.includes(type)
+      // Approval policy runs BEFORE the handler so the decision can gate the
+      // side effect itself, not merely re-label it afterwards.
+      let regulated = opts.taxonomy.regulatedTypes.includes(type)
+      if (opts.needsApproval) {
+        try {
+          regulated = await opts.needsApproval(type, { title, description }, ctx)
+        } catch {
+          regulated = true // fail-closed: a broken policy means approval required
+        }
+      }
+      const r = await opts.handlers.submitProposal({ type, title, description, regulated }, ctx)
       // Pass the handler's result through: products with immediate-execute
       // proposal types return status 'executed' plus their own fields
       // (e.g. datasetId) — the model must see what actually happened, not a
