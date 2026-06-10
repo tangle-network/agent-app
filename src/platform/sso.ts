@@ -109,8 +109,11 @@ export class TangleSsoUserCreateError extends Error {
  * the token is always available to `saveTangleLink`.
  */
 export interface TangleSsoAccountStore {
-  /** Find-or-create the app-local user for the platform email. */
-  upsertUserByEmail(input: { email: string; name: string | null }): Promise<{ userId: string }>
+  /** Find-or-create the app-local user. `tangleUserId` is the platform's
+   *  stable user id — match on it first when the app stores it (emails are
+   *  mutable on the platform; the id is not), falling back to email for
+   *  first-time logins. */
+  upsertUserByEmail(input: { email: string; name: string | null; tangleUserId: string }): Promise<{ userId: string }>
   /** Create an app session row; returns the session-cookie token value. */
   createSession(input: {
     userId: string
@@ -266,6 +269,7 @@ export function createTangleSsoHandlers(opts: TangleSsoHandlerOptions): TangleSs
         ;({ userId } = await opts.store.upsertUserByEmail({
           email: exchanged.user.email,
           name: exchanged.user.name ?? null,
+          tangleUserId: exchanged.user.id,
         }))
       } catch (err) {
         if (err instanceof TangleSsoUserCreateError) return loginErrorRedirect('tangle_user_create_failed')
