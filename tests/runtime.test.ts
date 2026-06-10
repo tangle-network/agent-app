@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { runAppToolLoop, streamAppToolLoop, type LoopEvent, type LoopToolCall, type StreamLoopYield } from '../src/runtime/index'
+import { runAppToolLoop, streamAppToolLoop, type LoopEvent, type LoopMessage, type LoopToolCall, type StreamLoopYield } from '../src/runtime/index'
 import type { AppToolOutcome } from '../src/tools/index'
 
 /** A scripted model: each entry is the events for one turn. */
@@ -13,6 +13,11 @@ function scriptedStream(turns: LoopEvent[][]) {
 }
 
 const isExec = (n: string) => n === 'submit_proposal' || n === 'schedule_followup'
+
+/** True once tool results have been appended — i.e. this is a re-run after a
+ *  dispatch. Keys off the OpenAI-correct `role: 'tool'` message, not a `user`
+ *  "Tool results:" string. */
+const sawToolResult = (messages: LoopMessage[]) => messages.some((m) => m.role === 'tool')
 
 describe('runAppToolLoop', () => {
   it('returns text immediately when no tool calls are emitted (single turn)', async () => {
@@ -29,13 +34,12 @@ describe('runAppToolLoop', () => {
     expect(r.cappedOut).toBe(false)
   })
 
-  it('executes a tool call, folds the result back, and re-runs to the final answer', async () => {
+  it('executes a tool call, appends the result, and re-runs to the final answer', async () => {
     const calls: LoopToolCall[] = []
     let turn = 0
-    const streamTurn = async function* (messages: Array<{ role: string; content: string }>) {
+    const streamTurn = async function* (messages: LoopMessage[]) {
       turn++
-      const sawResults = messages.some((m) => m.content.includes('Tool results'))
-      if (!sawResults) {
+      if (!sawToolResult(messages)) {
         yield { type: 'text', text: 'Routing. ' } as LoopEvent
         yield { type: 'tool_call', call: { toolName: 'submit_proposal', toolCallId: 'p1', args: { type: 'recommend', title: 'Proposal A' } } } as LoopEvent
         return
@@ -54,6 +58,88 @@ describe('runAppToolLoop', () => {
     expect(r.finalText).toBe('Routing. Routed for approval.')
     expect(r.toolResults[0]!.outcome).toMatchObject({ ok: true })
     expect(turn).toBe(2)
+  })
+
+  it('appends tool results in OpenAI shape: assistant.tool_calls then a role:tool message per result, keyed by tool_call_id', async () => {
+    const turnMessages: LoopMessage[][] = []
+    const streamTurn = async function* (messages: LoopMessage[]) {
+      turnMessages.push(messages)
+      if (!sawToolResult(messages)) {
+        yield { type: 'text', text: 'Routing both. ' } as LoopEvent
+        yield { type: 'tool_call', call: { toolName: 'submit_proposal', toolCallId: 'p1', args: { type: 'recommend', title: 'A' } } } as LoopEvent
+        yield { type: 'tool_call', call: { toolName: 'schedule_followup', toolCallId: 'f9', args: { title: 'x', dueDate: '2026-01-01' } } } as LoopEvent
+        return
+      }
+      yield { type: 'text', text: 'Done.' } as LoopEvent
+    }
+    await runAppToolLoop({
+      systemPrompt: 's', userMessage: 'u',
+      streamTurn,
+      executeToolCall: async (c) => ({ ok: true, result: { id: c.toolName } }),
+      isExecutableTool: isExec,
+    })
+
+    // The re-run sees: system, user, the assistant turn (with both tool_calls),
+    // then one role:'tool' result per call — and NO user-role "Tool results".
+    const reRun = turnMessages[1]!
+    expect(reRun.some((m) => m.role === 'user' && typeof m.content === 'string' && m.content.includes('Tool results'))).toBe(false)
+
+    const assistant = reRun.find((m) => m.role === 'assistant')!
+    expect(assistant.content).toBe('Routing both.')
+    expect(assistant.tool_calls).toEqual([
+      { id: 'p1', type: 'function', function: { name: 'submit_proposal', arguments: JSON.stringify({ type: 'recommend', title: 'A' }) } },
+      { id: 'f9', type: 'function', function: { name: 'schedule_followup', arguments: JSON.stringify({ title: 'x', dueDate: '2026-01-01' }) } },
+    ])
+
+    const toolMsgs = reRun.filter((m) => m.role === 'tool')
+    expect(toolMsgs.map((m) => m.tool_call_id)).toEqual(['p1', 'f9'])
+    // Each result message is keyed by tool_call_id and follows its assistant turn.
+    expect(reRun.indexOf(assistant)).toBeLessThan(reRun.indexOf(toolMsgs[0]!))
+    expect(typeof toolMsgs[0]!.content).toBe('string')
+  })
+
+  it('a tool-only assistant turn carries content:null and still emits tool_calls', async () => {
+    const turnMessages: LoopMessage[][] = []
+    const streamTurn = async function* (messages: LoopMessage[]) {
+      turnMessages.push(messages)
+      if (!sawToolResult(messages)) {
+        yield { type: 'tool_call', call: { toolName: 'submit_proposal', toolCallId: 'p1', args: { type: 'recommend', title: 'A' } } } as LoopEvent
+        return
+      }
+      yield { type: 'text', text: 'ok' } as LoopEvent
+    }
+    await runAppToolLoop({
+      systemPrompt: 's', userMessage: 'u',
+      streamTurn,
+      executeToolCall: async () => ({ ok: true, result: {} }),
+      isExecutableTool: isExec,
+    })
+    const assistant = turnMessages[1]!.find((m) => m.role === 'assistant')!
+    expect(assistant.content).toBeNull()
+    expect(assistant.tool_calls).toHaveLength(1)
+  })
+
+  it('derives a stable tool_call_id when the model omits one (assistant + result match)', async () => {
+    const turnMessages: LoopMessage[][] = []
+    const streamTurn = async function* (messages: LoopMessage[]) {
+      turnMessages.push(messages)
+      if (!sawToolResult(messages)) {
+        yield { type: 'tool_call', call: { toolName: 'submit_proposal', args: { type: 'recommend', title: 'A' } } } as LoopEvent
+        return
+      }
+      yield { type: 'text', text: 'ok' } as LoopEvent
+    }
+    await runAppToolLoop({
+      systemPrompt: 's', userMessage: 'u',
+      streamTurn,
+      executeToolCall: async () => ({ ok: true, result: {} }),
+      isExecutableTool: isExec,
+    })
+    const reRun = turnMessages[1]!
+    const assistant = reRun.find((m) => m.role === 'assistant')!
+    const toolMsg = reRun.find((m) => m.role === 'tool')!
+    expect(assistant.tool_calls![0]!.id).toBe('call_submit_proposal')
+    expect(toolMsg.tool_call_id).toBe('call_submit_proposal')
   })
 
   it('ignores non-executable tool calls (UI-only tools the app renders elsewhere)', async () => {
@@ -91,9 +177,9 @@ describe('runAppToolLoop', () => {
 
   it('turns an executor throw into a failed outcome and keeps going', async () => {
     let turn = 0
-    const streamTurn = async function* (messages: Array<{ role: string; content: string }>) {
+    const streamTurn = async function* (messages: LoopMessage[]) {
       turn++
-      if (!messages.some((m) => m.content.includes('Tool results'))) {
+      if (!sawToolResult(messages)) {
         yield { type: 'tool_call', call: { toolName: 'submit_proposal', args: { type: 'recommend', title: 'X' } } } as LoopEvent
         return
       }
@@ -120,11 +206,37 @@ describe('streamAppToolLoop', () => {
     isExecutableTool: (n: string) => n === 'submit_proposal',
   }
 
-  it('yields every raw event + each tool_result, drives the loop, folds results back', async () => {
+  it('appends the OpenAI tool history (assistant.tool_calls + role:tool) for the next turn', async () => {
+    const turnMessages: LoopMessage[][] = []
+    const streamTurn = async function* (messages: LoopMessage[]): AsyncIterable<Raw> {
+      turnMessages.push(messages)
+      if (!sawToolResult(messages)) {
+        yield { type: 'text_delta', text: 'Routing. ' }
+        yield { type: 'tool_call', toolName: 'submit_proposal', toolCallId: 'p1', args: { type: 'recommend', title: 'A' } }
+        return
+      }
+      yield { type: 'text_delta', text: 'Done.' }
+    }
+    for await (const _ of streamAppToolLoop<Raw>({
+      systemPrompt: 's', userMessage: 'u', streamTurn, ...opts,
+      executeToolCall: async () => ({ ok: true, result: { proposalId: 'prop-1' } }),
+    })) { /* drain */ }
+
+    const reRun = turnMessages[1]!
+    expect(reRun.some((m) => m.role === 'user' && typeof m.content === 'string' && m.content.includes('Tool results'))).toBe(false)
+    const assistant = reRun.find((m) => m.role === 'assistant')!
+    expect(assistant.tool_calls).toEqual([
+      { id: 'p1', type: 'function', function: { name: 'submit_proposal', arguments: JSON.stringify({ type: 'recommend', title: 'A' }) } },
+    ])
+    const toolMsg = reRun.find((m) => m.role === 'tool')!
+    expect(toolMsg.tool_call_id).toBe('p1')
+  })
+
+  it('yields every raw event + each tool_result, drives the loop, appends results back', async () => {
     let turn = 0
-    const streamTurn = async function* (messages: Array<{ role: string; content: string }>): AsyncIterable<Raw> {
+    const streamTurn = async function* (messages: LoopMessage[]): AsyncIterable<Raw> {
       turn++
-      if (!messages.some((m) => m.content.includes('Tool results'))) {
+      if (!sawToolResult(messages)) {
         yield { type: 'text_delta', text: 'Routing. ' }
         yield { type: 'tool_call', toolName: 'submit_proposal', toolCallId: 'p1', args: { type: 'recommend', title: 'A' } }
         return
@@ -165,8 +277,8 @@ describe('streamAppToolLoop', () => {
   })
 
   it('passes a custom labelFor through to the tool_result (e.g. an integration hub path)', async () => {
-    const streamTurn = async function* (messages: Array<{ role: string; content: string }>): AsyncIterable<Raw> {
-      if (!messages.some((m) => m.content.includes('Tool results'))) {
+    const streamTurn = async function* (messages: LoopMessage[]): AsyncIterable<Raw> {
+      if (!sawToolResult(messages)) {
         yield { type: 'tool_call', toolName: 'gmail_send', args: {} }
         return
       }

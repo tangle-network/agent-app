@@ -8,9 +8,17 @@ export * from './agent'
  * A model turn may emit tool calls (integration-hub actions, the app tools from
  * `../tools`, delegation). The loop: stream a turn, collect the executable tool
  * calls, stop if there are none / no executor / the turn cap is hit, otherwise
- * execute each, fold the results back as a message, and re-run so the model
- * reads them. Bounded by `maxToolTurns` so a model looping on a failing action
- * can't run forever.
+ * execute each, append the results to history in OpenAI function-calling shape,
+ * and re-run so the model reads them. Bounded by `maxToolTurns` so a model
+ * looping on a failing action can't run forever.
+ *
+ * The history shape is the OpenAI function-calling contract: the assistant turn
+ * that emitted tool calls is preserved as an `assistant` message carrying its
+ * `tool_calls` array, and each result is its own `{ role: 'tool', tool_call_id,
+ * content }` message keyed to the call. A strict model (Claude, and any model
+ * that validates tool history) needs this to read its own tool use back; folding
+ * results into a `user` message instead makes such models re-issue the same call
+ * in a loop.
  *
  * Substrate-free by design: the app supplies `streamTurn` (wrapping whatever
  * backend / `runAgentTaskStream` it uses) and `executeToolCall` (routing to its
@@ -34,6 +42,61 @@ export interface LoopToolCall {
   toolCallId?: string
   toolName: string
   args: Record<string, unknown>
+}
+
+/** One OpenAI-shaped tool-call entry on an assistant message. */
+export interface LoopAssistantToolCall {
+  id: string
+  type: 'function'
+  function: { name: string; arguments: string }
+}
+
+/**
+ * A message in the running conversation the loop sends to `streamTurn`.
+ *
+ * The base `{ role, content }` covers `system` / `user` / plain `assistant`
+ * turns. Two optional fields carry the OpenAI function-calling contract so the
+ * model reads its own tool use back correctly instead of re-issuing it:
+ *
+ *   - an assistant turn that emitted tool calls carries `tool_calls`, and its
+ *     `content` is `null` when the turn was tool-only;
+ *   - each tool result is its own `{ role: 'tool', tool_call_id, content }`
+ *     message keyed to the call that produced it.
+ *
+ * Widening is additive: a `streamTurn` that reads only `role` + `content` still
+ * works; one that forwards the whole message to an OpenAI-compatible endpoint
+ * now gets correct tool history. */
+export interface LoopMessage {
+  role: string
+  content: string | null
+  tool_calls?: LoopAssistantToolCall[]
+  tool_call_id?: string
+}
+
+/** A tool-call id is required to key a `role: 'tool'` result back to its call.
+ *  When the model omitted one, derive a stable id from the tool name so the
+ *  assistant `tool_calls` entry and its `tool` result still match. */
+function toolCallId(call: LoopToolCall): string {
+  return call.toolCallId ?? `call_${call.toolName}`
+}
+
+/** The assistant turn that emitted `pending`, in OpenAI shape: text content
+ *  (null when the turn was tool-only) plus its `tool_calls` array. */
+function assistantToolCallMessage(turnText: string, pending: LoopToolCall[]): LoopMessage {
+  return {
+    role: 'assistant',
+    content: turnText.trim() || null,
+    tool_calls: pending.map((call) => ({
+      id: toolCallId(call),
+      type: 'function',
+      function: { name: call.toolName, arguments: JSON.stringify(call.args) },
+    })),
+  }
+}
+
+/** One `role: 'tool'` result message keyed to its call by `tool_call_id`. */
+function toolResultMessage(call: LoopToolCall, content: string): LoopMessage {
+  return { role: 'tool', tool_call_id: toolCallId(call), content }
 }
 
 /** Events a turn stream yields. `text` accumulates into the final answer;
@@ -60,8 +123,10 @@ export interface AppToolLoopOptions {
   userMessage: string
   priorMessages?: Array<{ role: string; content: string }>
   /** Stream one model turn over the running message list. The app wraps its
-   *  backend here. */
-  streamTurn: (messages: Array<{ role: string; content: string }>) => AsyncIterable<LoopEvent>
+   *  backend here. Messages follow {@link LoopMessage}: a tool-calling assistant
+   *  turn carries `tool_calls`, and each tool result is a `role: 'tool'` message.
+   *  A backend that reads only `role` + `content` is unaffected. */
+  streamTurn: (messages: LoopMessage[]) => AsyncIterable<LoopEvent>
   /** Execute one tool call. The app routes to its integration executor / app-tool
    *  executor and returns the outcome. */
   executeToolCall: (call: LoopToolCall) => Promise<AppToolOutcome>
@@ -70,8 +135,8 @@ export interface AppToolLoopOptions {
   isExecutableTool: (toolName: string) => boolean
   /** Max tool-driven re-runs. Default 8. */
   maxToolTurns?: number
-  /** Render one tool outcome as a line the next turn's message carries. Default
-   *  is a compact `- <label> → ok/failed: …`. */
+  /** Render one tool outcome as the `content` of its `role: 'tool'` message.
+   *  Default is a compact `<label> → ok/failed: …`. */
   renderResult?: (label: string, outcome: AppToolOutcome) => string
   /** Map a tool call to the label its result is keyed under (default: toolName). */
   labelFor?: (call: LoopToolCall) => string
@@ -80,8 +145,8 @@ export interface AppToolLoopOptions {
 const DEFAULT_MAX_TOOL_TURNS = 8
 
 function defaultRender(label: string, outcome: AppToolOutcome): string {
-  if (outcome.ok) return `- ${label} → ok: ${JSON.stringify(outcome.result)}`
-  return `- ${label} → failed (${outcome.code}): ${outcome.message}`
+  if (outcome.ok) return `${label} → ok: ${JSON.stringify(outcome.result)}`
+  return `${label} → failed (${outcome.code}): ${outcome.message}`
 }
 
 /**
@@ -96,7 +161,7 @@ export async function runAppToolLoop(opts: AppToolLoopOptions): Promise<ToolLoop
   const render = opts.renderResult ?? defaultRender
   const labelFor = opts.labelFor ?? ((c: LoopToolCall) => c.toolName)
 
-  const messages: Array<{ role: string; content: string }> = [
+  const messages: LoopMessage[] = [
     { role: 'system', content: opts.systemPrompt },
     ...(opts.priorMessages ?? []),
     { role: 'user', content: opts.userMessage },
@@ -125,10 +190,10 @@ export async function runAppToolLoop(opts: AppToolLoopOptions): Promise<ToolLoop
       return { finalText, toolResults, turns, cappedOut: true }
     }
 
-    // Record the assistant's tool-calling turn so the next turn has its context.
-    if (turnText.trim()) messages.push({ role: 'assistant', content: turnText })
+    // The assistant turn that emitted the calls — with its tool_calls array —
+    // so the model sees its own tool use in history.
+    messages.push(assistantToolCallMessage(turnText, pending))
 
-    const lines: string[] = []
     for (const call of pending) {
       let outcome: AppToolOutcome
       try {
@@ -138,10 +203,9 @@ export async function runAppToolLoop(opts: AppToolLoopOptions): Promise<ToolLoop
       }
       const label = labelFor(call)
       toolResults.push({ call, label, outcome })
-      lines.push(render(label, outcome))
+      // One role:'tool' message per result, keyed to its call by tool_call_id.
+      messages.push(toolResultMessage(call, render(label, outcome)))
     }
-    // Fold every outcome back as one user-role message so the model reads them.
-    messages.push({ role: 'user', content: `Tool results:\n${lines.join('\n')}` })
   }
 
   return { finalText, toolResults, turns, cappedOut: false }
@@ -154,7 +218,7 @@ export async function runAppToolLoop(opts: AppToolLoopOptions): Promise<ToolLoop
 // AND record telemetry per event as it happens. `streamAppToolLoop` is the same
 // bounded loop as an async generator: it yields every raw turn event (the app
 // maps + telemetries + re-emits it) and every executed tool result (same), while
-// owning the loop control flow (collect → stop/dispatch → fold → re-run, capped).
+// owning the loop control flow (collect → stop/dispatch → append → re-run, capped).
 // `Raw` is the app's own runtime-event type — this package stays substrate-free.
 
 export type StreamLoopYield<Raw> =
@@ -166,8 +230,10 @@ export interface StreamAppToolLoopOptions<Raw> {
   systemPrompt: string
   userMessage: string
   priorMessages?: Array<{ role: string; content: string }>
-  /** Stream one model turn (the app wraps its backend / runAgentTaskStream). */
-  streamTurn: (messages: Array<{ role: string; content: string }>) => AsyncIterable<Raw>
+  /** Stream one model turn (the app wraps its backend / runAgentTaskStream).
+   *  Messages follow {@link LoopMessage}: a tool-calling assistant turn carries
+   *  `tool_calls`, and each tool result is a `role: 'tool'` message. */
+  streamTurn: (messages: LoopMessage[]) => AsyncIterable<Raw>
   /** Text contribution of a raw event, '' if none — used to record the
    *  assistant's turn so the next turn has its context. */
   extractText: (event: Raw) => string
@@ -193,7 +259,7 @@ export async function* streamAppToolLoop<Raw>(opts: StreamAppToolLoopOptions<Raw
   const render = opts.renderResult ?? defaultRender
   const labelFor = opts.labelFor ?? ((c: LoopToolCall) => c.toolName)
 
-  const messages: Array<{ role: string; content: string }> = [
+  const messages: LoopMessage[] = [
     { role: 'system', content: opts.systemPrompt },
     ...(opts.priorMessages ?? []),
     { role: 'user', content: opts.userMessage },
@@ -216,9 +282,9 @@ export async function* streamAppToolLoop<Raw>(opts: StreamAppToolLoopOptions<Raw
       return
     }
 
-    if (turnText.trim()) messages.push({ role: 'assistant', content: turnText })
+    // The assistant turn that emitted the calls — with its tool_calls array.
+    messages.push(assistantToolCallMessage(turnText, pending))
 
-    const lines: string[] = []
     for (const call of pending) {
       let outcome: AppToolOutcome
       try {
@@ -228,8 +294,8 @@ export async function* streamAppToolLoop<Raw>(opts: StreamAppToolLoopOptions<Raw
       }
       const label = labelFor(call)
       yield { kind: 'tool_result', toolName: call.toolName, toolCallId: call.toolCallId, label, outcome }
-      lines.push(render(label, outcome))
+      // One role:'tool' message per result, keyed to its call by tool_call_id.
+      messages.push(toolResultMessage(call, render(label, outcome)))
     }
-    messages.push({ role: 'user', content: `Tool results:\n${lines.join('\n')}` })
   }
 }

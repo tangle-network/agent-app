@@ -85,6 +85,23 @@ describe('createOpenAICompatStreamTurn', () => {
     ])
   })
 
+  it('forwards assistant.tool_calls + role:tool messages verbatim into the request body', async () => {
+    const seen: { init: RequestInit } = { init: {} }
+    const fetchImpl = (async (_url: string | URL | Request, init?: RequestInit) => {
+      seen.init = init ?? {}
+      return sseResponse(JSON.stringify({ choices: [{ delta: { content: 'ok' } }] }))
+    }) as unknown as typeof fetch
+    const streamTurn = createOpenAICompatStreamTurn({ baseUrl: 'https://r', apiKey: 'k', model: 'm', fetchImpl })
+    await collect(streamTurn([
+      { role: 'user', content: 'go' },
+      { role: 'assistant', content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'submit_proposal', arguments: '{}' } }] },
+      { role: 'tool', tool_call_id: 'c1', content: 'submit_proposal → ok: {}' },
+    ]))
+    const body = JSON.parse(String(seen.init.body))
+    expect(body.messages[1]).toEqual({ role: 'assistant', content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'submit_proposal', arguments: '{}' } }] })
+    expect(body.messages[2]).toEqual({ role: 'tool', tool_call_id: 'c1', content: 'submit_proposal → ok: {}' })
+  })
+
   it('throws loud on a non-2xx model response', async () => {
     const fetchImpl = (async () => new Response('nope', { status: 500 })) as unknown as typeof fetch
     const streamTurn = createOpenAICompatStreamTurn({ baseUrl: 'https://r', apiKey: 'k', model: 'm', fetchImpl })
