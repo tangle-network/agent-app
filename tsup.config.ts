@@ -18,6 +18,7 @@ export default defineConfig({
     'crypto/index': 'src/crypto/index.ts',
     'stream/index': 'src/stream/index.ts',
     'integrations/index': 'src/integrations/index.ts',
+    'platform/index': 'src/platform/index.ts',
     'web/index': 'src/web/index.ts',
     'redact/index': 'src/redact/index.ts',
     'store/index': 'src/store/index.ts',

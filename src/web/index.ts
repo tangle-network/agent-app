@@ -81,6 +81,51 @@ export async function checkRateLimit(kv: KvLike, key: string, limit: number, win
   return { allowed: true, remaining: limit - valid.length, resetAt: now + windowSeconds }
 }
 
+export interface CookieOptions {
+  name: string
+  /** Default '/'. */
+  path?: string
+  /** Default true. */
+  httpOnly?: boolean
+  /** Adds the `Secure` attribute. Default false. */
+  secure?: boolean
+  /** Default 'Lax'. */
+  sameSite?: 'Lax' | 'Strict' | 'None'
+  maxAgeSeconds?: number
+}
+
+/** Serialize a Set-Cookie header value: `name=encodeURIComponent(value)` plus
+ *  attributes in Path / HttpOnly / SameSite / Max-Age / Secure order. */
+export function serializeCookie(value: string, opts: CookieOptions): string {
+  const parts = [`${opts.name}=${encodeURIComponent(value)}`, `Path=${opts.path ?? '/'}`]
+  if (opts.httpOnly !== false) parts.push('HttpOnly')
+  parts.push(`SameSite=${opts.sameSite ?? 'Lax'}`)
+  if (opts.maxAgeSeconds !== undefined) parts.push(`Max-Age=${opts.maxAgeSeconds}`)
+  if (opts.secure) parts.push('Secure')
+  return parts.join('; ')
+}
+
+/** Set-Cookie header value that deletes the cookie (empty value, Max-Age=0). */
+export function clearCookieHeader(opts: Omit<CookieOptions, 'maxAgeSeconds'>): string {
+  return serializeCookie('', { ...opts, maxAgeSeconds: 0 })
+}
+
+/** Read + decode one cookie from a Cookie request header; null when absent. */
+export function readCookieValue(cookieHeader: string | null, name: string): string | null {
+  if (!cookieHeader) return null
+  for (const part of cookieHeader.split(/;\s*/)) {
+    const [cookieName, ...rest] = part.split('=')
+    if (cookieName === name) {
+      try {
+        return decodeURIComponent(rest.join('='))
+      } catch {
+        return null
+      }
+    }
+  }
+  return null
+}
+
 export interface SecurityHeaderOptions {
   /** Product disclaimer (e.g. "AI-powered tool. Not legal advice."). Omitted if absent. */
   disclaimer?: string
