@@ -169,7 +169,7 @@ describe('createTangleSsoHandlers — callback', () => {
     expect(res.status).toBe(302)
     expect(res.headers.get('Location')).toBe('/app/x')
     expect(h.calls).toEqual(['exchange:code_1', 'upsertUser', 'createSession', 'saveLink'])
-    expect(h.saved.user).toEqual({ email: 'a@b.co', name: 'Ada' })
+    expect(h.saved.user).toEqual({ email: 'a@b.co', name: 'Ada', tangleUserId: 'tu_1' })
     expect(h.saved.session).toMatchObject({ ipAddress: '9.9.9.9' })
     expect(h.saved.link).toMatchObject({
       userId: 'u_1',
