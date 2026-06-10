@@ -413,3 +413,270 @@ describe('createHubProxyRoutes — error mapping', () => {
     await expect(routes.catalog(GET())).rejects.toBe(redirect)
   })
 })
+
+// ── Platform billing HTTP + tier state ──────────────────────────────────────
+
+import {
+  createPlatformBillingHttp,
+  createTanglePlatformBillingClient,
+  isPlatformBillingHttpError,
+  normalizeTanglePlanTier,
+  readTangleTierState,
+  type PlatformBillingHttp,
+} from '../src/platform/index'
+import { createPlatformBalanceManager } from '../src/billing/index'
+import {
+  assertBillableBalance,
+  createAdminGuard,
+  createAuthGuard,
+  parseAdminEmails,
+} from '../src/platform/index'
+
+/** fetchImpl fake recording every call and answering from a route table. */
+function fakeFetch(routes: Record<string, { status?: number; body: unknown }>) {
+  const calls: Array<{ url: string; method: string; headers: Headers; body: unknown }> = []
+  const impl: typeof fetch = async (input, init) => {
+    const url = String(input)
+    const path = new URL(url).pathname
+    const route = routes[path]
+    if (!route) throw new Error(`no fake route for ${path}`)
+    calls.push({
+      url,
+      method: init?.method ?? 'GET',
+      headers: new Headers(init?.headers),
+      body: typeof init?.body === 'string' ? JSON.parse(init.body) : null,
+    })
+    return new Response(JSON.stringify(route.body), {
+      status: route.status ?? 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+  return { impl, calls }
+}
+
+function billingHttp(routes: Record<string, { status?: number; body: unknown }>) {
+  const f = fakeFetch(routes)
+  const http = createPlatformBillingHttp({
+    baseUrl: 'https://id.example/',
+    serviceToken: 'svc-token',
+    productSlug: 'my-agent',
+    fetchImpl: f.impl,
+  })
+  return { http, calls: f.calls }
+}
+
+describe('normalizeTanglePlanTier', () => {
+  it('passes pro/enterprise through and maps everything else to free', () => {
+    expect(normalizeTanglePlanTier('pro')).toBe('pro')
+    expect(normalizeTanglePlanTier('enterprise')).toBe('enterprise')
+    expect(normalizeTanglePlanTier('legacy')).toBe('free')
+    expect(normalizeTanglePlanTier(null)).toBe('free')
+    expect(normalizeTanglePlanTier(undefined)).toBe('free')
+  })
+})
+
+describe('createPlatformBillingHttp', () => {
+  it('reads send the user bearer and no service headers', async () => {
+    const { http, calls } = billingHttp({
+      '/v1/plans/current': { body: { success: true, data: { subscription: { plan: 'pro', status: 'active' } } } },
+    })
+    const sub = await http.getSubscription('sk-user-key')
+    expect(sub).toEqual({ tier: 'pro', status: 'active' })
+    expect(calls[0]!.headers.get('Authorization')).toBe('Bearer sk-user-key')
+    expect(calls[0]!.headers.get('X-Service-Name')).toBeNull()
+  })
+
+  it('parses balance and usage with zero defaults', async () => {
+    const { http } = billingHttp({
+      '/v1/billing/balance': { body: { success: true, data: { balance: 12.5, lifetimeSpent: 40 } } },
+      '/v1/billing/usage': { body: { success: true, data: [{ product: 'my-agent', totalSpent: 3 }] } },
+    })
+    expect(await http.getBalance('k')).toEqual({ balance: 12.5, lifetimeSpent: 40, updatedAt: undefined })
+    expect(await http.getUsageByProduct('k')).toEqual([{ product: 'my-agent', totalSpent: 3, count: 0 }])
+  })
+
+  it('deduct authenticates as the service and names the user in the body', async () => {
+    const { http, calls } = billingHttp({ '/v1/billing/deduct': { body: { success: true } } })
+    await http.deduct({ platformUserId: 'pu_1', amountUsd: 0.42, type: 'agent_turn', description: 'd', referenceId: 'r1' })
+    const call = calls[0]!
+    expect(call.method).toBe('POST')
+    expect(call.headers.get('Authorization')).toBe('Bearer svc-token')
+    expect(call.headers.get('X-Service-Name')).toBe('my-agent')
+    expect(call.body).toEqual({
+      userId: 'pu_1',
+      amount: 0.42,
+      type: 'agent_turn',
+      product: 'my-agent',
+      description: 'd',
+      referenceId: 'r1',
+    })
+  })
+
+  it('deduct fails loud when the service token resolves empty', async () => {
+    const f = fakeFetch({ '/v1/billing/deduct': { body: {} } })
+    const http = createPlatformBillingHttp({
+      baseUrl: 'https://id.example',
+      serviceToken: () => '',
+      productSlug: 'my-agent',
+      fetchImpl: f.impl,
+    })
+    await expect(
+      http.deduct({ platformUserId: 'p', amountUsd: 1, type: 't', description: 'd', referenceId: 'r' }),
+    ).rejects.toThrow('service token is required')
+    expect(f.calls).toHaveLength(0)
+  })
+
+  it('non-OK responses throw a typed error with the platform detail', async () => {
+    const { http } = billingHttp({
+      '/v1/billing/balance': { status: 403, body: { error: { message: 'forbidden by policy' } } },
+    })
+    const err = await http.getBalance('k').catch((e: unknown) => e)
+    expect(isPlatformBillingHttpError(err)).toBe(true)
+    expect((err as Error).message).toBe('Platform request failed (403): forbidden by policy')
+  })
+
+  it('billingUrl points at the platform billing surface', () => {
+    const { http } = billingHttp({})
+    expect(http.billingUrl()).toBe('https://id.example/app/billing')
+  })
+})
+
+describe('readTangleTierState', () => {
+  it('fails closed to free/zero for a missing key', async () => {
+    const neverHttp = {} as PlatformBillingHttp
+    expect(await readTangleTierState(neverHttp, null)).toEqual({
+      tier: 'free',
+      subscriptionStatus: null,
+      remainingBalanceUsd: 0,
+      lifetimeSpentUsd: 0,
+      concurrency: 1,
+      overageAllowed: false,
+    })
+  })
+
+  it('projects a paid tier onto the policy', async () => {
+    const { http } = billingHttp({
+      '/v1/plans/current': { body: { success: true, data: { subscription: { plan: 'enterprise', status: 'active' } } } },
+      '/v1/billing/balance': { body: { success: true, data: { balance: 100, lifetimeSpent: 5 } } },
+    })
+    const state = await readTangleTierState(http, 'k')
+    expect(state.tier).toBe('enterprise')
+    expect(state.overageAllowed).toBe(true)
+    expect(state.concurrency).toBe(Number.POSITIVE_INFINITY)
+    expect(state.remainingBalanceUsd).toBe(100)
+  })
+})
+
+describe('createTanglePlatformBillingClient through createPlatformBalanceManager', () => {
+  it('drives the /billing seam end-to-end', async () => {
+    const { http } = billingHttp({
+      '/v1/plans/current': { body: { success: true, data: { subscription: { plan: 'pro', status: 'active' } } } },
+      '/v1/billing/balance': { body: { success: true, data: { balance: 7, lifetimeSpent: 2 } } },
+      '/v1/billing/usage': { body: { success: true, data: [{ product: 'my-agent', totalSpent: 2, count: 4 }] } },
+    })
+    const client = createTanglePlatformBillingClient(http, {
+      resolveIdentity: async (userId) => ({ platformUserId: `p_${userId}`, apiKey: 'sk-user-key' }),
+    })
+    const manager = createPlatformBalanceManager({
+      client,
+      planLimits: {
+        free: { monthlyBalanceUsd: 0, concurrency: 1, overageAllowed: false },
+        pro: { monthlyBalanceUsd: 50, concurrency: 10, overageAllowed: true },
+        enterprise: { monthlyBalanceUsd: 500, concurrency: 100, overageAllowed: true },
+      },
+      freePlan: 'free',
+      productSlug: 'my-agent',
+    })
+    const { allowed, state } = await manager.canStartBillableTurn('u_1')
+    expect(allowed).toBe(true)
+    expect(state.plan).toBe('pro')
+    expect(state.remainingBalanceUsd).toBe(7)
+    expect(await manager.getProductUsage('u_1')).toEqual({ spentUsd: 2, transactionCount: 4 })
+  })
+})
+
+// ── Guards ──────────────────────────────────────────────────────────────────
+
+describe('createAuthGuard', () => {
+  const session = { user: { id: 'u_1', email: 'a@b.co' } }
+  const guard = createAuthGuard({ getSession: async (r) => (r.headers.get('cookie') ? session : null) })
+  const authed = () => new Request('https://my.app/x', { headers: { cookie: 's=1' } })
+  const anon = () => new Request('https://my.app/x')
+
+  it('returns the session when authenticated', async () => {
+    expect(await guard.requireUser(authed())).toBe(session)
+    expect(await guard.getOptionalSession(anon())).toBeNull()
+  })
+
+  it('requireUser throws a 302 redirect to the login path', async () => {
+    const thrown = await guard.requireUser(anon()).catch((e: unknown) => e)
+    expect(thrown).toBeInstanceOf(Response)
+    expect((thrown as Response).status).toBe(302)
+    expect((thrown as Response).headers.get('Location')).toBe('/login')
+  })
+
+  it('requireApiUser throws a JSON 401', async () => {
+    const thrown = (await guard.requireApiUser(anon()).catch((e: unknown) => e)) as Response
+    expect(thrown.status).toBe(401)
+    expect(await thrown.json()).toEqual({ error: 'Unauthorized', code: 'auth.unauthenticated' })
+  })
+})
+
+describe('parseAdminEmails + createAdminGuard', () => {
+  it('parses comma/whitespace lists case-insensitively', () => {
+    expect(parseAdminEmails(' A@b.Co, c@d.io\n e@f.gg ')).toEqual(['a@b.co', 'c@d.io', 'e@f.gg'])
+    expect(parseAdminEmails(undefined)).toEqual([])
+  })
+
+  const mkGuard = (allowed: string[]) =>
+    createAdminGuard({
+      requireUser: async () => ({ user: { email: 'A@b.Co' } }),
+      emailOf: (s) => s.user.email,
+      allowedEmails: () => allowed,
+    })
+
+  it('404s on an empty allowlist and for non-listed emails', async () => {
+    for (const guard of [mkGuard([]), mkGuard(['other@x.io'])]) {
+      const thrown = (await guard(new Request('https://my.app/admin')).catch((e: unknown) => e)) as Response
+      expect(thrown.status).toBe(404)
+    }
+  })
+
+  it('passes listed emails case-insensitively', async () => {
+    const session = await mkGuard(['a@b.co'])(new Request('https://my.app/admin'))
+    expect(session.user.email).toBe('A@b.Co')
+  })
+})
+
+describe('assertBillableBalance', () => {
+  const enforced = { APP_ENV: 'production' }
+
+  it('throws 402 with the stable code and merged body for a broke free tier', async () => {
+    let thrown: unknown
+    try {
+      assertBillableBalance(
+        { overageAllowed: false, remainingBalanceUsd: 0 },
+        { env: enforced, errorBody: { organizationId: 'org_1' } },
+      )
+    } catch (e) {
+      thrown = e
+    }
+    expect(thrown).toBeInstanceOf(Response)
+    expect((thrown as Response).status).toBe(402)
+    expect(await (thrown as Response).json()).toEqual({
+      error: 'Add balance or upgrade your plan to invoke this agent.',
+      code: 'billing.balance_required',
+      organizationId: 'org_1',
+    })
+  })
+
+  it('passes for overage tiers, positive balances, and disabled enforcement', () => {
+    assertBillableBalance({ overageAllowed: true, remainingBalanceUsd: 0 }, { env: enforced })
+    assertBillableBalance({ overageAllowed: false, remainingBalanceUsd: 5 }, { env: enforced })
+    assertBillableBalance(
+      { overageAllowed: false, remainingBalanceUsd: 0 },
+      { env: { APP_ENV: 'production', MY_FLAG: 'disabled' }, enforcementEnvVar: 'MY_FLAG' },
+    )
+    assertBillableBalance({ overageAllowed: false, remainingBalanceUsd: 0 }, { env: { APP_ENV: 'development' } })
+  })
+})
