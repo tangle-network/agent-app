@@ -122,6 +122,11 @@
       "import": "./dist/web/index.js",
       "default": "./dist/web/index.js"
     },
+    "./web-react": {
+      "types": "./dist/web-react/index.d.ts",
+      "import": "./dist/web-react/index.js",
+      "default": "./dist/web-react/index.js"
+    },
     "./redact": {
       "types": "./dist/redact/index.d.ts",
       "import": "./dist/redact/index.js",
@@ -148,19 +153,25 @@
     "@types/node": "^25.6.0",
     "tsup": "^8.0.0",
     "typescript": "^5.7.0",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "react": "^19.0.0",
+    "@types/react": "^19.0.0"
   },
   "peerDependencies": {
     "@tangle-network/agent-eval": ">=0.82.0",
     "@tangle-network/agent-integrations": ">=0.32.0",
     "@tangle-network/agent-knowledge": ">=1.5.0",
-    "@tangle-network/agent-runtime": ">=0.21.0"
+    "@tangle-network/agent-runtime": ">=0.21.0",
+    "react": ">=18"
   },
   "peerDependenciesMeta": {
     "@tangle-network/agent-knowledge": {
       "optional": true
     },
     "@tangle-network/agent-runtime": {
+      "optional": true
+    },
+    "react": {
       "optional": true
     }
   }
