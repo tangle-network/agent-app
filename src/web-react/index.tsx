@@ -17,6 +17,8 @@
  */
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+
+export * from './chat-stream'
 import type { CatalogModel } from '../runtime/model-catalog'
 
 // ── shared glyphs (no icon-library dependency) ────────────────────────────
@@ -573,9 +575,17 @@ export function ChatMessages({
               {formatModelCost(msg, models) && <span>{formatModelCost(msg, models)}</span>}
             </div>
             {msg.reasoning && (
-              <details className="mb-2 rounded-md border border-border/40 bg-muted/30 px-3 py-2">
-                <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">Thinking…</summary>
-                <div className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground/80">{msg.reasoning}</div>
+              <details
+                className="mb-2 rounded-md border border-border/40 bg-muted/30 px-3 py-2"
+                open={!msg.content}
+              >
+                <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
+                  {msg.content ? 'Thinking…' : 'Thinking'}
+                  {!msg.content && <span className="ml-1 inline-block animate-pulse">●</span>}
+                </summary>
+                <div className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap text-sm text-muted-foreground/80">
+                  {msg.reasoning}
+                </div>
               </details>
             )}
             <div className="text-base leading-[1.75]">{renderBody(msg.content)}</div>
