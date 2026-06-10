@@ -1,0 +1,1177 @@
+[
+ {
+  "id": "claude-sonnet-4-6",
+  "name": "Claude Sonnet 4.6",
+  "description": "Sonnet 4.6 is Anthropic's most capable Sonnet-class model yet, with frontier per",
+  "_provider": "anthropic",
+  "pricing": {
+   "prompt": "0.000003",
+   "completion": "0.000015"
+  },
+  "context_length": 1000000,
+  "architecture": {
+   "modality": "text+image+file->text",
+   "input_modalities": [
+    "text",
+    "image",
+    "file"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "tokenizer": "Claude",
+   "instruct_type": null
+  },
+  "supported_parameters": [
+   "include_reasoning",
+   "max_completion_tokens",
+   "max_tokens",
+   "reasoning",
+   "response_format",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "top_k",
+   "top_p",
+   "verbosity"
+  ],
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "anthropic",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "claude-opus-4-7",
+  "name": "Claude Opus 4.7",
+  "description": "Opus 4.7 is the next generation of Anthropic's Opus family, built for long-runni",
+  "_provider": "anthropic",
+  "pricing": {
+   "prompt": "0.000005",
+   "completion": "0.000025"
+  },
+  "context_length": 1000000,
+  "architecture": {
+   "modality": "text+image+file->text",
+   "input_modalities": [
+    "text",
+    "image",
+    "file"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "tokenizer": "Claude",
+   "instruct_type": null
+  },
+  "supported_parameters": [
+   "include_reasoning",
+   "max_tokens",
+   "reasoning",
+   "response_format",
+   "stop",
+   "structured_outputs",
+   "tool_choice",
+   "tools",
+   "verbosity"
+  ],
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "anthropic",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "claude-opus-4-6",
+  "name": "Claude Opus 4.6",
+  "description": "Opus 4.6 is Anthropic\u2019s strongest model for coding and long-running professional",
+  "_provider": "anthropic",
+  "pricing": {
+   "prompt": "0.000005",
+   "completion": "0.000025"
+  },
+  "context_length": 1000000,
+  "architecture": {
+   "modality": "text+image+file->text",
+   "input_modalities": [
+    "text",
+    "image",
+    "file"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "tokenizer": "Claude",
+   "instruct_type": null
+  },
+  "supported_parameters": [
+   "include_reasoning",
+   "max_completion_tokens",
+   "max_tokens",
+   "reasoning",
+   "response_format",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "top_k",
+   "top_p",
+   "verbosity"
+  ],
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "anthropic",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "claude-haiku-4-5-20251001",
+  "name": "Claude Haiku 4.5",
+  "_provider": "anthropic",
+  "pricing": {
+   "prompt": "0.0000001",
+   "completion": "0.0000005"
+  },
+  "context_length": 64000,
+  "architecture": {
+   "modality": "multimodal",
+   "input_modalities": [
+    "text",
+    "image"
+   ],
+   "output_modalities": [
+    "text"
+   ]
+  },
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "anthropic",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "gpt-5",
+  "name": "gpt-5",
+  "description": "GPT-5 is OpenAI\u2019s most advanced model, offering major improvements in reasoning,",
+  "_provider": "openai",
+  "pricing": {
+   "prompt": "0.00000125",
+   "completion": "0.00001"
+  },
+  "context_length": 400000,
+  "architecture": {
+   "modality": "text+image+file->text",
+   "input_modalities": [
+    "text",
+    "image",
+    "file"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "tokenizer": "GPT",
+   "instruct_type": null
+  },
+  "supported_parameters": [
+   "include_reasoning",
+   "max_completion_tokens",
+   "max_tokens",
+   "reasoning",
+   "response_format",
+   "seed",
+   "structured_outputs",
+   "tool_choice",
+   "tools"
+  ],
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "openai",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "gpt-5-mini",
+  "name": "gpt-5-mini",
+  "description": "GPT-5 Mini is a compact version of GPT-5, designed to handle lighter-weight reas",
+  "_provider": "openai",
+  "pricing": {
+   "prompt": "0.00000025",
+   "completion": "0.000002"
+  },
+  "context_length": 400000,
+  "architecture": {
+   "modality": "text+image+file->text",
+   "input_modalities": [
+    "text",
+    "image",
+    "file"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "tokenizer": "GPT",
+   "instruct_type": null
+  },
+  "supported_parameters": [
+   "include_reasoning",
+   "max_completion_tokens",
+   "max_tokens",
+   "reasoning",
+   "response_format",
+   "seed",
+   "structured_outputs",
+   "tool_choice",
+   "tools"
+  ],
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "openai",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "gemini-3.1-pro-preview",
+  "name": "Gemini 3.1 Pro Preview",
+  "description": "Gemini 3.1 Pro Preview is Google\u2019s frontier reasoning model, delivering enhanced",
+  "_provider": "google",
+  "pricing": {
+   "prompt": "0.000002",
+   "completion": "0.000012"
+  },
+  "context_length": 1048576,
+  "architecture": {
+   "modality": "text+image+file+audio+video->text",
+   "input_modalities": [
+    "audio",
+    "file",
+    "image",
+    "text",
+    "video"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "tokenizer": "Gemini",
+   "instruct_type": null
+  },
+  "supported_parameters": [
+   "include_reasoning",
+   "max_tokens",
+   "reasoning",
+   "response_format",
+   "seed",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "top_p"
+  ],
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "google",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "gemini-2.5-pro",
+  "name": "Gemini 2.5 Pro",
+  "description": "Gemini 2.5 Pro is Google\u2019s state-of-the-art AI model designed for advanced reaso",
+  "_provider": "google",
+  "pricing": {
+   "prompt": "0.00000125",
+   "completion": "0.00001"
+  },
+  "context_length": 1048576,
+  "architecture": {
+   "modality": "text+image+file+audio+video->text",
+   "input_modalities": [
+    "text",
+    "image",
+    "file",
+    "audio",
+    "video"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "tokenizer": "Gemini",
+   "instruct_type": null
+  },
+  "supported_parameters": [
+   "include_reasoning",
+   "max_tokens",
+   "reasoning",
+   "response_format",
+   "seed",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "top_p"
+  ],
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "google",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "gemini-2.5-flash",
+  "name": "Gemini 2.5 Flash",
+  "description": "Gemini 2.5 Flash is Google's state-of-the-art workhorse model, specifically desi",
+  "_provider": "google",
+  "pricing": {
+   "prompt": "0.0000003",
+   "completion": "0.0000025"
+  },
+  "context_length": 1048576,
+  "architecture": {
+   "modality": "text+image+file+audio+video->text",
+   "input_modalities": [
+    "file",
+    "image",
+    "text",
+    "audio",
+    "video"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "tokenizer": "Gemini",
+   "instruct_type": null
+  },
+  "supported_parameters": [
+   "include_reasoning",
+   "max_tokens",
+   "reasoning",
+   "response_format",
+   "seed",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "top_p"
+  ],
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "google",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "chatgpt-image-latest",
+  "name": "chatgpt-image-latest",
+  "_provider": "openai",
+  "pricing": {
+   "prompt": "0.0000005",
+   "completion": "0.000001"
+  },
+  "context_length": 16384,
+  "architecture": {
+   "modality": "image",
+   "input_modalities": [
+    "text"
+   ],
+   "output_modalities": [
+    "image"
+   ]
+  },
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "openai",
+   "mode": "system",
+   "endpoints": {
+    "images_generations": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "gpt-5-2025-08-07",
+  "name": "gpt-5-2025-08-07",
+  "_provider": "openai",
+  "pricing": {
+   "prompt": "0.000000125",
+   "completion": "0.000001"
+  },
+  "context_length": 128000,
+  "architecture": {
+   "modality": "multimodal",
+   "input_modalities": [
+    "text",
+    "image"
+   ],
+   "output_modalities": [
+    "text"
+   ]
+  },
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "openai",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "gpt-5.1",
+  "name": "gpt-5.1",
+  "description": "GPT-5.1 is the latest frontier-grade model in the GPT-5 series, offering stronge",
+  "_provider": "openai",
+  "pricing": {
+   "prompt": "0.00000125",
+   "completion": "0.00001"
+  },
+  "context_length": 400000,
+  "architecture": {
+   "modality": "text+image+file->text",
+   "input_modalities": [
+    "image",
+    "text",
+    "file"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "tokenizer": "GPT",
+   "instruct_type": null
+  },
+  "supported_parameters": [
+   "include_reasoning",
+   "max_completion_tokens",
+   "max_tokens",
+   "reasoning",
+   "response_format",
+   "seed",
+   "structured_outputs",
+   "tool_choice",
+   "tools"
+  ],
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "openai",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "gpt-5.1-codex",
+  "name": "gpt-5.1-codex",
+  "description": "GPT-5.1-Codex is a specialized version of GPT-5.1 optimized for software enginee",
+  "_provider": "openai",
+  "pricing": {
+   "prompt": "0.00000125",
+   "completion": "0.00001"
+  },
+  "context_length": 400000,
+  "architecture": {
+   "modality": "text+image->text",
+   "input_modalities": [
+    "text",
+    "image"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "tokenizer": "GPT",
+   "instruct_type": null
+  },
+  "supported_parameters": [
+   "include_reasoning",
+   "max_completion_tokens",
+   "max_tokens",
+   "reasoning",
+   "response_format",
+   "seed",
+   "structured_outputs",
+   "tool_choice",
+   "tools"
+  ],
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "openai",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "gpt-realtime",
+  "name": "gpt-realtime",
+  "_provider": "openai",
+  "pricing": {
+   "prompt": "0.0000004",
+   "completion": "0.0000016"
+  },
+  "context_length": 16384,
+  "architecture": {
+   "modality": "text",
+   "input_modalities": [
+    "text"
+   ],
+   "output_modalities": [
+    "text"
+   ]
+  },
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "openai",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "openai/gpt-oss-120b",
+  "name": "OpenAI: gpt-oss-120b",
+  "description": "gpt-oss-120b is an open-weight, 117B-parameter Mixture-of-Experts (MoE) language",
+  "_provider": "openai",
+  "pricing": {
+   "prompt": "0.000000039",
+   "completion": "0.00000018"
+  },
+  "context_length": 131072,
+  "architecture": {
+   "modality": "text->text",
+   "input_modalities": [
+    "text"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "tokenizer": "GPT",
+   "instruct_type": null
+  },
+  "supported_parameters": [
+   "frequency_penalty",
+   "include_reasoning",
+   "logit_bias",
+   "logprobs",
+   "max_tokens",
+   "min_p",
+   "presence_penalty",
+   "reasoning",
+   "repetition_penalty",
+   "response_format",
+   "seed",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "top_k",
+   "top_logprobs",
+   "top_p"
+  ],
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "openai",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "openai/gpt-oss-120b:free",
+  "name": "OpenAI: gpt-oss-120b (free)",
+  "description": "gpt-oss-120b is an open-weight, 117B-parameter Mixture-of-Experts (MoE) language",
+  "_provider": "openai",
+  "pricing": {
+   "prompt": "0",
+   "completion": "0"
+  },
+  "context_length": 131072,
+  "architecture": {
+   "modality": "text->text",
+   "input_modalities": [
+    "text"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "tokenizer": "GPT",
+   "instruct_type": null
+  },
+  "supported_parameters": [
+   "include_reasoning",
+   "max_tokens",
+   "reasoning",
+   "seed",
+   "stop",
+   "temperature",
+   "tool_choice",
+   "tools"
+  ],
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "openai",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "text-embedding-3-large",
+  "name": "text-embedding-3-large",
+  "_provider": "openai",
+  "pricing": {
+   "prompt": "0.000000013",
+   "completion": "0"
+  },
+  "context_length": 16384,
+  "architecture": {
+   "modality": "embedding",
+   "input_modalities": [
+    "text"
+   ],
+   "output_modalities": [
+    "embeddings"
+   ]
+  },
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "openai",
+   "mode": "system",
+   "endpoints": {
+    "embeddings": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "tts-1",
+  "name": "tts-1",
+  "_provider": "openai",
+  "pricing": {
+   "prompt": "0.0000015",
+   "completion": "0"
+  },
+  "context_length": 16384,
+  "architecture": {
+   "modality": "audio",
+   "input_modalities": [
+    "text"
+   ],
+   "output_modalities": [
+    "audio"
+   ]
+  },
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "openai",
+   "mode": "system",
+   "endpoints": {
+    "audio_speech": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "anthropic/claude-opus-4-5",
+  "name": "Anthropic: Claude Opus 4.5",
+  "description": "Claude Opus 4.5 is Anthropic\u2019s frontier reasoning model optimized for complex so",
+  "_provider": "anthropic",
+  "pricing": {
+   "prompt": "0.000005",
+   "completion": "0.000025"
+  },
+  "context_length": 200000,
+  "architecture": {
+   "modality": "text+image+file->text",
+   "input_modalities": [
+    "file",
+    "image",
+    "text"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "tokenizer": "Claude",
+   "instruct_type": null
+  },
+  "supported_parameters": [
+   "include_reasoning",
+   "max_tokens",
+   "reasoning",
+   "response_format",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "top_k",
+   "verbosity"
+  ],
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "anthropic",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "claude-opus-4-5-20251101",
+  "name": "Claude Opus 4.5",
+  "_provider": "anthropic",
+  "pricing": {
+   "prompt": "0.0000005",
+   "completion": "0.0000025"
+  },
+  "context_length": 64000,
+  "architecture": {
+   "modality": "multimodal",
+   "input_modalities": [
+    "text",
+    "image"
+   ],
+   "output_modalities": [
+    "text"
+   ]
+  },
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "anthropic",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "mistral-large-2512",
+  "name": "mistral-large-2512",
+  "description": "Mistral Large 3 2512 is Mistral\u2019s most capable model to date, featuring a sparse",
+  "_provider": "mistral",
+  "pricing": {
+   "prompt": "0.0000005",
+   "completion": "0.0000015"
+  },
+  "context_length": 262144,
+  "architecture": {
+   "modality": "text+image+file->text",
+   "input_modalities": [
+    "text",
+    "image",
+    "file"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "tokenizer": "Mistral",
+   "instruct_type": null
+  },
+  "supported_parameters": [
+   "frequency_penalty",
+   "max_tokens",
+   "presence_penalty",
+   "response_format",
+   "seed",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "top_p"
+  ],
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "mistral",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "deepseek-v4-flash",
+  "name": "deepseek-v4-flash",
+  "description": "DeepSeek V4 Flash is an efficiency-optimized Mixture-of-Experts model from DeepS",
+  "_provider": "deepseek",
+  "pricing": {
+   "prompt": "0.0000000983",
+   "completion": "0.0000001966"
+  },
+  "context_length": 1048576,
+  "architecture": {
+   "modality": "text->text",
+   "input_modalities": [
+    "text"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "tokenizer": "DeepSeek",
+   "instruct_type": null
+  },
+  "supported_parameters": [
+   "frequency_penalty",
+   "include_reasoning",
+   "logit_bias",
+   "logprobs",
+   "max_tokens",
+   "min_p",
+   "presence_penalty",
+   "reasoning",
+   "repetition_penalty",
+   "response_format",
+   "seed",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "top_k",
+   "top_logprobs",
+   "top_p"
+  ],
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "deepseek",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "glm-5",
+  "name": "glm-5",
+  "description": "GLM-5 is Z.ai\u2019s flagship open-source foundation model engineered for complex sys",
+  "_provider": "zai",
+  "pricing": {
+   "prompt": "0.0000006",
+   "completion": "0.00000192"
+  },
+  "context_length": 202752,
+  "architecture": {
+   "modality": "text->text",
+   "input_modalities": [
+    "text"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "tokenizer": "Other",
+   "instruct_type": null
+  },
+  "supported_parameters": [
+   "frequency_penalty",
+   "include_reasoning",
+   "logit_bias",
+   "max_tokens",
+   "min_p",
+   "presence_penalty",
+   "reasoning",
+   "repetition_penalty",
+   "response_format",
+   "seed",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "top_k",
+   "top_p"
+  ],
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "zai",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "glm-5.1",
+  "name": "glm-5.1",
+  "description": "GLM-5.1 delivers a major leap in coding capability, with particularly significan",
+  "_provider": "zai",
+  "pricing": {
+   "prompt": "0.00000098",
+   "completion": "0.00000308"
+  },
+  "context_length": 202752,
+  "architecture": {
+   "modality": "text->text",
+   "input_modalities": [
+    "text"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "tokenizer": "Other",
+   "instruct_type": null
+  },
+  "supported_parameters": [
+   "frequency_penalty",
+   "include_reasoning",
+   "logit_bias",
+   "logprobs",
+   "max_tokens",
+   "min_p",
+   "parallel_tool_calls",
+   "presence_penalty",
+   "reasoning",
+   "reasoning_effort",
+   "repetition_penalty",
+   "response_format",
+   "seed",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "top_k",
+   "top_logprobs",
+   "top_p"
+  ],
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "zai",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "grok-4.3",
+  "name": "grok-4.3",
+  "description": "Grok 4.3 is a reasoning model from xAI. It accepts text and image inputs with te",
+  "_provider": "xai",
+  "pricing": {
+   "prompt": "0.00000125",
+   "completion": "0.0000025"
+  },
+  "context_length": 1000000,
+  "architecture": {
+   "modality": "text+image->text",
+   "input_modalities": [
+    "text",
+    "image"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "tokenizer": "Grok",
+   "instruct_type": null
+  },
+  "supported_parameters": [
+   "frequency_penalty",
+   "include_reasoning",
+   "logprobs",
+   "max_tokens",
+   "presence_penalty",
+   "reasoning",
+   "response_format",
+   "seed",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "top_logprobs",
+   "top_p"
+  ],
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "xai",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ },
+ {
+  "id": "grok-build-0.1",
+  "name": "grok-build-0.1",
+  "description": "Grok Build 0.1 is xAI\u2019s fast coding model trained specifically for agentic softw",
+  "_provider": "xai",
+  "pricing": {
+   "prompt": "0.000001",
+   "completion": "0.000002"
+  },
+  "context_length": 256000,
+  "architecture": {
+   "modality": "text+image->text",
+   "input_modalities": [
+    "text",
+    "image"
+   ],
+   "output_modalities": [
+    "text"
+   ],
+   "tokenizer": "Grok",
+   "instruct_type": null
+  },
+  "supported_parameters": [
+   "frequency_penalty",
+   "include_reasoning",
+   "logprobs",
+   "max_tokens",
+   "presence_penalty",
+   "reasoning",
+   "response_format",
+   "seed",
+   "stop",
+   "structured_outputs",
+   "temperature",
+   "tool_choice",
+   "tools",
+   "top_logprobs",
+   "top_p"
+  ],
+  "routeability": {
+   "status": "routeable",
+   "routeable": true,
+   "provider": "xai",
+   "mode": "system",
+   "endpoints": {
+    "chat_completions": {
+     "status": "routeable",
+     "routeable": true
+    }
+   }
+  }
+ }
+]
