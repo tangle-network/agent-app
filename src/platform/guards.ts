@@ -100,11 +100,12 @@ export interface AssertBillableBalanceOptions {
 export function assertBillableBalance(state: BillableBalanceState, opts: AssertBillableBalanceOptions = {}): void {
   if (isTangleBillingEnforcementDisabled({ env: opts.env, enforcementEnvVar: opts.enforcementEnvVar })) return
   if (state.overageAllowed || state.remainingBalanceUsd > 0) return
+  // errorBody first: the stable error/code contract always wins over caller extras.
   throw Response.json(
     {
+      ...opts.errorBody,
       error: opts.errorMessage ?? 'Add balance or upgrade your plan to invoke this agent.',
       code: 'billing.balance_required',
-      ...opts.errorBody,
     },
     { status: 402 },
   )

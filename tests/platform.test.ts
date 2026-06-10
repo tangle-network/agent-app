@@ -153,7 +153,12 @@ async function startThenCallback(
   const query = new URLSearchParams({ code: 'code_1', state: payload.s })
   const m = mutate(query, cookie)
   return harness.handlers.callback(
-    new Request(`https://my.app/auth/tangle/callback?${m.query}`, { headers: m.cookie ? { cookie: m.cookie } : {} }),
+    new Request(`https://my.app/auth/tangle/callback?${m.query}`, {
+      headers: {
+        ...(m.cookie ? { cookie: m.cookie } : {}),
+        'x-forwarded-for': '9.9.9.9, 10.0.0.1',
+      },
+    }),
   )
 }
 
@@ -165,6 +170,7 @@ describe('createTangleSsoHandlers — callback', () => {
     expect(res.headers.get('Location')).toBe('/app/x')
     expect(h.calls).toEqual(['exchange:code_1', 'upsertUser', 'createSession', 'saveLink'])
     expect(h.saved.user).toEqual({ email: 'a@b.co', name: 'Ada' })
+    expect(h.saved.session).toMatchObject({ ipAddress: '9.9.9.9' })
     expect(h.saved.link).toMatchObject({
       userId: 'u_1',
       sessionToken: 'tok_abc',
@@ -667,6 +673,24 @@ describe('assertBillableBalance', () => {
       error: 'Add balance or upgrade your plan to invoke this agent.',
       code: 'billing.balance_required',
       organizationId: 'org_1',
+    })
+  })
+
+  it('errorBody extras cannot shadow the stable error/code contract', async () => {
+    let thrown: unknown
+    try {
+      assertBillableBalance(
+        { overageAllowed: false, remainingBalanceUsd: 0 },
+        { env: enforced, errorBody: { code: 'spoofed', error: 'spoofed', extra: 1 } },
+      )
+    } catch (e) {
+      thrown = e
+    }
+    const body = await (thrown as Response).json()
+    expect(body).toEqual({
+      error: 'Add balance or upgrade your plan to invoke this agent.',
+      code: 'billing.balance_required',
+      extra: 1,
     })
   })
 

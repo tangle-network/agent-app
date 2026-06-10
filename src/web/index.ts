@@ -95,8 +95,13 @@ export interface CookieOptions {
 }
 
 /** Serialize a Set-Cookie header value: `name=encodeURIComponent(value)` plus
- *  attributes in Path / HttpOnly / SameSite / Max-Age / Secure order. */
+ *  attributes in Path / HttpOnly / SameSite / Max-Age / Secure order.
+ *  Throws on `SameSite=None` without `secure` — browsers silently drop that
+ *  combination, which would otherwise fail invisibly. */
 export function serializeCookie(value: string, opts: CookieOptions): string {
+  if (opts.sameSite === 'None' && !opts.secure) {
+    throw new Error('SameSite=None cookies require secure: true (browsers reject them otherwise)')
+  }
   const parts = [`${opts.name}=${encodeURIComponent(value)}`, `Path=${opts.path ?? '/'}`]
   if (opts.httpOnly !== false) parts.push('HttpOnly')
   parts.push(`SameSite=${opts.sameSite ?? 'Lax'}`)

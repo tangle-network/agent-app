@@ -179,6 +179,16 @@ function redirectResponse(location: string, headers = new Headers()): Response {
   return new Response(null, { status: 302, headers })
 }
 
+/** Real client IP: `CF-Connecting-IP` behind Cloudflare, else the first
+ *  `x-forwarded-for` hop (the rest of the list is sender-controlled). */
+function clientIp(request: Request): string | null {
+  return (
+    request.headers.get('CF-Connecting-IP') ??
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    null
+  )
+}
+
 interface StateCookiePayload {
   s: string
   r: string
@@ -266,7 +276,7 @@ export function createTangleSsoHandlers(opts: TangleSsoHandlerOptions): TangleSs
       const { token } = await opts.store.createSession({
         userId,
         expiresAt,
-        ipAddress: request.headers.get('x-forwarded-for'),
+        ipAddress: clientIp(request),
         userAgent: request.headers.get('user-agent'),
       })
 
