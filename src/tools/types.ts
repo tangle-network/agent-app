@@ -44,6 +44,10 @@ export interface SubmitProposalArgs {
   type: string
   title: string
   description?: string | null
+  /** Stamped by dispatch from the approval policy (needsApproval predicate or
+   *  taxonomy.regulatedTypes). Handlers MUST queue (never auto-execute) when
+   *  true. Products don't set this; dispatch owns it — fail-closed. */
+  regulated?: boolean
 }
 export interface SubmitProposalResult {
   proposalId: string
