@@ -426,8 +426,11 @@ export interface ChatToolCallInfo {
   id: string
   name: string
   status: 'running' | 'done' | 'error'
+  /** The call arguments, captured from the tool_call event — shown in the
+   *  expanded card so users see exactly what the agent invoked. */
+  args?: Record<string, unknown>
   /** The tool outcome (`{ok, result}` shape). When `result.status` is
-   *  'queued_for_approval' the chip renders the approval state. */
+   *  'queued_for_approval' the card renders the approval state. */
   result?: unknown
 }
 
@@ -462,8 +465,10 @@ export interface ChatMessagesProps {
   /** Approve/Reject handlers for proposals awaiting approval. When omitted the
    *  chip still shows "awaiting approval" but without action buttons. */
   approval?: ProposalApprovalHandlers
-  /** Make tool chips clickable (e.g. open a {@link RunDrillIn} panel). */
+  /** Open a full-transcript view (e.g. {@link RunDrillIn}) from a tool card. */
   onToolCallClick?: (call: ChatToolCallInfo, message: ChatUiMessage) => void
+  /** Per-tool custom detail renderers for expanded tool cards. */
+  toolRenderers?: ToolDetailRenderers
 }
 
 export interface ProposalApprovalHandlers {
@@ -471,68 +476,173 @@ export interface ProposalApprovalHandlers {
   onReject: (proposalId: string, toolCallId: string) => void | Promise<void>
 }
 
-function ToolChips({
-  toolCalls,
-  approval,
-  onClick,
-}: {
-  toolCalls: ChatToolCallInfo[]
-  approval?: ProposalApprovalHandlers
-  onClick?: (call: ChatToolCallInfo) => void
-}) {
+/** Per-tool custom detail renderers for the expanded card body — keyed by
+ *  tool name. Return null to fall back to the generic detail view. */
+export type ToolDetailRenderers = Record<
+  string,
+  (call: ChatToolCallInfo, message: ChatUiMessage) => ReactNode
+>
+
+function toolOutcomeOf(call: ChatToolCallInfo): { ok?: boolean; result?: Record<string, unknown>; message?: string } | undefined {
+  return call.result as { ok?: boolean; result?: Record<string, unknown>; message?: string } | undefined
+}
+
+/** Human title for a call, derived from its real arguments. */
+function friendlyToolTitle(call: ChatToolCallInfo): string {
+  const a = call.args ?? {}
+  switch (call.name) {
+    case 'submit_proposal':
+      return `Proposal · ${String(a.type ?? '')}${a.title ? `: ${String(a.title)}` : ''}`
+    case 'sandbox_create':
+      return `Create sandbox (${String(a.environment ?? 'universal')})`
+    case 'sandbox_run_command':
+      return `$ ${String(a.command ?? '')}`
+    case 'sandbox_destroy':
+      return `Destroy sandbox ${String(a.sandbox_id ?? '')}`
+    case 'schedule_followup':
+      return `Follow-up · ${String(a.title ?? '')}`
+    case 'render_ui':
+      return `Render view · ${String(a.title ?? '')}`
+    case 'add_citation':
+      return `Citation · ${String(a.path ?? '')}`
+    default:
+      return call.name
+  }
+}
+
+function truncate(v: unknown, max = 240): string {
+  const s = typeof v === 'string' ? v : JSON.stringify(v)
+  return s.length > max ? `${s.slice(0, max)}…` : s
+}
+
+function KvRows({ data }: { data: Record<string, unknown> }) {
+  const entries = Object.entries(data).filter(([, v]) => v !== undefined && v !== null && v !== '')
+  if (!entries.length) return null
   return (
-    <div className="mt-2 flex flex-col gap-1">
-      {toolCalls.map((tc) => {
-        const pending = tc.status === 'done' ? pendingApprovalOf(tc) : null
-        if (pending) {
-          return (
-            <div
-              key={tc.id}
-              className="inline-flex w-fit items-center gap-2 rounded-md bg-amber-500/10 px-2.5 py-1 text-xs text-amber-700"
+    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+      {entries.map(([k, v]) => (
+        <div key={k} className="contents">
+          <dt className="font-mono text-[11px] text-muted-foreground/70">{k}</dt>
+          <dd className="min-w-0 whitespace-pre-wrap break-words font-mono text-[11px] text-muted-foreground">
+            {truncate(v)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+/** Generic expanded detail: what was called, and what actually happened. */
+function DefaultToolDetail({ call }: { call: ChatToolCallInfo }) {
+  const outcome = toolOutcomeOf(call)
+  return (
+    <div className="space-y-2">
+      {call.args && Object.keys(call.args).length > 0 && (
+        <div>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/50">Called with</p>
+          <KvRows data={call.args} />
+        </div>
+      )}
+      {outcome && (
+        <div>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/50">
+            {outcome.ok === false ? 'Failed' : 'Result'}
+          </p>
+          {outcome.ok === false ? (
+            <p className="text-xs text-red-600">{outcome.message ?? 'Tool failed'}</p>
+          ) : outcome.result && typeof outcome.result === 'object' ? (
+            <KvRows data={outcome.result} />
+          ) : (
+            <p className="font-mono text-[11px] text-muted-foreground">{truncate(outcome.result)}</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ToolCallCard({
+  call,
+  message,
+  approval,
+  onOpenRun,
+  renderers,
+}: {
+  call: ChatToolCallInfo
+  message: ChatUiMessage
+  approval?: ProposalApprovalHandlers
+  onOpenRun?: (call: ChatToolCallInfo, message: ChatUiMessage) => void
+  renderers?: ToolDetailRenderers
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const pending = call.status === 'done' ? pendingApprovalOf(call) : null
+  const failed = call.status === 'error' || toolOutcomeOf(call)?.ok === false
+  const custom = renderers?.[call.name]?.(call, message)
+
+  return (
+    <div
+      className={`w-fit min-w-[280px] max-w-full rounded-lg border text-xs transition ${
+        pending
+          ? 'border-amber-300/60 bg-amber-500/5'
+          : failed
+            ? 'border-red-300/60 bg-red-500/5'
+            : 'border-border/60 bg-muted/20'
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left"
+      >
+        <span
+          className={`h-2 w-2 shrink-0 rounded-full ${
+            call.status === 'running'
+              ? 'animate-pulse bg-yellow-500'
+              : pending
+                ? 'bg-amber-500'
+                : failed
+                  ? 'bg-red-500'
+                  : 'bg-green-500'
+          }`}
+        />
+        <span className="min-w-0 flex-1 truncate font-medium">{friendlyToolTitle(call)}</span>
+        {pending && approval && (
+          <span className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => approval.onApprove(pending.proposalId, call.id)}
+              className="rounded bg-green-600/90 px-2 py-0.5 text-[11px] font-semibold text-white transition hover:bg-green-600"
             >
-              <span className="font-mono opacity-70">⏸</span>
-              <span className="font-medium">{tc.name}</span>
-              <span className="opacity-60">awaiting approval</span>
-              {approval && (
-                <span className="ml-1 inline-flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => approval.onApprove(pending.proposalId, tc.id)}
-                    className="rounded bg-green-600/90 px-2 py-0.5 text-[11px] font-semibold text-white transition hover:bg-green-600"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => approval.onReject(pending.proposalId, tc.id)}
-                    className="rounded border border-border bg-card px-2 py-0.5 text-[11px] font-medium text-foreground transition hover:bg-accent/30"
-                  >
-                    Reject
-                  </button>
-                </span>
-              )}
-            </div>
-          )
-        }
-        const Tag = onClick ? 'button' : 'div'
-        return (
-          <Tag
-            key={tc.id}
-            {...(onClick ? { type: 'button' as const, onClick: () => onClick(tc) } : {})}
-            className={`inline-flex w-fit items-center gap-2 rounded-md px-2.5 py-1 text-xs ${
-              tc.status === 'running'
-                ? 'bg-yellow-500/10 text-yellow-700'
-                : tc.status === 'error'
-                  ? 'bg-red-500/10 text-red-700'
-                  : 'bg-green-500/10 text-green-700'
-            } ${onClick ? 'cursor-pointer transition hover:ring-1 hover:ring-border' : ''}`}
-          >
-            <span className="font-mono opacity-70">{tc.status === 'running' ? '⚡' : tc.status === 'error' ? '✗' : '✓'}</span>
-            <span className="font-medium">{tc.name}</span>
-            <span className="opacity-60">{tc.status === 'running' ? 'running…' : tc.status === 'error' ? 'failed' : 'done'}</span>
-          </Tag>
-        )
-      })}
+              Approve
+            </button>
+            <button
+              type="button"
+              onClick={() => approval.onReject(pending.proposalId, call.id)}
+              className="rounded border border-border bg-card px-2 py-0.5 text-[11px] font-medium text-foreground transition hover:bg-accent/30"
+            >
+              Reject
+            </button>
+          </span>
+        )}
+        <span className="shrink-0 text-[11px] text-muted-foreground/70">
+          {call.status === 'running' ? 'running…' : pending ? 'awaiting approval' : failed ? 'failed' : 'done'}
+        </span>
+        <ChevronDown className={`h-3 w-3 shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
+      </button>
+      {expanded && (
+        <div className="border-t border-border/40 px-3 py-2.5">
+          {custom ?? <DefaultToolDetail call={call} />}
+          {onOpenRun && call.name.startsWith('sandbox_') && (
+            <button
+              type="button"
+              onClick={() => onOpenRun(call, message)}
+              className="mt-2 rounded border border-border bg-card px-2 py-1 text-[11px] font-medium transition hover:bg-accent/30"
+            >
+              Open full transcript →
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -545,6 +655,7 @@ function AssistantMessage({
   renderBody,
   approval,
   onToolCallClick,
+  toolRenderers,
   renderExtras,
 }: {
   msg: ChatUiMessage
@@ -554,6 +665,7 @@ function AssistantMessage({
   renderBody: (content: string) => ReactNode
   approval?: ProposalApprovalHandlers
   onToolCallClick?: (call: ChatToolCallInfo, message: ChatUiMessage) => void
+  toolRenderers?: ToolDetailRenderers
   renderExtras?: (message: ChatUiMessage) => ReactNode
 }) {
   // Smooth reveal: chunky network slabs (model bursts, flush windows, replay
@@ -589,11 +701,18 @@ function AssistantMessage({
       )}
       <div className="text-base leading-[1.75]">{renderBody(content)}</div>
       {msg.toolCalls && msg.toolCalls.length > 0 && (
-        <ToolChips
-          toolCalls={msg.toolCalls}
-          approval={approval}
-          onClick={onToolCallClick ? (tc) => onToolCallClick(tc, msg) : undefined}
-        />
+        <div className="mt-2 flex flex-col gap-1.5">
+          {msg.toolCalls.map((tc) => (
+            <ToolCallCard
+              key={tc.id}
+              call={tc}
+              message={msg}
+              approval={approval}
+              onOpenRun={onToolCallClick}
+              renderers={toolRenderers}
+            />
+          ))}
+        </div>
       )}
       {renderExtras?.(msg)}
     </div>
@@ -635,6 +754,7 @@ export function ChatMessages({
   loading,
   approval,
   onToolCallClick,
+  toolRenderers,
 }: ChatMessagesProps) {
   const renderBody = renderMarkdown ?? ((content: string) => <p className="whitespace-pre-wrap">{content}</p>)
   const lastIsUser = messages[messages.length - 1]?.role === 'user'
@@ -662,6 +782,7 @@ export function ChatMessages({
             renderBody={renderBody}
             approval={approval}
             onToolCallClick={onToolCallClick}
+            toolRenderers={toolRenderers}
             renderExtras={renderExtras}
           />
         ),
