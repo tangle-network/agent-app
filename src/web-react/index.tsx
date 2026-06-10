@@ -18,9 +18,11 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ProviderLogo } from './provider-logo'
+import { useSmoothText } from './smooth-text'
 
 export * from './chat-stream'
 export * from './provider-logo'
+export * from './smooth-text'
 import type { CatalogModel } from '../runtime/model-catalog'
 
 // ── shared glyphs (no icon-library dependency) ────────────────────────────
@@ -535,6 +537,88 @@ function ToolChips({
   )
 }
 
+function AssistantMessage({
+  msg,
+  streaming,
+  models,
+  agentLabel,
+  renderBody,
+  approval,
+  onToolCallClick,
+  renderExtras,
+}: {
+  msg: ChatUiMessage
+  streaming: boolean
+  models: CatalogModel[]
+  agentLabel: string
+  renderBody: (content: string) => ReactNode
+  approval?: ProposalApprovalHandlers
+  onToolCallClick?: (call: ChatToolCallInfo, message: ChatUiMessage) => void
+  renderExtras?: (message: ChatUiMessage) => ReactNode
+}) {
+  // Smooth reveal: chunky network slabs (model bursts, flush windows, replay
+  // polls) paint as a continuous typewriter. Reasoning often arrives as one
+  // burst right before the answer — smoothing makes it visibly type out in
+  // the open thinking box instead of popping in and collapsing.
+  const content = useSmoothText(msg.content, streaming)
+  const reasoning = useSmoothText(msg.reasoning ?? '', streaming)
+  const reasoningScrollRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = reasoningScrollRef.current
+    if (el && streaming && !content) el.scrollTop = el.scrollHeight
+  }, [reasoning, streaming, content])
+
+  return (
+    <div className="mx-auto w-full max-w-3xl px-6 py-3">
+      <div className="mb-1 flex items-baseline gap-2 text-[11px] tracking-wide text-muted-foreground/60">
+        <span className="font-semibold uppercase">{agentLabel}</span>
+        {msg.modelUsed && <span className="font-mono normal-case">{msg.modelUsed}</span>}
+        {formatTokensPerSecond(msg) && <span>{formatTokensPerSecond(msg)}</span>}
+        {formatModelCost(msg, models) && <span>{formatModelCost(msg, models)}</span>}
+      </div>
+      {reasoning && (
+        <details className="mb-2 rounded-md border border-border/40 bg-muted/30 px-3 py-2" open={!content}>
+          <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
+            {content ? 'Thinking…' : 'Thinking'}
+            {!content && <span className="ml-1 inline-block animate-pulse">●</span>}
+          </summary>
+          <div ref={reasoningScrollRef} className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap text-sm text-muted-foreground/80">
+            {reasoning}
+          </div>
+        </details>
+      )}
+      <div className="text-base leading-[1.75]">{renderBody(content)}</div>
+      {msg.toolCalls && msg.toolCalls.length > 0 && (
+        <ToolChips
+          toolCalls={msg.toolCalls}
+          approval={approval}
+          onClick={onToolCallClick ? (tc) => onToolCallClick(tc, msg) : undefined}
+        />
+      )}
+      {renderExtras?.(msg)}
+    </div>
+  )
+}
+
+function ThinkingRow({ agentLabel }: { agentLabel: string }) {
+  const [seconds, setSeconds] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setSeconds((s) => s + 1), 1000)
+    return () => clearInterval(id)
+  }, [])
+  return (
+    <div className="mx-auto w-full max-w-3xl px-6 py-3">
+      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/60">{agentLabel}</p>
+      <div className="flex items-center gap-2 text-base text-muted-foreground">
+        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+          <path d="M21 12a9 9 0 1 1-6.219-8.56" strokeLinecap="round" />
+        </svg>
+        Thinking{seconds >= 3 ? ` · ${seconds}s` : '...'}
+      </div>
+    </div>
+  )
+}
+
 /**
  * The message thread: one centered column; user messages are right-aligned
  * bubbles with a User label; agent messages carry an Agent meta line with
@@ -569,50 +653,20 @@ export function ChatMessages({
             </div>
           </div>
         ) : (
-          <div key={msg.id} className="mx-auto w-full max-w-3xl px-6 py-3">
-            <div className="mb-1 flex items-baseline gap-2 text-[11px] tracking-wide text-muted-foreground/60">
-              <span className="font-semibold uppercase">{agentLabel}</span>
-              {msg.modelUsed && <span className="font-mono normal-case">{msg.modelUsed}</span>}
-              {formatTokensPerSecond(msg) && <span>{formatTokensPerSecond(msg)}</span>}
-              {formatModelCost(msg, models) && <span>{formatModelCost(msg, models)}</span>}
-            </div>
-            {msg.reasoning && (
-              <details
-                className="mb-2 rounded-md border border-border/40 bg-muted/30 px-3 py-2"
-                open={!msg.content}
-              >
-                <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
-                  {msg.content ? 'Thinking…' : 'Thinking'}
-                  {!msg.content && <span className="ml-1 inline-block animate-pulse">●</span>}
-                </summary>
-                <div className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap text-sm text-muted-foreground/80">
-                  {msg.reasoning}
-                </div>
-              </details>
-            )}
-            <div className="text-base leading-[1.75]">{renderBody(msg.content)}</div>
-            {msg.toolCalls && msg.toolCalls.length > 0 && (
-              <ToolChips
-                toolCalls={msg.toolCalls}
-                approval={approval}
-                onClick={onToolCallClick ? (tc) => onToolCallClick(tc, msg) : undefined}
-              />
-            )}
-            {renderExtras?.(msg)}
-          </div>
+          <AssistantMessage
+            key={msg.id}
+            msg={msg}
+            streaming={!!loading && msg.id === messages[messages.length - 1]?.id}
+            models={models}
+            agentLabel={agentLabel}
+            renderBody={renderBody}
+            approval={approval}
+            onToolCallClick={onToolCallClick}
+            renderExtras={renderExtras}
+          />
         ),
       )}
-      {loading && lastIsUser && (
-        <div className="mx-auto w-full max-w-3xl px-6 py-3">
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/60">{agentLabel}</p>
-          <div className="flex items-center gap-2 text-base text-muted-foreground">
-            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-              <path d="M21 12a9 9 0 1 1-6.219-8.56" strokeLinecap="round" />
-            </svg>
-            Thinking...
-          </div>
-        </div>
-      )}
+      {loading && lastIsUser && <ThinkingRow agentLabel={agentLabel} />}
     </>
   )
 }
