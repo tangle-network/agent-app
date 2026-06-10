@@ -1,8 +1,8 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "packageManager": "pnpm@10.33.4",
-  "description": "Application-shell framework for Tangle agent products: a bounded tool loop, the structured agent\u2192app tool side channel, integration-hub client, per-workspace billing, and crypto \u2014 composed over the Tangle agent substrate through typed seams.",
+  "description": "Application-shell framework for Tangle agent products: a bounded tool loop, the structured agent→app tool side channel, integration-hub client, per-workspace billing, and crypto — composed over the Tangle agent substrate through typed seams.",
   "keywords": [
     "tangle",
     "ai-agent",
@@ -141,6 +141,11 @@
       "types": "./dist/store/index.d.ts",
       "import": "./dist/store/index.js",
       "default": "./dist/store/index.js"
+    },
+    "./assets": {
+      "types": "./dist/assets/index.d.ts",
+      "import": "./dist/assets/index.js",
+      "default": "./dist/assets/index.js"
     }
   },
   "scripts": {
@@ -156,11 +161,11 @@
     "@tangle-network/agent-integrations": "^0.32.0",
     "@tangle-network/agent-knowledge": "^1.5.2",
     "@types/node": "^25.6.0",
+    "@types/react": "^19.0.0",
+    "react": "^19.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.7.0",
-    "vitest": "^3.0.0",
-    "react": "^19.0.0",
-    "@types/react": "^19.0.0"
+    "vitest": "^3.0.0"
   },
   "peerDependencies": {
     "@tangle-network/agent-eval": ">=0.82.0",
@@ -179,5 +184,8 @@
     "react": {
       "optional": true
     }
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
   }
 }
