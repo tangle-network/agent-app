@@ -1,0 +1,154 @@
+/**
+ * Integrations-hub proxy routes: the app-side surface that forwards an
+ * authenticated user's requests to the platform's `/v1/integrations/*` API
+ * using their stored platform key. Auth, key lookup, and the wire client are
+ * structural seams (`HubProxyContext`); error detection is by name + shape so
+ * it survives bundlers duplicating module instances.
+ */
+
+export class TangleBearerMissingError extends Error {
+  constructor(readonly userId: string) {
+    super(`No Tangle platform link for user ${userId}`)
+    this.name = 'TangleBearerMissingError'
+  }
+}
+
+/** Structural guard (name + userId shape) — robust when the error class is
+ *  constructed in a different module instance than the one checking it. */
+export function isTangleBearerMissingError(error: unknown): error is TangleBearerMissingError {
+  return (
+    error instanceof Error &&
+    error.name === 'TangleBearerMissingError' &&
+    typeof (error as { userId?: unknown }).userId === 'string'
+  )
+}
+
+/** Structural detection of the platform hub wire error (name + numeric status). */
+export function isPlatformHubErrorLike(error: unknown): error is Error & { status: number; code?: string } {
+  return (
+    error instanceof Error &&
+    error.name === 'PlatformHubError' &&
+    typeof (error as { status?: unknown }).status === 'number'
+  )
+}
+
+/** Structural subset of the platform hub wire client — extra methods are fine. */
+export interface HubClientLike {
+  catalog(): Promise<unknown>
+  listConnections(): Promise<unknown>
+  revokeConnection(connectionId: string): Promise<unknown>
+  startAuth(input: {
+    providerId: string
+    connectorId: string
+    returnUrl: string
+    requestedScopes?: string[]
+  }): Promise<{ authorizationUrl: string; state: string }>
+  listHealthchecks(): Promise<unknown>
+}
+
+export interface HubProxyContext {
+  /** Resolve the authenticated user id. Throw the app's own auth Response /
+   *  redirect to reject — it propagates untouched. */
+  requireUserId(request: Request): Promise<string>
+  /** The user's platform bearer; throw `TangleBearerMissingError` when unlinked. */
+  getBearer(userId: string): Promise<string>
+  /** A hub client bound to the bearer. */
+  createHubClient(bearer: string): HubClientLike
+}
+
+export interface HubProxyRouteArgs {
+  request: Request
+  params?: Record<string, string | undefined>
+}
+
+export interface HubProxyRoutes {
+  /** GET → `{ catalog }`. */
+  catalog(args: HubProxyRouteArgs): Promise<Response>
+  /** GET → `{ connections }`. */
+  connections(args: HubProxyRouteArgs): Promise<Response>
+  /** DELETE → the platform revocation result verbatim; 405 otherwise. */
+  connectionDelete(args: { request: Request; params: { connectionId: string } }): Promise<Response>
+  /** GET → `{ healthchecks }`. */
+  healthchecks(args: HubProxyRouteArgs): Promise<Response>
+  /** POST `{ providerId, connectorId, returnUrl, requestedScopes? }` →
+   *  `{ authorizationUrl, state }`; 405 non-POST; 400 on bad JSON / missing fields. */
+  authStart(args: HubProxyRouteArgs): Promise<Response>
+}
+
+interface StartAuthBody {
+  providerId?: string
+  connectorId?: string
+  returnUrl?: string
+  requestedScopes?: string[]
+}
+
+export function createHubProxyRoutes(ctx: HubProxyContext): HubProxyRoutes {
+  /** Auth runs OUTSIDE the proxy try/catch so the app's auth throw (redirect
+   *  Response etc.) is never swallowed; bearer + platform errors are mapped. */
+  async function proxy(request: Request, call: (hub: HubClientLike) => Promise<Response>): Promise<Response> {
+    const userId = await ctx.requireUserId(request)
+    try {
+      const bearer = await ctx.getBearer(userId)
+      return await call(ctx.createHubClient(bearer))
+    } catch (err) {
+      if (isTangleBearerMissingError(err)) {
+        return Response.json({ error: 'tangle_link_required' }, { status: 412 })
+      }
+      if (isPlatformHubErrorLike(err)) {
+        return Response.json({ error: err.message, code: err.code }, { status: err.status })
+      }
+      throw err
+    }
+  }
+
+  return {
+    catalog: ({ request }) => proxy(request, async (hub) => Response.json({ catalog: await hub.catalog() })),
+
+    connections: ({ request }) =>
+      proxy(request, async (hub) => Response.json({ connections: await hub.listConnections() })),
+
+    connectionDelete: async ({ request, params }) => {
+      if (request.method !== 'DELETE') {
+        return Response.json({ error: 'Method not allowed' }, { status: 405 })
+      }
+      return proxy(request, async (hub) => Response.json(await hub.revokeConnection(params.connectionId)))
+    },
+
+    healthchecks: ({ request }) =>
+      proxy(request, async (hub) => Response.json({ healthchecks: await hub.listHealthchecks() })),
+
+    authStart: async ({ request }) => {
+      if (request.method !== 'POST') {
+        return Response.json({ error: 'Method not allowed' }, { status: 405 })
+      }
+      const userId = await ctx.requireUserId(request)
+      let body: StartAuthBody
+      try {
+        body = (await request.json()) as StartAuthBody
+      } catch {
+        return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
+      }
+      if (!body.providerId || !body.connectorId || !body.returnUrl) {
+        return Response.json({ error: 'providerId, connectorId, and returnUrl are required' }, { status: 400 })
+      }
+      try {
+        const bearer = await ctx.getBearer(userId)
+        const result = await ctx.createHubClient(bearer).startAuth({
+          providerId: body.providerId,
+          connectorId: body.connectorId,
+          returnUrl: body.returnUrl,
+          requestedScopes: body.requestedScopes,
+        })
+        return Response.json({ authorizationUrl: result.authorizationUrl, state: result.state })
+      } catch (err) {
+        if (isTangleBearerMissingError(err)) {
+          return Response.json({ error: 'tangle_link_required' }, { status: 412 })
+        }
+        if (isPlatformHubErrorLike(err)) {
+          return Response.json({ error: err.message, code: err.code }, { status: err.status })
+        }
+        throw err
+      }
+    },
+  }
+}

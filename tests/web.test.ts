@@ -79,3 +79,45 @@ describe('redactForIngestion', () => {
     expect(out.keep).toBe('plain'); expect(out.n).toBe(7); expect(out.b).toBe(true); expect(out.z).toBeNull()
   })
 })
+
+describe('cookie helpers', () => {
+  it('serializeCookie round-trips through readCookieValue, including special characters', async () => {
+    const { serializeCookie, readCookieValue } = await import('../src/web/index')
+    const value = 'a=b; c="d"&e'
+    const header = serializeCookie(value, { name: 'tok' })
+    expect(header).toMatch(/^tok=/)
+    expect(header).toContain('Path=/')
+    expect(header).toContain('HttpOnly')
+    expect(header).toContain('SameSite=Lax')
+    expect(header).not.toContain('Secure')
+    const cookieLine = header.split(';')[0]!
+    expect(readCookieValue(`other=x; ${cookieLine}; later=y`, 'tok')).toBe(value)
+  })
+
+  it('serializeCookie emits Max-Age and Secure when requested, in stable order', async () => {
+    const { serializeCookie } = await import('../src/web/index')
+    expect(serializeCookie('v', { name: 'n', secure: true, maxAgeSeconds: 600 })).toBe(
+      'n=v; Path=/; HttpOnly; SameSite=Lax; Max-Age=600; Secure',
+    )
+    expect(serializeCookie('v', { name: 'n', httpOnly: false, sameSite: 'Strict' })).toBe('n=v; Path=/; SameSite=Strict')
+  })
+
+  it('serializeCookie throws on SameSite=None without secure', async () => {
+    const { serializeCookie } = await import('../src/web/index')
+    expect(() => serializeCookie('v', { name: 'n', sameSite: 'None' })).toThrow('SameSite=None')
+    expect(serializeCookie('v', { name: 'n', sameSite: 'None', secure: true })).toContain('SameSite=None; Secure')
+  })
+
+  it('clearCookieHeader empties the value with Max-Age=0', async () => {
+    const { clearCookieHeader } = await import('../src/web/index')
+    expect(clearCookieHeader({ name: 'n' })).toBe('n=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0')
+  })
+
+  it('readCookieValue handles absent headers, missing names, and undecodable values', async () => {
+    const { readCookieValue } = await import('../src/web/index')
+    expect(readCookieValue(null, 'n')).toBeNull()
+    expect(readCookieValue('a=1; b=2', 'n')).toBeNull()
+    expect(readCookieValue('n=%E0%A4%A', 'n')).toBeNull()
+    expect(readCookieValue('n=plain', 'n')).toBe('plain')
+  })
+})
