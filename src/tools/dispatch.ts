@@ -46,8 +46,19 @@ export async function dispatchAppTool(
       const description = rawArgs.description == null ? null : String(rawArgs.description)
       const r = await opts.handlers.submitProposal({ type, title, description }, ctx)
       const regulated = opts.taxonomy.regulatedTypes.includes(type)
-      opts.onProduced?.({ type: 'proposal_created', proposalId: r.proposalId, title, status: 'pending' })
-      return { ok: true, result: { status: 'queued_for_approval', proposalId: r.proposalId, deduped: r.deduped, regulated } }
+      // Pass the handler's result through: products with immediate-execute
+      // proposal types return status 'executed' plus their own fields
+      // (e.g. datasetId) — the model must see what actually happened, not a
+      // hard-coded "queued for approval".
+      const { proposalId, deduped, status, ...extra } = r
+      const effectiveStatus = status ?? 'queued_for_approval'
+      opts.onProduced?.({
+        type: 'proposal_created',
+        proposalId,
+        title,
+        status: effectiveStatus === 'executed' ? 'executed' : 'pending',
+      })
+      return { ok: true, result: { ...extra, status: effectiveStatus, proposalId, deduped, regulated } }
     }
 
     if (toolName === 'schedule_followup') {

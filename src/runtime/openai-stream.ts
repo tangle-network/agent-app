@@ -21,6 +21,9 @@ export interface OpenAIStreamChunk {
   choices?: Array<{
     delta?: {
       content?: string | null
+      /** Reasoning deltas — DeepSeek/router use `reasoning_content`; some proxies use `thinking`. */
+      reasoning_content?: string | null
+      thinking?: string | null
       tool_calls?: Array<{
         index: number
         id?: string
@@ -29,6 +32,11 @@ export interface OpenAIStreamChunk {
     }
     finish_reason?: string | null
   }>
+  /** Final-chunk token accounting (requires `stream_options.include_usage`). */
+  usage?: {
+    prompt_tokens?: number
+    completion_tokens?: number
+  } | null
 }
 
 interface PartialToolCall {
@@ -47,10 +55,23 @@ interface PartialToolCall {
 export async function* toLoopEvents(chunks: AsyncIterable<OpenAIStreamChunk>): AsyncIterable<LoopEvent> {
   const calls = new Map<number, PartialToolCall>()
   for await (const chunk of chunks) {
+    // Usage rides the final chunk, which has an empty choices array — handle
+    // it before the choice guard.
+    if (chunk.usage?.prompt_tokens != null || chunk.usage?.completion_tokens != null) {
+      yield {
+        type: 'usage',
+        usage: {
+          promptTokens: chunk.usage.prompt_tokens ?? 0,
+          completionTokens: chunk.usage.completion_tokens ?? 0,
+        },
+      }
+    }
     const choice = chunk.choices?.[0]
     if (!choice) continue
     const content = choice.delta?.content
     if (content) yield { type: 'text', text: content }
+    const reasoning = choice.delta?.reasoning_content ?? choice.delta?.thinking
+    if (reasoning) yield { type: 'reasoning', text: reasoning }
     for (const tc of choice.delta?.tool_calls ?? []) {
       const cur = calls.get(tc.index) ?? { name: '', args: '' }
       if (tc.id) cur.id = tc.id
@@ -109,6 +130,7 @@ export function createOpenAICompatStreamTurn(
         model: opts.model,
         messages,
         stream: true,
+        stream_options: { include_usage: true },
         ...(opts.tools && opts.tools.length > 0 ? { tools: opts.tools } : {}),
         ...(opts.temperature != null ? { temperature: opts.temperature } : {}),
         ...opts.extraBody,

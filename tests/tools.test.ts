@@ -92,6 +92,26 @@ describe('createAppToolRuntimeExecutor', () => {
     expect(produced).toEqual([{ type: 'proposal_created', proposalId: 'prop-1', title: 'Proposal A', status: 'pending' }])
   })
 
+  it('passes through an immediate-execute handler result (status + extra fields)', async () => {
+    const { handlers } = fakeHandlers()
+    const produced: AppToolProducedEvent[] = []
+    const executedHandlers: AppToolHandlers = {
+      ...handlers,
+      async submitProposal() {
+        return { proposalId: 'prop-x', deduped: false, status: 'executed', datasetId: 'ds-9', specId: 'spec-2' }
+      },
+    }
+    const exec = createAppToolRuntimeExecutor({ handlers: executedHandlers, taxonomy, ctx, onProduced: (e) => produced.push(e) })
+
+    const out = await exec({ toolName: 'submit_proposal', args: { type: 'research', title: 'Gen dataset' } })
+
+    expect(out).toEqual({
+      ok: true,
+      result: { status: 'executed', proposalId: 'prop-x', deduped: false, regulated: false, datasetId: 'ds-9', specId: 'spec-2' },
+    })
+    expect(produced).toEqual([{ type: 'proposal_created', proposalId: 'prop-x', title: 'Gen dataset', status: 'executed' }])
+  })
+
   it('labels a non-regulated proposal type as regulated:false', async () => {
     const { handlers } = fakeHandlers()
     const exec = createAppToolRuntimeExecutor({ handlers, taxonomy, ctx })

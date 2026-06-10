@@ -52,7 +52,40 @@ describe('toLoopEvents', () => {
     expect(evs[1]).toEqual({ type: 'tool_call', call: { toolCallId: 'a', toolName: 'schedule_followup', args: {} } })
     expect(evs[2]).toEqual({ type: 'tool_call', call: { toolCallId: 'b', toolName: 'render_ui', args: { title: 'v' } } })
   })
+
+  it('emits reasoning deltas (reasoning_content or thinking) as reasoning events', async () => {
+    const evs = await collect(
+      toLoopEvents(
+        chunks(
+          { choices: [{ delta: { reasoning_content: 'hmm ' } }] },
+          { choices: [{ delta: { thinking: 'ok' } }] },
+          { choices: [{ delta: { content: 'answer' } }] },
+        ),
+      ),
+    )
+    expect(evs).toEqual([
+      { type: 'reasoning', text: 'hmm ' },
+      { type: 'reasoning', text: 'ok' },
+      { type: 'text', text: 'answer' },
+    ])
+  })
+
+  it('emits the final-chunk usage (empty choices) as a usage event', async () => {
+    const evs = await collect(
+      toLoopEvents(
+        chunks(
+          { choices: [{ delta: { content: 'hi' } }] },
+          { choices: [], usage: { prompt_tokens: 12, completion_tokens: 34 } },
+        ),
+      ),
+    )
+    expect(evs).toEqual([
+      { type: 'text', text: 'hi' },
+      { type: 'usage', usage: { promptTokens: 12, completionTokens: 34 } },
+    ])
+  })
 })
+
 
 describe('createOpenAICompatStreamTurn', () => {
   function sseResponse(...frames: string[]): Response {

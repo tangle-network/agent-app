@@ -1,3 +1,4 @@
+export * from './model-catalog'
 export * from './model'
 export * from './openai-stream'
 export * from './agent'
@@ -100,11 +101,15 @@ function toolResultMessage(call: LoopToolCall, content: string): LoopMessage {
 }
 
 /** Events a turn stream yields. `text` accumulates into the final answer;
- *  `tool_call` is collected for dispatch. Extra event types pass through
- *  untouched (the caller re-emits them to its own UI stream). */
+ *  `tool_call` is collected for dispatch; `reasoning` and `usage` pass through
+ *  for UIs that render thinking sections and per-message token/cost metrics.
+ *  Extra event types pass through untouched (the caller re-emits them to its
+ *  own UI stream). */
 export type LoopEvent =
   | { type: 'text'; text: string }
+  | { type: 'reasoning'; text: string }
   | { type: 'tool_call'; call: LoopToolCall }
+  | { type: 'usage'; usage: { promptTokens: number; completionTokens: number } }
   | { type: 'other'; event: unknown }
 
 export interface ToolLoopResult {

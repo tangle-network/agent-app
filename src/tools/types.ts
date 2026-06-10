@@ -49,6 +49,13 @@ export interface SubmitProposalResult {
   proposalId: string
   /** True when an identical (workspace, title) proposal already existed. */
   deduped: boolean
+  /** Handlers that execute a proposal type immediately (an unregulated
+   *  generate-style action) return 'executed'; omitted/'queued_for_approval'
+   *  means a human gate. Dispatch reports this verbatim to the model. */
+  status?: 'queued_for_approval' | 'executed'
+  /** Product-specific result fields (e.g. datasetId) — passed through to the
+   *  tool outcome so the model and UI see what the handler actually did. */
+  [extra: string]: unknown
 }
 
 export interface ScheduleFollowupArgs {
@@ -103,7 +110,7 @@ export interface AppToolHandlers {
  *  artifact. Deliberately substrate-free (no RuntimeStreamEvent import); the
  *  consumer maps these onto its own telemetry shape. */
 export type AppToolProducedEvent =
-  | { type: 'proposal_created'; proposalId: string; title: string; status: 'pending' }
+  | { type: 'proposal_created'; proposalId: string; title: string; status: 'pending' | 'executed' }
   | { type: 'artifact'; path: string; content: string }
 
 /** Outcome of one tool dispatch — structurally compatible with the integration
