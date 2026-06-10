@@ -117,6 +117,11 @@
       "import": "./dist/integrations/index.js",
       "default": "./dist/integrations/index.js"
     },
+    "./missions": {
+      "types": "./dist/missions/index.d.ts",
+      "import": "./dist/missions/index.js",
+      "default": "./dist/missions/index.js"
+    },
     "./web": {
       "types": "./dist/web/index.d.ts",
       "import": "./dist/web/index.js",
