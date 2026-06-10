@@ -159,10 +159,12 @@ describe('runAppToolLoop', () => {
     expect(r.finalText).toBe('done')
   })
 
-  it('caps the loop and flags cappedOut when the model keeps calling tools', async () => {
-    // Always emits a tool call → would loop forever without the cap.
+  it('stops with backstop stopReason when the model keeps calling tools (varying args)', async () => {
+    // Each turn emits a DIFFERENT args object so stuck-loop never fires; only
+    // the backstop cap is hit.
+    let seq = 0
     const streamTurn = async function* () {
-      yield { type: 'tool_call', call: { toolName: 'schedule_followup', args: { title: 'x', dueDate: '2026-01-01' } } } as LoopEvent
+      yield { type: 'tool_call', call: { toolName: 'schedule_followup', args: { title: 'x', seq: seq++ } } } as LoopEvent
     }
     const r = await runAppToolLoop({
       systemPrompt: 's', userMessage: 'u', maxToolTurns: 3,
@@ -171,8 +173,26 @@ describe('runAppToolLoop', () => {
       isExecutableTool: isExec,
     })
     expect(r.cappedOut).toBe(true)
-    expect(r.turns).toBe(4) // turns 0..3 ran, the 4th detected the cap
+    expect(r.stopReason).toBe('backstop')
+    expect(r.turns).toBe(4) // turns 0..3 ran, the 4th detected the backstop
     expect(r.toolResults.length).toBe(3)
+  })
+
+  it('stops with stuck-loop stopReason when the model repeats the same call 3 times', async () => {
+    // Identical args each turn — stuck-loop fires at the 3rd repetition.
+    const streamTurn = async function* () {
+      yield { type: 'tool_call', call: { toolName: 'schedule_followup', args: { title: 'x', dueDate: '2026-01-01' } } } as LoopEvent
+    }
+    const r = await runAppToolLoop({
+      systemPrompt: 's', userMessage: 'u',
+      streamTurn,
+      executeToolCall: async () => ({ ok: true, result: {} }),
+      isExecutableTool: isExec,
+    })
+    expect(r.cappedOut).toBe(true)
+    expect(r.stopReason).toBe('stuck-loop')
+    // Fires on the 3rd identical call — 2 tool results recorded before stop.
+    expect(r.toolResults.length).toBe(2)
   })
 
   it('turns an executor throw into a failed outcome and keeps going', async () => {
@@ -260,9 +280,11 @@ describe('streamAppToolLoop', () => {
     expect(turn).toBe(2)
   })
 
-  it('emits a single capped signal when the model never stops calling tools', async () => {
+  it('emits a single capped signal with backstop stopReason when the model never stops (varying args)', async () => {
+    // Different args each turn so stuck-loop never fires; backstop fires instead.
+    let seq = 0
     const streamTurn = async function* (): AsyncIterable<Raw> {
-      yield { type: 'tool_call', toolName: 'submit_proposal', args: { type: 'recommend', title: 'x' } }
+      yield { type: 'tool_call', toolName: 'submit_proposal', args: { type: 'recommend', title: 'x', seq: seq++ } }
     }
     const yields: StreamLoopYield<Raw>[] = []
     for await (const item of streamAppToolLoop<Raw>({
@@ -273,7 +295,23 @@ describe('streamAppToolLoop', () => {
     }
     const capped = yields.filter((y) => y.kind === 'capped')
     expect(capped).toHaveLength(1)
-    expect((capped[0] as { pending: number }).pending).toBe(1)
+    expect(capped[0]).toMatchObject({ kind: 'capped', pending: 1, stopReason: 'backstop' })
+  })
+
+  it('emits capped with stuck-loop stopReason on 3 consecutive identical calls', async () => {
+    const streamTurn = async function* (): AsyncIterable<Raw> {
+      yield { type: 'tool_call', toolName: 'submit_proposal', args: { type: 'recommend', title: 'x' } }
+    }
+    const yields: StreamLoopYield<Raw>[] = []
+    for await (const item of streamAppToolLoop<Raw>({
+      systemPrompt: 's', userMessage: 'u', streamTurn, ...opts,
+      executeToolCall: async () => ({ ok: true, result: {} }),
+    })) {
+      yields.push(item)
+    }
+    const capped = yields.filter((y) => y.kind === 'capped')
+    expect(capped).toHaveLength(1)
+    expect(capped[0]).toMatchObject({ kind: 'capped', stopReason: 'stuck-loop' })
   })
 
   it('passes a custom labelFor through to the tool_result (e.g. an integration hub path)', async () => {

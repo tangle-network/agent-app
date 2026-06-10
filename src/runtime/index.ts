@@ -112,6 +112,13 @@ export type LoopEvent =
   | { type: 'usage'; usage: { promptTokens: number; completionTokens: number } }
   | { type: 'other'; event: unknown }
 
+/** Why the loop stopped. `completed` = model finished naturally; `stuck-loop` =
+ *  ≥3 consecutive identical tool calls (same tool + args); `backstop` = hit the
+ *  runaway-backstop cap (200 by default); `deadline` = wall-clock deadlineMs
+ *  exceeded; `budget` = maxCostUsd exhausted. Non-`completed` stops are infra /
+ *  resource outcomes — eval scoring must distinguish them from capability failure. */
+export type ToolLoopStopReason = 'completed' | 'stuck-loop' | 'backstop' | 'deadline' | 'budget'
+
 export interface ToolLoopResult {
   /** The model's final text across the loop. */
   finalText: string
@@ -119,7 +126,9 @@ export interface ToolLoopResult {
   toolResults: Array<{ call: LoopToolCall; label: string; outcome: AppToolOutcome }>
   /** Number of model turns run (1 + tool-driven re-runs). */
   turns: number
-  /** True when the loop stopped because it hit `maxToolTurns` with calls still pending. */
+  /** Why the loop stopped. */
+  stopReason: ToolLoopStopReason
+  /** @deprecated Use `stopReason !== 'completed'` instead. */
   cappedOut: boolean
 }
 
@@ -138,8 +147,16 @@ export interface AppToolLoopOptions {
   /** Which emitted tool names are executable (others are ignored — e.g. a UI-only
    *  tool the app renders but doesn't run here). */
   isExecutableTool: (toolName: string) => boolean
-  /** Max tool-driven re-runs. Default 8. */
+  /** Runaway-backstop cap. Default 200 — set far above any legitimate workflow.
+   *  For per-workflow limits use `maxCostUsd` or `deadlineMs` instead. */
   maxToolTurns?: number
+  /** Wall-clock deadline in ms since epoch (Date.now()-based). When exceeded the
+   *  loop stops with stopReason `deadline`. */
+  deadlineMs?: number
+  /** Maximum total cost in USD. Requires `costOf` to meter each tool call. */
+  maxCostUsd?: number
+  /** Return the USD cost of one outcome. Required for `maxCostUsd` to work. */
+  costOf?: (call: LoopToolCall, outcome: AppToolOutcome) => number
   /** Render one tool outcome as the `content` of its `role: 'tool'` message.
    *  Default is a compact `<label> → ok/failed: …`. */
   renderResult?: (label: string, outcome: AppToolOutcome) => string
@@ -147,7 +164,21 @@ export interface AppToolLoopOptions {
   labelFor?: (call: LoopToolCall) => string
 }
 
-const DEFAULT_MAX_TOOL_TURNS = 8
+/** Runaway-backstop: stops an infinite tool loop where cost is unmetered. Set
+ *  far above any legitimate workflow — this is a watchdog, not a policy cap. */
+const RUNAWAY_BACKSTOP_TURNS = 200
+/** Consecutive identical calls (same tool + canonical-JSON args) that trigger
+ *  stuck-loop detection. The window resets on any different call. */
+const STUCK_LOOP_THRESHOLD = 3
+
+/** Canonical identifier for a tool call used by stuck-loop detection.
+ *  Keys are sorted so {b:1,a:2} and {a:2,b:1} produce the same hash. */
+function canonicalCallHash(call: LoopToolCall): string {
+  const sortedArgs = Object.fromEntries(
+    Object.entries(call.args).sort(([a], [b]) => a.localeCompare(b)),
+  )
+  return `${call.toolName}:${JSON.stringify(sortedArgs)}`
+}
 
 function defaultRender(label: string, outcome: AppToolOutcome): string {
   if (outcome.ok) return `${label} → ok: ${JSON.stringify(outcome.result)}`
@@ -162,7 +193,7 @@ function defaultRender(label: string, outcome: AppToolOutcome): string {
  * testable.)
  */
 export async function runAppToolLoop(opts: AppToolLoopOptions): Promise<ToolLoopResult> {
-  const maxTurns = opts.maxToolTurns ?? DEFAULT_MAX_TOOL_TURNS
+  const backstop = opts.maxToolTurns ?? RUNAWAY_BACKSTOP_TURNS
   const render = opts.renderResult ?? defaultRender
   const labelFor = opts.labelFor ?? ((c: LoopToolCall) => c.toolName)
 
@@ -175,9 +206,18 @@ export async function runAppToolLoop(opts: AppToolLoopOptions): Promise<ToolLoop
   const toolResults: ToolLoopResult['toolResults'] = []
   let finalText = ''
   let turns = 0
+  let accumulatedCostUsd = 0
+  let lastCallHash: string | null = null
+  let consecutiveCount = 0
 
   for (let toolTurn = 0; ; toolTurn++) {
     turns++
+
+    // Wall-clock deadline check before every new turn.
+    if (opts.deadlineMs !== undefined && Date.now() >= opts.deadlineMs) {
+      return { finalText, toolResults, turns, stopReason: 'deadline', cappedOut: true }
+    }
+
     let turnText = ''
     const pending: LoopToolCall[] = []
 
@@ -191,8 +231,10 @@ export async function runAppToolLoop(opts: AppToolLoopOptions): Promise<ToolLoop
     }
 
     if (pending.length === 0) break
-    if (toolTurn >= maxTurns) {
-      return { finalText, toolResults, turns, cappedOut: true }
+
+    // Runaway backstop — the model keeps emitting calls past the safety ceiling.
+    if (toolTurn >= backstop) {
+      return { finalText, toolResults, turns, stopReason: 'backstop', cappedOut: true }
     }
 
     // The assistant turn that emitted the calls — with its tool_calls array —
@@ -200,12 +242,36 @@ export async function runAppToolLoop(opts: AppToolLoopOptions): Promise<ToolLoop
     messages.push(assistantToolCallMessage(turnText, pending))
 
     for (const call of pending) {
+      // Stuck-loop detection.
+      const callHash = canonicalCallHash(call)
+      if (callHash === lastCallHash) {
+        consecutiveCount++
+      } else {
+        lastCallHash = callHash
+        consecutiveCount = 1
+      }
+      if (consecutiveCount >= STUCK_LOOP_THRESHOLD) {
+        return { finalText, toolResults, turns, stopReason: 'stuck-loop', cappedOut: true }
+      }
+
       let outcome: AppToolOutcome
       try {
         outcome = await opts.executeToolCall(call)
       } catch (err) {
         outcome = { ok: false, code: 'executor_error', message: err instanceof Error ? err.message : String(err) }
       }
+
+      // Budget check after each tool call.
+      if (opts.maxCostUsd !== undefined && opts.costOf !== undefined) {
+        accumulatedCostUsd += opts.costOf(call, outcome)
+        if (accumulatedCostUsd >= opts.maxCostUsd) {
+          const label = labelFor(call)
+          toolResults.push({ call, label, outcome })
+          messages.push(toolResultMessage(call, render(label, outcome)))
+          return { finalText, toolResults, turns, stopReason: 'budget', cappedOut: true }
+        }
+      }
+
       const label = labelFor(call)
       toolResults.push({ call, label, outcome })
       // One role:'tool' message per result, keyed to its call by tool_call_id.
@@ -213,7 +279,7 @@ export async function runAppToolLoop(opts: AppToolLoopOptions): Promise<ToolLoop
     }
   }
 
-  return { finalText, toolResults, turns, cappedOut: false }
+  return { finalText, toolResults, turns, stopReason: 'completed', cappedOut: false }
 }
 
 // ── Streaming variant ──────────────────────────────────────────────────────
@@ -229,7 +295,7 @@ export async function runAppToolLoop(opts: AppToolLoopOptions): Promise<ToolLoop
 export type StreamLoopYield<Raw> =
   | { kind: 'event'; event: Raw }
   | { kind: 'tool_result'; toolName: string; toolCallId?: string; label: string; outcome: AppToolOutcome }
-  | { kind: 'capped'; pending: number }
+  | { kind: 'capped'; pending: number; stopReason: Exclude<ToolLoopStopReason, 'completed'> }
 
 export interface StreamAppToolLoopOptions<Raw> {
   systemPrompt: string
@@ -248,19 +314,26 @@ export interface StreamAppToolLoopOptions<Raw> {
   isExecutableTool: (toolName: string) => boolean
   /** Execute one call — the app routes to its integration / app-tool executor. */
   executeToolCall: (call: LoopToolCall) => Promise<AppToolOutcome>
+  /** Runaway-backstop cap. Default 200 — set far above any legitimate workflow. */
   maxToolTurns?: number
+  /** Wall-clock deadline in ms since epoch (Date.now()-based). */
+  deadlineMs?: number
+  /** Maximum total cost in USD. Requires `costOf` to meter each tool call. */
+  maxCostUsd?: number
+  /** Return the USD cost of one outcome. Required for `maxCostUsd` to work. */
+  costOf?: (call: LoopToolCall, outcome: AppToolOutcome) => number
   renderResult?: (label: string, outcome: AppToolOutcome) => string
   labelFor?: (call: LoopToolCall) => string
 }
 
 /**
  * The streaming bounded tool loop. Yields `event` for each raw turn event and
- * `tool_result` for each executed tool; emits a single `capped` when it stops at
- * the turn limit with calls still pending. The app drives telemetry + UI
+ * `tool_result` for each executed tool; emits a single `capped` (with stopReason)
+ * when it stops for any non-completed reason. The app drives telemetry + UI
  * emission off the yielded items.
  */
 export async function* streamAppToolLoop<Raw>(opts: StreamAppToolLoopOptions<Raw>): AsyncGenerator<StreamLoopYield<Raw>, void, unknown> {
-  const maxTurns = opts.maxToolTurns ?? DEFAULT_MAX_TOOL_TURNS
+  const backstop = opts.maxToolTurns ?? RUNAWAY_BACKSTOP_TURNS
   const render = opts.renderResult ?? defaultRender
   const labelFor = opts.labelFor ?? ((c: LoopToolCall) => c.toolName)
 
@@ -270,7 +343,17 @@ export async function* streamAppToolLoop<Raw>(opts: StreamAppToolLoopOptions<Raw
     { role: 'user', content: opts.userMessage },
   ]
 
+  let accumulatedCostUsd = 0
+  let lastCallHash: string | null = null
+  let consecutiveCount = 0
+
   for (let toolTurn = 0; ; toolTurn++) {
+    // Wall-clock deadline check before every new turn.
+    if (opts.deadlineMs !== undefined && Date.now() >= opts.deadlineMs) {
+      yield { kind: 'capped', pending: 0, stopReason: 'deadline' }
+      return
+    }
+
     let turnText = ''
     const pending: LoopToolCall[] = []
 
@@ -282,8 +365,10 @@ export async function* streamAppToolLoop<Raw>(opts: StreamAppToolLoopOptions<Raw
     }
 
     if (pending.length === 0) return
-    if (toolTurn >= maxTurns) {
-      yield { kind: 'capped', pending: pending.length }
+
+    // Runaway backstop.
+    if (toolTurn >= backstop) {
+      yield { kind: 'capped', pending: pending.length, stopReason: 'backstop' }
       return
     }
 
@@ -291,12 +376,38 @@ export async function* streamAppToolLoop<Raw>(opts: StreamAppToolLoopOptions<Raw
     messages.push(assistantToolCallMessage(turnText, pending))
 
     for (const call of pending) {
+      // Stuck-loop detection.
+      const callHash = canonicalCallHash(call)
+      if (callHash === lastCallHash) {
+        consecutiveCount++
+      } else {
+        lastCallHash = callHash
+        consecutiveCount = 1
+      }
+      if (consecutiveCount >= STUCK_LOOP_THRESHOLD) {
+        yield { kind: 'capped', pending: pending.length, stopReason: 'stuck-loop' }
+        return
+      }
+
       let outcome: AppToolOutcome
       try {
         outcome = await opts.executeToolCall(call)
       } catch (err) {
         outcome = { ok: false, code: 'executor_error', message: err instanceof Error ? err.message : String(err) }
       }
+
+      // Budget check after each tool call.
+      if (opts.maxCostUsd !== undefined && opts.costOf !== undefined) {
+        accumulatedCostUsd += opts.costOf(call, outcome)
+        if (accumulatedCostUsd >= opts.maxCostUsd) {
+          const label = labelFor(call)
+          yield { kind: 'tool_result', toolName: call.toolName, toolCallId: call.toolCallId, label, outcome }
+          messages.push(toolResultMessage(call, render(label, outcome)))
+          yield { kind: 'capped', pending: pending.length, stopReason: 'budget' }
+          return
+        }
+      }
+
       const label = labelFor(call)
       yield { kind: 'tool_result', toolName: call.toolName, toolCallId: call.toolCallId, label, outcome }
       // One role:'tool' message per result, keyed to its call by tool_call_id.
