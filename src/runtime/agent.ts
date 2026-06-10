@@ -70,7 +70,8 @@ export interface CreateAgentRuntimeOptions {
   handlers: AppToolHandlers
   /** Default agent identity / system prompt. A turn may override it. */
   systemPrompt: string
-  /** Max tool-driven re-runs per turn. Default 8. */
+  /** Runaway-backstop cap. Default 200 — set far above any legitimate workflow.
+   *  For per-workflow limits use `deadlineMs` or `maxCostUsd` on the loop options. */
   maxToolTurns?: number
   /** Extra OpenAI tool definitions advertised ALONGSIDE the four app tools
    *  (e.g. `integration_invoke`). Pair with {@link executeOtherTool}. */
