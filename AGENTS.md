@@ -28,6 +28,7 @@ Corollary — **extend, never duplicate.** Before writing anything that complete
 | `/integrations` | hub `/exec` client + `resolveIntegrationAction` + `invokeIntegrationHub` (wiring) | peer-dep `@tangle-network/agent-integrations` (the engine/catalog) |
 | `/tangle` | app-registration consent URL + cached broker-token provider | structural `TangleAppsClient` (from agent-integrations) |
 | `/billing` | per-workspace budget-capped key manager (mint/rotate/rollover/usage) | structural tcloud provisioner + store + crypto seams |
+| `/missions` | durable multi-step mission orchestration: guarded status/step machine + cursor + cost ledger over a `MissionStorePort` (CAS updates → typed conflict), idempotent plan engine (cached-done short-circuit, cursor reconciliation, retryable-vs-deterministic failure, detached-session polling), budget/classification/volume gates that park as `waiting_approval`, `:::mission` parser, client-safe live-event reducer | — (substrate-free; product supplies storage, `SandboxDispatch`, approvals port, `classifyStep`) |
 | `/delegation` | the agent-runtime driven-loop MCP server entry (opt-in) | — |
 | `/crypto` `/web` `/redact` `/stream` | AES-GCM field crypto · web boundary utils (body/context/rate-limit/headers) · PII redaction · SSE normalization + turn identity | — |
 
