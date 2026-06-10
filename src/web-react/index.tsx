@@ -17,8 +17,10 @@
  */
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { ProviderLogo } from './provider-logo'
 
 export * from './chat-stream'
+export * from './provider-logo'
 import type { CatalogModel } from '../runtime/model-catalog'
 
 // ── shared glyphs (no icon-library dependency) ────────────────────────────
@@ -120,7 +122,7 @@ function formatContext(len?: number): string | undefined {
 
 function SectionHeader({ children }: { children: ReactNode }) {
   return (
-    <div className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+    <div className="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
       {children}
     </div>
   )
@@ -143,18 +145,18 @@ function ModelRow({
     <button
       type="button"
       onClick={onSelect}
-      className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition ${
+      className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-sm transition ${
         selected ? 'bg-primary/10 font-medium' : 'hover:bg-accent/30'
       }`}
     >
-      {renderProviderBadge ? renderProviderBadge(model.provider) : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}
+      {renderProviderBadge ? renderProviderBadge(model.provider) : <ProviderLogo provider={model.provider} size={16} />}
       <span className="truncate">{model.name}</span>
       {!model.supportsTools && (
         <span className="shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
           no tools
         </span>
       )}
-      <span className="ml-auto flex shrink-0 items-center gap-2 text-[11px] text-muted-foreground">
+      <span className="ml-auto flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
         {ctx && <span>{ctx}</span>}
         {price && <span>{price}</span>}
       </span>
@@ -216,7 +218,7 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
         onClick={() => setOpen((v) => !v)}
         className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30"
       >
-        {selected && renderProviderBadge ? renderProviderBadge(selected.provider) : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}
+        {selected ? (renderProviderBadge ? renderProviderBadge(selected.provider) : <ProviderLogo provider={selected.provider} size={16} />) : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}
         <span className="max-w-[160px] truncate">{selected?.name ?? value}</span>
         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
       </button>
