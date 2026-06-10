@@ -329,6 +329,91 @@ export function EffortPicker({ value, onChange }: EffortPickerProps) {
   )
 }
 
+// ── Tool run drill-in (retained runs) ─────────────────────────────────────
+
+/** One step of a retained tool run (e.g. a sandbox command + its output). */
+export interface ToolRunStep {
+  at: string
+  label: string
+  detail?: string
+  status?: 'ok' | 'error'
+}
+
+/** A retained tool run keyed by the parent message's toolCallId. The product
+ *  persists these server-side (fail-closed: only ids its own loop created)
+ *  and serves them to the drill-in panel. */
+export interface ToolRunRecord {
+  toolCallId: string
+  toolName: string
+  title: string
+  status: 'running' | 'complete' | 'error'
+  steps: ToolRunStep[]
+}
+
+export interface RunDrillInProps {
+  run: ToolRunRecord
+  onClose: () => void
+}
+
+/**
+ * Readonly side panel showing a retained tool run's transcript — the
+ * "drill into what the sandbox actually did" view. Follow-ups happen in the
+ * main chat, never here.
+ */
+export function RunDrillIn({ run, onClose }: RunDrillInProps) {
+  return (
+    <div className="fixed inset-y-0 right-0 z-50 flex w-[480px] max-w-full flex-col border-l border-border bg-card shadow-xl">
+      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+        <span
+          className={`h-2 w-2 shrink-0 rounded-full ${
+            run.status === 'running' ? 'bg-yellow-500' : run.status === 'error' ? 'bg-red-500' : 'bg-green-500'
+          }`}
+        />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold">{run.title}</p>
+          <p className="truncate font-mono text-[11px] text-muted-foreground">{run.toolName}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-accent/30 hover:text-foreground"
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+        {run.steps.length === 0 && (
+          <p className="text-sm text-muted-foreground">No steps recorded yet.</p>
+        )}
+        {run.steps.map((step, i) => (
+          <div key={i} className="rounded-lg border border-border/60 bg-background">
+            <div className="flex items-baseline gap-2 border-b border-border/40 px-3 py-1.5">
+              <span className={`font-mono text-[11px] ${step.status === 'error' ? 'text-red-600' : 'text-muted-foreground'}`}>
+                {step.status === 'error' ? '✗' : '$'}
+              </span>
+              <code className="min-w-0 flex-1 truncate font-mono text-xs">{step.label}</code>
+              <span className="shrink-0 text-[10px] text-muted-foreground/60">
+                {new Date(step.at).toLocaleTimeString()}
+              </span>
+            </div>
+            {step.detail && (
+              <pre className="max-h-48 overflow-auto whitespace-pre-wrap px-3 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                {step.detail}
+              </pre>
+            )}
+          </div>
+        ))}
+      </div>
+      <p className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground/60">
+        Readonly drill-in. Follow up in the main chat.
+      </p>
+    </div>
+  )
+}
+
 // ── ChatMessages ──────────────────────────────────────────────────────────
 
 export interface ChatToolCallInfo {
@@ -371,6 +456,8 @@ export interface ChatMessagesProps {
   /** Approve/Reject handlers for proposals awaiting approval. When omitted the
    *  chip still shows "awaiting approval" but without action buttons. */
   approval?: ProposalApprovalHandlers
+  /** Make tool chips clickable (e.g. open a {@link RunDrillIn} panel). */
+  onToolCallClick?: (call: ChatToolCallInfo, message: ChatUiMessage) => void
 }
 
 export interface ProposalApprovalHandlers {
@@ -378,7 +465,15 @@ export interface ProposalApprovalHandlers {
   onReject: (proposalId: string, toolCallId: string) => void | Promise<void>
 }
 
-function ToolChips({ toolCalls, approval }: { toolCalls: ChatToolCallInfo[]; approval?: ProposalApprovalHandlers }) {
+function ToolChips({
+  toolCalls,
+  approval,
+  onClick,
+}: {
+  toolCalls: ChatToolCallInfo[]
+  approval?: ProposalApprovalHandlers
+  onClick?: (call: ChatToolCallInfo) => void
+}) {
   return (
     <div className="mt-2 flex flex-col gap-1">
       {toolCalls.map((tc) => {
@@ -413,21 +508,23 @@ function ToolChips({ toolCalls, approval }: { toolCalls: ChatToolCallInfo[]; app
             </div>
           )
         }
+        const Tag = onClick ? 'button' : 'div'
         return (
-          <div
+          <Tag
             key={tc.id}
+            {...(onClick ? { type: 'button' as const, onClick: () => onClick(tc) } : {})}
             className={`inline-flex w-fit items-center gap-2 rounded-md px-2.5 py-1 text-xs ${
               tc.status === 'running'
                 ? 'bg-yellow-500/10 text-yellow-700'
                 : tc.status === 'error'
                   ? 'bg-red-500/10 text-red-700'
                   : 'bg-green-500/10 text-green-700'
-            }`}
+            } ${onClick ? 'cursor-pointer transition hover:ring-1 hover:ring-border' : ''}`}
           >
             <span className="font-mono opacity-70">{tc.status === 'running' ? '⚡' : tc.status === 'error' ? '✗' : '✓'}</span>
             <span className="font-medium">{tc.name}</span>
             <span className="opacity-60">{tc.status === 'running' ? 'running…' : tc.status === 'error' ? 'failed' : 'done'}</span>
-          </div>
+          </Tag>
         )
       })}
     </div>
@@ -449,6 +546,7 @@ export function ChatMessages({
   agentLabel = 'Agent',
   loading,
   approval,
+  onToolCallClick,
 }: ChatMessagesProps) {
   const renderBody = renderMarkdown ?? ((content: string) => <p className="whitespace-pre-wrap">{content}</p>)
   const lastIsUser = messages[messages.length - 1]?.role === 'user'
@@ -481,7 +579,13 @@ export function ChatMessages({
               </details>
             )}
             <div className="text-base leading-[1.75]">{renderBody(msg.content)}</div>
-            {msg.toolCalls && msg.toolCalls.length > 0 && <ToolChips toolCalls={msg.toolCalls} approval={approval} />}
+            {msg.toolCalls && msg.toolCalls.length > 0 && (
+              <ToolChips
+                toolCalls={msg.toolCalls}
+                approval={approval}
+                onClick={onToolCallClick ? (tc) => onToolCallClick(tc, msg) : undefined}
+              />
+            )}
             {renderExtras?.(msg)}
           </div>
         ),
