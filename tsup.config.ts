@@ -20,6 +20,7 @@ export default defineConfig({
     'integrations/index': 'src/integrations/index.ts',
     'platform/index': 'src/platform/index.ts',
     'web/index': 'src/web/index.ts',
+    'web-react/index': 'src/web-react/index.tsx',
     'redact/index': 'src/redact/index.ts',
     'store/index': 'src/store/index.ts',
   },
@@ -28,5 +29,5 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   target: 'es2022',
-  external: ['@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog', '@tangle-network/agent-eval', '@tangle-network/agent-knowledge', '@tangle-network/agent-runtime'],
+  external: ['react', 'react/jsx-runtime', '@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog', '@tangle-network/agent-eval', '@tangle-network/agent-knowledge', '@tangle-network/agent-runtime'],
 })
