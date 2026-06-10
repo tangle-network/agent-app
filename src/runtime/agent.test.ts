@@ -73,7 +73,10 @@ describe('createAgentRuntime', () => {
     const result = await runtime.run('Swap my policy.', { ctx, onProduced: (e) => produced.push(e) })
 
     expect(calls).toHaveLength(1)
-    expect(calls[0]).toEqual({ tool: 'submit_proposal', args: { type: 'propose_swap', title: 'Swap A→B', description: null } })
+    expect(calls[0]).toEqual({
+      tool: 'submit_proposal',
+      args: { type: 'propose_swap', title: 'Swap A→B', description: null, regulated: true },
+    })
     expect(result.toolResults).toHaveLength(1)
     expect(result.toolResults[0]!.outcome).toEqual({
       ok: true,
