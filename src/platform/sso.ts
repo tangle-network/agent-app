@@ -167,6 +167,98 @@ export async function signSessionCookieValue(token: string, secret: string): Pro
   return `${token}.${btoa(bin)}`
 }
 
+/** Structural slice of a `betterAuth()` instance — only what cookie minting
+ *  reads. No better-auth import: the signing contract is implemented by
+ *  `signSessionCookieValue`, byte-compatible with better-auth's own
+ *  `makeSignature`. */
+export interface BetterAuthSessionCookieSource {
+  $context: PromiseLike<{
+    secret: string
+    authCookies: {
+      sessionToken: {
+        /** Final cookie name — better-auth decides the `__Secure-` prefix
+         *  (and any `advanced.cookiePrefix`) once at `betterAuth()` init. */
+        name: string
+        attributes: {
+          secure?: boolean
+          sameSite?: string
+          path?: string
+          httpOnly?: boolean
+          domain?: string
+        }
+      }
+    }
+  }>
+}
+
+export interface BetterAuthSessionCookieMinterOptions {
+  /** Receives the shadowed-cookie-name warning (see below). Default
+   *  console.warn. */
+  warn?: (message: string) => void
+}
+
+/**
+ * Canonical `setSessionCookie` wiring for better-auth apps: mint the session
+ * Set-Cookie exactly as better-auth's own login flows do — name + attributes
+ * from `auth.$context.authCookies.sessionToken` (better-auth stays
+ * authoritative over prefix/name/attributes) and the value signed to
+ * better-call's `getSignedCookie` contract. A raw unprefixed
+ * `better-auth.session_token` left by an earlier login is explicitly expired
+ * so it cannot shadow the real cookie.
+ *
+ * Warns when the app's session cookie still has better-auth's DEFAULT name:
+ * the Tangle platform (id.tangle.tools) sets a `Domain=.tangle.tools` cookie
+ * under that exact name, and equal-path cookies are sent oldest-first — the
+ * platform's cookie is always older (the user signs in there before the app's
+ * callback runs), so the app reads the platform's token, fails its own
+ * signature check, and every fresh login lands logged-out. Per-app
+ * `advanced.cookiePrefix` is the fix.
+ *
+ * Throws on a domain-scoped session cookie for the same reason: a
+ * `Domain=`-wide session cookie is exactly the shadowing footgun.
+ */
+export function createBetterAuthSessionCookieMinter(
+  auth: BetterAuthSessionCookieSource,
+  options: BetterAuthSessionCookieMinterOptions = {},
+): (args: TangleSsoSessionCookieArgs) => Promise<string[]> {
+  const warn = options.warn ?? ((message: string) => console.warn(message))
+  return async ({ token, ttlSeconds }) => {
+    const ctx = await auth.$context
+    if (!ctx.secret) {
+      throw new Error('createBetterAuthSessionCookieMinter: auth context has no secret')
+    }
+    const { name, attributes } = ctx.authCookies.sessionToken
+    if (attributes.domain) {
+      throw new Error(
+        `createBetterAuthSessionCookieMinter: refusing a domain-scoped session cookie (Domain=${attributes.domain}) — ` +
+          'a domain-wide session cookie shadows sibling apps that share the parent domain',
+      )
+    }
+    if (name === DEFAULT_SESSION_COOKIE || name === `__Secure-${DEFAULT_SESSION_COOKIE}`) {
+      warn(
+        `[tangle-sso] session cookie is named "${name}" — better-auth's default. ` +
+          'The Tangle platform (id.tangle.tools) sets a Domain=.tangle.tools cookie under the same name, ' +
+          "and the platform's (older) cookie wins the Cookie-header order, so this app's sessions read back null. " +
+          "Set a per-app prefix: betterAuth({ advanced: { cookiePrefix: '<app>' } }).",
+      )
+    }
+    const sameSite = typeof attributes.sameSite === 'string' ? attributes.sameSite : 'lax'
+    const cookieOptions = {
+      name,
+      path: typeof attributes.path === 'string' ? attributes.path : '/',
+      httpOnly: attributes.httpOnly !== false,
+      sameSite: (sameSite.charAt(0).toUpperCase() + sameSite.slice(1)) as 'Lax' | 'Strict' | 'None',
+      secure: Boolean(attributes.secure) || name.startsWith('__Secure-'),
+      maxAgeSeconds: ttlSeconds,
+    }
+    const cookies = [serializeCookie(await signSessionCookieValue(token, ctx.secret), cookieOptions)]
+    if (name !== DEFAULT_SESSION_COOKIE) {
+      cookies.push(clearCookieHeader({ ...cookieOptions, name: DEFAULT_SESSION_COOKIE }))
+    }
+    return cookies
+  }
+}
+
 // ── Handlers ────────────────────────────────────────────────────────────────
 
 export interface TangleSsoHandlerOptions {

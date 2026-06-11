@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest'
 import { betterAuth } from 'better-auth'
 import { memoryAdapter } from 'better-auth/adapters/memory'
 import {
+  createBetterAuthSessionCookieMinter,
   createTangleSsoHandlers,
   type TangleSsoAccountStore,
   type TangleSsoAuthClient,
@@ -21,11 +22,12 @@ import {
 const AUTH_SECRET = 'better-auth-secret-for-contract-test'
 const STATE_SECRET = 'state-secret-distinct-from-auth-secret'
 
-function makeAuth(baseURL: string) {
+function makeAuth(baseURL: string, cookiePrefix?: string) {
   return betterAuth({
     baseURL,
     secret: AUTH_SECRET,
     database: memoryAdapter({ user: [], session: [], account: [], verification: [] }),
+    ...(cookiePrefix ? { advanced: { cookiePrefix } } : {}),
   })
 }
 
@@ -132,6 +134,33 @@ describe('SSO session cookie ↔ better-auth contract', () => {
     const res = await loginThroughCallback(handlers, 'http://localhost:3000')
     const sessionSetCookie = res.headers.getSetCookie().find((c) => c.startsWith('better-auth.session_token='))
     expect(sessionSetCookie).toBeDefined()
+
+    const session = await getSessionWith(auth, cookieHeaderFrom(res))
+    expect(session?.user.email).toBe('ada@example.com')
+  })
+
+  it('createBetterAuthSessionCookieMinter: app-prefixed cookie round-trips through auth.api.getSession', async () => {
+    const auth = makeAuth('https://my.app', 'myapp')
+    const handlers = createTangleSsoHandlers({
+      auth: ssoClient,
+      store: betterAuthBackedStore(auth),
+      stateSecret: STATE_SECRET,
+      setSessionCookie: createBetterAuthSessionCookieMinter(auth),
+      callbackUrl: 'https://my.app/auth/tangle/callback',
+      stateCookieName: 'tangle_sso_state',
+      secureCookies: true,
+    })
+
+    const res = await loginThroughCallback(handlers, 'https://my.app')
+    expect(res.status).toBe(302)
+
+    // better-auth's own prefixed name, minted by the helper.
+    const sessionSetCookie = res.headers.getSetCookie().find((c) => c.startsWith('__Secure-myapp.session_token='))
+    expect(sessionSetCookie).toBeDefined()
+    // The default-name cookie appears only as an explicit expiry.
+    for (const c of res.headers.getSetCookie().filter((v) => v.startsWith('better-auth.session_token='))) {
+      expect(c).toContain('Max-Age=0')
+    }
 
     const session = await getSessionWith(auth, cookieHeaderFrom(res))
     expect(session?.user.email).toBe('ada@example.com')

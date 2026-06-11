@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   createSignedSsoState,
   verifySignedSsoState,
   createTangleSsoHandlers,
+  createBetterAuthSessionCookieMinter,
   signSessionCookieValue,
   TangleSsoUserCreateError,
   createHubProxyRoutes,
@@ -710,5 +711,79 @@ describe('assertBillableBalance', () => {
       { env: { APP_ENV: 'production', MY_FLAG: 'disabled' }, enforcementEnvVar: 'MY_FLAG' },
     )
     assertBillableBalance({ overageAllowed: false, remainingBalanceUsd: 0 }, { env: { APP_ENV: 'development' } })
+  })
+})
+
+describe('createBetterAuthSessionCookieMinter', () => {
+  const mintArgs = { token: 'tok_1', expiresAt: new Date(0), ttlSeconds: 2_592_000, secure: true }
+  const authWith = (name: string, attributes: Record<string, unknown> = {}) => ({
+    $context: Promise.resolve({
+      secret: AUTH_SECRET,
+      authCookies: {
+        sessionToken: {
+          name,
+          attributes: { httpOnly: true, sameSite: 'lax', secure: true, path: '/', ...attributes },
+        },
+      },
+    }),
+  })
+
+  it("mints better-auth's cookie verbatim: its name, its attributes, the signed value", async () => {
+    const mint = createBetterAuthSessionCookieMinter(authWith('__Secure-myapp.session_token'))
+    const cookies = await mint(mintArgs)
+
+    const [session] = cookies
+    expect(session).toMatch(/^__Secure-myapp\.session_token=/)
+    const value = session!.split(';')[0]!.split(/=(.*)/s)[1]!
+    expect(value).toBe(encodeURIComponent(await signSessionCookieValue('tok_1', AUTH_SECRET)))
+    expect(session).toContain('Path=/')
+    expect(session).toContain('HttpOnly')
+    expect(session).toContain('SameSite=Lax')
+    expect(session).toContain('Max-Age=2592000')
+    expect(session).toContain('Secure')
+  })
+
+  it('expires the legacy raw cookie when the better-auth name differs', async () => {
+    const mint = createBetterAuthSessionCookieMinter(authWith('__Secure-myapp.session_token'))
+    const cookies = await mint(mintArgs)
+
+    expect(cookies).toHaveLength(2)
+    expect(cookies[1]).toMatch(/^better-auth\.session_token=;/)
+    expect(cookies[1]).toContain('Max-Age=0')
+  })
+
+  it('sets no legacy expiry when the name IS the raw default (and warns)', async () => {
+    const warn = vi.fn()
+    const mint = createBetterAuthSessionCookieMinter(authWith('better-auth.session_token', { secure: false }), {
+      warn,
+    })
+    const cookies = await mint(mintArgs)
+
+    expect(cookies).toHaveLength(1)
+    expect(warn).toHaveBeenCalledTimes(1)
+  })
+
+  it("warns on better-auth's default cookie name — the platform's domain-wide cookie shadows it", async () => {
+    const warn = vi.fn()
+    const mint = createBetterAuthSessionCookieMinter(authWith('__Secure-better-auth.session_token'), { warn })
+    await mint(mintArgs)
+
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0]![0]).toContain('cookiePrefix')
+  })
+
+  it('does not warn on an app-prefixed name', async () => {
+    const warn = vi.fn()
+    const mint = createBetterAuthSessionCookieMinter(authWith('__Secure-myapp.session_token'), { warn })
+    await mint(mintArgs)
+
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('refuses a domain-scoped session cookie', async () => {
+    const mint = createBetterAuthSessionCookieMinter(
+      authWith('__Secure-myapp.session_token', { domain: '.tangle.tools' }),
+    )
+    await expect(mint(mintArgs)).rejects.toThrow(/domain-scoped/)
   })
 })
