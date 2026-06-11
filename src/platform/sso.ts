@@ -32,7 +32,7 @@ function randomHex(bytes: number): string {
   return Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-async function hmacHex(secret: string, value: string): Promise<string> {
+async function hmacBytes(secret: string, value: string): Promise<Uint8Array> {
   const key = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(secret),
@@ -40,8 +40,11 @@ async function hmacHex(secret: string, value: string): Promise<string> {
     false,
     ['sign'],
   )
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value))
-  return Array.from(new Uint8Array(sig), (b) => b.toString(16).padStart(2, '0')).join('')
+  return new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value)))
+}
+
+async function hmacHex(secret: string, value: string): Promise<string> {
+  return Array.from(await hmacBytes(secret, value), (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
 function constantTimeEqual(a: string, b: string): boolean {
@@ -133,6 +136,37 @@ export interface TangleSsoAccountStore {
   }): Promise<void>
 }
 
+// ── Session cookie ──────────────────────────────────────────────────────────
+
+/** Successful-login context handed to the `setSessionCookie` seam. */
+export interface TangleSsoSessionCookieArgs {
+  /** Session token returned by `store.createSession`. */
+  token: string
+  /** Session expiry (now + `sessionTtlSeconds`). */
+  expiresAt: Date
+  /** Mirrors `sessionTtlSeconds` after defaulting. */
+  ttlSeconds: number
+  /** Mirrors `TangleSsoHandlerOptions.secureCookies`. */
+  secure: boolean
+}
+
+/**
+ * Sign a session token to better-call's signed-cookie contract — the value
+ * better-auth's `getSignedCookie` verifies: `<token>.<signature>` where the
+ * signature is the raw HMAC-SHA256 of the token under `secret`, encoded as
+ * STANDARD base64 WITH padding (32 bytes → 44 chars ending `=`; better-call
+ * rejects any other length or suffix, so url-safe/unpadded variants read back
+ * as a null session). The joined value is percent-encoded once at cookie
+ * serialization, matching better-call's `serializeSignedCookie` byte-exactly.
+ */
+export async function signSessionCookieValue(token: string, secret: string): Promise<string> {
+  if (!secret) throw new Error('signSessionCookieValue requires a non-empty secret')
+  const sig = await hmacBytes(secret, token)
+  let bin = ''
+  for (const byte of sig) bin += String.fromCharCode(byte)
+  return `${token}.${btoa(bin)}`
+}
+
 // ── Handlers ────────────────────────────────────────────────────────────────
 
 export interface TangleSsoHandlerOptions {
@@ -143,9 +177,29 @@ export interface TangleSsoHandlerOptions {
   /** Absolute callback URL registered with the platform. */
   callbackUrl: string
   stateCookieName: string
-  /** Default 'better-auth.session_token'. */
+  /** Default 'better-auth.session_token'. Ignored when `setSessionCookie` is
+   *  provided. The default path prepends `__Secure-` iff `secureCookies`. */
   sessionCookieName?: string
-  /** Adds `Secure` to every cookie this module sets. */
+  /** Mint the host auth framework's own session cookie(s); return complete
+   *  Set-Cookie header values (the handler appends them verbatim and sets no
+   *  session cookie itself). Supply this when the framework should stay
+   *  authoritative over name/prefix/signing/attributes — e.g. better-auth:
+   *  `auth.$context.authCookies.sessionToken` + `makeSignature`. */
+  setSessionCookie?: (
+    args: TangleSsoSessionCookieArgs,
+  ) => readonly string[] | Promise<readonly string[]>
+  /** HMAC-SHA256 secret the host auth framework verifies session cookies with
+   *  (better-auth: its `secret`). Required when `setSessionCookie` is absent —
+   *  the default cookie is minted to better-call's signed contract via
+   *  `signSessionCookieValue`; an unsigned or mis-signed value reads back as a
+   *  null session, so there is deliberately no fallback to `stateSecret`
+   *  (which is not guaranteed to be the auth secret). */
+  sessionCookieSecret?: string
+  /** Adds `Secure` to every cookie this module sets, and (default session
+   *  cookie only) the `__Secure-` name prefix. Must match the auth
+   *  framework's own secure-cookie decision (better-auth: https `baseURL` /
+   *  `advanced.useSecureCookies`), or it will look up a different cookie name
+   *  than the one set here. */
   secureCookies: boolean
   /** Default 604 800 (7 days). */
   sessionTtlSeconds?: number
@@ -165,9 +219,10 @@ export interface TangleSsoHandlers {
    *  platform authorize URL. `?redirect=` carries the post-login path. */
   start(request: Request): Promise<Response>
   /** GET callback route: verify state, exchange the code, upsert the user,
-   *  create the session, save the platform link, set the session cookie,
-   *  302 to the saved redirect. Every failure 302s to
-   *  `loginPath?error=…` with the state cookie cleared. */
+   *  create the session, save the platform link, set the session cookie
+   *  (via the `setSessionCookie` seam, else signed to better-call's contract
+   *  with `sessionCookieSecret`), 302 to the saved redirect. Every failure
+   *  302s to `loginPath?error=…` with the state cookie cleared. */
   callback(request: Request): Promise<Response>
 }
 
@@ -216,6 +271,27 @@ export function createTangleSsoHandlers(opts: TangleSsoHandlerOptions): TangleSs
   if (!opts.stateCookieName) throw new Error('TangleSsoHandlerOptions.stateCookieName is required')
 
   const sessionCookieName = opts.sessionCookieName ?? DEFAULT_SESSION_COOKIE
+
+  let mintSessionCookies: (args: TangleSsoSessionCookieArgs) => Promise<readonly string[]>
+  if (opts.setSessionCookie) {
+    const seam = opts.setSessionCookie
+    mintSessionCookies = async (args) => await seam(args)
+  } else if (opts.sessionCookieSecret) {
+    const secret = opts.sessionCookieSecret
+    mintSessionCookies = async ({ token, secure, ttlSeconds }) => [
+      serializeCookie(await signSessionCookieValue(token, secret), {
+        name: secure ? `__Secure-${sessionCookieName}` : sessionCookieName,
+        secure,
+        maxAgeSeconds: ttlSeconds,
+      }),
+    ]
+  } else {
+    throw new Error(
+      'TangleSsoHandlerOptions requires setSessionCookie or sessionCookieSecret: ' +
+        'better-auth only accepts HMAC-signed (and, on https, __Secure--prefixed) session cookies, ' +
+        'so an unsigned default would mint sessions that read back null',
+    )
+  }
   const sessionTtlSeconds = opts.sessionTtlSeconds ?? DEFAULT_SESSION_TTL_SECONDS
   const stateTtlSeconds = opts.stateTtlSeconds ?? DEFAULT_STATE_TTL_SECONDS
   const defaultRedirectPath = opts.defaultRedirectPath ?? DEFAULT_REDIRECT_PATH
@@ -296,10 +372,13 @@ export function createTangleSsoHandlers(opts: TangleSsoHandlerOptions): TangleSs
 
       const headers = new Headers()
       headers.append('Set-Cookie', clearCookieHeader(stateCookieOpts))
-      headers.append(
-        'Set-Cookie',
-        serializeCookie(token, { name: sessionCookieName, secure: opts.secureCookies, maxAgeSeconds: sessionTtlSeconds }),
-      )
+      const sessionCookies = await mintSessionCookies({
+        token,
+        expiresAt,
+        ttlSeconds: sessionTtlSeconds,
+        secure: opts.secureCookies,
+      })
+      for (const cookie of sessionCookies) headers.append('Set-Cookie', cookie)
       return redirectResponse(sanitizeRedirectPath(payload.r, defaultRedirectPath), headers)
     },
   }
