@@ -24,6 +24,7 @@ export default defineConfig({
     'web-react/index': 'src/web-react/index.tsx',
     'redact/index': 'src/redact/index.ts',
     'store/index': 'src/store/index.ts',
+    'trace/index': 'src/trace/index.ts',
     'assets/index': 'src/assets/index.ts',
   },
   format: ['esm'],
