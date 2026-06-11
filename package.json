@@ -146,6 +146,11 @@
       "types": "./dist/assets/index.d.ts",
       "import": "./dist/assets/index.js",
       "default": "./dist/assets/index.js"
+    },
+    "./trace": {
+      "types": "./dist/trace/index.d.ts",
+      "import": "./dist/trace/index.js",
+      "default": "./dist/trace/index.js"
     }
   },
   "scripts": {

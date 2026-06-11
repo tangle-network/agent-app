@@ -90,6 +90,7 @@ export interface PumpBufferedTurnOptions {
  */
 export async function pumpBufferedTurn(opts: PumpBufferedTurnOptions): Promise<void> {
   const flushIntervalMs = opts.flushIntervalMs ?? 400
+  const startedAt = Date.now()
   let seq = 0
   let clientGone = false
   let pending: unknown[] = []
@@ -106,7 +107,10 @@ export async function pumpBufferedTurn(opts: PumpBufferedTurnOptions): Promise<v
 
   await opts.store.setStatus(opts.turnId, 'running')
   try {
-    for await (const ev of opts.source) {
+    for await (const raw of opts.source) {
+      // Stamp ms-since-turn-start so any stored turn is replayable AND
+      // traceable (see ../trace) from the same buffered rows.
+      const ev = raw && typeof raw === 'object' ? { ...(raw as Record<string, unknown>), _t: Date.now() - startedAt } : raw
       pending.push(ev)
       if (!clientGone && opts.write) {
         try {
