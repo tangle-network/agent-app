@@ -483,6 +483,39 @@ export type ToolDetailRenderers = Record<
   (call: ChatToolCallInfo, message: ChatUiMessage) => ReactNode
 >
 
+function ToolGlyph({ name, className }: { name: string; className?: string }) {
+  if (name.startsWith('sandbox_')) {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <polyline points="4 17 10 11 4 5" />
+        <line x1="12" y1="19" x2="20" y2="19" />
+      </svg>
+    )
+  }
+  if (name === 'submit_proposal') {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <path d="M14 2v6h6M9 15l2 2 4-4" />
+      </svg>
+    )
+  }
+  if (name === 'schedule_followup') {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 3" />
+      </svg>
+    )
+  }
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 3v3m0 12v3M3 12h3m12 0h3" />
+      <circle cx="12" cy="12" r="4" />
+    </svg>
+  )
+}
+
 function toolOutcomeOf(call: ChatToolCallInfo): { ok?: boolean; result?: Record<string, unknown>; message?: string } | undefined {
   return call.result as { ok?: boolean; result?: Record<string, unknown>; message?: string } | undefined
 }
@@ -529,6 +562,26 @@ function KvRows({ data }: { data: Record<string, unknown> }) {
         </div>
       ))}
     </dl>
+  )
+}
+
+/** Terminal-styled rendering for shell executions. */
+function ShellDetail({ call }: { call: ChatToolCallInfo }) {
+  const outcome = toolOutcomeOf(call)
+  const r = (outcome?.result ?? {}) as { stdout?: string; stderr?: string; exitCode?: number }
+  return (
+    <div className="overflow-hidden rounded-md bg-zinc-900 font-mono text-[11px] leading-relaxed">
+      <div className="flex items-center gap-2 px-3 pt-2 text-zinc-400">
+        <span className="select-none text-zinc-500">$</span>
+        <span className="min-w-0 flex-1 truncate text-zinc-200">{String(call.args?.command ?? '')}</span>
+        {r.exitCode != null && (
+          <span className={r.exitCode === 0 ? 'text-emerald-400' : 'text-red-400'}>exit {r.exitCode}</span>
+        )}
+      </div>
+      <pre className="max-h-56 overflow-auto whitespace-pre-wrap px-3 pb-2.5 pt-1.5 text-zinc-300">
+        {outcome?.ok === false ? (outcome.message ?? 'failed') : [r.stdout, r.stderr].filter(Boolean).join('\n') || '(no output)'}
+      </pre>
+    </div>
   )
 }
 
@@ -605,6 +658,7 @@ function ToolCallCard({
                   : 'bg-green-500'
           }`}
         />
+        <ToolGlyph name={call.name} className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate font-medium">{friendlyToolTitle(call)}</span>
         {pending && approval && (
           <span className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -631,7 +685,7 @@ function ToolCallCard({
       </button>
       {expanded && (
         <div className="border-t border-border/40 px-3 py-2.5">
-          {custom ?? <DefaultToolDetail call={call} />}
+          {custom ?? (call.name === 'sandbox_run_command' ? <ShellDetail call={call} /> : <DefaultToolDetail call={call} />)}
           {onOpenRun && call.name.startsWith('sandbox_') && (
             <button
               type="button"
@@ -675,6 +729,15 @@ function AssistantMessage({
   const content = useSmoothText(msg.content, streaming)
   const reasoning = useSmoothText(msg.reasoning ?? '', streaming)
   const reasoningScrollRef = useRef<HTMLDivElement>(null)
+  // Measure visible thinking time: first reasoning reveal → first answer text.
+  const thinkStartRef = useRef<number | null>(null)
+  const thinkMsRef = useRef<number | null>(null)
+  if (streaming && reasoning && !content && thinkStartRef.current === null) {
+    thinkStartRef.current = performance.now()
+  }
+  if (content && thinkStartRef.current !== null && thinkMsRef.current === null) {
+    thinkMsRef.current = performance.now() - thinkStartRef.current
+  }
   useEffect(() => {
     const el = reasoningScrollRef.current
     if (el && streaming && !content) el.scrollTop = el.scrollHeight
@@ -689,17 +752,27 @@ function AssistantMessage({
         {formatModelCost(msg, models) && <span>{formatModelCost(msg, models)}</span>}
       </div>
       {reasoning && (
-        <details className="mb-2 rounded-md border border-border/40 bg-muted/30 px-3 py-2" open={!content}>
+        <details className="mb-2 rounded-lg border-l-2 border-border/70 bg-muted/20 px-3 py-2" open={!content}>
           <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
-            {content ? 'Thinking…' : 'Thinking'}
-            {!content && <span className="ml-1 inline-block animate-pulse">●</span>}
+            {!content ? (
+              <span className="animate-pulse">Thinking…</span>
+            ) : thinkMsRef.current != null ? (
+              `Thought for ${Math.max(1, Math.round(thinkMsRef.current / 1000))}s`
+            ) : (
+              'Thought process'
+            )}
           </summary>
-          <div ref={reasoningScrollRef} className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap text-sm text-muted-foreground/80">
+          <div ref={reasoningScrollRef} className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap text-[13px] leading-relaxed text-muted-foreground/70">
             {reasoning}
           </div>
         </details>
       )}
-      <div className="text-base leading-[1.75]">{renderBody(content)}</div>
+      <div className="text-base leading-[1.75]">
+        {renderBody(content)}
+        {streaming && content && !msg.toolCalls?.length && (
+          <span className="ml-0.5 inline-block h-[1.1em] w-[3px] translate-y-[2px] animate-pulse rounded-sm bg-foreground/70" aria-hidden />
+        )}
+      </div>
       {msg.toolCalls && msg.toolCalls.length > 0 && (
         <div className="mt-2 flex flex-col gap-1.5">
           {msg.toolCalls.map((tc) => (
