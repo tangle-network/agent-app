@@ -3,6 +3,7 @@ import {
   createSignedSsoState,
   verifySignedSsoState,
   createTangleSsoHandlers,
+  signSessionCookieValue,
   TangleSsoUserCreateError,
   createHubProxyRoutes,
   isTangleBearerMissingError,
@@ -15,6 +16,9 @@ import {
 } from '../src/platform/index'
 
 const SECRET = 'test-secret'
+// Distinct from SECRET on purpose: the session cookie signs with the auth
+// framework's secret, never the state secret.
+const AUTH_SECRET = 'test-auth-secret'
 
 describe('signed sso state', () => {
   it('round-trips: a freshly minted state verifies', async () => {
@@ -88,6 +92,7 @@ function fakeHarness(overrides: {
     auth,
     store,
     stateSecret: SECRET,
+    sessionCookieSecret: AUTH_SECRET,
     callbackUrl: 'https://my.app/auth/tangle/callback',
     stateCookieName: 'app_tangle_state',
     secureCookies: false,
@@ -125,6 +130,7 @@ describe('createTangleSsoHandlers — start', () => {
       auth: { authorizeUrl: () => 'https://id.example/a', exchange: async () => ({ apiKey: '', user: { id: '', email: '' } }) },
       store: {} as TangleSsoAccountStore,
       stateSecret: SECRET,
+      sessionCookieSecret: AUTH_SECRET,
       callbackUrl: 'https://my.app/cb',
       stateCookieName: 'app_tangle_state',
       secureCookies: true,
@@ -182,7 +188,8 @@ describe('createTangleSsoHandlers — callback', () => {
     expect(cookies).toHaveLength(2)
     expect(cookies[0]).toContain('app_tangle_state=;')
     expect(cookies[0]).toContain('Max-Age=0')
-    expect(cookies[1]).toContain('better-auth.session_token=tok_abc')
+    const signedValue = encodeURIComponent(await signSessionCookieValue('tok_abc', AUTH_SECRET))
+    expect(cookies[1]).toContain(`better-auth.session_token=${signedValue}`)
     expect(cookies[1]).toContain('Max-Age=604800')
   })
 
@@ -219,6 +226,7 @@ describe('createTangleSsoHandlers — callback', () => {
       },
       store: {} as TangleSsoAccountStore,
       stateSecret: SECRET,
+      sessionCookieSecret: AUTH_SECRET,
       callbackUrl: 'https://my.app/cb',
       stateCookieName: 'app_tangle_state',
       secureCookies: false,
