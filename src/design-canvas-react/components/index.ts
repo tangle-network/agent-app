@@ -8,7 +8,8 @@
  * shaking removes the Konva paths if they are never rendered).
  */
 export { DesignCanvas, type DesignCanvasFullProps } from './DesignCanvas'
-export { Workspace } from './Workspace'
+export { DesignCanvasEditor } from './DesignCanvasEditor'
+export { Workspace, WorkspaceView, type WorkspaceViewProps } from './Workspace'
 export { SelectionLayer, type SelectionLayerProps } from './SelectionLayer'
 export { PagesStrip, type PagesStripProps } from './PagesStrip'
 export { LayersPanel, type LayersPanelProps } from './LayersPanel'

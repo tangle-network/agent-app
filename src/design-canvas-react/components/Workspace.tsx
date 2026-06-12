@@ -32,8 +32,14 @@
  * DEVICEPIXELRATIO: Konva's pixelRatio prop multiplies the backing canvas
  * resolution for crisp rendering at any DPR.
  *
- * Architecture: WorkspaceInner receives a guaranteed non-null activePage,
- * keeping all hooks at the top level and avoiding conditional-hook violations.
+ * Composition:
+ * - `WorkspaceView` is the injectable form: receives a pre-created stack and
+ *   a guaranteed non-null activePage, commits all gestures through that shared
+ *   stack. `DesignCanvasEditor` passes the chrome's stack here so undo/redo
+ *   and layers-panel selection stay coherent across both surfaces.
+ * - `Workspace` is the standalone wrapper: creates its own stack and renders
+ *   WorkspaceView. Existing consumers (tests, bare embeds) mount this without
+ *   any chrome.
  */
 
 import {
@@ -101,61 +107,33 @@ const NO_MARQUEE: MarqueeState = { active: false, startDocX: 0, startDocY: 0, en
 type GestureMode = 'idle' | 'pan' | 'marquee' | 'drag'
 
 // ---------------------------------------------------------------------------
-// Workspace — shell that guards page presence and delegates to WorkspaceInner
+// WorkspaceViewProps — injectable form (shared stack, guaranteed activePage)
 // ---------------------------------------------------------------------------
 
-export function Workspace(props: DesignCanvasProps) {
-  // Command stack is owned here so it outlives WorkspaceInner re-mounts.
-  const stackRef = useRef(
-    createSceneCommandStack(
-      props.document,
-      props.document.pages[0]?.id ?? '',
-    ),
-  )
-
-  const [, setTick] = useState(0)
-  const forceRender = useCallback(() => setTick((t) => t + 1), [])
-
-  useEffect(() => {
-    return stackRef.current.subscribe(forceRender)
-  }, [forceRender])
-
-  // Rebase on server refresh (host changes rev + document together).
-  const prevRevRef = useRef(props.rev)
-  useEffect(() => {
-    if (props.rev !== prevRevRef.current) {
-      prevRevRef.current = props.rev
-      stackRef.current.reset(props.document)
-    }
-  }, [props.rev, props.document])
-
-  const state = stackRef.current.getState()
-  const activePage =
-    state.document.pages.find((p) => p.id === state.activePageId) ??
-    state.document.pages[0]
-
-  // No pages — document is empty shell, nothing to render.
-  if (!activePage) return null
-
-  return (
-    <WorkspaceInner
-      {...props}
-      stack={stackRef.current}
-      activePage={activePage}
-    />
-  )
-}
-
-// ---------------------------------------------------------------------------
-// WorkspaceInner — receives a guaranteed activePage
-// ---------------------------------------------------------------------------
-
-interface WorkspaceInnerProps extends DesignCanvasProps {
+export interface WorkspaceViewProps {
+  /** The command stack this view commits gestures through. Must be the same
+   *  instance the chrome (DesignCanvasEditor) owns so undo/redo and layers-
+   *  panel selection are coherent. */
   stack: ReturnType<typeof createSceneCommandStack>
+  /** Active page resolved before render — WorkspaceView has no conditional
+   *  hook guards; the caller ensures this is never null. */
   activePage: ScenePage
+  canWrite: boolean
+  onApplyOperations: DesignCanvasProps['onApplyOperations']
+  onSelectionChange?: DesignCanvasProps['onSelectionChange']
+  renderAgentPanel?: DesignCanvasProps['renderAgentPanel']
+  renderSidePanel?: DesignCanvasProps['renderSidePanel']
+  className?: string
+  /** Ref the chrome fills with a fit-page callback. The chrome calls it on F /
+   *  Fit button; when injected via DesignCanvasEditor the ref is shared. */
+  onFitRef?: React.MutableRefObject<(() => void) | null>
 }
 
-function WorkspaceInner({
+// ---------------------------------------------------------------------------
+// WorkspaceView — all interaction + Konva render; commits through shared stack
+// ---------------------------------------------------------------------------
+
+export function WorkspaceView({
   canWrite,
   onApplyOperations,
   onSelectionChange,
@@ -164,7 +142,8 @@ function WorkspaceInner({
   className,
   stack,
   activePage,
-}: WorkspaceInnerProps) {
+  onFitRef,
+}: WorkspaceViewProps) {
   // Re-render when command stack changes state.
   const [, setTick] = useState(0)
   const forceRender = useCallback(() => setTick((t) => t + 1), [])
@@ -201,6 +180,26 @@ function WorkspaceInner({
   }, [])
 
   const stageRef = useRef<Konva.Stage | null>(null)
+
+  // -------------------------------------------------------------------------
+  // Fit-page callback — exposed via onFitRef so the chrome can trigger it
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!onFitRef) return
+    onFitRef.current = () => {
+      const { width, height } = containerSize
+      if (width <= 0 || height <= 0) return
+      const view = zoomPanMath.fitPage(activePage, { width, height })
+      stack.setView(view)
+    }
+    return () => {
+      // Only clear if we still own the slot (multiple WorkspaceView mounts
+      // would each try to own it; the last to mount wins, but on unmount we
+      // must not clear a ref filled by a newer mount).
+      if (onFitRef.current !== null) onFitRef.current = null
+    }
+  })
 
   // -------------------------------------------------------------------------
   // Gesture refs
@@ -840,5 +839,63 @@ function WorkspaceInner({
         </div>
       )}
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Workspace — standalone wrapper for bare embeds and tests (no chrome)
+// ---------------------------------------------------------------------------
+
+/**
+ * Self-contained Konva workspace that creates its own command stack. Mount
+ * this when you want the canvas without the toolbar/rulers/pages-strip chrome.
+ *
+ * Products that want the full editor (chrome + workspace sharing one stack)
+ * should mount `DesignCanvasEditor` instead.
+ */
+export function Workspace(props: DesignCanvasProps) {
+  // Stack outlives WorkspaceView re-mounts; created once from the initial doc.
+  const stackRef = useRef(
+    createSceneCommandStack(
+      props.document,
+      props.document.pages[0]?.id ?? '',
+    ),
+  )
+
+  const [, setTick] = useState(0)
+  const forceRender = useCallback(() => setTick((t) => t + 1), [])
+
+  useEffect(() => {
+    return stackRef.current.subscribe(forceRender)
+  }, [forceRender])
+
+  // Rebase on server refresh (host changes rev + document together).
+  const prevRevRef = useRef(props.rev)
+  useEffect(() => {
+    if (props.rev !== prevRevRef.current) {
+      prevRevRef.current = props.rev
+      stackRef.current.reset(props.document)
+    }
+  }, [props.rev, props.document])
+
+  const state = stackRef.current.getState()
+  const activePage =
+    state.document.pages.find((p) => p.id === state.activePageId) ??
+    state.document.pages[0]
+
+  // No pages — document is empty shell, nothing to render.
+  if (!activePage) return null
+
+  return (
+    <WorkspaceView
+      stack={stackRef.current}
+      activePage={activePage}
+      canWrite={props.canWrite}
+      onApplyOperations={props.onApplyOperations}
+      onSelectionChange={props.onSelectionChange}
+      renderAgentPanel={props.renderAgentPanel}
+      renderSidePanel={props.renderSidePanel}
+      className={props.className}
+    />
   )
 }

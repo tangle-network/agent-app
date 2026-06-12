@@ -56,9 +56,12 @@ import { ZoomControls } from './ZoomControls'
 export interface DesignCanvasFullProps extends DesignCanvasProps {
   /**
    * Render the Konva canvas workspace into the slot this shell provides.
-   * The shell passes viewport dimensions and view-state so the workspace can
-   * position the page correctly. The `onFitRef` is a ref the workspace fills
-   * with a function the shell calls when the user hits F or clicks Fit.
+   * The shell passes viewport dimensions, view-state, and the shared command
+   * stack so `WorkspaceView` can commit gestures through the same stack the
+   * chrome uses for undo/redo and layers-panel selection.
+   *
+   * `onFitRef` is a ref the workspace fills with a fit-page callback; the
+   * shell calls it when the user presses F or clicks the Fit button.
    */
   renderWorkspace(ctx: {
     document: SceneDocument
@@ -72,6 +75,10 @@ export interface DesignCanvasFullProps extends DesignCanvasProps {
     snapEnabled: boolean
     showBleed: boolean
     canWrite: boolean
+    /** The chrome's command stack. Pass to WorkspaceView so gestures, undo,
+     *  and layers-panel selection share a single state machine. */
+    stack: ReturnType<typeof createSceneCommandStack>
+    activePage: SceneDocument['pages'][number] | undefined
     onFitRef: React.MutableRefObject<(() => void) | null>
     onZoomChange(zoom: number): void
     onPanChange(panX: number, panY: number): void
@@ -598,6 +605,8 @@ export function DesignCanvas({
             snapEnabled: editorState.snapEnabled,
             showBleed: editorState.showBleed,
             canWrite,
+            stack,
+            activePage,
             onFitRef: fitRef,
             onZoomChange: setZoom,
             onPanChange: setPan,
