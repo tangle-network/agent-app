@@ -24,6 +24,9 @@ export * from './missions/index'
 export * from './web/index'
 export * from './redact/index'
 export * from './assets/index'
-// `/web-react` is intentionally NOT re-exported here: it needs the optional
-// react peer and would drag JSX into every root-entry consumer.
+// `/web-react` and `/sequences-react` are intentionally NOT re-exported here:
+// they need the optional react peer and would drag JSX into every root-entry
+// consumer. `/sequences/drizzle` likewise stays subpath-only — it imports the
+// optional drizzle-orm peer at module top.
 export * from './trace/index'
+export * from './sequences/index'

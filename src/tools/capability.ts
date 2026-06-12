@@ -42,11 +42,79 @@ export async function verifyCapabilityToken(userId: string, token: string, opts:
   return timingSafeEqual(token, expected)
 }
 
+export interface ExpiringCapabilityTokenOptions extends CapabilityTokenOptions {
+  /** Token lifetime. Expired tokens verify false regardless of signature. */
+  expiresInMs: number
+  /** Clock injection for tests; defaults to Date.now. */
+  now?: () => number
+}
+
+/**
+ * Mint an EXPIRING capability token: `<prefix><base64url(payload)>.<sig>` where
+ * the payload carries `{ sub, exp, n }` (subject, epoch-ms expiry, random
+ * nonce) and the signature is HMAC-SHA256 over the encoded payload. Use this
+ * for user-initiated scoped channels (e.g. a per-sequence MCP endpoint) where
+ * a captured token must not stay valid past its window; the bare
+ * {@link createCapabilityToken} remains for turn-scoped tool bridges whose
+ * mint+verify happen inside one request cycle. Fail-closed like the bare
+ * variant: no secret → no token.
+ */
+export async function createExpiringCapabilityToken(subject: string, opts: ExpiringCapabilityTokenOptions): Promise<string | undefined> {
+  const secret = opts.secret?.trim()
+  if (!secret) return undefined
+  if (!Number.isFinite(opts.expiresInMs) || opts.expiresInMs <= 0) throw new Error('expiresInMs must be a positive number')
+  const prefix = opts.prefix ?? 'cap_'
+  const now = opts.now ?? Date.now
+  const payload = base64urlText(JSON.stringify({ sub: subject, exp: now() + opts.expiresInMs, n: crypto.randomUUID() }))
+  return `${prefix}${payload}.${await signText(payload, secret)}`
+}
+
+/** Verify an expiring token against `subject`: prefix, payload integrity,
+ *  subject match, and expiry all checked; returns false (never throws) on any
+ *  failure including a malformed payload. */
+export async function verifyExpiringCapabilityToken(subject: string, token: string, opts: CapabilityTokenOptions & { now?: () => number }): Promise<boolean> {
+  const secret = opts.secret?.trim()
+  const prefix = opts.prefix ?? 'cap_'
+  if (!secret || !token.startsWith(prefix)) return false
+  const body = token.slice(prefix.length)
+  const dot = body.lastIndexOf('.')
+  if (dot <= 0 || dot === body.length - 1) return false
+  const payload = body.slice(0, dot)
+  const sig = body.slice(dot + 1)
+  if (!timingSafeEqual(sig, await signText(payload, secret))) return false
+  let parsed: { sub?: unknown; exp?: unknown }
+  try {
+    parsed = JSON.parse(textFromBase64url(payload)) as { sub?: unknown; exp?: unknown }
+  } catch {
+    return false
+  }
+  if (parsed.sub !== subject) return false
+  if (typeof parsed.exp !== 'number') return false
+  const now = opts.now ?? Date.now
+  return parsed.exp > now()
+}
+
 async function sign(userId: string, secret: string): Promise<string> {
+  return signText(`user:${userId}`, secret)
+}
+
+async function signText(message: string, secret: string): Promise<string> {
   const enc = new TextEncoder()
   const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
-  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(`user:${userId}`))
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message))
   return base64url(new Uint8Array(sig))
+}
+
+function base64urlText(text: string): string {
+  return base64url(new TextEncoder().encode(text))
+}
+
+function textFromBase64url(value: string): string {
+  const b64 = value.replace(/-/g, '+').replace(/_/g, '/')
+  const bin = atob(b64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return new TextDecoder().decode(bytes)
 }
 
 function base64url(bytes: Uint8Array): string {
