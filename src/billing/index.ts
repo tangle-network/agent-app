@@ -135,6 +135,30 @@ function nextPeriodEnd(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0))
 }
 
+/** A round-trip probe through the at-rest crypto seam (no platform key needed).
+ *  Runs BEFORE minting so a consumer with a missing/invalid FIELD_ENCRYPTION_KEY
+ *  fails loud with zero platform spend instead of orphaning a freshly minted key
+ *  when encrypt later throws. The probe never touches the real secret. */
+async function assertCryptoUsable(crypto: KeyCrypto): Promise<void> {
+  const probe = 'agent-app:key-manager:crypto-probe'
+  let roundTripped: string
+  try {
+    roundTripped = await crypto.decrypt(await crypto.encrypt(probe))
+  } catch (err) {
+    throw new Error(
+      'Key encryption is misconfigured: the crypto seam threw before minting. ' +
+        'Validate FIELD_ENCRYPTION_KEY (64-char hex) at startup. No platform key was minted.',
+      { cause: err },
+    )
+  }
+  if (roundTripped !== probe) {
+    throw new Error(
+      'Key encryption is misconfigured: encrypt/decrypt round-trip did not preserve the plaintext. ' +
+        'No platform key was minted.',
+    )
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Shared-platform-balance billing
 //
@@ -325,13 +349,45 @@ export function createWorkspaceKeyManager(opts: WorkspaceKeyManagerOptions): Wor
       if (ropts.rolloverCapUsd != null) budgetUsd = Math.min(budgetUsd, ropts.rolloverCapUsd)
     }
 
+    // Prove the at-rest crypto seam is usable BEFORE spending a platform mint.
+    // The `KeyCrypto` impl may close over an env-resolved key (createFieldCrypto)
+    // that is empty/invalid and only throws at encrypt time — after the mint —
+    // orphaning the child key. A round-trip probe makes a misconfigured consumer
+    // fail loud with ZERO platform spend.
+    await assertCryptoUsable(opts.crypto)
+
     const expiresAt = nextPeriodEnd(now)
     const created = await opts.provisioner.createKey({ name: `ws:${workspaceId}`, product, budgetUsd, expiresAt: expiresAt.toISOString() })
     if (!created.key || !created.id) throw new Error('tcloud createKey returned no key')
-    const keyEncrypted = await opts.crypto.encrypt(created.key)
+    const mintedKeyId = created.id
 
-    const priors = await opts.store.listActive(workspaceId)
-    await opts.store.insert({ workspaceId, keyId: created.id, keyEncrypted, budgetUsd, expiresAt })
+    // Past this point the platform has minted a budget-bearing child key. ANY
+    // failure before the row is persisted (encrypt, insert) MUST revoke the
+    // just-minted key, else it leaks as a zombie holding parent-key headroom —
+    // a missing/invalid encryption key would otherwise burn the child budget
+    // per mint attempt until the parent can no longer mint (fleet-wide outage).
+    let keyEncrypted: string
+    let priors: Array<{ id: string; keyId: string }>
+    try {
+      keyEncrypted = await opts.crypto.encrypt(created.key)
+      priors = await opts.store.listActive(workspaceId)
+      await opts.store.insert({ workspaceId, keyId: mintedKeyId, keyEncrypted, budgetUsd, expiresAt })
+    } catch (err) {
+      // Best-effort revoke of the orphan. A revoke failure must NOT mask the
+      // original cause — log it loudly and rethrow the original error.
+      try {
+        await opts.provisioner.revokeKey(mintedKeyId)
+      } catch (revokeErr) {
+        console.error(
+          `[workspace-key-manager] FAILED to revoke orphaned child key ${mintedKeyId} ` +
+            `for workspace ${workspaceId} after a post-mint failure — it now leaks parent-key budget. ` +
+            `Revoke error:`,
+          revokeErr,
+        )
+      }
+      throw err
+    }
+
     for (const p of priors) {
       await opts.store.markRevoked(p.id, now)
       // Best-effort upstream revoke — the row is already revoked and an expired

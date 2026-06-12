@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   createWorkspaceKeyManager,
   createPlatformBalanceManager,
@@ -118,6 +118,95 @@ describe('createWorkspaceKeyManager', () => {
     const secret = await mgr.ensureKey('ws1')
     expect(secret).toBe('sk-tan-key-2')
     expect(h.revoked).toContain('key-1')
+  })
+
+  it('revokes the just-minted key when encrypt throws after a successful mint (no orphan)', async () => {
+    const h = harness()
+    const boom = new Error('FIELD_ENCRYPTION_KEY invalid at encrypt time')
+    let probed = false
+    const crypto: KeyCrypto = {
+      async encrypt(s) {
+        // First call is the pre-mint probe (must pass so the mint happens);
+        // the real secret encrypt then throws to simulate a post-mint failure.
+        if (!probed) { probed = true; return `enc(${s})` }
+        throw boom
+      },
+      async decrypt(e) { return e.replace(/^enc\(/, '').replace(/\)$/, '') },
+    }
+    const mgr = createWorkspaceKeyManager({ store: h.store, provisioner: h.provisioner, crypto, defaultBudgetUsd: 100, now: () => T0 })
+    await expect(mgr.ensureKey('ws1')).rejects.toBe(boom)
+    // Mint happened (key-1) and was revoked; no active row persisted.
+    expect(h.revoked).toEqual(['key-1'])
+    expect(h.rows().filter((r) => r.status === 'active')).toHaveLength(0)
+  })
+
+  it('revokes the just-minted key when the store insert throws after a successful mint', async () => {
+    const h = harness()
+    const boom = new Error('D1 insert failed')
+    const store: WorkspaceKeyStore = { ...h.store, async insert() { throw boom } }
+    const mgr = createWorkspaceKeyManager({ store, provisioner: h.provisioner, crypto: h.crypto, defaultBudgetUsd: 100, now: () => T0 })
+    await expect(mgr.ensureKey('ws1')).rejects.toBe(boom)
+    expect(h.revoked).toEqual(['key-1'])
+    expect(h.rows().filter((r) => r.status === 'active')).toHaveLength(0)
+  })
+
+  it('surfaces the ORIGINAL error when the cleanup revoke also throws (revoke failure logged, not masked)', async () => {
+    const h = harness()
+    const original = new Error('insert failed')
+    const store: WorkspaceKeyStore = { ...h.store, async insert() { throw original } }
+    const provisioner: KeyProvisioner = { ...h.provisioner, async revokeKey() { throw new Error('platform revoke 500') } }
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const mgr = createWorkspaceKeyManager({ store, provisioner, crypto: h.crypto, defaultBudgetUsd: 100, now: () => T0 })
+    await expect(mgr.ensureKey('ws1')).rejects.toBe(original)
+    // Revoke failure is logged loudly, not masked.
+    expect(errSpy).toHaveBeenCalled()
+    expect(String(errSpy.mock.calls[0]?.[0])).toContain('FAILED to revoke orphaned child key key-1')
+    errSpy.mockRestore()
+  })
+
+  it('happy path mints without any revoke (no spurious cleanup)', async () => {
+    const h = harness()
+    const mgr = createWorkspaceKeyManager({ ...h, defaultBudgetUsd: 100, now: () => T0 })
+    await mgr.ensureKey('ws1')
+    expect(h.revoked).toEqual([])
+    expect(h.rows().filter((r) => r.status === 'active')).toHaveLength(1)
+  })
+
+  it('fails the pre-mint crypto probe BEFORE minting (zero platform spend on a misconfigured key)', async () => {
+    const h = harness()
+    let mints = 0
+    const provisioner: KeyProvisioner = { ...h.provisioner, async createKey(i) { mints++; return h.provisioner.createKey(i) } }
+    const crypto: KeyCrypto = { async encrypt() { throw new Error('no FIELD_ENCRYPTION_KEY') }, async decrypt(e) { return e } }
+    const mgr = createWorkspaceKeyManager({ store: h.store, provisioner, crypto, defaultBudgetUsd: 100, now: () => T0 })
+    await expect(mgr.ensureKey('ws1')).rejects.toThrow(/misconfigured/)
+    expect(mints).toBe(0)
+    expect(h.revoked).toEqual([])
+  })
+
+  it('fails the pre-mint probe when the crypto round-trip does not preserve plaintext', async () => {
+    const h = harness()
+    let mints = 0
+    const provisioner: KeyProvisioner = { ...h.provisioner, async createKey(i) { mints++; return h.provisioner.createKey(i) } }
+    // A wrong-key decrypt that returns garbage rather than throwing.
+    const crypto: KeyCrypto = { async encrypt(s) { return `enc(${s})` }, async decrypt() { return 'corrupted' } }
+    const mgr = createWorkspaceKeyManager({ store: h.store, provisioner, crypto, defaultBudgetUsd: 100, now: () => T0 })
+    await expect(mgr.ensureKey('ws1')).rejects.toThrow(/round-trip/)
+    expect(mints).toBe(0)
+  })
+
+  it('rotate also revokes the just-minted key when insert throws (sibling mint path covered)', async () => {
+    const h = harness()
+    // First ensure succeeds (key-1 active). Then make insert throw on the rotate.
+    const mgr = createWorkspaceKeyManager({ ...h, defaultBudgetUsd: 100, now: () => T0 })
+    await mgr.ensureKey('ws1')
+    const boom = new Error('insert failed on rotate')
+    const origInsert = h.store.insert
+    h.store.insert = async () => { throw boom }
+    await expect(mgr.rotateKey('ws1')).rejects.toBe(boom)
+    h.store.insert = origInsert
+    // key-2 (the rotate mint) was revoked; key-1 still the only active row, NOT revoked.
+    expect(h.revoked).toEqual(['key-2'])
+    expect(h.rows().filter((r) => r.status === 'active').map((r) => r.keyId)).toEqual(['key-1'])
   })
 
   it('reports live usage from the provisioner (drives the budget panel)', async () => {
