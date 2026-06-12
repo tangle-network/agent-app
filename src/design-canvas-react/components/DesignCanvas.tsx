@@ -107,8 +107,9 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 /** Commit a command: execute optimistically, persist via `onApplyOperations`,
- *  roll back locally on rejection. Returns a cancel-safe cleanup (noop here;
- *  the rollback is self-contained). */
+ *  roll back locally on rejection. The command reference is captured at call
+ *  time so the rejection handler removes that specific command regardless of
+ *  how many further commands the user has executed while the save was pending. */
 function useCommitCommand(
   stack: ReturnType<typeof createSceneCommandStack>,
   onApplyOperations: DesignCanvasProps['onApplyOperations'],
@@ -136,17 +137,13 @@ function useCommitCommand(
           }
         })
         .catch((error: unknown) => {
-          // Roll back only when this is still the top of the done stack to
-          // avoid corrupting history when the user already made further edits.
-          if (stack.canUndo()) {
-            try {
-              stack.undo()
-            } catch {
-              // The undo itself threw (e.g. element already removed by
-              // concurrent edit); accept the state divergence — the next
-              // server refresh (reset) will reconcile.
-            }
-          }
+          // Roll back the specific command that failed. stack.rollback() splices
+          // this command out of history and applies its inverse to the current
+          // state — commands the user executed while this save was in-flight are
+          // not disturbed (their undo entries are preserved). If the command is
+          // no longer in the stack (double-fire or already reset), rollback is a
+          // safe no-op.
+          stack.rollback(command)
           setError(error instanceof Error ? error.message : String(error))
         })
     },

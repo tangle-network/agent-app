@@ -233,15 +233,12 @@ export function WorkspaceView({
       const result = await onApplyOperations(command.operations())
       if (result.document) stack.reset(result.document)
     } catch {
-      // Roll back: execute the inverse transform as a new command so undo
-      // history stays coherent rather than silently patching state.
-      stack.execute({
-        label: 'rollback',
-        execute: (s) => command.undo(s),
-        undo: (s) => command.execute(s),
-        operations: () => command.inverseOperations(),
-        inverseOperations: () => command.operations(),
-      })
+      // Roll back by splicing this specific command from history and applying its
+      // inverse to the current state. Using stack.rollback(command) rather than
+      // stack.execute(synthetic-rollback) avoids polluting the undo stack with a
+      // phantom entry and preserves any commands the user executed while this save
+      // was in-flight.
+      stack.rollback(command)
     }
   }
 

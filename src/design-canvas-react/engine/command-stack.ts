@@ -100,6 +100,29 @@ export function createSceneCommandStack(document: SceneDocument, activePageId: s
       notify()
     },
 
+    rollback(command: SceneCommand): void {
+      const idx = undoStack.lastIndexOf(command)
+      // Command not in history — stale or double-fire rejection handler; no-op.
+      if (idx === -1) return
+
+      // Apply the command's inverse against the current state. For non-overlapping
+      // edits (different elements or different attributes) this is exact: the
+      // inverse commutes freely past all subsequent commands. For overlapping edits
+      // on the same attribute the result is defined but not semantically perfect;
+      // the persistence layer should trigger an onResyncRequired refetch in that
+      // case so the server document reconciles.
+      state = command.undo(state)
+
+      // Splice the target command out of the undo stack.
+      undoStack.splice(idx, 1)
+
+      // Clear the redo stack: its entries were computed relative to a history that
+      // included this command, so they are now stale.
+      redoStack.length = 0
+
+      notify()
+    },
+
     /** Rebase onto a server-refreshed document. History survives; selection
      *  drops ids the refresh removed so view state never dangles. */
     reset(newDocument: SceneDocument): void {

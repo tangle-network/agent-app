@@ -66,6 +66,21 @@ export interface SceneCommandStack {
   /** Rebase onto a server refresh WITHOUT clearing history (history holds
    *  operations, not snapshots). */
   reset(document: SceneDocument): void
+  /**
+   * Remove a specific command from the undo stack and apply its inverse to
+   * the current state. Called by the persistence layer when a save rejects
+   * AFTER the user may have made further edits.
+   *
+   * Invariant: for commands that operate on disjoint attributes, rollback is
+   * identity for all commands executed after the rolled-back one — their net
+   * effect is preserved. For overlapping attr edits (same element, same field)
+   * the result is defined but not guaranteed to be semantically correct; the
+   * caller should trigger an onResyncRequired fetch in that case.
+   *
+   * If `command` is not found in the undo stack (stale or double-fire
+   * rejection handler), this is a safe no-op.
+   */
+  rollback(command: SceneCommand): void
 }
 
 // ---------------------------------------------------------------------------
