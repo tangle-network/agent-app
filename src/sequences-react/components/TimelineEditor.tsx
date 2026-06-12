@@ -11,6 +11,17 @@
  *   (the server applied the original), so the editor mirrors the executed
  *   commands to know which operations an undo corresponds to — the engine
  *   stack exposes no command identity from `undo()`.
+ * - Clip-creating commands mint optimistic `local-…` ids. When
+ *   `onApplyOperations` resolves with `SequenceApplyResult[]`, the editor
+ *   records local→server aliases that every command resolves through at
+ *   execute/undo/emission time, so undoing a committed place/split/caption
+ *   works after a server refresh. Hosts resolving void skip reconciliation;
+ *   undo of creates then fails loud (error bar) once a refresh replaced the
+ *   local ids.
+ *
+ * Captions require an unlocked caption track: the editor creates clips, never
+ * tracks. Products seed a caption track at sequence creation (or let the
+ * agent's create_track tool add one); the caption button errors otherwise.
  * - The PLAYBACK CLOCK owns the playhead. Volatile view state (selection,
  *   zoom, snap toggle) lives in React state; the contract's
  *   `EditorTimelineState` view fields are initials, not a live channel.
@@ -36,7 +47,9 @@ import {
   secondsToFrames,
   trackIntervals,
 } from '../../sequences/model'
+import type { SequenceApplyResult } from '../../sequences/apply'
 import type { SequenceClip, SequenceMediaKind } from '../../sequences/model'
+import type { SequenceOperation } from '../../sequences/operations'
 import type { SnapPoint, TimelineCommand, TimelineEditorProps, VideoFrameProvider } from '../contracts'
 import { createCommandStack } from '../engine/command-stack'
 import {
@@ -213,9 +226,52 @@ export function TimelineEditor(props: TimelineEditorProps) {
 
   // --- command commit + history mirror ---------------------------------------
 
-  const historyRef = useRef<{ done: TimelineCommand[]; undone: TimelineCommand[] }>({ done: [], undone: [] })
+  interface HistoryEntry {
+    command: TimelineCommand
+    /** Optimistic ids this command's clip-creating operations minted, in
+     *  operation order — the pairing key for id reconciliation. */
+    createdLocalIds: string[]
+  }
 
-  function commitCommand(command: TimelineCommand) {
+  const historyRef = useRef<{ done: HistoryEntry[]; undone: HistoryEntry[] }>({ done: [], undone: [] })
+
+  /** Local→server clip-id aliases, fed by `onApplyOperations` results and
+   *  consulted live by every command (see engine/commands resolveClipId). */
+  const clipIdAliasesRef = useRef(new Map<string, string>())
+
+  function resolveClipId(clipId: string): string {
+    return clipIdAliasesRef.current.get(clipId) ?? clipId
+  }
+
+  /** Pair each clip-creating operation with its apply result and record the
+   *  local→server alias. Results are index-aligned with operations (the
+   *  `applySequenceOperations` contract); a host returning a mismatched array
+   *  is a wiring bug surfaced loud, not silently skipped. */
+  function reconcileCreatedClipIds(
+    operations: SequenceOperation[],
+    createdLocalIds: string[],
+    results: SequenceApplyResult[] | void,
+  ) {
+    if (createdLocalIds.length === 0 || !Array.isArray(results)) return
+    if (results.length !== operations.length) {
+      setCommitError(
+        `onApplyOperations returned ${results.length} results for ${operations.length} operations — clip-id reconciliation skipped`,
+      )
+      return
+    }
+    let cursor = 0
+    operations.forEach((operation, index) => {
+      if (operation.type !== 'place_clip' && operation.type !== 'add_caption' && operation.type !== 'split_clip') return
+      const localId = createdLocalIds[cursor]
+      cursor += 1
+      const result = results[index]
+      if (localId !== undefined && result !== undefined && result.kind === 'clip') {
+        clipIdAliasesRef.current.set(localId, result.clip.id)
+      }
+    })
+  }
+
+  function commitCommand(command: TimelineCommand, createdLocalIds: string[] = []) {
     if (!canWrite) return
     try {
       stack.execute(command)
@@ -224,44 +280,67 @@ export function TimelineEditor(props: TimelineEditorProps) {
       return
     }
     const history = historyRef.current
-    history.done.push(command)
+    const entry: HistoryEntry = { command, createdLocalIds }
+    history.done.push(entry)
     if (history.done.length > HISTORY_MIRROR_LIMIT) history.done.splice(0, history.done.length - HISTORY_MIRROR_LIMIT)
     history.undone = []
     setCommitError(null)
-    void onApplyOperations(command.operations()).catch((error: unknown) => {
-      // Roll back ONLY when this command is still the newest local edit; if
-      // the user already undid or stacked more edits, local rollback would
-      // corrupt history — surface the error and let the next server refresh
-      // (stack.reset) reconcile.
-      const mirror = historyRef.current
-      if (mirror.done[mirror.done.length - 1] === command && stack.canUndo()) {
-        stack.undo()
-        mirror.done.pop()
-      }
-      setCommitError(error instanceof Error ? error.message : String(error))
-    })
+    const operations = command.operations()
+    void onApplyOperations(operations)
+      .then((results) => reconcileCreatedClipIds(operations, createdLocalIds, results))
+      .catch((error: unknown) => {
+        // Roll back ONLY when this command is still the newest local edit; if
+        // the user already undid or stacked more edits, local rollback would
+        // corrupt history — surface the error and let the next server refresh
+        // (stack.reset) reconcile.
+        const mirror = historyRef.current
+        if (mirror.done[mirror.done.length - 1] === entry && stack.canUndo()) {
+          stack.undo()
+          mirror.done.pop()
+        }
+        setCommitError(error instanceof Error ? error.message : String(error))
+      })
   }
 
   function undoLast() {
-    if (!stack.canUndo()) return
-    const command = historyRef.current.done.pop()
-    if (!command) return
-    stack.undo()
-    historyRef.current.undone.push(command)
-    void onApplyOperations(command.inverseOperations()).catch((error: unknown) => {
+    const history = historyRef.current
+    const entry = history.done[history.done.length - 1]
+    if (!entry || !stack.canUndo()) return
+    try {
+      stack.undo()
+    } catch (error) {
+      // A reset() removed the command's target clip; the stack kept the entry
+      // (it may succeed after the next refresh), so the mirror stays too.
+      setCommitError(`Undo failed: ${error instanceof Error ? error.message : String(error)}`)
+      return
+    }
+    history.done.pop()
+    history.undone.push(entry)
+    void onApplyOperations(entry.command.inverseOperations()).catch((error: unknown) => {
       setCommitError(error instanceof Error ? error.message : String(error))
     })
   }
 
   function redoLast() {
-    if (!stack.canRedo()) return
-    const command = historyRef.current.undone.pop()
-    if (!command) return
-    stack.redo()
-    historyRef.current.done.push(command)
-    void onApplyOperations(command.operations()).catch((error: unknown) => {
-      setCommitError(error instanceof Error ? error.message : String(error))
-    })
+    const history = historyRef.current
+    const entry = history.undone[history.undone.length - 1]
+    if (!entry || !stack.canRedo()) return
+    try {
+      stack.redo()
+    } catch (error) {
+      setCommitError(`Redo failed: ${error instanceof Error ? error.message : String(error)}`)
+      return
+    }
+    history.undone.pop()
+    history.done.push(entry)
+    const operations = entry.command.operations()
+    // A redo of a clip-creating command mints fresh server ids — re-pair them
+    // so a later undo deletes the recreated clips, not the stale ones.
+    void onApplyOperations(operations)
+      .then((results) => reconcileCreatedClipIds(operations, entry.createdLocalIds, results))
+      .catch((error: unknown) => {
+        setCommitError(error instanceof Error ? error.message : String(error))
+      })
   }
 
   // --- edit handlers ----------------------------------------------------------
@@ -276,6 +355,7 @@ export function TimelineEditor(props: TimelineEditorProps) {
         clipId: input.clipId,
         startFrame: input.startFrame,
         ...(input.trackId !== clip.trackId ? { trackId: input.trackId } : {}),
+        resolveClipId,
       }),
     )
   }
@@ -288,12 +368,15 @@ export function TimelineEditor(props: TimelineEditorProps) {
         startFrame: input.startFrame,
         durationFrames: input.durationFrames,
         sourceInFrame: input.sourceInFrame,
+        resolveClipId,
       }),
     )
   }
 
   function handleCommitText(input: { clipId: string; text: string }) {
-    commitCommand(setClipTextCommand({ timeline: stack.getState().timeline, clipId: input.clipId, text: input.text }))
+    commitCommand(
+      setClipTextCommand({ timeline: stack.getState().timeline, clipId: input.clipId, text: input.text, resolveClipId }),
+    )
   }
 
   function deleteSelection() {
@@ -301,7 +384,7 @@ export function TimelineEditor(props: TimelineEditorProps) {
     const lockedTrackIds = new Set(current.tracks.filter((track) => track.locked).map((track) => track.id))
     const targets = selectedClips.filter((clip) => !lockedTrackIds.has(clip.trackId))
     if (targets.length === 0) return
-    const commands = targets.map((clip) => deleteClipCommand({ timeline: current, clipId: clip.id }))
+    const commands = targets.map((clip) => deleteClipCommand({ timeline: current, clipId: clip.id, resolveClipId }))
     commitCommand(commands.length === 1 ? (commands[0] as TimelineCommand) : compositeCommand(`Delete ${commands.length} clips`, commands))
     setSelectedClipIds([])
   }
@@ -316,13 +399,16 @@ export function TimelineEditor(props: TimelineEditorProps) {
 
   function splitAtPlayhead() {
     if (!splittableClip) return
+    const newClipId = mintClipId()
     commitCommand(
       splitClipCommand({
         timeline: stack.getState().timeline,
         clipId: splittableClip.id,
         atFrame: playheadFrame,
-        newClipId: mintClipId(),
+        newClipId,
+        resolveClipId,
       }),
+      [newClipId],
     )
   }
 
@@ -335,21 +421,31 @@ export function TimelineEditor(props: TimelineEditorProps) {
       setCommitError('No unlocked caption track in this sequence — add one before inserting captions.')
       return
     }
-    const placement = chooseCaptionPlacement({
-      playheadFrame,
-      fps,
-      sequenceDurationFrames: current.sequence.durationFrames,
-      occupiedIntervals: trackIntervals(current, captionTrack.id),
-    })
+    // Throws when the caption track has no free gap left near the playhead.
+    let placement: { startFrame: number; durationFrames: number }
+    try {
+      placement = chooseCaptionPlacement({
+        playheadFrame,
+        fps,
+        sequenceDurationFrames: current.sequence.durationFrames,
+        occupiedIntervals: trackIntervals(current, captionTrack.id),
+      })
+    } catch (error) {
+      setCommitError(error instanceof Error ? error.message : String(error))
+      return
+    }
+    const clipId = mintClipId()
     commitCommand(
       addCaptionCommand({
         timeline: current,
-        clipId: mintClipId(),
+        clipId,
         trackId: captionTrack.id,
         text: 'New caption',
         startFrame: placement.startFrame,
         durationFrames: placement.durationFrames,
+        resolveClipId,
       }),
+      [clipId],
     )
   }
 
@@ -459,10 +555,11 @@ export function TimelineEditor(props: TimelineEditorProps) {
         : fps * 5
     const startFrame = Math.min(dropFrame, current.sequence.durationFrames - 1)
     const placedDuration = Math.max(1, Math.min(naturalDuration, current.sequence.durationFrames - startFrame))
+    const clipId = mintClipId()
     commitCommand(
       placeClipCommand({
         timeline: current,
-        clipId: mintClipId(),
+        clipId,
         trackId: lane.dataset.laneTrack,
         label: payload.label ?? payload.url.split('/').pop() ?? payload.url,
         startFrame,
@@ -470,7 +567,9 @@ export function TimelineEditor(props: TimelineEditorProps) {
         media: { url: payload.url, kind: payload.kind },
         ...(payload.generationId !== undefined ? { generationId: payload.generationId } : {}),
         ...(payload.assetId !== undefined ? { assetId: payload.assetId } : {}),
+        resolveClipId,
       }),
+      [clipId],
     )
   }
 

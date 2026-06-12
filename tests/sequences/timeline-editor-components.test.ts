@@ -371,6 +371,44 @@ describe('TimelineEditor', () => {
     expect(applied[1]?.[0]).toMatchObject({ type: 'delete_clip' })
   })
 
+  it('reconciles optimistic ids from apply results so undo after a refresh targets the server id', async () => {
+    const serverClip = {
+      id: 'srv-caption-1',
+      trackId: 'track-captions',
+      label: 'New caption',
+      startFrame: 0,
+      durationFrames: 60,
+      sourceInFrame: 0,
+      sourceOutFrame: null,
+      disabled: false,
+      text: 'New caption',
+      metadata: {},
+    }
+    const applied: SequenceOperation[][] = []
+    const onApplyOperations = vi.fn(async (operations: SequenceOperation[]) => {
+      applied.push(operations)
+      // What a host route built on applySequenceOperations resolves with.
+      return [{ kind: 'clip' as const, clip: serverClip }]
+    })
+    const { rerender } = render(
+      createElement(TimelineEditor, { timeline: fixtureTimeline(), canWrite: true, onApplyOperations }),
+    )
+
+    fireEvent.click(screen.getByLabelText('Add caption at playhead'))
+    await waitFor(() => expect(onApplyOperations).toHaveBeenCalledTimes(1))
+
+    // Server refresh: the committed caption returns under its minted id and
+    // the optimistic local clip is gone.
+    const refreshed = fixtureTimeline()
+    refreshed.clips.push({ ...serverClip })
+    rerender(createElement(TimelineEditor, { timeline: refreshed, canWrite: true, onApplyOperations }))
+
+    fireEvent.click(screen.getByLabelText('Undo'))
+    await waitFor(() => expect(applied).toHaveLength(2))
+    expect(applied[1]?.[0]).toEqual({ type: 'delete_clip', clipId: 'srv-caption-1' })
+    expect(screen.queryByText('New caption')).toBeNull()
+  })
+
   it('rolls the edit back without emitting an inverse when persistence rejects', async () => {
     const onApplyOperations = vi.fn(async () => {
       throw new Error('workspace is read-only right now')

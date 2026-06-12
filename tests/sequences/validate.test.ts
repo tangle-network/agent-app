@@ -4,6 +4,7 @@ import {
   assertSequenceMediaUrl,
   captionTrackNameForLanguage,
   lastClipEndFrame,
+  parseSequenceOperations,
   resolveCaptionTarget,
   validateSequenceOperations,
 } from '../../src/sequences/validate'
@@ -284,6 +285,95 @@ describe('trim_clip', () => {
   it('accepts a valid trim', () => {
     expect(check([{ type: 'trim_clip', clipId: 'clip-a', startFrame: 110, durationFrames: 40, sourceInFrame: 20 }]))
       .not.toThrow()
+  })
+})
+
+describe('trim_clip source-window invariant', () => {
+  function windowedTimeline() {
+    return makeTimeline({
+      durationFrames: 600,
+      tracks: [makeTrack({ id: 'v1', kind: 'video' })],
+      // A split head: explicit window [30, 90) = 60 playable frames.
+      clips: [makeClip({ id: 'head', trackId: 'v1', startFrame: 0, durationFrames: 60, sourceInFrame: 30, sourceOutFrame: 90 })],
+    })
+  }
+
+  it('rejects a duration the stored window cannot cover', () => {
+    expect(() => validateSequenceOperations(windowedTimeline(), [
+      { type: 'trim_clip', clipId: 'head', startFrame: 0, durationFrames: 90 },
+    ], ctx)).toThrow('needs 90 source frames but the source window [30, 90) holds 60')
+  })
+
+  it('rejects a sourceInFrame at or past the out-point', () => {
+    expect(() => validateSequenceOperations(windowedTimeline(), [
+      { type: 'trim_clip', clipId: 'head', startFrame: 0, durationFrames: 1, sourceInFrame: 90 },
+    ], ctx)).toThrow('sourceOutFrame 90 must be greater than sourceInFrame 90')
+  })
+
+  it('accepts the extension when the operation moves the out-point with it', () => {
+    expect(() => validateSequenceOperations(windowedTimeline(), [
+      { type: 'trim_clip', clipId: 'head', startFrame: 0, durationFrames: 90, sourceOutFrame: 120 },
+    ], ctx)).not.toThrow()
+  })
+
+  it('accepts the extension when the operation releases the out-point with null', () => {
+    expect(() => validateSequenceOperations(windowedTimeline(), [
+      { type: 'trim_clip', clipId: 'head', startFrame: 0, durationFrames: 90, sourceOutFrame: null },
+    ], ctx)).not.toThrow()
+  })
+
+  it('clips without an out-point are unconstrained', () => {
+    expect(check([{ type: 'trim_clip', clipId: 'clip-a', startFrame: 0, durationFrames: 500 }])).not.toThrow()
+  })
+})
+
+describe('parseSequenceOperations (untrusted JSON edge)', () => {
+  it('round-trips well-formed operations and drops unknown fields', () => {
+    const parsed = parseSequenceOperations([
+      { type: 'move_clip', clipId: 'clip-a', startFrame: 10, evil: 'ignored' },
+      { type: 'trim_clip', clipId: 'clip-a', startFrame: 0, durationFrames: 30, sourceOutFrame: null },
+      { type: 'place_clip', label: 'x', startFrame: 0, durationFrames: 30, media: { url: 'https://cdn.example.com/v.mp4', kind: 'video' }, disabled: true },
+      { type: 'add_caption', text: 'hello' },
+      { type: 'split_clip', clipId: 'clip-a', atFrame: 120 },
+      { type: 'set_clip_text', clipId: 'clip-cap', text: 'hi', language: 'en' },
+      { type: 'set_clip_disabled', clipId: 'clip-a', disabled: false },
+      { type: 'delete_clip', clipId: 'clip-a' },
+      { type: 'create_track', kind: 'caption', name: 'Subs' },
+      { type: 'extend_sequence', durationFrames: 900 },
+      { type: 'queue_export', format: 'srt' },
+    ])
+    expect(parsed).toHaveLength(11)
+    expect(parsed[0]).toEqual({ type: 'move_clip', clipId: 'clip-a', startFrame: 10 })
+    expect(parsed[1]).toEqual({ type: 'trim_clip', clipId: 'clip-a', startFrame: 0, durationFrames: 30, sourceOutFrame: null })
+    expect(parsed[2]).toMatchObject({ type: 'place_clip', disabled: true, media: { url: 'https://cdn.example.com/v.mp4', kind: 'video' } })
+  })
+
+  it('names the operation index and field on junk-typed input', () => {
+    expect(() => parseSequenceOperations([{ type: 'place_clip', label: 42, startFrame: 0, durationFrames: 30 }]))
+      .toThrow('operations[0]: label must be a string (got number 42)')
+    expect(() => parseSequenceOperations([
+      { type: 'move_clip', clipId: 'clip-a', startFrame: 10 },
+      { type: 'add_caption', text: null },
+    ])).toThrow('operations[1]: text must be a string (got null)')
+    expect(() => parseSequenceOperations([{ type: 'trim_clip', clipId: 'c', startFrame: 1.5, durationFrames: 30 }]))
+      .toThrow('operations[0]: startFrame must be an integer frame count (got number 1.5)')
+  })
+
+  it('rejects non-array roots, empty batches, junk types, and non-object entries', () => {
+    expect(() => parseSequenceOperations({ type: 'delete_clip' })).toThrow('operations must be an array')
+    expect(() => parseSequenceOperations([])).toThrow('at least one operation')
+    expect(() => parseSequenceOperations(['delete_clip'])).toThrow('operations[0]: each operation must be an object')
+    expect(() => parseSequenceOperations([{ type: 'explode' }])).toThrow(/operations\[0\]: type must be one of/)
+  })
+
+  it('rejects junk enum vocabulary on create_track / queue_export / media kind', () => {
+    expect(() => parseSequenceOperations([{ type: 'create_track', kind: 'subtitle', name: 'x' }]))
+      .toThrow('operations[0]: kind must be one of: video, audio, caption, reference, agent')
+    expect(() => parseSequenceOperations([{ type: 'queue_export', format: 'gif' }]))
+      .toThrow('operations[0]: format must be one of: mp4, otio, xml, edl, vtt, srt, contact_sheet')
+    expect(() => parseSequenceOperations([
+      { type: 'place_clip', label: 'x', startFrame: 0, durationFrames: 30, media: { url: 'https://x.test/v', kind: 'gif' } },
+    ])).toThrow('operations[0]: media.kind must be one of: video, image, audio')
   })
 })
 

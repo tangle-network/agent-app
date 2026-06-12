@@ -38,9 +38,8 @@ import type {
 } from './model'
 import type { SequenceOperation } from './operations'
 import type { SequenceStore } from './store'
-import { validateSequenceOperations } from './validate'
 import type { SequenceOperationContext } from './validate'
-import { applySequenceOperation } from './apply'
+import { applySequenceOperations } from './apply'
 import type { SequenceApplyResult } from './apply'
 
 /** Everything one tool invocation needs. Constructed per request by the
@@ -150,6 +149,33 @@ function durationArgToFrames(seconds: number, name: string, fps: number): number
     throw new Error(`${name} (${formatSeconds(seconds)}) is shorter than ${MIN_SEQUENCE_CLIP_FRAMES} frame at ${fps} fps — minimum is ${formatSeconds(MIN_SEQUENCE_CLIP_FRAMES / fps)}`)
   }
   return frames
+}
+
+/** A (start, duration) seconds pair becomes frames by rounding the START and
+ *  END instants and deriving the duration — rounding start and duration
+ *  independently lets round(s·fps) + round(d·fps) drift a frame from
+ *  round((s+d)·fps), so back-to-back transcription cues would overlap or gap.
+ *  Rejects spans that collapse below the one-frame floor. */
+function boundsArgsToFrames(
+  startSeconds: number,
+  durationSeconds: number,
+  durationName: string,
+  fps: number,
+): { startFrame: number; durationFrames: number } {
+  const startFrame = secondsToFrames(startSeconds, fps)
+  const durationFrames = secondsToFrames(startSeconds + durationSeconds, fps) - startFrame
+  if (durationFrames < MIN_SEQUENCE_CLIP_FRAMES) {
+    throw new Error(`${durationName} (${formatSeconds(durationSeconds)}) spans fewer than ${MIN_SEQUENCE_CLIP_FRAMES} frame at ${fps} fps — minimum is ${formatSeconds(MIN_SEQUENCE_CLIP_FRAMES / fps)}`)
+  }
+  return { startFrame, durationFrames }
+}
+
+/** The frame DISPLAYED at instant t is floor(t·fps): a frame holds the screen
+ *  for [f/fps, (f+1)/fps), so rounding up would report the NEXT clip for the
+ *  half-frame before every cut. The epsilon absorbs float error in fractional
+ *  timestamps (1/3 s at 30 fps must be frame 10, not 9). */
+function displayedFrameAt(seconds: number, fps: number): number {
+  return Math.floor(seconds * fps + 1e-6)
 }
 
 // ---------------------------------------------------------------------------
@@ -284,10 +310,9 @@ interface MutationBuild {
 /**
  * The single mutation path every editing tool funnels through: fetch the
  * timeline (the fps source for the one seconds→frames conversion), build the
- * frame-typed operations, validate the WHOLE batch against pre-state, apply
- * sequentially with a timeline refresh between operations (later operations in
- * a batch must see earlier writes), then record exactly one decision row. Any
- * throw before the first apply leaves the sequence untouched.
+ * frame-typed operations, run them through the shared validate+apply batch
+ * kernel (`applySequenceOperations`), then record exactly one decision row.
+ * Any throw before the first apply leaves the sequence untouched.
  */
 async function runMutation(
   toolName: string,
@@ -300,15 +325,7 @@ async function runMutation(
   const { operations, clipId } = build(timeline)
   const context: SequenceOperationContext = { playheadFrame: env.playheadFrame }
 
-  validateSequenceOperations(timeline, operations, context)
-
-  const results: SequenceApplyResult[] = []
-  let current = timeline
-  for (let index = 0; index < operations.length; index += 1) {
-    const operation = operations[index] as SequenceOperation
-    results.push(await applySequenceOperation(env.store, current, operation, context))
-    if (index < operations.length - 1) current = await env.store.getTimeline()
-  }
+  const results = await applySequenceOperations(env.store, operations, context)
 
   const decision = await env.store.recordDecision({
     clipId: clipId ?? null,
@@ -363,7 +380,7 @@ export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
     run: async (args, env) => {
       const timeline = await env.store.getTimeline()
       const fps = timeline.sequence.fps
-      const frame = secondsToFrames(requireSeconds(args, 'seconds'), fps)
+      const frame = displayedFrameAt(requireSeconds(args, 'seconds'), fps)
       const snapshot = snapshotFrame(timeline, frame)
       const activeParts = snapshot.active.map(({ track, clip }) => {
         const range = `${formatTimecode(clip.startFrame, fps)}-${formatTimecode(clip.startFrame + clip.durationFrames, fps)}`
@@ -426,13 +443,19 @@ export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
         const generationId = optionalString(args, 'generation_id')
         const assetId = optionalString(args, 'asset_id')
         const trackId = optionalString(args, 'track_id')
+        const bounds = boundsArgsToFrames(
+          requireSeconds(args, 'start_seconds'),
+          requireSeconds(args, 'duration_seconds'),
+          'duration_seconds',
+          fps,
+        )
         return {
           operations: [
             {
               type: 'place_clip',
               label: requireString(args, 'label'),
-              startFrame: secondsToFrames(requireSeconds(args, 'start_seconds'), fps),
-              durationFrames: durationArgToFrames(requireSeconds(args, 'duration_seconds'), 'duration_seconds', fps),
+              startFrame: bounds.startFrame,
+              durationFrames: bounds.durationFrames,
               ...(trackId !== undefined ? { trackId } : {}),
               ...(mediaUrl !== undefined && mediaKind !== undefined ? { media: { url: mediaUrl, kind: mediaKind } } : {}),
               ...(generationId !== undefined ? { generationId } : {}),
@@ -461,16 +484,21 @@ export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
         const language = optionalString(args, 'language')
         const startSeconds = optionalSeconds(args, 'start_seconds')
         const durationSeconds = optionalSeconds(args, 'duration_seconds')
+        const bounds = startSeconds !== undefined && durationSeconds !== undefined
+          ? boundsArgsToFrames(startSeconds, durationSeconds, 'duration_seconds', fps)
+          : {
+              ...(startSeconds !== undefined ? { startFrame: secondsToFrames(startSeconds, fps) } : {}),
+              ...(durationSeconds !== undefined
+                ? { durationFrames: durationArgToFrames(durationSeconds, 'duration_seconds', fps) }
+                : {}),
+            }
         return {
           operations: [
             {
               type: 'add_caption',
               text: requireString(args, 'text'),
               ...(language !== undefined ? { language } : {}),
-              ...(startSeconds !== undefined ? { startFrame: secondsToFrames(startSeconds, fps) } : {}),
-              ...(durationSeconds !== undefined
-                ? { durationFrames: durationArgToFrames(durationSeconds, 'duration_seconds', fps) }
-                : {}),
+              ...bounds,
             },
           ],
         }
@@ -514,11 +542,17 @@ export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
         const operations = raw.map((entry, index): SequenceOperation => {
           if (!isRecord(entry)) throw new Error(`captions[${index}] must be an object with text, start_seconds, duration_seconds`)
           try {
+            const bounds = boundsArgsToFrames(
+              requireSeconds(entry, 'start_seconds'),
+              requireSeconds(entry, 'duration_seconds'),
+              'duration_seconds',
+              fps,
+            )
             return {
               type: 'add_caption',
               text: requireString(entry, 'text'),
-              startFrame: secondsToFrames(requireSeconds(entry, 'start_seconds'), fps),
-              durationFrames: durationArgToFrames(requireSeconds(entry, 'duration_seconds'), 'duration_seconds', fps),
+              startFrame: bounds.startFrame,
+              durationFrames: bounds.durationFrames,
               ...(language !== undefined ? { language } : {}),
             }
           } catch (err) {
@@ -560,13 +594,14 @@ export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
   {
     name: 'trim_clip',
     description:
-      'Set a clip to start_seconds + duration_seconds. source_in_seconds re-anchors where playback begins inside the source media (use it when trimming the head so the visible content stays aligned).',
+      'Set a clip to start_seconds + duration_seconds. source_in_seconds re-anchors where playback begins inside the source media (use it when trimming the head so the visible content stays aligned). A clip with an explicit source out-point (e.g. a split half) cannot grow past it — pass source_out_seconds to move the out-point when extending.',
     inputSchema: objectSchema(
       {
         clip_id: CLIP_ID_SCHEMA,
         start_seconds: secondsSchema('Clip start on the timeline, in seconds'),
         duration_seconds: secondsSchema('New clip length in seconds (at least one frame)'),
         source_in_seconds: secondsSchema('Offset into the source media where playback begins, in seconds'),
+        source_out_seconds: secondsSchema('Offset into the source media where playback ends, in seconds; only needed to extend past a stored out-point'),
       },
       ['clip_id', 'start_seconds', 'duration_seconds'],
     ),
@@ -575,15 +610,23 @@ export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
       return runMutation('trim_clip', args, env, (timeline) => {
         const fps = timeline.sequence.fps
         const sourceInSeconds = optionalSeconds(args, 'source_in_seconds')
+        const sourceOutSeconds = optionalSeconds(args, 'source_out_seconds')
+        const bounds = boundsArgsToFrames(
+          requireSeconds(args, 'start_seconds'),
+          requireSeconds(args, 'duration_seconds'),
+          'duration_seconds',
+          fps,
+        )
         return {
           clipId,
           operations: [
             {
               type: 'trim_clip',
               clipId,
-              startFrame: secondsToFrames(requireSeconds(args, 'start_seconds'), fps),
-              durationFrames: durationArgToFrames(requireSeconds(args, 'duration_seconds'), 'duration_seconds', fps),
+              startFrame: bounds.startFrame,
+              durationFrames: bounds.durationFrames,
               ...(sourceInSeconds !== undefined ? { sourceInFrame: secondsToFrames(sourceInSeconds, fps) } : {}),
+              ...(sourceOutSeconds !== undefined ? { sourceOutFrame: secondsToFrames(sourceOutSeconds, fps) } : {}),
             },
           ],
         }

@@ -4,12 +4,18 @@
  * addendum, and permission tightening to the workspace agent profile for turns
  * initiated FROM that surface, without the chat orchestrator knowing any
  * surface's specifics. The orchestrator resolves `(kind, ctx)` through a
- * registry built at startup and merges the result into the base profile it was
- * about to send to the sandbox.
+ * registry the REQUEST HANDLER constructs per request (construction is a Map
+ * build — cheap) and merges the result into the base profile it was about to
+ * send to the sandbox. Per-request construction is the trust mechanism, not an
+ * optimization target: each `build()` closes over server-trusted request state
+ * (env bindings, secrets, the AUTHENTICATED user/workspace), which on Workers
+ * exists only per request — a startup-built registry would force identity
+ * through the untrusted client `ctx`.
  *
  * SECURITY INVARIANT: the surface `kind` and the ids inside `ctx` arrive on
- * the client request and are pure ROUTING data — never trusted content. The
- * registered `build()` runs server-side only: it validates the ids against the
+ * the client request and are pure ROUTING data — never trusted content, never
+ * identity. Identity comes from the closure (see above). The registered
+ * `build()` runs server-side only: it validates the routing ids against the
  * product's access control, then mints its own URLs and capability tokens from
  * server configuration (`buildHttpMcpServer` + `createCapabilityToken` in
  * ../tools). A client can therefore never inject an arbitrary MCP url, header,

@@ -277,10 +277,13 @@ describe('command factories', () => {
       const command = splitClipCommand({ timeline, clipId: 'clip-b', atFrame: 180, newClipId: 'clip-b2' })
 
       const after = command.execute(before)
+      // The head's out-point becomes explicit at the cut, matching what the
+      // server-side apply persists.
       expect(after.timeline.clips.find((c) => c.id === 'clip-b')).toMatchObject({
         startFrame: 150,
         durationFrames: 30,
         sourceInFrame: 30,
+        sourceOutFrame: 60,
       })
       expect(after.timeline.clips.find((c) => c.id === 'clip-b2')).toMatchObject({
         trackId: 't-video',
@@ -294,9 +297,11 @@ describe('command factories', () => {
       expect(command.undo(after)).toEqual(before)
 
       expect(command.operations()).toEqual([{ type: 'split_clip', clipId: 'clip-b', atFrame: 180 }])
+      // The durable inverse restores the pre-split source window; without
+      // sourceOutFrame the head would keep its out-point at the cut.
       expect(command.inverseOperations()).toEqual([
         { type: 'delete_clip', clipId: 'clip-b2' },
-        { type: 'trim_clip', clipId: 'clip-b', startFrame: 150, durationFrames: 90, sourceInFrame: 30 },
+        { type: 'trim_clip', clipId: 'clip-b', startFrame: 150, durationFrames: 90, sourceInFrame: 30, sourceOutFrame: 240 },
       ])
     })
 
@@ -489,6 +494,127 @@ describe('createCommandStack', () => {
     expect(state.playheadFrame).toBeLessThanOrEqual(89)
     expect(state.selectedClipIds.every((id) => refreshed.clips.some((c) => c.id === id))).toBe(true)
     expect(state.zoom).toBe(before.zoom)
+  })
+})
+
+describe('command stack failure safety', () => {
+  it('a throwing undo leaves history and state intact instead of destroying the entry', () => {
+    const timeline = makeTimeline()
+    const stack = createCommandStack(timeline)
+    stack.execute(moveClipCommand({ timeline: stack.getState().timeline, clipId: 'clip-a', startFrame: 60 }))
+
+    // Rebase removes the command's target clip — its undo transform now throws.
+    const refreshed = makeTimeline()
+    refreshed.clips = refreshed.clips.filter((clip) => clip.id !== 'clip-a')
+    stack.reset(refreshed)
+
+    const stateBefore = stack.getState()
+    expect(() => stack.undo()).toThrow(/clip-a does not exist/)
+    expect(stack.getState()).toBe(stateBefore)
+    expect(stack.canUndo()).toBe(true)
+    expect(stack.canRedo()).toBe(false)
+
+    // Restore the clip; the kept entry now undoes cleanly.
+    stack.reset(makeTimeline())
+    stack.undo()
+    expect(stack.getState().timeline.clips.find((c) => c.id === 'clip-a')?.startFrame).toBe(0)
+  })
+
+  it('a throwing redo leaves the redo stack intact', () => {
+    const timeline = makeTimeline()
+    const stack = createCommandStack(timeline)
+    stack.execute(moveClipCommand({ timeline: stack.getState().timeline, clipId: 'clip-a', startFrame: 60 }))
+    stack.undo()
+
+    const refreshed = makeTimeline()
+    refreshed.clips = refreshed.clips.filter((clip) => clip.id !== 'clip-a')
+    stack.reset(refreshed)
+
+    expect(() => stack.redo()).toThrow(/clip-a does not exist/)
+    expect(stack.canRedo()).toBe(true)
+  })
+})
+
+describe('clip-id resolution (local → server aliases)', () => {
+  it('placeClipCommand resolves its target through a LIVE alias map at undo/emission time', () => {
+    const timeline = makeTimeline()
+    const aliases = new Map<string, string>()
+    const command = placeClipCommand({
+      timeline,
+      clipId: 'local-1',
+      trackId: 't-video2',
+      label: 'Optimistic',
+      startFrame: 0,
+      durationFrames: 30,
+      resolveClipId: (id) => aliases.get(id) ?? id,
+    })
+
+    // Pre-commit: no alias yet — the inverse references the local id.
+    expect(command.inverseOperations()).toEqual([{ type: 'delete_clip', clipId: 'local-1' }])
+
+    // The host committed and reconciled; a refresh replaced the local clip
+    // with the server-minted id.
+    aliases.set('local-1', 'srv-9')
+    const refreshed = makeTimeline()
+    refreshed.clips.push({
+      id: 'srv-9',
+      trackId: 't-video2',
+      label: 'Optimistic',
+      startFrame: 0,
+      durationFrames: 30,
+      sourceInFrame: 0,
+      sourceOutFrame: null,
+      disabled: false,
+      metadata: {},
+    })
+
+    expect(command.inverseOperations()).toEqual([{ type: 'delete_clip', clipId: 'srv-9' }])
+    const undone = command.undo(stateOf(refreshed))
+    expect(undone.timeline.clips.some((c) => c.id === 'srv-9')).toBe(false)
+  })
+
+  it('splitClipCommand resolves both halves through aliases', () => {
+    const timeline = makeTimeline()
+    const aliases = new Map<string, string>([['local-tail', 'srv-tail']])
+    const command = splitClipCommand({
+      timeline,
+      clipId: 'clip-b',
+      atFrame: 180,
+      newClipId: 'local-tail',
+      resolveClipId: (id) => aliases.get(id) ?? id,
+    })
+    expect(command.execute(stateOf(timeline)).timeline.clips.some((c) => c.id === 'srv-tail')).toBe(true)
+    expect(command.inverseOperations()[0]).toEqual({ type: 'delete_clip', clipId: 'srv-tail' })
+  })
+})
+
+describe('durable inverse fidelity', () => {
+  it('delete inverse carries sourceOutFrame and disabled so server-side undo restores them', () => {
+    const timeline = makeTimeline()
+    timeline.clips = timeline.clips.map((clip) => (clip.id === 'clip-b' ? { ...clip, disabled: true } : clip))
+    const command = deleteClipCommand({ timeline, clipId: 'clip-b' })
+    expect(command.inverseOperations()).toEqual([
+      {
+        type: 'place_clip',
+        trackId: 't-video',
+        label: 'Outro',
+        startFrame: 150,
+        durationFrames: 90,
+        sourceInFrame: 30,
+        sourceOutFrame: 240,
+        disabled: true,
+        media: { url: 'https://cdn.example/outro.mp4', kind: 'video' },
+        metadata: {},
+      },
+    ])
+  })
+
+  it('trimClipCommand rejects claiming more source frames than the stored window holds', () => {
+    const timeline = makeTimeline()
+    // clip-b: window [30, 240) = 210 frames; duration 211 from sourceIn 30 overflows.
+    expect(() =>
+      trimClipCommand({ timeline, clipId: 'clip-b', startFrame: 0, durationFrames: 211 }),
+    ).toThrow(/source window \[30, 240\)/)
   })
 })
 

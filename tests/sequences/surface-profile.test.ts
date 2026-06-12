@@ -20,38 +20,39 @@ function server(url = 'https://app.example.com/api/tools/x'): AppToolMcpServer {
   }
 }
 
-/** The worked example: a 'sequences' surface whose build validates nothing it
- *  can't (the ids are routing data here) but mints its own token + url — the
- *  client supplies only `sequenceId`/identity ids, never an endpoint. */
-const sequencesKind = defineSurfaceKind<{ sequenceId: string; userId: string; workspaceId: string }>({
-  kind: 'sequences',
-  build: async (ctx) => {
-    const token = await createCapabilityToken(ctx.userId, { secret: SECRET })
-    if (!token) throw new Error('capability secret unconfigured — refusing to mount the sequence MCP server')
-    return {
-      mcp: {
-        sequence_edit: buildHttpMcpServer({
-          path: '/api/tools/sequence-edit',
-          baseUrl: 'https://app.example.com',
-          token,
-          ctx: { userId: ctx.userId, workspaceId: ctx.workspaceId, threadId: null },
-          description: 'Apply timeline operations to the active sequence.',
-        }),
+/** The worked example, in the per-request shape the module doc prescribes:
+ *  the request handler builds the registry closing over server-trusted state
+ *  (the capability secret and the AUTHENTICATED user/workspace) — the client
+ *  ctx carries ONLY routing data (which sequence is open), never identity. */
+function sequencesRegistryFor(server: { secret: string; userId: string; workspaceId: string }) {
+  return createSurfaceRegistry([
+    defineSurfaceKind<{ sequenceId: string }>({
+      kind: 'sequences',
+      build: async (ctx) => {
+        const token = await createCapabilityToken(server.userId, { secret: server.secret })
+        if (!token) throw new Error('capability secret unconfigured — refusing to mount the sequence MCP server')
+        return {
+          mcp: {
+            sequence_edit: buildHttpMcpServer({
+              path: '/api/tools/sequence-edit',
+              baseUrl: 'https://app.example.com',
+              token,
+              ctx: { userId: server.userId, workspaceId: server.workspaceId, threadId: null },
+              description: 'Apply timeline operations to the active sequence.',
+            }),
+          },
+          promptAddendum: `The user has sequence ${ctx.sequenceId} open in the timeline editor.`,
+          permissions: { 'vault.purge': 'deny' },
+        }
       },
-      promptAddendum: `The user has sequence ${ctx.sequenceId} open in the timeline editor.`,
-      permissions: { 'vault.purge': 'deny' },
-    }
-  },
-})
+    }),
+  ])
+}
 
 describe('surface registry', () => {
-  it('resolves a registered kind: build mints the token + url server-side', async () => {
-    const registry = createSurfaceRegistry([sequencesKind])
-    const overlay = await registry.resolve('sequences', {
-      sequenceId: 'seq-1',
-      userId: 'user-1',
-      workspaceId: 'ws-1',
-    })
+  it('resolves a registered kind: identity from the request closure, routing from ctx', async () => {
+    const registry = sequencesRegistryFor({ secret: SECRET, userId: 'user-1', workspaceId: 'ws-1' })
+    const overlay = await registry.resolve('sequences', { sequenceId: 'seq-1' })
 
     const entry = overlay.mcp!.sequence_edit!
     expect(entry.url).toBe('https://app.example.com/api/tools/sequence-edit')
@@ -65,14 +66,15 @@ describe('surface registry', () => {
   })
 
   it('throws on an unknown kind and names the registered kinds', async () => {
-    const registry = createSurfaceRegistry([sequencesKind])
+    const registry = sequencesRegistryFor({ secret: SECRET, userId: 'user-1', workspaceId: 'ws-1' })
     await expect(registry.resolve('briefs', {})).rejects.toThrow(
       /unknown surface kind 'briefs' — registered kinds: sequences/,
     )
   })
 
   it('throws on duplicate kind registration', () => {
-    expect(() => createSurfaceRegistry([sequencesKind, sequencesKind])).toThrow(
+    const duplicate = defineSurfaceKind<Record<string, never>>({ kind: 'sequences', build: () => ({}) })
+    expect(() => createSurfaceRegistry([duplicate, duplicate])).toThrow(
       /duplicate surface kind 'sequences'/,
     )
   })

@@ -46,18 +46,24 @@ export function createCommandStack(initial: SequenceTimeline): CommandStack {
       notify()
     },
 
+    // Both transforms run BEFORE the stacks move: a throwing transform (the
+    // documented missing-clip path after reset()) leaves history and state
+    // exactly as they were, so the entry is never silently destroyed and the
+    // caller can retry after the next refresh restores the target.
     undo(): void {
-      const command = undoStack.pop()
+      const command = undoStack[undoStack.length - 1]
       if (!command) throw new Error('nothing to undo — guard with canUndo() before calling undo()')
       state = command.undo(state)
+      undoStack.pop()
       redoStack.push(command)
       notify()
     },
 
     redo(): void {
-      const command = redoStack.pop()
+      const command = redoStack[redoStack.length - 1]
       if (!command) throw new Error('nothing to redo — guard with canRedo() before calling redo()')
       state = command.execute(state)
+      redoStack.pop()
       undoStack.push(command)
       notify()
     },

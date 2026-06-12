@@ -22,6 +22,13 @@ export interface PlaceClipOperation {
   startFrame: number
   durationFrames: number
   sourceInFrame?: number
+  /** Explicit source out-point; null/omitted → natural end of the source.
+   *  Carried so the durable inverse of a delete can restore a split clip's
+   *  exact playable window. */
+  sourceOutFrame?: number | null
+  /** Create the clip disabled; omitted → enabled. Carried so the durable
+   *  inverse of deleting a disabled clip does not resurrect it visible. */
+  disabled?: boolean
   media?: { url: string; kind: 'video' | 'image' | 'audio' }
   generationId?: string
   assetId?: string
@@ -55,6 +62,11 @@ export interface TrimClipOperation {
   durationFrames: number
   /** New source in-point when trimming the head; omitted → unchanged. */
   sourceInFrame?: number
+  /** New source out-point; null releases it to the source's natural end;
+   *  omitted → unchanged. Required when extending a clip whose stored window
+   *  (e.g. a split head's cut point) is too short for the new duration, and
+   *  by the durable inverse of `split_clip` to restore the original window. */
+  sourceOutFrame?: number | null
 }
 
 export interface SplitClipOperation {

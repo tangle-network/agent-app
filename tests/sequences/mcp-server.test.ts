@@ -468,6 +468,59 @@ describe('mutating tools', () => {
     expect(result.text).toContain('duration_seconds')
   })
 
+  it('add_captions keeps adjacent transcription cues adjacent in frames (end-derived rounding)', async () => {
+    const { handler, state } = setup()
+    // round(0.49·30)=15 and round(0.49·30)+round(0.49·30)=30 ≠ round(0.98·30)=29:
+    // independent rounding would end cue 1 at frame 30 while cue 2 starts at 29.
+    const { isError } = await callTool(handler, 'add_captions', {
+      language: 'en',
+      captions: [
+        { text: 'one', start_seconds: 0.49, duration_seconds: 0.49 },
+        { text: 'two', start_seconds: 0.98, duration_seconds: 0.49 },
+      ],
+    })
+    expect(isError).toBe(false)
+    const cues = state.clips.filter((c) => c.text !== undefined).sort((a, b) => a.startFrame - b.startFrame)
+    expect(cues).toHaveLength(2)
+    expect(cues[0]!.startFrame + cues[0]!.durationFrames).toBe(cues[1]!.startFrame)
+  })
+
+  it('get_frame_at_time floors: the half-frame before a cut reports the clip on screen, not the next one', async () => {
+    const { handler } = setup()
+    // clip-intro covers [0, 150) = [0s, 5s). At 4.99s frame 149 is displayed;
+    // nearest-rounding would answer 150 — past the clip.
+    const before = await callTool(handler, 'get_frame_at_time', { seconds: 4.99 })
+    expect(before.json!.frame).toBe(149)
+    expect(before.json!.active).toHaveLength(1)
+
+    const at = await callTool(handler, 'get_frame_at_time', { seconds: 5 })
+    expect(at.json!.frame).toBe(150)
+    expect(at.json!.active).toHaveLength(0)
+  })
+
+  it('trim_clip enforces the source window of a split half and source_out_seconds lifts it', async () => {
+    const { handler, state } = setup()
+    await callTool(handler, 'split_clip', { clip_id: 'clip-intro', at_seconds: 2 })
+    // Head window is now [0s, 2s); extending to 4s without a new out-point is
+    // a corrupted source range.
+    const rejected = await callTool(handler, 'trim_clip', {
+      clip_id: 'clip-intro',
+      start_seconds: 0,
+      duration_seconds: 4,
+    })
+    expect(rejected.isError).toBe(true)
+    expect(rejected.text).toContain('source window [0, 60) holds 60')
+
+    const accepted = await callTool(handler, 'trim_clip', {
+      clip_id: 'clip-intro',
+      start_seconds: 0,
+      duration_seconds: 4,
+      source_out_seconds: 4,
+    })
+    expect(accepted.isError).toBe(false)
+    expect(state.clips.find((c) => c.id === 'clip-intro')).toMatchObject({ durationFrames: 120, sourceOutFrame: 120 })
+  })
+
   it('move/trim/split/disable/delete round-trip through the store', async () => {
     const { handler, state } = setup()
 

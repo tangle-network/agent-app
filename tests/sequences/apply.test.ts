@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applySequenceOperation } from '../../src/sequences/apply'
+import { applySequenceOperation, applySequenceOperations } from '../../src/sequences/apply'
 import { captionTrackNameForLanguage } from '../../src/sequences/validate'
 import { createMemoryStore, makeClip, makeTimeline, makeTrack } from './fixtures'
 
@@ -65,6 +65,35 @@ describe('place_clip', () => {
     if (result.kind !== 'clip') throw new Error(`expected clip result, got ${result.kind}`)
     expect(result.clip.trackId).toBe('a1')
   })
+
+  it('persists sourceOutFrame and disabled — the durable delete-undo path', async () => {
+    const { timeline, store } = baseSetup()
+    const result = await applySequenceOperation(store, timeline, {
+      type: 'place_clip',
+      trackId: 'v1',
+      label: 'restored',
+      startFrame: 300,
+      durationFrames: 40,
+      sourceInFrame: 10,
+      sourceOutFrame: 50,
+      disabled: true,
+    }, ctx)
+    if (result.kind !== 'clip') throw new Error(`expected clip result, got ${result.kind}`)
+    expect(result.clip).toMatchObject({ sourceInFrame: 10, sourceOutFrame: 50, disabled: true })
+  })
+
+  it('rejects a sourceOutFrame window too small for the duration', async () => {
+    const { timeline, store } = baseSetup()
+    await expect(applySequenceOperation(store, timeline, {
+      type: 'place_clip',
+      trackId: 'v1',
+      label: 'broken-window',
+      startFrame: 300,
+      durationFrames: 60,
+      sourceInFrame: 10,
+      sourceOutFrame: 50,
+    }, ctx)).rejects.toThrow('needs 60 source frames but the source window [10, 50) holds 40')
+  })
 })
 
 describe('add_caption placement', () => {
@@ -112,6 +141,107 @@ describe('add_caption placement', () => {
     if (result.kind !== 'clip') throw new Error(`expected clip result, got ${result.kind}`)
     expect(result.clip.startFrame).toBe(300)
     expect(result.clip.durationFrames).toBe(45)
+  })
+
+  it('falls back to the latest earlier gap when the sequence tail is occupied — never double-books', async () => {
+    const timeline = makeTimeline({
+      fps: 30,
+      durationFrames: 300,
+      tracks: [makeTrack({ id: 'c1', kind: 'caption' })],
+      clips: [makeClip({ id: 'cap-tail', trackId: 'c1', startFrame: 200, durationFrames: 100, text: 'tail' })],
+    })
+    const store = createMemoryStore(timeline)
+    const result = await applySequenceOperation(store, timeline, { type: 'add_caption', text: 'late' }, { playheadFrame: 290 })
+    if (result.kind !== 'clip') throw new Error(`expected clip result, got ${result.kind}`)
+    // The free space is [0, 200); the caption lands inside it, not over cap-tail.
+    expect(result.clip.startFrame + result.clip.durationFrames).toBeLessThanOrEqual(200)
+    expect(result.clip.durationFrames).toBe(90)
+  })
+
+  it('rejects auto placement when no free gap can hold the minimum', async () => {
+    const timeline = makeTimeline({
+      fps: 30,
+      durationFrames: 120,
+      tracks: [makeTrack({ id: 'c1', kind: 'caption' })],
+      clips: [makeClip({ id: 'cap-full', trackId: 'c1', startFrame: 0, durationFrames: 120, text: 'wall' })],
+    })
+    const store = createMemoryStore(timeline)
+    await expect(applySequenceOperation(store, timeline, { type: 'add_caption', text: 'no room' }, { playheadFrame: 60 }))
+      .rejects.toThrow('no free gap of at least 30 frames')
+  })
+})
+
+describe('applySequenceOperations (batch kernel)', () => {
+  it('validates the whole batch, applies in order, and returns index-aligned results', async () => {
+    const { timeline, store } = baseSetup()
+    const results = await applySequenceOperations(store, [
+      { type: 'move_clip', clipId: 'clip-a', startFrame: 200 },
+      { type: 'set_clip_disabled', clipId: 'clip-a', disabled: true },
+    ], ctx)
+    expect(results).toHaveLength(2)
+    expect(results[0]).toMatchObject({ kind: 'clip', clip: { id: 'clip-a', startFrame: 200 } })
+    expect(results[1]).toMatchObject({ kind: 'clip', clip: { id: 'clip-a', disabled: true } })
+    expect(timeline.clips.find((clip) => clip.id === 'clip-a')).toMatchObject({ startFrame: 200, disabled: true })
+  })
+
+  it('rejects the whole batch before any write when one operation is invalid', async () => {
+    const { timeline, store } = baseSetup()
+    await expect(applySequenceOperations(store, [
+      { type: 'move_clip', clipId: 'clip-a', startFrame: 200 },
+      { type: 'delete_clip', clipId: 'missing' },
+    ], ctx)).rejects.toThrow('operation 2 (delete_clip): references unknown clip missing')
+    expect(timeline.clips.find((clip) => clip.id === 'clip-a')?.startFrame).toBe(100)
+  })
+
+  it('rejects an empty batch', async () => {
+    const { store } = baseSetup()
+    await expect(applySequenceOperations(store, [], ctx)).rejects.toThrow('at least one operation')
+  })
+})
+
+describe('split → durable undo round-trip', () => {
+  it('the trim inverse with sourceOutFrame restores the exact pre-split source window', async () => {
+    const { timeline, store } = baseSetup()
+    const before = { ...timeline.clips.find((clip) => clip.id === 'clip-a')! }
+
+    const split = await applySequenceOperation(store, timeline, { type: 'split_clip', clipId: 'clip-a', atFrame: 130 }, ctx)
+    if (split.kind !== 'clip') throw new Error(`expected clip result, got ${split.kind}`)
+    expect(timeline.clips.find((clip) => clip.id === 'clip-a')).toMatchObject({ sourceOutFrame: 40 })
+
+    // The editor's durable inverse of a split: delete the tail, trim the head
+    // back — including the original out-point.
+    await applySequenceOperations(store, [
+      { type: 'delete_clip', clipId: split.clip.id },
+      {
+        type: 'trim_clip',
+        clipId: 'clip-a',
+        startFrame: before.startFrame,
+        durationFrames: before.durationFrames,
+        sourceInFrame: before.sourceInFrame,
+        sourceOutFrame: before.sourceOutFrame,
+      },
+    ], ctx)
+
+    expect(timeline.clips.find((clip) => clip.id === 'clip-a')).toMatchObject({
+      startFrame: before.startFrame,
+      durationFrames: before.durationFrames,
+      sourceInFrame: before.sourceInFrame,
+      sourceOutFrame: before.sourceOutFrame,
+    })
+  })
+
+  it('without sourceOutFrame the trim is rejected for exceeding the cut window — the lossy-undo trap', async () => {
+    const { timeline, store } = baseSetup()
+    await applySequenceOperation(store, timeline, { type: 'split_clip', clipId: 'clip-a', atFrame: 130 }, ctx)
+    // Head window is now [10, 40): restoring the full 80-frame duration without
+    // moving the out-point would corrupt the source range.
+    await expect(applySequenceOperation(store, timeline, {
+      type: 'trim_clip',
+      clipId: 'clip-a',
+      startFrame: 100,
+      durationFrames: 80,
+      sourceInFrame: 10,
+    }, ctx)).rejects.toThrow('needs 80 source frames but the source window [10, 40) holds 30')
   })
 })
 

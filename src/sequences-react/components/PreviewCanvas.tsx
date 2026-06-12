@@ -1,13 +1,16 @@
 /**
  * Program monitor: a canvas letterboxed to the sequence aspect that paints
- * the playhead frame — black base, the topmost enabled video/image clip via
+ * the playhead frame — black base, the topmost enabled video-track clip via
  * `frameProvider.drawFrame`, then caption text bottom-centered on an 80%
  * black backing bar with type scaled to canvas height / 18.
  *
  * Track stacking: tracks composite bottom-up, so among clips active at the
  * frame the one on the HIGHEST sortOrder track covers the rest; muted tracks
- * do not render. Paints serialize through a latest-wins queue — decode is
- * async, so a slow seek never paints over a newer frame.
+ * do not render. Only `video` tracks paint — `reference` tracks are
+ * non-rendered guide media (model contract) and are excluded from mp4/EDL/
+ * contact-sheet export, so painting them would preview content the program
+ * output does not contain. Paints serialize through a latest-wins queue —
+ * decode is async, so a slow seek never paints over a newer frame.
  *
  * `sourceSeconds` = (sourceInFrame + playhead offset into the clip) / fps:
  * the model maps source frames 1:1 at sequence fps.
@@ -94,7 +97,7 @@ export function PreviewCanvas({ timeline, clock, frameProvider, className }: Pre
       const snapshot = snapshotFrame(current, paintFrame)
 
       const mediaEntries = snapshot.active.filter(({ track, clip }) => (
-        !track.muted && clip.media !== undefined && (clip.media.kind === 'video' || clip.media.kind === 'image')
+        track.kind === 'video' && !track.muted && clip.media !== undefined && (clip.media.kind === 'video' || clip.media.kind === 'image')
       ))
       const top = mediaEntries[mediaEntries.length - 1]
       if (top && top.clip.media) {

@@ -24,6 +24,7 @@ import {
   resolveCaptionTarget,
   resolvePlaceClipTrack,
   validateSequenceOperation,
+  validateSequenceOperations,
 } from './validate'
 import type { SequenceOperationContext } from './validate'
 
@@ -39,6 +40,31 @@ export type SequenceApplyResult =
   | { kind: 'track'; track: SequenceTrack }
   | { kind: 'export'; record: SequenceExportRecord }
   | { kind: 'sequence'; sequence: SequenceMeta }
+
+/**
+ * The batch path every dispatcher (the MCP tools, a product's editor
+ * persistence route) funnels through: fetch the timeline, validate the WHOLE
+ * batch against pre-state, then apply in order with a timeline refresh between
+ * operations — later operations must see earlier writes (the static-validation
+ * boundary in ./validate). Any throw before the first apply leaves the
+ * sequence untouched. Decision-log rows are the caller's job: the MCP layer
+ * records `agent_edit`, an editor route records `human_edit`.
+ */
+export async function applySequenceOperations(
+  store: SequenceStore,
+  operations: SequenceOperation[],
+  ctx: SequenceOperationContext,
+): Promise<SequenceApplyResult[]> {
+  if (operations.length === 0) throw new Error('operations must contain at least one operation')
+  let timeline = await store.getTimeline()
+  validateSequenceOperations(timeline, operations, ctx)
+  const results: SequenceApplyResult[] = []
+  for (let index = 0; index < operations.length; index += 1) {
+    if (index > 0) timeline = await store.getTimeline()
+    results.push(await applySequenceOperation(store, timeline, operations[index] as SequenceOperation, ctx))
+  }
+  return results
+}
 
 export async function applySequenceOperation(
   store: SequenceStore,
@@ -60,6 +86,7 @@ export async function applySequenceOperation(
     case 'trim_clip': {
       const patch: SequenceClipPatch = { startFrame: op.startFrame, durationFrames: op.durationFrames }
       if (op.sourceInFrame !== undefined) patch.sourceInFrame = op.sourceInFrame
+      if (op.sourceOutFrame !== undefined) patch.sourceOutFrame = op.sourceOutFrame
       return { kind: 'clip', clip: await store.updateClip(op.clipId, patch) }
     }
     case 'split_clip':
@@ -103,11 +130,15 @@ async function applyPlaceClip(
     startFrame: op.startFrame,
     durationFrames: op.durationFrames,
     sourceInFrame: op.sourceInFrame ?? 0,
+    ...(op.sourceOutFrame !== undefined ? { sourceOutFrame: op.sourceOutFrame } : {}),
     ...(op.generationId !== undefined ? { generationId: op.generationId } : {}),
     ...(op.assetId !== undefined ? { assetId: op.assetId } : {}),
     ...(metadata !== undefined ? { metadata } : {}),
   })
-  return { kind: 'clip', clip }
+  // NewSequenceClip has no disabled field; flip it post-create so the durable
+  // inverse of deleting a disabled clip restores it hidden.
+  const final = op.disabled === true ? await store.updateClip(clip.id, { disabled: true }) : clip
+  return { kind: 'clip', clip: final }
 }
 
 async function applyAddCaption(
@@ -142,12 +173,9 @@ async function applySplitClip(
   // reading `original` after updateClip would see the shortened first half.
   const original = { ...requireTimelineClip(timeline, op.clipId) }
   const offset = op.atFrame - original.startFrame
-  // First half keeps the clip id; its out point becomes explicit at the cut so
-  // the playable source range stays exact.
-  await store.updateClip(original.id, {
-    durationFrames: offset,
-    sourceOutFrame: original.sourceInFrame + offset,
-  })
+  // The store is non-transactional, so the tail is created BEFORE the head is
+  // shortened: a failure between the writes leaves the cut content visible
+  // twice (recoverable) instead of silently dropped from the timeline.
   const second = await store.createClip({
     trackId: original.trackId,
     label: original.label,
@@ -160,6 +188,12 @@ async function applySplitClip(
     ...(original.generationId !== undefined ? { generationId: original.generationId } : {}),
     ...(original.assetId !== undefined ? { assetId: original.assetId } : {}),
     metadata: original.metadata,
+  })
+  // First half keeps the clip id; its out point becomes explicit at the cut so
+  // the playable source range stays exact.
+  await store.updateClip(original.id, {
+    durationFrames: offset,
+    sourceOutFrame: original.sourceInFrame + offset,
   })
   // NewSequenceClip has no disabled field; a disabled original must not yield
   // an enabled second half.

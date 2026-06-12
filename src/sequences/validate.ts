@@ -40,6 +40,7 @@ import type {
   SplitClipOperation,
   TrimClipOperation,
 } from './operations'
+import { SEQUENCE_OPERATION_TYPES } from './operations'
 
 /** Editor/agent context an operation is resolved against. `playheadFrame` is
  *  the implicit position for omitted caption placement; never persisted. */
@@ -139,6 +140,9 @@ export function validatePlaceClip(timeline: SequenceTimeline, operation: PlaceCl
     assertSequenceMediaUrl(operation.media.url)
   }
   if (operation.sourceInFrame !== undefined) assertSourceInFrame(operation.sourceInFrame)
+  if (operation.sourceOutFrame !== undefined) {
+    assertSourceWindow(operation.sourceInFrame ?? 0, operation.sourceOutFrame, operation.durationFrames)
+  }
   assertOperationBounds(timeline, { startFrame: operation.startFrame, durationFrames: operation.durationFrames })
   resolvePlaceClipTrack(timeline, operation)
 }
@@ -157,8 +161,8 @@ export function validateAddCaption(
     ctx,
     target.kind === 'existing' ? target.track.id : null,
   )
-  // The auto path clamps inside chooseCaptionPlacement; only explicit
-  // placement can land out of bounds.
+  // The auto path lands inside a free in-bounds gap (or throws) inside
+  // chooseCaptionPlacement; only explicit placement can land out of bounds.
   if (operation.startFrame !== undefined || operation.durationFrames !== undefined) {
     assertOperationBounds(timeline, placement)
   }
@@ -177,9 +181,16 @@ export function validateMoveClip(timeline: SequenceTimeline, operation: MoveClip
 }
 
 export function validateTrimClip(timeline: SequenceTimeline, operation: TrimClipOperation): void {
-  requireMutableClip(timeline, operation.clipId)
+  const { clip } = requireMutableClip(timeline, operation.clipId)
   if (operation.sourceInFrame !== undefined) assertSourceInFrame(operation.sourceInFrame)
   assertOperationBounds(timeline, { startFrame: operation.startFrame, durationFrames: operation.durationFrames })
+  // Source-window invariant: the trimmed clip may never claim more source
+  // frames than its (possibly updated) in/out window holds — otherwise a split
+  // head ends up with duration > (out − in) and exports contradict the stored
+  // out-point.
+  const sourceInFrame = operation.sourceInFrame ?? clip.sourceInFrame
+  const sourceOutFrame = operation.sourceOutFrame === undefined ? clip.sourceOutFrame : operation.sourceOutFrame
+  assertSourceWindow(sourceInFrame, sourceOutFrame, operation.durationFrames)
 }
 
 export function validateSplitClip(timeline: SequenceTimeline, operation: SplitClipOperation): void {
@@ -234,6 +245,183 @@ export function validateQueueExport(operation: QueueExportOperation): void {
   if (!(operation.format in EXPORT_FORMATS)) {
     throw new Error(`unsupported export format ${JSON.stringify(operation.format)}`)
   }
+}
+
+// ---------------------------------------------------------------------------
+// Wire parsing — the editor-persistence edge
+// ---------------------------------------------------------------------------
+
+/**
+ * Shape-gate untrusted JSON (a product's `onApplyOperations` route body) into
+ * `SequenceOperation[]` BEFORE `validateSequenceOperations` sees it. The
+ * validator assumes well-typed fields (`label.trim()` on a number is a raw
+ * TypeError → 500); this parser turns junk into a thrown Error naming the
+ * operation index and field so the route can answer 400 with an actionable
+ * reason. Unknown fields are dropped — only vocabulary fields reach the
+ * validator and store.
+ */
+export function parseSequenceOperations(input: unknown): SequenceOperation[] {
+  if (!Array.isArray(input)) throw new Error('operations must be an array of sequence operations')
+  if (input.length === 0) throw new Error('operations must contain at least one operation')
+  return input.map((raw, index) => {
+    try {
+      return parseSequenceOperation(raw)
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error)
+      throw new Error(`operations[${index}]: ${reason}`)
+    }
+  })
+}
+
+function parseSequenceOperation(raw: unknown): SequenceOperation {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw new Error('each operation must be an object with a type field')
+  }
+  const record = raw as Record<string, unknown>
+  const type = record.type
+  if (typeof type !== 'string' || !(SEQUENCE_OPERATION_TYPES as readonly string[]).includes(type)) {
+    throw new Error(`type must be one of: ${SEQUENCE_OPERATION_TYPES.join(', ')} (got ${JSON.stringify(type)})`)
+  }
+  switch (type as SequenceOperation['type']) {
+    case 'place_clip':
+      return {
+        type: 'place_clip',
+        label: readString(record, 'label'),
+        startFrame: readInt(record, 'startFrame'),
+        durationFrames: readInt(record, 'durationFrames'),
+        ...readOptional(record, 'trackId', readString),
+        ...readOptional(record, 'sourceInFrame', readInt),
+        ...readOptionalNullable(record, 'sourceOutFrame', readInt),
+        ...readOptional(record, 'disabled', readBool),
+        ...readOptional(record, 'media', readMedia),
+        ...readOptional(record, 'generationId', readString),
+        ...readOptional(record, 'assetId', readString),
+        ...readOptional(record, 'metadata', readRecord),
+      }
+    case 'add_caption':
+      return {
+        type: 'add_caption',
+        text: readString(record, 'text'),
+        ...readOptional(record, 'language', readString),
+        ...readOptional(record, 'startFrame', readInt),
+        ...readOptional(record, 'durationFrames', readInt),
+        ...readOptional(record, 'trackId', readString),
+      }
+    case 'move_clip':
+      return {
+        type: 'move_clip',
+        clipId: readString(record, 'clipId'),
+        startFrame: readInt(record, 'startFrame'),
+        ...readOptional(record, 'trackId', readString),
+      }
+    case 'trim_clip':
+      return {
+        type: 'trim_clip',
+        clipId: readString(record, 'clipId'),
+        startFrame: readInt(record, 'startFrame'),
+        durationFrames: readInt(record, 'durationFrames'),
+        ...readOptional(record, 'sourceInFrame', readInt),
+        ...readOptionalNullable(record, 'sourceOutFrame', readInt),
+      }
+    case 'split_clip':
+      return {
+        type: 'split_clip',
+        clipId: readString(record, 'clipId'),
+        atFrame: readInt(record, 'atFrame'),
+      }
+    case 'set_clip_text':
+      return {
+        type: 'set_clip_text',
+        clipId: readString(record, 'clipId'),
+        text: readString(record, 'text'),
+        ...readOptional(record, 'language', readString),
+      }
+    case 'set_clip_disabled':
+      return {
+        type: 'set_clip_disabled',
+        clipId: readString(record, 'clipId'),
+        disabled: readBool(record, 'disabled'),
+      }
+    case 'delete_clip':
+      return { type: 'delete_clip', clipId: readString(record, 'clipId') }
+    case 'create_track': {
+      const kind = readString(record, 'kind')
+      if (!(kind in TRACK_KINDS)) throw new Error(`kind must be one of: ${Object.keys(TRACK_KINDS).join(', ')}`)
+      return { type: 'create_track', kind: kind as SequenceTrackKind, name: readString(record, 'name') }
+    }
+    case 'extend_sequence':
+      return { type: 'extend_sequence', durationFrames: readInt(record, 'durationFrames') }
+    case 'queue_export': {
+      const format = readString(record, 'format')
+      if (!(format in EXPORT_FORMATS)) throw new Error(`format must be one of: ${Object.keys(EXPORT_FORMATS).join(', ')}`)
+      return { type: 'queue_export', format: format as SequenceExportFormat, ...readOptional(record, 'metadata', readRecord) }
+    }
+  }
+}
+
+function readString(record: Record<string, unknown>, name: string): string {
+  const value = record[name]
+  if (typeof value !== 'string') throw new Error(`${name} must be a string (got ${describeJsonValue(value)})`)
+  return value
+}
+
+function readInt(record: Record<string, unknown>, name: string): number {
+  const value = record[name]
+  if (typeof value !== 'number' || !Number.isInteger(value)) {
+    throw new Error(`${name} must be an integer frame count (got ${describeJsonValue(value)})`)
+  }
+  return value
+}
+
+function readBool(record: Record<string, unknown>, name: string): boolean {
+  const value = record[name]
+  if (typeof value !== 'boolean') throw new Error(`${name} must be true or false (got ${describeJsonValue(value)})`)
+  return value
+}
+
+function readRecord(record: Record<string, unknown>, name: string): Record<string, unknown> {
+  const value = record[name]
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error(`${name} must be an object (got ${describeJsonValue(value)})`)
+  }
+  return value as Record<string, unknown>
+}
+
+function readMedia(record: Record<string, unknown>, name: string): { url: string; kind: SequenceMediaKind } {
+  const media = readRecord(record, name)
+  const url = readString(media, 'url')
+  const kind = readString(media, 'kind')
+  if (!(kind in MEDIA_KINDS)) throw new Error(`${name}.kind must be one of: ${Object.keys(MEDIA_KINDS).join(', ')}`)
+  return { url, kind: kind as SequenceMediaKind }
+}
+
+/** Spread helper: absent/undefined fields stay absent so optional-property
+ *  semantics survive the parse (exactOptionalPropertyTypes-safe). */
+function readOptional<T>(
+  record: Record<string, unknown>,
+  name: string,
+  reader: (record: Record<string, unknown>, name: string) => T,
+): Record<string, T> {
+  if (record[name] === undefined) return {}
+  return { [name]: reader(record, name) }
+}
+
+/** Like `readOptional` but the field's vocabulary includes literal null. */
+function readOptionalNullable<T>(
+  record: Record<string, unknown>,
+  name: string,
+  reader: (record: Record<string, unknown>, name: string) => T,
+): Record<string, T | null> {
+  if (record[name] === undefined) return {}
+  if (record[name] === null) return { [name]: null }
+  return { [name]: reader(record, name) }
+}
+
+function describeJsonValue(value: unknown): string {
+  if (value === undefined) return 'missing'
+  if (value === null) return 'null'
+  if (Array.isArray(value)) return 'an array'
+  return typeof value === 'object' ? 'an object' : `${typeof value} ${JSON.stringify(value)}`
 }
 
 // ---------------------------------------------------------------------------
@@ -400,6 +588,23 @@ function assertOperationBounds(timeline: SequenceTimeline, bounds: TimelineClipB
 function assertSourceInFrame(sourceInFrame: number): void {
   if (!Number.isInteger(sourceInFrame) || sourceInFrame < 0) {
     throw new Error('sourceInFrame must be a non-negative integer')
+  }
+}
+
+/** `null` out-point = natural end of the source: nothing to check. An explicit
+ *  out-point must leave at least `durationFrames` of playable source. */
+function assertSourceWindow(sourceInFrame: number, sourceOutFrame: number | null, durationFrames: number): void {
+  if (sourceOutFrame === null) return
+  if (!Number.isInteger(sourceOutFrame) || sourceOutFrame < 1) {
+    throw new Error('sourceOutFrame must be a positive integer or null')
+  }
+  if (sourceOutFrame <= sourceInFrame) {
+    throw new Error(`sourceOutFrame ${sourceOutFrame} must be greater than sourceInFrame ${sourceInFrame}`)
+  }
+  if (sourceInFrame + durationFrames > sourceOutFrame) {
+    throw new Error(
+      `needs ${durationFrames} source frames but the source window [${sourceInFrame}, ${sourceOutFrame}) holds ${sourceOutFrame - sourceInFrame} — shorten durationFrames, lower sourceInFrame, or pass sourceOutFrame (null releases it to the source's natural end)`,
+    )
   }
 }
 

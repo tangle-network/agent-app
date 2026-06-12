@@ -11,6 +11,7 @@
  * responsive.
  */
 
+import type { SequenceApplyResult } from '../sequences/apply'
 import type { SequenceClip, SequenceTimeline } from '../sequences/model'
 import type { SequenceOperation } from '../sequences/operations'
 
@@ -142,8 +143,14 @@ export interface TranscriptionProvider {
 export interface TimelineEditorProps {
   timeline: SequenceTimeline
   canWrite: boolean
-  /** Persist operations the user produced. Reject to roll the edit back. */
-  onApplyOperations(operations: SequenceOperation[]): Promise<void>
+  /** Persist operations the user produced. Reject to roll the edit back.
+   *  Resolve with the per-operation `SequenceApplyResult[]` (what
+   *  `applySequenceOperations` returns, index-aligned with `operations`) so
+   *  the editor can reconcile its optimistic `local-…` clip ids to the
+   *  server-minted ids — without it, undoing a committed place/split/caption
+   *  after a timeline refresh emits operations the server cannot resolve.
+   *  Resolving void skips reconciliation. */
+  onApplyOperations(operations: SequenceOperation[]): Promise<SequenceApplyResult[] | void>
   /** Selection + playhead surface to the host (e.g. to attach agent context). */
   onSelectionChange?(clips: SequenceClip[]): void
   onPlayheadChange?(frame: number): void

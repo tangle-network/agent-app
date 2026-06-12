@@ -8,10 +8,13 @@
  *
  * Id boundary: `place_clip`, `add_caption`, and `split_clip` mint clip ids
  * server-side, so factories that create local clips take a caller-minted id.
- * The durable inverse of a committed create references that LOCAL id — the
- * host's `onApplyOperations` is the layer that reconciles local ids to server
- * ids (or the store accepts client ids). Purely local undo (uncommitted) is
- * always exact.
+ * Every factory also takes an optional `resolveClipId` — a LIVE local→server
+ * alias lookup the host feeds from `onApplyOperations` results. Resolution
+ * runs at execute/undo/emission time (never at construction), so a command
+ * captured against an optimistic `local-…` id keeps working after a server
+ * refresh replaced it with the minted id. Residual boundary: clips a durable
+ * undo recreates (e.g. the `place_clip` inverse of a delete) mint FRESH
+ * server ids that only the next refresh reconciles.
  *
  * Transforms re-resolve their target clip at execute/undo time and throw when
  * it no longer exists (e.g. removed by a `reset()` rebase) — editing a wrong
@@ -30,6 +33,12 @@ import type { EditorTimelineState, TimelineCommand } from '../contracts'
 // ---------------------------------------------------------------------------
 // Shared lookup + immutable-update helpers
 // ---------------------------------------------------------------------------
+
+/** Live local→server clip-id lookup (see module header). Must return its
+ *  argument when no alias exists. */
+export type ClipIdResolver = (clipId: string) => string
+
+const identityClipId: ClipIdResolver = (clipId) => clipId
 
 function requireClip(timeline: SequenceTimeline, clipId: string, context: string): SequenceClip {
   const clip = timeline.clips.find((candidate) => candidate.id === clipId)
@@ -96,6 +105,7 @@ export interface MoveClipInput {
   startFrame: number
   /** Omitted → stays on its current track. */
   trackId?: string
+  resolveClipId?: ClipIdResolver
 }
 
 /** Drag-move. The target start clamps through the model's `clampClipStart`
@@ -116,16 +126,17 @@ export function moveClipCommand(input: MoveClipInput): TimelineCommand {
   const originalTrackId = clip.trackId
   const trackChanged = targetTrackId !== originalTrackId
   const clipId = input.clipId
+  const resolve = input.resolveClipId ?? identityClipId
 
   return {
     label: `Move ${clip.label}`,
-    execute: (state) => patchClip(state, clipId, context, { startFrame: targetStart, trackId: targetTrackId }),
-    undo: (state) => patchClip(state, clipId, context, { startFrame: originalStart, trackId: originalTrackId }),
+    execute: (state) => patchClip(state, resolve(clipId), context, { startFrame: targetStart, trackId: targetTrackId }),
+    undo: (state) => patchClip(state, resolve(clipId), context, { startFrame: originalStart, trackId: originalTrackId }),
     operations: () => [
-      { type: 'move_clip', clipId, startFrame: targetStart, ...(trackChanged ? { trackId: targetTrackId } : {}) },
+      { type: 'move_clip', clipId: resolve(clipId), startFrame: targetStart, ...(trackChanged ? { trackId: targetTrackId } : {}) },
     ],
     inverseOperations: () => [
-      { type: 'move_clip', clipId, startFrame: originalStart, ...(trackChanged ? { trackId: originalTrackId } : {}) },
+      { type: 'move_clip', clipId: resolve(clipId), startFrame: originalStart, ...(trackChanged ? { trackId: originalTrackId } : {}) },
     ],
   }
 }
@@ -141,6 +152,7 @@ export interface TrimClipInput {
   durationFrames: number
   /** New source in-point when trimming the head; omitted → unchanged. */
   sourceInFrame?: number
+  resolveClipId?: ClipIdResolver
 }
 
 /** Trim is strict where move is forgiving: the caller (a trim handle) already
@@ -158,16 +170,26 @@ export function trimClipCommand(input: TrimClipInput): TimelineCommand {
     throw new Error(`${context}: sourceInFrame must be a non-negative integer`)
   }
   const targetSourceIn = input.sourceInFrame ?? clip.sourceInFrame
+  // Mirror of the server-side source-window invariant: a clip with an explicit
+  // out-point (a split half) cannot claim more source frames than the window
+  // holds — failing here keeps optimistic state from diverging into a commit
+  // the validator rejects.
+  if (clip.sourceOutFrame !== null && targetSourceIn + input.durationFrames > clip.sourceOutFrame) {
+    throw new Error(
+      `${context}: needs ${input.durationFrames} source frames from ${targetSourceIn} but ${clip.label} has source window [${clip.sourceInFrame}, ${clip.sourceOutFrame})`,
+    )
+  }
   const target = { startFrame: input.startFrame, durationFrames: input.durationFrames, sourceInFrame: targetSourceIn }
   const original = { startFrame: clip.startFrame, durationFrames: clip.durationFrames, sourceInFrame: clip.sourceInFrame }
   const clipId = input.clipId
+  const resolve = input.resolveClipId ?? identityClipId
 
   return {
     label: `Trim ${clip.label}`,
-    execute: (state) => patchClip(state, clipId, context, target),
-    undo: (state) => patchClip(state, clipId, context, original),
-    operations: () => [{ type: 'trim_clip', clipId, ...target }],
-    inverseOperations: () => [{ type: 'trim_clip', clipId, ...original }],
+    execute: (state) => patchClip(state, resolve(clipId), context, target),
+    undo: (state) => patchClip(state, resolve(clipId), context, original),
+    operations: () => [{ type: 'trim_clip', clipId: resolve(clipId), ...target }],
+    inverseOperations: () => [{ type: 'trim_clip', clipId: resolve(clipId), ...original }],
   }
 }
 
@@ -189,6 +211,7 @@ export interface PlaceClipInput {
   generationId?: string
   assetId?: string
   metadata?: Record<string, unknown>
+  resolveClipId?: ClipIdResolver
 }
 
 export function placeClipCommand(input: PlaceClipInput): TimelineCommand {
@@ -220,11 +243,12 @@ export function placeClipCommand(input: PlaceClipInput): TimelineCommand {
     metadata: input.metadata ?? {},
   }
   const clipId = input.clipId
+  const resolve = input.resolveClipId ?? identityClipId
 
   return {
     label: `Place ${input.label}`,
-    execute: (state) => insertClip(state, structuredClone(clip), context),
-    undo: (state) => removeClip(state, clipId, context),
+    execute: (state) => insertClip(state, { ...structuredClone(clip), id: resolve(clipId) }, context),
+    undo: (state) => removeClip(state, resolve(clipId), context),
     operations: () => [
       {
         type: 'place_clip',
@@ -239,7 +263,7 @@ export function placeClipCommand(input: PlaceClipInput): TimelineCommand {
         ...(input.metadata !== undefined ? { metadata: input.metadata } : {}),
       },
     ],
-    inverseOperations: () => [{ type: 'delete_clip', clipId }],
+    inverseOperations: () => [{ type: 'delete_clip', clipId: resolve(clipId) }],
   }
 }
 
@@ -250,13 +274,18 @@ export function placeClipCommand(input: PlaceClipInput): TimelineCommand {
 export interface DeleteClipInput {
   timeline: SequenceTimeline
   clipId: string
+  resolveClipId?: ClipIdResolver
 }
 
 /** Snapshots the full clip at construction so undo restores it exactly. The
  *  durable inverse rebuilds within the closed operation union: caption clips
  *  (caption track + text) invert through `add_caption` — `place_clip` cannot
- *  carry text/language — everything else through `place_clip` with media and
- *  product references intact. */
+ *  carry text/language — everything else through `place_clip` with media,
+ *  product references, source window, and disabled state intact. Boundary:
+ *  the caption path cannot carry `disabled` or `metadata`, so a deleted
+ *  disabled caption resurrects ENABLED server-side and caption metadata is
+ *  lost — local undo stays exact (same class of loss as the `set_clip_text`
+ *  language-clear boundary). */
 export function deleteClipCommand(input: DeleteClipInput): TimelineCommand {
   const context = 'delete_clip'
   const snapshot = structuredClone(requireClip(input.timeline, input.clipId, context))
@@ -265,12 +294,13 @@ export function deleteClipCommand(input: DeleteClipInput): TimelineCommand {
   const captionText =
     track.kind === 'caption' && typeof snapshot.text === 'string' && snapshot.text.length > 0 ? snapshot.text : null
   const clipId = input.clipId
+  const resolve = input.resolveClipId ?? identityClipId
 
   return {
     label: `Delete ${snapshot.label}`,
-    execute: (state) => removeClip(state, clipId, context),
-    undo: (state) => insertClip(state, structuredClone(snapshot), context),
-    operations: () => [{ type: 'delete_clip', clipId }],
+    execute: (state) => removeClip(state, resolve(clipId), context),
+    undo: (state) => insertClip(state, { ...structuredClone(snapshot), id: resolve(clipId) }, context),
+    operations: () => [{ type: 'delete_clip', clipId: resolve(clipId) }],
     inverseOperations: () =>
       captionText !== null
         ? [
@@ -291,6 +321,8 @@ export function deleteClipCommand(input: DeleteClipInput): TimelineCommand {
               startFrame: snapshot.startFrame,
               durationFrames: snapshot.durationFrames,
               sourceInFrame: snapshot.sourceInFrame,
+              ...(snapshot.sourceOutFrame !== null ? { sourceOutFrame: snapshot.sourceOutFrame } : {}),
+              ...(snapshot.disabled ? { disabled: true } : {}),
               ...(snapshot.media ? { media: { url: snapshot.media.url, kind: snapshot.media.kind } } : {}),
               ...(snapshot.generationId !== undefined ? { generationId: snapshot.generationId } : {}),
               ...(snapshot.assetId !== undefined ? { assetId: snapshot.assetId } : {}),
@@ -311,6 +343,7 @@ export interface SplitClipInput {
   atFrame: number
   /** Caller-minted id for the second (tail) clip. */
   newClipId: string
+  resolveClipId?: ClipIdResolver
 }
 
 /** Source mapping is 1:1 frames (no rate ramps in the model), so the tail's
@@ -337,22 +370,36 @@ export function splitClipCommand(input: SplitClipInput): TimelineCommand {
   }
   const clipId = input.clipId
   const newClipId = input.newClipId
+  const resolve = input.resolveClipId ?? identityClipId
+  // Mirrors applySplitClip: the head's out-point becomes explicit at the cut,
+  // so optimistic state matches what the server persists.
+  const headSourceOutFrame = original.sourceInFrame + headDurationFrames
 
   return {
     label: `Split ${original.label}`,
     execute: (state) =>
-      insertClip(patchClip(state, clipId, context, { durationFrames: headDurationFrames }), structuredClone(tail), context),
+      insertClip(
+        patchClip(state, resolve(clipId), context, { durationFrames: headDurationFrames, sourceOutFrame: headSourceOutFrame }),
+        { ...structuredClone(tail), id: resolve(newClipId) },
+        context,
+      ),
     undo: (state) =>
-      patchClip(removeClip(state, newClipId, context), clipId, context, structuredClone(original)),
-    operations: () => [{ type: 'split_clip', clipId, atFrame: input.atFrame }],
+      patchClip(removeClip(state, resolve(newClipId), context), resolve(clipId), context, {
+        ...structuredClone(original),
+        id: resolve(clipId),
+      }),
+    operations: () => [{ type: 'split_clip', clipId: resolve(clipId), atFrame: input.atFrame }],
     inverseOperations: () => [
-      { type: 'delete_clip', clipId: newClipId },
+      { type: 'delete_clip', clipId: resolve(newClipId) },
       {
         type: 'trim_clip',
-        clipId,
+        clipId: resolve(clipId),
         startFrame: original.startFrame,
         durationFrames: original.durationFrames,
         sourceInFrame: original.sourceInFrame,
+        // Restores the pre-split window; without it the head keeps its
+        // out-point at the cut while regaining the full duration.
+        sourceOutFrame: original.sourceOutFrame,
       },
     ],
   }
@@ -373,6 +420,7 @@ export interface AddCaptionInput {
   language?: string
   startFrame: number
   durationFrames: number
+  resolveClipId?: ClipIdResolver
 }
 
 export function addCaptionCommand(input: AddCaptionInput): TimelineCommand {
@@ -405,11 +453,12 @@ export function addCaptionCommand(input: AddCaptionInput): TimelineCommand {
     metadata: {},
   }
   const clipId = input.clipId
+  const resolve = input.resolveClipId ?? identityClipId
 
   return {
     label: `Add caption`,
-    execute: (state) => insertClip(state, structuredClone(clip), context),
-    undo: (state) => removeClip(state, clipId, context),
+    execute: (state) => insertClip(state, { ...structuredClone(clip), id: resolve(clipId) }, context),
+    undo: (state) => removeClip(state, resolve(clipId), context),
     operations: () => [
       {
         type: 'add_caption',
@@ -420,7 +469,7 @@ export function addCaptionCommand(input: AddCaptionInput): TimelineCommand {
         trackId: input.trackId,
       },
     ],
-    inverseOperations: () => [{ type: 'delete_clip', clipId }],
+    inverseOperations: () => [{ type: 'delete_clip', clipId: resolve(clipId) }],
   }
 }
 
@@ -434,6 +483,7 @@ export interface SetClipTextInput {
   text: string
   /** Omitted → language unchanged. */
   language?: string
+  resolveClipId?: ClipIdResolver
 }
 
 /** Requires the clip to already carry text: `set_clip_text` has no "create"
@@ -458,28 +508,29 @@ export function setClipTextCommand(input: SetClipTextInput): TimelineCommand {
    *  mirror in sync only when it was in sync to begin with. */
   const mirrorsLabel = clip.label === clip.text
   const clipId = input.clipId
+  const resolve = input.resolveClipId ?? identityClipId
 
   return {
     label: `Edit caption text`,
     execute: (state) =>
-      patchClip(state, clipId, context, {
+      patchClip(state, resolve(clipId), context, {
         text: input.text,
         language: targetLanguage,
         ...(mirrorsLabel ? { label: input.text } : {}),
       }),
     undo: (state) =>
-      patchClip(state, clipId, context, {
+      patchClip(state, resolve(clipId), context, {
         text: originalText,
         language: originalLanguage,
         ...(mirrorsLabel ? { label: originalText } : {}),
       }),
     operations: () => [
-      { type: 'set_clip_text', clipId, text: input.text, ...(input.language !== undefined ? { language: input.language } : {}) },
+      { type: 'set_clip_text', clipId: resolve(clipId), text: input.text, ...(input.language !== undefined ? { language: input.language } : {}) },
     ],
     inverseOperations: () => [
       {
         type: 'set_clip_text',
-        clipId,
+        clipId: resolve(clipId),
         text: originalText,
         ...(originalLanguage !== undefined ? { language: originalLanguage } : {}),
       },
@@ -494,6 +545,7 @@ export function setClipTextCommand(input: SetClipTextInput): TimelineCommand {
 export interface ToggleClipDisabledInput {
   timeline: SequenceTimeline
   clipId: string
+  resolveClipId?: ClipIdResolver
 }
 
 /** The target value is captured at construction (not flipped at execute time)
@@ -505,12 +557,13 @@ export function toggleClipDisabledCommand(input: ToggleClipDisabledInput): Timel
   const original = clip.disabled
   const target = !original
   const clipId = input.clipId
+  const resolve = input.resolveClipId ?? identityClipId
 
   return {
     label: target ? `Disable ${clip.label}` : `Enable ${clip.label}`,
-    execute: (state) => patchClip(state, clipId, context, { disabled: target }),
-    undo: (state) => patchClip(state, clipId, context, { disabled: original }),
-    operations: () => [{ type: 'set_clip_disabled', clipId, disabled: target }],
-    inverseOperations: () => [{ type: 'set_clip_disabled', clipId, disabled: original }],
+    execute: (state) => patchClip(state, resolve(clipId), context, { disabled: target }),
+    undo: (state) => patchClip(state, resolve(clipId), context, { disabled: original }),
+    operations: () => [{ type: 'set_clip_disabled', clipId: resolve(clipId), disabled: target }],
+    inverseOperations: () => [{ type: 'set_clip_disabled', clipId: resolve(clipId), disabled: original }],
   }
 }

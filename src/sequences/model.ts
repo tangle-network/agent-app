@@ -204,8 +204,11 @@ export function assertClipFitsSequence(input: {
   }
 }
 
-/** Place a caption near the playhead, sliding past occupied intervals so the
- *  caption track never double-books. Prefers fps*3 frames, floors at fps. */
+/** Place a caption near the playhead inside FREE space only — the caption
+ *  track never double-books. Prefers fps*3 frames, floors at fps. The gap
+ *  holding (or first after) the playhead wins; with everything ahead occupied
+ *  the latest earlier gap is used instead. Throws when no gap can hold the
+ *  minimum — the caller must supply explicit bounds or clear space. */
 export function chooseCaptionPlacement(input: {
   playheadFrame: number
   fps: number
@@ -214,7 +217,7 @@ export function chooseCaptionPlacement(input: {
 }): TimelineClipBounds {
   const preferredDurationFrames = Math.min(input.fps * 3, input.sequenceDurationFrames)
   const minimumDurationFrames = Math.min(input.fps, preferredDurationFrames)
-  const intervals = input.occupiedIntervals
+  const occupied = input.occupiedIntervals
     .map((interval) => ({
       startFrame: Math.max(0, interval.startFrame),
       endFrame: Math.min(input.sequenceDurationFrames, interval.endFrame),
@@ -222,26 +225,32 @@ export function chooseCaptionPlacement(input: {
     .filter((interval) => interval.endFrame > interval.startFrame)
     .sort((a, b) => a.startFrame - b.startFrame)
 
-  let startFrame = Math.max(0, Math.min(input.playheadFrame, Math.max(0, input.sequenceDurationFrames - minimumDurationFrames)))
-  let durationFrames = preferredDurationFrames
-  for (const interval of intervals) {
-    if (interval.endFrame <= startFrame) continue
-    const availableBeforeInterval = interval.startFrame - startFrame
-    if (availableBeforeInterval >= minimumDurationFrames) {
-      durationFrames = Math.min(preferredDurationFrames, availableBeforeInterval)
-      break
-    }
-    if (interval.startFrame < startFrame + minimumDurationFrames) startFrame = interval.endFrame
+  // Merge overlaps so the gap walk sees each free run exactly once.
+  const merged: TimelineInterval[] = []
+  for (const interval of occupied) {
+    const last = merged[merged.length - 1]
+    if (last && interval.startFrame <= last.endFrame) last.endFrame = Math.max(last.endFrame, interval.endFrame)
+    else merged.push({ ...interval })
   }
 
-  const remainingFrames = input.sequenceDurationFrames - startFrame
-  if (remainingFrames < minimumDurationFrames) {
-    startFrame = Math.max(0, input.sequenceDurationFrames - minimumDurationFrames)
-    durationFrames = minimumDurationFrames
-  } else {
-    durationFrames = Math.min(durationFrames, remainingFrames)
+  const gaps: TimelineInterval[] = []
+  let cursor = 0
+  for (const interval of merged) {
+    if (interval.startFrame > cursor) gaps.push({ startFrame: cursor, endFrame: interval.startFrame })
+    cursor = interval.endFrame
   }
+  if (cursor < input.sequenceDurationFrames) gaps.push({ startFrame: cursor, endFrame: input.sequenceDurationFrames })
 
+  const usable = gaps.filter((gap) => gap.endFrame - gap.startFrame >= minimumDurationFrames)
+  const latestUsable = usable[usable.length - 1]
+  if (latestUsable === undefined) {
+    throw new Error(
+      `no free gap of at least ${minimumDurationFrames} frames on the caption track — pass explicit startFrame/durationFrames or clear space first`,
+    )
+  }
+  const gap = usable.find((candidate) => candidate.endFrame > input.playheadFrame) ?? latestUsable
+  const durationFrames = Math.min(preferredDurationFrames, gap.endFrame - gap.startFrame)
+  const startFrame = Math.max(gap.startFrame, Math.min(input.playheadFrame, gap.endFrame - durationFrames))
   return { startFrame, durationFrames }
 }
 
