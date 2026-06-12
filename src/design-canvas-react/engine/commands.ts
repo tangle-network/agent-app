@@ -31,29 +31,12 @@ import type { EditorSceneState, SceneCommand } from '../contracts'
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-function requireDoc(state: EditorSceneState, context: string): SceneDocument {
-  if (!state.document) throw new Error(`${context}: missing document`)
-  return state.document
-}
-
 function applyOps(state: EditorSceneState, ops: SceneOperation[]): EditorSceneState {
   return { ...state, document: applySceneOperations(state.document, ops) }
 }
 
 function applyOp(state: EditorSceneState, op: SceneOperation): EditorSceneState {
   return { ...state, document: applySceneOperation(state.document, op) }
-}
-
-function requirePageElement(
-  document: SceneDocument,
-  pageId: string,
-  elementId: string,
-  context: string,
-): { page: ScenePage; element: SceneElement; owner: SceneElement[]; index: number } {
-  const page = requirePage(document, pageId)
-  const found = requireElement(page, elementId)
-  if (!found) throw new Error(`${context}: element ${elementId} not found on page ${pageId}`)
-  return { page, ...found }
 }
 
 // ---------------------------------------------------------------------------
@@ -188,9 +171,13 @@ export function reorderElementCommand(input: ReorderElementInput): SceneCommand 
   return {
     label: 'Reorder element',
     execute: (state) => {
-      const page = requirePage(state.document, input.pageId)
-      const { index } = requireElement(page, input.elementId)
-      capturedFromIndex = index
+      // Guard: on redo the element is already at toIndex, so we must not
+      // overwrite the captured origin with the wrong position.
+      if (capturedFromIndex === null) {
+        const page = requirePage(state.document, input.pageId)
+        const { index } = requireElement(page, input.elementId)
+        capturedFromIndex = index
+      }
       return applyOp(state, forwardOp)
     },
     undo: (state) => {
@@ -312,15 +299,10 @@ export function groupElementsCommand(input: GroupElementsInput): SceneCommand {
     groupId: input.groupId,
   }
 
-  // Pre-compute the post-group document so `operations()` and the execute
-  // path share a single source of truth for the group geometry.
-  let postGroupDocument: SceneDocument | null = null
-
   return {
     label: `Group ${input.elementIds.length} elements`,
     execute: (state) => {
       const next = applyOp(state, groupOp)
-      postGroupDocument = next.document
       return {
         ...next,
         selectedElementIds: [input.groupId],
@@ -462,19 +444,43 @@ export function deletePageCommand(input: DeletePageInput): SceneCommand {
   const page = requirePage(input.document, input.pageId)
   const currentIndex = input.document.pages.findIndex((p) => p.id === input.pageId)
   const snapshot = structuredClone(page)
-  const insertIndex = currentIndex
 
   const deleteOp: SceneOperation = { type: 'delete_page', pageId: input.pageId }
-  const restoreOp: SceneOperation = {
-    type: 'add_page',
-    pageId: input.pageId,
-    options: {
-      name: snapshot.name,
-      width: snapshot.width,
-      height: snapshot.height,
-      background: snapshot.background,
-    },
-    index: insertIndex,
+
+  // Undo uses add_page + per-element add_element to restore the full snapshot.
+  // The page shell is added first, then elements are inserted in z-order so
+  // subsequent undo/redo round-trips see the correct stack. This also makes
+  // inverseOperations() safe to emit server-side: the server will see the same
+  // full restore instead of a bare shell.
+  function buildRestoreOps(): SceneOperation[] {
+    const ops: SceneOperation[] = [
+      {
+        type: 'add_page',
+        pageId: snapshot.id,
+        options: {
+          name: snapshot.name,
+          width: snapshot.width,
+          height: snapshot.height,
+          background: snapshot.background,
+        },
+        index: currentIndex,
+      },
+    ]
+    if (snapshot.bleed) {
+      ops.push({ type: 'set_page_props', pageId: snapshot.id, bleed: snapshot.bleed })
+    }
+    if (snapshot.guides.vertical.length > 0 || snapshot.guides.horizontal.length > 0) {
+      ops.push({ type: 'set_page_guides', pageId: snapshot.id, guides: snapshot.guides })
+    }
+    for (let i = 0; i < snapshot.elements.length; i++) {
+      ops.push({
+        type: 'add_element',
+        pageId: snapshot.id,
+        element: structuredClone(snapshot.elements[i]!),
+        index: i,
+      })
+    }
+    return ops
   }
 
   return {
@@ -487,16 +493,11 @@ export function deletePageCommand(input: DeletePageInput): SceneCommand {
       return { ...next, activePageId: next.document.pages[fallbackIndex]!.id }
     },
     undo: (state) => {
-      // Restore the page shell; elements are NOT restored (use full snapshot
-      // only when the product needs full delete/undo fidelity — add as needed).
-      const next = applyOp(state, restoreOp)
+      const next = applyOps(state, buildRestoreOps())
       return { ...next, activePageId: input.pageId }
     },
     operations: () => [structuredClone(deleteOp)],
-    // The inverse is a best-effort page shell restore; element content is
-    // intentionally NOT included here — the server has the full document and
-    // can replay its own history. Local undo is approximate for delete_page.
-    inverseOperations: () => [structuredClone(restoreOp)],
+    inverseOperations: () => buildRestoreOps(),
   }
 }
 
@@ -517,8 +518,11 @@ export function reorderPageCommand(input: ReorderPageInput): SceneCommand {
   return {
     label: 'Reorder page',
     execute: (state) => {
-      capturedFromIndex = state.document.pages.findIndex((p) => p.id === input.pageId)
-      if (capturedFromIndex === -1) throw new Error(`reorderPageCommand: page ${input.pageId} not found`)
+      // Guard: on redo the page is already at toIndex; capture only on first execute.
+      if (capturedFromIndex === null) {
+        capturedFromIndex = state.document.pages.findIndex((p) => p.id === input.pageId)
+        if (capturedFromIndex === -1) throw new Error(`reorderPageCommand: page ${input.pageId} not found`)
+      }
       return applyOp(state, forwardOp)
     },
     undo: (state) => {

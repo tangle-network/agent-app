@@ -86,7 +86,7 @@ function optionalBoolean(args: Record<string, unknown>, name: string): boolean |
   return value
 }
 
-function optionalPositiveInteger(args: Record<string, unknown>, name: string): number | undefined {
+function optionalNonNegativeInteger(args: Record<string, unknown>, name: string): number | undefined {
   const value = args[name]
   if (value === undefined || value === null) return undefined
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
@@ -180,6 +180,25 @@ async function applyPlan(
   const { record } = await storeApplyScenePlan(store, plan, { actorKind: 'agent_edit', mintId })
   return { rev: record.rev, operation_count: operations.length }
 }
+
+/** Collect slot→elementId mapping for a SINGLE page (no cross-page slot walk,
+ *  so duplicate slot names across different pages don't cause an error). */
+function collectPageSlotAttrs(page: ScenePage): Map<string, { elementId: string; kind: SceneElement['kind'] }> {
+  const slots = new Map<string, { elementId: string; kind: SceneElement['kind'] }>()
+  const stack = [...page.elements]
+  while (stack.length > 0) {
+    const el = stack.pop()!
+    if (el.slot) {
+      if (slots.has(el.slot)) {
+        throw new Error(`duplicate slot name "${el.slot}" on page ${page.id}`)
+      }
+      slots.set(el.slot, { elementId: el.id, kind: el.kind })
+    }
+    if (el.kind === 'group') stack.push(...el.children)
+  }
+  return slots
+}
+
 
 // ---------------------------------------------------------------------------
 // JSON Schema helpers
@@ -312,7 +331,7 @@ const CANVAS_MCP_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] = [
         opacity: 1,
         locked: false,
         visible: true,
-        ...(optionalString(args, 'slot') ? { slot: optionalString(args, 'slot') } : {}),
+        ...(() => { const s = optionalString(args, 'slot'); return s ? { slot: s } : {} })(),
       }
       const result = await applyPlan(env.store, env.mintId, `add text "${text.slice(0, 40)}"`, [
         { type: 'add_element', pageId, element },
@@ -357,7 +376,7 @@ const CANVAS_MCP_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] = [
         opacity: 1,
         locked: false,
         visible: true,
-        ...(optionalString(args, 'slot') ? { slot: optionalString(args, 'slot') } : {}),
+        ...(() => { const s = optionalString(args, 'slot'); return s ? { slot: s } : {} })(),
       }
       const result = await applyPlan(env.store, env.mintId, 'add image element', [
         { type: 'add_element', pageId, element },
@@ -480,7 +499,7 @@ const CANVAS_MCP_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] = [
         opacity: 1,
         locked: false,
         visible: true,
-        ...(optionalString(args, 'poster_src') ? { posterSrc: optionalString(args, 'poster_src') } : {}),
+        ...(() => { const s = optionalString(args, 'poster_src'); return s ? { posterSrc: s } : {} })(),
       }
       const result = await applyPlan(env.store, env.mintId, 'add video element', [
         { type: 'add_element', pageId, element },
@@ -594,7 +613,7 @@ const CANVAS_MCP_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] = [
     async run(args, env) {
       const pageId = requireString(args, 'page_id')
       const elementId = requireString(args, 'element_id')
-      const toIndex = optionalPositiveInteger(args, 'to_index') ?? 0
+      const toIndex = optionalNonNegativeInteger(args, 'to_index') ?? 0
       const result = await applyPlan(env.store, env.mintId, `reorder element ${elementId} to index ${toIndex}`, [
         { type: 'reorder_element', pageId, elementId, toIndex },
       ])
@@ -686,7 +705,7 @@ const CANVAS_MCP_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] = [
             height: optionalNumber(args, 'height'),
             background: optionalString(args, 'background'),
           },
-          index: optionalPositiveInteger(args, 'index'),
+          index: optionalNonNegativeInteger(args, 'index'),
         },
       ])
       return { page_id: pageId, ...result }
@@ -800,8 +819,10 @@ const CANVAS_MCP_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] = [
     ),
     async run(args, env) {
       const pageId = requireString(args, 'page_id')
-      const vertical = Array.isArray(args['vertical']) ? (args['vertical'] as number[]) : []
-      const horizontal = Array.isArray(args['horizontal']) ? (args['horizontal'] as number[]) : []
+      if (!Array.isArray(args['vertical'])) throw new Error('vertical must be an array of numbers')
+      if (!Array.isArray(args['horizontal'])) throw new Error('horizontal must be an array of numbers')
+      const vertical = args['vertical'] as number[]
+      const horizontal = args['horizontal'] as number[]
       const result = await applyPlan(env.store, env.mintId, `set guides on page ${pageId}`, [
         { type: 'set_page_guides', pageId, guides: { vertical, horizontal } },
       ])
@@ -885,21 +906,51 @@ const CANVAS_MCP_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] = [
       const bindings = optionalRecord(args, 'bindings') ?? {}
       if (rawSourceIds.length === 0) throw new Error('source_page_ids must not be empty')
 
-      // Build: for each source page, duplicate it + collect the new page id
-      const ops: SceneOperation[] = []
+      // Phase 1: for each source page, collect any slots to temporarily unbind
+      // from the source before duplicating. apply_data's collectSlots() walks ALL
+      // pages, so it throws on duplicate slot names when source and copy share the
+      // same slot attribute. The strategy: unbind source slots → duplicate →
+      // apply_data (only copy pages carry slots now) → re-bind source slots. All
+      // four phases are one atomic applyPlan call.
+      const unbindOps: SceneOperation[] = []
+      const rebindOps: SceneOperation[] = []
+      const dupOps: SceneOperation[] = []
       const newPageIds: string[] = []
+
       for (const sourcePageId of rawSourceIds) {
-        requirePage(document, sourcePageId)
+        const sourcePage = requirePage(document, sourcePageId)
+        // Collect slots on the source page (single-page walk, no collision check).
+        const sourceSlots = collectPageSlotAttrs(sourcePage)
+        for (const [slotName, { elementId }] of sourceSlots) {
+          unbindOps.push({ type: 'bind_slot', pageId: sourcePageId, elementId, slot: null })
+          rebindOps.push({ type: 'bind_slot', pageId: sourcePageId, elementId, slot: slotName })
+        }
         const pageId = env.mintId()
         newPageIds.push(pageId)
-        ops.push({ type: 'duplicate_page', sourcePageId, pageId })
-      }
-      // apply_data runs after all duplicates exist
-      if (Object.keys(bindings).length > 0) {
-        ops.push({ type: 'apply_data', bindings })
+        dupOps.push({ type: 'duplicate_page', sourcePageId, pageId })
       }
 
-      const result = await applyPlan(env.store, env.mintId, `instantiate template (${rawSourceIds.length} pages)`, ops)
+      const applyDataOps: SceneOperation[] = Object.keys(bindings).length > 0
+        ? [{ type: 'apply_data', bindings }]
+        : []
+
+      // Op ordering is critical: duplicate FIRST (copies inherit source slots),
+      // then unbind source slots (sources now have no slots, copies still do),
+      // then apply_data (only copy pages carry slots — no duplicate names),
+      // then re-bind source slots (restore original state of source pages).
+      const allOps: SceneOperation[] = [
+        ...dupOps,
+        ...unbindOps,
+        ...applyDataOps,
+        ...rebindOps,
+      ]
+
+      const result = await applyPlan(
+        env.store,
+        env.mintId,
+        `instantiate template (${rawSourceIds.length} pages)`,
+        allOps,
+      )
       return { new_page_ids: newPageIds, ...result }
     },
   },

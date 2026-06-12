@@ -196,14 +196,18 @@ export function elementExtent(element: SceneElement): { width: number; height: n
       return { width: maxX, height: maxY }
     }
     case 'group': {
-      let maxX = 0
-      let maxY = 0
+      // minX/minY track the negative-space corner: a rotated child whose AABB
+      // extends left/above the group origin contributes negative values that
+      // the old 0-initialized implementation silently clipped.
+      let minX = 0, minY = 0, maxX = 0, maxY = 0
       for (const child of element.children) {
         const aabb = elementAabb(child)
+        minX = Math.min(minX, aabb.x)
+        minY = Math.min(minY, aabb.y)
         maxX = Math.max(maxX, aabb.x + aabb.width)
         maxY = Math.max(maxY, aabb.y + aabb.height)
       }
-      return { width: maxX, height: maxY }
+      return { width: maxX - minX, height: maxY - minY }
     }
   }
 }

@@ -711,3 +711,94 @@ describe('buildDesignCanvasMcpServerEntry', () => {
     ).toThrow(/must start with/)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Regression: instantiate_template works with slotted source pages
+// ---------------------------------------------------------------------------
+
+describe('instantiate_template — slotted source pages', () => {
+  it('fills text slot on the copy without throwing duplicate-slot-name', async () => {
+    const { handler, state } = setup()
+    const pageId = state.document.pages[0]!.id
+
+    // 1. Add a text element
+    const addResult = await callTool(handler, 'add_text', {
+      page_id: pageId,
+      text: 'Placeholder',
+      x: 0, y: 0, width: 400,
+    })
+    expect(addResult.isError).toBe(false)
+    const textId = addResult.json!['element_id'] as string
+
+    // 2. Bind a slot to the text element
+    const bindResult = await callTool(handler, 'bind_slot', {
+      page_id: pageId,
+      element_id: textId,
+      slot: 'title',
+    })
+    expect(bindResult.isError).toBe(false)
+
+    // 3. instantiate_template with bindings — previously threw
+    // "duplicate slot name" because apply_data walked ALL pages (source + copy)
+    const result = await callTool(handler, 'instantiate_template', {
+      source_page_ids: [pageId],
+      bindings: { title: 'Hello World' },
+    })
+    expect(result.isError).toBe(false)
+
+    // Document must now have 2 pages: original + copy
+    const doc = state.document
+    expect(doc.pages).toHaveLength(2)
+
+    // Copy page text must be 'Hello World'
+    const copyPage = doc.pages[1]!
+    const copyText = copyPage.elements.find((e) => e.kind === 'text') as import('../../src/design-canvas/model').TextElement | undefined
+    expect(copyText).toBeDefined()
+    expect(copyText!.text).toBe('Hello World')
+
+    // Original page text must still be 'Placeholder' (bindings targeted copy only)
+    const origText = doc.pages[0]!.elements.find((e) => e.id === textId) as import('../../src/design-canvas/model').TextElement | undefined
+    expect(origText).toBeDefined()
+    expect(origText!.text).toBe('Placeholder')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Regression: set_page_guides rejects non-array args
+// ---------------------------------------------------------------------------
+
+describe('set_page_guides — type validation', () => {
+  it('returns isError when vertical is not an array', async () => {
+    const { handler, state } = setup()
+    const result = await callTool(handler, 'set_page_guides', {
+      page_id: state.document.pages[0]!.id,
+      vertical: 500,
+      horizontal: [],
+    })
+    expect(result.isError).toBe(true)
+    expect(result.text).toMatch(/vertical must be an array/)
+  })
+
+  it('returns isError when horizontal is not an array', async () => {
+    const { handler, state } = setup()
+    const result = await callTool(handler, 'set_page_guides', {
+      page_id: state.document.pages[0]!.id,
+      vertical: [],
+      horizontal: 'bad',
+    })
+    expect(result.isError).toBe(true)
+    expect(result.text).toMatch(/horizontal must be an array/)
+  })
+
+  it('accepts valid arrays and stores guides', async () => {
+    const { handler, state } = setup()
+    const result = await callTool(handler, 'set_page_guides', {
+      page_id: state.document.pages[0]!.id,
+      vertical: [100, 200],
+      horizontal: [300],
+    })
+    expect(result.isError).toBe(false)
+    expect(state.document.pages[0]!.guides.vertical).toEqual([100, 200])
+    expect(state.document.pages[0]!.guides.horizontal).toEqual([300])
+  })
+})

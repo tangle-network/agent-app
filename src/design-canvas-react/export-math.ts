@@ -111,7 +111,9 @@ export function identifyTaintedSrc(imageSrcs: ReadonlyArray<{ name: string; src:
  * URL. Same-origin relative paths (/api/...) and data: blobs are safe.
  * This is intentionally conservative — the taint check runs only after a
  * SecurityError fires, so a false positive is "blamed" without being silently
- * ignored.
+ * ignored. NOTE: same-origin https:// assets will also match; if a
+ * SecurityError fires, the cross-origin culprit may be a different image than
+ * the one this function flags first.
  */
 export function isCrossOriginSrc(src: string): boolean {
   return /^https?:\/\//i.test(src)

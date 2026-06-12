@@ -39,13 +39,23 @@ export interface SceneCommand {
   execute(state: EditorSceneState): EditorSceneState
   undo(state: EditorSceneState): EditorSceneState
   operations(): SceneOperation[]
+  /**
+   * The inverse operation sequence for server-side persistence of an undo.
+   * Most commands return an exact inverse (e.g. set_attrs → prior set_attrs,
+   * add_element → delete_element). deletePageCommand returns add_page +
+   * per-element add_element ops restoring the full page snapshot.
+   */
   inverseOperations(): SceneOperation[]
 }
 
 export interface SceneCommandStack {
   execute(command: SceneCommand): void
-  undo(): void
-  redo(): void
+  /** Apply the top-of-done-stack inverse and return the command (callers use
+   *  `command.inverseOperations()` to persist the undo to the server). */
+  undo(): SceneCommand
+  /** Re-execute the top-of-redo-stack and return the command (callers use
+   *  `command.operations()` to persist the redo to the server). */
+  redo(): SceneCommand
   canUndo(): boolean
   canRedo(): boolean
   subscribe(listener: () => void): () => void

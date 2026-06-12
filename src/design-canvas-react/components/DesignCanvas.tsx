@@ -23,7 +23,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { SceneDocument, SceneElement } from '../../design-canvas/model'
-import { requirePage } from '../../design-canvas/model'
+import { findElement, requirePage } from '../../design-canvas/model'
 import type { SceneAttrsPatch, SceneOperation } from '../../design-canvas/operations'
 import type { PageBleed } from '../../design-canvas/model'
 import type { DesignCanvasProps, SceneCommand } from '../contracts'
@@ -228,11 +228,12 @@ export function DesignCanvas({
   const handleSetAttrs = useCallback(
     (elementId: string, attrs: SceneAttrsPatch) => {
       const page = requirePage(editorState.document, editorState.activePageId)
-      // Read prior attrs from the element's current state.
-      const found = page.elements.find((el) => el.id === elementId) ?? null
+      // findElement searches group children; page.elements.find misses nested elements.
+      const found = findElement(page, elementId)
       if (!found) return
+      if (found.element.locked) return
       const priorAttrs: SceneAttrsPatch = Object.fromEntries(
-        Object.keys(attrs).map((k) => [k, (found as unknown as Record<string, unknown>)[k]]),
+        Object.keys(attrs).map((k) => [k, (found.element as unknown as Record<string, unknown>)[k]]),
       ) as SceneAttrsPatch
       commit(
         setAttrsCommand({
@@ -249,14 +250,16 @@ export function DesignCanvas({
   const handleMultiSetAttrs = useCallback(
     (patches: Array<{ elementId: string; attrs: SceneAttrsPatch }>) => {
       const page = requirePage(editorState.document, editorState.activePageId)
-      const entries = patches.map(({ elementId, attrs }) => {
-        const el = page.elements.find((e) => e.id === elementId)
-        if (!el) throw new Error(`handleMultiSetAttrs: element ${elementId} not found`)
+      const entries = patches.flatMap(({ elementId, attrs }) => {
+        const found = findElement(page, elementId)
+        // Skip elements that are missing (concurrent delete) or locked.
+        if (!found || found.element.locked) return []
         const priorAttrs = Object.fromEntries(
-          Object.keys(attrs).map((k) => [k, (el as unknown as Record<string, unknown>)[k]]),
+          Object.keys(attrs).map((k) => [k, (found.element as unknown as Record<string, unknown>)[k]]),
         ) as SceneAttrsPatch
-        return { pageId: editorState.activePageId, elementId, attrs, priorAttrs }
+        return [{ pageId: editorState.activePageId, elementId, attrs, priorAttrs }]
       })
+      if (entries.length === 0) return
       commit(multiSetAttrsCommand(entries))
     },
     [commit, editorState.activePageId, editorState.document],
@@ -265,18 +268,20 @@ export function DesignCanvas({
   const handleReorder = useCallback(
     (elementId: string, toIndex: number, ownerLength: number, direction: 'front' | 'back' | 'forward' | 'backward') => {
       const page = requirePage(editorState.document, editorState.activePageId)
-      const found = page.elements.findIndex((el) => el.id === elementId)
-      if (found < 0) return
+      // findElement searches group children so nested elements are reorderable.
+      const found = findElement(page, elementId)
+      if (!found) return
+      const currentIndex = found.index
       const target =
         direction === 'front'
           ? topIndex(ownerLength)
           : direction === 'back'
             ? 0
             : direction === 'forward'
-              ? indexForward(found, ownerLength)
-              : indexBackward(found)
+              ? indexForward(currentIndex, ownerLength)
+              : indexBackward(currentIndex)
       const clamped = clampIndex(target, ownerLength)
-      if (clamped === found) return
+      if (clamped === currentIndex) return
       commit(reorderElementCommand({ pageId: editorState.activePageId, elementId, toIndex: clamped }))
     },
     [commit, editorState.activePageId, editorState.document],
@@ -377,38 +382,48 @@ export function DesignCanvas({
   // ---------------------------------------------------------------------------
 
   const handleUndo = useCallback(() => {
-    if (!stack.canUndo()) return
+    if (!canWrite || !stack.canUndo()) return
+    let command
     try {
-      stack.undo()
+      command = stack.undo()
     } catch (error) {
       setCommitError(`Undo failed: ${error instanceof Error ? error.message : String(error)}`)
       return
     }
-    // Emit the inverse operations so the server tracks the undo.
-    // The previous command's inverseOperations() are no longer accessible here
-    // because the command stack holds transforms, not an exposed top-of-stack.
-    // The engine contract exposes undo() which internally applies the inverse;
-    // persisting the effect requires the host's store to see the post-undo
-    // document. We re-emit operations through a full document save path here.
-    // This is intentional: undo is a NEW forward operation from the server's
-    // perspective (the server never saw the user's undo intent; it sees the
-    // resulting document state via onApplyOperations resolving the CURRENT state).
-    // Since the command stack does NOT expose the last-undone command's inverse
-    // operations to us (by design — the stack is opaque post-undo), we emit
-    // an empty array; products that need server-side undo tracking should wrap
-    // via the MCP layer's apply mechanism.
-    // This is consistent with the sequences-react pattern where undo emits the
-    // inverse through the mirror; here the stack owns the inverse internally.
-  }, [stack])
+    // Persist the inverse so the server tracks the undo; on rejection re-execute
+    // to re-apply the original forward state.
+    void onApplyOperations(command.inverseOperations())
+      .then((result) => {
+        if (result.document) stack.reset(result.document)
+      })
+      .catch((error: unknown) => {
+        if (stack.canRedo()) {
+          try { stack.redo() } catch { /* concurrent edit; next reset reconciles */ }
+        }
+        setCommitError(error instanceof Error ? error.message : String(error))
+      })
+  }, [stack, canWrite, onApplyOperations])
 
   const handleRedo = useCallback(() => {
-    if (!stack.canRedo()) return
+    if (!canWrite || !stack.canRedo()) return
+    let command
     try {
-      stack.redo()
+      command = stack.redo()
     } catch (error) {
       setCommitError(`Redo failed: ${error instanceof Error ? error.message : String(error)}`)
+      return
     }
-  }, [stack])
+    void onApplyOperations(command.operations())
+      .then((result) => {
+        if (result.document) stack.reset(result.document)
+      })
+      .catch((error: unknown) => {
+        if (stack.canUndo()) {
+          try { stack.undo() } catch { /* concurrent edit; next reset reconciles */ }
+        }
+        setCommitError(error instanceof Error ? error.message : String(error))
+      })
+  }, [stack, canWrite, onApplyOperations])
 
   // ---------------------------------------------------------------------------
   // Keyboard shortcuts

@@ -137,6 +137,13 @@ function makeCounter(): () => string {
 // Public: store-integrated helper
 // ---------------------------------------------------------------------------
 
+/** Detects the stale-revision sentinel thrown by drizzle-store. The store
+ *  throws a plain Error whose message contains "stale rev" — no custom class
+ *  is needed because the store contract documents exactly this phrase. */
+function isStaleRevError(err: unknown): boolean {
+  return err instanceof Error && /stale rev/i.test(err.message)
+}
+
 export async function storeApplyScenePlan(
   store: SceneStore,
   plan: ScenePlan,
@@ -150,8 +157,11 @@ export async function storeApplyScenePlan(
   let record: SceneDocumentRecord
   try {
     record = await store.saveDocument(applied.document, rev)
-  } catch {
-    // One retry on stale rev: refetch, revalidate, reapply.
+  } catch (firstError) {
+    // Only retry for stale-rev conflicts. Any other error (network, constraint,
+    // permissions) is a hard failure — retrying would risk a double-apply if
+    // the first save actually succeeded but the acknowledgement was lost.
+    if (!isStaleRevError(firstError)) throw firstError
     const refreshed = await store.getDocument()
     validateSceneOperations(refreshed.document, plan.operations)
     applied = applySceneOperations(refreshed.document, plan.operations, { mintId: opts.mintId })

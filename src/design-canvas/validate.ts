@@ -148,6 +148,8 @@ function validateReorderElement(document: SceneDocument, op: ReorderElementOpera
   if (element.locked) {
     throw new Error(`element "${op.elementId}" is locked; unlock it before reordering`)
   }
+  // toIndex is the insertion point after splice-remove; owner.length-1 is valid
+  // (element becomes last). owner.length itself is out-of-range post-remove.
   if (op.toIndex < 0 || op.toIndex >= owner.length) {
     throw new Error(`toIndex ${op.toIndex} out of range (owner has ${owner.length} elements)`)
   }

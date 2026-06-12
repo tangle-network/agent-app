@@ -70,7 +70,7 @@ import { InlineTextEditor } from './InlineTextEditor'
 import { BleedTrimOverlay } from './BleedTrimOverlay'
 
 import { normalizeMarquee, nudgeDelta as nudgeDeltaMath } from './transform-math'
-import { findElement } from '../../design-canvas/model'
+import { elementAabb, findElement } from '../../design-canvas/model'
 import type { SceneElement, ScenePage, TextElement } from '../../design-canvas/model'
 import type { SnapResult, SnapTarget, SceneCommand } from '../contracts'
 
@@ -211,7 +211,9 @@ function WorkspaceInner({
   const [marquee, setMarquee] = useState<MarqueeState>(NO_MARQUEE)
   const marqueeRef = useRef<MarqueeState>(NO_MARQUEE)
   const spaceHeldRef = useRef(false)
-  const dragOriginRef = useRef<Map<string, { x: number; y: number }>>(new Map())
+  // Stores origin position AND AABB dimensions captured at drag start so
+  // snap reference points (center, far edge) are correct for any element size.
+  const dragOriginRef = useRef<Map<string, { x: number; y: number; width: number; height: number }>>(new Map())
   const [activeSnap, setActiveSnap] = useState<SnapResult | null>(null)
   const [editingElementId, setEditingElementId] = useState<string | null>(null)
   const editingPreRef = useRef<string>('')
@@ -334,10 +336,13 @@ function WorkspaceInner({
   function handleElementDragStart(elementId: string) {
     if (!canWrite) return
     const ids = selectedElementIds.includes(elementId) ? selectedElementIds : [elementId]
-    const origins = new Map<string, { x: number; y: number }>()
+    const origins = new Map<string, { x: number; y: number; width: number; height: number }>()
     for (const id of ids) {
       const found = findElement(activePage, id)
-      if (found) origins.set(id, { x: found.element.x, y: found.element.y })
+      if (found) {
+        const aabb = elementAabb(found.element)
+        origins.set(id, { x: found.element.x, y: found.element.y, width: aabb.width, height: aabb.height })
+      }
     }
     dragOriginRef.current = origins
     gestureRef.current = 'drag'
@@ -353,26 +358,19 @@ function WorkspaceInner({
     const dragging = selectedElementIds.includes(elementId) ? selectedElementIds : [elementId]
     const proposedX = origin.x + dx
     const proposedY = origin.y + dy
+    // Use the actual element AABB dimensions so center and far-edge snap points
+    // are correct for elements of any size (not the former hardcoded 100×100).
+    const snapBounds = { x: proposedX, y: proposedY, width: origin.width, height: origin.height }
 
     if (snapEnabled) {
       const targets = snapEngine.collectTargets(state, dragging)
       if (gridEnabled) {
         const thresholdDoc = SNAP_THRESHOLD_SCREEN_PX / zoom
-        const gt = collectGridTargets(
-          { x: proposedX, y: proposedY, width: 100, height: 100 },
-          gridSize,
-          activePage,
-          thresholdDoc,
-        )
+        const gt = collectGridTargets(snapBounds, gridSize, activePage, thresholdDoc)
         targets.vertical.push(...gt.vertical)
         targets.horizontal.push(...gt.horizontal)
       }
-      const snapResult = snapEngine.apply(
-        { x: proposedX, y: proposedY, width: 100, height: 100 },
-        targets,
-        SNAP_THRESHOLD_SCREEN_PX,
-        zoom,
-      )
+      const snapResult = snapEngine.apply(snapBounds, targets, SNAP_THRESHOLD_SCREEN_PX, zoom)
       setActiveSnap(snapResult)
     }
   }

@@ -43,7 +43,22 @@ import type {
 // Image cache — module-level so it survives re-renders
 // ---------------------------------------------------------------------------
 
+// LRU bound: large asset libraries with many unique src URLs would accumulate
+// held HTMLImageElement objects indefinitely without eviction. 256 entries
+// covers any reasonable single-session use and keeps memory predictable.
+const IMAGE_CACHE_MAX = 256
+
 const imageCache = new Map<string, HTMLImageElement>()
+
+/** Evict the least-recently-inserted entry when the cache is at capacity.
+ *  Map iteration order is insertion order, so the first key is the oldest. */
+function imageCacheSet(src: string, img: HTMLImageElement): void {
+  if (imageCache.size >= IMAGE_CACHE_MAX) {
+    const oldest = imageCache.keys().next().value
+    if (oldest !== undefined) imageCache.delete(oldest)
+  }
+  imageCache.set(src, img)
+}
 
 function useImage(src: string): HTMLImageElement | null {
   const [, setVersion] = useState(0)
@@ -53,12 +68,12 @@ function useImage(src: string): HTMLImageElement | null {
     const img = new window.Image()
     img.crossOrigin = 'anonymous'
     img.onload = () => {
-      imageCache.set(src, img)
+      imageCacheSet(src, img)
       setVersion((v) => v + 1)
     }
     img.onerror = () => {
       // Store a sentinel so we don't retry infinitely; placeholder renders instead.
-      imageCache.set(src, img)
+      imageCacheSet(src, img)
       setVersion((v) => v + 1)
     }
     img.src = src

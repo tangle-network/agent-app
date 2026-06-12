@@ -56,22 +56,24 @@ export function createSceneCommandStack(document: SceneDocument, activePageId: s
     // missing element after reset()) leaves history and state exactly as they
     // were. The entry is never silently destroyed — the caller can retry after
     // the next server refresh restores the target.
-    undo(): void {
+    undo(): SceneCommand {
       const command = undoStack[undoStack.length - 1]
       if (!command) throw new Error('nothing to undo — guard with canUndo() before calling undo()')
       state = command.undo(state)
       undoStack.pop()
       redoStack.push(command)
       notify()
+      return command
     },
 
-    redo(): void {
+    redo(): SceneCommand {
       const command = redoStack[redoStack.length - 1]
       if (!command) throw new Error('nothing to redo — guard with canRedo() before calling redo()')
       state = command.execute(state)
       redoStack.pop()
       undoStack.push(command)
       notify()
+      return command
     },
 
     canUndo(): boolean {

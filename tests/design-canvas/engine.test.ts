@@ -5,7 +5,9 @@ import {
   boundsIntersect,
   createEmptyDocument,
   elementAabb,
+  elementExtent,
   type Bounds,
+  type GroupElement,
   type RectElement,
   type SceneDocument,
   type SceneElement,
@@ -867,5 +869,161 @@ describe('applySceneOperations', () => {
   it('delete_page throws on last page', () => {
     const doc = makeDocument()
     expect(() => applySceneOperation(doc, { type: 'delete_page', pageId: PAGE_ID })).toThrow(/last page/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 15. Regression: reorderElementCommand undo after redo returns to origin
+// ---------------------------------------------------------------------------
+
+describe('reorderElementCommand — undo survives redo', () => {
+  it('execute → undo → redo → undo brings element back to index 0 both times', () => {
+    // 3 elements; move r1 (index 0) to index 2
+    const doc = makeDocument([makeRect('r1', 0, 0), makeRect('r2', 100, 0), makeRect('r3', 200, 0)])
+    const stack = createSceneCommandStack(doc, PAGE_ID)
+
+    const cmd = reorderElementCommand({ pageId: PAGE_ID, elementId: 'r1', toIndex: 2 })
+    stack.execute(cmd)
+    const afterExecute = stack.getState().document.pages[0]!.elements.map((e) => e.id)
+    expect(afterExecute).toEqual(['r2', 'r3', 'r1'])
+
+    stack.undo()
+    const afterUndo1 = stack.getState().document.pages[0]!.elements.map((e) => e.id)
+    expect(afterUndo1).toEqual(['r1', 'r2', 'r3'])
+
+    stack.redo()
+    const afterRedo = stack.getState().document.pages[0]!.elements.map((e) => e.id)
+    expect(afterRedo).toEqual(['r2', 'r3', 'r1'])
+
+    // Second undo must also restore to index 0 (the original position),
+    // not toIndex 2 (which is what execute() would capture on redo without the guard).
+    stack.undo()
+    const afterUndo2 = stack.getState().document.pages[0]!.elements.map((e) => e.id)
+    expect(afterUndo2).toEqual(['r1', 'r2', 'r3'])
+  })
+})
+
+describe('reorderPageCommand — undo survives redo', () => {
+  it('execute → undo → redo → undo restores original page order both times', () => {
+    const doc = applySceneOperation(
+      applySceneOperation(makeDocument(), { type: 'add_page', pageId: 'page-2' }),
+      { type: 'add_page', pageId: 'page-3' },
+    )
+    const stack = createSceneCommandStack(doc, PAGE_ID)
+
+    // Move page-1 (index 0) to index 2
+    const cmd = reorderPageCommand({ pageId: PAGE_ID, toIndex: 2 })
+    stack.execute(cmd)
+    expect(stack.getState().document.pages.map((p) => p.id)).toEqual(['page-2', 'page-3', PAGE_ID])
+
+    stack.undo()
+    expect(stack.getState().document.pages.map((p) => p.id)).toEqual([PAGE_ID, 'page-2', 'page-3'])
+
+    stack.redo()
+    expect(stack.getState().document.pages.map((p) => p.id)).toEqual(['page-2', 'page-3', PAGE_ID])
+
+    stack.undo()
+    // Must restore page-1 to index 0, not index 2
+    expect(stack.getState().document.pages.map((p) => p.id)).toEqual([PAGE_ID, 'page-2', 'page-3'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 16. Regression: deletePageCommand full-snapshot restore
+// ---------------------------------------------------------------------------
+
+describe('deletePageCommand — undo restores full page content', () => {
+  it('undo restores elements and guides; inverseOperations() round-trips to server', () => {
+    const doc = makeDocument([makeRect('r1', 10, 20), makeRect('r2', 100, 200)])
+    const withGuides = applySceneOperation(doc, {
+      type: 'set_page_guides', pageId: PAGE_ID,
+      guides: { vertical: [100], horizontal: [200] },
+    })
+    const twoPage = applySceneOperation(withGuides, { type: 'add_page', pageId: 'page-2' })
+
+    const before = makeState(twoPage)
+    const cmd = deletePageCommand({ document: twoPage, pageId: PAGE_ID })
+
+    const after = cmd.execute(before)
+    expect(after.document.pages.map((p) => p.id)).toEqual(['page-2'])
+
+    const restored = cmd.undo(after)
+    const restoredPage = restored.document.pages.find((p) => p.id === PAGE_ID)!
+    expect(restoredPage).toBeDefined()
+    expect(restoredPage.elements.map((e) => e.id)).toEqual(['r1', 'r2'])
+    expect(restoredPage.guides.vertical).toEqual([100])
+
+    // Server-side round-trip: applying inverseOperations() must also restore elements
+    const serverRestored = applySceneOperations(after.document, cmd.inverseOperations())
+    const serverPage = serverRestored.pages.find((p) => p.id === PAGE_ID)!
+    expect(serverPage.elements.map((e) => e.id)).toEqual(['r1', 'r2'])
+    expect(serverPage.guides.vertical).toEqual([100])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 17. Regression: group elementExtent with rotated negative-AABB children
+// ---------------------------------------------------------------------------
+
+describe('elementExtent — group with rotated child whose AABB extends negative', () => {
+  it('extent width matches elementAabb width for the same rotated child', () => {
+    // A 100×100 rect at group-local (0,0) rotated 45°. Its AABB extends into
+    // negative group-local x (the AABB left edge is at approximately -35).
+    const rotatedChild: RectElement = {
+      id: 'c1', kind: 'rect', name: 'c1',
+      x: 0, y: 0, rotation: 45, opacity: 1, locked: false, visible: true,
+      width: 100, height: 100, fill: '#ff0000',
+    }
+    const group: GroupElement = {
+      id: 'g1', kind: 'group', name: 'g1',
+      x: 50, y: 50, rotation: 0, opacity: 1, locked: false, visible: true,
+      children: [rotatedChild],
+    }
+
+    const childAabb = elementAabb(rotatedChild)
+    const { width, height } = elementExtent(group)
+
+    // The group extent must cover the full AABB of the rotated child, including
+    // any part that extends into negative group-local space.
+    expect(width).toBeCloseTo(childAabb.width, 6)
+    expect(height).toBeCloseTo(childAabb.height, 6)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 18. Regression: storeApplyScenePlan does NOT retry on non-stale-rev errors
+// ---------------------------------------------------------------------------
+
+describe('storeApplyScenePlan — non-stale-rev errors are not retried', () => {
+  it('throws immediately without calling saveDocument a second time on constraint error', async () => {
+    const { storeApplyScenePlan } = await import('../../src/design-canvas/apply')
+    const doc = makeDocument([makeRect('r1', 0, 0)])
+    let saveCount = 0
+    // Minimal SceneStore stub — only saveDocument matters for this test
+    const store = {
+      async getDocument() { return { document: doc, rev: 1 } },
+      async saveDocument(_d: SceneDocument, _r: number) {
+        saveCount += 1
+        throw new Error('SQLITE_CONSTRAINT_UNIQUE: design_documents.workspaceId')
+      },
+      async recordDecision(input: { kind: string; instruction: string }) {
+        return { id: 'd1', kind: input.kind as 'agent_edit', instruction: input.instruction, reasoningSummary: null, metadata: {}, createdAt: new Date() }
+      },
+      async createExport(format: string) {
+        return { id: 'e1', format: format as 'json', status: 'queued' as const, resultUrl: null, metadata: {}, createdAt: new Date() }
+      },
+      async listDecisions() { return [] as never[] },
+      async listExports() { return [] as never[] },
+    }
+    const plan = {
+      summary: 'test',
+      operations: [{ type: 'set_attrs' as const, pageId: PAGE_ID, elementId: 'r1', attrs: { x: 1 } }],
+    }
+    await expect(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      storeApplyScenePlan(store as any, plan, { actorKind: 'agent_edit', mintId: () => 'id-1' })
+    ).rejects.toThrow(/SQLITE_CONSTRAINT_UNIQUE/)
+    // Must not retry — saveDocument called exactly once (no second attempt on non-stale error)
+    expect(saveCount).toBe(1)
   })
 })
