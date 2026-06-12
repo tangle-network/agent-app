@@ -14,6 +14,8 @@
  * carry `approx: true` to keep reports honest about that.
  */
 
+export * from './mission-trace'
+
 export interface TimedEvent {
   /** ms since turn start (`_t` stamped by pumpBufferedTurn). */
   t: number

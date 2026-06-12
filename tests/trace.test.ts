@@ -5,6 +5,9 @@ import {
   renderWaterfall,
   renderHistogram,
   summarize,
+  createMissionTraceContext,
+  childSpanContext,
+  traceEnv,
 } from '../src/trace/index'
 
 const line = (t: number, obj: Record<string, unknown>) => JSON.stringify({ ...obj, _t: t })
@@ -71,5 +74,50 @@ describe('distributions', () => {
       .slice(1)
       .map((l) => Number(l.trim().split(' ').pop()))
     expect(counts.reduce((a, b) => a + b, 0)).toBe(12)
+  })
+})
+
+describe('mission trace context (agent-runtime id-format parity)', () => {
+  const TRACE_32_HEX = /^[0-9a-f]{32}$/
+  const SPAN_16_HEX = /^[0-9a-f]{16}$/
+
+  it('mints 32-hex trace ids and 16-hex span ids (OTLP wire widths)', () => {
+    for (const ctx of [createMissionTraceContext(), createMissionTraceContext('m-42')]) {
+      expect(ctx.traceId).toMatch(TRACE_32_HEX)
+      expect(ctx.rootSpanId).toMatch(SPAN_16_HEX)
+    }
+    const child = childSpanContext(createMissionTraceContext('m-42'), 'step-1#1')
+    expect(child.spanId).toMatch(SPAN_16_HEX)
+  })
+
+  it('is deterministic per missionId — a re-dispatch joins the same trace', () => {
+    expect(createMissionTraceContext('m-42')).toEqual(createMissionTraceContext('m-42'))
+    expect(createMissionTraceContext('m-42').traceId).not.toBe(createMissionTraceContext('m-43').traceId)
+    expect(createMissionTraceContext().traceId).not.toBe(createMissionTraceContext().traceId)
+  })
+
+  it('threads parentage: step attempts nest under the root, nested work under the step', () => {
+    const mission = createMissionTraceContext('m-42')
+    const attempt = childSpanContext(mission, 'step-1#1')
+    expect(attempt.traceId).toBe(mission.traceId)
+    expect(attempt.parentSpanId).toBe(mission.rootSpanId)
+    expect(childSpanContext(mission, 'step-1#1')).toEqual(attempt) // seeded ⇒ deterministic
+    expect(childSpanContext(mission, 'step-1#2').spanId).not.toBe(attempt.spanId)
+
+    const nested = childSpanContext(attempt, 'delegate-0')
+    expect(nested.parentSpanId).toBe(attempt.spanId)
+    expect(nested.traceId).toBe(mission.traceId)
+  })
+
+  it('traceEnv emits the exact env names agent-runtime readTraceContextFromEnv reads', () => {
+    const mission = createMissionTraceContext('m-42')
+    expect(traceEnv(mission)).toEqual({
+      TRACE_ID: mission.traceId,
+      PARENT_SPAN_ID: mission.rootSpanId,
+    })
+    const attempt = childSpanContext(mission, 'step-1#1')
+    const env = traceEnv(attempt)
+    expect(Object.keys(env).sort()).toEqual(['PARENT_SPAN_ID', 'TRACE_ID'])
+    expect(env.PARENT_SPAN_ID).toBe(attempt.spanId)
   })
 })
