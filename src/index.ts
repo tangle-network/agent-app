@@ -24,3 +24,6 @@ export * from './missions/index'
 export * from './web/index'
 export * from './redact/index'
 export * from './assets/index'
+// `/web-react` is intentionally NOT re-exported here: it needs the optional
+// react peer and would drag JSX into every root-entry consumer.
+export * from './trace/index'
