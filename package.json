@@ -1,8 +1,8 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "packageManager": "pnpm@10.33.4",
-  "description": "Application-shell framework for Tangle agent products: a bounded tool loop, the structured agent\u2192app tool side channel, integration-hub client, per-workspace billing, and crypto \u2014 composed over the Tangle agent substrate through typed seams.",
+  "description": "Application-shell framework for Tangle agent products: a bounded tool loop, the structured agent→app tool side channel, integration-hub client, per-workspace billing, and crypto — composed over the Tangle agent substrate through typed seams.",
   "keywords": [
     "tangle",
     "ai-agent",
@@ -151,6 +151,21 @@
       "types": "./dist/trace/index.d.ts",
       "import": "./dist/trace/index.js",
       "default": "./dist/trace/index.js"
+    },
+    "./sequences": {
+      "types": "./dist/sequences/index.d.ts",
+      "import": "./dist/sequences/index.js",
+      "default": "./dist/sequences/index.js"
+    },
+    "./sequences/drizzle": {
+      "types": "./dist/sequences/drizzle.d.ts",
+      "import": "./dist/sequences/drizzle.js",
+      "default": "./dist/sequences/drizzle.js"
+    },
+    "./sequences-react": {
+      "types": "./dist/sequences-react/index.d.ts",
+      "import": "./dist/sequences-react/index.js",
+      "default": "./dist/sequences-react/index.js"
     }
   },
   "scripts": {
@@ -165,26 +180,41 @@
     "@tangle-network/agent-eval": "^0.82.0",
     "@tangle-network/agent-integrations": "^0.32.0",
     "@tangle-network/agent-knowledge": "^1.5.2",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.6.0",
     "@types/react": "^19.0.0",
     "better-auth": "^1.6.16",
+    "better-sqlite3": "^12.10.0",
+    "drizzle-orm": "^0.45.2",
+    "jsdom": "^29.1.1",
     "react": "^19.0.0",
+    "react-dom": "^19.2.7",
     "tsup": "^8.0.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
   },
   "peerDependencies": {
+    "@huggingface/transformers": ">=3",
     "@tangle-network/agent-eval": ">=0.82.0",
     "@tangle-network/agent-integrations": ">=0.32.0",
     "@tangle-network/agent-knowledge": ">=1.5.0",
     "@tangle-network/agent-runtime": ">=0.21.0",
+    "drizzle-orm": ">=0.36",
     "react": ">=18"
   },
   "peerDependenciesMeta": {
+    "@huggingface/transformers": {
+      "optional": true
+    },
     "@tangle-network/agent-knowledge": {
       "optional": true
     },
     "@tangle-network/agent-runtime": {
+      "optional": true
+    },
+    "drizzle-orm": {
       "optional": true
     },
     "react": {
@@ -193,5 +223,10 @@
   },
   "dependencies": {
     "zod": "^4.4.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ]
   }
 }
