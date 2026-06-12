@@ -22,6 +22,13 @@ export {
   type AppToolName,
   type OpenAIFunctionTool,
 } from './openai'
+export {
+  resolveToolCapabilities,
+  restrictTaxonomy,
+  type ToolCapability,
+  type ResolveToolCapabilitiesOptions,
+  type ResolvedToolCapabilities,
+} from './gating'
 export { dispatchAppTool, outcomeStatus, type DispatchOptions } from './dispatch'
 export { createAppToolRuntimeExecutor, type AppToolRuntimeExecutor, type RuntimeExecutorOptions } from './runtime'
 export { handleAppToolRequest, type HandleToolRequestOptions } from './http'
