@@ -200,6 +200,42 @@ export function loopTraceEventsToFlowSpans(events: LoopTraceEventLike[]): FlowSp
   return spans
 }
 
+/**
+ * A single step's activity lane as its own FlowTrace — what a per-step
+ * drill-in renders. Origin defaults to the earliest delegation start so the
+ * waterfall begins at the lane's first run.
+ */
+export function stepActivityFlowTrace(
+  activity: StepAgentActivity[],
+  opts?: { startedAt?: number; nowMs?: number },
+): FlowTrace {
+  let origin = opts?.startedAt
+  if (origin === undefined) {
+    for (const run of activity) {
+      const parsed = Date.parse(run.startedAt)
+      if (Number.isFinite(parsed) && (origin === undefined || parsed < origin)) origin = parsed
+    }
+  }
+  const spans = delegationActivityToFlowSpans(
+    activity,
+    origin ?? 0,
+    opts?.nowMs !== undefined ? { nowMs: opts.nowMs } : undefined,
+  )
+  let costUsd: number | undefined
+  for (const span of spans) {
+    const c = num(rec(span.meta).costUsd)
+    if (c !== undefined) costUsd = (costUsd ?? 0) + c
+  }
+  return {
+    spans,
+    totalMs: spans.reduce((max, s) => Math.max(max, s.endMs), 0),
+    promptTokens: 0,
+    completionTokens: 0,
+    ...(costUsd !== undefined ? { costUsd } : {}),
+    toolCalls: spans.length,
+  }
+}
+
 export interface MissionFlowStep {
   id: string
   intent: string
