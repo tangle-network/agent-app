@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "packageManager": "pnpm@10.33.4",
   "description": "Application-shell framework for Tangle agent products: a bounded tool loop, the structured agent→app tool side channel, integration-hub client, per-workspace billing, and crypto — composed over the Tangle agent substrate through typed seams.",
   "keywords": [
@@ -166,6 +166,21 @@
       "types": "./dist/sequences-react/index.d.ts",
       "import": "./dist/sequences-react/index.js",
       "default": "./dist/sequences-react/index.js"
+    },
+    "./design-canvas": {
+      "types": "./dist/design-canvas/index.d.ts",
+      "import": "./dist/design-canvas/index.js",
+      "default": "./dist/design-canvas/index.js"
+    },
+    "./design-canvas/drizzle": {
+      "types": "./dist/design-canvas/drizzle.d.ts",
+      "import": "./dist/design-canvas/drizzle.js",
+      "default": "./dist/design-canvas/drizzle.js"
+    },
+    "./design-canvas-react": {
+      "types": "./dist/design-canvas-react/index.d.ts",
+      "import": "./dist/design-canvas-react/index.js",
+      "default": "./dist/design-canvas-react/index.js"
     }
   },
   "scripts": {
@@ -189,8 +204,10 @@
     "better-sqlite3": "^12.10.0",
     "drizzle-orm": "^0.45.2",
     "jsdom": "^29.1.1",
+    "konva": "^10.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.2.7",
+    "react-konva": "^19.2.5",
     "tsup": "^8.0.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
@@ -202,7 +219,9 @@
     "@tangle-network/agent-knowledge": ">=1.5.0",
     "@tangle-network/agent-runtime": ">=0.21.0",
     "drizzle-orm": ">=0.36",
-    "react": ">=18"
+    "react": ">=18",
+    "konva": ">=9",
+    "react-konva": ">=18"
   },
   "peerDependenciesMeta": {
     "@huggingface/transformers": {
@@ -218,6 +237,12 @@
       "optional": true
     },
     "react": {
+      "optional": true
+    },
+    "konva": {
+      "optional": true
+    },
+    "react-konva": {
       "optional": true
     }
   },

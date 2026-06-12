@@ -33,6 +33,14 @@ export {
   type BuildHttpMcpServerOptions,
   type BuildMcpServerOptions,
 } from './mcp'
+export {
+  createMcpToolHandler,
+  MCP_PROTOCOL_VERSIONS,
+  type McpProtocolVersion,
+  type McpServerInfo,
+  type McpToolDefinition,
+  type CreateMcpToolHandlerOptions,
+} from './mcp-rpc'
 export type {
   AppToolContext,
   AppToolTaxonomy,

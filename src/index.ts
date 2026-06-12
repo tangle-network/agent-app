@@ -30,3 +30,7 @@ export * from './assets/index'
 // optional drizzle-orm peer at module top.
 export * from './trace/index'
 export * from './sequences/index'
+// `/design-canvas/drizzle` and `/design-canvas-react` are intentionally NOT
+// re-exported here: drizzle imports the optional peer at module top; react and
+// konva are optional peers pulled in only by the design-canvas-react subpath.
+export * from './design-canvas/index'
