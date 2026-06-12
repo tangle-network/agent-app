@@ -124,6 +124,13 @@ Each is an independent entry point — import only what you use.
 
 The root entry (`@tangle-network/agent-app`) re-exports every module, but importing the subpath keeps your bundle to what you use.
 
+### Missions: id shape and product columns
+
+Two `createMissionService` seams adopters hit on day one:
+
+- **`generateId`** (on `MissionServiceOptions`) defaults to `crypto.randomUUID()` — a 36-char dashed UUID. If your mission table has an existing id shape (e.g. 32-hex to match D1 row defaults), inject your own generator; the service stamps it verbatim on the inserted record.
+- **`CreateMissionInput.extras`** carries opaque product-column values (a `workflowId` FK, a source-turn pointer) verbatim to `MissionStorePort.insert(record, extras)`, so creation is a single write — no post-insert stamp. The service never reads them.
+
 ## Compatibility
 
 - **ESM only.** Ships `import` + `types` conditions per subpath.
