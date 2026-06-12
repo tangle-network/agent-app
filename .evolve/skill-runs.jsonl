@@ -1,2 +1,0 @@
-{"skill":"critical-audit","run":"2026-06-12T21:47:39Z","scope":"src/design-canvas/ src/design-canvas-react/ src/tools/mcp-rpc.ts tests/design-canvas/","verdict":"REQUEST_CHANGES","high":2,"medium":3,"low":2}
-{"skill":"critical-audit","scope":["src/design-canvas/","src/design-canvas-react/","src/tools/mcp-rpc.ts","tests/design-canvas/"],"head":"fd30260","ts":"2026-06-12T14:00:00Z","findings_by_severity":{"CRITICAL":0,"HIGH":2,"MEDIUM":3,"LOW":2}}
