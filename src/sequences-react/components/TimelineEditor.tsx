@@ -646,7 +646,7 @@ export function TimelineEditor(props: TimelineEditorProps) {
           <div
             ref={trackViewportRef}
             data-timeline-tracks
-            className="relative h-60 shrink-0 overflow-auto overscroll-x-contain"
+            className="relative max-h-60 min-h-[6rem] shrink-0 overflow-auto overscroll-x-contain"
             onDragOver={handleTrackAreaDragOver}
             onDrop={handleTrackAreaDrop}
           >

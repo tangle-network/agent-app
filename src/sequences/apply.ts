@@ -46,9 +46,15 @@ export type SequenceApplyResult =
  * persistence route) funnels through: fetch the timeline, validate the WHOLE
  * batch against pre-state, then apply in order with a timeline refresh between
  * operations — later operations must see earlier writes (the static-validation
- * boundary in ./validate). Any throw before the first apply leaves the
- * sequence untouched. Decision-log rows are the caller's job: the MCP layer
- * records `agent_edit`, an editor route records `human_edit`.
+ * boundary in ./validate).
+ *
+ * Atomicity contract: validation throws (before the first store write) leave
+ * the sequence untouched. Store-layer throws after at least one successful
+ * write leave a prefix-committed state — operations 1..N-1 are persisted,
+ * operations N..end are not. The store is non-transactional (SQLite D1);
+ * callers that receive a partial-commit throw must treat the result as partial
+ * success, not a full rollback. Decision-log rows are the caller's job: the
+ * MCP layer records `agent_edit`, an editor route records `human_edit`.
  */
 export async function applySequenceOperations(
   store: SequenceStore,
