@@ -658,3 +658,54 @@ describe('mission engine binding (setEngineRef)', () => {
     })
   })
 })
+
+describe('createMission extras passthrough (opaque product columns)', () => {
+  it('hands extras VERBATIM to MissionStorePort.insert alongside the record', async () => {
+    const store = createInMemoryMissionStore()
+    const seen: Array<Record<string, unknown> | undefined> = []
+    const capturing: MissionStorePort = {
+      load: (id) => store.load(id),
+      appendEvent: (event) => store.appendEvent(event),
+      update: (id, guard, patch) => store.update(id, guard, patch),
+      insert: (record, extras) => {
+        seen.push(extras)
+        return store.insert(record, extras)
+      },
+    }
+    const service = createMissionService({ store: capturing })
+
+    const extras = { workflowId: 'wf-9', sourceTurnId: 'turn-3' }
+    const record = await service.createMission({
+      workspaceId: WORKSPACE_ID,
+      title: 'single-write create',
+      plan: samplePlan(),
+      trigger: 'manual',
+      extras,
+    })
+
+    expect(seen).toEqual([extras])
+    // extras never leak onto the record itself — they are insert-call-only.
+    expect(record.metadata).toBeNull()
+    expect('workflowId' in record).toBe(false)
+  })
+
+  it('omitting extras passes undefined (stores without product columns ignore it)', async () => {
+    const store = createInMemoryMissionStore()
+    const seen: Array<Record<string, unknown> | undefined> = []
+    const capturing: MissionStorePort = {
+      ...store,
+      insert: (record, extras) => {
+        seen.push(extras)
+        return store.insert(record)
+      },
+    }
+    const service = createMissionService({ store: capturing })
+    await service.createMission({
+      workspaceId: WORKSPACE_ID,
+      title: 'no extras',
+      plan: samplePlan(),
+      trigger: 'manual',
+    })
+    expect(seen).toEqual([undefined])
+  })
+})

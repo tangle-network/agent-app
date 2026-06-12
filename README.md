@@ -118,11 +118,21 @@ Each is an independent entry point — import only what you use.
 | [`/billing`](src/billing) | `createWorkspaceKeyManager` — mint / rotate / roll over / report usage on per-workspace, budget-capped model keys. Seams for provisioner, store, and crypto. |
 | [`/delegation`](src/delegation) | `buildDelegationMcpServer` — the agent-runtime driven-loop MCP (`delegate_research`, `delegate_code`, `delegation_status`) for multi-step work that runs to completion in its own sandbox. Opt-in. |
 | [`/crypto`](src/crypto) | AES-GCM field encryption: `encryptAesGcm`, `decryptAesGcm`, `createFieldCrypto`. Key supplied by the caller. |
+| [`/missions`](src/missions) | Durable multi-step mission orchestration over a `MissionStorePort` seam: guarded status/step machine, idempotent plan engine with budget/approval gates, `:::mission` parser, the client-safe live-event reducer, and the canonical `StepAgentActivity` per-step delegated-run lane. |
+| [`/trace`](src/trace) | Flow observability: `buildFlowTrace` + ASCII `renderWaterfall`/`renderHistogram`; the mission trace bridge (`createMissionTraceContext`, `childSpanContext`, `traceEnv`) whose ids/env agent-runtime's delegation MCP inherits; and delegation→FlowSpan converters (`delegationActivityToFlowSpans`, `loopTraceEventsToFlowSpans`, `composeMissionFlowTrace`). |
+| [`/web-react`](src/web-react) | Shared React components: `ModelPicker`, `EffortPicker`, `ChatMessages`, `RunDrillIn`, plus the observability surfaces — `MissionActivityLane`, `AgentActivityPanel`, `FlowWaterfall`. React is an optional peer; not re-exported from the root entry. |
 | [`/web`](src/web) | Request-boundary utilities: `parseJsonObjectBody`, `requireString`, `extractRequestContext`, `checkRateLimit`, `addSecurityHeaders`. |
 | [`/stream`](src/stream) | SSE normalization and turn identity: `normalizeToolEvent`, `resolveChatTurn`, `encodeEvent`, message-part merging. |
 | [`/redact`](src/redact) | `redactForIngestion` — PII redaction before content leaves the boundary. |
 
 The root entry (`@tangle-network/agent-app`) re-exports every module, but importing the subpath keeps your bundle to what you use.
+
+### Missions: id shape and product columns
+
+Two `createMissionService` seams adopters hit on day one:
+
+- **`generateId`** (on `MissionServiceOptions`) defaults to `crypto.randomUUID()` — a 36-char dashed UUID. If your mission table has an existing id shape (e.g. 32-hex to match D1 row defaults), inject your own generator; the service stamps it verbatim on the inserted record.
+- **`CreateMissionInput.extras`** carries opaque product-column values (a `workflowId` FK, a source-turn pointer) verbatim to `MissionStorePort.insert(record, extras)`, so creation is a single write — no post-insert stamp. The service never reads them.
 
 ## Compatibility
 

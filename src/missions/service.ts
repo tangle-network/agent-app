@@ -144,7 +144,11 @@ export interface MissionAuditEvent {
  */
 export interface MissionStorePort {
   load(id: string): Promise<MissionRecord | null>
-  insert(record: MissionRecord): Promise<MissionRecord>
+  /** `extras` are the opaque product-column values from
+   *  `CreateMissionInput.extras` — write them in the SAME statement as the
+   *  record (single-write creation) or ignore them if the table has no extra
+   *  columns. */
+  insert(record: MissionRecord, extras?: Record<string, unknown>): Promise<MissionRecord>
   update(id: string, guard: MissionUpdateGuard, patch: MissionUpdatePatch): Promise<MissionRecord | null>
   appendEvent(event: MissionAuditEvent): Promise<void>
 }
@@ -226,6 +230,13 @@ export interface CreateMissionInput {
    *  model). Read back via `mission.metadata`; the engine only reads
    *  `stopRequested` from it. */
   metadata?: Record<string, unknown> | null
+  /**
+   * Opaque product-column values handed VERBATIM to `MissionStorePort.insert`
+   * (e.g. a `workflowId` FK on the product's mission table), so creation is a
+   * single write — no post-insert stamp. The service never reads, validates,
+   * or persists them itself; they exist only on the insert call.
+   */
+  extras?: Record<string, unknown>
 }
 
 export interface SetStepStatusPatch {
@@ -283,8 +294,14 @@ export interface MissionServiceOptions {
   store: MissionStorePort
   /** Injectable clock (epoch ms). Default `Date.now`. */
   now?: () => number
-  /** Row-id generator when `CreateMissionInput.id` is omitted.
-   *  Default `crypto.randomUUID`. */
+  /**
+   * Row-id generator when `CreateMissionInput.id` is omitted. Default
+   * `crypto.randomUUID()` — a 36-char dashed UUID. Inject your own when your
+   * mission table already has an id shape (e.g. 32-hex matching D1 row
+   * defaults): the service stamps the generated id verbatim onto the inserted
+   * record, so a mismatch with the rest of your schema surfaces only at the
+   * product layer. Keep id shape parity here, not in the store.
+   */
   generateId?: () => string
 }
 
@@ -374,24 +391,27 @@ export function createMissionService(options: MissionServiceOptions): MissionSer
       ...(step.resultRef === undefined ? {} : { resultRef: step.resultRef }),
     }))
 
-    const record = await store.insert({
-      id: input.id ?? generateId(),
-      workspaceId: input.workspaceId,
-      status,
-      trigger: input.trigger,
-      summary: input.title,
-      plan,
-      cursor: 0,
-      cost: { ...ZERO_LEDGER },
-      budgetUsd: input.budgetUsd ?? null,
-      spentUsd: 0,
-      pauseReason: null,
-      engineRef: null,
-      scheduledAt,
-      startedAt: now(),
-      completedAt: null,
-      metadata: input.metadata ?? null,
-    })
+    const record = await store.insert(
+      {
+        id: input.id ?? generateId(),
+        workspaceId: input.workspaceId,
+        status,
+        trigger: input.trigger,
+        summary: input.title,
+        plan,
+        cursor: 0,
+        cost: { ...ZERO_LEDGER },
+        budgetUsd: input.budgetUsd ?? null,
+        spentUsd: 0,
+        pauseReason: null,
+        engineRef: null,
+        scheduledAt,
+        startedAt: now(),
+        completedAt: null,
+        metadata: input.metadata ?? null,
+      },
+      input.extras,
+    )
 
     await appendEvent(record, 'info', 'mission.created', `Mission "${input.title}" ${status}`, {
       status,

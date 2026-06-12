@@ -17,6 +17,8 @@
  *     The sink itself does no dedupe.
  */
 
+import type { StepAgentActivity } from './agent-activity'
+
 export interface MissionEventSink {
   emit(event: MissionStreamEvent): void
 }
@@ -79,7 +81,14 @@ export type MissionStreamEvent =
       missionId: string
       at: number
       stepId: string
-      sublabel: string
+      sublabel?: string
+      /**
+       * Full CURRENT snapshot of the step's delegated runs — never a delta.
+       * The reducer replaces the whole lane (latest snapshot wins by `at`), so
+       * emitters re-send everything they know each time and at-least-once /
+       * out-of-order delivery converges.
+       */
+      agentActivity?: StepAgentActivity[]
     }
   | {
       type: 'step.completed'
@@ -175,6 +184,11 @@ export interface MissionStepState {
   sublabel?: string
   reason?: string
   durationMs?: number
+  /** Latest delegated-run snapshot for the step (see `step.updated`). */
+  agentActivity?: StepAgentActivity[]
+  /** The `at` of the snapshot currently held — an older snapshot arriving
+   *  late never replaces a newer one. */
+  agentActivityAt?: number
 }
 
 /** Live per-mission view the reducer folds events into. */
@@ -319,7 +333,13 @@ export function applyMissionEvent(
           ...step,
           // A sublabel is a live counter ("7/15") — always take the latest; it
           // does not move status.
-          sublabel: event.sublabel,
+          ...(event.sublabel !== undefined ? { sublabel: event.sublabel } : {}),
+          // agentActivity is a full snapshot, replaced wholesale. Guarded by
+          // `at` so a stale snapshot delivered late never erases newer rows;
+          // an equal-`at` replay rewrites identical content (idempotent).
+          ...(event.agentActivity !== undefined && at >= (step.agentActivityAt ?? 0)
+            ? { agentActivity: event.agentActivity, agentActivityAt: at }
+            : {}),
         })),
         lastEventAt,
       }
@@ -391,6 +411,8 @@ export function applyMissionEvent(
             ...(existing.sublabel !== undefined ? { sublabel: existing.sublabel } : {}),
             ...(existing.reason !== undefined ? { reason: existing.reason } : {}),
             ...(existing.durationMs !== undefined ? { durationMs: existing.durationMs } : {}),
+            ...(existing.agentActivity !== undefined ? { agentActivity: existing.agentActivity } : {}),
+            ...(existing.agentActivityAt !== undefined ? { agentActivityAt: existing.agentActivityAt } : {}),
           }
         }),
         lastEventAt,
@@ -468,6 +490,9 @@ export function mergeMissionState(live: MissionState | undefined, seed: MissionS
       ...(current.sublabel !== undefined ? { sublabel: current.sublabel } : seededStep.sublabel !== undefined ? { sublabel: seededStep.sublabel } : {}),
       ...(current.reason !== undefined ? { reason: current.reason } : seededStep.reason !== undefined ? { reason: seededStep.reason } : {}),
       ...(current.durationMs !== undefined ? { durationMs: current.durationMs } : seededStep.durationMs !== undefined ? { durationMs: seededStep.durationMs } : {}),
+      // The newer snapshot wins by its stamped `at`; an unstamped lane (loader
+      // seed copied from the settled artifact) only fills an empty live lane.
+      ...(mergeActivity(current, seededStep)),
     })
   }
   for (const current of live.steps) {
@@ -494,7 +519,29 @@ function hasStepProgressEvidence(step: MissionStepState): boolean {
   return step.status !== 'pending' ||
     step.sublabel !== undefined ||
     step.reason !== undefined ||
-    step.durationMs !== undefined
+    step.durationMs !== undefined ||
+    step.agentActivity !== undefined
+}
+
+// Pick the activity lane to keep when merging a loader seed into live state:
+// the snapshot with the larger `at` wins; ties keep the live side.
+function mergeActivity(
+  live: MissionStepState,
+  seeded: MissionStepState,
+): Pick<MissionStepState, 'agentActivity' | 'agentActivityAt'> {
+  const winner = (seeded.agentActivityAt ?? 0) > (live.agentActivityAt ?? 0) ? seeded : live
+  if (winner.agentActivity === undefined) {
+    const fallback = winner === live ? seeded : live
+    if (fallback.agentActivity === undefined) return {}
+    return {
+      agentActivity: fallback.agentActivity,
+      ...(fallback.agentActivityAt !== undefined ? { agentActivityAt: fallback.agentActivityAt } : {}),
+    }
+  }
+  return {
+    agentActivity: winner.agentActivity,
+    ...(winner.agentActivityAt !== undefined ? { agentActivityAt: winner.agentActivityAt } : {}),
+  }
 }
 
 function mergeSeedMissionStatus(

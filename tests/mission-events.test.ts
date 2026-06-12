@@ -6,6 +6,7 @@ import {
   mergeMissionState,
   parseSessionStreamEnvelope,
   reduceMissionEvents,
+  stepAgentActivity,
   type MissionState,
   type MissionStreamEvent,
 } from '../src/missions/index'
@@ -599,5 +600,180 @@ describe('parseSessionStreamEnvelope (wire reconstruction)', () => {
       data: { missionId: 'm1', at: 1, workspaceId: 'ws1', threadId: 't1', sessionId: 't1' },
     })
     expect(event).toMatchObject({ type: 'mission.started', missionId: 'm1' })
+  })
+})
+
+describe('step agent-activity lane (structured delegation snapshots)', () => {
+  const ACT = (over: Partial<import('../src/missions/index').StepAgentActivity> = {}) => ({
+    taskId: 'task-1',
+    tool: 'coder',
+    status: 'running',
+    detail: 'wire the exporter',
+    startedAt: '2026-06-12T10:00:00.000Z',
+    ...over,
+  })
+
+  it('step.updated folds the snapshot onto the step (sublabel untouched)', () => {
+    const events: MissionStreamEvent[] = [
+      PLAN,
+      { type: 'step.started', missionId: 'm1', at: 120, stepId: 's1' },
+      { type: 'step.updated', missionId: 'm1', at: 125, stepId: 's1', sublabel: '1/3' },
+      {
+        type: 'step.updated',
+        missionId: 'm1',
+        at: 130,
+        stepId: 's1',
+        agentActivity: [ACT({ iteration: 2, phase: 'verifying' })],
+      },
+    ]
+    const step = get(reduceMissionEvents(events), 'm1').steps[0]!
+    expect(step.sublabel).toBe('1/3') // activity-only update never clears the counter
+    expect(step.agentActivity).toEqual([ACT({ iteration: 2, phase: 'verifying' })])
+    expect(step.agentActivityAt).toBe(130)
+  })
+
+  it('snapshot-replace: a newer snapshot replaces the lane wholesale', () => {
+    const events: MissionStreamEvent[] = [
+      PLAN,
+      { type: 'step.updated', missionId: 'm1', at: 130, stepId: 's1', agentActivity: [ACT()] },
+      {
+        type: 'step.updated',
+        missionId: 'm1',
+        at: 140,
+        stepId: 's1',
+        agentActivity: [ACT({ status: 'completed', costUsd: 0.12, durationMs: 9000 }), ACT({ taskId: 'task-2' })],
+      },
+    ]
+    const step = get(reduceMissionEvents(events), 'm1').steps[0]!
+    expect(step.agentActivity).toHaveLength(2)
+    expect(step.agentActivity?.[0]?.status).toBe('completed')
+  })
+
+  it('out-of-order: a stale snapshot arriving late never erases newer rows', () => {
+    const fresh: MissionStreamEvent = {
+      type: 'step.updated',
+      missionId: 'm1',
+      at: 140,
+      stepId: 's1',
+      agentActivity: [ACT(), ACT({ taskId: 'task-2' })],
+    }
+    const stale: MissionStreamEvent = {
+      type: 'step.updated',
+      missionId: 'm1',
+      at: 130,
+      stepId: 's1',
+      agentActivity: [ACT()],
+    }
+    const inOrder = get(reduceMissionEvents([PLAN, stale, fresh]), 'm1')
+    const outOfOrder = get(reduceMissionEvents([PLAN, fresh, stale]), 'm1')
+    expect(outOfOrder.steps[0]?.agentActivity).toEqual(inOrder.steps[0]?.agentActivity)
+    expect(outOfOrder.steps[0]?.agentActivity).toHaveLength(2)
+  })
+
+  it('is idempotent: replaying the same snapshot converges', () => {
+    const update: MissionStreamEvent = {
+      type: 'step.updated',
+      missionId: 'm1',
+      at: 130,
+      stepId: 's1',
+      agentActivity: [ACT()],
+    }
+    const once = get(reduceMissionEvents([PLAN, update]), 'm1')
+    const thrice = get(reduceMissionEvents([PLAN, update, update, update]), 'm1')
+    expect(thrice).toEqual(once)
+  })
+
+  it('survives a plan.updated rebuild of the step list', () => {
+    const events: MissionStreamEvent[] = [
+      PLAN,
+      { type: 'step.updated', missionId: 'm1', at: 130, stepId: 's1', agentActivity: [ACT()] },
+      {
+        type: 'mission.plan.updated',
+        missionId: 'm1',
+        at: 150,
+        title: 'Render the previz',
+        steps: [
+          { id: 's1', intent: 'gather refs', kind: 'research', status: 'pending' },
+          { id: 's2', intent: 'storyboard', kind: 'generate', status: 'pending' },
+        ],
+      },
+    ]
+    const step = get(reduceMissionEvents(events), 'm1').steps[0]!
+    expect(step.agentActivity).toEqual([ACT()])
+  })
+
+  it('mergeMissionState: the newer-stamped lane wins; a seed fills an empty live lane', () => {
+    const live = get(
+      reduceMissionEvents([
+        PLAN,
+        { type: 'step.updated', missionId: 'm1', at: 140, stepId: 's1', agentActivity: [ACT(), ACT({ taskId: 'task-2' })] },
+      ]),
+      'm1',
+    )
+    const staleSeed: MissionState = {
+      missionId: 'm1',
+      status: 'running',
+      steps: [
+        { id: 's1', intent: 'gather refs', kind: 'research', status: 'running', agentActivity: [ACT()], agentActivityAt: 120 },
+        { id: 's2', intent: 'storyboard', kind: 'generate', status: 'pending' },
+        { id: 's3', intent: 'assemble', kind: 'write', status: 'pending' },
+      ],
+      spentUsd: 0,
+      lastEventAt: 120,
+    }
+    expect(mergeMissionState(live, staleSeed).steps[0]?.agentActivity).toHaveLength(2)
+
+    // Seed copied from the settled artifact (unstamped) fills an empty live lane.
+    const liveEmpty = get(reduceMissionEvents([PLAN]), 'm1')
+    const artifactSeed: MissionState = {
+      ...staleSeed,
+      steps: [
+        { id: 's1', intent: 'gather refs', kind: 'research', status: 'done', agentActivity: [ACT({ status: 'completed' })] },
+        ...staleSeed.steps.slice(1),
+      ],
+    }
+    expect(mergeMissionState(liveEmpty, artifactSeed).steps[0]?.agentActivity).toEqual([ACT({ status: 'completed' })])
+  })
+})
+
+describe('stepAgentActivity (boundary re-validation)', () => {
+  it('keeps well-typed entries, optional fields included', () => {
+    const lane = stepAgentActivity({
+      agentActivity: [
+        {
+          taskId: 't1',
+          tool: 'researcher',
+          status: 'completed',
+          detail: 'compare codecs',
+          startedAt: '2026-06-12T10:00:00.000Z',
+          costUsd: 0.4,
+          durationMs: 12_000,
+          iteration: 3,
+          phase: 'synthesis',
+          traceId: 'a'.repeat(32),
+          spanId: 'b'.repeat(16),
+        },
+      ],
+    })
+    expect(lane).toHaveLength(1)
+    expect(lane[0]).toMatchObject({ iteration: 3, phase: 'synthesis', traceId: 'a'.repeat(32) })
+  })
+
+  it('drops torn rows and strips ill-typed optional fields', () => {
+    const lane = stepAgentActivity({
+      agentActivity: [
+        { taskId: 't1', tool: 'coder', status: 'running', detail: 'x', startedAt: 'now', costUsd: 'NaN', iteration: Infinity },
+        { taskId: 't2', tool: 'coder' }, // missing required fields
+        'garbage',
+        null,
+      ],
+    })
+    expect(lane).toHaveLength(1)
+    expect(lane[0]).toEqual({ taskId: 't1', tool: 'coder', status: 'running', detail: 'x', startedAt: 'now' })
+  })
+
+  it('returns [] when the lane is absent or not an array', () => {
+    expect(stepAgentActivity({})).toEqual([])
+    expect(stepAgentActivity({ agentActivity: 'nope' })).toEqual([])
   })
 })
