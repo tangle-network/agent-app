@@ -15,6 +15,7 @@
  */
 
 export * from './mission-trace'
+export * from './mission-flow'
 
 export interface TimedEvent {
   /** ms since turn start (`_t` stamped by pumpBufferedTurn). */
