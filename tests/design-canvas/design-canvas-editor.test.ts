@@ -16,7 +16,6 @@ import type { SceneDocument } from '../../src/design-canvas/model'
 
 function makeDoc(pageId = 'page-1'): SceneDocument {
   return {
-    id: 'doc-1',
     schemaVersion: 1,
     title: 'Test',
     pages: [
@@ -46,6 +45,8 @@ function makeDoc(pageId = 'page-1'): SceneDocument {
         ],
       },
     ],
+    settings: { dpi: 96 },
+    metadata: {},
   }
 }
 

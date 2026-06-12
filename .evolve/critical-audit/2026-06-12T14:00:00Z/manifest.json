@@ -1,0 +1,17 @@
+{
+  "scope": [
+    "src/design-canvas/",
+    "src/design-canvas-react/",
+    "src/tools/mcp-rpc.ts",
+    "tests/design-canvas/"
+  ],
+  "head": "fd30260",
+  "project_type": "typescript",
+  "flags": ["--scope", "--effort max"],
+  "findings_count_by_severity": {
+    "CRITICAL": 0,
+    "HIGH": 2,
+    "MEDIUM": 5,
+    "LOW": 3
+  }
+}
