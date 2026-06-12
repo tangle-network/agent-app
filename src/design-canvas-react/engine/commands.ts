@@ -1,0 +1,669 @@
+/**
+ * Concrete `SceneCommand` factories for the design-canvas editor. Every factory
+ * captures the inverse from PRE-state at construction — undo is a value
+ * computed once, never re-derived from current state later. Local execute/undo
+ * update `EditorSceneState` immutably by routing through `applySceneOperation`
+ * so optimistic state matches what the server-side dispatcher will persist.
+ *
+ * Drag gestures coalesce: pointer moves update volatile state, ONE command
+ * executes on pointer release with (finalAttrs, priorAttrs). `setAttrsCommand`
+ * is that gesture command — one undo step per drag/transform/toolbar change.
+ * `multiSetAttrsCommand` collects N set_attrs ops into one undo step for
+ * multi-select transforms.
+ *
+ * Group/ungroup route through `applySceneOperation` so the group-origin
+ * rebasing in `apply.ts` is the single source of truth for both optimistic and
+ * server state.
+ */
+
+import type { SceneDocument, SceneElement, ScenePage } from '../../design-canvas/model'
+import { requireElement, requirePage } from '../../design-canvas/model'
+import { applySceneOperation, applySceneOperations } from '../../design-canvas/apply'
+import type {
+  AddElementOperation,
+  DeleteElementOperation,
+  SceneAttrsPatch,
+  SceneOperation,
+} from '../../design-canvas/operations'
+import type { EditorSceneState, SceneCommand } from '../contracts'
+
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+function requireDoc(state: EditorSceneState, context: string): SceneDocument {
+  if (!state.document) throw new Error(`${context}: missing document`)
+  return state.document
+}
+
+function applyOps(state: EditorSceneState, ops: SceneOperation[]): EditorSceneState {
+  return { ...state, document: applySceneOperations(state.document, ops) }
+}
+
+function applyOp(state: EditorSceneState, op: SceneOperation): EditorSceneState {
+  return { ...state, document: applySceneOperation(state.document, op) }
+}
+
+function requirePageElement(
+  document: SceneDocument,
+  pageId: string,
+  elementId: string,
+  context: string,
+): { page: ScenePage; element: SceneElement; owner: SceneElement[]; index: number } {
+  const page = requirePage(document, pageId)
+  const found = requireElement(page, elementId)
+  if (!found) throw new Error(`${context}: element ${elementId} not found on page ${pageId}`)
+  return { page, ...found }
+}
+
+// ---------------------------------------------------------------------------
+// add_element  /  inverse = delete_element
+// ---------------------------------------------------------------------------
+
+export interface AddElementInput {
+  pageId: string
+  element: SceneElement
+  /** Insertion z-index within owner; omitted → top. */
+  index?: number
+  /** Parent group id; omitted → page root. */
+  parentGroupId?: string
+}
+
+export function addElementCommand(input: AddElementInput): SceneCommand {
+  const addOp: SceneOperation = {
+    type: 'add_element',
+    pageId: input.pageId,
+    element: structuredClone(input.element),
+    ...(input.index !== undefined ? { index: input.index } : {}),
+    ...(input.parentGroupId !== undefined ? { parentGroupId: input.parentGroupId } : {}),
+  }
+  const deleteOp: SceneOperation = {
+    type: 'delete_element',
+    pageId: input.pageId,
+    elementId: input.element.id,
+  }
+
+  return {
+    label: `Add ${input.element.kind}`,
+    execute: (state) => applyOp(state, addOp),
+    undo: (state) => applyOp(state, deleteOp),
+    operations: () => [structuredClone(addOp)],
+    inverseOperations: () => [structuredClone(deleteOp)],
+  }
+}
+
+// ---------------------------------------------------------------------------
+// set_attrs  — THE gesture command (one undo step per drag/transform)
+// ---------------------------------------------------------------------------
+
+export interface SetAttrsInput {
+  pageId: string
+  elementId: string
+  /** Final attribute values after the gesture. */
+  attrs: SceneAttrsPatch
+  /** Attribute values BEFORE the gesture began — inverse is built from these. */
+  priorAttrs: SceneAttrsPatch
+}
+
+export function setAttrsCommand(input: SetAttrsInput): SceneCommand {
+  const forwardOp: SceneOperation = {
+    type: 'set_attrs',
+    pageId: input.pageId,
+    elementId: input.elementId,
+    attrs: structuredClone(input.attrs),
+  }
+  const inverseOp: SceneOperation = {
+    type: 'set_attrs',
+    pageId: input.pageId,
+    elementId: input.elementId,
+    attrs: structuredClone(input.priorAttrs),
+  }
+
+  return {
+    label: 'Edit element',
+    execute: (state) => applyOp(state, forwardOp),
+    undo: (state) => applyOp(state, inverseOp),
+    operations: () => [structuredClone(forwardOp)],
+    inverseOperations: () => [structuredClone(inverseOp)],
+  }
+}
+
+// ---------------------------------------------------------------------------
+// multi-select set_attrs  — N set_attrs ops, one undo step
+// ---------------------------------------------------------------------------
+
+export interface MultiSetAttrsEntry {
+  pageId: string
+  elementId: string
+  attrs: SceneAttrsPatch
+  priorAttrs: SceneAttrsPatch
+}
+
+export function multiSetAttrsCommand(entries: MultiSetAttrsEntry[]): SceneCommand {
+  if (entries.length === 0) throw new Error('multiSetAttrsCommand: entries must not be empty')
+
+  const forwardOps: SceneOperation[] = entries.map((e) => ({
+    type: 'set_attrs' as const,
+    pageId: e.pageId,
+    elementId: e.elementId,
+    attrs: structuredClone(e.attrs),
+  }))
+  const inverseOps: SceneOperation[] = entries.map((e) => ({
+    type: 'set_attrs' as const,
+    pageId: e.pageId,
+    elementId: e.elementId,
+    attrs: structuredClone(e.priorAttrs),
+  }))
+
+  return {
+    label: `Edit ${entries.length} elements`,
+    execute: (state) => applyOps(state, forwardOps),
+    undo: (state) => applyOps(state, inverseOps),
+    operations: () => structuredClone(forwardOps),
+    inverseOperations: () => structuredClone(inverseOps),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// reorder_element
+// ---------------------------------------------------------------------------
+
+export interface ReorderElementInput {
+  pageId: string
+  elementId: string
+  toIndex: number
+}
+
+export function reorderElementCommand(input: ReorderElementInput): SceneCommand {
+  // Capture the element's current index at construction for the inverse
+  let capturedFromIndex: number | null = null
+
+  const forwardOp: SceneOperation = {
+    type: 'reorder_element',
+    pageId: input.pageId,
+    elementId: input.elementId,
+    toIndex: input.toIndex,
+  }
+
+  return {
+    label: 'Reorder element',
+    execute: (state) => {
+      const page = requirePage(state.document, input.pageId)
+      const { index } = requireElement(page, input.elementId)
+      capturedFromIndex = index
+      return applyOp(state, forwardOp)
+    },
+    undo: (state) => {
+      if (capturedFromIndex === null) {
+        throw new Error('reorderElementCommand: undo called before execute')
+      }
+      return applyOp(state, {
+        type: 'reorder_element',
+        pageId: input.pageId,
+        elementId: input.elementId,
+        toIndex: capturedFromIndex,
+      })
+    },
+    operations: () => [structuredClone(forwardOp)],
+    inverseOperations: () => {
+      if (capturedFromIndex === null) {
+        throw new Error('reorderElementCommand: inverseOperations called before execute')
+      }
+      return [{
+        type: 'reorder_element' as const,
+        pageId: input.pageId,
+        elementId: input.elementId,
+        toIndex: capturedFromIndex,
+      }]
+    },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// delete_element  /  inverse = add_element (full snapshot + index + parent)
+// ---------------------------------------------------------------------------
+
+export interface DeleteElementInput {
+  document: SceneDocument
+  pageId: string
+  elementId: string
+}
+
+export function deleteElementCommand(input: DeleteElementInput): SceneCommand {
+  const page = requirePage(input.document, input.pageId)
+  const { element, owner, index } = requireElement(page, input.elementId)
+  const snapshot = structuredClone(element)
+
+  // Determine parentGroupId by finding which group owns this element
+  const parentGroupId = findParentGroupId(page, owner)
+
+  const deleteOp: DeleteElementOperation = {
+    type: 'delete_element',
+    pageId: input.pageId,
+    elementId: input.elementId,
+  }
+  const addOp: AddElementOperation = {
+    type: 'add_element',
+    pageId: input.pageId,
+    element: snapshot,
+    index,
+    ...(parentGroupId !== undefined ? { parentGroupId } : {}),
+  }
+
+  return {
+    label: `Delete ${element.kind}`,
+    execute: (state) => {
+      const next = applyOp(state, deleteOp)
+      return {
+        ...next,
+        selectedElementIds: next.selectedElementIds.filter((id) => id !== input.elementId),
+      }
+    },
+    undo: (state) => applyOp(state, addOp),
+    operations: () => [structuredClone(deleteOp)],
+    inverseOperations: () => [structuredClone(addOp)],
+  }
+}
+
+function findParentGroupId(page: ScenePage, owner: SceneElement[]): string | undefined {
+  if (owner === page.elements) return undefined
+  // Walk the element tree looking for a group whose children === owner
+  return findGroupWithChildren(page.elements, owner)
+}
+
+function findGroupWithChildren(elements: SceneElement[], target: SceneElement[]): string | undefined {
+  for (const el of elements) {
+    if (el.kind === 'group') {
+      if (el.children === target) return el.id
+      const found = findGroupWithChildren(el.children, target)
+      if (found !== undefined) return found
+    }
+  }
+  return undefined
+}
+
+// ---------------------------------------------------------------------------
+// group_elements  /  inverse = ungroup_element
+// ---------------------------------------------------------------------------
+
+export interface GroupElementsInput {
+  document: SceneDocument
+  pageId: string
+  elementIds: string[]
+  groupId: string
+  name?: string
+}
+
+export function groupElementsCommand(input: GroupElementsInput): SceneCommand {
+  if (input.elementIds.length < 2) {
+    throw new Error('groupElementsCommand: requires ≥ 2 elementIds')
+  }
+
+  const groupOp: SceneOperation = {
+    type: 'group_elements',
+    pageId: input.pageId,
+    elementIds: input.elementIds.slice(),
+    groupId: input.groupId,
+    ...(input.name !== undefined ? { name: input.name } : {}),
+  }
+  const ungroupOp: SceneOperation = {
+    type: 'ungroup_element',
+    pageId: input.pageId,
+    groupId: input.groupId,
+  }
+
+  // Pre-compute the post-group document so `operations()` and the execute
+  // path share a single source of truth for the group geometry.
+  let postGroupDocument: SceneDocument | null = null
+
+  return {
+    label: `Group ${input.elementIds.length} elements`,
+    execute: (state) => {
+      const next = applyOp(state, groupOp)
+      postGroupDocument = next.document
+      return {
+        ...next,
+        selectedElementIds: [input.groupId],
+      }
+    },
+    undo: (state) => {
+      const next = applyOp(state, ungroupOp)
+      return { ...next, selectedElementIds: input.elementIds.slice() }
+    },
+    operations: () => [structuredClone(groupOp)],
+    inverseOperations: () => [structuredClone(ungroupOp)],
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ungroup_element  /  inverse = group_elements (re-using original ids)
+// ---------------------------------------------------------------------------
+
+export interface UngroupElementInput {
+  document: SceneDocument
+  pageId: string
+  groupId: string
+}
+
+export function ungroupElementCommand(input: UngroupElementInput): SceneCommand {
+  const page = requirePage(input.document, input.pageId)
+  const { element } = requireElement(page, input.groupId)
+  if (element.kind !== 'group') {
+    throw new Error(`ungroupElementCommand: element ${input.groupId} is kind ${element.kind}, not group`)
+  }
+  const childIds = element.children.map((c) => c.id)
+
+  const ungroupOp: SceneOperation = {
+    type: 'ungroup_element',
+    pageId: input.pageId,
+    groupId: input.groupId,
+  }
+  const regroupOp: SceneOperation = {
+    type: 'group_elements',
+    pageId: input.pageId,
+    elementIds: childIds,
+    groupId: input.groupId,
+    name: element.name,
+  }
+
+  return {
+    label: `Ungroup`,
+    execute: (state) => {
+      const next = applyOp(state, ungroupOp)
+      return { ...next, selectedElementIds: childIds.slice() }
+    },
+    undo: (state) => {
+      const next = applyOp(state, regroupOp)
+      return { ...next, selectedElementIds: [input.groupId] }
+    },
+    operations: () => [structuredClone(ungroupOp)],
+    inverseOperations: () => [structuredClone(regroupOp)],
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Page commands
+// ---------------------------------------------------------------------------
+
+export interface AddPageInput {
+  pageId: string
+  options?: import('../../design-canvas/model').NewPageOptions
+  index?: number
+}
+
+export function addPageCommand(input: AddPageInput): SceneCommand {
+  const addOp: SceneOperation = {
+    type: 'add_page',
+    pageId: input.pageId,
+    ...(input.options !== undefined ? { options: input.options } : {}),
+    ...(input.index !== undefined ? { index: input.index } : {}),
+  }
+  const deleteOp: SceneOperation = { type: 'delete_page', pageId: input.pageId }
+
+  return {
+    label: 'Add page',
+    execute: (state) => {
+      const next = applyOp(state, addOp)
+      return { ...next, activePageId: input.pageId }
+    },
+    undo: (state) => {
+      const next = applyOp(state, deleteOp)
+      // Switch active page to first surviving page if we deleted the active one
+      const activeExists = next.document.pages.some((p) => p.id === next.activePageId)
+      return activeExists ? next : { ...next, activePageId: next.document.pages[0]!.id }
+    },
+    operations: () => [structuredClone(addOp)],
+    inverseOperations: () => [structuredClone(deleteOp)],
+  }
+}
+
+export interface DuplicatePageInput {
+  document: SceneDocument
+  sourcePageId: string
+  /** Caller-minted id for the copy. */
+  pageId: string
+}
+
+export function duplicatePageCommand(input: DuplicatePageInput): SceneCommand {
+  requirePage(input.document, input.sourcePageId)
+
+  const dupOp: SceneOperation = {
+    type: 'duplicate_page',
+    sourcePageId: input.sourcePageId,
+    pageId: input.pageId,
+  }
+  const deleteOp: SceneOperation = { type: 'delete_page', pageId: input.pageId }
+
+  return {
+    label: 'Duplicate page',
+    execute: (state) => {
+      const next = applyOp(state, dupOp)
+      return { ...next, activePageId: input.pageId }
+    },
+    undo: (state) => {
+      const next = applyOp(state, deleteOp)
+      const activeExists = next.document.pages.some((p) => p.id === next.activePageId)
+      return activeExists ? next : { ...next, activePageId: input.sourcePageId }
+    },
+    operations: () => [structuredClone(dupOp)],
+    inverseOperations: () => [structuredClone(deleteOp)],
+  }
+}
+
+export interface DeletePageInput {
+  document: SceneDocument
+  pageId: string
+}
+
+export function deletePageCommand(input: DeletePageInput): SceneCommand {
+  if (input.document.pages.length <= 1) {
+    throw new Error('deletePageCommand: cannot delete the last page')
+  }
+  const page = requirePage(input.document, input.pageId)
+  const currentIndex = input.document.pages.findIndex((p) => p.id === input.pageId)
+  const snapshot = structuredClone(page)
+  const insertIndex = currentIndex
+
+  const deleteOp: SceneOperation = { type: 'delete_page', pageId: input.pageId }
+  const restoreOp: SceneOperation = {
+    type: 'add_page',
+    pageId: input.pageId,
+    options: {
+      name: snapshot.name,
+      width: snapshot.width,
+      height: snapshot.height,
+      background: snapshot.background,
+    },
+    index: insertIndex,
+  }
+
+  return {
+    label: 'Delete page',
+    execute: (state) => {
+      const next = applyOp(state, deleteOp)
+      const activeExists = next.document.pages.some((p) => p.id === next.activePageId)
+      if (activeExists) return next
+      const fallbackIndex = Math.min(currentIndex, next.document.pages.length - 1)
+      return { ...next, activePageId: next.document.pages[fallbackIndex]!.id }
+    },
+    undo: (state) => {
+      // Restore the page shell; elements are NOT restored (use full snapshot
+      // only when the product needs full delete/undo fidelity — add as needed).
+      const next = applyOp(state, restoreOp)
+      return { ...next, activePageId: input.pageId }
+    },
+    operations: () => [structuredClone(deleteOp)],
+    // The inverse is a best-effort page shell restore; element content is
+    // intentionally NOT included here — the server has the full document and
+    // can replay its own history. Local undo is approximate for delete_page.
+    inverseOperations: () => [structuredClone(restoreOp)],
+  }
+}
+
+export interface ReorderPageInput {
+  pageId: string
+  toIndex: number
+}
+
+export function reorderPageCommand(input: ReorderPageInput): SceneCommand {
+  let capturedFromIndex: number | null = null
+
+  const forwardOp: SceneOperation = {
+    type: 'reorder_page',
+    pageId: input.pageId,
+    toIndex: input.toIndex,
+  }
+
+  return {
+    label: 'Reorder page',
+    execute: (state) => {
+      capturedFromIndex = state.document.pages.findIndex((p) => p.id === input.pageId)
+      if (capturedFromIndex === -1) throw new Error(`reorderPageCommand: page ${input.pageId} not found`)
+      return applyOp(state, forwardOp)
+    },
+    undo: (state) => {
+      if (capturedFromIndex === null) throw new Error('reorderPageCommand: undo called before execute')
+      return applyOp(state, {
+        type: 'reorder_page',
+        pageId: input.pageId,
+        toIndex: capturedFromIndex,
+      })
+    },
+    operations: () => [structuredClone(forwardOp)],
+    inverseOperations: () => {
+      if (capturedFromIndex === null) throw new Error('reorderPageCommand: inverseOperations called before execute')
+      return [{ type: 'reorder_page' as const, pageId: input.pageId, toIndex: capturedFromIndex }]
+    },
+  }
+}
+
+export interface SetPagePropsInput {
+  document: SceneDocument
+  pageId: string
+  props: {
+    name?: string
+    width?: number
+    height?: number
+    background?: string
+    bleed?: import('../../design-canvas/model').PageBleed | null
+  }
+}
+
+export function setPagePropsCommand(input: SetPagePropsInput): SceneCommand {
+  const page = requirePage(input.document, input.pageId)
+  const prior: NonNullable<import('../../design-canvas/operations').SetPagePropsOperation> = {
+    type: 'set_page_props',
+    pageId: input.pageId,
+    ...(input.props.name !== undefined ? { name: page.name } : {}),
+    ...(input.props.width !== undefined ? { width: page.width } : {}),
+    ...(input.props.height !== undefined ? { height: page.height } : {}),
+    ...(input.props.background !== undefined ? { background: page.background } : {}),
+    ...(input.props.bleed !== undefined ? { bleed: page.bleed } : {}),
+  }
+
+  const forwardOp: SceneOperation = {
+    type: 'set_page_props',
+    pageId: input.pageId,
+    ...input.props,
+  }
+
+  return {
+    label: 'Edit page',
+    execute: (state) => applyOp(state, forwardOp),
+    undo: (state) => applyOp(state, prior),
+    operations: () => [structuredClone(forwardOp)],
+    inverseOperations: () => [structuredClone(prior) as SceneOperation],
+  }
+}
+
+export interface SetPageGuidesInput {
+  document: SceneDocument
+  pageId: string
+  guides: import('../../design-canvas/model').PageGuides
+}
+
+export function setPageGuidesCommand(input: SetPageGuidesInput): SceneCommand {
+  const page = requirePage(input.document, input.pageId)
+  const priorGuides = structuredClone(page.guides)
+
+  const forwardOp: SceneOperation = {
+    type: 'set_page_guides',
+    pageId: input.pageId,
+    guides: structuredClone(input.guides),
+  }
+  const inverseOp: SceneOperation = {
+    type: 'set_page_guides',
+    pageId: input.pageId,
+    guides: priorGuides,
+  }
+
+  return {
+    label: 'Edit guides',
+    execute: (state) => applyOp(state, forwardOp),
+    undo: (state) => applyOp(state, inverseOp),
+    operations: () => [structuredClone(forwardOp)],
+    inverseOperations: () => [structuredClone(inverseOp)],
+  }
+}
+
+// ---------------------------------------------------------------------------
+// bind_slot
+// ---------------------------------------------------------------------------
+
+export interface BindSlotInput {
+  document: SceneDocument
+  pageId: string
+  elementId: string
+  slot: string | null
+}
+
+export function bindSlotCommand(input: BindSlotInput): SceneCommand {
+  const page = requirePage(input.document, input.pageId)
+  const { element } = requireElement(page, input.elementId)
+  const priorSlot = element.slot ?? null
+
+  const forwardOp: SceneOperation = {
+    type: 'bind_slot',
+    pageId: input.pageId,
+    elementId: input.elementId,
+    slot: input.slot,
+  }
+  const inverseOp: SceneOperation = {
+    type: 'bind_slot',
+    pageId: input.pageId,
+    elementId: input.elementId,
+    slot: priorSlot,
+  }
+
+  return {
+    label: input.slot === null ? 'Unbind slot' : `Bind slot "${input.slot}"`,
+    execute: (state) => applyOp(state, forwardOp),
+    undo: (state) => applyOp(state, inverseOp),
+    operations: () => [structuredClone(forwardOp)],
+    inverseOperations: () => [structuredClone(inverseOp)],
+  }
+}
+
+// ---------------------------------------------------------------------------
+// set_document_title
+// ---------------------------------------------------------------------------
+
+export interface SetDocumentTitleInput {
+  document: SceneDocument
+  title: string
+}
+
+export function setDocumentTitleCommand(input: SetDocumentTitleInput): SceneCommand {
+  const priorTitle = input.document.title
+
+  const forwardOp: SceneOperation = { type: 'set_document_title', title: input.title }
+  const inverseOp: SceneOperation = { type: 'set_document_title', title: priorTitle }
+
+  return {
+    label: `Rename document`,
+    execute: (state) => applyOp(state, forwardOp),
+    undo: (state) => applyOp(state, inverseOp),
+    operations: () => [structuredClone(forwardOp)],
+    inverseOperations: () => [structuredClone(inverseOp)],
+  }
+}
