@@ -14,6 +14,9 @@
  */
 
 import { elementAabb, requirePage, SCENE_ELEMENT_KINDS } from './model'
+import { lintSceneDocument, lintScenePage } from './lint'
+import { THEME_PACKS, requireThemePack } from './themes'
+import { ARCHETYPE_DESCRIPTORS, buildArchetype } from './archetypes'
 import type {
   RectElement,
   EllipseElement,
@@ -955,6 +958,44 @@ const CANVAS_MCP_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] = [
     },
   },
 
+  // ─── lint ─────────────────────────────────────────────────────────────────
+
+  {
+    name: 'design_lint',
+    description:
+      'Audit the scene document for visual defects. Returns structured findings grouped by rule ' +
+      'and a 0–100 quality score per page. ' +
+      'WORKFLOW: run design_lint after composing a page, fix every ERROR finding (text-overlap, ' +
+      'element-overflow, contrast), then fix WARNING findings (hierarchy, alignment, spacing, palette), ' +
+      'then rerun design_lint until errorCount is 0. A clean pass is required before export. ' +
+      'Findings include concrete element names, measured values, and a fix suggestion — act on them directly.',
+    inputSchema: objectSchema(
+      { page_id: { type: 'string', description: 'Lint a single page by id. Omit to lint all pages.' } },
+      [],
+    ),
+    async run(args, env) {
+      const { document } = await env.store.getDocument()
+      const pageId = optionalString(args, 'page_id')
+      const report = pageId ? lintScenePage(document, pageId) : lintSceneDocument(document)
+      return {
+        documentScore: report.documentScore,
+        errorCount: report.errorCount,
+        warningCount: report.warningCount,
+        pages: report.pages.map((p) => ({
+          pageId: p.pageId,
+          pageName: p.pageName,
+          score: p.score,
+          findings: p.findings.map((f) => ({
+            rule: f.rule,
+            severity: f.severity,
+            elementIds: f.elementIds,
+            message: f.message,
+          })),
+        })),
+      }
+    },
+  },
+
   // ─── exports ──────────────────────────────────────────────────────────────
 
   {
@@ -996,6 +1037,145 @@ const CANVAS_MCP_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] = [
         status: exportRecord.status,
         metadata: exportRecord.metadata,
         created_at: exportRecord.createdAt,
+      }
+    },
+  },
+
+  // ─── themes + archetypes ─────────────────────────────────────────────────
+
+  {
+    name: 'list_themes',
+    description:
+      'List all available ThemePack design languages. Returns id, name, mood, and a palette summary for each. ' +
+      'WORKFLOW: call list_themes first to pick a visual direction, then call scaffold_from_archetype — ' +
+      'never compose from a blank page when an archetype fits the target format.',
+    inputSchema: objectSchema({}, []),
+    async run(_args, _env) {
+      return {
+        themes: THEME_PACKS.map((t) => ({
+          id: t.id,
+          name: t.name,
+          mood: t.mood,
+          palette: {
+            background: t.palette.background,
+            surface: t.palette.surface,
+            textPrimary: t.palette.textPrimary,
+            textSecondary: t.palette.textSecondary,
+            accent: t.palette.accent,
+            accentText: t.palette.accentText,
+          },
+          displayFamily: t.typography.display.family,
+          bodyFamily: t.typography.body.family,
+          doctrine: t.doctrine,
+        })),
+      }
+    },
+  },
+
+  {
+    name: 'list_archetypes',
+    description:
+      'List all available layout archetypes. Returns id, label, description, and the full slot list for each. ' +
+      'Use this to identify which archetype fits the desired output format before calling scaffold_from_archetype. ' +
+      'Scaffold first, adapt second — archetypes produce a correct, grid-aligned skeleton so you never start from a blank page.',
+    inputSchema: objectSchema({}, []),
+    async run(_args, _env) {
+      return {
+        archetypes: ARCHETYPE_DESCRIPTORS.map((a) => ({
+          id: a.id,
+          label: a.label,
+          description: a.description,
+          slots: a.slots,
+          defaultWidth: a.defaultWidth,
+          defaultHeight: a.defaultHeight,
+        })),
+      }
+    },
+  },
+
+  {
+    name: 'scaffold_from_archetype',
+    description:
+      'Build a fully-composed scene document from an archetype + theme combination and REPLACE the current ' +
+      'document\'s pages with the archetype output. Optionally fill slot bindings in the same call. ' +
+      'WORKFLOW: scaffold_from_archetype is the canonical starting point for any new asset — it produces a ' +
+      'grid-aligned skeleton with correct hierarchy and real placeholder copy. Adapt slots with apply_data, ' +
+      'then refine individual elements. Call design_lint after adapting to catch any issues before export. ' +
+      'Returns the new document state including page ids and slot summary.',
+    inputSchema: objectSchema(
+      {
+        archetype_id: {
+          type: 'string',
+          description: 'Archetype id — call list_archetypes to discover valid values.',
+        },
+        theme_id: {
+          type: 'string',
+          description: 'ThemePack id — call list_themes to discover valid values.',
+        },
+        preset_id: {
+          type: 'string',
+          description: 'Export preset id to derive frame dimensions from (optional). When omitted the archetype default size is used.',
+        },
+        bindings: {
+          type: 'object',
+          description: 'Slot name → value map applied immediately after scaffolding. Partial application is allowed.',
+          additionalProperties: { type: 'string' },
+        },
+      },
+      ['archetype_id', 'theme_id'],
+    ),
+    async run(args, env) {
+      const archetypeId = requireString(args, 'archetype_id')
+      const themeId = requireString(args, 'theme_id')
+      const presetId = optionalString(args, 'preset_id')
+      const bindings = optionalRecord(args, 'bindings') ?? {}
+
+      // Validate theme exists before building (requireThemePack throws loud)
+      requireThemePack(themeId)
+
+      // Build archetype document — throws on unknown archetype or theme
+      const archetypeDoc = buildArchetype(archetypeId, themeId, presetId)
+
+      // Apply slot bindings if provided
+      let finalDoc = archetypeDoc
+      if (Object.keys(bindings).length > 0) {
+        const { applyBindingsToDocument } = await import('./templates')
+        finalDoc = applyBindingsToDocument(archetypeDoc, bindings)
+      }
+
+      // Get the current document revision so we can overwrite it
+      const { rev } = await env.store.getDocument()
+
+      // Overwrite the document with the scaffolded content
+      const saved = await env.store.saveDocument(finalDoc, rev)
+
+      await env.store.recordDecision({
+        kind: 'agent_edit',
+        instruction: `scaffold_from_archetype: archetype=${archetypeId} theme=${themeId}${presetId ? ` preset=${presetId}` : ''}${Object.keys(bindings).length > 0 ? ` bindings=[${Object.keys(bindings).join(', ')}]` : ''}`,
+        metadata: { tool: 'scaffold_from_archetype', archetypeId, themeId, presetId: presetId ?? null },
+      })
+
+      // Build slot summary from saved document
+      const { collectSlots } = await import('./model')
+      const slots = collectSlots(saved.document)
+      const slotSummary: Array<{ name: string; pageId: string; kind: string }> = []
+      for (const [name, { pageId, kind }] of slots) {
+        slotSummary.push({ name, pageId, kind })
+      }
+
+      return {
+        rev: saved.rev,
+        title: saved.document.title,
+        page_count: saved.document.pages.length,
+        pages: saved.document.pages.map((p) => ({
+          id: p.id,
+          name: p.name,
+          width: p.width,
+          height: p.height,
+        })),
+        slots: slotSummary,
+        archetype_id: archetypeId,
+        theme_id: themeId,
       }
     },
   },

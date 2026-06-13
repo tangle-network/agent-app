@@ -203,6 +203,10 @@ describe('tools/list', () => {
         'bind_slot',
         'apply_data',
         'instantiate_template',
+        'design_lint',
+        'list_themes',
+        'list_archetypes',
+        'scaffold_from_archetype',
         'create_export',
       ].sort(),
     )
@@ -210,7 +214,7 @@ describe('tools/list', () => {
       expect(tool.description.length).toBeGreaterThan(20)
       expect(tool.inputSchema.type).toBe('object')
     }
-    expect(CANVAS_MCP_TOOLS).toHaveLength(24)
+    expect(CANVAS_MCP_TOOLS).toHaveLength(28)
   })
 })
 
