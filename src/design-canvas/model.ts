@@ -198,7 +198,7 @@ export function elementExtent(element: SceneElement): { width: number; height: n
     case 'group': {
       // minX/minY track the negative-space corner: a rotated child whose AABB
       // extends left/above the group origin contributes negative values, so
-      // minX/minY must seed from the first child, not 0 (0 clips negative AABBs).
+      // they must seed from the first child, not 0 (0 would clip them).
       let minX = 0, minY = 0, maxX = 0, maxY = 0
       for (const child of element.children) {
         const aabb = elementAabb(child)
