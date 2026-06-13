@@ -965,9 +965,12 @@ const CANVAS_MCP_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] = [
     description:
       'Audit the scene document for visual defects. Returns structured findings grouped by rule ' +
       'and a 0–100 quality score per page. ' +
+      'HARD CONTRACT: You may not end your turn while any ERROR finding exists. After every edit or ' +
+      'revision, call design_lint and resolve every ERROR before yielding. ' +
       'WORKFLOW: run design_lint after composing a page, fix every ERROR finding (text-overlap, ' +
-      'element-overflow, contrast), then fix WARNING findings (hierarchy, alignment, spacing, palette), ' +
-      'then rerun design_lint until errorCount is 0. A clean pass is required before export. ' +
+      'element-overflow, text-overflow-band, contrast), then fix WARNING findings (hierarchy, alignment, ' +
+      'spacing, palette), then rerun design_lint until errorCount is 0. ' +
+      'create_export will be blocked until errorCount reaches 0 — fixing errors is not optional. ' +
       'Findings include concrete element names, measured values, and a fix suggestion — act on them directly.',
     inputSchema: objectSchema(
       { page_id: { type: 'string', description: 'Lint a single page by id. Omit to lint all pages.' } },
@@ -1014,6 +1017,23 @@ const CANVAS_MCP_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] = [
       const format = requireEnum(args, 'format', ['png', 'jpeg', 'json'] as const)
       const pageId = optionalString(args, 'page_id')
       const pixelRatio = optionalNumber(args, 'pixel_ratio') ?? 1
+
+      // Hard lint gate: export is blocked until all ERROR findings are resolved.
+      // This enforces the design_lint contract structurally rather than as a
+      // prompt suggestion the model can skip.
+      const { document: lintDoc } = await env.store.getDocument()
+      const lintReport = pageId ? lintScenePage(lintDoc, pageId) : lintSceneDocument(lintDoc)
+      if (lintReport.errorCount > 0) {
+        const errorMessages = lintReport.pages
+          .flatMap((p) => p.findings.filter((f) => f.severity === 'error'))
+          .map((f) => f.message)
+          .join(' | ')
+        throw new Error(
+          `Export blocked: ${lintReport.errorCount} lint error(s) must be fixed before export. ` +
+          `Run design_lint, resolve every ERROR finding, then retry create_export. ` +
+          `Errors: ${errorMessages}`,
+        )
+      }
 
       let metadata: Record<string, unknown> = {
         pageId: pageId ?? null,

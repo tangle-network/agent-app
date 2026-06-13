@@ -15,7 +15,7 @@
  * not fall back to a guess.
  */
 
-import { SCENE_SCHEMA_VERSION } from './model'
+import { SCENE_SCHEMA_VERSION, estimateTextHeight } from './model'
 import type { SceneDocument, ScenePage, SceneElement, TextElement, RectElement, ImageElement } from './model'
 import { requireThemePack } from './themes'
 import type { ThemePack } from './themes'
@@ -305,6 +305,34 @@ function makeDocument(title: string, pages: ScenePage[]): SceneDocument {
 }
 
 // ---------------------------------------------------------------------------
+// Type scale helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Scale a raw sizeScale value (defined at 1080 px frame width) to the actual
+ * frame width. Clamps to [minPx, maxPx] after scaling so degenerate presets
+ * cannot produce invisibly small or oversized type.
+ */
+function scaleType(rawPx: number, frameWidth: number, minPx = 8, maxPx = 400): number {
+  return snap8(Math.min(maxPx, Math.max(minPx, rawPx * (frameWidth / 1080))))
+}
+
+/**
+ * Estimate the rendered height of a text block so downstream elements can be
+ * positioned below its actual AABB rather than a static size multiplier.
+ * All parameters must match the TextSpec that will be passed to text().
+ */
+function textBlockHeight(
+  content: string,
+  fontSize: number,
+  width: number,
+  lineHeight: number,
+  letterSpacing: number,
+): number {
+  return estimateTextHeight({ text: content, fontSize, width, lineHeight, letterSpacing })
+}
+
+// ---------------------------------------------------------------------------
 // Contrast helpers
 // ---------------------------------------------------------------------------
 
@@ -374,9 +402,9 @@ function buildHeroStatement(theme: ThemePack, presetId: string | undefined): Sce
   const contentWidth = width - margin * 2
   const ids = makeIdFactory()
   const [display, body] = [theme.typography.display, theme.typography.body]
-  const heroSize = display.sizeScale[0]
-  const h1Size = display.sizeScale[1]
-  const bodySize = body.sizeScale[3]
+  const heroSize = scaleType(display.sizeScale[0], width)
+  const h1Size = scaleType(display.sizeScale[1], width)
+  const bodySize = scaleType(body.sizeScale[3], width)
 
   const ctaH = snap8(heroSize * 0.6)
   const ctaW = snap8(contentWidth * 0.44)
@@ -436,14 +464,34 @@ function buildSplitLeftMedia(theme: ThemePack, presetId: string | undefined): Sc
   const contentW = width - contentX - margin
   const ids = makeIdFactory()
   const [display, body] = [theme.typography.display, theme.typography.body]
-  const h1Size = display.sizeScale[1]
-  const bodySize = body.sizeScale[3]
+  // Available vertical space for the 3-block content stack (headline + subline
+  // + CTA) is the frame height minus top and bottom margins.
+  const availableH = height - margin * 2
+  // Budget: headline gets 45%, subline 30%, CTA 25% of available height.
+  // Font sizes are chosen so text blocks never exceed their budget even when
+  // the copy wraps in the narrow content column.
+  const headlineBudget = availableH * 0.45
+  const sublineBudget = availableH * 0.30
+  const headlineText = 'One platform.\nEvery workflow.'
+  const sublineText = 'Connect your tools, automate the gaps, and let your team focus on work that matters.'
+  // Binary-search the largest h1Size that keeps headlineH within budget.
+  let h1Size = scaleType(display.sizeScale[1], width)
+  while (h1Size > 8 && textBlockHeight(headlineText, h1Size, contentW, 1.1, -1) > headlineBudget) {
+    h1Size = snap8(h1Size * 0.85)
+  }
+  let bodySize = scaleType(body.sizeScale[3], width)
+  while (bodySize > 8 && textBlockHeight(sublineText, bodySize, contentW, 1.5, 0) > sublineBudget) {
+    bodySize = snap8(bodySize * 0.85)
+  }
 
-  const headlineY = snap8(height * 0.22)
-  const sublineY = snap8(headlineY + h1Size * 2.2)
+  const headlineH = textBlockHeight(headlineText, h1Size, contentW, 1.1, -1)
+  const sublineH = textBlockHeight(sublineText, bodySize, contentW, 1.5, 0)
   const ctaH = snap8(bodySize * 2.4)
   const ctaW = snap8(contentW * 0.6)
-  const ctaY = snap8(height - margin - ctaH)
+  const totalContentH = headlineH + margin + sublineH + margin + ctaH
+  const headlineY = snap8(Math.max(margin, (height - totalContentH) / 2))
+  const sublineY = snap8(headlineY + headlineH + margin)
+  const ctaY = snap8(sublineY + sublineH + margin)
 
   const elements: SceneElement[] = [
     bgRect(ids(), width, height, theme.palette.background),
@@ -499,9 +547,9 @@ function buildBadgeProof(theme: ThemePack, presetId: string | undefined): SceneD
   const contentW = width - margin * 2
   const ids = makeIdFactory()
   const [display, body] = [theme.typography.display, theme.typography.body]
-  const h2Size = display.sizeScale[2]
-  const bodySize = body.sizeScale[3]
-  const captionSize = body.sizeScale[4]
+  const h2Size = scaleType(display.sizeScale[2], width)
+  const bodySize = scaleType(body.sizeScale[3], width)
+  const captionSize = scaleType(body.sizeScale[4], width)
 
   // Logo strip height
   const logoStripH = snap8(height * 0.2)
@@ -560,15 +608,18 @@ function buildStoryVertical(theme: ThemePack, presetId: string | undefined): Sce
   const contentW = width - margin * 2
   const ids = makeIdFactory()
   const [display, body] = [theme.typography.display, theme.typography.body]
-  const heroSize = display.sizeScale[0]
-  const bodySize = body.sizeScale[3]
+  const heroSize = scaleType(display.sizeScale[0], width)
+  const bodySize = scaleType(body.sizeScale[3], width)
 
-  // Three vertical thirds
+  // Three vertical thirds — mediaY derives from actual hook text height so
+  // the Media image never overlaps the Hook text AABB.
+  const hookText = 'You\'re leaving money on the table.\n\nHere\'s how to fix it.'
   const hookY = snap8(height * 0.08)
-  const mediaY = snap8(height * 0.32)
-  const mediaH = snap8(height * 0.42)
+  const hookH = textBlockHeight(hookText, heroSize, contentW, 1.1, -1)
   const ctaBarH = snap8(height * 0.14)
   const ctaBarY = height - ctaBarH
+  const mediaY = snap8(Math.max(height * 0.32, hookY + hookH + margin))
+  const mediaH = snap8(Math.max(8, ctaBarY - mediaY - margin))
 
   const ctaBtnW = snap8(contentW * 0.7)
   const ctaBtnH = snap8(bodySize * 2.8)
@@ -627,10 +678,10 @@ function buildCarouselPage(
   const contentW = width - margin * 2
   const ids = makeIdFactory()
   const [display, body] = [theme.typography.display, theme.typography.body]
-  const heroSize = display.sizeScale[0]
-  const h1Size = display.sizeScale[1]
-  const bodySize = body.sizeScale[3]
-  const captionSize = body.sizeScale[4]
+  const heroSize = scaleType(display.sizeScale[0], width)
+  const h1Size = scaleType(display.sizeScale[1], width)
+  const bodySize = scaleType(body.sizeScale[3], width)
+  const captionSize = scaleType(body.sizeScale[4], width)
 
   let elements: SceneElement[]
 
@@ -667,10 +718,13 @@ function buildCarouselPage(
       rect({ id: ids(), name: 'Arrow Bar', x: snap8(width - margin - 40), y: snap8(height / 2 - 4), width: 40, height: 4, fill: theme.palette.accent }),
     ]
   } else if (archetypeId === 'carousel-value') {
-    // headline must start below the slide-number label (captionSize * lineHeight + gap)
-    const slideNumH = snap8(captionSize * 1.4)
+    const h2Size = scaleType(display.sizeScale[2], width)
+    // Derive headlineY from actual Slide Number AABB bottom so there's no overlap.
+    const slideNumH = textBlockHeight('02 / 03', captionSize, snap8(64), 1.2, 1)
     const headlineY = snap8(margin + slideNumH + 8)
-    const mediaY = snap8(headlineY + display.sizeScale[2] * 1.3)
+    // Derive mediaY from actual Value Headline AABB bottom.
+    const valHeadH = textBlockHeight('Friction costs you 68% of visitors.', h2Size, contentW, 1.1, -0.5)
+    const mediaY = snap8(headlineY + valHeadH + margin)
     const mediaH = snap8(height * 0.38)
     const bodyY = snap8(mediaY + mediaH + margin)
     elements = [
@@ -686,7 +740,7 @@ function buildCarouselPage(
         id: ids(), name: 'Value Headline', slot: 'value-headline',
         x: margin, y: headlineY, width: contentW,
         text: 'Friction costs you 68% of visitors.',
-        fontFamily: display.family, fontSize: display.sizeScale[2], fontStyle: 'bold',
+        fontFamily: display.family, fontSize: h2Size, fontStyle: 'bold',
         fill: theme.palette.textPrimary, align: 'left', lineHeight: 1.1, letterSpacing: -0.5,
       }),
       image({
@@ -706,7 +760,7 @@ function buildCarouselPage(
   } else {
     // carousel-cta
     const headlineY = snap8(height * 0.28)
-    const ctaH = snap8(body.sizeScale[3] * 2.8)
+    const ctaH = snap8(bodySize * 2.8)
     const ctaW = snap8(contentW * 0.7)
     const ctaX = margin + snap8((contentW - ctaW) / 2)
     const ctaY = snap8(height * 0.62)
@@ -782,8 +836,11 @@ function buildEmailHeader600(theme: ThemePack, presetId: string | undefined): Sc
   const contentW = width - margin * 2
   const ids = makeIdFactory()
   const [display, body] = [theme.typography.display, theme.typography.body]
-  const h2Size = Math.min(display.sizeScale[2], snap8(height * 0.3))
-  const captionSize = body.sizeScale[4]
+  // Scale sizeScale values from the 1080-px reference frame to the 600-px frame.
+  // Additional height cap (height * 0.3) prevents the headline overflowing the
+  // 200 px band even for themes with large display sizes.
+  const h2Size = scaleType(display.sizeScale[2], width, 8, snap8(height * 0.3))
+  const captionSize = scaleType(body.sizeScale[4], width)
 
   const brandY = snap8(height * 0.15)
   const headlineY = snap8(height * 0.4)
@@ -839,20 +896,23 @@ function buildQuoteCard(theme: ThemePack, presetId: string | undefined): SceneDo
   const contentW = width - margin * 2
   const ids = makeIdFactory()
   const [display, body] = [theme.typography.display, theme.typography.body]
-  const h2Size = display.sizeScale[2]
-  const captionSize = body.sizeScale[4]
+  const h2Size = scaleType(display.sizeScale[2], width)
+  const captionSize = scaleType(body.sizeScale[4], width)
 
   // Layout: vertical stack with generous breathing room
   // Accent bar (top-left vertical stripe) + quote body + attribution
   // The decorative accent element is a simple filled rect rule, not overlapping text.
   const accentBarW = 6
-  const accentBarH = snap8(h2Size * 4)
   const accentBarX = margin
   const accentBarY = snap8(height * 0.24)
   const quoteX = snap8(margin + accentBarW + 24)
   const quoteW = width - quoteX - margin
   const quoteY = accentBarY
-  const attrY = snap8(accentBarY + accentBarH + margin)
+  const quoteText = 'We cut onboarding time by 60% in the first month. The team didn\'t believe the numbers — then we showed them the dashboard.'
+  const quoteH = textBlockHeight(quoteText, h2Size, quoteW, 1.3, -0.5)
+  // Accent bar matches actual quote height for visual alignment.
+  const accentBarH = snap8(quoteH)
+  const attrY = snap8(quoteY + quoteH + margin)
 
   const elements: SceneElement[] = [
     bgRect(ids(), width, height, theme.palette.background),
@@ -892,9 +952,9 @@ function buildStatLed(theme: ThemePack, presetId: string | undefined): SceneDocu
   const contentW = width - margin * 2
   const ids = makeIdFactory()
   const [display, body] = [theme.typography.display, theme.typography.body]
-  const heroSize = display.sizeScale[0]
-  const bodySize = body.sizeScale[3]
-  const captionSize = body.sizeScale[4]
+  const heroSize = scaleType(display.sizeScale[0], width)
+  const bodySize = scaleType(body.sizeScale[3], width)
+  const captionSize = scaleType(body.sizeScale[4], width)
 
   // Stat dominates: top-center, then context below
   const labelY = snap8(height * 0.2)

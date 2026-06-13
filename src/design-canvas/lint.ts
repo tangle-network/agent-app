@@ -22,6 +22,7 @@ export type LintSeverity = 'error' | 'warning'
 export type LintRule =
   | 'text-overlap'
   | 'element-overflow'
+  | 'text-overflow-band'
   | 'contrast'
   | 'hierarchy'
   | 'alignment'
@@ -330,6 +331,110 @@ function lintElementOverflow(flat: FlatElement[], page: ScenePage): LintFinding[
         message:
           `"${element.name}" exceeds ${bound}: ${offenders.join(', ')}. ` +
           `Move or resize the element to fit within the ${bound} (tolerance ${OVERFLOW_TOLERANCE}px).`,
+      })
+    }
+  }
+
+  return findings
+}
+
+// ---------------------------------------------------------------------------
+// Rule: text-overflow-band (ERROR)
+// ---------------------------------------------------------------------------
+
+/**
+ * Flags text elements whose AABB bottom extends past the bottom of the nearest
+ * opaque rect below them in z-order that acts as a visual band. A "band" here
+ * is any opaque rect with a lower z-index whose horizontal span overlaps the
+ * text by ≥50% of the text's width — a structural container, not a decorative
+ * element that happens to share an x range.
+ *
+ * Without the wrap-aware estimateTextHeight fix (Gap 1) this rule fires only
+ * when the overflow is detectable via explicit-newline line counts. With the
+ * fix, it also catches wrap-induced overflows.
+ */
+function lintTextOverflowBand(flat: FlatElement[], _page: ScenePage): LintFinding[] {
+  const findings: LintFinding[] = []
+
+  const visibleTexts = flat.filter(
+    (fe) => fe.element.visible && fe.element.kind === 'text' && fe.effectiveOpacity > 0,
+  )
+
+  const opaqueRects = flat.filter((fe) => {
+    if (!fe.element.visible) return false
+    if (fe.element.kind !== 'rect') return false
+    if (fe.effectiveOpacity <= 0.9) return false
+    const fill = parseColor((fe.element as { fill: string }).fill)
+    return fill !== null
+  })
+
+  for (const textFe of visibleTexts) {
+    const textEl = textFe.element as TextElement
+    const textBottom = textFe.aabb.y + textFe.aabb.height
+    const textLeft = textFe.aabb.x
+    const textRight = textFe.aabb.x + textFe.aabb.width
+    // Minimum band height: must be at least 1× the text's fontSize to qualify
+    // as a structural container. Thin rules (height < fontSize) are decorative
+    // and cannot meaningfully "contain" text.
+    const minBandHeight = textEl.fontSize
+
+    // Find the tightest qualifying band: an opaque rect below the text in
+    // z-order whose span overlaps ≥50% of the text width, is at least
+    // minBandHeight tall, starts at or above the text top, and whose bottom
+    // is less than the text AABB bottom. Only the tightest (smallest height
+    // that still contains the text start) is flagged to avoid duplicate
+    // findings from nested bands.
+    let tightestBand: FlatElement | null = null
+
+    for (const rectFe of opaqueRects) {
+      if (rectFe.zIndex >= textFe.zIndex) continue
+
+      const rectH = rectFe.aabb.height
+      if (rectH < minBandHeight) continue
+
+      const rectBottom = rectFe.aabb.y + rectFe.aabb.height
+      const rectLeft = rectFe.aabb.x
+      const rectRight = rectFe.aabb.x + rectFe.aabb.width
+
+      // Horizontal overlap between text and rect
+      const overlapLeft = Math.max(textLeft, rectLeft)
+      const overlapRight = Math.min(textRight, rectRight)
+      const horizOverlap = Math.max(0, overlapRight - overlapLeft)
+      const textWidth = textFe.aabb.width
+      if (textWidth <= 0) continue
+      if (horizOverlap / textWidth < 0.5) continue
+
+      // The rect must bracket the text's starting position: rect starts above
+      // (or at) text top AND rect bottom is at or below text top. A rect that
+      // ends before the text begins is a sibling/separator, not a container.
+      if (rectFe.aabb.y > textFe.aabb.y) continue
+      if (rectBottom < textFe.aabb.y - OVERFLOW_TOLERANCE) continue
+
+      // The text bottom must exceed the band bottom — overflow candidate.
+      const overflow = textBottom - rectBottom
+      if (overflow <= OVERFLOW_TOLERANCE) continue
+
+      // Track the tightest (smallest) qualifying band so we report the most
+      // specific containment relationship, not every enclosing rect.
+      if (
+        tightestBand === null ||
+        rectFe.aabb.height < tightestBand.aabb.height
+      ) {
+        tightestBand = rectFe
+      }
+    }
+
+    if (tightestBand !== null) {
+      const tightBottom = tightestBand.aabb.y + tightestBand.aabb.height
+      const overflow = textBottom - tightBottom
+      findings.push({
+        rule: 'text-overflow-band',
+        severity: 'error',
+        elementIds: [textFe.element.id, tightestBand.element.id],
+        message:
+          `"${textFe.element.name}" AABB bottom (${Math.round(textBottom)}px) exceeds its containing band ` +
+          `"${tightestBand.element.name}" bottom (${Math.round(tightBottom)}px) by ${Math.round(overflow)}px. ` +
+          `Reduce font size, increase the band height, or shorten the text to fit.`,
       })
     }
   }
@@ -692,6 +797,7 @@ export function lintScenePage(document: SceneDocument, pageId: string): LintRepo
   const findings: LintFinding[] = [
     ...lintTextOverlap(flat, page),
     ...lintElementOverflow(flat, page),
+    ...lintTextOverflowBand(flat, page),
     ...lintContrast(flat, page),
     ...lintHierarchy(flat, page),
     ...lintAlignment(flat, page),
@@ -720,6 +826,7 @@ export function lintSceneDocument(document: SceneDocument): LintReport {
     const findings: LintFinding[] = [
       ...lintTextOverlap(flat, page),
       ...lintElementOverflow(flat, page),
+      ...lintTextOverflowBand(flat, page),
       ...lintContrast(flat, page),
       ...lintHierarchy(flat, page),
       ...lintAlignment(flat, page),

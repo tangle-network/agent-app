@@ -212,9 +212,39 @@ export function elementExtent(element: SceneElement): { width: number; height: n
   }
 }
 
-export function estimateTextHeight(element: Pick<TextElement, 'text' | 'fontSize' | 'lineHeight'>): number {
-  const lines = element.text.length === 0 ? 1 : element.text.split('\n').length
-  return lines * element.fontSize * element.lineHeight
+/**
+ * Average character width as a fraction of fontSize for a typical proportional
+ * sans-serif. Used to approximate characters-per-line when a wrap width is
+ * known. 0.52 is conservative (slightly wide) — it over-estimates line count
+ * rather than under-estimating, which is the safe direction for layout math.
+ */
+const AVG_CHAR_WIDTH_RATIO = 0.52
+
+export function estimateTextHeight(
+  element: Pick<TextElement, 'text' | 'fontSize' | 'lineHeight' | 'width' | 'letterSpacing'>,
+): number {
+  if (element.text.length === 0) return element.fontSize * element.lineHeight
+
+  // Break on explicit newlines first, then approximate word-wrap within each
+  // explicit line using character-width heuristics.
+  const explicitLines = element.text.split('\n')
+  let totalLines = 0
+
+  const charWidthPx = element.fontSize * AVG_CHAR_WIDTH_RATIO + element.letterSpacing
+  // Minimum 1-character-wide column prevents divide-by-zero on degenerate widths.
+  const charsPerLine = Math.max(1, element.width / charWidthPx)
+
+  for (const line of explicitLines) {
+    if (line.length === 0) {
+      // Blank explicit line (double-newline paragraph break) counts as 1 line.
+      totalLines += 1
+    } else {
+      // ceil(chars / charsPerLine) visual lines for this explicit line segment.
+      totalLines += Math.ceil(line.length / charsPerLine)
+    }
+  }
+
+  return totalLines * element.fontSize * element.lineHeight
 }
 
 /** Axis-aligned bounding box in the parent's coordinate space, accounting for

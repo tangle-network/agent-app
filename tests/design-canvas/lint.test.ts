@@ -17,7 +17,7 @@ import type {
   TextElement,
   RectElement,
 } from '../../src/design-canvas/model'
-import { createEmptyDocument } from '../../src/design-canvas/model'
+import { createEmptyDocument, estimateTextHeight } from '../../src/design-canvas/model'
 import type { SceneDecision, SceneDocumentRecord, SceneExportRecord, SceneStore } from '../../src/design-canvas/store'
 import type { NewSceneDecision } from '../../src/design-canvas/store'
 import { createDesignCanvasMcpHandler } from '../../src/design-canvas/mcp-handler'
@@ -882,5 +882,186 @@ describe('MCP tool: design_lint', () => {
     expect(Array.isArray(finding.elementIds)).toBe(true)
     expect(typeof finding.message).toBe('string')
     expect(finding.message.length).toBeGreaterThan(20)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Rule: text-overflow-band (ERROR)
+// ---------------------------------------------------------------------------
+
+describe('rule: text-overflow-band', () => {
+  it('POSITIVE — text whose wrapped AABB bottom exceeds its containing band is flagged', () => {
+    // Reproduces the email-header-600 root cause: a headline in a 200px tall
+    // band whose wrap-aware height exceeds the band. The band rect is 150px tall
+    // and the text at 36px in a 272px column wraps to 2 visual lines (86px)
+    // which fits, but at 72px in the same column wraps to 4 lines (346px > 150px).
+    const band = makeRect({ id: 'band', x: 0, y: 0, width: 400, height: 150, fill: '#ffffff', opacity: 1 })
+    // Text at 72px in 272px width: charWidth ≈ 72*0.52 = 37.4px, charsPerLine ≈ 7.3
+    // "Your Headline Goes Here" = 23 chars → ceil(23/7.3) = 4 lines → h = 4*72*1.2 = 345.6px > 150px
+    const headline = makeText({
+      id: 'headline', name: 'Headline',
+      x: 50, y: 50, width: 272,
+      text: 'Your Headline Goes Here',
+      fontSize: 72, lineHeight: 1.2, letterSpacing: 0,
+    })
+    const page = makePage({ width: 600, height: 200, elements: [band, headline] })
+    const doc = makeDoc(page)
+    const report = lintScenePage(doc, page.id)
+    const findings = report.pages[0]!.findings.filter((f) => f.rule === 'text-overflow-band')
+    expect(findings).toHaveLength(1)
+    expect(findings[0]!.severity).toBe('error')
+    expect(findings[0]!.elementIds).toContain('headline')
+    expect(findings[0]!.elementIds).toContain('band')
+    expect(findings[0]!.message).toMatch(/exceeds its containing band/)
+  })
+
+  it('NEGATIVE — text that fits within its band produces no finding', () => {
+    // Same band at 36px fontSize: charsPerLine ≈ 272/(36*0.52) ≈ 14.5
+    // "Your Headline Goes Here" = 23 chars → 2 lines → h = 2*36*1.2 = 86.4px < 150px
+    const band = makeRect({ id: 'band', x: 0, y: 0, width: 400, height: 150, fill: '#ffffff', opacity: 1 })
+    const headline = makeText({
+      id: 'headline', name: 'Headline',
+      x: 50, y: 50, width: 272,
+      text: 'Your Headline Goes Here',
+      fontSize: 36, lineHeight: 1.2, letterSpacing: 0,
+    })
+    const page = makePage({ width: 600, height: 200, elements: [band, headline] })
+    const doc = makeDoc(page)
+    const report = lintScenePage(doc, page.id)
+    const findings = report.pages[0]!.findings.filter((f) => f.rule === 'text-overflow-band')
+    expect(findings).toHaveLength(0)
+  })
+
+  it('POSITIVE — ig-story-style oversized hook text exceeds its accent block (Gap 1 regression)', () => {
+    // Reproduces the ig-story "GET 20% OFF" case: hook at fontSize=180 with
+    // letterSpacing=28 in a 904px column. charWidth = 180*0.52 + 28 = 121.6px
+    // charsPerLine = 904/121.6 ≈ 7.4. "GET 20% OFF" = 11 chars → ceil(11/7.4) = 2 lines
+    // height = 2 * 180 * 1.05 = 378px. Accent block is only 262px tall (1024 - 762).
+    const accentBlock = makeRect({
+      id: 'accent', name: 'Headline Accent Block',
+      x: 88, y: 762, width: 904, height: 262, fill: '#ff6600', opacity: 1,
+    })
+    const hook = makeText({
+      id: 'hook', name: 'Hook',
+      x: 88, y: 762, width: 904,
+      text: 'GET 20% OFF',
+      fontSize: 180, lineHeight: 1.05, letterSpacing: 28,
+    })
+    const page = makePage({ width: 1080, height: 1920, elements: [accentBlock, hook] })
+    const doc = makeDoc(page)
+    const report = lintScenePage(doc, page.id)
+    const findings = report.pages[0]!.findings.filter((f) => f.rule === 'text-overflow-band')
+    expect(findings).toHaveLength(1)
+    expect(findings[0]!.severity).toBe('error')
+    expect(findings[0]!.elementIds).toContain('hook')
+    expect(findings[0]!.elementIds).toContain('accent')
+  })
+
+  it('NEGATIVE — thin decorative rule is not treated as a containing band', () => {
+    // A 4px-tall rule with height < fontSize is not a structural band.
+    const thinRule = makeRect({ id: 'rule', x: 0, y: 0, width: 600, height: 4, fill: '#000000', opacity: 1 })
+    const body = makeText({
+      id: 'body', name: 'Body',
+      x: 50, y: 20, width: 500,
+      text: 'Some body text that would overflow the thin rule if it were treated as a band.',
+      fontSize: 16, lineHeight: 1.5, letterSpacing: 0,
+    })
+    const page = makePage({ width: 600, height: 400, elements: [thinRule, body] })
+    const doc = makeDoc(page)
+    const report = lintScenePage(doc, page.id)
+    const findings = report.pages[0]!.findings.filter((f) => f.rule === 'text-overflow-band')
+    expect(findings).toHaveLength(0)
+  })
+
+  it('NEGATIVE — text below a closed band (not overlapping vertically) is not flagged', () => {
+    // Band ends at y=100. Text starts at y=120. Band bottom < text top → not a container.
+    const band = makeRect({ id: 'band', x: 0, y: 0, width: 400, height: 100, fill: '#ffffff', opacity: 1 })
+    const body = makeText({
+      id: 'body', name: 'Body',
+      x: 50, y: 120, width: 300,
+      text: 'Text starts well below the band.',
+      fontSize: 16, lineHeight: 1.5, letterSpacing: 0,
+    })
+    const page = makePage({ elements: [band, body] })
+    const doc = makeDoc(page)
+    const report = lintScenePage(doc, page.id)
+    const findings = report.pages[0]!.findings.filter((f) => f.rule === 'text-overflow-band')
+    expect(findings).toHaveLength(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// estimateTextHeight — wrap-aware height computation
+// ---------------------------------------------------------------------------
+
+describe('estimateTextHeight (wrap-aware)', () => {
+  it('single line of short text at wide width produces ~1 line height', () => {
+    const el = makeText({ text: 'Hello', fontSize: 20, width: 500, lineHeight: 1.2, letterSpacing: 0 })
+    // "Hello" = 5 chars; charsPerLine = 500/(20*0.52) ≈ 48 → 1 line → height = 1*20*1.2 = 24
+    expect(estimateTextHeight(el)).toBe(24)
+  })
+
+  it('explicit newlines are counted as line breaks', () => {
+    const el = makeText({ text: 'Line 1\nLine 2\nLine 3', fontSize: 16, width: 600, lineHeight: 1.2, letterSpacing: 0 })
+    // 3 explicit lines, each short enough to fit in one visual line at width=600
+    expect(estimateTextHeight(el)).toBe(3 * 16 * 1.2)
+  })
+
+  it('long text wraps at narrow width producing more lines than explicit breaks', () => {
+    // 30-char text, fontSize=24, width=100: charWidth=24*0.52=12.48, charsPerLine≈8
+    // ceil(30/8) = 4 lines → h = 4*24*1.2 = 115.2
+    const el = makeText({ text: 'A'.repeat(30), fontSize: 24, width: 100, lineHeight: 1.2, letterSpacing: 0 })
+    const h = estimateTextHeight(el)
+    expect(h).toBeGreaterThan(24 * 1.2) // more than 1 line
+    expect(h).toBeLessThanOrEqual(6 * 24 * 1.2) // no more than 6 lines
+  })
+
+  it('large letterSpacing increases effective char width, reducing chars per line', () => {
+    const elNoSpacing = makeText({ text: 'GET 20% OFF', fontSize: 180, width: 904, lineHeight: 1.05, letterSpacing: 0 })
+    const elWithSpacing = makeText({ text: 'GET 20% OFF', fontSize: 180, width: 904, lineHeight: 1.05, letterSpacing: 28 })
+    // With letterSpacing=28 each char takes 180*0.52+28=121.6px vs 93.6px without
+    // So letterSpacing version should produce more lines (taller height)
+    expect(estimateTextHeight(elWithSpacing)).toBeGreaterThanOrEqual(estimateTextHeight(elNoSpacing))
+  })
+})
+
+// ---------------------------------------------------------------------------
+// MCP tool: create_export — lint gate
+// ---------------------------------------------------------------------------
+
+describe('MCP tool: create_export — lint gate', () => {
+  it('is blocked when the document has lint errors', async () => {
+    // White text on white background → contrast error (errorCount ≥ 1)
+    const errText = makeText({ id: 'bad', fill: '#ffffff', fontSize: 16, x: 200, y: 200 })
+    const page = makePage({ background: '#ffffff', elements: [errText] })
+    const doc = makeDoc(page)
+    const { handler } = setupHandler(doc)
+    const result = await callTool(handler, 'create_export', { format: 'png' })
+    expect(result.isError).toBe(true)
+    expect(result.text).toMatch(/Export blocked/)
+    expect(result.text).toMatch(/lint error/)
+  })
+
+  it('succeeds when the document has no lint errors', async () => {
+    // Clean document: no elements that would trigger errors
+    const safeText = makeText({ id: 'ok', fill: '#000000', fontSize: 16, x: 200, y: 200, width: 200 })
+    const page = makePage({ background: '#ffffff', elements: [safeText] })
+    const doc = makeDoc(page)
+    const { handler } = setupHandler(doc)
+    const result = await callTool(handler, 'create_export', { format: 'png' })
+    expect(result.isError).toBe(false)
+    expect(result.json!.format).toBe('png')
+    expect(result.json!.status).toBe('queued')
+  })
+
+  it('error message includes the specific lint error details', async () => {
+    const errText = makeText({ id: 'bad', fill: '#ffffff', fontSize: 16, x: 200, y: 200 })
+    const page = makePage({ background: '#ffffff', elements: [errText] })
+    const doc = makeDoc(page)
+    const { handler } = setupHandler(doc)
+    const result = await callTool(handler, 'create_export', { format: 'json' })
+    expect(result.isError).toBe(true)
+    // Message should contain the concrete lint error (contrast rule info)
+    expect(result.text).toMatch(/contrast/)
   })
 })
