@@ -214,6 +214,8 @@ export function DesignCanvasEditor(props: DesignCanvasProps) {
             // Shares the chrome's fit ref so F / Fit button trigger workspace
             // fit-to-page through the same callback slot.
             onFitRef={ctx.onFitRef}
+            fitOnMount={ctx.fitOnMount}
+            onReady={ctx.onReady}
           />
         )
       }}
