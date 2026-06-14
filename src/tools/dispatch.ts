@@ -71,6 +71,7 @@ export async function dispatchAppTool(
         proposalId,
         title,
         status: effectiveStatus === 'executed' ? 'executed' : 'pending',
+        content: description ?? undefined,
       })
       return { ok: true, result: { ...extra, status: effectiveStatus, proposalId, deduped, regulated } }
     }

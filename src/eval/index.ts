@@ -44,7 +44,7 @@ export type {
 export function producedFromToolEvents(events: readonly AppToolProducedEvent[]): RuntimeEventLike[] {
   return events.map((e) =>
     e.type === 'proposal_created'
-      ? { type: 'proposal_created', proposalId: e.proposalId, title: e.title, status: e.status }
+      ? { type: 'proposal_created', proposalId: e.proposalId, title: e.title, status: e.status, content: e.content }
       : { type: 'artifact', artifactId: `vault:${e.path}`, name: e.path, uri: `vault://${e.path}`, mimeType: 'text/markdown', content: e.content },
   )
 }
