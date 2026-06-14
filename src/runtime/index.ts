@@ -2,6 +2,7 @@ export * from './model-catalog'
 export * from './model'
 export * from './openai-stream'
 export * from './agent'
+export * from './certified-delivery'
 export * from './surface-profile'
 /**
  * The bounded agent tool-loop — owned by `@tangle-network/agent-runtime`.
