@@ -114,7 +114,16 @@ export interface AppToolHandlers {
  *  artifact. Deliberately substrate-free (no RuntimeStreamEvent import); the
  *  consumer maps these onto its own telemetry shape. */
 export type AppToolProducedEvent =
-  | { type: 'proposal_created'; proposalId: string; title: string; status: 'pending' | 'executed' }
+  | {
+      type: 'proposal_created'
+      proposalId: string
+      title: string
+      status: 'pending' | 'executed'
+      // Proposal body (the submit_proposal `description`) — the assessable
+      // deliverable, carried in-band so produced-state grading reads it from the
+      // event, not the product database. Mirrors `content` on the artifact case.
+      content?: string
+    }
   | { type: 'artifact'; path: string; content: string }
 
 /** Outcome of one tool dispatch — structurally identical to the agent-runtime
