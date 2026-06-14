@@ -42,8 +42,10 @@ import {
   runAppToolLoop,
   streamAppToolLoop,
   type LoopEvent,
+  type LoopMessage,
   type LoopToolCall,
   type StreamLoopYield,
+  type ToolLoopEvent,
   type ToolLoopResult,
 } from './index'
 import { createOpenAICompatStreamTurn } from './openai-stream'
@@ -154,7 +156,9 @@ export function createAgentRuntime(opts: CreateAgentRuntimeOptions): AgentRuntim
         systemPrompt: turn.systemPrompt ?? opts.systemPrompt,
         userMessage,
         priorMessages: turn.priorMessages,
-        streamTurn,
+        // The awaitable loop consumes only text + tool_call; the app's UI-only
+        // reasoning/usage events ride the substrate's `other` channel.
+        streamTurn: narrowToToolLoopEvents(streamTurn),
         executeToolCall: buildExecutor(turn),
         isExecutableTool,
         maxToolTurns: opts.maxToolTurns,
@@ -174,4 +178,24 @@ export function createAgentRuntime(opts: CreateAgentRuntimeOptions): AgentRuntim
       })
     },
   }
+}
+
+/**
+ * Adapt the app's rich {@link LoopEvent} stream to the substrate awaitable
+ * loop's `ToolLoopEvent` contract. The loop reads only `text` (accumulated into
+ * the answer) and `tool_call` (dispatched); the app's UI-only `reasoning` /
+ * `usage` events have no awaitable meaning, so they collapse onto the
+ * substrate's `other` channel and are ignored by the loop.
+ */
+function narrowToToolLoopEvents(
+  streamTurn: (messages: LoopMessage[]) => AsyncIterable<LoopEvent>,
+): (messages: LoopMessage[]) => AsyncIterable<ToolLoopEvent> {
+  return (messages) =>
+    (async function* () {
+      for await (const ev of streamTurn(messages)) {
+        if (ev.type === 'text') yield { type: 'text', text: ev.text }
+        else if (ev.type === 'tool_call') yield { type: 'tool_call', call: ev.call }
+        else yield { type: 'other', event: ev }
+      }
+    })()
 }

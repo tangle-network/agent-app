@@ -117,9 +117,11 @@ export type AppToolProducedEvent =
   | { type: 'proposal_created'; proposalId: string; title: string; status: 'pending' | 'executed' }
   | { type: 'artifact'; path: string; content: string }
 
-/** Outcome of one tool dispatch — structurally compatible with the integration
- *  tool-outcome union the agent-runtime chat loop already folds into a
- *  tool_result. */
+/** Outcome of one tool dispatch — structurally identical to the agent-runtime
+ *  tool-loop's `ToolCallOutcome`, so a dispatched outcome folds straight into
+ *  the loop's `role: 'tool'` result message. Defined here (not imported) to keep
+ *  the `tools/` module substrate-free: it depends only on Web `Request`/
+ *  `Response`, never on the agent runtime. */
 export type AppToolOutcome =
   | { ok: true; result: unknown }
   | { ok: false; code: string; message: string; status?: number }

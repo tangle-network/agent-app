@@ -13,14 +13,17 @@ importers:
         version: 4.4.3
     devDependencies:
       '@tangle-network/agent-eval':
-        specifier: ^0.82.0
-        version: 0.82.0(typescript@5.9.3)
+        specifier: ^0.83.0
+        version: 0.83.0(typescript@5.9.3)
       '@tangle-network/agent-integrations':
         specifier: ^0.32.0
         version: 0.32.0
       '@tangle-network/agent-knowledge':
         specifier: ^1.5.2
         version: 1.5.2(typescript@5.9.3)
+      '@tangle-network/agent-runtime':
+        specifier: ^0.52.0
+        version: 0.52.0(@tangle-network/agent-eval@0.83.0(typescript@5.9.3))(@tangle-network/agent-knowledge@1.5.2(typescript@5.9.3))
       '@testing-library/dom':
         specifier: ^10.4.1
         version: 10.4.1
@@ -636,8 +639,8 @@ packages:
       '@tangle-network/sandbox':
         optional: true
 
-  '@tangle-network/agent-eval@0.82.0':
-    resolution: {integrity: sha512-kPiZ+FG2jaHycNMQmqjPI28nyEqKz2x/xZpNsgmL4OAoQvqttHJYOpBpUTHr9Wz7/yyu0EuIJTcVJwbl6185gA==}
+  '@tangle-network/agent-eval@0.83.0':
+    resolution: {integrity: sha512-tD+UkCcjuN62nCgDKlayD2t8DfeQ4MmF97kwUhUWcG66/dLZ3+x05JONiPo+hwjKEgK+imWrb264mUfwiy1Dew==}
     engines: {node: '>=20'}
     hasBin: true
     peerDependencies:
@@ -672,6 +675,23 @@ packages:
       '@tangle-network/agent-knowledge':
         optional: true
       '@tangle-network/sandbox':
+        optional: true
+
+  '@tangle-network/agent-runtime@0.52.0':
+    resolution: {integrity: sha512-oZL1cDW7x2inhBrcAgKHST3HQFGQsJtQR/ko41js9DcBP4bIVVPeosEwQ50h41yPXHkJpIYznh54pj0FJxiYwQ==}
+    engines: {node: '>=20'}
+    hasBin: true
+    peerDependencies:
+      '@tangle-network/agent-eval': '>=0.83.0 <1.0.0'
+      '@tangle-network/agent-knowledge': '>=1.3.0 <2.0.0'
+      '@tangle-network/sandbox': '>=0.1.2 <0.7.0'
+      playwright: ^1.40.0
+    peerDependenciesMeta:
+      '@tangle-network/agent-knowledge':
+        optional: true
+      '@tangle-network/sandbox':
+        optional: true
+      playwright:
         optional: true
 
   '@tangle-network/sandbox@0.3.0':
@@ -2079,7 +2099,7 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@tangle-network/agent-eval@0.82.0(typescript@5.9.3)':
+  '@tangle-network/agent-eval@0.83.0(typescript@5.9.3)':
     dependencies:
       '@asteasolutions/zod-to-openapi': 8.5.0(zod@4.4.3)
       '@ax-llm/ax': 19.0.45(zod@4.4.3)
@@ -2128,6 +2148,12 @@ snapshots:
       - openai
       - typescript
       - utf-8-validate
+
+  '@tangle-network/agent-runtime@0.52.0(@tangle-network/agent-eval@0.83.0(typescript@5.9.3))(@tangle-network/agent-knowledge@1.5.2(typescript@5.9.3))':
+    dependencies:
+      '@tangle-network/agent-eval': 0.83.0(typescript@5.9.3)
+    optionalDependencies:
+      '@tangle-network/agent-knowledge': 1.5.2(typescript@5.9.3)
 
   '@tangle-network/sandbox@0.3.0(viem@2.52.0(typescript@5.9.3)(zod@4.4.3))':
     dependencies:

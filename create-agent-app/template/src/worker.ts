@@ -27,6 +27,9 @@ import {
 import {
   runAppToolLoop,
   createOpenAICompatStreamTurn,
+  type LoopEvent,
+  type LoopMessage,
+  type ToolLoopEvent,
 } from '@tangle-network/agent-app/runtime'
 
 interface ChatRequest {
@@ -35,6 +38,26 @@ interface ChatRequest {
   userId?: string
   workspaceId?: string
   threadId?: string | null
+}
+
+/**
+ * The OpenAI-compat stream yields the app's rich `LoopEvent` (it adds UI-only
+ * `reasoning` / `usage` deltas). The awaitable loop consumes only `text` +
+ * `tool_call`, so narrow the rest onto the substrate's `other` channel. (The
+ * streaming `streamAppToolLoop` path takes the rich stream directly via
+ * `extractText` / `extractToolCall` and needs no narrowing.)
+ */
+function narrowToToolLoopEvents(
+  streamTurn: (messages: LoopMessage[]) => AsyncIterable<LoopEvent>,
+): (messages: LoopMessage[]) => AsyncIterable<ToolLoopEvent> {
+  return (messages) =>
+    (async function* () {
+      for await (const ev of streamTurn(messages)) {
+        if (ev.type === 'text') yield { type: 'text', text: ev.text }
+        else if (ev.type === 'tool_call') yield { type: 'tool_call', call: ev.call }
+        else yield { type: 'other', event: ev }
+      }
+    })()
 }
 
 /** Assemble the system prompt from the config identity (DATA → prompt). */
@@ -83,7 +106,7 @@ export default {
     const result = await runAppToolLoop({
       systemPrompt: buildSystemPrompt(),
       userMessage: body.message,
-      streamTurn: createOpenAICompatStreamTurn({ ...app.resolveModel(), tools }),
+      streamTurn: narrowToToolLoopEvents(createOpenAICompatStreamTurn({ ...app.resolveModel(), tools })),
       executeToolCall: (call) => executor({ toolName: call.toolName, args: call.args }),
       isExecutableTool: isAppToolName,
     })
