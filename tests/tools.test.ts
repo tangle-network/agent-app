@@ -89,7 +89,9 @@ describe('createAppToolRuntimeExecutor', () => {
     expect(out).toEqual({ ok: true, result: { status: 'queued_for_approval', proposalId: 'prop-1', deduped: false, regulated: true } })
     expect(calls.submitProposal).toHaveLength(1)
     expect((calls.submitProposal[0] as { ctx: unknown }).ctx).toEqual(ctx)
-    expect(produced).toEqual([{ type: 'proposal_created', proposalId: 'prop-1', title: 'Proposal A', status: 'pending' }])
+    expect(produced).toEqual([
+      { type: 'proposal_created', proposalId: 'prop-1', title: 'Proposal A', status: 'pending', content: 'body' },
+    ])
   })
 
   it('passes through an immediate-execute handler result (status + extra fields)', async () => {

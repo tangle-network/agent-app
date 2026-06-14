@@ -57,7 +57,7 @@ describe('createAgentRuntime', () => {
       [
         { choices: [{ delta: { tool_calls: [{ index: 0, id: 'call_1', function: { name: 'submit_proposal' } }] } }] },
         { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '{"type":"propose_swap",' } }] } }] },
-        { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '"title":"Swap A→B"}' } }] } }] },
+        { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '"title":"Swap A→B","description":"Swap from carrier A to carrier B; premium drops 12%, coverage equal."}' } }] } }] },
       ],
       // Turn 2: after the tool result is folded back, model answers.
       [{ choices: [{ delta: { content: 'Queued the swap for approval.' } }] }],
@@ -75,7 +75,12 @@ describe('createAgentRuntime', () => {
     expect(calls).toHaveLength(1)
     expect(calls[0]).toEqual({
       tool: 'submit_proposal',
-      args: { type: 'propose_swap', title: 'Swap A→B', description: null, regulated: true },
+      args: {
+        type: 'propose_swap',
+        title: 'Swap A→B',
+        description: 'Swap from carrier A to carrier B; premium drops 12%, coverage equal.',
+        regulated: true,
+      },
     })
     expect(result.toolResults).toHaveLength(1)
     expect(result.toolResults[0]!.outcome).toEqual({
@@ -84,7 +89,16 @@ describe('createAgentRuntime', () => {
     })
     expect(result.finalText).toBe('Queued the swap for approval.')
     expect(result.turns).toBe(2)
-    expect(produced).toEqual([{ type: 'proposal_created', proposalId: 'p-1', title: 'Swap A→B', status: 'pending' }])
+    // The proposal body threads in-band through the tool loop → produced event.
+    expect(produced).toEqual([
+      {
+        type: 'proposal_created',
+        proposalId: 'p-1',
+        title: 'Swap A→B',
+        status: 'pending',
+        content: 'Swap from carrier A to carrier B; premium drops 12%, coverage equal.',
+      },
+    ])
   })
 
   it('rejects a proposal type outside the taxonomy without calling the handler', async () => {
