@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { runAppToolLoop, streamAppToolLoop, type LoopEvent, type LoopMessage, type LoopToolCall, type StreamLoopYield } from '../src/runtime/index'
+import { runAppToolLoop, streamAppToolLoop, type ToolLoopEvent, type LoopMessage, type LoopToolCall, type StreamLoopYield } from '../src/runtime/index'
 import type { AppToolOutcome } from '../src/tools/index'
 
 /** A scripted model: each entry is the events for one turn. */
-function scriptedStream(turns: LoopEvent[][]) {
+function scriptedStream(turns: ToolLoopEvent[][]) {
   let i = 0
   return async function* () {
     const turn = turns[Math.min(i, turns.length - 1)]!
@@ -40,11 +40,11 @@ describe('runAppToolLoop', () => {
     const streamTurn = async function* (messages: LoopMessage[]) {
       turn++
       if (!sawToolResult(messages)) {
-        yield { type: 'text', text: 'Routing. ' } as LoopEvent
-        yield { type: 'tool_call', call: { toolName: 'submit_proposal', toolCallId: 'p1', args: { type: 'recommend', title: 'Proposal A' } } } as LoopEvent
+        yield { type: 'text', text: 'Routing. ' } as ToolLoopEvent
+        yield { type: 'tool_call', call: { toolName: 'submit_proposal', toolCallId: 'p1', args: { type: 'recommend', title: 'Proposal A' } } } as ToolLoopEvent
         return
       }
-      yield { type: 'text', text: 'Routed for approval.' } as LoopEvent
+      yield { type: 'text', text: 'Routed for approval.' } as ToolLoopEvent
     }
     const r = await runAppToolLoop({
       systemPrompt: 's', userMessage: 'u',
@@ -65,12 +65,12 @@ describe('runAppToolLoop', () => {
     const streamTurn = async function* (messages: LoopMessage[]) {
       turnMessages.push(messages)
       if (!sawToolResult(messages)) {
-        yield { type: 'text', text: 'Routing both. ' } as LoopEvent
-        yield { type: 'tool_call', call: { toolName: 'submit_proposal', toolCallId: 'p1', args: { type: 'recommend', title: 'A' } } } as LoopEvent
-        yield { type: 'tool_call', call: { toolName: 'schedule_followup', toolCallId: 'f9', args: { title: 'x', dueDate: '2026-01-01' } } } as LoopEvent
+        yield { type: 'text', text: 'Routing both. ' } as ToolLoopEvent
+        yield { type: 'tool_call', call: { toolName: 'submit_proposal', toolCallId: 'p1', args: { type: 'recommend', title: 'A' } } } as ToolLoopEvent
+        yield { type: 'tool_call', call: { toolName: 'schedule_followup', toolCallId: 'f9', args: { title: 'x', dueDate: '2026-01-01' } } } as ToolLoopEvent
         return
       }
-      yield { type: 'text', text: 'Done.' } as LoopEvent
+      yield { type: 'text', text: 'Done.' } as ToolLoopEvent
     }
     await runAppToolLoop({
       systemPrompt: 's', userMessage: 'u',
@@ -103,10 +103,10 @@ describe('runAppToolLoop', () => {
     const streamTurn = async function* (messages: LoopMessage[]) {
       turnMessages.push(messages)
       if (!sawToolResult(messages)) {
-        yield { type: 'tool_call', call: { toolName: 'submit_proposal', toolCallId: 'p1', args: { type: 'recommend', title: 'A' } } } as LoopEvent
+        yield { type: 'tool_call', call: { toolName: 'submit_proposal', toolCallId: 'p1', args: { type: 'recommend', title: 'A' } } } as ToolLoopEvent
         return
       }
-      yield { type: 'text', text: 'ok' } as LoopEvent
+      yield { type: 'text', text: 'ok' } as ToolLoopEvent
     }
     await runAppToolLoop({
       systemPrompt: 's', userMessage: 'u',
@@ -124,10 +124,10 @@ describe('runAppToolLoop', () => {
     const streamTurn = async function* (messages: LoopMessage[]) {
       turnMessages.push(messages)
       if (!sawToolResult(messages)) {
-        yield { type: 'tool_call', call: { toolName: 'submit_proposal', args: { type: 'recommend', title: 'A' } } } as LoopEvent
+        yield { type: 'tool_call', call: { toolName: 'submit_proposal', args: { type: 'recommend', title: 'A' } } } as ToolLoopEvent
         return
       }
-      yield { type: 'text', text: 'ok' } as LoopEvent
+      yield { type: 'text', text: 'ok' } as ToolLoopEvent
     }
     await runAppToolLoop({
       systemPrompt: 's', userMessage: 'u',
@@ -164,7 +164,7 @@ describe('runAppToolLoop', () => {
     // the backstop cap is hit.
     let seq = 0
     const streamTurn = async function* () {
-      yield { type: 'tool_call', call: { toolName: 'schedule_followup', args: { title: 'x', seq: seq++ } } } as LoopEvent
+      yield { type: 'tool_call', call: { toolName: 'schedule_followup', args: { title: 'x', seq: seq++ } } } as ToolLoopEvent
     }
     const r = await runAppToolLoop({
       systemPrompt: 's', userMessage: 'u', maxToolTurns: 3,
@@ -181,7 +181,7 @@ describe('runAppToolLoop', () => {
   it('stops with stuck-loop stopReason when the model repeats the same call 3 times', async () => {
     // Identical args each turn — stuck-loop fires at the 3rd repetition.
     const streamTurn = async function* () {
-      yield { type: 'tool_call', call: { toolName: 'schedule_followup', args: { title: 'x', dueDate: '2026-01-01' } } } as LoopEvent
+      yield { type: 'tool_call', call: { toolName: 'schedule_followup', args: { title: 'x', dueDate: '2026-01-01' } } } as ToolLoopEvent
     }
     const r = await runAppToolLoop({
       systemPrompt: 's', userMessage: 'u',
@@ -200,10 +200,10 @@ describe('runAppToolLoop', () => {
     const streamTurn = async function* (messages: LoopMessage[]) {
       turn++
       if (!sawToolResult(messages)) {
-        yield { type: 'tool_call', call: { toolName: 'submit_proposal', args: { type: 'recommend', title: 'X' } } } as LoopEvent
+        yield { type: 'tool_call', call: { toolName: 'submit_proposal', args: { type: 'recommend', title: 'X' } } } as ToolLoopEvent
         return
       }
-      yield { type: 'text', text: 'noted the failure' } as LoopEvent
+      yield { type: 'text', text: 'noted the failure' } as ToolLoopEvent
     }
     const r = await runAppToolLoop({
       systemPrompt: 's', userMessage: 'u',
