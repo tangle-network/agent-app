@@ -160,4 +160,8 @@ export interface DesignCanvasProps {
   /** Export hook — host persists the rendered blob (upload → asset row). */
   onExport?(result: { pageId: string; format: 'png' | 'jpeg'; dataUrl: string; pixelRatio: number }): Promise<void>
   className?: string
+  /** Fit the active page to the viewport once, on the first non-zero measurement. Default true. Set false to keep zoom:1/pan:0 (e.g. when restoring a saved viewport). */
+  fitOnMount?: boolean
+  /** Called once after the first real (non-zero) measurement, after the initial fit is applied (or skipped when fitOnMount is false). */
+  onReady?(): void
 }

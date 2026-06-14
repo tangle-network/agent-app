@@ -80,6 +80,12 @@ export interface DesignCanvasFullProps extends DesignCanvasProps {
     stack: ReturnType<typeof createSceneCommandStack>
     activePage: SceneDocument['pages'][number] | undefined
     onFitRef: React.MutableRefObject<(() => void) | null>
+    /** Forwarded from DesignCanvasProps. Default true: WorkspaceView fits the
+     *  active page to the viewport once, on the first non-zero measurement. */
+    fitOnMount?: boolean
+    /** Forwarded from DesignCanvasProps. Fires once after the first real
+     *  measurement, after the initial fit is applied (or skipped). */
+    onReady?(): void
     onZoomChange(zoom: number): void
     onPanChange(panX: number, panY: number): void
     onSelectElements(ids: string[], additive: boolean): void
@@ -161,6 +167,8 @@ export function DesignCanvas({
   renderSidePanel,
   onExport,
   className,
+  fitOnMount,
+  onReady,
   renderWorkspace,
   renderThumbnail,
 }: DesignCanvasFullProps) {
@@ -605,6 +613,8 @@ export function DesignCanvas({
             stack,
             activePage,
             onFitRef: fitRef,
+            fitOnMount,
+            onReady,
             onZoomChange: setZoom,
             onPanChange: setPan,
             onSelectElements: setSelectedElements,
