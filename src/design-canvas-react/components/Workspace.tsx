@@ -127,6 +127,10 @@ export interface WorkspaceViewProps {
   /** Ref the chrome fills with a fit-page callback. The chrome calls it on F /
    *  Fit button; when injected via DesignCanvasEditor the ref is shared. */
   onFitRef?: React.MutableRefObject<(() => void) | null>
+  /** Fit the active page to the viewport once, on the first non-zero measurement. Default true. */
+  fitOnMount?: boolean
+  /** Called once after the first real (non-zero) measurement, after the initial fit is applied (or skipped). */
+  onReady?(): void
 }
 
 // ---------------------------------------------------------------------------
@@ -143,6 +147,8 @@ export function WorkspaceView({
   stack,
   activePage,
   onFitRef,
+  fitOnMount = true,
+  onReady,
 }: WorkspaceViewProps) {
   // Re-render when command stack changes state.
   const [, setTick] = useState(0)
@@ -165,6 +171,7 @@ export function WorkspaceView({
 
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 })
+  const hasFittedRef = useRef(false)
 
   useLayoutEffect(() => {
     const el = containerRef.current
@@ -174,10 +181,20 @@ export function WorkspaceView({
       if (!entry) return
       const { width, height } = entry.contentRect
       setContainerSize({ width, height })
+      // One-shot fit on the first real measurement. The hasFittedRef guard keeps
+      // it single-fire across the effect's re-subscriptions (page switch must
+      // preserve the user's zoom+pan, not re-fit).
+      if (!hasFittedRef.current && width > 0 && height > 0) {
+        hasFittedRef.current = true
+        if (fitOnMount && activePage.width > 0 && activePage.height > 0) {
+          stack.setView(zoomPanMath.fitPage(activePage, { width, height }))
+        }
+        onReady?.()
+      }
     })
     ro.observe(el)
     return () => ro.disconnect()
-  }, [])
+  }, [activePage, fitOnMount, onReady, stack, zoomPanMath])
 
   const stageRef = useRef<Konva.Stage | null>(null)
 
