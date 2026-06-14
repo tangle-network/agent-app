@@ -189,3 +189,54 @@ describe('createAgentRuntime', () => {
     expect(kinds.filter((k) => k === 'event').length).toBeGreaterThanOrEqual(2)
   })
 })
+
+describe('createAgentRuntime — profile delivery (composeProfile)', () => {
+  // A fetch that captures each request body so we can assert what reached the model.
+  function capturingFetch(captured: Array<Record<string, unknown>>): typeof fetch {
+    return (async (_url: string, init: RequestInit) => {
+      captured.push(JSON.parse(String(init.body)))
+      return sseResponse([{ choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }] }])
+    }) as unknown as typeof fetch
+  }
+
+  it('applies the profile transform: folds the composed prompt AND advertises delivered tools', async () => {
+    const { handlers } = recordingHandlers()
+    const captured: Array<Record<string, unknown>> = []
+    const deliveredTool = {
+      type: 'function',
+      function: { name: 'delivered_tool', parameters: { type: 'object', properties: {} } },
+    }
+    const runtime = createAgentRuntime({
+      model: { baseUrl: 'b', apiKey: 'k', model: 'm', fetchImpl: capturingFetch(captured) },
+      taxonomy,
+      handlers,
+      systemPrompt: 'BASE',
+      composeProfile: (base) => ({
+        systemPrompt: `${base.systemPrompt}\n\n## Certified guidance\nverify the invoice id`,
+        extraTools: [...base.extraTools, deliveredTool],
+      }),
+    })
+    await runtime.run('hi', { ctx })
+    const req = captured[0]!
+    expect(JSON.stringify(req.messages)).toContain('BASE')
+    expect(JSON.stringify(req.messages)).toContain('verify the invoice id')
+    const tools = (req.tools ?? []) as Array<{ function?: { name?: string } }>
+    expect(tools.some((t) => t.function?.name === 'delivered_tool')).toBe(true)
+  })
+
+  it('without composeProfile the base prompt + tools are unchanged (zero behavior change)', async () => {
+    const { handlers } = recordingHandlers()
+    const captured: Array<Record<string, unknown>> = []
+    const runtime = createAgentRuntime({
+      model: { baseUrl: 'b', apiKey: 'k', model: 'm', fetchImpl: capturingFetch(captured) },
+      taxonomy,
+      handlers,
+      systemPrompt: 'BASE',
+    })
+    await runtime.run('hi', { ctx })
+    const req = captured[0]!
+    expect(JSON.stringify(req.messages)).toContain('BASE')
+    const tools = (req.tools ?? []) as Array<{ function?: { name?: string } }>
+    expect(tools.some((t) => t.function?.name === 'delivered_tool')).toBe(false)
+  })
+})

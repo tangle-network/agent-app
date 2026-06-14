@@ -62,9 +62,29 @@ export interface AgentRuntimeModelConfig {
   extraBody?: Record<string, unknown>
 }
 
+/** The agent's resolved profile surfaces for one turn — the things a delivered
+ *  / certified `AgentProfile` can change. Profile-WIDE on purpose: certified
+ *  delivery folds prompt-surface + skills into `systemPrompt` AND can add
+ *  certified `tool` artifacts to `extraTools` (the model's advertised tools is
+ *  rebuilt when these change). MCP servers / memory / RAG that materialize as
+ *  files or servers deliver through the sandbox-provisioning seam, not here. */
+export interface ResolvedAgentProfile {
+  systemPrompt: string
+  extraTools: unknown[]
+}
+
 export interface CreateAgentRuntimeOptions {
   /** The model endpoint the turns stream from. */
   model: AgentRuntimeModelConfig
+  /**
+   * Optional transform applied to the resolved profile surfaces each turn —
+   * the seam for certified-artifact delivery (`createCertifiedDelivery`). It is
+   * profile-WIDE (not prompt-only): it returns the effective `systemPrompt` +
+   * advertised `extraTools`. Kept generic + injected so this substrate-free core
+   * never imports `@tangle-network/agent-runtime`. Fail-closed by contract: an
+   * impl that can't reach the plane returns the base surfaces unchanged.
+   */
+  composeProfile?: (base: ResolvedAgentProfile) => ResolvedAgentProfile | Promise<ResolvedAgentProfile>
   /** The product's proposal taxonomy — advertises `submit_proposal`'s `type`
    *  enum to the model and labels the regulated subset on the result. */
   taxonomy: AppToolTaxonomy
@@ -119,17 +139,43 @@ export function createAgentRuntime(opts: CreateAgentRuntimeOptions): AgentRuntim
   // Tool schemas + the streamTurn are stable across turns — build once. The
   // model MUST be advertised the tools or it never emits a tool_call (the exact
   // failure that scores a tool-driven agent zero off-sandbox).
-  const tools = [...buildAppToolOpenAITools(opts.taxonomy), ...(opts.extraTools ?? [])]
   const m = opts.model
-  const streamTurn = createOpenAICompatStreamTurn({
-    baseUrl: m.baseUrl,
-    apiKey: m.apiKey,
-    model: m.model,
-    tools,
-    temperature: m.temperature,
-    fetchImpl: m.fetchImpl,
-    extraBody: m.extraBody,
-  })
+  const buildStreamTurn = (extraTools: unknown[]) =>
+    createOpenAICompatStreamTurn({
+      baseUrl: m.baseUrl,
+      apiKey: m.apiKey,
+      model: m.model,
+      tools: [...buildAppToolOpenAITools(opts.taxonomy), ...extraTools],
+      temperature: m.temperature,
+      fetchImpl: m.fetchImpl,
+      extraBody: m.extraBody,
+    })
+
+  // The advertised tool set is stable across turns UNLESS a delivered profile
+  // changes `extraTools` (certified-tool delivery, on the cache-refresh cadence
+  // — not per turn). Memoize the streamTurn by the active extraTools identity so
+  // it rebuilds only when the certified tools actually change.
+  const baseExtraTools = opts.extraTools ?? []
+  let activeExtraTools = baseExtraTools
+  let activeStreamTurn = buildStreamTurn(baseExtraTools)
+  const streamTurnFor = (extraTools: unknown[]) => {
+    if (extraTools !== activeExtraTools) {
+      activeExtraTools = extraTools
+      activeStreamTurn = buildStreamTurn(extraTools)
+    }
+    return activeStreamTurn
+  }
+
+  // Resolve the per-turn profile surfaces, applying the optional profile
+  // transform (certified-artifact delivery). Profile-wide: system prompt +
+  // advertised tools.
+  const resolveProfile = async (turn: AgentTurnOptions): Promise<ResolvedAgentProfile> => {
+    const base: ResolvedAgentProfile = {
+      systemPrompt: turn.systemPrompt ?? opts.systemPrompt,
+      extraTools: baseExtraTools,
+    }
+    return opts.composeProfile ? opts.composeProfile(base) : base
+  }
 
   const isExecutableTool = (name: string): boolean =>
     isAppToolName(name) || (opts.isOtherExecutableTool?.(name) ?? false)
@@ -151,25 +197,27 @@ export function createAgentRuntime(opts: CreateAgentRuntimeOptions): AgentRuntim
   }
 
   return {
-    run(userMessage, turn) {
+    async run(userMessage, turn) {
+      const profile = await resolveProfile(turn)
       return runAppToolLoop({
-        systemPrompt: turn.systemPrompt ?? opts.systemPrompt,
+        systemPrompt: profile.systemPrompt,
         userMessage,
         priorMessages: turn.priorMessages,
         // The awaitable loop consumes only text + tool_call; the app's UI-only
         // reasoning/usage events ride the substrate's `other` channel.
-        streamTurn: narrowToToolLoopEvents(streamTurn),
+        streamTurn: narrowToToolLoopEvents(streamTurnFor(profile.extraTools)),
         executeToolCall: buildExecutor(turn),
         isExecutableTool,
         maxToolTurns: opts.maxToolTurns,
       })
     },
-    stream(userMessage, turn) {
-      return streamAppToolLoop<LoopEvent>({
-        systemPrompt: turn.systemPrompt ?? opts.systemPrompt,
+    async *stream(userMessage, turn) {
+      const profile = await resolveProfile(turn)
+      yield* streamAppToolLoop<LoopEvent>({
+        systemPrompt: profile.systemPrompt,
         userMessage,
         priorMessages: turn.priorMessages,
-        streamTurn,
+        streamTurn: streamTurnFor(profile.extraTools),
         extractText: (ev) => (ev.type === 'text' ? ev.text : ''),
         extractToolCall: (ev) => (ev.type === 'tool_call' ? ev.call : null),
         isExecutableTool,
