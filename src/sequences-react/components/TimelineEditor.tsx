@@ -50,7 +50,7 @@ import {
 import type { SequenceApplyResult } from '../../sequences/apply'
 import type { SequenceClip, SequenceMediaKind } from '../../sequences/model'
 import type { SequenceOperation } from '../../sequences/operations'
-import type { SnapPoint, TimelineCommand, TimelineEditorProps, VideoFrameProvider } from '../contracts'
+import type { PlaybackClock, SnapPoint, TimelineCommand, TimelineEditorProps, VideoFrameProvider } from '../contracts'
 import { createCommandStack } from '../engine/command-stack'
 import {
   addCaptionCommand,
@@ -146,27 +146,45 @@ export function TimelineEditor(props: TimelineEditorProps) {
     stack.reset(props.timeline)
   }, [props.timeline, stack])
 
-  const clock = useMemo(
-    () => createPlaybackClock({ fps, durationFrames: timeline.sequence.durationFrames }),
-    [fps, timeline.sequence.durationFrames],
+  // The playback clock lives in state so render-time consumers (preview canvas,
+  // transport, scrub handlers) share the exact instance the driving effect owns.
+  // Creation and disposal are co-located inside that effect, keyed on the engine
+  // config, so every (re)mount builds a fresh clock. Tying a render-created
+  // clock's disposal to an effect cleanup instead reuses the disposed instance
+  // under React StrictMode's mount/unmount/remount probe — the remount then
+  // seeks a disposed clock ("PlaybackClock is disposed"). The initial state value
+  // is a placeholder the effect disposes and replaces on mount; a recreated clock
+  // (duration change) resumes from the prior playhead, tracked in a ref.
+  const [clock, setClock] = useState<PlaybackClock>(() =>
+    createPlaybackClock({ fps, durationFrames: timeline.sequence.durationFrames }),
   )
-  useEffect(() => () => clock.dispose(), [clock])
-
+  const clockRef = useRef(clock)
   const [playheadFrame, setPlayheadFrame] = useState(0)
+  const playheadFrameRef = useRef(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const onPlayheadChangeRef = useRef(props.onPlayheadChange)
   onPlayheadChangeRef.current = props.onPlayheadChange
+
   useEffect(() => {
-    // A recreated clock (duration change) resumes from the prior playhead.
-    clock.seek(Math.min(playheadFrame, timeline.sequence.durationFrames - 1))
-    return clock.subscribe((frame) => {
+    const next = createPlaybackClock({ fps, durationFrames: timeline.sequence.durationFrames })
+    // Dispose the clock this run replaces — the initial placeholder on the first
+    // run, or an already-disposed prior clock on a config change (dispose is
+    // idempotent) — so no instance is left undisposed across recreations.
+    clockRef.current.dispose()
+    clockRef.current = next
+    setClock(next)
+    next.seek(Math.min(playheadFrameRef.current, timeline.sequence.durationFrames - 1))
+    const unsubscribe = next.subscribe((frame) => {
+      playheadFrameRef.current = frame
       setPlayheadFrame(frame)
-      setIsPlaying(clock.isPlaying())
+      setIsPlaying(next.isPlaying())
       onPlayheadChangeRef.current?.(frame)
     })
-    // playheadFrame is intentionally read once per clock identity.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clock])
+    return () => {
+      unsubscribe()
+      next.dispose()
+    }
+  }, [fps, timeline.sequence.durationFrames])
 
   const ownedProviderRef = useRef<VideoFrameProvider | null>(null)
   const frameProvider = useMemo(() => {

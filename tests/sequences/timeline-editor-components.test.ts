@@ -8,7 +8,7 @@
  */
 
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { createElement } from 'react'
+import { createElement, StrictMode } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { SequenceOperation } from '../../src/sequences/operations'
 import type { SequenceTimeline } from '../../src/sequences/model'
@@ -452,5 +452,29 @@ describe('TimelineEditor', () => {
 
     const lastCall = onSelectionChange.mock.calls.at(-1)?.[0] as Array<{ id: string }>
     expect(lastCall.map((clip) => clip.id)).toEqual(['clip-video'])
+  })
+
+  it('survives the StrictMode mount/unmount/remount probe with a live playback clock', () => {
+    // StrictMode double-invokes mount effects in development. The playback clock
+    // must be rebuilt on remount rather than seeked after disposal — a clock
+    // created in render and disposed in a cleanup is reused across the probe,
+    // and the regression throws "PlaybackClock is disposed" during the remount,
+    // failing this render.
+    render(
+      createElement(
+        StrictMode,
+        null,
+        createElement(TimelineEditor, {
+          timeline: fixtureTimeline(),
+          canWrite: true,
+          onApplyOperations: vi.fn(async () => {}),
+        }),
+      ),
+    )
+
+    // Driving the transport proves the surviving clock is the live instance, not
+    // a disposed placeholder: play() would throw on a disposed clock.
+    fireEvent.click(screen.getByLabelText('Play'))
+    expect(screen.getByLabelText('Pause')).toBeTruthy()
   })
 })
