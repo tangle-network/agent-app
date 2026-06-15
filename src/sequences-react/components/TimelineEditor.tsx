@@ -153,11 +153,12 @@ export function TimelineEditor(props: TimelineEditorProps) {
   // clock's disposal to an effect cleanup instead reuses the disposed instance
   // under React StrictMode's mount/unmount/remount probe — the remount then
   // seeks a disposed clock ("PlaybackClock is disposed"). The initial state value
-  // is a placeholder the effect replaces on mount; a recreated clock (duration
-  // change) resumes from the prior playhead, tracked in a ref.
+  // is a placeholder the effect disposes and replaces on mount; a recreated clock
+  // (duration change) resumes from the prior playhead, tracked in a ref.
   const [clock, setClock] = useState<PlaybackClock>(() =>
     createPlaybackClock({ fps, durationFrames: timeline.sequence.durationFrames }),
   )
+  const clockRef = useRef(clock)
   const [playheadFrame, setPlayheadFrame] = useState(0)
   const playheadFrameRef = useRef(0)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -166,6 +167,11 @@ export function TimelineEditor(props: TimelineEditorProps) {
 
   useEffect(() => {
     const next = createPlaybackClock({ fps, durationFrames: timeline.sequence.durationFrames })
+    // Dispose the clock this run replaces — the initial placeholder on the first
+    // run, or an already-disposed prior clock on a config change (dispose is
+    // idempotent) — so no instance is left undisposed across recreations.
+    clockRef.current.dispose()
+    clockRef.current = next
     setClock(next)
     next.seek(Math.min(playheadFrameRef.current, timeline.sequence.durationFrames - 1))
     const unsubscribe = next.subscribe((frame) => {
