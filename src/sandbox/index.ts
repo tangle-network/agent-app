@@ -12,7 +12,7 @@ import {
   type AppToolContext,
   type ToolHeaderNames,
 } from '../tools/index'
-import type { Harness } from '../harness/index'
+import { assertHarnessModelCompatible, type Harness } from '../harness/index'
 
 export type Outcome<T> =
   | { succeeded: true; value: T }
@@ -329,6 +329,11 @@ export async function* streamSandboxPrompt(
     model: options?.model,
     modelApiKey: options?.modelApiKey,
   })
+
+  // Server-side enforcement of the harness↔model policy: a vendor-locked harness
+  // (claude-code/codex/kimi-code) must not be sent a foreign-provider model, even
+  // if the UI snap was bypassed. Provider-less ids pass (session's own config).
+  if (model?.model) assertHarnessModelCompatible(harness, model.model)
 
   const prompt = flattenHistory(message, options?.history)
 
