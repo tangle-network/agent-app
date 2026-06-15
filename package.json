@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "packageManager": "pnpm@10.33.4",
   "description": "Application-shell framework for Tangle agent products: a bounded tool loop, the structured agent→app tool side channel, integration-hub client, per-workspace billing, and crypto — composed over the Tangle agent substrate through typed seams.",
   "keywords": [
@@ -81,6 +81,31 @@
       "types": "./dist/skills/index.d.ts",
       "import": "./dist/skills/index.js",
       "default": "./dist/skills/index.js"
+    },
+    "./profile": {
+      "types": "./dist/profile/index.d.ts",
+      "import": "./dist/profile/index.js",
+      "default": "./dist/profile/index.js"
+    },
+    "./prompt": {
+      "types": "./dist/prompt/index.d.ts",
+      "import": "./dist/prompt/index.js",
+      "default": "./dist/prompt/index.js"
+    },
+    "./model-resolution": {
+      "types": "./dist/model-resolution/index.d.ts",
+      "import": "./dist/model-resolution/index.js",
+      "default": "./dist/model-resolution/index.js"
+    },
+    "./sandbox": {
+      "types": "./dist/sandbox/index.d.ts",
+      "import": "./dist/sandbox/index.js",
+      "default": "./dist/sandbox/index.js"
+    },
+    "./run": {
+      "types": "./dist/run/index.d.ts",
+      "import": "./dist/run/index.js",
+      "default": "./dist/run/index.js"
     },
     "./config": {
       "types": "./dist/config/index.d.ts",
