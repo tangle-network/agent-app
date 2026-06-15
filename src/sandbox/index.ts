@@ -5,6 +5,8 @@ import {
   type AgentProfileMcpServer,
   type SandboxInstance,
   type ScopedTokenScope,
+  type StorageConfig,
+  type PromptResult,
 } from '@tangle-network/sandbox'
 import {
   buildAppToolMcpServer,
@@ -50,6 +52,32 @@ export interface ProviderResolutionConfig {
 export interface SandboxBuildContext {
   workspaceId: string
   connectedIntegrationIds: string[]
+  userId?: string
+}
+
+// SDK-typed snapshot storage config (re-exported for product seam closures).
+export type { StorageConfig }
+
+// Scope handed to per-identity seams. workspaceId is always present; userId is
+// present when the lifecycle op carries one. Workspace-keyed products ignore userId.
+export interface SandboxScope {
+  workspaceId: string
+  userId?: string
+}
+
+// Snapshot RESTORE-on-create. Returned alongside storage; undefined => fresh box.
+export interface SandboxRestoreSpec {
+  fromSnapshot: string
+  fromSandboxId: string
+}
+
+// Reuse health gate + sidecar liveness. The exec+timeout-race is generic; the
+// sidecarProcessPattern is harness-specific (which process is the live sidecar),
+// so it is a closure. Absent => no liveness probe (reuse on metadata.harness match).
+export interface LivenessProbeConfig {
+  sidecarProcessPattern: (harness: Harness) => string
+  execTimeoutMs?: number
+  psTimeoutMs?: number
 }
 
 export interface ProfileComposeOptions {
@@ -60,7 +88,11 @@ export interface ProfileComposeOptions {
 }
 
 export interface SandboxRuntimeConfig {
-  credentials: () => SandboxClientCredentials | null
+  // Widened to accept an optional scope and be async so a per-user key can be
+  // minted. The sync, no-arg form still satisfies the type (back-compat).
+  credentials: (
+    scope?: SandboxScope,
+  ) => SandboxClientCredentials | null | Promise<SandboxClientCredentials | null>
   name: (workspaceId: string) => string
   metadata: (harness: Harness) => Record<string, unknown>
   connectedIntegrationIds: (workspaceId: string) => Promise<string[]>
@@ -71,6 +103,26 @@ export interface SandboxRuntimeConfig {
   permissionRole?: (workspaceRole: string) => SandboxPermissionLevel
   resources?: SandboxResourceConfig
   provider?: ProviderResolutionConfig
+
+  // BYOS3/R2 snapshot storage. Returns undefined => key omitted entirely
+  // (fail-closed when creds absent). Product owns bucket/endpoint/credentials/prefix.
+  storage?: (ctx: SandboxBuildContext) => StorageConfig | undefined
+  // Snapshot RESTORE-on-create. undefined => fresh box.
+  restore?: (ctx: SandboxBuildContext) => SandboxRestoreSpec | undefined
+  // Per-identity box NAME. Defaults to name(scope.workspaceId) when absent.
+  boxKey?: (scope: SandboxScope) => string
+  // Per-workspace child-key mint: overrides the resolved model apiKey before create.
+  // Applied only when a model is resolved and its provider is openai-compat.
+  childKeyMint?: (scope: SandboxScope) => Promise<Outcome<string>>
+  // One-shot post-running bootstrap, on BOTH create and reuse paths (idempotency
+  // is the closure's job — it owns the marker check).
+  bootstrap?: (box: SandboxInstance, scope: SandboxScope) => Promise<Outcome<void>>
+  // Reuse health gate + sidecar liveness probe.
+  livenessProbe?: LivenessProbeConfig
+  // default true: try stopped-resume before create.
+  resumeStopped?: boolean
+  // default false: bake resolveModel() into backend.model at create.
+  backendModelAtCreate?: boolean
 }
 
 export const DEFAULT_SANDBOX_RESOURCES: SandboxResourceConfig = {
@@ -89,16 +141,25 @@ interface ClientCacheEntry {
 
 let _cached: ClientCacheEntry | null = null
 
-export function getClient(shell: SandboxRuntimeConfig): Sandbox {
-  const creds = shell.credentials()
-  if (!creds) throw new Error('sandbox credentials are required (apiKey/baseUrl)')
-
+function getClientFromCreds(creds: SandboxClientCredentials): Sandbox {
   const fingerprint = `${creds.apiKey} ${creds.baseUrl}`
   if (_cached && _cached.fingerprint === fingerprint) return _cached.client
 
   const client = new Sandbox({ apiKey: creds.apiKey, baseUrl: creds.baseUrl })
   _cached = { client, fingerprint }
   return client
+}
+
+// Sync client for non-scoped callers (secretStoreFromClient etc.). Resolves
+// credentials with no scope; throws if the seam returns a Promise — scoped
+// products must use the async ensureWorkspaceSandbox path.
+export function getClient(shell: SandboxRuntimeConfig): Sandbox {
+  const creds = shell.credentials()
+  if (creds && typeof (creds as Promise<unknown>).then === 'function') {
+    throw new Error('getClient: scoped (async) credentials require the async sandbox path')
+  }
+  if (!creds) throw new Error('sandbox credentials are required (apiKey/baseUrl)')
+  return getClientFromCreds(creds as SandboxClientCredentials)
 }
 
 export function resetClientCache(): void {
@@ -140,6 +201,14 @@ export interface EnsureWorkspaceSandboxOptions {
   workspaceId: string
   userId?: string
   harness: Harness
+  // When set, both the running-reuse and stopped-resume short-circuits are
+  // skipped and any name-matched box is deleted before create.
+  forceNew?: boolean
+}
+
+// Single-quote a string for safe interpolation into a shell command.
+function shellSingleQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`
 }
 
 async function listRunning(
@@ -171,31 +240,134 @@ async function deleteBox(box: SandboxInstance): Promise<Outcome<void>> {
 // named harness) is what enforces correctness.
 type CreatePayload = Parameters<Sandbox['create']>[0]
 
+// Generic exec+sidecar liveness probe. Absent probe => always alive (the prior
+// reuse-on-metadata-match behavior). With a probe: the container must answer an
+// `echo alive` exec within execTimeoutMs, and the sidecar process must be found
+// by pgrep within psTimeoutMs (an inconclusive pgrep is treated as reusable).
+async function isBoxAlive(
+  box: SandboxInstance,
+  harness: Harness,
+  probe: LivenessProbeConfig | undefined,
+): Promise<boolean> {
+  if (!probe) return true
+  const execTimeout = probe.execTimeoutMs ?? 5000
+  const psTimeout = probe.psTimeoutMs ?? 3000
+  const race = <T>(p: Promise<T>, ms: number, label: string): Promise<T> =>
+    Promise.race([
+      p,
+      new Promise<T>((_, reject) => setTimeout(() => reject(new Error(label)), ms)),
+    ])
+  try {
+    const alive = await race(box.exec('echo alive'), execTimeout, 'alive check timeout')
+    if (!alive.stdout.includes('alive')) return false
+    const pattern = probe.sidecarProcessPattern(harness)
+    try {
+      const ps = await race(
+        box.exec(`pgrep -f ${shellSingleQuote(pattern)} || echo no-sidecar`),
+        psTimeout,
+        'ps check timeout',
+      )
+      if (ps.stdout.includes('no-sidecar')) return false
+    } catch {
+      // sidecar probe inconclusive — container is alive, treat as reusable
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Resume a name-matched stopped box and wait for it to reach running. Returns
+// ok(null) when no stopped box matches the name.
+async function resumeStoppedBox(
+  client: Sandbox,
+  name: string,
+  timeoutMs: number,
+): Promise<Outcome<SandboxInstance | null>> {
+  try {
+    const stopped = await client.list({ status: 'stopped' })
+    const match = stopped.find((s) => s.name === name) ?? null
+    if (!match) return ok(null)
+    await match.resume()
+    await match.waitFor('running', { timeoutMs })
+    return ok(match)
+  } catch (err) {
+    return fail(err)
+  }
+}
+
 export async function ensureWorkspaceSandbox(
   shell: SandboxRuntimeConfig,
   options: EnsureWorkspaceSandboxOptions,
 ): Promise<SandboxInstance> {
-  const { workspaceId, userId, harness } = options
-  const client = getClient(shell)
-  const name = shell.name(workspaceId)
+  const { workspaceId, userId, harness, forceNew } = options
+  const scope: SandboxScope = { workspaceId, ...(userId ? { userId } : {}) }
+  const creds = await shell.credentials(scope)
+  if (!creds) throw new Error('sandbox credentials are required (apiKey/baseUrl)')
+  const client = getClientFromCreds(creds)
+  const name = shell.boxKey ? shell.boxKey(scope) : shell.name(workspaceId)
   const resources = shell.resources ?? DEFAULT_SANDBOX_RESOURCES
+  const resumeTimeout = 120_000
 
+  // Stage 1 — running-box reuse (skipped on forceNew).
   const existing = await listRunning(client, name)
   if (existing.succeeded && existing.value) {
     const found = existing.value
-    if (found.metadata?.harness === harness) return found
-    const dropped = await deleteBox(found)
-    if (!dropped.succeeded) {
-      throw new Error(
-        `harness-mismatched sandbox ${name} ` +
-          `(was ${String(found.metadata?.harness ?? 'unknown')}, want ${harness}) could not be deleted`,
-        { cause: dropped.error },
-      )
+    if (forceNew) {
+      const dropped = await deleteBox(found)
+      if (!dropped.succeeded) {
+        throw new Error(`forceNew: sandbox ${name} could not be deleted`, { cause: dropped.error })
+      }
+    } else if (
+      found.metadata?.harness === harness &&
+      (await isBoxAlive(found, harness, shell.livenessProbe))
+    ) {
+      if (shell.bootstrap) {
+        const boot = await shell.bootstrap(found, scope)
+        if (!boot.succeeded) {
+          throw new Error(`bootstrap failed on reused box ${name}`, { cause: boot.error })
+        }
+      }
+      return found
+    } else {
+      const dropped = await deleteBox(found)
+      if (!dropped.succeeded) {
+        throw new Error(
+          `sandbox ${name} ` +
+            `(was ${String(found.metadata?.harness ?? 'unknown')}, want ${harness}, or unresponsive) ` +
+            `could not be deleted`,
+          { cause: dropped.error },
+        )
+      }
     }
   }
 
+  // Stage 2 — stopped-box resume (skipped on forceNew or resumeStopped===false).
+  if (!forceNew && shell.resumeStopped !== false) {
+    const resumed = await resumeStoppedBox(client, name, resumeTimeout)
+    if (
+      resumed.succeeded &&
+      resumed.value &&
+      (await isBoxAlive(resumed.value, harness, shell.livenessProbe))
+    ) {
+      const box = resumed.value
+      if (shell.bootstrap) {
+        const boot = await shell.bootstrap(box, scope)
+        if (!boot.succeeded) {
+          throw new Error(`bootstrap failed on resumed box ${name}`, { cause: boot.error })
+        }
+      }
+      return box
+    }
+  }
+
+  // Stage 3 — create fresh.
   const connectedIntegrationIds = await shell.connectedIntegrationIds(workspaceId)
-  const buildCtx: SandboxBuildContext = { workspaceId, connectedIntegrationIds }
+  const buildCtx: SandboxBuildContext = {
+    workspaceId,
+    connectedIntegrationIds,
+    ...(userId ? { userId } : {}),
+  }
   const [secrets, env, files] = await Promise.all([
     shell.secrets(workspaceId),
     shell.env(buildCtx),
@@ -205,6 +377,23 @@ export async function ensureWorkspaceSandbox(
 
   const role = userId && shell.permissionRole ? shell.permissionRole('developer') : undefined
 
+  // Bake the model at create when opted in. childKeyMint overrides the apiKey
+  // per-workspace; a typed mint failure falls through to the parent key (logged).
+  let model = shell.backendModelAtCreate ? resolveModel(shell.provider) : undefined
+  if (model && shell.childKeyMint && model.provider === 'openai-compat') {
+    const minted = await shell.childKeyMint(scope)
+    if (minted.succeeded) model = { ...model, apiKey: minted.value }
+    else {
+      console.error(
+        `[sandbox] childKeyMint failed for ${workspaceId}; using parent key:`,
+        minted.error.message,
+      )
+    }
+  }
+
+  const storage = shell.storage?.(buildCtx)
+  const restore = shell.restore?.(buildCtx)
+
   const payload = {
     name,
     image: resources.image,
@@ -212,7 +401,9 @@ export async function ensureWorkspaceSandbox(
     ...(userId ? { permissions: { initialUsers: [{ userId, role }] } } : {}),
     env,
     secrets,
-    backend: { type: harness, profile },
+    backend: { type: harness, profile, ...(model ? { model } : {}) },
+    ...(storage ? { storage } : {}),
+    ...(restore ? restore : {}),
     maxLifetimeSeconds: resources.maxLifetimeSeconds,
     idleTimeoutSeconds: resources.idleTimeoutSeconds,
     resources: {
@@ -226,6 +417,13 @@ export async function ensureWorkspaceSandbox(
 
   await box.waitFor('running', { timeoutMs: 120_000 })
   if (!box.connection?.runtimeUrl) await box.refresh()
+
+  if (shell.bootstrap) {
+    const boot = await shell.bootstrap(box, scope)
+    if (!boot.succeeded) {
+      throw new Error(`bootstrap failed on new box ${name}`, { cause: boot.error })
+    }
+  }
   return box
 }
 
@@ -314,6 +512,11 @@ export interface StreamSandboxPromptOptions {
   appToolMcp?: Record<string, AgentProfileMcpServer>
   baseProfileMcp?: Record<string, AgentProfileMcpServer>
   extraMcp?: Record<string, AgentProfileMcpServer>
+  signal?: AbortSignal
+  timeoutMs?: number
+  // When true, an interactive question event throws instead of yielding —
+  // detached (cron/mission-step) runs have no consumer to answer it.
+  disallowQuestions?: boolean
 }
 
 type StreamPromptOptions = Parameters<SandboxInstance['streamPrompt']>[1]
@@ -347,6 +550,8 @@ export async function* streamSandboxPrompt(
     sessionId: options?.sessionId,
     executionId: options?.executionId,
     lastEventId: options?.lastEventId,
+    ...(options?.signal ? { signal: options.signal } : {}),
+    ...(options?.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
     backend: {
       type: harness,
       profile: profileWithEffort,
@@ -354,7 +559,26 @@ export async function* streamSandboxPrompt(
     },
   } as StreamPromptOptions)
 
-  for await (const event of stream) yield event
+  let severedFinishReason: string | null = null
+  for await (const event of stream) {
+    const step = classifySeveredStream(event)
+    if (step) severedFinishReason = step.kind === 'step-finish' && step.severed ? step.reason : null
+    if (severedFinishReason && isTerminalPromptEvent(event)) {
+      throw new Error(`sandbox model stream severed mid-turn (reason="${severedFinishReason}")`)
+    }
+    if (options?.disallowQuestions) {
+      const q = detectInteractiveQuestion(event)
+      if (q) {
+        throw new Error(`sandbox agent asked an interactive question during an autonomous run: ${q}`)
+      }
+    }
+    yield event
+  }
+  // Reconnect-exhausted path: the stream ended on a severed step without a
+  // terminal event. A truncated turn must fail loud, not return silently.
+  if (severedFinishReason) {
+    throw new Error(`sandbox model stream severed mid-turn (reason="${severedFinishReason}")`)
+  }
 }
 
 export async function runSandboxPrompt(
@@ -523,4 +747,197 @@ export async function mintSandboxScopedToken(
   } catch (err) {
     return fail(err)
   }
+}
+
+// Detached single-turn advance. The SDK SandboxInstance has no `driveTurn`; the
+// non-streaming sibling of streamPrompt is box.prompt(message, opts) -> PromptResult.
+// Returns a typed Outcome so a failed turn is inspected, not swallowed.
+export async function driveSandboxTurn(
+  shell: SandboxRuntimeConfig,
+  box: SandboxInstance,
+  message: string,
+  options: StreamSandboxPromptOptions & { sessionId: string },
+): Promise<Outcome<PromptResult>> {
+  const harness = options.harness ?? 'opencode'
+  const model = resolveModel(shell.provider, {
+    model: options.model,
+    modelApiKey: options.modelApiKey,
+  })
+  if (model?.model) assertHarnessModelCompatible(harness, model.model)
+  const prompt = flattenHistory(message, options.history)
+  const appToolMcp = options.appToolMcp ?? {}
+  const extraMcp = mergeExtraMcp(appToolMcp, options.baseProfileMcp ?? {}, options.extraMcp)
+  const profile = attachReasoningEffort(
+    shell.profile({ systemPrompt: options.systemPrompt, extraMcp }),
+    harness,
+    options.effort,
+  )
+  try {
+    const result = await box.prompt(prompt, {
+      sessionId: options.sessionId,
+      ...(options.executionId ? { executionId: options.executionId } : {}),
+      ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+      ...(options.signal ? { signal: options.signal } : {}),
+      backend: { type: harness, profile, ...(model ? { model } : {}) },
+    } as Parameters<SandboxInstance['prompt']>[1])
+    if (!result.success) return fail(new Error(result.error ?? 'sandbox turn failed'))
+    return ok(result)
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+// Terminal-proxy HMAC token. Identity tuple is generic; the secret comes from a
+// closure (fail-loud if absent).
+export interface TerminalProxyIdentity {
+  userId: string
+  workspaceId: string
+  sandboxId: string
+}
+
+const TERMINAL_PROXY_TOKEN_TTL_MS = 15 * 60 * 1000
+
+async function signTerminalProxyToken(secret: string, encodedPayload: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  )
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(encodedPayload))
+  return base64UrlEncodeBytes(new Uint8Array(sig))
+}
+
+export async function mintTerminalProxyToken(
+  secret: string,
+  identity: TerminalProxyIdentity,
+  ttlMs = TERMINAL_PROXY_TOKEN_TTL_MS,
+): Promise<Outcome<{ token: string; expiresAt: Date }>> {
+  if (!secret) return fail(new Error('mintTerminalProxyToken: secret is required'))
+  if (!identity.userId || !identity.workspaceId || !identity.sandboxId) {
+    return fail(new Error('mintTerminalProxyToken: userId/workspaceId/sandboxId are required'))
+  }
+  const expiresAt = new Date(Date.now() + ttlMs)
+  const payload = { ...identity, exp: Math.floor(expiresAt.getTime() / 1000) }
+  const encoded = base64UrlEncodeUtf8(JSON.stringify(payload))
+  const sig = await signTerminalProxyToken(secret, encoded)
+  return ok({ token: `${encoded}.${sig}`, expiresAt })
+}
+
+export async function verifyTerminalProxyToken(
+  secret: string,
+  token: string,
+  expected: TerminalProxyIdentity,
+): Promise<boolean> {
+  if (!secret) return false
+  const [encoded, sig, extra] = token.split('.')
+  if (!encoded || !sig || extra !== undefined) return false
+  const expectedSig = await signTerminalProxyToken(secret, encoded)
+  if (!constantTimeEqual(sig, expectedSig)) return false
+  let payload: TerminalProxyIdentity & { exp: number }
+  try {
+    payload = JSON.parse(base64UrlDecodeUtf8(encoded))
+  } catch {
+    return false
+  }
+  return (
+    payload.userId === expected.userId &&
+    payload.workspaceId === expected.workspaceId &&
+    payload.sandboxId === expected.sandboxId &&
+    Number.isFinite(payload.exp) &&
+    payload.exp > Math.floor(Date.now() / 1000)
+  )
+}
+
+function base64UrlEncodeBytes(bytes: Uint8Array): string {
+  let bin = ''
+  for (const b of bytes) bin += String.fromCharCode(b)
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function base64UrlEncodeUtf8(v: string): string {
+  return base64UrlEncodeBytes(new TextEncoder().encode(v))
+}
+
+function base64UrlDecodeUtf8(v: string): string {
+  const padded = v.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(v.length / 4) * 4, '=')
+  const bin = atob(padded)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i)
+  return new TextDecoder().decode(bytes)
+}
+
+function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let r = 0
+  for (let i = 0; i < a.length; i += 1) r |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return r === 0
+}
+
+// Severed-stream classifier. Generic to any router-backed harness: a final step
+// that finished with error/other/unknown is a truncated turn, not a completed one.
+const SEVERED_FINISH_REASONS = new Set(['error', 'other', 'unknown'])
+
+export type SandboxStepTransition =
+  | { kind: 'step-start' }
+  | { kind: 'step-finish'; reason: string; severed: boolean }
+
+function asPlainRecord(v: unknown): Record<string, unknown> | null {
+  return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null
+}
+
+export function classifySeveredStream(event: unknown): SandboxStepTransition | null {
+  const root = asPlainRecord(event)
+  if (!root || root.type !== 'message.part.updated') return null
+  const body = asPlainRecord(root.properties) ?? asPlainRecord(root.data) ?? root
+  const part = asPlainRecord(body.part)
+  if (!part) return null
+  if (part.type === 'step-start') return { kind: 'step-start' }
+  if (part.type !== 'step-finish') return null
+  const reason = typeof part.reason === 'string' && part.reason ? part.reason : 'unknown'
+  return { kind: 'step-finish', reason, severed: SEVERED_FINISH_REASONS.has(reason) }
+}
+
+export function isTerminalPromptEvent(event: unknown): boolean {
+  const t = asPlainRecord(event)?.type
+  return t === 'result' || t === 'done'
+}
+
+// Interactive-question detector. Returns the question text or null. Used by
+// streamSandboxPrompt when disallowQuestions is set.
+export function detectInteractiveQuestion(event: unknown): string | null {
+  const root = asPlainRecord(event)
+  if (!root) return null
+  const type = typeof root.type === 'string' ? root.type : undefined
+  const data = asPlainRecord(root.data)
+  const props = asPlainRecord(root.properties)
+  const body = props ?? data ?? root
+  if (type === 'question.asked' || type === 'question') return firstQuestionText(body)
+  const part = asPlainRecord(data?.part) ?? asPlainRecord(body.part)
+  const tool =
+    (typeof part?.tool === 'string' && part.tool) ||
+    (typeof part?.name === 'string' && part.name) ||
+    (typeof body.tool === 'string' && body.tool) ||
+    undefined
+  const isQ =
+    type === 'message.part.updated' &&
+    (tool === 'question' || asPlainRecord(part)?.type === 'question')
+  if (!isQ) return null
+  const state = asPlainRecord(asPlainRecord(part)?.state)
+  return firstQuestionText(asPlainRecord(state?.input) ?? state ?? part ?? body)
+}
+
+function firstQuestionText(value: Record<string, unknown> | null): string {
+  const arr = Array.isArray(value?.questions)
+    ? value!.questions
+    : Array.isArray(asPlainRecord(value?.input)?.questions)
+      ? (asPlainRecord(value!.input)!.questions as unknown[])
+      : []
+  const first = asPlainRecord(arr[0])
+  const q =
+    (typeof first?.question === 'string' && first.question) ||
+    (typeof first?.prompt === 'string' && first.prompt) ||
+    undefined
+  return q ?? 'interactive question'
 }
