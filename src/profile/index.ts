@@ -101,6 +101,10 @@ export interface ProfileOverlay {
    *  `prompt.systemPrompt` while keeping base `prompt.instructions`. When unset,
    *  the base prompt passes through unchanged. */
   systemPrompt?: string
+  /** Extra instruction lines merged onto the active prompt (e.g. a per-turn
+   *  domain/integration directive). Appended to base `prompt.instructions` by
+   *  the SDK merge. */
+  instructions?: string[]
   /** Profile `name` override. When unset, the base name is kept. */
   name?: string
 }
@@ -156,9 +160,13 @@ export function composeAgentProfile(
     : userFiles
   const files = [...channelFiles, ...overlayFiles]
 
+  const promptOverlay: { systemPrompt?: string; instructions?: string[] } = {}
+  if (overlay.systemPrompt) promptOverlay.systemPrompt = overlay.systemPrompt
+  if (overlay.instructions && overlay.instructions.length > 0) promptOverlay.instructions = overlay.instructions
+
   const overlayProfile: AgentProfile = {
     ...(overlay.name ? { name: overlay.name } : {}),
-    ...(overlay.systemPrompt ? { prompt: { systemPrompt: overlay.systemPrompt } } : {}),
+    ...(Object.keys(promptOverlay).length > 0 ? { prompt: promptOverlay } : {}),
     ...(overlay.mcp ? { mcp: overlay.mcp } : {}),
     resources: { files },
   }
@@ -166,7 +174,21 @@ export function composeAgentProfile(
   const merged = mergeAgentProfiles(base, overlayProfile)
   if (!merged)
     throw new Error('composeAgentProfile: mergeAgentProfiles returned undefined for a defined base')
-  return merged
+  return pruneEmptyResourceChannels(merged)
+}
+
+/** Drop empty resource channels the SDK merge normalizes in (`tools`/`skills`/
+ *  `agents`/`commands`: `[]`), so the composed profile's wire payload carries
+ *  only the channels that actually have content — one canonical shape every app
+ *  emits, instead of a sidecar payload full of empty arrays. */
+function pruneEmptyResourceChannels(profile: AgentProfile): AgentProfile {
+  if (!profile.resources) return profile
+  const kept = Object.fromEntries(
+    Object.entries(profile.resources).filter(([, value]) => !(Array.isArray(value) && value.length === 0)),
+  ) as AgentProfile['resources']
+  const out: AgentProfile = { ...profile, resources: kept }
+  if (kept && Object.keys(kept).length === 0) delete out.resources
+  return out
 }
 
 /** True body of an addendum file with HTML comments stripped — an all-comment

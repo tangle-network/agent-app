@@ -201,3 +201,19 @@ describe('makeEvolvableSection', () => {
     expect(section.evolvable).toBe(true)
   })
 })
+
+describe('composeAgentProfile — canonical wire shape', () => {
+  it('prunes empty resource channels the SDK merge normalizes in', () => {
+    const out = composeAgentProfile(BASE, {})
+    const res = (out.resources ?? {}) as Record<string, unknown>
+    // No empty tools/skills/agents/commands arrays leak to the wire payload.
+    for (const k of ['tools', 'skills', 'agents', 'commands']) {
+      expect(Array.isArray(res[k]) && (res[k] as unknown[]).length === 0).toBe(false)
+    }
+  })
+
+  it('merges an instructions overlay onto the prompt', () => {
+    const out = composeAgentProfile(BASE, {}, { instructions: ['per-turn directive'] })
+    expect(out.prompt?.instructions).toContain('per-turn directive')
+  })
+})
