@@ -1,8 +1,8 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "packageManager": "pnpm@10.33.4",
-  "description": "Application-shell framework for Tangle agent products: a bounded tool loop, the structured agent\u2192app tool side channel, integration-hub client, per-workspace billing, and crypto \u2014 composed over the Tangle agent substrate through typed seams.",
+  "description": "Application-shell framework for Tangle agent products: a bounded tool loop, the structured agent→app tool side channel, integration-hub client, per-workspace billing, and crypto — composed over the Tangle agent substrate through typed seams.",
   "keywords": [
     "tangle",
     "ai-agent",
@@ -76,6 +76,11 @@
       "types": "./dist/knowledge/index.d.ts",
       "import": "./dist/knowledge/index.js",
       "default": "./dist/knowledge/index.js"
+    },
+    "./skills": {
+      "types": "./dist/skills/index.d.ts",
+      "import": "./dist/skills/index.js",
+      "default": "./dist/skills/index.js"
     },
     "./config": {
       "types": "./dist/config/index.d.ts",
@@ -196,6 +201,7 @@
     "@tangle-network/agent-integrations": "^0.32.0",
     "@tangle-network/agent-runtime": "^0.52.0",
     "@tangle-network/agent-knowledge": "^1.5.2",
+    "@tangle-network/sandbox": "^0.4.4",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@types/better-sqlite3": "^7.6.13",
@@ -219,6 +225,7 @@
     "@tangle-network/agent-integrations": ">=0.32.0",
     "@tangle-network/agent-knowledge": ">=1.5.0",
     "@tangle-network/agent-runtime": ">=0.52.0",
+    "@tangle-network/sandbox": ">=0.4",
     "drizzle-orm": ">=0.36",
     "react": ">=18",
     "konva": ">=9",
@@ -232,6 +239,9 @@
       "optional": true
     },
     "@tangle-network/agent-runtime": {
+      "optional": true
+    },
+    "@tangle-network/sandbox": {
       "optional": true
     },
     "drizzle-orm": {

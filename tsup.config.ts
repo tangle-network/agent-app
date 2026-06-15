@@ -11,6 +11,7 @@ export default defineConfig({
     'eval-campaign/index': 'src/eval-campaign/index.ts',
     'knowledge/index': 'src/knowledge/index.ts',
     'knowledge-loop/index': 'src/knowledge-loop/index.ts',
+    'skills/index': 'src/skills/index.ts',
     'harness/index': 'src/harness/index.ts',
     'config/index': 'src/config/index.ts',
     'preset-cloudflare/index': 'src/preset-cloudflare/index.ts',
@@ -38,5 +39,5 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   target: 'es2022',
-  external: ['react', 'react/jsx-runtime', 'konva', 'react-konva', '@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog', '@tangle-network/agent-eval', '@tangle-network/agent-knowledge', '@tangle-network/agent-runtime', 'drizzle-orm', 'drizzle-orm/*', '@huggingface/transformers'],
+  external: ['react', 'react/jsx-runtime', 'konva', 'react-konva', '@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog', '@tangle-network/agent-eval', '@tangle-network/agent-knowledge', '@tangle-network/agent-runtime', '@tangle-network/sandbox', 'drizzle-orm', 'drizzle-orm/*', '@huggingface/transformers'],
 })
