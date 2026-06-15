@@ -39,6 +39,12 @@ import {
   readSecret,
   deleteSecret,
   mintSandboxScopedToken,
+  mintTerminalProxyToken,
+  verifyTerminalProxyToken,
+  classifySeveredStream,
+  detectInteractiveQuestion,
+  isTerminalPromptEvent,
+  driveSandboxTurn,
   type SandboxRuntimeConfig,
   type SecretStore,
 } from './index'
@@ -369,5 +375,231 @@ describe('mintSandboxScopedToken', () => {
     const r = await mintSandboxScopedToken(box, { scope: 'session' })
     expect(r.succeeded).toBe(false)
     if (!r.succeeded) expect(r.error.message).toContain('403')
+  })
+})
+
+describe('ensureWorkspaceSandbox — new seams', () => {
+  beforeEach(() => {
+    resetClientCache()
+    listMock.mockReset()
+    createMock.mockReset()
+    sandboxCtor.mockReset()
+  })
+
+  it('forceNew deletes a name-matched running box and creates fresh', async () => {
+    const del = vi.fn().mockResolvedValue(undefined)
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      status === 'running'
+        ? Promise.resolve([fakeBox({ name: 'box-w1', delete: del })])
+        : Promise.resolve([]),
+    )
+    const created = fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never })
+    createMock.mockResolvedValue(created)
+    await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }), {
+      workspaceId: 'w1',
+      harness: 'opencode',
+      forceNew: true,
+    })
+    expect(del).toHaveBeenCalledOnce()
+    expect(createMock).toHaveBeenCalledOnce()
+  })
+
+  it('liveness probe deletes an unresponsive running box and recreates', async () => {
+    const del = vi.fn().mockResolvedValue(undefined)
+    const dead = fakeBox({
+      name: 'box-w1',
+      delete: del,
+      exec: vi.fn().mockResolvedValue({ stdout: '', exitCode: 1 }),
+    })
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      status === 'running' ? Promise.resolve([dead]) : Promise.resolve([]),
+    )
+    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      livenessProbe: { sidecarProcessPattern: () => 'opencode\\|claude' },
+    })
+    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+    expect(dead.exec).toHaveBeenCalledWith('echo alive')
+    expect(del).toHaveBeenCalledOnce()
+    expect(createMock).toHaveBeenCalledOnce()
+  })
+
+  it('resumes a stopped box from snapshot instead of creating', async () => {
+    const resume = vi.fn().mockResolvedValue(undefined)
+    const stopped = fakeBox({
+      name: 'box-w1',
+      resume,
+      waitFor: vi.fn(),
+      exec: vi.fn().mockResolvedValue({ stdout: 'alive', exitCode: 0 }),
+    })
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      status === 'running'
+        ? Promise.resolve([])
+        : status === 'stopped'
+          ? Promise.resolve([stopped])
+          : Promise.resolve([]),
+    )
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      livenessProbe: { sidecarProcessPattern: () => 'opencode' },
+    })
+    const box = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+    expect(resume).toHaveBeenCalledOnce()
+    expect(createMock).not.toHaveBeenCalled()
+    expect(box).toBe(stopped)
+  })
+
+  it('spreads storage + restore into the create payload', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
+    const storage = {
+      type: 'r2' as const,
+      bucket: 'b',
+      endpoint: 'e',
+      credentials: { accessKeyId: 'a', secretAccessKey: 's' },
+      prefix: 'p/w1/',
+    }
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      storage: () => storage,
+      restore: () => ({ fromSnapshot: 'snap1', fromSandboxId: 'sb1' }),
+      resumeStopped: false,
+    })
+    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+    const payload = createMock.mock.calls[0]![0]
+    expect(payload.storage).toEqual(storage)
+    expect(payload.fromSnapshot).toBe('snap1')
+    expect(payload.fromSandboxId).toBe('sb1')
+  })
+
+  it('bakes resolved model + childKeyMint override into backend.model', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      backendModelAtCreate: true,
+      resumeStopped: false,
+      provider: { providerName: 'openai-compat', modelName: 'm', apiKey: 'parent' },
+      childKeyMint: async () => ({ succeeded: true, value: 'child-key' }),
+    })
+    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', userId: 'u9', harness: 'opencode' })
+    expect(createMock.mock.calls[0]![0].backend.model).toMatchObject({
+      provider: 'openai-compat',
+      model: 'm',
+      apiKey: 'child-key',
+    })
+  })
+
+  it('childKeyMint failure falls through to parent key (logged, not thrown)', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      backendModelAtCreate: true,
+      resumeStopped: false,
+      provider: { providerName: 'openai-compat', modelName: 'm', apiKey: 'parent' },
+      childKeyMint: async () => ({ succeeded: false, error: new Error('tcloud down') }),
+    })
+    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+    expect(createMock.mock.calls[0]![0].backend.model.apiKey).toBe('parent')
+  })
+
+  it('runs bootstrap after create and on reuse; throws on bootstrap failure', async () => {
+    const boot = vi.fn().mockResolvedValue({ succeeded: false, error: new Error('apk failed') })
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { bootstrap: boot, resumeStopped: false })
+    await expect(
+      ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' }),
+    ).rejects.toThrow(/bootstrap failed/)
+    expect(boot).toHaveBeenCalledOnce()
+  })
+
+  it('boxKey overrides the workspace-keyed name (per-user keying)', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      boxKey: (s) => `vault-ai-${(s.userId ?? '').slice(0, 8)}`,
+      resumeStopped: false,
+    })
+    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', userId: 'abcdef1234', harness: 'opencode' })
+    expect(createMock.mock.calls[0]![0].name).toBe('vault-ai-abcdef12')
+  })
+
+  it('async scoped credentials mint a per-user client', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
+    const creds = vi.fn(async (scope?: { userId?: string }) => ({
+      apiKey: `key-${scope?.userId}`,
+      baseUrl: 'u',
+    }))
+    const shell = shellFor(null, { credentials: creds, resumeStopped: false })
+    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', userId: 'u9', harness: 'opencode' })
+    expect(creds).toHaveBeenCalledWith({ workspaceId: 'w1', userId: 'u9' })
+    expect(sandboxCtor).toHaveBeenCalledWith({ apiKey: 'key-u9', baseUrl: 'u' })
+  })
+
+  it('userId reaches the env/files build context', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
+    const env = vi.fn(async (ctx: { userId?: string }) => ({
+      BAD_CUSTOMER_ID: ctx.userId ? `user:${ctx.userId}` : '',
+    }))
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { env, resumeStopped: false })
+    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', userId: 'u9', harness: 'opencode' })
+    expect(createMock.mock.calls[0]![0].env.BAD_CUSTOMER_ID).toBe('user:u9')
+  })
+})
+
+describe('terminal-proxy HMAC token', () => {
+  const secret = 'test-secret'
+  const id = { userId: 'u1', workspaceId: 'w1', sandboxId: 's1' }
+  it('round-trips mint -> verify', async () => {
+    const minted = await mintTerminalProxyToken(secret, id)
+    expect(minted.succeeded).toBe(true)
+    if (minted.succeeded) expect(await verifyTerminalProxyToken(secret, minted.value.token, id)).toBe(true)
+  })
+  it('rejects wrong identity, wrong secret, and expired token', async () => {
+    const minted = await mintTerminalProxyToken(secret, id)
+    if (!minted.succeeded) throw minted.error
+    expect(await verifyTerminalProxyToken(secret, minted.value.token, { ...id, sandboxId: 's2' })).toBe(false)
+    expect(await verifyTerminalProxyToken('other', minted.value.token, id)).toBe(false)
+    const expired = await mintTerminalProxyToken(secret, id, -1000)
+    if (expired.succeeded) expect(await verifyTerminalProxyToken(secret, expired.value.token, id)).toBe(false)
+  })
+  it('fails loud when secret absent', async () => {
+    expect((await mintTerminalProxyToken('', id)).succeeded).toBe(false)
+  })
+})
+
+describe('stream classifiers', () => {
+  it('classifySeveredStream flags error-finish as severed, clears on step-start', () => {
+    expect(
+      classifySeveredStream({ type: 'message.part.updated', data: { part: { type: 'step-finish', reason: 'error' } } }),
+    ).toEqual({ kind: 'step-finish', reason: 'error', severed: true })
+    expect(
+      classifySeveredStream({ type: 'message.part.updated', data: { part: { type: 'step-finish', reason: 'stop' } } }),
+    ).toEqual({ kind: 'step-finish', reason: 'stop', severed: false })
+    expect(
+      classifySeveredStream({ type: 'message.part.updated', data: { part: { type: 'step-start' } } }),
+    ).toEqual({ kind: 'step-start' })
+  })
+  it('isTerminalPromptEvent matches result/done only', () => {
+    expect(isTerminalPromptEvent({ type: 'result' })).toBe(true)
+    expect(isTerminalPromptEvent({ type: 'message.part.updated' })).toBe(false)
+  })
+  it('detectInteractiveQuestion extracts question text', () => {
+    expect(
+      detectInteractiveQuestion({ type: 'question.asked', data: { questions: [{ question: 'pick one?' }] } }),
+    ).toBe('pick one?')
+    expect(detectInteractiveQuestion({ type: 'message.part.updated', data: { part: { type: 'text' } } })).toBeNull()
+  })
+})
+
+describe('driveSandboxTurn', () => {
+  it('returns ok on success and fail on result.success=false', async () => {
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' })
+    const okBox = fakeBox({ prompt: vi.fn().mockResolvedValue({ success: true, response: 'hi', durationMs: 1 }) })
+    const r1 = await driveSandboxTurn(shell, okBox, 'go', { sessionId: 'sess1' })
+    expect(r1.succeeded).toBe(true)
+    const failBox = fakeBox({ prompt: vi.fn().mockResolvedValue({ success: false, error: 'boom', durationMs: 1 }) })
+    const r2 = await driveSandboxTurn(shell, failBox, 'go', { sessionId: 'sess1' })
+    expect(r2.succeeded).toBe(false)
   })
 })
