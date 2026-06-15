@@ -186,19 +186,28 @@ export function TimelineEditor(props: TimelineEditorProps) {
     }
   }, [fps, timeline.sequence.durationFrames])
 
-  const ownedProviderRef = useRef<VideoFrameProvider | null>(null)
-  const frameProvider = useMemo(() => {
-    if (props.frameProvider) return props.frameProvider
-    if (!ownedProviderRef.current) ownedProviderRef.current = createVideoElementFrameProvider()
-    return ownedProviderRef.current
-  }, [props.frameProvider])
-  useEffect(
-    () => () => {
-      ownedProviderRef.current?.dispose()
-      ownedProviderRef.current = null
-    },
-    [],
+  // The frame provider follows the same effect-owned lifecycle as the playback
+  // clock: created and disposed inside the effect so a remount — including React
+  // StrictMode's mount/unmount/remount probe — rebuilds it rather than leaving a
+  // disposed provider in render. A caller-supplied provider is used as-is and is
+  // never disposed here; only one we create is. The initial state value is a
+  // placeholder the effect disposes and replaces on mount (or the caller's
+  // provider, which the effect leaves untouched).
+  const [frameProvider, setFrameProvider] = useState<VideoFrameProvider>(
+    () => props.frameProvider ?? createVideoElementFrameProvider(),
   )
+  const frameProviderRef = useRef(frameProvider)
+  const ownsFrameProviderRef = useRef(!props.frameProvider)
+  useEffect(() => {
+    const next = props.frameProvider ?? createVideoElementFrameProvider()
+    if (ownsFrameProviderRef.current) frameProviderRef.current.dispose()
+    ownsFrameProviderRef.current = !props.frameProvider
+    frameProviderRef.current = next
+    setFrameProvider(next)
+    return () => {
+      if (!props.frameProvider) next.dispose()
+    }
+  }, [props.frameProvider])
 
   // --- view state -------------------------------------------------------------
 
