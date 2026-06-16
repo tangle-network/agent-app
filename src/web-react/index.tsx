@@ -24,6 +24,7 @@ export * from './chat-stream'
 export * from './provider-logo'
 export * from './smooth-text'
 export * from './mission-activity'
+export * from './sandbox-terminal'
 export * from './seat-paywall'
 import type { CatalogModel } from '../runtime/model-catalog'
 

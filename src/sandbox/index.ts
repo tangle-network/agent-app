@@ -941,3 +941,6 @@ function firstQuestionText(value: Record<string, unknown> | null): string {
     undefined
   return q ?? 'interactive question'
 }
+// Workspace sandbox terminal handlers: WebSocket upgrade proxy, connection
+// + runtime-proxy handlers, and scoped terminal-token mint/verify.
+export * from './workspace-terminal'
