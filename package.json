@@ -122,6 +122,11 @@
       "import": "./dist/missions/index.js",
       "default": "./dist/missions/index.js"
     },
+    "./sandbox": {
+      "types": "./dist/sandbox/index.d.ts",
+      "import": "./dist/sandbox/index.js",
+      "default": "./dist/sandbox/index.js"
+    },
     "./web": {
       "types": "./dist/web/index.d.ts",
       "import": "./dist/web/index.js",
