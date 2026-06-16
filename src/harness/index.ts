@@ -87,3 +87,93 @@ export function resolveSessionHarness(input: ResolveSessionHarnessInput = {}): R
   const harness = coerceHarness(input.requested, coerceHarness(input.workspaceDefault, fallback))
   return { harness, locked: false, swapAttempted: false }
 }
+
+/**
+ * Harness ↔ model compatibility policy — the ONE source of truth, server-side.
+ *
+ * Native CLI harnesses are vendor-locked: claude-code only drives Anthropic
+ * models, codex only OpenAI, kimi-code only Moonshot. Router-backed harnesses
+ * (opencode, etc.) accept any catalog model (`providers: null`). The pickers in
+ * sandbox-ui keep the pair coherent in the UI; this is the same policy the SHELL
+ * enforces so a bypassed/forged request can't pair claude-code with a gpt model
+ * and fail at the sidecar. Operates on plain canonical ids ("provider/model") so
+ * it stays substrate-free — no model-catalog or UI dependency.
+ */
+export interface HarnessModelPolicy {
+  /** Canonical-id provider prefixes the harness can run; null = any. */
+  providers: readonly string[] | null
+  /** Snap-target patterns, best first; highest version within a pattern wins. */
+  preferred: readonly RegExp[]
+}
+
+export const HARNESS_MODEL_POLICIES: Partial<Record<Harness, HarnessModelPolicy>> = {
+  'claude-code': {
+    providers: ['anthropic'],
+    preferred: [/^anthropic\/claude-opus-[\d.-]+$/, /^anthropic\/claude-sonnet-[\d.-]+$/, /^anthropic\//],
+  },
+  codex: {
+    providers: ['openai'],
+    preferred: [/^openai\/gpt-\d+(\.\d+)?$/, /^openai\/gpt/, /^openai\//],
+  },
+  'kimi-code': { providers: ['moonshot'], preferred: [/^moonshot\//] },
+}
+
+/** Native harness for a model's provider (anthropic → claude-code, …). */
+export const PROVIDER_PREFERRED_HARNESS: Record<string, Harness> = {
+  anthropic: 'claude-code',
+  openai: 'codex',
+  moonshot: 'kimi-code',
+}
+
+/** Provider prefix of a canonical id ("anthropic/claude-…" → "anthropic"). */
+export function modelProvider(modelId: string): string | null {
+  const slash = modelId.indexOf('/')
+  return slash > 0 ? modelId.slice(0, slash) : null
+}
+
+/** Provider-less ids (sentinels like "default", or a session's own config) are
+ *  compatible everywhere — every harness honors its own configuration. */
+export function isModelCompatibleWithHarness(harness: Harness, modelId: string): boolean {
+  const policy = HARNESS_MODEL_POLICIES[harness]
+  if (!policy || policy.providers === null) return true
+  const provider = modelProvider(modelId)
+  if (!provider) return true
+  return policy.providers.includes(provider)
+}
+
+const numericDesc = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
+
+/** Keep `modelId` when the harness can run it; else the harness's best compatible
+ *  catalog id (preferred patterns in order, highest version). When nothing in the
+ *  catalog fits, return the original so the caller sees the incompatibility. */
+export function snapModelToHarness(harness: Harness, modelId: string, canonicalIds: readonly string[]): string {
+  if (isModelCompatibleWithHarness(harness, modelId)) return modelId
+  const policy = HARNESS_MODEL_POLICIES[harness]
+  if (!policy) return modelId
+  for (const pattern of policy.preferred) {
+    const matches = canonicalIds.filter((id) => pattern.test(id)).sort((a, b) => numericDesc.compare(b, a))
+    if (matches.length > 0) return matches[0]!
+  }
+  return canonicalIds.find((id) => isModelCompatibleWithHarness(harness, id)) ?? modelId
+}
+
+/** Keep the harness when it can run `modelId`; else the model's native harness
+ *  (anthropic → claude-code, openai → codex), falling back to opencode. */
+export function snapHarnessToModel(harness: Harness, modelId: string): Harness {
+  if (isModelCompatibleWithHarness(harness, modelId)) return harness
+  const provider = modelProvider(modelId)
+  return (provider && PROVIDER_PREFERRED_HARNESS[provider]) || 'opencode'
+}
+
+/** Fail-loud server guard: throw when a harness is asked to run a model it can't.
+ *  Call before dispatching a sandbox turn so a bypassed UI can't reach the sidecar
+ *  with an incompatible pair. */
+export function assertHarnessModelCompatible(harness: Harness, modelId: string): void {
+  if (!isModelCompatibleWithHarness(harness, modelId)) {
+    const provider = modelProvider(modelId)
+    throw new Error(
+      `Harness "${harness}" cannot run model "${modelId}" (provider "${provider}"). ` +
+        `Use ${PROVIDER_PREFERRED_HARNESS[provider ?? ''] ?? 'a router-backed harness (opencode)'} or an allowed model.`,
+    )
+  }
+}

@@ -8,11 +8,12 @@
  */
 
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { createElement } from 'react'
+import { createElement, StrictMode } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { SequenceOperation } from '../../src/sequences/operations'
 import type { SequenceTimeline } from '../../src/sequences/model'
-import type { EditorTimelineState, TimelineCommand } from '../../src/sequences-react/contracts'
+import type { EditorTimelineState, TimelineCommand, VideoFrameProvider } from '../../src/sequences-react/contracts'
+import * as frameProviderModule from '../../src/sequences-react/media/frame-provider'
 import {
   captionFontPx,
   chooseMoveSnap,
@@ -452,5 +453,96 @@ describe('TimelineEditor', () => {
 
     const lastCall = onSelectionChange.mock.calls.at(-1)?.[0] as Array<{ id: string }>
     expect(lastCall.map((clip) => clip.id)).toEqual(['clip-video'])
+  })
+
+  it('survives the StrictMode mount/unmount/remount probe with a live playback clock', () => {
+    // StrictMode double-invokes mount effects in development. The playback clock
+    // must be rebuilt on remount rather than seeked after disposal — a clock
+    // created in render and disposed in a cleanup is reused across the probe,
+    // and the regression throws "PlaybackClock is disposed" during the remount,
+    // failing this render.
+    render(
+      createElement(
+        StrictMode,
+        null,
+        createElement(TimelineEditor, {
+          timeline: fixtureTimeline(),
+          canWrite: true,
+          onApplyOperations: vi.fn(async () => {}),
+        }),
+      ),
+    )
+
+    // Driving the transport proves the surviving clock is the live instance, not
+    // a disposed placeholder: play() would throw on a disposed clock.
+    fireEvent.click(screen.getByLabelText('Play'))
+    expect(screen.getByLabelText('Pause')).toBeTruthy()
+  })
+
+  it('keeps a live owned frame provider after the StrictMode probe (rebuilds, not disposed)', () => {
+    // The owned provider is created inside the effect. Disposing it in a separate
+    // cleanup (the prior pattern) leaves every created instance disposed after the
+    // probe; the fix rebuilds, so a live instance survives.
+    const created: Array<{ disposed: boolean }> = []
+    const spy = vi
+      .spyOn(frameProviderModule, 'createVideoElementFrameProvider')
+      .mockImplementation(() => {
+        const instance = {
+          disposed: false,
+          drawFrame: vi.fn(async () => {}),
+          prefetch: vi.fn(),
+          dispose: vi.fn(() => {
+            instance.disposed = true
+          }),
+        }
+        created.push(instance)
+        return instance as unknown as VideoFrameProvider
+      })
+
+    try {
+      render(
+        createElement(
+          StrictMode,
+          null,
+          createElement(TimelineEditor, {
+            timeline: fixtureTimeline(),
+            canWrite: true,
+            onApplyOperations: vi.fn(async () => {}),
+          }),
+        ),
+      )
+      expect(created.length).toBeGreaterThan(0)
+      expect(created.some((instance) => !instance.disposed)).toBe(true)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('never disposes a caller-supplied frame provider across the StrictMode probe or unmount', () => {
+    // Ownership invariant: the editor disposes only providers it creates. A
+    // provider passed in is the caller's to manage and must outlive the probe and
+    // a real unmount.
+    const external = {
+      drawFrame: vi.fn(async () => {}),
+      prefetch: vi.fn(),
+      dispose: vi.fn(),
+    } satisfies VideoFrameProvider
+
+    const { unmount } = render(
+      createElement(
+        StrictMode,
+        null,
+        createElement(TimelineEditor, {
+          timeline: fixtureTimeline(),
+          canWrite: true,
+          onApplyOperations: vi.fn(async () => {}),
+          frameProvider: external,
+        }),
+      ),
+    )
+
+    expect(external.dispose).not.toHaveBeenCalled()
+    unmount()
+    expect(external.dispose).not.toHaveBeenCalled()
   })
 })

@@ -1,560 +1,946 @@
-export interface WorkspaceSandboxInstanceLike {
-  id: string
-  name?: string
-  status?: string
-  connection?: {
-    runtimeUrl?: string
-    sidecarUrl?: string
-    authToken?: string
-    sidecarToken?: string
-    authTokenExpiresAt?: string
-  } | null
+import {
+  Sandbox,
+  type AgentProfile,
+  type AgentProfileFileMount,
+  type AgentProfileMcpServer,
+  type SandboxInstance,
+  type ScopedTokenScope,
+  type StorageConfig,
+  type PromptResult,
+} from '@tangle-network/sandbox'
+import {
+  buildAppToolMcpServer,
+  type AppToolName,
+  type AppToolContext,
+  type ToolHeaderNames,
+} from '../tools/index'
+import { assertHarnessModelCompatible, type Harness } from '../harness/index'
+
+export type Outcome<T> =
+  | { succeeded: true; value: T }
+  | { succeeded: false; error: Error }
+
+const ok = <T>(value: T): Outcome<T> => ({ succeeded: true, value })
+const fail = (error: unknown): Outcome<never> => ({
+  succeeded: false,
+  error: error instanceof Error ? error : new Error(String(error)),
+})
+
+export interface SandboxClientCredentials {
+  apiKey: string
+  baseUrl: string
 }
 
-export interface WorkspaceSandboxEnsureContext {
+export interface SandboxResourceConfig {
+  image: string
+  cpuCores: number
+  memoryMB: number
+  diskGB: number
+  maxLifetimeSeconds: number
+  idleTimeoutSeconds: number
+}
+
+export interface ProviderResolutionConfig {
+  routerBaseUrl?: string
+  apiKey?: string
+  providerName?: string
+  modelName?: string
+  defaultModel?: string
+  openaiApiKey?: string
+}
+
+export interface SandboxBuildContext {
   workspaceId: string
-  userId: string
+  connectedIntegrationIds: string[]
+  userId?: string
 }
 
-export interface WorkspaceSandboxManagerOptions<TClient, TBox extends WorkspaceSandboxInstanceLike, TEnsureOptions = void> {
-  getClient: (ctx: WorkspaceSandboxEnsureContext) => Promise<TClient> | TClient
-  nameForWorkspace: (workspaceId: string, ctx: WorkspaceSandboxEnsureContext) => string
-  listSandboxes: (client: TClient, ctx: WorkspaceSandboxEnsureContext) => Promise<TBox[]>
-  createSandbox: (args: {
-    client: TClient
-    ctx: WorkspaceSandboxEnsureContext
-    name: string
-    options: TEnsureOptions
-    listError?: unknown
-  }) => Promise<TBox>
-  waitForRunning?: (box: TBox, ctx: WorkspaceSandboxEnsureContext) => Promise<void>
-  prepareExisting?: (box: TBox, ctx: WorkspaceSandboxEnsureContext, options: TEnsureOptions) => Promise<TBox | void>
-  prepareCreated?: (box: TBox, ctx: WorkspaceSandboxEnsureContext, options: TEnsureOptions) => Promise<TBox | void>
-  onListError?: (error: unknown, ctx: WorkspaceSandboxEnsureContext) => void
+// SDK-typed snapshot storage config (re-exported for product seam closures).
+export type { StorageConfig }
+
+// Scope handed to per-identity seams. workspaceId is always present; userId is
+// present when the lifecycle op carries one. Workspace-keyed products ignore userId.
+export interface SandboxScope {
+  workspaceId: string
+  userId?: string
 }
 
-export interface WorkspaceSandboxManager<TBox extends WorkspaceSandboxInstanceLike, TEnsureOptions = void> {
-  ensureWorkspaceSandbox: (
-    workspaceId: string,
-    userId: string,
-    options?: TEnsureOptions,
-  ) => Promise<TBox>
+// Snapshot RESTORE-on-create. Returned alongside storage; undefined => fresh box.
+export interface SandboxRestoreSpec {
+  fromSnapshot: string
+  fromSandboxId: string
 }
 
-export function createWorkspaceSandboxManager<TClient, TBox extends WorkspaceSandboxInstanceLike, TEnsureOptions = void>(
-  opts: WorkspaceSandboxManagerOptions<TClient, TBox, TEnsureOptions>,
-): WorkspaceSandboxManager<TBox, TEnsureOptions> {
+// Reuse health gate + sidecar liveness. The exec+timeout-race is generic; the
+// sidecarProcessPattern is harness-specific (which process is the live sidecar),
+// so it is a closure. Absent => no liveness probe (reuse on metadata.harness match).
+export interface LivenessProbeConfig {
+  sidecarProcessPattern: (harness: Harness) => string
+  execTimeoutMs?: number
+  psTimeoutMs?: number
+}
+
+export interface ProfileComposeOptions {
+  systemPrompt?: string
+  extraFiles?: AgentProfileFileMount[]
+  extraMcp?: Record<string, AgentProfileMcpServer>
+  name?: string
+}
+
+export interface SandboxRuntimeConfig {
+  // Widened to accept an optional scope and be async so a per-user key can be
+  // minted. The sync, no-arg form still satisfies the type (back-compat).
+  credentials: (
+    scope?: SandboxScope,
+  ) => SandboxClientCredentials | null | Promise<SandboxClientCredentials | null>
+  name: (workspaceId: string) => string
+  metadata: (harness: Harness) => Record<string, unknown>
+  connectedIntegrationIds: (workspaceId: string) => Promise<string[]>
+  env: (ctx: SandboxBuildContext) => Promise<Record<string, string>>
+  files: (ctx: SandboxBuildContext) => Promise<AgentProfileFileMount[]>
+  secrets: (workspaceId: string) => Promise<string[]>
+  profile: (options: ProfileComposeOptions) => AgentProfile
+  permissionRole?: (workspaceRole: string) => SandboxPermissionLevel
+  resources?: SandboxResourceConfig
+  provider?: ProviderResolutionConfig
+
+  // BYOS3/R2 snapshot storage. Returns undefined => key omitted entirely
+  // (fail-closed when creds absent). Product owns bucket/endpoint/credentials/prefix.
+  storage?: (ctx: SandboxBuildContext) => StorageConfig | undefined
+  // Snapshot RESTORE-on-create. undefined => fresh box.
+  restore?: (ctx: SandboxBuildContext) => SandboxRestoreSpec | undefined
+  // Per-identity box NAME. Defaults to name(scope.workspaceId) when absent.
+  boxKey?: (scope: SandboxScope) => string
+  // Per-workspace child-key mint: overrides the resolved model apiKey before create.
+  // Applied only when a model is resolved and its provider is openai-compat.
+  childKeyMint?: (scope: SandboxScope) => Promise<Outcome<string>>
+  // One-shot post-running bootstrap, on BOTH create and reuse paths (idempotency
+  // is the closure's job — it owns the marker check).
+  bootstrap?: (box: SandboxInstance, scope: SandboxScope) => Promise<Outcome<void>>
+  // Reuse health gate + sidecar liveness probe.
+  livenessProbe?: LivenessProbeConfig
+  // default true: try stopped-resume before create.
+  resumeStopped?: boolean
+  // default false: bake resolveModel() into backend.model at create.
+  backendModelAtCreate?: boolean
+}
+
+export const DEFAULT_SANDBOX_RESOURCES: SandboxResourceConfig = {
+  image: 'universal',
+  cpuCores: 2,
+  memoryMB: 4096,
+  diskGB: 10,
+  maxLifetimeSeconds: 86400,
+  idleTimeoutSeconds: 3600,
+}
+
+interface ClientCacheEntry {
+  client: Sandbox
+  fingerprint: string
+}
+
+let _cached: ClientCacheEntry | null = null
+
+function getClientFromCreds(creds: SandboxClientCredentials): Sandbox {
+  const fingerprint = `${creds.apiKey} ${creds.baseUrl}`
+  if (_cached && _cached.fingerprint === fingerprint) return _cached.client
+
+  const client = new Sandbox({ apiKey: creds.apiKey, baseUrl: creds.baseUrl })
+  _cached = { client, fingerprint }
+  return client
+}
+
+// Sync client for non-scoped callers (secretStoreFromClient etc.). Resolves
+// credentials with no scope; throws if the seam returns a Promise — scoped
+// products must use the async ensureWorkspaceSandbox path.
+export function getClient(shell: SandboxRuntimeConfig): Sandbox {
+  const creds = shell.credentials()
+  if (creds && typeof (creds as Promise<unknown>).then === 'function') {
+    throw new Error('getClient: scoped (async) credentials require the async sandbox path')
+  }
+  if (!creds) throw new Error('sandbox credentials are required (apiKey/baseUrl)')
+  return getClientFromCreds(creds as SandboxClientCredentials)
+}
+
+export function resetClientCache(): void {
+  _cached = null
+}
+
+export interface AppToolDescriptor {
+  tool: AppToolName
+  key: string
+  description: string
+}
+
+export interface BuildAppToolMcpServersOptions {
+  tools: AppToolDescriptor[]
+  baseUrl: string
+  token: string
+  ctx: AppToolContext
+  headerNames?: ToolHeaderNames
+}
+
+export function buildAppToolMcpServers(
+  options: BuildAppToolMcpServersOptions,
+): Record<string, AgentProfileMcpServer> {
+  const entries: Record<string, AgentProfileMcpServer> = {}
+  for (const { tool, key, description } of options.tools) {
+    entries[key] = buildAppToolMcpServer({
+      tool,
+      baseUrl: options.baseUrl,
+      token: options.token,
+      ctx: options.ctx,
+      description,
+      headerNames: options.headerNames,
+    }) as AgentProfileMcpServer
+  }
+  return entries
+}
+
+export interface EnsureWorkspaceSandboxOptions {
+  workspaceId: string
+  userId?: string
+  harness: Harness
+  // When set, both the running-reuse and stopped-resume short-circuits are
+  // skipped and any name-matched box is deleted before create.
+  forceNew?: boolean
+}
+
+// Single-quote a string for safe interpolation into a shell command.
+function shellSingleQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
+async function listRunning(
+  client: Sandbox,
+  name: string,
+): Promise<Outcome<SandboxInstance | null>> {
+  try {
+    const running = await client.list({ status: 'running' })
+    return ok(running.find((s) => s.name === name) ?? null)
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+async function deleteBox(box: SandboxInstance): Promise<Outcome<void>> {
+  try {
+    await box.delete()
+    return ok(undefined)
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+// The SDK narrows `backend.type` to its own BackendType union and
+// `initialUsers[].role` to PermissionLevel — neither symbol is exported. The
+// create payload is assembled with the product's Harness/role strings, which
+// are a superset surface; the localized cast at the boundary is the only place
+// this widening is allowed, and the runtime contract (the sidecar boots the
+// named harness) is what enforces correctness.
+type CreatePayload = Parameters<Sandbox['create']>[0]
+
+// Generic exec+sidecar liveness probe. Absent probe => always alive (the prior
+// reuse-on-metadata-match behavior). With a probe: the container must answer an
+// `echo alive` exec within execTimeoutMs, and the sidecar process must be found
+// by pgrep within psTimeoutMs (an inconclusive pgrep is treated as reusable).
+async function isBoxAlive(
+  box: SandboxInstance,
+  harness: Harness,
+  probe: LivenessProbeConfig | undefined,
+): Promise<boolean> {
+  if (!probe) return true
+  const execTimeout = probe.execTimeoutMs ?? 5000
+  const psTimeout = probe.psTimeoutMs ?? 3000
+  const race = <T>(p: Promise<T>, ms: number, label: string): Promise<T> =>
+    Promise.race([
+      p,
+      new Promise<T>((_, reject) => setTimeout(() => reject(new Error(label)), ms)),
+    ])
+  try {
+    const alive = await race(box.exec('echo alive'), execTimeout, 'alive check timeout')
+    if (!alive.stdout.includes('alive')) return false
+    const pattern = probe.sidecarProcessPattern(harness)
+    try {
+      const ps = await race(
+        box.exec(`pgrep -f ${shellSingleQuote(pattern)} || echo no-sidecar`),
+        psTimeout,
+        'ps check timeout',
+      )
+      if (ps.stdout.includes('no-sidecar')) return false
+    } catch {
+      // sidecar probe inconclusive — container is alive, treat as reusable
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Resume a name-matched stopped box and wait for it to reach running. Returns
+// ok(null) when no stopped box matches the name.
+async function resumeStoppedBox(
+  client: Sandbox,
+  name: string,
+  timeoutMs: number,
+): Promise<Outcome<SandboxInstance | null>> {
+  try {
+    const stopped = await client.list({ status: 'stopped' })
+    const match = stopped.find((s) => s.name === name) ?? null
+    if (!match) return ok(null)
+    await match.resume()
+    await match.waitFor('running', { timeoutMs })
+    return ok(match)
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function ensureWorkspaceSandbox(
+  shell: SandboxRuntimeConfig,
+  options: EnsureWorkspaceSandboxOptions,
+): Promise<SandboxInstance> {
+  const { workspaceId, userId, harness, forceNew } = options
+  const scope: SandboxScope = { workspaceId, ...(userId ? { userId } : {}) }
+  const creds = await shell.credentials(scope)
+  if (!creds) throw new Error('sandbox credentials are required (apiKey/baseUrl)')
+  const client = getClientFromCreds(creds)
+  const name = shell.boxKey ? shell.boxKey(scope) : shell.name(workspaceId)
+  const resources = shell.resources ?? DEFAULT_SANDBOX_RESOURCES
+  const resumeTimeout = 120_000
+
+  // Stage 1 — running-box reuse (skipped on forceNew).
+  const existing = await listRunning(client, name)
+  if (existing.succeeded && existing.value) {
+    const found = existing.value
+    if (forceNew) {
+      const dropped = await deleteBox(found)
+      if (!dropped.succeeded) {
+        throw new Error(`forceNew: sandbox ${name} could not be deleted`, { cause: dropped.error })
+      }
+    } else if (
+      found.metadata?.harness === harness &&
+      (await isBoxAlive(found, harness, shell.livenessProbe))
+    ) {
+      if (shell.bootstrap) {
+        const boot = await shell.bootstrap(found, scope)
+        if (!boot.succeeded) {
+          throw new Error(`bootstrap failed on reused box ${name}`, { cause: boot.error })
+        }
+      }
+      return found
+    } else {
+      const dropped = await deleteBox(found)
+      if (!dropped.succeeded) {
+        throw new Error(
+          `sandbox ${name} ` +
+            `(was ${String(found.metadata?.harness ?? 'unknown')}, want ${harness}, or unresponsive) ` +
+            `could not be deleted`,
+          { cause: dropped.error },
+        )
+      }
+    }
+  }
+
+  // Stage 2 — stopped-box resume (skipped on forceNew or resumeStopped===false).
+  if (!forceNew && shell.resumeStopped !== false) {
+    const resumed = await resumeStoppedBox(client, name, resumeTimeout)
+    if (
+      resumed.succeeded &&
+      resumed.value &&
+      (await isBoxAlive(resumed.value, harness, shell.livenessProbe))
+    ) {
+      const box = resumed.value
+      if (shell.bootstrap) {
+        const boot = await shell.bootstrap(box, scope)
+        if (!boot.succeeded) {
+          throw new Error(`bootstrap failed on resumed box ${name}`, { cause: boot.error })
+        }
+      }
+      return box
+    }
+  }
+
+  // Stage 3 — create fresh.
+  const connectedIntegrationIds = await shell.connectedIntegrationIds(workspaceId)
+  const buildCtx: SandboxBuildContext = {
+    workspaceId,
+    connectedIntegrationIds,
+    ...(userId ? { userId } : {}),
+  }
+  const [secrets, env, files] = await Promise.all([
+    shell.secrets(workspaceId),
+    shell.env(buildCtx),
+    shell.files(buildCtx),
+  ])
+  const profile = shell.profile({ extraFiles: files })
+
+  const role = userId && shell.permissionRole ? shell.permissionRole('developer') : undefined
+
+  // Bake the model at create when opted in. childKeyMint overrides the apiKey
+  // per-workspace; a typed mint failure falls through to the parent key (logged).
+  let model = shell.backendModelAtCreate ? resolveModel(shell.provider) : undefined
+  if (model && shell.childKeyMint && model.provider === 'openai-compat') {
+    const minted = await shell.childKeyMint(scope)
+    if (minted.succeeded) model = { ...model, apiKey: minted.value }
+    else {
+      console.error(
+        `[sandbox] childKeyMint failed for ${workspaceId}; using parent key:`,
+        minted.error.message,
+      )
+    }
+  }
+
+  const storage = shell.storage?.(buildCtx)
+  const restore = shell.restore?.(buildCtx)
+
+  const payload = {
+    name,
+    image: resources.image,
+    metadata: shell.metadata(harness),
+    ...(userId ? { permissions: { initialUsers: [{ userId, role }] } } : {}),
+    env,
+    secrets,
+    backend: { type: harness, profile, ...(model ? { model } : {}) },
+    ...(storage ? { storage } : {}),
+    ...(restore ? restore : {}),
+    maxLifetimeSeconds: resources.maxLifetimeSeconds,
+    idleTimeoutSeconds: resources.idleTimeoutSeconds,
+    resources: {
+      cpuCores: resources.cpuCores,
+      memoryMB: resources.memoryMB,
+      diskGB: resources.diskGB,
+    },
+  } as CreatePayload
+
+  const box = await client.create(payload)
+
+  await box.waitFor('running', { timeoutMs: 120_000 })
+  if (!box.connection?.runtimeUrl) await box.refresh()
+
+  if (shell.bootstrap) {
+    const boot = await shell.bootstrap(box, scope)
+    if (!boot.succeeded) {
+      throw new Error(`bootstrap failed on new box ${name}`, { cause: boot.error })
+    }
+  }
+  return box
+}
+
+export interface ResolvedModel {
+  model: string
+  provider: string
+  apiKey: string
+  baseUrl?: string
+}
+
+export function resolveModel(
+  config: ProviderResolutionConfig | undefined,
+  override?: { model?: string; modelApiKey?: string },
+): ResolvedModel | undefined {
+  const c = config ?? {}
+  const explicitBaseUrl = c.routerBaseUrl
+  const explicitApiKey = override?.modelApiKey ?? c.apiKey
+  const provider =
+    c.providerName ?? (explicitApiKey ? 'openai-compat' : c.openaiApiKey ? 'openai' : undefined)
+  const modelName =
+    override?.model ??
+    c.modelName ??
+    (provider === 'openai' || provider === 'openai-compat' ? c.defaultModel : undefined)
+  const apiKey = explicitApiKey ?? (provider === 'openai' ? c.openaiApiKey : undefined)
+  if (!provider || !modelName || !apiKey) return undefined
   return {
-    async ensureWorkspaceSandbox(workspaceId, userId, options) {
-      if (!workspaceId) throw new Error('workspaceId is required')
-      if (!userId) throw new Error('userId is required')
-      const ctx = { workspaceId, userId }
-      const client = await opts.getClient(ctx)
-      const name = opts.nameForWorkspace(workspaceId, ctx)
-      let listError: unknown
-      let existing: TBox[] = []
+    model: modelName,
+    provider,
+    apiKey,
+    ...(explicitBaseUrl ? { baseUrl: explicitBaseUrl } : {}),
+  }
+}
 
-      try {
-        existing = await opts.listSandboxes(client, ctx)
-      } catch (err) {
-        listError = err
-        opts.onListError?.(err, ctx)
-      }
+export function flattenHistory(
+  message: string,
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>,
+): string {
+  if (!history?.length) return message
+  const transcript = history
+    .map((entry) => `${entry.role === 'assistant' ? 'Assistant' : 'User'}: ${entry.content}`)
+    .join('\n\n')
+  return `${transcript}\n\nUser: ${message}`
+}
 
-      const found = existing.find((box) => box.name === name)
-      if (found) {
-        return (await opts.prepareExisting?.(found, ctx, options as TEnsureOptions)) ?? found
-      }
+export function mergeExtraMcp(
+  appToolMcp: Record<string, AgentProfileMcpServer>,
+  baseProfileMcp: Record<string, AgentProfileMcpServer>,
+  extra: Record<string, AgentProfileMcpServer> | undefined,
+): Record<string, AgentProfileMcpServer> {
+  for (const key of Object.keys(extra ?? {})) {
+    if (key in appToolMcp || key in baseProfileMcp) {
+      throw new Error(`extraMcp key '${key}' collides with an existing profile MCP server`)
+    }
+  }
+  return { ...appToolMcp, ...(extra ?? {}) }
+}
 
-      const created = await opts.createSandbox({
-        client,
-        ctx,
-        name,
-        options: options as TEnsureOptions,
-        listError,
-      })
-      await opts.waitForRunning?.(created, ctx)
-      return (await opts.prepareCreated?.(created, ctx, options as TEnsureOptions)) ?? created
+export function attachReasoningEffort(
+  profile: AgentProfile,
+  harness: Harness,
+  effort: 'auto' | 'low' | 'medium' | 'high' | undefined,
+): AgentProfile {
+  if (!effort || effort === 'auto') return profile
+  return {
+    ...profile,
+    extensions: {
+      ...(profile.extensions ?? {}),
+      [harness]: {
+        ...(profile.extensions?.[harness] ?? {}),
+        reasoningEffort: effort,
+      },
     },
   }
 }
 
-export interface SandboxTerminalTokenOptions {
-  secret?: string
-  prefix?: string
-  expiresInMs?: number
-  now?: () => number
+export interface StreamSandboxPromptOptions {
+  sessionId?: string
+  executionId?: string
+  lastEventId?: string
+  systemPrompt?: string
+  model?: string
+  modelApiKey?: string
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>
+  harness?: Harness
+  effort?: 'auto' | 'low' | 'medium' | 'high'
+  appToolMcp?: Record<string, AgentProfileMcpServer>
+  baseProfileMcp?: Record<string, AgentProfileMcpServer>
+  extraMcp?: Record<string, AgentProfileMcpServer>
+  signal?: AbortSignal
+  timeoutMs?: number
+  // When true, an interactive question event throws instead of yielding —
+  // detached (cron/mission-step) runs have no consumer to answer it.
+  disallowQuestions?: boolean
 }
 
-export interface SandboxTerminalTokenSubject {
+type StreamPromptOptions = Parameters<SandboxInstance['streamPrompt']>[1]
+
+export async function* streamSandboxPrompt(
+  shell: SandboxRuntimeConfig,
+  box: SandboxInstance,
+  message: string,
+  options?: StreamSandboxPromptOptions,
+): AsyncGenerator<unknown> {
+  const harness = options?.harness ?? 'opencode'
+  const model = resolveModel(shell.provider, {
+    model: options?.model,
+    modelApiKey: options?.modelApiKey,
+  })
+
+  // Server-side enforcement of the harness↔model policy: a vendor-locked harness
+  // (claude-code/codex/kimi-code) must not be sent a foreign-provider model, even
+  // if the UI snap was bypassed. Provider-less ids pass (session's own config).
+  if (model?.model) assertHarnessModelCompatible(harness, model.model)
+
+  const prompt = flattenHistory(message, options?.history)
+
+  const appToolMcp = options?.appToolMcp ?? {}
+  const extraMcp = mergeExtraMcp(appToolMcp, options?.baseProfileMcp ?? {}, options?.extraMcp)
+
+  const profile = shell.profile({ systemPrompt: options?.systemPrompt, extraMcp })
+  const profileWithEffort = attachReasoningEffort(profile, harness, options?.effort)
+
+  const stream = box.streamPrompt(prompt, {
+    sessionId: options?.sessionId,
+    executionId: options?.executionId,
+    lastEventId: options?.lastEventId,
+    ...(options?.signal ? { signal: options.signal } : {}),
+    ...(options?.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+    backend: {
+      type: harness,
+      profile: profileWithEffort,
+      ...(model ? { model } : {}),
+    },
+  } as StreamPromptOptions)
+
+  let severedFinishReason: string | null = null
+  for await (const event of stream) {
+    const step = classifySeveredStream(event)
+    if (step) severedFinishReason = step.kind === 'step-finish' && step.severed ? step.reason : null
+    if (severedFinishReason && isTerminalPromptEvent(event)) {
+      throw new Error(`sandbox model stream severed mid-turn (reason="${severedFinishReason}")`)
+    }
+    if (options?.disallowQuestions) {
+      const q = detectInteractiveQuestion(event)
+      if (q) {
+        throw new Error(`sandbox agent asked an interactive question during an autonomous run: ${q}`)
+      }
+    }
+    yield event
+  }
+  // Reconnect-exhausted path: the stream ended on a severed step without a
+  // terminal event. A truncated turn must fail loud, not return silently.
+  if (severedFinishReason) {
+    throw new Error(`sandbox model stream severed mid-turn (reason="${severedFinishReason}")`)
+  }
+}
+
+export async function runSandboxPrompt(
+  shell: SandboxRuntimeConfig,
+  box: SandboxInstance,
+  message: string,
+  options?: StreamSandboxPromptOptions,
+): Promise<string> {
+  let fullText = ''
+  let firstTextSeen = false
+
+  for await (const rawEvent of streamSandboxPrompt(shell, box, message, options)) {
+    const event = rawEvent as { type?: string; data?: Record<string, unknown> }
+    if (!event.type) continue
+
+    if (event.type === 'message.part.updated') {
+      const part = event.data?.part as Record<string, unknown> | undefined
+      const delta = typeof event.data?.delta === 'string' ? event.data.delta : null
+      if (String(part?.type ?? '') === 'text') {
+        if (!firstTextSeen) {
+          firstTextSeen = true
+          continue
+        }
+        if (delta) fullText += delta
+        else if (typeof part?.text === 'string') fullText = part.text
+      }
+    } else if (event.type === 'result') {
+      const finalText = typeof event.data?.finalText === 'string' ? event.data.finalText : null
+      if (finalText) fullText = finalText
+    }
+  }
+
+  return fullText
+}
+
+// Mirrors the SDK's PermissionLevel union (not re-exported by
+// @tangle-network/sandbox). The product's role-mapping seam must produce one of
+// these; binding the seam's return type to the union makes a wrong mapping a
+// compile error rather than a runtime 400 from the orchestrator.
+export type SandboxPermissionLevel = 'owner' | 'admin' | 'developer' | 'viewer'
+
+export interface MemberSyncSeam {
+  roleToSandboxRole: (workspaceRole: string) => SandboxPermissionLevel
+}
+
+export async function syncSandboxMemberAdd(
+  box: SandboxInstance,
+  seam: MemberSyncSeam,
+  userId: string,
+  role: string,
+): Promise<Outcome<void>> {
+  try {
+    await box.permissions.add({ userId, role: seam.roleToSandboxRole(role) })
+    return ok(undefined)
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function syncSandboxMemberRemove(
+  box: SandboxInstance,
+  userId: string,
+): Promise<Outcome<void>> {
+  try {
+    await box.permissions.remove(userId, { preserveHomeDir: true })
+    return ok(undefined)
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function syncSandboxMemberRole(
+  box: SandboxInstance,
+  seam: MemberSyncSeam,
+  userId: string,
+  role: string,
+): Promise<Outcome<void>> {
+  try {
+    await box.permissions.update(userId, { role: seam.roleToSandboxRole(role) })
+    return ok(undefined)
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export interface SecretStore {
+  create: (name: string, value: string) => Promise<void>
+  update: (name: string, value: string) => Promise<void>
+  get: (name: string) => Promise<string>
+  delete: (name: string) => Promise<void>
+}
+
+export function secretStoreFromClient(shell: SandboxRuntimeConfig): SecretStore {
+  const client = getClient(shell)
+  return {
+    create: async (name, value) => {
+      await client.secrets.create(name, value)
+    },
+    update: async (name, value) => {
+      await client.secrets.update(name, value)
+    },
+    get: (name) => client.secrets.get(name),
+    delete: async (name) => {
+      await client.secrets.delete(name)
+    },
+  }
+}
+
+export async function storeSecret(
+  store: SecretStore,
+  name: string,
+  value: string,
+): Promise<Outcome<void>> {
+  try {
+    await store.create(name, value)
+    return ok(undefined)
+  } catch {
+    try {
+      await store.update(name, value)
+      return ok(undefined)
+    } catch (err) {
+      return fail(new Error(`Failed to store sandbox secret ${name}`, { cause: err }))
+    }
+  }
+}
+
+export async function readSecret(store: SecretStore, name: string): Promise<Outcome<string>> {
+  try {
+    return ok(await store.get(name))
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function deleteSecret(store: SecretStore, name: string): Promise<Outcome<void>> {
+  try {
+    await store.delete(name)
+    return ok(undefined)
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export interface ScopedTokenResult {
+  token: string
+  expiresAt: Date
+  scope: ScopedTokenScope
+}
+
+/**
+ * Mint a scoped token for an already-provisioned box (e.g. to hand a terminal
+ * proxy a narrowed credential). Uses the SDK's native `box.mintScopedToken`,
+ * which normalizes `expiresAt` to a Date — no hand-rolled wire call.
+ */
+export async function mintSandboxScopedToken(
+  box: SandboxInstance,
+  options: { scope: ScopedTokenScope; sessionId?: string; ttlMinutes?: number },
+): Promise<Outcome<ScopedTokenResult>> {
+  try {
+    const token = await box.mintScopedToken({
+      scope: options.scope,
+      ...(options.sessionId ? { sessionId: options.sessionId } : {}),
+      ...(options.ttlMinutes ? { ttlMinutes: options.ttlMinutes } : {}),
+    })
+    return ok({ token: token.token, expiresAt: token.expiresAt, scope: token.scope })
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+// Detached single-turn advance. The SDK SandboxInstance has no `driveTurn`; the
+// non-streaming sibling of streamPrompt is box.prompt(message, opts) -> PromptResult.
+// Returns a typed Outcome so a failed turn is inspected, not swallowed.
+export async function driveSandboxTurn(
+  shell: SandboxRuntimeConfig,
+  box: SandboxInstance,
+  message: string,
+  options: StreamSandboxPromptOptions & { sessionId: string },
+): Promise<Outcome<PromptResult>> {
+  const harness = options.harness ?? 'opencode'
+  const model = resolveModel(shell.provider, {
+    model: options.model,
+    modelApiKey: options.modelApiKey,
+  })
+  if (model?.model) assertHarnessModelCompatible(harness, model.model)
+  const prompt = flattenHistory(message, options.history)
+  const appToolMcp = options.appToolMcp ?? {}
+  const extraMcp = mergeExtraMcp(appToolMcp, options.baseProfileMcp ?? {}, options.extraMcp)
+  const profile = attachReasoningEffort(
+    shell.profile({ systemPrompt: options.systemPrompt, extraMcp }),
+    harness,
+    options.effort,
+  )
+  try {
+    const result = await box.prompt(prompt, {
+      sessionId: options.sessionId,
+      ...(options.executionId ? { executionId: options.executionId } : {}),
+      ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+      ...(options.signal ? { signal: options.signal } : {}),
+      backend: { type: harness, profile, ...(model ? { model } : {}) },
+    } as Parameters<SandboxInstance['prompt']>[1])
+    if (!result.success) return fail(new Error(result.error ?? 'sandbox turn failed'))
+    return ok(result)
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+// Terminal-proxy HMAC token. Identity tuple is generic; the secret comes from a
+// closure (fail-loud if absent).
+export interface TerminalProxyIdentity {
   userId: string
   workspaceId: string
   sandboxId: string
 }
 
-export interface SandboxTerminalTokenResult {
-  token: string
-  expiresAt: Date
+const TERMINAL_PROXY_TOKEN_TTL_MS = 15 * 60 * 1000
+
+async function signTerminalProxyToken(secret: string, encodedPayload: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  )
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(encodedPayload))
+  return base64UrlEncodeBytes(new Uint8Array(sig))
 }
 
-interface SandboxTerminalTokenPayload extends SandboxTerminalTokenSubject {
-  exp: number
-  n: string
-}
-
-const DEFAULT_TERMINAL_TOKEN_PREFIX = 'sbxt_'
-const DEFAULT_TERMINAL_TOKEN_TTL_MS = 15 * 60 * 1000
-const BEARER_SUBPROTOCOL_PREFIX = 'bearer.'
-
-export async function createSandboxTerminalToken(
-  subject: SandboxTerminalTokenSubject,
-  opts: SandboxTerminalTokenOptions,
-): Promise<SandboxTerminalTokenResult> {
-  validateTerminalSubject(subject)
-  const secret = opts.secret?.trim()
-  if (!secret) throw new Error('terminal token secret is required')
-  const now = opts.now ?? Date.now
-  const expiresInMs = opts.expiresInMs ?? DEFAULT_TERMINAL_TOKEN_TTL_MS
-  if (!Number.isFinite(expiresInMs) || expiresInMs <= 0) throw new Error('expiresInMs must be a positive number')
-  const expiresAt = new Date(now() + expiresInMs)
-  const payload: SandboxTerminalTokenPayload = {
-    ...subject,
-    exp: Math.floor(expiresAt.getTime() / 1000),
-    n: crypto.randomUUID(),
+export async function mintTerminalProxyToken(
+  secret: string,
+  identity: TerminalProxyIdentity,
+  ttlMs = TERMINAL_PROXY_TOKEN_TTL_MS,
+): Promise<Outcome<{ token: string; expiresAt: Date }>> {
+  if (!secret) return fail(new Error('mintTerminalProxyToken: secret is required'))
+  if (!identity.userId || !identity.workspaceId || !identity.sandboxId) {
+    return fail(new Error('mintTerminalProxyToken: userId/workspaceId/sandboxId are required'))
   }
-  const encodedPayload = base64urlText(JSON.stringify(payload))
-  const signature = await signText(encodedPayload, secret)
-  return {
-    token: `${opts.prefix ?? DEFAULT_TERMINAL_TOKEN_PREFIX}${encodedPayload}.${signature}`,
-    expiresAt,
-  }
+  const expiresAt = new Date(Date.now() + ttlMs)
+  const payload = { ...identity, exp: Math.floor(expiresAt.getTime() / 1000) }
+  const encoded = base64UrlEncodeUtf8(JSON.stringify(payload))
+  const sig = await signTerminalProxyToken(secret, encoded)
+  return ok({ token: `${encoded}.${sig}`, expiresAt })
 }
 
-export async function verifySandboxTerminalToken(
+export async function verifyTerminalProxyToken(
+  secret: string,
   token: string,
-  expected: SandboxTerminalTokenSubject,
-  opts: SandboxTerminalTokenOptions,
+  expected: TerminalProxyIdentity,
 ): Promise<boolean> {
-  validateTerminalSubject(expected)
-  const secret = opts.secret?.trim()
-  const prefix = opts.prefix ?? DEFAULT_TERMINAL_TOKEN_PREFIX
-  if (!secret || !token.startsWith(prefix)) return false
-  const body = token.slice(prefix.length)
-  const dot = body.lastIndexOf('.')
-  if (dot <= 0 || dot === body.length - 1) return false
-  const encodedPayload = body.slice(0, dot)
-  const signature = body.slice(dot + 1)
-  if (!timingSafeEqual(signature, await signText(encodedPayload, secret))) return false
-
-  let payload: SandboxTerminalTokenPayload
+  if (!secret) return false
+  const [encoded, sig, extra] = token.split('.')
+  if (!encoded || !sig || extra !== undefined) return false
+  const expectedSig = await signTerminalProxyToken(secret, encoded)
+  if (!constantTimeEqual(sig, expectedSig)) return false
+  let payload: TerminalProxyIdentity & { exp: number }
   try {
-    payload = JSON.parse(textFromBase64url(encodedPayload)) as SandboxTerminalTokenPayload
+    payload = JSON.parse(base64UrlDecodeUtf8(encoded))
   } catch {
     return false
   }
-
-  const now = opts.now ?? Date.now
-  return payload.userId === expected.userId
-    && payload.workspaceId === expected.workspaceId
-    && payload.sandboxId === expected.sandboxId
-    && Number.isFinite(payload.exp)
-    && payload.exp > Math.floor(now() / 1000)
+  return (
+    payload.userId === expected.userId &&
+    payload.workspaceId === expected.workspaceId &&
+    payload.sandboxId === expected.sandboxId &&
+    Number.isFinite(payload.exp) &&
+    payload.exp > Math.floor(Date.now() / 1000)
+  )
 }
 
-export interface AuthenticatedSandboxUser {
-  id: string
+function base64UrlEncodeBytes(bytes: Uint8Array): string {
+  let bin = ''
+  for (const b of bytes) bin += String.fromCharCode(b)
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
-export interface WorkspaceSandboxConnectionHandlerOptions<TBox extends WorkspaceSandboxInstanceLike> {
-  requireUser: (request: Request) => Promise<AuthenticatedSandboxUser>
-  requireWorkspaceAccess: (args: { request: Request; userId: string; workspaceId: string }) => Promise<void>
-  ensureWorkspaceSandbox: (workspaceId: string, userId: string) => Promise<TBox>
-  tokenSecret: string | (() => string | undefined)
-  tokenExpiresInMs?: number
-  tokenPrefix?: string
-  proxyRuntimeUrl?: (args: { request: Request; workspaceId: string; sandboxId: string; box: TBox }) => string
-  exposeDirectSidecar?: boolean
+function base64UrlEncodeUtf8(v: string): string {
+  return base64UrlEncodeBytes(new TextEncoder().encode(v))
 }
 
-export interface WorkspaceSandboxConnectionArgs {
-  request: Request
-  params: {
-    workspaceId?: string
-  }
-}
-
-export function createWorkspaceSandboxConnectionHandler<TBox extends WorkspaceSandboxInstanceLike>(
-  opts: WorkspaceSandboxConnectionHandlerOptions<TBox>,
-) {
-  return async function handleWorkspaceSandboxConnection({ request, params }: WorkspaceSandboxConnectionArgs): Promise<Response> {
-    const user = await opts.requireUser(request)
-    const workspaceId = params.workspaceId
-    if (!workspaceId) return Response.json({ error: 'workspaceId is required' }, { status: 400 })
-    await opts.requireWorkspaceAccess({ request, userId: user.id, workspaceId })
-
-    let box: TBox
-    try {
-      box = await opts.ensureWorkspaceSandbox(workspaceId, user.id)
-    } catch (err) {
-      return Response.json(
-        { error: err instanceof Error ? err.message : 'Failed to provision workspace sandbox' },
-        { status: 500 },
-      )
-    }
-
-    const directSidecarUrl = box.connection?.sidecarUrl ?? (box.connection?.authToken ? box.connection?.runtimeUrl : undefined)
-    const directSidecarToken = box.connection?.authToken ?? box.connection?.sidecarToken
-    const directSidecarExpiresAt = box.connection?.authTokenExpiresAt
-    if (opts.exposeDirectSidecar && directSidecarUrl && directSidecarToken && directSidecarExpiresAt) {
-      return Response.json({
-        runtimeUrl: directSidecarUrl,
-        sidecarUrl: directSidecarUrl,
-        token: directSidecarToken,
-        expiresAt: directSidecarExpiresAt,
-        status: box.status,
-        sandboxId: box.id,
-      })
-    }
-
-    if (!box.connection?.runtimeUrl) {
-      return Response.json(
-        {
-          error: 'Workspace sandbox runtime not ready. The sandbox is still initializing -- retry in a few seconds.',
-          status: box.status,
-        },
-        { status: 503 },
-      )
-    }
-
-    const secret = typeof opts.tokenSecret === 'function' ? opts.tokenSecret() : opts.tokenSecret
-    let scoped: SandboxTerminalTokenResult
-    try {
-      scoped = await createSandboxTerminalToken(
-        { userId: user.id, workspaceId, sandboxId: box.id },
-        { secret, expiresInMs: opts.tokenExpiresInMs, prefix: opts.tokenPrefix },
-      )
-    } catch (err) {
-      return Response.json(
-        { error: err instanceof Error ? err.message : 'Failed to mint sandbox token' },
-        { status: 503 },
-      )
-    }
-
-    const runtimeUrl = opts.proxyRuntimeUrl
-      ? opts.proxyRuntimeUrl({ request, workspaceId, sandboxId: box.id, box })
-      : `/api/workspaces/${encodeURIComponent(workspaceId)}/sandbox/runtime/${encodeURIComponent(box.id)}`
-
-    return Response.json({
-      runtimeUrl,
-      sidecarUrl: runtimeUrl,
-      token: scoped.token,
-      expiresAt: scoped.expiresAt.toISOString(),
-      status: box.status,
-      sandboxId: box.id,
-    })
-  }
-}
-
-export interface SandboxApiCredentials {
-  baseUrl: string
-  apiKey: string
-}
-
-export interface SandboxRuntimeConnection {
-  runtimeUrl: string
-  authToken?: string
-}
-
-export interface WorkspaceSandboxRuntimeProxyHandlerOptions {
-  requireUser: (request: Request) => Promise<AuthenticatedSandboxUser>
-  requireWorkspaceAccess: (args: { request: Request; userId: string; workspaceId: string; sandboxId: string }) => Promise<void>
-  getSandboxApiCredentials: (args: { request: Request; userId: string; workspaceId: string; sandboxId: string }) => Promise<SandboxApiCredentials>
-  getSandboxRuntimeConnection?: (args: { request: Request; userId: string; workspaceId: string; sandboxId: string }) => Promise<SandboxRuntimeConnection | null | undefined>
-  tokenSecret: string | (() => string | undefined)
-  tokenPrefix?: string
-  fetch?: typeof fetch
-  forwardHeaders?: string[]
-}
-
-export interface WorkspaceSandboxRuntimeProxyArgs {
-  request: Request
-  params: {
-    workspaceId?: string
-    sandboxId?: string
-    '*'?: string
-  }
-}
-
-export function createWorkspaceSandboxRuntimeProxyHandler(opts: WorkspaceSandboxRuntimeProxyHandlerOptions) {
-  return async function handleWorkspaceSandboxRuntimeProxy({ request, params }: WorkspaceSandboxRuntimeProxyArgs): Promise<Response> {
-    const user = await opts.requireUser(request)
-    const workspaceId = params.workspaceId
-    const sandboxId = params.sandboxId
-    const runtimePath = params['*']
-    if (!workspaceId || !sandboxId || !runtimePath) {
-      return Response.json({ error: 'workspaceId, sandboxId, and runtime path are required' }, { status: 400 })
-    }
-    const encodedRuntimePath = encodeSandboxRuntimePath(runtimePath)
-    if (!encodedRuntimePath) return Response.json({ error: 'Invalid sandbox runtime path' }, { status: 400 })
-
-    await opts.requireWorkspaceAccess({ request, userId: user.id, workspaceId, sandboxId })
-
-    const token = terminalTokenFromRequest(request.headers)
-    const secret = typeof opts.tokenSecret === 'function' ? opts.tokenSecret() : opts.tokenSecret
-    if (!token || !(await verifySandboxTerminalToken(token, { userId: user.id, workspaceId, sandboxId }, { secret, prefix: opts.tokenPrefix }))) {
-      return Response.json({ error: 'Invalid terminal token' }, { status: 403 })
-    }
-
-    const requestUrl = new URL(request.url)
-    const runtimeConnection = await opts.getSandboxRuntimeConnection?.({ request, userId: user.id, workspaceId, sandboxId })
-    const credentials = runtimeConnection ? null : await opts.getSandboxApiCredentials({ request, userId: user.id, workspaceId, sandboxId })
-    const upstreamUrl = runtimeConnection
-      ? new URL(encodedRuntimePath, `${runtimeConnection.runtimeUrl.replace(/\/+$/, '')}/`)
-      : new URL(
-        `/v1/sandboxes/${encodeURIComponent(sandboxId)}/runtime/${encodedRuntimePath}`,
-        credentials!.baseUrl,
-      )
-    upstreamUrl.search = requestUrl.search
-
-    const headers = buildSandboxRuntimeProxyHeaders(
-      request.headers,
-      runtimeConnection?.authToken ?? credentials!.apiKey,
-      opts.forwardHeaders,
-    )
-    const init: RequestInit & { duplex?: 'half' } = {
-      method: request.method,
-      headers,
-      redirect: 'manual',
-    }
-    if (request.method !== 'GET' && request.method !== 'HEAD' && request.body) {
-      init.body = request.body
-      init.duplex = 'half'
-    }
-
-    const fetchImpl = opts.fetch ?? fetch
-    const response = await fetchImpl(upstreamUrl, init)
-    const responseHeaders = new Headers(response.headers)
-    responseHeaders.delete('set-cookie')
-    return new Response(response.body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: responseHeaders,
-    })
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Terminal WebSocket upgrade
-//
-// The interactive terminal is WebSocket-only on the current sidecar (the REST
-// `POST /terminals` create route was removed in the websocket-first migration).
-// `createWorkspaceSandboxRuntimeProxyHandler` runs inside a React Router
-// loader/action, which can only return a normal Response — never a 101 — so it
-// cannot perform the upgrade. The upgrade must be intercepted at the Worker
-// fetch entry (server.ts) BEFORE React Router, mirroring the session-stream WS
-// interceptor. This handler does exactly that: it auth-gates the upgrade (the
-// scoped terminal token rides in the `bearer.` subprotocol because browsers
-// can't set Authorization on a WS handshake) and forwards it to the sandbox API
-// runtime proxy with the server-to-server credential. Returning the upstream
-// 101 passes the live socket straight through to the browser — the same idiom
-// the sandbox API uses to reach the orchestrator.
-//
-// NOTE: this only runs under a WebSocket-capable runtime (Cloudflare Workers /
-// `wrangler`). `react-router dev` (Vite) never invokes the Worker fetch entry,
-// so the terminal WS is exercised under `wrangler dev` / production.
-// ---------------------------------------------------------------------------
-
-const SANDBOX_TERMINAL_WS_PATHNAME =
-  /^\/api\/workspaces\/([^/]+)\/sandbox\/runtime\/([^/]+)\/(terminals\/[^/]+\/ws)$/
-
-export interface SandboxTerminalWsMatch {
-  workspaceId: string
-  sandboxId: string
-  subPath: string
-}
-
-/**
- * Parse a same-origin terminal-WS pathname into its parts, or `null` when the
- * path is not a sandbox terminal WebSocket. Matches the default `runtimeUrl`
- * convention emitted by {@link createWorkspaceSandboxConnectionHandler}
- * (`/api/workspaces/:workspaceId/sandbox/runtime/:sandboxId`) with a canonical
- * `terminals/:id/ws` sub-path. `subPath` is left URL-encoded for re-use in the
- * upstream URL; the ids are decoded for auth checks.
- */
-export function matchSandboxTerminalWsPath(pathname: string): SandboxTerminalWsMatch | null {
-  const m = SANDBOX_TERMINAL_WS_PATHNAME.exec(pathname)
-  if (!m) return null
-  const [, workspaceId, sandboxId, subPath] = m
-  if (!workspaceId || !sandboxId || !subPath) return null
-  return { workspaceId: decodeURIComponent(workspaceId), sandboxId: decodeURIComponent(sandboxId), subPath }
-}
-
-/** True when `request` is a WebSocket upgrade for a sandbox terminal path. */
-export function isSandboxTerminalWsUpgrade(request: Request): boolean {
-  if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') return false
-  try {
-    return matchSandboxTerminalWsPath(new URL(request.url).pathname) !== null
-  } catch {
-    return false
-  }
-}
-
-export interface WorkspaceSandboxTerminalUpgradeHandlerOptions {
-  requireUser: (request: Request) => Promise<AuthenticatedSandboxUser>
-  requireWorkspaceAccess: (args: { request: Request; userId: string; workspaceId: string; sandboxId: string }) => Promise<void>
-  getSandboxApiCredentials: (args: { request: Request; userId: string; workspaceId: string; sandboxId: string }) => Promise<SandboxApiCredentials>
-  getSandboxRuntimeConnection?: (args: { request: Request; userId: string; workspaceId: string; sandboxId: string }) => Promise<SandboxRuntimeConnection | null | undefined>
-  tokenSecret: string | (() => string | undefined)
-  tokenPrefix?: string
-  fetch?: typeof fetch
-}
-
-/**
- * Build a Worker-entry handler that proxies a sandbox terminal WebSocket
- * upgrade to the sandbox API runtime proxy. Returns `null` when the request is
- * not a terminal WS upgrade, so the caller can fall through to its normal
- * request handler:
- *
- * ```ts
- * const handled = await handleSandboxTerminalUpgrade(request)
- * if (handled) return handled
- * ```
- */
-export function createWorkspaceSandboxTerminalUpgradeHandler(opts: WorkspaceSandboxTerminalUpgradeHandlerOptions) {
-  return async function handleWorkspaceSandboxTerminalUpgrade(request: Request): Promise<Response | null> {
-    if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') return null
-    let url: URL
-    try {
-      url = new URL(request.url)
-    } catch {
-      return null
-    }
-    const match = matchSandboxTerminalWsPath(url.pathname)
-    if (!match) return null
-    const { workspaceId, sandboxId, subPath } = match
-
-    let user: AuthenticatedSandboxUser
-    try {
-      user = await opts.requireUser(request)
-    } catch {
-      return new Response('Unauthorized', { status: 401 })
-    }
-    try {
-      await opts.requireWorkspaceAccess({ request, userId: user.id, workspaceId, sandboxId })
-    } catch {
-      return new Response('Forbidden', { status: 403 })
-    }
-
-    const token = terminalTokenFromRequest(request.headers)
-    const secret = typeof opts.tokenSecret === 'function' ? opts.tokenSecret() : opts.tokenSecret
-    if (!token || !(await verifySandboxTerminalToken(token, { userId: user.id, workspaceId, sandboxId }, { secret, prefix: opts.tokenPrefix }))) {
-      return new Response('Invalid terminal token', { status: 403 })
-    }
-
-    const runtimeConnection = await opts.getSandboxRuntimeConnection?.({ request, userId: user.id, workspaceId, sandboxId })
-    const credentials = runtimeConnection ? null : await opts.getSandboxApiCredentials({ request, userId: user.id, workspaceId, sandboxId })
-    const upstreamUrl = runtimeConnection
-      ? new URL(subPath, `${runtimeConnection.runtimeUrl.replace(/\/+$/, '')}/`)
-      : new URL(`/v1/sandboxes/${encodeURIComponent(sandboxId)}/runtime/${subPath}`, credentials!.baseUrl)
-    upstreamUrl.search = url.search
-
-    // Forward the upgrade verbatim — keep the Upgrade/Connection + Sec-WebSocket-*
-    // headers the handshake needs and the offered subprotocol — but swap the auth
-    // to the server-to-server sandbox credential. Returning the upstream 101
-    // passes the live socket straight through to the browser.
-    const upstreamHeaders = new Headers(request.headers)
-    upstreamHeaders.set('Authorization', `Bearer ${runtimeConnection?.authToken ?? credentials!.apiKey}`)
-    upstreamHeaders.delete('host')
-    const fetchImpl = opts.fetch ?? fetch
-    return fetchImpl(upstreamUrl.toString(), { method: request.method, headers: upstreamHeaders })
-  }
-}
-
-const DEFAULT_RUNTIME_PROXY_HEADERS = ['accept', 'content-type', 'last-event-id', 'x-session-id']
-
-export function buildSandboxRuntimeProxyHeaders(source: Headers, sandboxApiKey: string, forwardHeaders = DEFAULT_RUNTIME_PROXY_HEADERS): Headers {
-  const headers = new Headers()
-  headers.set('Authorization', `Bearer ${sandboxApiKey}`)
-  for (const name of forwardHeaders) {
-    const value = source.get(name)
-    if (value) headers.set(name, value)
-  }
-  return headers
-}
-
-export function encodeSandboxRuntimePath(runtimePath: string): string | null {
-  const segments = runtimePath.split('/')
-  if (segments.some((segment) => !segment || segment === '.' || segment === '..')) return null
-  return segments.map((segment) => encodeURIComponent(segment)).join('/')
-}
-
-export function bearerToken(value: string | null): string | null {
-  if (!value) return null
-  const trimmed = value.trim()
-  if (!trimmed) return null
-  if (trimmed.toLowerCase() === 'bearer') return null
-  if (trimmed.toLowerCase().startsWith('bearer ')) {
-    const token = trimmed.slice('bearer '.length).trim()
-    return token || null
-  }
-  return trimmed
-}
-
-export function bearerSubprotocolToken(value: string | null): string | null {
-  if (!value) return null
-  for (const part of value.split(',')) {
-    const protocol = part.trim()
-    if (!protocol.toLowerCase().startsWith(BEARER_SUBPROTOCOL_PREFIX)) continue
-    const encoded = protocol.slice(BEARER_SUBPROTOCOL_PREFIX.length)
-    if (!encoded) return null
-    try {
-      const token = textFromBase64url(encoded).trim()
-      return token || null
-    } catch {
-      return null
-    }
-  }
-  return null
-}
-
-export function terminalTokenFromRequest(headers: Headers): string | null {
-  return bearerToken(headers.get('Authorization')) ?? bearerSubprotocolToken(headers.get('Sec-WebSocket-Protocol'))
-}
-
-function validateTerminalSubject(subject: SandboxTerminalTokenSubject): void {
-  if (!subject.userId) throw new Error('userId is required')
-  if (!subject.workspaceId) throw new Error('workspaceId is required')
-  if (!subject.sandboxId) throw new Error('sandboxId is required')
-}
-
-async function signText(message: string, secret: string): Promise<string> {
-  const enc = new TextEncoder()
-  const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
-  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message))
-  return base64url(new Uint8Array(sig))
-}
-
-function base64urlText(text: string): string {
-  return base64url(new TextEncoder().encode(text))
-}
-
-function textFromBase64url(value: string): string {
-  const b64 = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=')
-  const bin = atob(b64)
+function base64UrlDecodeUtf8(v: string): string {
+  const padded = v.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(v.length / 4) * 4, '=')
+  const bin = atob(padded)
   const bytes = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i)
   return new TextDecoder().decode(bytes)
 }
 
-function base64url(bytes: Uint8Array): string {
-  let s = ''
-  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]!)
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let r = 0
+  for (let i = 0; i < a.length; i += 1) r |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return r === 0
 }
 
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  let diff = 0
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  return diff === 0
+// Severed-stream classifier. Generic to any router-backed harness: a final step
+// that finished with error/other/unknown is a truncated turn, not a completed one.
+const SEVERED_FINISH_REASONS = new Set(['error', 'other', 'unknown'])
+
+export type SandboxStepTransition =
+  | { kind: 'step-start' }
+  | { kind: 'step-finish'; reason: string; severed: boolean }
+
+function asPlainRecord(v: unknown): Record<string, unknown> | null {
+  return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null
 }
+
+export function classifySeveredStream(event: unknown): SandboxStepTransition | null {
+  const root = asPlainRecord(event)
+  if (!root || root.type !== 'message.part.updated') return null
+  const body = asPlainRecord(root.properties) ?? asPlainRecord(root.data) ?? root
+  const part = asPlainRecord(body.part)
+  if (!part) return null
+  if (part.type === 'step-start') return { kind: 'step-start' }
+  if (part.type !== 'step-finish') return null
+  const reason = typeof part.reason === 'string' && part.reason ? part.reason : 'unknown'
+  return { kind: 'step-finish', reason, severed: SEVERED_FINISH_REASONS.has(reason) }
+}
+
+export function isTerminalPromptEvent(event: unknown): boolean {
+  const t = asPlainRecord(event)?.type
+  return t === 'result' || t === 'done'
+}
+
+// Interactive-question detector. Returns the question text or null. Used by
+// streamSandboxPrompt when disallowQuestions is set.
+export function detectInteractiveQuestion(event: unknown): string | null {
+  const root = asPlainRecord(event)
+  if (!root) return null
+  const type = typeof root.type === 'string' ? root.type : undefined
+  const data = asPlainRecord(root.data)
+  const props = asPlainRecord(root.properties)
+  const body = props ?? data ?? root
+  if (type === 'question.asked' || type === 'question') return firstQuestionText(body)
+  const part = asPlainRecord(data?.part) ?? asPlainRecord(body.part)
+  const tool =
+    (typeof part?.tool === 'string' && part.tool) ||
+    (typeof part?.name === 'string' && part.name) ||
+    (typeof body.tool === 'string' && body.tool) ||
+    undefined
+  const isQ =
+    type === 'message.part.updated' &&
+    (tool === 'question' || asPlainRecord(part)?.type === 'question')
+  if (!isQ) return null
+  const state = asPlainRecord(asPlainRecord(part)?.state)
+  return firstQuestionText(asPlainRecord(state?.input) ?? state ?? part ?? body)
+}
+
+function firstQuestionText(value: Record<string, unknown> | null): string {
+  const arr = Array.isArray(value?.questions)
+    ? value!.questions
+    : Array.isArray(asPlainRecord(value?.input)?.questions)
+      ? (asPlainRecord(value!.input)!.questions as unknown[])
+      : []
+  const first = asPlainRecord(arr[0])
+  const q =
+    (typeof first?.question === 'string' && first.question) ||
+    (typeof first?.prompt === 'string' && first.prompt) ||
+    undefined
+  return q ?? 'interactive question'
+}
+// Workspace sandbox terminal handlers: WebSocket upgrade proxy, connection
+// + runtime-proxy handlers, and scoped terminal-token mint/verify.
+export * from './workspace-terminal'
