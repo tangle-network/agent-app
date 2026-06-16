@@ -26,6 +26,10 @@ export * from './smooth-text'
 export * from './mission-activity'
 export * from './sandbox-terminal'
 export * from './seat-paywall'
+export {
+  AgentSessionControls,
+  type AgentSessionControlsProps,
+} from './agent-session-controls'
 import type { CatalogModel } from '../runtime/model-catalog'
 
 // ── shared glyphs (no icon-library dependency) ────────────────────────────
