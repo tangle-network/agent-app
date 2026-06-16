@@ -22,8 +22,6 @@ export interface InlineTextEditorProps {
   zoom: number
   panX: number
   panY: number
-  /** Bounding rect of the Konva stage container in the viewport. */
-  stageRect: { left: number; top: number }
   onCommit(text: string): void
   onCancel(): void
 }
@@ -33,7 +31,6 @@ export function InlineTextEditor({
   zoom,
   panX,
   panY,
-  stageRect,
   onCommit,
   onCancel,
 }: InlineTextEditorProps) {
@@ -47,8 +44,6 @@ export function InlineTextEditor({
     zoom,
     panX,
     panY,
-    stageLeft: stageRect.left,
-    stageTop: stageRect.top,
     elementFontSize: element.fontSize,
   })
 

@@ -180,9 +180,6 @@ export interface OverlayPositionInput {
   zoom: number
   panX: number
   panY: number
-  /** Stage offset in the viewport (e.g. from stage.container().getBoundingClientRect). */
-  stageLeft: number
-  stageTop: number
 }
 
 export interface OverlayPosition {
@@ -206,9 +203,11 @@ export interface OverlayPosition {
 export function computeTextOverlayPosition(
   input: OverlayPositionInput & { elementFontSize: number },
 ): OverlayPosition {
-  // Document-to-screen: screenX = panX + elementX * zoom
-  const left = input.panX + input.elementX * input.zoom + input.stageLeft
-  const top = input.panY + input.elementY * input.zoom + input.stageTop
+  // The overlay textarea is position:absolute inside the workspace's relative
+  // container, so its coordinates are container-relative, not viewport-relative:
+  // containerX = panX + elementX * zoom.
+  const left = input.panX + input.elementX * input.zoom
+  const top = input.panY + input.elementY * input.zoom
   return {
     left,
     top,
