@@ -121,8 +121,6 @@ export interface WorkspaceViewProps {
   canWrite: boolean
   onApplyOperations: DesignCanvasProps['onApplyOperations']
   onSelectionChange?: DesignCanvasProps['onSelectionChange']
-  renderAgentPanel?: DesignCanvasProps['renderAgentPanel']
-  renderSidePanel?: DesignCanvasProps['renderSidePanel']
   className?: string
   /** Ref the chrome fills with a fit-page callback. The chrome calls it on F /
    *  Fit button; when injected via DesignCanvasEditor the ref is shared. */
@@ -141,8 +139,6 @@ export function WorkspaceView({
   canWrite,
   onApplyOperations,
   onSelectionChange,
-  renderAgentPanel,
-  renderSidePanel,
   className,
   stack,
   activePage,
@@ -680,7 +676,6 @@ export function WorkspaceView({
     ? (findElement(activePage, editingElementId)?.element as TextElement | undefined) ?? null
     : null
 
-  const stageRect = containerRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 }
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1
 
   const pageScreenX = panX
@@ -712,13 +707,6 @@ export function WorkspaceView({
       onKeyUp={handleKeyUp}
       style={{ cursor: spaceHeldRef.current ? 'grab' : 'default' }}
     >
-      {/* Left side panel */}
-      {renderSidePanel && (
-        <div className="absolute left-0 top-0 bottom-0 z-20 w-60 pointer-events-auto">
-          {renderSidePanel()}
-        </div>
-      )}
-
       {/* Konva Stage */}
       <Stage
         ref={stageRef}
@@ -840,17 +828,9 @@ export function WorkspaceView({
           zoom={zoom}
           panX={panX}
           panY={panY}
-          stageRect={{ left: stageRect.left, top: stageRect.top }}
           onCommit={handleTextCommit}
           onCancel={handleTextCancel}
         />
-      )}
-
-      {/* Agent panel (right) */}
-      {renderAgentPanel && (
-        <div className="absolute right-0 top-0 bottom-0 z-20 w-80 pointer-events-auto">
-          {renderAgentPanel({ selectedElements, activePageId })}
-        </div>
       )}
     </div>
   )
@@ -907,8 +887,6 @@ export function Workspace(props: DesignCanvasProps) {
       canWrite={props.canWrite}
       onApplyOperations={props.onApplyOperations}
       onSelectionChange={props.onSelectionChange}
-      renderAgentPanel={props.renderAgentPanel}
-      renderSidePanel={props.renderSidePanel}
       className={props.className}
     />
   )
