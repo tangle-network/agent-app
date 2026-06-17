@@ -200,7 +200,7 @@ function formatContext(len?: number): string | undefined {
 
 function SectionHeader({ children }: { children: ReactNode }) {
   return (
-    <div className="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+    <div className="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
       {children}
     </div>
   )
@@ -481,7 +481,7 @@ export function RunDrillIn({ run, onClose }: RunDrillInProps) {
                 {step.status === 'error' ? '✗' : '$'}
               </span>
               <code className="min-w-0 flex-1 truncate font-mono text-xs">{step.label}</code>
-              <span className="shrink-0 text-[10px] text-muted-foreground/60">
+              <span className="shrink-0 text-[10px] text-muted-foreground">
                 {new Date(step.at).toLocaleTimeString()}
               </span>
             </div>
@@ -493,7 +493,7 @@ export function RunDrillIn({ run, onClose }: RunDrillInProps) {
           </div>
         ))}
       </div>
-      <p className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground/60">
+      <p className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
         Readonly drill-in. Follow up in the main chat.
       </p>
     </div>
@@ -642,7 +642,7 @@ function KvRows({ data }: { data: Record<string, unknown> }) {
     <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
       {entries.map(([k, v]) => (
         <div key={k} className="contents">
-          <dt className="font-mono text-[11px] text-muted-foreground/70">{k}</dt>
+          <dt className="font-mono text-[11px] text-muted-foreground">{k}</dt>
           <dd className="min-w-0 whitespace-pre-wrap break-words font-mono text-[11px] text-muted-foreground">
             {truncate(v)}
           </dd>
@@ -679,13 +679,13 @@ function DefaultToolDetail({ call }: { call: ChatToolCallInfo }) {
     <div className="space-y-2">
       {call.args && Object.keys(call.args).length > 0 && (
         <div>
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/50">Called with</p>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Called with</p>
           <KvRows data={call.args} />
         </div>
       )}
       {outcome && (
         <div>
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/50">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             {outcome.ok === false ? 'Failed' : 'Result'}
           </p>
           {outcome.ok === false ? (
@@ -768,7 +768,7 @@ function ToolCallCard({
             </button>
           </span>
         )}
-        <span className="shrink-0 text-[11px] text-muted-foreground/70">
+        <span className="shrink-0 text-[11px] text-muted-foreground">
           {call.status === 'running' ? 'running…' : pending ? 'awaiting approval' : failed ? 'failed' : 'done'}
         </span>
         <ChevronDown className={`h-3 w-3 shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
@@ -835,7 +835,7 @@ function AssistantMessage({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-3">
-      <div className="mb-1 flex items-baseline gap-2 text-[11px] tracking-wide text-muted-foreground/60">
+      <div className="mb-1 flex items-baseline gap-2 text-[11px] tracking-wide text-muted-foreground">
         <span className="font-semibold uppercase">{agentLabel}</span>
         {msg.modelUsed && <span className="font-mono normal-case">{msg.modelUsed}</span>}
         {formatTokensPerSecond(msg) && <span>{formatTokensPerSecond(msg)}</span>}
@@ -852,7 +852,7 @@ function AssistantMessage({
               'Thought process'
             )}
           </summary>
-          <div ref={reasoningScrollRef} className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap text-[13px] leading-relaxed text-muted-foreground/70">
+          <div ref={reasoningScrollRef} className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap text-[13px] leading-relaxed text-muted-foreground">
             {reasoning}
           </div>
         </details>
@@ -890,7 +890,7 @@ function ThinkingRow({ agentLabel }: { agentLabel: string }) {
   }, [])
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-3">
-      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/60">{agentLabel}</p>
+      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{agentLabel}</p>
       <div className="flex items-center gap-2 text-base text-muted-foreground">
         <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
           <path d="M21 12a9 9 0 1 1-6.219-8.56" strokeLinecap="round" />
@@ -954,7 +954,7 @@ export function ChatMessages({
         msg.role === 'user' ? (
           <div key={msg.id} className="mx-auto w-full max-w-3xl px-6 py-3">
             <div className="ml-auto w-fit max-w-[85%]">
-              <p className="mb-1 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/60">
+              <p className="mb-1 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {userLabel}
               </p>
               <div className="rounded-2xl rounded-tr-md bg-primary/10 px-4 py-2.5 text-base leading-relaxed">

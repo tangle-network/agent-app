@@ -25,6 +25,17 @@ Toggle light/dark with the header button or `?theme=dark` on any route — this
 exercises the `tokens.css` + Tailwind-preset theme contract (`./styles`,
 `./tailwind-preset`). It is also the target for `bad design-audit --url http://localhost:4321/<route>`.
 
+## Deterministic a11y / contrast audit
+
+```bash
+npm run dev            # in one shell
+node scripts/a11y-axe.mjs   # axe-core over /canvas /timeline /chat × light/dark
+```
+
+Returns real WCAG violations (exact contrast ratios, missing labels/roles) with
+element selectors — the trustworthy alternative to LLM "visual" audits. Prefer
+this for visual QA.
+
 > Note: `vite.config.ts` pins `react`/`react-dom`/`react-konva`/`konva` to the
 > playground's own copies — agent-app is linked by symlink, so without the alias
 > Vite would resolve React from the parent repo's devDeps (v19) and mismatch
