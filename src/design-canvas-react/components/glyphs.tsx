@@ -195,3 +195,17 @@ export const ZoomFitGlyph = glyph(
     <path d="M15 3h6v6M14 10l6.1-6.1M9 21H3v-6M10 14l-6.1 6.1" />
   </>,
 )
+
+export const ExportGlyph = glyph(
+  <>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+  </>,
+)
+
+export const ShapesGlyph = glyph(
+  <>
+    <rect x="3" y="13" width="8" height="8" rx="1" />
+    <circle cx="17" cy="17" r="4" />
+    <path d="M8.5 3 13 11H4z" />
+  </>,
+)
