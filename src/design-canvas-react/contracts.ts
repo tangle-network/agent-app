@@ -157,11 +157,28 @@ export interface ExportTriggerOptions {
   pixelRatio: number
 }
 
+/**
+ * Editor capability mode.
+ * - `'edit'` (default): the full authoring editor — insert panel, page
+ *   add/duplicate/delete, layers, grid/snap/ruler/bleed toggles, group/ungroup,
+ *   z-order. This is the designer surface.
+ * - `'review'`: a lean review/tweak surface for agent-authored output. The
+ *   minimal toolbar exposes only safe direct edits (undo/redo, fit/zoom). The
+ *   insert panel, blank-page-create, and authoring controls are hidden. Drag,
+ *   select, double-click-to-edit-text, image swap, the agent panel, and
+ *   gallery/thumbnail/export all stay. Additive and backward-compatible.
+ */
+export type DesignCanvasMode = 'edit' | 'review'
+
 export interface DesignCanvasProps {
   document: SceneDocument
   /** Revision the document was loaded at; threaded through saves. */
   rev: number
   canWrite: boolean
+  /** Editor capability mode. Default `'edit'` (full authoring editor). Set
+   *  `'review'` for a lean reviewer that hides authoring controls but keeps
+   *  drag/select/text-edit/image-swap and the agent panel. */
+  mode?: DesignCanvasMode
   /** Persist operations. Resolve with the new revision; reject to roll back.
    *  A stale-revision failure should resolve AFTER refetch with the fresh
    *  document so the editor rebases instead of fighting. */

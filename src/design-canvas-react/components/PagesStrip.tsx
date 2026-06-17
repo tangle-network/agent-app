@@ -27,6 +27,9 @@ export interface PagesStripProps {
   onDuplicatePage(pageId: string): void
   onDeletePage(pageId: string): void
   onReorderPage(pageId: string, toIndex: number): void
+  /** Show page-management affordances (add / duplicate / delete). Default true.
+   *  The review surface passes false: pages are navigated, not authored. */
+  canManagePages?: boolean
 }
 
 const THUMBNAIL_W = 80
@@ -45,6 +48,7 @@ export function PagesStrip({
   onDuplicatePage,
   onDeletePage,
   onReorderPage,
+  canManagePages = true,
 }: PagesStripProps) {
   // Map from page id → data URL; null while loading.
   const [thumbnails, setThumbnails] = useState<Record<string, string | null>>({})
@@ -161,7 +165,7 @@ export function PagesStrip({
             </span>
 
             {/* Per-page action buttons — visible on hover or when active */}
-            {canWrite ? (
+            {canWrite && canManagePages ? (
               <div className="pointer-events-none absolute -top-1 right-0 flex gap-0.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
                 <button
                   type="button"
@@ -193,7 +197,7 @@ export function PagesStrip({
       })}
 
       {/* Add page button */}
-      {canWrite ? (
+      {canWrite && canManagePages ? (
         <button
           type="button"
           aria-label="Add page"

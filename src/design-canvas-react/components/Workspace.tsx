@@ -58,7 +58,7 @@ import { exportPageDataUrl } from '../export'
 import { createSceneCommandStack } from '../engine/command-stack'
 import { createSnapEngine, collectGridTargets } from '../engine/snap'
 import { createZoomPanMath } from '../engine/zoom-pan'
-import { marqueeSelect } from '../engine/selection'
+import { marqueeSelect, hitTestPoint } from '../engine/selection'
 import {
   addElementCommand,
   setAttrsCommand,
@@ -314,21 +314,25 @@ export function WorkspaceView({
     }
     if (e.button !== 0) return
 
-    const stage = stageRef.current
     const rect = containerRef.current?.getBoundingClientRect()
-    if (!stage || !rect) return
+    if (!rect) return
     const screenX = e.clientX - rect.left
     const screenY = e.clientY - rect.top
-    const hitNode = stage.getIntersection({ x: screenX, y: screenY })
+    const docPos = zoomPanMath.screenToDocument({ zoom, panX, panY }, screenX, screenY)
 
-    if (hitNode && !hitNode.name().startsWith('overlay:') && hitNode.name() !== 'page-background') {
+    // Element-vs-empty-space is decided against the scene model in document
+    // space, not Konva's hit-graph canvas. The hit canvas misclassifies presses
+    // over elements (clip group, listening:false background, redraw lag right
+    // after a pan/zoom setView), which silently routed an element press into the
+    // marquee branch — the element drag never started. A model hit means: let
+    // Konva's draggable node begin the move; only empty space starts a marquee.
+    if (hitTestPoint(activePage, docPos.x, docPos.y) !== null) {
       return
     }
 
     e.preventDefault()
     ;(e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId)
     gestureRef.current = 'marquee'
-    const docPos = zoomPanMath.screenToDocument({ zoom, panX, panY }, screenX, screenY)
     const m: MarqueeState = { active: true, startDocX: docPos.x, startDocY: docPos.y, endDocX: docPos.x, endDocY: docPos.y }
     marqueeRef.current = m
     setMarquee(m)

@@ -167,6 +167,7 @@ export function DesignCanvas({
   document: initialDocument,
   rev: initialRev,
   canWrite,
+  mode = 'edit',
   onApplyOperations,
   onSelectionChange,
   renderAgentPanel,
@@ -499,6 +500,8 @@ export function DesignCanvas({
       .filter((el): el is SceneElement => el !== undefined)
   }, [activePage, editorState.selectedElementIds])
 
+  const review = mode === 'review'
+
   if (!activePage) {
     return (
       <div className={`flex h-full items-center justify-center bg-[var(--bg-input)] text-[var(--text-muted)] ${className ?? ''}`}>
@@ -519,8 +522,10 @@ export function DesignCanvas({
 
   return (
     <div className={`flex h-full min-h-0 bg-[var(--bg-input)] text-[var(--text-primary)] ${className ?? ''}`}>
-      {/* Optional left side panel (asset/template browser, etc.) */}
-      {renderSidePanel ? (
+      {/* Optional left side panel (asset/template browser, insert panel, etc.).
+          Suppressed in review mode: the lean reviewer hides authoring/insert
+          surfaces regardless of what the integrator passes. */}
+      {renderSidePanel && !review ? (
         <aside className="flex w-64 shrink-0 flex-col overflow-hidden border-r border-[var(--border-default)]">
           {renderSidePanel()}
         </aside>
@@ -536,6 +541,7 @@ export function DesignCanvas({
               page={activePage}
               selectedElements={selectedElements}
               canWrite={canWrite}
+              mode={mode}
               canUndo={stack.canUndo()}
               canRedo={stack.canRedo()}
               gridEnabled={editorState.gridEnabled}
@@ -653,6 +659,7 @@ export function DesignCanvas({
               pages={editorState.document.pages}
               activePageId={editorState.activePageId}
               canWrite={canWrite}
+              canManagePages={!review}
               renderThumbnail={renderThumbnail}
               onSelectPage={setActivePage}
               onAddPage={handleAddPage}
