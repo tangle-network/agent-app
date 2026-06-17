@@ -187,7 +187,7 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
                 className="shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
               >
                 {element.locked
-                  ? <LockGlyph className="h-3.5 w-3.5 text-amber-400" />
+                  ? <LockGlyph className="h-3.5 w-3.5 text-[var(--text-warning)]" />
                   : <UnlockGlyph className="h-3.5 w-3.5" />}
               </button>
             </div>

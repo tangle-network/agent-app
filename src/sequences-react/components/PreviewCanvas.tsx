@@ -173,7 +173,7 @@ export function PreviewCanvas({ timeline, clock, frameProvider, className }: Pre
         style={size ? { width: `${size.width}px`, height: `${size.height}px` } : { width: '100%', height: '100%' }}
       />
       {drawError ? (
-        <p className="absolute inset-x-3 bottom-2 truncate rounded bg-rose-950/80 px-2 py-1 text-center text-xs text-rose-200" role="alert">
+        <p className="absolute inset-x-3 bottom-2 truncate rounded bg-[hsl(var(--destructive))] px-2 py-1 text-center text-xs text-[hsl(var(--destructive-foreground))]" role="alert">
           {drawError}
         </p>
       ) : null}

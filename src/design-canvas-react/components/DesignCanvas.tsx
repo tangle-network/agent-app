@@ -577,7 +577,7 @@ export function DesignCanvas({
         {/* Error bar */}
         {commitError ? (
           <div
-            className="flex shrink-0 items-center justify-between gap-3 border-b border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-300"
+            className="flex shrink-0 items-center justify-between gap-3 border-b border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.1)] px-3 py-1.5 text-xs text-[var(--text-danger)]"
             role="alert"
           >
             <span className="min-w-0 truncate">{commitError}</span>

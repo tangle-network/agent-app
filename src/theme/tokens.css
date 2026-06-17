@@ -35,7 +35,7 @@
   --muted-foreground: 215 16% 44%;
   --accent: 210 40% 96%;
   --accent-foreground: 222 47% 11%;
-  --destructive: 0 72% 51%;
+  --destructive: 0 72% 45%;
   --destructive-foreground: 0 0% 100%;
   --border: 214 32% 91%;
   --input: 214 32% 91%;
@@ -43,8 +43,12 @@
   /* note: --primary below is darkened from 53% → 47% L so the brand blue clears
      WCAG AA (4.5:1) when used AS TEXT on a light surface; --ring stays at the
      brighter 53% (a 2px focus ring only needs 3:1 non-text contrast). */
-  --success: 142 71% 45%;
-  --warning: 38 92% 50%;
+  /* status colors — dark enough on light surfaces to clear AA as text (used by
+     chips, dots, and solid buttons via the Tailwind preset's success/warning). */
+  --success: 142 72% 29%;
+  --success-foreground: 0 0% 100%;
+  --warning: 38 92% 32%;
+  --warning-foreground: 38 92% 12%;
 
   /* canvas/sequences aliases — full colors, resolve to the triples above */
   --bg-input: hsl(var(--card));
@@ -52,6 +56,7 @@
   --text-secondary: hsl(var(--secondary-foreground));
   --text-muted: hsl(var(--muted-foreground));
   --text-danger: hsl(var(--destructive));
+  --text-warning: hsl(var(--warning));
   --border-default: hsl(var(--border));
   --brand-primary: hsl(var(--primary));
 
@@ -76,13 +81,15 @@
   --muted-foreground: 215 20% 65%;
   --accent: 217 33% 17%;
   --accent-foreground: 210 40% 98%;
-  --destructive: 0 63% 50%;
-  --destructive-foreground: 210 40% 98%;
+  --destructive: 0 78% 67%;
+  --destructive-foreground: 0 0% 12%;
   --border: 217 33% 20%;
   --input: 217 33% 20%;
   --ring: 217 91% 60%;
-  --success: 142 71% 45%;
-  --warning: 38 92% 50%;
+  --success: 142 60% 50%;
+  --success-foreground: 142 80% 12%;
+  --warning: 38 95% 58%;
+  --warning-foreground: 38 92% 12%;
 
   --canvas-backdrop: hsl(0 0% 10%);
 }

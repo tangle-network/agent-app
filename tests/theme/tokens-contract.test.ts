@@ -69,3 +69,33 @@ describe('theme token contract', () => {
     expect(REQUIRED_ALIASES.filter((v) => !defined.has(v))).toEqual([])
   })
 })
+
+describe('no status-palette literals outside the allowlist', () => {
+  // Tailwind palette literals (bg-green-500, text-rose-300, …) bypass the token
+  // system and won't re-theme. The var()-completeness guard above can't see them.
+  // This enforces ADOPTION: status colors must use the semantic tokens
+  // (success/warning/destructive, or the --text-danger/--text-warning aliases).
+  // Allowlist = deliberate NON-status palettes (clip kind-coding, print bleed).
+  const ALLOW = [
+    'sequences-react/components/TimelineClipChip.tsx', // video/audio/agent kind-coding
+    'design-canvas-react/components/BleedTrimOverlay.tsx', // print bleed (red convention)
+  ]
+  const PALETTE = /(text|bg|border|ring|fill|stroke)-(rose|amber|emerald|green|red|yellow|lime|orange)-[0-9]/
+
+  it('every status color uses a semantic token, not a raw palette literal', () => {
+    const offenders: string[] = []
+    for (const pkg of REACT_PKGS) {
+      for (const file of walk(join(repoRoot, 'src', pkg))) {
+        const rel = file.replace(repoRoot + '/src/', '')
+        if (ALLOW.some((a) => rel.endsWith(a))) continue
+        readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+          if (PALETTE.test(line)) offenders.push(`${rel}:${i + 1}  ${line.trim().slice(0, 90)}`)
+        })
+      }
+    }
+    expect(
+      offenders,
+      `Status colors must use tokens (success/warning/destructive). Offenders:\n${offenders.join('\n')}`,
+    ).toEqual([])
+  })
+})
