@@ -1,0 +1,28 @@
+{
+  "name": "agent-app-playground",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Dev-only visual playground for agent-app UI surfaces. Not part of the published package.",
+  "scripts": {
+    "dev": "vite --port 4321",
+    "build": "vite build",
+    "preview": "vite preview --port 4321"
+  },
+  "dependencies": {
+    "@tangle-network/agent-app": "file:..",
+    "konva": "^9.3.16",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-konva": "^18.2.10"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "vite": "^5.4.11"
+  }
+}
