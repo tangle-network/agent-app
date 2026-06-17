@@ -72,7 +72,7 @@ export function TimelineTrackRow(props: TimelineTrackRowProps) {
       <div className={`sticky left-0 z-10 flex w-36 shrink-0 items-center gap-2 border-r border-[var(--border-default)] bg-[var(--bg-input)] px-2.5 ${laneHeight}`}>
         <Glyph className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--text-secondary)]">{track.name}</span>
-        {track.locked ? <LockGlyph className="h-3 w-3 shrink-0 text-amber-400" /> : null}
+        {track.locked ? <LockGlyph className="h-3 w-3 shrink-0 text-[var(--text-warning)]" /> : null}
         {track.muted ? <MutedGlyph className="h-3 w-3 shrink-0 text-[var(--text-muted)]" /> : null}
       </div>
       <div

@@ -138,7 +138,7 @@ export function PagesStrip({
             >
             {/* Thumbnail or placeholder */}
             <div
-              className="overflow-hidden rounded border border-[var(--border-default)] bg-white"
+              className="overflow-hidden rounded border border-[var(--border-default)] bg-[hsl(var(--card))]"
               style={{ width: THUMBNAIL_W, height: THUMBNAIL_H }}
             >
               {thumbUrl ? (
@@ -185,7 +185,7 @@ export function PagesStrip({
                   }}
                   className={BTN_SM}
                 >
-                  <TrashGlyph className="h-3 w-3 text-rose-400" />
+                  <TrashGlyph className="h-3 w-3 text-[var(--text-danger)]" />
                 </button>
               </div>
             ) : null}

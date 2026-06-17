@@ -739,7 +739,7 @@ export function TimelineEditor(props: TimelineEditorProps) {
           </div>
 
           {commitError ? (
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-300" role="alert">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.1)] px-3 py-1.5 text-xs text-[var(--text-danger)]" role="alert">
               <span className="min-w-0 truncate">{commitError}</span>
               <button type="button" onClick={() => setCommitError(null)} className="shrink-0 underline-offset-2 hover:underline">
                 Dismiss

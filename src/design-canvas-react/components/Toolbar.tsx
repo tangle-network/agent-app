@@ -707,7 +707,7 @@ function SelectionControls({
 
       {/* Delete */}
       <button type="button" aria-label="Delete selection" disabled={!canWrite} onClick={onDelete} className={BTN}>
-        <TrashGlyph className="h-3.5 w-3.5 text-rose-400" />
+        <TrashGlyph className="h-3.5 w-3.5 text-[var(--text-danger)]" />
       </button>
       </>
       )}

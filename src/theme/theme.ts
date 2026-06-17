@@ -29,7 +29,9 @@ export interface AgentAppTheme {
   input: string
   ring: string
   success: string
+  successForeground: string
   warning: string
+  warningForeground: string
   /** Full CSS color (not a triple) — the canvas/scene backdrop. */
   canvasBackdrop: string
 }
@@ -49,13 +51,15 @@ export const lightTheme: AgentAppTheme = {
   mutedForeground: '215 16% 44%',
   accent: '210 40% 96%',
   accentForeground: '222 47% 11%',
-  destructive: '0 72% 51%',
+  destructive: '0 72% 45%',
   destructiveForeground: '0 0% 100%',
   border: '214 32% 91%',
   input: '214 32% 91%',
   ring: '221 83% 53%',
-  success: '142 71% 45%',
-  warning: '38 92% 50%',
+  success: '142 72% 29%',
+  successForeground: '0 0% 100%',
+  warning: '38 92% 32%',
+  warningForeground: '38 92% 12%',
   canvasBackdrop: 'hsl(220 13% 91%)',
 }
 
@@ -74,13 +78,15 @@ export const darkTheme: AgentAppTheme = {
   mutedForeground: '215 20% 65%',
   accent: '217 33% 17%',
   accentForeground: '210 40% 98%',
-  destructive: '0 63% 50%',
-  destructiveForeground: '210 40% 98%',
+  destructive: '0 78% 67%',
+  destructiveForeground: '0 0% 12%',
   border: '217 33% 20%',
   input: '217 33% 20%',
   ring: '217 91% 60%',
-  success: '142 71% 45%',
-  warning: '38 92% 50%',
+  success: '142 60% 50%',
+  successForeground: '142 80% 12%',
+  warning: '38 95% 58%',
+  warningForeground: '38 92% 12%',
   canvasBackdrop: 'hsl(0 0% 10%)',
 }
 
@@ -118,7 +124,9 @@ export function themeToCssVars(theme: AgentAppTheme): Record<string, string> {
     '--input': theme.input,
     '--ring': theme.ring,
     '--success': theme.success,
+    '--success-foreground': theme.successForeground,
     '--warning': theme.warning,
+    '--warning-foreground': theme.warningForeground,
     '--bg-input': `hsl(${theme.card})`,
     '--text-primary': `hsl(${theme.foreground})`,
     '--text-secondary': `hsl(${theme.secondaryForeground})`,

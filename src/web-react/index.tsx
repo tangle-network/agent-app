@@ -452,7 +452,7 @@ export function RunDrillIn({ run, onClose }: RunDrillInProps) {
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
         <span
           className={`h-2 w-2 shrink-0 rounded-full ${
-            run.status === 'running' ? 'bg-yellow-500' : run.status === 'error' ? 'bg-red-500' : 'bg-green-500'
+            run.status === 'running' ? 'bg-warning' : run.status === 'error' ? 'bg-destructive' : 'bg-success'
           }`}
         />
         <div className="min-w-0 flex-1">
@@ -477,7 +477,7 @@ export function RunDrillIn({ run, onClose }: RunDrillInProps) {
         {run.steps.map((step, i) => (
           <div key={i} className="rounded-lg border border-border/60 bg-background">
             <div className="flex items-baseline gap-2 border-b border-border/40 px-3 py-1.5">
-              <span className={`font-mono text-[11px] ${step.status === 'error' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+              <span className={`font-mono text-[11px] ${step.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>
                 {step.status === 'error' ? '✗' : '$'}
               </span>
               <code className="min-w-0 flex-1 truncate font-mono text-xs">{step.label}</code>
@@ -662,7 +662,7 @@ function ShellDetail({ call }: { call: ChatToolCallInfo }) {
         <span className="select-none text-zinc-500">$</span>
         <span className="min-w-0 flex-1 truncate text-zinc-200">{String(call.args?.command ?? '')}</span>
         {r.exitCode != null && (
-          <span className={r.exitCode === 0 ? 'text-emerald-400' : 'text-red-400'}>exit {r.exitCode}</span>
+          <span className={r.exitCode === 0 ? 'text-success' : 'text-destructive'}>exit {r.exitCode}</span>
         )}
       </div>
       <pre className="max-h-56 overflow-auto whitespace-pre-wrap px-3 pb-2.5 pt-1.5 text-zinc-300">
@@ -689,7 +689,7 @@ function DefaultToolDetail({ call }: { call: ChatToolCallInfo }) {
             {outcome.ok === false ? 'Failed' : 'Result'}
           </p>
           {outcome.ok === false ? (
-            <p className="text-xs text-red-600 dark:text-red-400">{outcome.message ?? 'Tool failed'}</p>
+            <p className="text-xs text-destructive">{outcome.message ?? 'Tool failed'}</p>
           ) : outcome.result && typeof outcome.result === 'object' ? (
             <KvRows data={outcome.result} />
           ) : (
@@ -724,9 +724,9 @@ function ToolCallCard({
     <div
       className={`w-fit min-w-[280px] max-w-full rounded-lg border text-xs transition ${
         pending
-          ? 'border-amber-300/60 bg-amber-500/5'
+          ? 'border-warning/40 bg-warning/5'
           : failed
-            ? 'border-red-300/60 bg-red-500/5'
+            ? 'border-destructive/40 bg-destructive/5'
             : 'border-border/60 bg-muted/20'
       }`}
     >
@@ -743,12 +743,12 @@ function ToolCallCard({
           <span
             className={`h-2 w-2 shrink-0 rounded-full ${
               call.status === 'running'
-                ? 'animate-pulse bg-yellow-500'
+                ? 'animate-pulse bg-warning'
                 : pending
-                  ? 'bg-amber-500'
+                  ? 'bg-warning'
                   : failed
-                    ? 'bg-red-500'
-                    : 'bg-green-500'
+                    ? 'bg-destructive'
+                    : 'bg-success'
             }`}
           />
           <ToolGlyph name={call.name} className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -760,7 +760,7 @@ function ToolCallCard({
               type="button"
               disabled={deciding}
               onClick={() => decide(() => approval.onApprove(pending.proposalId, call.id))}
-              className="rounded bg-green-700 px-2 py-0.5 text-[11px] font-semibold text-white transition hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded bg-success px-2 py-0.5 text-[11px] font-semibold text-success-foreground transition hover:bg-success/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Approve
             </button>
@@ -920,7 +920,7 @@ function ThinkingRow({ agentLabel }: { agentLabel: string }) {
 function StreamErrorRow({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-3">
-      <div role="alert" className="flex items-start gap-2.5 rounded-lg border border-red-300/60 bg-red-500/5 px-3 py-2.5 text-sm text-red-600 dark:text-red-400">
+      <div role="alert" className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
         <svg className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <circle cx="12" cy="12" r="9" />
           <path d="M12 8v4m0 4h.01" />
@@ -930,7 +930,7 @@ function StreamErrorRow({ message, onRetry }: { message: string; onRetry?: () =>
           <button
             type="button"
             onClick={onRetry}
-            className={`shrink-0 rounded border border-red-300/60 bg-card px-2 py-0.5 text-[11px] font-medium text-red-600 dark:text-red-400 transition hover:bg-red-500/10 ${POPOVER_OPTION_FOCUS}`}
+            className={`shrink-0 rounded border border-destructive/40 bg-card px-2 py-0.5 text-[11px] font-medium text-destructive transition hover:bg-destructive/10 ${POPOVER_OPTION_FOCUS}`}
           >
             Retry
           </button>
