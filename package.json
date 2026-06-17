@@ -177,6 +177,11 @@
       "import": "./dist/assets/index.js",
       "default": "./dist/assets/index.js"
     },
+    "./brand-extraction": {
+      "types": "./dist/brand-extraction/index.d.ts",
+      "import": "./dist/brand-extraction/index.js",
+      "default": "./dist/brand-extraction/index.js"
+    },
     "./trace": {
       "types": "./dist/trace/index.d.ts",
       "import": "./dist/trace/index.js",
