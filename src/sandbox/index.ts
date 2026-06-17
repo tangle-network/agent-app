@@ -123,6 +123,19 @@ export interface SandboxRuntimeConfig {
   resumeStopped?: boolean
   // default false: bake resolveModel() into backend.model at create.
   backendModelAtCreate?: boolean
+  // default false: write the profile's `resources.files` INTO the box after it
+  // reaches running (via `box.exec`), instead of inlining them in the create
+  // payload. The orchestrator caps the provision body at 256 KiB; a large
+  // file corpus (skills, tool scripts) blows that cap. Deferring it keeps the
+  // provision body small and uncapped in corpus size, and lands real files on
+  // disk — which is also the only path that works for harnesses whose backend
+  // does not materialize the provider-neutral `resources.files` channel.
+  //
+  // Only `kind: 'inline'` files are deferred; non-inline refs (e.g. github)
+  // stay in the create payload so the orchestrator resolves them. Runs on the
+  // create AND resume/reuse paths (idempotent overwrite). Inline files are
+  // STRIPPED from `resources.files` before create when this is set.
+  deferProfileFiles?: boolean
 }
 
 export const DEFAULT_SANDBOX_RESOURCES: SandboxResourceConfig = {
@@ -209,6 +222,94 @@ export interface EnsureWorkspaceSandboxOptions {
 // Single-quote a string for safe interpolation into a shell command.
 function shellSingleQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
+// Split a profile's `resources.files` into the inline mounts that can be
+// written into a running box and the rest (non-inline refs that the
+// orchestrator must resolve, so they stay in the create payload). Returns the
+// inline set to defer and a profile copy with those inline files removed.
+export function splitDeferredProfileFiles(
+  profile: AgentProfile,
+): { leanProfile: AgentProfile; deferredFiles: AgentProfileFileMount[] } {
+  const files = profile.resources?.files ?? []
+  const deferredFiles: AgentProfileFileMount[] = []
+  const keptFiles: AgentProfileFileMount[] = []
+  for (const mount of files) {
+    if (mount.resource.kind === 'inline') deferredFiles.push(mount)
+    else keptFiles.push(mount)
+  }
+  if (deferredFiles.length === 0) return { leanProfile: profile, deferredFiles }
+  const leanProfile: AgentProfile = {
+    ...profile,
+    resources: { ...(profile.resources ?? {}), files: keptFiles },
+  }
+  return { leanProfile, deferredFiles }
+}
+
+// Materialize inline profile files into a running box via `box.exec`. Uses a
+// base64 pipe so arbitrary content (scripts, unicode, special chars) lands
+// byte-exact, and writes to ANY absolute path (e.g. /usr/local/bin) or a
+// `~`-relative path — the exec runs as the sidecar, which is not bound by the
+// safe-prefix allow-list the /files/write API enforces. Sets the executable
+// bit when the mount declares it OR the target is a bin directory. One exec
+// per file keeps a single bad mount from poisoning the batch; the first
+// failure is returned (fail-loud), the rest are not attempted.
+export async function writeProfileFilesToBox(
+  box: SandboxInstance,
+  files: AgentProfileFileMount[],
+): Promise<Outcome<void>> {
+  for (const mount of files) {
+    if (mount.resource.kind !== 'inline') continue
+    const content = mount.resource.content ?? ''
+    const b64 = Buffer.from(content, 'utf8').toString('base64')
+    const path = mount.path
+    const dir = path.replace(/\/[^/]*$/, '')
+    const isBin = /(^|\/)(s?bin)\//.test(path)
+    const executable = mount.executable ?? isBin
+    const q = shellSingleQuote(path)
+    // mkdir -p handles `~` (the shell expands it); printf '%s' avoids a
+    // trailing newline; base64 -d reconstructs the exact bytes.
+    const mkdir = dir && dir !== path ? `mkdir -p ${shellSingleQuote(dir)} && ` : ''
+    const chmod = executable ? ` && chmod +x ${q}` : ''
+    const cmd = `${mkdir}printf '%s' ${shellSingleQuote(b64)} | base64 -d > ${q}${chmod}`
+    try {
+      const res = await box.exec(cmd)
+      if (res.exitCode !== 0) {
+        return fail(
+          new Error(
+            `writeProfileFilesToBox: failed to write ${path} (exit ${res.exitCode}): ${res.stderr.slice(0, 500)}`,
+          ),
+        )
+      }
+    } catch (err) {
+      return fail(new Error(`writeProfileFilesToBox: exec failed for ${path}`, { cause: err }))
+    }
+  }
+  return ok(undefined)
+}
+
+// Resolve the shell's deferred (inline) profile files and write them into a
+// box that already exists (reuse/resume paths). No-op unless the shell opts
+// into deferProfileFiles. Idempotent overwrite — a redeploy with new skills
+// refreshes the corpus on the next ensure call.
+async function materializeDeferredFilesForExistingBox(
+  shell: SandboxRuntimeConfig,
+  box: SandboxInstance,
+  workspaceId: string,
+  userId: string | undefined,
+): Promise<Outcome<void>> {
+  if (!shell.deferProfileFiles) return ok(undefined)
+  const connectedIntegrationIds = await shell.connectedIntegrationIds(workspaceId)
+  const buildCtx: SandboxBuildContext = {
+    workspaceId,
+    connectedIntegrationIds,
+    ...(userId ? { userId } : {}),
+  }
+  const files = await shell.files(buildCtx)
+  const fullProfile = shell.profile({ extraFiles: files })
+  const { deferredFiles } = splitDeferredProfileFiles(fullProfile)
+  if (deferredFiles.length === 0) return ok(undefined)
+  return writeProfileFilesToBox(box, deferredFiles)
 }
 
 async function listRunning(
@@ -322,6 +423,10 @@ export async function ensureWorkspaceSandbox(
       found.metadata?.harness === harness &&
       (await isBoxAlive(found, harness, shell.livenessProbe))
     ) {
+      const written = await materializeDeferredFilesForExistingBox(shell, found, workspaceId, userId)
+      if (!written.succeeded) {
+        throw new Error(`deferred file write failed on reused box ${name}`, { cause: written.error })
+      }
       if (shell.bootstrap) {
         const boot = await shell.bootstrap(found, scope)
         if (!boot.succeeded) {
@@ -351,6 +456,10 @@ export async function ensureWorkspaceSandbox(
       (await isBoxAlive(resumed.value, harness, shell.livenessProbe))
     ) {
       const box = resumed.value
+      const written = await materializeDeferredFilesForExistingBox(shell, box, workspaceId, userId)
+      if (!written.succeeded) {
+        throw new Error(`deferred file write failed on resumed box ${name}`, { cause: written.error })
+      }
       if (shell.bootstrap) {
         const boot = await shell.bootstrap(box, scope)
         if (!boot.succeeded) {
@@ -373,7 +482,14 @@ export async function ensureWorkspaceSandbox(
     shell.env(buildCtx),
     shell.files(buildCtx),
   ])
-  const profile = shell.profile({ extraFiles: files })
+  const fullProfile = shell.profile({ extraFiles: files })
+  // When deferring, strip inline files from the create payload and write them
+  // into the box after it reaches running. Keeps the provision body under the
+  // orchestrator's 256 KiB cap and lands real files on disk.
+  const { leanProfile, deferredFiles } = shell.deferProfileFiles
+    ? splitDeferredProfileFiles(fullProfile)
+    : { leanProfile: fullProfile, deferredFiles: [] as AgentProfileFileMount[] }
+  const profile = leanProfile
 
   const role = userId && shell.permissionRole ? shell.permissionRole('developer') : undefined
 
@@ -417,6 +533,13 @@ export async function ensureWorkspaceSandbox(
 
   await box.waitFor('running', { timeoutMs: 120_000 })
   if (!box.connection?.runtimeUrl) await box.refresh()
+
+  if (deferredFiles.length > 0) {
+    const written = await writeProfileFilesToBox(box, deferredFiles)
+    if (!written.succeeded) {
+      throw new Error(`deferred file write failed on new box ${name}`, { cause: written.error })
+    }
+  }
 
   if (shell.bootstrap) {
     const boot = await shell.bootstrap(box, scope)
