@@ -9,14 +9,12 @@ export default defineConfig({
     // scaffolder itself is exercised by `tests/create-agent-app.test.ts`.
     include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/dist/**', 'create-agent-app/template/**'],
-    // Run test FILES one at a time. With parallel forks, each worker loads the
-    // full module graph (React, TipTap, drizzle, better-sqlite3, konva) and
-    // accumulates heap across the files it owns; on the 4-core publish runner the
-    // combined footprint exceeded usable RAM and tinypool crashed a worker with
-    // ERR_WORKER_OUT_OF_MEMORY. Serializing bounds peak RSS to a single file
-    // (~0.7GB locally vs ~3.5GB fanned out) and also removes the CPU contention
-    // that intermittently failed real-timer tests. The suite is small, so the
-    // sequential wall-time cost is a few seconds — acceptable for a publish gate.
+    // Run test FILES one at a time. Parallel forks each load the full module
+    // graph (React, TipTap, drizzle, better-sqlite3, konva) and accumulate heap
+    // across the files they own; serializing bounds peak RSS to a single file
+    // (~0.7GB vs ~3.5GB fanned out) and removes the CPU contention that
+    // intermittently failed real-timer tests. The suite is small, so the
+    // sequential wall-time cost is only a few seconds.
     pool: 'forks',
     fileParallelism: false,
     poolOptions: {
