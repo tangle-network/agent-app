@@ -20,6 +20,14 @@ export { PagesStrip, type PagesStripProps } from './PagesStrip'
 export { LayersPanel, type LayersPanelProps } from './LayersPanel'
 export { Toolbar, type ToolbarProps } from './Toolbar'
 export { ZoomControls, type ZoomControlsProps } from './ZoomControls'
+export {
+  IconButton,
+  type IconButtonProps,
+  BTN,
+  BTN_ACTIVE,
+  BTN_SM,
+  BTN_SM_ACTIVE,
+} from './icon-button'
 export { ElementNode, type ElementNodeProps } from './ElementNode'
 export { GridLayer, type GridLayerProps } from './GridLayer'
 export { Rulers, type RulersProps } from './Rulers'

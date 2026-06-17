@@ -120,7 +120,7 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
               }}
               onClick={(event) => onSelect(element.id, event.metaKey || event.ctrlKey)}
               className={[
-                'flex cursor-pointer items-center gap-1.5 py-1 pr-2 text-[13px] transition-colors',
+                'group flex cursor-pointer items-center gap-1.5 py-1 pr-2 text-[13px] transition-colors',
                 isSelected ? 'bg-[var(--brand-primary)]/15 text-[var(--text-primary)]' : 'hover:bg-[var(--border-default)]/40 text-[var(--text-secondary)]',
                 dragOverIndex === row.ownerIndex ? 'border-t border-[var(--brand-primary)]' : '',
               ].join(' ')}
@@ -164,12 +164,13 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
               <button
                 type="button"
                 aria-label={element.visible ? 'Hide element' : 'Show element'}
+                aria-pressed={!element.visible}
                 onClick={(event) => {
                   event.stopPropagation()
                   if (canWrite) onSetAttrs(element.id, { visible: !element.visible })
                 }}
                 disabled={!canWrite}
-                className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:opacity-100 focus:opacity-100 group-hover:opacity-100 [.flex:hover_&]:opacity-60"
+                className="shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
               >
                 {element.visible
                   ? <EyeGlyph className="h-3.5 w-3.5" />
@@ -180,12 +181,13 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
               <button
                 type="button"
                 aria-label={element.locked ? 'Unlock element' : 'Lock element'}
+                aria-pressed={!!element.locked}
                 onClick={(event) => {
                   event.stopPropagation()
                   if (canWrite) onSetAttrs(element.id, { locked: !element.locked })
                 }}
                 disabled={!canWrite}
-                className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:opacity-100 focus:opacity-100 [.flex:hover_&]:opacity-60"
+                className="shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
               >
                 {element.locked
                   ? <LockGlyph className="h-3.5 w-3.5 text-amber-400" />

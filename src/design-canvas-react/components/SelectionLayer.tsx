@@ -112,7 +112,15 @@ export function SelectionLayer({
   const multiSelect = selectedIds.length > 1
 
   return (
-    <Layer name="overlay:selection" listening={false}>
+    // The Layer must participate in the hit graph (listening) or the Transformer
+    // anchors below receive no pointer events and resize/rotate is dead. We scope
+    // listening to canWrite so a read-only canvas stays fully click-through.
+    // Click-through to elements for selection is preserved: this layer paints
+    // only the Transformer, whose anchors are the sole hit targets — empty
+    // regions have no shapes, so pointer hits fall through to the content layer.
+    // Export exclusion is unaffected: export.ts hides nodes by the 'overlay:'
+    // name prefix, not by `listening` (see export-math.isExportHiddenNodeName).
+    <Layer name="overlay:selection" listening={canWrite}>
       <Transformer
         ref={trRef}
         name="overlay:transformer"
