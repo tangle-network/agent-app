@@ -9,6 +9,11 @@
  */
 export { DesignCanvas, type DesignCanvasFullProps } from './DesignCanvas'
 export { DesignCanvasEditor } from './DesignCanvasEditor'
+export {
+  CanvasInsertPanel,
+  type CanvasInsertPanelProps,
+  type InsertGeneration,
+} from './CanvasInsertPanel'
 export { Workspace, WorkspaceView, type WorkspaceViewProps } from './Workspace'
 export { SelectionLayer, type SelectionLayerProps } from './SelectionLayer'
 export { PagesStrip, type PagesStripProps } from './PagesStrip'

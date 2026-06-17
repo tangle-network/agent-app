@@ -209,8 +209,6 @@ export function DesignCanvasEditor(props: DesignCanvasProps) {
             canWrite={ctx.canWrite}
             onApplyOperations={props.onApplyOperations}
             onSelectionChange={props.onSelectionChange}
-            renderAgentPanel={props.renderAgentPanel}
-            renderSidePanel={props.renderSidePanel}
             // Shares the chrome's fit ref so F / Fit button trigger workspace
             // fit-to-page through the same callback slot.
             onFitRef={ctx.onFitRef}
