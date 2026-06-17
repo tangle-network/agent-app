@@ -37,12 +37,17 @@ export interface TimelineTrackRowProps {
   zoom: number
   sequenceDurationFrames: number
   selectedClipIds: ReadonlySet<string>
+  /** The single clip that carries tabIndex 0 (roving tabindex); null seeds the
+   *  first chip in the editor as the lone Tab stop. */
+  tabbableClipId: string | null
   canWrite: boolean
   frameProvider: VideoFrameProvider
   snapMove(candidate: { startFrame: number; durationFrames: number; clipId: string }): { startFrame: number; point: SnapPoint | null }
   snapEdge(candidate: { frame: number; clipId: string }): { frame: number; point: SnapPoint | null }
   onSnapPointChange(point: SnapPoint | null): void
   onSelectClip(clipId: string, additive: boolean): void
+  onRequestDeleteClip(clipId: string): void
+  onFocusStepClip(clipId: string, direction: -1 | 1): void
   onCommitMove(input: ClipMoveCommit): void
   onCommitTrim(input: ClipTrimCommit): void
   onCommitText(input: { clipId: string; text: string }): void
@@ -88,11 +93,14 @@ export function TimelineTrackRow(props: TimelineTrackRowProps) {
             sequenceDurationFrames={sequenceDurationFrames}
             selected={props.selectedClipIds.has(clip.id)}
             canWrite={props.canWrite}
+            tabbable={props.tabbableClipId === clip.id}
             frameProvider={props.frameProvider}
             snapMove={props.snapMove}
             snapEdge={props.snapEdge}
             onSnapPointChange={props.onSnapPointChange}
             onSelect={props.onSelectClip}
+            onRequestDelete={props.onRequestDeleteClip}
+            onFocusStep={props.onFocusStepClip}
             onCommitMove={props.onCommitMove}
             onCommitTrim={props.onCommitTrim}
             onCommitText={props.onCommitText}

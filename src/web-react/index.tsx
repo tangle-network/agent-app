@@ -59,17 +59,86 @@ function SparkleGlyph({ className }: { className?: string }) {
   )
 }
 
-/** Close an absolutely-positioned popover on outside mousedown. */
-function useClickOutside(onOutside: () => void) {
-  const ref = useRef<HTMLDivElement>(null)
+/**
+ * Keyboard + pointer model for a trigger-and-popover pair, dependency-free.
+ * Outside-mousedown and Escape both close; Escape also returns focus to the
+ * trigger so keyboard users aren't dropped at the top of the document. The
+ * returned `triggerProps` carry the ARIA contract (`aria-haspopup`/
+ * `aria-expanded`); spread them onto the trigger button.
+ */
+export function usePopover(open: boolean, setOpen: (open: boolean) => void) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+
   useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onOutside()
+    if (!open) return
+    function onMouseDown(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  })
-  return ref
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setOpen(false)
+        triggerRef.current?.focus()
+      }
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open, setOpen])
+
+  return {
+    containerRef,
+    triggerRef,
+    triggerProps: {
+      ref: triggerRef,
+      'aria-haspopup': true as const,
+      'aria-expanded': open,
+    },
+  }
+}
+
+/** Tailwind utilities applied to every popover option so keyboard focus is
+ *  visible (the prior buttons had no focus ring). */
+const POPOVER_OPTION_FOCUS =
+  'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card'
+
+/**
+ * Guard an async action against double-submit. `run` ignores re-entrant calls
+ * while a promise is in flight and flips `pending` so the caller can disable
+ * the control — the fix for double-charge / double-approve on a slow network.
+ * Settles (success or throw) before clearing, and no-ops state updates after
+ * unmount.
+ */
+export function usePending(): { pending: boolean; run: (action: () => void | Promise<void>) => void } {
+  const [pending, setPending] = useState(false)
+  const inFlight = useRef(false)
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+  const run = (action: () => void | Promise<void>) => {
+    if (inFlight.current) return
+    let result: void | Promise<void>
+    try {
+      result = action()
+    } catch {
+      return
+    }
+    if (!(result instanceof Promise)) return
+    inFlight.current = true
+    setPending(true)
+    void result.finally(() => {
+      inFlight.current = false
+      if (mounted.current) setPending(false)
+    })
+  }
+  return { pending, run }
 }
 
 // ── metrics helpers ───────────────────────────────────────────────────────
@@ -154,7 +223,7 @@ function ModelRow({
     <button
       type="button"
       onClick={onSelect}
-      className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-sm transition ${
+      className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
         selected ? 'bg-primary/10 font-medium' : 'hover:bg-accent/30'
       }`}
     >
@@ -181,7 +250,7 @@ function ModelRow({
 export function ModelPicker({ value, onChange, models, loading, renderProviderBadge, recommendedLabel = 'Recommended' }: ModelPickerProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const containerRef = useClickOutside(() => setOpen(false))
+  const { containerRef, triggerProps } = usePopover(open, setOpen)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -224,8 +293,9 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
     <div ref={containerRef} className="relative inline-flex">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30"
+        {...triggerProps}
+        onClick={() => setOpen(!open)}
+        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
       >
         {selected ? (renderProviderBadge ? renderProviderBadge(selected.provider) : <ProviderLogo provider={selected.provider} size={16} />) : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}
         <span className="max-w-[160px] truncate">{selected?.name ?? value}</span>
@@ -304,32 +374,35 @@ export interface EffortPickerProps {
  *  it only when the selected model `supportsReasoning`. */
 export function EffortPicker({ value, onChange }: EffortPickerProps) {
   const [open, setOpen] = useState(false)
-  const containerRef = useClickOutside(() => setOpen(false))
+  const { containerRef, triggerProps } = usePopover(open, setOpen)
   const selected = EFFORT_LEVELS.find((l) => l.id === value) ?? EFFORT_LEVELS[2]
 
   return (
     <div ref={containerRef} className="relative inline-flex">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        {...triggerProps}
+        onClick={() => setOpen(!open)}
         title="Reasoning effort"
-        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30"
+        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
       >
         <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />
         <span>{selected.label}</span>
         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
       </button>
       {open && (
-        <div className="absolute bottom-full left-0 z-50 mb-2 w-36 overflow-hidden rounded-xl border border-border bg-card p-1 shadow-lg">
+        <div role="menu" className="absolute bottom-full left-0 z-50 mb-2 w-36 overflow-hidden rounded-xl border border-border bg-card p-1 shadow-lg">
           {EFFORT_LEVELS.map((l) => (
             <button
               key={l.id}
               type="button"
+              role="menuitemradio"
+              aria-checked={l.id === value}
               onClick={() => {
                 onChange(l.id)
                 setOpen(false)
               }}
-              className={`flex w-full items-center rounded-md px-3 py-2 text-left text-sm transition ${
+              className={`flex w-full items-center rounded-md px-3 py-2 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
                 l.id === value ? 'bg-primary/10 font-medium' : 'hover:bg-accent/30'
               }`}
             >
@@ -476,6 +549,13 @@ export interface ChatMessagesProps {
   onToolCallClick?: (call: ChatToolCallInfo, message: ChatUiMessage) => void
   /** Per-tool custom detail renderers for expanded tool cards. */
   toolRenderers?: ToolDetailRenderers
+  /** Stream-error affordance: when the turn failed (a thrown transport error or
+   *  a loop-level `onErrorEvent`), pass the message here to render an error row.
+   *  A failed turn otherwise just stops with no UI signal. */
+  error?: string | null
+  /** Retry control shown on the error row; omit to render the error without a
+   *  retry button (e.g. when the product retries automatically). */
+  onRetry?: () => void
 }
 
 export interface ProposalApprovalHandlers {
@@ -638,6 +718,7 @@ function ToolCallCard({
   const pending = call.status === 'done' ? pendingApprovalOf(call) : null
   const failed = call.status === 'error' || toolOutcomeOf(call)?.ok === false
   const custom = renderers?.[call.name]?.(call, message)
+  const { pending: deciding, run: decide } = usePending()
 
   return (
     <div
@@ -671,15 +752,17 @@ function ToolCallCard({
           <span className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
-              onClick={() => approval.onApprove(pending.proposalId, call.id)}
-              className="rounded bg-green-600/90 px-2 py-0.5 text-[11px] font-semibold text-white transition hover:bg-green-600"
+              disabled={deciding}
+              onClick={() => decide(() => approval.onApprove(pending.proposalId, call.id))}
+              className="rounded bg-green-600/90 px-2 py-0.5 text-[11px] font-semibold text-white transition hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Approve
             </button>
             <button
               type="button"
-              onClick={() => approval.onReject(pending.proposalId, call.id)}
-              className="rounded border border-border bg-card px-2 py-0.5 text-[11px] font-medium text-foreground transition hover:bg-accent/30"
+              disabled={deciding}
+              onClick={() => decide(() => approval.onReject(pending.proposalId, call.id))}
+              className="rounded border border-border bg-card px-2 py-0.5 text-[11px] font-medium text-foreground transition hover:bg-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Reject
             </button>
@@ -818,6 +901,31 @@ function ThinkingRow({ agentLabel }: { agentLabel: string }) {
   )
 }
 
+/** Top-level turn-failure row with an optional Retry — the affordance a failed
+ *  stream otherwise lacks (the turn just stopped). */
+function StreamErrorRow({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <div className="mx-auto w-full max-w-3xl px-6 py-3">
+      <div role="alert" className="flex items-start gap-2.5 rounded-lg border border-red-300/60 bg-red-500/5 px-3 py-2.5 text-sm text-red-600">
+        <svg className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 8v4m0 4h.01" />
+        </svg>
+        <span className="min-w-0 flex-1 break-words">{message}</span>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className={`shrink-0 rounded border border-red-300/60 bg-card px-2 py-0.5 text-[11px] font-medium text-red-600 transition hover:bg-red-500/10 ${POPOVER_OPTION_FOCUS}`}
+          >
+            Retry
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /**
  * The message thread: one centered column; user messages are right-aligned
  * bubbles with a User label; agent messages carry an Agent meta line with
@@ -835,6 +943,8 @@ export function ChatMessages({
   approval,
   onToolCallClick,
   toolRenderers,
+  error,
+  onRetry,
 }: ChatMessagesProps) {
   const renderBody = renderMarkdown ?? ((content: string) => <p className="whitespace-pre-wrap">{content}</p>)
   const lastIsUser = messages[messages.length - 1]?.role === 'user'
@@ -868,6 +978,7 @@ export function ChatMessages({
         ),
       )}
       {loading && lastIsUser && <ThinkingRow agentLabel={agentLabel} />}
+      {error && !loading && <StreamErrorRow message={error} onRetry={onRetry} />}
     </>
   )
 }

@@ -134,6 +134,44 @@ function RefreshGlyph({ className }: { className?: string }) {
   )
 }
 
+function CopyGlyph({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  )
+}
+
+/** Copy a trace id to the clipboard — the drill-in's actionable handle instead
+ *  of a bare, dead-end string. Falls back silently when the Clipboard API is
+ *  unavailable (insecure context / older browser). */
+function TraceIdCopy({ traceId }: { traceId: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = useCallback(() => {
+    void navigator.clipboard?.writeText(traceId).then(
+      () => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1200)
+      },
+      () => {},
+    )
+  }, [traceId])
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      title="Copy trace id"
+      aria-label="Copy trace id"
+      className="inline-flex min-w-0 items-center gap-1.5 rounded text-left font-mono text-muted-foreground transition hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card"
+    >
+      <span className="truncate">{traceId}</span>
+      <CopyGlyph className="h-3 w-3 shrink-0" />
+      {copied && <span className="shrink-0 not-italic text-green-600">copied</span>}
+    </button>
+  )
+}
+
 function StatusDot({ tone }: { tone: ActivityTone }) {
   return (
     <span
@@ -311,7 +349,12 @@ function ActivityRow({
         <ChevronGlyph className={`h-3 w-3 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="space-y-1.5 border-t border-border/40 px-3 py-2.5">
+        <div className="space-y-2.5 border-t border-border/40 px-3 py-2.5">
+          {record.durationMs !== undefined && (
+            <div className="rounded-md border border-border/50 bg-muted/10 p-2">
+              <FlowWaterfall trace={stepActivityFlowTrace([record])} />
+            </div>
+          )}
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono text-[11px]">
             <dt className="text-muted-foreground/60">task</dt>
             <dd className="truncate text-muted-foreground">{record.taskId}</dd>
@@ -326,7 +369,9 @@ function ActivityRow({
             {record.traceId && (
               <>
                 <dt className="text-muted-foreground/60">trace</dt>
-                <dd className="truncate text-muted-foreground">{record.traceId}</dd>
+                <dd className="min-w-0">
+                  <TraceIdCopy traceId={record.traceId} />
+                </dd>
               </>
             )}
           </dl>
