@@ -28,6 +28,7 @@ function glyph(paths: React.ReactNode) {
 
 export const UndoGlyph = glyph(<path d="M3 7v6h6M3 13a9 9 0 1 0 3-7.7" />)
 export const RedoGlyph = glyph(<path d="M21 7v6h-6M21 13a9 9 0 1 1-3-7.7" />)
+export const SwapGlyph = glyph(<path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7" />)
 
 export const EyeGlyph = glyph(
   <>

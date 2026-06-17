@@ -16,6 +16,7 @@ import type { ReactNode } from 'react'
 import type { SceneElement, ScenePage, TextElement, RectElement, EllipseElement, ImageElement } from '../../design-canvas/model'
 import type { SceneAttrsPatch } from '../../design-canvas/operations'
 import type { PageBleed } from '../../design-canvas/model'
+import type { DesignCanvasMode } from '../contracts'
 import { matchPreset, SIZE_PRESETS } from '../../design-canvas/export-presets'
 import {
   AlignCenterGlyph,
@@ -33,6 +34,7 @@ import {
   RulerGlyph,
   SendBackGlyph,
   SlotGlyph,
+  SwapGlyph,
   TrashGlyph,
   UndoGlyph,
   UngroupGlyph,
@@ -47,6 +49,12 @@ export interface ToolbarProps {
   page: ScenePage
   selectedElements: SceneElement[]
   canWrite: boolean
+  /** Capability mode. `'review'` (the lean reviewer) hides the view toggles,
+   *  page-props controls, and the destructive/structural selection controls
+   *  (z-order, group/ungroup, lock, slot, delete), keeping only safe direct
+   *  edits: text content, image fit/replace, opacity/rotation, undo/redo.
+   *  Defaults to `'edit'` (the full authoring toolbar). */
+  mode?: DesignCanvasMode
   canUndo: boolean
   canRedo: boolean
   gridEnabled: boolean
@@ -403,6 +411,7 @@ export function Toolbar({
   page,
   selectedElements,
   canWrite,
+  mode = 'edit',
   canUndo,
   canRedo,
   gridEnabled,
@@ -446,6 +455,7 @@ export function Toolbar({
   const selectedIds = selectedElements.map((e) => e.id)
   const isGroup = single?.kind === 'group'
   const groupable = selectedElements.length >= 2
+  const review = mode === 'review'
 
   // ----
 
@@ -461,53 +471,64 @@ export function Toolbar({
           <RedoGlyph className="h-3.5 w-3.5" />
         </button>
 
-        {SEP}
-
-        {/* View toggles */}
-        <button type="button" aria-label="Toggle rulers" aria-pressed={showRulers} onClick={onToggleRulers} className={showRulers ? BTN_ACTIVE : BTN}>
-          <RulerGlyph className="h-3.5 w-3.5" />
-        </button>
-        <button type="button" aria-label="Toggle grid" aria-pressed={gridEnabled} onClick={onToggleGrid} className={gridEnabled ? BTN_ACTIVE : BTN}>
-          <GridGlyph className="h-3.5 w-3.5" />
-        </button>
-        <button type="button" aria-label="Toggle snap" aria-pressed={snapEnabled} onClick={onToggleSnap} className={snapEnabled ? BTN_ACTIVE : BTN}>
-          <MagnetGlyph className="h-3.5 w-3.5" />
-        </button>
-        <button type="button" aria-label="Toggle bleed overlay" aria-pressed={showBleed} onClick={onToggleBleed} className={showBleed ? BTN_ACTIVE : BTN} disabled={!page.bleed}>
-          <BleedGlyph className="h-3.5 w-3.5" />
-        </button>
+        {/* View toggles (grid/snap/ruler/bleed) are authoring affordances — the
+            review surface hides them so the bar stays lean. */}
+        {!review ? (
+          <>
+            {SEP}
+            <button type="button" aria-label="Toggle rulers" aria-pressed={showRulers} onClick={onToggleRulers} className={showRulers ? BTN_ACTIVE : BTN}>
+              <RulerGlyph className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" aria-label="Toggle grid" aria-pressed={gridEnabled} onClick={onToggleGrid} className={gridEnabled ? BTN_ACTIVE : BTN}>
+              <GridGlyph className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" aria-label="Toggle snap" aria-pressed={snapEnabled} onClick={onToggleSnap} className={snapEnabled ? BTN_ACTIVE : BTN}>
+              <MagnetGlyph className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" aria-label="Toggle bleed overlay" aria-pressed={showBleed} onClick={onToggleBleed} className={showBleed ? BTN_ACTIVE : BTN} disabled={!page.bleed}>
+              <BleedGlyph className="h-3.5 w-3.5" />
+            </button>
+          </>
+        ) : null}
       </div>
 
-      {SEP}
-
-      {/* Selection / page attributes: this group wraps to the next line when
-          the column is narrow so nothing is ever clipped or scrolled away. */}
+      {/* Selection attributes: this group wraps to the next line when the column
+          is narrow so nothing is ever clipped or scrolled away. In review mode
+          the page-props controls (no-selection authoring) are omitted entirely
+          and the selection controls drop structural/destructive actions. */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         {hasSelection ? (
-          <SelectionControls
-            elements={selectedElements}
-            single={single}
-            isGroup={isGroup}
-            groupable={groupable}
-            allSameKind={allSameKind}
-            firstKind={firstKind}
-            canWrite={canWrite}
-            patchAll={patchAll}
-            reorderSingle={reorderSingle}
-            onGroup={() => onGroup(selectedIds)}
-            onUngroup={() => { if (single) onUngroup(single.id) }}
-            onDelete={() => onDelete(selectedIds)}
-            onBindSlot={single ? (slot) => onBindSlot(single.id, slot) : undefined}
-            currentSlot={single?.slot ?? null}
-          />
-        ) : (
-          <PagePropsControls
-            page={page}
-            canWrite={canWrite}
-            onSetPageProps={onSetPageProps}
-            onSetPageGuides={onSetPageGuides}
-          />
-        )}
+          <>
+            {SEP}
+            <SelectionControls
+              elements={selectedElements}
+              single={single}
+              isGroup={isGroup}
+              groupable={groupable}
+              allSameKind={allSameKind}
+              firstKind={firstKind}
+              canWrite={canWrite}
+              review={review}
+              patchAll={patchAll}
+              reorderSingle={reorderSingle}
+              onGroup={() => onGroup(selectedIds)}
+              onUngroup={() => { if (single) onUngroup(single.id) }}
+              onDelete={() => onDelete(selectedIds)}
+              onBindSlot={single ? (slot) => onBindSlot(single.id, slot) : undefined}
+              currentSlot={single?.slot ?? null}
+            />
+          </>
+        ) : !review ? (
+          <>
+            {SEP}
+            <PagePropsControls
+              page={page}
+              canWrite={canWrite}
+              onSetPageProps={onSetPageProps}
+              onSetPageGuides={onSetPageGuides}
+            />
+          </>
+        ) : null}
       </div>
     </div>
   )
@@ -525,6 +546,8 @@ interface SelectionControlsProps {
   allSameKind: boolean
   firstKind: SceneElement['kind'] | undefined
   canWrite: boolean
+  /** Review mode drops z-order, group/ungroup, lock, slot-bind, and delete. */
+  review: boolean
   patchAll(attrs: SceneAttrsPatch): void
   reorderSingle(direction: 'front' | 'back' | 'forward' | 'backward'): void
   onGroup(): void
@@ -542,6 +565,7 @@ function SelectionControls({
   allSameKind,
   firstKind,
   canWrite,
+  review,
   patchAll,
   reorderSingle,
   onGroup,
@@ -590,6 +614,10 @@ function SelectionControls({
         className="w-14"
       />
 
+      {/* Structural + destructive controls: hidden on the review surface, which
+          allows only direct attribute edits and reposition (drag). */}
+      {review ? null : (
+      <>
       {SEP}
 
       {/* Z-order (single selection) */}
@@ -681,6 +709,8 @@ function SelectionControls({
       <button type="button" aria-label="Delete selection" disabled={!canWrite} onClick={onDelete} className={BTN}>
         <TrashGlyph className="h-3.5 w-3.5 text-rose-400" />
       </button>
+      </>
+      )}
     </>
   )
 }
@@ -745,19 +775,70 @@ function ShapeControls({ element, canWrite, onPatch, showCornerRadius }: { eleme
 }
 
 function ImageControls({ element, canWrite, onPatch }: { element: ImageElement; canWrite: boolean; onPatch(attrs: SceneAttrsPatch): void }) {
+  const [swapOpen, setSwapOpen] = useState(false)
+  const [swapUrl, setSwapUrl] = useState('')
+
   return (
-    <SelectControl
-      label="Fit"
-      value={element.fit}
-      disabled={!canWrite}
-      onChange={(fit) => onPatch({ fit })}
-      buttonClassName="w-24"
-      options={[
-        { value: 'fill', label: 'Fill' },
-        { value: 'cover', label: 'Cover' },
-        { value: 'contain', label: 'Contain' },
-      ]}
-    />
+    <>
+      <SelectControl
+        label="Fit"
+        value={element.fit}
+        disabled={!canWrite}
+        onChange={(fit) => onPatch({ fit })}
+        buttonClassName="w-24"
+        options={[
+          { value: 'fill', label: 'Fill' },
+          { value: 'cover', label: 'Cover' },
+          { value: 'contain', label: 'Contain' },
+        ]}
+      />
+      {/* Image swap: replace the source in place (size/position preserved). A
+          safe direct edit, available in review mode. */}
+      <Popover
+        open={swapOpen}
+        onClose={() => setSwapOpen(false)}
+        trigger={
+          <button
+            type="button"
+            aria-label="Replace image"
+            disabled={!canWrite}
+            onClick={() => { setSwapUrl(element.src); setSwapOpen((v) => !v) }}
+            className={BTN}
+            title="Replace image"
+          >
+            <SwapGlyph className="h-3.5 w-3.5" />
+          </button>
+        }
+      >
+        <div className={`${POPOVER_PANEL} w-64 gap-2 p-2`}>
+          <input
+            autoFocus
+            value={swapUrl}
+            onChange={(event) => setSwapUrl(event.target.value)}
+            placeholder="https://… image URL"
+            aria-label="New image URL"
+            className="rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={!swapUrl.trim() || swapUrl.trim() === element.src}
+              onClick={() => { onPatch({ src: swapUrl.trim() }); setSwapOpen(false) }}
+              className="flex-1 rounded border border-[var(--brand-primary)] px-2 py-0.5 text-[11px] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/10 disabled:cursor-default disabled:opacity-40"
+            >
+              Replace
+            </button>
+            <button
+              type="button"
+              onClick={() => setSwapOpen(false)}
+              className="rounded border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </Popover>
+    </>
   )
 }
 
