@@ -104,4 +104,17 @@ describe('templates', () => {
     const ops = onInsert.mock.calls[0]![0]
     expect(ops[0].element.kind).toBe('text')
   })
+
+  it('renders a distinguishable preview per tile (not four identical chips)', () => {
+    setup()
+    fireEvent.click(screen.getByText('Templates'))
+    // Heading → "T" glyph, Body text → "¶" glyph. Their presence proves the
+    // text tiles are visually distinct from each other and from the shape tiles.
+    expect(screen.getByText('T')).toBeTruthy()
+    expect(screen.getByText('¶')).toBeTruthy()
+    // Each built-in template still exposes its label for clicking/inserting.
+    for (const label of ['Heading', 'Body text', 'Rectangle', 'Ellipse']) {
+      expect(screen.getByText(label)).toBeTruthy()
+    }
+  })
 })

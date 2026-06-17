@@ -53,7 +53,8 @@ import {
 import { Stage, Layer, Rect, Group } from 'react-konva'
 import type Konva from 'konva'
 
-import type { DesignCanvasProps } from '../contracts'
+import type { DesignCanvasProps, ExportTriggerOptions } from '../contracts'
+import { exportPageDataUrl } from '../export'
 import { createSceneCommandStack } from '../engine/command-stack'
 import { createSnapEngine, collectGridTargets } from '../engine/snap'
 import { createZoomPanMath } from '../engine/zoom-pan'
@@ -125,6 +126,13 @@ export interface WorkspaceViewProps {
   /** Ref the chrome fills with a fit-page callback. The chrome calls it on F /
    *  Fit button; when injected via DesignCanvasEditor the ref is shared. */
   onFitRef?: React.MutableRefObject<(() => void) | null>
+  /** Host export hook. When set, the workspace fills `onExportRef` with a
+   *  callback that renders the stage to a data URL and forwards the result. */
+  onExport?: DesignCanvasProps['onExport']
+  /** Ref the workspace fills with an export callback `(opts) => void`. The
+   *  chrome's Export control calls it; the workspace owns the Konva stage so it
+   *  produces the data URL here. Filled only when `onExport` is also set. */
+  onExportRef?: React.MutableRefObject<((opts: ExportTriggerOptions) => void) | null>
   /** Fit the active page to the viewport once, on the first non-zero measurement. Default true. */
   fitOnMount?: boolean
   /** Called once after the first real (non-zero) measurement, after the initial fit is applied (or skipped). */
@@ -143,6 +151,8 @@ export function WorkspaceView({
   stack,
   activePage,
   onFitRef,
+  onExport,
+  onExportRef,
   fitOnMount = true,
   onReady,
 }: WorkspaceViewProps) {
@@ -211,6 +221,26 @@ export function WorkspaceView({
       // would each try to own it; the last to mount wins, but on unmount we
       // must not clear a ref filled by a newer mount).
       if (onFitRef.current !== null) onFitRef.current = null
+    }
+  })
+
+  // -------------------------------------------------------------------------
+  // Export callback — the chrome's Export control calls this through the ref;
+  // the workspace owns the stage, so it renders here and forwards the result.
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!onExportRef || !onExport) return
+    onExportRef.current = ({ format, pixelRatio }: ExportTriggerOptions) => {
+      const stage = stageRef.current
+      if (!stage) return
+      void (async () => {
+        const dataUrl = await exportPageDataUrl(stage, activePage, { format, pixelRatio })
+        await onExport({ pageId: activePageId, format, dataUrl, pixelRatio })
+      })()
+    }
+    return () => {
+      if (onExportRef.current !== null) onExportRef.current = null
     }
   })
 
@@ -696,7 +726,7 @@ export function WorkspaceView({
 
   return (
     <div
-      className={`design-canvas-workspace relative overflow-hidden bg-[#1a1a1a] outline-none ${className ?? ''}`}
+      className={`design-canvas-workspace relative overflow-hidden bg-[var(--canvas-backdrop,#1a1a1a)] outline-none ${className ?? ''}`}
       ref={containerRef}
       tabIndex={0}
       onWheel={handleWheel}

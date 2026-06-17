@@ -144,6 +144,19 @@ export interface ApplySceneResult {
   document?: SceneDocument
 }
 
+/**
+ * What the chrome's Export control collects and hands to the workspace's
+ * export callback. The workspace (which owns the Konva stage) renders the
+ * page to a data URL with these params and forwards the full result to
+ * {@link DesignCanvasProps.onExport}. The chrome is Konva-free, so it cannot
+ * produce the data URL itself — it only chooses the format and scale.
+ */
+export interface ExportTriggerOptions {
+  format: 'png' | 'jpeg'
+  /** Output scale multiplier (1 = page size, 2 = retina). */
+  pixelRatio: number
+}
+
 export interface DesignCanvasProps {
   document: SceneDocument
   /** Revision the document was loaded at; threaded through saves. */
@@ -159,6 +172,12 @@ export interface DesignCanvasProps {
   renderSidePanel?(): React.ReactNode
   /** Export hook — host persists the rendered blob (upload → asset row). */
   onExport?(result: { pageId: string; format: 'png' | 'jpeg'; dataUrl: string; pixelRatio: number }): Promise<void>
+  /**
+   * Optional caller-supplied default for the export popover. The chrome's
+   * Export control opens with this format/scale pre-selected. Omitted →
+   * PNG @ 1x.
+   */
+  exportDefaults?: ExportTriggerOptions
   className?: string
   /** Fit the active page to the viewport once, on the first non-zero measurement. Default true. Set false to keep zoom:1/pan:0 (e.g. when restoring a saved viewport). */
   fitOnMount?: boolean

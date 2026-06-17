@@ -96,8 +96,11 @@ export function InlineTextEditor({
         lineHeight: element.lineHeight,
         letterSpacing: element.letterSpacing * zoom,
         color: element.fill,
-        background: 'rgba(255,255,255,0.95)',
-        border: '2px solid #3b82f6',
+        // Neutral token surface rather than a forced white: a white fill makes
+        // light text invisible while editing. The token surface stays legible
+        // for any text color and matches the editor chrome.
+        background: 'var(--bg-input)',
+        border: '2px solid var(--brand-primary)',
         borderRadius: 2,
         padding: 2,
         resize: 'none',
