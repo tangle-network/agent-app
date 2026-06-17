@@ -28,6 +28,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Group, Rect, Ellipse, Line, Text, Image as KonvaImage } from 'react-konva'
 import { ellipseCenterFromTopLeft } from './transform-math'
+import { lightTheme, type CanvasRenderPalette } from '../../theme/theme'
 import type {
   SceneElement,
   RectElement,
@@ -90,6 +91,8 @@ export interface ElementNodeProps {
   element: SceneElement
   isSelected: boolean
   zoom: number
+  /** Theme render palette. Omitted → light defaults (byte-identical history). */
+  render?: CanvasRenderPalette
   onClick?(elementId: string): void
   onDragStart?(elementId: string): void
   onDragMove?(elementId: string, dx: number, dy: number): void
@@ -261,10 +264,8 @@ function TextNode({ element, ...rest }: ElementNodeProps & { element: TextElemen
 // Image
 // ---------------------------------------------------------------------------
 
-const BROKEN_FILL = '#e5e7eb'
-const BROKEN_STROKE = '#9ca3af'
-
 function ImageNode({ element, ...rest }: ElementNodeProps & { element: ImageElement }) {
+  const render = rest.render ?? lightTheme.canvasRender
   const img = useImage(element.src)
   const drag = useDragBindings({ element, ...rest }, element.x, element.y)
 
@@ -279,8 +280,8 @@ function ImageNode({ element, ...rest }: ElementNodeProps & { element: ImageElem
         height={element.height}
         rotation={element.rotation}
         opacity={element.opacity}
-        fill={BROKEN_FILL}
-        stroke={BROKEN_STROKE}
+        fill={render.brokenFill}
+        stroke={render.brokenStroke}
         strokeWidth={1}
         {...drag}
       />
@@ -339,6 +340,7 @@ function ImageNode({ element, ...rest }: ElementNodeProps & { element: ImageElem
 // ---------------------------------------------------------------------------
 
 function VideoNode({ element, ...rest }: ElementNodeProps & { element: VideoElement }) {
+  const render = rest.render ?? lightTheme.canvasRender
   // Poster image path — never silently drop; show placeholder when absent.
   const img = useImage(element.posterSrc ?? '')
   const drag = useDragBindings({ element, ...rest }, element.x, element.y)
@@ -353,8 +355,8 @@ function VideoNode({ element, ...rest }: ElementNodeProps & { element: VideoElem
         height={element.height}
         rotation={element.rotation}
         opacity={element.opacity}
-        fill="#1f2937"
-        stroke="#374151"
+        fill={render.placeholderFill}
+        stroke={render.placeholderStroke}
         strokeWidth={1}
         {...drag}
       />

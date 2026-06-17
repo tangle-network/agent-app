@@ -167,7 +167,10 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
                   if (canWrite) onSetAttrs(element.id, { visible: !element.visible })
                 }}
                 disabled={!canWrite}
-                className="shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+                className={[
+                  'shrink-0 rounded p-0.5 transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]',
+                  element.visible ? 'opacity-0' : 'opacity-100',
+                ].join(' ')}
               >
                 {element.visible
                   ? <EyeGlyph className="h-3.5 w-3.5" />
@@ -184,7 +187,10 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
                   if (canWrite) onSetAttrs(element.id, { locked: !element.locked })
                 }}
                 disabled={!canWrite}
-                className="shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+                className={[
+                  'shrink-0 rounded p-0.5 transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]',
+                  element.locked ? 'opacity-100' : 'opacity-0',
+                ].join(' ')}
               >
                 {element.locked
                   ? <LockGlyph className="h-3.5 w-3.5 text-[var(--text-warning)]" />

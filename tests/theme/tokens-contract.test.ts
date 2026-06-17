@@ -54,6 +54,29 @@ function definedVars(): Set<string> {
   return defs
 }
 
+/** Extract the body of the first brace-balanced block whose header matches `re`. */
+function blockBody(css: string, re: RegExp): string {
+  const start = css.search(re)
+  if (start < 0) throw new Error(`no block matching ${re}`)
+  const open = css.indexOf('{', start)
+  let depth = 0
+  let i = open
+  for (; i < css.length; i++) {
+    if (css[i] === '{') depth++
+    else if (css[i] === '}' && --depth === 0) break
+  }
+  return css.slice(open + 1, i)
+}
+
+/** Map of `--name` → trimmed value for every declaration in a block body. */
+function blockDefs(body: string): Map<string, string> {
+  const defs = new Map<string, string>()
+  for (const m of body.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/gi)) if (m[1] && m[2]) defs.set(m[1], m[2].trim())
+  return defs
+}
+
+const isAlias = (value: string) => /hsl\(\s*var\(/i.test(value)
+
 describe('theme token contract', () => {
   it('every CSS var referenced by a React surface is defined in tokens.css', () => {
     const used = referencedVars()
@@ -67,6 +90,38 @@ describe('theme token contract', () => {
   it('tokens.css defines every canonical alias the canvas/sequences packages consume', () => {
     const defined = definedVars()
     expect(REQUIRED_ALIASES.filter((v) => !defined.has(v))).toEqual([])
+  })
+
+  // Every CONCRETE :root token (a literal value, not an `hsl(var(--…))` alias)
+  // must have a dark override, or the dark theme silently inherits the light
+  // value. Aliases re-theme automatically through the cascade, so they're exempt
+  // and must NOT be redefined in the dark block. THEME_INVARIANT lists tokens
+  // intentionally identical across themes (currently none).
+  const THEME_INVARIANT: string[] = []
+
+  it('every concrete :root token has a dark override (light/dark parity)', () => {
+    const css = readFileSync(cssPath, 'utf8')
+    const root = blockDefs(blockBody(css, /:root\s*\{/))
+    const dark = blockDefs(blockBody(css, /\[data-theme=['"]dark['"]\]\s*,\s*\.dark\s*\{/))
+
+    const concrete = [...root].filter(([, v]) => !isAlias(v)).map(([k]) => k)
+    const missing = concrete.filter((k) => !dark.has(k) && !THEME_INVARIANT.includes(k))
+    expect(
+      missing,
+      `Concrete :root tokens lacking a [data-theme="dark"] override (dark inherits the light value):\n${missing.join('\n')}`,
+    ).toEqual([])
+  })
+
+  it('aliases are not redefined in the dark block (they re-theme via the cascade)', () => {
+    const css = readFileSync(cssPath, 'utf8')
+    const root = blockDefs(blockBody(css, /:root\s*\{/))
+    const dark = blockDefs(blockBody(css, /\[data-theme=['"]dark['"]\]\s*,\s*\.dark\s*\{/))
+
+    const redundant = [...dark.keys()].filter((k) => root.has(k) && isAlias(root.get(k)!))
+    expect(
+      redundant,
+      `Alias tokens redundantly redefined in the dark block (they already re-theme through the triples):\n${redundant.join('\n')}`,
+    ).toEqual([])
   })
 })
 

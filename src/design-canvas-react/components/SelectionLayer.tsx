@@ -42,6 +42,7 @@ import {
 import type { MultiSetAttrsEntry } from '../engine/commands'
 import type { SceneAttrsPatch } from '../../design-canvas/operations'
 import type { SceneElement } from '../../design-canvas/model'
+import { lightTheme, type CanvasRenderPalette } from '../../theme/theme'
 
 export interface SelectionLayerProps {
   /** Konva stage reference to look up selected nodes by name. */
@@ -56,6 +57,8 @@ export interface SelectionLayerProps {
   onTransformEnd(entries: MultiSetAttrsEntry[]): void
   /** Active page id — every entry in onTransformEnd carries this. */
   pageId: string
+  /** Theme render palette. Omitted → light defaults (byte-identical history). */
+  render?: CanvasRenderPalette
 }
 
 const MIN_SIZE = 4
@@ -67,6 +70,7 @@ export function SelectionLayer({
   canWrite,
   onTransformEnd,
   pageId,
+  render = lightTheme.canvasRender,
 }: SelectionLayerProps) {
   const trRef = useRef<Konva.Transformer | null>(null)
 
@@ -132,6 +136,9 @@ export function SelectionLayer({
         // transformend for fine-grain 5° threshold enforcement.
         rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
         rotationSnapTolerance={5}
+        borderStroke={render.selectionStroke}
+        anchorStroke={render.selectionStroke}
+        anchorFill={render.selectionAnchorFill}
         // Min size so elements cannot be collapsed.
         boundBoxFunc={(oldBox, newBox) => {
           if (newBox.width < MIN_SIZE || newBox.height < MIN_SIZE) return oldBox

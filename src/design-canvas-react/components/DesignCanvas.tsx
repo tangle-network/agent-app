@@ -92,6 +92,9 @@ export interface DesignCanvasFullProps extends DesignCanvasProps {
     /** Forwarded from DesignCanvasProps. Fires once after the first real
      *  measurement, after the initial fit is applied (or skipped). */
     onReady?(): void
+    /** Forwarded from DesignCanvasProps. The Konva render palette; the
+     *  Konva-free chrome passes it straight through to the workspace. */
+    render?: DesignCanvasProps['render']
     onZoomChange(zoom: number): void
     onPanChange(panX: number, panY: number): void
     onSelectElements(ids: string[], additive: boolean): void
@@ -177,6 +180,7 @@ export function DesignCanvas({
   className,
   fitOnMount,
   onReady,
+  render,
   renderWorkspace,
   renderThumbnail,
 }: DesignCanvasFullProps) {
@@ -646,6 +650,7 @@ export function DesignCanvas({
             onExportRef: exportRef,
             fitOnMount,
             onReady,
+            render,
             onZoomChange: setZoom,
             onPanChange: setPan,
             onSelectElements: setSelectedElements,

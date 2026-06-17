@@ -34,6 +34,39 @@ export interface AgentAppTheme {
   warningForeground: string
   /** Full CSS color (not a triple) — the canvas/scene backdrop. */
   canvasBackdrop: string
+  /** Konva render palette — full hex colors the bitmap canvas paints with
+   *  (it cannot resolve `var(--…)`). NOT emitted by themeToCssVars. */
+  canvasRender: CanvasRenderPalette
+}
+
+/**
+ * Colors the Konva design-canvas paints directly. Konva renders to a bitmap
+ * and cannot read CSS custom properties, so these are full hex strings sourced
+ * from the active theme and threaded through the canvas components.
+ */
+export interface CanvasRenderPalette {
+  /** Grid line color (GridLayer). */
+  grid: string
+  /** Grid-snap guide line (SnapGuidesOverlay, kind 'grid'). */
+  snapGrid: string
+  /** Saved ruler-guide snap line (kind 'guide'). */
+  snapGuide: string
+  /** Page edge/center snap line (kinds 'page-edge'/'page-center'). */
+  snapPage: string
+  /** Element edge/center snap line (kinds 'element-edge'/'element-center'). */
+  snapElement: string
+  /** Transformer border + anchor stroke (SelectionLayer). */
+  selectionStroke: string
+  /** Transformer anchor fill (SelectionLayer). */
+  selectionAnchorFill: string
+  /** Video placeholder fill (ElementNode VideoNode). */
+  placeholderFill: string
+  /** Video placeholder stroke (ElementNode VideoNode). */
+  placeholderStroke: string
+  /** Broken/loading image placeholder fill (ElementNode ImageNode). */
+  brokenFill: string
+  /** Broken/loading image placeholder stroke (ElementNode ImageNode). */
+  brokenStroke: string
 }
 
 export const lightTheme: AgentAppTheme = {
@@ -61,6 +94,19 @@ export const lightTheme: AgentAppTheme = {
   warning: '38 92% 32%',
   warningForeground: '38 92% 12%',
   canvasBackdrop: 'hsl(220 13% 91%)',
+  canvasRender: {
+    grid: '#c0c0c0',
+    snapGrid: '#a0a0a0',
+    snapGuide: '#3b82f6',
+    snapPage: '#f59e0b',
+    snapElement: '#f43f5e',
+    selectionStroke: '#00a1ff',
+    selectionAnchorFill: '#ffffff',
+    placeholderFill: '#1f2937',
+    placeholderStroke: '#374151',
+    brokenFill: '#e5e7eb',
+    brokenStroke: '#9ca3af',
+  },
 }
 
 export const darkTheme: AgentAppTheme = {
@@ -88,6 +134,19 @@ export const darkTheme: AgentAppTheme = {
   warning: '38 95% 58%',
   warningForeground: '38 92% 12%',
   canvasBackdrop: 'hsl(0 0% 10%)',
+  canvasRender: {
+    grid: '#3a3a3a',
+    snapGrid: '#5a5a5a',
+    snapGuide: '#3b82f6',
+    snapPage: '#f59e0b',
+    snapElement: '#f43f5e',
+    selectionStroke: '#00a1ff',
+    selectionAnchorFill: '#e5e7eb',
+    placeholderFill: '#2a2f3a',
+    placeholderStroke: '#3f4654',
+    brokenFill: '#262b33',
+    brokenStroke: '#4b5563',
+  },
 }
 
 /** Wrap a channel triple in `hsl()`; pass through values already in a color form. */
