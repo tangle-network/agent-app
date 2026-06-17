@@ -5,9 +5,8 @@
  *
  * The editor is a positioned <textarea> the Workspace mounts over a text
  * element. It must commit the textarea's CURRENT value on blur and on
- * mod+Enter, and cancel (no commit) on Escape. Positioning is verified at the
- * seam: the overlay's left/top are container-relative (stageRect 0/0) so they
- * equal pan + element*zoom with no double-counted viewport offset.
+ * mod+Enter, and cancel (no commit) on Escape. Positioning is container-relative
+ * (computeTextOverlayPosition): the overlay's left/top equal pan + element*zoom.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -51,9 +50,7 @@ describe('InlineTextEditor', () => {
         element: textEl(),
         zoom: 1,
         panX: 0,
-        panY: 0,
-        stageRect: { left: 0, top: 0 },
-        onCommit,
+        panY: 0,        onCommit,
         onCancel,
       }),
     )
@@ -71,9 +68,7 @@ describe('InlineTextEditor', () => {
         element: textEl(),
         zoom: 1,
         panX: 0,
-        panY: 0,
-        stageRect: { left: 0, top: 0 },
-        onCommit,
+        panY: 0,        onCommit,
         onCancel: vi.fn(),
       }),
     )
@@ -95,9 +90,7 @@ describe('InlineTextEditor', () => {
         element: textEl(),
         zoom: 1,
         panX: 0,
-        panY: 0,
-        stageRect: { left: 0, top: 0 },
-        onCommit,
+        panY: 0,        onCommit,
         onCancel,
       }),
     )
@@ -108,19 +101,15 @@ describe('InlineTextEditor', () => {
     expect(onCommit).not.toHaveBeenCalled()
   })
 
-  it('positions the overlay container-relative (no double-counted stage offset)', () => {
-    // Workspace mounts the editor inside its `relative` container and passes
-    // stageRect {0,0}; the overlay origin must equal pan + element*zoom so it
-    // lands exactly over the text. A non-zero stageRect here would prove the
-    // double-count regression.
+  it('positions the overlay container-relative (pan + element*zoom)', () => {
+    // The overlay origin must equal pan + element*zoom so it lands exactly over
+    // the text inside the Workspace's `relative` container.
     const { container } = render(
       createElement(InlineTextEditor, {
         element: textEl({ x: 100, y: 50, width: 200 }),
         zoom: 2,
         panX: 10,
-        panY: 20,
-        stageRect: { left: 0, top: 0 },
-        onCommit: vi.fn(),
+        panY: 20,        onCommit: vi.fn(),
         onCancel: vi.fn(),
       }),
     )

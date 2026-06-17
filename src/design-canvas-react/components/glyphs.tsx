@@ -28,6 +28,7 @@ function glyph(paths: React.ReactNode) {
 
 export const UndoGlyph = glyph(<path d="M3 7v6h6M3 13a9 9 0 1 0 3-7.7" />)
 export const RedoGlyph = glyph(<path d="M21 7v6h-6M21 13a9 9 0 1 1-3-7.7" />)
+export const SwapGlyph = glyph(<path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7" />)
 
 export const EyeGlyph = glyph(
   <>
@@ -193,5 +194,19 @@ export const DuplicateGlyph = glyph(
 export const ZoomFitGlyph = glyph(
   <>
     <path d="M15 3h6v6M14 10l6.1-6.1M9 21H3v-6M10 14l-6.1 6.1" />
+  </>,
+)
+
+export const ExportGlyph = glyph(
+  <>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+  </>,
+)
+
+export const ShapesGlyph = glyph(
+  <>
+    <rect x="3" y="13" width="8" height="8" rx="1" />
+    <circle cx="17" cy="17" r="4" />
+    <path d="M8.5 3 13 11H4z" />
   </>,
 )

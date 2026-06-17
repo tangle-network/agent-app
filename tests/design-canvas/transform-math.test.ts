@@ -184,29 +184,25 @@ describe('computeTextOverlayPosition', () => {
       zoom: 2,
       panX: 10,
       panY: 20,
-      stageLeft: 0,
-      stageTop: 0,
       elementFontSize: 16,
     })
-    // screenX = panX + elementX * zoom = 10 + 100*2 = 210
+    // containerX = panX + elementX * zoom = 10 + 100*2 = 210
     expect(result.left).toBe(210)
-    // screenY = panY + elementY * zoom = 20 + 50*2 = 120
+    // containerY = panY + elementY * zoom = 20 + 50*2 = 120
     expect(result.top).toBe(120)
     expect(result.width).toBe(400) // 200 * 2
     expect(result.fontSize).toBe(32) // 16 * 2
   })
 
-  it('includes stageLeft/stageTop offset', () => {
+  it('is container-relative — pan-only offset with no stage term', () => {
     const result = computeTextOverlayPosition({
       elementX: 0,
       elementY: 0,
       elementWidth: 100,
       elementHeight: 50,
       zoom: 1,
-      panX: 0,
-      panY: 0,
-      stageLeft: 40,
-      stageTop: 60,
+      panX: 40,
+      panY: 60,
       elementFontSize: 14,
     })
     expect(result.left).toBe(40)
@@ -222,8 +218,6 @@ describe('computeTextOverlayPosition', () => {
       zoom: 0.5,
       panX: 0,
       panY: 0,
-      stageLeft: 0,
-      stageTop: 0,
       elementFontSize: 24,
     })
     expect(result.left).toBe(100)

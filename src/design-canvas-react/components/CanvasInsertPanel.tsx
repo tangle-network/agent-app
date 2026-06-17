@@ -31,7 +31,7 @@ import {
   type InsertPageGeometry,
   type InsertTemplate,
 } from '../insert-builders'
-import { ImageGlyph, TextGlyph } from './glyphs'
+import { ImageGlyph, ShapesGlyph } from './glyphs'
 
 /** An already-generated image the panel can offer for one-click insertion. */
 export interface InsertGeneration {
@@ -111,6 +111,64 @@ function SpinnerGlyph({ className }: { className?: string }) {
       <path d="M21 12a9 9 0 1 1-6.2-8.6" strokeLinecap="round" />
     </svg>
   )
+}
+
+/** Probe-page geometry for deriving a template's primary element kind. The
+ *  result drives only the tile preview, so the exact dimensions don't matter. */
+const PREVIEW_PROBE_PAGE: InsertPageGeometry = { pageId: 'preview', width: 1000, height: 1000 }
+
+/** The visual a template tile shows. Derived from the first element the
+ *  template's (pure) `build` produces, so custom templates render correctly
+ *  too — not just the built-in set. */
+type TemplateShape = 'heading' | 'body' | 'rect' | 'ellipse' | 'other'
+
+/** A text element is treated as a heading (shown as "T") when it reads as a
+ *  title — bold or set in a large face; otherwise body copy (shown as "¶"). */
+const HEADING_FONT_SIZE = 32
+
+function templateShape(tpl: InsertTemplate): TemplateShape {
+  try {
+    const ops = tpl.build(PREVIEW_PROBE_PAGE)
+    const added = ops.find((op) => op.type === 'add_element')
+    if (!added || added.type !== 'add_element') return 'other'
+    const el = added.element
+    if (el.kind === 'rect') return 'rect'
+    if (el.kind === 'ellipse') return 'ellipse'
+    if (el.kind === 'text') {
+      const isHeading = el.fontStyle.includes('bold') || el.fontSize >= HEADING_FONT_SIZE
+      return isHeading ? 'heading' : 'body'
+    }
+    return 'other'
+  } catch {
+    // A throwing build can't preview; fall through to the neutral shape glyph.
+    return 'other'
+  }
+}
+
+/** A small visual standing in for what the template inserts, so tiles are
+ *  distinguishable at a glance instead of four identical text chips. */
+function TemplatePreview({ shape }: { shape: TemplateShape }) {
+  if (shape === 'rect') {
+    return <span className="block h-6 w-9 rounded-sm bg-[var(--brand-primary)]" aria-hidden />
+  }
+  if (shape === 'ellipse') {
+    return <span className="block h-7 w-7 rounded-full bg-[var(--brand-primary)]" aria-hidden />
+  }
+  // Text tiles show a glyph: a bold "T" for a heading, a paragraph mark "¶"
+  // for body copy.
+  if (shape === 'heading' || shape === 'body') {
+    return (
+      <span
+        className={`block leading-none text-[var(--text-primary)] ${
+          shape === 'heading' ? 'text-2xl font-bold' : 'text-lg'
+        }`}
+        aria-hidden
+      >
+        {shape === 'heading' ? 'T' : '¶'}
+      </span>
+    )
+  }
+  return <ShapesGlyph className="h-6 w-6 text-[var(--text-muted)]" />
 }
 
 export function CanvasInsertPanel({
@@ -193,7 +251,7 @@ export function CanvasInsertPanel({
 
   const tabs: Array<{ id: Tab; label: string; icon: (p: { className?: string }) => ReactElement; show: boolean }> = [
     { id: 'uploads', label: 'Uploads', icon: ImageGlyph, show: true },
-    { id: 'templates', label: 'Templates', icon: TextGlyph, show: templates.length > 0 },
+    { id: 'templates', label: 'Templates', icon: ShapesGlyph, show: templates.length > 0 },
     { id: 'generations', label: 'Generations', icon: SparkleGlyph, show: !!loadGenerations },
   ]
   const visibleTabs = tabs.filter((t) => t.show)
@@ -280,6 +338,9 @@ export function CanvasInsertPanel({
                   onClick={() => void runInsert(() => tpl.build(page))}
                   className="flex h-20 flex-col items-center justify-center gap-1.5 rounded-md border border-[var(--border-default)] bg-[var(--bg-input)] text-xs font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--brand-primary)]/40 disabled:opacity-50"
                 >
+                  <span className="flex h-7 items-center justify-center">
+                    <TemplatePreview shape={templateShape(tpl)} />
+                  </span>
                   <span>{tpl.label}</span>
                 </button>
               ))}

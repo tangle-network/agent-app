@@ -53,11 +53,12 @@ import {
 import { Stage, Layer, Rect, Group } from 'react-konva'
 import type Konva from 'konva'
 
-import type { DesignCanvasProps } from '../contracts'
+import type { DesignCanvasProps, ExportTriggerOptions } from '../contracts'
+import { exportPageDataUrl } from '../export'
 import { createSceneCommandStack } from '../engine/command-stack'
 import { createSnapEngine, collectGridTargets } from '../engine/snap'
 import { createZoomPanMath } from '../engine/zoom-pan'
-import { marqueeSelect } from '../engine/selection'
+import { marqueeSelect, hitTestPoint } from '../engine/selection'
 import {
   addElementCommand,
   setAttrsCommand,
@@ -121,12 +122,17 @@ export interface WorkspaceViewProps {
   canWrite: boolean
   onApplyOperations: DesignCanvasProps['onApplyOperations']
   onSelectionChange?: DesignCanvasProps['onSelectionChange']
-  renderAgentPanel?: DesignCanvasProps['renderAgentPanel']
-  renderSidePanel?: DesignCanvasProps['renderSidePanel']
   className?: string
   /** Ref the chrome fills with a fit-page callback. The chrome calls it on F /
    *  Fit button; when injected via DesignCanvasEditor the ref is shared. */
   onFitRef?: React.MutableRefObject<(() => void) | null>
+  /** Host export hook. When set, the workspace fills `onExportRef` with a
+   *  callback that renders the stage to a data URL and forwards the result. */
+  onExport?: DesignCanvasProps['onExport']
+  /** Ref the workspace fills with an export callback `(opts) => void`. The
+   *  chrome's Export control calls it; the workspace owns the Konva stage so it
+   *  produces the data URL here. Filled only when `onExport` is also set. */
+  onExportRef?: React.MutableRefObject<((opts: ExportTriggerOptions) => void) | null>
   /** Fit the active page to the viewport once, on the first non-zero measurement. Default true. */
   fitOnMount?: boolean
   /** Called once after the first real (non-zero) measurement, after the initial fit is applied (or skipped). */
@@ -141,12 +147,12 @@ export function WorkspaceView({
   canWrite,
   onApplyOperations,
   onSelectionChange,
-  renderAgentPanel,
-  renderSidePanel,
   className,
   stack,
   activePage,
   onFitRef,
+  onExport,
+  onExportRef,
   fitOnMount = true,
   onReady,
 }: WorkspaceViewProps) {
@@ -215,6 +221,26 @@ export function WorkspaceView({
       // would each try to own it; the last to mount wins, but on unmount we
       // must not clear a ref filled by a newer mount).
       if (onFitRef.current !== null) onFitRef.current = null
+    }
+  })
+
+  // -------------------------------------------------------------------------
+  // Export callback — the chrome's Export control calls this through the ref;
+  // the workspace owns the stage, so it renders here and forwards the result.
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!onExportRef || !onExport) return
+    onExportRef.current = ({ format, pixelRatio }: ExportTriggerOptions) => {
+      const stage = stageRef.current
+      if (!stage) return
+      void (async () => {
+        const dataUrl = await exportPageDataUrl(stage, activePage, { format, pixelRatio })
+        await onExport({ pageId: activePageId, format, dataUrl, pixelRatio })
+      })()
+    }
+    return () => {
+      if (onExportRef.current !== null) onExportRef.current = null
     }
   })
 
@@ -288,21 +314,25 @@ export function WorkspaceView({
     }
     if (e.button !== 0) return
 
-    const stage = stageRef.current
     const rect = containerRef.current?.getBoundingClientRect()
-    if (!stage || !rect) return
+    if (!rect) return
     const screenX = e.clientX - rect.left
     const screenY = e.clientY - rect.top
-    const hitNode = stage.getIntersection({ x: screenX, y: screenY })
+    const docPos = zoomPanMath.screenToDocument({ zoom, panX, panY }, screenX, screenY)
 
-    if (hitNode && !hitNode.name().startsWith('overlay:') && hitNode.name() !== 'page-background') {
+    // Element-vs-empty-space is decided against the scene model in document
+    // space, not Konva's hit-graph canvas. The hit canvas misclassifies presses
+    // over elements (clip group, listening:false background, redraw lag right
+    // after a pan/zoom setView), which silently routed an element press into the
+    // marquee branch — the element drag never started. A model hit means: let
+    // Konva's draggable node begin the move; only empty space starts a marquee.
+    if (hitTestPoint(activePage, docPos.x, docPos.y) !== null) {
       return
     }
 
     e.preventDefault()
     ;(e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId)
     gestureRef.current = 'marquee'
-    const docPos = zoomPanMath.screenToDocument({ zoom, panX, panY }, screenX, screenY)
     const m: MarqueeState = { active: true, startDocX: docPos.x, startDocY: docPos.y, endDocX: docPos.x, endDocY: docPos.y }
     marqueeRef.current = m
     setMarquee(m)
@@ -726,7 +756,7 @@ export function WorkspaceView({
 
   return (
     <div
-      className={`design-canvas-workspace relative overflow-hidden bg-[var(--canvas-surface)] outline-none ${className ?? ''}`}
+      className={`design-canvas-workspace relative overflow-hidden bg-[var(--canvas-backdrop,#1a1a1a)] outline-none ${className ?? ''}`}
       ref={containerRef}
       tabIndex={0}
       onWheel={handleWheel}
@@ -737,13 +767,6 @@ export function WorkspaceView({
       onKeyUp={handleKeyUp}
       style={{ cursor: spaceHeldRef.current ? 'grab' : 'default' }}
     >
-      {/* Left side panel */}
-      {renderSidePanel && (
-        <div className="absolute left-0 top-0 bottom-0 z-20 w-60 pointer-events-auto">
-          {renderSidePanel()}
-        </div>
-      )}
-
       {/* Konva Stage */}
       <Stage
         ref={stageRef}
@@ -867,22 +890,9 @@ export function WorkspaceView({
           zoom={zoom}
           panX={panX}
           panY={panY}
-          // The textarea is absolutely positioned INSIDE this container div (which
-          // is `relative`), so its offset parent already starts at the stage's
-          // viewport origin. Passing the stage's viewport rect here would add that
-          // origin a second time, offsetting the editor from the text. The overlay
-          // origin in container space is exactly (panX, panY) + element*zoom.
-          stageRect={{ left: 0, top: 0 }}
           onCommit={handleTextCommit}
           onCancel={handleTextCancel}
         />
-      )}
-
-      {/* Agent panel (right) */}
-      {renderAgentPanel && (
-        <div className="absolute right-0 top-0 bottom-0 z-20 w-80 pointer-events-auto">
-          {renderAgentPanel({ selectedElements, activePageId })}
-        </div>
       )}
     </div>
   )
@@ -939,8 +949,6 @@ export function Workspace(props: DesignCanvasProps) {
       canWrite={props.canWrite}
       onApplyOperations={props.onApplyOperations}
       onSelectionChange={props.onSelectionChange}
-      renderAgentPanel={props.renderAgentPanel}
-      renderSidePanel={props.renderSidePanel}
       className={props.className}
     />
   )

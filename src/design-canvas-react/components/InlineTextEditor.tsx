@@ -22,8 +22,6 @@ export interface InlineTextEditorProps {
   zoom: number
   panX: number
   panY: number
-  /** Bounding rect of the Konva stage container in the viewport. */
-  stageRect: { left: number; top: number }
   onCommit(text: string): void
   onCancel(): void
 }
@@ -33,7 +31,6 @@ export function InlineTextEditor({
   zoom,
   panX,
   panY,
-  stageRect,
   onCommit,
   onCancel,
 }: InlineTextEditorProps) {
@@ -47,8 +44,6 @@ export function InlineTextEditor({
     zoom,
     panX,
     panY,
-    stageLeft: stageRect.left,
-    stageTop: stageRect.top,
     elementFontSize: element.fontSize,
   })
 
@@ -101,8 +96,11 @@ export function InlineTextEditor({
         lineHeight: element.lineHeight,
         letterSpacing: element.letterSpacing * zoom,
         color: element.fill,
-        background: 'rgba(255,255,255,0.95)',
-        border: '2px solid #3b82f6',
+        // Neutral token surface rather than a forced white: a white fill makes
+        // light text invisible while editing. The token surface stays legible
+        // for any text color and matches the editor chrome.
+        background: 'var(--bg-input)',
+        border: '2px solid var(--brand-primary)',
         borderRadius: 2,
         padding: 2,
         resize: 'none',

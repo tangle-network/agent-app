@@ -50,8 +50,9 @@
   --border-default: hsl(var(--border));
   --brand-primary: hsl(var(--primary));
 
-  /* canvas-only surfaces (not part of the shadcn vocabulary) */
-  --canvas-surface: hsl(220 13% 91%);
+  /* canvas-only surfaces (not part of the shadcn vocabulary). Name matches the
+     `--canvas-backdrop` the design-canvas Workspace references (with a #1a1a1a fallback). */
+  --canvas-backdrop: hsl(220 13% 91%);
 }
 
 [data-theme='dark'],
@@ -78,5 +79,5 @@
   --success: 142 71% 45%;
   --warning: 38 92% 50%;
 
-  --canvas-surface: hsl(0 0% 10%);
+  --canvas-backdrop: hsl(0 0% 10%);
 }

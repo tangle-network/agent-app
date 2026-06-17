@@ -28,6 +28,7 @@ export {
   BTN_SM,
   BTN_SM_ACTIVE,
 } from './icon-button'
+export { ExportControl, type ExportControlProps } from './ExportControl'
 export { ElementNode, type ElementNodeProps } from './ElementNode'
 export { GridLayer, type GridLayerProps } from './GridLayer'
 export { Rulers, type RulersProps } from './Rulers'

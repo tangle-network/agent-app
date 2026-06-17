@@ -31,7 +31,7 @@ export interface AgentAppTheme {
   success: string
   warning: string
   /** Full CSS color (not a triple) — the canvas/scene backdrop. */
-  canvasSurface: string
+  canvasBackdrop: string
 }
 
 export const lightTheme: AgentAppTheme = {
@@ -56,7 +56,7 @@ export const lightTheme: AgentAppTheme = {
   ring: '221 83% 53%',
   success: '142 71% 45%',
   warning: '38 92% 50%',
-  canvasSurface: 'hsl(220 13% 91%)',
+  canvasBackdrop: 'hsl(220 13% 91%)',
 }
 
 export const darkTheme: AgentAppTheme = {
@@ -81,7 +81,7 @@ export const darkTheme: AgentAppTheme = {
   ring: '217 91% 60%',
   success: '142 71% 45%',
   warning: '38 92% 50%',
-  canvasSurface: 'hsl(0 0% 10%)',
+  canvasBackdrop: 'hsl(0 0% 10%)',
 }
 
 /** Wrap a channel triple in `hsl()`; pass through values already in a color form. */
@@ -126,6 +126,6 @@ export function themeToCssVars(theme: AgentAppTheme): Record<string, string> {
     '--text-danger': `hsl(${theme.destructive})`,
     '--border-default': `hsl(${theme.border})`,
     '--brand-primary': `hsl(${theme.primary})`,
-    '--canvas-surface': theme.canvasSurface,
+    '--canvas-backdrop': theme.canvasBackdrop,
   }
 }

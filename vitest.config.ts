@@ -9,5 +9,16 @@ export default defineConfig({
     // scaffolder itself is exercised by `tests/create-agent-app.test.ts`.
     include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/dist/**', 'create-agent-app/template/**'],
+    // Run test FILES one at a time. Parallel forks each load the full module
+    // graph (React, TipTap, drizzle, better-sqlite3, konva) and accumulate heap
+    // across the files they own; serializing bounds peak RSS to a single file
+    // (~0.7GB vs ~3.5GB fanned out) and removes the CPU contention that
+    // intermittently failed real-timer tests. The suite is small, so the
+    // sequential wall-time cost is only a few seconds.
+    pool: 'forks',
+    fileParallelism: false,
+    poolOptions: {
+      forks: { execArgv: ['--max-old-space-size=4096'] },
+    },
   },
 })
