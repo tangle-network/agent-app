@@ -1,0 +1,82 @@
+/**
+ * agent-app design tokens — the single source of truth for theming every React
+ * surface (design-canvas-react, sequences-react, web-react).
+ *
+ * Import once at your app root:  import '@tangle-network/agent-app/styles'
+ * Dark mode: set `data-theme="dark"` (or class `dark`) on a parent element.
+ *
+ * Two vocabularies resolve to ONE set of channel triples:
+ *   - shadcn semantic names (--card, --foreground, --muted-foreground, …) —
+ *     consumed by web-react via Tailwind classes (bg-card, text-foreground).
+ *     Wire them with the Tailwind preset: import '@tangle-network/agent-app/tailwind-preset'.
+ *   - canvas/sequences alias names (--bg-input, --text-primary, …) — full
+ *     colors consumed directly via Tailwind arbitrary values (bg-[var(--bg-input)]).
+ *     These need no Tailwind config; tokens.css alone is enough.
+ *
+ * The aliases reference the triples, so redefining only the triples in the dark
+ * scope re-themes both vocabularies through the cascade.
+ */
+
+:root {
+  /* shadcn channel triples — "H S% L%", consumed as hsl(var(--name)) */
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 221 83% 53%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 30%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 221 83% 53%;
+  --success: 142 71% 45%;
+  --warning: 38 92% 50%;
+
+  /* canvas/sequences aliases — full colors, resolve to the triples above */
+  --bg-input: hsl(var(--card));
+  --text-primary: hsl(var(--foreground));
+  --text-secondary: hsl(var(--secondary-foreground));
+  --text-muted: hsl(var(--muted-foreground));
+  --text-danger: hsl(var(--destructive));
+  --border-default: hsl(var(--border));
+  --brand-primary: hsl(var(--primary));
+
+  /* canvas-only surfaces (not part of the shadcn vocabulary) */
+  --canvas-surface: hsl(220 13% 91%);
+}
+
+[data-theme='dark'],
+.dark {
+  --background: 222 47% 7%;
+  --foreground: 210 40% 98%;
+  --card: 222 47% 11%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 47% 11%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 217 91% 60%;
+  --primary-foreground: 222 47% 11%;
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 210 40% 90%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 217 33% 17%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 63% 50%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217 33% 20%;
+  --input: 217 33% 20%;
+  --ring: 217 91% 60%;
+  --success: 142 71% 45%;
+  --warning: 38 92% 50%;
+
+  --canvas-surface: hsl(0 0% 10%);
+}
