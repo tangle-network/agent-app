@@ -25,12 +25,14 @@
   --card-foreground: 222 47% 11%;
   --popover: 0 0% 100%;
   --popover-foreground: 222 47% 11%;
-  --primary: 221 83% 53%;
+  --primary: 221 83% 47%;
   --primary-foreground: 0 0% 100%;
   --secondary: 210 40% 96%;
   --secondary-foreground: 222 47% 30%;
   --muted: 210 40% 96%;
-  --muted-foreground: 215 16% 47%;
+  /* 44% L (was 47%) so muted text clears WCAG AA even on subtly tinted surfaces
+     (e.g. the failed tool card's 5%-red wash); ~4.7:1 on white. */
+  --muted-foreground: 215 16% 44%;
   --accent: 210 40% 96%;
   --accent-foreground: 222 47% 11%;
   --destructive: 0 72% 51%;
@@ -38,6 +40,9 @@
   --border: 214 32% 91%;
   --input: 214 32% 91%;
   --ring: 221 83% 53%;
+  /* note: --primary below is darkened from 53% → 47% L so the brand blue clears
+     WCAG AA (4.5:1) when used AS TEXT on a light surface; --ring stays at the
+     brighter 53% (a 2px focus ring only needs 3:1 non-text contrast). */
   --success: 142 71% 45%;
   --warning: 38 92% 50%;
 
@@ -63,7 +68,7 @@
   --card-foreground: 210 40% 98%;
   --popover: 222 47% 11%;
   --popover-foreground: 210 40% 98%;
-  --primary: 217 91% 60%;
+  --primary: 217 91% 72%;
   --primary-foreground: 222 47% 11%;
   --secondary: 217 33% 17%;
   --secondary-foreground: 210 40% 90%;

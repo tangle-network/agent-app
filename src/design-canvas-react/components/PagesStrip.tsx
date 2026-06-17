@@ -97,10 +97,6 @@ export function PagesStrip({
         return (
           <div
             key={page.id}
-            role="button"
-            tabIndex={0}
-            aria-label={`Page ${index + 1}: ${page.name}${isActive ? ' (active)' : ''}`}
-            aria-pressed={isActive}
             draggable={canWrite}
             onDragStart={() => {
               dragIndexRef.current = index
@@ -123,21 +119,23 @@ export function PagesStrip({
               dragIndexRef.current = null
               setDragOverIndex(null)
             }}
-            onClick={() => onSelectPage(page.id)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault()
-                onSelectPage(page.id)
-              }
-            }}
             className={[
-              'group relative flex shrink-0 cursor-pointer flex-col items-center gap-1 rounded p-1 transition focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]',
+              'group relative flex shrink-0 flex-col items-center gap-1 rounded p-1 transition',
               isActive
                 ? 'ring-2 ring-[var(--brand-primary)]'
                 : 'hover:bg-[var(--border-default)]/40',
               dragOverIndex === index ? 'ring-1 ring-[var(--brand-primary)]/60' : '',
             ].join(' ')}
           >
+            {/* Selection is a real button so the tile is not an interactive control
+                nesting the per-page action buttons (axe: nested-interactive). */}
+            <button
+              type="button"
+              aria-label={`Page ${index + 1}: ${page.name}${isActive ? ' (active)' : ''}`}
+              aria-pressed={isActive}
+              onClick={() => onSelectPage(page.id)}
+              className="flex cursor-pointer flex-col items-center gap-1 rounded focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+            >
             {/* Thumbnail or placeholder */}
             <div
               className="overflow-hidden rounded border border-[var(--border-default)] bg-white"
@@ -161,6 +159,7 @@ export function PagesStrip({
             <span className="max-w-[80px] truncate text-[10px] text-[var(--text-secondary)]">
               {page.name}
             </span>
+            </button>
 
             {/* Per-page action buttons — visible on hover or when active */}
             {canWrite && canManagePages ? (
