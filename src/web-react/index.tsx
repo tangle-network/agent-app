@@ -477,7 +477,7 @@ export function RunDrillIn({ run, onClose }: RunDrillInProps) {
         {run.steps.map((step, i) => (
           <div key={i} className="rounded-lg border border-border/60 bg-background">
             <div className="flex items-baseline gap-2 border-b border-border/40 px-3 py-1.5">
-              <span className={`font-mono text-[11px] ${step.status === 'error' ? 'text-red-600' : 'text-muted-foreground'}`}>
+              <span className={`font-mono text-[11px] ${step.status === 'error' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
                 {step.status === 'error' ? '✗' : '$'}
               </span>
               <code className="min-w-0 flex-1 truncate font-mono text-xs">{step.label}</code>
@@ -689,7 +689,7 @@ function DefaultToolDetail({ call }: { call: ChatToolCallInfo }) {
             {outcome.ok === false ? 'Failed' : 'Result'}
           </p>
           {outcome.ok === false ? (
-            <p className="text-xs text-red-600">{outcome.message ?? 'Tool failed'}</p>
+            <p className="text-xs text-red-600 dark:text-red-400">{outcome.message ?? 'Tool failed'}</p>
           ) : outcome.result && typeof outcome.result === 'object' ? (
             <KvRows data={outcome.result} />
           ) : (
@@ -730,31 +730,37 @@ function ToolCallCard({
             : 'border-border/60 bg-muted/20'
       }`}
     >
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left"
-      >
-        <span
-          className={`h-2 w-2 shrink-0 rounded-full ${
-            call.status === 'running'
-              ? 'animate-pulse bg-yellow-500'
-              : pending
-                ? 'bg-amber-500'
-                : failed
-                  ? 'bg-red-500'
-                  : 'bg-green-500'
-          }`}
-        />
-        <ToolGlyph name={call.name} className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 flex-1 truncate font-medium">{friendlyToolTitle(call)}</span>
+      {/* Header is a flex row, NOT a button, so the Approve/Reject controls are
+          siblings of the expand toggle rather than nested inside it (axe:
+          nested-interactive; also invalid: a <button> may not contain a <button>). */}
+      <div className="flex w-full items-center gap-2 px-3 py-2">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded text-left focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span
+            className={`h-2 w-2 shrink-0 rounded-full ${
+              call.status === 'running'
+                ? 'animate-pulse bg-yellow-500'
+                : pending
+                  ? 'bg-amber-500'
+                  : failed
+                    ? 'bg-red-500'
+                    : 'bg-green-500'
+            }`}
+          />
+          <ToolGlyph name={call.name} className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 flex-1 truncate font-medium">{friendlyToolTitle(call)}</span>
+        </button>
         {pending && approval && (
-          <span className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <span className="flex shrink-0 items-center gap-1">
             <button
               type="button"
               disabled={deciding}
               onClick={() => decide(() => approval.onApprove(pending.proposalId, call.id))}
-              className="rounded bg-green-600/90 px-2 py-0.5 text-[11px] font-semibold text-white transition hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded bg-green-700 px-2 py-0.5 text-[11px] font-semibold text-white transition hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Approve
             </button>
@@ -771,8 +777,16 @@ function ToolCallCard({
         <span className="shrink-0 text-[11px] text-muted-foreground">
           {call.status === 'running' ? 'running…' : pending ? 'awaiting approval' : failed ? 'failed' : 'done'}
         </span>
-        <ChevronDown className={`h-3 w-3 shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
-      </button>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-label={expanded ? 'Collapse details' : 'Expand details'}
+          aria-expanded={expanded}
+          className="shrink-0 rounded p-0.5 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
       {expanded && (
         <div className="border-t border-border/40 px-3 py-2.5">
           {custom ?? (call.name === 'sandbox_run_command' ? <ShellDetail call={call} /> : <DefaultToolDetail call={call} />)}
@@ -906,7 +920,7 @@ function ThinkingRow({ agentLabel }: { agentLabel: string }) {
 function StreamErrorRow({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-3">
-      <div role="alert" className="flex items-start gap-2.5 rounded-lg border border-red-300/60 bg-red-500/5 px-3 py-2.5 text-sm text-red-600">
+      <div role="alert" className="flex items-start gap-2.5 rounded-lg border border-red-300/60 bg-red-500/5 px-3 py-2.5 text-sm text-red-600 dark:text-red-400">
         <svg className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <circle cx="12" cy="12" r="9" />
           <path d="M12 8v4m0 4h.01" />
@@ -916,7 +930,7 @@ function StreamErrorRow({ message, onRetry }: { message: string; onRetry?: () =>
           <button
             type="button"
             onClick={onRetry}
-            className={`shrink-0 rounded border border-red-300/60 bg-card px-2 py-0.5 text-[11px] font-medium text-red-600 transition hover:bg-red-500/10 ${POPOVER_OPTION_FOCUS}`}
+            className={`shrink-0 rounded border border-red-300/60 bg-card px-2 py-0.5 text-[11px] font-medium text-red-600 dark:text-red-400 transition hover:bg-red-500/10 ${POPOVER_OPTION_FOCUS}`}
           >
             Retry
           </button>

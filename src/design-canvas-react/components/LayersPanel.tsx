@@ -118,47 +118,44 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
                 dragRowRef.current = null
                 setDragOverIndex(null)
               }}
-              onClick={(event) => onSelect(element.id, event.metaKey || event.ctrlKey)}
               className={[
-                'group flex cursor-pointer items-center gap-1.5 py-1 pr-2 text-[13px] transition-colors',
+                'group flex items-center gap-1.5 py-1 pr-2 text-[13px] transition-colors',
                 isSelected ? 'bg-[var(--brand-primary)]/15 text-[var(--text-primary)]' : 'hover:bg-[var(--border-default)]/40 text-[var(--text-secondary)]',
                 dragOverIndex === row.ownerIndex ? 'border-t border-[var(--brand-primary)]' : '',
               ].join(' ')}
               style={{ paddingLeft: 8 + row.depth * INDENT_PX }}
             >
-              <KindIcon kind={element.kind} className="h-3.5 w-3.5 shrink-0 opacity-60" />
-
-              {element.slot ? (
-                <SlotGlyph className="h-3 w-3 shrink-0 text-[var(--brand-primary)]" />
-              ) : null}
-
-              <span className="min-w-0 flex-1 truncate">
-                {isRenaming ? (
-                  <input
-                    autoFocus
-                    value={renameValue}
-                    onChange={(event) => setRenameValue(event.target.value)}
-                    onBlur={() => commitRename(element.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') commitRename(element.id)
-                      if (event.key === 'Escape') setRenamingId(null)
-                      event.stopPropagation()
-                    }}
-                    onClick={(event) => event.stopPropagation()}
-                    className="w-full rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
-                  />
-                ) : (
-                  <span
-                    onDoubleClick={(event) => {
-                      event.stopPropagation()
-                      if (canWrite) startRename(element)
-                    }}
-                    title={element.name}
-                  >
-                    {element.name}
-                  </span>
-                )}
-              </span>
+              {isRenaming ? (
+                <input
+                  autoFocus
+                  value={renameValue}
+                  onChange={(event) => setRenameValue(event.target.value)}
+                  onBlur={() => commitRename(element.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') commitRename(element.id)
+                    if (event.key === 'Escape') setRenamingId(null)
+                    event.stopPropagation()
+                  }}
+                  className="min-w-0 flex-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
+                />
+              ) : (
+                // Selection is a real button (sibling of the eye/lock buttons) so
+                // the row is not an interactive control nesting interactive
+                // controls (axe: nested-interactive).
+                <button
+                  type="button"
+                  onClick={(event) => onSelect(element.id, event.metaKey || event.ctrlKey)}
+                  onDoubleClick={() => {
+                    if (canWrite) startRename(element)
+                  }}
+                  title={element.name}
+                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 bg-transparent text-left focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+                >
+                  <KindIcon kind={element.kind} className="h-3.5 w-3.5 shrink-0 opacity-60" />
+                  {element.slot ? <SlotGlyph className="h-3 w-3 shrink-0 text-[var(--brand-primary)]" /> : null}
+                  <span className="min-w-0 flex-1 truncate">{element.name}</span>
+                </button>
+              )}
 
               {/* Visibility toggle */}
               <button
