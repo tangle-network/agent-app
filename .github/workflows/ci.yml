@@ -8,6 +8,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # tsup generates .d.ts for ~38 entries in a worker thread (the `prepare`
+      # script runs during install, and again in the build step); that worker
+      # needs ~4.7GB and OOMs at the default limit. The worker inherits
+      # NODE_OPTIONS, so set the heap once at the job level.
+      NODE_OPTIONS: --max-old-space-size=6144
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
