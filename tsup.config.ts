@@ -32,6 +32,7 @@ export default defineConfig({
     'store/index': 'src/store/index.ts',
     'trace/index': 'src/trace/index.ts',
     'assets/index': 'src/assets/index.ts',
+    'brand-extraction/index': 'src/brand-extraction/index.ts',
     'sequences/index': 'src/sequences/index.ts',
     'sequences/drizzle': 'src/sequences/drizzle.ts',
     'sequences-react/index': 'src/sequences-react/index.ts',
