@@ -426,9 +426,29 @@ export function WorkspaceView({
     const origin = dragOriginRef.current.get(elementId)
     if (!origin) return
 
-    const dx = finalX - origin.x
-    const dy = finalY - origin.y
     const draggingIds = selectedElementIds.includes(elementId) ? selectedElementIds : [elementId]
+
+    // Re-run snapping for the drop position so the PERSISTED coordinates match the
+    // guide the user saw mid-drag. Without this the element lands at the raw
+    // pointer position and the snap line is purely cosmetic.
+    let snappedX = finalX
+    let snappedY = finalY
+    if (snapEnabled) {
+      const snapBounds = { x: finalX, y: finalY, width: origin.width, height: origin.height }
+      const targets = snapEngine.collectTargets(state, draggingIds)
+      if (gridEnabled) {
+        const thresholdDoc = SNAP_THRESHOLD_SCREEN_PX / zoom
+        const gt = collectGridTargets(snapBounds, gridSize, activePage, thresholdDoc)
+        targets.vertical.push(...gt.vertical)
+        targets.horizontal.push(...gt.horizontal)
+      }
+      const snapResult = snapEngine.apply(snapBounds, targets, SNAP_THRESHOLD_SCREEN_PX, zoom)
+      snappedX = snapResult.x
+      snappedY = snapResult.y
+    }
+
+    const dx = snappedX - origin.x
+    const dy = snappedY - origin.y
 
     if (draggingIds.length === 1) {
       const el = findElement(activePage, elementId)?.element
@@ -437,7 +457,7 @@ export function WorkspaceView({
         setAttrsCommand({
           pageId: activePageId,
           elementId,
-          attrs: { x: finalX, y: finalY },
+          attrs: { x: snappedX, y: snappedY },
           priorAttrs: { x: el.x, y: el.y },
         }),
       )
@@ -537,6 +557,10 @@ export function WorkspaceView({
 
     if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementIds.length > 0) {
       e.preventDefault()
+      // Stop the event reaching DesignCanvas's window-level keydown, which also
+      // handles delete/undo/redo — without this the editor handles the key twice
+      // (delete two history steps, undo twice) when Workspace mounts inside it.
+      e.stopPropagation()
       for (const id of [...selectedElementIds]) {
         try {
           persist(deleteElementCommand({ document, pageId: activePageId, elementId: id }))
@@ -548,11 +572,13 @@ export function WorkspaceView({
 
     if (mod && e.key === 'z' && !e.shiftKey) {
       e.preventDefault()
+      e.stopPropagation()
       if (stack.canUndo()) stack.undo()
       return
     }
     if (mod && ((e.key === 'z' && e.shiftKey) || e.key === 'y')) {
       e.preventDefault()
+      e.stopPropagation()
       if (stack.canRedo()) stack.redo()
       return
     }
@@ -756,6 +782,8 @@ export function WorkspaceView({
             pageHeight={activePage.height}
             gridSize={gridSize}
             zoom={zoom}
+            panX={panX}
+            panY={panY}
           />
         )}
 

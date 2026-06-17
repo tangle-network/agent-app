@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ScenePage } from '../../design-canvas/model'
 import { DuplicateGlyph, PageGlyph, PlusGlyph, TrashGlyph } from './glyphs'
+import { BTN_SM } from './icon-button'
 
 export interface PagesStripProps {
   pages: ScenePage[]
@@ -34,9 +35,6 @@ export interface PagesStripProps {
 
 const THUMBNAIL_W = 80
 const THUMBNAIL_H = 56
-
-const BTN =
-  'flex h-6 w-6 items-center justify-center rounded border border-[var(--border-default)] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:cursor-default disabled:opacity-40'
 
 export function PagesStrip({
   pages,
@@ -133,7 +131,7 @@ export function PagesStrip({
               }
             }}
             className={[
-              'group relative flex shrink-0 cursor-pointer flex-col items-center gap-1 rounded p-1 transition',
+              'group relative flex shrink-0 cursor-pointer flex-col items-center gap-1 rounded p-1 transition focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]',
               isActive
                 ? 'ring-2 ring-[var(--brand-primary)]'
                 : 'hover:bg-[var(--border-default)]/40',
@@ -174,7 +172,7 @@ export function PagesStrip({
                     event.stopPropagation()
                     onDuplicatePage(page.id)
                   }}
-                  className={BTN}
+                  className={BTN_SM}
                 >
                   <DuplicateGlyph className="h-3 w-3" />
                 </button>
@@ -186,7 +184,7 @@ export function PagesStrip({
                     event.stopPropagation()
                     if (pages.length > 1) onDeletePage(page.id)
                   }}
-                  className={BTN}
+                  className={BTN_SM}
                 >
                   <TrashGlyph className="h-3 w-3 text-rose-400" />
                 </button>
@@ -202,7 +200,7 @@ export function PagesStrip({
           type="button"
           aria-label="Add page"
           onClick={onAddPage}
-          className="flex h-[72px] w-[80px] shrink-0 flex-col items-center justify-center gap-1 rounded border border-dashed border-[var(--border-default)] text-[var(--text-muted)] transition hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]"
+          className="flex h-[72px] w-[80px] shrink-0 flex-col items-center justify-center gap-1 rounded border border-dashed border-[var(--border-default)] text-[var(--text-muted)] transition hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
         >
           <PlusGlyph className="h-4 w-4" />
           <span className="text-[10px]">Add page</span>

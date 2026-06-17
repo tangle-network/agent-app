@@ -25,6 +25,7 @@
   },
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
@@ -216,7 +217,28 @@
       "types": "./dist/design-canvas-react/index.d.ts",
       "import": "./dist/design-canvas-react/index.js",
       "default": "./dist/design-canvas-react/index.js"
-    }
+    },
+    "./design-canvas-react/engine": {
+      "types": "./dist/design-canvas-react/engine.d.ts",
+      "import": "./dist/design-canvas-react/engine.js",
+      "default": "./dist/design-canvas-react/engine.js"
+    },
+    "./design-canvas-react/lazy": {
+      "types": "./dist/design-canvas-react/lazy.d.ts",
+      "import": "./dist/design-canvas-react/lazy.js",
+      "default": "./dist/design-canvas-react/lazy.js"
+    },
+    "./theme": {
+      "types": "./dist/theme/index.d.ts",
+      "import": "./dist/theme/index.js",
+      "default": "./dist/theme/index.js"
+    },
+    "./tailwind-preset": {
+      "types": "./dist/theme/tailwind-preset.d.ts",
+      "import": "./dist/theme/tailwind-preset.js",
+      "default": "./dist/theme/tailwind-preset.js"
+    },
+    "./styles": "./dist/theme/tokens.css"
   },
   "scripts": {
     "build": "tsup",

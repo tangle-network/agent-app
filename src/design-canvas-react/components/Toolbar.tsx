@@ -40,6 +40,7 @@ import {
   UngroupGlyph,
   UnlockGlyph,
 } from './glyphs'
+import { BTN, BTN_ACTIVE } from './icon-button'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -103,11 +104,6 @@ const FONT_FAMILIES = [
 // ---------------------------------------------------------------------------
 // Small helpers
 // ---------------------------------------------------------------------------
-
-const BTN =
-  'flex h-7 w-7 items-center justify-center rounded border border-[var(--border-default)] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:cursor-default disabled:opacity-40'
-
-const BTN_ACTIVE = `${BTN} border-[var(--brand-primary)] text-[var(--brand-primary)] hover:text-[var(--brand-primary)]`
 
 const SEP = <div className="mx-1 h-5 w-px shrink-0 bg-[var(--border-default)]" />
 
@@ -650,6 +646,7 @@ function SelectionControls({
         <button
           type="button"
           aria-label={single.locked ? 'Unlock element' : 'Lock element'}
+          aria-pressed={!!single.locked}
           disabled={!canWrite}
           onClick={() => patchAll({ locked: !single.locked })}
           className={single.locked ? BTN_ACTIVE : BTN}
@@ -667,6 +664,9 @@ function SelectionControls({
             <button
               type="button"
               aria-label={currentSlot ? `Slot: ${currentSlot}` : 'Bind slot'}
+              aria-pressed={!!currentSlot}
+              aria-haspopup="dialog"
+              aria-expanded={slotPopoverOpen}
               onClick={() => { setSlotInput(currentSlot ?? ''); setSlotPopoverOpen((v) => !v) }}
               className={currentSlot ? BTN_ACTIVE : BTN}
               title={currentSlot ? `Slot: ${currentSlot}` : 'Bind slot'}
@@ -727,6 +727,7 @@ function TextControls({ element, canWrite, onPatch }: { element: TextElement; ca
       <button
         type="button"
         aria-label="Bold"
+        aria-pressed={!!element.fontStyle?.includes('bold')}
         disabled={!canWrite}
         onClick={() => onPatch({ fontStyle: element.fontStyle === 'bold' || element.fontStyle === 'bold italic' ? (element.fontStyle === 'bold italic' ? 'italic' : 'normal') : (element.fontStyle === 'italic' ? 'bold italic' : 'bold') })}
         className={element.fontStyle?.includes('bold') ? BTN_ACTIVE : BTN}
@@ -736,24 +737,29 @@ function TextControls({ element, canWrite, onPatch }: { element: TextElement; ca
       <button
         type="button"
         aria-label="Italic"
+        aria-pressed={!!element.fontStyle?.includes('italic')}
         disabled={!canWrite}
         onClick={() => onPatch({ fontStyle: element.fontStyle === 'italic' || element.fontStyle === 'bold italic' ? (element.fontStyle === 'bold italic' ? 'bold' : 'normal') : (element.fontStyle === 'bold' ? 'bold italic' : 'italic') })}
         className={element.fontStyle?.includes('italic') ? BTN_ACTIVE : BTN}
       >
         <ItalicGlyph className="h-3.5 w-3.5" />
       </button>
-      {(['left', 'center', 'right'] as const).map((align) => (
-        <button
-          key={align}
-          type="button"
-          aria-label={`Align ${align}`}
-          disabled={!canWrite}
-          onClick={() => onPatch({ align })}
-          className={element.align === align ? BTN_ACTIVE : BTN}
-        >
-          {align === 'left' ? <AlignLeftGlyph className="h-3.5 w-3.5" /> : align === 'center' ? <AlignCenterGlyph className="h-3.5 w-3.5" /> : <AlignRightGlyph className="h-3.5 w-3.5" />}
-        </button>
-      ))}
+      <div role="radiogroup" aria-label="Text alignment" className="flex items-center gap-2">
+        {(['left', 'center', 'right'] as const).map((align) => (
+          <button
+            key={align}
+            type="button"
+            role="radio"
+            aria-label={`Align ${align}`}
+            aria-checked={element.align === align}
+            disabled={!canWrite}
+            onClick={() => onPatch({ align })}
+            className={element.align === align ? BTN_ACTIVE : BTN}
+          >
+            {align === 'left' ? <AlignLeftGlyph className="h-3.5 w-3.5" /> : align === 'center' ? <AlignCenterGlyph className="h-3.5 w-3.5" /> : <AlignRightGlyph className="h-3.5 w-3.5" />}
+          </button>
+        ))}
+      </div>
       <NumberInput label="Line H" value={element.lineHeight} step={0.1} min={0.5} onCommit={(v) => onPatch({ lineHeight: v })} className="w-12" />
       <NumberInput label="Spacing" value={element.letterSpacing} step={0.5} onCommit={(v) => onPatch({ letterSpacing: v })} className="w-14" />
       <ColorSwatch label="Fill" value={element.fill} onCommit={(v) => onPatch({ fill: v })} disabled={!canWrite} />

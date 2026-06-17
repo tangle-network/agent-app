@@ -15,11 +15,15 @@
 
 import type { ReactNode } from 'react'
 
+import { usePending } from './index'
+
 export interface SeatPaywallProps {
   /** Human product name shown in the headline, e.g. "Creative". */
   product: string
-  /** Fired when the user clicks the unlock CTA — route them to checkout. */
-  onCheckout: () => void
+  /** Fired when the user clicks the unlock CTA — route them to checkout. When
+   *  it returns a promise the button shows a pending state and ignores repeat
+   *  clicks until it settles (no double-charge on a slow checkout open). */
+  onCheckout: () => void | Promise<void>
   /** Monthly seat price in whole dollars. Default 100. */
   priceUsd?: number
   /** Included monthly AI usage in whole dollars. Default 50. */
@@ -71,6 +75,7 @@ export function SeatPaywall({
   tagline,
   ctaLabel,
 }: SeatPaywallProps): ReactNode {
+  const { pending, run } = usePending()
   return (
     <div className="flex min-h-[60vh] w-full items-center justify-center p-6">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-sm">
@@ -100,10 +105,11 @@ export function SeatPaywall({
 
         <button
           type="button"
-          onClick={onCheckout}
-          className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
+          disabled={pending}
+          onClick={() => run(onCheckout)}
+          className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {ctaLabel ?? `Unlock ${product}`}
+          {pending ? 'Opening checkout…' : ctaLabel ?? `Unlock ${product}`}
         </button>
         <p className="mt-3 text-center text-xs text-muted-foreground/70">
           Cancel anytime.

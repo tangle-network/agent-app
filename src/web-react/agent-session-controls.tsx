@@ -23,14 +23,14 @@
  * sandbox-ui dependency.
  */
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import {
   snapHarnessToModel,
   snapModelToHarness,
   type Harness,
 } from '../harness'
 import type { CatalogModel } from '../runtime/model-catalog'
-import { ModelPicker, EffortPicker } from './index'
+import { ModelPicker, EffortPicker, usePopover } from './index'
 
 /** Plain-English labels for the harnesses a product is likely to expose. Unknown
  *  ids fall back to the raw value so a new backend still renders a usable label. */
@@ -71,19 +71,9 @@ function GearGlyph({ className }: { className?: string }) {
   )
 }
 
-/** Close an absolutely-positioned popover on outside mousedown. */
-function useClickOutside<T extends HTMLElement>(active: boolean, onOutside: () => void) {
-  const ref = useRef<T>(null)
-  useEffect(() => {
-    if (!active) return
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onOutside()
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [active, onOutside])
-  return ref
-}
+/** Tailwind utilities for keyboard-visible focus on popover options + triggers. */
+const FOCUS_RING =
+  'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background'
 
 /** Pill-styled harness picker — inline, no sandbox-ui dependency. */
 function HarnessPicker({
@@ -96,30 +86,33 @@ function HarnessPicker({
   available?: ReadonlyArray<Harness>
 }) {
   const [open, setOpen] = useState(false)
-  const containerRef = useClickOutside<HTMLDivElement>(open, () => setOpen(false))
+  const { containerRef, triggerProps } = usePopover(open, setOpen)
   const options = available ?? (Object.keys(HARNESS_LABELS) as Harness[])
   return (
     <div ref={containerRef} className="relative inline-flex">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        {...triggerProps}
+        onClick={() => setOpen(!open)}
         title="Agent backend"
-        className="inline-flex w-full items-center justify-between gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30"
+        className={`inline-flex w-full items-center justify-between gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30 ${FOCUS_RING}`}
       >
         <span className="truncate">{harnessLabel(value)}</span>
         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
       </button>
       {open && (
-        <div className="absolute bottom-full left-0 z-50 mb-2 max-h-64 w-full min-w-[220px] overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-lg">
+        <div role="menu" className="absolute bottom-full left-0 z-50 mb-2 max-h-64 w-full min-w-[220px] overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-lg">
           {options.map((h) => (
             <button
               key={h}
               type="button"
+              role="menuitemradio"
+              aria-checked={h === value}
               onClick={() => {
                 onChange(h)
                 setOpen(false)
               }}
-              className={`flex w-full items-center rounded-md px-3 py-2 text-left text-sm transition ${
+              className={`flex w-full items-center rounded-md px-3 py-2 text-left text-sm transition ${FOCUS_RING} ${
                 h === value ? 'bg-primary/10 font-medium' : 'hover:bg-accent/30'
               }`}
             >
@@ -198,7 +191,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
   } = props
   const { onModel, onHarness } = useCoherentHandlers(props)
   const [open, setOpen] = useState(false)
-  const popoverRef = useClickOutside<HTMLDivElement>(open, () => setOpen(false))
+  const { containerRef: popoverRef, triggerProps } = usePopover(open, setOpen)
 
   const selectedModel = models.find((m) => m.id === model)
   const showEffort = selectedModel?.supportsReasoning ?? true
@@ -234,9 +227,10 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
         <div ref={popoverRef} className="relative inline-flex">
           <button
             type="button"
-            onClick={() => setOpen((v) => !v)}
+            {...triggerProps}
+            onClick={() => setOpen(!open)}
             title="Model settings — pick the agent backend and how hard it thinks"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-[state=open]:bg-muted"
+            className={`flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-[state=open]:bg-muted ${FOCUS_RING}`}
             data-state={open ? 'open' : 'closed'}
           >
             <GearGlyph className="h-4 w-4" />

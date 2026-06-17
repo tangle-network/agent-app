@@ -39,6 +39,10 @@ export default defineConfig({
     'design-canvas/index': 'src/design-canvas/index.ts',
     'design-canvas/drizzle': 'src/design-canvas/drizzle.ts',
     'design-canvas-react/index': 'src/design-canvas-react/index.ts',
+    'design-canvas-react/engine': 'src/design-canvas-react/engine.ts',
+    'design-canvas-react/lazy': 'src/design-canvas-react/lazy.tsx',
+    'theme/index': 'src/theme/index.ts',
+    'theme/tailwind-preset': 'src/theme/tailwind-preset.ts',
   },
   format: ['esm'],
   dts: true,
@@ -46,4 +50,7 @@ export default defineConfig({
   clean: true,
   target: 'es2022',
   external: ['react', 'react/jsx-runtime', 'konva', 'react-konva', '@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog', '@tangle-network/agent-eval', '@tangle-network/agent-knowledge', '@tangle-network/agent-runtime', '@tangle-network/sandbox', 'drizzle-orm', 'drizzle-orm/*', '@huggingface/transformers'],
+  // tokens.css is shipped raw (the ./styles subpath); copy it next to the
+  // built theme entries so `import '@tangle-network/agent-app/styles'` resolves.
+  onSuccess: 'cp src/theme/tokens.css dist/theme/tokens.css',
 })
