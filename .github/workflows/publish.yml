@@ -23,6 +23,10 @@ jobs:
         run: pnpm run typecheck
       - name: Test
         run: pnpm run test
+        env:
+          # Belt-and-suspenders: vitest forks inherit NODE_OPTIONS, so even the
+          # parent and any worker that ignores execArgv gets the raised heap.
+          NODE_OPTIONS: --max-old-space-size=4096
       - name: Build
         run: pnpm run build
       - name: Verify tag/version lock
