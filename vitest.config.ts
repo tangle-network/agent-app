@@ -9,5 +9,12 @@ export default defineConfig({
     // scaffolder itself is exercised by `tests/create-agent-app.test.ts`.
     include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/dist/**', 'create-agent-app/template/**'],
+    // The suite grew large enough that a fork worker hit the default ~2GB heap
+    // and crashed (ERR_WORKER_OUT_OF_MEMORY) in the publish verify job. Give
+    // each worker headroom; the runner has ample RAM.
+    pool: 'forks',
+    poolOptions: {
+      forks: { execArgv: ['--max-old-space-size=4096'] },
+    },
   },
 })
