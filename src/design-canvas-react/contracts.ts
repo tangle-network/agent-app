@@ -13,6 +13,7 @@
 
 import type { Bounds, SceneDocument, SceneElement } from '../design-canvas/model'
 import type { SceneOperation } from '../design-canvas/operations'
+import type { CanvasRenderPalette } from '../theme/theme'
 
 // ---------------------------------------------------------------------------
 // Engine: state + command stack
@@ -196,6 +197,13 @@ export interface DesignCanvasProps {
    */
   exportDefaults?: ExportTriggerOptions
   className?: string
+  /** Konva render palette — the full hex colors the bitmap canvas paints with
+   *  (grid, snap guides, selection handles, placeholders). Konva cannot resolve
+   *  `var(--…)`, so the host supplies the active theme's `canvasRender` here
+   *  (e.g. `darkTheme.canvasRender` under a dark surface). Omitted →
+   *  `lightTheme.canvasRender`, which keeps light-mode rendering byte-identical
+   *  to the historical hardcoded values. */
+  render?: CanvasRenderPalette
   /** Fit the active page to the viewport once, on the first non-zero measurement. Default true. Set false to keep zoom:1/pan:0 (e.g. when restoring a saved viewport). */
   fitOnMount?: boolean
   /** Called once after the first real (non-zero) measurement, after the initial fit is applied (or skipped when fitOnMount is false). */

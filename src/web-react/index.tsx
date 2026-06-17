@@ -556,6 +556,9 @@ export interface ChatMessagesProps {
   /** Retry control shown on the error row; omit to render the error without a
    *  retry button (e.g. when the product retries automatically). */
   onRetry?: () => void
+  /** Zero-state renderer, shown when there are no messages and the turn is
+   *  neither loading nor errored. Omit to render nothing (current behavior). */
+  renderEmpty?: () => ReactNode
 }
 
 export interface ProposalApprovalHandlers {
@@ -959,9 +962,11 @@ export function ChatMessages({
   toolRenderers,
   error,
   onRetry,
+  renderEmpty,
 }: ChatMessagesProps) {
   const renderBody = renderMarkdown ?? ((content: string) => <p className="whitespace-pre-wrap">{content}</p>)
   const lastIsUser = messages[messages.length - 1]?.role === 'user'
+  if (messages.length === 0 && !loading && !error && renderEmpty) return <>{renderEmpty()}</>
   return (
     <>
       {messages.map((msg) =>

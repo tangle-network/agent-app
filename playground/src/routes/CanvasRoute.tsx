@@ -1,8 +1,29 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { DesignCanvasEditor } from '@tangle-network/agent-app/design-canvas-react'
 import { applySceneOperations } from '@tangle-network/agent-app/design-canvas'
 import type { SceneOperation } from '@tangle-network/agent-app/design-canvas'
+import { lightTheme, darkTheme } from '@tangle-network/agent-app/theme'
 import { makeSceneDocument } from '../fixtures'
+
+/** Read the live theme from the document element so the Konva canvas (which
+ *  cannot resolve CSS vars) paints with the active palette. Tracks toggles via
+ *  a MutationObserver on the `data-theme` attribute and `class` list. */
+function useIsDark(): boolean {
+  const read = () => {
+    if (typeof document === 'undefined') return false
+    const root = document.documentElement
+    return root.getAttribute('data-theme') === 'dark' || root.classList.contains('dark')
+  }
+  const [isDark, setIsDark] = useState(read)
+  useEffect(() => {
+    const root = document.documentElement
+    const obs = new MutationObserver(() => setIsDark(read()))
+    obs.observe(root, { attributes: true, attributeFilter: ['data-theme', 'class'] })
+    setIsDark(read())
+    return () => obs.disconnect()
+  }, [])
+  return isDark
+}
 
 /**
  * Mounts the full design-canvas editor (toolbar, rulers, layers panel, pages
@@ -17,6 +38,7 @@ import { makeSceneDocument } from '../fixtures'
 export function CanvasRoute() {
   const [doc, setDoc] = useState(() => makeSceneDocument())
   const [rev, setRev] = useState(1)
+  const isDark = useIsDark()
 
   const onApplyOperations = useCallback(
     async (operations: SceneOperation[]) => {
@@ -33,7 +55,13 @@ export function CanvasRoute() {
 
   return (
     <div className="h-full w-full">
-      <DesignCanvasEditor document={doc} rev={rev} canWrite onApplyOperations={onApplyOperations} />
+      <DesignCanvasEditor
+        document={doc}
+        rev={rev}
+        canWrite
+        onApplyOperations={onApplyOperations}
+        render={isDark ? darkTheme.canvasRender : lightTheme.canvasRender}
+      />
     </div>
   )
 }

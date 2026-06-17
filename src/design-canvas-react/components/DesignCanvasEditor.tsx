@@ -218,6 +218,7 @@ export function DesignCanvasEditor(props: DesignCanvasProps) {
             onExportRef={ctx.onExportRef}
             fitOnMount={ctx.fitOnMount}
             onReady={ctx.onReady}
+            render={ctx.render}
           />
         )
       }}

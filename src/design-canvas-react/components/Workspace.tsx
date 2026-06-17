@@ -80,6 +80,7 @@ import { normalizeMarquee, nudgeDelta as nudgeDeltaMath } from './transform-math
 import { elementAabb, findElement } from '../../design-canvas/model'
 import type { SceneElement, ScenePage, TextElement } from '../../design-canvas/model'
 import type { SnapResult, SnapTarget, SceneCommand } from '../contracts'
+import { lightTheme, type CanvasRenderPalette } from '../../theme/theme'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -137,6 +138,8 @@ export interface WorkspaceViewProps {
   fitOnMount?: boolean
   /** Called once after the first real (non-zero) measurement, after the initial fit is applied (or skipped). */
   onReady?(): void
+  /** Konva render palette. Omitted → light defaults (byte-identical history). */
+  render?: CanvasRenderPalette
 }
 
 // ---------------------------------------------------------------------------
@@ -155,6 +158,7 @@ export function WorkspaceView({
   onExportRef,
   fitOnMount = true,
   onReady,
+  render = lightTheme.canvasRender,
 }: WorkspaceViewProps) {
   // Re-render when command stack changes state.
   const [, setTick] = useState(0)
@@ -784,6 +788,7 @@ export function WorkspaceView({
             zoom={zoom}
             panX={panX}
             panY={panY}
+            color={render.grid}
           />
         )}
 
@@ -814,6 +819,7 @@ export function WorkspaceView({
                   element={element}
                   isSelected={selectedElementIds.includes(element.id)}
                   zoom={zoom}
+                  render={render}
                   onClick={handleElementClick}
                   onDragStart={handleElementDragStart}
                   onDragMove={handleElementDragMove}
@@ -835,6 +841,7 @@ export function WorkspaceView({
                 activeVertical={activeVerticalGuide}
                 activeHorizontal={activeHorizontalGuide}
                 zoom={zoom}
+                render={render}
               />
             </Group>
           </Layer>
@@ -848,6 +855,7 @@ export function WorkspaceView({
           canWrite={canWrite}
           onTransformEnd={handleTransformEnd}
           pageId={activePageId}
+          render={render}
         />
       </Stage>
 
@@ -950,6 +958,7 @@ export function Workspace(props: DesignCanvasProps) {
       onApplyOperations={props.onApplyOperations}
       onSelectionChange={props.onSelectionChange}
       className={props.className}
+      render={props.render}
     />
   )
 }
