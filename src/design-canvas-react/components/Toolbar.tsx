@@ -4,9 +4,15 @@
  * Every number input commits on blur or Enter as a single command (not
  * per-keystroke). The toolbar is stateless beyond transient input focus;
  * the caller owns the command stack.
+ *
+ * Layout: the root never scrolls horizontally. Global controls (undo/redo +
+ * view toggles) are pinned left; the selection/page attribute group wraps so
+ * the whole bar fits the editor's center column (viewport minus the w-64 side
+ * panel and w-80 agent panel) at 1024–1280px with nothing clipped.
  */
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { SceneElement, ScenePage, TextElement, RectElement, EllipseElement, ImageElement } from '../../design-canvas/model'
 import type { SceneAttrsPatch } from '../../design-canvas/operations'
 import type { PageBleed } from '../../design-canvas/model'
@@ -18,8 +24,6 @@ import {
   BleedGlyph,
   BoldGlyph,
   BringFrontGlyph,
-  DuplicateGlyph,
-  FitGlyph,
   GridGlyph,
   GroupGlyph,
   ItalicGlyph,
@@ -67,6 +71,28 @@ export interface ToolbarProps {
 }
 
 // ---------------------------------------------------------------------------
+// Font families offered by the font picker. The model's fontFamily is a free
+// string (agents/templates may set anything); the picker selects from this
+// curated list but always surfaces the element's current family even when it
+// is not a member, so a programmatically-set font is never silently dropped.
+// ---------------------------------------------------------------------------
+
+const FONT_FAMILIES = [
+  'Inter',
+  'Arial',
+  'Helvetica',
+  'Verdana',
+  'Tahoma',
+  'Trebuchet MS',
+  'Times New Roman',
+  'Georgia',
+  'Garamond',
+  'Courier New',
+  'Brush Script MT',
+  'Impact',
+] as const
+
+// ---------------------------------------------------------------------------
 // Small helpers
 // ---------------------------------------------------------------------------
 
@@ -75,7 +101,55 @@ const BTN =
 
 const BTN_ACTIVE = `${BTN} border-[var(--brand-primary)] text-[var(--brand-primary)] hover:text-[var(--brand-primary)]`
 
-const SEP = <div className="mx-1 h-5 w-px bg-[var(--border-default)]" />
+const SEP = <div className="mx-1 h-5 w-px shrink-0 bg-[var(--border-default)]" />
+
+const POPOVER_PANEL =
+  'absolute top-full left-0 z-50 mt-1 flex flex-col rounded border border-[var(--border-default)] bg-[var(--bg-input)] shadow-lg'
+
+/**
+ * Click-outside / Escape-to-close popover anchored under its trigger. The
+ * trigger renders inside the relative wrapper so the panel positions against
+ * it. `open`/`onClose` are owned by the caller so the trigger can stay a
+ * stateful glyph button when needed.
+ */
+function Popover({
+  open,
+  onClose,
+  trigger,
+  children,
+}: {
+  open: boolean
+  onClose(): void
+  trigger: ReactNode
+  children: ReactNode
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onDocPointer(event: PointerEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) onClose()
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('pointerdown', onDocPointer)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onDocPointer)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open, onClose])
+
+  return (
+    <div ref={ref} className="relative">
+      {trigger}
+      {open ? children : null}
+    </div>
+  )
+}
+
+const FIELD_LABEL = 'text-[9px] uppercase tracking-wide text-[var(--text-muted)]'
 
 function NumberInput({
   label,
@@ -102,7 +176,7 @@ function NumberInput({
 
   return (
     <label className="flex flex-col items-center gap-0.5">
-      <span className="text-[9px] uppercase tracking-wide text-[var(--text-muted)]">{label}</span>
+      <span className={FIELD_LABEL}>{label}</span>
       <input
         type="number"
         value={raw ?? value}
@@ -120,17 +194,204 @@ function NumberInput({
   )
 }
 
-function ColorSwatch({ label, value, onCommit }: { label: string; value: string; onCommit(v: string): void }) {
+/**
+ * Compact dropdown built on the popover pattern (replaces native <select>,
+ * which the design system bans). Same value/onChange contract: `value` is the
+ * current option id, `onChange` fires with the chosen id.
+ */
+function SelectControl<T extends string>({
+  label,
+  value,
+  options,
+  disabled,
+  onChange,
+  buttonClassName = 'w-24',
+}: {
+  label: string
+  value: T
+  options: ReadonlyArray<{ value: T; label: string }>
+  disabled?: boolean
+  onChange(value: T): void
+  buttonClassName?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const current = options.find((o) => o.value === value)
+
   return (
-    <label className="flex flex-col items-center gap-0.5 cursor-pointer">
-      <span className="text-[9px] uppercase tracking-wide text-[var(--text-muted)]">{label}</span>
-      <input
-        type="color"
-        value={value.startsWith('#') ? value : '#ffffff'}
-        onChange={(event) => onCommit(event.target.value)}
-        className="h-6 w-10 cursor-pointer rounded border border-[var(--border-default)] p-0.5"
-      />
+    <label className="flex flex-col items-center gap-0.5">
+      <span className={FIELD_LABEL}>{label}</span>
+      <Popover
+        open={open}
+        onClose={() => setOpen(false)}
+        trigger={
+          <button
+            type="button"
+            disabled={disabled}
+            aria-haspopup="listbox"
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+            className={`${buttonClassName} flex items-center justify-between gap-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-left text-[12px] text-[var(--text-primary)] outline-none hover:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40`}
+          >
+            <span className="truncate">{current?.label ?? value}</span>
+            <span className="text-[8px] text-[var(--text-muted)]">▾</span>
+          </button>
+        }
+      >
+        <div role="listbox" className={`${POPOVER_PANEL} max-h-64 w-44 overflow-y-auto py-1`}>
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              role="option"
+              aria-selected={opt.value === value}
+              onClick={() => {
+                onChange(opt.value)
+                setOpen(false)
+              }}
+              className={`px-3 py-1 text-left text-[12px] hover:bg-[var(--brand-primary)]/10 ${
+                opt.value === value ? 'text-[var(--brand-primary)]' : 'text-[var(--text-primary)]'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </Popover>
     </label>
+  )
+}
+
+/**
+ * Searchable font dropdown. Each option previews in its own family. The
+ * element's current family is always present in the list (prepended when it
+ * is not one of the curated families) so a typed/agent-set font is never lost.
+ */
+function FontPicker({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: string
+  disabled?: boolean
+  onChange(value: string): void
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+
+  const families: string[] = FONT_FAMILIES.includes(value as (typeof FONT_FAMILIES)[number])
+    ? [...FONT_FAMILIES]
+    : [value, ...FONT_FAMILIES]
+  const filtered = families.filter((f) => f.toLowerCase().includes(query.trim().toLowerCase()))
+
+  return (
+    <label className="flex flex-col items-center gap-0.5">
+      <span className={FIELD_LABEL}>Font</span>
+      <Popover
+        open={open}
+        onClose={() => {
+          setOpen(false)
+          setQuery('')
+        }}
+        trigger={
+          <button
+            type="button"
+            disabled={disabled}
+            aria-haspopup="listbox"
+            aria-expanded={open}
+            aria-label="Font family"
+            onClick={() => setOpen((v) => !v)}
+            className="flex w-28 items-center justify-between gap-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-left text-[12px] text-[var(--text-primary)] outline-none hover:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40"
+            style={{ fontFamily: value }}
+          >
+            <span className="truncate">{value}</span>
+            <span className="text-[8px] text-[var(--text-muted)]">▾</span>
+          </button>
+        }
+      >
+        <div className={`${POPOVER_PANEL} w-52`}>
+          <input
+            autoFocus
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search fonts"
+            aria-label="Search fonts"
+            className="m-1 rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
+          />
+          <div role="listbox" className="max-h-60 overflow-y-auto py-1">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-2 text-[11px] text-[var(--text-muted)]">No matches</div>
+            ) : (
+              filtered.map((family) => (
+                <button
+                  key={family}
+                  type="button"
+                  role="option"
+                  aria-selected={family === value}
+                  onClick={() => {
+                    onChange(family)
+                    setOpen(false)
+                    setQuery('')
+                  }}
+                  style={{ fontFamily: family }}
+                  className={`block w-full px-3 py-1 text-left text-[13px] hover:bg-[var(--brand-primary)]/10 ${
+                    family === value ? 'text-[var(--brand-primary)]' : 'text-[var(--text-primary)]'
+                  }`}
+                >
+                  {family}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      </Popover>
+    </label>
+  )
+}
+
+/**
+ * Color control: a swatch button (showing the current color) that opens a
+ * popover with a native color picker + hex field. Replaces the bare
+ * <input type="color"> chrome while keeping the string value/onChange contract.
+ */
+function ColorSwatch({ label, value, onCommit, disabled }: { label: string; value: string; onCommit(v: string): void; disabled?: boolean }) {
+  const [open, setOpen] = useState(false)
+  const normalized = value.startsWith('#') ? value : '#ffffff'
+
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      <span className={FIELD_LABEL}>{label}</span>
+      <Popover
+        open={open}
+        onClose={() => setOpen(false)}
+        trigger={
+          <button
+            type="button"
+            disabled={disabled}
+            aria-label={`${label} color`}
+            onClick={() => setOpen((v) => !v)}
+            className="h-6 w-10 rounded border border-[var(--border-default)] disabled:cursor-default disabled:opacity-40"
+            style={{ backgroundColor: normalized }}
+          />
+        }
+      >
+        <div className={`${POPOVER_PANEL} w-40 gap-2 p-2`}>
+          <input
+            type="color"
+            aria-label={`${label} color picker`}
+            value={normalized}
+            onChange={(event) => onCommit(event.target.value)}
+            className="h-8 w-full cursor-pointer rounded border border-[var(--border-default)] p-0.5"
+          />
+          <input
+            type="text"
+            aria-label={`${label} hex value`}
+            value={value}
+            onChange={(event) => onCommit(event.target.value)}
+            className="rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
+          />
+        </div>
+      </Popover>
+    </div>
   )
 }
 
@@ -189,58 +450,65 @@ export function Toolbar({
   // ----
 
   return (
-    <div className="flex h-11 shrink-0 items-center gap-2 overflow-x-auto border-b border-[var(--border-default)] bg-[var(--bg-input)] px-3">
-      {/* Undo / Redo */}
-      <button type="button" aria-label="Undo" disabled={!canUndo || !canWrite} onClick={onUndo} className={BTN}>
-        <UndoGlyph className="h-3.5 w-3.5" />
-      </button>
-      <button type="button" aria-label="Redo" disabled={!canRedo || !canWrite} onClick={onRedo} className={BTN}>
-        <RedoGlyph className="h-3.5 w-3.5" />
-      </button>
+    <div className="flex min-h-11 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-[var(--border-default)] bg-[var(--bg-input)] px-3 py-1">
+      {/* Global controls: pinned first, never wrap away from the left edge. */}
+      <div className="flex shrink-0 items-center gap-2">
+        {/* Undo / Redo */}
+        <button type="button" aria-label="Undo" disabled={!canUndo || !canWrite} onClick={onUndo} className={BTN}>
+          <UndoGlyph className="h-3.5 w-3.5" />
+        </button>
+        <button type="button" aria-label="Redo" disabled={!canRedo || !canWrite} onClick={onRedo} className={BTN}>
+          <RedoGlyph className="h-3.5 w-3.5" />
+        </button>
+
+        {SEP}
+
+        {/* View toggles */}
+        <button type="button" aria-label="Toggle rulers" aria-pressed={showRulers} onClick={onToggleRulers} className={showRulers ? BTN_ACTIVE : BTN}>
+          <RulerGlyph className="h-3.5 w-3.5" />
+        </button>
+        <button type="button" aria-label="Toggle grid" aria-pressed={gridEnabled} onClick={onToggleGrid} className={gridEnabled ? BTN_ACTIVE : BTN}>
+          <GridGlyph className="h-3.5 w-3.5" />
+        </button>
+        <button type="button" aria-label="Toggle snap" aria-pressed={snapEnabled} onClick={onToggleSnap} className={snapEnabled ? BTN_ACTIVE : BTN}>
+          <MagnetGlyph className="h-3.5 w-3.5" />
+        </button>
+        <button type="button" aria-label="Toggle bleed overlay" aria-pressed={showBleed} onClick={onToggleBleed} className={showBleed ? BTN_ACTIVE : BTN} disabled={!page.bleed}>
+          <BleedGlyph className="h-3.5 w-3.5" />
+        </button>
+      </div>
 
       {SEP}
 
-      {/* View toggles */}
-      <button type="button" aria-label="Toggle rulers" aria-pressed={showRulers} onClick={onToggleRulers} className={showRulers ? BTN_ACTIVE : BTN}>
-        <RulerGlyph className="h-3.5 w-3.5" />
-      </button>
-      <button type="button" aria-label="Toggle grid" aria-pressed={gridEnabled} onClick={onToggleGrid} className={gridEnabled ? BTN_ACTIVE : BTN}>
-        <GridGlyph className="h-3.5 w-3.5" />
-      </button>
-      <button type="button" aria-label="Toggle snap" aria-pressed={snapEnabled} onClick={onToggleSnap} className={snapEnabled ? BTN_ACTIVE : BTN}>
-        <MagnetGlyph className="h-3.5 w-3.5" />
-      </button>
-      <button type="button" aria-label="Toggle bleed overlay" aria-pressed={showBleed} onClick={onToggleBleed} className={showBleed ? BTN_ACTIVE : BTN} disabled={!page.bleed}>
-        <BleedGlyph className="h-3.5 w-3.5" />
-      </button>
-
-      {SEP}
-
-      {hasSelection ? (
-        <SelectionControls
-          elements={selectedElements}
-          single={single}
-          isGroup={isGroup}
-          groupable={groupable}
-          allSameKind={allSameKind}
-          firstKind={firstKind}
-          canWrite={canWrite}
-          patchAll={patchAll}
-          reorderSingle={reorderSingle}
-          onGroup={() => onGroup(selectedIds)}
-          onUngroup={() => { if (single) onUngroup(single.id) }}
-          onDelete={() => onDelete(selectedIds)}
-          onBindSlot={single ? (slot) => onBindSlot(single.id, slot) : undefined}
-          currentSlot={single?.slot ?? null}
-        />
-      ) : (
-        <PagePropsControls
-          page={page}
-          canWrite={canWrite}
-          onSetPageProps={onSetPageProps}
-          onSetPageGuides={onSetPageGuides}
-        />
-      )}
+      {/* Selection / page attributes: this group wraps to the next line when
+          the column is narrow so nothing is ever clipped or scrolled away. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        {hasSelection ? (
+          <SelectionControls
+            elements={selectedElements}
+            single={single}
+            isGroup={isGroup}
+            groupable={groupable}
+            allSameKind={allSameKind}
+            firstKind={firstKind}
+            canWrite={canWrite}
+            patchAll={patchAll}
+            reorderSingle={reorderSingle}
+            onGroup={() => onGroup(selectedIds)}
+            onUngroup={() => { if (single) onUngroup(single.id) }}
+            onDelete={() => onDelete(selectedIds)}
+            onBindSlot={single ? (slot) => onBindSlot(single.id, slot) : undefined}
+            currentSlot={single?.slot ?? null}
+          />
+        ) : (
+          <PagePropsControls
+            page={page}
+            canWrite={canWrite}
+            onSetPageProps={onSetPageProps}
+            onSetPageGuides={onSetPageGuides}
+          />
+        )}
+      </div>
     </div>
   )
 }
@@ -364,44 +632,47 @@ function SelectionControls({
 
       {/* Slot binding (single element only) */}
       {single && onBindSlot ? (
-        <div className="relative">
-          <button
-            type="button"
-            aria-label={currentSlot ? `Slot: ${currentSlot}` : 'Bind slot'}
-            onClick={() => { setSlotInput(currentSlot ?? ''); setSlotPopoverOpen((v) => !v) }}
-            className={currentSlot ? BTN_ACTIVE : BTN}
-            title={currentSlot ? `Slot: ${currentSlot}` : 'Bind slot'}
-          >
-            <SlotGlyph className="h-3.5 w-3.5" />
-          </button>
-          {slotPopoverOpen ? (
-            <div className="absolute top-full left-0 z-50 mt-1 flex w-48 flex-col gap-2 rounded border border-[var(--border-default)] bg-[var(--bg-input)] p-2 shadow-lg">
-              <input
-                autoFocus
-                value={slotInput}
-                onChange={(event) => setSlotInput(event.target.value)}
-                placeholder="slot-name"
-                className="rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
-              />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => { onBindSlot(slotInput.trim() || null); setSlotPopoverOpen(false) }}
-                  className="flex-1 rounded border border-[var(--brand-primary)] px-2 py-0.5 text-[11px] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/10"
-                >
-                  {slotInput.trim() ? 'Bind' : 'Unbind'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSlotPopoverOpen(false)}
-                  className="rounded border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]"
-                >
-                  Cancel
-                </button>
-              </div>
+        <Popover
+          open={slotPopoverOpen}
+          onClose={() => setSlotPopoverOpen(false)}
+          trigger={
+            <button
+              type="button"
+              aria-label={currentSlot ? `Slot: ${currentSlot}` : 'Bind slot'}
+              onClick={() => { setSlotInput(currentSlot ?? ''); setSlotPopoverOpen((v) => !v) }}
+              className={currentSlot ? BTN_ACTIVE : BTN}
+              title={currentSlot ? `Slot: ${currentSlot}` : 'Bind slot'}
+            >
+              <SlotGlyph className="h-3.5 w-3.5" />
+            </button>
+          }
+        >
+          <div className={`${POPOVER_PANEL} w-48 gap-2 p-2`}>
+            <input
+              autoFocus
+              value={slotInput}
+              onChange={(event) => setSlotInput(event.target.value)}
+              placeholder="slot-name"
+              className="rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => { onBindSlot(slotInput.trim() || null); setSlotPopoverOpen(false) }}
+                className="flex-1 rounded border border-[var(--brand-primary)] px-2 py-0.5 text-[11px] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/10"
+              >
+                {slotInput.trim() ? 'Bind' : 'Unbind'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSlotPopoverOpen(false)}
+                className="rounded border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]"
+              >
+                Cancel
+              </button>
             </div>
-          ) : null}
-        </div>
+          </div>
+        </Popover>
       ) : null}
 
       {SEP}
@@ -421,15 +692,7 @@ function SelectionControls({
 function TextControls({ element, canWrite, onPatch }: { element: TextElement; canWrite: boolean; onPatch(attrs: SceneAttrsPatch): void }) {
   return (
     <>
-      <input
-        type="text"
-        aria-label="Font family"
-        value={element.fontFamily}
-        disabled={!canWrite}
-        onChange={(event) => onPatch({ fontFamily: event.target.value })}
-        className="w-28 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
-        placeholder="Font"
-      />
+      <FontPicker value={element.fontFamily} disabled={!canWrite} onChange={(fontFamily) => onPatch({ fontFamily })} />
       <NumberInput label="Size" value={element.fontSize} min={1} onCommit={(v) => onPatch({ fontSize: v })} className="w-12" />
       <button
         type="button"
@@ -463,7 +726,7 @@ function TextControls({ element, canWrite, onPatch }: { element: TextElement; ca
       ))}
       <NumberInput label="Line H" value={element.lineHeight} step={0.1} min={0.5} onCommit={(v) => onPatch({ lineHeight: v })} className="w-12" />
       <NumberInput label="Spacing" value={element.letterSpacing} step={0.5} onCommit={(v) => onPatch({ letterSpacing: v })} className="w-14" />
-      <ColorSwatch label="Fill" value={element.fill} onCommit={(v) => onPatch({ fill: v })} />
+      <ColorSwatch label="Fill" value={element.fill} onCommit={(v) => onPatch({ fill: v })} disabled={!canWrite} />
     </>
   )
 }
@@ -471,8 +734,8 @@ function TextControls({ element, canWrite, onPatch }: { element: TextElement; ca
 function ShapeControls({ element, canWrite, onPatch, showCornerRadius }: { element: RectElement | EllipseElement; canWrite: boolean; onPatch(attrs: SceneAttrsPatch): void; showCornerRadius: boolean }) {
   return (
     <>
-      <ColorSwatch label="Fill" value={element.fill} onCommit={(v) => onPatch({ fill: v })} />
-      <ColorSwatch label="Stroke" value={element.stroke ?? '#000000'} onCommit={(v) => onPatch({ stroke: v })} />
+      <ColorSwatch label="Fill" value={element.fill} onCommit={(v) => onPatch({ fill: v })} disabled={!canWrite} />
+      <ColorSwatch label="Stroke" value={element.stroke ?? '#000000'} onCommit={(v) => onPatch({ stroke: v })} disabled={!canWrite} />
       <NumberInput label="Stroke W" value={element.strokeWidth ?? 0} min={0} onCommit={(v) => onPatch({ strokeWidth: v })} className="w-14" />
       {showCornerRadius && 'cornerRadius' in element ? (
         <NumberInput label="Corner R" value={(element as RectElement).cornerRadius ?? 0} min={0} onCommit={(v) => onPatch({ cornerRadius: v })} className="w-14" />
@@ -483,19 +746,18 @@ function ShapeControls({ element, canWrite, onPatch, showCornerRadius }: { eleme
 
 function ImageControls({ element, canWrite, onPatch }: { element: ImageElement; canWrite: boolean; onPatch(attrs: SceneAttrsPatch): void }) {
   return (
-    <label className="flex flex-col items-center gap-0.5">
-      <span className="text-[9px] uppercase tracking-wide text-[var(--text-muted)]">Fit</span>
-      <select
-        value={element.fit}
-        disabled={!canWrite}
-        onChange={(event) => onPatch({ fit: event.target.value as ImageElement['fit'] })}
-        className="rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
-      >
-        <option value="fill">Fill</option>
-        <option value="cover">Cover</option>
-        <option value="contain">Contain</option>
-      </select>
-    </label>
+    <SelectControl
+      label="Fit"
+      value={element.fit}
+      disabled={!canWrite}
+      onChange={(fit) => onPatch({ fit })}
+      buttonClassName="w-24"
+      options={[
+        { value: 'fill', label: 'Fill' },
+        { value: 'cover', label: 'Cover' },
+        { value: 'contain', label: 'Contain' },
+      ]}
+    />
   )
 }
 
@@ -522,6 +784,11 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides }: 
     else setCustomH(null)
   }
 
+  const presetOptions = [
+    { value: 'custom', label: 'Custom' },
+    ...SIZE_PRESETS.map((p) => ({ value: p.id, label: p.label })),
+  ]
+
   return (
     <>
       {/* Page name */}
@@ -537,27 +804,20 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides }: 
       {SEP}
 
       {/* Size preset */}
-      <label className="flex flex-col items-center gap-0.5">
-        <span className="text-[9px] uppercase tracking-wide text-[var(--text-muted)]">Preset</span>
-        <select
-          value={matchedPreset?.id ?? 'custom'}
-          disabled={!canWrite}
-          onChange={(event) => {
-            const preset = SIZE_PRESETS.find((p) => p.id === event.target.value)
-            if (preset) onSetPageProps({ width: preset.width, height: preset.height })
-          }}
-          className="rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
-        >
-          <option value="custom">Custom</option>
-          {SIZE_PRESETS.map((p) => (
-            <option key={p.id} value={p.id}>{p.label}</option>
-          ))}
-        </select>
-      </label>
+      <SelectControl
+        label="Preset"
+        value={matchedPreset?.id ?? 'custom'}
+        disabled={!canWrite}
+        onChange={(id) => {
+          const preset = SIZE_PRESETS.find((p) => p.id === id)
+          if (preset) onSetPageProps({ width: preset.width, height: preset.height })
+        }}
+        options={presetOptions}
+      />
 
       {/* Custom W × H */}
       <label className="flex flex-col items-center gap-0.5">
-        <span className="text-[9px] uppercase tracking-wide text-[var(--text-muted)]">W</span>
+        <span className={FIELD_LABEL}>W</span>
         <input
           type="number"
           value={customW ?? page.width}
@@ -574,7 +834,7 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides }: 
       </label>
       <span className="text-[var(--text-muted)]">×</span>
       <label className="flex flex-col items-center gap-0.5">
-        <span className="text-[9px] uppercase tracking-wide text-[var(--text-muted)]">H</span>
+        <span className={FIELD_LABEL}>H</span>
         <input
           type="number"
           value={customH ?? page.height}
@@ -592,7 +852,7 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides }: 
 
       {SEP}
 
-      <ColorSwatch label="BG" value={page.background} onCommit={(v) => onSetPageProps({ background: v })} />
+      <ColorSwatch label="BG" value={page.background} onCommit={(v) => onSetPageProps({ background: v })} disabled={!canWrite} />
 
       {SEP}
 
