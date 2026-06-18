@@ -51,6 +51,8 @@ export default defineConfig({
     'intakes/api': 'src/intakes/api.ts',
     'intakes-react/index': 'src/intakes-react/index.ts',
     'intakes-react/lazy': 'src/intakes-react/lazy.tsx',
+    'vault/index': 'src/vault/index.ts',
+    'vault/lazy': 'src/vault/lazy.tsx',
     'theme/index': 'src/theme/index.ts',
     'theme/tailwind-preset': 'src/theme/tailwind-preset.ts',
   },
