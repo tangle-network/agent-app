@@ -4,8 +4,12 @@
  * (panX, panY, zoom) transform the content layer uses, or the grid drifts off
  * the page on pan/zoom. A Konva.Layer cannot live inside a Group, so the fix
  * applies the transform to an inner Group; this test asserts that Group exists
- * with matching transform values, and that the lines are its children authored
- * in document space.
+ * with matching transform values.
+ *
+ * The whole grid is painted by a SINGLE Konva.Shape (sceneFunc), not one Line
+ * per grid line, so panning does not reconcile hundreds of nodes. The line
+ * geometry is therefore verified through the pure generators the sceneFunc uses
+ * (gridVerticalLines / gridHorizontalLines), authored in document space.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -13,7 +17,11 @@ import { createElement } from 'react'
 import { cleanup, render } from '@testing-library/react'
 import { Stage } from 'react-konva'
 import type Konva from 'konva'
-import { GridLayer } from '../../src/design-canvas-react/components/GridLayer'
+import {
+  GridLayer,
+  gridVerticalLines,
+  gridHorizontalLines,
+} from '../../src/design-canvas-react/components/GridLayer'
 
 class ResizeObserverStub {
   observe(): void {}
@@ -88,18 +96,23 @@ describe('GridLayer transform consistency', () => {
     expect(group.scaleY()).toBe(2)
   })
 
-  it('keeps grid lines authored in document space (transform handles screen mapping)', () => {
+  it('paints the whole grid with a single Konva.Shape (no per-line nodes)', () => {
     const stage = renderGrid({ panX: 33, panY: 44, zoom: 1.5, gridSize: 100 })
     const group = gridTransformGroup(stage)
-    const lines = group.getChildren((n) => n.name() === 'overlay:grid-line')
-    expect(lines.length).toBeGreaterThan(0)
+    const children = group.getChildren()
+    expect(children.length).toBe(1)
+    const shape = children[0] as Konva.Shape
+    expect(shape.getClassName()).toBe('Shape')
+    expect(shape.name()).toBe('overlay:grid-shape')
+    // No legacy per-line Line nodes survive the single-Shape conversion.
+    expect(group.getChildren((n) => n.getClassName() === 'Line').length).toBe(0)
+  })
+
+  it('keeps grid lines authored in document space (transform handles screen mapping)', () => {
     // First vertical line is at document x = gridSize (100), in document space —
     // its screen position comes from the parent Group transform, not the points.
-    const firstVertical = lines.find((l) => {
-      const pts = (l as Konva.Line).points()
-      return pts[0] === 100 && pts[2] === 100
-    })
-    expect(firstVertical).toBeTruthy()
+    expect(gridVerticalLines(400, 100)).toEqual([100, 200, 300])
+    expect(gridHorizontalLines(300, 100)).toEqual([100, 200])
   })
 
   it('tracks pan changes: re-render moves the whole grid by the pan delta', () => {

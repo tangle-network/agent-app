@@ -9,7 +9,7 @@
 
 import type { SequenceClip, SequenceDecision, SequenceTimeline, SequenceTrack } from '../../src/sequences/model'
 
-export interface SequenceCheckResult {
+interface SequenceCheckResult {
   id: string
   passed: boolean
   detail: string

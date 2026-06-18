@@ -156,6 +156,40 @@ describe('mission-events reducer', () => {
     )
   })
 
+  it('#14 a scheduled mission converges to the SAME status regardless of arrival order', () => {
+    // Order-dependence bug: the reducer seeded a create-less mission at
+    // `running`, so a step.started landing BEFORE a `scheduled` mission.created
+    // pinned the mission at running (created-first → scheduled, started-first →
+    // running). Seeding the lowest rank ('scheduled') makes both orders converge.
+    const createdScheduled: MissionStreamEvent = {
+      type: 'mission.created',
+      missionId: 'm1',
+      at: 100,
+      title: 'Scheduled run',
+      status: 'scheduled',
+      steps: [{ id: 's1', intent: 'wait', kind: 'schedule', status: 'pending' }],
+    }
+    const started: MissionStreamEvent = { type: 'step.started', missionId: 'm1', at: 90, stepId: 's1' }
+
+    const createdFirst = get(reduceMissionEvents([createdScheduled, started]), 'm1')
+    const startedFirst = get(reduceMissionEvents([started, createdScheduled]), 'm1')
+
+    // Both orders agree, and neither marks a scheduled mission as running.
+    expect(createdFirst.status).toBe('scheduled')
+    expect(startedFirst.status).toBe('scheduled')
+    expect(startedFirst.status).toBe(createdFirst.status)
+  })
+
+  it('#14 a create-less stream still surfaces as scheduled until a status edge climbs it', () => {
+    // A lone step.started (reconnect race, no create yet) seeds the lowest rank.
+    // It must NOT pre-pin `running`; only an explicit status edge (mission.started
+    // or a running create) climbs it.
+    const state = applyMissionEvent(undefined, { type: 'step.started', missionId: 'm1', at: 50, stepId: 's1' })
+    expect(state.status).toBe('scheduled')
+    const running = applyMissionEvent(state, { type: 'mission.started', missionId: 'm1', at: 60 })
+    expect(running.status).toBe('running')
+  })
+
   it('cost.updated never lowers the displayed spend on an out-of-order older value', () => {
     let state = applyMissionEvent(undefined, { type: 'cost.updated', missionId: 'm1', at: 200, spentUsd: 1.5 })
     expect(state.spentUsd).toBeCloseTo(1.5)

@@ -16,6 +16,7 @@
  * between applications and validate per-operation.
  */
 
+import { assertMediaUrl } from '../web'
 import { assertClipFitsSequence, chooseCaptionPlacement, trackIntervals } from './model'
 import type {
   SequenceClip,
@@ -532,17 +533,11 @@ export function lastClipEndFrame(timeline: SequenceTimeline): number {
 /** Media references must be provider URLs or app-served paths. Local sandbox
  *  artifacts (file:, data:, /tmp/, /home/) are rejected because they are
  *  unreachable from the product and signal an agent substituting local ffmpeg
- *  output for real provider generation. */
+ *  output for real provider generation. Delegates to the canonical
+ *  `assertMediaUrl` boundary in `../web` — sequences and design-canvas share ONE
+ *  rule so the two surfaces cannot drift on what counts as a reachable url. */
 export function assertSequenceMediaUrl(url: string): void {
-  const trimmed = url.trim()
-  if (/^https?:\/\//i.test(trimmed)) return
-  if (trimmed.startsWith('/api/')) return
-  const shown = trimmed.length > 96 ? `${trimmed.slice(0, 96)}…` : trimmed
-  const lower = trimmed.toLowerCase()
-  if (lower.startsWith('file:') || lower.startsWith('data:') || lower.startsWith('/tmp/') || lower.startsWith('/home/')) {
-    throw new Error(`media url must reference a provider URL or rooted /api/ path, not a local sandbox file (${shown})`)
-  }
-  throw new Error(`media url must be http(s) or a rooted /api/ path (${shown})`)
+  assertMediaUrl(url, 'media url')
 }
 
 // ---------------------------------------------------------------------------

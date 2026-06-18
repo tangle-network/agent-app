@@ -15,7 +15,7 @@
 
 import type { ReactNode } from 'react'
 
-import { usePending } from './index'
+import { usePending } from './controls'
 
 export interface SeatPaywallProps {
   /** Human product name shown in the headline, e.g. "Creative". */

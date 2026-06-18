@@ -361,6 +361,17 @@ export function TimelineEditor(props: TimelineEditorProps) {
     history.done.pop()
     history.undone.push(entry)
     void onApplyOperations(entry.command.inverseOperations()).catch((error: unknown) => {
+      // The undo's persist rejected: the server still has the command applied,
+      // so the local undo diverged. Re-redo it ONLY when this entry is still the
+      // newest undone edit (mirror commitCommand: still-newest guard); if the
+      // user has since stacked more undo/redo, a local re-redo would corrupt
+      // history — defer to the next server refresh (stack.reset).
+      const mirror = historyRef.current
+      if (mirror.undone[mirror.undone.length - 1] === entry && stack.canRedo()) {
+        stack.redo()
+        mirror.undone.pop()
+        mirror.done.push(entry)
+      }
       setCommitError(error instanceof Error ? error.message : String(error))
     })
   }
@@ -383,6 +394,16 @@ export function TimelineEditor(props: TimelineEditorProps) {
     void onApplyOperations(operations)
       .then((results) => reconcileCreatedClipIds(operations, entry.createdLocalIds, results))
       .catch((error: unknown) => {
+        // The redo's persist rejected: the server does NOT have the command
+        // applied, so the local redo diverged. Re-undo it ONLY when this entry
+        // is still the newest done edit (mirror commitCommand:341); else a local
+        // re-undo would corrupt history — defer to the next server refresh.
+        const mirror = historyRef.current
+        if (mirror.done[mirror.done.length - 1] === entry && stack.canUndo()) {
+          stack.undo()
+          mirror.done.pop()
+          mirror.undone.push(entry)
+        }
         setCommitError(error instanceof Error ? error.message : String(error))
       })
   }

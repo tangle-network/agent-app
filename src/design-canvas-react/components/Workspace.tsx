@@ -77,8 +77,8 @@ import { InlineTextEditor } from './InlineTextEditor'
 import { BleedTrimOverlay } from './BleedTrimOverlay'
 
 import { normalizeMarquee, nudgeDelta as nudgeDeltaMath } from './transform-math'
-import { elementAabb, findElement } from '../../design-canvas/model'
-import type { SceneElement, ScenePage, TextElement } from '../../design-canvas/model'
+import { elementAabb, findElement, boundsIntersect } from '../../design-canvas/model'
+import type { SceneElement, ScenePage, TextElement, Bounds } from '../../design-canvas/model'
 import type { SnapResult, SnapTarget, SceneCommand } from '../contracts'
 import { lightTheme, type CanvasRenderPalette } from '../../theme/theme'
 
@@ -755,6 +755,66 @@ export function WorkspaceView({
     : null
 
   // -------------------------------------------------------------------------
+  // Stable element-handler identities
+  //
+  // WorkspaceView re-renders on every `stack.notify()` (~120/s during a pan or
+  // marquee). The element handlers below are fresh closures each render, so
+  // passing them straight to ElementNode would change every node's props every
+  // frame and defeat React.memo — all N nodes would re-render per pointermove.
+  // We hold the latest closures in a ref and hand ElementNode stable wrappers
+  // (identity fixed for the component's lifetime) that read through the ref, so
+  // memoized nodes see byte-identical handler props frame to frame.
+  // -------------------------------------------------------------------------
+
+  const handlerImplRef = useRef({
+    onClick: handleElementClick,
+    onDragStart: handleElementDragStart,
+    onDragMove: handleElementDragMove,
+    onDragEnd: handleElementDragEnd,
+    onDoubleClick: handleElementDoubleClick,
+  })
+  handlerImplRef.current = {
+    onClick: handleElementClick,
+    onDragStart: handleElementDragStart,
+    onDragMove: handleElementDragMove,
+    onDragEnd: handleElementDragEnd,
+    onDoubleClick: handleElementDoubleClick,
+  }
+
+  const onElementClick = useCallback((id: string) => handlerImplRef.current.onClick(id), [])
+  const onElementDragStart = useCallback((id: string) => handlerImplRef.current.onDragStart(id), [])
+  const onElementDragMove = useCallback(
+    (id: string, dx: number, dy: number) => handlerImplRef.current.onDragMove(id, dx, dy),
+    [],
+  )
+  const onElementDragEnd = useCallback(
+    (id: string, x: number, y: number) => handlerImplRef.current.onDragEnd(id, x, y),
+    [],
+  )
+  const onElementDoubleClick = useCallback((id: string) => handlerImplRef.current.onDoubleClick(id), [])
+
+  // -------------------------------------------------------------------------
+  // Page-bounds viewport culling
+  //
+  // Skip rendering elements whose AABB is FULLY outside the page rect. This is
+  // PAGE-bounds culling, never SCREEN-viewport culling: export.ts rasterizes
+  // whatever nodes are on the stage and crops to the page rect, so a node that
+  // is on-page but off-screen MUST stay mounted or it would silently vanish
+  // from exported PNGs. Only off-page elements (which export never captures)
+  // are dropped. A pinned id (selected or being edited) is never culled so the
+  // transformer/inline editor always has its node, even if dragged off-page.
+  // -------------------------------------------------------------------------
+
+  const visibleElements = useMemo(() => {
+    const pageRect: Bounds = { x: 0, y: 0, width: activePage.width, height: activePage.height }
+    const pinned = new Set<string>(selectedElementIds)
+    if (editingElementId) pinned.add(editingElementId)
+    return activePage.elements.filter(
+      (el) => pinned.has(el.id) || boundsIntersect(elementAabb(el), pageRect),
+    )
+  }, [activePage.elements, activePage.width, activePage.height, selectedElementIds, editingElementId])
+
+  // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
 
@@ -813,18 +873,18 @@ export function WorkspaceView({
               clipWidth={activePage.width}
               clipHeight={activePage.height}
             >
-              {activePage.elements.map((element) => (
+              {visibleElements.map((element) => (
                 <ElementNode
                   key={element.id}
                   element={element}
                   isSelected={selectedElementIds.includes(element.id)}
                   zoom={zoom}
                   render={render}
-                  onClick={handleElementClick}
-                  onDragStart={handleElementDragStart}
-                  onDragMove={handleElementDragMove}
-                  onDragEnd={handleElementDragEnd}
-                  onDoubleClick={handleElementDoubleClick}
+                  onClick={onElementClick}
+                  onDragStart={onElementDragStart}
+                  onDragMove={onElementDragMove}
+                  onDragEnd={onElementDragEnd}
+                  onDoubleClick={onElementDoubleClick}
                 />
               ))}
             </Group>

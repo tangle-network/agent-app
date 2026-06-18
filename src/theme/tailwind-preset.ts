@@ -17,7 +17,7 @@ const withForeground = (name: string) => ({
   foreground: `hsl(var(--${name}-foreground))`,
 })
 
-export const agentAppPreset = {
+const agentAppPreset = {
   darkMode: ['class', '[data-theme="dark"]'] as [string, string],
   theme: {
     extend: {
