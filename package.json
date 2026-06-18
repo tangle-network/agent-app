@@ -228,6 +228,31 @@
       "import": "./dist/design-canvas-react/lazy.js",
       "default": "./dist/design-canvas-react/lazy.js"
     },
+    "./teams": {
+      "types": "./dist/teams/index.d.ts",
+      "import": "./dist/teams/index.js",
+      "default": "./dist/teams/index.js"
+    },
+    "./teams/drizzle": {
+      "types": "./dist/teams/drizzle.d.ts",
+      "import": "./dist/teams/drizzle.js",
+      "default": "./dist/teams/drizzle.js"
+    },
+    "./teams/members-api": {
+      "types": "./dist/teams/members-api.d.ts",
+      "import": "./dist/teams/members-api.js",
+      "default": "./dist/teams/members-api.js"
+    },
+    "./teams-react": {
+      "types": "./dist/teams-react/index.d.ts",
+      "import": "./dist/teams-react/index.js",
+      "default": "./dist/teams-react/index.js"
+    },
+    "./teams-react/lazy": {
+      "types": "./dist/teams-react/lazy.d.ts",
+      "import": "./dist/teams-react/lazy.js",
+      "default": "./dist/teams-react/lazy.js"
+    },
     "./theme": {
       "types": "./dist/theme/index.d.ts",
       "import": "./dist/theme/index.js",
