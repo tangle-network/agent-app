@@ -32,6 +32,11 @@ export interface SeatPaywallProps {
   tagline?: string
   /** CTA label. Default "Unlock {product}". */
   ctaLabel?: string
+  /** Value-prop bullets. Default = product/usage-derived only; pass your own to
+   *  supply product-specific value props (the shell bakes no GTM copy). */
+  benefits?: ReactNode[]
+  /** Optional fine print under the CTA (e.g. "Cancel anytime."). Omitted by default. */
+  footnote?: ReactNode
 }
 
 function CheckGlyph(): ReactNode {
@@ -74,6 +79,8 @@ export function SeatPaywall({
   includedUsageUsd = 50,
   tagline,
   ctaLabel,
+  benefits,
+  footnote,
 }: SeatPaywallProps): ReactNode {
   const { pending, run } = usePending()
   return (
@@ -96,11 +103,12 @@ export function SeatPaywall({
         </p>
 
         <ul className="mt-6 space-y-2.5">
-          <Benefit>Full access to {product}</Benefit>
-          <Benefit>
-            ${includedUsageUsd}/mo of AI usage included, every month
-          </Benefit>
-          <Benefit>One Tangle wallet across every product you run</Benefit>
+          {(benefits ?? [
+            `Full access to ${product}`,
+            `$${includedUsageUsd}/mo of AI usage included, every month`,
+          ]).map((benefit, i) => (
+            <Benefit key={i}>{benefit}</Benefit>
+          ))}
         </ul>
 
         <button
@@ -111,9 +119,11 @@ export function SeatPaywall({
         >
           {pending ? 'Opening checkout…' : ctaLabel ?? `Unlock ${product}`}
         </button>
-        <p className="mt-3 text-center text-xs text-muted-foreground/70">
-          Cancel anytime.
-        </p>
+        {footnote && (
+          <p className="mt-3 text-center text-xs text-muted-foreground/70">
+            {footnote}
+          </p>
+        )}
       </div>
     </div>
   )
