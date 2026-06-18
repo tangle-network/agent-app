@@ -253,6 +253,31 @@
       "import": "./dist/teams-react/lazy.js",
       "default": "./dist/teams-react/lazy.js"
     },
+    "./intakes": {
+      "types": "./dist/intakes/index.d.ts",
+      "import": "./dist/intakes/index.js",
+      "default": "./dist/intakes/index.js"
+    },
+    "./intakes/drizzle": {
+      "types": "./dist/intakes/drizzle.d.ts",
+      "import": "./dist/intakes/drizzle.js",
+      "default": "./dist/intakes/drizzle.js"
+    },
+    "./intakes/api": {
+      "types": "./dist/intakes/api.d.ts",
+      "import": "./dist/intakes/api.js",
+      "default": "./dist/intakes/api.js"
+    },
+    "./intakes-react": {
+      "types": "./dist/intakes-react/index.d.ts",
+      "import": "./dist/intakes-react/index.js",
+      "default": "./dist/intakes-react/index.js"
+    },
+    "./intakes-react/lazy": {
+      "types": "./dist/intakes-react/lazy.d.ts",
+      "import": "./dist/intakes-react/lazy.js",
+      "default": "./dist/intakes-react/lazy.js"
+    },
     "./theme": {
       "types": "./dist/theme/index.d.ts",
       "import": "./dist/theme/index.js",
