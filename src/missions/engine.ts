@@ -472,24 +472,42 @@ export function createMissionEngine(options: MissionEngineOptions): MissionEngin
     // USD: provider-authored price when the dispatch reports one, the injected
     // estimate otherwise (the budget gate runs on the same estimate, so spend
     // and gate stay consistent). Token counts/wall time come from the
-    // dispatch's ledgerDelta when the platform reported them.
-    {
-      const deltaUsd = dispatched.cost?.deltaUsd ?? estimateStepCostUsd(step)
-      if (deltaUsd > 0 || dispatched.cost?.ledgerDelta) {
-        const cost = await recordCost(missionId, deltaUsd, {
-          costUsd: deltaUsd,
-          llmCalls: 1,
-          ...(dispatched.cost?.ledgerDelta ?? {}),
-        })
-        if (!cost.succeeded) return rejectStep(cost)
-      }
-    }
+    // dispatch's ledgerDelta when the platform reported them. The spend is
+    // folded into the SAME guarded pending->done write below so step completion
+    // is the per-step idempotency key: a RESUME re-dispatching an already-done
+    // step short-circuits as a no-op and never charges twice.
+    const deltaUsd = dispatched.cost?.deltaUsd ?? estimateStepCostUsd(step)
+    const chargeable = deltaUsd > 0 || Boolean(dispatched.cost?.ledgerDelta)
+    const spentBefore = afterDispatch.spentUsd
 
     const done = await service.setStepStatus(missionId, stepId, 'done', {
       resultRef: dispatched.resultRef,
       ...(dispatched.sublabel === undefined ? {} : { sublabel: dispatched.sublabel }),
+      ...(chargeable
+        ? {
+            cost: {
+              deltaUsd,
+              ledgerDelta: {
+                costUsd: deltaUsd,
+                llmCalls: 1,
+                ...(dispatched.cost?.ledgerDelta ?? {}),
+              },
+            },
+          }
+        : {}),
     })
     if (!done.succeeded) return rejectStep(done)
+    // Emit cost.updated only when the spend actually committed (a real
+    // transition, not a replayed no-op that re-asserted an already-done step).
+    if (done.value.spentUsd !== spentBefore) {
+      safeEmit(sink, {
+        type: 'cost.updated',
+        missionId,
+        at: Date.now(),
+        spentUsd: done.value.spentUsd,
+        capUsd: done.value.budgetUsd,
+      })
+    }
     safeEmit(sink, {
       type: 'step.completed',
       missionId,
@@ -548,7 +566,12 @@ export function createMissionEngine(options: MissionEngineOptions): MissionEngin
     if (capUsd === null) return { kind: 'continue' }
     const estimatedCostUsd = estimateStepCostUsd(step)
     if (estimatedCostUsd <= 0) return { kind: 'continue' }
-    if (mission.spentUsd + estimatedCostUsd <= capUsd) return { kind: 'continue' }
+    // Compare in integer cents: USD amounts accumulate binary-float error (e.g.
+    // 0.1 + 0.2 > 0.3), so a raw float compare can spuriously trip the gate at
+    // the exact cap. Cent-rounding makes the boundary deterministic.
+    if (Math.round((mission.spentUsd + estimatedCostUsd) * 100) <= Math.round(capUsd * 100)) {
+      return { kind: 'continue' }
+    }
 
     if (!gates) {
       const reason = `Budget cap reached before step ${step.id}: $${mission.spentUsd.toFixed(2)} spent of $${capUsd.toFixed(2)}, next step estimated $${estimatedCostUsd.toFixed(2)}`

@@ -20,7 +20,7 @@
  */
 
 import type { StepAgentActivity } from '../missions/agent-activity'
-import type { FlowSpan, FlowTrace } from './index'
+import type { FlowSpan, FlowTrace } from './flow-types'
 
 /** Structural mirror of agent-runtime's `LoopTraceEvent` — same fields, no
  *  import, so journals parsed from JSON feed straight in. */

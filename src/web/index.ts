@@ -67,18 +67,54 @@ export interface RateLimitResult {
 }
 
 /** KV-backed sliding-window rate limit. Stores recent timestamps per key,
- *  prunes the window, allows until `limit` is hit. */
+ *  prunes the window, allows until `limit` is hit.
+ *
+ *  Read-modify-write is best-effort, NOT atomic: KV has no compare-and-swap, so
+ *  two requests racing on the same key can each read the same pre-state and both
+ *  write — a concurrent burst can momentarily admit up to one extra request per
+ *  racing writer. This is acceptable for coarse abuse limiting; it is NOT a hard
+ *  quota gate.
+ *
+ *  Fail-CLOSED on unreadable state: corrupt/non-array KV (a poisoned or
+ *  truncated value) is treated as a full window, so a tampered key cannot reset
+ *  the count and bypass the limiter. A bare `JSON.parse` here would throw and
+ *  abort the request handler, silently disabling the limit (fail-open). */
 export async function checkRateLimit(kv: KvLike, key: string, limit: number, windowSeconds: number): Promise<RateLimitResult> {
   const now = Math.floor(Date.now() / 1000)
   const windowStart = now - windowSeconds
   const kvKey = `rl:${key}`
   const raw = await kv.get(kvKey)
-  const timestamps: number[] = raw ? JSON.parse(raw) : []
-  const valid = timestamps.filter((t) => t > windowStart)
+  const parsed = parseRateLimitState(raw)
+  if (parsed === POISONED_STATE) {
+    // Unreadable state (parse threw or value is not a JSON array): deny rather
+    // than reset the window to empty. A poisoned key must not become a bypass.
+    return { allowed: false, remaining: 0, resetAt: now + windowSeconds }
+  }
+  const valid = parsed.filter((t) => t > windowStart)
   if (valid.length >= limit) return { allowed: false, remaining: 0, resetAt: (valid[0] ?? now) + windowSeconds }
   valid.push(now)
   await kv.put(kvKey, JSON.stringify(valid), { expirationTtl: windowSeconds * 2 })
   return { allowed: true, remaining: limit - valid.length, resetAt: now + windowSeconds }
+}
+
+/** Sentinel returned by `parseRateLimitState` when the stored value cannot be
+ *  read as a timestamp array — distinct from an empty window so the limiter can
+ *  fail closed instead of treating corruption as a fresh window. */
+const POISONED_STATE = Symbol('rate-limit-poisoned-state')
+
+/** Parse stored rate-limit state into a timestamp array. Absent state is a
+ *  fresh (empty) window. A value that fails to parse, or parses to a non-array,
+ *  returns `POISONED_STATE`; numeric junk inside a valid array is dropped. */
+function parseRateLimitState(raw: string | null): number[] | typeof POISONED_STATE {
+  if (raw === null) return []
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return POISONED_STATE
+  }
+  if (!Array.isArray(parsed)) return POISONED_STATE
+  return parsed.filter((t): t is number => typeof t === 'number' && Number.isFinite(t))
 }
 
 export interface CookieOptions {
@@ -153,4 +189,38 @@ export function addSecurityHeaders(response: Response, opts: SecurityHeaderOptio
   if (opts.retention) response.headers.set('X-Data-Retention', opts.retention)
   for (const [k, v] of Object.entries(opts.extra ?? {})) response.headers.set(k, v)
   return response
+}
+
+/** Local-sandbox / inline schemes a stored media reference must never use.
+ *  Reachable from neither a browser nor the product worker, and a `file:`/`data:`
+ *  url is the tell of an agent substituting local ffmpeg output for a real
+ *  provider artifact. `blob:` and `javascript:` are inert/active client schemes
+ *  with no server reachability. */
+const REJECTED_MEDIA_SCHEMES = ['file:', 'data:', 'blob:', 'javascript:', 'vbscript:'] as const
+
+/**
+ * Canonical media-reference boundary shared by every surface that persists a
+ * media url (sequences clips, design-canvas image/video src). The ONE rule:
+ * remote `http(s)` or a rooted `/api/` path are allowed; everything else is
+ * rejected, with a named reason for known-bad local/inline schemes so the
+ * thrown message is actionable for an LLM planner. The url is trimmed before
+ * the scheme check so leading whitespace cannot smuggle a rejected scheme past
+ * a naive `startsWith`.
+ *
+ * @param what - noun for the error message (e.g. 'media url', 'src').
+ */
+export function assertMediaUrl(url: string, what = 'media url'): void {
+  const trimmed = url.trim()
+  if (/^https?:\/\//i.test(trimmed)) return
+  if (trimmed.startsWith('/api/')) return
+  const shown = trimmed.length > 96 ? `${trimmed.slice(0, 96)}…` : trimmed
+  const lower = trimmed.toLowerCase()
+  if (
+    REJECTED_MEDIA_SCHEMES.some((scheme) => lower.startsWith(scheme)) ||
+    lower.startsWith('/tmp/') ||
+    lower.startsWith('/home/')
+  ) {
+    throw new Error(`${what} must reference a provider http(s) URL or a rooted /api/ path, not a local sandbox file (${shown})`)
+  }
+  throw new Error(`${what} must be http(s) or a rooted /api/ path (${shown})`)
 }

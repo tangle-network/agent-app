@@ -18,7 +18,32 @@ import type { EditorSceneState, SceneCommand, SceneCommandStack } from '../contr
 /** Oldest entries are dropped past this bound; redo stack is cleared on execute. */
 export const SCENE_COMMAND_HISTORY_LIMIT = 200
 
-export function createSceneCommandStack(document: SceneDocument, activePageId: string): SceneCommandStack {
+/**
+ * The base {@link SceneCommandStack} plus the two command-specific recovery
+ * primitives the undo/redo persistence path needs. `rollback` (on the base
+ * contract) undoes a failed COMMIT; these undo a failed UNDO/REDO persist.
+ * Defined here (not on the shared contract) so consumers that take the stack as
+ * `ReturnType<typeof createSceneCommandStack>` see them without a contract bump.
+ */
+export interface SceneCommandStackWithReapply extends SceneCommandStack {
+  /**
+   * A persisted UNDO rejected: re-apply that command's FORWARD transform (move
+   * it redo→undo). Mirrors `rollback`'s command-specific contract — it acts on
+   * the captured command, not blindly on the redo-stack top, so an interleaved
+   * edit cannot make it re-apply the wrong command. No-op if the command is not
+   * the top of the redo stack (a newer edit reshaped history — the next
+   * `reset()` reconciles).
+   */
+  reexecute(command: SceneCommand): void
+  /**
+   * A persisted REDO rejected: re-apply that command's INVERSE transform (move
+   * it undo→redo). The redo-side mirror of `reexecute`. No-op unless the command
+   * is the top of the undo stack.
+   */
+  reundo(command: SceneCommand): void
+}
+
+export function createSceneCommandStack(document: SceneDocument, activePageId: string): SceneCommandStackWithReapply {
   let state: EditorSceneState = {
     document,
     activePageId,
@@ -97,6 +122,37 @@ export function createSceneCommandStack(document: SceneDocument, activePageId: s
 
     setView(patch: Partial<Omit<EditorSceneState, 'document'>>): void {
       state = { ...state, ...patch }
+      notify()
+    },
+
+    // A persisted UNDO rejected: the server still has `command` applied, but the
+    // local undo already removed it (and a later execute may have cleared the
+    // redo stack). Deterministically re-converge — mirror of `rollback`, in the
+    // forward direction: re-apply the command's FORWARD transform to current
+    // state and ensure it lives on the undo stack (so a later undo can remove it
+    // again). Idempotent: if the command is already on the undo stack (the undo
+    // never actually left local history), this is a no-op. For disjoint edits the
+    // forward transform commutes past commands executed while the undo was
+    // pending, so their net effect is preserved.
+    reexecute(command: SceneCommand): void {
+      if (undoStack.includes(command)) return
+      state = command.execute(state)
+      const redoIdx = redoStack.lastIndexOf(command)
+      if (redoIdx !== -1) redoStack.splice(redoIdx, 1)
+      undoStack.push(command)
+      notify()
+    },
+
+    // A persisted REDO rejected: the server does NOT have `command` applied, but
+    // the local redo just applied it forward and put it on the undo stack.
+    // Re-apply its INVERSE and move it to the redo stack — the redo-side mirror
+    // of `reexecute`. No-op if the command is not on the undo stack.
+    reundo(command: SceneCommand): void {
+      const undoIdx = undoStack.lastIndexOf(command)
+      if (undoIdx === -1) return
+      state = command.undo(state)
+      undoStack.splice(undoIdx, 1)
+      if (!redoStack.includes(command)) redoStack.push(command)
       notify()
     },
 

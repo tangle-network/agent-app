@@ -115,7 +115,6 @@ export const ItalicGlyph = glyph(<path d="M11 4h6M7 20h6M14 4 8 20" />)
 
 export const PlusGlyph = glyph(<path d="M12 5v14M5 12h14" />)
 export const ChevronDownGlyph = glyph(<path d="m6 9 6 6 6-6" />)
-export const ChevronRightGlyph = glyph(<path d="m9 18 6-6-6-6" />)
 
 export const RectGlyph = glyph(<rect x="3" y="3" width="18" height="18" rx="2" />)
 export const EllipseGlyph = glyph(<ellipse cx="12" cy="12" rx="10" ry="7" />)
@@ -139,13 +138,6 @@ export const SlotGlyph = glyph(
   <>
     <circle cx="12" cy="12" r="3" />
     <path d="M12 1v4M12 19v4M4.2 4.2l2.8 2.8M17 17l2.8 2.8M1 12h4M19 12h4M4.2 19.8l2.8-2.8M17 7 19.8 4.2" />
-  </>,
-)
-
-export const FitGlyph = glyph(
-  <>
-    <path d="M3 3h4v4H3zM17 3h4v4h-4zM3 17h4v4H3zM17 17h4v4h-4z" />
-    <path d="M7 5h10M5 7v10M19 7v10M7 19h10" />
   </>,
 )
 

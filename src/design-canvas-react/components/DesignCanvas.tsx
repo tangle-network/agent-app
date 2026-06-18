@@ -418,16 +418,16 @@ export function DesignCanvas({
       setCommitError(`Undo failed: ${error instanceof Error ? error.message : String(error)}`)
       return
     }
-    // Persist the inverse so the server tracks the undo; on rejection re-execute
-    // to re-apply the original forward state.
+    // Persist the inverse so the server tracks the undo; on rejection re-apply
+    // THIS command's forward transform (stack.reexecute) — captured at undo
+    // time, not a blind canRedo()/redo() that diverges from the server when an
+    // edit interleaves before the rejection lands.
     void onApplyOperations(command.inverseOperations())
       .then((result) => {
         if (result.document) stack.reset(result.document)
       })
       .catch((error: unknown) => {
-        if (stack.canRedo()) {
-          try { stack.redo() } catch { /* concurrent edit; next reset reconciles */ }
-        }
+        stack.reexecute(command)
         setCommitError(error instanceof Error ? error.message : String(error))
       })
   }, [stack, canWrite, onApplyOperations])
@@ -441,14 +441,15 @@ export function DesignCanvas({
       setCommitError(`Redo failed: ${error instanceof Error ? error.message : String(error)}`)
       return
     }
+    // Persist the redo; on rejection re-apply THIS command's inverse
+    // (stack.reundo) — captured at redo time, not a blind canUndo()/undo() that
+    // undoes the wrong command when an edit interleaves before the rejection.
     void onApplyOperations(command.operations())
       .then((result) => {
         if (result.document) stack.reset(result.document)
       })
       .catch((error: unknown) => {
-        if (stack.canUndo()) {
-          try { stack.undo() } catch { /* concurrent edit; next reset reconciles */ }
-        }
+        stack.reundo(command)
         setCommitError(error instanceof Error ? error.message : String(error))
       })
   }, [stack, canWrite, onApplyOperations])

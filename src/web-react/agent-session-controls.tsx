@@ -30,7 +30,7 @@ import {
   type Harness,
 } from '../harness'
 import type { CatalogModel } from '../runtime/model-catalog'
-import { ModelPicker, EffortPicker, usePopover } from './index'
+import { ModelPicker, EffortPicker, usePopover } from './controls'
 
 /** Plain-English labels for the harnesses a product is likely to expose. Unknown
  *  ids fall back to the raw value so a new backend still renders a usable label. */

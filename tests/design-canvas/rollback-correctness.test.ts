@@ -329,6 +329,92 @@ describe('stack.rollback(command) — correct rollback API', () => {
     expect(stack.canRedo()).toBe(false)
   })
 
+  it('#5 reexecute(undone) re-applies the right command when an edit interleaved before the undo rejected', () => {
+    // Interleave repro: user executes A, undoes A, then makes a NEW edit B while
+    // A's UNDO persist is in-flight. A's undo then REJECTS. The OLD recovery
+    // (blind stack.canRedo()/redo()) would re-redo whatever sits on the redo
+    // top — but B's execute cleared the redo stack, so canRedo() is false and
+    // A's forward state is LOST (divergence from the server, which rejected the
+    // undo and still holds A). reexecute(A) deterministically re-applies A.
+    const doc = makeDoc()
+    const stack = createSceneCommandStack(doc, pageId(doc))
+
+    const cmdA = setAttrsCommand({
+      pageId: pageId(doc),
+      elementId: 'el-1',
+      attrs: { x: 99 },
+      priorAttrs: { x: 10 },
+    })
+    const cmdB = setAttrsCommand({
+      pageId: pageId(doc),
+      elementId: 'el-2',
+      attrs: { x: 300 },
+      priorAttrs: { x: 200 },
+    })
+
+    stack.execute(cmdA) // el-1 -> 99
+    const undone = stack.undo() // local undo of A: el-1 -> 10, A on redo stack
+    expect(undone).toBe(cmdA)
+    // Interleaved edit B lands while A's undo persist is pending. execute()
+    // clears the redo stack, so a blind canRedo() is now false.
+    stack.execute(cmdB) // el-2 -> 300
+    expect(stack.canRedo()).toBe(false)
+
+    // A's undo persist REJECTS. The server still has A applied (it rejected the
+    // undo). reexecute(A) must re-apply A's forward state so local re-converges.
+    stack.reexecute(cmdA)
+
+    const el1 = stack.getState().document.pages[0]!.elements.find((e: SceneElement) => e.id === 'el-1')!
+    const el2 = stack.getState().document.pages[0]!.elements.find((e: SceneElement) => e.id === 'el-2')!
+    expect(el1.x).toBe(99) // A re-applied — converged with the server
+    expect(el2.x).toBe(300) // B preserved, not double-applied or dropped
+  })
+
+  it('#5 reexecute is idempotent — a no-op when the command is already on the undo stack', () => {
+    // The command is still applied locally (the undo never left history, or a
+    // double-fire rejection handler). reexecute must not re-apply it a second
+    // time (which would double the forward transform).
+    const doc = makeDoc()
+    const stack = createSceneCommandStack(doc, pageId(doc))
+    const cmdA = setAttrsCommand({ pageId: pageId(doc), elementId: 'el-1', attrs: { x: 99 }, priorAttrs: { x: 10 } })
+    stack.execute(cmdA) // el-1 -> 99, cmdA on the undo stack
+    const before = stack.getState().document.pages[0]!.elements[0]!.x
+    expect(before).toBe(99)
+    stack.reexecute(cmdA)
+    expect(stack.getState().document.pages[0]!.elements[0]!.x).toBe(99) // not doubled
+    expect(stack.canUndo()).toBe(true)
+  })
+
+  it('#5 non-interleaved undo reject reverts exactly as before via reexecute', () => {
+    // With no interleaving, reexecute(A) restores the forward state the failed
+    // undo tried to remove — the same net result the old blind redo produced.
+    const doc = makeDoc()
+    const stack = createSceneCommandStack(doc, pageId(doc))
+    const cmdA = setAttrsCommand({ pageId: pageId(doc), elementId: 'el-1', attrs: { x: 99 }, priorAttrs: { x: 10 } })
+    stack.execute(cmdA)
+    stack.undo() // el-1 -> 10
+    expect(stack.getState().document.pages[0]!.elements[0]!.x).toBe(10)
+    stack.reexecute(cmdA) // undo rejected -> re-apply forward
+    expect(stack.getState().document.pages[0]!.elements[0]!.x).toBe(99)
+    expect(stack.canUndo()).toBe(true)
+    expect(stack.canRedo()).toBe(false)
+  })
+
+  it('#5 reundo restores the inverse after a redo persist rejects', () => {
+    // Redo-side mirror: execute A, undo A, redo A (el-1 -> 99 again), then the
+    // redo persist rejects. reundo(A) re-applies A's inverse (el-1 -> 10).
+    const doc = makeDoc()
+    const stack = createSceneCommandStack(doc, pageId(doc))
+    const cmdA = setAttrsCommand({ pageId: pageId(doc), elementId: 'el-1', attrs: { x: 99 }, priorAttrs: { x: 10 } })
+    stack.execute(cmdA)
+    stack.undo()
+    const redone = stack.redo() // el-1 -> 99, A back on undo stack
+    expect(redone).toBe(cmdA)
+    stack.reundo(cmdA) // redo rejected -> re-apply inverse
+    expect(stack.getState().document.pages[0]!.elements[0]!.x).toBe(10)
+    expect(stack.canRedo()).toBe(true)
+  })
+
   it('rollback(B) when A and B are both in the stack removes only B', () => {
     const doc = makeDoc()
     const stack = createSceneCommandStack(doc, pageId(doc))

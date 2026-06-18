@@ -434,6 +434,64 @@ describe('TimelineEditor', () => {
     expect((screen.getByLabelText('Undo') as HTMLButtonElement).disabled).toBe(true)
   })
 
+  it('#9 rolls an undo back (re-redo) when the undo persist rejects and it is still newest', async () => {
+    // The undo's inverse-op persist fails. Before the fix the local undo stuck
+    // even though the server rejected it — local state diverged from the server.
+    // Now the still-newest undone entry is re-redone so the two re-converge.
+    let calls = 0
+    const onApplyOperations = vi.fn(async () => {
+      calls += 1
+      // 1: the add commit (ok). 2: the undo's inverse (reject).
+      if (calls === 2) throw new Error('undo persist failed')
+    })
+    render(
+      createElement(TimelineEditor, { timeline: fixtureTimeline(), canWrite: true, onApplyOperations }),
+    )
+
+    fireEvent.click(screen.getByLabelText('Add caption at playhead'))
+    await waitFor(() => expect(calls).toBe(1))
+    expect(screen.getByText('New caption')).toBeTruthy()
+
+    fireEvent.click(screen.getByLabelText('Undo'))
+    // The undo applied optimistically (caption gone), then its persist rejects
+    // and the still-newest entry is re-redone — the caption re-converges.
+    await waitFor(() => {
+      expect(screen.getByText('New caption')).toBeTruthy()
+    })
+    expect(screen.getByRole('alert').textContent).toContain('undo persist failed')
+    // Undo is available again (the edit is back on the done stack).
+    expect((screen.getByLabelText('Undo') as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('#9 rolls a redo back (re-undo) when the redo persist rejects and it is still newest', async () => {
+    // Redo-side mirror: add (ok), undo (ok), redo whose persist rejects. The
+    // redo is re-undone so the caption disappears again to match the server.
+    let calls = 0
+    const onApplyOperations = vi.fn(async () => {
+      calls += 1
+      // 1: add (ok). 2: undo inverse (ok). 3: redo (reject).
+      if (calls === 3) throw new Error('redo persist failed')
+    })
+    render(
+      createElement(TimelineEditor, { timeline: fixtureTimeline(), canWrite: true, onApplyOperations }),
+    )
+
+    fireEvent.click(screen.getByLabelText('Add caption at playhead'))
+    await waitFor(() => expect(calls).toBe(1))
+    fireEvent.click(screen.getByLabelText('Undo'))
+    await waitFor(() => expect(calls).toBe(2))
+    expect(screen.queryByText('New caption')).toBeNull()
+
+    fireEvent.click(screen.getByLabelText('Redo'))
+    // The redo applied optimistically (caption back), then its persist rejects
+    // and the still-newest done entry is re-undone — the caption disappears.
+    await waitFor(() => {
+      expect(screen.queryByText('New caption')).toBeNull()
+    })
+    expect(screen.getByRole('alert').textContent).toContain('redo persist failed')
+    expect((screen.getByLabelText('Redo') as HTMLButtonElement).disabled).toBe(false)
+  })
+
   it('selects a clip on click and surfaces it to onSelectionChange', () => {
     const onSelectionChange = vi.fn()
     render(

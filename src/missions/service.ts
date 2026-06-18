@@ -243,6 +243,18 @@ export interface SetStepStatusPatch {
   sublabel?: string
   resultRef?: string
   error?: string
+  /**
+   * Spend committed ATOMICALLY with the step transition. Folding the cost into
+   * the SAME guarded write makes step completion the per-step idempotency key:
+   * a same-status replay (the step is already `done`) short-circuits as a no-op
+   * BEFORE the write, so the charge lands exactly once even when an engine
+   * RESUME re-dispatches a step whose cost previously committed. `deltaUsd` is
+   * the marginal spend; `ledgerDelta` carries the token/wall/llm breakdown.
+   */
+  cost?: {
+    deltaUsd: number
+    ledgerDelta?: Partial<MissionCostLedger>
+  }
 }
 
 export interface CompleteMissionInput {
@@ -496,13 +508,42 @@ export function createMissionService(options: MissionServiceOptions): MissionSer
     const nextPlan = plan.slice()
     nextPlan[index] = nextStep
 
-    // The plan write is guarded on the status, plan, AND metadata we read: a
-    // concurrent stop request (a metadata write) or any plan mutation flips a
-    // guard and the loser reports the race instead of clobbering it.
+    // Spend folded into the SAME guarded write as the transition. Because the
+    // same-status no-op above returns BEFORE this point, a step that is already
+    // `done` never reaches here — so an engine RESUME re-dispatching a committed
+    // step cannot charge a second time. The ledger CAS guard preserves the
+    // over-spend protection `addCost` carried: an undercounted concurrent merge
+    // surfaces as a lost race, never a clobber.
+    const cost = patch.cost
+    const ledgerDelta = cost?.ledgerDelta
+    const base = mission.cost ?? { ...ZERO_LEDGER }
+    const nextCost: MissionCostLedger | undefined =
+      cost === undefined
+        ? undefined
+        : {
+            tokensIn: base.tokensIn + (ledgerDelta?.tokensIn ?? 0),
+            tokensOut: base.tokensOut + (ledgerDelta?.tokensOut ?? 0),
+            costUsd: base.costUsd + (ledgerDelta?.costUsd ?? cost.deltaUsd),
+            wallMs: base.wallMs + (ledgerDelta?.wallMs ?? 0),
+            llmCalls: base.llmCalls + (ledgerDelta?.llmCalls ?? 0),
+          }
+
+    // The plan write is guarded on the status, plan, metadata, AND (when a cost
+    // rides along) the ledger we read: a concurrent stop request (a metadata
+    // write), any plan mutation, or a racing spend flips a guard and the loser
+    // reports the race instead of clobbering it.
     const updated = await store.update(
       id,
-      { status: mission.status, plan: mission.plan, metadata: mission.metadata },
-      { plan: nextPlan },
+      {
+        status: mission.status,
+        plan: mission.plan,
+        metadata: mission.metadata,
+        ...(cost === undefined ? {} : { cost: mission.cost }),
+      },
+      {
+        plan: nextPlan,
+        ...(cost === undefined ? {} : { cost: nextCost!, spentUsd: mission.spentUsd + cost.deltaUsd }),
+      },
     )
     if (!updated) return lostRace(id)
     await appendEvent(
@@ -518,6 +559,13 @@ export function createMissionService(options: MissionServiceOptions): MissionSer
         ...(patch.resultRef ? { resultRef: patch.resultRef } : {}),
       },
     )
+    if (cost !== undefined) {
+      await appendEvent(updated, 'info', 'mission.cost', `Spent +$${cost.deltaUsd.toFixed(4)}`, {
+        deltaUsd: cost.deltaUsd,
+        spentUsd: updated.spentUsd,
+        budgetUsd: updated.budgetUsd,
+      })
+    }
     return { succeeded: true, value: updated }
   }
 

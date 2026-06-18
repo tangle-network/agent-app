@@ -254,9 +254,15 @@ function maxMissionStatus(
 }
 
 function emptyMission(missionId: string): MissionState {
+  // Seed at the LOWEST status rank so a fold-in is purely monotonic. A
+  // step.started that arrives before mission.created must not pin the mission
+  // at `running`: were the create to carry `scheduled`, the reducer would then
+  // diverge by arrival order (created-first → scheduled, started-first →
+  // running). Seeding `scheduled` makes every status edge climb upward only, so
+  // both orders converge to the same state.
   return {
     missionId,
-    status: 'running',
+    status: 'scheduled',
     steps: [],
     spentUsd: 0,
     lastEventAt: 0,
@@ -306,7 +312,7 @@ export function applyMissionEvent(
       return {
         ...base,
         title: event.title || base.title,
-        status: prev ? maxMissionStatus(base.status, event.status ?? 'running') : event.status ?? base.status,
+        status: maxMissionStatus(base.status, event.status ?? base.status),
         capUsd: event.budgetUsd ?? base.capUsd,
         steps: merged,
         lastEventAt,

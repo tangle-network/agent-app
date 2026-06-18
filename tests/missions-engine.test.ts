@@ -719,22 +719,26 @@ describe('mission engine', () => {
     const { dispatch } = recordingDispatch()
     await h.engine.runPlan(missionId, h.directRunStep(missionId, dispatch))
 
-    // created, then per step: running, estimated cost, done, cursor; then
-    // mission.succeeded. Every step records a non-zero estimated cost when the
-    // dispatch surfaces no provider-authored spend.
+    // created, then per step: running, done, cost, cursor; then
+    // mission.succeeded. The spend is folded into the SAME guarded write as the
+    // pending->done transition (per-step idempotency: a replay of an already-done
+    // step never re-charges), so the cost event is appended immediately AFTER
+    // the step.done event within that atomic write. Every step records a
+    // non-zero estimated cost when the dispatch surfaces no provider-authored
+    // spend.
     expect(h.eventSteps(missionId)).toEqual([
       'mission.created',
       'mission.step.running',
-      'mission.cost',
       'mission.step.done',
+      'mission.cost',
       'mission.cursor',
       'mission.step.running',
-      'mission.cost',
       'mission.step.done',
+      'mission.cost',
       'mission.cursor',
       'mission.step.running',
-      'mission.cost',
       'mission.step.done',
+      'mission.cost',
       'mission.cursor',
       'mission.succeeded',
     ])
@@ -775,5 +779,127 @@ describe('mission engine', () => {
 
     expect(outcome).toEqual({ kind: 'done', resultRef: 'artifact:prior', cached: true })
     expect(h.emitted.map((event) => event.type)).toEqual(['step.completed'])
+  })
+
+  it('#3 PRE-FIX evidence: a separate recordCost BEFORE setStepStatus(done) double-charges on resume', async () => {
+    // Inline simulation of the OLD done-path (recordCost, THEN setStepStatus):
+    // a crash between the two writes leaves the step `running` with cost already
+    // committed. The owner RESUMES, re-dispatches (the cached-done guard misses
+    // because status !== done), and recordCost charges a SECOND time. This is the
+    // money bug the fix removes; the simulation makes the breakage durable.
+    const h = harness()
+    const missionId = await h.createMission([
+      { id: 'solo', intent: 'one step', kind: 'research', status: 'pending', attempts: 0 },
+    ])
+
+    async function oldDonePath() {
+      await h.service.setStepStatus(missionId, 'solo', 'running').catch(() => undefined)
+      // OLD: cost committed via a SEPARATE write first.
+      await h.service.addCost(missionId, 0.05, { costUsd: 0.05, llmCalls: 1 })
+      // (crash here on the first pass — done is never written)
+    }
+
+    await oldDonePath() // first attempt: cost committed, status still running
+    const mid = await h.service.getMission(missionId)
+    expect(mid?.plan[0]?.status).toBe('running')
+    expect(mid?.spentUsd).toBeCloseTo(0.05)
+
+    await oldDonePath() // resume: re-charges because there is no idempotency key
+    const doubled = await h.service.getMission(missionId)
+    expect(doubled?.spentUsd).toBeCloseTo(0.1) // BUG: charged twice
+    expect(doubled?.cost?.llmCalls).toBe(2)
+  })
+
+  it('#3 charges a step exactly once across an engine-driven resume (no double-charge)', async () => {
+    // The fix folds spend into the SAME guarded pending->done write, so step
+    // completion is the per-step idempotency key: a resume that re-invokes an
+    // already-done step short-circuits at the cached-done guard BEFORE any write
+    // and never re-charges.
+    const h = harness()
+    const missionId = await h.createMission([
+      { id: 'solo', intent: 'one step', kind: 'research', status: 'pending', attempts: 0 },
+    ])
+    const { dispatch, ran } = recordingDispatch()
+
+    // First run: drives the step to done and charges the estimate once, in one
+    // atomic write (no window where cost commits without done).
+    const first = await h.engine.runStep(missionId, 'solo', dispatch)
+    expect(first.kind).toBe('done')
+    const afterFirst = await h.service.getMission(missionId)
+    expect(afterFirst?.spentUsd).toBeCloseTo(estimate(afterFirst!.plan[0]!))
+    expect(afterFirst?.plan[0]?.status).toBe('done')
+    const chargedOnce = afterFirst!.spentUsd
+    h.emitted.length = 0
+
+    // The owner RESUMES and re-invokes the same step (at-least-once delivery /
+    // crash replay). The cached-done guard fires: the dispatch is NOT re-run and
+    // — critically — spend does NOT move. Charged exactly once.
+    const resumed = await h.engine.runStep(missionId, 'solo', dispatch)
+    expect(resumed).toEqual({ kind: 'done', resultRef: 'artifact:solo', cached: true })
+    expect(ran).toEqual(['solo'])
+    const afterResume = await h.service.getMission(missionId)
+    expect(afterResume?.spentUsd).toBe(chargedOnce)
+    expect(afterResume?.cost?.llmCalls).toBe(afterFirst?.cost?.llmCalls)
+    // No cost.updated re-emitted on the replay — only the terminal step event.
+    expect(h.emitted.map((event) => event.type)).toEqual(['step.completed'])
+  })
+
+  it('#3 a direct setStepStatus(done) replay with cost is a no-op (idempotency key)', async () => {
+    // The service-level guarantee under the engine fix: re-asserting `done` with
+    // a cost rider on an already-done step must NOT re-charge. The same-status
+    // no-op short-circuit returns before the folded cost write.
+    const h = harness()
+    const missionId = await h.createMission([
+      { id: 'solo', intent: 'one step', kind: 'research', status: 'pending', attempts: 0 },
+    ])
+    await h.service.setStepStatus(missionId, 'solo', 'running')
+    const cost = { deltaUsd: 0.4, ledgerDelta: { costUsd: 0.4, llmCalls: 1 } }
+    await h.service.setStepStatus(missionId, 'solo', 'done', { resultRef: 'artifact:solo', cost })
+    const once = await h.service.getMission(missionId)
+    expect(once?.spentUsd).toBeCloseTo(0.4)
+    expect(once?.cost?.llmCalls).toBe(1)
+
+    // Replay the exact same done write — charge must not double.
+    await h.service.setStepStatus(missionId, 'solo', 'done', { resultRef: 'artifact:solo', cost })
+    const twice = await h.service.getMission(missionId)
+    expect(twice?.spentUsd).toBeCloseTo(0.4)
+    expect(twice?.cost?.llmCalls).toBe(1)
+  })
+
+  it('#13 budget gate admits a step that lands EXACTLY on the cap (cent-rounding)', async () => {
+    // Float-compare bug: 0.1 + 0.2 > 0.3 in IEEE-754, so a step whose estimate
+    // lands exactly on the remaining budget spuriously tripped the gate and
+    // PAUSED the mission (fail-closed, no approvals port). The fix compares in
+    // integer cents, so the exact-cap case is admitted. The budget gate runs
+    // only inside runPlan, so the test drives the plan. A dedicated engine pins
+    // the per-step estimate to 0.2; cap 0.3 with 0.1 already spent is the
+    // fragile boundary (spent + est === cap, but a binary-float overshoot).
+    const store = createInMemoryMissionStore()
+    const service = createMissionService({ store })
+    const engine = createMissionEngine({ service, estimateStepCostUsd: () => 0.2 })
+    const mission = await service.createMission({
+      workspaceId: WORKSPACE_ID,
+      title: 'Mission',
+      plan: [{ id: 'edge', intent: 'fit the cap', kind: 'research', status: 'pending', attempts: 0 }],
+      trigger: 'manual',
+      budgetUsd: 0.3,
+    })
+    // Seed prior spend of 0.1 (spent 0.1 + est 0.2 === cap 0.3 — the boundary).
+    await service.addCost(mission.id, 0.1)
+
+    const ran: string[] = []
+    const dispatch: SandboxDispatch = async ({ step }) => {
+      ran.push(step.id)
+      return { resultRef: `artifact:${step.id}` }
+    }
+    const outcome = await engine.runPlan(mission.id, (step) => engine.runStep(mission.id, step.id, dispatch))
+
+    // The plan COMPLETES (gate admits the exact-cap case), it does not pause.
+    expect(outcome).toEqual({ kind: 'completed', summary: 'Completed 1 step' })
+    expect(ran).toEqual(['edge'])
+    const after = await service.getMission(mission.id)
+    expect(after?.status).toBe('succeeded')
+    expect(after?.plan.find((s) => s.id === 'edge')?.status).toBe('done')
+    expect(Math.round(after!.spentUsd * 100)).toBe(30)
   })
 })

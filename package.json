@@ -246,7 +246,8 @@
     "prepare": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "knip": "knip"
   },
   "devDependencies": {
     "@tangle-network/agent-eval": "^0.83.0",
@@ -262,7 +263,9 @@
     "better-auth": "^1.6.16",
     "better-sqlite3": "^12.10.0",
     "drizzle-orm": "^0.45.2",
+    "fast-check": "^3.23.2",
     "jsdom": "^29.1.1",
+    "knip": "^5.46.0",
     "konva": "^10.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.2.7",
