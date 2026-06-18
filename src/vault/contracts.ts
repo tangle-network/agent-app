@@ -118,6 +118,17 @@ export interface VaultDockRenderProps {
   onClose: () => void
 }
 
+/** Configures the dock toggle VaultPane renders above the artifact pane. */
+export interface VaultDockToggle {
+  /** Button + aria label (e.g. 'Discuss', 'Review'). */
+  label: string
+  /** Tooltip when enabled. Defaults to `label`. */
+  title?: string
+  /** Disable the toggle while the open file has unsaved edits — a chat dock wants
+   *  this (save before discussing); a review panel does not. Default true. */
+  disabledWhenDirty?: boolean
+}
+
 /** The two editor surfaces the pane switches between for editable text files. */
 export type VaultEditorMode = 'rich' | 'source'
 
@@ -130,6 +141,15 @@ export interface VaultPaneProps {
   renderArtifact: (props: VaultArtifactRenderProps) => ReactNode
   /** Renders an optional right dock (agent chat, metadata, …). Omit to hide. */
   renderDock?: (props: VaultDockRenderProps) => ReactNode
+  /** Dock toggle config, or `false` for a PERSISTENT dock (no toggle, always open
+   *  with the selected file) — e.g. a domain review panel. Default: a collapsible
+   *  'Discuss' chat toggle disabled while the file is dirty. */
+  dockToggle?: VaultDockToggle | false
+  /** Bump (counter or string) to force the pane to re-list the tree + re-read the
+   *  open file after an out-of-band change (an upload, an accepted edit). */
+  refreshKey?: number | string
+  /** Extra controls rendered in the tree-pane header (e.g. an upload button). */
+  headerActions?: ReactNode
   /**
    * When false, all write affordances (create / delete / save / source editor)
    * are hidden and the pane is read-only. Defaults to true.
