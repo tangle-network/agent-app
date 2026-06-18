@@ -35,6 +35,9 @@ export interface VaultFile {
   mimeType?: string
   /** Object URL for binary/media previews the artifact renderer streams. */
   blobUrl?: string
+  /** Product-domain passthrough (media metadata, review state, …) the artifact
+   *  renderer reads. The pane never inspects it. */
+  extras?: Record<string, unknown>
 }
 
 /**
@@ -49,8 +52,9 @@ export interface VaultDataPort {
   readFile(path: string): Promise<VaultFile>
   /** Persist `content` to `path`. */
   writeFile(path: string, content: string): Promise<void>
-  /** Create a new (empty or scaffolded) file at `path`. */
-  createFile(path: string): Promise<void>
+  /** Create a new file at `path`; returns the CANONICAL path actually created
+   *  (the port may normalize, e.g. append an extension) so the pane opens it. */
+  createFile(path: string): Promise<string>
   /** Delete the file at `path`. */
   deleteFile(path: string): Promise<void>
 }
@@ -69,6 +73,11 @@ export type VaultRichParts = unknown
  * dirtiness against the saved content via `serialize`. Default: identity
  * passthrough (the rich draft IS the raw string) so source mode works without a
  * codec and there's no markdown dependency in the shell.
+ *
+ * CONTRACT: `parse`/`serialize` MUST be exact inverses — `serialize(parse(raw))
+ * === raw` for ALL content, INCLUDING the empty / no-metadata case. The pane
+ * uses that round-trip to detect edits, so a non-inverse opens files false-dirty
+ * and a save corrupts them.
  */
 export interface VaultMarkdownCodec {
   parse(raw: string): VaultRichParts
@@ -86,6 +95,20 @@ export interface VaultTreeRenderProps {
 export interface VaultArtifactRenderProps {
   file: VaultFile | null
   loading: boolean
+  /** Current editor mode. In 'rich' mode the product MAY host a WYSIWYG editor
+   *  wired to `richDraft` + `onRichChange` + `onSave`; else render a read preview. */
+  mode: VaultEditorMode
+  /** Whether editing is allowed (mirrors VaultPaneProps.canWrite). */
+  canWrite: boolean
+  /** The live rich draft (the codec's parsed form). The product's rich editor
+   *  edits this; reverting to the saved content clears dirtiness. */
+  richDraft: VaultRichParts
+  /** Whether the draft has unsaved edits. */
+  dirty: boolean
+  /** The product's rich editor reports edits here (updates draft + dirtiness). */
+  onRichChange: (parts: VaultRichParts) => void
+  /** Persist the current draft through the data port. */
+  onSave: () => void
 }
 
 /** Props the pane passes to the product's optional dock renderer (e.g. an agent dock). */

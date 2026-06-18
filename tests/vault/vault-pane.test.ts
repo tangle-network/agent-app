@@ -46,7 +46,7 @@ function fakePort(overrides: Partial<VaultDataPort> = {}): VaultDataPort {
     listTree: vi.fn(async () => TREE),
     readFile: vi.fn(async (path: string): Promise<VaultFile> => ({ path, content: files[path] ?? '' })),
     writeFile: vi.fn(async (path: string, content: string) => { files[path] = content }),
-    createFile: vi.fn(async (path: string) => { files[path] = '' }),
+    createFile: vi.fn(async (path: string): Promise<string> => { files[path] = ''; return path }),
     deleteFile: vi.fn(async (path: string) => { delete files[path] }),
     ...overrides,
   }
@@ -125,6 +125,39 @@ function typeSource(text: string) {
 function currentPath(): string | null {
   return document.querySelector('[data-vault-path]')?.textContent ?? null
 }
+
+/** A renderArtifact that surfaces the rich-editing seam as testable buttons —
+ *  the way a product wires its WYSIWYG editor (e.g. FileArtifactPane.editor). */
+function richArtifact(props: VaultArtifactRenderProps) {
+  return createElement(
+    'div',
+    {
+      'data-testid': 'rich-artifact',
+      'data-mode': props.mode,
+      'data-dirty': String(props.dirty),
+      'data-canwrite': String(props.canWrite),
+    },
+    createElement('button', { 'data-testid': 'rich-edit', onClick: () => props.onRichChange({ fm: '', body: 'EDITED' }) }, 'edit'),
+    createElement('button', { 'data-testid': 'rich-save', onClick: () => props.onSave() }, 'save'),
+  )
+}
+
+describe('VaultPane — rich-editing seam', () => {
+  it('exposes mode + draft + onRichChange + onSave so a product can host a WYSIWYG editor', async () => {
+    const { port } = mount({ renderArtifact: richArtifact })
+    fireEvent.click(await screen.findByTestId('tree-a.md'))
+    const art = await screen.findByTestId('rich-artifact')
+    expect(art.getAttribute('data-mode')).toBe('rich')
+    expect(art.getAttribute('data-canwrite')).toBe('true')
+    expect(art.getAttribute('data-dirty')).toBe('false')
+    // the product's rich editor reports an edit through the seam → dirty
+    fireEvent.click(screen.getByTestId('rich-edit'))
+    await waitFor(() => expect(screen.getByTestId('rich-artifact').getAttribute('data-dirty')).toBe('true'))
+    // save persists the serialized draft through the port
+    fireEvent.click(screen.getByTestId('rich-save'))
+    await waitFor(() => expect(port.writeFile).toHaveBeenCalledWith('a.md', expect.stringContaining('EDITED')))
+  })
+})
 
 describe('VaultPane — load + selection', () => {
   it('lists the tree on mount and opens a clicked file through the port', async () => {

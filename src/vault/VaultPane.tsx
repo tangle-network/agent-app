@@ -292,6 +292,11 @@ export function VaultPane(props: VaultPaneProps) {
     setIsDirty(next !== savedContentRef.current)
   }, [])
 
+  const onRichChange = useCallback((next: VaultRichParts) => {
+    setRichDraft(next)
+    setIsDirty(activeCodec.serialize(next) !== savedContentRef.current)
+  }, [activeCodec])
+
   const saveCurrent = useCallback(async () => {
     if (!selectedFile) return
     const content = editorMode === 'source' ? sourceDraft : activeCodec.serialize(richDraft)
@@ -313,11 +318,11 @@ export function VaultPane(props: VaultPaneProps) {
     if (!trimmed) return
     setCreating(true)
     try {
-      await port.createFile(trimmed)
+      const created = await port.createFile(trimmed)
       setCreateOpen(false)
       setNewPath('')
       await refresh()
-      commitPath(trimmed)
+      commitPath(created)
     } finally {
       setCreating(false)
     }
@@ -462,7 +467,16 @@ export function VaultPane(props: VaultPaneProps) {
                 onSave={() => void saveCurrent()}
               />
             ) : selectedFile ? (
-              renderArtifact({ file: selectedFile, loading: false })
+              renderArtifact({
+                file: selectedFile,
+                loading: false,
+                mode: editorMode,
+                canWrite,
+                richDraft,
+                dirty: isDirty,
+                onRichChange,
+                onSave: () => void saveCurrent(),
+              })
             ) : (
               <EmptyState />
             )}
