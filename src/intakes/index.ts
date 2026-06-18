@@ -2,8 +2,9 @@
  * Intakes capability — per-user onboarding and per-project intake interviews
  * for agent products, exposed as opt-in subpaths so an app that never imports
  * `./intakes*` pulls zero intakes code (and zero `drizzle-orm`). This barrel is
- * the PURE leaf: the question-graph model and the completion-state algebra with
- * no drizzle, no env, no react, no I/O.
+ * the PURE leaf: the question-graph model, the completion-state algebra, and
+ * the context-sufficiency floor + conversational-gather scaffold — with no
+ * drizzle, no env, no react, no I/O.
  *
  * Intakes are orthogonal to teams: an app can adopt intakes with zero teams,
  * and the per-USER intake (one-time onboarding keyed on `user.id`) needs no
@@ -24,3 +25,4 @@
  */
 export * from './model'
 export * from './completion'
+export * from './context-sufficiency'
