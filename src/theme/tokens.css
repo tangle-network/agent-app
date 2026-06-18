@@ -18,36 +18,36 @@
  */
 
 :root {
-  /* shadcn channel triples — "H S% L%", consumed as hsl(var(--name)) */
+  /* shadcn channel triples — "H S% L%", consumed as hsl(var(--name)).
+     Values mirror @tangle-network/brand (Tangle Quiet) so agent-app surfaces
+     match sandbox-ui in the same app. agent-app keeps its own light-default /
+     [data-theme="dark"] scope model (brand is dark-default), so /theme stays
+     dependency-free — only the values are shared, not the cascade. */
   --background: 0 0% 100%;
-  --foreground: 222 47% 11%;
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
+  --foreground: 0 0% 5%;
+  --card: 240 7% 97%;
+  --card-foreground: 0 0% 5%;
   --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
-  --primary: 221 83% 47%;
+  --popover-foreground: 0 0% 5%;
+  --primary: 245 62% 57%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 210 40% 96%;
-  --secondary-foreground: 222 47% 30%;
-  --muted: 210 40% 96%;
-  /* 44% L (was 47%) so muted text clears WCAG AA even on subtly tinted surfaces
-     (e.g. the failed tool card's 5%-red wash); ~4.7:1 on white. */
-  --muted-foreground: 215 16% 44%;
-  --accent: 210 40% 96%;
-  --accent-foreground: 222 47% 11%;
-  --destructive: 0 72% 45%;
+  --secondary: 240 6% 93%;
+  --secondary-foreground: 0 0% 10%;
+  --muted: 240 6% 93%;
+  --muted-foreground: 240 5% 38%;
+  --accent: 240 6% 93%;
+  --accent-foreground: 0 0% 10%;
+  --destructive: 0 72% 41%;
   --destructive-foreground: 0 0% 100%;
-  --border: 214 32% 91%;
-  --input: 214 32% 91%;
-  --ring: 221 83% 53%;
-  /* note: --primary below is darkened from 53% → 47% L so the brand blue clears
-     WCAG AA (4.5:1) when used AS TEXT on a light surface; --ring stays at the
-     brighter 53% (a 2px focus ring only needs 3:1 non-text contrast). */
-  /* status colors — dark enough on light surfaces to clear AA as text (used by
-     chips, dots, and solid buttons via the Tailwind preset's success/warning). */
-  --success: 142 72% 29%;
+  --border: 240 6% 89%;
+  --input: 240 6% 89%;
+  --ring: 245 62% 57%;
+  /* status colors — brand hues (teal/gold/red), but lightness kept dark enough
+     to clear WCAG AA when used AS TEXT on tinted chips. Brand's own status
+     accents are dot/surface colors and are not text-contrast-tuned. */
+  --success: 160 84% 26%;
   --success-foreground: 0 0% 100%;
-  --warning: 38 92% 32%;
+  --warning: 41 96% 38%;
   --warning-foreground: 38 92% 12%;
 
   /* canvas/sequences aliases — full colors, resolve to the triples above */
@@ -62,34 +62,36 @@
 
   /* canvas-only surfaces (not part of the shadcn vocabulary). Name matches the
      `--canvas-backdrop` the design-canvas Workspace references (with a #1a1a1a fallback). */
-  --canvas-backdrop: hsl(220 13% 91%);
+  --canvas-backdrop: hsl(240 7% 90%);
 }
 
 [data-theme='dark'],
 .dark {
-  --background: 222 47% 7%;
-  --foreground: 210 40% 98%;
-  --card: 222 47% 11%;
-  --card-foreground: 210 40% 98%;
-  --popover: 222 47% 11%;
-  --popover-foreground: 210 40% 98%;
-  --primary: 217 91% 72%;
-  --primary-foreground: 222 47% 11%;
-  --secondary: 217 33% 17%;
-  --secondary-foreground: 210 40% 90%;
-  --muted: 217 33% 17%;
-  --muted-foreground: 215 20% 65%;
-  --accent: 217 33% 17%;
-  --accent-foreground: 210 40% 98%;
-  --destructive: 0 78% 67%;
+  --background: 240 8% 5%;
+  --foreground: 240 6% 93%;
+  --card: 240 5% 8%;
+  --card-foreground: 240 6% 93%;
+  --popover: 240 4% 13%;
+  --popover-foreground: 240 6% 93%;
+  /* 74% L (brand's #818CF8 intent) so primary clears AA as TEXT on a primary/10
+     tint in dark; the solid primary button pairs it with a light foreground. */
+  --primary: 239 84% 74%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 5% 11%;
+  --secondary-foreground: 240 6% 93%;
+  --muted: 240 5% 11%;
+  --muted-foreground: 240 4% 62%;
+  --accent: 240 5% 11%;
+  --accent-foreground: 240 6% 93%;
+  --destructive: 348 90% 68%;
   --destructive-foreground: 0 0% 12%;
-  --border: 217 33% 20%;
-  --input: 217 33% 20%;
-  --ring: 217 91% 60%;
-  --success: 142 60% 50%;
-  --success-foreground: 142 80% 12%;
-  --warning: 38 95% 58%;
+  --border: 240 3% 13%;
+  --input: 240 5% 11%;
+  --ring: 239 84% 74%;
+  --success: 160 70% 52%;
+  --success-foreground: 160 84% 10%;
+  --warning: 40 94% 56%;
   --warning-foreground: 38 92% 12%;
 
-  --canvas-backdrop: hsl(0 0% 10%);
+  --canvas-backdrop: hsl(240 8% 5%);
 }
