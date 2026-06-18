@@ -130,11 +130,17 @@ export function VaultPane(props: VaultPaneProps) {
     onSelectedPathChange,
     codec,
     className,
+    dockToggle,
+    refreshKey,
+    headerActions,
   } = props
 
   const activeCodec = codec ?? IDENTITY_CODEC
   const controlled = controlledPath !== undefined
   const isMarkdownCapable = codec !== undefined
+  // `false` → a persistent dock (no toggle, always open with the selected file).
+  const persistentDock = dockToggle === false
+  const dockToggleCfg = dockToggle ? dockToggle : { label: 'Discuss', disabledWhenDirty: true }
 
   const [tree, setTree] = useState<VaultTreeNode[]>([])
   const [treeLoading, setTreeLoading] = useState(true)
@@ -187,7 +193,7 @@ export function VaultPane(props: VaultPaneProps) {
 
   useEffect(() => {
     void refresh()
-  }, [refresh])
+  }, [refresh, refreshKey])
 
   useEffect(() => {
     if (!selectedPath) {
@@ -212,7 +218,7 @@ export function VaultPane(props: VaultPaneProps) {
     return () => {
       cancelled = true
     }
-  }, [port, selectedPath])
+  }, [port, selectedPath, refreshKey])
 
   useEffect(() => {
     if (!selectedFile) {
@@ -355,6 +361,7 @@ export function VaultPane(props: VaultPaneProps) {
               </span>
             </div>
             <div className="flex shrink-0 items-center gap-1">
+              {headerActions}
               <button
                 type="button"
                 aria-label="Refresh vault"
@@ -423,13 +430,13 @@ export function VaultPane(props: VaultPaneProps) {
                     </button>
                   </div>
                 )}
-                {renderDock && (
+                {renderDock && !persistentDock && (
                   <button
                     type="button"
-                    aria-label="Discuss with agent"
+                    aria-label={dockToggleCfg.label}
                     aria-pressed={dockOpen}
-                    disabled={isDirty}
-                    title={isDirty ? 'Save before discussing with agent' : 'Discuss with agent'}
+                    disabled={(dockToggleCfg.disabledWhenDirty ?? true) && isDirty}
+                    title={(dockToggleCfg.disabledWhenDirty ?? true) && isDirty ? 'Save your changes first' : (dockToggleCfg.title ?? dockToggleCfg.label)}
                     onClick={() => setDockOpen((v) => !v)}
                     className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs transition-colors disabled:pointer-events-none disabled:opacity-40 ${
                       dockOpen
@@ -437,7 +444,7 @@ export function VaultPane(props: VaultPaneProps) {
                         : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     }`}
                   >
-                    Discuss
+                    {dockToggleCfg.label}
                   </button>
                 )}
                 {canWrite && (
@@ -485,8 +492,8 @@ export function VaultPane(props: VaultPaneProps) {
 
         {renderDock && selectedFile && renderDock({
           file: selectedFile,
-          open: dockOpen,
-          onClose: () => setDockOpen(false),
+          open: persistentDock ? true : dockOpen,
+          onClose: persistentDock ? () => {} : () => setDockOpen(false),
         })}
 
         <ConfirmDialog

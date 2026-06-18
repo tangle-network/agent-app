@@ -21,6 +21,7 @@ import type {
   VaultTreeNode,
   VaultTreeRenderProps,
   VaultArtifactRenderProps,
+  VaultDockRenderProps,
 } from '../../src/vault/contracts'
 
 afterEach(cleanup)
@@ -364,5 +365,44 @@ describe('VaultPane — dock seam', () => {
     expect(screen.queryByTestId('dock')).toBeNull()
     await openFile('a.md')
     expect(screen.getByTestId('dock')).toBeTruthy()
+  })
+})
+
+describe('VaultPane — dock toggle + refreshKey + headerActions', () => {
+  const openDock = (props: VaultDockRenderProps) =>
+    createElement('div', { 'data-testid': 'dock', 'data-open': String(props.open) }, props.file?.path ?? '')
+
+  it('dockToggle=false renders a persistent dock — no toggle, always open with the file', async () => {
+    mount({ renderDock: openDock, dockToggle: false })
+    await openFile('a.md')
+    expect(screen.getByTestId('dock').getAttribute('data-open')).toBe('true')
+    expect(screen.queryByRole('button', { name: 'Discuss' })).toBeNull()
+  })
+
+  it('a custom dockToggle sets the label and can stay enabled while dirty', async () => {
+    mount({ renderDock: openDock, dockToggle: { label: 'Review', disabledWhenDirty: false }, renderArtifact: richArtifact })
+    fireEvent.click(await screen.findByTestId('tree-a.md'))
+    await waitFor(() => expect(screen.getByTestId('rich-artifact').getAttribute('data-body')).toBe('body A'))
+    expect(screen.getByRole('button', { name: 'Review' })).toBeTruthy()
+    fireEvent.click(screen.getByTestId('rich-edit'))
+    await waitFor(() => expect(screen.getByTestId('rich-artifact').getAttribute('data-dirty')).toBe('true'))
+    expect((screen.getByRole('button', { name: 'Review' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('bumping refreshKey re-lists the tree and re-reads the open file', async () => {
+    const port = fakePort()
+    const el = (key: number) => createElement(VaultPane, { port, renderTree, renderArtifact, codec: fmCodec, refreshKey: key })
+    const { rerender } = render(el(1))
+    await openFile('a.md')
+    const lists = (port.listTree as ReturnType<typeof vi.fn>).mock.calls.length
+    const reads = (port.readFile as ReturnType<typeof vi.fn>).mock.calls.length
+    rerender(el(2))
+    await waitFor(() => expect((port.listTree as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(lists))
+    await waitFor(() => expect((port.readFile as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(reads))
+  })
+
+  it('headerActions renders in the tree-pane header', async () => {
+    mount({ headerActions: createElement('button', { 'data-testid': 'upload-btn' }, 'Upload') })
+    expect(await screen.findByTestId('upload-btn')).toBeTruthy()
   })
 })
