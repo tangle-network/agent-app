@@ -278,6 +278,16 @@
       "import": "./dist/intakes-react/lazy.js",
       "default": "./dist/intakes-react/lazy.js"
     },
+    "./vault": {
+      "types": "./dist/vault/index.d.ts",
+      "import": "./dist/vault/index.js",
+      "default": "./dist/vault/index.js"
+    },
+    "./vault/lazy": {
+      "types": "./dist/vault/lazy.d.ts",
+      "import": "./dist/vault/lazy.js",
+      "default": "./dist/vault/lazy.js"
+    },
     "./theme": {
       "types": "./dist/theme/index.d.ts",
       "import": "./dist/theme/index.js",
