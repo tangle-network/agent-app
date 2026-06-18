@@ -136,6 +136,7 @@ function richArtifact(props: VaultArtifactRenderProps) {
       'data-mode': props.mode,
       'data-dirty': String(props.dirty),
       'data-canwrite': String(props.canWrite),
+      'data-body': (props.richDraft as { body?: string })?.body ?? '',
     },
     createElement('button', { 'data-testid': 'rich-edit', onClick: () => props.onRichChange({ fm: '', body: 'EDITED' }) }, 'edit'),
     createElement('button', { 'data-testid': 'rich-save', onClick: () => props.onSave() }, 'save'),
@@ -149,7 +150,12 @@ describe('VaultPane — rich-editing seam', () => {
     const art = await screen.findByTestId('rich-artifact')
     expect(art.getAttribute('data-mode')).toBe('rich')
     expect(art.getAttribute('data-canwrite')).toBe('true')
-    expect(art.getAttribute('data-dirty')).toBe('false')
+    // Wait for the file load to FULLY settle (the codec-parsed draft is present)
+    // before editing. The load runs as two effects — readFile, then the process
+    // effect that sets savedContentRef + clears dirty — and editing before the
+    // second flushes lets its setIsDirty(false) clobber the edit's dirty=true.
+    await waitFor(() => expect(screen.getByTestId('rich-artifact').getAttribute('data-body')).toBe('body A'))
+    expect(screen.getByTestId('rich-artifact').getAttribute('data-dirty')).toBe('false')
     // the product's rich editor reports an edit through the seam → dirty
     fireEvent.click(screen.getByTestId('rich-edit'))
     await waitFor(() => expect(screen.getByTestId('rich-artifact').getAttribute('data-dirty')).toBe('true'))
