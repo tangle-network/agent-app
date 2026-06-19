@@ -98,7 +98,11 @@ function fakeBox(over: Partial<SandboxInstance> = {}): SandboxInstance {
     name: 'box-w1',
     id: 'sandbox-1',
     metadata: { harness: 'opencode' },
-    connection: { runtimeUrl: 'https://rt' },
+    connection: {
+      runtimeUrl: 'https://rt',
+      authToken: 'runtime-token',
+      authTokenExpiresAt: '2999-01-01T00:00:00.000Z',
+    } as never,
     waitFor: vi.fn().mockResolvedValue(undefined),
     refresh: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
@@ -1427,6 +1431,159 @@ describe('deferred profile files', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('ensureWorkspaceSandbox: refreshes missing runtime auth before deferred writes on a reused box', async () => {
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    const running = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      connection: { runtimeUrl: 'https://rt' } as never,
+    })
+    const refreshed = fakeBox({
+      id: running.id,
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      exec,
+    })
+    listMock.mockResolvedValue([running])
+    getMock.mockResolvedValue(refreshed)
+    const filesProfile = {
+      name: 'p',
+      resources: { files: [inlineMount('skills/seo.md', '# SEO')] },
+    } as unknown as AgentProfile
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      deferProfileFiles: true,
+      profile: () => filesProfile,
+    })
+
+    const box = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(box).toBe(refreshed)
+    expect(running.refresh).toHaveBeenCalledOnce()
+    expect(getMock).toHaveBeenCalledWith(running.id)
+    expect(exec).toHaveBeenCalledTimes(3)
+  })
+
+  it('ensureWorkspaceSandbox: refreshes expired runtime auth before deferred writes on a resumed box', async () => {
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    const stopped = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      resume: vi.fn(),
+      connection: {
+        runtimeUrl: 'https://rt',
+        authToken: 'expired-runtime-token',
+        authTokenExpiresAt: '2000-01-01T00:00:00.000Z',
+      } as never,
+    })
+    const refreshed = fakeBox({
+      id: stopped.id,
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      exec,
+    })
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      status === 'running'
+        ? Promise.resolve([])
+        : status === 'stopped'
+          ? Promise.resolve([stopped])
+          : Promise.resolve([]),
+    )
+    getMock.mockResolvedValue(refreshed)
+    const filesProfile = {
+      name: 'p',
+      resources: { files: [inlineMount('skills/seo.md', '# SEO')] },
+    } as unknown as AgentProfile
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      deferProfileFiles: true,
+      profile: () => filesProfile,
+    })
+
+    const box = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(box).toBe(refreshed)
+    expect(stopped.resume).toHaveBeenCalledOnce()
+    expect(stopped.refresh).toHaveBeenCalledOnce()
+    expect(getMock).toHaveBeenCalledWith(stopped.id)
+    expect(exec).toHaveBeenCalledTimes(3)
+  })
+
+  it('ensureWorkspaceSandbox: refreshes runtime auth after one deferred-write 401 and retries idempotently', async () => {
+    const cwd = await mkdtemp(join(tmpdir(), 'agent-app-profile-write-auth-'))
+    let calls = 0
+    const exec = vi.fn().mockImplementation(async (cmd: string) => {
+      calls++
+      try {
+        const output = await execFileAsync('bash', ['-lc', cmd], { cwd, timeout: 5000 })
+        if (calls === 2) {
+          throw Object.assign(new Error('Missing or invalid authentication'), {
+            status: 401,
+            code: 'AUTH_ERROR',
+          })
+        }
+        return { stdout: String(output.stdout), stderr: String(output.stderr), exitCode: 0 }
+      } catch (err) {
+        const e = err as { stdout?: unknown; stderr?: unknown; code?: unknown; status?: unknown }
+        if (e.status === 401) throw err
+        return {
+          stdout: typeof e.stdout === 'string' ? e.stdout : '',
+          stderr: typeof e.stderr === 'string' ? e.stderr : '',
+          exitCode: typeof e.code === 'number' ? e.code : 1,
+        }
+      }
+    })
+    try {
+      const running = fakeBox({ name: 'box-w1', metadata: { harness: 'opencode' }, exec })
+      listMock.mockResolvedValue([running])
+      const filesProfile = {
+        name: 'p',
+        resources: { files: [inlineMount('skills/seo.md', 'abc')] },
+      } as unknown as AgentProfile
+      const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+        deferProfileFiles: true,
+        profile: () => filesProfile,
+      })
+
+      const box = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+
+      expect(box).toBe(running)
+      expect(running.refresh).toHaveBeenCalledOnce()
+      expect(exec).toHaveBeenCalledTimes(5)
+      await expect(readFsFile(join(cwd, 'skills/seo.md'), 'utf8')).resolves.toBe('abc')
+    } finally {
+      await rm(cwd, { recursive: true, force: true })
+    }
+  })
+
+  it('ensureWorkspaceSandbox: persistent deferred-write 401 after auth refresh is typed and bounded', async () => {
+    const authError = Object.assign(new Error('Missing or invalid authentication'), {
+      status: 401,
+      code: 'AUTH_ERROR',
+    })
+    const exec = vi.fn().mockRejectedValue(authError)
+    const running = fakeBox({ name: 'box-w1', metadata: { harness: 'opencode' }, exec })
+    listMock.mockResolvedValue([running])
+    const filesProfile = {
+      name: 'p',
+      resources: { files: [inlineMount('skills/seo.md', '# SEO')] },
+    } as unknown as AgentProfile
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      deferProfileFiles: true,
+      profile: () => filesProfile,
+    })
+
+    const err = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+      .catch((error: Error) => error)
+    const thrown = err as Error
+
+    expect(thrown.message).toContain(
+      'deferred file write failed on reused box box-w1: reused sandbox auth refresh failed for box-w1: runtime exec remained unauthorized after auth refresh',
+    )
+    expect((thrown.cause as Error).name).toBe('SandboxRuntimeAuthRefreshError')
+    expect(((thrown.cause as Error).cause as Error).cause).toBe(authError)
+    expect(running.refresh).toHaveBeenCalledOnce()
+    expect(exec).toHaveBeenCalledTimes(2)
   })
 
   it('ensureWorkspaceSandbox: deferred write failure includes failed path and cause chain', async () => {
