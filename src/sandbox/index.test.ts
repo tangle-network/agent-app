@@ -924,7 +924,28 @@ describe('deferred profile files', () => {
     const box = fakeBox({ exec })
     const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')])
     expect(res.succeeded).toBe(false)
+    expect(exec).toHaveBeenCalledTimes(1)
     if (!res.succeeded) expect(res.error.message).toContain('disk full')
+  })
+
+  it('handles a GTM-scale deferred corpus without oversized execs', async () => {
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    const box = fakeBox({ exec })
+    const fileSizes = [
+      ...Array.from({ length: 22 }, () => 4500),
+      ...Array.from({ length: 25 }, () => 4941),
+      4952,
+    ]
+    expect(fileSizes.reduce((sum, size) => sum + size, 0)).toBe(227_477)
+    const files = fileSizes.map((size, i) => inlineMount(`skills/gtm/file-${i}.md`, 'x'.repeat(size)))
+
+    const res = await writeProfileFilesToBox(box, files, { paceMs: 0 })
+
+    expect(res.succeeded).toBe(true)
+    expect(exec).toHaveBeenCalledTimes(218)
+    for (const [cmd] of exec.mock.calls) {
+      expect(Buffer.byteLength(cmd as string, 'utf8')).toBeLessThan(4096)
+    }
   })
 
   it('expands a ~/ mount path to $HOME (not a literal ~ dir); absolute paths unchanged', async () => {
@@ -978,19 +999,96 @@ describe('deferred profile files', () => {
     expect(calls).toBe(5)
   })
 
-  it('fails loud immediately on a non-429 thrown error (no retry)', async () => {
+  it('retries a 5xx SandboxError with backoff, then succeeds', async () => {
+    vi.useFakeTimers()
+    try {
+      let calls = 0
+      const exec = vi.fn().mockImplementation(async () => {
+        calls++
+        if (calls === 1) {
+          const err = Object.assign(new Error('Service Unavailable'), { status: 503, code: 'server_error' })
+          throw err
+        }
+        return { stdout: '', stderr: '', exitCode: 0 }
+      })
+      const box = fakeBox({ exec })
+      const promise = writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')], { paceMs: 0 })
+
+      await vi.advanceTimersByTimeAsync(2_000)
+      const res = await promise
+
+      expect(res.succeeded).toBe(true)
+      expect(calls).toBe(4)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('retries connection reset/network errors with backoff, then succeeds', async () => {
+    vi.useFakeTimers()
+    try {
+      let calls = 0
+      const reset = Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' })
+      const exec = vi.fn().mockImplementation(async () => {
+        calls++
+        if (calls === 1) throw new Error('fetch failed', { cause: reset })
+        return { stdout: '', stderr: '', exitCode: 0 }
+      })
+      const box = fakeBox({ exec })
+      const promise = writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')], { paceMs: 0 })
+
+      await vi.advanceTimersByTimeAsync(2_000)
+      const res = await promise
+
+      expect(res.succeeded).toBe(true)
+      expect(calls).toBe(4)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('fails loud immediately on a non-retryable thrown error (no retry)', async () => {
     let calls = 0
     const exec = vi.fn().mockImplementation(async () => {
       calls++
-      const err = Object.assign(new Error('connection reset'), { status: 503, code: 'server_error' })
+      const err = Object.assign(new Error('bad request'), { status: 400, code: 'bad_request' })
       throw err
     })
     const box = fakeBox({ exec })
     const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')], { paceMs: 0 })
     expect(res.succeeded).toBe(false)
-    // Exactly one attempt — a non-429 error is not retried.
+    // Exactly one attempt — deterministic/non-transient transport errors are not retried.
     expect(calls).toBe(1)
     if (!res.succeeded) expect(res.error.message).toContain('exec failed')
+  })
+
+  it('persistent retryable exec failures exhaust retries and preserve the cause', async () => {
+    vi.useFakeTimers()
+    try {
+      let calls = 0
+      const cause = Object.assign(new Error('Service Unavailable'), { status: 503, code: 'server_error' })
+      const exec = vi.fn().mockImplementation(async () => {
+        calls++
+        throw cause
+      })
+      const box = fakeBox({ exec })
+      const promise = writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')], {
+        maxRetries: 2,
+        paceMs: 0,
+      })
+
+      await vi.advanceTimersByTimeAsync(2_000)
+      const res = await promise
+
+      expect(res.succeeded).toBe(false)
+      expect(calls).toBe(3)
+      if (!res.succeeded) {
+        expect(res.error.message).toContain('exec failed for skills/x.md')
+        expect(res.error.cause).toBe(cause)
+      }
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('times out a hung exec, retries with backoff, then succeeds (no infinite park)', async () => {
@@ -1101,25 +1199,147 @@ describe('deferred profile files', () => {
   })
 
   it('ensureWorkspaceSandbox: deferred files are stripped from create payload and written post-running', async () => {
-    listMock.mockResolvedValue([])
-    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
-    const created = fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), exec, connection: { runtimeUrl: 'x' } as never })
-    createMock.mockResolvedValue(created)
-    const filesProfile = {
-      name: 'p',
-      resources: { files: [inlineMount('skills/seo.md', '# SEO'), inlineMount('/usr/local/bin/gtm', 'echo')] },
-    } as unknown as AgentProfile
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-      deferProfileFiles: true,
-      resumeStopped: false,
-      profile: () => filesProfile,
-    })
-    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
-    const payload = createMock.mock.calls[0]![0]
-    // Inline files stripped from the create payload.
-    expect(payload.backend.profile.resources.files).toEqual([])
-    // ...and written into the box afterward (3 small execs per file).
-    expect(exec).toHaveBeenCalledTimes(6)
+    vi.useFakeTimers()
+    try {
+      listMock.mockResolvedValue([])
+      let calls = 0
+      const exec = vi.fn().mockImplementation(async () => {
+        calls++
+        if (calls === 1) {
+          const err = Object.assign(new Error('Service Unavailable'), { status: 503, code: 'server_error' })
+          throw err
+        }
+        return { stdout: '', stderr: '', exitCode: 0 }
+      })
+      const created = fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), exec, connection: { runtimeUrl: 'x' } as never })
+      createMock.mockResolvedValue(created)
+      const filesProfile = {
+        name: 'p',
+        resources: { files: [inlineMount('skills/seo.md', '# SEO'), inlineMount('/usr/local/bin/gtm', 'echo')] },
+      } as unknown as AgentProfile
+      const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+        deferProfileFiles: true,
+        resumeStopped: false,
+        profile: () => filesProfile,
+      })
+      const promise = ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+
+      await vi.advanceTimersByTimeAsync(2_000)
+      await promise
+
+      const payload = createMock.mock.calls[0]![0]
+      // Inline files stripped from the create payload.
+      expect(payload.backend.profile.resources.files).toEqual([])
+      // ...and written into the box afterward; first exec retried once after a transient 503.
+      expect(exec).toHaveBeenCalledTimes(7)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('ensureWorkspaceSandbox: retries deferred writes on a reused box', async () => {
+    vi.useFakeTimers()
+    try {
+      let calls = 0
+      const exec = vi.fn().mockImplementation(async () => {
+        calls++
+        if (calls === 1) throw Object.assign(new Error('fetch failed'), { code: 'ECONNRESET' })
+        return { stdout: '', stderr: '', exitCode: 0 }
+      })
+      const running = fakeBox({ name: 'box-w1', metadata: { harness: 'opencode' }, exec })
+      listMock.mockResolvedValue([running])
+      const filesProfile = {
+        name: 'p',
+        resources: { files: [inlineMount('skills/seo.md', '# SEO')] },
+      } as unknown as AgentProfile
+      const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+        deferProfileFiles: true,
+        profile: () => filesProfile,
+      })
+      const promise = ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+
+      await vi.advanceTimersByTimeAsync(2_000)
+      const box = await promise
+
+      expect(box).toBe(running)
+      expect(createMock).not.toHaveBeenCalled()
+      expect(exec).toHaveBeenCalledTimes(4)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('ensureWorkspaceSandbox: retries deferred writes on a resumed box', async () => {
+    vi.useFakeTimers()
+    try {
+      let calls = 0
+      const exec = vi.fn().mockImplementation(async () => {
+        calls++
+        if (calls === 1) throw Object.assign(new Error('sidecar not ready'), { status: 425 })
+        return { stdout: '', stderr: '', exitCode: 0 }
+      })
+      const stopped = fakeBox({ name: 'box-w1', metadata: { harness: 'opencode' }, resume: vi.fn(), exec })
+      listMock.mockImplementation(({ status }: { status: string }) =>
+        status === 'running'
+          ? Promise.resolve([])
+          : status === 'stopped'
+            ? Promise.resolve([stopped])
+            : Promise.resolve([]),
+      )
+      const filesProfile = {
+        name: 'p',
+        resources: { files: [inlineMount('skills/seo.md', '# SEO')] },
+      } as unknown as AgentProfile
+      const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+        deferProfileFiles: true,
+        profile: () => filesProfile,
+      })
+      const promise = ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+
+      await vi.advanceTimersByTimeAsync(2_000)
+      const box = await promise
+
+      expect(box).toBe(stopped)
+      expect(stopped.resume).toHaveBeenCalledOnce()
+      expect(createMock).not.toHaveBeenCalled()
+      expect(exec).toHaveBeenCalledTimes(4)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('ensureWorkspaceSandbox: deferred write failure includes failed path and cause chain', async () => {
+    vi.useFakeTimers()
+    try {
+      listMock.mockResolvedValue([])
+      const cause = Object.assign(new Error('Service Unavailable'), { status: 503, code: 'server_error' })
+      const exec = vi.fn().mockRejectedValue(cause)
+      const created = fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), exec, connection: { runtimeUrl: 'x' } as never })
+      createMock.mockResolvedValue(created)
+      const filesProfile = {
+        name: 'p',
+        resources: { files: [inlineMount('skills/seo.md', '# SEO')] },
+      } as unknown as AgentProfile
+      const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+        deferProfileFiles: true,
+        resumeStopped: false,
+        profile: () => filesProfile,
+      })
+      const promise = ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+        .catch((err: Error) => err)
+
+      await vi.advanceTimersByTimeAsync(60_000)
+      const err = await promise
+      expect(err).toBeInstanceOf(Error)
+      const thrown = err as Error
+
+      expect(thrown.message).toContain(
+        'deferred file write failed on new box box-w1: writeProfileFilesToBox: exec failed for skills/seo.md',
+      )
+      expect((thrown.cause as Error).cause).toBe(cause)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('ensureWorkspaceSandbox: keeps files inline when deferProfileFiles is unset', async () => {
