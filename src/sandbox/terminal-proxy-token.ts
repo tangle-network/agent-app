@@ -1,12 +1,4 @@
-type TerminalProxyOutcome<T> =
-  | { succeeded: true; value: T }
-  | { succeeded: false; error: Error }
-
-const ok = <T>(value: T): TerminalProxyOutcome<T> => ({ succeeded: true, value })
-const fail = (error: unknown): TerminalProxyOutcome<never> => ({
-  succeeded: false,
-  error: error instanceof Error ? error : new Error(String(error)),
-})
+import { ok, fail, type Outcome } from './outcome'
 
 // Terminal-proxy HMAC token. Identity tuple is generic; the secret comes from a
 // closure (fail-loud if absent).
@@ -35,7 +27,7 @@ export async function mintTerminalProxyToken(
   identity: TerminalProxyIdentity,
   ttlMs = TERMINAL_PROXY_TOKEN_TTL_MS,
   now: () => number = Date.now,
-): Promise<TerminalProxyOutcome<{ token: string; expiresAt: Date }>> {
+): Promise<Outcome<{ token: string; expiresAt: Date }>> {
   if (!secret) return fail(new Error('mintTerminalProxyToken: secret is required'))
   if (!identity.userId || !identity.workspaceId || !identity.sandboxId) {
     return fail(new Error('mintTerminalProxyToken: userId/workspaceId/sandboxId are required'))

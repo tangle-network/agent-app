@@ -15,16 +15,9 @@ import {
   type ToolHeaderNames,
 } from '../tools/index'
 import { assertHarnessModelCompatible, type Harness } from '../harness/index'
+import { ok, fail, type Outcome } from './outcome'
 
-export type Outcome<T> =
-  | { succeeded: true; value: T }
-  | { succeeded: false; error: Error }
-
-const ok = <T>(value: T): Outcome<T> => ({ succeeded: true, value })
-const fail = (error: unknown): Outcome<never> => ({
-  succeeded: false,
-  error: error instanceof Error ? error : new Error(String(error)),
-})
+export type { Outcome } from './outcome'
 
 export interface SandboxClientCredentials {
   apiKey: string
