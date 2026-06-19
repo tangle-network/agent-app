@@ -1510,6 +1510,68 @@ describe('deferred profile files', () => {
     expect(exec).toHaveBeenCalledTimes(3)
   })
 
+  it('ensureWorkspaceSandbox: tokenless reused box still attempts deferred write when exec works', async () => {
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    const running = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      connection: { runtimeUrl: 'https://rt' } as never,
+      exec,
+    })
+    listMock.mockResolvedValue([running])
+    getMock.mockResolvedValue(undefined)
+    const filesProfile = {
+      name: 'p',
+      resources: { files: [inlineMount('skills/seo.md', '# SEO')] },
+    } as unknown as AgentProfile
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      deferProfileFiles: true,
+      profile: () => filesProfile,
+    })
+
+    const box = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(box).toBe(running)
+    expect(running.refresh).toHaveBeenCalledOnce()
+    expect(getMock).toHaveBeenCalledWith(running.id)
+    expect(exec).toHaveBeenCalledTimes(3)
+  })
+
+  it('ensureWorkspaceSandbox: tokenless resumed box still attempts deferred write when exec works', async () => {
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    const stopped = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      connection: { runtimeUrl: 'https://rt' } as never,
+      resume: vi.fn(),
+      exec,
+    })
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      status === 'running'
+        ? Promise.resolve([])
+        : status === 'stopped'
+          ? Promise.resolve([stopped])
+          : Promise.resolve([]),
+    )
+    getMock.mockResolvedValue(undefined)
+    const filesProfile = {
+      name: 'p',
+      resources: { files: [inlineMount('skills/seo.md', '# SEO')] },
+    } as unknown as AgentProfile
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      deferProfileFiles: true,
+      profile: () => filesProfile,
+    })
+
+    const box = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(box).toBe(stopped)
+    expect(stopped.resume).toHaveBeenCalledOnce()
+    expect(stopped.refresh).toHaveBeenCalledOnce()
+    expect(getMock).toHaveBeenCalledWith(stopped.id)
+    expect(exec).toHaveBeenCalledTimes(3)
+  })
+
   it('ensureWorkspaceSandbox: refreshes runtime auth after one deferred-write 401 and retries idempotently', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'agent-app-profile-write-auth-'))
     let calls = 0
@@ -1585,6 +1647,34 @@ describe('deferred profile files', () => {
     expect(((thrown.cause as Error).cause as Error).cause).toBe(authError)
     expect(running.refresh).toHaveBeenCalledOnce()
     expect(exec).toHaveBeenCalledTimes(2)
+  })
+
+  it('ensureWorkspaceSandbox: shell failures with auth-like path/stderr do not refresh auth or retry', async () => {
+    const exec = vi.fn().mockResolvedValue({
+      stdout: '',
+      stderr: 'unauthorized content in generated file',
+      exitCode: 1,
+    })
+    const running = fakeBox({ name: 'box-w1', metadata: { harness: 'opencode' }, exec })
+    listMock.mockResolvedValue([running])
+    const filesProfile = {
+      name: 'p',
+      resources: { files: [inlineMount('skills/http-401.md', '# SEO')] },
+    } as unknown as AgentProfile
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      deferProfileFiles: true,
+      profile: () => filesProfile,
+    })
+
+    const err = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+      .catch((error: Error) => error)
+    const thrown = err as Error
+
+    expect(thrown.message).toContain('failed to write skills/http-401.md')
+    expect(thrown.message).toContain('unauthorized content')
+    expect(thrown.cause).not.toBeInstanceOf(SandboxRuntimeAuthRefreshError)
+    expect(running.refresh).not.toHaveBeenCalled()
+    expect(exec).toHaveBeenCalledTimes(1)
   })
 
   it('ensureWorkspaceSandbox: deferred write failure includes failed path and cause chain', async () => {

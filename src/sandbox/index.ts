@@ -649,18 +649,32 @@ function isRuntimeExecAuthError(err: unknown, seen = new Set<object>()): boolean
     statusCode?: unknown
     response?: unknown
     code?: unknown
+    name?: unknown
     message?: unknown
     cause?: unknown
   }
   if (errorStatus(e) === 401) return true
-  if (typeof e.code === 'string' && /AUTH_ERROR|UNAUTH(?:ORIZED|ENTICATED)|401/i.test(e.code)) return true
   if (
-    typeof e.message === 'string' &&
-    /401|AUTH_ERROR|missing or invalid authentication|unauthori[sz]ed|unauthenticated/i.test(e.message)
+    typeof e.code === 'string' &&
+    /^(AUTH_ERROR|AUTHENTICATION_ERROR|UNAUTHORIZED|UNAUTHENTICATED|ERR_UNAUTHORIZED|ERR_UNAUTHENTICATED|401)$/i.test(e.code)
+  ) {
+    return true
+  }
+  if (
+    typeof e.name === 'string' &&
+    /^(AuthError|AuthenticationError|UnauthorizedError|UnauthenticatedError|SandboxAuthError)$/i.test(e.name)
   ) {
     return true
   }
   return isRuntimeExecAuthError(e.cause, seen)
+}
+
+function isRuntimeAuthRefreshDenied(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  return (
+    isRuntimeExecAuthError(err) ||
+    errorStatus(err as { status?: unknown; statusCode?: unknown; response?: unknown }) === 403
+  )
 }
 
 // Classify an exec failure as transient-retryable. Retryable shapes share the
@@ -988,6 +1002,50 @@ async function refreshRuntimeConnection(
   return current
 }
 
+async function bestEffortRefreshRuntimeExecAuth(
+  client: Sandbox,
+  box: SandboxInstance,
+  stage: ExistingBoxStage,
+  name: string,
+): Promise<Outcome<SandboxInstance>> {
+  let current = box
+
+  try {
+    await current.refresh()
+    if (hasFreshRuntimeExecAuth(current)) return ok(current)
+  } catch (err) {
+    if (isRuntimeAuthRefreshDenied(err)) {
+      return fail(
+        new SandboxRuntimeAuthRefreshError(
+          stage,
+          name,
+          'runtime exec auth refresh was unauthorized',
+          err,
+        ),
+      )
+    }
+  }
+
+  try {
+    const latest = await client.get(current.id)
+    if (latest) current = latest
+    if (hasFreshRuntimeExecAuth(current)) return ok(current)
+  } catch (err) {
+    if (isRuntimeAuthRefreshDenied(err)) {
+      return fail(
+        new SandboxRuntimeAuthRefreshError(
+          stage,
+          name,
+          'runtime exec auth re-fetch was unauthorized',
+          err,
+        ),
+      )
+    }
+  }
+
+  return ok(current)
+}
+
 async function refreshRuntimeExecAuth(
   client: Sandbox,
   box: SandboxInstance,
@@ -1029,7 +1087,7 @@ async function writeDeferredFilesWithRuntimeAuthRefresh(
   let writeBox = box
 
   if (!hasFreshRuntimeExecAuth(writeBox)) {
-    const refreshed = await refreshRuntimeExecAuth(client, writeBox, stage, name)
+    const refreshed = await bestEffortRefreshRuntimeExecAuth(client, writeBox, stage, name)
     if (!refreshed.succeeded) return fail(refreshed.error)
     writeBox = refreshed.value
   }
