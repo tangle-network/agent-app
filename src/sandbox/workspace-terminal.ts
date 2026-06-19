@@ -1,3 +1,4 @@
+import { base64UrlDecodeText } from '../crypto/web-token'
 import {
   mintTerminalProxyToken,
   verifyTerminalProxyToken,
@@ -493,7 +494,7 @@ export function bearerSubprotocolToken(value: string | null): string | null {
     const encoded = protocol.slice(BEARER_SUBPROTOCOL_PREFIX.length)
     if (!encoded) return null
     try {
-      const token = textFromBase64url(encoded).trim()
+      const token = base64UrlDecodeText(encoded).trim()
       return token || null
     } catch {
       return null
@@ -532,12 +533,4 @@ function validateTerminalSubject(subject: SandboxTerminalTokenSubject): void {
   if (!subject.userId) throw new Error('userId is required')
   if (!subject.workspaceId) throw new Error('workspaceId is required')
   if (!subject.sandboxId) throw new Error('sandboxId is required')
-}
-
-function textFromBase64url(value: string): string {
-  const b64 = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=')
-  const bin = atob(b64)
-  const bytes = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-  return new TextDecoder().decode(bytes)
 }
