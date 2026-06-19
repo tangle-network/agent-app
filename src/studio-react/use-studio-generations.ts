@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRevalidator } from 'react-router'
 import {
   type Generation,
-  generationMergeKey,
   generationStatus,
   isLocalGeneration,
   latestBatchOf,
   mergeLiveGeneration,
+  mergeLoaderAndLive,
 } from '../studio'
 
 /**
@@ -28,26 +28,10 @@ export function useStudioGenerations(
   const revalidator = useRevalidator()
   const [liveGenerations, setLiveGenerations] = useState<Generation[]>([])
 
-  const mergedGenerations = useMemo(() => {
-    if (liveGenerations.length === 0) return loaderGenerations
-    const leadingGenerations = liveGenerations.map((generation) => {
-      const mergeKey = generationMergeKey(generation)
-      return mergeKey
-        ? loaderGenerations.find((gen) => generationMergeKey(gen) === mergeKey) ?? generation
-        : loaderGenerations.find((gen) => gen.id === generation.id) ?? generation
-    })
-    const leadingIds = new Set(leadingGenerations.map((gen) => gen.id))
-    const leadingMergeKeys = new Set(leadingGenerations
-      .map((gen) => generationMergeKey(gen))
-      .filter((id): id is string => Boolean(id)))
-    return [
-      ...leadingGenerations,
-      ...loaderGenerations.filter((gen) => (
-        !leadingIds.has(gen.id)
-        && !leadingMergeKeys.has(generationMergeKey(gen) ?? '')
-      )),
-    ]
-  }, [loaderGenerations, liveGenerations])
+  const mergedGenerations = useMemo(
+    () => mergeLoaderAndLive(loaderGenerations, liveGenerations),
+    [loaderGenerations, liveGenerations],
+  )
 
   const latestBatch = useMemo(() => latestBatchOf(mergedGenerations), [mergedGenerations])
 
@@ -59,11 +43,23 @@ export function useStudioGenerations(
     .map((gen) => gen.id)
     .filter((id) => !id.startsWith('local-')), [mergedGenerations])
 
+  // The poll loop must not churn the effect. `runningGenerationIds` is a fresh
+  // array every render and react-router's `revalidator` identity flips while a
+  // revalidation is in flight — depending on either restarts the interval on
+  // every tick, collapsing the 4s cadence into a request flood. Key the effect
+  // on the STABLE join of the running ids (re-subscribe only when the set
+  // actually changes) and reach the live ids / revalidate through refs.
+  const runningIdsRef = useRef(runningGenerationIds)
+  runningIdsRef.current = runningGenerationIds
+  const revalidateRef = useRef(revalidator.revalidate)
+  revalidateRef.current = revalidator.revalidate
+  const runningKey = runningGenerationIds.join(',')
+
   useEffect(() => {
-    if (!workspaceId || runningGenerationIds.length === 0) return
+    if (!workspaceId || !runningKey) return
     let cancelled = false
     const poll = async () => {
-      const responses = await Promise.all(runningGenerationIds.map(async (id) => {
+      const responses = await Promise.all(runningIdsRef.current.map(async (id) => {
         const res = await fetch(`${generationsEndpoint}?workspaceId=${encodeURIComponent(workspaceId)}&id=${encodeURIComponent(id)}`)
         if (!res.ok) return null
         const data = await res.json() as { generation?: Generation }
@@ -75,7 +71,7 @@ export function useStudioGenerations(
         setLiveGenerations((current) => refreshed.reduce(mergeLiveGeneration, current))
       }
       if (refreshed.some((gen) => generationStatus(gen) !== 'running' && generationStatus(gen) !== 'pending')) {
-        revalidator.revalidate()
+        revalidateRef.current()
       }
     }
     const interval = window.setInterval(() => { void poll() }, 4_000)
@@ -84,12 +80,12 @@ export function useStudioGenerations(
       cancelled = true
       window.clearInterval(interval)
     }
-  }, [revalidator, runningGenerationIds, workspaceId, generationsEndpoint])
+  }, [runningKey, workspaceId, generationsEndpoint])
 
   const onGenerated = useCallback((generation: Generation) => {
     setLiveGenerations((current) => mergeLiveGeneration(current, generation))
-    if (!isLocalGeneration(generation)) revalidator.revalidate()
-  }, [revalidator])
+    if (!isLocalGeneration(generation)) revalidateRef.current()
+  }, [])
 
   return { mergedGenerations, latestBatch, onGenerated }
 }

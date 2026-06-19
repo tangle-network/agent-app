@@ -149,7 +149,7 @@ export function buildPublishPackage({
   }
 }
 
-export function isPublishPackage(value: unknown): value is { caption?: string; description?: string; mentions?: string[]; destinations: string[]; cadence?: string } {
+export function isPublishPackage(value: unknown): value is { caption?: string; description?: string; mentions?: string[]; destinations?: string[]; cadence?: string } {
   if (!value || typeof value !== 'object') return false
   const publishPackage = value as {
     caption?: unknown
@@ -246,24 +246,32 @@ export function buildGenerationRequestBody(fields: GenerationRequestFields): Rec
     quality: fields.image.quality,
     n: fields.image.count,
   })
-  if (fields.type === 'video') Object.assign(body, {
-    duration: Number(fields.video.duration),
-    resolution: fields.video.resolution,
-    aspectRatio: fields.video.aspectRatio.trim() || undefined,
-    referenceImageUrl: fields.video.referenceImageUrl.trim() || undefined,
-  })
+  if (fields.type === 'video') {
+    const duration = Number(fields.video.duration)
+    Object.assign(body, {
+      // omit (let the API default) rather than serialize NaN → null on bad input
+      duration: Number.isFinite(duration) ? duration : undefined,
+      resolution: fields.video.resolution,
+      aspectRatio: fields.video.aspectRatio.trim() || undefined,
+      referenceImageUrl: fields.video.referenceImageUrl.trim() || undefined,
+    })
+  }
   if (fields.type === 'speech') Object.assign(body, { voice: fields.speech.voice })
   if (fields.type === 'avatar') Object.assign(body, {
     audioUrl: fields.avatar.audioUrl.trim(),
     imageUrl: fields.avatar.imageUrl.trim() || undefined,
     avatarId: fields.avatar.avatarId.trim() || undefined,
   })
-  if (fields.type === 'transcription') Object.assign(body, {
-    audioUrl: fields.transcription.audioUrl.trim(),
-    language: fields.transcription.language.trim() || undefined,
-    responseFormat: fields.transcription.responseFormat,
-    temperature: Number(fields.transcription.temperature),
-  })
+  if (fields.type === 'transcription') {
+    const temperature = Number(fields.transcription.temperature)
+    Object.assign(body, {
+      audioUrl: fields.transcription.audioUrl.trim(),
+      language: fields.transcription.language.trim() || undefined,
+      responseFormat: fields.transcription.responseFormat,
+      // omit (let the API default) rather than serialize NaN → null on bad input
+      temperature: Number.isFinite(temperature) ? temperature : undefined,
+    })
+  }
   return body
 }
 
@@ -315,6 +323,33 @@ export function mergeLiveGeneration(current: Generation[], generation: Generatio
   const next = [...current]
   next[existingIndex] = generation
   return next
+}
+
+// Overlay in-flight `live` generations on the loader's rows: each live row leads
+// (prefer the matching loader row by merge key / id so it carries the freshest
+// server state), then the remaining loader rows that no live row already
+// represents — deduped by BOTH id and merge key so a server row and its
+// optimistic twin never both appear. Returns `loader` unchanged when nothing is
+// live. Drives the canvas, library, and polling off one list.
+export function mergeLoaderAndLive(loader: Generation[], live: Generation[]): Generation[] {
+  if (live.length === 0) return loader
+  const leading = live.map((generation) => {
+    const mergeKey = generationMergeKey(generation)
+    return mergeKey
+      ? loader.find((gen) => generationMergeKey(gen) === mergeKey) ?? generation
+      : loader.find((gen) => gen.id === generation.id) ?? generation
+  })
+  const leadingIds = new Set(leading.map((gen) => gen.id))
+  const leadingMergeKeys = new Set(leading
+    .map((gen) => generationMergeKey(gen))
+    .filter((id): id is string => Boolean(id)))
+  return [
+    ...leading,
+    ...loader.filter((gen) => (
+      !leadingIds.has(gen.id)
+      && !leadingMergeKeys.has(generationMergeKey(gen) ?? '')
+    )),
+  ]
 }
 
 export function isLocalGeneration(generation: Generation): boolean {
