@@ -224,6 +224,21 @@ function shellSingleQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`
 }
 
+// Build a shell-safe path token that preserves tilde-home semantics. A path
+// beginning `~/` (or a bare `~`) must resolve to the box user's real `$HOME`,
+// but single-quoting the whole path suppresses shell `~` expansion and lands
+// the file in a literal directory named `~`. Expand the leading `~` to an
+// UNQUOTED `"$HOME"` (so the shell expands it) and single-quote only the
+// remainder. Absolute and relative paths are single-quoted unchanged.
+function shellPath(path: string): string {
+  if (path === '~') return '"$HOME"'
+  if (path.startsWith('~/')) {
+    const rest = path.slice(2)
+    return rest ? `"$HOME"/${shellSingleQuote(rest)}` : '"$HOME"'
+  }
+  return shellSingleQuote(path)
+}
+
 // Split a profile's `resources.files` into the inline mounts that can be
 // written into a running box and the rest (non-inline refs that the
 // orchestrator must resolve, so they stay in the create payload). Returns the
@@ -255,6 +270,33 @@ export function splitDeferredProfileFiles(
 // JSON request envelope — comfortably below 4096.
 const PROFILE_WRITE_B64_CHUNK_CHARS = 3000
 
+// gtm's corpus is ~45 small execs; on a cold box the runtime exec proxy can
+// return HTTP 429 (rate limit) mid-batch. A 429 is transient, so retry it with
+// exponential backoff before failing loud. Non-429 errors are NOT retried.
+const PROFILE_WRITE_MAX_429_RETRIES = 4
+const PROFILE_WRITE_RETRY_BASE_MS = 250
+const PROFILE_WRITE_RETRY_MAX_MS = 2000
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+
+// Detect a rate-limit (HTTP 429) surfaced by the exec proxy, regardless of
+// whether it arrives as a SandboxError-shaped object (status/code/retryAfterMs)
+// or as a generic thrown error whose message carries the 429.
+function rateLimit(err: unknown): { is429: boolean; retryAfterMs?: number } {
+  if (err && typeof err === 'object') {
+    const e = err as { status?: unknown; code?: unknown; message?: unknown; retryAfterMs?: unknown }
+    const retryAfterMs = typeof e.retryAfterMs === 'number' ? e.retryAfterMs : undefined
+    if (e.status === 429) return { is429: true, retryAfterMs }
+    if (typeof e.code === 'string' && /rate.?limit|too.?many.?requests|429/i.test(e.code)) {
+      return { is429: true, retryAfterMs }
+    }
+    if (typeof e.message === 'string' && /\b429\b|rate.?limit|too many requests/i.test(e.message)) {
+      return { is429: true, retryAfterMs }
+    }
+  }
+  return { is429: false }
+}
+
 // Materialize inline profile files into a running box via `box.exec`. Uses a
 // base64 pipe so arbitrary content (scripts, unicode, special chars) lands
 // byte-exact, and writes to ANY absolute path (e.g. /usr/local/bin) or a
@@ -278,30 +320,45 @@ export async function writeProfileFilesToBox(
     const dir = path.replace(/\/[^/]*$/, '')
     const isBin = /(^|\/)(s?bin)\//.test(path)
     const executable = mount.executable ?? isBin
-    const q = shellSingleQuote(path)
-    const qb64 = shellSingleQuote(`${path}.b64`)
+    const q = shellPath(path)
+    const qb64 = shellPath(`${path}.b64`)
 
     // Run one exec step, surfacing a non-zero exit or transport error as a
     // fail-loud Outcome with the underlying NetworkError/TimeoutError as cause.
+    // A 429 (rate limit) from the proxy is transient: retry with exponential
+    // backoff up to PROFILE_WRITE_MAX_429_RETRIES. Any non-429 error fails loud
+    // immediately. A non-zero exit is a real command failure, not retried.
     const step = async (cmd: string): Promise<Outcome<void>> => {
-      try {
-        const res = await box.exec(cmd)
-        if (res.exitCode !== 0) {
-          return fail(
-            new Error(
-              `writeProfileFilesToBox: failed to write ${path} (exit ${res.exitCode}): ${res.stderr.slice(0, 500)}`,
-            ),
-          )
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const res = await box.exec(cmd)
+          if (res.exitCode !== 0) {
+            return fail(
+              new Error(
+                `writeProfileFilesToBox: failed to write ${path} (exit ${res.exitCode}): ${res.stderr.slice(0, 500)}`,
+              ),
+            )
+          }
+          return ok(undefined)
+        } catch (err) {
+          const { is429, retryAfterMs } = rateLimit(err)
+          if (is429 && attempt < PROFILE_WRITE_MAX_429_RETRIES) {
+            const backoff = Math.min(
+              PROFILE_WRITE_RETRY_BASE_MS * 2 ** attempt,
+              PROFILE_WRITE_RETRY_MAX_MS,
+            )
+            await sleep(retryAfterMs ?? backoff)
+            continue
+          }
+          return fail(new Error(`writeProfileFilesToBox: exec failed for ${path}`, { cause: err }))
         }
-        return ok(undefined)
-      } catch (err) {
-        return fail(new Error(`writeProfileFilesToBox: exec failed for ${path}`, { cause: err }))
       }
     }
 
-    // mkdir -p handles `~` (the shell expands it). Start the staging file empty
-    // so re-runs (redeploy with new skills) overwrite rather than append.
-    const mkdir = dir && dir !== path ? `mkdir -p ${shellSingleQuote(dir)} && ` : ''
+    // Start the staging file empty so re-runs (redeploy with new skills)
+    // overwrite rather than append. mkdir -p creates the target directory;
+    // shellPath keeps `~/...` resolving to the box user's real $HOME.
+    const mkdir = dir && dir !== path ? `mkdir -p ${shellPath(dir)} && ` : ''
     let res = await step(`${mkdir}: > ${qb64}`)
     if (!res.succeeded) return res
 

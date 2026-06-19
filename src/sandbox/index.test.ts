@@ -712,6 +712,72 @@ describe('deferred profile files', () => {
     if (!res.succeeded) expect(res.error.message).toContain('disk full')
   })
 
+  it('expands a ~/ mount path to $HOME (not a literal ~ dir); absolute paths unchanged', async () => {
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    const box = fakeBox({ exec })
+    const res = await writeProfileFilesToBox(box, [
+      inlineMount('~/.claude/skills/gtm/SKILL.md', '# GTM skill'),
+      inlineMount('/etc/app/config.json', '{}'),
+    ])
+    expect(res.succeeded).toBe(true)
+    const cmds = exec.mock.calls.map((c) => c[0] as string)
+
+    // The tilde mount's commands expand `~` to $HOME and single-quote only the
+    // remainder — never a single-quoted literal '~/...'.
+    const tildeCmds = cmds.filter((c) => c.includes('.claude/skills/gtm'))
+    expect(tildeCmds.length).toBeGreaterThan(0)
+    for (const cmd of tildeCmds) {
+      // Unquoted $HOME followed by `/` — the shell expands it to the real home.
+      expect(cmd).toMatch(/"\$HOME"\//)
+      expect(cmd).not.toContain("'~/")
+      expect(cmd).not.toMatch(/'~'/)
+    }
+    // mkdir -p targets the real $HOME tree.
+    expect(tildeCmds[0]).toContain(`mkdir -p "$HOME"/'.claude/skills/gtm'`)
+    // The decode writes to $HOME, not a literal ~.
+    expect(tildeCmds.some((c) => c.includes(`base64 -d`) && c.includes('"$HOME"/'))).toBe(true)
+
+    // The absolute path is passed through single-quoted, with no $HOME rewrite.
+    const absCmds = cmds.filter((c) => c.includes('/etc/app/config.json'))
+    expect(absCmds.length).toBeGreaterThan(0)
+    for (const cmd of absCmds) expect(cmd).not.toContain('$HOME')
+    expect(absCmds[0]).toContain(`mkdir -p '/etc/app'`)
+  })
+
+  it('retries a 429 (rate limit) with backoff, then succeeds', async () => {
+    let calls = 0
+    const exec = vi.fn().mockImplementation(async () => {
+      calls++
+      // First exec is rate-limited twice, then the proxy lets it through.
+      if (calls <= 2) {
+        const err = Object.assign(new Error('Too Many Requests'), { status: 429, code: 'rate_limited' })
+        throw err
+      }
+      return { stdout: '', stderr: '', exitCode: 0 }
+    })
+    const box = fakeBox({ exec })
+    const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')])
+    expect(res.succeeded).toBe(true)
+    // 2 rejected attempts on the first step + the successful retry + the
+    // remaining 2 steps (append, decode) = 5 total exec invocations.
+    expect(calls).toBe(5)
+  })
+
+  it('fails loud immediately on a non-429 thrown error (no retry)', async () => {
+    let calls = 0
+    const exec = vi.fn().mockImplementation(async () => {
+      calls++
+      const err = Object.assign(new Error('connection reset'), { status: 503, code: 'server_error' })
+      throw err
+    })
+    const box = fakeBox({ exec })
+    const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')])
+    expect(res.succeeded).toBe(false)
+    // Exactly one attempt — a non-429 error is not retried.
+    expect(calls).toBe(1)
+    if (!res.succeeded) expect(res.error.message).toContain('exec failed')
+  })
+
   it('ensureWorkspaceSandbox: deferred files are stripped from create payload and written post-running', async () => {
     listMock.mockResolvedValue([])
     const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
