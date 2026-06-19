@@ -31,6 +31,182 @@ export interface SandboxClientCredentials {
   baseUrl: string
 }
 
+export type SandboxCredentialEnvironment =
+  | 'development'
+  | 'test'
+  | 'staging'
+  | 'production'
+
+export interface ResolveSandboxClientCredentialsOptions {
+  /**
+   * Environment object to read from. Defaults to process.env when available.
+   */
+  env?: Record<string, string | undefined>
+  /**
+   * Explicit environment classification. Defaults to APP_ENV/NODE_ENV derived
+   * behavior: local/development/test use direct env credentials; staging/prod
+   * require the provision callback unless allowDirectEnvCredentials opts in.
+   */
+  environment?: SandboxCredentialEnvironment
+  /**
+   * Env names that may carry a sandbox-compatible bearer. The first non-empty
+   * value wins when direct env credentials are allowed.
+   */
+  directKeyNames?: readonly string[]
+  /**
+   * Env names that may carry the sandbox gateway URL. The first non-empty value
+   * wins, then defaultBaseUrl.
+   */
+  baseUrlNames?: readonly string[]
+  /**
+   * Base URL used when none of baseUrlNames are present.
+   */
+  defaultBaseUrl?: string
+  /**
+   * Whether direct env credentials are allowed for this environment. Defaults
+   * to true in development/test and false in staging/production.
+   */
+  allowDirectEnvCredentials?: boolean | ((environment: SandboxCredentialEnvironment) => boolean)
+  /**
+   * Product-owned provision path, usually minting a per-user sandbox key from a
+   * linked platform account. Called before direct env credentials in
+   * staging/production and after direct env credentials in development/test.
+   */
+  provision?: (
+    context: {
+      environment: SandboxCredentialEnvironment
+      env: Record<string, string | undefined>
+    },
+  ) => SandboxClientCredentials | null | undefined | Promise<SandboxClientCredentials | null | undefined>
+}
+
+const DEFAULT_SANDBOX_DIRECT_KEY_NAMES = [
+  'TCLOUD_SANDBOX_API_KEY',
+  'SANDBOX_API_KEY',
+  'TANGLE_API_KEY',
+] as const
+const DEFAULT_SANDBOX_BASE_URL_NAMES = ['SANDBOX_GATEWAY_URL', 'SANDBOX_API_URL'] as const
+
+function trimOrNull(value: string | undefined): string | null {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
+}
+
+function normalizeBaseUrl(value: string): string {
+  return value.trim().replace(/\/v1\/?$/, '').replace(/\/+$/, '')
+}
+
+function normalizeSandboxCredentialEnvironment(
+  value: string | undefined,
+): SandboxCredentialEnvironment | null {
+  switch (value?.trim().toLowerCase()) {
+    case 'local':
+    case 'dev':
+    case 'development':
+      return 'development'
+    case 'test':
+      return 'test'
+    case 'staging':
+      return 'staging'
+    case 'prod':
+    case 'production':
+      return 'production'
+    default:
+      return null
+  }
+}
+
+function processEnv(): Record<string, string | undefined> {
+  return typeof process === 'undefined' ? {} : process.env
+}
+
+export function resolveSandboxCredentialEnvironment(
+  env: Record<string, string | undefined> = processEnv(),
+): SandboxCredentialEnvironment {
+  return normalizeSandboxCredentialEnvironment(env.APP_ENV)
+    ?? normalizeSandboxCredentialEnvironment(env.NODE_ENV)
+    ?? 'production'
+}
+
+function directEnvCredentialsAllowed(
+  environment: SandboxCredentialEnvironment,
+  allow: ResolveSandboxClientCredentialsOptions['allowDirectEnvCredentials'],
+): boolean {
+  if (typeof allow === 'function') return allow(environment)
+  if (typeof allow === 'boolean') return allow
+  return environment === 'development' || environment === 'test'
+}
+
+function resolveSandboxBaseUrl(
+  env: Record<string, string | undefined>,
+  names: readonly string[],
+  defaultBaseUrl: string | undefined,
+): string {
+  for (const name of names) {
+    const value = trimOrNull(env[name])
+    if (value) return normalizeBaseUrl(value)
+  }
+  const value = trimOrNull(defaultBaseUrl)
+  if (value) return normalizeBaseUrl(value)
+  throw new Error(
+    `Sandbox base URL is required (set one of ${names.join(', ')} or pass defaultBaseUrl).`,
+  )
+}
+
+function resolveDirectSandboxCredentials(
+  env: Record<string, string | undefined>,
+  keyNames: readonly string[],
+  baseUrlNames: readonly string[],
+  defaultBaseUrl: string | undefined,
+): SandboxClientCredentials | null {
+  for (const name of keyNames) {
+    const apiKey = trimOrNull(env[name])
+    if (!apiKey) continue
+    return {
+      apiKey,
+      baseUrl: resolveSandboxBaseUrl(env, baseUrlNames, defaultBaseUrl),
+    }
+  }
+  return null
+}
+
+export async function resolveSandboxClientCredentials(
+  options: ResolveSandboxClientCredentialsOptions = {},
+): Promise<SandboxClientCredentials> {
+  const env = options.env ?? processEnv()
+  const environment = options.environment ?? resolveSandboxCredentialEnvironment(env)
+  const keyNames = options.directKeyNames ?? DEFAULT_SANDBOX_DIRECT_KEY_NAMES
+  const baseUrlNames = options.baseUrlNames ?? DEFAULT_SANDBOX_BASE_URL_NAMES
+  const directAllowed = directEnvCredentialsAllowed(environment, options.allowDirectEnvCredentials)
+  const direct = () =>
+    directAllowed
+      ? resolveDirectSandboxCredentials(env, keyNames, baseUrlNames, options.defaultBaseUrl)
+      : null
+
+  if (environment === 'development' || environment === 'test') {
+    const credentials = direct()
+    if (credentials) return credentials
+  }
+
+  const provisioned = await options.provision?.({ environment, env })
+  if (provisioned) {
+    return {
+      apiKey: provisioned.apiKey,
+      baseUrl: normalizeBaseUrl(provisioned.baseUrl),
+    }
+  }
+
+  const credentials = direct()
+  if (credentials) return credentials
+
+  const directHint = directAllowed
+    ? ` or set one of ${keyNames.join(', ')}`
+    : ''
+  throw new Error(
+    `Sandbox credentials are required for ${environment} (provide a provision callback${directHint}).`,
+  )
+}
+
 export interface SandboxResourceConfig {
   image: string
   cpuCores: number
@@ -224,6 +400,119 @@ function shellSingleQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`
 }
 
+function sandboxPathShellExpression(path: string): string {
+  if (path.includes('\0') || path.includes('\n')) {
+    throw new Error('sandbox profile file path must not contain NUL bytes or newlines.')
+  }
+  if (path === '~') return '"${HOME:-/home/agent}"'
+  if (path.startsWith('~/')) return `"\${HOME:-/home/agent}"/${shellSingleQuote(path.slice(2))}`
+  return shellSingleQuote(path)
+}
+
+export interface SandboxToolSpec {
+  name: string
+  content: string
+  executable?: boolean
+}
+
+export interface SandboxToolPathOptions {
+  appName: string
+  baseDir?: string
+  binDir?: string
+}
+
+export interface BuildSandboxToolFileMountsOptions extends SandboxToolPathOptions {
+  tools: readonly SandboxToolSpec[]
+}
+
+const DEFAULT_SANDBOX_TOOL_BASE_DIR = '/home/agent/tools'
+const SAFE_TOOL_SEGMENT = /^[A-Za-z0-9._-]+$/
+
+function normalizeSandboxToolSegment(value: string, label: string): string {
+  const segment = value.trim()
+  if (!segment || segment === '.' || segment === '..' || !SAFE_TOOL_SEGMENT.test(segment)) {
+    throw new Error(`${label} must contain only letters, numbers, dots, underscores, or hyphens.`)
+  }
+  return segment
+}
+
+function normalizeSandboxToolDir(value: string, label: string): string {
+  const dir = value.trim().replace(/\/+$/, '')
+  if (!dir || !dir.startsWith('/') || dir.includes('\0') || dir.includes('\n')) {
+    throw new Error(`${label} must be an absolute sandbox path.`)
+  }
+  return dir === '' ? '/' : dir
+}
+
+export function sandboxToolRootDir(options: SandboxToolPathOptions): string {
+  const appName = normalizeSandboxToolSegment(options.appName, 'sandbox tool appName')
+  const baseDir = normalizeSandboxToolDir(
+    options.baseDir ?? DEFAULT_SANDBOX_TOOL_BASE_DIR,
+    'sandbox tool baseDir',
+  )
+  return `${baseDir}/${appName}`
+}
+
+export function sandboxToolBinDir(options: SandboxToolPathOptions): string {
+  normalizeSandboxToolSegment(options.appName, 'sandbox tool appName')
+  if (options.binDir) return normalizeSandboxToolDir(options.binDir, 'sandbox tool binDir')
+  return `${sandboxToolRootDir(options)}/bin`
+}
+
+export function sandboxToolPath(options: SandboxToolPathOptions & { toolName: string }): string {
+  const toolName = normalizeSandboxToolSegment(options.toolName, 'sandbox tool name')
+  return `${sandboxToolBinDir(options)}/${toolName}`
+}
+
+export function buildSandboxToolFileMounts(
+  options: BuildSandboxToolFileMountsOptions,
+): AgentProfileFileMount[] {
+  return options.tools.map((tool) => {
+    const name = normalizeSandboxToolSegment(tool.name, 'sandbox tool name')
+    return {
+      path: sandboxToolPath({ ...options, toolName: name }),
+      resource: { kind: 'inline' as const, name, content: tool.content },
+      executable: tool.executable ?? true,
+    }
+  })
+}
+
+export function buildSandboxToolPathSetupScript(options: SandboxToolPathOptions): string {
+  const binDir = sandboxToolBinDir(options)
+  const exportLine = `export PATH=${binDir}:$PATH`
+  return [
+    'set -eu',
+    `mkdir -p ${shellSingleQuote(binDir)}`,
+    `PATH=${shellSingleQuote(binDir)}:$PATH`,
+    'export PATH',
+    'for profile in "${HOME:-/home/agent}/.profile" "${HOME:-/home/agent}/.bashrc" "${HOME:-/home/agent}/.zshrc"; do',
+    '  mkdir -p "$(dirname "$profile")"',
+    '  touch "$profile"',
+    `  grep -Fqx ${shellSingleQuote(exportLine)} "$profile" || printf '\\n%s\\n' ${shellSingleQuote(exportLine)} >> "$profile"`,
+    'done',
+  ].join('\n')
+}
+
+export async function runSandboxToolPathSetup(
+  box: SandboxInstance,
+  options: SandboxToolPathOptions,
+): Promise<Outcome<void>> {
+  try {
+    const res = await box.exec(buildSandboxToolPathSetupScript(options))
+    if (res.exitCode !== 0) {
+      return fail(
+        new Error(
+          `runSandboxToolPathSetup: failed to configure PATH for ${sandboxToolBinDir(options)} ` +
+            `(exit ${res.exitCode}): ${res.stderr.slice(0, 500)}`,
+        ),
+      )
+    }
+    return ok(undefined)
+  } catch (err) {
+    return fail(new Error('runSandboxToolPathSetup: exec failed', { cause: err }))
+  }
+}
+
 // Split a profile's `resources.files` into the inline mounts that can be
 // written into a running box and the rest (non-inline refs that the
 // orchestrator must resolve, so they stay in the create payload). Returns the
@@ -246,14 +535,16 @@ export function splitDeferredProfileFiles(
   return { leanProfile, deferredFiles }
 }
 
-// Materialize inline profile files into a running box via `box.exec`. Uses a
-// base64 pipe so arbitrary content (scripts, unicode, special chars) lands
-// byte-exact, and writes to ANY absolute path (e.g. /usr/local/bin) or a
+const DEFERRED_FILE_BASE64_CHUNK_SIZE = 1800
+let deferredFileTempCounter = 0
+
+// Materialize inline profile files into a running box via `box.exec`. Stages
+// base64 in small append chunks so arbitrary content (scripts, unicode, special
+// chars) lands byte-exact without exceeding the sandbox exec transport's command
+// size limits. Writes to ANY absolute path (e.g. /usr/local/bin) or a
 // `~`-relative path — the exec runs as the sidecar, which is not bound by the
 // safe-prefix allow-list the /files/write API enforces. Sets the executable
-// bit when the mount declares it OR the target is a bin directory. One exec
-// per file keeps a single bad mount from poisoning the batch; the first
-// failure is returned (fail-loud), the rest are not attempted.
+// bit when the mount declares it OR the target is a bin directory.
 export async function writeProfileFilesToBox(
   box: SandboxInstance,
   files: AgentProfileFileMount[],
@@ -266,23 +557,31 @@ export async function writeProfileFilesToBox(
     const dir = path.replace(/\/[^/]*$/, '')
     const isBin = /(^|\/)(s?bin)\//.test(path)
     const executable = mount.executable ?? isBin
-    const q = shellSingleQuote(path)
-    // mkdir -p handles `~` (the shell expands it); printf '%s' avoids a
-    // trailing newline; base64 -d reconstructs the exact bytes.
-    const mkdir = dir && dir !== path ? `mkdir -p ${shellSingleQuote(dir)} && ` : ''
+    const q = sandboxPathShellExpression(path)
+    const tmpPath = `/tmp/agent-app-profile-file-${process.pid}-${Date.now()}-${deferredFileTempCounter++}.b64`
+    const tmp = shellSingleQuote(tmpPath)
+    const mkdir = dir && dir !== path ? `mkdir -p ${sandboxPathShellExpression(dir)} && ` : ''
     const chmod = executable ? ` && chmod +x ${q}` : ''
-    const cmd = `${mkdir}printf '%s' ${shellSingleQuote(b64)} | base64 -d > ${q}${chmod}`
-    try {
-      const res = await box.exec(cmd)
-      if (res.exitCode !== 0) {
-        return fail(
-          new Error(
-            `writeProfileFilesToBox: failed to write ${path} (exit ${res.exitCode}): ${res.stderr.slice(0, 500)}`,
-          ),
-        )
+    const commands = [
+      `${mkdir}rm -f ${tmp} && : > ${tmp}`,
+      ...b64.match(new RegExp(`.{1,${DEFERRED_FILE_BASE64_CHUNK_SIZE}}`, 'g'))
+        ?.map((chunk) => `printf '%s' ${shellSingleQuote(chunk)} >> ${tmp}`) ?? [],
+      `if base64 -d ${tmp} > ${q}${chmod}; then rm -f ${tmp}; else code=$?; rm -f ${tmp}; exit "$code"; fi`,
+    ]
+
+    for (const cmd of commands) {
+      try {
+        const res = await box.exec(cmd)
+        if (res.exitCode !== 0) {
+          return fail(
+            new Error(
+              `writeProfileFilesToBox: failed to write ${path} (exit ${res.exitCode}): ${res.stderr.slice(0, 500)}`,
+            ),
+          )
+        }
+      } catch (err) {
+        return fail(new Error(`writeProfileFilesToBox: exec failed for ${path}`, { cause: err }))
       }
-    } catch (err) {
-      return fail(new Error(`writeProfileFilesToBox: exec failed for ${path}`, { cause: err }))
     }
   }
   return ok(undefined)

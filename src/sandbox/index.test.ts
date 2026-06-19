@@ -41,10 +41,17 @@ import {
   mintSandboxScopedToken,
   mintTerminalProxyToken,
   verifyTerminalProxyToken,
+  resolveSandboxCredentialEnvironment,
+  resolveSandboxClientCredentials,
   classifySeveredStream,
   detectInteractiveQuestion,
   isTerminalPromptEvent,
   driveSandboxTurn,
+  sandboxToolBinDir,
+  sandboxToolPath,
+  buildSandboxToolFileMounts,
+  buildSandboxToolPathSetupScript,
+  runSandboxToolPathSetup,
   splitDeferredProfileFiles,
   writeProfileFilesToBox,
   type SandboxRuntimeConfig,
@@ -120,6 +127,80 @@ describe('getClient credential-fingerprint cache', () => {
 
   it('throws fail-loud when no credentials are available', () => {
     expect(() => getClient(shellFor(null))).toThrow(/credentials are required/)
+  })
+})
+
+describe('resolveSandboxClientCredentials', () => {
+  it('classifies local/test envs as direct-env capable and unknown envs as production-safe', () => {
+    expect(resolveSandboxCredentialEnvironment({ APP_ENV: 'local' })).toBe('development')
+    expect(resolveSandboxCredentialEnvironment({ NODE_ENV: 'test' })).toBe('test')
+    expect(resolveSandboxCredentialEnvironment({ APP_ENV: 'preview' })).toBe('production')
+    expect(resolveSandboxCredentialEnvironment({})).toBe('production')
+  })
+
+  it('uses direct env credentials in local development without calling provision', async () => {
+    const provision = vi.fn()
+    await expect(resolveSandboxClientCredentials({
+      env: {
+        APP_ENV: 'development',
+        TANGLE_API_KEY: 'sk-tan-local',
+        SANDBOX_API_URL: 'https://sandbox.example.com/v1',
+      },
+      provision,
+    })).resolves.toEqual({
+      apiKey: 'sk-tan-local',
+      baseUrl: 'https://sandbox.example.com',
+    })
+    expect(provision).not.toHaveBeenCalled()
+  })
+
+  it('prefers the provision callback in production even when a direct env key exists', async () => {
+    const provision = vi.fn(async () => ({
+      apiKey: 'sk-sandbox-provisioned',
+      baseUrl: 'https://sandbox.tangle.tools/v1',
+    }))
+    await expect(resolveSandboxClientCredentials({
+      env: {
+        APP_ENV: 'production',
+        TANGLE_API_KEY: 'sk-tan-env',
+        SANDBOX_API_URL: 'https://sandbox.example.com',
+      },
+      provision,
+    })).resolves.toEqual({
+      apiKey: 'sk-sandbox-provisioned',
+      baseUrl: 'https://sandbox.tangle.tools',
+    })
+    expect(provision).toHaveBeenCalledTimes(1)
+  })
+
+  it('can explicitly allow direct env credentials outside local/test', async () => {
+    await expect(resolveSandboxClientCredentials({
+      env: {
+        APP_ENV: 'staging',
+        SANDBOX_API_KEY: 'sk-sandbox-staging',
+      },
+      defaultBaseUrl: 'https://sandbox.tangle.tools',
+      allowDirectEnvCredentials: true,
+    })).resolves.toEqual({
+      apiKey: 'sk-sandbox-staging',
+      baseUrl: 'https://sandbox.tangle.tools',
+    })
+  })
+
+  it('throws a clear error when the direct key exists but no sandbox base URL resolves', async () => {
+    await expect(resolveSandboxClientCredentials({
+      env: {
+        APP_ENV: 'development',
+        TANGLE_API_KEY: 'sk-tan-local',
+      },
+    })).rejects.toThrow(/Sandbox base URL is required/)
+  })
+
+  it('throws a clear error when neither provisioning nor direct env credentials resolve', async () => {
+    await expect(resolveSandboxClientCredentials({
+      env: { APP_ENV: 'development' },
+      provision: async () => null,
+    })).rejects.toThrow(/Sandbox credentials are required for development/)
   })
 })
 
@@ -641,14 +722,30 @@ describe('deferred profile files', () => {
       inlineMount('/usr/local/bin/gtm', '#!/bin/sh\necho hi'),
     ])
     expect(res.succeeded).toBe(true)
-    expect(exec).toHaveBeenCalledTimes(2)
+    expect(exec).toHaveBeenCalledTimes(6)
     const cmds = exec.mock.calls.map((c) => c[0] as string)
     // base64 of "# SEO"
-    expect(cmds[0]).toContain(Buffer.from('# SEO', 'utf8').toString('base64'))
-    expect(cmds[0]).toContain('base64 -d')
+    expect(cmds.some((cmd) => cmd.includes(Buffer.from('# SEO', 'utf8').toString('base64')))).toBe(true)
+    expect(cmds.some((cmd) => cmd.includes('base64 -d'))).toBe(true)
     // bin target gets +x
-    expect(cmds[1]).toContain('chmod +x')
-    expect(cmds[0]).not.toContain('chmod +x')
+    expect(cmds.at(-1)).toContain('chmod +x')
+    expect(cmds.slice(0, -1).some((cmd) => cmd.includes('chmod +x'))).toBe(false)
+  })
+
+  it('chunks large inline files to avoid oversized sandbox exec commands', async () => {
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    const box = fakeBox({ exec })
+    const largeScript = '#!/bin/sh\n' + 'echo x\n'.repeat(1500)
+
+    const res = await writeProfileFilesToBox(box, [
+      inlineMount('/home/agent/tools/gtm-agent/bin/gtm', largeScript),
+    ])
+
+    expect(res.succeeded).toBe(true)
+    const cmds = exec.mock.calls.map((c) => c[0] as string)
+    expect(cmds.length).toBeGreaterThan(4)
+    expect(Math.max(...cmds.map((cmd) => cmd.length))).toBeLessThan(2500)
+    expect(cmds.at(-1)).toContain('base64 -d')
   })
 
   it('fails loud on a non-zero exec exit', async () => {
@@ -678,7 +775,7 @@ describe('deferred profile files', () => {
     // Inline files stripped from the create payload.
     expect(payload.backend.profile.resources.files).toEqual([])
     // ...and written into the box afterward.
-    expect(exec).toHaveBeenCalledTimes(2)
+    expect(exec).toHaveBeenCalledTimes(6)
   })
 
   it('ensureWorkspaceSandbox: keeps files inline when deferProfileFiles is unset', async () => {
@@ -696,5 +793,58 @@ describe('deferred profile files', () => {
     await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
     const payload = createMock.mock.calls[0]![0]
     expect(payload.backend.profile.resources.files).toHaveLength(1)
+  })
+})
+
+describe('sandbox tool install helpers', () => {
+  it('builds executable tool mounts under a writable app-owned bin dir', () => {
+    expect(sandboxToolBinDir({ appName: 'gtm-agent' })).toBe('/home/agent/tools/gtm-agent/bin')
+    expect(sandboxToolPath({ appName: 'gtm-agent', toolName: 'gtm' }))
+      .toBe('/home/agent/tools/gtm-agent/bin/gtm')
+
+    const files = buildSandboxToolFileMounts({
+      appName: 'gtm-agent',
+      tools: [{ name: 'gtm', content: '#!/bin/sh\necho hi' }],
+    })
+
+    expect(files).toEqual([
+      {
+        path: '/home/agent/tools/gtm-agent/bin/gtm',
+        resource: { kind: 'inline', name: 'gtm', content: '#!/bin/sh\necho hi' },
+        executable: true,
+      },
+    ])
+    expect(files[0]!.path).not.toContain('/usr/local/bin')
+  })
+
+  it('rejects unsafe app and tool path segments', () => {
+    expect(() => sandboxToolBinDir({ appName: '../gtm' })).toThrow(/appName/)
+    expect(() => sandboxToolPath({ appName: 'gtm-agent', toolName: 'bin/gtm' })).toThrow(/tool name/)
+    expect(() => buildSandboxToolFileMounts({
+      appName: 'gtm-agent',
+      tools: [{ name: 'bad name', content: 'x' }],
+    })).toThrow(/tool name/)
+  })
+
+  it('builds an idempotent PATH setup script for shell profiles', () => {
+    const script = buildSandboxToolPathSetupScript({ appName: 'gtm-agent' })
+    expect(script).toContain("mkdir -p '/home/agent/tools/gtm-agent/bin'")
+    expect(script).toContain("PATH='/home/agent/tools/gtm-agent/bin':$PATH")
+    expect(script).toContain('export PATH=/home/agent/tools/gtm-agent/bin:$PATH')
+    expect(script).toContain('.profile')
+    expect(script).toContain('.bashrc')
+    expect(script).toContain('.zshrc')
+  })
+
+  it('runs PATH setup through box.exec and preserves setup failures', async () => {
+    const okExec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    await expect(runSandboxToolPathSetup(fakeBox({ exec: okExec }), { appName: 'gtm-agent' }))
+      .resolves.toEqual({ succeeded: true, value: undefined })
+    expect(okExec.mock.calls[0]![0]).toContain('/home/agent/tools/gtm-agent/bin')
+
+    const failExec = vi.fn().mockResolvedValue({ stdout: '', stderr: 'readonly', exitCode: 1 })
+    const outcome = await runSandboxToolPathSetup(fakeBox({ exec: failExec }), { appName: 'gtm-agent' })
+    expect(outcome.succeeded).toBe(false)
+    if (!outcome.succeeded) expect(outcome.error.message).toContain('readonly')
   })
 })

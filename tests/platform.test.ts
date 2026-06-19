@@ -8,6 +8,8 @@ import {
   TangleSsoUserCreateError,
   createHubProxyRoutes,
   isTangleBearerMissingError,
+  resolveUserTangleHubBearer,
+  resolveUserTangleHubBearerForUser,
   TangleBearerMissingError,
   type HubClientLike,
   type HubProxyContext,
@@ -426,6 +428,62 @@ describe('createHubProxyRoutes — error mapping', () => {
       },
     })
     await expect(routes.catalog(GET())).rejects.toBe(redirect)
+  })
+})
+
+describe('resolveUserTangleHubBearer', () => {
+  it('uses TANGLE_API_KEY in local development', async () => {
+    await expect(resolveUserTangleHubBearer({
+      userId: 'u_1',
+      environment: 'development',
+      env: { TANGLE_API_KEY: ' sk-local ' },
+      getUserApiKey: async () => 'sk-user',
+    })).resolves.toEqual({ bearer: 'sk-local', source: 'local-env' })
+  })
+
+  it('can infer local development from env', async () => {
+    await expect(resolveUserTangleHubBearer({
+      userId: 'u_1',
+      env: { APP_ENV: 'local', TANGLE_API_KEY: 'sk-local' },
+      getUserApiKey: async () => 'sk-user',
+    })).resolves.toEqual({ bearer: 'sk-local', source: 'local-env' })
+  })
+
+  it('falls back to the linked user key when local development has no env key', async () => {
+    await expect(resolveUserTangleHubBearer({
+      userId: 'u_1',
+      environment: 'development',
+      env: {},
+      getUserApiKey: async () => ' sk-user ',
+    })).resolves.toEqual({ bearer: 'sk-user', source: 'user' })
+  })
+
+  it('uses the linked user key in deployed environments', async () => {
+    await expect(resolveUserTangleHubBearer({
+      userId: 'u_1',
+      env: { APP_ENV: 'production', TANGLE_API_KEY: 'sk-env-ignored' },
+      getUserApiKey: async () => ' sk-user ',
+    })).resolves.toEqual({ bearer: 'sk-user', source: 'user' })
+  })
+
+  it('passes the user id through the app storage seam', async () => {
+    await expect(resolveUserTangleHubBearerForUser({
+      userId: 'u_1',
+      env: { APP_ENV: 'production', TANGLE_API_KEY: 'sk-env-ignored' },
+      getUserApiKey: async (userId) => userId === 'u_1' ? 'sk-user' : null,
+    })).resolves.toEqual({ bearer: 'sk-user', source: 'user' })
+  })
+
+  it('throws the hub missing-link error when no bearer resolves', async () => {
+    await expect(resolveUserTangleHubBearer({
+      userId: 'u_1',
+      environment: 'development',
+      env: {},
+      getUserApiKey: async () => null,
+    })).rejects.toMatchObject({
+      name: 'TangleBearerMissingError',
+      userId: 'u_1',
+    })
   })
 })
 

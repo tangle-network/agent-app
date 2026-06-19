@@ -6,11 +6,77 @@
  * it survives bundlers duplicating module instances.
  */
 
+import { resolveTangleExecutionEnvironment, type TangleExecutionEnvironment } from '../runtime/model'
+
+export type TangleHubBearerSource = 'local-env' | 'user'
+
+export interface ResolvedTangleHubBearer {
+  bearer: string
+  source: TangleHubBearerSource
+}
+
+export interface ResolveUserTangleHubBearerOptions {
+  userId: string
+  /** Deployment context. Only local development may use env credentials. */
+  environment?: TangleExecutionEnvironment
+  /** Env to read for the local-development bearer. */
+  env?: Record<string, string | undefined>
+  /** App-owned lookup for the caller's linked platform API key. */
+  getUserApiKey: () => string | null | undefined | Promise<string | null | undefined>
+}
+
+export interface ResolveUserTangleHubBearerForUserOptions<UserId = string> {
+  userId: UserId
+  environment?: TangleExecutionEnvironment
+  env?: Record<string, string | undefined>
+  getUserApiKey: (userId: UserId) => string | null | undefined | Promise<string | null | undefined>
+}
+
+function trimOrNull(value: string | null | undefined): string | null {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
+}
+
 export class TangleBearerMissingError extends Error {
   constructor(readonly userId: string) {
     super(`No Tangle platform link for user ${userId}`)
     this.name = 'TangleBearerMissingError'
   }
+}
+
+/**
+ * Resolve the Tangle bearer used by the integration hub proxy.
+ *
+ * Local development may use a server env key so apps can exercise the hub
+ * without completing cross-site SSO. Deployed contexts must use the caller's
+ * linked platform key; this keeps integration ownership aligned with the user.
+ */
+export async function resolveUserTangleHubBearer(
+  opts: ResolveUserTangleHubBearerOptions,
+): Promise<ResolvedTangleHubBearer> {
+  const env = opts.env ?? (process.env as Record<string, string | undefined>)
+  const environment = opts.environment ?? resolveTangleExecutionEnvironment(env)
+
+  if (environment === 'development') {
+    const bearer = trimOrNull(env.TANGLE_API_KEY)
+    if (bearer) return { bearer, source: 'local-env' }
+  }
+
+  const bearer = trimOrNull(await opts.getUserApiKey())
+  if (bearer) return { bearer, source: 'user' }
+
+  throw new TangleBearerMissingError(opts.userId)
+}
+
+export async function resolveUserTangleHubBearerForUser<UserId = string>(
+  opts: ResolveUserTangleHubBearerForUserOptions<UserId>,
+): Promise<ResolvedTangleHubBearer> {
+  return resolveUserTangleHubBearer({
+    userId: String(opts.userId),
+    environment: opts.environment,
+    env: opts.env,
+    getUserApiKey: () => opts.getUserApiKey(opts.userId),
+  })
 }
 
 /** Structural guard (name + userId shape) — robust when the error class is
