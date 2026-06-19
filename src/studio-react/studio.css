@@ -1,0 +1,65 @@
+/*
+ * Studio animations: the right-side library sheet slide/fade, the result-canvas
+ * bloom-in, and the neutral skeleton shimmer. Ships as a raw stylesheet (the
+ * `./styles` precedent) so apps that don't already define these classes can
+ * `import '@tangle-network/agent-app/studio-react/styles'` once. Token-driven
+ * (`--muted`, `--muted-foreground`) so it inherits the consuming app's theme.
+ */
+
+/* ── Studio: library sheet + result canvas ── */
+@keyframes studio-sheet-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+@keyframes studio-sheet-out {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+@keyframes studio-overlay-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes studio-bloom {
+  from { opacity: 0; transform: translateY(6px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Dedicated classes (not tailwindcss-animate .animate-in) so the right-side
+   sheet is unaffected by a conflicting .animate-in rule. Driven by Radix's
+   data-state on the dialog parts. */
+.studio-sheet-content[data-state='open'] { animation: studio-sheet-in 0.28s cubic-bezier(0.32, 0.72, 0, 1); }
+.studio-sheet-content[data-state='closed'] { animation: studio-sheet-out 0.2s cubic-bezier(0.4, 0, 1, 1); }
+.studio-sheet-overlay[data-state='open'] { animation: studio-overlay-fade 0.28s ease-out; }
+.studio-sheet-overlay[data-state='closed'] { animation: studio-overlay-fade 0.2s ease-in reverse; }
+.studio-bloom { animation: studio-bloom 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* Neutral skeleton shimmer — a soft grey band sweeps the muted surface.
+   `.shimmer` is an alias so the generation card and result canvas share one
+   skeleton treatment. */
+@keyframes studio-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.studio-shimmer,
+.shimmer {
+  background-color: hsl(var(--muted));
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    hsl(var(--muted-foreground) / 0.22) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: studio-shimmer 1.7s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-sheet-content[data-state='open'],
+  .studio-sheet-content[data-state='closed'],
+  .studio-sheet-overlay[data-state='open'],
+  .studio-sheet-overlay[data-state='closed'],
+  .studio-bloom,
+  .studio-shimmer,
+  .shimmer { animation: none; }
+}
