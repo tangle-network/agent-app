@@ -59,10 +59,12 @@ const SUGGESTIONS: Array<{ label: string; prompt: string; type: GenerationType }
 
 export function ComposerHero({
   workspaceId,
+  integrationsHref,
   canManageIntegrations,
   onGenerated,
 }: {
   workspaceId?: string
+  integrationsHref?: string
   canManageIntegrations: boolean
   onGenerated: (generation: Generation) => void
 }) {
@@ -250,7 +252,7 @@ export function ComposerHero({
   const hasInlineParams = type === 'image' || type === 'video' || type === 'speech'
 
   return (
-    <section className="rounded-xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+    <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
       <Field label="Media type" className="space-y-1.5">
         <div
           role="tablist"
@@ -460,7 +462,7 @@ export function ComposerHero({
             connections={integrations.connections}
             connectionError={integrations.error}
             connectionsLoading={integrations.isLoading}
-            workspaceId={workspaceId}
+            integrationsHref={integrationsHref}
             canManageIntegrations={canManageIntegrations}
             onCaptionChange={setCaption}
             onDescriptionChange={setPostDescription}

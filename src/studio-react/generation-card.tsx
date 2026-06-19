@@ -98,7 +98,7 @@ export function GenerationStatusBadge({
   const label = status === 'failed' ? 'Failed' : status === 'running' ? 'Running' : 'Pending'
   const className = status === 'failed'
     ? 'border-destructive/25 bg-destructive/10 text-destructive'
-    : 'border-amber-500/25 bg-amber-500/10 text-amber-700'
+    : 'border-warning/25 bg-warning/10 text-warning'
 
   return (
     <div className={inline ? '' : 'absolute bottom-2 left-2'}>

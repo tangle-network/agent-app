@@ -11,19 +11,16 @@ import { GenerationStatusBadge } from './generation-card'
 
 export function GenerationDetail({
   generation,
-  workspaceId,
+  vaultHref,
   onNavigate,
 }: {
   generation: Generation
-  workspaceId?: string
+  vaultHref?: (filePath?: string | null) => string
   onNavigate?: () => void
 }) {
   const cfg = typeConfigFor(generation.type)
   const Icon = cfg.icon
-  const vaultPath = generationVaultPath(generation)
-  const vaultHref = vaultPath
-    ? `/app/${workspaceId}/vault?file=${encodeURIComponent(vaultPath)}`
-    : `/app/${workspaceId}/vault`
+  const href = vaultHref ? vaultHref(generationVaultPath(generation)) : null
 
   return (
     <div className="space-y-4">
@@ -86,14 +83,16 @@ export function GenerationDetail({
         </div>
       )}
 
-      <div className="border-t border-border pt-2">
-        <Link to={vaultHref} prefetch="intent" onClick={onNavigate}>
-          <Button size="sm" variant="outline">
-            <FolderOpen className="mr-1.5 h-3.5 w-3.5" />
-            Open in Vault
-          </Button>
-        </Link>
-      </div>
+      {href && (
+        <div className="border-t border-border pt-2">
+          <Link to={href} prefetch="intent" onClick={onNavigate}>
+            <Button size="sm" variant="outline">
+              <FolderOpen className="mr-1.5 h-3.5 w-3.5" />
+              Open in Vault
+            </Button>
+          </Link>
+        </div>
+      )}
     </div>
   )
 }

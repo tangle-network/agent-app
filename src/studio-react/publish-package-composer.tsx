@@ -14,7 +14,7 @@ export function PublishPackageComposer({
   connections,
   connectionError,
   connectionsLoading,
-  workspaceId,
+  integrationsHref,
   canManageIntegrations,
   onCaptionChange,
   onDescriptionChange,
@@ -30,7 +30,7 @@ export function PublishPackageComposer({
   connections: IntegrationConnection[]
   connectionError: Error | null
   connectionsLoading: boolean
-  workspaceId?: string
+  integrationsHref?: string
   canManageIntegrations: boolean
   onCaptionChange: (value: string) => void
   onDescriptionChange: (value: string) => void
@@ -42,7 +42,7 @@ export function PublishPackageComposer({
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         {connectionError ? (
-          <div className="flex items-center gap-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-2.5 py-1.5 text-xs text-amber-700">
+          <div className="flex items-center gap-2 rounded-md border border-warning/20 bg-warning/5 px-2.5 py-1.5 text-xs text-warning">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
             Couldn't load connected apps. Check Integrations.
           </div>
@@ -53,8 +53,8 @@ export function PublishPackageComposer({
               : 'Stage captions, destinations, cadence. Saved with the generated asset.'}
           </p>
         )}
-        {workspaceId && canManageIntegrations && (
-          <Link to={`/app/${workspaceId}/integrations`} prefetch="intent" className="shrink-0">
+        {integrationsHref && canManageIntegrations && (
+          <Link to={integrationsHref} prefetch="intent" className="shrink-0">
             <Button variant="outline" size="sm">Connect</Button>
           </Link>
         )}

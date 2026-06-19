@@ -16,7 +16,7 @@ export function ResultCanvas({
   onOpenLibrary: () => void
   onSelect: (generation: Generation) => void
 }) {
-  const cardClass = 'rounded-xl border border-border bg-card shadow-[var(--shadow-card)]'
+  const cardClass = 'rounded-xl border border-border bg-card shadow-sm'
 
   if (batch.length === 0) {
     return (

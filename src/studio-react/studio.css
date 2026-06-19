@@ -54,6 +54,13 @@
   animation: studio-shimmer 1.7s ease-in-out infinite;
 }
 
+/* Library card entrance. */
+@keyframes studio-row-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-row-in { animation: studio-row-in 0.25s ease-out both; }
+
 @media (prefers-reduced-motion: reduce) {
   .studio-sheet-content[data-state='open'],
   .studio-sheet-content[data-state='closed'],
@@ -61,5 +68,6 @@
   .studio-sheet-overlay[data-state='closed'],
   .studio-bloom,
   .studio-shimmer,
-  .shimmer { animation: none; }
+  .shimmer,
+  .animate-row-in { animation: none; }
 }

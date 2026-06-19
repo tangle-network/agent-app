@@ -18,6 +18,10 @@ export interface StudioWorkspaceProps {
   role: StudioRole
   /** Polling endpoint override (default `/api/generations`). */
   generationsEndpoint?: string
+  /** Build a vault link, optionally to a specific file. Defaults to `/app/<workspaceId>/vault`. */
+  vaultHref?: (filePath?: string | null) => string
+  /** Integrations page href for the publish-package "Connect" link. Defaults to `/app/<workspaceId>/integrations`. */
+  integrationsHref?: string
 }
 
 /**
@@ -34,6 +38,8 @@ export function StudioWorkspace({
   workspaceId,
   role,
   generationsEndpoint,
+  vaultHref,
+  integrationsHref,
 }: StudioWorkspaceProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const typeFilter = searchParams.get('type')
@@ -42,6 +48,15 @@ export function StudioWorkspace({
   const canvasRef = useRef<HTMLDivElement>(null)
   const canGenerate = role !== 'viewer'
   const canManageIntegrations = role === 'owner' || role === 'admin'
+  // Default the navigation hrefs to the conventional /app/<workspaceId>/… routes;
+  // a host on a different route scheme passes its own builders.
+  const resolvedVaultHref = vaultHref ?? (workspaceId
+    ? (filePath?: string | null) => (filePath
+      ? `/app/${workspaceId}/vault?file=${encodeURIComponent(filePath)}`
+      : `/app/${workspaceId}/vault`)
+    : undefined)
+  const resolvedIntegrationsHref = integrationsHref
+    ?? (workspaceId ? `/app/${workspaceId}/integrations` : undefined)
 
   const { mergedGenerations, latestBatch, onGenerated } = useStudioGenerations(generations, {
     workspaceId,
@@ -76,6 +91,7 @@ export function StudioWorkspace({
           <>
             <ComposerHero
               workspaceId={workspaceId}
+              integrationsHref={resolvedIntegrationsHref}
               canManageIntegrations={canManageIntegrations}
               onGenerated={(generation) => {
                 onGenerated(generation)
@@ -93,7 +109,7 @@ export function StudioWorkspace({
             </div>
           </>
         ) : (
-          <section className="flex flex-col items-center justify-center gap-3 rounded-xl border border-border bg-card p-10 text-center shadow-[var(--shadow-card)]">
+          <section className="flex flex-col items-center justify-center gap-3 rounded-xl border border-border bg-card p-10 text-center shadow-sm">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
               <Images className="h-6 w-6 text-muted-foreground/40" />
             </div>
@@ -120,7 +136,7 @@ export function StudioWorkspace({
         totalCost={totalCost}
         typeFilter={typeFilter}
         onFilterChange={setFilter}
-        workspaceId={workspaceId}
+        vaultHref={resolvedVaultHref}
         selected={selected}
         onSelect={(generation) => { setSelected(generation); if (generation) setDrawerOpen(true) }}
       />

@@ -21,7 +21,7 @@ export function LibraryDrawer({
   totalCost,
   typeFilter,
   onFilterChange,
-  workspaceId,
+  vaultHref,
   selected,
   onSelect,
 }: {
@@ -31,7 +31,7 @@ export function LibraryDrawer({
   totalCost: number
   typeFilter: string | null
   onFilterChange: (type: string | null) => void
-  workspaceId?: string
+  vaultHref?: (filePath?: string | null) => string
   selected: Generation | null
   onSelect: (generation: Generation | null) => void
 }) {
@@ -69,7 +69,7 @@ export function LibraryDrawer({
         <div className="flex-1 overflow-y-auto p-4">
           <GenerationDetail
             generation={selected}
-            workspaceId={workspaceId}
+            vaultHref={vaultHref}
             onNavigate={() => onOpenChange(false)}
           />
         </div>
@@ -84,12 +84,14 @@ export function LibraryDrawer({
                   {totalCost.toFixed(2)} spent
                 </span>
               </div>
-              <Link to={`/app/${workspaceId}/vault`} prefetch="intent" onClick={() => onOpenChange(false)}>
-                <Button size="sm" variant="outline">
-                  <FolderOpen className="mr-1.5 h-3.5 w-3.5" />
-                  Vault
-                </Button>
-              </Link>
+              {vaultHref && (
+                <Link to={vaultHref()} prefetch="intent" onClick={() => onOpenChange(false)}>
+                  <Button size="sm" variant="outline">
+                    <FolderOpen className="mr-1.5 h-3.5 w-3.5" />
+                    Vault
+                  </Button>
+                </Link>
+              )}
             </div>
             <Tabs value={typeFilter ?? 'all'} onValueChange={(v) => onFilterChange(v === 'all' ? null : v)}>
               <TabsList className="h-9 w-full justify-start gap-1 overflow-x-auto bg-transparent">
