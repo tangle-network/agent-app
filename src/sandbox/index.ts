@@ -10,6 +10,7 @@ import {
   type StorageConfig,
   type PromptResult,
 } from '@tangle-network/sandbox'
+import { createHash } from 'node:crypto'
 import {
   buildAppToolMcpServer,
   type AppToolName,
@@ -675,7 +676,7 @@ export interface WriteProfileFilesOptions {
   execTimeoutMs?: number
   // Delay between execs (ms) to stay under the proxy throttle. 0 disables it.
   paceMs?: number
-  // Max retries for a transient (429 or timeout/hang) exec before failing loud.
+  // Max retries for a transient exec before failing loud.
   maxRetries?: number
 }
 
@@ -695,12 +696,19 @@ export async function writeProfileFilesToBox(
     if (mount.resource.kind !== 'inline') continue
     const content = mount.resource.content ?? ''
     const b64 = Buffer.from(content, 'utf8').toString('base64')
+    const b64Chunks: string[] = []
+    for (let i = 0; i < b64.length; i += PROFILE_WRITE_B64_CHUNK_CHARS) {
+      b64Chunks.push(b64.slice(i, i + PROFILE_WRITE_B64_CHUNK_CHARS))
+    }
+    const expectedSha256 = createHash('sha256').update(content, 'utf8').digest('hex')
     const path = mount.path
     const dir = path.replace(/\/[^/]*$/, '')
     const isBin = /(^|\/)(s?bin)\//.test(path)
     const executable = mount.executable ?? isBin
     const q = shellPath(path)
     const qb64 = shellPath(`${path}.b64`)
+    const qtmp = shellPath(`${path}.tmp`)
+    const qpartPrefix = shellPath(`${path}.b64.part.`)
 
     // Run one exec step, surfacing a non-zero exit or transport error as a
     // fail-loud Outcome with the underlying error as cause. Transient failures
@@ -737,25 +745,41 @@ export async function writeProfileFilesToBox(
       }
     }
 
-    // Start the staging file empty so re-runs (redeploy with new skills)
-    // overwrite rather than append. mkdir -p creates the target directory;
-    // shellPath keeps `~/...` resolving to the box user's real $HOME.
-    const mkdir = dir && dir !== path ? `mkdir -p ${shellPath(dir)} && ` : ''
-    let res = await step(`${mkdir}: > ${qb64}`)
+    // Ensure the target directory exists. Chunk/final commands below are
+    // idempotent under unknown-outcome transport retries; this no-op/mkdir is too.
+    const mkdir = dir && dir !== path ? `mkdir -p ${shellPath(dir)}` : ':'
+    let res = await step(mkdir)
     if (!res.succeeded) return res
 
-    // Append the base64 in capped slices; the base64 alphabet has no single
-    // quotes, so single-quoting each slice is safe. printf '%s' adds no newline.
-    for (let i = 0; i < b64.length; i += PROFILE_WRITE_B64_CHUNK_CHARS) {
-      const slice = b64.slice(i, i + PROFILE_WRITE_B64_CHUNK_CHARS)
-      res = await step(`printf '%s' '${slice}' >> ${qb64}`)
+    // Write each deterministic part with overwrite, not append. If the server
+    // writes a part but the HTTP response is lost, retrying the same step lands
+    // the same bytes instead of duplicating them.
+    for (let i = 0; i < b64Chunks.length; i++) {
+      const slice = b64Chunks[i]!
+      res = await step(`printf '%s' '${slice}' > ${shellPath(`${path}.b64.part.${i}`)}`)
       if (!res.succeeded) return res
     }
 
-    // Decode the staged base64 to the real path, drop the staging file, and set
-    // the executable bit when required. base64 -d reconstructs the exact bytes.
-    const chmod = executable ? ` && chmod +x ${q}` : ''
-    res = await step(`base64 -d ${qb64} > ${q} && rm -f ${qb64}${chmod}`)
+    // Materialize from deterministic parts into a temp file, verify its content
+    // hash, then atomically move into place. If the final exec succeeds but its
+    // response is lost, a retry first accepts an already-correct target and only
+    // re-runs idempotent chmod/cleanup. Parts are cleaned only after the target
+    // hash is known-good, so a retried final step can always reconstruct.
+    const chmod = executable ? `chmod +x ${q} || exit 1; ` : ''
+    const checksumMismatch = shellSingleQuote(`writeProfileFilesToBox: checksum mismatch for ${path}`)
+    const finalCmd =
+      `expected='${expectedSha256}'; ` +
+      `if [ -f ${q} ] && [ "$(sha256sum ${q} | awk '{print $1}')" = "$expected" ]; then ` +
+      `${chmod}rm -f ${qb64} ${qtmp}; i=0; while [ "$i" -lt ${b64Chunks.length} ]; do rm -f ${qpartPrefix}$i; i=$((i+1)); done; exit 0; fi; ` +
+      `: > ${qb64} && ` +
+      `i=0; while [ "$i" -lt ${b64Chunks.length} ]; do cat ${qpartPrefix}$i >> ${qb64} || exit 1; i=$((i+1)); done && ` +
+      `base64 -d ${qb64} > ${qtmp} && ` +
+      `[ "$(sha256sum ${qtmp} | awk '{print $1}')" = "$expected" ] || { echo ${checksumMismatch} >&2; exit 1; }; ` +
+      `mv ${qtmp} ${q} && ` +
+      `${executable ? `chmod +x ${q} && ` : ''}` +
+      `[ "$(sha256sum ${q} | awk '{print $1}')" = "$expected" ] || { echo ${checksumMismatch} >&2; exit 1; }; ` +
+      `rm -f ${qb64} ${qtmp}; i=0; while [ "$i" -lt ${b64Chunks.length} ]; do rm -f ${qpartPrefix}$i; i=$((i+1)); done`
+    res = await step(finalCmd)
     if (!res.succeeded) return res
   }
   return ok(undefined)

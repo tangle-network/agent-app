@@ -1,4 +1,11 @@
+import { execFile } from 'node:child_process'
+import { mkdtemp, readFile as readFsFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { promisify } from 'node:util'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+const execFileAsync = promisify(execFile)
 
 const createMock = vi.fn()
 const listMock = vi.fn()
@@ -833,6 +840,40 @@ describe('deferred profile files', () => {
     ...(executable !== undefined ? { executable } : {}),
   })
 
+  async function withShellBackedProfileWriter<T>(
+    failAfterSuccessfulCalls: Set<number>,
+    run: (ctx: { box: SandboxInstance; cwd: string; exec: ReturnType<typeof vi.fn> }) => Promise<T>,
+  ): Promise<T> {
+    const cwd = await mkdtemp(join(tmpdir(), 'agent-app-profile-write-'))
+    let calls = 0
+    const exec = vi.fn().mockImplementation(async (cmd: string) => {
+      calls++
+      let stdout = ''
+      let stderr = ''
+      try {
+        const output = await execFileAsync('bash', ['-lc', cmd], { cwd, timeout: 5000 })
+        stdout = String(output.stdout)
+        stderr = String(output.stderr)
+      } catch (err) {
+        const e = err as { stdout?: unknown; stderr?: unknown; code?: unknown }
+        return {
+          stdout: typeof e.stdout === 'string' ? e.stdout : '',
+          stderr: typeof e.stderr === 'string' ? e.stderr : '',
+          exitCode: typeof e.code === 'number' ? e.code : 1,
+        }
+      }
+      if (failAfterSuccessfulCalls.has(calls)) {
+        throw Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' })
+      }
+      return { stdout, stderr, exitCode: 0 }
+    })
+    try {
+      return await run({ box: fakeBox({ exec }), cwd, exec })
+    } finally {
+      await rm(cwd, { recursive: true, force: true })
+    }
+  }
+
   it('splits inline files out and keeps non-inline refs in the profile', () => {
     const profile = {
       name: 'p',
@@ -897,6 +938,7 @@ describe('deferred profile files', () => {
     // original content byte-exact.
     const payload = appends
       .map((c) => c.replace(/^printf '%s' '/, '').replace(/' >> .*$/, ''))
+      .map((c) => c.replace(/' > .*$/, ''))
       .join('')
     expect(Buffer.from(payload, 'base64').toString('utf8')).toBe(big)
   })
@@ -915,6 +957,7 @@ describe('deferred profile files', () => {
     const payload = cmds
       .filter((c) => c.startsWith("printf '%s' '"))
       .map((c) => c.replace(/^printf '%s' '/, '').replace(/' >> .*$/, ''))
+      .map((c) => c.replace(/' > .*$/, ''))
       .join('')
     expect(Buffer.from(payload, 'base64').toString('utf8')).toBe(big)
   })
@@ -977,7 +1020,7 @@ describe('deferred profile files', () => {
     const absCmds = cmds.filter((c) => c.includes('/etc/app/config.json'))
     expect(absCmds.length).toBeGreaterThan(0)
     for (const cmd of absCmds) expect(cmd).not.toContain('$HOME')
-    expect(absCmds[0]).toContain(`mkdir -p '/etc/app'`)
+    expect(cmds.some((c) => c === `mkdir -p '/etc/app'`)).toBe(true)
   })
 
   it('retries a 429 (rate limit) with backoff, then succeeds', async () => {
@@ -1047,6 +1090,28 @@ describe('deferred profile files', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('retries a lost transport response after a chunk write without duplicating content', async () => {
+    await withShellBackedProfileWriter(new Set([2]), async ({ box, cwd, exec }) => {
+      const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'abc')], { paceMs: 0 })
+
+      expect(res.succeeded).toBe(true)
+      expect(exec).toHaveBeenCalledTimes(4)
+      await expect(readFsFile(join(cwd, 'skills/x.md'), 'utf8')).resolves.toBe('abc')
+    })
+  })
+
+  it('retries a lost transport response after final materialization without false failure', async () => {
+    await withShellBackedProfileWriter(new Set([3]), async ({ box, cwd, exec }) => {
+      const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'abc')], { paceMs: 0 })
+
+      expect(res.succeeded).toBe(true)
+      expect(exec).toHaveBeenCalledTimes(4)
+      await expect(readFsFile(join(cwd, 'skills/x.md'), 'utf8')).resolves.toBe('abc')
+      await expect(readFsFile(join(cwd, 'skills/x.md.b64.part.0'), 'utf8')).rejects.toThrow()
+      await expect(readFsFile(join(cwd, 'skills/x.md.b64'), 'utf8')).rejects.toThrow()
+    })
   })
 
   it.each([
