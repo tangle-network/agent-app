@@ -225,6 +225,57 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
 
     expect(createMock.mock.calls[0]![0].webTerminalEnabled).toBe(true)
   })
+
+  it('recreates a reused box whose edge has failed instead of returning it', async () => {
+    const del = vi.fn().mockResolvedValue(undefined)
+    const failed = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      connection: { runtimeUrl: 'https://rt', edgeStatus: 'failed' } as never,
+      delete: del,
+    })
+    // running-only: a status-blind mock would re-surface the box on the stopped
+    // list and send Stage 2 down a resume() path the fake box can't service.
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      status === 'running' ? Promise.resolve([failed]) : Promise.resolve([]),
+    )
+    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
+
+    await ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(del).toHaveBeenCalledOnce()
+    expect(createMock).toHaveBeenCalledOnce()
+  })
+
+  it('recreates a reused box that never surfaces a runtime connection (no silent reuse)', async () => {
+    vi.useFakeTimers()
+    try {
+      const del = vi.fn().mockResolvedValue(undefined)
+      // Matches harness but has no connection; refresh + get never populate one,
+      // so refreshRuntimeConnection exhausts its polling window.
+      const stuck = fakeBox({
+        name: 'box-w1',
+        metadata: { harness: 'opencode' },
+        connection: undefined,
+        delete: del,
+      })
+      listMock.mockImplementation(({ status }: { status: string }) =>
+        status === 'running' ? Promise.resolve([stuck]) : Promise.resolve([]),
+      )
+      getMock.mockResolvedValue(stuck)
+      createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
+
+      const promise = ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
+      // Drive past the 30s readiness deadline so the poll loop gives up.
+      await vi.advanceTimersByTimeAsync(31_000)
+      await promise
+
+      expect(del).toHaveBeenCalledOnce()
+      expect(createMock).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('buildAppToolMcpServers', () => {

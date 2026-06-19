@@ -408,6 +408,22 @@ async function refreshRuntimeConnection(
   return current
 }
 
+// Decide whether an existing (reused or resumed) box is safe to hand back.
+// `refreshRuntimeConnection` has already polled for the runtime URL, so a box
+// that still has none never became connectable and must be recreated rather
+// than silently reused — downstream exec/terminal traffic would fail against
+// it. A failed edge is likewise unusable. Only when the connection is present
+// do we spend an exec round-trip on the liveness probe.
+async function isReusableBox(
+  box: SandboxInstance,
+  harness: Harness,
+  probe: LivenessProbeConfig | undefined,
+): Promise<boolean> {
+  if (sandboxEdgeFailed(box)) return false
+  if (!sandboxRuntimeUrl(box)) return false
+  return isBoxAlive(box, harness, probe)
+}
+
 // Resume a name-matched stopped box and wait for it to reach running. Returns
 // ok(null) when no stopped box matches the name.
 async function resumeStoppedBox(
@@ -451,20 +467,7 @@ export async function ensureWorkspaceSandbox(
       }
     } else if (found.metadata?.harness === harness) {
       const ready = await refreshRuntimeConnection(client, found)
-      if (
-        sandboxEdgeFailed(ready) ||
-        (sandboxRuntimeUrl(ready) && !(await isBoxAlive(ready, harness, shell.livenessProbe)))
-      ) {
-        const dropped = await deleteBox(ready)
-        if (!dropped.succeeded) {
-          throw new Error(
-            `sandbox ${name} ` +
-              `(was ${String(found.metadata?.harness ?? 'unknown')}, want ${harness}, or unresponsive) ` +
-              `could not be deleted`,
-            { cause: dropped.error },
-          )
-        }
-      } else {
+      if (await isReusableBox(ready, harness, shell.livenessProbe)) {
         const written = await materializeDeferredFilesForExistingBox(shell, ready, workspaceId, userId)
         if (!written.succeeded) {
           throw new Error(`deferred file write failed on reused box ${name}`, { cause: written.error })
@@ -476,6 +479,15 @@ export async function ensureWorkspaceSandbox(
           }
         }
         return ready
+      }
+      const dropped = await deleteBox(ready)
+      if (!dropped.succeeded) {
+        throw new Error(
+          `sandbox ${name} ` +
+            `(was ${String(found.metadata?.harness ?? 'unknown')}, want ${harness}, or unresponsive) ` +
+            `could not be deleted`,
+          { cause: dropped.error },
+        )
       }
     } else {
       const dropped = await deleteBox(found)
@@ -495,20 +507,7 @@ export async function ensureWorkspaceSandbox(
     const resumed = await resumeStoppedBox(client, name, resumeTimeout)
     if (resumed.succeeded && resumed.value) {
       const box = await refreshRuntimeConnection(client, resumed.value)
-      if (
-        sandboxEdgeFailed(box) ||
-        (sandboxRuntimeUrl(box) && !(await isBoxAlive(box, harness, shell.livenessProbe)))
-      ) {
-        const dropped = await deleteBox(box)
-        if (!dropped.succeeded) {
-          throw new Error(
-            `resumed sandbox ${name} ` +
-              `(was ${String(box.metadata?.harness ?? 'unknown')}, want ${harness}, or unresponsive) ` +
-              `could not be deleted`,
-            { cause: dropped.error },
-          )
-        }
-      } else {
+      if (await isReusableBox(box, harness, shell.livenessProbe)) {
         const written = await materializeDeferredFilesForExistingBox(shell, box, workspaceId, userId)
         if (!written.succeeded) {
           throw new Error(`deferred file write failed on resumed box ${name}`, { cause: written.error })
@@ -520,6 +519,15 @@ export async function ensureWorkspaceSandbox(
           }
         }
         return box
+      }
+      const dropped = await deleteBox(box)
+      if (!dropped.succeeded) {
+        throw new Error(
+          `resumed sandbox ${name} ` +
+            `(was ${String(box.metadata?.harness ?? 'unknown')}, want ${harness}, or unresponsive) ` +
+            `could not be deleted`,
+          { cause: dropped.error },
+        )
       }
     }
   }

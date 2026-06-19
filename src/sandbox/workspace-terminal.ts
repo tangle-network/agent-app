@@ -17,6 +17,79 @@ export interface WorkspaceSandboxInstanceLike {
   } | null
 }
 
+// Generic name-keyed sandbox lifecycle manager. A structural, substrate-free
+// helper for products that drive their own SDK/box types (distinct from the
+// concrete `ensureWorkspaceSandbox` in ./index, which is bound to the
+// @tangle-network/sandbox client). Kept as a public export — external
+// consumers compose it; removing it would be a breaking change.
+export interface WorkspaceSandboxEnsureContext {
+  workspaceId: string
+  userId: string
+}
+
+export interface WorkspaceSandboxManagerOptions<TClient, TBox extends WorkspaceSandboxInstanceLike, TEnsureOptions = void> {
+  getClient: (ctx: WorkspaceSandboxEnsureContext) => Promise<TClient> | TClient
+  nameForWorkspace: (workspaceId: string, ctx: WorkspaceSandboxEnsureContext) => string
+  listSandboxes: (client: TClient, ctx: WorkspaceSandboxEnsureContext) => Promise<TBox[]>
+  createSandbox: (args: {
+    client: TClient
+    ctx: WorkspaceSandboxEnsureContext
+    name: string
+    options: TEnsureOptions
+    listError?: unknown
+  }) => Promise<TBox>
+  waitForRunning?: (box: TBox, ctx: WorkspaceSandboxEnsureContext) => Promise<void>
+  prepareExisting?: (box: TBox, ctx: WorkspaceSandboxEnsureContext, options: TEnsureOptions) => Promise<TBox | void>
+  prepareCreated?: (box: TBox, ctx: WorkspaceSandboxEnsureContext, options: TEnsureOptions) => Promise<TBox | void>
+  onListError?: (error: unknown, ctx: WorkspaceSandboxEnsureContext) => void
+}
+
+export interface WorkspaceSandboxManager<TBox extends WorkspaceSandboxInstanceLike, TEnsureOptions = void> {
+  ensureWorkspaceSandbox: (
+    workspaceId: string,
+    userId: string,
+    options?: TEnsureOptions,
+  ) => Promise<TBox>
+}
+
+export function createWorkspaceSandboxManager<TClient, TBox extends WorkspaceSandboxInstanceLike, TEnsureOptions = void>(
+  opts: WorkspaceSandboxManagerOptions<TClient, TBox, TEnsureOptions>,
+): WorkspaceSandboxManager<TBox, TEnsureOptions> {
+  return {
+    async ensureWorkspaceSandbox(workspaceId, userId, options) {
+      if (!workspaceId) throw new Error('workspaceId is required')
+      if (!userId) throw new Error('userId is required')
+      const ctx = { workspaceId, userId }
+      const client = await opts.getClient(ctx)
+      const name = opts.nameForWorkspace(workspaceId, ctx)
+      let listError: unknown
+      let existing: TBox[] = []
+
+      try {
+        existing = await opts.listSandboxes(client, ctx)
+      } catch (err) {
+        listError = err
+        opts.onListError?.(err, ctx)
+      }
+
+      const found = existing.find((box) => box.name === name)
+      if (found) {
+        return (await opts.prepareExisting?.(found, ctx, options as TEnsureOptions)) ?? found
+      }
+
+      const created = await opts.createSandbox({
+        client,
+        ctx,
+        name,
+        options: options as TEnsureOptions,
+        listError,
+      })
+      await opts.waitForRunning?.(created, ctx)
+      return (await opts.prepareCreated?.(created, ctx, options as TEnsureOptions)) ?? created
+    },
+  }
+}
+
 export interface SandboxTerminalTokenOptions {
   secret?: string
   expiresInMs?: number
@@ -32,6 +105,12 @@ export interface SandboxTerminalTokenResult {
 
 const DEFAULT_TERMINAL_TOKEN_TTL_MS = 15 * 60 * 1000
 const BEARER_SUBPROTOCOL_PREFIX = 'bearer.'
+// Legacy `createSandboxTerminalToken` (pre proxy-token extraction) prefixed
+// minted tokens with `sbxt_` and signed the unprefixed payload. New tokens
+// carry no prefix. Strip it on verify so tokens minted by a prior deploy still
+// validate within their (default 15-min) TTL window — avoids a wave of 403s on
+// in-flight browser terminal sessions right after rollout.
+const LEGACY_TERMINAL_TOKEN_PREFIX = 'sbxt_'
 
 export async function createSandboxTerminalToken(
   subject: SandboxTerminalTokenSubject,
@@ -56,7 +135,10 @@ export async function verifySandboxTerminalToken(
   validateTerminalSubject(expected)
   const secret = opts.secret?.trim()
   const now = opts.now ?? Date.now
-  return verifyTerminalProxyToken(secret ?? '', token, expected, now)
+  const normalized = token.startsWith(LEGACY_TERMINAL_TOKEN_PREFIX)
+    ? token.slice(LEGACY_TERMINAL_TOKEN_PREFIX.length)
+    : token
+  return verifyTerminalProxyToken(secret ?? '', normalized, expected, now)
 }
 
 export interface AuthenticatedSandboxUser {

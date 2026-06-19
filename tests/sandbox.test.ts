@@ -5,6 +5,7 @@ import {
   buildSandboxRuntimeProxyHeaders,
   createSandboxTerminalToken,
   createWorkspaceSandboxConnectionHandler,
+  createWorkspaceSandboxManager,
   createWorkspaceSandboxRuntimeProxyHandler,
   createWorkspaceSandboxTerminalUpgradeHandler,
   encodeSandboxRuntimePath,
@@ -12,9 +13,56 @@ import {
   matchSandboxTerminalWsPath,
   terminalTokenFromRequest,
   verifySandboxTerminalToken,
+  type WorkspaceSandboxInstanceLike,
 } from '../src/sandbox/index'
 
 const secret = 'terminal-secret'
+
+describe('createWorkspaceSandboxManager', () => {
+  it('reuses only the exact workspace sandbox name and never falls back to the first running sandbox', async () => {
+    type Box = WorkspaceSandboxInstanceLike & { prepared?: boolean; waited?: boolean }
+    const created: Box = { id: 'created', name: 'creative-workspace-1', status: 'provisioning', connection: { runtimeUrl: 'https://runtime' } }
+    const manager = createWorkspaceSandboxManager<unknown, Box, { installTools: boolean }>({
+      getClient: () => ({}),
+      nameForWorkspace: (workspaceId) => `creative-${workspaceId}`,
+      listSandboxes: async () => [
+        { id: 'wrong', name: 'creative-other-workspace', status: 'running' },
+      ],
+      createSandbox: async ({ name }) => ({ ...created, name }),
+      waitForRunning: async (box) => {
+        box.waited = true
+      },
+      prepareCreated: async (box) => {
+        box.prepared = true
+      },
+    })
+
+    const box = await manager.ensureWorkspaceSandbox('workspace-1', 'user-1', { installTools: true })
+
+    expect(box.id).toBe('created')
+    expect(box.name).toBe('creative-workspace-1')
+    expect(box.waited).toBe(true)
+    expect(box.prepared).toBe(true)
+  })
+
+  it('runs the existing-box callback when the exact name is found', async () => {
+    const found = { id: 'box-1', name: 'creative-workspace-1', status: 'running' }
+    const createSandbox = vi.fn()
+    const manager = createWorkspaceSandboxManager({
+      getClient: () => ({}),
+      nameForWorkspace: (workspaceId) => `creative-${workspaceId}`,
+      listSandboxes: async () => [found],
+      createSandbox,
+      prepareExisting: async (box) => ({ ...box, status: 'prepared' }),
+    })
+
+    await expect(manager.ensureWorkspaceSandbox('workspace-1', 'user-1')).resolves.toMatchObject({
+      id: 'box-1',
+      status: 'prepared',
+    })
+    expect(createSandbox).not.toHaveBeenCalled()
+  })
+})
 
 describe('sandbox terminal tokens', () => {
   it('round-trips for the bound user, workspace, and sandbox', async () => {
@@ -36,6 +84,19 @@ describe('sandbox terminal tokens', () => {
     await expect(verifySandboxTerminalToken(minted.token, subject, { secret: 'other', now: () => 1_000 })).resolves.toBe(false)
     await expect(verifySandboxTerminalToken('not-a-token', subject, { secret, now: () => 1_000 })).resolves.toBe(false)
     await expect(verifySandboxTerminalToken(minted.token, subject, { secret, now: () => 2_000 })).resolves.toBe(false)
+  })
+
+  it('verifies legacy sbxt_-prefixed tokens for backward compatibility', async () => {
+    const subject = { userId: 'user-1', workspaceId: 'workspace-1', sandboxId: 'box-1' }
+    const minted = await createSandboxTerminalToken(subject, { secret, now: () => 1_000, expiresInMs: 1_000 })
+    // A token minted by a prior deploy carried an `sbxt_` prefix over the same
+    // signed payload; verification must still accept it within its TTL.
+    const legacyToken = `sbxt_${minted.token}`
+
+    await expect(verifySandboxTerminalToken(legacyToken, subject, { secret, now: () => 1_000 })).resolves.toBe(true)
+    // The prefix is no escape hatch — wrong secret and expiry still fail.
+    await expect(verifySandboxTerminalToken(legacyToken, subject, { secret: 'other', now: () => 1_000 })).resolves.toBe(false)
+    await expect(verifySandboxTerminalToken(legacyToken, subject, { secret, now: () => 2_000 })).resolves.toBe(false)
   })
 })
 
