@@ -47,10 +47,17 @@ import {
   detectInteractiveQuestion,
   isTerminalPromptEvent,
   driveSandboxTurn,
+  splitDeferredProfileFiles,
+  writeProfileFilesToBox,
   type SandboxRuntimeConfig,
   type SecretStore,
 } from './index'
-import type { AgentProfile, AgentProfileMcpServer, SandboxInstance } from '@tangle-network/sandbox'
+import type {
+  AgentProfile,
+  AgentProfileFileMount,
+  AgentProfileMcpServer,
+  SandboxInstance,
+} from '@tangle-network/sandbox'
 
 const PROFILE: AgentProfile = { name: 'test' } as AgentProfile
 
@@ -653,5 +660,93 @@ describe('driveSandboxTurn', () => {
     const failBox = fakeBox({ prompt: vi.fn().mockResolvedValue({ success: false, error: 'boom', durationMs: 1 }) })
     const r2 = await driveSandboxTurn(shell, failBox, 'go', { sessionId: 'sess1' })
     expect(r2.succeeded).toBe(false)
+  })
+})
+
+describe('deferred profile files', () => {
+  const inlineMount = (path: string, content: string, executable?: boolean): AgentProfileFileMount => ({
+    path,
+    resource: { kind: 'inline', name: path, content },
+    ...(executable !== undefined ? { executable } : {}),
+  })
+
+  it('splits inline files out and keeps non-inline refs in the profile', () => {
+    const profile = {
+      name: 'p',
+      resources: {
+        files: [
+          inlineMount('skills/a.md', '# A'),
+          { path: 'gh/b.md', resource: { kind: 'github', path: 'b.md' } },
+        ],
+      },
+    } as unknown as AgentProfile
+    const { leanProfile, deferredFiles } = splitDeferredProfileFiles(profile)
+    expect(deferredFiles.map((f) => f.path)).toEqual(['skills/a.md'])
+    expect((leanProfile.resources?.files ?? []).map((f) => f.path)).toEqual(['gh/b.md'])
+  })
+
+  it('writes each inline file via base64 exec and chmods bin targets', async () => {
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    const box = fakeBox({ exec })
+    const res = await writeProfileFilesToBox(box, [
+      inlineMount('skills/seo.md', '# SEO'),
+      inlineMount('/usr/local/bin/gtm', '#!/bin/sh\necho hi'),
+    ])
+    expect(res.succeeded).toBe(true)
+    expect(exec).toHaveBeenCalledTimes(2)
+    const cmds = exec.mock.calls.map((c) => c[0] as string)
+    // base64 of "# SEO"
+    expect(cmds[0]).toContain(Buffer.from('# SEO', 'utf8').toString('base64'))
+    expect(cmds[0]).toContain('base64 -d')
+    // bin target gets +x
+    expect(cmds[1]).toContain('chmod +x')
+    expect(cmds[0]).not.toContain('chmod +x')
+  })
+
+  it('fails loud on a non-zero exec exit', async () => {
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: 'disk full', exitCode: 1 })
+    const box = fakeBox({ exec })
+    const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')])
+    expect(res.succeeded).toBe(false)
+    if (!res.succeeded) expect(res.error.message).toContain('disk full')
+  })
+
+  it('ensureWorkspaceSandbox: deferred files are stripped from create payload and written post-running', async () => {
+    listMock.mockResolvedValue([])
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    const created = fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), exec, connection: { runtimeUrl: 'x' } as never })
+    createMock.mockResolvedValue(created)
+    const filesProfile = {
+      name: 'p',
+      resources: { files: [inlineMount('skills/seo.md', '# SEO'), inlineMount('/usr/local/bin/gtm', 'echo')] },
+    } as unknown as AgentProfile
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      deferProfileFiles: true,
+      resumeStopped: false,
+      profile: () => filesProfile,
+    })
+    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+    const payload = createMock.mock.calls[0]![0]
+    // Inline files stripped from the create payload.
+    expect(payload.backend.profile.resources.files).toEqual([])
+    // ...and written into the box afterward.
+    expect(exec).toHaveBeenCalledTimes(2)
+  })
+
+  it('ensureWorkspaceSandbox: keeps files inline when deferProfileFiles is unset', async () => {
+    listMock.mockResolvedValue([])
+    const created = fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never })
+    createMock.mockResolvedValue(created)
+    const filesProfile = {
+      name: 'p',
+      resources: { files: [inlineMount('skills/seo.md', '# SEO')] },
+    } as unknown as AgentProfile
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      resumeStopped: false,
+      profile: () => filesProfile,
+    })
+    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+    const payload = createMock.mock.calls[0]![0]
+    expect(payload.backend.profile.resources.files).toHaveLength(1)
   })
 })

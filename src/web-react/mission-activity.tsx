@@ -134,13 +134,55 @@ function RefreshGlyph({ className }: { className?: string }) {
   )
 }
 
+function CopyGlyph({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  )
+}
+
+/** Copy a trace id to the clipboard — the drill-in's actionable handle instead
+ *  of a bare, dead-end string. Falls back silently when the Clipboard API is
+ *  unavailable (insecure context / older browser). */
+function TraceIdCopy({ traceId }: { traceId: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = useCallback(() => {
+    void navigator.clipboard?.writeText(traceId).then(
+      () => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1200)
+      },
+      () => {},
+    )
+  }, [traceId])
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      title="Copy trace id"
+      aria-label="Copy trace id"
+      className="inline-flex min-w-0 items-center gap-1.5 rounded text-left font-mono text-muted-foreground transition hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card"
+    >
+      <span className="truncate">{traceId}</span>
+      <CopyGlyph className="h-3 w-3 shrink-0" />
+      {copied && <span className="shrink-0 not-italic text-success">copied</span>}
+    </button>
+  )
+}
+
 function StatusDot({ tone }: { tone: ActivityTone }) {
   return (
-    <span
-      className={`h-2 w-2 shrink-0 rounded-full ${
-        tone === 'live' ? 'animate-pulse bg-yellow-500' : tone === 'ok' ? 'bg-green-500' : tone === 'error' ? 'bg-red-500' : 'bg-muted-foreground/40'
-      }`}
-    />
+    <span className="inline-flex items-center">
+      <span
+        aria-hidden
+        className={`h-2 w-2 shrink-0 rounded-full ${
+          tone === 'live' ? 'animate-pulse bg-warning' : tone === 'ok' ? 'bg-success' : tone === 'error' ? 'bg-destructive' : 'bg-muted-foreground/40'
+        }`}
+      />
+      <span className="sr-only">{tone}</span>
+    </span>
   )
 }
 
@@ -171,7 +213,7 @@ export function FlowWaterfall({ trace }: FlowWaterfallProps) {
           </span>
           <div className="relative h-2 rounded-sm bg-muted/40">
             <div
-              className={`absolute inset-y-0 rounded-sm ${row.ok ? BAR_CLASS[row.kind] : 'bg-red-500/80'} ${row.approx ? 'opacity-70' : ''}`}
+              className={`absolute inset-y-0 rounded-sm ${row.ok ? BAR_CLASS[row.kind] : 'bg-destructive/80'} ${row.approx ? 'opacity-70' : ''}`}
               style={{ left: `${row.offsetPct}%`, width: `${row.widthPct}%` }}
             />
           </div>
@@ -218,7 +260,7 @@ export function MissionActivityLane({ activity, startedAt, nowMs }: MissionActiv
               <span className="text-muted-foreground"> — {run.detail}</span>
             </span>
             {tone === 'live' && (run.iteration !== undefined || run.phase !== undefined) && (
-              <span className="shrink-0 rounded-full bg-yellow-500/10 px-1.5 py-0.5 font-mono text-[10px] text-yellow-700 dark:text-yellow-400">
+              <span className="shrink-0 rounded-full bg-warning/10 px-1.5 py-0.5 font-mono text-[10px] text-warning">
                 {[run.iteration !== undefined ? `iter ${run.iteration}` : null, run.phase ?? null]
                   .filter(Boolean)
                   .join(' · ')}
@@ -288,7 +330,7 @@ function ActivityRow({
           <span className="text-muted-foreground"> — {record.detail}</span>
         </span>
         {tone === 'live' && (record.iteration !== undefined || record.phase !== undefined) && (
-          <span className="shrink-0 rounded-full bg-yellow-500/10 px-2 py-0.5 font-mono text-[10px] text-yellow-700 dark:text-yellow-400">
+          <span className="shrink-0 rounded-full bg-warning/10 px-2 py-0.5 font-mono text-[10px] text-warning">
             {[record.iteration !== undefined ? `iter ${record.iteration}` : null, record.phase ?? null]
               .filter(Boolean)
               .join(' · ')}
@@ -297,11 +339,11 @@ function ActivityRow({
         <span
           className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
             tone === 'ok'
-              ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+              ? 'bg-success/10 text-success'
               : tone === 'error'
-                ? 'bg-red-500/10 text-red-700 dark:text-red-400'
+                ? 'bg-destructive/10 text-destructive'
                 : tone === 'live'
-                  ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
+                  ? 'bg-warning/10 text-warning'
                   : 'bg-muted/60 text-muted-foreground'
           }`}
         >
@@ -311,7 +353,12 @@ function ActivityRow({
         <ChevronGlyph className={`h-3 w-3 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="space-y-1.5 border-t border-border/40 px-3 py-2.5">
+        <div className="space-y-2.5 border-t border-border/40 px-3 py-2.5">
+          {record.durationMs !== undefined && (
+            <div className="rounded-md border border-border/50 bg-muted/10 p-2">
+              <FlowWaterfall trace={stepActivityFlowTrace([record])} />
+            </div>
+          )}
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono text-[11px]">
             <dt className="text-muted-foreground/60">task</dt>
             <dd className="truncate text-muted-foreground">{record.taskId}</dd>
@@ -326,7 +373,9 @@ function ActivityRow({
             {record.traceId && (
               <>
                 <dt className="text-muted-foreground/60">trace</dt>
-                <dd className="truncate text-muted-foreground">{record.traceId}</dd>
+                <dd className="min-w-0">
+                  <TraceIdCopy traceId={record.traceId} />
+                </dd>
               </>
             )}
           </dl>
@@ -383,7 +432,7 @@ export function AgentActivityPanel({ fetchActivity, renderMissionRef, title = 'A
           <RefreshGlyph className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
-      {error && <p className="rounded-md border border-red-300/60 bg-red-500/5 px-3 py-2 text-xs text-red-600">{error}</p>}
+      {error && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">{error}</p>}
       {!error && rows.length === 0 && !loading && <p className="px-1 text-sm text-muted-foreground">{emptyLabel}</p>}
       <div className="space-y-1.5">
         {rows.map((record) => (

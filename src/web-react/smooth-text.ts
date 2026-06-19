@@ -66,13 +66,18 @@ export function useSmoothText(target: string, enabled: boolean, opts?: SmoothRev
       if (shownRef.current < targetLen) {
         shownRef.current = nextRevealCount(shownRef.current, targetLen, dt, opts)
         force((n) => n + 1)
+        // Keep painting while there is still backlog to reveal.
+        raf = requestAnimationFrame(tick)
       }
-      raf = requestAnimationFrame(tick)
+      // Caught up: stop the loop. A later `target` growth re-renders this hook
+      // (target is read fresh below), and the next render's effect — re-run
+      // because `target` is a dep — restarts the loop. Idle messages spawn no
+      // rAF, so a full thread of completed turns is dormant.
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled])
+  }, [enabled, target])
 
   return target.slice(0, Math.floor(shownRef.current))
 }

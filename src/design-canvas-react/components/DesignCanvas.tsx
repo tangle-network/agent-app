@@ -26,7 +26,7 @@ import type { SceneDocument, SceneElement } from '../../design-canvas/model'
 import { findElement, requirePage } from '../../design-canvas/model'
 import type { SceneAttrsPatch, SceneOperation } from '../../design-canvas/operations'
 import type { PageBleed } from '../../design-canvas/model'
-import type { DesignCanvasProps, SceneCommand } from '../contracts'
+import type { DesignCanvasProps, ExportTriggerOptions, SceneCommand } from '../contracts'
 import { createSceneCommandStack } from '../engine/command-stack'
 import {
   addPageCommand,
@@ -50,6 +50,7 @@ import { PagesStrip } from './PagesStrip'
 import { Rulers } from './Rulers'
 import { Toolbar } from './Toolbar'
 import { ZoomControls } from './ZoomControls'
+import { ExportControl } from './ExportControl'
 
 /** Callers inject a workspace renderer so this chrome stays Konva-free. The
  *  workspace occupies the scrollable area between the rulers and the bottom bar. */
@@ -80,12 +81,20 @@ export interface DesignCanvasFullProps extends DesignCanvasProps {
     stack: ReturnType<typeof createSceneCommandStack>
     activePage: SceneDocument['pages'][number] | undefined
     onFitRef: React.MutableRefObject<(() => void) | null>
+    /** A ref the workspace fills with an export callback. The chrome's Export
+     *  control calls it with the chosen format/scale; the workspace renders the
+     *  Konva stage to a data URL and forwards the result to `onExport`. Filled
+     *  only when `onExport` is wired (the workspace skips it otherwise). */
+    onExportRef: React.MutableRefObject<((opts: ExportTriggerOptions) => void) | null>
     /** Forwarded from DesignCanvasProps. Default true: WorkspaceView fits the
      *  active page to the viewport once, on the first non-zero measurement. */
     fitOnMount?: boolean
     /** Forwarded from DesignCanvasProps. Fires once after the first real
      *  measurement, after the initial fit is applied (or skipped). */
     onReady?(): void
+    /** Forwarded from DesignCanvasProps. The Konva render palette; the
+     *  Konva-free chrome passes it straight through to the workspace. */
+    render?: DesignCanvasProps['render']
     onZoomChange(zoom: number): void
     onPanChange(panX: number, panY: number): void
     onSelectElements(ids: string[], additive: boolean): void
@@ -161,14 +170,17 @@ export function DesignCanvas({
   document: initialDocument,
   rev: initialRev,
   canWrite,
+  mode = 'edit',
   onApplyOperations,
   onSelectionChange,
   renderAgentPanel,
   renderSidePanel,
   onExport,
+  exportDefaults,
   className,
   fitOnMount,
   onReady,
+  render,
   renderWorkspace,
   renderThumbnail,
 }: DesignCanvasFullProps) {
@@ -208,6 +220,10 @@ export function DesignCanvas({
 
   // Workspace fit callback ref — the workspace fills this; the shell calls it.
   const fitRef = useRef<(() => void) | null>(null)
+
+  // Workspace export callback ref — the workspace (Konva owner) fills this; the
+  // chrome's Export control calls it with the chosen format/scale.
+  const exportRef = useRef<((opts: ExportTriggerOptions) => void) | null>(null)
 
   // ---------------------------------------------------------------------------
   // View-state helpers (no history)
@@ -402,16 +418,16 @@ export function DesignCanvas({
       setCommitError(`Undo failed: ${error instanceof Error ? error.message : String(error)}`)
       return
     }
-    // Persist the inverse so the server tracks the undo; on rejection re-execute
-    // to re-apply the original forward state.
+    // Persist the inverse so the server tracks the undo; on rejection re-apply
+    // THIS command's forward transform (stack.reexecute) — captured at undo
+    // time, not a blind canRedo()/redo() that diverges from the server when an
+    // edit interleaves before the rejection lands.
     void onApplyOperations(command.inverseOperations())
       .then((result) => {
         if (result.document) stack.reset(result.document)
       })
       .catch((error: unknown) => {
-        if (stack.canRedo()) {
-          try { stack.redo() } catch { /* concurrent edit; next reset reconciles */ }
-        }
+        stack.reexecute(command)
         setCommitError(error instanceof Error ? error.message : String(error))
       })
   }, [stack, canWrite, onApplyOperations])
@@ -425,14 +441,15 @@ export function DesignCanvas({
       setCommitError(`Redo failed: ${error instanceof Error ? error.message : String(error)}`)
       return
     }
+    // Persist the redo; on rejection re-apply THIS command's inverse
+    // (stack.reundo) — captured at redo time, not a blind canUndo()/undo() that
+    // undoes the wrong command when an edit interleaves before the rejection.
     void onApplyOperations(command.operations())
       .then((result) => {
         if (result.document) stack.reset(result.document)
       })
       .catch((error: unknown) => {
-        if (stack.canUndo()) {
-          try { stack.undo() } catch { /* concurrent edit; next reset reconciles */ }
-        }
+        stack.reundo(command)
         setCommitError(error instanceof Error ? error.message : String(error))
       })
   }, [stack, canWrite, onApplyOperations])
@@ -488,6 +505,8 @@ export function DesignCanvas({
       .filter((el): el is SceneElement => el !== undefined)
   }, [activePage, editorState.selectedElementIds])
 
+  const review = mode === 'review'
+
   if (!activePage) {
     return (
       <div className={`flex h-full items-center justify-center bg-[var(--bg-input)] text-[var(--text-muted)] ${className ?? ''}`}>
@@ -508,8 +527,10 @@ export function DesignCanvas({
 
   return (
     <div className={`flex h-full min-h-0 bg-[var(--bg-input)] text-[var(--text-primary)] ${className ?? ''}`}>
-      {/* Optional left side panel (asset/template browser, etc.) */}
-      {renderSidePanel ? (
+      {/* Optional left side panel (asset/template browser, insert panel, etc.).
+          Suppressed in review mode: the lean reviewer hides authoring/insert
+          surfaces regardless of what the integrator passes. */}
+      {renderSidePanel && !review ? (
         <aside className="flex w-64 shrink-0 flex-col overflow-hidden border-r border-[var(--border-default)]">
           {renderSidePanel()}
         </aside>
@@ -517,37 +538,51 @@ export function DesignCanvas({
 
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Toolbar */}
-        <Toolbar
-          page={activePage}
-          selectedElements={selectedElements}
-          canWrite={canWrite}
-          canUndo={stack.canUndo()}
-          canRedo={stack.canRedo()}
-          gridEnabled={editorState.gridEnabled}
-          snapEnabled={editorState.snapEnabled}
-          showRulers={editorState.showRulers}
-          showBleed={editorState.showBleed}
-          onUndo={handleUndo}
-          onRedo={handleRedo}
-          onToggleGrid={() => stack.setView({ gridEnabled: !editorState.gridEnabled })}
-          onToggleSnap={() => stack.setView({ snapEnabled: !editorState.snapEnabled })}
-          onToggleRulers={() => stack.setView({ showRulers: !editorState.showRulers })}
-          onToggleBleed={() => stack.setView({ showBleed: !editorState.showBleed })}
-          onSetAttrs={handleSetAttrs}
-          onSetPageProps={handleSetPageProps}
-          onSetPageGuides={handleSetPageGuides}
-          onReorder={handleReorder}
-          onGroup={handleGroup}
-          onUngroup={handleUngroup}
-          onDelete={handleDelete}
-          onBindSlot={handleBindSlot}
-        />
+        {/* Toolbar + chrome-right controls (Export). The Toolbar grows to fill;
+            the Export control is pinned to the top-right of the chrome. */}
+        <div className="flex shrink-0 items-stretch">
+          <div className="min-w-0 flex-1">
+            <Toolbar
+              page={activePage}
+              selectedElements={selectedElements}
+              canWrite={canWrite}
+              mode={mode}
+              canUndo={stack.canUndo()}
+              canRedo={stack.canRedo()}
+              gridEnabled={editorState.gridEnabled}
+              snapEnabled={editorState.snapEnabled}
+              showRulers={editorState.showRulers}
+              showBleed={editorState.showBleed}
+              onUndo={handleUndo}
+              onRedo={handleRedo}
+              onToggleGrid={() => stack.setView({ gridEnabled: !editorState.gridEnabled })}
+              onToggleSnap={() => stack.setView({ snapEnabled: !editorState.snapEnabled })}
+              onToggleRulers={() => stack.setView({ showRulers: !editorState.showRulers })}
+              onToggleBleed={() => stack.setView({ showBleed: !editorState.showBleed })}
+              onSetAttrs={handleSetAttrs}
+              onSetPageProps={handleSetPageProps}
+              onSetPageGuides={handleSetPageGuides}
+              onReorder={handleReorder}
+              onGroup={handleGroup}
+              onUngroup={handleUngroup}
+              onDelete={handleDelete}
+              onBindSlot={handleBindSlot}
+            />
+          </div>
+          {onExport ? (
+            <div className="flex shrink-0 items-center border-b border-l border-[var(--border-default)] bg-[var(--bg-input)] px-2">
+              <ExportControl
+                defaults={exportDefaults}
+                onExport={(opts) => exportRef.current?.(opts)}
+              />
+            </div>
+          ) : null}
+        </div>
 
         {/* Error bar */}
         {commitError ? (
           <div
-            className="flex shrink-0 items-center justify-between gap-3 border-b border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-300"
+            className="flex shrink-0 items-center justify-between gap-3 border-b border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.1)] px-3 py-1.5 text-xs text-[var(--text-danger)]"
             role="alert"
           >
             <span className="min-w-0 truncate">{commitError}</span>
@@ -613,8 +648,10 @@ export function DesignCanvas({
             stack,
             activePage,
             onFitRef: fitRef,
+            onExportRef: exportRef,
             fitOnMount,
             onReady,
+            render,
             onZoomChange: setZoom,
             onPanChange: setPan,
             onSelectElements: setSelectedElements,
@@ -628,6 +665,7 @@ export function DesignCanvas({
               pages={editorState.document.pages}
               activePageId={editorState.activePageId}
               canWrite={canWrite}
+              canManagePages={!review}
               renderThumbnail={renderThumbnail}
               onSelectPage={setActivePage}
               onAddPage={handleAddPage}

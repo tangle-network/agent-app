@@ -9,6 +9,7 @@
 
 import { Layer, Line } from 'react-konva'
 import type { SnapTarget, SnapTargetKind } from '../contracts'
+import { lightTheme, type CanvasRenderPalette } from '../../theme/theme'
 
 export interface SnapGuidesOverlayProps {
   /** Page dimensions in document px. */
@@ -20,15 +21,19 @@ export interface SnapGuidesOverlayProps {
   activeHorizontal: SnapTarget | null
   /** Screen px per document px — used to compute 1-px-screen stroke widths. */
   zoom: number
+  /** Theme render palette. Omitted → light defaults (byte-identical history). */
+  render?: CanvasRenderPalette
 }
 
-const KIND_COLOR: Record<SnapTargetKind, string> = {
-  'grid':           '#a0a0a0',
-  'guide':          '#3b82f6',
-  'page-edge':      '#f59e0b',
-  'page-center':    '#f59e0b',
-  'element-edge':   '#f43f5e',
-  'element-center': '#f43f5e',
+function kindColors(render: CanvasRenderPalette): Record<SnapTargetKind, string> {
+  return {
+    'grid':           render.snapGrid,
+    'guide':          render.snapGuide,
+    'page-edge':      render.snapPage,
+    'page-center':    render.snapPage,
+    'element-edge':   render.snapElement,
+    'element-center': render.snapElement,
+  }
 }
 
 export function SnapGuidesOverlay({
@@ -37,9 +42,11 @@ export function SnapGuidesOverlay({
   activeVertical,
   activeHorizontal,
   zoom,
+  render = lightTheme.canvasRender,
 }: SnapGuidesOverlayProps) {
   if (!activeVertical && !activeHorizontal) return null
 
+  const KIND_COLOR = kindColors(render)
   const strokeWidth = 1 / zoom
 
   return (

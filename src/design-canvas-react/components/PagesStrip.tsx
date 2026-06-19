@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ScenePage } from '../../design-canvas/model'
 import { DuplicateGlyph, PageGlyph, PlusGlyph, TrashGlyph } from './glyphs'
+import { BTN_SM } from './icon-button'
 
 export interface PagesStripProps {
   pages: ScenePage[]
@@ -27,13 +28,13 @@ export interface PagesStripProps {
   onDuplicatePage(pageId: string): void
   onDeletePage(pageId: string): void
   onReorderPage(pageId: string, toIndex: number): void
+  /** Show page-management affordances (add / duplicate / delete). Default true.
+   *  The review surface passes false: pages are navigated, not authored. */
+  canManagePages?: boolean
 }
 
 const THUMBNAIL_W = 80
 const THUMBNAIL_H = 56
-
-const BTN =
-  'flex h-6 w-6 items-center justify-center rounded border border-[var(--border-default)] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:cursor-default disabled:opacity-40'
 
 export function PagesStrip({
   pages,
@@ -45,6 +46,7 @@ export function PagesStrip({
   onDuplicatePage,
   onDeletePage,
   onReorderPage,
+  canManagePages = true,
 }: PagesStripProps) {
   // Map from page id → data URL; null while loading.
   const [thumbnails, setThumbnails] = useState<Record<string, string | null>>({})
@@ -95,10 +97,6 @@ export function PagesStrip({
         return (
           <div
             key={page.id}
-            role="button"
-            tabIndex={0}
-            aria-label={`Page ${index + 1}: ${page.name}${isActive ? ' (active)' : ''}`}
-            aria-pressed={isActive}
             draggable={canWrite}
             onDragStart={() => {
               dragIndexRef.current = index
@@ -121,24 +119,26 @@ export function PagesStrip({
               dragIndexRef.current = null
               setDragOverIndex(null)
             }}
-            onClick={() => onSelectPage(page.id)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault()
-                onSelectPage(page.id)
-              }
-            }}
             className={[
-              'group relative flex shrink-0 cursor-pointer flex-col items-center gap-1 rounded p-1 transition',
+              'group relative flex shrink-0 flex-col items-center gap-1 rounded p-1 transition',
               isActive
                 ? 'ring-2 ring-[var(--brand-primary)]'
                 : 'hover:bg-[var(--border-default)]/40',
               dragOverIndex === index ? 'ring-1 ring-[var(--brand-primary)]/60' : '',
             ].join(' ')}
           >
+            {/* Selection is a real button so the tile is not an interactive control
+                nesting the per-page action buttons (axe: nested-interactive). */}
+            <button
+              type="button"
+              aria-label={`Page ${index + 1}: ${page.name}${isActive ? ' (active)' : ''}`}
+              aria-pressed={isActive}
+              onClick={() => onSelectPage(page.id)}
+              className="flex cursor-pointer flex-col items-center gap-1 rounded focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+            >
             {/* Thumbnail or placeholder */}
             <div
-              className="overflow-hidden rounded border border-[var(--border-default)] bg-white"
+              className="overflow-hidden rounded border border-[var(--border-default)] bg-[hsl(var(--card))]"
               style={{ width: THUMBNAIL_W, height: THUMBNAIL_H }}
             >
               {thumbUrl ? (
@@ -159,9 +159,10 @@ export function PagesStrip({
             <span className="max-w-[80px] truncate text-[10px] text-[var(--text-secondary)]">
               {page.name}
             </span>
+            </button>
 
             {/* Per-page action buttons — visible on hover or when active */}
-            {canWrite ? (
+            {canWrite && canManagePages ? (
               <div className="pointer-events-none absolute -top-1 right-0 flex gap-0.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
                 <button
                   type="button"
@@ -170,7 +171,7 @@ export function PagesStrip({
                     event.stopPropagation()
                     onDuplicatePage(page.id)
                   }}
-                  className={BTN}
+                  className={BTN_SM}
                 >
                   <DuplicateGlyph className="h-3 w-3" />
                 </button>
@@ -182,9 +183,9 @@ export function PagesStrip({
                     event.stopPropagation()
                     if (pages.length > 1) onDeletePage(page.id)
                   }}
-                  className={BTN}
+                  className={BTN_SM}
                 >
-                  <TrashGlyph className="h-3 w-3 text-rose-400" />
+                  <TrashGlyph className="h-3 w-3 text-[var(--text-danger)]" />
                 </button>
               </div>
             ) : null}
@@ -193,12 +194,12 @@ export function PagesStrip({
       })}
 
       {/* Add page button */}
-      {canWrite ? (
+      {canWrite && canManagePages ? (
         <button
           type="button"
           aria-label="Add page"
           onClick={onAddPage}
-          className="flex h-[72px] w-[80px] shrink-0 flex-col items-center justify-center gap-1 rounded border border-dashed border-[var(--border-default)] text-[var(--text-muted)] transition hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]"
+          className="flex h-[72px] w-[80px] shrink-0 flex-col items-center justify-center gap-1 rounded border border-dashed border-[var(--border-default)] text-[var(--text-muted)] transition hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
         >
           <PlusGlyph className="h-4 w-4" />
           <span className="text-[10px]">Add page</span>

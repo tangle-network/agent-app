@@ -13,6 +13,8 @@
  * Nothing here touches Konva, React, or a database.
  */
 
+import { assertMediaUrl } from '../web'
+
 export const SCENE_SCHEMA_VERSION = 1
 
 export interface SceneDocument {
@@ -341,15 +343,33 @@ export function assertFinite(value: number, label: string): void {
   if (!Number.isFinite(value)) throw new Error(`${label} must be a finite number`)
 }
 
-const COLOR_PATTERN = /^(#[0-9a-fA-F]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(,\s*(0|1|0?\.\d+)\s*)?\)|transparent)$/
+/** Valid hex lengths are exactly 3 (rgb), 4 (rgba), 6 (rrggbb), or 8
+ *  (rrggbbaa) digits — `{3,8}` wrongly admitted 5- and 7-digit junk that no
+ *  renderer accepts. */
+const HEX_COLOR = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/
+const RGB_COLOR = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)$/
 
 export function assertColor(value: string, label: string): void {
-  if (!COLOR_PATTERN.test(value)) throw new Error(`${label} must be a hex/rgb(a) color or 'transparent', got "${value}"`)
+  if (value === 'transparent' || HEX_COLOR.test(value)) return
+  const rgb = RGB_COLOR.exec(value)
+  if (rgb && rgbChannelsInRange(rgb)) return
+  throw new Error(`${label} must be a hex/rgb(a) color or 'transparent', got "${value}"`)
+}
+
+/** Each of the three rgb channels must be 0..255 — the pattern alone admits
+ *  values like `rgb(999,0,0)` which clamp or render wrong. */
+function rgbChannelsInRange(match: RegExpExecArray): boolean {
+  for (let i = 1; i <= 3; i += 1) {
+    const channel = Number(match[i])
+    if (channel > 255) return false
+  }
+  return true
 }
 
 /** Media boundary rule shared with sequences: remote http(s) or a rooted
- *  /api/ path — never sandbox-local files or data: blobs. */
+ *  /api/ path — never sandbox-local files or data:/blob: blobs. Delegates to the
+ *  canonical `assertMediaUrl` boundary in `../web`; the two surfaces share ONE
+ *  rule (trims, named-rejects local/inline schemes) so they cannot drift. */
 export function assertSceneMediaSrc(value: string, label: string): void {
-  if (/^https?:\/\//i.test(value) || /^\/api\//.test(value)) return
-  throw new Error(`${label} must be an http(s) URL or a rooted /api/ path, got "${value}"`)
+  assertMediaUrl(value, label)
 }

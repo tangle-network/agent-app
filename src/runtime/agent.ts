@@ -47,7 +47,7 @@ import {
   type StreamLoopYield,
   type ToolLoopEvent,
   type ToolLoopResult,
-} from './index'
+} from './loop'
 import { createOpenAICompatStreamTurn } from './openai-stream'
 
 /** OpenAI-compatible model endpoint (Tangle Router / tcloud / any compat

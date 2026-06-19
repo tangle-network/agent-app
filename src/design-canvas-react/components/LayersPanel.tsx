@@ -118,58 +118,59 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
                 dragRowRef.current = null
                 setDragOverIndex(null)
               }}
-              onClick={(event) => onSelect(element.id, event.metaKey || event.ctrlKey)}
               className={[
-                'flex cursor-pointer items-center gap-1.5 py-1 pr-2 text-[13px] transition-colors',
+                'group flex items-center gap-1.5 py-1 pr-2 text-[13px] transition-colors',
                 isSelected ? 'bg-[var(--brand-primary)]/15 text-[var(--text-primary)]' : 'hover:bg-[var(--border-default)]/40 text-[var(--text-secondary)]',
                 dragOverIndex === row.ownerIndex ? 'border-t border-[var(--brand-primary)]' : '',
               ].join(' ')}
               style={{ paddingLeft: 8 + row.depth * INDENT_PX }}
             >
-              <KindIcon kind={element.kind} className="h-3.5 w-3.5 shrink-0 opacity-60" />
-
-              {element.slot ? (
-                <SlotGlyph className="h-3 w-3 shrink-0 text-[var(--brand-primary)]" />
-              ) : null}
-
-              <span className="min-w-0 flex-1 truncate">
-                {isRenaming ? (
-                  <input
-                    autoFocus
-                    value={renameValue}
-                    onChange={(event) => setRenameValue(event.target.value)}
-                    onBlur={() => commitRename(element.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') commitRename(element.id)
-                      if (event.key === 'Escape') setRenamingId(null)
-                      event.stopPropagation()
-                    }}
-                    onClick={(event) => event.stopPropagation()}
-                    className="w-full rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
-                  />
-                ) : (
-                  <span
-                    onDoubleClick={(event) => {
-                      event.stopPropagation()
-                      if (canWrite) startRename(element)
-                    }}
-                    title={element.name}
-                  >
-                    {element.name}
-                  </span>
-                )}
-              </span>
+              {isRenaming ? (
+                <input
+                  autoFocus
+                  value={renameValue}
+                  onChange={(event) => setRenameValue(event.target.value)}
+                  onBlur={() => commitRename(element.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') commitRename(element.id)
+                    if (event.key === 'Escape') setRenamingId(null)
+                    event.stopPropagation()
+                  }}
+                  className="min-w-0 flex-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
+                />
+              ) : (
+                // Selection is a real button (sibling of the eye/lock buttons) so
+                // the row is not an interactive control nesting interactive
+                // controls (axe: nested-interactive).
+                <button
+                  type="button"
+                  onClick={(event) => onSelect(element.id, event.metaKey || event.ctrlKey)}
+                  onDoubleClick={() => {
+                    if (canWrite) startRename(element)
+                  }}
+                  title={element.name}
+                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 bg-transparent text-left focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+                >
+                  <KindIcon kind={element.kind} className="h-3.5 w-3.5 shrink-0 opacity-60" />
+                  {element.slot ? <SlotGlyph className="h-3 w-3 shrink-0 text-[var(--brand-primary)]" /> : null}
+                  <span className="min-w-0 flex-1 truncate">{element.name}</span>
+                </button>
+              )}
 
               {/* Visibility toggle */}
               <button
                 type="button"
                 aria-label={element.visible ? 'Hide element' : 'Show element'}
+                aria-pressed={!element.visible}
                 onClick={(event) => {
                   event.stopPropagation()
                   if (canWrite) onSetAttrs(element.id, { visible: !element.visible })
                 }}
                 disabled={!canWrite}
-                className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:opacity-100 focus:opacity-100 group-hover:opacity-100 [.flex:hover_&]:opacity-60"
+                className={[
+                  'shrink-0 rounded p-0.5 transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]',
+                  element.visible ? 'opacity-0' : 'opacity-100',
+                ].join(' ')}
               >
                 {element.visible
                   ? <EyeGlyph className="h-3.5 w-3.5" />
@@ -180,15 +181,19 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
               <button
                 type="button"
                 aria-label={element.locked ? 'Unlock element' : 'Lock element'}
+                aria-pressed={!!element.locked}
                 onClick={(event) => {
                   event.stopPropagation()
                   if (canWrite) onSetAttrs(element.id, { locked: !element.locked })
                 }}
                 disabled={!canWrite}
-                className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:opacity-100 focus:opacity-100 [.flex:hover_&]:opacity-60"
+                className={[
+                  'shrink-0 rounded p-0.5 transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]',
+                  element.locked ? 'opacity-100' : 'opacity-0',
+                ].join(' ')}
               >
                 {element.locked
-                  ? <LockGlyph className="h-3.5 w-3.5 text-amber-400" />
+                  ? <LockGlyph className="h-3.5 w-3.5 text-[var(--text-warning)]" />
                   : <UnlockGlyph className="h-3.5 w-3.5" />}
               </button>
             </div>

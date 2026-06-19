@@ -212,8 +212,13 @@ export function DesignCanvasEditor(props: DesignCanvasProps) {
             // Shares the chrome's fit ref so F / Fit button trigger workspace
             // fit-to-page through the same callback slot.
             onFitRef={ctx.onFitRef}
+            // Shares the chrome's export ref so the Export control renders the
+            // stage here (the workspace owns Konva) and forwards to onExport.
+            onExport={props.onExport}
+            onExportRef={ctx.onExportRef}
             fitOnMount={ctx.fitOnMount}
             onReady={ctx.onReady}
+            render={ctx.render}
           />
         )
       }}

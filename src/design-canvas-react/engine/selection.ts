@@ -12,6 +12,56 @@
 import { boundsIntersect, elementAabb } from '../../design-canvas/model'
 import type { Bounds, SceneElement, ScenePage } from '../../design-canvas/model'
 
+// ---------------------------------------------------------------------------
+// Point hit-test (model-space)
+// ---------------------------------------------------------------------------
+
+/**
+ * Top-most selectable element whose AABB contains the document-space point, or
+ * null when the point is over empty space.
+ *
+ * This is the authoritative "is the pointer over an element?" test for the
+ * pointer-down gesture router. It runs against the scene model in document
+ * coordinates rather than Konva's hit-graph canvas, so it is independent of
+ * clip groups, listening flags, and hit-canvas redraw timing — all of which
+ * could make `stage.getIntersection` misclassify a press as empty space and
+ * silently start a marquee instead of an element drag.
+ *
+ * Z-order: later elements paint on top, so we scan the array in reverse and
+ * return the first hit. Groups descend into children (top child wins); a hit on
+ * a group child resolves to the group itself, matching drag/selection which
+ * operate on the group as a unit. Locked and invisible elements never hit.
+ */
+export function hitTestPoint(page: ScenePage, x: number, y: number): string | null {
+  return hitTestIn(page.elements, x, y, null)
+}
+
+function hitTestIn(
+  elements: SceneElement[],
+  x: number,
+  y: number,
+  resolveTo: string | null,
+): string | null {
+  for (let i = elements.length - 1; i >= 0; i -= 1) {
+    const el = elements[i]!
+    if (!el.visible || el.locked) continue
+    const aabb = elementAabb(el)
+    if (!pointInBounds(aabb, x, y)) continue
+    if (el.kind === 'group') {
+      // A press anywhere inside the group AABB selects the group as a unit,
+      // even over the gaps between children — the group is the draggable node.
+      const child = hitTestIn(el.children, x, y, el.id)
+      return child ?? el.id
+    }
+    return resolveTo ?? el.id
+  }
+  return null
+}
+
+function pointInBounds(b: Bounds, x: number, y: number): boolean {
+  return x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height
+}
+
 export interface MarqueeSelectOptions {
   /** When true, the element's AABB must be fully inside the marquee; default is
    *  intersection (any overlap selects). */

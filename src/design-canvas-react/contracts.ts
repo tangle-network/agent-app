@@ -13,6 +13,7 @@
 
 import type { Bounds, SceneDocument, SceneElement } from '../design-canvas/model'
 import type { SceneOperation } from '../design-canvas/operations'
+import type { CanvasRenderPalette } from '../theme/theme'
 
 // ---------------------------------------------------------------------------
 // Engine: state + command stack
@@ -144,11 +145,41 @@ export interface ApplySceneResult {
   document?: SceneDocument
 }
 
+/**
+ * What the chrome's Export control collects and hands to the workspace's
+ * export callback. The workspace (which owns the Konva stage) renders the
+ * page to a data URL with these params and forwards the full result to
+ * {@link DesignCanvasProps.onExport}. The chrome is Konva-free, so it cannot
+ * produce the data URL itself — it only chooses the format and scale.
+ */
+export interface ExportTriggerOptions {
+  format: 'png' | 'jpeg'
+  /** Output scale multiplier (1 = page size, 2 = retina). */
+  pixelRatio: number
+}
+
+/**
+ * Editor capability mode.
+ * - `'edit'` (default): the full authoring editor — insert panel, page
+ *   add/duplicate/delete, layers, grid/snap/ruler/bleed toggles, group/ungroup,
+ *   z-order. This is the designer surface.
+ * - `'review'`: a lean review/tweak surface for agent-authored output. The
+ *   minimal toolbar exposes only safe direct edits (undo/redo, fit/zoom). The
+ *   insert panel, blank-page-create, and authoring controls are hidden. Drag,
+ *   select, double-click-to-edit-text, image swap, the agent panel, and
+ *   gallery/thumbnail/export all stay. Additive and backward-compatible.
+ */
+export type DesignCanvasMode = 'edit' | 'review'
+
 export interface DesignCanvasProps {
   document: SceneDocument
   /** Revision the document was loaded at; threaded through saves. */
   rev: number
   canWrite: boolean
+  /** Editor capability mode. Default `'edit'` (full authoring editor). Set
+   *  `'review'` for a lean reviewer that hides authoring controls but keeps
+   *  drag/select/text-edit/image-swap and the agent panel. */
+  mode?: DesignCanvasMode
   /** Persist operations. Resolve with the new revision; reject to roll back.
    *  A stale-revision failure should resolve AFTER refetch with the fresh
    *  document so the editor rebases instead of fighting. */
@@ -159,7 +190,20 @@ export interface DesignCanvasProps {
   renderSidePanel?(): React.ReactNode
   /** Export hook — host persists the rendered blob (upload → asset row). */
   onExport?(result: { pageId: string; format: 'png' | 'jpeg'; dataUrl: string; pixelRatio: number }): Promise<void>
+  /**
+   * Optional caller-supplied default for the export popover. The chrome's
+   * Export control opens with this format/scale pre-selected. Omitted →
+   * PNG @ 1x.
+   */
+  exportDefaults?: ExportTriggerOptions
   className?: string
+  /** Konva render palette — the full hex colors the bitmap canvas paints with
+   *  (grid, snap guides, selection handles, placeholders). Konva cannot resolve
+   *  `var(--…)`, so the host supplies the active theme's `canvasRender` here
+   *  (e.g. `darkTheme.canvasRender` under a dark surface). Omitted →
+   *  `lightTheme.canvasRender`, which keeps light-mode rendering byte-identical
+   *  to the historical hardcoded values. */
+  render?: CanvasRenderPalette
   /** Fit the active page to the viewport once, on the first non-zero measurement. Default true. Set false to keep zoom:1/pan:0 (e.g. when restoring a saved viewport). */
   fitOnMount?: boolean
   /** Called once after the first real (non-zero) measurement, after the initial fit is applied (or skipped when fitOnMount is false). */

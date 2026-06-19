@@ -1,0 +1,97 @@
+/**
+ * agent-app design tokens — the single source of truth for theming every React
+ * surface (design-canvas-react, sequences-react, web-react).
+ *
+ * Import once at your app root:  import '@tangle-network/agent-app/styles'
+ * Dark mode: set `data-theme="dark"` (or class `dark`) on a parent element.
+ *
+ * Two vocabularies resolve to ONE set of channel triples:
+ *   - shadcn semantic names (--card, --foreground, --muted-foreground, …) —
+ *     consumed by web-react via Tailwind classes (bg-card, text-foreground).
+ *     Wire them with the Tailwind preset: import '@tangle-network/agent-app/tailwind-preset'.
+ *   - canvas/sequences alias names (--bg-input, --text-primary, …) — full
+ *     colors consumed directly via Tailwind arbitrary values (bg-[var(--bg-input)]).
+ *     These need no Tailwind config; tokens.css alone is enough.
+ *
+ * The aliases reference the triples, so redefining only the triples in the dark
+ * scope re-themes both vocabularies through the cascade.
+ */
+
+:root {
+  /* shadcn channel triples — "H S% L%", consumed as hsl(var(--name)).
+     Values mirror @tangle-network/brand (Tangle Quiet) so agent-app surfaces
+     match sandbox-ui in the same app. agent-app keeps its own light-default /
+     [data-theme="dark"] scope model (brand is dark-default), so /theme stays
+     dependency-free — only the values are shared, not the cascade. */
+  --background: 0 0% 100%;
+  --foreground: 0 0% 5%;
+  --card: 240 7% 97%;
+  --card-foreground: 0 0% 5%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 5%;
+  --primary: 245 62% 57%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 6% 93%;
+  --secondary-foreground: 0 0% 10%;
+  --muted: 240 6% 93%;
+  --muted-foreground: 240 5% 38%;
+  --accent: 240 6% 93%;
+  --accent-foreground: 0 0% 10%;
+  --destructive: 0 72% 41%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 240 6% 89%;
+  --input: 240 6% 89%;
+  --ring: 245 62% 57%;
+  /* status colors — brand hues (teal/gold/red), but lightness kept dark enough
+     to clear WCAG AA when used AS TEXT on tinted chips. Brand's own status
+     accents are dot/surface colors and are not text-contrast-tuned. */
+  --success: 160 84% 26%;
+  --success-foreground: 0 0% 100%;
+  --warning: 41 96% 38%;
+  --warning-foreground: 38 92% 12%;
+
+  /* canvas/sequences aliases — full colors, resolve to the triples above */
+  --bg-input: hsl(var(--card));
+  --text-primary: hsl(var(--foreground));
+  --text-secondary: hsl(var(--secondary-foreground));
+  --text-muted: hsl(var(--muted-foreground));
+  --text-danger: hsl(var(--destructive));
+  --text-warning: hsl(var(--warning));
+  --border-default: hsl(var(--border));
+  --brand-primary: hsl(var(--primary));
+
+  /* canvas-only surfaces (not part of the shadcn vocabulary). Name matches the
+     `--canvas-backdrop` the design-canvas Workspace references (with a #1a1a1a fallback). */
+  --canvas-backdrop: hsl(240 7% 90%);
+}
+
+[data-theme='dark'],
+.dark {
+  --background: 240 8% 5%;
+  --foreground: 240 6% 93%;
+  --card: 240 5% 8%;
+  --card-foreground: 240 6% 93%;
+  --popover: 240 4% 13%;
+  --popover-foreground: 240 6% 93%;
+  /* 74% L (brand's #818CF8 intent) so primary clears AA as TEXT on a primary/10
+     tint in dark; the solid primary button pairs it with a light foreground. */
+  --primary: 239 84% 74%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 5% 11%;
+  --secondary-foreground: 240 6% 93%;
+  --muted: 240 5% 11%;
+  --muted-foreground: 240 4% 62%;
+  --accent: 240 5% 11%;
+  --accent-foreground: 240 6% 93%;
+  --destructive: 348 90% 68%;
+  --destructive-foreground: 0 0% 12%;
+  --border: 240 3% 13%;
+  --input: 240 5% 11%;
+  --ring: 239 84% 74%;
+  --success: 160 70% 52%;
+  --success-foreground: 160 84% 10%;
+  --warning: 40 94% 56%;
+  --warning-foreground: 38 92% 12%;
+
+  --canvas-backdrop: hsl(240 8% 5%);
+}

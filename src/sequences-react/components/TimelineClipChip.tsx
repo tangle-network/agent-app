@@ -20,7 +20,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import type { PointerEvent as ReactPointerEvent } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react'
 import { formatTimecode } from '../../sequences/model'
 import type { SequenceClip, SequenceTrack, SequenceTrackKind } from '../../sequences/model'
 import type { SnapPoint, VideoFrameProvider, WaveformData } from '../contracts'
@@ -55,6 +55,9 @@ export interface TimelineClipChipProps {
   sequenceDurationFrames: number
   selected: boolean
   canWrite: boolean
+  /** Roving-tabindex: exactly one chip per editor carries tabIndex 0 so the
+   *  clip set is a single Tab stop; arrows move focus across the others. */
+  tabbable: boolean
   frameProvider: VideoFrameProvider
   /** Snap a candidate move (both clip edges considered); editor closes over
    *  the engine's snap points. */
@@ -63,6 +66,12 @@ export interface TimelineClipChipProps {
   snapEdge(candidate: { frame: number; clipId: string }): { frame: number; point: SnapPoint | null }
   onSnapPointChange(point: SnapPoint | null): void
   onSelect(clipId: string, additive: boolean): void
+  /** Keyboard delete of the focused clip (one command on the stack), routed
+   *  through the same locked-track guard as the transport Delete key. */
+  onRequestDelete(clipId: string): void
+  /** Move keyboard focus to the previous/next clip in DOM order (roving
+   *  tabindex); the editor owns the ordered chip set. */
+  onFocusStep(clipId: string, direction: -1 | 1): void
   onCommitMove(input: ClipMoveCommit): void
   onCommitTrim(input: ClipTrimCommit): void
   onCommitText(input: { clipId: string; text: string }): void
@@ -116,7 +125,7 @@ function sourceDurationFrames(clip: SequenceClip, fps: number): number | undefin
 }
 
 export function TimelineClipChip(props: TimelineClipChipProps) {
-  const { clip, track, fps, zoom, selected, canWrite, frameProvider } = props
+  const { clip, track, fps, zoom, selected, canWrite, tabbable, frameProvider } = props
   const rootRef = useRef<HTMLDivElement | null>(null)
   const gestureRef = useRef<GestureState | null>(null)
   const [preview, setPreview] = useState<GesturePreview | null>(null)
@@ -407,16 +416,53 @@ export function TimelineClipChip(props: TimelineClipChipProps) {
   const isCaption = track.kind === 'caption'
   const dragging = preview !== null
 
+  // Keyboard parity with the pointer gestures: the chip is a roving-tabindex
+  // button — Enter/Space selects (Shift for additive, mirroring shift-click),
+  // Delete/Backspace removes it through the editor's locked-track guard, and
+  // Arrow keys walk focus across the chip set. Frame stepping and clip nudging
+  // are the editor's keydown (they need the playhead clock + command stack).
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (editingText !== null) return
+    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
+      event.preventDefault()
+      event.stopPropagation()
+      props.onSelect(clip.id, event.shiftKey)
+      return
+    }
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      if (!interactive) return
+      event.preventDefault()
+      event.stopPropagation()
+      props.onRequestDelete(clip.id)
+      return
+    }
+    // Plain Arrow walks focus across the chip set (roving tabindex). Alt+Arrow
+    // is reserved for clip nudge and falls through to the editor's keydown.
+    if (event.altKey) return
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault()
+      props.onFocusStep(clip.id, -1)
+      return
+    }
+    if (event.key === 'ArrowRight') {
+      event.preventDefault()
+      props.onFocusStep(clip.id, 1)
+    }
+  }
+
   return (
     <div
       ref={rootRef}
       data-clip-id={clip.id}
       role="button"
-      tabIndex={-1}
+      aria-pressed={selected}
+      aria-label={clip.label}
+      tabIndex={tabbable ? 0 : -1}
+      onKeyDown={handleKeyDown}
       title={clip.label}
-      className={`group absolute bottom-1 top-1 overflow-hidden rounded border text-left select-none ${KIND_TONES[track.kind]} ${
+      className={`group absolute bottom-1 top-1 overflow-hidden rounded border text-left select-none outline-none ${KIND_TONES[track.kind]} ${
         selected ? 'ring-2 ring-[var(--brand-primary)]' : 'hover:ring-1 hover:ring-[var(--text-muted)]'
-      } ${clip.disabled ? 'opacity-40' : ''} ${dragging ? 'z-30 shadow-lg shadow-black/30' : ''} ${
+      } focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--bg-input)] ${clip.disabled ? 'opacity-40' : ''} ${dragging ? 'z-30 shadow-lg shadow-black/30' : ''} ${
         interactive ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
       }`}
       style={{

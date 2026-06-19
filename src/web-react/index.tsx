@@ -16,9 +16,9 @@
  * `renderProviderBadge`) so this package stays dependency-free beyond React.
  */
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ProviderLogo } from './provider-logo'
+import { useEffect, useMemo, useRef, useState, memo, type ReactNode } from 'react'
 import { useSmoothText } from './smooth-text'
+import { ChevronDown, POPOVER_OPTION_FOCUS, usePending } from './controls'
 
 export * from './chat-stream'
 export * from './provider-logo'
@@ -27,50 +27,18 @@ export * from './mission-activity'
 export * from './sandbox-terminal'
 export * from './seat-paywall'
 export {
+  usePopover,
+  usePending,
+  ModelPicker,
+  EffortPicker,
+  type ModelPickerProps,
+  type EffortPickerProps,
+} from './controls'
+export {
   AgentSessionControls,
   type AgentSessionControlsProps,
 } from './agent-session-controls'
 import type { CatalogModel } from '../runtime/model-catalog'
-
-// ── shared glyphs (no icon-library dependency) ────────────────────────────
-
-function ChevronDown({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="m6 9 6 6 6-6" />
-    </svg>
-  )
-}
-
-function SearchGlyph({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.3-4.3" />
-    </svg>
-  )
-}
-
-function SparkleGlyph({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1M7.7 16.3l-2.1 2.1" />
-    </svg>
-  )
-}
-
-/** Close an absolutely-positioned popover on outside mousedown. */
-function useClickOutside(onOutside: () => void) {
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onOutside()
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  })
-  return ref
-}
 
 // ── metrics helpers ───────────────────────────────────────────────────────
 
@@ -97,249 +65,6 @@ export function formatModelCost(msg: ChatMessageMetrics, models: CatalogModel[])
 export function formatTokensPerSecond(msg: ChatMessageMetrics): string | null {
   if (msg.completionTokens == null || !msg.durationMs) return null
   return `${Math.round(msg.completionTokens / (msg.durationMs / 1000))} tok/s`
-}
-
-// ── ModelPicker ───────────────────────────────────────────────────────────
-
-export interface ModelPickerProps {
-  value: string
-  onChange: (id: string) => void
-  /** Catalogue models — from `GET`ing the app's catalogue route (see
-   *  `runtime/model-catalog`), plus any product-specific entries appended. */
-  models: CatalogModel[]
-  loading?: boolean
-  /** Render a provider logo/badge; default is a generic sparkle. */
-  renderProviderBadge?: (provider: string) => ReactNode
-  /** Section label for `featured` models. */
-  recommendedLabel?: string
-}
-
-function formatPrice(p?: string): string | undefined {
-  if (!p) return undefined
-  const n = Number(p)
-  if (isNaN(n) || n === 0) return undefined
-  const perM = n * 1_000_000
-  return perM >= 1 ? `$${perM.toFixed(0)}/M` : `$${perM.toFixed(2)}/M`
-}
-
-function formatContext(len?: number): string | undefined {
-  if (!len) return undefined
-  if (len >= 1_000_000) return `${(len / 1_000_000).toFixed(1)}M ctx`
-  if (len >= 1_000) return `${Math.round(len / 1_000)}K ctx`
-  return `${len} ctx`
-}
-
-function SectionHeader({ children }: { children: ReactNode }) {
-  return (
-    <div className="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-      {children}
-    </div>
-  )
-}
-
-function ModelRow({
-  model,
-  selected,
-  onSelect,
-  renderProviderBadge,
-}: {
-  model: CatalogModel
-  selected: boolean
-  onSelect: () => void
-  renderProviderBadge?: (provider: string) => ReactNode
-}) {
-  const price = formatPrice(model.pricing?.prompt)
-  const ctx = formatContext(model.contextLength)
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-sm transition ${
-        selected ? 'bg-primary/10 font-medium' : 'hover:bg-accent/30'
-      }`}
-    >
-      {renderProviderBadge ? renderProviderBadge(model.provider) : <ProviderLogo provider={model.provider} size={16} />}
-      <span className="truncate">{model.name}</span>
-      {!model.supportsTools && (
-        <span className="shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-          no tools
-        </span>
-      )}
-      <span className="ml-auto flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-        {ctx && <span>{ctx}</span>}
-        {price && <span>{price}</span>}
-      </span>
-    </button>
-  )
-}
-
-/**
- * Searchable model picker pill + popover: a featured/recommended section
- * first, then per-provider groups in catalogue order (the server already
- * sorts providers by tier).
- */
-export function ModelPicker({ value, onChange, models, loading, renderProviderBadge, recommendedLabel = 'Recommended' }: ModelPickerProps) {
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const containerRef = useClickOutside(() => setOpen(false))
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (open) inputRef.current?.focus()
-  }, [open])
-
-  const selected = models.find((m) => m.id === value)
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return null
-    return models.filter(
-      (m) =>
-        m.id.toLowerCase().includes(q) ||
-        m.name.toLowerCase().includes(q) ||
-        (m.description?.toLowerCase() ?? '').includes(q) ||
-        m.provider.toLowerCase().includes(q),
-    )
-  }, [models, query])
-
-  const sections = useMemo(() => {
-    const recommended = models.filter((m) => m.featured)
-    const byProvider: Array<{ provider: string; items: CatalogModel[] }> = []
-    for (const m of models) {
-      if (m.featured) continue
-      const last = byProvider[byProvider.length - 1]
-      if (last && last.provider === m.provider) last.items.push(m)
-      else byProvider.push({ provider: m.provider, items: [m] })
-    }
-    return { recommended, byProvider }
-  }, [models])
-
-  const select = (id: string) => {
-    onChange(id)
-    setOpen(false)
-    setQuery('')
-  }
-
-  return (
-    <div ref={containerRef} className="relative inline-flex">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30"
-      >
-        {selected ? (renderProviderBadge ? renderProviderBadge(selected.provider) : <ProviderLogo provider={selected.provider} size={16} />) : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}
-        <span className="max-w-[160px] truncate">{selected?.name ?? value}</span>
-        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-      </button>
-
-      {open && (
-        <div className="absolute bottom-full left-0 z-50 mb-2 w-[420px] overflow-hidden rounded-xl border border-border bg-card shadow-lg">
-          <div className="border-b border-border px-3 py-2">
-            <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
-              <SearchGlyph className="h-3.5 w-3.5 text-muted-foreground" />
-              <input
-                ref={inputRef}
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search models..."
-                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              />
-            </div>
-          </div>
-          <div className="max-h-[400px] overflow-y-auto p-1 pb-2">
-            {loading && <div className="px-3 py-4 text-center text-sm text-muted-foreground">Loading models...</div>}
-            {!loading && filtered && (
-              <>
-                {filtered.length === 0 && (
-                  <div className="px-3 py-4 text-center text-sm text-muted-foreground">No models match your search</div>
-                )}
-                {filtered.map((m) => (
-                  <ModelRow key={m.id} model={m} selected={m.id === value} onSelect={() => select(m.id)} renderProviderBadge={renderProviderBadge} />
-                ))}
-              </>
-            )}
-            {!loading && !filtered && (
-              <>
-                {sections.recommended.length > 0 && (
-                  <>
-                    <SectionHeader>{recommendedLabel}</SectionHeader>
-                    {sections.recommended.map((m) => (
-                      <ModelRow key={m.id} model={m} selected={m.id === value} onSelect={() => select(m.id)} renderProviderBadge={renderProviderBadge} />
-                    ))}
-                  </>
-                )}
-                {sections.byProvider.map((g) => (
-                  <div key={g.provider}>
-                    <SectionHeader>{g.provider}</SectionHeader>
-                    {g.items.map((m) => (
-                      <ModelRow key={m.id} model={m} selected={m.id === value} onSelect={() => select(m.id)} renderProviderBadge={renderProviderBadge} />
-                    ))}
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── EffortPicker ──────────────────────────────────────────────────────────
-
-const EFFORT_LEVELS = [
-  { id: 'off', label: 'Off' },
-  { id: 'low', label: 'Low' },
-  { id: 'medium', label: 'Medium' },
-  { id: 'high', label: 'High' },
-] as const
-
-export interface EffortPickerProps {
-  value: string
-  onChange: (id: string) => void
-}
-
-/** Reasoning-effort selector pill, styled to match {@link ModelPicker}. Show
- *  it only when the selected model `supportsReasoning`. */
-export function EffortPicker({ value, onChange }: EffortPickerProps) {
-  const [open, setOpen] = useState(false)
-  const containerRef = useClickOutside(() => setOpen(false))
-  const selected = EFFORT_LEVELS.find((l) => l.id === value) ?? EFFORT_LEVELS[2]
-
-  return (
-    <div ref={containerRef} className="relative inline-flex">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        title="Reasoning effort"
-        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30"
-      >
-        <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />
-        <span>{selected.label}</span>
-        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-      </button>
-      {open && (
-        <div className="absolute bottom-full left-0 z-50 mb-2 w-36 overflow-hidden rounded-xl border border-border bg-card p-1 shadow-lg">
-          {EFFORT_LEVELS.map((l) => (
-            <button
-              key={l.id}
-              type="button"
-              onClick={() => {
-                onChange(l.id)
-                setOpen(false)
-              }}
-              className={`flex w-full items-center rounded-md px-3 py-2 text-left text-sm transition ${
-                l.id === value ? 'bg-primary/10 font-medium' : 'hover:bg-accent/30'
-              }`}
-            >
-              {l.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
 }
 
 // ── Tool run drill-in (retained runs) ─────────────────────────────────────
@@ -379,7 +104,7 @@ export function RunDrillIn({ run, onClose }: RunDrillInProps) {
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
         <span
           className={`h-2 w-2 shrink-0 rounded-full ${
-            run.status === 'running' ? 'bg-yellow-500' : run.status === 'error' ? 'bg-red-500' : 'bg-green-500'
+            run.status === 'running' ? 'bg-warning' : run.status === 'error' ? 'bg-destructive' : 'bg-success'
           }`}
         />
         <div className="min-w-0 flex-1">
@@ -404,11 +129,11 @@ export function RunDrillIn({ run, onClose }: RunDrillInProps) {
         {run.steps.map((step, i) => (
           <div key={i} className="rounded-lg border border-border/60 bg-background">
             <div className="flex items-baseline gap-2 border-b border-border/40 px-3 py-1.5">
-              <span className={`font-mono text-[11px] ${step.status === 'error' ? 'text-red-600' : 'text-muted-foreground'}`}>
+              <span className={`font-mono text-[11px] ${step.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>
                 {step.status === 'error' ? '✗' : '$'}
               </span>
               <code className="min-w-0 flex-1 truncate font-mono text-xs">{step.label}</code>
-              <span className="shrink-0 text-[10px] text-muted-foreground/60">
+              <span className="shrink-0 text-[10px] text-muted-foreground">
                 {new Date(step.at).toLocaleTimeString()}
               </span>
             </div>
@@ -420,7 +145,7 @@ export function RunDrillIn({ run, onClose }: RunDrillInProps) {
           </div>
         ))}
       </div>
-      <p className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground/60">
+      <p className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
         Readonly drill-in. Follow up in the main chat.
       </p>
     </div>
@@ -476,6 +201,16 @@ export interface ChatMessagesProps {
   onToolCallClick?: (call: ChatToolCallInfo, message: ChatUiMessage) => void
   /** Per-tool custom detail renderers for expanded tool cards. */
   toolRenderers?: ToolDetailRenderers
+  /** Stream-error affordance: when the turn failed (a thrown transport error or
+   *  a loop-level `onErrorEvent`), pass the message here to render an error row.
+   *  A failed turn otherwise just stops with no UI signal. */
+  error?: string | null
+  /** Retry control shown on the error row; omit to render the error without a
+   *  retry button (e.g. when the product retries automatically). */
+  onRetry?: () => void
+  /** Zero-state renderer, shown when there are no messages and the turn is
+   *  neither loading nor errored. Omit to render nothing (current behavior). */
+  renderEmpty?: () => ReactNode
 }
 
 export interface ProposalApprovalHandlers {
@@ -562,7 +297,7 @@ function KvRows({ data }: { data: Record<string, unknown> }) {
     <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
       {entries.map(([k, v]) => (
         <div key={k} className="contents">
-          <dt className="font-mono text-[11px] text-muted-foreground/70">{k}</dt>
+          <dt className="font-mono text-[11px] text-muted-foreground">{k}</dt>
           <dd className="min-w-0 whitespace-pre-wrap break-words font-mono text-[11px] text-muted-foreground">
             {truncate(v)}
           </dd>
@@ -582,7 +317,7 @@ function ShellDetail({ call }: { call: ChatToolCallInfo }) {
         <span className="select-none text-zinc-500">$</span>
         <span className="min-w-0 flex-1 truncate text-zinc-200">{String(call.args?.command ?? '')}</span>
         {r.exitCode != null && (
-          <span className={r.exitCode === 0 ? 'text-emerald-400' : 'text-red-400'}>exit {r.exitCode}</span>
+          <span className={r.exitCode === 0 ? 'text-success' : 'text-destructive'}>exit {r.exitCode}</span>
         )}
       </div>
       <pre className="max-h-56 overflow-auto whitespace-pre-wrap px-3 pb-2.5 pt-1.5 text-zinc-300">
@@ -599,17 +334,17 @@ function DefaultToolDetail({ call }: { call: ChatToolCallInfo }) {
     <div className="space-y-2">
       {call.args && Object.keys(call.args).length > 0 && (
         <div>
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/50">Called with</p>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Called with</p>
           <KvRows data={call.args} />
         </div>
       )}
       {outcome && (
         <div>
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/50">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             {outcome.ok === false ? 'Failed' : 'Result'}
           </p>
           {outcome.ok === false ? (
-            <p className="text-xs text-red-600">{outcome.message ?? 'Tool failed'}</p>
+            <p className="text-xs text-destructive">{outcome.message ?? 'Tool failed'}</p>
           ) : outcome.result && typeof outcome.result === 'object' ? (
             <KvRows data={outcome.result} />
           ) : (
@@ -638,58 +373,75 @@ function ToolCallCard({
   const pending = call.status === 'done' ? pendingApprovalOf(call) : null
   const failed = call.status === 'error' || toolOutcomeOf(call)?.ok === false
   const custom = renderers?.[call.name]?.(call, message)
+  const { pending: deciding, run: decide } = usePending()
 
   return (
     <div
       className={`w-fit min-w-[280px] max-w-full rounded-lg border text-xs transition ${
         pending
-          ? 'border-amber-300/60 bg-amber-500/5'
+          ? 'border-warning/40 bg-warning/5'
           : failed
-            ? 'border-red-300/60 bg-red-500/5'
+            ? 'border-destructive/40 bg-destructive/5'
             : 'border-border/60 bg-muted/20'
       }`}
     >
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left"
-      >
-        <span
-          className={`h-2 w-2 shrink-0 rounded-full ${
-            call.status === 'running'
-              ? 'animate-pulse bg-yellow-500'
-              : pending
-                ? 'bg-amber-500'
-                : failed
-                  ? 'bg-red-500'
-                  : 'bg-green-500'
-          }`}
-        />
-        <ToolGlyph name={call.name} className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 flex-1 truncate font-medium">{friendlyToolTitle(call)}</span>
+      {/* Header is a flex row, NOT a button, so the Approve/Reject controls are
+          siblings of the expand toggle rather than nested inside it (axe:
+          nested-interactive; also invalid: a <button> may not contain a <button>). */}
+      <div className="flex w-full items-center gap-2 px-3 py-2">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded text-left focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span
+            className={`h-2 w-2 shrink-0 rounded-full ${
+              call.status === 'running'
+                ? 'animate-pulse bg-warning'
+                : pending
+                  ? 'bg-warning'
+                  : failed
+                    ? 'bg-destructive'
+                    : 'bg-success'
+            }`}
+          />
+          <ToolGlyph name={call.name} className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 flex-1 truncate font-medium">{friendlyToolTitle(call)}</span>
+        </button>
         {pending && approval && (
-          <span className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <span className="flex shrink-0 items-center gap-1">
             <button
               type="button"
-              onClick={() => approval.onApprove(pending.proposalId, call.id)}
-              className="rounded bg-green-600/90 px-2 py-0.5 text-[11px] font-semibold text-white transition hover:bg-green-600"
+              disabled={deciding}
+              onClick={() => decide(() => approval.onApprove(pending.proposalId, call.id))}
+              className="rounded bg-success px-2 py-0.5 text-[11px] font-semibold text-success-foreground transition hover:bg-success/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Approve
             </button>
             <button
               type="button"
-              onClick={() => approval.onReject(pending.proposalId, call.id)}
-              className="rounded border border-border bg-card px-2 py-0.5 text-[11px] font-medium text-foreground transition hover:bg-accent/30"
+              disabled={deciding}
+              onClick={() => decide(() => approval.onReject(pending.proposalId, call.id))}
+              className="rounded border border-border bg-card px-2 py-0.5 text-[11px] font-medium text-foreground transition hover:bg-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Reject
             </button>
           </span>
         )}
-        <span className="shrink-0 text-[11px] text-muted-foreground/70">
+        <span className="shrink-0 text-[11px] text-muted-foreground">
           {call.status === 'running' ? 'running…' : pending ? 'awaiting approval' : failed ? 'failed' : 'done'}
         </span>
-        <ChevronDown className={`h-3 w-3 shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
-      </button>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-label={expanded ? 'Collapse details' : 'Expand details'}
+          aria-expanded={expanded}
+          className="shrink-0 rounded p-0.5 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
       {expanded && (
         <div className="border-t border-border/40 px-3 py-2.5">
           {custom ?? (call.name === 'sandbox_run_command' ? <ShellDetail call={call} /> : <DefaultToolDetail call={call} />)}
@@ -708,7 +460,7 @@ function ToolCallCard({
   )
 }
 
-function AssistantMessage({
+function AssistantMessageImpl({
   msg,
   streaming,
   models,
@@ -735,6 +487,11 @@ function AssistantMessage({
   // the open thinking box instead of popping in and collapsing.
   const content = useSmoothText(msg.content, streaming)
   const reasoning = useSmoothText(msg.reasoning ?? '', streaming)
+  // The smooth reveal re-renders on every rAF frame while streaming, but the
+  // FLOORED visible length only advances every few frames — re-parsing markdown
+  // each frame is wasted work on the hot path. Memo on (renderBody, content) so
+  // the parse runs only when the visible text actually changes.
+  const body = useMemo(() => renderBody(content), [renderBody, content])
   const reasoningScrollRef = useRef<HTMLDivElement>(null)
   // Measure visible thinking time: first reasoning reveal → first answer text.
   const thinkStartRef = useRef<number | null>(null)
@@ -752,7 +509,7 @@ function AssistantMessage({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-3">
-      <div className="mb-1 flex items-baseline gap-2 text-[11px] tracking-wide text-muted-foreground/60">
+      <div className="mb-1 flex items-baseline gap-2 text-[11px] tracking-wide text-muted-foreground">
         <span className="font-semibold uppercase">{agentLabel}</span>
         {msg.modelUsed && <span className="font-mono normal-case">{msg.modelUsed}</span>}
         {formatTokensPerSecond(msg) && <span>{formatTokensPerSecond(msg)}</span>}
@@ -769,13 +526,13 @@ function AssistantMessage({
               'Thought process'
             )}
           </summary>
-          <div ref={reasoningScrollRef} className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap text-[13px] leading-relaxed text-muted-foreground/70">
+          <div ref={reasoningScrollRef} className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap text-[13px] leading-relaxed text-muted-foreground">
             {reasoning}
           </div>
         </details>
       )}
       <div className="text-base leading-[1.75]">
-        {renderBody(content)}
+        {body}
         {streaming && content && !msg.toolCalls?.length && (
           <span className="ml-0.5 inline-block h-[1.1em] w-[3px] translate-y-[2px] animate-pulse rounded-sm bg-foreground/70" aria-hidden />
         )}
@@ -799,6 +556,15 @@ function AssistantMessage({
   )
 }
 
+/**
+ * Only the actively-streaming message changes per frame; historical messages
+ * are referentially stable. `memo` keeps a stable `AssistantMessage` from
+ * re-rendering (and re-running its markdown parse) when a sibling streams —
+ * default shallow-equal prop comparison is exactly right here since every prop
+ * is referentially stable except the one being streamed.
+ */
+const AssistantMessage = memo(AssistantMessageImpl)
+
 function ThinkingRow({ agentLabel }: { agentLabel: string }) {
   const [seconds, setSeconds] = useState(0)
   useEffect(() => {
@@ -807,12 +573,37 @@ function ThinkingRow({ agentLabel }: { agentLabel: string }) {
   }, [])
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-3">
-      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/60">{agentLabel}</p>
+      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{agentLabel}</p>
       <div className="flex items-center gap-2 text-base text-muted-foreground">
         <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
           <path d="M21 12a9 9 0 1 1-6.219-8.56" strokeLinecap="round" />
         </svg>
         Thinking{seconds >= 3 ? ` · ${seconds}s` : '...'}
+      </div>
+    </div>
+  )
+}
+
+/** Top-level turn-failure row with an optional Retry — the affordance a failed
+ *  stream otherwise lacks (the turn just stopped). */
+function StreamErrorRow({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <div className="mx-auto w-full max-w-3xl px-6 py-3">
+      <div role="alert" className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
+        <svg className="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 8v4m0 4h.01" />
+        </svg>
+        <span className="min-w-0 flex-1 break-words">{message}</span>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className={`shrink-0 rounded border border-destructive/40 bg-card px-2 py-0.5 text-[11px] font-medium text-destructive transition hover:bg-destructive/10 ${POPOVER_OPTION_FOCUS}`}
+          >
+            Retry
+          </button>
+        )}
       </div>
     </div>
   )
@@ -835,16 +626,27 @@ export function ChatMessages({
   approval,
   onToolCallClick,
   toolRenderers,
+  error,
+  onRetry,
+  renderEmpty,
 }: ChatMessagesProps) {
-  const renderBody = renderMarkdown ?? ((content: string) => <p className="whitespace-pre-wrap">{content}</p>)
+  // Stabilize the fallback renderer's identity so it doesn't change every
+  // render — otherwise the memoized `AssistantMessage` (and its per-frame body
+  // memo) would invalidate on every parent render when no `renderMarkdown` is
+  // supplied.
+  const renderBody = useMemo(
+    () => renderMarkdown ?? ((content: string) => <p className="whitespace-pre-wrap">{content}</p>),
+    [renderMarkdown],
+  )
   const lastIsUser = messages[messages.length - 1]?.role === 'user'
+  if (messages.length === 0 && !loading && !error && renderEmpty) return <>{renderEmpty()}</>
   return (
     <>
       {messages.map((msg) =>
         msg.role === 'user' ? (
           <div key={msg.id} className="mx-auto w-full max-w-3xl px-6 py-3">
             <div className="ml-auto w-fit max-w-[85%]">
-              <p className="mb-1 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/60">
+              <p className="mb-1 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {userLabel}
               </p>
               <div className="rounded-2xl rounded-tr-md bg-primary/10 px-4 py-2.5 text-base leading-relaxed">
@@ -868,6 +670,7 @@ export function ChatMessages({
         ),
       )}
       {loading && lastIsUser && <ThinkingRow agentLabel={agentLabel} />}
+      {error && !loading && <StreamErrorRow message={error} onRetry={onRetry} />}
     </>
   )
 }

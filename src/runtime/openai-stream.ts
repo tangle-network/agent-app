@@ -14,7 +14,7 @@
  * (browser/edge/Node-safe, zero deps). For richer transport use the tcloud SDK
  * or the Vercel AI SDK and pipe their stream through {@link toLoopEvents}.
  */
-import type { LoopEvent, LoopMessage, LoopToolCall } from './index'
+import type { LoopEvent, LoopMessage, LoopToolCall } from './loop'
 
 /** Minimal OpenAI Chat Completions streaming chunk (structural — no `openai` dep). */
 export interface OpenAIStreamChunk {

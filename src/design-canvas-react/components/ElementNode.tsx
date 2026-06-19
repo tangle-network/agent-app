@@ -25,9 +25,11 @@
  * hidden → not rendered.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { Group, Rect, Ellipse, Line, Text, Image as KonvaImage } from 'react-konva'
+import type Konva from 'konva'
 import { ellipseCenterFromTopLeft } from './transform-math'
+import { lightTheme, type CanvasRenderPalette } from '../../theme/theme'
 import type {
   SceneElement,
   RectElement,
@@ -90,6 +92,8 @@ export interface ElementNodeProps {
   element: SceneElement
   isSelected: boolean
   zoom: number
+  /** Theme render palette. Omitted → light defaults (byte-identical history). */
+  render?: CanvasRenderPalette
   onClick?(elementId: string): void
   onDragStart?(elementId: string): void
   onDragMove?(elementId: string, dx: number, dy: number): void
@@ -97,7 +101,7 @@ export interface ElementNodeProps {
   onDoubleClick?(elementId: string): void
 }
 
-export function ElementNode(props: ElementNodeProps) {
+function ElementNodeImpl(props: ElementNodeProps) {
   const { element } = props
   if (!element.visible) return null
 
@@ -112,6 +116,16 @@ export function ElementNode(props: ElementNodeProps) {
   }
 }
 
+/**
+ * Memoized so a `stack.notify()` (fired ~120/s during a pan/marquee) that
+ * re-renders WorkspaceView does NOT re-render every element. With stable
+ * handler identities supplied by WorkspaceView, an ElementNode re-renders only
+ * when its OWN `element` reference, `isSelected`, `zoom`, or `render` palette
+ * change — i.e. when it actually moved, was (de)selected, or the view scaled.
+ * Pan-only frames change none of these props, so the N nodes stay reconciled.
+ */
+export const ElementNode = memo(ElementNodeImpl)
+
 // ---------------------------------------------------------------------------
 // Shared drag handlers factory
 // ---------------------------------------------------------------------------
@@ -119,6 +133,9 @@ export function ElementNode(props: ElementNodeProps) {
 interface DragBindings {
   draggable: boolean
   listening: boolean
+  /** True between dragStart and dragEnd — gates Konva node caching off so the
+   *  moving node redraws live instead of showing a stale cached bitmap. */
+  dragging: boolean
   onDragStart?: (e: { target: { x(): number; y(): number } }) => void
   onDragMove?: (e: { target: { x(): number; y(): number } }) => void
   onDragEnd?: (e: { target: { x(): number; y(): number } }) => void
@@ -131,16 +148,19 @@ function useDragBindings(props: ElementNodeProps, originX: number, originY: numb
   const isDraggable = !element.locked && !!onDragEnd
   const originRef = useRef({ x: originX, y: originY })
   originRef.current = { x: originX, y: originY }
+  const [dragging, setDragging] = useState(false)
 
   return {
     draggable: isDraggable,
     // locked elements still receive click for selection; listening must be true.
     listening: true,
-    onDragStart: isDraggable ? () => { onDragStart?.(element.id) } : undefined,
+    dragging,
+    onDragStart: isDraggable ? () => { setDragging(true); onDragStart?.(element.id) } : undefined,
     onDragMove: isDraggable ? (e: { target: { x(): number; y(): number } }) => {
       onDragMove?.(element.id, e.target.x() - originRef.current.x, e.target.y() - originRef.current.y)
     } : undefined,
     onDragEnd: isDraggable ? (e: { target: { x(): number; y(): number } }) => {
+      setDragging(false)
       onDragEnd?.(element.id, e.target.x(), e.target.y())
     } : undefined,
     onClick: () => onClick?.(element.id),
@@ -148,14 +168,54 @@ function useDragBindings(props: ElementNodeProps, originX: number, originY: numb
   }
 }
 
+/**
+ * Konva node bitmap caching for static elements. A cached node draws from a
+ * pre-rasterized bitmap instead of re-running its shape draw each frame, which
+ * is the snappiness win when many static nodes are on stage during a pan/zoom.
+ *
+ * Gated OFF while `isSelected || dragging`: a selected node is under the
+ * transformer (resize/rotate must redraw live) and a dragging node moves every
+ * frame — a cached bitmap would freeze its visuals. On select/drag start the
+ * cache is cleared; on deselect/drop it is re-cached. `zoom` is a dependency so
+ * the bitmap re-rasterizes at the current scale and never looks blurry.
+ */
+function useNodeCache(
+  ref: React.RefObject<Konva.Node | null>,
+  isSelected: boolean,
+  dragging: boolean,
+  zoom: number,
+  invalidateKey: unknown,
+): void {
+  useEffect(() => {
+    const node = ref.current
+    if (!node) return
+    if (isSelected || dragging) {
+      // clearCache is a no-op when the node was never cached.
+      node.clearCache()
+      return
+    }
+    node.cache()
+    return () => {
+      // Drop the bitmap when the node unmounts or before re-caching so a stale
+      // bitmap is never left attached across a prop change.
+      node.clearCache()
+    }
+    // `invalidateKey` (the element reference) re-rasterizes the bitmap when any
+    // element attribute changes; `zoom` keeps it crisp at the current scale.
+  }, [ref, isSelected, dragging, zoom, invalidateKey])
+}
+
 // ---------------------------------------------------------------------------
 // Rect
 // ---------------------------------------------------------------------------
 
 function RectNode({ element, ...rest }: ElementNodeProps & { element: RectElement }) {
-  const drag = useDragBindings({ element, ...rest }, element.x, element.y)
+  const { dragging, ...drag } = useDragBindings({ element, ...rest }, element.x, element.y)
+  const ref = useRef<Konva.Rect | null>(null)
+  useNodeCache(ref, rest.isSelected, dragging, rest.zoom, element)
   return (
     <Rect
+      ref={ref}
       name={element.id}
       x={element.x}
       y={element.y}
@@ -180,10 +240,13 @@ function EllipseNode({ element, ...rest }: ElementNodeProps & { element: Ellipse
   // Model: top-left (x, y) + width/height bounding box.
   // Konva.Ellipse: center (x, y) + radiusX/radiusY.
   const { x: cx, y: cy, radiusX, radiusY } = ellipseCenterFromTopLeft(element)
-  const drag = useDragBindings({ element, ...rest }, element.x, element.y)
+  const { dragging, ...drag } = useDragBindings({ element, ...rest }, element.x, element.y)
+  const ref = useRef<Konva.Ellipse | null>(null)
+  useNodeCache(ref, rest.isSelected, dragging, rest.zoom, element)
 
   return (
     <Ellipse
+      ref={ref}
       name={element.id}
       x={cx}
       y={cy}
@@ -204,9 +267,12 @@ function EllipseNode({ element, ...rest }: ElementNodeProps & { element: Ellipse
 // ---------------------------------------------------------------------------
 
 function LineNode({ element, ...rest }: ElementNodeProps & { element: LineElement }) {
-  const drag = useDragBindings({ element, ...rest }, element.x, element.y)
+  const { dragging, ...drag } = useDragBindings({ element, ...rest }, element.x, element.y)
+  const ref = useRef<Konva.Line | null>(null)
+  useNodeCache(ref, rest.isSelected, dragging, rest.zoom, element)
   return (
     <Line
+      ref={ref}
       name={element.id}
       x={element.x}
       y={element.y}
@@ -233,11 +299,14 @@ const FONT_STYLE_MAP: Record<TextElement['fontStyle'], { fontStyle: string; font
 }
 
 function TextNode({ element, ...rest }: ElementNodeProps & { element: TextElement }) {
-  const drag = useDragBindings({ element, ...rest }, element.x, element.y)
+  const { dragging, ...drag } = useDragBindings({ element, ...rest }, element.x, element.y)
+  const ref = useRef<Konva.Text | null>(null)
+  useNodeCache(ref, rest.isSelected, dragging, rest.zoom, element)
   const { fontStyle, fontWeight } = FONT_STYLE_MAP[element.fontStyle]
 
   return (
     <Text
+      ref={ref}
       name={element.id}
       x={element.x}
       y={element.y}
@@ -261,17 +330,28 @@ function TextNode({ element, ...rest }: ElementNodeProps & { element: TextElemen
 // Image
 // ---------------------------------------------------------------------------
 
-const BROKEN_FILL = '#e5e7eb'
-const BROKEN_STROKE = '#9ca3af'
-
 function ImageNode({ element, ...rest }: ElementNodeProps & { element: ImageElement }) {
+  const render = rest.render ?? lightTheme.canvasRender
   const img = useImage(element.src)
-  const drag = useDragBindings({ element, ...rest }, element.x, element.y)
+  const { dragging, ...drag } = useDragBindings({ element, ...rest }, element.x, element.y)
+  const ref = useRef<Konva.Node | null>(null)
+  const imgReady = !!img && img.complete && img.naturalWidth > 0
+  // Cache key folds load state + the attrs that change the rasterized pixels
+  // (src, size, fit). Position/opacity/rotation are post-cache transforms and
+  // are deliberately excluded so a drag/opacity change never re-rasterizes.
+  useNodeCache(
+    ref,
+    rest.isSelected,
+    dragging,
+    rest.zoom,
+    `${imgReady}:${element.src}:${element.width}x${element.height}:${element.fit}`,
+  )
 
   if (!img || !img.complete || img.naturalWidth === 0) {
     // Placeholder while loading or broken: a grey rect with the src in its name.
     return (
       <Rect
+        ref={ref as React.RefObject<Konva.Rect>}
         name={element.id}
         x={element.x}
         y={element.y}
@@ -279,8 +359,8 @@ function ImageNode({ element, ...rest }: ElementNodeProps & { element: ImageElem
         height={element.height}
         rotation={element.rotation}
         opacity={element.opacity}
-        fill={BROKEN_FILL}
-        stroke={BROKEN_STROKE}
+        fill={render.brokenFill}
+        stroke={render.brokenStroke}
         strokeWidth={1}
         {...drag}
       />
@@ -320,6 +400,7 @@ function ImageNode({ element, ...rest }: ElementNodeProps & { element: ImageElem
 
   return (
     <KonvaImage
+      ref={ref as React.RefObject<Konva.Image>}
       name={element.id}
       x={element.x}
       y={element.y}
@@ -339,13 +420,24 @@ function ImageNode({ element, ...rest }: ElementNodeProps & { element: ImageElem
 // ---------------------------------------------------------------------------
 
 function VideoNode({ element, ...rest }: ElementNodeProps & { element: VideoElement }) {
+  const render = rest.render ?? lightTheme.canvasRender
   // Poster image path — never silently drop; show placeholder when absent.
   const img = useImage(element.posterSrc ?? '')
-  const drag = useDragBindings({ element, ...rest }, element.x, element.y)
+  const { dragging, ...drag } = useDragBindings({ element, ...rest }, element.x, element.y)
+  const ref = useRef<Konva.Node | null>(null)
+  const posterReady = !!element.posterSrc && !!img && img.complete && img.naturalWidth > 0
+  useNodeCache(
+    ref,
+    rest.isSelected,
+    dragging,
+    rest.zoom,
+    `${posterReady}:${element.posterSrc ?? ''}:${element.width}x${element.height}`,
+  )
 
   if (!element.posterSrc || !img || !img.complete || img.naturalWidth === 0) {
     return (
       <Rect
+        ref={ref as React.RefObject<Konva.Rect>}
         name={element.id}
         x={element.x}
         y={element.y}
@@ -353,8 +445,8 @@ function VideoNode({ element, ...rest }: ElementNodeProps & { element: VideoElem
         height={element.height}
         rotation={element.rotation}
         opacity={element.opacity}
-        fill="#1f2937"
-        stroke="#374151"
+        fill={render.placeholderFill}
+        stroke={render.placeholderStroke}
         strokeWidth={1}
         {...drag}
       />
@@ -363,6 +455,7 @@ function VideoNode({ element, ...rest }: ElementNodeProps & { element: VideoElem
 
   return (
     <KonvaImage
+      ref={ref as React.RefObject<Konva.Image>}
       name={element.id}
       x={element.x}
       y={element.y}
@@ -381,7 +474,11 @@ function VideoNode({ element, ...rest }: ElementNodeProps & { element: VideoElem
 // ---------------------------------------------------------------------------
 
 function GroupNode({ element, ...rest }: ElementNodeProps & { element: GroupElement }) {
-  const drag = useDragBindings({ element, ...rest }, element.x, element.y)
+  const { dragging: _dragging, ...drag } = useDragBindings({ element, ...rest }, element.x, element.y)
+  // A group is NOT bitmap-cached: caching a container would flatten its children
+  // into one static bitmap and break per-child hit-testing/transform. The win is
+  // that each child node (memoized + leaf-cached) keeps its own cache.
+  void _dragging
   return (
     <Group
       name={element.id}

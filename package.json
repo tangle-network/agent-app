@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.24.0",
+  "version": "0.36.0",
   "packageManager": "pnpm@10.33.4",
   "description": "Application-shell framework for Tangle agent products: a bounded tool loop, the structured agent→app tool side channel, integration-hub client, per-workspace billing, and crypto — composed over the Tangle agent substrate through typed seams.",
   "keywords": [
@@ -25,6 +25,7 @@
   },
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
@@ -177,6 +178,11 @@
       "import": "./dist/assets/index.js",
       "default": "./dist/assets/index.js"
     },
+    "./brand-extraction": {
+      "types": "./dist/brand-extraction/index.d.ts",
+      "import": "./dist/brand-extraction/index.js",
+      "default": "./dist/brand-extraction/index.js"
+    },
     "./trace": {
       "types": "./dist/trace/index.d.ts",
       "import": "./dist/trace/index.js",
@@ -211,7 +217,99 @@
       "types": "./dist/design-canvas-react/index.d.ts",
       "import": "./dist/design-canvas-react/index.js",
       "default": "./dist/design-canvas-react/index.js"
-    }
+    },
+    "./design-canvas-react/engine": {
+      "types": "./dist/design-canvas-react/engine.d.ts",
+      "import": "./dist/design-canvas-react/engine.js",
+      "default": "./dist/design-canvas-react/engine.js"
+    },
+    "./design-canvas-react/lazy": {
+      "types": "./dist/design-canvas-react/lazy.d.ts",
+      "import": "./dist/design-canvas-react/lazy.js",
+      "default": "./dist/design-canvas-react/lazy.js"
+    },
+    "./studio": {
+      "types": "./dist/studio/index.d.ts",
+      "import": "./dist/studio/index.js",
+      "default": "./dist/studio/index.js"
+    },
+    "./studio-react": {
+      "types": "./dist/studio-react/index.d.ts",
+      "import": "./dist/studio-react/index.js",
+      "default": "./dist/studio-react/index.js"
+    },
+    "./studio-react/styles": "./dist/studio-react/studio.css",
+    "./teams": {
+      "types": "./dist/teams/index.d.ts",
+      "import": "./dist/teams/index.js",
+      "default": "./dist/teams/index.js"
+    },
+    "./teams/drizzle": {
+      "types": "./dist/teams/drizzle.d.ts",
+      "import": "./dist/teams/drizzle.js",
+      "default": "./dist/teams/drizzle.js"
+    },
+    "./teams/members-api": {
+      "types": "./dist/teams/members-api.d.ts",
+      "import": "./dist/teams/members-api.js",
+      "default": "./dist/teams/members-api.js"
+    },
+    "./teams-react": {
+      "types": "./dist/teams-react/index.d.ts",
+      "import": "./dist/teams-react/index.js",
+      "default": "./dist/teams-react/index.js"
+    },
+    "./teams-react/lazy": {
+      "types": "./dist/teams-react/lazy.d.ts",
+      "import": "./dist/teams-react/lazy.js",
+      "default": "./dist/teams-react/lazy.js"
+    },
+    "./intakes": {
+      "types": "./dist/intakes/index.d.ts",
+      "import": "./dist/intakes/index.js",
+      "default": "./dist/intakes/index.js"
+    },
+    "./intakes/drizzle": {
+      "types": "./dist/intakes/drizzle.d.ts",
+      "import": "./dist/intakes/drizzle.js",
+      "default": "./dist/intakes/drizzle.js"
+    },
+    "./intakes/api": {
+      "types": "./dist/intakes/api.d.ts",
+      "import": "./dist/intakes/api.js",
+      "default": "./dist/intakes/api.js"
+    },
+    "./intakes-react": {
+      "types": "./dist/intakes-react/index.d.ts",
+      "import": "./dist/intakes-react/index.js",
+      "default": "./dist/intakes-react/index.js"
+    },
+    "./intakes-react/lazy": {
+      "types": "./dist/intakes-react/lazy.d.ts",
+      "import": "./dist/intakes-react/lazy.js",
+      "default": "./dist/intakes-react/lazy.js"
+    },
+    "./vault": {
+      "types": "./dist/vault/index.d.ts",
+      "import": "./dist/vault/index.js",
+      "default": "./dist/vault/index.js"
+    },
+    "./vault/lazy": {
+      "types": "./dist/vault/lazy.d.ts",
+      "import": "./dist/vault/lazy.js",
+      "default": "./dist/vault/lazy.js"
+    },
+    "./theme": {
+      "types": "./dist/theme/index.d.ts",
+      "import": "./dist/theme/index.js",
+      "default": "./dist/theme/index.js"
+    },
+    "./tailwind-preset": {
+      "types": "./dist/theme/tailwind-preset.d.ts",
+      "import": "./dist/theme/tailwind-preset.js",
+      "default": "./dist/theme/tailwind-preset.js"
+    },
+    "./styles": "./dist/theme/tokens.css"
   },
   "scripts": {
     "build": "tsup",
@@ -219,14 +317,18 @@
     "prepare": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "knip": "knip"
   },
   "devDependencies": {
+    "@radix-ui/react-dialog": "^1.1.15",
     "@tangle-network/agent-eval": "^0.83.0",
     "@tangle-network/agent-integrations": "^0.32.0",
-    "@tangle-network/agent-runtime": "^0.52.0",
     "@tangle-network/agent-knowledge": "^1.5.2",
+    "@tangle-network/agent-runtime": "^0.52.0",
     "@tangle-network/sandbox": "^0.6.0",
+    "@tangle-network/sandbox-ui": "^0.39.1",
+    "@tangle-network/ui": "^4.1.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@types/better-sqlite3": "^7.6.13",
@@ -235,26 +337,34 @@
     "better-auth": "^1.6.16",
     "better-sqlite3": "^12.10.0",
     "drizzle-orm": "^0.45.2",
+    "fast-check": "^3.23.2",
     "jsdom": "^29.1.1",
+    "knip": "^5.46.0",
     "konva": "^10.3.0",
+    "lucide-react": "^1.16.0",
     "react": "^19.0.0",
     "react-dom": "^19.2.7",
     "react-konva": "^19.2.5",
+    "react-router": "^7.15.1",
     "tsup": "^8.0.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
   },
   "peerDependencies": {
     "@huggingface/transformers": ">=3",
+    "@radix-ui/react-dialog": ">=1.1",
     "@tangle-network/agent-eval": ">=0.83.0",
     "@tangle-network/agent-integrations": ">=0.32.0",
     "@tangle-network/agent-knowledge": ">=1.5.0",
     "@tangle-network/agent-runtime": ">=0.52.0",
     "@tangle-network/sandbox": ">=0.4",
+    "@tangle-network/sandbox-ui": ">=0.32",
     "drizzle-orm": ">=0.36",
-    "react": ">=18",
     "konva": ">=9",
-    "react-konva": ">=18"
+    "lucide-react": ">=1",
+    "react": ">=18",
+    "react-konva": ">=18",
+    "react-router": ">=7"
   },
   "peerDependenciesMeta": {
     "@huggingface/transformers": {
@@ -279,6 +389,18 @@
       "optional": true
     },
     "react-konva": {
+      "optional": true
+    },
+    "@tangle-network/sandbox-ui": {
+      "optional": true
+    },
+    "react-router": {
+      "optional": true
+    },
+    "lucide-react": {
+      "optional": true
+    },
+    "@radix-ui/react-dialog": {
       "optional": true
     }
   },

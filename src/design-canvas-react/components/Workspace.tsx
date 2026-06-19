@@ -53,11 +53,12 @@ import {
 import { Stage, Layer, Rect, Group } from 'react-konva'
 import type Konva from 'konva'
 
-import type { DesignCanvasProps } from '../contracts'
+import type { DesignCanvasProps, ExportTriggerOptions } from '../contracts'
+import { exportPageDataUrl } from '../export'
 import { createSceneCommandStack } from '../engine/command-stack'
 import { createSnapEngine, collectGridTargets } from '../engine/snap'
 import { createZoomPanMath } from '../engine/zoom-pan'
-import { marqueeSelect } from '../engine/selection'
+import { marqueeSelect, hitTestPoint } from '../engine/selection'
 import {
   addElementCommand,
   setAttrsCommand,
@@ -76,9 +77,10 @@ import { InlineTextEditor } from './InlineTextEditor'
 import { BleedTrimOverlay } from './BleedTrimOverlay'
 
 import { normalizeMarquee, nudgeDelta as nudgeDeltaMath } from './transform-math'
-import { elementAabb, findElement } from '../../design-canvas/model'
-import type { SceneElement, ScenePage, TextElement } from '../../design-canvas/model'
+import { elementAabb, findElement, boundsIntersect } from '../../design-canvas/model'
+import type { SceneElement, ScenePage, TextElement, Bounds } from '../../design-canvas/model'
 import type { SnapResult, SnapTarget, SceneCommand } from '../contracts'
+import { lightTheme, type CanvasRenderPalette } from '../../theme/theme'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -125,10 +127,19 @@ export interface WorkspaceViewProps {
   /** Ref the chrome fills with a fit-page callback. The chrome calls it on F /
    *  Fit button; when injected via DesignCanvasEditor the ref is shared. */
   onFitRef?: React.MutableRefObject<(() => void) | null>
+  /** Host export hook. When set, the workspace fills `onExportRef` with a
+   *  callback that renders the stage to a data URL and forwards the result. */
+  onExport?: DesignCanvasProps['onExport']
+  /** Ref the workspace fills with an export callback `(opts) => void`. The
+   *  chrome's Export control calls it; the workspace owns the Konva stage so it
+   *  produces the data URL here. Filled only when `onExport` is also set. */
+  onExportRef?: React.MutableRefObject<((opts: ExportTriggerOptions) => void) | null>
   /** Fit the active page to the viewport once, on the first non-zero measurement. Default true. */
   fitOnMount?: boolean
   /** Called once after the first real (non-zero) measurement, after the initial fit is applied (or skipped). */
   onReady?(): void
+  /** Konva render palette. Omitted → light defaults (byte-identical history). */
+  render?: CanvasRenderPalette
 }
 
 // ---------------------------------------------------------------------------
@@ -143,8 +154,11 @@ export function WorkspaceView({
   stack,
   activePage,
   onFitRef,
+  onExport,
+  onExportRef,
   fitOnMount = true,
   onReady,
+  render = lightTheme.canvasRender,
 }: WorkspaceViewProps) {
   // Re-render when command stack changes state.
   const [, setTick] = useState(0)
@@ -211,6 +225,26 @@ export function WorkspaceView({
       // would each try to own it; the last to mount wins, but on unmount we
       // must not clear a ref filled by a newer mount).
       if (onFitRef.current !== null) onFitRef.current = null
+    }
+  })
+
+  // -------------------------------------------------------------------------
+  // Export callback — the chrome's Export control calls this through the ref;
+  // the workspace owns the stage, so it renders here and forwards the result.
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!onExportRef || !onExport) return
+    onExportRef.current = ({ format, pixelRatio }: ExportTriggerOptions) => {
+      const stage = stageRef.current
+      if (!stage) return
+      void (async () => {
+        const dataUrl = await exportPageDataUrl(stage, activePage, { format, pixelRatio })
+        await onExport({ pageId: activePageId, format, dataUrl, pixelRatio })
+      })()
+    }
+    return () => {
+      if (onExportRef.current !== null) onExportRef.current = null
     }
   })
 
@@ -284,21 +318,25 @@ export function WorkspaceView({
     }
     if (e.button !== 0) return
 
-    const stage = stageRef.current
     const rect = containerRef.current?.getBoundingClientRect()
-    if (!stage || !rect) return
+    if (!rect) return
     const screenX = e.clientX - rect.left
     const screenY = e.clientY - rect.top
-    const hitNode = stage.getIntersection({ x: screenX, y: screenY })
+    const docPos = zoomPanMath.screenToDocument({ zoom, panX, panY }, screenX, screenY)
 
-    if (hitNode && !hitNode.name().startsWith('overlay:') && hitNode.name() !== 'page-background') {
+    // Element-vs-empty-space is decided against the scene model in document
+    // space, not Konva's hit-graph canvas. The hit canvas misclassifies presses
+    // over elements (clip group, listening:false background, redraw lag right
+    // after a pan/zoom setView), which silently routed an element press into the
+    // marquee branch — the element drag never started. A model hit means: let
+    // Konva's draggable node begin the move; only empty space starts a marquee.
+    if (hitTestPoint(activePage, docPos.x, docPos.y) !== null) {
       return
     }
 
     e.preventDefault()
     ;(e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId)
     gestureRef.current = 'marquee'
-    const docPos = zoomPanMath.screenToDocument({ zoom, panX, panY }, screenX, screenY)
     const m: MarqueeState = { active: true, startDocX: docPos.x, startDocY: docPos.y, endDocX: docPos.x, endDocY: docPos.y }
     marqueeRef.current = m
     setMarquee(m)
@@ -392,9 +430,29 @@ export function WorkspaceView({
     const origin = dragOriginRef.current.get(elementId)
     if (!origin) return
 
-    const dx = finalX - origin.x
-    const dy = finalY - origin.y
     const draggingIds = selectedElementIds.includes(elementId) ? selectedElementIds : [elementId]
+
+    // Re-run snapping for the drop position so the PERSISTED coordinates match the
+    // guide the user saw mid-drag. Without this the element lands at the raw
+    // pointer position and the snap line is purely cosmetic.
+    let snappedX = finalX
+    let snappedY = finalY
+    if (snapEnabled) {
+      const snapBounds = { x: finalX, y: finalY, width: origin.width, height: origin.height }
+      const targets = snapEngine.collectTargets(state, draggingIds)
+      if (gridEnabled) {
+        const thresholdDoc = SNAP_THRESHOLD_SCREEN_PX / zoom
+        const gt = collectGridTargets(snapBounds, gridSize, activePage, thresholdDoc)
+        targets.vertical.push(...gt.vertical)
+        targets.horizontal.push(...gt.horizontal)
+      }
+      const snapResult = snapEngine.apply(snapBounds, targets, SNAP_THRESHOLD_SCREEN_PX, zoom)
+      snappedX = snapResult.x
+      snappedY = snapResult.y
+    }
+
+    const dx = snappedX - origin.x
+    const dy = snappedY - origin.y
 
     if (draggingIds.length === 1) {
       const el = findElement(activePage, elementId)?.element
@@ -403,7 +461,7 @@ export function WorkspaceView({
         setAttrsCommand({
           pageId: activePageId,
           elementId,
-          attrs: { x: finalX, y: finalY },
+          attrs: { x: snappedX, y: snappedY },
           priorAttrs: { x: el.x, y: el.y },
         }),
       )
@@ -503,6 +561,10 @@ export function WorkspaceView({
 
     if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElementIds.length > 0) {
       e.preventDefault()
+      // Stop the event reaching DesignCanvas's window-level keydown, which also
+      // handles delete/undo/redo — without this the editor handles the key twice
+      // (delete two history steps, undo twice) when Workspace mounts inside it.
+      e.stopPropagation()
       for (const id of [...selectedElementIds]) {
         try {
           persist(deleteElementCommand({ document, pageId: activePageId, elementId: id }))
@@ -514,11 +576,13 @@ export function WorkspaceView({
 
     if (mod && e.key === 'z' && !e.shiftKey) {
       e.preventDefault()
+      e.stopPropagation()
       if (stack.canUndo()) stack.undo()
       return
     }
     if (mod && ((e.key === 'z' && e.shiftKey) || e.key === 'y')) {
       e.preventDefault()
+      e.stopPropagation()
       if (stack.canRedo()) stack.redo()
       return
     }
@@ -691,12 +755,72 @@ export function WorkspaceView({
     : null
 
   // -------------------------------------------------------------------------
+  // Stable element-handler identities
+  //
+  // WorkspaceView re-renders on every `stack.notify()` (~120/s during a pan or
+  // marquee). The element handlers below are fresh closures each render, so
+  // passing them straight to ElementNode would change every node's props every
+  // frame and defeat React.memo — all N nodes would re-render per pointermove.
+  // We hold the latest closures in a ref and hand ElementNode stable wrappers
+  // (identity fixed for the component's lifetime) that read through the ref, so
+  // memoized nodes see byte-identical handler props frame to frame.
+  // -------------------------------------------------------------------------
+
+  const handlerImplRef = useRef({
+    onClick: handleElementClick,
+    onDragStart: handleElementDragStart,
+    onDragMove: handleElementDragMove,
+    onDragEnd: handleElementDragEnd,
+    onDoubleClick: handleElementDoubleClick,
+  })
+  handlerImplRef.current = {
+    onClick: handleElementClick,
+    onDragStart: handleElementDragStart,
+    onDragMove: handleElementDragMove,
+    onDragEnd: handleElementDragEnd,
+    onDoubleClick: handleElementDoubleClick,
+  }
+
+  const onElementClick = useCallback((id: string) => handlerImplRef.current.onClick(id), [])
+  const onElementDragStart = useCallback((id: string) => handlerImplRef.current.onDragStart(id), [])
+  const onElementDragMove = useCallback(
+    (id: string, dx: number, dy: number) => handlerImplRef.current.onDragMove(id, dx, dy),
+    [],
+  )
+  const onElementDragEnd = useCallback(
+    (id: string, x: number, y: number) => handlerImplRef.current.onDragEnd(id, x, y),
+    [],
+  )
+  const onElementDoubleClick = useCallback((id: string) => handlerImplRef.current.onDoubleClick(id), [])
+
+  // -------------------------------------------------------------------------
+  // Page-bounds viewport culling
+  //
+  // Skip rendering elements whose AABB is FULLY outside the page rect. This is
+  // PAGE-bounds culling, never SCREEN-viewport culling: export.ts rasterizes
+  // whatever nodes are on the stage and crops to the page rect, so a node that
+  // is on-page but off-screen MUST stay mounted or it would silently vanish
+  // from exported PNGs. Only off-page elements (which export never captures)
+  // are dropped. A pinned id (selected or being edited) is never culled so the
+  // transformer/inline editor always has its node, even if dragged off-page.
+  // -------------------------------------------------------------------------
+
+  const visibleElements = useMemo(() => {
+    const pageRect: Bounds = { x: 0, y: 0, width: activePage.width, height: activePage.height }
+    const pinned = new Set<string>(selectedElementIds)
+    if (editingElementId) pinned.add(editingElementId)
+    return activePage.elements.filter(
+      (el) => pinned.has(el.id) || boundsIntersect(elementAabb(el), pageRect),
+    )
+  }, [activePage.elements, activePage.width, activePage.height, selectedElementIds, editingElementId])
+
+  // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
 
   return (
     <div
-      className={`design-canvas-workspace relative overflow-hidden bg-[#1a1a1a] outline-none ${className ?? ''}`}
+      className={`design-canvas-workspace relative overflow-hidden bg-[var(--canvas-backdrop,#1a1a1a)] outline-none ${className ?? ''}`}
       ref={containerRef}
       tabIndex={0}
       onWheel={handleWheel}
@@ -722,6 +846,9 @@ export function WorkspaceView({
             pageHeight={activePage.height}
             gridSize={gridSize}
             zoom={zoom}
+            panX={panX}
+            panY={panY}
+            color={render.grid}
           />
         )}
 
@@ -746,17 +873,18 @@ export function WorkspaceView({
               clipWidth={activePage.width}
               clipHeight={activePage.height}
             >
-              {activePage.elements.map((element) => (
+              {visibleElements.map((element) => (
                 <ElementNode
                   key={element.id}
                   element={element}
                   isSelected={selectedElementIds.includes(element.id)}
                   zoom={zoom}
-                  onClick={handleElementClick}
-                  onDragStart={handleElementDragStart}
-                  onDragMove={handleElementDragMove}
-                  onDragEnd={handleElementDragEnd}
-                  onDoubleClick={handleElementDoubleClick}
+                  render={render}
+                  onClick={onElementClick}
+                  onDragStart={onElementDragStart}
+                  onDragMove={onElementDragMove}
+                  onDragEnd={onElementDragEnd}
+                  onDoubleClick={onElementDoubleClick}
                 />
               ))}
             </Group>
@@ -773,6 +901,7 @@ export function WorkspaceView({
                 activeVertical={activeVerticalGuide}
                 activeHorizontal={activeHorizontalGuide}
                 zoom={zoom}
+                render={render}
               />
             </Group>
           </Layer>
@@ -786,6 +915,7 @@ export function WorkspaceView({
           canWrite={canWrite}
           onTransformEnd={handleTransformEnd}
           pageId={activePageId}
+          render={render}
         />
       </Stage>
 
@@ -888,6 +1018,7 @@ export function Workspace(props: DesignCanvasProps) {
       onApplyOperations={props.onApplyOperations}
       onSelectionChange={props.onSelectionChange}
       className={props.className}
+      render={props.render}
     />
   )
 }

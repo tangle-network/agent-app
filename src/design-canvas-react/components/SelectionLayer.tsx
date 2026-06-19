@@ -42,6 +42,7 @@ import {
 import type { MultiSetAttrsEntry } from '../engine/commands'
 import type { SceneAttrsPatch } from '../../design-canvas/operations'
 import type { SceneElement } from '../../design-canvas/model'
+import { lightTheme, type CanvasRenderPalette } from '../../theme/theme'
 
 export interface SelectionLayerProps {
   /** Konva stage reference to look up selected nodes by name. */
@@ -56,6 +57,8 @@ export interface SelectionLayerProps {
   onTransformEnd(entries: MultiSetAttrsEntry[]): void
   /** Active page id — every entry in onTransformEnd carries this. */
   pageId: string
+  /** Theme render palette. Omitted → light defaults (byte-identical history). */
+  render?: CanvasRenderPalette
 }
 
 const MIN_SIZE = 4
@@ -67,6 +70,7 @@ export function SelectionLayer({
   canWrite,
   onTransformEnd,
   pageId,
+  render = lightTheme.canvasRender,
 }: SelectionLayerProps) {
   const trRef = useRef<Konva.Transformer | null>(null)
 
@@ -112,7 +116,15 @@ export function SelectionLayer({
   const multiSelect = selectedIds.length > 1
 
   return (
-    <Layer name="overlay:selection" listening={false}>
+    // The Layer must participate in the hit graph (listening) or the Transformer
+    // anchors below receive no pointer events and resize/rotate is dead. We scope
+    // listening to canWrite so a read-only canvas stays fully click-through.
+    // Click-through to elements for selection is preserved: this layer paints
+    // only the Transformer, whose anchors are the sole hit targets — empty
+    // regions have no shapes, so pointer hits fall through to the content layer.
+    // Export exclusion is unaffected: export.ts hides nodes by the 'overlay:'
+    // name prefix, not by `listening` (see export-math.isExportHiddenNodeName).
+    <Layer name="overlay:selection" listening={canWrite}>
       <Transformer
         ref={trRef}
         name="overlay:transformer"
@@ -124,6 +136,9 @@ export function SelectionLayer({
         // transformend for fine-grain 5° threshold enforcement.
         rotationSnaps={[0, 45, 90, 135, 180, 225, 270, 315]}
         rotationSnapTolerance={5}
+        borderStroke={render.selectionStroke}
+        anchorStroke={render.selectionStroke}
+        anchorFill={render.selectionAnchorFill}
         // Min size so elements cannot be collapsed.
         boundBoxFunc={(oldBox, newBox) => {
           if (newBox.width < MIN_SIZE || newBox.height < MIN_SIZE) return oldBox

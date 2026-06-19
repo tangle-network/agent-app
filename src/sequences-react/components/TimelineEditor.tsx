@@ -43,6 +43,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import type { DragEvent as ReactDragEvent } from 'react'
 import {
   chooseCaptionPlacement,
+  clampClipStart,
   formatTimecode,
   secondsToFrames,
   trackIntervals,
@@ -77,6 +78,7 @@ import { TimelineTrackRow } from './TimelineTrackRow'
 import { ZoomControl } from './ZoomControl'
 import {
   CaptionPlusGlyph,
+  FilmGlyph,
   MagnetGlyph,
   PauseGlyph,
   PlayGlyph,
@@ -241,6 +243,21 @@ export function TimelineEditor(props: TimelineEditorProps) {
   }, [selectedClips])
 
   const sortedTracks = useMemo(() => [...timeline.tracks].sort((a, b) => a.sortOrder - b.sortOrder), [timeline.tracks])
+  // Chips render track-by-track (sortOrder), clips in array order within a
+  // track — the roving-tabindex walk order and the seed for the lone Tab stop.
+  const orderedClipIds = useMemo(() => {
+    const ids: string[] = []
+    for (const track of sortedTracks) {
+      for (const clip of timeline.clips) {
+        if (clip.trackId === track.id) ids.push(clip.id)
+      }
+    }
+    return ids
+  }, [sortedTracks, timeline.clips])
+  const tabbableClipId = useMemo(() => {
+    const selected = orderedClipIds.find((id) => selectedClipIds.includes(id))
+    return selected ?? orderedClipIds[0] ?? null
+  }, [orderedClipIds, selectedClipIds])
   const clipsByTrack = useMemo(() => {
     const byTrack = new Map<string, SequenceClip[]>()
     for (const clip of timeline.clips) {
@@ -344,6 +361,17 @@ export function TimelineEditor(props: TimelineEditorProps) {
     history.done.pop()
     history.undone.push(entry)
     void onApplyOperations(entry.command.inverseOperations()).catch((error: unknown) => {
+      // The undo's persist rejected: the server still has the command applied,
+      // so the local undo diverged. Re-redo it ONLY when this entry is still the
+      // newest undone edit (mirror commitCommand: still-newest guard); if the
+      // user has since stacked more undo/redo, a local re-redo would corrupt
+      // history — defer to the next server refresh (stack.reset).
+      const mirror = historyRef.current
+      if (mirror.undone[mirror.undone.length - 1] === entry && stack.canRedo()) {
+        stack.redo()
+        mirror.undone.pop()
+        mirror.done.push(entry)
+      }
       setCommitError(error instanceof Error ? error.message : String(error))
     })
   }
@@ -366,6 +394,16 @@ export function TimelineEditor(props: TimelineEditorProps) {
     void onApplyOperations(operations)
       .then((results) => reconcileCreatedClipIds(operations, entry.createdLocalIds, results))
       .catch((error: unknown) => {
+        // The redo's persist rejected: the server does NOT have the command
+        // applied, so the local redo diverged. Re-undo it ONLY when this entry
+        // is still the newest done edit (mirror commitCommand:341); else a local
+        // re-undo would corrupt history — defer to the next server refresh.
+        const mirror = historyRef.current
+        if (mirror.done[mirror.done.length - 1] === entry && stack.canUndo()) {
+          stack.undo()
+          mirror.done.pop()
+          mirror.undone.push(entry)
+        }
         setCommitError(error instanceof Error ? error.message : String(error))
       })
   }
@@ -414,6 +452,54 @@ export function TimelineEditor(props: TimelineEditorProps) {
     const commands = targets.map((clip) => deleteClipCommand({ timeline: current, clipId: clip.id, resolveClipId }))
     commitCommand(commands.length === 1 ? (commands[0] as TimelineCommand) : compositeCommand(`Delete ${commands.length} clips`, commands))
     setSelectedClipIds([])
+  }
+
+  function deleteClip(clipId: string) {
+    const current = stack.getState().timeline
+    const clip = current.clips.find((candidate) => candidate.id === clipId)
+    if (!clip) return
+    const track = current.tracks.find((candidate) => candidate.id === clip.trackId)
+    if (track?.locked) return
+    commitCommand(deleteClipCommand({ timeline: current, clipId, resolveClipId }))
+    setSelectedClipIds((ids) => ids.filter((id) => id !== clipId))
+  }
+
+  function focusStepClip(clipId: string, direction: -1 | 1) {
+    const index = orderedClipIds.indexOf(clipId)
+    if (index === -1) return
+    const nextId = orderedClipIds[index + direction]
+    if (nextId === undefined) return
+    const root = trackViewportRef.current
+    const next = root?.querySelector<HTMLElement>(`[data-clip-id="${CSS.escape(nextId)}"]`)
+    next?.focus()
+  }
+
+  /** Step the playhead by whole frames, clamped to the sequence. The transport
+   *  clock owns the playhead, so this seeks it — frame-accurate, no float drift. */
+  function stepPlayhead(deltaFrames: number) {
+    const max = stack.getState().timeline.sequence.durationFrames - 1
+    const next = Math.max(0, Math.min(max, playheadFrameRef.current + deltaFrames))
+    clock.seek(next)
+  }
+
+  /** Nudge the single selected clip by whole frames through the same optimistic
+   *  move command a pointer drag commits (one undo step per keypress). */
+  function nudgeSelectedClip(deltaFrames: number) {
+    if (!canWrite) return
+    const selectedId = selectedClipIds.length === 1 ? selectedClipIds[0] : undefined
+    if (selectedId === undefined) return
+    const current = stack.getState().timeline
+    const clip = current.clips.find((candidate) => candidate.id === selectedId)
+    if (!clip) return
+    const track = current.tracks.find((candidate) => candidate.id === clip.trackId)
+    if (track?.locked) return
+    const startFrame = clampClipStart({
+      startFrame: clip.startFrame + deltaFrames,
+      durationFrames: clip.durationFrames,
+      sequenceDurationFrames: current.sequence.durationFrames,
+    })
+    if (startFrame === clip.startFrame) return
+    commitCommand(moveClipCommand({ timeline: current, clipId: selectedId, startFrame, resolveClipId }))
   }
 
   const splittableClip =
@@ -526,6 +612,22 @@ export function TimelineEditor(props: TimelineEditorProps) {
         if (!canWrite) return
         event.preventDefault()
         deleteSelection()
+        return
+      }
+      if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !isTypingTarget(event.target)) {
+        const direction = event.key === 'ArrowLeft' ? -1 : 1
+        // Alt+Arrow nudges the selected clip by whole frames (canvas-grain
+        // "move the thing" modifier), one undo step per press.
+        if (event.altKey) {
+          event.preventDefault()
+          nudgeSelectedClip(direction)
+          return
+        }
+        // A focused chip owns plain Arrow to walk focus across the chip set;
+        // the editor only steps the playhead when focus is elsewhere.
+        if (event.target instanceof Element && event.target.closest('[data-clip-id]')) return
+        event.preventDefault()
+        stepPlayhead(direction * (event.shiftKey ? 10 : 1))
         return
       }
       const mod = event.metaKey || event.ctrlKey
@@ -658,7 +760,7 @@ export function TimelineEditor(props: TimelineEditorProps) {
           </div>
 
           {commitError ? (
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-300" role="alert">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.1)] px-3 py-1.5 text-xs text-[var(--text-danger)]" role="alert">
               <span className="min-w-0 truncate">{commitError}</span>
               <button type="button" onClick={() => setCommitError(null)} className="shrink-0 underline-offset-2 hover:underline">
                 Dismiss
@@ -684,6 +786,19 @@ export function TimelineEditor(props: TimelineEditorProps) {
               </div>
 
               <div className="relative">
+                {sortedTracks.length === 0 ? (
+                  <div
+                    data-timeline-empty
+                    className="sticky left-0 flex min-h-[6rem] flex-col items-center justify-center gap-1.5 px-6 py-10 text-center"
+                    style={{ width: '100%' }}
+                  >
+                    <FilmGlyph className="h-6 w-6 text-[var(--text-muted)]" />
+                    <p className="text-sm font-medium text-[var(--text-secondary)]">This sequence has no tracks yet</p>
+                    <p className="max-w-xs text-xs text-[var(--text-muted)]">
+                      Add a video, audio, or caption track to start placing clips.
+                    </p>
+                  </div>
+                ) : null}
                 {sortedTracks.map((track) => (
                   <TimelineTrackRow
                     key={track.id}
@@ -693,12 +808,15 @@ export function TimelineEditor(props: TimelineEditorProps) {
                     zoom={zoom}
                     sequenceDurationFrames={timeline.sequence.durationFrames}
                     selectedClipIds={new Set(selectedClipIds)}
+                    tabbableClipId={tabbableClipId}
                     canWrite={canWrite}
                     frameProvider={frameProvider}
                     snapMove={snapMove}
                     snapEdge={snapEdge}
                     onSnapPointChange={setActiveSnapPoint}
                     onSelectClip={selectClip}
+                    onRequestDeleteClip={deleteClip}
+                    onFocusStepClip={focusStepClip}
                     onCommitMove={handleCommitMove}
                     onCommitTrim={handleCommitTrim}
                     onCommitText={handleCommitText}

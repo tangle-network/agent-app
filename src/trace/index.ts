@@ -15,31 +15,15 @@
  */
 
 export * from './mission-trace'
+export * from './flow-types'
 export * from './mission-flow'
+
+import type { FlowSpan, FlowTrace } from './flow-types'
 
 export interface TimedEvent {
   /** ms since turn start (`_t` stamped by pumpBufferedTurn). */
   t: number
   event: Record<string, unknown>
-}
-
-export interface FlowSpan {
-  kind: 'pipeline' | 'model' | 'tool'
-  name: string
-  startMs: number
-  endMs: number
-  approx?: boolean
-  meta?: Record<string, unknown>
-}
-
-export interface FlowTrace {
-  spans: FlowSpan[]
-  totalMs: number
-  promptTokens: number
-  completionTokens: number
-  /** Computed when per-token pricing is supplied. */
-  costUsd?: number
-  toolCalls: number
 }
 
 /** Parse stored turn-event lines (JSON strings with `_t`) into TimedEvents. */

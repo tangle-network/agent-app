@@ -37,12 +37,17 @@ export interface TimelineTrackRowProps {
   zoom: number
   sequenceDurationFrames: number
   selectedClipIds: ReadonlySet<string>
+  /** The single clip that carries tabIndex 0 (roving tabindex); null seeds the
+   *  first chip in the editor as the lone Tab stop. */
+  tabbableClipId: string | null
   canWrite: boolean
   frameProvider: VideoFrameProvider
   snapMove(candidate: { startFrame: number; durationFrames: number; clipId: string }): { startFrame: number; point: SnapPoint | null }
   snapEdge(candidate: { frame: number; clipId: string }): { frame: number; point: SnapPoint | null }
   onSnapPointChange(point: SnapPoint | null): void
   onSelectClip(clipId: string, additive: boolean): void
+  onRequestDeleteClip(clipId: string): void
+  onFocusStepClip(clipId: string, direction: -1 | 1): void
   onCommitMove(input: ClipMoveCommit): void
   onCommitTrim(input: ClipTrimCommit): void
   onCommitText(input: { clipId: string; text: string }): void
@@ -67,7 +72,7 @@ export function TimelineTrackRow(props: TimelineTrackRowProps) {
       <div className={`sticky left-0 z-10 flex w-36 shrink-0 items-center gap-2 border-r border-[var(--border-default)] bg-[var(--bg-input)] px-2.5 ${laneHeight}`}>
         <Glyph className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--text-secondary)]">{track.name}</span>
-        {track.locked ? <LockGlyph className="h-3 w-3 shrink-0 text-amber-400" /> : null}
+        {track.locked ? <LockGlyph className="h-3 w-3 shrink-0 text-[var(--text-warning)]" /> : null}
         {track.muted ? <MutedGlyph className="h-3 w-3 shrink-0 text-[var(--text-muted)]" /> : null}
       </div>
       <div
@@ -88,11 +93,14 @@ export function TimelineTrackRow(props: TimelineTrackRowProps) {
             sequenceDurationFrames={sequenceDurationFrames}
             selected={props.selectedClipIds.has(clip.id)}
             canWrite={props.canWrite}
+            tabbable={props.tabbableClipId === clip.id}
             frameProvider={props.frameProvider}
             snapMove={props.snapMove}
             snapEdge={props.snapEdge}
             onSnapPointChange={props.onSnapPointChange}
             onSelect={props.onSelectClip}
+            onRequestDelete={props.onRequestDeleteClip}
+            onFocusStep={props.onFocusStepClip}
             onCommitMove={props.onCommitMove}
             onCommitTrim={props.onCommitTrim}
             onCommitText={props.onCommitText}
