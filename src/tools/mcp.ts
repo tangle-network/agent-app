@@ -63,6 +63,72 @@ export function buildHttpMcpServer(opts: BuildHttpMcpServerOptions): AppToolMcpS
   }
 }
 
+/** Options for a per-document/scoped MCP channel entry (design-canvas,
+ *  sequences, …). The capability token + path scope ONE resource; the document
+ *  id lives in the path, never a tool argument. */
+export interface ScopedMcpServerEntryOptions {
+  /** App base URL the sandbox reaches back to (trailing slash tolerated). */
+  baseUrl: string
+  /** Product route serving the resource's MCP handler — id is part of the path. */
+  path: string
+  /** Capability token the product minted for this (user, resource) scope. With
+   *  no token there is no entry to build — omit the server instead. */
+  token: string
+  /** Override the channel's default tool-server description. */
+  description?: string
+  /** Identity headers for products whose route recovers the user via
+   *  `authenticateToolRequest`. Omit when the bearer token is self-contained. */
+  ctx?: AppToolContext
+  headerNames?: ToolHeaderNames
+}
+
+/**
+ * Build the `AgentProfileMcpServer`-shaped entry for a scoped, per-resource MCP
+ * channel. The shared mechanism behind the per-domain entry builders
+ * (`buildDesignCanvasMcpServerEntry`, `buildSequencesMcpServerEntry`): same
+ * token/path guards, same description default, same ctx-vs-self-contained-token
+ * branching. The domain is two parameters — `label` (for guard messages) and
+ * `defaultDescription` — never baked.
+ *
+ * The no-`ctx` branch is a GENUINE behavioral path, not a shortcut: it emits a
+ * self-contained-token entry with ONLY `Authorization` + `Content-Type`.
+ * Routing it through {@link buildHttpMcpServer} would unconditionally write a
+ * `userId` identity header (here `undefined`), so it stays a distinct branch.
+ */
+export function buildScopedMcpServerEntry(
+  opts: ScopedMcpServerEntryOptions & { label: string; defaultDescription: string },
+): AppToolMcpServer {
+  if (opts.token.trim().length === 0) {
+    throw new Error(`${opts.label} requires a capability token — omit the MCP server when none is available`)
+  }
+  if (!opts.path.startsWith('/')) {
+    throw new Error(`${opts.label} path must start with "/" (got "${opts.path}")`)
+  }
+  const description = opts.description ?? opts.defaultDescription
+
+  if (opts.ctx) {
+    return buildHttpMcpServer({
+      path: opts.path,
+      baseUrl: opts.baseUrl,
+      token: opts.token,
+      ctx: opts.ctx,
+      description,
+      headerNames: opts.headerNames ?? DEFAULT_HEADER_NAMES,
+    })
+  }
+
+  return {
+    transport: 'http',
+    url: `${opts.baseUrl.replace(/\/+$/, '')}${opts.path}`,
+    headers: {
+      Authorization: `Bearer ${opts.token}`,
+      'Content-Type': 'application/json',
+    },
+    enabled: true,
+    metadata: { description },
+  }
+}
+
 export interface BuildMcpServerOptions {
   tool: AppToolName
   baseUrl: string
