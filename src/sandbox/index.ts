@@ -119,6 +119,8 @@ export interface SandboxRuntimeConfig {
   bootstrap?: (box: SandboxInstance, scope: SandboxScope) => Promise<Outcome<void>>
   // Reuse health gate + sidecar liveness probe.
   livenessProbe?: LivenessProbeConfig
+  // Enable browser terminal endpoints on newly-created sandboxes.
+  webTerminalEnabled?: boolean
   // default true: try stopped-resume before create.
   resumeStopped?: boolean
   // default false: bake resolveModel() into backend.model at create.
@@ -277,6 +279,41 @@ async function isBoxAlive(
   }
 }
 
+const RUNTIME_CONNECTION_WAIT_MS = 30_000
+const RUNTIME_CONNECTION_POLL_MS = 1_000
+
+function sandboxRuntimeUrl(box: SandboxInstance): string | undefined {
+  const connection = box.connection as { runtimeUrl?: string; sidecarUrl?: string } | null | undefined
+  return connection?.sidecarUrl ?? connection?.runtimeUrl
+}
+
+function sandboxEdgeFailed(box: SandboxInstance): boolean {
+  const connection = box.connection as { edgeStatus?: string; edgeError?: unknown } | null | undefined
+  return connection?.edgeStatus === 'failed' || Boolean(connection?.edgeError)
+}
+
+async function refreshRuntimeConnection(
+  client: Sandbox,
+  box: SandboxInstance,
+): Promise<SandboxInstance> {
+  let current = box
+  if (sandboxRuntimeUrl(current)) return current
+
+  const deadline = Date.now() + RUNTIME_CONNECTION_WAIT_MS
+  while (Date.now() < deadline) {
+    await current.refresh()
+    if (sandboxRuntimeUrl(current)) return current
+
+    const latest = await client.get(current.id)
+    if (latest) current = latest
+    if (sandboxRuntimeUrl(current)) return current
+
+    await new Promise((resolve) => setTimeout(resolve, RUNTIME_CONNECTION_POLL_MS))
+  }
+
+  return current
+}
+
 // Resume a name-matched stopped box and wait for it to reach running. Returns
 // ok(null) when no stopped box matches the name.
 async function resumeStoppedBox(
@@ -318,17 +355,30 @@ export async function ensureWorkspaceSandbox(
       if (!dropped.succeeded) {
         throw new Error(`forceNew: sandbox ${name} could not be deleted`, { cause: dropped.error })
       }
-    } else if (
-      found.metadata?.harness === harness &&
-      (await isBoxAlive(found, harness, shell.livenessProbe))
-    ) {
-      if (shell.bootstrap) {
-        const boot = await shell.bootstrap(found, scope)
-        if (!boot.succeeded) {
-          throw new Error(`bootstrap failed on reused box ${name}`, { cause: boot.error })
+    } else if (found.metadata?.harness === harness) {
+      const ready = await refreshRuntimeConnection(client, found)
+      if (
+        sandboxEdgeFailed(ready) ||
+        (sandboxRuntimeUrl(ready) && !(await isBoxAlive(ready, harness, shell.livenessProbe)))
+      ) {
+        const dropped = await deleteBox(ready)
+        if (!dropped.succeeded) {
+          throw new Error(
+            `sandbox ${name} ` +
+              `(was ${String(found.metadata?.harness ?? 'unknown')}, want ${harness}, or unresponsive) ` +
+              `could not be deleted`,
+            { cause: dropped.error },
+          )
         }
+      } else {
+        if (shell.bootstrap) {
+          const boot = await shell.bootstrap(ready, scope)
+          if (!boot.succeeded) {
+            throw new Error(`bootstrap failed on reused box ${name}`, { cause: boot.error })
+          }
+        }
+        return ready
       }
-      return found
     } else {
       const dropped = await deleteBox(found)
       if (!dropped.succeeded) {
@@ -345,19 +395,30 @@ export async function ensureWorkspaceSandbox(
   // Stage 2 — stopped-box resume (skipped on forceNew or resumeStopped===false).
   if (!forceNew && shell.resumeStopped !== false) {
     const resumed = await resumeStoppedBox(client, name, resumeTimeout)
-    if (
-      resumed.succeeded &&
-      resumed.value &&
-      (await isBoxAlive(resumed.value, harness, shell.livenessProbe))
-    ) {
-      const box = resumed.value
-      if (shell.bootstrap) {
-        const boot = await shell.bootstrap(box, scope)
-        if (!boot.succeeded) {
-          throw new Error(`bootstrap failed on resumed box ${name}`, { cause: boot.error })
+    if (resumed.succeeded && resumed.value) {
+      const box = await refreshRuntimeConnection(client, resumed.value)
+      if (
+        sandboxEdgeFailed(box) ||
+        (sandboxRuntimeUrl(box) && !(await isBoxAlive(box, harness, shell.livenessProbe)))
+      ) {
+        const dropped = await deleteBox(box)
+        if (!dropped.succeeded) {
+          throw new Error(
+            `resumed sandbox ${name} ` +
+              `(was ${String(box.metadata?.harness ?? 'unknown')}, want ${harness}, or unresponsive) ` +
+              `could not be deleted`,
+            { cause: dropped.error },
+          )
         }
+      } else {
+        if (shell.bootstrap) {
+          const boot = await shell.bootstrap(box, scope)
+          if (!boot.succeeded) {
+            throw new Error(`bootstrap failed on resumed box ${name}`, { cause: boot.error })
+          }
+        }
+        return box
       }
-      return box
     }
   }
 
@@ -404,6 +465,7 @@ export async function ensureWorkspaceSandbox(
     backend: { type: harness, profile, ...(model ? { model } : {}) },
     ...(storage ? { storage } : {}),
     ...(restore ? restore : {}),
+    ...(shell.webTerminalEnabled ? { webTerminalEnabled: true } : {}),
     maxLifetimeSeconds: resources.maxLifetimeSeconds,
     idleTimeoutSeconds: resources.idleTimeoutSeconds,
     resources: {
@@ -413,10 +475,10 @@ export async function ensureWorkspaceSandbox(
     },
   } as CreatePayload
 
-  const box = await client.create(payload)
+  let box = await client.create(payload)
 
   await box.waitFor('running', { timeoutMs: 120_000 })
-  if (!box.connection?.runtimeUrl) await box.refresh()
+  box = await refreshRuntimeConnection(client, box)
 
   if (shell.bootstrap) {
     const boot = await shell.bootstrap(box, scope)
@@ -787,94 +849,6 @@ export async function driveSandboxTurn(
   }
 }
 
-// Terminal-proxy HMAC token. Identity tuple is generic; the secret comes from a
-// closure (fail-loud if absent).
-export interface TerminalProxyIdentity {
-  userId: string
-  workspaceId: string
-  sandboxId: string
-}
-
-const TERMINAL_PROXY_TOKEN_TTL_MS = 15 * 60 * 1000
-
-async function signTerminalProxyToken(secret: string, encodedPayload: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  )
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(encodedPayload))
-  return base64UrlEncodeBytes(new Uint8Array(sig))
-}
-
-export async function mintTerminalProxyToken(
-  secret: string,
-  identity: TerminalProxyIdentity,
-  ttlMs = TERMINAL_PROXY_TOKEN_TTL_MS,
-): Promise<Outcome<{ token: string; expiresAt: Date }>> {
-  if (!secret) return fail(new Error('mintTerminalProxyToken: secret is required'))
-  if (!identity.userId || !identity.workspaceId || !identity.sandboxId) {
-    return fail(new Error('mintTerminalProxyToken: userId/workspaceId/sandboxId are required'))
-  }
-  const expiresAt = new Date(Date.now() + ttlMs)
-  const payload = { ...identity, exp: Math.floor(expiresAt.getTime() / 1000) }
-  const encoded = base64UrlEncodeUtf8(JSON.stringify(payload))
-  const sig = await signTerminalProxyToken(secret, encoded)
-  return ok({ token: `${encoded}.${sig}`, expiresAt })
-}
-
-export async function verifyTerminalProxyToken(
-  secret: string,
-  token: string,
-  expected: TerminalProxyIdentity,
-): Promise<boolean> {
-  if (!secret) return false
-  const [encoded, sig, extra] = token.split('.')
-  if (!encoded || !sig || extra !== undefined) return false
-  const expectedSig = await signTerminalProxyToken(secret, encoded)
-  if (!constantTimeEqual(sig, expectedSig)) return false
-  let payload: TerminalProxyIdentity & { exp: number }
-  try {
-    payload = JSON.parse(base64UrlDecodeUtf8(encoded))
-  } catch {
-    return false
-  }
-  return (
-    payload.userId === expected.userId &&
-    payload.workspaceId === expected.workspaceId &&
-    payload.sandboxId === expected.sandboxId &&
-    Number.isFinite(payload.exp) &&
-    payload.exp > Math.floor(Date.now() / 1000)
-  )
-}
-
-function base64UrlEncodeBytes(bytes: Uint8Array): string {
-  let bin = ''
-  for (const b of bytes) bin += String.fromCharCode(b)
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-function base64UrlEncodeUtf8(v: string): string {
-  return base64UrlEncodeBytes(new TextEncoder().encode(v))
-}
-
-function base64UrlDecodeUtf8(v: string): string {
-  const padded = v.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(v.length / 4) * 4, '=')
-  const bin = atob(padded)
-  const bytes = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i)
-  return new TextDecoder().decode(bytes)
-}
-
-function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  let r = 0
-  for (let i = 0; i < a.length; i += 1) r |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  return r === 0
-}
-
 // Severed-stream classifier. Generic to any router-backed harness: a final step
 // that finished with error/other/unknown is a truncated turn, not a completed one.
 const SEVERED_FINISH_REASONS = new Set(['error', 'other', 'unknown'])
@@ -943,4 +917,5 @@ function firstQuestionText(value: Record<string, unknown> | null): string {
 }
 // Workspace sandbox terminal handlers: WebSocket upgrade proxy, connection
 // + runtime-proxy handlers, and scoped terminal-token mint/verify.
+export * from './terminal-proxy-token'
 export * from './workspace-terminal'

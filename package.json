@@ -152,11 +152,6 @@
       "import": "./dist/missions/index.js",
       "default": "./dist/missions/index.js"
     },
-    "./sandbox": {
-      "types": "./dist/sandbox/index.d.ts",
-      "import": "./dist/sandbox/index.js",
-      "default": "./dist/sandbox/index.js"
-    },
     "./web": {
       "types": "./dist/web/index.d.ts",
       "import": "./dist/web/index.js",
@@ -231,7 +226,7 @@
     "@tangle-network/agent-integrations": "^0.32.0",
     "@tangle-network/agent-runtime": "^0.52.0",
     "@tangle-network/agent-knowledge": "^1.5.2",
-    "@tangle-network/sandbox": "^0.4.4",
+    "@tangle-network/sandbox": "^0.6.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@types/better-sqlite3": "^7.6.13",
