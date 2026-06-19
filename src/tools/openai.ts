@@ -1,4 +1,4 @@
-import type { AppToolTaxonomy } from './types'
+import type { AppToolTaxonomy, BuildAppToolsOptions } from './types'
 
 /** The four canonical app-tool names. Stable identifiers the model calls in
  *  both the sandbox (MCP server name) and runtime (function-tool name) paths. */
@@ -24,16 +24,25 @@ export interface OpenAIFunctionTool {
 
 /**
  * Build the four app tools in OpenAI function-tool shape. `submit_proposal`'s
- * `type` enum is the product's {@link AppToolTaxonomy.proposalTypes}; the other
- * three are fixed. Pass the result to the agent-runtime backend's `tools`.
+ * `type` enum is the product's {@link AppToolTaxonomy.proposalTypes}; the
+ * model-facing descriptions and the follow-up priority enum default to the
+ * Tangle reference vocabulary and can be retuned via {@link BuildAppToolsOptions}
+ * (the tool names + JSON-Schema shapes stay fixed — they are mechanism). Pass
+ * the result to the agent-runtime backend's `tools`.
  */
-export function buildAppToolOpenAITools(taxonomy: AppToolTaxonomy): OpenAIFunctionTool[] {
+export function buildAppToolOpenAITools(
+  taxonomy: AppToolTaxonomy,
+  opts?: BuildAppToolsOptions,
+): OpenAIFunctionTool[] {
+  const d = opts?.descriptions
+  const priorityValues = opts?.priorityValues ?? ['low', 'medium', 'high']
   return [
     {
       type: 'function',
       function: {
         name: 'submit_proposal',
         description:
+          d?.submit_proposal ??
           'Route a regulated or state-changing action to a human for approval (a recommendation, contacting/soliciting a contact, outreach, a record/account change, scheduling). Queues it for a named certified human to approve before it executes.',
         parameters: {
           type: 'object',
@@ -50,13 +59,15 @@ export function buildAppToolOpenAITools(taxonomy: AppToolTaxonomy): OpenAIFuncti
       type: 'function',
       function: {
         name: 'schedule_followup',
-        description: 'Register a dated cadence step (a reminder, chase, or check-in) on the follow-up calendar. Executes immediately.',
+        description:
+          d?.schedule_followup ??
+          'Register a dated cadence step (a reminder, chase, or check-in) on the follow-up calendar. Executes immediately.',
         parameters: {
           type: 'object',
           properties: {
             title: { type: 'string' },
             dueDate: { type: 'string', description: 'ISO date YYYY-MM-DD.' },
-            priority: { type: 'string', enum: ['low', 'medium', 'high'] },
+            priority: { type: 'string', enum: [...priorityValues] },
           },
           required: ['title', 'dueDate'],
         },
@@ -66,7 +77,9 @@ export function buildAppToolOpenAITools(taxonomy: AppToolTaxonomy): OpenAIFuncti
       type: 'function',
       function: {
         name: 'render_ui',
-        description: 'Show a generated view live in the workspace. Validates the OpenUI JSON and persists the artifact. Executes immediately.',
+        description:
+          d?.render_ui ??
+          'Show a generated view live in the workspace. Validates the OpenUI JSON and persists the artifact. Executes immediately.',
         parameters: {
           type: 'object',
           properties: {
@@ -81,7 +94,9 @@ export function buildAppToolOpenAITools(taxonomy: AppToolTaxonomy): OpenAIFuncti
       type: 'function',
       function: {
         name: 'add_citation',
-        description: 'Anchor a grounding reference: the exact quote from a file backing a figure or claim. Verifies the quote appears in the file. Executes immediately.',
+        description:
+          d?.add_citation ??
+          'Anchor a grounding reference: the exact quote from a file backing a figure or claim. Verifies the quote appears in the file. Executes immediately.',
         parameters: {
           type: 'object',
           properties: {

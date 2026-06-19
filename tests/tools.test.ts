@@ -65,6 +65,28 @@ describe('buildAppToolOpenAITools', () => {
     const proposal = tools[0]!.function.parameters as { properties: { type: { enum: string[] } } }
     expect(proposal.properties.type.enum).toEqual(['recommend', 'contact', 'research', 'other'])
   })
+
+  it('uses the baked reference descriptions and priority enum by default', () => {
+    const tools = buildAppToolOpenAITools(taxonomy)
+    expect(tools[2]!.function.description).toContain('OpenUI JSON')
+    expect(tools[3]!.function.description).toContain('grounding reference')
+    const followup = tools[1]!.function.parameters as { properties: { priority: { enum: string[] } } }
+    expect(followup.properties.priority.enum).toEqual(['low', 'medium', 'high'])
+  })
+
+  it('lets a product retune model-facing prose + priority vocabulary without forking', () => {
+    const tools = buildAppToolOpenAITools(taxonomy, {
+      descriptions: { render_ui: 'Render a dashboard tile.', add_citation: 'Cite a knowledge-base passage.' },
+      priorityValues: ['p0', 'p1', 'p2'] as const,
+    })
+    expect(tools[2]!.function.description).toBe('Render a dashboard tile.')
+    expect(tools[3]!.function.description).toBe('Cite a knowledge-base passage.')
+    // Un-overridden tools keep their defaults; names + schema shapes are untouched.
+    expect(tools[0]!.function.description).toContain('regulated')
+    expect(tools.map((t) => t.function.name)).toEqual(['submit_proposal', 'schedule_followup', 'render_ui', 'add_citation'])
+    const followup = tools[1]!.function.parameters as { properties: { priority: { enum: string[] } } }
+    expect(followup.properties.priority.enum).toEqual(['p0', 'p1', 'p2'])
+  })
 })
 
 describe('isAppToolName', () => {

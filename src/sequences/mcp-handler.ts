@@ -23,10 +23,10 @@ import type { SequenceMcpToolEnv } from './mcp-tools'
 import { createMcpToolHandler } from '../tools/mcp-rpc'
 import type { McpToolDefinition } from '../tools/mcp-rpc'
 
-/** Newest first. The handler echoes the client's requested version when
- *  supported, else answers with the newest it speaks (per MCP negotiation the
- *  client then disconnects if it cannot use it). */
-export const SEQUENCES_MCP_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'] as const
+/** The supported MCP protocol versions are an envelope-level (engine) concern
+ *  owned by the shared `createMcpToolHandler`. Re-exported under the historical
+ *  name to keep the public surface stable without a second source of truth. */
+export { MCP_PROTOCOL_VERSIONS as SEQUENCES_MCP_PROTOCOL_VERSIONS } from '../tools/mcp-rpc'
 
 export interface SequencesMcpServerInfo {
   name: string

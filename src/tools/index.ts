@@ -35,10 +35,12 @@ export { handleAppToolRequest, type HandleToolRequestOptions } from './http'
 export {
   buildHttpMcpServer,
   buildAppToolMcpServer,
+  buildScopedMcpServerEntry,
   DEFAULT_APP_TOOL_PATHS,
   type AppToolMcpServer,
   type BuildHttpMcpServerOptions,
   type BuildMcpServerOptions,
+  type ScopedMcpServerEntryOptions,
 } from './mcp'
 export {
   createMcpToolHandler,
@@ -51,6 +53,7 @@ export {
 export type {
   AppToolContext,
   AppToolTaxonomy,
+  BuildAppToolsOptions,
   AppToolHandlers,
   AppToolProducedEvent,
   AppToolOutcome,

@@ -40,6 +40,18 @@ export interface AppToolTaxonomy {
   regulatedTypes: readonly string[]
 }
 
+/** Optional overrides for {@link buildAppToolOpenAITools}. The tool NAMES and
+ *  JSON-Schema parameter shapes are mechanism (stable identifiers the model and
+ *  both transports rely on); the model-facing PROSE and the follow-up priority
+ *  vocabulary are domain — a product with no vault/contacts/OpenUI can retune
+ *  them here instead of forking the shell. Omit for the defaults. */
+export interface BuildAppToolsOptions {
+  /** Override the model-facing description of any of the four tools. */
+  descriptions?: Partial<Record<'submit_proposal' | 'schedule_followup' | 'render_ui' | 'add_citation', string>>
+  /** The `schedule_followup.priority` enum (defaults to `['low','medium','high']`). */
+  priorityValues?: readonly string[]
+}
+
 export interface SubmitProposalArgs {
   type: string
   title: string
