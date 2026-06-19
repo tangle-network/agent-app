@@ -15,6 +15,11 @@ import {
   type ToolHeaderNames,
 } from '../tools/index'
 import { assertHarnessModelCompatible, type Harness } from '../harness/index'
+import {
+  resolveTangleExecutionEnvironment,
+  trimOrNull,
+  type TangleExecutionEnvironment,
+} from '../runtime/model'
 
 export type Outcome<T> =
   | { succeeded: true; value: T }
@@ -31,11 +36,12 @@ export interface SandboxClientCredentials {
   baseUrl: string
 }
 
-export type SandboxCredentialEnvironment =
-  | 'development'
-  | 'test'
-  | 'staging'
-  | 'production'
+/**
+ * Sandbox credential policy reuses the canonical execution-environment union
+ * (development/test/staging/production) so env classification stays in one place
+ * (see resolveTangleExecutionEnvironment in runtime/model).
+ */
+export type SandboxCredentialEnvironment = TangleExecutionEnvironment
 
 export interface ResolveSandboxClientCredentialsOptions {
   /**
@@ -87,45 +93,12 @@ const DEFAULT_SANDBOX_DIRECT_KEY_NAMES = [
 ] as const
 const DEFAULT_SANDBOX_BASE_URL_NAMES = ['SANDBOX_GATEWAY_URL', 'SANDBOX_API_URL'] as const
 
-function trimOrNull(value: string | undefined): string | null {
-  const trimmed = value?.trim()
-  return trimmed ? trimmed : null
-}
-
 function normalizeBaseUrl(value: string): string {
   return value.trim().replace(/\/v1\/?$/, '').replace(/\/+$/, '')
 }
 
-function normalizeSandboxCredentialEnvironment(
-  value: string | undefined,
-): SandboxCredentialEnvironment | null {
-  switch (value?.trim().toLowerCase()) {
-    case 'local':
-    case 'dev':
-    case 'development':
-      return 'development'
-    case 'test':
-      return 'test'
-    case 'staging':
-      return 'staging'
-    case 'prod':
-    case 'production':
-      return 'production'
-    default:
-      return null
-  }
-}
-
 function processEnv(): Record<string, string | undefined> {
   return typeof process === 'undefined' ? {} : process.env
-}
-
-export function resolveSandboxCredentialEnvironment(
-  env: Record<string, string | undefined> = processEnv(),
-): SandboxCredentialEnvironment {
-  return normalizeSandboxCredentialEnvironment(env.APP_ENV)
-    ?? normalizeSandboxCredentialEnvironment(env.NODE_ENV)
-    ?? 'production'
 }
 
 function directEnvCredentialsAllowed(
@@ -174,7 +147,7 @@ export async function resolveSandboxClientCredentials(
   options: ResolveSandboxClientCredentialsOptions = {},
 ): Promise<SandboxClientCredentials> {
   const env = options.env ?? processEnv()
-  const environment = options.environment ?? resolveSandboxCredentialEnvironment(env)
+  const environment = options.environment ?? resolveTangleExecutionEnvironment(env)
   const keyNames = options.directKeyNames ?? DEFAULT_SANDBOX_DIRECT_KEY_NAMES
   const baseUrlNames = options.baseUrlNames ?? DEFAULT_SANDBOX_BASE_URL_NAMES
   const directAllowed = directEnvCredentialsAllowed(environment, options.allowDirectEnvCredentials)

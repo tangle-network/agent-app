@@ -6,9 +6,14 @@
  * it survives bundlers duplicating module instances.
  */
 
-import { resolveTangleExecutionEnvironment, type TangleExecutionEnvironment } from '../runtime/model'
+import {
+  resolveTangleDevOrUserKey,
+  type TangleExecutionEnvironment,
+  type TangleExecutionKeySource,
+} from '../runtime/model'
 
-export type TangleHubBearerSource = 'local-env' | 'user'
+/** Hub bearer provenance mirrors the execution-key source union. */
+export type TangleHubBearerSource = TangleExecutionKeySource
 
 export interface ResolvedTangleHubBearer {
   bearer: string
@@ -32,11 +37,6 @@ export interface ResolveUserTangleHubBearerForUserOptions<UserId = string> {
   getUserApiKey: (userId: UserId) => string | null | undefined | Promise<string | null | undefined>
 }
 
-function trimOrNull(value: string | null | undefined): string | null {
-  const trimmed = value?.trim()
-  return trimmed ? trimmed : null
-}
-
 export class TangleBearerMissingError extends Error {
   constructor(readonly userId: string) {
     super(`No Tangle platform link for user ${userId}`)
@@ -54,16 +54,12 @@ export class TangleBearerMissingError extends Error {
 export async function resolveUserTangleHubBearer(
   opts: ResolveUserTangleHubBearerOptions,
 ): Promise<ResolvedTangleHubBearer> {
-  const env = opts.env ?? (process.env as Record<string, string | undefined>)
-  const environment = opts.environment ?? resolveTangleExecutionEnvironment(env)
-
-  if (environment === 'development') {
-    const bearer = trimOrNull(env.TANGLE_API_KEY)
-    if (bearer) return { bearer, source: 'local-env' }
-  }
-
-  const bearer = trimOrNull(await opts.getUserApiKey())
-  if (bearer) return { bearer, source: 'user' }
+  const resolved = await resolveTangleDevOrUserKey({
+    environment: opts.environment,
+    env: opts.env,
+    getUserApiKey: opts.getUserApiKey,
+  })
+  if (resolved) return { bearer: resolved.apiKey, source: resolved.source }
 
   throw new TangleBearerMissingError(opts.userId)
 }

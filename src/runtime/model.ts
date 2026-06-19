@@ -51,6 +51,15 @@ export interface ResolvedTangleExecutionKey {
   source: TangleExecutionKeySource
 }
 
+export interface ResolveTangleDevOrUserKeyOptions {
+  /** Deployment context. Only local development may use the env key. */
+  environment?: TangleExecutionEnvironment
+  /** Env to read for the local-development fallback. */
+  env?: Record<string, string | undefined>
+  /** App-owned lookup for the caller's linked platform API key. */
+  getUserApiKey: () => string | null | undefined | Promise<string | null | undefined>
+}
+
 export interface TangleExecutionKeyHttpError {
   status: number
   body: {
@@ -84,7 +93,7 @@ function requireEnv(env: Record<string, string | undefined>, name: string): stri
   return value
 }
 
-function trimOrNull(value: string | null | undefined): string | null {
+export function trimOrNull(value: string | null | undefined): string | null {
   const trimmed = value?.trim()
   return trimmed ? trimmed : null
 }
@@ -161,6 +170,29 @@ export function tangleExecutionKeyHttpError(error: unknown): TangleExecutionKeyH
 }
 
 /**
+ * Shared dev-aware Tangle key resolution. Local development may use a server
+ * `TANGLE_API_KEY`; otherwise the caller's linked platform key is used. Returns
+ * null when neither resolves, so each caller can throw its own domain error
+ * (e.g. model-execution 503/401 vs hub `tangle_link_required` 412).
+ */
+export async function resolveTangleDevOrUserKey(
+  opts: ResolveTangleDevOrUserKeyOptions,
+): Promise<ResolvedTangleExecutionKey | null> {
+  const env = opts.env ?? (process.env as Record<string, string | undefined>)
+  const environment = opts.environment ?? resolveTangleExecutionEnvironment(env)
+
+  if (environment === 'development') {
+    const apiKey = trimOrNull(env.TANGLE_API_KEY)
+    if (apiKey) return { apiKey, source: 'local-env' }
+  }
+
+  const apiKey = trimOrNull(await opts.getUserApiKey())
+  if (apiKey) return { apiKey, source: 'user' }
+
+  return null
+}
+
+/**
  * Resolve the user-facing Tangle API key for model execution.
  *
  * Local development may use a server env key so apps remain easy to run.
@@ -173,13 +205,8 @@ export async function resolveUserTangleExecutionKey(
   const env = opts.env ?? (process.env as Record<string, string | undefined>)
   const environment = opts.environment ?? resolveTangleExecutionEnvironment(env)
 
-  if (environment === 'development') {
-    const apiKey = trimOrNull(env.TANGLE_API_KEY)
-    if (apiKey) return { apiKey, source: 'local-env' }
-  }
-
-  const apiKey = trimOrNull(await opts.getUserApiKey())
-  if (apiKey) return { apiKey, source: 'user' }
+  const resolved = await resolveTangleDevOrUserKey({ environment, env, getUserApiKey: opts.getUserApiKey })
+  if (resolved) return resolved
 
   if (environment === 'development') {
     throw new TangleExecutionKeyError(

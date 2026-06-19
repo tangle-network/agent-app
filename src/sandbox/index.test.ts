@@ -41,7 +41,6 @@ import {
   mintSandboxScopedToken,
   mintTerminalProxyToken,
   verifyTerminalProxyToken,
-  resolveSandboxCredentialEnvironment,
   resolveSandboxClientCredentials,
   classifySeveredStream,
   detectInteractiveQuestion,
@@ -57,6 +56,7 @@ import {
   type SandboxRuntimeConfig,
   type SecretStore,
 } from './index'
+import { resolveTangleExecutionEnvironment } from '../runtime/model'
 import type {
   AgentProfile,
   AgentProfileFileMount,
@@ -132,10 +132,10 @@ describe('getClient credential-fingerprint cache', () => {
 
 describe('resolveSandboxClientCredentials', () => {
   it('classifies local/test envs as direct-env capable and unknown envs as production-safe', () => {
-    expect(resolveSandboxCredentialEnvironment({ APP_ENV: 'local' })).toBe('development')
-    expect(resolveSandboxCredentialEnvironment({ NODE_ENV: 'test' })).toBe('test')
-    expect(resolveSandboxCredentialEnvironment({ APP_ENV: 'preview' })).toBe('production')
-    expect(resolveSandboxCredentialEnvironment({})).toBe('production')
+    expect(resolveTangleExecutionEnvironment({ APP_ENV: 'local' })).toBe('development')
+    expect(resolveTangleExecutionEnvironment({ NODE_ENV: 'test' })).toBe('test')
+    expect(resolveTangleExecutionEnvironment({ APP_ENV: 'preview' })).toBe('production')
+    expect(resolveTangleExecutionEnvironment({})).toBe('production')
   })
 
   it('uses direct env credentials in local development without calling provision', async () => {
