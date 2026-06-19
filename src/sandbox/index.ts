@@ -405,12 +405,21 @@ async function refreshRuntimeConnection(
 
   const deadline = Date.now() + RUNTIME_CONNECTION_WAIT_MS
   while (Date.now() < deadline) {
-    await current.refresh()
-    if (sandboxRuntimeUrl(current)) return current
+    // Tolerate transient refresh/get failures (5xx, network blips) while the
+    // orchestrator is still attaching the connection: swallow and retry. A box
+    // that never surfaces a runtime URL is returned as-is so the caller's
+    // readiness gate (isReusableBox) drops and recreates it — rather than this
+    // poll throwing a hard provisioning failure on a recoverable hiccup.
+    try {
+      await current.refresh()
+      if (sandboxRuntimeUrl(current)) return current
 
-    const latest = await client.get(current.id)
-    if (latest) current = latest
-    if (sandboxRuntimeUrl(current)) return current
+      const latest = await client.get(current.id)
+      if (latest) current = latest
+      if (sandboxRuntimeUrl(current)) return current
+    } catch {
+      // transient — fall through to the poll delay and retry
+    }
 
     await new Promise((resolve) => setTimeout(resolve, RUNTIME_CONNECTION_POLL_MS))
   }

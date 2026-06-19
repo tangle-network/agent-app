@@ -276,6 +276,37 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
       vi.useRealTimers()
     }
   })
+
+  it('recreates instead of hard-failing when refresh/get throw during the readiness poll', async () => {
+    vi.useFakeTimers()
+    try {
+      const del = vi.fn().mockResolvedValue(undefined)
+      // A harness-matched running box with no connection whose refresh + get
+      // keep throwing (transient 5xx / network blip). The poll must swallow and
+      // retry, then fall through to recreate — not surface a hard failure.
+      const flaky = fakeBox({
+        name: 'box-w1',
+        metadata: { harness: 'opencode' },
+        connection: undefined,
+        delete: del,
+        refresh: vi.fn().mockRejectedValue(new Error('transient 5xx')),
+      })
+      listMock.mockImplementation(({ status }: { status: string }) =>
+        status === 'running' ? Promise.resolve([flaky]) : Promise.resolve([]),
+      )
+      getMock.mockRejectedValue(new Error('transient 5xx'))
+      createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
+
+      const promise = ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
+      await vi.advanceTimersByTimeAsync(31_000)
+
+      await expect(promise).resolves.toBeDefined()
+      expect(del).toHaveBeenCalledOnce()
+      expect(createMock).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('buildAppToolMcpServers', () => {
