@@ -10,6 +10,7 @@ import {
   type StorageConfig,
   type PromptResult,
 } from '@tangle-network/sandbox'
+import { createHash } from 'node:crypto'
 import {
   buildAppToolMcpServer,
   type AppToolName,
@@ -524,10 +525,10 @@ const PROFILE_WRITE_B64_CHUNK_CHARS = 3000
 // hard-throttles (HTTP 429 after ~21 execs in ~34s) and, under sustained load,
 // SILENTLY HANGS instead of returning 429 — one parked exec wedges the channel
 // and `writeProfileFilesToBox` never returns, so `ensureWorkspaceSandbox`
-// parks the worker (~140s, no exception). Both failure shapes are transient:
-// retry the SAME exec with exponential backoff before failing loud. A non-429,
-// non-timeout error fails loud immediately; a non-zero exit is a real command
-// failure, never retried.
+// parks the worker (~140s, no exception). These failures plus sidecar exec-plane
+// readiness/transport failures (5xx, reset, fetch/network errors) are transient:
+// retry the SAME exec with exponential backoff before failing loud. A non-zero
+// exit is a real command failure, never retried.
 const PROFILE_WRITE_MAX_RETRIES = 4
 const PROFILE_WRITE_RETRY_BASE_MS = 250
 const PROFILE_WRITE_RETRY_MAX_MS = 2000
@@ -591,25 +592,66 @@ function execWithTimeout(
   })
 }
 
-// Classify an exec failure as transient-retryable. Two shapes are transient and
-// share the backoff path: (1) a rate-limit (HTTP 429) the proxy surfaces as a
-// SandboxError-shaped object (status/code/retryAfterMs) or a thrown error whose
-// message carries the 429; (2) a client-side per-exec timeout, i.e. a wedged/
-// hung proxy exec abandoned by execWithTimeout. Everything else fails loud.
+const TRANSIENT_EXEC_STATUS_CODES = new Set([408, 409, 425, 429, 500, 502, 503, 504])
+const TRANSIENT_EXEC_CODE_RE = /^(ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|ECONNABORTED)$/i
+const TRANSIENT_EXEC_MESSAGE_RE =
+  /\b(408|409|425|429|500|502|503|504)\b|rate.?limit|too many requests|\bfetch failed\b|network error|connection reset|socket hang up|timed? out|service unavailable|bad gateway|gateway timeout|internal server error|\b(?:sidecar|runtime|exec(?:ution)?|terminal|sandbox|service|command(?:s)?|proxy)\b.{0,80}\bnot ready\b|\bnot ready\b.{0,80}\b(?:sidecar|runtime|exec(?:ution)?|terminal|sandbox|service|command(?:s)?|proxy)\b/i
+
+function errorStatus(err: { status?: unknown; statusCode?: unknown; response?: unknown }): number | undefined {
+  const rawStatus = err.status ?? err.statusCode ?? (
+    err.response && typeof err.response === 'object'
+      ? (err.response as { status?: unknown }).status
+      : undefined
+  )
+  if (typeof rawStatus === 'number') return rawStatus
+  if (typeof rawStatus === 'string' && /^\d+$/.test(rawStatus)) return Number(rawStatus)
+  return undefined
+}
+
+function retryAfterMs(err: unknown, seen = new Set<object>()): number | undefined {
+  if (!err || typeof err !== 'object') return undefined
+  if (seen.has(err)) return undefined
+  seen.add(err)
+  const e = err as { retryAfterMs?: unknown; cause?: unknown }
+  if (typeof e.retryAfterMs === 'number') return e.retryAfterMs
+  return retryAfterMs(e.cause, seen)
+}
+
+function isTransientExecError(err: unknown, seen = new Set<object>()): boolean {
+  if (!err || typeof err !== 'object') return false
+  if (seen.has(err)) return false
+  seen.add(err)
+  const e = err as {
+    status?: unknown
+    statusCode?: unknown
+    response?: unknown
+    code?: unknown
+    message?: unknown
+    cause?: unknown
+  }
+  const status = errorStatus(e)
+  if (status !== undefined && TRANSIENT_EXEC_STATUS_CODES.has(status)) return true
+  if (typeof e.code === 'string') {
+    if (TRANSIENT_EXEC_CODE_RE.test(e.code)) return true
+    if (/rate.?limit|too.?many.?requests|429|server.?error|service.?unavailable/i.test(e.code)) return true
+  }
+  if (typeof e.message === 'string' && TRANSIENT_EXEC_MESSAGE_RE.test(e.message)) return true
+  return isTransientExecError(e.cause, seen)
+}
+
+// Classify an exec failure as transient-retryable. Retryable shapes share the
+// same backoff path: rate-limit (HTTP 429 + retryAfterMs), client-side timeout,
+// and transient sidecar/transport/readiness failures surfaced as SandboxError-
+// shaped objects, fetch errors, network resets, or 5xx-ish messages. Everything
+// else fails loud. Non-zero shell exits never reach this classifier.
 function transientExecError(err: unknown): { retryable: boolean; retryAfterMs?: number } {
   if (err instanceof ProfileWriteExecTimeoutError) return { retryable: true }
-  if (err && typeof err === 'object') {
-    const e = err as { status?: unknown; code?: unknown; message?: unknown; retryAfterMs?: unknown }
-    const retryAfterMs = typeof e.retryAfterMs === 'number' ? e.retryAfterMs : undefined
-    if (e.status === 429) return { retryable: true, retryAfterMs }
-    if (typeof e.code === 'string' && /rate.?limit|too.?many.?requests|429/i.test(e.code)) {
-      return { retryable: true, retryAfterMs }
-    }
-    if (typeof e.message === 'string' && /\b429\b|rate.?limit|too many requests/i.test(e.message)) {
-      return { retryable: true, retryAfterMs }
-    }
-  }
+  if (isTransientExecError(err)) return { retryable: true, retryAfterMs: retryAfterMs(err) }
   return { retryable: false }
+}
+
+function deferredProfileWriteFailed(stage: 'new' | 'reused' | 'resumed', name: string, cause: Error): Error {
+  return new Error(`deferred file write failed on ${stage} box ${name}: ${cause.message}`, { cause })
 }
 
 // Materialize inline profile files into a running box via `box.exec`. Uses a
@@ -625,15 +667,16 @@ function transientExecError(err: unknown): { retryable: boolean; retryAfterMs?: 
 // and the first failure is returned (fail-loud), the rest are not attempted.
 //
 // Each exec is bounded by a client-side hard timeout and retried with backoff
-// on a 429 OR a hang/timeout, so one wedged proxy exec can never park the
-// caller (and thus never park provisioning). A small pace between execs keeps
-// the burst rate below the proxy throttle that triggers the hang.
+// on transient rate-limit/readiness/transport failures, so one wedged or early
+// exec-plane request can never park the caller (and thus never park provisioning).
+// A small pace between execs keeps the burst rate below the proxy throttle that
+// triggers the hang.
 export interface WriteProfileFilesOptions {
   // Hard ceiling per exec (ms). A hung/wedged exec is abandoned and retried.
   execTimeoutMs?: number
   // Delay between execs (ms) to stay under the proxy throttle. 0 disables it.
   paceMs?: number
-  // Max retries for a transient (429 or timeout/hang) exec before failing loud.
+  // Max retries for a transient exec before failing loud.
   maxRetries?: number
 }
 
@@ -653,20 +696,26 @@ export async function writeProfileFilesToBox(
     if (mount.resource.kind !== 'inline') continue
     const content = mount.resource.content ?? ''
     const b64 = Buffer.from(content, 'utf8').toString('base64')
+    const b64Chunks: string[] = []
+    for (let i = 0; i < b64.length; i += PROFILE_WRITE_B64_CHUNK_CHARS) {
+      b64Chunks.push(b64.slice(i, i + PROFILE_WRITE_B64_CHUNK_CHARS))
+    }
+    const expectedSha256 = createHash('sha256').update(content, 'utf8').digest('hex')
     const path = mount.path
     const dir = path.replace(/\/[^/]*$/, '')
     const isBin = /(^|\/)(s?bin)\//.test(path)
     const executable = mount.executable ?? isBin
     const q = shellPath(path)
     const qb64 = shellPath(`${path}.b64`)
+    const qtmp = shellPath(`${path}.tmp`)
+    const qpartPrefix = shellPath(`${path}.b64.part.`)
 
     // Run one exec step, surfacing a non-zero exit or transport error as a
-    // fail-loud Outcome with the underlying error as cause. A transient failure
-    // — a 429 (rate limit) OR a client-side timeout (a hung/wedged proxy exec) —
-    // is retried with exponential backoff up to maxRetries. Any other error
+    // fail-loud Outcome with the underlying error as cause. Transient failures
+    // are retried with exponential backoff up to maxRetries. Any other error
     // fails loud immediately. A non-zero exit is a real command failure, not
-    // retried. After maxRetries the timeout is surfaced as the Outcome cause so
-    // a persistently-wedged exec fails fast and visibly instead of hanging.
+    // retried. After maxRetries the last transient error is surfaced as the
+    // Outcome cause so persistent exec-plane failures fail fast and visibly.
     const step = async (cmd: string): Promise<Outcome<void>> => {
       for (let attempt = 0; ; attempt++) {
         if (execStarted && paceMs > 0) await sleep(paceMs)
@@ -696,25 +745,41 @@ export async function writeProfileFilesToBox(
       }
     }
 
-    // Start the staging file empty so re-runs (redeploy with new skills)
-    // overwrite rather than append. mkdir -p creates the target directory;
-    // shellPath keeps `~/...` resolving to the box user's real $HOME.
-    const mkdir = dir && dir !== path ? `mkdir -p ${shellPath(dir)} && ` : ''
-    let res = await step(`${mkdir}: > ${qb64}`)
+    // Ensure the target directory exists. Chunk/final commands below are
+    // idempotent under unknown-outcome transport retries; this no-op/mkdir is too.
+    const mkdir = dir && dir !== path ? `mkdir -p ${shellPath(dir)}` : ':'
+    let res = await step(mkdir)
     if (!res.succeeded) return res
 
-    // Append the base64 in capped slices; the base64 alphabet has no single
-    // quotes, so single-quoting each slice is safe. printf '%s' adds no newline.
-    for (let i = 0; i < b64.length; i += PROFILE_WRITE_B64_CHUNK_CHARS) {
-      const slice = b64.slice(i, i + PROFILE_WRITE_B64_CHUNK_CHARS)
-      res = await step(`printf '%s' '${slice}' >> ${qb64}`)
+    // Write each deterministic part with overwrite, not append. If the server
+    // writes a part but the HTTP response is lost, retrying the same step lands
+    // the same bytes instead of duplicating them.
+    for (let i = 0; i < b64Chunks.length; i++) {
+      const slice = b64Chunks[i]!
+      res = await step(`printf '%s' '${slice}' > ${shellPath(`${path}.b64.part.${i}`)}`)
       if (!res.succeeded) return res
     }
 
-    // Decode the staged base64 to the real path, drop the staging file, and set
-    // the executable bit when required. base64 -d reconstructs the exact bytes.
-    const chmod = executable ? ` && chmod +x ${q}` : ''
-    res = await step(`base64 -d ${qb64} > ${q} && rm -f ${qb64}${chmod}`)
+    // Materialize from deterministic parts into a temp file, verify its content
+    // hash, then atomically move into place. If the final exec succeeds but its
+    // response is lost, a retry first accepts an already-correct target and only
+    // re-runs idempotent chmod/cleanup. Parts are cleaned only after the target
+    // hash is known-good, so a retried final step can always reconstruct.
+    const chmod = executable ? `chmod +x ${q} || exit 1; ` : ''
+    const checksumMismatch = shellSingleQuote(`writeProfileFilesToBox: checksum mismatch for ${path}`)
+    const finalCmd =
+      `expected='${expectedSha256}'; ` +
+      `if [ -f ${q} ] && [ "$(sha256sum ${q} | awk '{print $1}')" = "$expected" ]; then ` +
+      `${chmod}rm -f ${qb64} ${qtmp}; i=0; while [ "$i" -lt ${b64Chunks.length} ]; do rm -f ${qpartPrefix}$i; i=$((i+1)); done; exit 0; fi; ` +
+      `: > ${qb64} && ` +
+      `i=0; while [ "$i" -lt ${b64Chunks.length} ]; do cat ${qpartPrefix}$i >> ${qb64} || exit 1; i=$((i+1)); done && ` +
+      `base64 -d ${qb64} > ${qtmp} && ` +
+      `[ "$(sha256sum ${qtmp} | awk '{print $1}')" = "$expected" ] || { echo ${checksumMismatch} >&2; exit 1; }; ` +
+      `mv ${qtmp} ${q} && ` +
+      `${executable ? `chmod +x ${q} && ` : ''}` +
+      `[ "$(sha256sum ${q} | awk '{print $1}')" = "$expected" ] || { echo ${checksumMismatch} >&2; exit 1; }; ` +
+      `rm -f ${qb64} ${qtmp}; i=0; while [ "$i" -lt ${b64Chunks.length} ]; do rm -f ${qpartPrefix}$i; i=$((i+1)); done`
+    res = await step(finalCmd)
     if (!res.succeeded) return res
   }
   return ok(undefined)
@@ -925,7 +990,7 @@ export async function ensureWorkspaceSandbox(
       if (await isReusableBox(ready, harness, shell.livenessProbe)) {
         const written = await materializeDeferredFilesForExistingBox(shell, ready, workspaceId, userId)
         if (!written.succeeded) {
-          throw new Error(`deferred file write failed on reused box ${name}`, { cause: written.error })
+          throw deferredProfileWriteFailed('reused', name, written.error)
         }
         if (shell.bootstrap) {
           const boot = await shell.bootstrap(ready, scope)
@@ -965,7 +1030,7 @@ export async function ensureWorkspaceSandbox(
       if (await isReusableBox(box, harness, shell.livenessProbe)) {
         const written = await materializeDeferredFilesForExistingBox(shell, box, workspaceId, userId)
         if (!written.succeeded) {
-          throw new Error(`deferred file write failed on resumed box ${name}`, { cause: written.error })
+          throw deferredProfileWriteFailed('resumed', name, written.error)
         }
         if (shell.bootstrap) {
           const boot = await shell.bootstrap(box, scope)
@@ -1055,7 +1120,7 @@ export async function ensureWorkspaceSandbox(
   if (deferredFiles.length > 0) {
     const written = await writeProfileFilesToBox(box, deferredFiles)
     if (!written.succeeded) {
-      throw new Error(`deferred file write failed on new box ${name}`, { cause: written.error })
+      throw deferredProfileWriteFailed('new', name, written.error)
     }
   }
 

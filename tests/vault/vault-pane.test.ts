@@ -116,6 +116,11 @@ async function openFile(path: string) {
   const node = await screen.findByTestId(`tree-${path}`)
   fireEvent.click(node)
   await waitFor(() => expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe(path))
+  // VaultPane renders the selected file, then a follow-up effect initializes
+  // editor drafts and resets mode/dirty state for that file. Let that effect
+  // flush before tests interact with the source/rich toggle; otherwise the
+  // reset can race the click and flip Source back to Rich under suite load.
+  await act(async () => {})
 }
 
 async function typeSource(text: string) {
