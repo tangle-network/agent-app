@@ -3,6 +3,7 @@ import {
   type AgentProfile,
   type AgentProfileFileMount,
   type AgentProfileMcpServer,
+  type SandboxConnection,
   type SandboxInstance,
   type ScopedTokenScope,
   type StorageConfig,
@@ -376,13 +377,22 @@ async function isBoxAlive(
 const RUNTIME_CONNECTION_WAIT_MS = 30_000
 const RUNTIME_CONNECTION_POLL_MS = 1_000
 
+// `sidecarUrl` is a product/forward-compat field the orchestrator may set on
+// the connection ahead of the SDK declaring it — the v0.6 `SandboxConnection`
+// exposes only `runtimeUrl`. Read it through a typed augmentation rather than an
+// ad-hoc cast (a plain `SandboxConnection` satisfies the optional field), and
+// fall back to the SDK runtime URL. The product-facing `WorkspaceSandboxInstanceLike`
+// carries the same field for consumers driving their own box types.
+type RuntimeConnectionFields = SandboxConnection & { sidecarUrl?: string }
+
 function sandboxRuntimeUrl(box: SandboxInstance): string | undefined {
-  const connection = box.connection as { runtimeUrl?: string; sidecarUrl?: string } | null | undefined
+  const connection: RuntimeConnectionFields | undefined = box.connection
   return connection?.sidecarUrl ?? connection?.runtimeUrl
 }
 
 function sandboxEdgeFailed(box: SandboxInstance): boolean {
-  const connection = box.connection as { edgeStatus?: string; edgeError?: unknown } | null | undefined
+  // `edgeStatus`/`edgeError` are declared on the SDK's `SandboxConnection`, so no cast.
+  const connection = box.connection
   return connection?.edgeStatus === 'failed' || Boolean(connection?.edgeError)
 }
 
