@@ -20,7 +20,12 @@ export function GenerationDetail({
 }) {
   const cfg = typeConfigFor(generation.type)
   const Icon = cfg.icon
-  const href = vaultHref ? vaultHref(generationVaultPath(generation)) : null
+  // Only offer the vault link when the generation actually persisted a file.
+  // generationVaultPath is null for failed/pending/running and storage-failed
+  // generations; without this guard vaultHref(null) falls back to the vault
+  // root, rendering a button that opens nothing relevant.
+  const vaultPath = generationVaultPath(generation)
+  const href = vaultHref && vaultPath ? vaultHref(vaultPath) : null
 
   return (
     <div className="space-y-4">
