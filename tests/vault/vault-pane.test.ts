@@ -118,8 +118,11 @@ async function openFile(path: string) {
   await waitFor(() => expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe(path))
 }
 
-function typeSource(text: string) {
-  fireEvent.change(screen.getByLabelText('Source editor'), { target: { value: text } })
+async function typeSource(text: string) {
+  // Await the source-editor re-render: the preceding "Edit as source" click
+  // toggles modes, and under full-suite load that re-render lags a sync query
+  // (getByLabelText) — findByLabelText retries until the textarea mounts.
+  fireEvent.change(await screen.findByLabelText('Source editor'), { target: { value: text } })
 }
 
 /** The selected path as the toolbar shows it — stable across rich/source modes. */
@@ -187,7 +190,7 @@ describe('VaultPane — dirty-guard state machine', () => {
     await openFile('a.md')
     // enter source mode and dirty the buffer
     fireEvent.click(screen.getByLabelText('Edit as source'))
-    typeSource('mutated A')
+    await typeSource('mutated A')
     expect(screen.getByText('Unsaved changes')).toBeTruthy()
 
     const readsBefore = (port.readFile as ReturnType<typeof vi.fn>).mock.calls.length
@@ -203,7 +206,7 @@ describe('VaultPane — dirty-guard state machine', () => {
     const { port } = mount()
     await openFile('a.md')
     fireEvent.click(screen.getByLabelText('Edit as source'))
-    typeSource('mutated A')
+    await typeSource('mutated A')
 
     fireEvent.click(screen.getByTestId('tree-b.md'))
     fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }))
@@ -216,7 +219,7 @@ describe('VaultPane — dirty-guard state machine', () => {
     mount()
     await openFile('a.md')
     fireEvent.click(screen.getByLabelText('Edit as source'))
-    typeSource('mutated A')
+    await typeSource('mutated A')
 
     fireEvent.click(screen.getByTestId('tree-b.md'))
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
@@ -230,7 +233,7 @@ describe('VaultPane — dirty-guard state machine', () => {
     const { port } = mount()
     await openFile('a.md')
     fireEvent.click(screen.getByLabelText('Edit as source'))
-    typeSource('mutated A')
+    await typeSource('mutated A')
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /^Save/ }))
