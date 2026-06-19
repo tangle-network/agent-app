@@ -190,7 +190,9 @@ export function ComposerHero({
     if (type === 'image' && requestedImageCount !== imageCount) setImageCount(requestedImageCount)
     const localGenerations = Array.from({ length: requestedImageCount }, (_, outputIndex) => optimisticGeneration({
       type,
-      prompt: promptText || transcriptionAudioUrlText || avatarAudioUrlText,
+      // avatar hides the prompt field (promptText is stale); transcription's is
+      // an optional vocab hint. Never surface the source audio URL as the prompt.
+      prompt: type === 'avatar' ? '' : promptText,
       model: selectedModel,
       clientRequestId,
       outputIndex: type === 'image' ? outputIndex : undefined,
@@ -238,7 +240,7 @@ export function ComposerHero({
         receivedServerGeneration = true
         serverGenerations.slice().reverse().forEach(onGenerated)
       }
-      if (!res.ok || serverGenerations.length === 0) throw new Error(userSafeGenerationMessage(data.error))
+      if (!res.ok || serverGenerations.length === 0) throw new Error(data.error ?? 'Generation failed')
     } catch (err) {
       if (!receivedServerGeneration) localGenerations.map(failedOptimisticGeneration).forEach(onGenerated)
       setError(err instanceof Error ? userSafeGenerationMessage(err.message) : 'Generation failed')

@@ -19,6 +19,7 @@ export function GenerationCard({
   const cfg = typeConfigFor(generation.type)
   const Icon = cfg.icon
   const status = generationStatus(generation)
+  const publishPackage = generation.metadata?.publishPackage
   return (
     <button type="button" onClick={() => onSelect(generation)} className="group text-left animate-row-in">
       <Card className="overflow-hidden transition-all group-hover:border-primary/50 group-hover:shadow-md">
@@ -68,14 +69,14 @@ export function GenerationCard({
               <span className="text-[10px] text-muted-foreground">{relativeTime(generation.createdAt)}</span>
             </div>
           </div>
-          {isPublishPackage(generation.metadata?.publishPackage) && (
+          {isPublishPackage(publishPackage) && (
             <div className="mt-3 rounded-md border border-border bg-muted/30 p-2">
               <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium text-foreground">
                 <Send className="h-3 w-3" />
-                {generation.metadata.publishPackage.destinations.join(', ')}
+                {(publishPackage.destinations ?? []).join(', ') || 'Publish package'}
               </div>
               <p className="line-clamp-2 text-[10px] text-muted-foreground">
-                {generation.metadata.publishPackage.caption || 'Caption pending'}
+                {publishPackage.caption || 'Caption pending'}
               </p>
             </div>
           )}
