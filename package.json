@@ -228,6 +228,17 @@
       "import": "./dist/design-canvas-react/lazy.js",
       "default": "./dist/design-canvas-react/lazy.js"
     },
+    "./studio": {
+      "types": "./dist/studio/index.d.ts",
+      "import": "./dist/studio/index.js",
+      "default": "./dist/studio/index.js"
+    },
+    "./studio-react": {
+      "types": "./dist/studio-react/index.d.ts",
+      "import": "./dist/studio-react/index.js",
+      "default": "./dist/studio-react/index.js"
+    },
+    "./studio-react/styles": "./dist/studio-react/studio.css",
     "./teams": {
       "types": "./dist/teams/index.d.ts",
       "import": "./dist/teams/index.js",
@@ -310,11 +321,14 @@
     "knip": "knip"
   },
   "devDependencies": {
+    "@radix-ui/react-dialog": "^1.1.15",
     "@tangle-network/agent-eval": "^0.83.0",
     "@tangle-network/agent-integrations": "^0.32.0",
-    "@tangle-network/agent-runtime": "^0.52.0",
     "@tangle-network/agent-knowledge": "^1.5.2",
+    "@tangle-network/agent-runtime": "^0.52.0",
     "@tangle-network/sandbox": "^0.4.4",
+    "@tangle-network/sandbox-ui": "^0.39.1",
+    "@tangle-network/ui": "^4.1.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@types/better-sqlite3": "^7.6.13",
@@ -327,24 +341,30 @@
     "jsdom": "^29.1.1",
     "knip": "^5.46.0",
     "konva": "^10.3.0",
+    "lucide-react": "^1.16.0",
     "react": "^19.0.0",
     "react-dom": "^19.2.7",
     "react-konva": "^19.2.5",
+    "react-router": "^7.15.1",
     "tsup": "^8.0.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
   },
   "peerDependencies": {
     "@huggingface/transformers": ">=3",
+    "@radix-ui/react-dialog": ">=1.1",
     "@tangle-network/agent-eval": ">=0.83.0",
     "@tangle-network/agent-integrations": ">=0.32.0",
     "@tangle-network/agent-knowledge": ">=1.5.0",
     "@tangle-network/agent-runtime": ">=0.52.0",
     "@tangle-network/sandbox": ">=0.4",
+    "@tangle-network/sandbox-ui": ">=0.32",
     "drizzle-orm": ">=0.36",
-    "react": ">=18",
     "konva": ">=9",
-    "react-konva": ">=18"
+    "lucide-react": ">=1",
+    "react": ">=18",
+    "react-konva": ">=18",
+    "react-router": ">=7"
   },
   "peerDependenciesMeta": {
     "@huggingface/transformers": {
@@ -369,6 +389,18 @@
       "optional": true
     },
     "react-konva": {
+      "optional": true
+    },
+    "@tangle-network/sandbox-ui": {
+      "optional": true
+    },
+    "react-router": {
+      "optional": true
+    },
+    "lucide-react": {
+      "optional": true
+    },
+    "@radix-ui/react-dialog": {
       "optional": true
     }
   },
