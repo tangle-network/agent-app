@@ -16,6 +16,11 @@ import {
   type ToolHeaderNames,
 } from '../tools/index'
 import { assertHarnessModelCompatible, type Harness } from '../harness/index'
+import {
+  resolveTangleExecutionEnvironment,
+  trimOrNull,
+  type TangleExecutionEnvironment,
+} from '../runtime/model'
 import { ok, fail, type Outcome } from './outcome'
 
 export type { Outcome } from './outcome'
@@ -23,6 +28,150 @@ export type { Outcome } from './outcome'
 export interface SandboxClientCredentials {
   apiKey: string
   baseUrl: string
+}
+
+/**
+ * Sandbox credential policy reuses the canonical execution-environment union
+ * (development/test/staging/production) so env classification stays in one place
+ * (see resolveTangleExecutionEnvironment in runtime/model).
+ */
+export type SandboxCredentialEnvironment = TangleExecutionEnvironment
+
+export interface ResolveSandboxClientCredentialsOptions {
+  /**
+   * Environment object to read from. Defaults to process.env when available.
+   */
+  env?: Record<string, string | undefined>
+  /**
+   * Explicit environment classification. Defaults to APP_ENV/NODE_ENV derived
+   * behavior: local/development/test use direct env credentials; staging/prod
+   * require the provision callback unless allowDirectEnvCredentials opts in.
+   */
+  environment?: SandboxCredentialEnvironment
+  /**
+   * Env names that may carry a sandbox-compatible bearer. The first non-empty
+   * value wins when direct env credentials are allowed.
+   */
+  directKeyNames?: readonly string[]
+  /**
+   * Env names that may carry the sandbox gateway URL. The first non-empty value
+   * wins, then defaultBaseUrl.
+   */
+  baseUrlNames?: readonly string[]
+  /**
+   * Base URL used when none of baseUrlNames are present.
+   */
+  defaultBaseUrl?: string
+  /**
+   * Whether direct env credentials are allowed for this environment. Defaults
+   * to true in development/test and false in staging/production.
+   */
+  allowDirectEnvCredentials?: boolean | ((environment: SandboxCredentialEnvironment) => boolean)
+  /**
+   * Product-owned provision path, usually minting a per-user sandbox key from a
+   * linked platform account. Called before direct env credentials in
+   * staging/production and after direct env credentials in development/test.
+   */
+  provision?: (
+    context: {
+      environment: SandboxCredentialEnvironment
+      env: Record<string, string | undefined>
+    },
+  ) => SandboxClientCredentials | null | undefined | Promise<SandboxClientCredentials | null | undefined>
+}
+
+const DEFAULT_SANDBOX_DIRECT_KEY_NAMES = [
+  'TCLOUD_SANDBOX_API_KEY',
+  'SANDBOX_API_KEY',
+  'TANGLE_API_KEY',
+] as const
+const DEFAULT_SANDBOX_BASE_URL_NAMES = ['SANDBOX_GATEWAY_URL', 'SANDBOX_API_URL'] as const
+
+function normalizeBaseUrl(value: string): string {
+  return value.trim().replace(/\/v1\/?$/, '').replace(/\/+$/, '')
+}
+
+function processEnv(): Record<string, string | undefined> {
+  return typeof process === 'undefined' ? {} : process.env
+}
+
+function directEnvCredentialsAllowed(
+  environment: SandboxCredentialEnvironment,
+  allow: ResolveSandboxClientCredentialsOptions['allowDirectEnvCredentials'],
+): boolean {
+  if (typeof allow === 'function') return allow(environment)
+  if (typeof allow === 'boolean') return allow
+  return environment === 'development' || environment === 'test'
+}
+
+function resolveSandboxBaseUrl(
+  env: Record<string, string | undefined>,
+  names: readonly string[],
+  defaultBaseUrl: string | undefined,
+): string {
+  for (const name of names) {
+    const value = trimOrNull(env[name])
+    if (value) return normalizeBaseUrl(value)
+  }
+  const value = trimOrNull(defaultBaseUrl)
+  if (value) return normalizeBaseUrl(value)
+  throw new Error(
+    `Sandbox base URL is required (set one of ${names.join(', ')} or pass defaultBaseUrl).`,
+  )
+}
+
+function resolveDirectSandboxCredentials(
+  env: Record<string, string | undefined>,
+  keyNames: readonly string[],
+  baseUrlNames: readonly string[],
+  defaultBaseUrl: string | undefined,
+): SandboxClientCredentials | null {
+  for (const name of keyNames) {
+    const apiKey = trimOrNull(env[name])
+    if (!apiKey) continue
+    return {
+      apiKey,
+      baseUrl: resolveSandboxBaseUrl(env, baseUrlNames, defaultBaseUrl),
+    }
+  }
+  return null
+}
+
+export async function resolveSandboxClientCredentials(
+  options: ResolveSandboxClientCredentialsOptions = {},
+): Promise<SandboxClientCredentials> {
+  const env = options.env ?? processEnv()
+  const environment = options.environment ?? resolveTangleExecutionEnvironment(env)
+  const keyNames = options.directKeyNames ?? DEFAULT_SANDBOX_DIRECT_KEY_NAMES
+  const baseUrlNames = options.baseUrlNames ?? DEFAULT_SANDBOX_BASE_URL_NAMES
+  const directAllowed = directEnvCredentialsAllowed(environment, options.allowDirectEnvCredentials)
+  const direct = () =>
+    directAllowed
+      ? resolveDirectSandboxCredentials(env, keyNames, baseUrlNames, options.defaultBaseUrl)
+      : null
+
+  if (environment === 'development' || environment === 'test') {
+    const credentials = direct()
+    if (credentials) return credentials
+  }
+
+  const provisioned = await options.provision?.({ environment, env })
+  if (provisioned) {
+    return {
+      apiKey: provisioned.apiKey,
+      baseUrl: normalizeBaseUrl(provisioned.baseUrl),
+    }
+  }
+
+  const credentials = direct()
+  if (credentials) return credentials
+
+  const directHint = directAllowed
+    ? ` or set one of ${keyNames.join(', ')}`
+    : ''
+  throw new Error(
+    `Sandbox credentials are required for ${environment} (provide a provision callback${directHint}).`,
+  )
 }
 
 export interface SandboxResourceConfig {
@@ -218,6 +367,110 @@ export interface EnsureWorkspaceSandboxOptions {
 // Single-quote a string for safe interpolation into a shell command.
 function shellSingleQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
+export interface SandboxToolSpec {
+  name: string
+  content: string
+  executable?: boolean
+}
+
+export interface SandboxToolPathOptions {
+  appName: string
+  baseDir?: string
+  binDir?: string
+}
+
+export interface BuildSandboxToolFileMountsOptions extends SandboxToolPathOptions {
+  tools: readonly SandboxToolSpec[]
+}
+
+const DEFAULT_SANDBOX_TOOL_BASE_DIR = '/home/agent/tools'
+const SAFE_TOOL_SEGMENT = /^[A-Za-z0-9._-]+$/
+
+function normalizeSandboxToolSegment(value: string, label: string): string {
+  const segment = value.trim()
+  if (!segment || segment === '.' || segment === '..' || !SAFE_TOOL_SEGMENT.test(segment)) {
+    throw new Error(`${label} must contain only letters, numbers, dots, underscores, or hyphens.`)
+  }
+  return segment
+}
+
+function normalizeSandboxToolDir(value: string, label: string): string {
+  const dir = value.trim().replace(/\/+$/, '')
+  if (!dir || !dir.startsWith('/') || dir.includes('\0') || dir.includes('\n')) {
+    throw new Error(`${label} must be an absolute sandbox path.`)
+  }
+  return dir === '' ? '/' : dir
+}
+
+export function sandboxToolRootDir(options: SandboxToolPathOptions): string {
+  const appName = normalizeSandboxToolSegment(options.appName, 'sandbox tool appName')
+  const baseDir = normalizeSandboxToolDir(
+    options.baseDir ?? DEFAULT_SANDBOX_TOOL_BASE_DIR,
+    'sandbox tool baseDir',
+  )
+  return `${baseDir}/${appName}`
+}
+
+export function sandboxToolBinDir(options: SandboxToolPathOptions): string {
+  normalizeSandboxToolSegment(options.appName, 'sandbox tool appName')
+  if (options.binDir) return normalizeSandboxToolDir(options.binDir, 'sandbox tool binDir')
+  return `${sandboxToolRootDir(options)}/bin`
+}
+
+export function sandboxToolPath(options: SandboxToolPathOptions & { toolName: string }): string {
+  const toolName = normalizeSandboxToolSegment(options.toolName, 'sandbox tool name')
+  return `${sandboxToolBinDir(options)}/${toolName}`
+}
+
+export function buildSandboxToolFileMounts(
+  options: BuildSandboxToolFileMountsOptions,
+): AgentProfileFileMount[] {
+  return options.tools.map((tool) => {
+    const name = normalizeSandboxToolSegment(tool.name, 'sandbox tool name')
+    return {
+      path: sandboxToolPath({ ...options, toolName: name }),
+      resource: { kind: 'inline' as const, name, content: tool.content },
+      executable: tool.executable ?? true,
+    }
+  })
+}
+
+export function buildSandboxToolPathSetupScript(options: SandboxToolPathOptions): string {
+  const binDir = sandboxToolBinDir(options)
+  const exportLine = `export PATH=${binDir}:$PATH`
+  return [
+    'set -eu',
+    `mkdir -p ${shellSingleQuote(binDir)}`,
+    `PATH=${shellSingleQuote(binDir)}:$PATH`,
+    'export PATH',
+    'for profile in "${HOME:-/home/agent}/.profile" "${HOME:-/home/agent}/.bashrc" "${HOME:-/home/agent}/.zshrc"; do',
+    '  mkdir -p "$(dirname "$profile")"',
+    '  touch "$profile"',
+    `  grep -Fqx ${shellSingleQuote(exportLine)} "$profile" || printf '\\n%s\\n' ${shellSingleQuote(exportLine)} >> "$profile"`,
+    'done',
+  ].join('\n')
+}
+
+export async function runSandboxToolPathSetup(
+  box: SandboxInstance,
+  options: SandboxToolPathOptions,
+): Promise<Outcome<void>> {
+  try {
+    const res = await box.exec(buildSandboxToolPathSetupScript(options))
+    if (res.exitCode !== 0) {
+      return fail(
+        new Error(
+          `runSandboxToolPathSetup: failed to configure PATH for ${sandboxToolBinDir(options)} ` +
+            `(exit ${res.exitCode}): ${res.stderr.slice(0, 500)}`,
+        ),
+      )
+    }
+    return ok(undefined)
+  } catch (err) {
+    return fail(new Error('runSandboxToolPathSetup: exec failed', { cause: err }))
+  }
 }
 
 // Build a shell-safe path token that preserves tilde-home semantics. A path
