@@ -2,12 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const createMock = vi.fn()
 const listMock = vi.fn()
+const getMock = vi.fn()
 const sandboxCtor = vi.fn()
 
 vi.mock('@tangle-network/sandbox', () => ({
   Sandbox: class {
     list = listMock
     create = createMock
+    get = getMock
     secrets = {
       create: vi.fn(),
       update: vi.fn(),
@@ -80,6 +82,7 @@ function shellFor(
 function fakeBox(over: Partial<SandboxInstance> = {}): SandboxInstance {
   return {
     name: 'box-w1',
+    id: 'sandbox-1',
     metadata: { harness: 'opencode' },
     connection: { runtimeUrl: 'https://rt' },
     waitFor: vi.fn().mockResolvedValue(undefined),
@@ -99,6 +102,7 @@ beforeEach(() => {
   resetClientCache()
   createMock.mockReset()
   listMock.mockReset()
+  getMock.mockReset()
   sandboxCtor.mockReset()
 })
 
@@ -131,6 +135,25 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     listMock.mockResolvedValue([running])
     const box = await ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
     expect(box).toBe(running)
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('refreshes a reused running box when the list shape has no runtime connection', async () => {
+    const running = fakeBox({ name: 'box-w1', metadata: { harness: 'opencode' }, connection: undefined })
+    const latest = fakeBox({
+      id: running.id,
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      connection: { sidecarUrl: 'https://sidecar.example' } as never,
+    })
+    listMock.mockResolvedValue([running])
+    getMock.mockResolvedValue(latest)
+
+    const box = await ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(running.refresh).toHaveBeenCalledTimes(1)
+    expect(getMock).toHaveBeenCalledWith(running.id)
+    expect(box).toBe(latest)
     expect(createMock).not.toHaveBeenCalled()
   })
 
@@ -170,9 +193,119 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
   it('refreshes when the created box has no runtimeUrl', async () => {
     listMock.mockResolvedValue([])
     const created = fakeBox({ connection: undefined })
+    const latest = fakeBox({
+      id: created.id,
+      connection: { sidecarUrl: 'https://sidecar.example' } as never,
+    })
     createMock.mockResolvedValue(created)
-    await ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
+    getMock.mockResolvedValue(latest)
+    const box = await ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
     expect(created.refresh).toHaveBeenCalledTimes(1)
+    expect(getMock).toHaveBeenCalledWith(created.id)
+    expect(box).toBe(latest)
+  })
+
+  it('treats sidecarUrl-only created boxes as runtime-ready', async () => {
+    listMock.mockResolvedValue([])
+    const created = fakeBox({ connection: { sidecarUrl: 'https://sidecar.example' } as never })
+    createMock.mockResolvedValue(created)
+
+    await ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(created.refresh).not.toHaveBeenCalled()
+  })
+
+  it('adds webTerminalEnabled to the create payload when requested by the shell', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox())
+
+    await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
+      webTerminalEnabled: true,
+    }), { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(createMock.mock.calls[0]![0].webTerminalEnabled).toBe(true)
+  })
+
+  it('recreates a reused box whose edge has failed instead of returning it', async () => {
+    const del = vi.fn().mockResolvedValue(undefined)
+    const failed = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      connection: { runtimeUrl: 'https://rt', edgeStatus: 'failed' } as never,
+      delete: del,
+    })
+    // running-only: a status-blind mock would re-surface the box on the stopped
+    // list and send Stage 2 down a resume() path the fake box can't service.
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      status === 'running' ? Promise.resolve([failed]) : Promise.resolve([]),
+    )
+    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
+
+    await ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(del).toHaveBeenCalledOnce()
+    expect(createMock).toHaveBeenCalledOnce()
+  })
+
+  it('recreates a reused box that never surfaces a runtime connection (no silent reuse)', async () => {
+    vi.useFakeTimers()
+    try {
+      const del = vi.fn().mockResolvedValue(undefined)
+      // Matches harness but has no connection; refresh + get never populate one,
+      // so refreshRuntimeConnection exhausts its polling window.
+      const stuck = fakeBox({
+        name: 'box-w1',
+        metadata: { harness: 'opencode' },
+        connection: undefined,
+        delete: del,
+      })
+      listMock.mockImplementation(({ status }: { status: string }) =>
+        status === 'running' ? Promise.resolve([stuck]) : Promise.resolve([]),
+      )
+      getMock.mockResolvedValue(stuck)
+      createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
+
+      const promise = ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
+      // Drive past the 30s readiness deadline so the poll loop gives up.
+      await vi.advanceTimersByTimeAsync(31_000)
+      await promise
+
+      expect(del).toHaveBeenCalledOnce()
+      expect(createMock).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('recreates instead of hard-failing when refresh/get throw during the readiness poll', async () => {
+    vi.useFakeTimers()
+    try {
+      const del = vi.fn().mockResolvedValue(undefined)
+      // A harness-matched running box with no connection whose refresh + get
+      // keep throwing (transient 5xx / network blip). The poll must swallow and
+      // retry, then fall through to recreate — not surface a hard failure.
+      const flaky = fakeBox({
+        name: 'box-w1',
+        metadata: { harness: 'opencode' },
+        connection: undefined,
+        delete: del,
+        refresh: vi.fn().mockRejectedValue(new Error('transient 5xx')),
+      })
+      listMock.mockImplementation(({ status }: { status: string }) =>
+        status === 'running' ? Promise.resolve([flaky]) : Promise.resolve([]),
+      )
+      getMock.mockRejectedValue(new Error('transient 5xx'))
+      createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
+
+      const promise = ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
+      await vi.advanceTimersByTimeAsync(31_000)
+
+      await expect(promise).resolves.toBeDefined()
+      expect(del).toHaveBeenCalledOnce()
+      expect(createMock).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
@@ -390,6 +523,7 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     resetClientCache()
     listMock.mockReset()
     createMock.mockReset()
+    getMock.mockReset()
     sandboxCtor.mockReset()
   })
 

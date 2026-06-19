@@ -7,7 +7,10 @@ import {
   createWorkspaceSandboxConnectionHandler,
   createWorkspaceSandboxManager,
   createWorkspaceSandboxRuntimeProxyHandler,
+  createWorkspaceSandboxTerminalUpgradeHandler,
   encodeSandboxRuntimePath,
+  isSandboxTerminalWsUpgrade,
+  matchSandboxTerminalWsPath,
   terminalTokenFromRequest,
   verifySandboxTerminalToken,
   type WorkspaceSandboxInstanceLike,
@@ -66,22 +69,34 @@ describe('sandbox terminal tokens', () => {
     const subject = { userId: 'user-1', workspaceId: 'workspace-1', sandboxId: 'box-1' }
     const minted = await createSandboxTerminalToken(subject, { secret, now: () => 1_000, expiresInMs: 60_000 })
 
-    expect(minted.token.startsWith('sbxt_')).toBe(true)
+    expect(minted.token.split('.')).toHaveLength(2)
     expect(minted.expiresAt.toISOString()).toBe('1970-01-01T00:01:01.000Z')
     await expect(verifySandboxTerminalToken(minted.token, subject, { secret, now: () => 1_000 })).resolves.toBe(true)
   })
 
-  it('rejects wrong scope, wrong secret, wrong prefix, malformed, and expired tokens', async () => {
+  it('rejects wrong scope, wrong secret, malformed, and expired tokens', async () => {
     const subject = { userId: 'user-1', workspaceId: 'workspace-1', sandboxId: 'box-1' }
-    const minted = await createSandboxTerminalToken(subject, { secret, now: () => 1_000, expiresInMs: 1_000, prefix: 'custom_' })
+    const minted = await createSandboxTerminalToken(subject, { secret, now: () => 1_000, expiresInMs: 1_000 })
 
-    await expect(verifySandboxTerminalToken(minted.token, { ...subject, userId: 'user-2' }, { secret, now: () => 1_000, prefix: 'custom_' })).resolves.toBe(false)
-    await expect(verifySandboxTerminalToken(minted.token, { ...subject, workspaceId: 'workspace-2' }, { secret, now: () => 1_000, prefix: 'custom_' })).resolves.toBe(false)
-    await expect(verifySandboxTerminalToken(minted.token, { ...subject, sandboxId: 'box-2' }, { secret, now: () => 1_000, prefix: 'custom_' })).resolves.toBe(false)
-    await expect(verifySandboxTerminalToken(minted.token, subject, { secret: 'other', now: () => 1_000, prefix: 'custom_' })).resolves.toBe(false)
-    await expect(verifySandboxTerminalToken(minted.token, subject, { secret, now: () => 1_000 })).resolves.toBe(false)
+    await expect(verifySandboxTerminalToken(minted.token, { ...subject, userId: 'user-2' }, { secret, now: () => 1_000 })).resolves.toBe(false)
+    await expect(verifySandboxTerminalToken(minted.token, { ...subject, workspaceId: 'workspace-2' }, { secret, now: () => 1_000 })).resolves.toBe(false)
+    await expect(verifySandboxTerminalToken(minted.token, { ...subject, sandboxId: 'box-2' }, { secret, now: () => 1_000 })).resolves.toBe(false)
+    await expect(verifySandboxTerminalToken(minted.token, subject, { secret: 'other', now: () => 1_000 })).resolves.toBe(false)
     await expect(verifySandboxTerminalToken('not-a-token', subject, { secret, now: () => 1_000 })).resolves.toBe(false)
-    await expect(verifySandboxTerminalToken(minted.token, subject, { secret, now: () => 2_000, prefix: 'custom_' })).resolves.toBe(false)
+    await expect(verifySandboxTerminalToken(minted.token, subject, { secret, now: () => 2_000 })).resolves.toBe(false)
+  })
+
+  it('verifies legacy sbxt_-prefixed tokens for backward compatibility', async () => {
+    const subject = { userId: 'user-1', workspaceId: 'workspace-1', sandboxId: 'box-1' }
+    const minted = await createSandboxTerminalToken(subject, { secret, now: () => 1_000, expiresInMs: 1_000 })
+    // A token minted by a prior deploy carried an `sbxt_` prefix over the same
+    // signed payload; verification must still accept it within its TTL.
+    const legacyToken = `sbxt_${minted.token}`
+
+    await expect(verifySandboxTerminalToken(legacyToken, subject, { secret, now: () => 1_000 })).resolves.toBe(true)
+    // The prefix is no escape hatch — wrong secret and expiry still fail.
+    await expect(verifySandboxTerminalToken(legacyToken, subject, { secret: 'other', now: () => 1_000 })).resolves.toBe(false)
+    await expect(verifySandboxTerminalToken(legacyToken, subject, { secret, now: () => 2_000 })).resolves.toBe(false)
   })
 })
 
@@ -137,6 +152,30 @@ describe('workspace sandbox connection handler', () => {
     expect(data.sidecarUrl).toBe('/api/workspaces/workspace-1/sandbox/runtime/box-1')
     expect(data.token).toEqual(expect.any(String))
     expect(data.expiresAt).toEqual(expect.any(String))
+    expect(data.status).toBe('running')
+    expect(data.sandboxId).toBe('box-1')
+  })
+
+  it('accepts sidecarUrl-only SDK connections as runtime-ready in proxy mode', async () => {
+    const handler = createWorkspaceSandboxConnectionHandler({
+      requireUser: async () => ({ id: 'user-1' }),
+      requireWorkspaceAccess: vi.fn(async () => {}),
+      ensureWorkspaceSandbox: async () => ({
+        id: 'box-1',
+        status: 'running',
+        connection: { sidecarUrl: 'https://sandbox-sidecar.example' },
+      }),
+      tokenSecret: secret,
+      tokenExpiresInMs: 60_000,
+    })
+
+    const res = await handler({ request: new Request('https://app.test/api'), params: { workspaceId: 'workspace-1' } })
+    const data = await res.json() as Record<string, unknown>
+
+    expect(res.status).toBe(200)
+    expect(data.runtimeUrl).toBe('/api/workspaces/workspace-1/sandbox/runtime/box-1')
+    expect(data.sidecarUrl).toBe('/api/workspaces/workspace-1/sandbox/runtime/box-1')
+    expect(data.token).toEqual(expect.any(String))
     expect(data.status).toBe('running')
     expect(data.sandboxId).toBe('box-1')
   })
@@ -229,7 +268,7 @@ describe('workspace sandbox runtime proxy', () => {
     expect(await res.text()).toBe('ok')
     expect(res.headers.get('set-cookie')).toBeNull()
     expect(res.headers.get('x-runtime')).toBe('yes')
-    const [upstream, init] = fetchMock.mock.calls[0] as [URL, RequestInit]
+    const [upstream, init] = fetchMock.mock.calls[0] as [URL, RequestInit & { duplex?: 'half' }]
     expect(String(upstream)).toBe('https://sandbox.test/v1/sandboxes/box-1/runtime/terminal/session%20a?cursor=1')
     expect(init.headers).toBeInstanceOf(Headers)
     expect((init.headers as Headers).get('authorization')).toBe('Bearer sandbox-key')
@@ -268,10 +307,46 @@ describe('workspace sandbox runtime proxy', () => {
     expect(res.status).toBe(201)
     expect(await res.text()).toBe('created')
     expect(getSandboxApiCredentials).not.toHaveBeenCalled()
-    const [upstream, init] = fetchMock.mock.calls[0] as [URL, RequestInit]
+    const [upstream, init] = fetchMock.mock.calls[0] as [URL, RequestInit & { duplex?: 'half' }]
     expect(String(upstream)).toBe('http://localhost:60031/terminals?cols=120')
     expect((init.headers as Headers).get('authorization')).toBe('Bearer sidecar-token')
     expect((init.headers as Headers).get('content-type')).toBe('application/json')
+    expect(init.body).toBeInstanceOf(ReadableStream)
+    expect(init.duplex).toBe('half')
+  })
+
+  it('falls back to the sandbox API when a direct sidecar connection has no bearer', async () => {
+    const token = await createSandboxTerminalToken(
+      { userId: 'user-1', workspaceId: 'workspace-1', sandboxId: 'box-1' },
+      { secret, expiresInMs: 60_000 },
+    )
+    const fetchMock = vi.fn(async (_input: URL, _init?: RequestInit) => new Response('proxied', {
+      status: 200,
+    }))
+    const getSandboxApiCredentials = vi.fn(async () => ({ baseUrl: 'https://sandbox.test', apiKey: 'sandbox-key' }))
+    const handler = createWorkspaceSandboxRuntimeProxyHandler({
+      requireUser: async () => ({ id: 'user-1' }),
+      requireWorkspaceAccess: async () => {},
+      getSandboxApiCredentials,
+      getSandboxRuntimeConnection: async () => ({ runtimeUrl: 'http://localhost:60031' }),
+      tokenSecret: secret,
+      fetch: fetchMock as typeof fetch,
+    })
+
+    const res = await handler({
+      request: new Request('https://app.test/api/workspaces/workspace-1/sandbox/runtime/box-1/terminals?cols=120', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows: 30 }),
+      }),
+      params: { workspaceId: 'workspace-1', sandboxId: 'box-1', '*': 'terminals' },
+    })
+
+    expect(res.status).toBe(200)
+    expect(getSandboxApiCredentials).toHaveBeenCalledOnce()
+    const [upstream, init] = fetchMock.mock.calls[0] as [URL, RequestInit & { duplex?: 'half' }]
+    expect(String(upstream)).toBe('https://sandbox.test/v1/sandboxes/box-1/runtime/terminals?cols=120')
+    expect((init.headers as Headers).get('authorization')).toBe('Bearer sandbox-key')
   })
 
   it('accepts terminal proxy auth from the browser WebSocket subprotocol', async () => {
@@ -318,6 +393,100 @@ describe('workspace sandbox runtime proxy', () => {
     })
 
     expect(res.status).toBe(403)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('workspace sandbox terminal WebSocket upgrade', () => {
+  it('matches terminal WebSocket paths and rejects malformed encoded ids', () => {
+    expect(matchSandboxTerminalWsPath('/api/workspaces/workspace%201/sandbox/runtime/box%201/terminals/session/ws')).toEqual({
+      workspaceId: 'workspace 1',
+      sandboxId: 'box 1',
+      subPath: 'terminals/session/ws',
+    })
+    expect(matchSandboxTerminalWsPath('/api/workspaces/%ZZ/sandbox/runtime/box-1/terminals/session/ws')).toBeNull()
+    expect(isSandboxTerminalWsUpgrade(new Request('https://app.test/api/workspaces/%ZZ/sandbox/runtime/box-1/terminals/session/ws', {
+      headers: { Upgrade: 'websocket' },
+    }))).toBe(false)
+  })
+
+  it('auth-gates and forwards terminal WebSocket upgrades without the browser bearer subprotocol', async () => {
+    const token = await createSandboxTerminalToken(
+      { userId: 'user-1', workspaceId: 'workspace-1', sandboxId: 'box-1' },
+      { secret, expiresInMs: 60_000 },
+    )
+    const encoded = btoa(token.token).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    const fetchMock = vi.fn(async (_input: string, _init?: RequestInit) => new Response('upgraded', { status: 200 }))
+    const handler = createWorkspaceSandboxTerminalUpgradeHandler({
+      requireUser: async () => ({ id: 'user-1' }),
+      requireWorkspaceAccess: async () => {},
+      getSandboxApiCredentials: async () => ({ baseUrl: 'https://sandbox.test', apiKey: 'sandbox-key' }),
+      tokenSecret: secret,
+      fetch: fetchMock as typeof fetch,
+    })
+
+    const res = await handler(new Request('https://app.test/api/workspaces/workspace-1/sandbox/runtime/box-1/terminals/session/ws?cols=120', {
+      headers: {
+        Upgrade: 'websocket',
+        'Sec-WebSocket-Protocol': `terminal, bearer.${encoded}`,
+      },
+    }))
+
+    expect(res?.status).toBe(200)
+    const [upstream, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(upstream).toBe('https://sandbox.test/v1/sandboxes/box-1/runtime/terminals/session/ws?cols=120')
+    expect((init.headers as Headers).get('authorization')).toBe('Bearer sandbox-key')
+    expect((init.headers as Headers).get('sec-websocket-protocol')).toBe('terminal')
+  })
+
+  it('keeps the runtime bearer out of the websocket subprotocol for direct sidecar upgrades', async () => {
+    const token = await createSandboxTerminalToken(
+      { userId: 'user-1', workspaceId: 'workspace-1', sandboxId: 'box-1' },
+      { secret, expiresInMs: 60_000 },
+    )
+    const encoded = btoa(token.token).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    const fetchMock = vi.fn(async (_input: string, _init?: RequestInit) => new Response('upgraded', { status: 200 }))
+    const handler = createWorkspaceSandboxTerminalUpgradeHandler({
+      requireUser: async () => ({ id: 'user-1' }),
+      requireWorkspaceAccess: async () => {},
+      getSandboxApiCredentials: async () => ({ baseUrl: 'https://sandbox.test', apiKey: 'sandbox-key' }),
+      getSandboxRuntimeConnection: async () => ({ runtimeUrl: 'https://sidecar.test', authToken: 'runtime-token' }),
+      tokenSecret: secret,
+      fetch: fetchMock as typeof fetch,
+    })
+
+    const res = await handler(new Request('https://app.test/api/workspaces/workspace-1/sandbox/runtime/box-1/terminals/session/ws', {
+      headers: {
+        Upgrade: 'websocket',
+        'Sec-WebSocket-Protocol': `terminal, bearer.${encoded}`,
+      },
+    }))
+
+    expect(res?.status).toBe(200)
+    const [upstream, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(upstream).toBe('https://sidecar.test/terminals/session/ws')
+    expect((init.headers as Headers).get('authorization')).toBe('Bearer runtime-token')
+    expect((init.headers as Headers).get('sec-websocket-protocol')).toBe('terminal')
+  })
+
+  it('rejects invalid WebSocket terminal tokens before fetching upstream', async () => {
+    const fetchMock = vi.fn(async (_input: string, _init?: RequestInit) => new Response('upgraded', { status: 200 }))
+    const handler = createWorkspaceSandboxTerminalUpgradeHandler({
+      requireUser: async () => ({ id: 'user-1' }),
+      requireWorkspaceAccess: async () => {},
+      getSandboxApiCredentials: async () => ({ baseUrl: 'https://sandbox.test', apiKey: 'sandbox-key' }),
+      tokenSecret: secret,
+      fetch: fetchMock as typeof fetch,
+    })
+
+    const res = await handler(new Request('https://app.test/api/workspaces/workspace-1/sandbox/runtime/box-1/terminals/session/ws', {
+      headers: {
+        Upgrade: 'websocket',
+        'Sec-WebSocket-Protocol': 'bearer.bad',
+      },
+    }))
+
+    expect(res?.status).toBe(403)
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })
