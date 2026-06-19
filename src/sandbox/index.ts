@@ -3,6 +3,7 @@ import {
   type AgentProfile,
   type AgentProfileFileMount,
   type AgentProfileMcpServer,
+  type ExecResult,
   type SandboxConnection,
   type SandboxInstance,
   type ScopedTokenScope,
@@ -519,31 +520,96 @@ export function splitDeferredProfileFiles(
 // JSON request envelope — comfortably below 4096.
 const PROFILE_WRITE_B64_CHUNK_CHARS = 3000
 
-// gtm's corpus is ~45 small execs; on a cold box the runtime exec proxy can
-// return HTTP 429 (rate limit) mid-batch. A 429 is transient, so retry it with
-// exponential backoff before failing loud. Non-429 errors are NOT retried.
-const PROFILE_WRITE_MAX_429_RETRIES = 4
+// gtm's corpus is ~135 small execs; on a cold box the runtime exec proxy
+// hard-throttles (HTTP 429 after ~21 execs in ~34s) and, under sustained load,
+// SILENTLY HANGS instead of returning 429 — one parked exec wedges the channel
+// and `writeProfileFilesToBox` never returns, so `ensureWorkspaceSandbox`
+// parks the worker (~140s, no exception). Both failure shapes are transient:
+// retry the SAME exec with exponential backoff before failing loud. A non-429,
+// non-timeout error fails loud immediately; a non-zero exit is a real command
+// failure, never retried.
+const PROFILE_WRITE_MAX_RETRIES = 4
 const PROFILE_WRITE_RETRY_BASE_MS = 250
 const PROFILE_WRITE_RETRY_MAX_MS = 2000
 
+// Client-side hard ceiling per exec. The proxy's own 30s timeout is unreliable
+// once the channel wedges (it can hang past it), so we race each exec against an
+// independent timer we control: a wedged exec is abandoned here and retried as a
+// transient transport error, never silently parked. We also pass timeoutMs to
+// the SDK as defense-in-depth, but the race is the guarantee.
+const PROFILE_WRITE_EXEC_TIMEOUT_MS = 30_000
+
+// Pacing between execs to stay under the proxy throttle that triggers the hang.
+// The drill saw throttling at ~0.6 exec/s bursts; ~150ms between ~135 execs
+// adds well under a minute total and keeps the burst rate below the trip point.
+// On by default for the deferred path; overridable for tests/tuning.
+const PROFILE_WRITE_PACE_MS = 150
+
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
-// Detect a rate-limit (HTTP 429) surfaced by the exec proxy, regardless of
-// whether it arrives as a SandboxError-shaped object (status/code/retryAfterMs)
-// or as a generic thrown error whose message carries the 429.
-function rateLimit(err: unknown): { is429: boolean; retryAfterMs?: number } {
+// Sentinel cause for a client-side per-exec timeout (a hung/wedged proxy exec).
+// Carried as the `.cause` of the fail-loud Outcome so callers see the wedged
+// command instead of an opaque infinite hang.
+class ProfileWriteExecTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`exec exceeded ${timeoutMs}ms (proxy hang/wedge)`)
+    this.name = 'ProfileWriteExecTimeoutError'
+  }
+}
+
+// Run a box.exec, abandoning it if it does not settle within timeoutMs. The
+// returned promise rejects with ProfileWriteExecTimeoutError on timeout so the
+// retry loop treats a hang exactly like a transient transport error. We also
+// forward timeoutMs to the SDK so the underlying request is cancelled when the
+// SDK honors it; the race covers the case where it does not.
+function execWithTimeout(
+  box: SandboxInstance,
+  cmd: string,
+  timeoutMs: number,
+): Promise<ExecResult> {
+  return new Promise<ExecResult>((resolve, reject) => {
+    let settled = false
+    const timer = setTimeout(() => {
+      if (settled) return
+      settled = true
+      reject(new ProfileWriteExecTimeoutError(timeoutMs))
+    }, timeoutMs)
+    box.exec(cmd, { timeoutMs }).then(
+      (res) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        resolve(res)
+      },
+      (err) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        reject(err)
+      },
+    )
+  })
+}
+
+// Classify an exec failure as transient-retryable. Two shapes are transient and
+// share the backoff path: (1) a rate-limit (HTTP 429) the proxy surfaces as a
+// SandboxError-shaped object (status/code/retryAfterMs) or a thrown error whose
+// message carries the 429; (2) a client-side per-exec timeout, i.e. a wedged/
+// hung proxy exec abandoned by execWithTimeout. Everything else fails loud.
+function transientExecError(err: unknown): { retryable: boolean; retryAfterMs?: number } {
+  if (err instanceof ProfileWriteExecTimeoutError) return { retryable: true }
   if (err && typeof err === 'object') {
     const e = err as { status?: unknown; code?: unknown; message?: unknown; retryAfterMs?: unknown }
     const retryAfterMs = typeof e.retryAfterMs === 'number' ? e.retryAfterMs : undefined
-    if (e.status === 429) return { is429: true, retryAfterMs }
+    if (e.status === 429) return { retryable: true, retryAfterMs }
     if (typeof e.code === 'string' && /rate.?limit|too.?many.?requests|429/i.test(e.code)) {
-      return { is429: true, retryAfterMs }
+      return { retryable: true, retryAfterMs }
     }
     if (typeof e.message === 'string' && /\b429\b|rate.?limit|too many requests/i.test(e.message)) {
-      return { is429: true, retryAfterMs }
+      return { retryable: true, retryAfterMs }
     }
   }
-  return { is429: false }
+  return { retryable: false }
 }
 
 // Materialize inline profile files into a running box via `box.exec`. Uses a
@@ -557,10 +623,32 @@ function rateLimit(err: unknown): { is429: boolean; retryAfterMs?: number } {
 // chunk, then a decode+cleanup) so no single exec request body trips the
 // ~4 KiB proxy cap. Writes are sequential; a single bad mount stops the batch
 // and the first failure is returned (fail-loud), the rest are not attempted.
+//
+// Each exec is bounded by a client-side hard timeout and retried with backoff
+// on a 429 OR a hang/timeout, so one wedged proxy exec can never park the
+// caller (and thus never park provisioning). A small pace between execs keeps
+// the burst rate below the proxy throttle that triggers the hang.
+export interface WriteProfileFilesOptions {
+  // Hard ceiling per exec (ms). A hung/wedged exec is abandoned and retried.
+  execTimeoutMs?: number
+  // Delay between execs (ms) to stay under the proxy throttle. 0 disables it.
+  paceMs?: number
+  // Max retries for a transient (429 or timeout/hang) exec before failing loud.
+  maxRetries?: number
+}
+
 export async function writeProfileFilesToBox(
   box: SandboxInstance,
   files: AgentProfileFileMount[],
+  options: WriteProfileFilesOptions = {},
 ): Promise<Outcome<void>> {
+  const execTimeoutMs = options.execTimeoutMs ?? PROFILE_WRITE_EXEC_TIMEOUT_MS
+  const paceMs = options.paceMs ?? PROFILE_WRITE_PACE_MS
+  const maxRetries = options.maxRetries ?? PROFILE_WRITE_MAX_RETRIES
+  // Pace BETWEEN execs, not before the first or after the last. Shared across
+  // every mount in this call so the whole ~135-exec corpus stays paced.
+  let execStarted = false
+
   for (const mount of files) {
     if (mount.resource.kind !== 'inline') continue
     const content = mount.resource.content ?? ''
@@ -573,14 +661,18 @@ export async function writeProfileFilesToBox(
     const qb64 = shellPath(`${path}.b64`)
 
     // Run one exec step, surfacing a non-zero exit or transport error as a
-    // fail-loud Outcome with the underlying NetworkError/TimeoutError as cause.
-    // A 429 (rate limit) from the proxy is transient: retry with exponential
-    // backoff up to PROFILE_WRITE_MAX_429_RETRIES. Any non-429 error fails loud
-    // immediately. A non-zero exit is a real command failure, not retried.
+    // fail-loud Outcome with the underlying error as cause. A transient failure
+    // — a 429 (rate limit) OR a client-side timeout (a hung/wedged proxy exec) —
+    // is retried with exponential backoff up to maxRetries. Any other error
+    // fails loud immediately. A non-zero exit is a real command failure, not
+    // retried. After maxRetries the timeout is surfaced as the Outcome cause so
+    // a persistently-wedged exec fails fast and visibly instead of hanging.
     const step = async (cmd: string): Promise<Outcome<void>> => {
       for (let attempt = 0; ; attempt++) {
+        if (execStarted && paceMs > 0) await sleep(paceMs)
+        execStarted = true
         try {
-          const res = await box.exec(cmd)
+          const res = await execWithTimeout(box, cmd, execTimeoutMs)
           if (res.exitCode !== 0) {
             return fail(
               new Error(
@@ -590,8 +682,8 @@ export async function writeProfileFilesToBox(
           }
           return ok(undefined)
         } catch (err) {
-          const { is429, retryAfterMs } = rateLimit(err)
-          if (is429 && attempt < PROFILE_WRITE_MAX_429_RETRIES) {
+          const { retryable, retryAfterMs } = transientExecError(err)
+          if (retryable && attempt < maxRetries) {
             const backoff = Math.min(
               PROFILE_WRITE_RETRY_BASE_MS * 2 ** attempt,
               PROFILE_WRITE_RETRY_MAX_MS,

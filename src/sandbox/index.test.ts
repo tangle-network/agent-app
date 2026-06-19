@@ -854,7 +854,7 @@ describe('deferred profile files', () => {
     const res = await writeProfileFilesToBox(box, [
       inlineMount('skills/seo.md', '# SEO'),
       inlineMount('/usr/local/bin/gtm', '#!/bin/sh\necho hi'),
-    ])
+    ], { paceMs: 0 })
     expect(res.succeeded).toBe(true)
     // Small files: truncate(.b64) + one base64 chunk + decode, per file.
     expect(exec).toHaveBeenCalledTimes(6)
@@ -878,7 +878,7 @@ describe('deferred profile files', () => {
     const big =
       Array.from({ length: 9000 }, (_, i) => String.fromCharCode(33 + (i % 90))).join('') +
       '\nüé€\t"quotes" & $pecials\n'
-    const res = await writeProfileFilesToBox(box, [inlineMount('skills/big.md', big)])
+    const res = await writeProfileFilesToBox(box, [inlineMount('skills/big.md', big)], { paceMs: 0 })
     expect(res.succeeded).toBe(true)
     const cmds = exec.mock.calls.map((c) => c[0] as string)
 
@@ -905,7 +905,7 @@ describe('deferred profile files', () => {
     const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
     const box = fakeBox({ exec })
     const big = '#!/bin/sh\n' + 'echo x;'.repeat(2000) // >12 KiB
-    const res = await writeProfileFilesToBox(box, [inlineMount('skills/run.sh', big, true)])
+    const res = await writeProfileFilesToBox(box, [inlineMount('skills/run.sh', big, true)], { paceMs: 0 })
     expect(res.succeeded).toBe(true)
     const cmds = exec.mock.calls.map((c) => c[0] as string)
     for (const cmd of cmds) expect(Buffer.byteLength(cmd, 'utf8')).toBeLessThan(4096)
@@ -933,7 +933,7 @@ describe('deferred profile files', () => {
     const res = await writeProfileFilesToBox(box, [
       inlineMount('~/.claude/skills/gtm/SKILL.md', '# GTM skill'),
       inlineMount('/etc/app/config.json', '{}'),
-    ])
+    ], { paceMs: 0 })
     expect(res.succeeded).toBe(true)
     const cmds = exec.mock.calls.map((c) => c[0] as string)
 
@@ -971,7 +971,7 @@ describe('deferred profile files', () => {
       return { stdout: '', stderr: '', exitCode: 0 }
     })
     const box = fakeBox({ exec })
-    const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')])
+    const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')], { paceMs: 0 })
     expect(res.succeeded).toBe(true)
     // 2 rejected attempts on the first step + the successful retry + the
     // remaining 2 steps (append, decode) = 5 total exec invocations.
@@ -986,11 +986,118 @@ describe('deferred profile files', () => {
       throw err
     })
     const box = fakeBox({ exec })
-    const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')])
+    const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')], { paceMs: 0 })
     expect(res.succeeded).toBe(false)
     // Exactly one attempt — a non-429 error is not retried.
     expect(calls).toBe(1)
     if (!res.succeeded) expect(res.error.message).toContain('exec failed')
+  })
+
+  it('times out a hung exec, retries with backoff, then succeeds (no infinite park)', async () => {
+    vi.useFakeTimers()
+    try {
+      let calls = 0
+      // The first exec HANGS forever (never resolves) — the proxy wedge. The
+      // client-side timeout must abandon it and retry; the retry succeeds.
+      const exec = vi.fn().mockImplementation(
+        () =>
+          new Promise<{ stdout: string; stderr: string; exitCode: number }>((resolve) => {
+            calls++
+            if (calls === 1) return // hang: never settle
+            resolve({ stdout: '', stderr: '', exitCode: 0 })
+          }),
+      )
+      const box = fakeBox({ exec })
+      const promise = writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')], {
+        execTimeoutMs: 1000,
+        paceMs: 0,
+      })
+      // Drive past the 1s exec timeout (abandons the hang) + the first backoff.
+      await vi.advanceTimersByTimeAsync(1000 + 250 + 50)
+      const res = await promise
+      expect(res.succeeded).toBe(true)
+      // hung attempt 1 + retry of the same step (2) + append + decode = 4 execs.
+      expect(calls).toBe(4)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a persistently-hanging exec fails fast after the retry bound (not an infinite hang), timeout as cause', async () => {
+    vi.useFakeTimers()
+    try {
+      let calls = 0
+      // Every exec hangs forever — a fully-wedged channel. The loop must give up
+      // after maxRetries and fail loud with the timeout as cause, NOT hang.
+      const exec = vi.fn().mockImplementation(() => {
+        calls++
+        return new Promise<never>(() => {}) // never settles
+      })
+      const box = fakeBox({ exec })
+      const promise = writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')], {
+        execTimeoutMs: 1000,
+        maxRetries: 2,
+        paceMs: 0,
+      })
+      // Advance well past all (timeout + backoff) cycles: the whole thing must
+      // settle to a rejected-as-Outcome result in bounded time.
+      await vi.advanceTimersByTimeAsync(60_000)
+      const res = await promise
+      expect(res.succeeded).toBe(false)
+      // Initial attempt + 2 retries = 3 exec invocations on the first step,
+      // then the loop stops — it never reaches the append/decode steps.
+      expect(calls).toBe(3)
+      if (!res.succeeded) {
+        expect(res.error.message).toContain('exec failed')
+        // The wedged exec surfaces as the Outcome cause (a timeout), so callers
+        // see WHY provisioning failed instead of an opaque 140s park.
+        const cause = res.error.cause as Error
+        expect(cause).toBeInstanceOf(Error)
+        expect(cause.name).toBe('ProfileWriteExecTimeoutError')
+        expect(cause.message).toContain('1000ms')
+      }
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('paces execs: a delay elapses between consecutive execs (throttle avoidance)', async () => {
+    vi.useFakeTimers()
+    try {
+      const callTimes: number[] = []
+      const exec = vi.fn().mockImplementation(async () => {
+        callTimes.push(Date.now())
+        return { stdout: '', stderr: '', exitCode: 0 }
+      })
+      const box = fakeBox({ exec })
+      // One small file = 3 execs (truncate, append, decode). With paceMs=200,
+      // the 2nd and 3rd execs must each be ~200ms after the prior one.
+      const promise = writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')], {
+        paceMs: 200,
+      })
+      await vi.advanceTimersByTimeAsync(1000)
+      const res = await promise
+      expect(res.succeeded).toBe(true)
+      expect(callTimes.length).toBe(3)
+      // No pace before the first exec; a pace before each subsequent exec.
+      expect(callTimes[1]! - callTimes[0]!).toBeGreaterThanOrEqual(200)
+      expect(callTimes[2]! - callTimes[1]!).toBeGreaterThanOrEqual(200)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('forwards the per-exec timeout to the SDK exec call (defense-in-depth)', async () => {
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    const box = fakeBox({ exec })
+    const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')], {
+      execTimeoutMs: 12_345,
+      paceMs: 0,
+    })
+    expect(res.succeeded).toBe(true)
+    for (const call of exec.mock.calls) {
+      expect(call[1]).toMatchObject({ timeoutMs: 12_345 })
+    }
   })
 
   it('ensureWorkspaceSandbox: deferred files are stripped from create payload and written post-running', async () => {
