@@ -1572,6 +1572,74 @@ describe('deferred profile files', () => {
     expect(exec).toHaveBeenCalledTimes(3)
   })
 
+  it('ensureWorkspaceSandbox: refresh 403 during best-effort auth refresh fails typed without writing', async () => {
+    const denied = Object.assign(new Error('forbidden'), { status: 403 })
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    const running = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      connection: { runtimeUrl: 'https://rt' } as never,
+      refresh: vi.fn().mockRejectedValue(denied),
+      exec,
+    })
+    listMock.mockResolvedValue([running])
+    const filesProfile = {
+      name: 'p',
+      resources: { files: [inlineMount('skills/seo.md', '# SEO')] },
+    } as unknown as AgentProfile
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      deferProfileFiles: true,
+      profile: () => filesProfile,
+    })
+
+    const err = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+      .catch((error: Error) => error)
+    const thrown = err as Error
+
+    expect(thrown.message).toContain(
+      'deferred file write failed on reused box box-w1: reused sandbox auth refresh failed for box-w1: runtime exec auth refresh was unauthorized',
+    )
+    expect(thrown.cause).toBeInstanceOf(SandboxRuntimeAuthRefreshError)
+    expect((thrown.cause as Error).cause).toBe(denied)
+    expect(running.refresh).toHaveBeenCalledOnce()
+    expect(getMock).not.toHaveBeenCalled()
+    expect(exec).not.toHaveBeenCalled()
+  })
+
+  it('ensureWorkspaceSandbox: get 403 during best-effort auth refresh fails typed without writing', async () => {
+    const denied = Object.assign(new Error('forbidden'), { status: 403 })
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    const running = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      connection: { runtimeUrl: 'https://rt' } as never,
+      exec,
+    })
+    listMock.mockResolvedValue([running])
+    getMock.mockRejectedValue(denied)
+    const filesProfile = {
+      name: 'p',
+      resources: { files: [inlineMount('skills/seo.md', '# SEO')] },
+    } as unknown as AgentProfile
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      deferProfileFiles: true,
+      profile: () => filesProfile,
+    })
+
+    const err = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+      .catch((error: Error) => error)
+    const thrown = err as Error
+
+    expect(thrown.message).toContain(
+      'deferred file write failed on reused box box-w1: reused sandbox auth refresh failed for box-w1: runtime exec auth re-fetch was unauthorized',
+    )
+    expect(thrown.cause).toBeInstanceOf(SandboxRuntimeAuthRefreshError)
+    expect((thrown.cause as Error).cause).toBe(denied)
+    expect(running.refresh).toHaveBeenCalledOnce()
+    expect(getMock).toHaveBeenCalledWith(running.id)
+    expect(exec).not.toHaveBeenCalled()
+  })
+
   it('ensureWorkspaceSandbox: refreshes runtime auth after one deferred-write 401 and retries idempotently', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'agent-app-profile-write-auth-'))
     let calls = 0
