@@ -722,30 +722,67 @@ describe('deferred profile files', () => {
       inlineMount('/usr/local/bin/gtm', '#!/bin/sh\necho hi'),
     ])
     expect(res.succeeded).toBe(true)
+    // Small files: truncate(.b64) + one base64 chunk + decode, per file.
     expect(exec).toHaveBeenCalledTimes(6)
     const cmds = exec.mock.calls.map((c) => c[0] as string)
-    // base64 of "# SEO"
-    expect(cmds.some((cmd) => cmd.includes(Buffer.from('# SEO', 'utf8').toString('base64')))).toBe(true)
-    expect(cmds.some((cmd) => cmd.includes('base64 -d'))).toBe(true)
-    // bin target gets +x
-    expect(cmds.at(-1)).toContain('chmod +x')
-    expect(cmds.slice(0, -1).some((cmd) => cmd.includes('chmod +x'))).toBe(false)
+    const joined = cmds.join('\n')
+    // base64 of "# SEO" lands in a printf append; a final step decodes it.
+    expect(joined).toContain(Buffer.from('# SEO', 'utf8').toString('base64'))
+    expect(joined).toContain('base64 -d')
+    // bin target gets +x; the non-bin skill file does not.
+    const gtmCmds = cmds.filter((c) => c.includes('/usr/local/bin/gtm'))
+    const seoCmds = cmds.filter((c) => c.includes('skills/seo.md'))
+    expect(gtmCmds.some((c) => c.includes('chmod +x'))).toBe(true)
+    expect(seoCmds.some((c) => c.includes('chmod +x'))).toBe(false)
   })
 
-  it('chunks large inline files to avoid oversized sandbox exec commands', async () => {
+  it('chunks a large file so every exec body stays under the 4 KiB proxy cap', async () => {
     const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
     const box = fakeBox({ exec })
-    const largeScript = '#!/bin/sh\n' + 'echo x\n'.repeat(1500)
-
-    const res = await writeProfileFilesToBox(box, [
-      inlineMount('/home/agent/tools/gtm-agent/bin/gtm', largeScript),
-    ])
-
+    // >8 KiB of varied bytes (ascii + unicode + shell specials) exercises
+    // multi-chunk slicing and byte-exact round-trip.
+    const big =
+      Array.from({ length: 9000 }, (_, i) => String.fromCharCode(33 + (i % 90))).join('') +
+      '\nüé€\t"quotes" & $pecials\n'
+    const res = await writeProfileFilesToBox(box, [inlineMount('skills/big.md', big)])
     expect(res.succeeded).toBe(true)
     const cmds = exec.mock.calls.map((c) => c[0] as string)
-    expect(cmds.length).toBeGreaterThan(4)
-    expect(Math.max(...cmds.map((cmd) => cmd.length))).toBeLessThan(2500)
-    expect(cmds.at(-1)).toContain('base64 -d')
+
+    // (a) every recorded exec command's UTF-8 byte length is under the cap.
+    for (const cmd of cmds) {
+      expect(Buffer.byteLength(cmd, 'utf8')).toBeLessThan(4096)
+    }
+    // A >8 KiB file needs more than one append chunk.
+    const appends = cmds.filter((c) => c.startsWith("printf '%s' '"))
+    expect(appends.length).toBeGreaterThan(1)
+
+    // (d) mkdir -p precedes the writes (it is part of the first command).
+    expect(cmds[0]).toContain('mkdir -p')
+
+    // (b) concatenating the printf payloads and base64-decoding reproduces the
+    // original content byte-exact.
+    const payload = appends
+      .map((c) => c.replace(/^printf '%s' '/, '').replace(/' >> .*$/, ''))
+      .join('')
+    expect(Buffer.from(payload, 'base64').toString('utf8')).toBe(big)
+  })
+
+  it('chmod +x is issued for an executable large file, every body under the cap', async () => {
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    const box = fakeBox({ exec })
+    const big = '#!/bin/sh\n' + 'echo x;'.repeat(2000) // >12 KiB
+    const res = await writeProfileFilesToBox(box, [inlineMount('skills/run.sh', big, true)])
+    expect(res.succeeded).toBe(true)
+    const cmds = exec.mock.calls.map((c) => c[0] as string)
+    for (const cmd of cmds) expect(Buffer.byteLength(cmd, 'utf8')).toBeLessThan(4096)
+    // (c) chmod +x is issued for the executable file.
+    expect(cmds.some((c) => c.includes('chmod +x'))).toBe(true)
+    // Round-trips byte-exact.
+    const payload = cmds
+      .filter((c) => c.startsWith("printf '%s' '"))
+      .map((c) => c.replace(/^printf '%s' '/, '').replace(/' >> .*$/, ''))
+      .join('')
+    expect(Buffer.from(payload, 'base64').toString('utf8')).toBe(big)
   })
 
   it('fails loud on a non-zero exec exit', async () => {
@@ -754,6 +791,72 @@ describe('deferred profile files', () => {
     const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')])
     expect(res.succeeded).toBe(false)
     if (!res.succeeded) expect(res.error.message).toContain('disk full')
+  })
+
+  it('expands a ~/ mount path to $HOME (not a literal ~ dir); absolute paths unchanged', async () => {
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    const box = fakeBox({ exec })
+    const res = await writeProfileFilesToBox(box, [
+      inlineMount('~/.claude/skills/gtm/SKILL.md', '# GTM skill'),
+      inlineMount('/etc/app/config.json', '{}'),
+    ])
+    expect(res.succeeded).toBe(true)
+    const cmds = exec.mock.calls.map((c) => c[0] as string)
+
+    // The tilde mount's commands expand `~` to $HOME and single-quote only the
+    // remainder — never a single-quoted literal '~/...'.
+    const tildeCmds = cmds.filter((c) => c.includes('.claude/skills/gtm'))
+    expect(tildeCmds.length).toBeGreaterThan(0)
+    for (const cmd of tildeCmds) {
+      // Unquoted $HOME followed by `/` — the shell expands it to the real home.
+      expect(cmd).toMatch(/"\$HOME"\//)
+      expect(cmd).not.toContain("'~/")
+      expect(cmd).not.toMatch(/'~'/)
+    }
+    // mkdir -p targets the real $HOME tree.
+    expect(tildeCmds[0]).toContain(`mkdir -p "$HOME"/'.claude/skills/gtm'`)
+    // The decode writes to $HOME, not a literal ~.
+    expect(tildeCmds.some((c) => c.includes(`base64 -d`) && c.includes('"$HOME"/'))).toBe(true)
+
+    // The absolute path is passed through single-quoted, with no $HOME rewrite.
+    const absCmds = cmds.filter((c) => c.includes('/etc/app/config.json'))
+    expect(absCmds.length).toBeGreaterThan(0)
+    for (const cmd of absCmds) expect(cmd).not.toContain('$HOME')
+    expect(absCmds[0]).toContain(`mkdir -p '/etc/app'`)
+  })
+
+  it('retries a 429 (rate limit) with backoff, then succeeds', async () => {
+    let calls = 0
+    const exec = vi.fn().mockImplementation(async () => {
+      calls++
+      // First exec is rate-limited twice, then the proxy lets it through.
+      if (calls <= 2) {
+        const err = Object.assign(new Error('Too Many Requests'), { status: 429, code: 'rate_limited' })
+        throw err
+      }
+      return { stdout: '', stderr: '', exitCode: 0 }
+    })
+    const box = fakeBox({ exec })
+    const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')])
+    expect(res.succeeded).toBe(true)
+    // 2 rejected attempts on the first step + the successful retry + the
+    // remaining 2 steps (append, decode) = 5 total exec invocations.
+    expect(calls).toBe(5)
+  })
+
+  it('fails loud immediately on a non-429 thrown error (no retry)', async () => {
+    let calls = 0
+    const exec = vi.fn().mockImplementation(async () => {
+      calls++
+      const err = Object.assign(new Error('connection reset'), { status: 503, code: 'server_error' })
+      throw err
+    })
+    const box = fakeBox({ exec })
+    const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')])
+    expect(res.succeeded).toBe(false)
+    // Exactly one attempt — a non-429 error is not retried.
+    expect(calls).toBe(1)
+    if (!res.succeeded) expect(res.error.message).toContain('exec failed')
   })
 
   it('ensureWorkspaceSandbox: deferred files are stripped from create payload and written post-running', async () => {
@@ -774,7 +877,7 @@ describe('deferred profile files', () => {
     const payload = createMock.mock.calls[0]![0]
     // Inline files stripped from the create payload.
     expect(payload.backend.profile.resources.files).toEqual([])
-    // ...and written into the box afterward.
+    // ...and written into the box afterward (3 small execs per file).
     expect(exec).toHaveBeenCalledTimes(6)
   })
 
