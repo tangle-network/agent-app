@@ -62,6 +62,7 @@ import {
   runSandboxToolPathSetup,
   splitDeferredProfileFiles,
   writeProfileFilesToBox,
+  SandboxRuntimeAuthRefreshError,
   type SandboxRuntimeConfig,
   type SecretStore,
 } from './index'
@@ -1580,7 +1581,7 @@ describe('deferred profile files', () => {
     expect(thrown.message).toContain(
       'deferred file write failed on reused box box-w1: reused sandbox auth refresh failed for box-w1: runtime exec remained unauthorized after auth refresh',
     )
-    expect((thrown.cause as Error).name).toBe('SandboxRuntimeAuthRefreshError')
+    expect(thrown.cause).toBeInstanceOf(SandboxRuntimeAuthRefreshError)
     expect(((thrown.cause as Error).cause as Error).cause).toBe(authError)
     expect(running.refresh).toHaveBeenCalledOnce()
     expect(exec).toHaveBeenCalledTimes(2)

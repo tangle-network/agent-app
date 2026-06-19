@@ -680,7 +680,7 @@ function deferredProfileWriteFailed(stage: 'new' | 'reused' | 'resumed', name: s
 
 type ExistingBoxStage = 'reused' | 'resumed'
 
-class SandboxRuntimeAuthRefreshError extends Error {
+export class SandboxRuntimeAuthRefreshError extends Error {
   constructor(stage: ExistingBoxStage, name: string, detail: string, cause?: unknown) {
     super(`${stage} sandbox auth refresh failed for ${name}: ${detail}`, { cause })
     this.name = 'SandboxRuntimeAuthRefreshError'
