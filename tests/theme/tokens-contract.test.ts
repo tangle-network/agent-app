@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const cssPath = join(repoRoot, 'src', 'theme', 'tokens.css')
-const REACT_PKGS = ['design-canvas-react', 'sequences-react', 'web-react']
+const REACT_PKGS = ['design-canvas-react', 'sequences-react', 'studio-react', 'web-react']
 const REQUIRED_ALIASES = [
   '--bg-input', '--text-primary', '--text-secondary', '--text-muted',
   '--text-danger', '--border-default', '--brand-primary',
@@ -134,6 +134,7 @@ describe('no status-palette literals outside the allowlist', () => {
   const ALLOW = [
     'sequences-react/components/TimelineClipChip.tsx', // video/audio/agent kind-coding
     'design-canvas-react/components/BleedTrimOverlay.tsx', // print bleed (red convention)
+    'studio-react/type-config.ts', // media-type kind-coding (image/video/avatar/speech/transcription)
   ]
   const PALETTE = /(text|bg|border|ring|fill|stroke)-(rose|amber|emerald|green|red|yellow|lime|orange)-[0-9]/
 
