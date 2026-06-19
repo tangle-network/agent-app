@@ -7,7 +7,7 @@ export default defineConfig({
     // tests run inside a GENERATED project, not here (they import the published
     // `@tangle-network/agent-app`, absent in this repo's module graph). The
     // scaffolder itself is exercised by `tests/create-agent-app.test.ts`.
-    include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
+    include: ['tests/**/*.test.{ts,tsx}', 'src/**/*.test.{ts,tsx}'],
     exclude: ['**/node_modules/**', '**/dist/**', 'create-agent-app/template/**'],
     // Run test FILES one at a time. Parallel forks each load the full module
     // graph (React, TipTap, drizzle, better-sqlite3, konva) and accumulate heap
