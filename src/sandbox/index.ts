@@ -246,14 +246,26 @@ export function splitDeferredProfileFiles(
   return { leanProfile, deferredFiles }
 }
 
+// The runtime exec proxy (`box.exec` → /terminals/commands) hangs (30s
+// timeout) on any request whose body crosses ~4096 bytes, and one oversized
+// exec wedges the channel so every later exec on the box hangs too. We slice
+// each file's base64 into appends whose full command string stays well under
+// that cap. 3000 chars of base64 leaves ~1000 bytes of headroom for the
+// surrounding `printf '%s' '<slice>' >> <path>.b64` command plus the proxy's
+// JSON request envelope — comfortably below 4096.
+const PROFILE_WRITE_B64_CHUNK_CHARS = 3000
+
 // Materialize inline profile files into a running box via `box.exec`. Uses a
 // base64 pipe so arbitrary content (scripts, unicode, special chars) lands
 // byte-exact, and writes to ANY absolute path (e.g. /usr/local/bin) or a
 // `~`-relative path — the exec runs as the sidecar, which is not bound by the
 // safe-prefix allow-list the /files/write API enforces. Sets the executable
-// bit when the mount declares it OR the target is a bin directory. One exec
-// per file keeps a single bad mount from poisoning the batch; the first
-// failure is returned (fail-loud), the rest are not attempted.
+// bit when the mount declares it OR the target is a bin directory.
+//
+// Each file is written in several small execs (mkdir, one append per base64
+// chunk, then a decode+cleanup) so no single exec request body trips the
+// ~4 KiB proxy cap. Writes are sequential; a single bad mount stops the batch
+// and the first failure is returned (fail-loud), the rest are not attempted.
 export async function writeProfileFilesToBox(
   box: SandboxInstance,
   files: AgentProfileFileMount[],
@@ -267,23 +279,45 @@ export async function writeProfileFilesToBox(
     const isBin = /(^|\/)(s?bin)\//.test(path)
     const executable = mount.executable ?? isBin
     const q = shellSingleQuote(path)
-    // mkdir -p handles `~` (the shell expands it); printf '%s' avoids a
-    // trailing newline; base64 -d reconstructs the exact bytes.
-    const mkdir = dir && dir !== path ? `mkdir -p ${shellSingleQuote(dir)} && ` : ''
-    const chmod = executable ? ` && chmod +x ${q}` : ''
-    const cmd = `${mkdir}printf '%s' ${shellSingleQuote(b64)} | base64 -d > ${q}${chmod}`
-    try {
-      const res = await box.exec(cmd)
-      if (res.exitCode !== 0) {
-        return fail(
-          new Error(
-            `writeProfileFilesToBox: failed to write ${path} (exit ${res.exitCode}): ${res.stderr.slice(0, 500)}`,
-          ),
-        )
+    const qb64 = shellSingleQuote(`${path}.b64`)
+
+    // Run one exec step, surfacing a non-zero exit or transport error as a
+    // fail-loud Outcome with the underlying NetworkError/TimeoutError as cause.
+    const step = async (cmd: string): Promise<Outcome<void>> => {
+      try {
+        const res = await box.exec(cmd)
+        if (res.exitCode !== 0) {
+          return fail(
+            new Error(
+              `writeProfileFilesToBox: failed to write ${path} (exit ${res.exitCode}): ${res.stderr.slice(0, 500)}`,
+            ),
+          )
+        }
+        return ok(undefined)
+      } catch (err) {
+        return fail(new Error(`writeProfileFilesToBox: exec failed for ${path}`, { cause: err }))
       }
-    } catch (err) {
-      return fail(new Error(`writeProfileFilesToBox: exec failed for ${path}`, { cause: err }))
     }
+
+    // mkdir -p handles `~` (the shell expands it). Start the staging file empty
+    // so re-runs (redeploy with new skills) overwrite rather than append.
+    const mkdir = dir && dir !== path ? `mkdir -p ${shellSingleQuote(dir)} && ` : ''
+    let res = await step(`${mkdir}: > ${qb64}`)
+    if (!res.succeeded) return res
+
+    // Append the base64 in capped slices; the base64 alphabet has no single
+    // quotes, so single-quoting each slice is safe. printf '%s' adds no newline.
+    for (let i = 0; i < b64.length; i += PROFILE_WRITE_B64_CHUNK_CHARS) {
+      const slice = b64.slice(i, i + PROFILE_WRITE_B64_CHUNK_CHARS)
+      res = await step(`printf '%s' '${slice}' >> ${qb64}`)
+      if (!res.succeeded) return res
+    }
+
+    // Decode the staged base64 to the real path, drop the staging file, and set
+    // the executable bit when required. base64 -d reconstructs the exact bytes.
+    const chmod = executable ? ` && chmod +x ${q}` : ''
+    res = await step(`base64 -d ${qb64} > ${q} && rm -f ${qb64}${chmod}`)
+    if (!res.succeeded) return res
   }
   return ok(undefined)
 }

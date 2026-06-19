@@ -641,14 +641,67 @@ describe('deferred profile files', () => {
       inlineMount('/usr/local/bin/gtm', '#!/bin/sh\necho hi'),
     ])
     expect(res.succeeded).toBe(true)
-    expect(exec).toHaveBeenCalledTimes(2)
+    // Small files: truncate(.b64) + one base64 chunk + decode, per file.
+    expect(exec).toHaveBeenCalledTimes(6)
     const cmds = exec.mock.calls.map((c) => c[0] as string)
-    // base64 of "# SEO"
-    expect(cmds[0]).toContain(Buffer.from('# SEO', 'utf8').toString('base64'))
-    expect(cmds[0]).toContain('base64 -d')
-    // bin target gets +x
-    expect(cmds[1]).toContain('chmod +x')
-    expect(cmds[0]).not.toContain('chmod +x')
+    const joined = cmds.join('\n')
+    // base64 of "# SEO" lands in a printf append; a final step decodes it.
+    expect(joined).toContain(Buffer.from('# SEO', 'utf8').toString('base64'))
+    expect(joined).toContain('base64 -d')
+    // bin target gets +x; the non-bin skill file does not.
+    const gtmCmds = cmds.filter((c) => c.includes('/usr/local/bin/gtm'))
+    const seoCmds = cmds.filter((c) => c.includes('skills/seo.md'))
+    expect(gtmCmds.some((c) => c.includes('chmod +x'))).toBe(true)
+    expect(seoCmds.some((c) => c.includes('chmod +x'))).toBe(false)
+  })
+
+  it('chunks a large file so every exec body stays under the 4 KiB proxy cap', async () => {
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    const box = fakeBox({ exec })
+    // >8 KiB of varied bytes (ascii + unicode + shell specials) exercises
+    // multi-chunk slicing and byte-exact round-trip.
+    const big =
+      Array.from({ length: 9000 }, (_, i) => String.fromCharCode(33 + (i % 90))).join('') +
+      '\nüé€\t"quotes" & $pecials\n'
+    const res = await writeProfileFilesToBox(box, [inlineMount('skills/big.md', big)])
+    expect(res.succeeded).toBe(true)
+    const cmds = exec.mock.calls.map((c) => c[0] as string)
+
+    // (a) every recorded exec command's UTF-8 byte length is under the cap.
+    for (const cmd of cmds) {
+      expect(Buffer.byteLength(cmd, 'utf8')).toBeLessThan(4096)
+    }
+    // A >8 KiB file needs more than one append chunk.
+    const appends = cmds.filter((c) => c.startsWith("printf '%s' '"))
+    expect(appends.length).toBeGreaterThan(1)
+
+    // (d) mkdir -p precedes the writes (it is part of the first command).
+    expect(cmds[0]).toContain('mkdir -p')
+
+    // (b) concatenating the printf payloads and base64-decoding reproduces the
+    // original content byte-exact.
+    const payload = appends
+      .map((c) => c.replace(/^printf '%s' '/, '').replace(/' >> .*$/, ''))
+      .join('')
+    expect(Buffer.from(payload, 'base64').toString('utf8')).toBe(big)
+  })
+
+  it('chmod +x is issued for an executable large file, every body under the cap', async () => {
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    const box = fakeBox({ exec })
+    const big = '#!/bin/sh\n' + 'echo x;'.repeat(2000) // >12 KiB
+    const res = await writeProfileFilesToBox(box, [inlineMount('skills/run.sh', big, true)])
+    expect(res.succeeded).toBe(true)
+    const cmds = exec.mock.calls.map((c) => c[0] as string)
+    for (const cmd of cmds) expect(Buffer.byteLength(cmd, 'utf8')).toBeLessThan(4096)
+    // (c) chmod +x is issued for the executable file.
+    expect(cmds.some((c) => c.includes('chmod +x'))).toBe(true)
+    // Round-trips byte-exact.
+    const payload = cmds
+      .filter((c) => c.startsWith("printf '%s' '"))
+      .map((c) => c.replace(/^printf '%s' '/, '').replace(/' >> .*$/, ''))
+      .join('')
+    expect(Buffer.from(payload, 'base64').toString('utf8')).toBe(big)
   })
 
   it('fails loud on a non-zero exec exit', async () => {
@@ -677,8 +730,8 @@ describe('deferred profile files', () => {
     const payload = createMock.mock.calls[0]![0]
     // Inline files stripped from the create payload.
     expect(payload.backend.profile.resources.files).toEqual([])
-    // ...and written into the box afterward.
-    expect(exec).toHaveBeenCalledTimes(2)
+    // ...and written into the box afterward (3 small execs per file).
+    expect(exec).toHaveBeenCalledTimes(6)
   })
 
   it('ensureWorkspaceSandbox: keeps files inline when deferProfileFiles is unset', async () => {
