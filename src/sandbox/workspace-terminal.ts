@@ -1,3 +1,10 @@
+import { base64UrlDecodeText } from '../crypto/web-token'
+import {
+  mintTerminalProxyToken,
+  verifyTerminalProxyToken,
+  type TerminalProxyIdentity,
+} from './terminal-proxy-token'
+
 export interface WorkspaceSandboxInstanceLike {
   id: string
   name?: string
@@ -11,6 +18,11 @@ export interface WorkspaceSandboxInstanceLike {
   } | null
 }
 
+// Generic name-keyed sandbox lifecycle manager. A structural, substrate-free
+// helper for products that drive their own SDK/box types (distinct from the
+// concrete `ensureWorkspaceSandbox` in ./index, which is bound to the
+// @tangle-network/sandbox client). Kept as a public export — external
+// consumers compose it; removing it would be a breaking change.
 export interface WorkspaceSandboxEnsureContext {
   workspaceId: string
   userId: string
@@ -81,30 +93,25 @@ export function createWorkspaceSandboxManager<TClient, TBox extends WorkspaceSan
 
 export interface SandboxTerminalTokenOptions {
   secret?: string
-  prefix?: string
   expiresInMs?: number
   now?: () => number
 }
 
-export interface SandboxTerminalTokenSubject {
-  userId: string
-  workspaceId: string
-  sandboxId: string
-}
+export type SandboxTerminalTokenSubject = TerminalProxyIdentity
 
 export interface SandboxTerminalTokenResult {
   token: string
   expiresAt: Date
 }
 
-interface SandboxTerminalTokenPayload extends SandboxTerminalTokenSubject {
-  exp: number
-  n: string
-}
-
-const DEFAULT_TERMINAL_TOKEN_PREFIX = 'sbxt_'
 const DEFAULT_TERMINAL_TOKEN_TTL_MS = 15 * 60 * 1000
 const BEARER_SUBPROTOCOL_PREFIX = 'bearer.'
+// Legacy `createSandboxTerminalToken` (pre proxy-token extraction) prefixed
+// minted tokens with `sbxt_` and signed the unprefixed payload. New tokens
+// carry no prefix. Strip it on verify so tokens minted by a prior deploy still
+// validate within their (default 15-min) TTL window — avoids a wave of 403s on
+// in-flight browser terminal sessions right after rollout.
+const LEGACY_TERMINAL_TOKEN_PREFIX = 'sbxt_'
 
 export async function createSandboxTerminalToken(
   subject: SandboxTerminalTokenSubject,
@@ -116,18 +123,9 @@ export async function createSandboxTerminalToken(
   const now = opts.now ?? Date.now
   const expiresInMs = opts.expiresInMs ?? DEFAULT_TERMINAL_TOKEN_TTL_MS
   if (!Number.isFinite(expiresInMs) || expiresInMs <= 0) throw new Error('expiresInMs must be a positive number')
-  const expiresAt = new Date(now() + expiresInMs)
-  const payload: SandboxTerminalTokenPayload = {
-    ...subject,
-    exp: Math.floor(expiresAt.getTime() / 1000),
-    n: crypto.randomUUID(),
-  }
-  const encodedPayload = base64urlText(JSON.stringify(payload))
-  const signature = await signText(encodedPayload, secret)
-  return {
-    token: `${opts.prefix ?? DEFAULT_TERMINAL_TOKEN_PREFIX}${encodedPayload}.${signature}`,
-    expiresAt,
-  }
+  const minted = await mintTerminalProxyToken(secret, subject, expiresInMs, now)
+  if (!minted.succeeded) throw minted.error
+  return minted.value
 }
 
 export async function verifySandboxTerminalToken(
@@ -137,28 +135,11 @@ export async function verifySandboxTerminalToken(
 ): Promise<boolean> {
   validateTerminalSubject(expected)
   const secret = opts.secret?.trim()
-  const prefix = opts.prefix ?? DEFAULT_TERMINAL_TOKEN_PREFIX
-  if (!secret || !token.startsWith(prefix)) return false
-  const body = token.slice(prefix.length)
-  const dot = body.lastIndexOf('.')
-  if (dot <= 0 || dot === body.length - 1) return false
-  const encodedPayload = body.slice(0, dot)
-  const signature = body.slice(dot + 1)
-  if (!timingSafeEqual(signature, await signText(encodedPayload, secret))) return false
-
-  let payload: SandboxTerminalTokenPayload
-  try {
-    payload = JSON.parse(textFromBase64url(encodedPayload)) as SandboxTerminalTokenPayload
-  } catch {
-    return false
-  }
-
   const now = opts.now ?? Date.now
-  return payload.userId === expected.userId
-    && payload.workspaceId === expected.workspaceId
-    && payload.sandboxId === expected.sandboxId
-    && Number.isFinite(payload.exp)
-    && payload.exp > Math.floor(now() / 1000)
+  const normalized = token.startsWith(LEGACY_TERMINAL_TOKEN_PREFIX)
+    ? token.slice(LEGACY_TERMINAL_TOKEN_PREFIX.length)
+    : token
+  return verifyTerminalProxyToken(secret ?? '', normalized, expected, now)
 }
 
 export interface AuthenticatedSandboxUser {
@@ -171,7 +152,6 @@ export interface WorkspaceSandboxConnectionHandlerOptions<TBox extends Workspace
   ensureWorkspaceSandbox: (workspaceId: string, userId: string) => Promise<TBox>
   tokenSecret: string | (() => string | undefined)
   tokenExpiresInMs?: number
-  tokenPrefix?: string
   proxyRuntimeUrl?: (args: { request: Request; workspaceId: string; sandboxId: string; box: TBox }) => string
   exposeDirectSidecar?: boolean
 }
@@ -202,7 +182,7 @@ export function createWorkspaceSandboxConnectionHandler<TBox extends WorkspaceSa
       )
     }
 
-    const directSidecarUrl = box.connection?.sidecarUrl ?? (box.connection?.authToken ? box.connection?.runtimeUrl : undefined)
+    const directSidecarUrl = box.connection?.sidecarUrl ?? box.connection?.runtimeUrl
     const directSidecarToken = box.connection?.authToken ?? box.connection?.sidecarToken
     const directSidecarExpiresAt = box.connection?.authTokenExpiresAt
     if (opts.exposeDirectSidecar && directSidecarUrl && directSidecarToken && directSidecarExpiresAt) {
@@ -216,7 +196,7 @@ export function createWorkspaceSandboxConnectionHandler<TBox extends WorkspaceSa
       })
     }
 
-    if (!box.connection?.runtimeUrl) {
+    if (!directSidecarUrl) {
       return Response.json(
         {
           error: 'Workspace sandbox runtime not ready. The sandbox is still initializing -- retry in a few seconds.',
@@ -231,7 +211,7 @@ export function createWorkspaceSandboxConnectionHandler<TBox extends WorkspaceSa
     try {
       scoped = await createSandboxTerminalToken(
         { userId: user.id, workspaceId, sandboxId: box.id },
-        { secret, expiresInMs: opts.tokenExpiresInMs, prefix: opts.tokenPrefix },
+        { secret, expiresInMs: opts.tokenExpiresInMs },
       )
     } catch (err) {
       return Response.json(
@@ -262,6 +242,7 @@ export interface SandboxApiCredentials {
 
 export interface SandboxRuntimeConnection {
   runtimeUrl: string
+  /** Server-side sidecar bearer. Must authorize terminal routes; never expose it to browser code. */
   authToken?: string
 }
 
@@ -271,7 +252,6 @@ export interface WorkspaceSandboxRuntimeProxyHandlerOptions {
   getSandboxApiCredentials: (args: { request: Request; userId: string; workspaceId: string; sandboxId: string }) => Promise<SandboxApiCredentials>
   getSandboxRuntimeConnection?: (args: { request: Request; userId: string; workspaceId: string; sandboxId: string }) => Promise<SandboxRuntimeConnection | null | undefined>
   tokenSecret: string | (() => string | undefined)
-  tokenPrefix?: string
   fetch?: typeof fetch
   forwardHeaders?: string[]
 }
@@ -301,15 +281,16 @@ export function createWorkspaceSandboxRuntimeProxyHandler(opts: WorkspaceSandbox
 
     const token = terminalTokenFromRequest(request.headers)
     const secret = typeof opts.tokenSecret === 'function' ? opts.tokenSecret() : opts.tokenSecret
-    if (!token || !(await verifySandboxTerminalToken(token, { userId: user.id, workspaceId, sandboxId }, { secret, prefix: opts.tokenPrefix }))) {
+    if (!token || !(await verifySandboxTerminalToken(token, { userId: user.id, workspaceId, sandboxId }, { secret }))) {
       return Response.json({ error: 'Invalid terminal token' }, { status: 403 })
     }
 
     const requestUrl = new URL(request.url)
     const runtimeConnection = await opts.getSandboxRuntimeConnection?.({ request, userId: user.id, workspaceId, sandboxId })
-    const credentials = runtimeConnection ? null : await opts.getSandboxApiCredentials({ request, userId: user.id, workspaceId, sandboxId })
-    const upstreamUrl = runtimeConnection
-      ? new URL(encodedRuntimePath, `${runtimeConnection.runtimeUrl.replace(/\/+$/, '')}/`)
+    const directRuntimeConnection = runtimeConnection?.runtimeUrl && runtimeConnection.authToken ? runtimeConnection : null
+    const credentials = directRuntimeConnection ? null : await opts.getSandboxApiCredentials({ request, userId: user.id, workspaceId, sandboxId })
+    const upstreamUrl = directRuntimeConnection
+      ? new URL(encodedRuntimePath, `${directRuntimeConnection.runtimeUrl.replace(/\/+$/, '')}/`)
       : new URL(
         `/v1/sandboxes/${encodeURIComponent(sandboxId)}/runtime/${encodedRuntimePath}`,
         credentials!.baseUrl,
@@ -318,7 +299,7 @@ export function createWorkspaceSandboxRuntimeProxyHandler(opts: WorkspaceSandbox
 
     const headers = buildSandboxRuntimeProxyHeaders(
       request.headers,
-      runtimeConnection?.authToken ?? credentials!.apiKey,
+      directRuntimeConnection?.authToken ?? credentials!.apiKey,
       opts.forwardHeaders,
     )
     const init: RequestInit & { duplex?: 'half' } = {
@@ -386,7 +367,10 @@ export function matchSandboxTerminalWsPath(pathname: string): SandboxTerminalWsM
   if (!m) return null
   const [, workspaceId, sandboxId, subPath] = m
   if (!workspaceId || !sandboxId || !subPath) return null
-  return { workspaceId: decodeURIComponent(workspaceId), sandboxId: decodeURIComponent(sandboxId), subPath }
+  const decodedWorkspaceId = safeDecodeURIComponent(workspaceId)
+  const decodedSandboxId = safeDecodeURIComponent(sandboxId)
+  if (!decodedWorkspaceId || !decodedSandboxId) return null
+  return { workspaceId: decodedWorkspaceId, sandboxId: decodedSandboxId, subPath }
 }
 
 /** True when `request` is a WebSocket upgrade for a sandbox terminal path. */
@@ -405,7 +389,6 @@ export interface WorkspaceSandboxTerminalUpgradeHandlerOptions {
   getSandboxApiCredentials: (args: { request: Request; userId: string; workspaceId: string; sandboxId: string }) => Promise<SandboxApiCredentials>
   getSandboxRuntimeConnection?: (args: { request: Request; userId: string; workspaceId: string; sandboxId: string }) => Promise<SandboxRuntimeConnection | null | undefined>
   tokenSecret: string | (() => string | undefined)
-  tokenPrefix?: string
   fetch?: typeof fetch
 }
 
@@ -447,24 +430,27 @@ export function createWorkspaceSandboxTerminalUpgradeHandler(opts: WorkspaceSand
 
     const token = terminalTokenFromRequest(request.headers)
     const secret = typeof opts.tokenSecret === 'function' ? opts.tokenSecret() : opts.tokenSecret
-    if (!token || !(await verifySandboxTerminalToken(token, { userId: user.id, workspaceId, sandboxId }, { secret, prefix: opts.tokenPrefix }))) {
+    if (!token || !(await verifySandboxTerminalToken(token, { userId: user.id, workspaceId, sandboxId }, { secret }))) {
       return new Response('Invalid terminal token', { status: 403 })
     }
 
     const runtimeConnection = await opts.getSandboxRuntimeConnection?.({ request, userId: user.id, workspaceId, sandboxId })
-    const credentials = runtimeConnection ? null : await opts.getSandboxApiCredentials({ request, userId: user.id, workspaceId, sandboxId })
-    const upstreamUrl = runtimeConnection
-      ? new URL(subPath, `${runtimeConnection.runtimeUrl.replace(/\/+$/, '')}/`)
+    const directRuntimeConnection = runtimeConnection?.runtimeUrl && runtimeConnection.authToken ? runtimeConnection : null
+    const credentials = directRuntimeConnection ? null : await opts.getSandboxApiCredentials({ request, userId: user.id, workspaceId, sandboxId })
+    const upstreamUrl = directRuntimeConnection
+      ? new URL(subPath, `${directRuntimeConnection.runtimeUrl.replace(/\/+$/, '')}/`)
       : new URL(`/v1/sandboxes/${encodeURIComponent(sandboxId)}/runtime/${subPath}`, credentials!.baseUrl)
     upstreamUrl.search = url.search
 
     // Forward the upgrade verbatim — keep the Upgrade/Connection + Sec-WebSocket-*
-    // headers the handshake needs and the offered subprotocol — but swap the auth
-    // to the server-to-server sandbox credential. Returning the upstream 101
-    // passes the live socket straight through to the browser.
+    // headers the handshake needs, but strip the browser-only bearer subprotocol
+    // and send the server-to-server sandbox credential only as Authorization.
+    // Returning the upstream 101 passes the live socket straight through to the browser.
     const upstreamHeaders = new Headers(request.headers)
-    upstreamHeaders.set('Authorization', `Bearer ${runtimeConnection?.authToken ?? credentials!.apiKey}`)
+    const upstreamBearer = directRuntimeConnection?.authToken ?? credentials!.apiKey
+    upstreamHeaders.set('Authorization', `Bearer ${upstreamBearer}`)
     upstreamHeaders.delete('host')
+    stripBearerSubprotocol(upstreamHeaders)
     const fetchImpl = opts.fetch ?? fetch
     return fetchImpl(upstreamUrl.toString(), { method: request.method, headers: upstreamHeaders })
   }
@@ -508,7 +494,7 @@ export function bearerSubprotocolToken(value: string | null): string | null {
     const encoded = protocol.slice(BEARER_SUBPROTOCOL_PREFIX.length)
     if (!encoded) return null
     try {
-      const token = textFromBase64url(encoded).trim()
+      const token = base64UrlDecodeText(encoded).trim()
       return token || null
     } catch {
       return null
@@ -521,40 +507,30 @@ export function terminalTokenFromRequest(headers: Headers): string | null {
   return bearerToken(headers.get('Authorization')) ?? bearerSubprotocolToken(headers.get('Sec-WebSocket-Protocol'))
 }
 
+function safeDecodeURIComponent(value: string): string | null {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return null
+  }
+}
+
+function stripBearerSubprotocol(headers: Headers): void {
+  const value = headers.get('Sec-WebSocket-Protocol')
+  if (!value) return
+  const protocols = value
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part && !part.toLowerCase().startsWith(BEARER_SUBPROTOCOL_PREFIX))
+  if (protocols.length) {
+    headers.set('Sec-WebSocket-Protocol', protocols.join(', '))
+  } else {
+    headers.delete('Sec-WebSocket-Protocol')
+  }
+}
+
 function validateTerminalSubject(subject: SandboxTerminalTokenSubject): void {
   if (!subject.userId) throw new Error('userId is required')
   if (!subject.workspaceId) throw new Error('workspaceId is required')
   if (!subject.sandboxId) throw new Error('sandboxId is required')
-}
-
-async function signText(message: string, secret: string): Promise<string> {
-  const enc = new TextEncoder()
-  const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
-  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message))
-  return base64url(new Uint8Array(sig))
-}
-
-function base64urlText(text: string): string {
-  return base64url(new TextEncoder().encode(text))
-}
-
-function textFromBase64url(value: string): string {
-  const b64 = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=')
-  const bin = atob(b64)
-  const bytes = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-  return new TextDecoder().decode(bytes)
-}
-
-function base64url(bytes: Uint8Array): string {
-  let s = ''
-  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]!)
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  let diff = 0
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  return diff === 0
 }

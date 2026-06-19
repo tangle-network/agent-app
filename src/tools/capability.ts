@@ -15,6 +15,13 @@
  * Workers, Node, and the browser with no Node `crypto` dependency.
  */
 
+import {
+  base64UrlDecodeText,
+  base64UrlEncodeText,
+  constantTimeEqual,
+  hmacSha256Base64Url,
+} from '../crypto/web-token'
+
 export interface CapabilityTokenOptions {
   /** Shared HMAC secret. When absent, mint returns undefined / verify returns false. */
   secret?: string
@@ -39,7 +46,7 @@ export async function verifyCapabilityToken(userId: string, token: string, opts:
   const prefix = opts.prefix ?? 'cap_'
   if (!secret || !token.startsWith(prefix)) return false
   const expected = `${prefix}${await sign(userId, secret)}`
-  return timingSafeEqual(token, expected)
+  return constantTimeEqual(token, expected)
 }
 
 export interface ExpiringCapabilityTokenOptions extends CapabilityTokenOptions {
@@ -65,8 +72,8 @@ export async function createExpiringCapabilityToken(subject: string, opts: Expir
   if (!Number.isFinite(opts.expiresInMs) || opts.expiresInMs <= 0) throw new Error('expiresInMs must be a positive number')
   const prefix = opts.prefix ?? 'cap_'
   const now = opts.now ?? Date.now
-  const payload = base64urlText(JSON.stringify({ sub: subject, exp: now() + opts.expiresInMs, n: crypto.randomUUID() }))
-  return `${prefix}${payload}.${await signText(payload, secret)}`
+  const payload = base64UrlEncodeText(JSON.stringify({ sub: subject, exp: now() + opts.expiresInMs, n: crypto.randomUUID() }))
+  return `${prefix}${payload}.${await hmacSha256Base64Url(payload, secret)}`
 }
 
 /** Verify an expiring token against `subject`: prefix, payload integrity,
@@ -81,10 +88,10 @@ export async function verifyExpiringCapabilityToken(subject: string, token: stri
   if (dot <= 0 || dot === body.length - 1) return false
   const payload = body.slice(0, dot)
   const sig = body.slice(dot + 1)
-  if (!timingSafeEqual(sig, await signText(payload, secret))) return false
+  if (!constantTimeEqual(sig, await hmacSha256Base64Url(payload, secret))) return false
   let parsed: { sub?: unknown; exp?: unknown }
   try {
-    parsed = JSON.parse(textFromBase64url(payload)) as { sub?: unknown; exp?: unknown }
+    parsed = JSON.parse(base64UrlDecodeText(payload)) as { sub?: unknown; exp?: unknown }
   } catch {
     return false
   }
@@ -95,38 +102,5 @@ export async function verifyExpiringCapabilityToken(subject: string, token: stri
 }
 
 async function sign(userId: string, secret: string): Promise<string> {
-  return signText(`user:${userId}`, secret)
-}
-
-async function signText(message: string, secret: string): Promise<string> {
-  const enc = new TextEncoder()
-  const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
-  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message))
-  return base64url(new Uint8Array(sig))
-}
-
-function base64urlText(text: string): string {
-  return base64url(new TextEncoder().encode(text))
-}
-
-function textFromBase64url(value: string): string {
-  const b64 = value.replace(/-/g, '+').replace(/_/g, '/')
-  const bin = atob(b64)
-  const bytes = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-  return new TextDecoder().decode(bytes)
-}
-
-function base64url(bytes: Uint8Array): string {
-  let s = ''
-  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]!)
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-/** Length-independent-leak-free compare for two same-charset strings. */
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  let diff = 0
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  return diff === 0
+  return hmacSha256Base64Url(`user:${userId}`, secret)
 }

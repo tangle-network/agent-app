@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export interface SandboxTerminalConnection {
   runtimeUrl: string | null
@@ -50,6 +50,8 @@ const EMPTY_CONNECTION: SandboxTerminalConnection = {
 
 export function useSandboxTerminalConnection(opts: UseSandboxTerminalConnectionOptions): UseSandboxTerminalConnectionResult {
   const [conn, setConn] = useState<SandboxTerminalConnection>(EMPTY_CONNECTION)
+  const mountedRef = useRef(false)
+  const generationRef = useRef(0)
   const fetcher = opts.fetcher ?? fetch
   const pollIntervalMs = opts.provisionPollIntervalMs ?? DEFAULT_PROVISION_POLL_INTERVAL_MS
   const pollTimeoutMs = opts.provisionPollTimeoutMs ?? DEFAULT_PROVISION_POLL_TIMEOUT_MS
@@ -61,17 +63,26 @@ export function useSandboxTerminalConnection(opts: UseSandboxTerminalConnectionO
   }, [opts.connectionUrl, opts.workspaceId])
 
   const connect = useCallback(async () => {
-    setConn((current) => ({ ...current, loading: true, error: null }))
+    const generation = generationRef.current + 1
+    generationRef.current = generation
+    const isCurrent = () => mountedRef.current && generationRef.current === generation
+    const setCurrentConn: typeof setConn = (value) => {
+      if (!isCurrent()) return
+      setConn(value)
+    }
+
+    setCurrentConn((current) => ({ ...current, loading: true, error: null }))
     const deadline = Date.now() + pollTimeoutMs
-    while (true) {
+    while (isCurrent()) {
       try {
         const res = await fetcher(connectionUrl())
         const data = (await res.json()) as SandboxTerminalConnectionResponse
+        if (!isCurrent()) return
         const runtimeUrl = data.runtimeUrl ?? data.sidecarUrl
         if (res.ok && runtimeUrl && data.token && data.expiresAt) {
-          setConn({
+          setCurrentConn({
             runtimeUrl,
-            sidecarUrl: runtimeUrl,
+            sidecarUrl: data.sidecarUrl ?? runtimeUrl,
             token: data.token,
             expiresAt: data.expiresAt,
             status: data.status ?? 'running',
@@ -82,7 +93,7 @@ export function useSandboxTerminalConnection(opts: UseSandboxTerminalConnectionO
           return
         }
         if (res.ok) {
-          setConn({
+          setCurrentConn({
             runtimeUrl: null,
             sidecarUrl: null,
             token: null,
@@ -95,7 +106,7 @@ export function useSandboxTerminalConnection(opts: UseSandboxTerminalConnectionO
           return
         }
         if (res.status === 503 && Date.now() < deadline) {
-          setConn((current) => ({
+          setCurrentConn((current) => ({
             ...current,
             loading: true,
             status: data.status ?? 'provisioning',
@@ -104,7 +115,7 @@ export function useSandboxTerminalConnection(opts: UseSandboxTerminalConnectionO
           await sleep(pollIntervalMs)
           continue
         }
-        setConn((current) => ({
+        setCurrentConn((current) => ({
           ...current,
           runtimeUrl: null,
           sidecarUrl: null,
@@ -116,11 +127,12 @@ export function useSandboxTerminalConnection(opts: UseSandboxTerminalConnectionO
         }))
         return
       } catch (err) {
+        if (!isCurrent()) return
         if (Date.now() < deadline) {
           await sleep(pollIntervalMs)
           continue
         }
-        setConn((current) => ({
+        setCurrentConn((current) => ({
           ...current,
           runtimeUrl: null,
           sidecarUrl: null,
@@ -133,6 +145,14 @@ export function useSandboxTerminalConnection(opts: UseSandboxTerminalConnectionO
       }
     }
   }, [connectionUrl, fetcher, pollIntervalMs, pollTimeoutMs])
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      generationRef.current += 1
+    }
+  }, [])
 
   useEffect(() => {
     void connect()
