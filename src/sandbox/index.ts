@@ -592,7 +592,7 @@ function execWithTimeout(
 }
 
 const TRANSIENT_EXEC_STATUS_CODES = new Set([408, 409, 425, 429, 500, 502, 503, 504])
-const TRANSIENT_EXEC_CODE_RE = /^(ECONNRESET|ETIMEDOUT|EPIPE|ECONNABORTED)$/i
+const TRANSIENT_EXEC_CODE_RE = /^(ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|ECONNABORTED)$/i
 const TRANSIENT_EXEC_MESSAGE_RE =
   /\b(408|409|425|429|500|502|503|504)\b|rate.?limit|too many requests|fetch failed|network error|connection reset|socket hang up|timed? out|service unavailable|bad gateway|gateway timeout|internal server error|sidecar .*not ready|not ready/i
 

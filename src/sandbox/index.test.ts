@@ -1024,14 +1024,16 @@ describe('deferred profile files', () => {
     }
   })
 
-  it('retries connection reset/network errors with backoff, then succeeds', async () => {
+  it('retries connection reset/refused network errors with backoff, then succeeds', async () => {
     vi.useFakeTimers()
     try {
       let calls = 0
       const reset = Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' })
+      const refused = Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' })
       const exec = vi.fn().mockImplementation(async () => {
         calls++
         if (calls === 1) throw new Error('fetch failed', { cause: reset })
+        if (calls === 2) throw refused
         return { stdout: '', stderr: '', exitCode: 0 }
       })
       const box = fakeBox({ exec })
@@ -1041,7 +1043,7 @@ describe('deferred profile files', () => {
       const res = await promise
 
       expect(res.succeeded).toBe(true)
-      expect(calls).toBe(4)
+      expect(calls).toBe(5)
     } finally {
       vi.useRealTimers()
     }
