@@ -1049,6 +1049,60 @@ describe('deferred profile files', () => {
     }
   })
 
+  it.each([
+    ['prefetch failed', () => new Error('prefetch failed')],
+    ['payment not ready', () => new Error('payment not ready')],
+    ['unsupported 501 status', () => Object.assign(new Error('not implemented'), { status: 501 })],
+  ])('does not retry unrelated exec message/status: %s', async (_label, makeError) => {
+    vi.useFakeTimers()
+    try {
+      let calls = 0
+      const exec = vi.fn().mockImplementation(async () => {
+        calls++
+        throw makeError()
+      })
+      const box = fakeBox({ exec })
+      const promise = writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')], {
+        maxRetries: 2,
+        paceMs: 0,
+      })
+
+      await vi.advanceTimersByTimeAsync(2_000)
+      const res = await promise
+
+      expect(res.succeeded).toBe(false)
+      expect(calls).toBe(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it.each([
+    ['runtime not ready', () => new Error('runtime not ready')],
+    ['sidecar exec plane not ready', () => new Error('sidecar exec plane not ready')],
+    ['terminal service not ready', () => new Error('terminal service not ready')],
+  ])('retries exec readiness message with context: %s', async (_label, makeError) => {
+    vi.useFakeTimers()
+    try {
+      let calls = 0
+      const exec = vi.fn().mockImplementation(async () => {
+        calls++
+        if (calls === 1) throw makeError()
+        return { stdout: '', stderr: '', exitCode: 0 }
+      })
+      const box = fakeBox({ exec })
+      const promise = writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')], { paceMs: 0 })
+
+      await vi.advanceTimersByTimeAsync(2_000)
+      const res = await promise
+
+      expect(res.succeeded).toBe(true)
+      expect(calls).toBe(4)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('fails loud immediately on a non-retryable thrown error (no retry)', async () => {
     let calls = 0
     const exec = vi.fn().mockImplementation(async () => {

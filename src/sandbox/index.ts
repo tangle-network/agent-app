@@ -594,7 +594,7 @@ function execWithTimeout(
 const TRANSIENT_EXEC_STATUS_CODES = new Set([408, 409, 425, 429, 500, 502, 503, 504])
 const TRANSIENT_EXEC_CODE_RE = /^(ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|ECONNABORTED)$/i
 const TRANSIENT_EXEC_MESSAGE_RE =
-  /\b(408|409|425|429|500|502|503|504)\b|rate.?limit|too many requests|fetch failed|network error|connection reset|socket hang up|timed? out|service unavailable|bad gateway|gateway timeout|internal server error|sidecar .*not ready|not ready/i
+  /\b(408|409|425|429|500|502|503|504)\b|rate.?limit|too many requests|\bfetch failed\b|network error|connection reset|socket hang up|timed? out|service unavailable|bad gateway|gateway timeout|internal server error|\b(?:sidecar|runtime|exec(?:ution)?|terminal|sandbox|service|command(?:s)?|proxy)\b.{0,80}\bnot ready\b|\bnot ready\b.{0,80}\b(?:sidecar|runtime|exec(?:ution)?|terminal|sandbox|service|command(?:s)?|proxy)\b/i
 
 function errorStatus(err: { status?: unknown; statusCode?: unknown; response?: unknown }): number | undefined {
   const rawStatus = err.status ?? err.statusCode ?? (
@@ -629,7 +629,7 @@ function isTransientExecError(err: unknown, seen = new Set<object>()): boolean {
     cause?: unknown
   }
   const status = errorStatus(e)
-  if (status !== undefined && (TRANSIENT_EXEC_STATUS_CODES.has(status) || status >= 500)) return true
+  if (status !== undefined && TRANSIENT_EXEC_STATUS_CODES.has(status)) return true
   if (typeof e.code === 'string') {
     if (TRANSIENT_EXEC_CODE_RE.test(e.code)) return true
     if (/rate.?limit|too.?many.?requests|429|server.?error|service.?unavailable/i.test(e.code)) return true
