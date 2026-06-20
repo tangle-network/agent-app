@@ -596,6 +596,7 @@ const TRANSIENT_EXEC_STATUS_CODES = new Set([408, 409, 425, 429, 500, 502, 503, 
 const TRANSIENT_EXEC_CODE_RE = /^(ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|ECONNABORTED)$/i
 const TRANSIENT_EXEC_MESSAGE_RE =
   /\b(408|409|425|429|500|502|503|504)\b|rate.?limit|too many requests|\bfetch failed\b|network error|connection reset|socket hang up|timed? out|service unavailable|bad gateway|gateway timeout|internal server error|\b(?:sidecar|runtime|exec(?:ution)?|terminal|sandbox|service|command(?:s)?|proxy)\b.{0,80}\bnot ready\b|\bnot ready\b.{0,80}\b(?:sidecar|runtime|exec(?:ution)?|terminal|sandbox|service|command(?:s)?|proxy)\b/i
+const RUNTIME_AUTH_REFRESH_SKEW_MS = 60_000
 
 function errorStatus(err: { status?: unknown; statusCode?: unknown; response?: unknown }): number | undefined {
   const rawStatus = err.status ?? err.statusCode ?? (
@@ -639,6 +640,43 @@ function isTransientExecError(err: unknown, seen = new Set<object>()): boolean {
   return isTransientExecError(e.cause, seen)
 }
 
+function isRuntimeExecAuthError(err: unknown, seen = new Set<object>()): boolean {
+  if (!err || typeof err !== 'object') return false
+  if (seen.has(err)) return false
+  seen.add(err)
+  const e = err as {
+    status?: unknown
+    statusCode?: unknown
+    response?: unknown
+    code?: unknown
+    name?: unknown
+    message?: unknown
+    cause?: unknown
+  }
+  if (errorStatus(e) === 401) return true
+  if (
+    typeof e.code === 'string' &&
+    /^(AUTH_ERROR|AUTHENTICATION_ERROR|UNAUTHORIZED|UNAUTHENTICATED|ERR_UNAUTHORIZED|ERR_UNAUTHENTICATED|401)$/i.test(e.code)
+  ) {
+    return true
+  }
+  if (
+    typeof e.name === 'string' &&
+    /^(AuthError|AuthenticationError|UnauthorizedError|UnauthenticatedError|SandboxAuthError)$/i.test(e.name)
+  ) {
+    return true
+  }
+  return isRuntimeExecAuthError(e.cause, seen)
+}
+
+function isRuntimeAuthRefreshDenied(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  return (
+    isRuntimeExecAuthError(err) ||
+    errorStatus(err as { status?: unknown; statusCode?: unknown; response?: unknown }) === 403
+  )
+}
+
 // Classify an exec failure as transient-retryable. Retryable shapes share the
 // same backoff path: rate-limit (HTTP 429 + retryAfterMs), client-side timeout,
 // and transient sidecar/transport/readiness failures surfaced as SandboxError-
@@ -652,6 +690,15 @@ function transientExecError(err: unknown): { retryable: boolean; retryAfterMs?: 
 
 function deferredProfileWriteFailed(stage: 'new' | 'reused' | 'resumed', name: string, cause: Error): Error {
   return new Error(`deferred file write failed on ${stage} box ${name}: ${cause.message}`, { cause })
+}
+
+type ExistingBoxStage = 'reused' | 'resumed'
+
+export class SandboxRuntimeAuthRefreshError extends Error {
+  constructor(stage: ExistingBoxStage, name: string, detail: string, cause?: unknown) {
+    super(`${stage} sandbox auth refresh failed for ${name}: ${detail}`, { cause })
+    this.name = 'SandboxRuntimeAuthRefreshError'
+  }
 }
 
 // Materialize inline profile files into a running box via `box.exec`. Uses a
@@ -791,11 +838,14 @@ export async function writeProfileFilesToBox(
 // refreshes the corpus on the next ensure call.
 async function materializeDeferredFilesForExistingBox(
   shell: SandboxRuntimeConfig,
+  client: Sandbox,
   box: SandboxInstance,
+  stage: ExistingBoxStage,
+  name: string,
   workspaceId: string,
   userId: string | undefined,
-): Promise<Outcome<void>> {
-  if (!shell.deferProfileFiles) return ok(undefined)
+): Promise<Outcome<SandboxInstance>> {
+  if (!shell.deferProfileFiles) return ok(box)
   const connectedIntegrationIds = await shell.connectedIntegrationIds(workspaceId)
   const buildCtx: SandboxBuildContext = {
     workspaceId,
@@ -805,8 +855,8 @@ async function materializeDeferredFilesForExistingBox(
   const files = await shell.files(buildCtx)
   const fullProfile = shell.profile({ extraFiles: files })
   const { deferredFiles } = splitDeferredProfileFiles(fullProfile)
-  if (deferredFiles.length === 0) return ok(undefined)
-  return writeProfileFilesToBox(box, deferredFiles)
+  if (deferredFiles.length === 0) return ok(box)
+  return writeDeferredFilesWithRuntimeAuthRefresh(client, box, deferredFiles, stage, name)
 }
 
 async function listRunning(
@@ -884,11 +934,35 @@ const RUNTIME_CONNECTION_POLL_MS = 1_000
 // ad-hoc cast (a plain `SandboxConnection` satisfies the optional field), and
 // fall back to the SDK runtime URL. The product-facing `WorkspaceSandboxInstanceLike`
 // carries the same field for consumers driving their own box types.
-type RuntimeConnectionFields = SandboxConnection & { sidecarUrl?: string }
+type RuntimeConnectionFields = SandboxConnection & {
+  sidecarUrl?: string
+  authToken?: string
+  sidecarToken?: string
+  authTokenExpiresAt?: string | number | Date
+  sidecarTokenExpiresAt?: string | number | Date
+}
 
 function sandboxRuntimeUrl(box: SandboxInstance): string | undefined {
   const connection: RuntimeConnectionFields | undefined = box.connection
   return connection?.sidecarUrl ?? connection?.runtimeUrl
+}
+
+function runtimeAuthExpiresAtMs(value: string | number | Date | undefined): number | undefined {
+  if (value instanceof Date) return value.getTime()
+  if (typeof value === 'number') return value
+  if (typeof value !== 'string' || value.trim() === '') return undefined
+  const parsed = Date.parse(value)
+  return Number.isNaN(parsed) ? undefined : parsed
+}
+
+function hasFreshRuntimeExecAuth(box: SandboxInstance, now = Date.now()): boolean {
+  const connection: RuntimeConnectionFields | undefined = box.connection
+  const token = connection?.authToken ?? connection?.sidecarToken
+  if (!sandboxRuntimeUrl(box) || !token) return false
+  const expiresAt = runtimeAuthExpiresAtMs(
+    connection?.authTokenExpiresAt ?? connection?.sidecarTokenExpiresAt,
+  )
+  return expiresAt === undefined || expiresAt > now + RUNTIME_AUTH_REFRESH_SKEW_MS
 }
 
 function sandboxEdgeFailed(box: SandboxInstance): boolean {
@@ -926,6 +1000,117 @@ async function refreshRuntimeConnection(
   }
 
   return current
+}
+
+async function bestEffortRefreshRuntimeExecAuth(
+  client: Sandbox,
+  box: SandboxInstance,
+  stage: ExistingBoxStage,
+  name: string,
+): Promise<Outcome<SandboxInstance>> {
+  let current = box
+
+  try {
+    await current.refresh()
+    if (hasFreshRuntimeExecAuth(current)) return ok(current)
+  } catch (err) {
+    if (isRuntimeAuthRefreshDenied(err)) {
+      return fail(
+        new SandboxRuntimeAuthRefreshError(
+          stage,
+          name,
+          'runtime exec auth refresh was unauthorized',
+          err,
+        ),
+      )
+    }
+  }
+
+  try {
+    const latest = await client.get(current.id)
+    if (latest) current = latest
+    if (hasFreshRuntimeExecAuth(current)) return ok(current)
+  } catch (err) {
+    if (isRuntimeAuthRefreshDenied(err)) {
+      return fail(
+        new SandboxRuntimeAuthRefreshError(
+          stage,
+          name,
+          'runtime exec auth re-fetch was unauthorized',
+          err,
+        ),
+      )
+    }
+  }
+
+  return ok(current)
+}
+
+async function refreshRuntimeExecAuth(
+  client: Sandbox,
+  box: SandboxInstance,
+  stage: ExistingBoxStage,
+  name: string,
+): Promise<Outcome<SandboxInstance>> {
+  let current = box
+  let lastError: unknown
+  const deadline = Date.now() + RUNTIME_CONNECTION_WAIT_MS
+
+  while (Date.now() < deadline) {
+    try {
+      await current.refresh()
+      if (hasFreshRuntimeExecAuth(current)) return ok(current)
+
+      const latest = await client.get(current.id)
+      if (latest) current = latest
+      if (hasFreshRuntimeExecAuth(current)) return ok(current)
+    } catch (err) {
+      lastError = err
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, RUNTIME_CONNECTION_POLL_MS))
+  }
+
+  const detail = sandboxRuntimeUrl(current)
+    ? 'runtime exec credentials are missing or expired after refresh'
+    : 'runtime connection is missing after refresh'
+  return fail(new SandboxRuntimeAuthRefreshError(stage, name, detail, lastError))
+}
+
+async function writeDeferredFilesWithRuntimeAuthRefresh(
+  client: Sandbox,
+  box: SandboxInstance,
+  files: AgentProfileFileMount[],
+  stage: ExistingBoxStage,
+  name: string,
+): Promise<Outcome<SandboxInstance>> {
+  let writeBox = box
+
+  if (!hasFreshRuntimeExecAuth(writeBox)) {
+    const refreshed = await bestEffortRefreshRuntimeExecAuth(client, writeBox, stage, name)
+    if (!refreshed.succeeded) return fail(refreshed.error)
+    writeBox = refreshed.value
+  }
+
+  const first = await writeProfileFilesToBox(writeBox, files)
+  if (first.succeeded) return ok(writeBox)
+  if (!isRuntimeExecAuthError(first.error)) return fail(first.error)
+
+  const refreshed = await refreshRuntimeExecAuth(client, writeBox, stage, name)
+  if (!refreshed.succeeded) return fail(refreshed.error)
+
+  const second = await writeProfileFilesToBox(refreshed.value, files)
+  if (second.succeeded) return ok(refreshed.value)
+  if (!isRuntimeExecAuthError(second.error)) return fail(second.error)
+
+  return fail(
+    new SandboxRuntimeAuthRefreshError(
+      stage,
+      name,
+      'runtime exec remained unauthorized after auth refresh',
+      second.error,
+    ),
+  )
 }
 
 // Decide whether an existing (reused or resumed) box is safe to hand back.
@@ -988,17 +1173,26 @@ export async function ensureWorkspaceSandbox(
     } else if (found.metadata?.harness === harness) {
       const ready = await refreshRuntimeConnection(client, found)
       if (await isReusableBox(ready, harness, shell.livenessProbe)) {
-        const written = await materializeDeferredFilesForExistingBox(shell, ready, workspaceId, userId)
+        const written = await materializeDeferredFilesForExistingBox(
+          shell,
+          client,
+          ready,
+          'reused',
+          name,
+          workspaceId,
+          userId,
+        )
         if (!written.succeeded) {
           throw deferredProfileWriteFailed('reused', name, written.error)
         }
+        const reusedBox = written.value
         if (shell.bootstrap) {
-          const boot = await shell.bootstrap(ready, scope)
+          const boot = await shell.bootstrap(reusedBox, scope)
           if (!boot.succeeded) {
             throw new Error(`bootstrap failed on reused box ${name}`, { cause: boot.error })
           }
         }
-        return ready
+        return reusedBox
       }
       const dropped = await deleteBox(ready)
       if (!dropped.succeeded) {
@@ -1028,17 +1222,26 @@ export async function ensureWorkspaceSandbox(
     if (resumed.succeeded && resumed.value) {
       const box = await refreshRuntimeConnection(client, resumed.value)
       if (await isReusableBox(box, harness, shell.livenessProbe)) {
-        const written = await materializeDeferredFilesForExistingBox(shell, box, workspaceId, userId)
+        const written = await materializeDeferredFilesForExistingBox(
+          shell,
+          client,
+          box,
+          'resumed',
+          name,
+          workspaceId,
+          userId,
+        )
         if (!written.succeeded) {
           throw deferredProfileWriteFailed('resumed', name, written.error)
         }
+        const resumedBox = written.value
         if (shell.bootstrap) {
-          const boot = await shell.bootstrap(box, scope)
+          const boot = await shell.bootstrap(resumedBox, scope)
           if (!boot.succeeded) {
             throw new Error(`bootstrap failed on resumed box ${name}`, { cause: boot.error })
           }
         }
-        return box
+        return resumedBox
       }
       const dropped = await deleteBox(box)
       if (!dropped.succeeded) {
