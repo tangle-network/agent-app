@@ -4,7 +4,7 @@
  *
  * The loop ENGINE lives in `@tangle-network/agent-eval` (a peer dependency):
  * `selfImprove` already owns the whole cycle — train/holdout split, the GEPA
- * driver, the held-out production gate, durable provenance + hosted ingest, and
+ * proposer, the held-out production gate, durable provenance + hosted ingest, and
  * every default. A product should NOT hand-roll `runImprovementLoop` +
  * `emitLoopProvenance` around it (that is the boilerplate this surface exists to
  * delete). It should call `selfImprove` with three things it actually owns:
@@ -20,7 +20,7 @@
  *   fan-out, partial-failure handling, and composite are the scaffold's.
  *
  * Everything else is a curated re-export so a product has ONE eval import:
- * `selfImprove` + the gates + the drivers + the types. See
+ * `selfImprove` + the gates + the proposers + the types. See
  * `.claude/skills/eval-campaign/SKILL.md` for the wiring contract.
  */
 
@@ -128,8 +128,8 @@ export type {
 } from '@tangle-network/agent-eval'
 export {
   defaultProductionGate,
-  evolutionaryDriver,
-  gepaDriver,
+  evolutionaryProposer,
+  gepaProposer,
   paretoSignificanceGate,
   runCampaign,
 } from '@tangle-network/agent-eval/campaign'
@@ -137,7 +137,6 @@ export type {
   CampaignResult,
   DispatchContext,
   Gate,
-  ImprovementDriver,
   JudgeConfig,
   JudgeDimension,
   JudgeScore,
@@ -145,6 +144,7 @@ export type {
   MutableSurface,
   Mutator,
   Scenario,
+  SurfaceProposer,
 } from '@tangle-network/agent-eval/campaign'
 export { selfImprove } from '@tangle-network/agent-eval/contract'
 export type {

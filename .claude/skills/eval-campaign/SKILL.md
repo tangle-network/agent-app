@@ -12,7 +12,7 @@ You are integrating a product agent's self-improvement loop. The loop **engine a
 `selfImprove` (from `@tangle-network/agent-eval/contract`, re-exported here) owns the entire cycle:
 
 - the **train/holdout split** from a flat `scenarios` array,
-- the **driver** (default `gepaDriver` from your `mutationPrimitives`),
+- the **proposer** (default `gepaProposer` from your `mutationPrimitives`),
 - the **held-out production gate** (default `defaultProductionGate`, `deltaThreshold` 0.05),
 - **durable provenance** + optional hosted ingest,
 - every budget/seed/storage default.
@@ -36,7 +36,7 @@ import {
 } from '@tangle-network/agent-app/eval-campaign'
 ```
 
-> Requires `@tangle-network/agent-eval >= 0.81.0` (peer). The scaffold composes the substrate downward; never import a product package from agent-eval (layering rule).
+> Requires `@tangle-network/agent-eval >= 0.95.0` (peer). The scaffold composes the substrate downward; never import a product package from agent-eval (layering rule).
 
 ## Minimal wiring (copy, then fill the three blanks)
 
@@ -64,7 +64,7 @@ const result = await selfImprove<MyScenario, MyArtifact>({
   agent: dispatchUnderSurface,          // YOU own — (surface, scenario, ctx) => artifact
   judge,                                // built above
   baselineSurface: '',                  // the addendum the loop optimizes (start empty)
-  mutationPrimitives: MY_DIRECTIVES,    // the optimization levers (default driver mutates toward these)
+  mutationPrimitives: MY_DIRECTIVES,    // the optimization levers (default proposer mutates toward these)
   runDir: process.env.MY_RUN_DIR,       // a real path → durable provenance; omit → in-memory
   // budget / model / gate / hostedTenant all default — override only when needed
 })
@@ -87,8 +87,8 @@ if (result.gate.decision === 'ship') await ship(result.winnerSurface)
 | `agent` | — (required) | your dispatch under a surface |
 | `judge` | — (required) | `buildEnsembleJudge` or a `JudgeConfig` |
 | `baselineSurface` | — (required) | the surface the loop optimizes; start `''` |
-| `mutationPrimitives` | gepaDriver's own | your optimization levers (additive directives) |
-| `driver` | `gepaDriver` | pass `evolutionaryDriver({ mutator })` for blind addendum rotation |
+| `mutationPrimitives` | gepaProposer's own | your optimization levers (additive directives) |
+| `proposer` | `gepaProposer` | pass `evolutionaryProposer({ mutator })` for blind addendum rotation |
 | `gate` | `defaultProductionGate` (Δ 0.05) | `paretoSignificanceGate` for multi-objective; tune `deltaThreshold` for your rubric scale |
 | `budget` | 3 gens × pop 2, 0.25 holdout | `budget.reps` (replicates → tighter CIs), `budget.promoteTopK`, `budget.holdoutScenarios` (explicit split), `budget.dollars` (cost cap) |
 | `expectUsage` | **`'assert'`** | the fail-loud backend-integrity guard. Leave at `'assert'` for real runs (a stub cell throws); set `'off'` ONLY for a deterministic offline/replay run |

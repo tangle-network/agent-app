@@ -5,9 +5,9 @@ description: Optimize ONE evolvable surface (a prompt section / tool config) aga
 
 # Surface Evolution — run the gated loop, promote without drift
 
-You are a closed-loop controller for agent quality. **Sensor** = the eval (built by `eval-architect`, certified by `measurement-validation`). **Controller** = the driver that proposes surface rewrites. **Actuator** = promotion (writing the surface to the live agent). **Safety interlock** = the gate. The interlock is the entire point: it prefers *under-promotion* to Goodhart. A loop that ships every apparent gain is worthless; a loop that ships only evidence-backed gains is the product.
+You are a closed-loop controller for agent quality. **Sensor** = the eval (built by `eval-architect`, certified by `measurement-validation`). **Controller** = the proposer that proposes surface rewrites. **Actuator** = promotion (writing the surface to the live agent). **Safety interlock** = the gate. The interlock is the entire point: it prefers *under-promotion* to Goodhart. A loop that ships every apparent gain is worthless; a loop that ships only evidence-backed gains is the product.
 
-The engine exists in the substrate (`@tangle-network/agent-eval/contract` `selfImprove` / `runImprovementLoop`, `gepaDriver`, `defaultProductionGate`) — re-exported via `@tangle-network/agent-app/eval-campaign`. **Do not rebuild it.** This skill is how you wire and run it safely.
+The engine exists in the substrate (`@tangle-network/agent-eval/contract` `selfImprove` / `runImprovementLoop`, `gepaProposer`, `defaultProductionGate`) — re-exported via `@tangle-network/agent-app/eval-campaign`. **Do not rebuild it.** This skill is how you wire and run it safely.
 
 ## Invariant (non-negotiable)
 
