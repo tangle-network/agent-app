@@ -22,14 +22,14 @@ importers:
         specifier: ^0.32.0
         version: 0.32.0
       '@tangle-network/agent-knowledge':
-        specifier: ^1.5.2
-        version: 1.5.2(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)
+        specifier: ^1.7.0
+        version: 1.7.0(@tangle-network/sandbox@0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)
       '@tangle-network/agent-runtime':
         specifier: ^0.70.0
-        version: 0.70.0(@tangle-network/agent-eval@0.95.0(typescript@5.9.3))(@tangle-network/agent-interface@0.10.1)(@tangle-network/agent-knowledge@1.5.2(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))
+        version: 0.70.0(@tangle-network/agent-eval@0.95.0(typescript@5.9.3))(@tangle-network/agent-interface@0.10.1)(@tangle-network/agent-knowledge@1.7.0(@tangle-network/sandbox@0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/sandbox@0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))
       '@tangle-network/sandbox':
-        specifier: ^0.6.0
-        version: 0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3))
+        specifier: ^0.8.0
+        version: 0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3))
       '@tangle-network/sandbox-ui':
         specifier: ^0.39.1
         version: 0.39.1(@tangle-network/agent-interface@0.10.1)(@tangle-network/ui@4.1.0(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react-router@7.18.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -1211,29 +1211,13 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@tangle-network/agent-eval@0.40.5':
-    resolution: {integrity: sha512-ew27fDkzvYcM/3/u6Jx1HGS3/bPoIWAXKGa/2XlOro2hBwMA/h37SAHg4ytUDMd2M0mAKQAAanUxnHfkt/aklw==}
+  '@tangle-network/agent-eval@0.79.0':
+    resolution: {integrity: sha512-reN1SbKvTXFS27PQa4l5dnwf0y33j118FM0aPKAq8I0fvj3H6olF1wwQWHCSm7Sjats9rU4c8x2wlSNk0VeCBQ==}
     engines: {node: '>=20'}
     hasBin: true
     peerDependencies:
-      '@tangle-network/agent-runtime': ^0.21.0
-      '@tangle-network/sandbox': ^0.2.1
+      '@tangle-network/sandbox': '>=0.2.1 <0.5.0'
     peerDependenciesMeta:
-      '@tangle-network/agent-runtime':
-        optional: true
-      '@tangle-network/sandbox':
-        optional: true
-
-  '@tangle-network/agent-eval@0.42.0':
-    resolution: {integrity: sha512-gJFT1Vm5LYDHtIF0BUqGq6i3Qa9IvFr3EvTfAE1CYjErFNl3TohL1sduJqj1GXIhDbswVVuWp5qaahHZHaIsbA==}
-    engines: {node: '>=20'}
-    hasBin: true
-    peerDependencies:
-      '@tangle-network/agent-runtime': ^0.21.0
-      '@tangle-network/sandbox': ^0.2.1
-    peerDependenciesMeta:
-      '@tangle-network/agent-runtime':
-        optional: true
       '@tangle-network/sandbox':
         optional: true
 
@@ -1255,18 +1239,22 @@ packages:
   '@tangle-network/agent-interface@0.10.1':
     resolution: {integrity: sha512-yehY/0EgKvu8lG6jIVoZCtMPLkj8VEWwasuAtuph2RaB9MKE5wuxRF647O6jw8KufNZ3aQ2UVVWpZ19dGCbs6w==}
 
-  '@tangle-network/agent-knowledge@1.5.2':
-    resolution: {integrity: sha512-muedsxgtEtMNM1/zM3HdquvcoYRh8Cl3zMbCqJkW+vKwg5Ni21PucdjQv9h7aQu/dO4oG7+Z79p+9yzfVTASeQ==}
+  '@tangle-network/agent-interface@0.8.0':
+    resolution: {integrity: sha512-okz9LGKwPNKODNyT9Y7+T+sQsJ4g6oTy/hpWpxR6r2BI7pS6WqIdgCOQcx98+WtlPoibkY3ewRRAb8YJMrPHog==}
+
+  '@tangle-network/agent-knowledge@1.7.0':
+    resolution: {integrity: sha512-F+a21T2UMW7HVj1Dt6Sv5GqjEQXWUshsVftRpStW1t0bVG0/1aT6DeHYKok1lLmi+D8WZnC0CNXPdb+LyxC/iA==}
     engines: {node: '>=20'}
     hasBin: true
 
-  '@tangle-network/agent-runtime@0.25.2':
-    resolution: {integrity: sha512-/HSrfr1kyW5wjLApudXQ4CcvjsZaxYtGXp6R6i0MdVoCVmZ6XBewKoVv1QGs+k0i8fUYrdEfh48cvGnrGOaQZQ==}
+  '@tangle-network/agent-runtime@0.44.0':
+    resolution: {integrity: sha512-uMzWcziIV+SsgvdvvnnSobaFYZuYXQ3KRfvq9h9kHglVLtPoUGH78ypCnyn5QQIccTk4gjSenAHC5Iy076DkQg==}
     engines: {node: '>=20'}
     hasBin: true
     peerDependencies:
+      '@tangle-network/agent-eval': '>=0.61.0 <1.0.0'
       '@tangle-network/agent-knowledge': '>=1.3.0 <2.0.0'
-      '@tangle-network/sandbox': '>=0.1.2 <0.4.0'
+      '@tangle-network/sandbox': '>=0.1.2 <0.5.0'
     peerDependenciesMeta:
       '@tangle-network/agent-knowledge':
         optional: true
@@ -1338,8 +1326,8 @@ packages:
       viem:
         optional: true
 
-  '@tangle-network/sandbox@0.6.2':
-    resolution: {integrity: sha512-PXn7jsmUZaXAoEv7a30q5ku0eqX+WEEc9rBMI/zPtZqXEBNQ6mxJveEdWZvbPPdv1V2P17wywQI1RIGNrpFF4A==}
+  '@tangle-network/sandbox@0.8.2':
+    resolution: {integrity: sha512-MG3dj7SnF7vI8CagW1OwpkJSUq3IREpADBWp6knOukKxSYYCMGwJ0nPZz+O2eotI+Nl2A2LIGiHqPB82jgOvjw==}
     peerDependencies:
       '@mastra/core': ^1.36.0
       '@modelcontextprotocol/sdk': ^1.29.0
@@ -3872,7 +3860,7 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@tangle-network/agent-eval@0.40.5(@tangle-network/agent-runtime@0.25.2(@tangle-network/agent-knowledge@1.5.2(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)':
+  '@tangle-network/agent-eval@0.79.0(@tangle-network/sandbox@0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)':
     dependencies:
       '@asteasolutions/zod-to-openapi': 8.5.0(zod@4.4.3)
       '@ax-llm/ax': 19.0.45(zod@4.4.3)
@@ -3881,28 +3869,7 @@ snapshots:
       hono: 4.12.23
       zod: 4.4.3
     optionalDependencies:
-      '@tangle-network/agent-runtime': 0.25.2(@tangle-network/agent-knowledge@1.5.2(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)
-      '@tangle-network/sandbox': 0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3))
-    transitivePeerDependencies:
-      - '@mastra/core'
-      - '@modelcontextprotocol/sdk'
-      - ai
-      - bufferutil
-      - openai
-      - typescript
-      - utf-8-validate
-
-  '@tangle-network/agent-eval@0.42.0(@tangle-network/agent-runtime@0.25.2(@tangle-network/agent-knowledge@1.5.2(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)':
-    dependencies:
-      '@asteasolutions/zod-to-openapi': 8.5.0(zod@4.4.3)
-      '@ax-llm/ax': 19.0.45(zod@4.4.3)
-      '@hono/node-server': 2.0.4(hono@4.12.23)
-      '@tangle-network/tcloud': 0.4.12(typescript@5.9.3)(zod@4.4.3)
-      hono: 4.12.23
-      zod: 4.4.3
-    optionalDependencies:
-      '@tangle-network/agent-runtime': 0.25.2(@tangle-network/agent-knowledge@1.5.2(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)
-      '@tangle-network/sandbox': 0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3))
+      '@tangle-network/sandbox': 0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3))
     transitivePeerDependencies:
       - '@mastra/core'
       - '@modelcontextprotocol/sdk'
@@ -3938,10 +3905,14 @@ snapshots:
     dependencies:
       zod: 4.4.3
 
-  '@tangle-network/agent-knowledge@1.5.2(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)':
+  '@tangle-network/agent-interface@0.8.0':
     dependencies:
-      '@tangle-network/agent-eval': 0.42.0(@tangle-network/agent-runtime@0.25.2(@tangle-network/agent-knowledge@1.5.2(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)
-      '@tangle-network/agent-runtime': 0.25.2(@tangle-network/agent-knowledge@1.5.2(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)
+      zod: 4.4.3
+
+  '@tangle-network/agent-knowledge@1.7.0(@tangle-network/sandbox@0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)':
+    dependencies:
+      '@tangle-network/agent-eval': 0.79.0(@tangle-network/sandbox@0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)
+      '@tangle-network/agent-runtime': 0.44.0(@tangle-network/agent-eval@0.79.0(@tangle-network/sandbox@0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/agent-knowledge@1.7.0(@tangle-network/sandbox@0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/sandbox@0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))
       zod: 4.4.3
     transitivePeerDependencies:
       - '@mastra/core'
@@ -3953,28 +3924,20 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@tangle-network/agent-runtime@0.25.2(@tangle-network/agent-knowledge@1.5.2(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)':
+  '@tangle-network/agent-runtime@0.44.0(@tangle-network/agent-eval@0.79.0(@tangle-network/sandbox@0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/agent-knowledge@1.7.0(@tangle-network/sandbox@0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/sandbox@0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))':
     dependencies:
-      '@tangle-network/agent-eval': 0.40.5(@tangle-network/agent-runtime@0.25.2(@tangle-network/agent-knowledge@1.5.2(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)
+      '@tangle-network/agent-eval': 0.79.0(@tangle-network/sandbox@0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)
     optionalDependencies:
-      '@tangle-network/agent-knowledge': 1.5.2(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)
-      '@tangle-network/sandbox': 0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3))
-    transitivePeerDependencies:
-      - '@mastra/core'
-      - '@modelcontextprotocol/sdk'
-      - ai
-      - bufferutil
-      - openai
-      - typescript
-      - utf-8-validate
+      '@tangle-network/agent-knowledge': 1.7.0(@tangle-network/sandbox@0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)
+      '@tangle-network/sandbox': 0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3))
 
-  '@tangle-network/agent-runtime@0.70.0(@tangle-network/agent-eval@0.95.0(typescript@5.9.3))(@tangle-network/agent-interface@0.10.1)(@tangle-network/agent-knowledge@1.5.2(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))':
+  '@tangle-network/agent-runtime@0.70.0(@tangle-network/agent-eval@0.95.0(typescript@5.9.3))(@tangle-network/agent-interface@0.10.1)(@tangle-network/agent-knowledge@1.7.0(@tangle-network/sandbox@0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/sandbox@0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))':
     dependencies:
       '@tangle-network/agent-eval': 0.95.0(typescript@5.9.3)
     optionalDependencies:
       '@tangle-network/agent-interface': 0.10.1
-      '@tangle-network/agent-knowledge': 1.5.2(@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)
-      '@tangle-network/sandbox': 0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3))
+      '@tangle-network/agent-knowledge': 1.7.0(@tangle-network/sandbox@0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)
+      '@tangle-network/sandbox': 0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3))
 
   '@tangle-network/sandbox-ui@0.39.1(@tangle-network/agent-interface@0.10.1)(@tangle-network/ui@4.1.0(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react-router@7.18.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
@@ -3997,7 +3960,9 @@ snapshots:
     optionalDependencies:
       viem: 2.52.0(typescript@5.9.3)(zod@4.4.3)
 
-  '@tangle-network/sandbox@0.6.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3))':
+  '@tangle-network/sandbox@0.8.2(viem@2.52.0(typescript@5.9.3)(zod@4.4.3))':
+    dependencies:
+      '@tangle-network/agent-interface': 0.8.0
     optionalDependencies:
       viem: 2.52.0(typescript@5.9.3)(zod@4.4.3)
 
