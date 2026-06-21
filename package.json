@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.39.2",
+  "version": "0.40.0",
   "packageManager": "pnpm@10.33.4",
   "description": "Application-shell framework for Tangle agent products: a bounded tool loop, the structured agent→app tool side channel, integration-hub client, per-workspace billing, and crypto — composed over the Tangle agent substrate through typed seams.",
   "keywords": [
@@ -322,12 +322,12 @@
   },
   "devDependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
-    "@tangle-network/agent-eval": "^0.95.0",
-    "@tangle-network/agent-integrations": "^0.32.0",
+    "@tangle-network/agent-eval": "^0.95.1",
+    "@tangle-network/agent-integrations": "^0.43.0",
     "@tangle-network/agent-knowledge": "^1.7.0",
-    "@tangle-network/agent-runtime": "^0.70.0",
+    "@tangle-network/agent-runtime": "^0.70.1",
     "@tangle-network/sandbox": "^0.8.0",
-    "@tangle-network/sandbox-ui": "^0.39.1",
+    "@tangle-network/sandbox-ui": "^0.40.0",
     "@tangle-network/ui": "^4.1.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
@@ -354,7 +354,7 @@
     "@huggingface/transformers": ">=3",
     "@radix-ui/react-dialog": ">=1.1",
     "@tangle-network/agent-eval": ">=0.95.0",
-    "@tangle-network/agent-integrations": ">=0.32.0",
+    "@tangle-network/agent-integrations": ">=0.43.0",
     "@tangle-network/agent-knowledge": ">=1.7.0",
     "@tangle-network/agent-runtime": ">=0.70.0",
     "@tangle-network/sandbox": ">=0.8.0",
