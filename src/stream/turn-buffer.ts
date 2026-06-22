@@ -27,8 +27,15 @@ export interface BufferedTurnEvent {
 export interface TurnEventStore {
   append(turnId: string, events: BufferedTurnEvent[]): Promise<void>
   read(turnId: string, fromSeq: number): Promise<BufferedTurnEvent[]>
-  setStatus(turnId: string, status: TurnStatus): Promise<void>
+  /** Record turn lifecycle. `scopeId` (a thread/session id) is optional and lets
+   *  {@link TurnEventStore.listRunning} rediscover this turn after a client reload
+   *  loses the turnId; stores that don't track scope ignore it. */
+  setStatus(turnId: string, status: TurnStatus, scopeId?: string): Promise<void>
   getStatus(turnId: string): Promise<TurnStatus | null>
+  /** Running turnIds for a scope, newest first — so a reloaded client (clientRunId
+   *  lost) can find and resume the in-flight turn. Optional: a store records it
+   *  only if `setStatus` was given a `scopeId`. */
+  listRunning?(scopeId: string): Promise<string[]>
 }
 
 // ── coalescing ────────────────────────────────────────────────────────────
@@ -67,6 +74,49 @@ export function coalesceDeltas(events: unknown[]): unknown[] {
   return out
 }
 
+function asPartUpdate(ev: unknown): { partId: unknown; delta: unknown } | null {
+  const e = ev as AnyRecord | null
+  if (!e || typeof e !== 'object' || e.type !== 'message.part.updated') return null
+  const data = e.data as AnyRecord | undefined
+  if (!data || typeof data !== 'object') return null
+  const part = data.part as AnyRecord | undefined
+  const partId = part?.id ?? data.partId ?? part?.partId ?? null
+  return { partId, delta: data.delta }
+}
+
+/**
+ * Coalesce consecutive `message.part.updated` deltas for the SAME part into one
+ * event. agent-runtime products stream `ChatStreamEvent` NDJSON
+ * (`{type:'message.part.updated', data:{part, delta}}`); pumped through the
+ * buffer with the default tool-loop coalescer, every per-token delta persists as
+ * its own row because that coalescer never recognizes the shape. Pass this as
+ * {@link PumpBufferedTurnOptions.coalesce} instead.
+ *
+ * Concatenation-preserving for BOTH consumer styles: the merged event keeps the
+ * LATEST event's `data.part` (already the cumulative accumulation) and sets
+ * `data.delta` to the concatenation of the merged deltas, so a client that
+ * appends `delta` and one that reads the cumulative `part` both reconstruct the
+ * identical final text.
+ */
+export function coalesceChatStreamEvents(events: unknown[]): unknown[] {
+  const out: unknown[] = []
+  for (const ev of events) {
+    const cur = asPartUpdate(ev)
+    const prevEv = out[out.length - 1]
+    const prev = prevEv ? asPartUpdate(prevEv) : null
+    if (cur && prev && cur.partId != null && cur.partId === prev.partId) {
+      // Base the merged row on the latest event (its `part` is the most complete
+      // accumulation); carry forward the summed delta.
+      const merged = JSON.parse(JSON.stringify(ev)) as AnyRecord
+      ;(merged.data as AnyRecord).delta = String(prev.delta ?? '') + String(cur.delta ?? '')
+      out[out.length - 1] = merged
+      continue
+    }
+    out.push(ev)
+  }
+  return out
+}
+
 // ── pump (producer side) ──────────────────────────────────────────────────
 
 export interface PumpBufferedTurnOptions {
@@ -78,6 +128,14 @@ export interface PumpBufferedTurnOptions {
   write?: (line: string) => Promise<void> | void
   /** Flush buffered events to the store at most this often. Default 400ms. */
   flushIntervalMs?: number
+  /** Per-flush coalescer. Default {@link coalesceDeltas} (tool-loop text/reasoning
+   *  deltas). agent-runtime products streaming `ChatStreamEvent` pass
+   *  {@link coalesceChatStreamEvents} so per-token deltas don't each persist as a
+   *  row. Must be concatenation-preserving. */
+  coalesce?: (events: unknown[]) => unknown[]
+  /** Optional scope (thread/session id) recorded with the turn status, so
+   *  {@link TurnEventStore.listRunning} can find this turn after a reload. */
+  scopeId?: string
 }
 
 /**
@@ -90,6 +148,7 @@ export interface PumpBufferedTurnOptions {
  */
 export async function pumpBufferedTurn(opts: PumpBufferedTurnOptions): Promise<void> {
   const flushIntervalMs = opts.flushIntervalMs ?? 400
+  const coalesce = opts.coalesce ?? coalesceDeltas
   const startedAt = Date.now()
   let seq = 0
   let clientGone = false
@@ -98,14 +157,14 @@ export async function pumpBufferedTurn(opts: PumpBufferedTurnOptions): Promise<v
 
   async function flush(): Promise<void> {
     if (pending.length === 0) return
-    const batch = coalesceDeltas(pending)
+    const batch = coalesce(pending)
     pending = []
     const rows = batch.map((ev) => ({ seq: ++seq, event: JSON.stringify(ev) }))
     await opts.store.append(opts.turnId, rows)
     lastFlush = Date.now()
   }
 
-  await opts.store.setStatus(opts.turnId, 'running')
+  await opts.store.setStatus(opts.turnId, 'running', opts.scopeId)
   try {
     for await (const raw of opts.source) {
       // Stamp ms-since-turn-start so any stored turn is replayable AND
@@ -201,9 +260,16 @@ CREATE TABLE IF NOT EXISTS turn_events (
 CREATE TABLE IF NOT EXISTS turn_status (
   turnId TEXT PRIMARY KEY,
   status TEXT NOT NULL,
+  scopeId TEXT,
   updatedAt TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_turn_status_scope ON turn_status (scopeId, status);
 `
+
+/** For deployments whose `turn_status` table predates `scopeId`/`listRunning` —
+ *  run once to add the column (the CREATE above already includes it for new
+ *  deployments). SQLite ignores a duplicate-add error if already applied. */
+export const TURN_STATUS_SCOPE_MIGRATION_SQL = `ALTER TABLE turn_status ADD COLUMN scopeId TEXT;`
 
 export function createD1TurnEventStore(db: D1LikeForTurns): TurnEventStore {
   return {
@@ -221,17 +287,26 @@ export function createD1TurnEventStore(db: D1LikeForTurns): TurnEventStore {
         .all<{ seq: number; event: string }>()
       return results
     },
-    async setStatus(turnId, status) {
+    async setStatus(turnId, status, scopeId) {
+      // COALESCE preserves a scopeId set on the initial 'running' write when a
+      // later 'complete'/'error' write passes none.
       await db
         .prepare(
-          'INSERT INTO turn_status (turnId, status, updatedAt) VALUES (?, ?, ?) ON CONFLICT(turnId) DO UPDATE SET status = excluded.status, updatedAt = excluded.updatedAt',
+          'INSERT INTO turn_status (turnId, status, scopeId, updatedAt) VALUES (?, ?, ?, ?) ON CONFLICT(turnId) DO UPDATE SET status = excluded.status, scopeId = COALESCE(excluded.scopeId, turn_status.scopeId), updatedAt = excluded.updatedAt',
         )
-        .bind(turnId, status, new Date().toISOString())
+        .bind(turnId, status, scopeId ?? null, new Date().toISOString())
         .run()
     },
     async getStatus(turnId) {
       const row = await db.prepare('SELECT status FROM turn_status WHERE turnId = ?').bind(turnId).first<{ status: TurnStatus }>()
       return row?.status ?? null
+    },
+    async listRunning(scopeId) {
+      const { results } = await db
+        .prepare("SELECT turnId FROM turn_status WHERE scopeId = ? AND status = 'running' ORDER BY updatedAt DESC")
+        .bind(scopeId)
+        .all<{ turnId: string }>()
+      return results.map((r) => r.turnId)
     },
   }
 }
@@ -240,6 +315,8 @@ export function createD1TurnEventStore(db: D1LikeForTurns): TurnEventStore {
 export function createMemoryTurnEventStore(): TurnEventStore {
   const events = new Map<string, BufferedTurnEvent[]>()
   const status = new Map<string, TurnStatus>()
+  const scopes = new Map<string, string>()
+  const order: string[] = []
   return {
     async append(turnId, rows) {
       const list = events.get(turnId) ?? []
@@ -249,11 +326,17 @@ export function createMemoryTurnEventStore(): TurnEventStore {
     async read(turnId, fromSeq) {
       return (events.get(turnId) ?? []).filter((e) => e.seq > fromSeq)
     },
-    async setStatus(turnId, s) {
+    async setStatus(turnId, s, scopeId) {
       status.set(turnId, s)
+      if (scopeId) scopes.set(turnId, scopeId)
+      if (!order.includes(turnId)) order.push(turnId)
     },
     async getStatus(turnId) {
       return status.get(turnId) ?? null
+    },
+    async listRunning(scopeId) {
+      // Newest first, mirroring the D1 store's `ORDER BY updatedAt DESC`.
+      return [...order].reverse().filter((t) => status.get(t) === 'running' && scopes.get(t) === scopeId)
     },
   }
 }

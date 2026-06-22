@@ -25,6 +25,7 @@ export * from './provider-logo'
 export * from './smooth-text'
 export * from './mission-activity'
 export * from './sandbox-terminal'
+export * from './workspace-terminal-panel'
 export * from './seat-paywall'
 export {
   usePopover,

@@ -1,10 +1,12 @@
 import { authenticateToolRequest, type ToolHeaderNames } from './auth'
 import { dispatchAppTool, outcomeStatus, type DispatchOptions } from './dispatch'
 import type { AppToolName } from './openai'
+import type { AppToolDefinition } from './registry'
 
 export interface HandleToolRequestOptions extends DispatchOptions {
-  /** Which app tool this route serves. */
-  tool: AppToolName
+  /** Which app tool this route serves — a built-in name or a product-registered
+   *  {@link AppToolDefinition} (auto-added to `customTools` for dispatch). */
+  tool: AppToolName | AppToolDefinition
   /** Verify the bearer capability token belongs to the header user. */
   verifyToken: (userId: string, bearer: string) => Promise<boolean>
   headerNames?: ToolHeaderNames
@@ -33,7 +35,12 @@ export async function handleAppToolRequest(request: Request, opts: HandleToolReq
   }
   const args = (body.args ?? body.arguments ?? body) as Record<string, unknown>
 
-  const outcome = await dispatchAppTool(opts.tool, args, auth.ctx, opts)
+  // A custom tool passed as `tool` is registered for this dispatch so the route
+  // file stays a one-liner (no separate customTools wiring needed).
+  const toolName = typeof opts.tool === 'string' ? opts.tool : opts.tool.name
+  const customTools =
+    typeof opts.tool === 'string' ? opts.customTools : [...(opts.customTools ?? []), opts.tool]
+  const outcome = await dispatchAppTool(toolName, args, auth.ctx, { ...opts, customTools })
   if (!outcome.ok) {
     return Response.json({ error: outcome.code, message: outcome.message }, { status: outcomeStatus(outcome) })
   }

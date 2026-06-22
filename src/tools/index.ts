@@ -29,6 +29,12 @@ export {
   type ResolveToolCapabilitiesOptions,
   type ResolvedToolCapabilities,
 } from './gating'
+export {
+  defineAppTool,
+  customToolToOpenAI,
+  findCustomTool,
+  type AppToolDefinition,
+} from './registry'
 export { dispatchAppTool, outcomeStatus, type DispatchOptions } from './dispatch'
 export { createAppToolRuntimeExecutor, type AppToolRuntimeExecutor, type RuntimeExecutorOptions } from './runtime'
 export { handleAppToolRequest, type HandleToolRequestOptions } from './http'

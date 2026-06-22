@@ -36,6 +36,10 @@ export function buildAppToolOpenAITools(
 ): OpenAIFunctionTool[] {
   const d = opts?.descriptions
   const priorityValues = opts?.priorityValues ?? ['low', 'medium', 'high']
+  const custom: OpenAIFunctionTool[] = (opts?.customTools ?? []).map((t) => ({
+    type: 'function',
+    function: { name: t.name, description: t.description, parameters: t.parameters },
+  }))
   return [
     {
       type: 'function',
@@ -107,5 +111,6 @@ export function buildAppToolOpenAITools(
         },
       },
     },
+    ...custom,
   ]
 }
