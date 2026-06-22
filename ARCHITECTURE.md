@@ -39,7 +39,7 @@ Pure mechanism behind callback seams. Import nothing from the package; safe
 anywhere. `crypto` (AES-GCM fields) · `web` (request/body/rate-limit utils) ·
 `stream` (SSE normalize + resumable turn buffer) · `redact` (PII) · `harness` ·
 `missions` (durable step machine over a storage port) · `store` · `prompt` ·
-`model-resolution` · `tangle` (broker token) · `delegation` · `skills` ·
+`model-resolution` · `tangle` (broker token) · `skills` ·
 `knowledge` · `integrations` (hub client) · `billing` (budget-capped keys) ·
 `eval-campaign` · `assets` · `brand-extraction` · `studio` (generation types).
 

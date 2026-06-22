@@ -52,11 +52,9 @@ describe('AgentAppConfig contract', () => {
       },
       integrations: { enabled: ['salesforce', 'gmail'] },
       ui: { generatedUi: true },
-      delegation: { enabled: true },
       model,
     })
 
-    expect(cfg.delegation?.enabled).toBe(true)
     expect(cfg.knowledge.requirements[0]).toBe(requirement)
     expect(cfg.knowledge.loop?.minConfidence).toBe(0.8)
     expect(cfg.model?.provider).toBe('openai-compat')
@@ -94,7 +92,6 @@ describe('AgentAppConfig contract', () => {
       'knowledge',
       'integrations',
       'ui',
-      'delegation',
       'model',
     ])
     expect(s.properties.identity.required).toEqual(['name', 'persona'])

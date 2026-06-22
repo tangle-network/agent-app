@@ -3,7 +3,6 @@
   "entry": [
     "src/index.ts",
     "src/tools/index.ts",
-    "src/delegation/index.ts",
     "src/tangle/index.ts",
     "src/runtime/index.ts",
     "src/eval/index.ts",
