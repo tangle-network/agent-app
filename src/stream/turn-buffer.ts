@@ -117,14 +117,13 @@ export function coalesceChatStreamEvents(events: unknown[]): unknown[] {
   return out
 }
 
-// ── pump (producer side) ──────────────────────────────────────────────────
+// ── buffering core (the tap) ────────────────────────────────────────────────
 
-export interface PumpBufferedTurnOptions {
-  source: AsyncIterable<unknown>
+export interface BufferedTurnOptions {
   store: TurnEventStore
   turnId: string
-  /** Deliver one serialized line (with seq) to the live client. Throwing here
-   *  (client disconnected) does NOT stop the turn — events keep buffering. */
+  /** Deliver one serialized line to the live client. Throwing here (client
+   *  disconnected) does NOT stop buffering — events keep persisting. */
   write?: (line: string) => Promise<void> | void
   /** Flush buffered events to the store at most this often. Default 400ms. */
   flushIntervalMs?: number
@@ -138,15 +137,29 @@ export interface PumpBufferedTurnOptions {
   scopeId?: string
 }
 
+/** A push-driven buffer for a turn whose producer the caller does NOT own. */
+export interface BufferedTurnTap {
+  /** Buffer one event: persist (coalesced, on the flush window) + best-effort
+   *  live-deliver. Wire to a push source's per-event hook (e.g. agent-runtime
+   *  `handleChatTurn`'s `hooks.onEvent`). Marks the turn 'running' on first call. */
+  onEvent(raw: unknown): Promise<void>
+  /** Settle the turn: final flush + set status. Call after the producer resolves
+   *  ('complete') or rejects ('error'). 'error' flushes what was produced first. */
+  done(status?: Extract<TurnStatus, 'complete' | 'error'>): Promise<void>
+}
+
 /**
- * Drive a turn to completion regardless of the live client: every source
- * event is sequence-numbered, delivered to `write` (best-effort), and flushed
- * to the store in coalesced batches. Returns a promise that resolves when the
- * turn finishes — hand it to `ctx.waitUntil` so a disconnect can't kill the
- * turn. Never rejects on client-write failure; a source error marks the turn
- * status 'error' (after flushing what was produced) and rethrows.
+ * The buffering core. Sequence-numbers every event, delivers it to `write`
+ * (best-effort — a disconnected client never stops buffering), and flushes to
+ * the store in coalesced batches. Drives both transports:
+ *
+ *   • {@link pumpBufferedTurn}     — when you OWN an `AsyncIterable` producer.
+ *   • this tap (`onEvent`/`done`)  — when the producer owns iteration and only
+ *     hands you a push callback (agent-runtime `handleChatTurn`'s `hooks.onEvent`
+ *     + the finished body). Durability stays here in the shell; the engine needs
+ *     no `TurnEventStore` seam.
  */
-export async function pumpBufferedTurn(opts: PumpBufferedTurnOptions): Promise<void> {
+export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTap {
   const flushIntervalMs = opts.flushIntervalMs ?? 400
   const coalesce = opts.coalesce ?? coalesceDeltas
   const startedAt = Date.now()
@@ -154,6 +167,7 @@ export async function pumpBufferedTurn(opts: PumpBufferedTurnOptions): Promise<v
   let clientGone = false
   let pending: unknown[] = []
   let lastFlush = Date.now()
+  let started = false
 
   async function flush(): Promise<void> {
     if (pending.length === 0) return
@@ -164,30 +178,65 @@ export async function pumpBufferedTurn(opts: PumpBufferedTurnOptions): Promise<v
     lastFlush = Date.now()
   }
 
-  await opts.store.setStatus(opts.turnId, 'running', opts.scopeId)
-  try {
-    for await (const raw of opts.source) {
-      // Stamp ms-since-turn-start so any stored turn is replayable AND
-      // traceable (see ../trace) from the same buffered rows.
+  async function ensureStarted(): Promise<void> {
+    if (started) return
+    started = true
+    await opts.store.setStatus(opts.turnId, 'running', opts.scopeId)
+  }
+
+  return {
+    async onEvent(raw) {
+      await ensureStarted()
+      // Stamp ms-since-turn-start so any stored turn is replayable AND traceable
+      // (see ../trace) from the same buffered rows.
       const ev = raw && typeof raw === 'object' ? { ...(raw as Record<string, unknown>), _t: Date.now() - startedAt } : raw
       pending.push(ev)
       if (!clientGone && opts.write) {
         try {
-          // Live delivery carries a provisional ordering hint, not the
-          // persisted seq (coalescing changes seq assignment); clients resume
-          // with the seqs from replay, or 0 for "everything".
+          // Live delivery carries a provisional ordering hint, not the persisted
+          // seq (coalescing changes seq assignment); clients resume with the
+          // seqs from replay, or 0 for "everything".
           await opts.write(JSON.stringify(ev))
         } catch {
           clientGone = true
         }
       }
       if (Date.now() - lastFlush >= flushIntervalMs) await flush()
-    }
-    await flush()
-    await opts.store.setStatus(opts.turnId, 'complete')
+    },
+    async done(status = 'complete') {
+      await ensureStarted()
+      if (status === 'error') {
+        await flush().catch(() => {})
+        await opts.store.setStatus(opts.turnId, 'error', opts.scopeId).catch(() => {})
+        return
+      }
+      await flush()
+      await opts.store.setStatus(opts.turnId, 'complete', opts.scopeId)
+    },
+  }
+}
+
+// ── pump (producer side) ──────────────────────────────────────────────────
+
+export interface PumpBufferedTurnOptions extends BufferedTurnOptions {
+  source: AsyncIterable<unknown>
+}
+
+/**
+ * Drive a turn to completion regardless of the live client, when you OWN the
+ * producer as an `AsyncIterable`. A thin driver over {@link createBufferedTurnTap}.
+ * Returns a promise that resolves when the turn finishes — hand it to
+ * `ctx.waitUntil` so a disconnect can't kill the turn. Never rejects on
+ * client-write failure; a source error marks the turn 'error' (after flushing
+ * what was produced) and rethrows.
+ */
+export async function pumpBufferedTurn(opts: PumpBufferedTurnOptions): Promise<void> {
+  const tap = createBufferedTurnTap(opts)
+  try {
+    for await (const raw of opts.source) await tap.onEvent(raw)
+    await tap.done('complete')
   } catch (err) {
-    await flush().catch(() => {})
-    await opts.store.setStatus(opts.turnId, 'error').catch(() => {})
+    await tap.done('error')
     throw err
   }
 }
