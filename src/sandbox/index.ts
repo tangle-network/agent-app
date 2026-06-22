@@ -769,6 +769,32 @@ export async function writeProfileFilesToBox(
   // SDK exposes no file API.
   const fileApiAvailable = typeof box.fs?.write === 'function'
 
+  // Pace + transient-retry ONE transport attempt — shared by the file-API and
+  // exec branches so backoff/pace/fail-loud semantics live in one place. `run`
+  // must be idempotent under unknown-outcome retries (both transports are: the
+  // file API is a whole-file overwrite; exec writes deterministic parts). A
+  // transient error retries with backoff up to maxRetries (honoring a server
+  // Retry-After); anything else, or exhausting retries, fails loud with the
+  // cause. The pace counter is shared across every attempt in this call so the
+  // whole corpus stays under the proxy throttle.
+  const paceAndRetry = async <T>(run: () => Promise<T>, path: string): Promise<Outcome<T>> => {
+    for (let attempt = 0; ; attempt++) {
+      if (execStarted && paceMs > 0) await sleep(paceMs)
+      execStarted = true
+      try {
+        return ok(await run())
+      } catch (err) {
+        const { retryable, retryAfterMs } = transientExecError(err)
+        if (retryable && attempt < maxRetries) {
+          const backoff = Math.min(PROFILE_WRITE_RETRY_BASE_MS * 2 ** attempt, PROFILE_WRITE_RETRY_MAX_MS)
+          await sleep(retryAfterMs ?? backoff)
+          continue
+        }
+        return fail(new Error(`writeProfileFilesToBox: exec failed for ${path}`, { cause: err }))
+      }
+    }
+  }
+
   for (const mount of files) {
     if (mount.resource.kind !== 'inline') continue
     const content = mount.resource.content ?? ''
@@ -782,25 +808,8 @@ export async function writeProfileFilesToBox(
     // runtime-auth-refresh wrapper still recovers from a 401 surfaced here.
     const fileApiPath = fileApiAvailable ? fileApiTarget(mount) : null
     if (fileApiPath !== null) {
-      for (let attempt = 0; ; attempt++) {
-        if (execStarted && paceMs > 0) await sleep(paceMs)
-        execStarted = true
-        try {
-          await box.fs.write(fileApiPath, content)
-          break
-        } catch (err) {
-          const { retryable, retryAfterMs } = transientExecError(err)
-          if (retryable && attempt < maxRetries) {
-            const backoff = Math.min(
-              PROFILE_WRITE_RETRY_BASE_MS * 2 ** attempt,
-              PROFILE_WRITE_RETRY_MAX_MS,
-            )
-            await sleep(retryAfterMs ?? backoff)
-            continue
-          }
-          return fail(new Error(`writeProfileFilesToBox: exec failed for ${path}`, { cause: err }))
-        }
-      }
+      const res = await paceAndRetry(() => box.fs.write(fileApiPath, content), path)
+      if (!res.succeeded) return res
       continue
     }
 
@@ -818,39 +827,21 @@ export async function writeProfileFilesToBox(
     const qtmp = shellPath(`${path}.tmp`)
     const qpartPrefix = shellPath(`${path}.b64.part.`)
 
-    // Run one exec step, surfacing a non-zero exit or transport error as a
-    // fail-loud Outcome with the underlying error as cause. Transient failures
-    // are retried with exponential backoff up to maxRetries. Any other error
-    // fails loud immediately. A non-zero exit is a real command failure, not
-    // retried. After maxRetries the last transient error is surfaced as the
-    // Outcome cause so persistent exec-plane failures fail fast and visibly.
+    // Run one exec step. Transport errors (incl. a wedged-proxy timeout) are
+    // paced + retried by paceAndRetry; a non-zero exit is a REAL command failure
+    // — surfaced immediately, never retried.
     const step = async (cmd: string): Promise<Outcome<void>> => {
-      for (let attempt = 0; ; attempt++) {
-        if (execStarted && paceMs > 0) await sleep(paceMs)
-        execStarted = true
-        try {
-          const res = await execWithTimeout(box, cmd, execTimeoutMs)
-          if (res.exitCode !== 0) {
-            return fail(
-              new Error(
-                `writeProfileFilesToBox: failed to write ${path} (exit ${res.exitCode}): ${res.stderr.slice(0, 500)}`,
-              ),
-            )
-          }
-          return ok(undefined)
-        } catch (err) {
-          const { retryable, retryAfterMs } = transientExecError(err)
-          if (retryable && attempt < maxRetries) {
-            const backoff = Math.min(
-              PROFILE_WRITE_RETRY_BASE_MS * 2 ** attempt,
-              PROFILE_WRITE_RETRY_MAX_MS,
-            )
-            await sleep(retryAfterMs ?? backoff)
-            continue
-          }
-          return fail(new Error(`writeProfileFilesToBox: exec failed for ${path}`, { cause: err }))
-        }
+      const res = await paceAndRetry(() => execWithTimeout(box, cmd, execTimeoutMs), path)
+      if (!res.succeeded) return res
+      const exec = res.value
+      if (exec.exitCode !== 0) {
+        return fail(
+          new Error(
+            `writeProfileFilesToBox: failed to write ${path} (exit ${exec.exitCode}): ${exec.stderr.slice(0, 500)}`,
+          ),
+        )
       }
+      return ok(undefined)
     }
 
     // Ensure the target directory exists. Chunk/final commands below are
