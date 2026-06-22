@@ -84,7 +84,7 @@ consumer of L0/L1 installs none of them): `konva`/`react-konva` → only
 | Completion checks / produced-state / eval bridge | `eval` (+ peer `agent-eval`) |
 | Integration-hub `/exec` calls | `integrations` |
 | Per-workspace key mint/rotate/budget | `billing` |
-| Resumable chat turns (buffer/replay/coalesce) | `stream` |
+| Resumable chat turns (buffer/replay/coalesce) | `stream` — see [`examples/resumable-turns.md`](./examples/resumable-turns.md) |
 | Flow traces / waterfalls | `trace` |
 | Chat UI + run/observability components | `web-react` |
 | Canvas editor UI | `design-canvas` (+ `-react`) |
