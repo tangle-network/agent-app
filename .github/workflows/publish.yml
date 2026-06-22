@@ -1,13 +1,87 @@
 name: Publish
 
+# Two ways to release, both under THIS filename on purpose — npm OIDC trusted
+# publishing is bound to `publish.yml`, so all publishing must originate here:
+#
+#   • auto-release  — every merge to main: verify → bump patch → tag → publish.
+#   • tag path      — a human-pushed `v*` tag (or workflow_dispatch on a tag):
+#                     verify (with tag/version lock) → publish that exact version.
+#
+# The auto-release version-bump commit + tag are pushed with the default
+# GITHUB_TOKEN, which by design does NOT re-trigger workflows — so it never loops
+# (and a GITHUB_TOKEN tag push wouldn't fire the tag path either).
+
 on:
   push:
+    branches: [main]
     tags:
       - 'v*'
   workflow_dispatch:
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
+  # ── auto-release on merge to main ─────────────────────────────────────────
+  auto-release:
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      !startsWith(github.event.head_commit.message, 'chore(release):') &&
+      !contains(github.event.head_commit.message, '[skip release]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the version-bump commit + tag
+      id-token: write # OIDC trusted publish + Sigstore provenance
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      # Verify BEFORE bumping, so a red main never gets a version/tag.
+      - name: Typecheck
+        run: pnpm run typecheck
+      - name: Test
+        run: pnpm run test
+      - name: Build
+        run: pnpm run build
+
+      - run: npm install -g npm@latest
+
+      - name: Bump patch, commit, tag, push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          npm version patch -m "chore(release): %s [skip release]"
+          git push origin HEAD:main --follow-tags
+
+      - name: Publish to npm (skip if already published)
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "$NAME@$VERSION already on registry; skipping publish"
+          else
+            npm publish --provenance --access public || {
+              echo "::error::npm publish failed. Verify the trusted publisher entry exists at https://www.npmjs.com/package/@tangle-network/agent-app/access (workflow=publish.yml)."
+              exit 1
+            }
+          fi
+
+  # ── manual / human-pushed tag path ────────────────────────────────────────
   verify:
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
       # tsup builds .d.ts for ~38 entry points in a worker thread (the `prepare`
