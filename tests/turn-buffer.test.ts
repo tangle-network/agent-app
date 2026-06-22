@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   coalesceDeltas,
+  coalesceChatStreamEvents,
   pumpBufferedTurn,
   replayTurnEvents,
   createMemoryTurnEventStore,
@@ -40,6 +41,78 @@ describe('coalesceDeltas', () => {
     const toolCall = { kind: 'event', event: { type: 'tool_call', call: { toolName: 'x', args: {} } } }
     const out = coalesceDeltas([text('a'), toolCall, text('b')])
     expect(out).toHaveLength(3)
+  })
+})
+
+// ── #42: ChatStreamEvent coalescer + the pluggable coalesce seam ────────────
+
+function partUpdate(id: string, delta: string, cumulative: string) {
+  return { type: 'message.part.updated', data: { part: { id, type: 'text', text: cumulative }, delta } }
+}
+
+describe('coalesceChatStreamEvents', () => {
+  it('merges consecutive deltas for the same part, summing delta and keeping the latest cumulative part', () => {
+    const out = coalesceChatStreamEvents([
+      partUpdate('p1', 'Hel', 'Hel'),
+      partUpdate('p1', 'lo', 'Hello'),
+      partUpdate('p1', '!', 'Hello!'),
+    ])
+    expect(out).toHaveLength(1)
+    const data = (out[0] as any).data
+    expect(data.delta).toBe('Hello!') // append-consumers reconstruct the full text
+    expect(data.part.text).toBe('Hello!') // cumulative-consumers see the latest part
+  })
+
+  it('does not merge across different part ids', () => {
+    const out = coalesceChatStreamEvents([
+      partUpdate('p1', 'a', 'a'),
+      partUpdate('p2', 'b', 'b'),
+      partUpdate('p2', 'c', 'bc'),
+    ])
+    expect(out).toHaveLength(2)
+    expect((out[1] as any).data.delta).toBe('bc')
+  })
+
+  it('leaves unrecognized shapes untouched (no silent drop)', () => {
+    const other = { type: 'message.completed', data: {} }
+    const out = coalesceChatStreamEvents([partUpdate('p1', 'a', 'a'), other, partUpdate('p1', 'b', 'b')])
+    expect(out).toHaveLength(3)
+  })
+})
+
+describe('pumpBufferedTurn — pluggable coalesce + scope discovery', () => {
+  it('uses the supplied coalescer so ChatStreamEvent deltas persist as one row, not per-token', async () => {
+    const store = createMemoryTurnEventStore()
+    await pumpBufferedTurn({
+      source: gen([partUpdate('p1', 'Hel', 'Hel'), partUpdate('p1', 'lo', 'Hello')]),
+      store,
+      turnId: 'c1',
+      // Wide window so both deltas accumulate and the final flush coalesces them
+      // (flushIntervalMs:0 would flush each event alone — no batch to coalesce).
+      flushIntervalMs: 10_000,
+      coalesce: coalesceChatStreamEvents,
+    })
+    const rows = await store.read('c1', 0)
+    expect(rows).toHaveLength(1) // would be 2 with the default tool-loop coalescer
+    expect(JSON.parse(rows[0]!.event).data.delta).toBe('Hello')
+  })
+
+  it('listRunning finds an in-flight turn by scope and drops it once complete', async () => {
+    const store = createMemoryTurnEventStore()
+    await store.setStatus('a', 'running', 'thread-9')
+    await store.setStatus('b', 'running', 'thread-9')
+    await store.setStatus('c', 'running', 'thread-other')
+    expect(await store.listRunning!('thread-9')).toEqual(['b', 'a']) // newest first
+    await store.setStatus('a', 'complete')
+    expect(await store.listRunning!('thread-9')).toEqual(['b'])
+  })
+
+  it('records the pump scopeId so a reloaded client can rediscover the turn', async () => {
+    const store = createMemoryTurnEventStore()
+    await pumpBufferedTurn({ source: gen([text('x')]), store, turnId: 'd1', flushIntervalMs: 0, scopeId: 'sess-1' })
+    // turn finished, so it is no longer "running"
+    expect(await store.listRunning!('sess-1')).toEqual([])
+    expect(await store.getStatus('d1')).toBe('complete')
   })
 })
 

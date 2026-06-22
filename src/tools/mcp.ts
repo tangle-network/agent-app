@@ -1,5 +1,6 @@
 import type { AppToolContext } from './types'
 import type { AppToolName } from './openai'
+import type { AppToolDefinition } from './registry'
 import type { ToolHeaderNames } from './auth'
 import { DEFAULT_HEADER_NAMES } from './auth'
 
@@ -130,20 +131,32 @@ export function buildScopedMcpServerEntry(
 }
 
 export interface BuildMcpServerOptions {
-  tool: AppToolName
+  /** A built-in app tool name, or a product-registered {@link AppToolDefinition}.
+   *  A custom tool supplies its route via `AppToolDefinition.path` (or `paths`). */
+  tool: AppToolName | AppToolDefinition
   baseUrl: string
   token: string
   ctx: AppToolContext
   description: string
   headerNames?: ToolHeaderNames
-  paths?: Partial<Record<AppToolName, string>>
+  paths?: Partial<Record<string, string>>
 }
 
-/** Build one of the four app-tool MCP servers — a thin wrapper over
- *  {@link buildHttpMcpServer} that maps the tool name to its route path. */
+/** Build one app-tool MCP server entry — a thin wrapper over
+ *  {@link buildHttpMcpServer} that resolves the tool's route path. Built-ins map
+ *  through {@link DEFAULT_APP_TOOL_PATHS}; a custom tool uses its own `path`
+ *  (or a `paths` override). */
 export function buildAppToolMcpServer(opts: BuildMcpServerOptions): AppToolMcpServer {
+  const path =
+    typeof opts.tool === 'string'
+      ? opts.paths?.[opts.tool] ?? DEFAULT_APP_TOOL_PATHS[opts.tool]
+      : opts.paths?.[opts.tool.name] ?? opts.tool.path
+  if (!path) {
+    const name = typeof opts.tool === 'string' ? opts.tool : opts.tool.name
+    throw new Error(`buildAppToolMcpServer: tool "${name}" has no route path — set AppToolDefinition.path or pass it via opts.paths`)
+  }
   return buildHttpMcpServer({
-    path: opts.paths?.[opts.tool] ?? DEFAULT_APP_TOOL_PATHS[opts.tool],
+    path,
     baseUrl: opts.baseUrl,
     token: opts.token,
     ctx: opts.ctx,

@@ -185,3 +185,35 @@ export function useSandboxTerminalConnection(opts: UseSandboxTerminalConnectionO
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms))
 }
+
+const DEFAULT_TERMINAL_CID_KEY = 'agent-app:terminal-connection-id'
+
+function newConnectionId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  return `cid-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`
+}
+
+/**
+ * Stable-per-tab, unique-per-client terminal connection id.
+ *
+ * Persists in `sessionStorage` so a reload in the same tab reuses the id (the
+ * sidecar restores the same PTY session via `TerminalView.connectionId`), while
+ * separate tabs/windows each get a distinct id. Pass the result as
+ * `TerminalView`'s `connectionId`. Without it (e.g. gtm-agent today) every tab
+ * shares one connection id and their reconnects evict each other.
+ *
+ * Falls back to an ephemeral id when `sessionStorage` is unavailable (SSR,
+ * privacy mode) — still unique per call, just not reload-stable.
+ */
+export function tabTerminalConnectionId(storageKey: string = DEFAULT_TERMINAL_CID_KEY): string {
+  try {
+    const store = globalThis.sessionStorage
+    const existing = store?.getItem(storageKey)
+    if (existing) return existing
+    const id = newConnectionId()
+    store?.setItem(storageKey, id)
+    return id
+  } catch {
+    return newConnectionId()
+  }
+}

@@ -50,6 +50,9 @@ export interface BuildAppToolsOptions {
   descriptions?: Partial<Record<'submit_proposal' | 'schedule_followup' | 'render_ui' | 'add_citation', string>>
   /** The `schedule_followup.priority` enum (defaults to `['low','medium','high']`). */
   priorityValues?: readonly string[]
+  /** Product-registered tools to advertise to the model alongside the four
+   *  built-ins (appended in order, after the built-ins). */
+  customTools?: readonly import('./registry').AppToolDefinition[]
 }
 
 export interface SubmitProposalArgs {

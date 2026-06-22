@@ -1,5 +1,6 @@
 import { ToolInputError } from './errors'
 import { isAppToolName } from './openai'
+import { findCustomTool, type AppToolDefinition } from './registry'
 import type {
   AppToolContext,
   AppToolHandlers,
@@ -11,6 +12,10 @@ import type {
 export interface DispatchOptions {
   handlers: AppToolHandlers
   taxonomy: AppToolTaxonomy
+  /** Product-registered tools beyond the four built-ins. A called name that is
+   *  not a built-in is dispatched to the matching {@link AppToolDefinition.execute}
+   *  through this same validation/outcome path. */
+  customTools?: readonly AppToolDefinition[]
   /** Per-call approval policy. When provided it OVERRIDES the static
    *  `taxonomy.regulatedTypes` membership check, so products can gate by
    *  cost threshold, environment, or first-use instead of always/never.
@@ -38,7 +43,12 @@ export async function dispatchAppTool(
 ): Promise<AppToolOutcome> {
   try {
     if (!isAppToolName(toolName)) {
-      return { ok: false, code: 'unknown_tool', message: `${toolName} is not an app tool.` }
+      const custom = findCustomTool(toolName, opts.customTools)
+      if (!custom) return { ok: false, code: 'unknown_tool', message: `${toolName} is not an app tool.` }
+      // Custom tools own their own arg validation (their execute throws
+      // ToolInputError for correctable input); the outer try/catch maps it.
+      const result = await custom.execute(rawArgs, ctx)
+      return { ok: true, result }
     }
 
     if (toolName === 'submit_proposal') {
