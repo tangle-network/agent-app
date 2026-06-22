@@ -761,22 +761,43 @@ export async function writeProfileFilesToBox(
   const execTimeoutMs = options.execTimeoutMs ?? PROFILE_WRITE_EXEC_TIMEOUT_MS
   const paceMs = options.paceMs ?? PROFILE_WRITE_PACE_MS
   const maxRetries = options.maxRetries ?? PROFILE_WRITE_MAX_RETRIES
-  // Pace BETWEEN execs, not before the first or after the last. Shared across
-  // every mount in this call so the whole ~135-exec corpus stays paced.
-  let execStarted = false
-  // box.fs.write hits the sidecar file API (FILES rate group, 300/min) instead
-  // of the terminal exec channel (50/min); fall back to exec when the resolved
-  // SDK exposes no file API.
-  const fileApiAvailable = typeof box.fs?.write === 'function'
+  // The bulk of a profile corpus (skills, `~/.claude/skills/…`, config) is
+  // inline, non-executable, and workspace-relative — write it in ONE paced,
+  // retry-aware batch via the SDK's file API (`box.fs.writeMany`, FILES rate
+  // group 300/min). The SDK owns the pacing + transient-retry this module used
+  // to hand-roll. Executables / absolute / bare-`~` paths can't use the file
+  // API (no +x, prefix-restricted), so they stay on the chunked exec path.
+  // Capability-guarded: an SDK without `writeMany` (<0.9.0) routes everything
+  // through exec, unchanged.
+  const fileApiAvailable = typeof box.fs?.writeMany === 'function'
+  const viaFileApi: { path: string; content: string }[] = []
+  const viaExec: AgentProfileFileMount[] = []
+  for (const mount of files) {
+    if (mount.resource.kind !== 'inline') continue
+    const fileApiPath = fileApiAvailable ? fileApiTarget(mount) : null
+    if (fileApiPath !== null) viaFileApi.push({ path: fileApiPath, content: mount.resource.content ?? '' })
+    else viaExec.push(mount)
+  }
+  if (viaFileApi.length > 0) {
+    // `writeMany` is fail-loud on the first file it can't write. Preserve the
+    // cause so the runtime-auth-refresh wrapper still detects a 401 — it
+    // recurses `.cause` for an AuthError/401 shape (see isRuntimeExecAuthError).
+    try {
+      await box.fs.writeMany(viaFileApi, { paceMs, maxRetries })
+    } catch (err) {
+      return fail(new Error('writeProfileFilesToBox: file-API batch write failed', { cause: err }))
+    }
+  }
 
-  // Pace + transient-retry ONE transport attempt — shared by the file-API and
-  // exec branches so backoff/pace/fail-loud semantics live in one place. `run`
-  // must be idempotent under unknown-outcome retries (both transports are: the
-  // file API is a whole-file overwrite; exec writes deterministic parts). A
-  // transient error retries with backoff up to maxRetries (honoring a server
-  // Retry-After); anything else, or exhausting retries, fails loud with the
-  // cause. The pace counter is shared across every attempt in this call so the
-  // whole corpus stays under the proxy throttle.
+  // Pace BETWEEN execs, not before the first or after the last. Shared across
+  // the exec mounts so the (now smaller) executable/edge-case set stays paced.
+  let execStarted = false
+
+  // Pace + transient-retry ONE exec attempt: backoff/pace/fail-loud in one place.
+  // `run` must be idempotent under unknown-outcome retries (exec writes
+  // deterministic parts). A transient error retries with backoff up to
+  // maxRetries (honoring a server Retry-After); anything else, or exhausting
+  // retries, fails loud with the cause.
   const paceAndRetry = async <T>(run: () => Promise<T>, path: string): Promise<Outcome<T>> => {
     for (let attempt = 0; ; attempt++) {
       if (execStarted && paceMs > 0) await sleep(paceMs)
@@ -795,23 +816,10 @@ export async function writeProfileFilesToBox(
     }
   }
 
-  for (const mount of files) {
-    if (mount.resource.kind !== 'inline') continue
+  for (const mount of viaExec) {
+    if (mount.resource.kind !== 'inline') continue // always true (viaExec is inline) — narrows for TS
     const content = mount.resource.content ?? ''
     const path = mount.path
-
-    // Fast path: write the whole file in one request via the file API for
-    // workspace-resolvable, non-executable files (the bulk of the corpus —
-    // `skills/…` and `~/.claude/skills/…`). Shares the pacing counter and the
-    // transient-retry classifier with the exec branch, and reuses the same
-    // fail-loud message shape ("exec" is transport-agnostic wording) so the
-    // runtime-auth-refresh wrapper still recovers from a 401 surfaced here.
-    const fileApiPath = fileApiAvailable ? fileApiTarget(mount) : null
-    if (fileApiPath !== null) {
-      const res = await paceAndRetry(() => box.fs.write(fileApiPath, content), path)
-      if (!res.succeeded) return res
-      continue
-    }
 
     const b64 = Buffer.from(content, 'utf8').toString('base64')
     const b64Chunks: string[] = []
