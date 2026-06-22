@@ -1804,37 +1804,44 @@ describe('writeProfileFilesToBox — file API transport', () => {
     ...(executable !== undefined ? { executable } : {}),
   })
 
-  // A box exposing BOTH box.fs.write (file API) and box.exec, so the per-file
-  // transport choice is asserted by which mock received the mount.
+  // A box exposing BOTH box.fs.writeMany (file API batch) and box.exec, so the
+  // transport choice is asserted by which mock received the mounts. Pacing +
+  // transient-retry now live INSIDE the SDK's writeMany, so these tests assert
+  // the batch hand-off, not per-file retry (that is covered in the SDK's own
+  // sandbox-instance-filesystem suite).
   const dualBox = (
-    over: { write?: ReturnType<typeof vi.fn>; exec?: ReturnType<typeof vi.fn> } = {},
+    over: { writeMany?: ReturnType<typeof vi.fn>; exec?: ReturnType<typeof vi.fn> } = {},
   ) => {
-    const write = over.write ?? vi.fn().mockResolvedValue(undefined)
+    const writeMany = over.writeMany ?? vi.fn().mockResolvedValue(undefined)
     const exec = over.exec ?? vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
-    const box = fakeBox({ exec, fs: { write } } as unknown as Partial<SandboxInstance>)
-    return { box, write, exec }
+    const box = fakeBox({ exec, fs: { writeMany } } as unknown as Partial<SandboxInstance>)
+    return { box, writeMany, exec }
   }
 
-  it('writes a relative, non-executable file via the file API (one request, no exec)', async () => {
-    const { box, write, exec } = dualBox()
+  it('batches a relative, non-executable file through writeMany (one call, no exec)', async () => {
+    const { box, writeMany, exec } = dualBox()
     const res = await writeProfileFilesToBox(box, [inlineMount('skills/seo.md', '# SEO')], { paceMs: 0 })
     expect(res.succeeded).toBe(true)
-    expect(write).toHaveBeenCalledTimes(1)
-    expect(write).toHaveBeenCalledWith('skills/seo.md', '# SEO')
+    expect(writeMany).toHaveBeenCalledTimes(1)
+    expect(writeMany).toHaveBeenCalledWith(
+      [{ path: 'skills/seo.md', content: '# SEO' }],
+      expect.objectContaining({ paceMs: 0 }),
+    )
     expect(exec).not.toHaveBeenCalled()
   })
 
-  it('routes the GTM-scale relative corpus entirely through the file API (no exec, no quota)', async () => {
-    const { box, write, exec } = dualBox()
+  it('routes the GTM-scale relative corpus through ONE writeMany batch (no exec, no quota)', async () => {
+    const { box, writeMany, exec } = dualBox()
     const files = Array.from({ length: 48 }, (_, i) => inlineMount(`skills/gtm/file-${i}.md`, `# ${i}`))
     const res = await writeProfileFilesToBox(box, files, { paceMs: 0 })
     expect(res.succeeded).toBe(true)
-    expect(write).toHaveBeenCalledTimes(48)
+    expect(writeMany).toHaveBeenCalledTimes(1)
+    expect(writeMany.mock.calls[0]![0]).toHaveLength(48) // all 48 in one batch
     expect(exec).not.toHaveBeenCalled()
   })
 
   it('keeps executable, bin-dir, absolute, and unsafe paths on the exec path', async () => {
-    const { box, write, exec } = dualBox()
+    const { box, writeMany, exec } = dualBox()
     const res = await writeProfileFilesToBox(
       box,
       [
@@ -1848,12 +1855,12 @@ describe('writeProfileFilesToBox — file API transport', () => {
       { paceMs: 0 },
     )
     expect(res.succeeded).toBe(true)
-    expect(write).not.toHaveBeenCalled()
+    expect(writeMany).not.toHaveBeenCalled() // nothing file-API-eligible
     expect(exec).toHaveBeenCalled()
   })
 
-  it('writes ~/-relative files via the file API with the home prefix stripped', async () => {
-    const { box, write, exec } = dualBox()
+  it('batches ~/-relative files via writeMany with the home prefix stripped', async () => {
+    const { box, writeMany, exec } = dualBox()
     const res = await writeProfileFilesToBox(
       box,
       [inlineMount('~/.claude/skills/vault-audit/SKILL.md', '# audit')],
@@ -1862,73 +1869,60 @@ describe('writeProfileFilesToBox — file API transport', () => {
     expect(res.succeeded).toBe(true)
     // $HOME == workspace root in agent sandboxes, so the home-relative mount is
     // written as a workspace-relative path (the `~/` prefix stripped).
-    expect(write).toHaveBeenCalledTimes(1)
-    expect(write).toHaveBeenCalledWith('.claude/skills/vault-audit/SKILL.md', '# audit')
+    expect(writeMany).toHaveBeenCalledTimes(1)
+    expect(writeMany).toHaveBeenCalledWith(
+      [{ path: '.claude/skills/vault-audit/SKILL.md', content: '# audit' }],
+      expect.objectContaining({ paceMs: 0 }),
+    )
     expect(exec).not.toHaveBeenCalled()
   })
 
-  it('retries a 429 on box.fs.write and then succeeds', async () => {
-    const write = vi
-      .fn()
-      .mockRejectedValueOnce(Object.assign(new Error('Too many requests'), { status: 429, retryAfterMs: 1 }))
-      .mockRejectedValueOnce(Object.assign(new Error('Too many requests'), { status: 429, retryAfterMs: 1 }))
-      .mockResolvedValueOnce(undefined)
-    const { box, exec } = dualBox({ write })
-    const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')], { paceMs: 0 })
+  it('partitions a mixed corpus: eligible files batch via writeMany, executables via exec', async () => {
+    const { box, writeMany, exec } = dualBox()
+    const res = await writeProfileFilesToBox(
+      box,
+      [inlineMount('skills/a.md', 'A'), inlineMount('skills/b.md', 'B'), inlineMount('bin/tool', 'x')],
+      { paceMs: 0 },
+    )
     expect(res.succeeded).toBe(true)
-    expect(write).toHaveBeenCalledTimes(3)
-    expect(exec).not.toHaveBeenCalled()
+    expect(writeMany).toHaveBeenCalledTimes(1)
+    expect(writeMany.mock.calls[0]![0]).toEqual([
+      { path: 'skills/a.md', content: 'A' },
+      { path: 'skills/b.md', content: 'B' },
+    ])
+    expect(exec).toHaveBeenCalled() // bin/tool (executable) went via exec
   })
 
-  it('fails loud with the path and cause when box.fs.write stays throttled', async () => {
+  it('fails loud with the cause when writeMany rejects (SDK owns the retry)', async () => {
     const quota = Object.assign(new Error('Too many requests'), { status: 429, code: 'QUOTA_EXCEEDED' })
-    const write = vi.fn().mockRejectedValue(quota)
-    const { box } = dualBox({ write })
-    const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')], { paceMs: 0, maxRetries: 0 })
+    const writeMany = vi.fn().mockRejectedValue(quota)
+    const { box } = dualBox({ writeMany })
+    const res = await writeProfileFilesToBox(box, [inlineMount('skills/x.md', 'x')], { paceMs: 0 })
     expect(res.succeeded).toBe(false)
     if (res.succeeded) return
-    expect(res.error.message).toContain('writeProfileFilesToBox: exec failed for skills/x.md')
+    expect(res.error.message).toContain('file-API batch write failed')
+    // Cause preserved so the runtime-auth-refresh wrapper still sees a 401/etc.
     expect(res.error.cause).toBe(quota)
   })
 
-  it('falls back to the exec path when the SDK exposes no file API', async () => {
+  it('falls back to the exec path when the SDK exposes no writeMany', async () => {
     const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
     const box = fakeBox({ exec }) // no box.fs
     const res = await writeProfileFilesToBox(box, [inlineMount('skills/seo.md', '# SEO')], { paceMs: 0 })
     expect(res.succeeded).toBe(true)
-    expect(exec).toHaveBeenCalled() // relative file went via exec because box.fs is absent
+    expect(exec).toHaveBeenCalled() // relative file went via exec because box.fs.writeMany is absent
   })
 
-  it('shares pacing across the file-API and exec transports', async () => {
-    const writeTimes: number[] = []
-    const execTimes: number[] = []
-    const write = vi.fn().mockImplementation(async () => {
-      writeTimes.push(Date.now())
-    })
-    const exec = vi.fn().mockImplementation(async () => {
-      execTimes.push(Date.now())
-      return { stdout: '', stderr: '', exitCode: 0 }
-    })
-    const { box } = dualBox({ write, exec })
-    // relative (file API) first, then absolute (exec): the exec call is paced
-    // AFTER the file-API write via the shared counter.
-    await writeProfileFilesToBox(
-      box,
-      [inlineMount('skills/seo.md', '# SEO'), inlineMount('/abs/gtm', 'x')],
-      { paceMs: 60 },
-    )
-    expect(writeTimes).toHaveLength(1)
-    expect(execTimes.length).toBeGreaterThan(0)
-    expect(execTimes[0]! - writeTimes[0]!).toBeGreaterThanOrEqual(40)
-  })
-
-  it('writes a large relative file in a single file-API request (no chunking)', async () => {
-    const { box, write, exec } = dualBox()
+  it('writes a large relative file in a single batched request (no chunking)', async () => {
+    const { box, writeMany, exec } = dualBox()
     const big = 'x'.repeat(50_000)
     const res = await writeProfileFilesToBox(box, [inlineMount('skills/big.md', big)], { paceMs: 0 })
     expect(res.succeeded).toBe(true)
-    expect(write).toHaveBeenCalledTimes(1)
-    expect(write).toHaveBeenCalledWith('skills/big.md', big)
+    expect(writeMany).toHaveBeenCalledTimes(1)
+    expect(writeMany).toHaveBeenCalledWith(
+      [{ path: 'skills/big.md', content: big }],
+      expect.objectContaining({ paceMs: 0 }),
+    )
     expect(exec).not.toHaveBeenCalled()
   })
 })
