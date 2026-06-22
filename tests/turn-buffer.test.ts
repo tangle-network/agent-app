@@ -3,6 +3,7 @@ import {
   coalesceDeltas,
   coalesceChatStreamEvents,
   pumpBufferedTurn,
+  createBufferedTurnTap,
   replayTurnEvents,
   createMemoryTurnEventStore,
 } from '../src/stream/turn-buffer'
@@ -203,5 +204,63 @@ describe('pumpBufferedTurn + replayTurnEvents', () => {
     expect(await store.getStatus('t5')).toBe('error')
     const rows = await store.read('t5', 0)
     expect(rows.length).toBeGreaterThan(0)
+  })
+})
+
+// ── #42: the push-driven tap (handleChatTurn hooks.onEvent path) ────────────
+
+describe('createBufferedTurnTap', () => {
+  it('buffers pushed events and completes via done(); replay reproduces the text', async () => {
+    const store = createMemoryTurnEventStore()
+    // Simulate agent-runtime handleChatTurn: it owns iteration and pushes to a
+    // hook. We DON'T own an AsyncIterable here — only the per-event callback.
+    const tap = createBufferedTurnTap({ store, turnId: 'k1', flushIntervalMs: 0, scopeId: 'thread-1' })
+    async function handleChatTurn(hooks: { onEvent: (e: unknown) => Promise<void> }) {
+      for (const t of ['Hel', 'lo', '!']) await hooks.onEvent(text(t))
+    }
+    try {
+      await handleChatTurn({ onEvent: tap.onEvent })
+      await tap.done('complete')
+    } catch {
+      await tap.done('error')
+    }
+    expect(await store.getStatus('k1')).toBe('complete')
+    const rows = await collect(replayTurnEvents({ store, turnId: 'k1', pollMs: 1 }))
+    const out = rows
+      .filter((r) => r.seq > 0)
+      .map((r) => JSON.parse(r.event).event.text)
+      .join('')
+    expect(out).toBe('Hello!')
+  })
+
+  it('marks the turn running on first event so listRunning can find it mid-flight', async () => {
+    const store = createMemoryTurnEventStore()
+    const tap = createBufferedTurnTap({ store, turnId: 'k2', flushIntervalMs: 10_000, scopeId: 'sess-A' })
+    expect(await store.getStatus('k2')).toBeNull() // nothing until first event
+    await tap.onEvent(text('mid'))
+    expect(await store.getStatus('k2')).toBe('running')
+    expect(await store.listRunning!('sess-A')).toEqual(['k2'])
+    await tap.done('complete')
+    expect(await store.listRunning!('sess-A')).toEqual([])
+  })
+
+  it('done("error") flushes what was produced and marks error', async () => {
+    const store = createMemoryTurnEventStore()
+    const tap = createBufferedTurnTap({ store, turnId: 'k3', flushIntervalMs: 10_000 })
+    await tap.onEvent(text('partial'))
+    await tap.done('error')
+    expect(await store.getStatus('k3')).toBe('error')
+    expect((await store.read('k3', 0)).length).toBeGreaterThan(0)
+  })
+
+  it('coalesces ChatStreamEvent deltas pushed through onEvent (no per-token rows)', async () => {
+    const store = createMemoryTurnEventStore()
+    const tap = createBufferedTurnTap({ store, turnId: 'k4', flushIntervalMs: 10_000, coalesce: coalesceChatStreamEvents })
+    await tap.onEvent(partUpdate('p1', 'Hel', 'Hel'))
+    await tap.onEvent(partUpdate('p1', 'lo', 'Hello'))
+    await tap.done('complete')
+    const rows = await store.read('k4', 0)
+    expect(rows).toHaveLength(1)
+    expect(JSON.parse(rows[0]!.event).data.delta).toBe('Hello')
   })
 })
