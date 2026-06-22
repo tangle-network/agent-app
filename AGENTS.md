@@ -20,6 +20,8 @@ Corollary — **extend, never duplicate.** Before writing anything that complete
 
 ## Module map
 
+> For the layered view (L0 foundation → L3 React surfaces), the dependency-direction rule, and a "where do I add X?" guide, see [`ARCHITECTURE.md`](./ARCHITECTURE.md). The table below is the per-subpath ownership detail.
+
 | Subpath | Owns (app-shell) | Composes (peer/structural) |
 |---|---|---|
 | `/tools` | structured agent→app side channel (`submit_proposal`/`schedule_followup`/`render_ui`/`add_citation`): OpenAI defs, MCP-server builder (`buildHttpMcpServer`/`buildAppToolMcpServer`), HTTP route handler, runtime executor, capability auth, `ToolInputError` | — |
