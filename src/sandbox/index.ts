@@ -548,6 +548,10 @@ const PROFILE_WRITE_PACE_MS = 150
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
+// A mount whose path sits in a bin directory is made executable. Shared so the
+// file-API eligibility check and the exec branch agree on "executable by dir".
+const PROFILE_BIN_DIR_RE = /(^|\/)(s?bin)\//
+
 // Sentinel cause for a client-side per-exec timeout (a hung/wedged proxy exec).
 // Carried as the `.cause` of the fail-loud Outcome so callers see the wedged
 // command instead of an opaque infinite hang.
@@ -727,6 +731,28 @@ export interface WriteProfileFilesOptions {
   maxRetries?: number
 }
 
+// The workspace-relative target for a deferred inline mount when it can be
+// materialized through the sidecar file API (`box.fs.write` — FILES rate group,
+// 300/min, whole-file, auto-mkdir) instead of the chunked terminal-exec path
+// (50/min); null when it must stay on exec. The file API resolves relative
+// paths from the workspace root and cannot set the executable bit, so
+// eligibility is: inline, non-executable, and a path that resolves under the
+// workspace root with no `..`/`.sidecar` segment. `~/…` is home-relative; agent
+// sandboxes set $HOME to the workspace root, so it maps to the same relative
+// target. Absolute (`/…`), bare `~`/`~user`, and executable mounts stay on exec.
+function fileApiTarget(mount: AgentProfileFileMount): string | null {
+  if (mount.resource.kind !== 'inline') return null
+  if (mount.executable ?? PROFILE_BIN_DIR_RE.test(mount.path)) return null
+  let rel: string
+  if (mount.path.startsWith('~/')) rel = mount.path.slice(2)
+  else if (mount.path.startsWith('/') || mount.path.startsWith('~')) return null
+  else rel = mount.path
+  if (rel.length === 0 || rel.split('/').some((seg) => seg === '..' || seg === '.sidecar')) {
+    return null
+  }
+  return rel
+}
+
 export async function writeProfileFilesToBox(
   box: SandboxInstance,
   files: AgentProfileFileMount[],
@@ -738,19 +764,54 @@ export async function writeProfileFilesToBox(
   // Pace BETWEEN execs, not before the first or after the last. Shared across
   // every mount in this call so the whole ~135-exec corpus stays paced.
   let execStarted = false
+  // box.fs.write hits the sidecar file API (FILES rate group, 300/min) instead
+  // of the terminal exec channel (50/min); fall back to exec when the resolved
+  // SDK exposes no file API.
+  const fileApiAvailable = typeof box.fs?.write === 'function'
 
   for (const mount of files) {
     if (mount.resource.kind !== 'inline') continue
     const content = mount.resource.content ?? ''
+    const path = mount.path
+
+    // Fast path: write the whole file in one request via the file API for
+    // workspace-resolvable, non-executable files (the bulk of the corpus —
+    // `skills/…` and `~/.claude/skills/…`). Shares the pacing counter and the
+    // transient-retry classifier with the exec branch, and reuses the same
+    // fail-loud message shape ("exec" is transport-agnostic wording) so the
+    // runtime-auth-refresh wrapper still recovers from a 401 surfaced here.
+    const fileApiPath = fileApiAvailable ? fileApiTarget(mount) : null
+    if (fileApiPath !== null) {
+      for (let attempt = 0; ; attempt++) {
+        if (execStarted && paceMs > 0) await sleep(paceMs)
+        execStarted = true
+        try {
+          await box.fs.write(fileApiPath, content)
+          break
+        } catch (err) {
+          const { retryable, retryAfterMs } = transientExecError(err)
+          if (retryable && attempt < maxRetries) {
+            const backoff = Math.min(
+              PROFILE_WRITE_RETRY_BASE_MS * 2 ** attempt,
+              PROFILE_WRITE_RETRY_MAX_MS,
+            )
+            await sleep(retryAfterMs ?? backoff)
+            continue
+          }
+          return fail(new Error(`writeProfileFilesToBox: exec failed for ${path}`, { cause: err }))
+        }
+      }
+      continue
+    }
+
     const b64 = Buffer.from(content, 'utf8').toString('base64')
     const b64Chunks: string[] = []
     for (let i = 0; i < b64.length; i += PROFILE_WRITE_B64_CHUNK_CHARS) {
       b64Chunks.push(b64.slice(i, i + PROFILE_WRITE_B64_CHUNK_CHARS))
     }
     const expectedSha256 = createHash('sha256').update(content, 'utf8').digest('hex')
-    const path = mount.path
     const dir = path.replace(/\/[^/]*$/, '')
-    const isBin = /(^|\/)(s?bin)\//.test(path)
+    const isBin = PROFILE_BIN_DIR_RE.test(path)
     const executable = mount.executable ?? isBin
     const q = shellPath(path)
     const qb64 = shellPath(`${path}.b64`)
