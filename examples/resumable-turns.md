@@ -1,9 +1,22 @@
 # Resumable chat turns (don't lose a stream on disconnect)
 
 When a model answers, it streams out in pieces. If the user's tab drops — or a
-Worker restarts mid-turn — you don't want to lose the answer. The `/stream`
-module buffers every event as it's produced; a reconnecting client replays the
-buffered tail by sequence number and keeps following until the turn completes.
+Worker restarts mid-turn — you don't want to lose the answer. This module buffers
+every event as it's produced so a reconnecting client can replay the tail.
+
+## ⚠️ First: are you on the sandbox? Then you almost certainly DON'T need this.
+
+**The `@tangle-network/sandbox` SDK already buffers + replays session streams.**
+`streamPrompt` / `dispatchPrompt` buffer events server-side; a reconnecting
+client replays with `lastEventId` (the `Last-Event-ID` header), and
+`findCompletedTurn` is the idempotent completion check. Both gtm-agent and
+creative-agent already use this — **do not hand-roll the buffer below over a
+sandbox session.** See the `sandbox-sdk-integration` guidance.
+
+**This module is the resume story for the SANDBOX-FREE path only** — a browser or
+edge copilot streaming the Tangle Router (or any OpenAI-compatible endpoint)
+directly, where there is no sandbox session gateway to replay for you (the
+[`browser-copilot.md`](./browser-copilot.md) shape). That's the whole niche.
 
 ```
 POST /chat/stream          → buffer the turn + stream live    (pump OR tap)
@@ -13,12 +26,13 @@ GET  /chat/stream/:turnId  → replayTurnEvents({ fromSeq }) → NDJSON tail
 It is pure mechanism behind a storage seam — no peers. Storage is a
 `TurnEventStore`; a D1 implementation and an in-memory one ship here.
 
-## Do you even need it?
+## Do you need it?
 
 | You're running… | Use this? |
 | --- | --- |
-| **Interactive turn** a user is watching (chat, copilot) | **Yes** — buffer so a dropped tab/Worker restart loses nothing. |
-| **Autonomous turn** (mission, queue, cron) | Prefer the sandbox SDK's `dispatchPrompt({ detach: true })` + poll. Buffer only if you also stream it to a watcher. |
+| **Sandbox-backed turn** (most products) | **No** — the SDK gateway already buffers + replays (`streamPrompt` + `lastEventId`). Use that. |
+| **Sandbox-free interactive turn** (browser/edge copilot on the Router directly) | **Yes** — there's no gateway; this is your resume mechanism. |
+| **Autonomous turn** (mission, queue, cron) | Prefer `dispatchPrompt({ detach: true })` + poll. Buffer only if you also stream it to a watcher AND aren't sandbox-backed. |
 | **Eval / CI** (long-lived process) | **No** — the harness is the consumer and outlives the run; a failed run is re-run, not resumed. |
 
 ## Pick a transport — who owns the producer?
