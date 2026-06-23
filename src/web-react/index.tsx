@@ -474,6 +474,18 @@ function ToolCallCard({
   )
 }
 
+/** The blinking insertion caret shown at the end of streaming answer text.
+ *  Shared by the segmented and legacy branches so their streaming cue can't
+ *  visually diverge. */
+function StreamingCaret() {
+  return (
+    <span
+      className="ml-0.5 inline-block h-[1.1em] w-[3px] translate-y-[2px] animate-pulse rounded-sm bg-foreground/70"
+      aria-hidden
+    />
+  )
+}
+
 /** One text run inside a segmented turn. Smooths its own text so only the
  *  actively-streaming trailing run types out; finalized runs render at once.
  *  A child component (not an inline map) so its `useSmoothText` state is stable
@@ -494,12 +506,7 @@ function SegmentText({
   return (
     <div className="text-base leading-[1.75]">
       {body}
-      {showCaret && text && (
-        <span
-          className="ml-0.5 inline-block h-[1.1em] w-[3px] translate-y-[2px] animate-pulse rounded-sm bg-foreground/70"
-          aria-hidden
-        />
-      )}
+      {showCaret && text && <StreamingCaret />}
     </div>
   )
 }
@@ -596,7 +603,10 @@ function AssistantMessageImpl({
               />
             ) : (
               <ToolCallCard
-                key={seg.call.id}
+                // Namespaced so a tool call id can never collide with a
+                // `text-<i>` key; call ids are unique within a turn (deduped by
+                // call id upstream), so this stays stable across re-renders.
+                key={`tool-${seg.call.id}`}
                 call={seg.call}
                 message={msg}
                 approval={approval}
@@ -610,9 +620,7 @@ function AssistantMessageImpl({
         <>
           <div className="text-base leading-[1.75]">
             {body}
-            {streaming && content && !msg.toolCalls?.length && (
-              <span className="ml-0.5 inline-block h-[1.1em] w-[3px] translate-y-[2px] animate-pulse rounded-sm bg-foreground/70" aria-hidden />
-            )}
+            {streaming && content && !msg.toolCalls?.length && <StreamingCaret />}
           </div>
           {msg.toolCalls && msg.toolCalls.length > 0 && (
             <div className="mt-2 flex flex-col gap-1.5">
