@@ -503,13 +503,17 @@ function SegmentText({
 }) {
   const text = useSmoothText(content, streaming)
   const body = useMemo(() => renderBody(text), [renderBody, text])
-  // An empty / whitespace-only run would paint a blank line-height gap — render
-  // nothing for it. (Hooks run first, so this stays rules-of-hooks safe.)
-  if (!content.trim()) return null
+  // An empty / whitespace-only run paints a blank line-height gap — render
+  // nothing, UNLESS it's the live trailing run (showCaret), where it still
+  // carries the caret so the turn doesn't look frozen. (Hooks run first, so
+  // this stays rules-of-hooks safe.)
+  if (!content.trim() && !showCaret) return null
   return (
     <div className="text-base leading-[1.75]">
       {body}
-      {showCaret && text && <StreamingCaret />}
+      {/* Gate on showCaret (not the smoothed `text`, which is '' on the first
+          frame) so the caret is steady from the start instead of flickering. */}
+      {showCaret && <StreamingCaret />}
     </div>
   )
 }
@@ -613,20 +617,33 @@ function AssistantMessageImpl({
   // When a turn is segmented, render the ordered text/tool runs interleaved;
   // otherwise fall back to the single content body + trailing tool group.
   const segments = msg.segments
+  // "Has the answer started?" — true once any answer text exists, whether the
+  // producer puts it in `content` (legacy) or in a text `segment`. Drives the
+  // reasoning box (open while still thinking, the thinking timer, the summary
+  // label), so a segmented message with `content: ''` doesn't read as
+  // perpetually "Thinking…" after its answer segments are visible.
+  const hasAnswerText =
+    content !== '' ||
+    (segments?.some((s) => s.kind === 'text' && s.content.trim() !== '') ??
+      false)
   const reasoningScrollRef = useRef<HTMLDivElement>(null)
   // Measure visible thinking time: first reasoning reveal → first answer text.
   const thinkStartRef = useRef<number | null>(null)
   const thinkMsRef = useRef<number | null>(null)
-  if (streaming && reasoning && !content && thinkStartRef.current === null) {
+  if (streaming && reasoning && !hasAnswerText && thinkStartRef.current === null) {
     thinkStartRef.current = performance.now()
   }
-  if (content && thinkStartRef.current !== null && thinkMsRef.current === null) {
+  if (
+    hasAnswerText &&
+    thinkStartRef.current !== null &&
+    thinkMsRef.current === null
+  ) {
     thinkMsRef.current = performance.now() - thinkStartRef.current
   }
   useEffect(() => {
     const el = reasoningScrollRef.current
-    if (el && streaming && !content) el.scrollTop = el.scrollHeight
-  }, [reasoning, streaming, content])
+    if (el && streaming && !hasAnswerText) el.scrollTop = el.scrollHeight
+  }, [reasoning, streaming, hasAnswerText])
 
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-3">
@@ -637,9 +654,9 @@ function AssistantMessageImpl({
         {formatModelCost(msg, models) && <span>{formatModelCost(msg, models)}</span>}
       </div>
       {reasoning && (
-        <details className="mb-2 rounded-lg border-l-2 border-border/70 bg-muted/20 px-3 py-2" open={!content}>
+        <details className="mb-2 rounded-lg border-l-2 border-border/70 bg-muted/20 px-3 py-2" open={!hasAnswerText}>
           <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
-            {!content ? (
+            {!hasAnswerText ? (
               <span className="animate-pulse">Thinking…</span>
             ) : thinkMsRef.current != null ? (
               `Thought for ${Math.max(1, Math.round(thinkMsRef.current / 1000))}s`

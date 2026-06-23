@@ -125,4 +125,39 @@ describe('ChatMessages segmented turns', () => {
     const matches = (container.textContent ?? '').match(/validate_workflow/g) ?? []
     expect(matches).toHaveLength(1)
   })
+
+  it('does not leave the reasoning panel Thinking for a segmented message with empty content', () => {
+    const message: ChatUiMessage = {
+      id: 'm1',
+      role: 'assistant',
+      content: '',
+      reasoning: 'Considering the options.',
+      segments: [{ kind: 'text', content: 'Here is the answer.' }],
+    }
+    const { container } = render(<ChatMessages messages={[message]} />)
+    expect(container.textContent).toContain('Here is the answer.')
+    // The answer exists, so the reasoning box is collapsed and NOT pulsing
+    // "Thinking…" — even though `content` is '' and the answer is in a segment.
+    expect(container.textContent).not.toContain('Thinking…')
+    expect(container.querySelector('details')?.open).toBe(false)
+  })
+
+  it('shows a streaming caret when the live turn ends on a tool segment', () => {
+    const message: ChatUiMessage = {
+      id: 'm1',
+      role: 'assistant',
+      content: 'Checking.',
+      segments: [
+        { kind: 'text', content: 'Checking.' },
+        { kind: 'tool', call: { id: 't1', name: 'validate_workflow', status: 'running' } },
+      ],
+    }
+    // `loading` + last message → this turn is streaming.
+    const { container } = render(<ChatMessages messages={[message]} loading />)
+    // The decorative caret is the only aria-hidden pulsing span (the tool's own
+    // running dot is not aria-hidden).
+    expect(
+      container.querySelector('span[aria-hidden].animate-pulse'),
+    ).not.toBeNull()
+  })
 })
