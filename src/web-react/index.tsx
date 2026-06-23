@@ -175,12 +175,25 @@ export function pendingApprovalOf(call: ChatToolCallInfo): { proposalId: string 
   return { proposalId: outcome.result.proposalId }
 }
 
+/** One ordered piece of an assistant turn: a run of answer text, or a tool
+ *  call, in the sequence the agent emitted them. A message carrying `segments`
+ *  is rendered in order — interleaving text and tool chips — so the agent's
+ *  pre- and post-tool reasoning reads chronologically instead of as one text
+ *  blob with the tool chips collected after it. */
+export type ChatMessageSegment =
+  | { kind: 'text'; content: string }
+  | { kind: 'tool'; call: ChatToolCallInfo }
+
 export interface ChatUiMessage extends ChatMessageMetrics {
   id: string
   role: 'user' | 'assistant' | 'system'
   content: string
   reasoning?: string
   toolCalls?: ChatToolCallInfo[]
+  /** Ordered text/tool sequence for true chronological interleaving. When
+   *  present and non-empty it is rendered in place of `content` + `toolCalls`;
+   *  both remain the fallback for producers that don't segment a turn. */
+  segments?: ChatMessageSegment[]
 }
 
 export interface ChatMessagesProps {
@@ -461,6 +474,36 @@ function ToolCallCard({
   )
 }
 
+/** One text run inside a segmented turn. Smooths its own text so only the
+ *  actively-streaming trailing run types out; finalized runs render at once.
+ *  A child component (not an inline map) so its `useSmoothText` state is stable
+ *  across the parent's per-frame stream re-renders. */
+function SegmentText({
+  content,
+  streaming,
+  showCaret,
+  renderBody,
+}: {
+  content: string
+  streaming: boolean
+  showCaret: boolean
+  renderBody: (content: string) => ReactNode
+}) {
+  const text = useSmoothText(content, streaming)
+  const body = useMemo(() => renderBody(text), [renderBody, text])
+  return (
+    <div className="text-base leading-[1.75]">
+      {body}
+      {showCaret && text && (
+        <span
+          className="ml-0.5 inline-block h-[1.1em] w-[3px] translate-y-[2px] animate-pulse rounded-sm bg-foreground/70"
+          aria-hidden
+        />
+      )}
+    </div>
+  )
+}
+
 function AssistantMessageImpl({
   msg,
   streaming,
@@ -493,6 +536,9 @@ function AssistantMessageImpl({
   // each frame is wasted work on the hot path. Memo on (renderBody, content) so
   // the parse runs only when the visible text actually changes.
   const body = useMemo(() => renderBody(content), [renderBody, content])
+  // When a turn is segmented, render the ordered text/tool runs interleaved;
+  // otherwise fall back to the single content body + trailing tool group.
+  const segments = msg.segments
   const reasoningScrollRef = useRef<HTMLDivElement>(null)
   // Measure visible thinking time: first reasoning reveal → first answer text.
   const thinkStartRef = useRef<number | null>(null)
@@ -532,25 +578,57 @@ function AssistantMessageImpl({
           </div>
         </details>
       )}
-      <div className="text-base leading-[1.75]">
-        {body}
-        {streaming && content && !msg.toolCalls?.length && (
-          <span className="ml-0.5 inline-block h-[1.1em] w-[3px] translate-y-[2px] animate-pulse rounded-sm bg-foreground/70" aria-hidden />
-        )}
-      </div>
-      {msg.toolCalls && msg.toolCalls.length > 0 && (
-        <div className="mt-2 flex flex-col gap-1.5">
-          {msg.toolCalls.map((tc) => (
-            <ToolCallCard
-              key={tc.id}
-              call={tc}
-              message={msg}
-              approval={approval}
-              onOpenRun={onToolCallClick}
-              renderers={toolRenderers}
-            />
-          ))}
+      {segments && segments.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          {segments.map((seg, i) => {
+            const isLast = i === segments.length - 1
+            return seg.kind === 'text' ? (
+              <SegmentText
+                // Segments only ever append within a turn, so the index is a
+                // stable key — a finalized run keeps its slot as later runs/tools
+                // are added, so its smooth-text state isn't reset.
+                key={`text-${i}`}
+                content={seg.content}
+                // Only the trailing run of the live turn types out + shows the caret.
+                streaming={streaming && isLast}
+                showCaret={streaming && isLast}
+                renderBody={renderBody}
+              />
+            ) : (
+              <ToolCallCard
+                key={seg.call.id}
+                call={seg.call}
+                message={msg}
+                approval={approval}
+                onOpenRun={onToolCallClick}
+                renderers={toolRenderers}
+              />
+            )
+          })}
         </div>
+      ) : (
+        <>
+          <div className="text-base leading-[1.75]">
+            {body}
+            {streaming && content && !msg.toolCalls?.length && (
+              <span className="ml-0.5 inline-block h-[1.1em] w-[3px] translate-y-[2px] animate-pulse rounded-sm bg-foreground/70" aria-hidden />
+            )}
+          </div>
+          {msg.toolCalls && msg.toolCalls.length > 0 && (
+            <div className="mt-2 flex flex-col gap-1.5">
+              {msg.toolCalls.map((tc) => (
+                <ToolCallCard
+                  key={tc.id}
+                  call={tc}
+                  message={msg}
+                  approval={approval}
+                  onOpenRun={onToolCallClick}
+                  renderers={toolRenderers}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
       {renderExtras?.(msg)}
     </div>
