@@ -6,12 +6,16 @@
  */
 
 import { lazy } from 'react'
-import type { MembersPanelProps, InviteAcceptPageProps } from './contracts'
+import type { MembersPanelProps, InvitationsPanelProps, InviteAcceptPageProps } from './contracts'
 
-export type { MembersPanelProps, InviteAcceptPageProps }
+export type { MembersPanelProps, InvitationsPanelProps, InviteAcceptPageProps }
 
 export const MembersPanelLazy = lazy(
   () => import('./components/MembersPanel').then((m) => ({ default: m.MembersPanel })),
+)
+
+export const InvitationsPanelLazy = lazy(
+  () => import('./components/InvitationsPanel').then((m) => ({ default: m.InvitationsPanel })),
 )
 
 export const InviteAcceptPageLazy = lazy(

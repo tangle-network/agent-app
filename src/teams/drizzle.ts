@@ -10,5 +10,6 @@
  * so an app that imports only `./teams` (or only `.`) never pulls drizzle.
  */
 export * from './drizzle/schema'
+export * from './drizzle/invitations-schema'
 export * from './drizzle/access'
 export * from './drizzle/personal-organization'

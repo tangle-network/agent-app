@@ -10,14 +10,16 @@
 import { useState } from 'react'
 import type { InviteAcceptPageProps } from '../contracts'
 
-export function InviteAcceptPage({ details, onAccept, onNavigate }: InviteAcceptPageProps) {
+export function InviteAcceptPage({ details, onAccept, onNavigate, onResendVerification }: InviteAcceptPageProps) {
   const [accepting, setAccepting] = useState(false)
   const [acceptError, setAcceptError] = useState<string | null>(null)
   const [accepted, setAccepted] = useState(false)
+  const [resendingVerification, setResendingVerification] = useState(false)
+  const [verificationSent, setVerificationSent] = useState(false)
 
   if (details.status === 'invalid') {
     return (
-      <Shell title="Invalid invite" body="This invite link is invalid or has expired.">
+      <Shell title="Invalid invite" body="This invite link is invalid.">
         <PrimaryButton onClick={() => onNavigate({ kind: 'sign-in' })}>Go to sign in</PrimaryButton>
       </Shell>
     )
@@ -27,6 +29,22 @@ export function InviteAcceptPage({ details, onAccept, onNavigate }: InviteAccept
     return (
       <Shell title="Already accepted" body="This invite has already been accepted.">
         <PrimaryButton onClick={() => onNavigate({ kind: 'open-app' })}>Open workspace</PrimaryButton>
+      </Shell>
+    )
+  }
+
+  if (details.status === 'expired') {
+    return (
+      <Shell title="Invite expired" body="This invitation has expired. Ask the workspace admin to send a new one.">
+        <PrimaryButton onClick={() => onNavigate({ kind: 'sign-in' })}>Go to sign in</PrimaryButton>
+      </Shell>
+    )
+  }
+
+  if (details.status === 'revoked') {
+    return (
+      <Shell title="Invite revoked" body="This invitation has been revoked. Ask the workspace admin to send a new one.">
+        <PrimaryButton onClick={() => onNavigate({ kind: 'sign-in' })}>Go to sign in</PrimaryButton>
       </Shell>
     )
   }
@@ -69,6 +87,10 @@ export function InviteAcceptPage({ details, onAccept, onNavigate }: InviteAccept
     details.inviteEmail &&
     details.inviteEmail.toLowerCase() !== details.currentUserEmail.toLowerCase(),
   )
+  const needsVerification = Boolean(details.needsEmailVerification) && !emailMismatch
+  const expiryLabel = details.expiresAt != null
+    ? new Date(details.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : null
 
   async function handleAccept() {
     setAccepting(true)
@@ -86,6 +108,17 @@ export function InviteAcceptPage({ details, onAccept, onNavigate }: InviteAccept
     }
   }
 
+  async function handleResendVerification() {
+    if (!onResendVerification || resendingVerification) return
+    setResendingVerification(true)
+    try {
+      await onResendVerification()
+      setVerificationSent(true)
+    } finally {
+      setResendingVerification(false)
+    }
+  }
+
   return (
     <Shell title="Join workspace">
       <p className="mb-4 text-sm text-[var(--text-secondary)]">
@@ -94,6 +127,9 @@ export function InviteAcceptPage({ details, onAccept, onNavigate }: InviteAccept
       <p className="mb-4 text-sm text-[var(--text-secondary)]">
         Signed in as <span className="font-medium text-[var(--text-primary)]">{details.currentUserEmail}</span>
       </p>
+      {expiryLabel && (
+        <p className="mb-4 text-xs text-[var(--text-muted)]">This invitation expires on {expiryLabel}.</p>
+      )}
       {emailMismatch && (
         <div
           role="alert"
@@ -102,12 +138,33 @@ export function InviteAcceptPage({ details, onAccept, onNavigate }: InviteAccept
           This invite was sent to <span className="font-medium">{details.inviteEmail}</span>. Switch to that account to accept it.
         </div>
       )}
+      {needsVerification && (
+        <div
+          role="alert"
+          className="mb-4 rounded-md border border-[var(--border-default)] px-4 py-2 text-sm text-[var(--text-warning)]"
+        >
+          {verificationSent
+            ? 'Verification email sent — check your inbox, then refresh this page to accept.'
+            : 'Verify your email address before you can accept this invitation.'}
+        </div>
+      )}
       {acceptError && (
         <p role="alert" className="mb-4 text-sm text-[var(--text-danger)]">{acceptError}</p>
       )}
       <div className="flex gap-2">
         {emailMismatch ? (
           <PrimaryButton onClick={() => onNavigate({ kind: 'switch-account' })}>Switch account</PrimaryButton>
+        ) : needsVerification ? (
+          onResendVerification ? (
+            <PrimaryButton
+              onClick={() => void handleResendVerification()}
+              disabled={resendingVerification || verificationSent}
+            >
+              {verificationSent ? 'Verification sent' : resendingVerification ? 'Sending…' : 'Resend verification email'}
+            </PrimaryButton>
+          ) : (
+            <PrimaryButton onClick={() => onNavigate({ kind: 'open-app' })}>Open app</PrimaryButton>
+          )
         ) : (
           <PrimaryButton onClick={() => void handleAccept()} disabled={accepting}>
             {accepting ? 'Accepting…' : 'Accept invite'}

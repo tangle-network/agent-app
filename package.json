@@ -249,6 +249,11 @@
       "import": "./dist/teams/members-api.js",
       "default": "./dist/teams/members-api.js"
     },
+    "./teams/invitations-api": {
+      "types": "./dist/teams/invitations-api.d.ts",
+      "import": "./dist/teams/invitations-api.js",
+      "default": "./dist/teams/invitations-api.js"
+    },
     "./teams-react": {
       "types": "./dist/teams-react/index.d.ts",
       "import": "./dist/teams-react/index.js",
