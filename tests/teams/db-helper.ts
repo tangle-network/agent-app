@@ -9,7 +9,7 @@
 import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { getTableName, is, SQL } from 'drizzle-orm'
-import { getTableConfig, sqliteTable, text, SQLiteSyncDialect } from 'drizzle-orm/sqlite-core'
+import { getTableConfig, integer, sqliteTable, text, SQLiteSyncDialect } from 'drizzle-orm/sqlite-core'
 import type { AnySQLiteTable, ForeignKey, SQLiteColumn } from 'drizzle-orm/sqlite-core'
 
 const dialect = new SQLiteSyncDialect()
@@ -18,6 +18,7 @@ export const usersTable = sqliteTable('user', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   email: text('email').notNull(),
+  emailVerified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
 })
 
 export const workspacesTable = sqliteTable('workspace', {
