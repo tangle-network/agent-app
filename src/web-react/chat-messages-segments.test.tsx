@@ -6,10 +6,11 @@ import { ChatMessages, type ChatUiMessage } from './index'
 
 afterEach(cleanup)
 
-/** Index of a substring in the rendered text, for asserting DOM order. */
-function orderOf(container: HTMLElement, ...needles: string[]): number[] {
-  const text = container.textContent ?? ''
-  return needles.map((n) => text.indexOf(n))
+/** Index of a substring in the rendered text, for asserting DOM order; -1 when
+ *  absent. Returns a plain `number` so callers can compare without unguarded
+ *  array-index access. */
+function indexIn(container: HTMLElement, needle: string): number {
+  return (container.textContent ?? '').indexOf(needle)
 }
 
 describe('ChatMessages segmented turns', () => {
@@ -35,14 +36,11 @@ describe('ChatMessages segmented turns', () => {
 
     const { container } = render(<ChatMessages messages={[message]} />)
 
-    const [pre, schema, mid, validate, post] = orderOf(
-      container,
-      'Checking the workflow format first.',
-      'get_workflow_schema',
-      'Now validating the definition.',
-      'validate_workflow',
-      'Validated. Here is the plan.',
-    )
+    const pre = indexIn(container, 'Checking the workflow format first.')
+    const schema = indexIn(container, 'get_workflow_schema')
+    const mid = indexIn(container, 'Now validating the definition.')
+    const validate = indexIn(container, 'validate_workflow')
+    const post = indexIn(container, 'Validated. Here is the plan.')
     // Every needle is present...
     expect(Math.min(pre, schema, mid, validate, post)).toBeGreaterThanOrEqual(0)
     // ...and they appear strictly interleaved in emission order, not as one
@@ -63,7 +61,8 @@ describe('ChatMessages segmented turns', () => {
 
     const { container } = render(<ChatMessages messages={[message]} />)
 
-    const [body, tool] = orderOf(container, 'All done.', 'list_workflows')
+    const body = indexIn(container, 'All done.')
+    const tool = indexIn(container, 'list_workflows')
     expect(body).toBeGreaterThanOrEqual(0)
     expect(tool).toBeGreaterThanOrEqual(0)
     // Legacy producers keep the prior layout: content first, tool chips after.
