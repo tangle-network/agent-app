@@ -503,10 +503,77 @@ function SegmentText({
 }) {
   const text = useSmoothText(content, streaming)
   const body = useMemo(() => renderBody(text), [renderBody, text])
+  // An empty / whitespace-only run would paint a blank line-height gap — render
+  // nothing for it. (Hooks run first, so this stays rules-of-hooks safe.)
+  if (!content.trim()) return null
   return (
     <div className="text-base leading-[1.75]">
       {body}
       {showCaret && text && <StreamingCaret />}
+    </div>
+  )
+}
+
+/** Renders a turn's ordered text/tool segments interleaved. The trailing text
+ *  run carries the streaming caret; if the last segment is instead a tool, a
+ *  trailing caret keeps the gap before the next run from looking frozen. Any
+ *  `toolCalls` not represented in `segments` (a partially-migrated producer that
+ *  set both) still render, so a tool chip is never silently dropped. */
+function SegmentedBody({
+  segments,
+  msg,
+  streaming,
+  renderBody,
+  approval,
+  onToolCallClick,
+  toolRenderers,
+}: {
+  segments: ChatMessageSegment[]
+  msg: ChatUiMessage
+  streaming: boolean
+  renderBody: (content: string) => ReactNode
+  approval?: ProposalApprovalHandlers
+  onToolCallClick?: (call: ChatToolCallInfo, message: ChatUiMessage) => void
+  toolRenderers?: ToolDetailRenderers
+}) {
+  const lastIndex = segments.length - 1
+  const segmentToolIds = new Set(
+    segments.flatMap((s) => (s.kind === 'tool' ? [s.call.id] : [])),
+  )
+  const leftoverToolCalls = (msg.toolCalls ?? []).filter(
+    (tc) => !segmentToolIds.has(tc.id),
+  )
+  const renderToolCard = (call: ChatToolCallInfo) => (
+    <ToolCallCard
+      key={`tool-${call.id}`}
+      call={call}
+      message={msg}
+      approval={approval}
+      onOpenRun={onToolCallClick}
+      renderers={toolRenderers}
+    />
+  )
+  return (
+    <div className="flex flex-col gap-2">
+      {segments.map((seg, i) =>
+        seg.kind === 'text' ? (
+          <SegmentText
+            // Segments only ever append within a turn, so the index is a stable
+            // key — a finalized run keeps its slot as later runs/tools are added,
+            // so its smooth-text state isn't reset.
+            key={`text-${i}`}
+            content={seg.content}
+            // Only the trailing run of the live turn types out + shows the caret.
+            streaming={streaming && i === lastIndex}
+            showCaret={streaming && i === lastIndex}
+            renderBody={renderBody}
+          />
+        ) : (
+          renderToolCard(seg.call)
+        ),
+      )}
+      {leftoverToolCalls.map(renderToolCard)}
+      {streaming && segments[lastIndex]?.kind === 'tool' && <StreamingCaret />}
     </div>
   )
 }
@@ -586,36 +653,15 @@ function AssistantMessageImpl({
         </details>
       )}
       {segments && segments.length > 0 ? (
-        <div className="flex flex-col gap-2">
-          {segments.map((seg, i) => {
-            const isLast = i === segments.length - 1
-            return seg.kind === 'text' ? (
-              <SegmentText
-                // Segments only ever append within a turn, so the index is a
-                // stable key — a finalized run keeps its slot as later runs/tools
-                // are added, so its smooth-text state isn't reset.
-                key={`text-${i}`}
-                content={seg.content}
-                // Only the trailing run of the live turn types out + shows the caret.
-                streaming={streaming && isLast}
-                showCaret={streaming && isLast}
-                renderBody={renderBody}
-              />
-            ) : (
-              <ToolCallCard
-                // Namespaced so a tool call id can never collide with a
-                // `text-<i>` key; call ids are unique within a turn (deduped by
-                // call id upstream), so this stays stable across re-renders.
-                key={`tool-${seg.call.id}`}
-                call={seg.call}
-                message={msg}
-                approval={approval}
-                onOpenRun={onToolCallClick}
-                renderers={toolRenderers}
-              />
-            )
-          })}
-        </div>
+        <SegmentedBody
+          segments={segments}
+          msg={msg}
+          streaming={streaming}
+          renderBody={renderBody}
+          approval={approval}
+          onToolCallClick={onToolCallClick}
+          toolRenderers={toolRenderers}
+        />
       ) : (
         <>
           <div className="text-base leading-[1.75]">

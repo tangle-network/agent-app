@@ -80,4 +80,49 @@ describe('ChatMessages segmented turns', () => {
     const { container } = render(<ChatMessages messages={[message]} />)
     expect(container.textContent).toContain('Plain answer with no tools.')
   })
+
+  it('skips an empty text segment without disturbing the following segments', () => {
+    const message: ChatUiMessage = {
+      id: 'm1',
+      role: 'assistant',
+      content: 'After.',
+      segments: [
+        { kind: 'text', content: '   ' },
+        { kind: 'tool', call: { id: 't1', name: 'list_skills', status: 'done' } },
+        { kind: 'text', content: 'After.' },
+      ],
+    }
+    const { container } = render(<ChatMessages messages={[message]} />)
+    const text = container.textContent ?? ''
+    expect(text).toContain('list_skills')
+    expect(text.indexOf('After.')).toBeGreaterThan(text.indexOf('list_skills'))
+  })
+
+  it('renders a toolCall not represented in segments rather than dropping it', () => {
+    const message: ChatUiMessage = {
+      id: 'm1',
+      role: 'assistant',
+      content: 'Working.',
+      segments: [{ kind: 'text', content: 'Working.' }],
+      // A partially-migrated producer set both fields; the orphan tool must show.
+      toolCalls: [{ id: 'orphan', name: 'list_workflows', status: 'done' }],
+    }
+    const { container } = render(<ChatMessages messages={[message]} />)
+    expect(container.textContent).toContain('list_workflows')
+  })
+
+  it('does not duplicate a toolCall already present as a segment', () => {
+    const message: ChatUiMessage = {
+      id: 'm1',
+      role: 'assistant',
+      content: '',
+      segments: [
+        { kind: 'tool', call: { id: 't1', name: 'validate_workflow', status: 'done' } },
+      ],
+      toolCalls: [{ id: 't1', name: 'validate_workflow', status: 'done' }],
+    }
+    const { container } = render(<ChatMessages messages={[message]} />)
+    const matches = (container.textContent ?? '').match(/validate_workflow/g) ?? []
+    expect(matches).toHaveLength(1)
+  })
 })
