@@ -43,6 +43,7 @@ export default defineConfig({
     'teams/index': 'src/teams/index.ts',
     'teams/drizzle': 'src/teams/drizzle.ts',
     'teams/members-api': 'src/teams/members-api.ts',
+    'teams/invitations-api': 'src/teams/invitations-api.ts',
     'teams-react/index': 'src/teams-react/index.ts',
     'teams-react/lazy': 'src/teams-react/lazy.tsx',
     'intakes/index': 'src/intakes/index.ts',
