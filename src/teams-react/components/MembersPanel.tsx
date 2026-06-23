@@ -29,6 +29,7 @@ export function MembersPanel({
   onChangeRole,
   onRemove,
   onNotice,
+  showInviteForm = true,
 }: MembersPanelProps) {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<WorkspaceRole>('editor')
@@ -94,7 +95,7 @@ export function MembersPanel({
         )}
       </div>
 
-      {canManage && (
+      {canManage && showInviteForm && (
         <div className="flex flex-col gap-1.5 border-t border-[var(--border-default)] pt-3">
           <label className="text-xs font-medium text-[var(--text-muted)]">Invite member</label>
           <div className="flex gap-2">
