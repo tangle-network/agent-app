@@ -77,6 +77,12 @@ export interface ToolbarProps {
   onUngroup(groupId: string): void
   onDelete(elementIds: string[]): void
   onBindSlot(elementId: string, slot: string | null): void
+  /** Field label for the page-size preset control. Overridable so a consumer
+   *  can use the clearer "Page size"; defaults to "Preset" for back-compat. */
+  pageSizeLabel?: string
+  /** Title for the "turn on print bleed" action. Defaults to "Show print bleed"
+   *  (the outcome) rather than the print-shop term "bleed". */
+  enableBleedLabel?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -428,6 +434,8 @@ export function Toolbar({
   onUngroup,
   onDelete,
   onBindSlot,
+  pageSizeLabel = 'Preset',
+  enableBleedLabel = 'Show print bleed',
 }: ToolbarProps) {
   const hasSelection = selectedElements.length > 0
   const single = selectedElements.length === 1 ? selectedElements[0]! : null
@@ -457,33 +465,43 @@ export function Toolbar({
 
   return (
     <div className="flex min-h-11 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-[var(--border-default)] bg-[var(--bg-input)] px-3 py-1">
-      {/* Global controls: pinned first, never wrap away from the left edge. */}
+      {/* Global controls: pinned first, never wrap away from the left edge.
+          Grouped by intent so history reads apart from the view utilities:
+          Undo/Redo (history) | a labelled View cluster (rulers/grid/snap/bleed). */}
       <div className="flex shrink-0 items-center gap-2">
-        {/* Undo / Redo */}
-        <button type="button" aria-label="Undo" disabled={!canUndo || !canWrite} onClick={onUndo} className={BTN}>
-          <UndoGlyph className="h-3.5 w-3.5" />
-        </button>
-        <button type="button" aria-label="Redo" disabled={!canRedo || !canWrite} onClick={onRedo} className={BTN}>
-          <RedoGlyph className="h-3.5 w-3.5" />
-        </button>
+        {/* History: Undo / Redo */}
+        <div className="flex items-center gap-1" role="group" aria-label="History">
+          <button type="button" aria-label="Undo" disabled={!canUndo || !canWrite} onClick={onUndo} className={BTN}>
+            <UndoGlyph className="h-3.5 w-3.5" />
+          </button>
+          <button type="button" aria-label="Redo" disabled={!canRedo || !canWrite} onClick={onRedo} className={BTN}>
+            <RedoGlyph className="h-3.5 w-3.5" />
+          </button>
+        </div>
 
-        {/* View toggles (grid/snap/ruler/bleed) are authoring affordances — the
-            review surface hides them so the bar stays lean. */}
+        {/* View toggles (grid/snap/ruler/bleed) are view utilities, not creation
+            actions — a quiet "View" label sets them apart by intent. The review
+            surface hides them so the bar stays lean. */}
         {!review ? (
           <>
             {SEP}
-            <button type="button" aria-label="Toggle rulers" aria-pressed={showRulers} onClick={onToggleRulers} className={showRulers ? BTN_ACTIVE : BTN}>
-              <RulerGlyph className="h-3.5 w-3.5" />
-            </button>
-            <button type="button" aria-label="Toggle grid" aria-pressed={gridEnabled} onClick={onToggleGrid} className={gridEnabled ? BTN_ACTIVE : BTN}>
-              <GridGlyph className="h-3.5 w-3.5" />
-            </button>
-            <button type="button" aria-label="Toggle snap" aria-pressed={snapEnabled} onClick={onToggleSnap} className={snapEnabled ? BTN_ACTIVE : BTN}>
-              <MagnetGlyph className="h-3.5 w-3.5" />
-            </button>
-            <button type="button" aria-label="Toggle bleed overlay" aria-pressed={showBleed} onClick={onToggleBleed} className={showBleed ? BTN_ACTIVE : BTN} disabled={!page.bleed}>
-              <BleedGlyph className="h-3.5 w-3.5" />
-            </button>
+            <div className="flex items-center gap-1" role="group" aria-label="View">
+              <span className={`${FIELD_LABEL} mr-0.5 hidden md:inline`} aria-hidden>
+                View
+              </span>
+              <button type="button" aria-label="Toggle rulers" aria-pressed={showRulers} onClick={onToggleRulers} className={showRulers ? BTN_ACTIVE : BTN} title="Rulers">
+                <RulerGlyph className="h-3.5 w-3.5" />
+              </button>
+              <button type="button" aria-label="Toggle grid" aria-pressed={gridEnabled} onClick={onToggleGrid} className={gridEnabled ? BTN_ACTIVE : BTN} title="Grid">
+                <GridGlyph className="h-3.5 w-3.5" />
+              </button>
+              <button type="button" aria-label="Toggle snap" aria-pressed={snapEnabled} onClick={onToggleSnap} className={snapEnabled ? BTN_ACTIVE : BTN} title="Snap to guides">
+                <MagnetGlyph className="h-3.5 w-3.5" />
+              </button>
+              <button type="button" aria-label="Toggle bleed overlay" aria-pressed={showBleed} onClick={onToggleBleed} className={showBleed ? BTN_ACTIVE : BTN} disabled={!page.bleed} title="Show print bleed">
+                <BleedGlyph className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </>
         ) : null}
       </div>
@@ -522,6 +540,8 @@ export function Toolbar({
               canWrite={canWrite}
               onSetPageProps={onSetPageProps}
               onSetPageGuides={onSetPageGuides}
+              pageSizeLabel={pageSizeLabel}
+              enableBleedLabel={enableBleedLabel}
             />
           </>
         ) : null}
@@ -705,9 +725,15 @@ function SelectionControls({
 
       {SEP}
 
-      {/* Delete */}
-      <button type="button" aria-label="Delete selection" disabled={!canWrite} onClick={onDelete} className={BTN}>
-        <TrashGlyph className="h-3.5 w-3.5 text-[var(--text-danger)]" />
+      {/* Delete — destructive, marked apart with a danger-tinted hover. */}
+      <button
+        type="button"
+        aria-label="Delete selection"
+        disabled={!canWrite}
+        onClick={onDelete}
+        className={`${BTN} text-[var(--text-danger)] hover:border-[var(--text-danger)] hover:text-[var(--text-danger)]`}
+      >
+        <TrashGlyph className="h-3.5 w-3.5" />
       </button>
       </>
       )}
@@ -857,9 +883,11 @@ interface PagePropsControlsProps {
   canWrite: boolean
   onSetPageProps(props: { name?: string; width?: number; height?: number; background?: string; bleed?: PageBleed | null }): void
   onSetPageGuides(guides: { vertical: number[]; horizontal: number[] }): void
+  pageSizeLabel?: string
+  enableBleedLabel?: string
 }
 
-function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides }: PagePropsControlsProps) {
+function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides, pageSizeLabel = 'Preset', enableBleedLabel = 'Show print bleed' }: PagePropsControlsProps) {
   const matchedPreset = matchPreset(page.width, page.height)
   const [customW, setCustomW] = useState<string | null>(null)
   const [customH, setCustomH] = useState<string | null>(null)
@@ -892,7 +920,7 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides }: 
 
       {/* Size preset */}
       <SelectControl
-        label="Preset"
+        label={pageSizeLabel}
         value={matchedPreset?.id ?? 'custom'}
         disabled={!canWrite}
         onChange={(id) => {
@@ -944,7 +972,7 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides }: 
       {SEP}
 
       {/* Bleed controls */}
-      <BleedControls page={page} canWrite={canWrite} onSetPageProps={onSetPageProps} />
+      <BleedControls page={page} canWrite={canWrite} onSetPageProps={onSetPageProps} enableBleedLabel={enableBleedLabel} />
     </>
   )
 }
@@ -953,7 +981,7 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides }: 
 // Bleed sub-controls
 // ---------------------------------------------------------------------------
 
-function BleedControls({ page, canWrite, onSetPageProps }: { page: ScenePage; canWrite: boolean; onSetPageProps: PagePropsControlsProps['onSetPageProps'] }) {
+function BleedControls({ page, canWrite, onSetPageProps, enableBleedLabel = 'Show print bleed' }: { page: ScenePage; canWrite: boolean; onSetPageProps: PagePropsControlsProps['onSetPageProps']; enableBleedLabel?: string }) {
   const bleed = page.bleed
 
   function setBleedSide(side: keyof PageBleed, value: number) {
@@ -965,10 +993,11 @@ function BleedControls({ page, canWrite, onSetPageProps }: { page: ScenePage; ca
     return (
       <button
         type="button"
+        aria-label={enableBleedLabel}
         disabled={!canWrite}
         onClick={() => onSetPageProps({ bleed: { top: 3, right: 3, bottom: 3, left: 3 } })}
         className={BTN}
-        title="Enable bleed"
+        title={enableBleedLabel}
       >
         <BleedGlyph className="h-3.5 w-3.5" />
       </button>

@@ -22,6 +22,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { BrandKnot } from './BrandKnot'
 import type { SceneDocument, SceneElement } from '../../design-canvas/model'
 import { findElement, requirePage } from '../../design-canvas/model'
 import type { SceneAttrsPatch, SceneOperation } from '../../design-canvas/operations'
@@ -95,6 +96,10 @@ export interface DesignCanvasFullProps extends DesignCanvasProps {
     /** Forwarded from DesignCanvasProps. The Konva render palette; the
      *  Konva-free chrome passes it straight through to the workspace. */
     render?: DesignCanvasProps['render']
+    /** Forwarded from DesignCanvasProps. Toggles the branded in-canvas empty
+     *  state and its agent door. */
+    showEmptyState?: DesignCanvasProps['showEmptyState']
+    onAskAgent?: DesignCanvasProps['onAskAgent']
     onZoomChange(zoom: number): void
     onPanChange(panX: number, panY: number): void
     onSelectElements(ids: string[], additive: boolean): void
@@ -181,6 +186,11 @@ export function DesignCanvas({
   fitOnMount,
   onReady,
   render,
+  showEmptyState,
+  onAskAgent,
+  pageSizeLabel,
+  enableBleedLabel,
+  fitLabel,
   renderWorkspace,
   renderThumbnail,
 }: DesignCanvasFullProps) {
@@ -531,7 +541,7 @@ export function DesignCanvas({
           Suppressed in review mode: the lean reviewer hides authoring/insert
           surfaces regardless of what the integrator passes. */}
       {renderSidePanel && !review ? (
-        <aside className="flex w-64 shrink-0 flex-col overflow-hidden border-r border-[var(--border-default)]">
+        <aside className="hidden w-64 shrink-0 flex-col overflow-hidden border-r border-[var(--border-default)] lg:flex">
           {renderSidePanel()}
         </aside>
       ) : null}
@@ -567,6 +577,8 @@ export function DesignCanvas({
               onUngroup={handleUngroup}
               onDelete={handleDelete}
               onBindSlot={handleBindSlot}
+              pageSizeLabel={pageSizeLabel}
+              enableBleedLabel={enableBleedLabel}
             />
           </div>
           {onExport ? (
@@ -596,8 +608,21 @@ export function DesignCanvas({
           </div>
         ) : null}
 
+        {/* Phones (<640px): the Konva editor is unusable squeezed, so show a
+            clean, on-brand notice instead of a broken canvas. The full editor
+            area renders from sm: up. */}
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center sm:hidden">
+          <BrandKnot size={32} className="shrink-0" />
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-semibold text-[var(--text-primary)]">Best edited on a larger screen</p>
+            <p className="text-xs leading-5 text-[var(--text-secondary)]">
+              The design canvas needs room to work. Open this on a tablet or desktop to edit pages, elements, and export.
+            </p>
+          </div>
+        </div>
+
         {/* Rulers + Workspace area */}
-        <div className="relative min-h-0 flex-1">
+        <div className="relative hidden min-h-0 flex-1 sm:block">
           {/* Rulers overlay inside the workspace container */}
           <Rulers
             pageWidth={activePage.width}
@@ -652,6 +677,10 @@ export function DesignCanvas({
             fitOnMount,
             onReady,
             render,
+            // Review mode hides authoring affordances; the empty state's doors
+            // create content, so they only belong on the editor surface.
+            showEmptyState: review ? false : showEmptyState,
+            onAskAgent,
             onZoomChange: setZoom,
             onPanChange: setPan,
             onSelectElements: setSelectedElements,
@@ -679,6 +708,7 @@ export function DesignCanvas({
               zoom={editorState.zoom}
               onZoom={setZoom}
               onFit={() => fitRef.current?.()}
+              fitLabel={fitLabel}
             />
           </div>
         </div>
@@ -686,7 +716,7 @@ export function DesignCanvas({
 
       {/* Optional right agent panel */}
       {renderAgentPanel ? (
-        <aside className="flex w-80 shrink-0 flex-col overflow-hidden border-l border-[var(--border-default)]">
+        <aside className="hidden w-80 shrink-0 flex-col overflow-hidden border-l border-[var(--border-default)] lg:flex">
           {renderAgentPanel({ selectedElements, activePageId: editorState.activePageId })}
         </aside>
       ) : null}

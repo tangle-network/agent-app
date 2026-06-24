@@ -11,13 +11,16 @@ export interface ZoomControlsProps {
   zoom: number
   onZoom(zoom: number): void
   onFit(): void
+  /** Label/aria for the fit action. Defaults to "Fit to screen" — shorter and
+   *  matching every other tool's wording for the same action. */
+  fitLabel?: string
 }
 
 const STEP = 0.1
 const MIN = 0.05
 const MAX = 32
 
-export function ZoomControls({ zoom, onZoom, onFit }: ZoomControlsProps) {
+export function ZoomControls({ zoom, onZoom, onFit, fitLabel = 'Fit to screen' }: ZoomControlsProps) {
   function zoomOut() {
     onZoom(Math.max(MIN, parseFloat((zoom - STEP).toFixed(4))))
   }
@@ -32,10 +35,10 @@ export function ZoomControls({ zoom, onZoom, onFit }: ZoomControlsProps) {
     <div className="flex items-center gap-1 px-2">
       <button
         type="button"
-        aria-label="Fit page to viewport"
+        aria-label={fitLabel}
         onClick={onFit}
         className={BTN_SM}
-        title="Fit page (F)"
+        title={`${fitLabel} (F)`}
       >
         <ZoomFitGlyph className="h-3.5 w-3.5" />
       </button>

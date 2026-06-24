@@ -208,4 +208,19 @@ export interface DesignCanvasProps {
   fitOnMount?: boolean
   /** Called once after the first real (non-zero) measurement, after the initial fit is applied (or skipped when fitOnMount is false). */
   onReady?(): void
+  /** Show the branded in-canvas empty state (three doors: template, add element,
+   *  ask the agent) while the active page has no elements and the user can write.
+   *  Default true. Additive and backward-compatible. */
+  showEmptyState?: boolean
+  /** Wire the empty state's "Ask the agent" door. Typically focuses the agent
+   *  panel (`renderAgentPanel`). Omitted → that door is hidden. */
+  onAskAgent?(): void
+  /** Field label for the page-size preset control. Overridable so a consumer
+   *  can use the clearer "Page size"; defaults to "Preset" for back-compat. */
+  pageSizeLabel?: string
+  /** Title/aria for the "turn on print bleed" action. Defaults to
+   *  "Show print bleed" (the outcome), not the print-shop term "bleed". */
+  enableBleedLabel?: string
+  /** Label/aria for the zoom fit action. Defaults to "Fit to screen". */
+  fitLabel?: string
 }

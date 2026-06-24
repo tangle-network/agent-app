@@ -219,6 +219,8 @@ export function DesignCanvasEditor(props: DesignCanvasProps) {
             fitOnMount={ctx.fitOnMount}
             onReady={ctx.onReady}
             render={ctx.render}
+            showEmptyState={ctx.showEmptyState}
+            onAskAgent={ctx.onAskAgent}
           />
         )
       }}

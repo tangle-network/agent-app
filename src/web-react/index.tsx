@@ -19,6 +19,7 @@
 import { useEffect, useMemo, useRef, useState, memo, type ReactNode } from 'react'
 import { useSmoothText } from './smooth-text'
 import { ChevronDown, POPOVER_OPTION_FOCUS, usePending } from './controls'
+import { BrandMark } from './brand-mark'
 
 export * from './chat-stream'
 export * from './provider-logo'
@@ -32,8 +33,10 @@ export {
   usePending,
   ModelPicker,
   EffortPicker,
+  DEFAULT_EFFORT_LEVELS,
   type ModelPickerProps,
   type EffortPickerProps,
+  type EffortLevel,
 } from './controls'
 export {
   AgentSessionControls,
@@ -223,8 +226,78 @@ export interface ChatMessagesProps {
    *  retry button (e.g. when the product retries automatically). */
   onRetry?: () => void
   /** Zero-state renderer, shown when there are no messages and the turn is
-   *  neither loading nor errored. Omit to render nothing (current behavior). */
+   *  neither loading nor errored. When omitted, a branded first-run state is
+   *  shown ({@link ChatEmptyState}); pass `() => null` to render nothing. */
   renderEmpty?: () => ReactNode
+  /** First-run state config used when `renderEmpty` is not supplied. Lets a
+   *  product set the headline and the "doors" (e.g. start from a template, ask
+   *  the agent) without replacing the whole zero-state. */
+  emptyState?: ChatEmptyStateProps
+  /** Optional branded header slot rendered above the thread. Off by default to
+   *  preserve the current layout; pass `{ title }` (or your own node via
+   *  `header`) to show the Tangle mark + product title in the chat shell. */
+  header?: ReactNode
+}
+
+/** One starting "door" in the chat first-run state — a concrete, labeled action
+ *  (start from a template, do it by hand, ask the agent), not a placeholder. */
+export interface ChatEmptyDoor {
+  label: string
+  description?: string
+  onSelect: () => void
+}
+
+export interface ChatEmptyStateProps {
+  /** Product name shown next to the Tangle mark. Default "Agent". */
+  productName?: string
+  /** Headline. Default frames delegation, not messaging. */
+  headline?: string
+  /** Subline under the headline. */
+  subline?: string
+  /** Up to three concrete starting doors. Omit for a mark-and-prompt-only state. */
+  doors?: ChatEmptyDoor[]
+}
+
+/**
+ * Branded chat first-run state: the Tangle mark, a delegation-framed prompt, and
+ * up to three concrete doors. Replaces the blank thread that read as "empty or
+ * broken". Concrete + actionable — never a "coming soon" placeholder.
+ */
+export function ChatEmptyState({
+  productName = 'Agent',
+  headline = 'Ask the agent to do something',
+  subline = 'Describe the outcome you want. The agent works through it step by step, and pauses for your approval before anything irreversible.',
+  doors,
+}: ChatEmptyStateProps) {
+  return (
+    <div className="mx-auto flex w-full max-w-2xl flex-col items-center px-6 py-12 text-center sm:py-20">
+      <span className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/15">
+        <BrandMark size={32} className="shrink-0" />
+      </span>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{productName}</p>
+      <h2 className="mt-1.5 text-balance text-2xl font-semibold leading-tight text-foreground sm:text-[28px]">
+        {headline}
+      </h2>
+      {subline && <p className="mt-3 max-w-md text-[15px] leading-relaxed text-muted-foreground">{subline}</p>}
+      {doors && doors.length > 0 && (
+        <div className="mt-7 grid w-full gap-2.5 sm:grid-cols-3">
+          {doors.slice(0, 3).map((door, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={door.onSelect}
+              className="group flex min-h-[44px] flex-col items-start rounded-xl border border-border bg-card px-4 py-3 text-left transition hover:border-primary/40 hover:bg-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              <span className="text-sm font-semibold text-foreground">{door.label}</span>
+              {door.description && (
+                <span className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{door.description}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export interface ProposalApprovalHandlers {
@@ -276,27 +349,89 @@ function toolOutcomeOf(call: ChatToolCallInfo): { ok?: boolean; result?: Record<
   return call.result as { ok?: boolean; result?: Record<string, unknown>; message?: string } | undefined
 }
 
-/** Human title for a call, derived from its real arguments. */
+/** The four visual kinds a tool call presents as. They are *different kinds of
+ *  thing* (audit chat finding #3/#4) and must read differently: a command is a
+ *  past-tense action, a proposal is a pending decision, a follow-up is a
+ *  scheduled intent, everything else is a generic tool step. Derived from the
+ *  tool name + outcome, never from baked domain values. */
+type BlockKind = 'command' | 'proposal' | 'followup' | 'generic'
+
+function blockKindOf(call: ChatToolCallInfo): BlockKind {
+  if (call.name === 'submit_proposal') return 'proposal'
+  if (call.name === 'schedule_followup') return 'followup'
+  if (call.name.startsWith('sandbox_')) return 'command'
+  return 'generic'
+}
+
+/** Human title for a call, derived from its real arguments. Proposals lead with
+ *  the decision verb (docs/product-surfaces.md) rather than the internal tool
+ *  taxonomy, so the user reads "Approve: publish …?" not "submit_proposal". */
 function friendlyToolTitle(call: ChatToolCallInfo): string {
   const a = call.args ?? {}
   switch (call.name) {
     case 'submit_proposal':
-      return `Proposal · ${String(a.type ?? '')}${a.title ? `: ${String(a.title)}` : ''}`
+      return a.title ? `Approve: ${String(a.title)}?` : 'Approve this action?'
     case 'sandbox_create':
-      return `Create sandbox (${String(a.environment ?? 'universal')})`
+      return `Created sandbox (${String(a.environment ?? 'universal')})`
     case 'sandbox_run_command':
-      return `$ ${String(a.command ?? '')}`
+      return `Ran ${String(a.command ?? 'command')}`
     case 'sandbox_destroy':
-      return `Destroy sandbox ${String(a.sandbox_id ?? '')}`
+      return `Destroyed sandbox ${String(a.sandbox_id ?? '')}`
     case 'schedule_followup':
-      return `Follow-up · ${String(a.title ?? '')}`
+      return `Scheduled: ${String(a.title ?? 'follow-up')}`
     case 'render_ui':
-      return `Render view · ${String(a.title ?? '')}`
+      return `Rendered view · ${String(a.title ?? '')}`
     case 'add_citation':
-      return `Citation · ${String(a.path ?? '')}`
+      return `Cited ${String(a.path ?? '')}`
     default:
       return call.name
   }
+}
+
+/** A one-line, plain-English preview of WHAT a proposal will do, assembled from
+ *  the proposal's real arguments (audit chat finding #2 — "approving a black box
+ *  is the fastest way to lose trust"). Domain stays a parameter: we only read
+ *  conventional fields (destinations/targets/channels, cost, reach) when present
+ *  — nothing here is baked to a specific product's proposal type. Returns null
+ *  when there's nothing meaningful to preview. */
+function proposalPreview(call: ChatToolCallInfo): { summary: string | null; meta: string[] } {
+  const a = (call.args ?? {}) as Record<string, unknown>
+  const asString = (v: unknown): string | null =>
+    typeof v === 'string' && v.trim() ? v.trim() : null
+  const asList = (v: unknown): string[] =>
+    Array.isArray(v)
+      ? v.map((x) => (typeof x === 'string' ? x : null)).filter((x): x is string => !!x)
+      : asString(v)
+        ? [asString(v) as string]
+        : []
+
+  // The verb: a free-form summary the agent wrote, else derive from type.
+  const verbPhrase =
+    asString(a.summary) ??
+    asString(a.description) ??
+    (asString(a.type)
+      ? `${String(a.type).replace(/_/g, ' ')}${asString(a.title) ? `: ${asString(a.title)}` : ''}`
+      : null)
+
+  const destinations = [
+    ...asList(a.destinations),
+    ...asList(a.channels),
+    ...asList(a.targets),
+    ...asList(a.platforms),
+  ]
+  const dest = destinations.length ? ` to ${destinations.join(' and ')}` : ''
+  const summary = verbPhrase ? `${verbPhrase}${dest}` : destinations.length ? `Publish to ${destinations.join(' and ')}` : null
+
+  // Cost / reach: surfaced when the data carries it, formatted lightly.
+  const meta: string[] = []
+  const cost = a.cost ?? a.price ?? a.estimatedCost
+  if (typeof cost === 'number' && cost > 0) meta.push(`~$${cost < 0.01 ? cost.toFixed(4) : cost.toFixed(2)}`)
+  else if (asString(cost)) meta.push(asString(cost) as string)
+  const reach = a.reach ?? a.audience ?? a.estimatedReach
+  if (typeof reach === 'number' && reach > 0) meta.push(`reaches ~${reach.toLocaleString()}`)
+  else if (asString(reach)) meta.push(asString(reach) as string)
+
+  return { summary, meta }
 }
 
 function truncate(v: unknown, max = 240): string {
@@ -370,6 +505,108 @@ function DefaultToolDetail({ call }: { call: ChatToolCallInfo }) {
   )
 }
 
+/** The pending-decision card. The single highest-leverage surface in the repo
+ *  (audit chat finding #1, critical): Approve is the affirmative path — filled,
+ *  brand-colored, primary — and Reject is quiet/outline, so a user never reads
+ *  both labels twice to know the safe action. Carries a plain-English preview of
+ *  WHAT it will do (#2). `onApprove`/`onReject` are unchanged. */
+function ProposalCard({
+  call,
+  message,
+  pending,
+  approval,
+  renderers,
+}: {
+  call: ChatToolCallInfo
+  message: ChatUiMessage
+  pending: { proposalId: string }
+  approval?: ProposalApprovalHandlers
+  renderers?: ToolDetailRenderers
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const { summary, meta } = proposalPreview(call)
+  const custom = renderers?.[call.name]?.(call, message)
+  const { pending: deciding, run: decide } = usePending()
+
+  return (
+    <div className="w-full max-w-full rounded-xl border border-warning/50 bg-warning/[0.06] text-sm shadow-sm ring-1 ring-warning/10">
+      <div className="flex items-start gap-2.5 px-4 pt-3.5">
+        <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-warning/15 text-warning">
+          <ToolGlyph name={call.name} className="h-3.5 w-3.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-warning-foreground">Needs your approval</p>
+          <p className="mt-0.5 text-[15px] font-semibold leading-snug text-foreground">{friendlyToolTitle(call)}</p>
+          {summary && <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{summary}</p>}
+          {meta.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              {meta.map((m, i) => (
+                <span key={i} className="rounded-full bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  {m}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 px-4 pb-3.5 pt-3">
+        {approval ? (
+          <>
+            <button
+              type="button"
+              disabled={deciding}
+              onClick={() => decide(() => approval.onApprove(pending.proposalId, call.id))}
+              className="inline-flex min-h-[40px] flex-1 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:min-w-[160px]"
+            >
+              Approve &amp; run
+            </button>
+            <button
+              type="button"
+              disabled={deciding}
+              onClick={() => decide(() => approval.onReject(pending.proposalId, call.id))}
+              className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-border bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-accent/30 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Reject
+            </button>
+          </>
+        ) : (
+          <span className="text-[12px] font-medium text-muted-foreground">Awaiting approval…</span>
+        )}
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="ml-auto inline-flex items-center gap-1 rounded text-[12px] font-medium text-muted-foreground transition hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {expanded ? 'Hide details' : 'View details'}
+          <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+      {expanded && (
+        <div className="border-t border-warning/20 px-4 py-3 text-xs">
+          {custom ?? <DefaultToolDetail call={call} />}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** A scheduled follow-up — a pending, time-based intent, not a decision and not
+ *  a completed action (audit finding #5). Quiet left-rule card with a clock. */
+function FollowupCard({ call }: { call: ChatToolCallInfo }) {
+  const a = (call.args ?? {}) as Record<string, unknown>
+  const when = typeof a.when === 'string' ? a.when : typeof a.at === 'string' ? a.at : typeof a.schedule === 'string' ? a.schedule : null
+  return (
+    <div className="w-fit min-w-[260px] max-w-full rounded-lg border border-border/60 border-l-2 border-l-primary/60 bg-muted/20 px-3 py-2 text-sm">
+      <div className="flex items-center gap-2">
+        <ToolGlyph name={call.name} className="h-3.5 w-3.5 shrink-0 text-primary/80" />
+        <span className="min-w-0 flex-1 truncate font-medium text-foreground">{friendlyToolTitle(call)}</span>
+      </div>
+      {when && <p className="mt-0.5 pl-[22px] text-[12px] text-muted-foreground">{when}</p>}
+    </div>
+  )
+}
+
 function ToolCallCard({
   call,
   message,
@@ -385,23 +622,40 @@ function ToolCallCard({
 }) {
   const [expanded, setExpanded] = useState(false)
   const pending = call.status === 'done' ? pendingApprovalOf(call) : null
+  const kind = blockKindOf(call)
   const failed = call.status === 'error' || toolOutcomeOf(call)?.ok === false
   const custom = renderers?.[call.name]?.(call, message)
-  const { pending: deciding, run: decide } = usePending()
 
+  // A proposal awaiting approval is a pending DECISION, not a tool chip — it
+  // gets its own prominent card with primary Approve / quiet Reject.
+  if (pending) {
+    return (
+      <ProposalCard
+        call={call}
+        message={message}
+        pending={pending}
+        approval={approval}
+        renderers={renderers}
+      />
+    )
+  }
+  // A scheduled follow-up is a time-based intent — distinct from a tool chip.
+  if (kind === 'followup' && !failed) {
+    return <FollowupCard call={call} />
+  }
+
+  // A command chip reads as a past-tense action; its command text is monospace
+  // (audit finding #1 minor). Everything else is a generic tool step. Both share
+  // one card shape so the transcript reads as a worklog, not a flat list.
+  const isCommand = kind === 'command'
   return (
     <div
       className={`w-fit min-w-[280px] max-w-full rounded-lg border text-xs transition ${
-        pending
-          ? 'border-warning/40 bg-warning/5'
-          : failed
-            ? 'border-destructive/40 bg-destructive/5'
-            : 'border-border/60 bg-muted/20'
+        failed ? 'border-destructive/40 bg-destructive/5' : 'border-border/60 bg-muted/20'
       }`}
     >
-      {/* Header is a flex row, NOT a button, so the Approve/Reject controls are
-          siblings of the expand toggle rather than nested inside it (axe:
-          nested-interactive; also invalid: a <button> may not contain a <button>). */}
+      {/* Header is a flex row, NOT a button, so any controls are siblings of the
+          expand toggle rather than nested inside it (axe: nested-interactive). */}
       <div className="flex w-full items-center gap-2 px-3 py-2">
         <button
           type="button"
@@ -411,40 +665,20 @@ function ToolCallCard({
         >
           <span
             className={`h-2 w-2 shrink-0 rounded-full ${
-              call.status === 'running'
-                ? 'animate-pulse bg-warning'
-                : pending
-                  ? 'bg-warning'
-                  : failed
-                    ? 'bg-destructive'
-                    : 'bg-success'
+              call.status === 'running' ? 'animate-pulse bg-warning' : failed ? 'bg-destructive' : 'bg-success'
             }`}
           />
           <ToolGlyph name={call.name} className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <span className="min-w-0 flex-1 truncate font-medium">{friendlyToolTitle(call)}</span>
-        </button>
-        {pending && approval && (
-          <span className="flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              disabled={deciding}
-              onClick={() => decide(() => approval.onApprove(pending.proposalId, call.id))}
-              className="rounded bg-success px-2 py-0.5 text-[11px] font-semibold text-success-foreground transition hover:bg-success/90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Approve
-            </button>
-            <button
-              type="button"
-              disabled={deciding}
-              onClick={() => decide(() => approval.onReject(pending.proposalId, call.id))}
-              className="rounded border border-border bg-card px-2 py-0.5 text-[11px] font-medium text-foreground transition hover:bg-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Reject
-            </button>
+          <span
+            className={`min-w-0 flex-1 truncate ${
+              isCommand ? 'font-mono text-[12px] tracking-tight text-foreground/90' : 'font-medium'
+            }`}
+          >
+            {friendlyToolTitle(call)}
           </span>
-        )}
+        </button>
         <span className="shrink-0 text-[11px] text-muted-foreground">
-          {call.status === 'running' ? 'running…' : pending ? 'awaiting approval' : failed ? 'failed' : 'done'}
+          {call.status === 'running' ? 'running…' : failed ? 'failed' : 'done'}
         </span>
         <button
           type="button"
@@ -779,6 +1013,8 @@ export function ChatMessages({
   error,
   onRetry,
   renderEmpty,
+  emptyState,
+  header,
 }: ChatMessagesProps) {
   // Stabilize the fallback renderer's identity so it doesn't change every
   // render — otherwise the memoized `AssistantMessage` (and its per-frame body
@@ -789,9 +1025,20 @@ export function ChatMessages({
     [renderMarkdown],
   )
   const lastIsUser = messages[messages.length - 1]?.role === 'user'
-  if (messages.length === 0 && !loading && !error && renderEmpty) return <>{renderEmpty()}</>
+  if (messages.length === 0 && !loading && !error) {
+    // Explicit renderEmpty wins (incl. `() => null` to opt out); otherwise show
+    // the branded first-run state instead of a blank thread.
+    const empty = renderEmpty ? renderEmpty() : <ChatEmptyState {...emptyState} />
+    return (
+      <>
+        {header}
+        {empty}
+      </>
+    )
+  }
   return (
     <>
+      {header}
       {messages.map((msg) =>
         msg.role === 'user' ? (
           <div key={msg.id} className="mx-auto w-full max-w-3xl px-6 py-3">

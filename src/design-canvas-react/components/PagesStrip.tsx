@@ -31,6 +31,10 @@ export interface PagesStripProps {
   /** Show page-management affordances (add / duplicate / delete). Default true.
    *  The review surface passes false: pages are navigated, not authored. */
   canManagePages?: boolean
+  /** Heading shown above the strip so it reads as page management. Overridable;
+   *  defaults to "Pages". Set to '' to hide the visible label (the container
+   *  keeps its accessible name regardless). */
+  label?: string
 }
 
 const THUMBNAIL_W = 80
@@ -47,6 +51,7 @@ export function PagesStrip({
   onDeletePage,
   onReorderPage,
   canManagePages = true,
+  label = 'Pages',
 }: PagesStripProps) {
   // Map from page id → data URL; null while loading.
   const [thumbnails, setThumbnails] = useState<Record<string, string | null>>({})
@@ -86,10 +91,20 @@ export function PagesStrip({
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
   return (
-    <div
-      className="flex h-[84px] shrink-0 items-center gap-2 overflow-x-auto border-t border-[var(--border-default)] bg-[var(--bg-input)] px-2"
-      aria-label="Pages"
-    >
+    <div className="flex shrink-0 flex-col bg-[var(--bg-input)]">
+      {/* Quiet section heading so the thumbnail row reads as page management,
+          not a stray strip. The scroll container below keeps the accessible
+          "Pages" name regardless of whether the visible label is shown. */}
+      {label ? (
+        <div className="flex items-center gap-1.5 px-3 pt-1.5 text-[var(--text-muted)]">
+          <PageGlyph className="h-3 w-3" />
+          <span className="text-[10px] font-medium uppercase tracking-[0.08em]">{label}</span>
+        </div>
+      ) : null}
+      <div
+        className="flex h-[84px] items-center gap-2 overflow-x-auto px-2 pb-1"
+        aria-label="Pages"
+      >
       {pages.map((page, index) => {
         const isActive = page.id === activePageId
         const thumbUrl = thumbnails[page.id]
@@ -205,6 +220,7 @@ export function PagesStrip({
           <span className="text-[10px]">Add page</span>
         </button>
       ) : null}
+      </div>
     </div>
   )
 }

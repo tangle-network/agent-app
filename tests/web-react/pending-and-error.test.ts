@@ -46,7 +46,7 @@ describe('usePending — Approve/Reject double-submit guard', () => {
         approval: { onApprove, onReject },
       }),
     )
-    const approve = screen.getByRole('button', { name: 'Approve' })
+    const approve = screen.getByRole('button', { name: /Approve/ })
     const reject = screen.getByRole('button', { name: 'Reject' })
 
     fireEvent.click(approve)
@@ -74,7 +74,7 @@ describe('usePending — Approve/Reject double-submit guard', () => {
         approval: { onApprove, onReject: vi.fn() },
       }),
     )
-    const approve = screen.getByRole('button', { name: 'Approve' })
+    const approve = screen.getByRole('button', { name: /Approve/ })
     fireEvent.click(approve)
     expect(onApprove).toHaveBeenCalledTimes(1)
     expect((approve as HTMLButtonElement).disabled).toBe(false)

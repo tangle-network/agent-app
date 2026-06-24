@@ -55,7 +55,7 @@ describe('layout', () => {
     fireEvent.click(gear)
     expect(screen.getByText('Claude Code (Anthropic)')).toBeTruthy()
     expect(screen.getByText('Agent backend')).toBeTruthy()
-    expect(screen.getByText('Reasoning effort')).toBeTruthy()
+    expect(screen.getByText('Thinking')).toBeTruthy()
   })
 })
 
