@@ -266,7 +266,7 @@ describe("Toolbar mode='edit' (default) is unchanged", () => {
 
   it("explicit mode='edit' matches the default", () => {
     setup({ mode: 'edit', selectedElements: [] })
-    expect(screen.getByText('Preset')).toBeTruthy()
+    expect(screen.getByText('Page size')).toBeTruthy()
     expect(screen.getByLabelText('Page name')).toBeTruthy()
   })
 })
@@ -283,7 +283,7 @@ describe('SelectControl (replaces native <select>)', () => {
 
   it('page size preset is a popover dropdown that fires width/height', () => {
     const { onSetPageProps } = setup({ selectedElements: [] })
-    const presetTrigger = within(screen.getByText('Preset').closest('label') as HTMLElement).getByRole('button')
+    const presetTrigger = within(screen.getByText('Page size').closest('label') as HTMLElement).getByRole('button')
     fireEvent.click(presetTrigger)
     fireEvent.click(screen.getByRole('option', { name: 'YouTube Thumbnail' }))
     expect(onSetPageProps).toHaveBeenCalledWith({ width: 1280, height: 720 })

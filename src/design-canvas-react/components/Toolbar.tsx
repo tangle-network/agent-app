@@ -77,8 +77,8 @@ export interface ToolbarProps {
   onUngroup(groupId: string): void
   onDelete(elementIds: string[]): void
   onBindSlot(elementId: string, slot: string | null): void
-  /** Field label for the page-size preset control. Overridable so a consumer
-   *  can use the clearer "Page size"; defaults to "Preset" for back-compat. */
+  /** Field label for the page-size control. Defaults to the clearer "Page size";
+   *  overridable for consumers that want the older "Preset" wording. */
   pageSizeLabel?: string
   /** Title for the "turn on print bleed" action. Defaults to "Show print bleed"
    *  (the outcome) rather than the print-shop term "bleed". */
@@ -434,7 +434,7 @@ export function Toolbar({
   onUngroup,
   onDelete,
   onBindSlot,
-  pageSizeLabel = 'Preset',
+  pageSizeLabel = 'Page size',
   enableBleedLabel = 'Show print bleed',
 }: ToolbarProps) {
   const hasSelection = selectedElements.length > 0
@@ -887,7 +887,7 @@ interface PagePropsControlsProps {
   enableBleedLabel?: string
 }
 
-function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides, pageSizeLabel = 'Preset', enableBleedLabel = 'Show print bleed' }: PagePropsControlsProps) {
+function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides, pageSizeLabel = 'Page size', enableBleedLabel = 'Show print bleed' }: PagePropsControlsProps) {
   const matchedPreset = matchPreset(page.width, page.height)
   const [customW, setCustomW] = useState<string | null>(null)
   const [customH, setCustomH] = useState<string | null>(null)
