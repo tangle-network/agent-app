@@ -299,6 +299,11 @@
       "import": "./dist/vault/lazy.js",
       "default": "./dist/vault/lazy.js"
     },
+    "./brand": {
+      "types": "./dist/brand/index.d.ts",
+      "import": "./dist/brand/index.js",
+      "default": "./dist/brand/index.js"
+    },
     "./theme": {
       "types": "./dist/theme/index.d.ts",
       "import": "./dist/theme/index.js",
