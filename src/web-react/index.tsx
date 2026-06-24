@@ -175,12 +175,25 @@ export function pendingApprovalOf(call: ChatToolCallInfo): { proposalId: string 
   return { proposalId: outcome.result.proposalId }
 }
 
+/** One ordered piece of an assistant turn: a run of answer text, or a tool
+ *  call, in the sequence the agent emitted them. A message carrying `segments`
+ *  is rendered in order — interleaving text and tool chips — so the agent's
+ *  pre- and post-tool reasoning reads chronologically instead of as one text
+ *  blob with the tool chips collected after it. */
+export type ChatMessageSegment =
+  | { kind: 'text'; content: string }
+  | { kind: 'tool'; call: ChatToolCallInfo }
+
 export interface ChatUiMessage extends ChatMessageMetrics {
   id: string
   role: 'user' | 'assistant' | 'system'
   content: string
   reasoning?: string
   toolCalls?: ChatToolCallInfo[]
+  /** Ordered text/tool sequence for true chronological interleaving. When
+   *  present and non-empty it is rendered in place of `content` + `toolCalls`;
+   *  both remain the fallback for producers that don't segment a turn. */
+  segments?: ChatMessageSegment[]
 }
 
 export interface ChatMessagesProps {
@@ -461,6 +474,114 @@ function ToolCallCard({
   )
 }
 
+/** The blinking insertion caret shown at the end of streaming answer text.
+ *  Shared by the segmented and legacy branches so their streaming cue can't
+ *  visually diverge. */
+function StreamingCaret() {
+  return (
+    <span
+      className="ml-0.5 inline-block h-[1.1em] w-[3px] translate-y-[2px] animate-pulse rounded-sm bg-foreground/70"
+      aria-hidden
+    />
+  )
+}
+
+/** One text run inside a segmented turn. Smooths its own text so only the
+ *  actively-streaming trailing run types out; finalized runs render at once.
+ *  A child component (not an inline map) so its `useSmoothText` state is stable
+ *  across the parent's per-frame stream re-renders. */
+function SegmentText({
+  content,
+  streaming,
+  showCaret,
+  renderBody,
+}: {
+  content: string
+  streaming: boolean
+  showCaret: boolean
+  renderBody: (content: string) => ReactNode
+}) {
+  const text = useSmoothText(content, streaming)
+  const body = useMemo(() => renderBody(text), [renderBody, text])
+  // An empty / whitespace-only run paints a blank line-height gap — render
+  // nothing, UNLESS it's the live trailing run (showCaret), where it still
+  // carries the caret so the turn doesn't look frozen. (Hooks run first, so
+  // this stays rules-of-hooks safe.)
+  if (!content.trim() && !showCaret) return null
+  return (
+    <div className="text-base leading-[1.75]">
+      {body}
+      {/* Gate on showCaret (not the smoothed `text`, which is '' on the first
+          frame) so the caret is steady from the start instead of flickering. */}
+      {showCaret && <StreamingCaret />}
+    </div>
+  )
+}
+
+/** Renders a turn's ordered text/tool segments interleaved. The trailing text
+ *  run carries the streaming caret; if the last segment is instead a tool, a
+ *  trailing caret keeps the gap before the next run from looking frozen. Any
+ *  `toolCalls` not represented in `segments` (a partially-migrated producer that
+ *  set both) still render, so a tool chip is never silently dropped. */
+function SegmentedBody({
+  segments,
+  msg,
+  streaming,
+  renderBody,
+  approval,
+  onToolCallClick,
+  toolRenderers,
+}: {
+  segments: ChatMessageSegment[]
+  msg: ChatUiMessage
+  streaming: boolean
+  renderBody: (content: string) => ReactNode
+  approval?: ProposalApprovalHandlers
+  onToolCallClick?: (call: ChatToolCallInfo, message: ChatUiMessage) => void
+  toolRenderers?: ToolDetailRenderers
+}) {
+  const lastIndex = segments.length - 1
+  const segmentToolIds = new Set(
+    segments.flatMap((s) => (s.kind === 'tool' ? [s.call.id] : [])),
+  )
+  const leftoverToolCalls = (msg.toolCalls ?? []).filter(
+    (tc) => !segmentToolIds.has(tc.id),
+  )
+  const renderToolCard = (call: ChatToolCallInfo) => (
+    <ToolCallCard
+      key={`tool-${call.id}`}
+      call={call}
+      message={msg}
+      approval={approval}
+      onOpenRun={onToolCallClick}
+      renderers={toolRenderers}
+    />
+  )
+  return (
+    <div className="flex flex-col gap-2">
+      {segments.map((seg, i) =>
+        seg.kind === 'text' ? (
+          <SegmentText
+            // Segments only ever append within a turn, so the index is a stable
+            // key — a finalized run keeps its slot as later runs/tools are added,
+            // so its smooth-text state isn't reset.
+            key={`text-${i}`}
+            content={seg.content}
+            // Only the trailing run of the live turn types out + shows the caret.
+            streaming={streaming && i === lastIndex}
+            showCaret={streaming && i === lastIndex}
+            renderBody={renderBody}
+          />
+        ) : (
+          renderToolCard(seg.call)
+        ),
+      )}
+      {leftoverToolCalls.map(renderToolCard)}
+      {streaming && segments[lastIndex]?.kind === 'tool' && <StreamingCaret />}
+    </div>
+  )
+}
+
 function AssistantMessageImpl({
   msg,
   streaming,
@@ -493,20 +614,36 @@ function AssistantMessageImpl({
   // each frame is wasted work on the hot path. Memo on (renderBody, content) so
   // the parse runs only when the visible text actually changes.
   const body = useMemo(() => renderBody(content), [renderBody, content])
+  // When a turn is segmented, render the ordered text/tool runs interleaved;
+  // otherwise fall back to the single content body + trailing tool group.
+  const segments = msg.segments
+  // "Has the answer started?" — true once any answer text exists, whether the
+  // producer puts it in `content` (legacy) or in a text `segment`. Drives the
+  // reasoning box (open while still thinking, the thinking timer, the summary
+  // label), so a segmented message with `content: ''` doesn't read as
+  // perpetually "Thinking…" after its answer segments are visible.
+  const hasAnswerText =
+    content !== '' ||
+    (segments?.some((s) => s.kind === 'text' && s.content.trim() !== '') ??
+      false)
   const reasoningScrollRef = useRef<HTMLDivElement>(null)
   // Measure visible thinking time: first reasoning reveal → first answer text.
   const thinkStartRef = useRef<number | null>(null)
   const thinkMsRef = useRef<number | null>(null)
-  if (streaming && reasoning && !content && thinkStartRef.current === null) {
+  if (streaming && reasoning && !hasAnswerText && thinkStartRef.current === null) {
     thinkStartRef.current = performance.now()
   }
-  if (content && thinkStartRef.current !== null && thinkMsRef.current === null) {
+  if (
+    hasAnswerText &&
+    thinkStartRef.current !== null &&
+    thinkMsRef.current === null
+  ) {
     thinkMsRef.current = performance.now() - thinkStartRef.current
   }
   useEffect(() => {
     const el = reasoningScrollRef.current
-    if (el && streaming && !content) el.scrollTop = el.scrollHeight
-  }, [reasoning, streaming, content])
+    if (el && streaming && !hasAnswerText) el.scrollTop = el.scrollHeight
+  }, [reasoning, streaming, hasAnswerText])
 
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-3">
@@ -517,9 +654,9 @@ function AssistantMessageImpl({
         {formatModelCost(msg, models) && <span>{formatModelCost(msg, models)}</span>}
       </div>
       {reasoning && (
-        <details className="mb-2 rounded-lg border-l-2 border-border/70 bg-muted/20 px-3 py-2" open={!content}>
+        <details className="mb-2 rounded-lg border-l-2 border-border/70 bg-muted/20 px-3 py-2" open={!hasAnswerText}>
           <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
-            {!content ? (
+            {!hasAnswerText ? (
               <span className="animate-pulse">Thinking…</span>
             ) : thinkMsRef.current != null ? (
               `Thought for ${Math.max(1, Math.round(thinkMsRef.current / 1000))}s`
@@ -532,25 +669,37 @@ function AssistantMessageImpl({
           </div>
         </details>
       )}
-      <div className="text-base leading-[1.75]">
-        {body}
-        {streaming && content && !msg.toolCalls?.length && (
-          <span className="ml-0.5 inline-block h-[1.1em] w-[3px] translate-y-[2px] animate-pulse rounded-sm bg-foreground/70" aria-hidden />
-        )}
-      </div>
-      {msg.toolCalls && msg.toolCalls.length > 0 && (
-        <div className="mt-2 flex flex-col gap-1.5">
-          {msg.toolCalls.map((tc) => (
-            <ToolCallCard
-              key={tc.id}
-              call={tc}
-              message={msg}
-              approval={approval}
-              onOpenRun={onToolCallClick}
-              renderers={toolRenderers}
-            />
-          ))}
-        </div>
+      {segments && segments.length > 0 ? (
+        <SegmentedBody
+          segments={segments}
+          msg={msg}
+          streaming={streaming}
+          renderBody={renderBody}
+          approval={approval}
+          onToolCallClick={onToolCallClick}
+          toolRenderers={toolRenderers}
+        />
+      ) : (
+        <>
+          <div className="text-base leading-[1.75]">
+            {body}
+            {streaming && content && !msg.toolCalls?.length && <StreamingCaret />}
+          </div>
+          {msg.toolCalls && msg.toolCalls.length > 0 && (
+            <div className="mt-2 flex flex-col gap-1.5">
+              {msg.toolCalls.map((tc) => (
+                <ToolCallCard
+                  key={tc.id}
+                  call={tc}
+                  message={msg}
+                  approval={approval}
+                  onOpenRun={onToolCallClick}
+                  renderers={toolRenderers}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
       {renderExtras?.(msg)}
     </div>
