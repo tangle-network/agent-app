@@ -258,7 +258,7 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
       </button>
 
       {open && (
-        <div className="absolute bottom-full left-0 z-50 mb-2 w-[420px] overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+        <div className="absolute bottom-full left-0 z-50 mb-2 w-[420px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-card shadow-lg">
           <div className="border-b border-border px-3 py-2">
             <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
               <SearchGlyph className="h-3.5 w-3.5 text-muted-foreground" />

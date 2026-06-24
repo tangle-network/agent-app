@@ -469,6 +469,8 @@ export function TimelineClipChip(props: TimelineClipChipProps) {
         left: `${geometry.left}px`,
         width: `${geometry.width}px`,
         transform: shown.translateY !== 0 ? `translateY(${shown.translateY}px)` : undefined,
+        // own the touch gesture so move/trim drags don't trigger lane scroll
+        touchAction: 'none',
       }}
       onPointerDown={(event) => beginGesture(event, 'move')}
       onPointerMove={updateGesture}

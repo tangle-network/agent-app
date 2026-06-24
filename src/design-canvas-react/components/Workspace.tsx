@@ -829,7 +829,9 @@ export function WorkspaceView({
       onPointerUp={handlePointerUp}
       onKeyDown={handleKeyDown}
       onKeyUp={handleKeyUp}
-      style={{ cursor: spaceHeldRef.current ? 'grab' : 'default' }}
+      // touch-action:none lets pointer pan/marquee/transform own the gesture on
+      // touch devices — without it the browser's native scroll/pinch fights every drag.
+      style={{ cursor: spaceHeldRef.current ? 'grab' : 'default', touchAction: 'none' }}
     >
       {/* Konva Stage */}
       <Stage

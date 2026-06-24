@@ -80,7 +80,7 @@ export function TimelineTrackRow(props: TimelineTrackRowProps) {
         data-lane-kind={track.kind}
         data-lane-locked={track.locked ? 'true' : 'false'}
         className={`relative ${laneHeight} ${track.muted ? 'opacity-60' : ''}`}
-        style={{ width: `${sequenceDurationFrames * zoom}px` }}
+        style={{ width: `${sequenceDurationFrames * zoom}px`, touchAction: 'none' }}
         onPointerDown={handleLanePointerDown}
       >
         {clips.map((clip) => (
