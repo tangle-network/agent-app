@@ -70,7 +70,7 @@ export function TimelineRuler({ fps, durationFrames, zoom, onScrub }: TimelineRu
     <div
       data-timeline-ruler
       className="relative h-7 cursor-ew-resize select-none border-b border-[var(--border-default)] bg-[var(--bg-input)]"
-      style={{ width: `${durationFrames * zoom}px` }}
+      style={{ width: `${durationFrames * zoom}px`, touchAction: 'none' }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
     >

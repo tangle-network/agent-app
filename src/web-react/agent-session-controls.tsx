@@ -248,8 +248,8 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
               )}
               {showEffort && (
                 <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-foreground">Reasoning effort</p>
-                  <EffortPicker value={effort} onChange={onEffortChange} />
+                  <p className="text-xs font-medium text-foreground">Thinking</p>
+                  <EffortPicker value={effort} onChange={onEffortChange} label="" />
                   <p className="text-[11px] leading-snug text-muted-foreground">
                     How hard the agent thinks before answering. Higher is slower but more thorough.
                   </p>

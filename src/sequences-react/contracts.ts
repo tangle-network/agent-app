@@ -140,6 +140,35 @@ export interface TranscriptionProvider {
 // Components: the editor's public props
 // ---------------------------------------------------------------------------
 
+/** Overridable copy for the editor's product-facing labels. Every field is
+ *  optional; the editor ships clear defaults (see `DEFAULT_TIMELINE_LABELS`).
+ *  Accessible names (the `*AriaLabel` fields) stay descriptive for screen
+ *  readers; the short visible labels carry the on-screen verb. Products rename
+ *  per their own vocabulary without forking the component. */
+export interface TimelineEditorLabels {
+  /** Visible verb on the split-at-playhead tool. */
+  splitClip?: string
+  splitClipAriaLabel?: string
+  /** Visible verb on the add-caption-at-playhead tool. */
+  addCaption?: string
+  addCaptionAriaLabel?: string
+  /** Visible verb on the export action (rendered only when `onCreateExport`). */
+  createExport?: string
+  /** Empty-state heading + the three doors. */
+  emptyTitle?: string
+  emptyBody?: string
+  emptyTemplateDoor?: string
+  emptyClipDoor?: string
+  emptyAgentDoor?: string
+  /** Phone gate shown instead of the gesture-heavy editor below `sm`. */
+  smallScreenTitle?: string
+  smallScreenBody?: string
+  /** Ghost-lane names shown at rest so time reads as a timeline before any
+   *  track exists. */
+  ghostVideoLane?: string
+  ghostCaptionLane?: string
+}
+
 export interface TimelineEditorProps {
   timeline: SequenceTimeline
   canWrite: boolean
@@ -159,5 +188,37 @@ export interface TimelineEditorProps {
   renderAssetShelf?(): React.ReactNode
   /** Frame provider override; omitted → the baseline HTMLVideoElement provider. */
   frameProvider?: VideoFrameProvider
+  /** Overridable product-facing copy; defaults are clear on their own. */
+  labels?: TimelineEditorLabels
+  /** Empty-state doors. Supplying a handler renders that door; omitting it
+   *  hides it. With none supplied the empty state shows guidance only. */
+  onStartFromTemplate?(): void
+  onAddClip?(): void
+  onAskAgent?(): void
+  /** Render the export action (a toolbar "Export…" button). Omitted → no export
+   *  affordance. The handler owns the dialog/flow; this surface only invokes it. */
+  onCreateExport?(): void
+  /** Off by default. When true AND the consuming product supplies a branded
+   *  export pipeline, the export door/button is marked as Tangle-branded. This
+   *  surface has no render pipeline of its own to brand, so the flag is a
+   *  forward-compatible hint to `onCreateExport`, never a baked watermark. */
+  brandedExport?: boolean
   className?: string
+}
+
+export const DEFAULT_TIMELINE_LABELS: Required<TimelineEditorLabels> = {
+  splitClip: 'Split here',
+  splitClipAriaLabel: 'Split clip at playhead',
+  addCaption: 'Add caption',
+  addCaptionAriaLabel: 'Add caption at playhead',
+  createExport: 'Export…',
+  emptyTitle: 'This sequence has no tracks yet',
+  emptyBody: 'Start from a template, drop in a clip, or hand it to the agent.',
+  emptyTemplateDoor: 'Start from a template',
+  emptyClipDoor: 'Add a clip',
+  emptyAgentDoor: 'Ask the agent',
+  smallScreenTitle: 'Best edited on a larger screen',
+  smallScreenBody: 'The timeline needs room to scrub and trim. Open this cut on a tablet or desktop to edit.',
+  ghostVideoLane: 'Video',
+  ghostCaptionLane: 'Captions',
 }

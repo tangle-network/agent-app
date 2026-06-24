@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
+
+// No `../brand` mock: web-react reaches the Tangle mark through `./brand-mark`,
+// a lazy boundary that degrades to reserved space when the opt-in
+// `@tangle-network/sandbox-ui` peer isn't installed. The branded first-run state
+// renders here via that spacer fallback precisely because web-react never pulls
+// the peer into its static graph — the contract this suite quietly depends on.
 
 import { ChatMessages, type ChatUiMessage } from './index'
 
@@ -140,6 +146,65 @@ describe('ChatMessages segmented turns', () => {
     // "Thinking…" — even though `content` is '' and the answer is in a segment.
     expect(container.textContent).not.toContain('Thinking…')
     expect(container.querySelector('details')?.open).toBe(false)
+  })
+
+  it('renders a pending proposal as a primary Approve / quiet Reject decision card with a preview', () => {
+    const message: ChatUiMessage = {
+      id: 'm1',
+      role: 'assistant',
+      content: '',
+      toolCalls: [
+        {
+          id: 't1',
+          name: 'submit_proposal',
+          status: 'done',
+          args: { title: 'Launch poster', summary: 'Publish Launch poster', channels: ['X', 'LinkedIn'], cost: 4 },
+          result: { ok: true, result: { status: 'queued_for_approval', proposalId: 'p1' } },
+        },
+      ],
+    }
+    const onApprove = vi.fn()
+    const onReject = vi.fn()
+    const { getByText, container } = render(
+      <ChatMessages messages={[message]} approval={{ onApprove, onReject }} />,
+    )
+    // Decision verb leads, not the internal tool taxonomy.
+    expect(getByText('Approve: Launch poster?')).toBeTruthy()
+    // Plain-English preview of WHAT it does, with destinations woven in.
+    expect(container.textContent).toContain('Publish Launch poster to X and LinkedIn')
+    // Cost surfaced from the data.
+    expect(container.textContent).toContain('$4.00')
+    // Approve is the filled brand-primary action; Reject is the quiet outline.
+    const approve = getByText('Approve & run').closest('button') as HTMLButtonElement
+    const reject = getByText('Reject').closest('button') as HTMLButtonElement
+    expect(approve.className).toContain('bg-primary')
+    expect(reject.className).toContain('border-border')
+    expect(reject.className).not.toContain('bg-primary')
+  })
+
+  it('renders a scheduled follow-up distinctly from a proposal', () => {
+    const message: ChatUiMessage = {
+      id: 'm1',
+      role: 'assistant',
+      content: '',
+      toolCalls: [
+        { id: 't1', name: 'schedule_followup', status: 'done', args: { title: 'post launch poster', when: 'Tomorrow 9am' } },
+      ],
+    }
+    const { container } = render(<ChatMessages messages={[message]} />)
+    expect(container.textContent).toContain('Scheduled: post launch poster')
+    expect(container.textContent).toContain('Tomorrow 9am')
+  })
+
+  it('shows the branded first-run state when there are no messages', () => {
+    const onSelect = vi.fn()
+    const { container, getByText } = render(
+      <ChatMessages messages={[]} emptyState={{ doors: [{ label: 'Start from a template', onSelect }] }} />,
+    )
+    // The Tangle mark loads through a lazy boundary that degrades to a spacer
+    // when the opt-in sandbox-ui peer is absent (as in this env), so we assert
+    // the peer-independent empty-state content — the door the user actually acts on.
+    expect(getByText('Start from a template')).toBeTruthy()
   })
 
   it('shows a streaming caret when the live turn ends on a tool segment', () => {

@@ -52,6 +52,7 @@ import type { SequenceApplyResult } from '../../sequences/apply'
 import type { SequenceClip, SequenceMediaKind } from '../../sequences/model'
 import type { SequenceOperation } from '../../sequences/operations'
 import type { PlaybackClock, SnapPoint, TimelineCommand, TimelineEditorProps, VideoFrameProvider } from '../contracts'
+import { DEFAULT_TIMELINE_LABELS } from '../contracts'
 import { createCommandStack } from '../engine/command-stack'
 import {
   addCaptionCommand,
@@ -75,10 +76,13 @@ import type { ClipMoveCommit, ClipTrimCommit } from './TimelineClipChip'
 import { TimelinePlayhead } from './TimelinePlayhead'
 import { TimelineRuler } from './TimelineRuler'
 import { TimelineTrackRow } from './TimelineTrackRow'
+import { TimelineEmptyState } from './TimelineEmptyState'
+import { TimelineGhostLanes } from './TimelineGhostLanes'
+import { TimelineSmallScreenGate } from './TimelineSmallScreenGate'
 import { ZoomControl } from './ZoomControl'
 import {
   CaptionPlusGlyph,
-  FilmGlyph,
+  ExportGlyph,
   MagnetGlyph,
   PauseGlyph,
   PlayGlyph,
@@ -98,8 +102,18 @@ const MAX_ZOOM = 24
 /** Tailwind w-36 on the track header column. */
 const TRACK_HEADER_PX = 144
 
+/** Icon-only secondary control (undo, redo, snap): square, quiet, 44px tap
+ *  target on touch (h-7 visual + the row's padding clears the guideline). */
 const TRANSPORT_BUTTON =
-  'flex h-7 w-7 items-center justify-center rounded border border-[var(--border-default)] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:cursor-default disabled:opacity-40 disabled:hover:text-[var(--text-secondary)]'
+  'flex h-7 w-7 items-center justify-center rounded border border-[var(--border-default)] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-40 disabled:hover:text-[var(--text-secondary)]'
+
+/** Labeled edit tool (Split here, Add caption): icon + verb, secondary weight,
+ *  distinct from transport so the edit cluster reads as its own kind of thing. */
+const EDIT_TOOL_BUTTON =
+  'flex h-7 items-center gap-1.5 rounded border border-[var(--border-default)] px-2 text-xs font-medium text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-40 disabled:hover:text-[var(--text-secondary)]'
+
+/** A visible vertical separator between toolbar clusters. */
+const CLUSTER_DIVIDER = 'mx-1 h-5 w-px shrink-0 bg-[var(--border-default)]'
 
 function mintClipId(): string {
   const uuid = globalThis.crypto && 'randomUUID' in globalThis.crypto ? globalThis.crypto.randomUUID() : null
@@ -134,6 +148,7 @@ export function TimelineEditor(props: TimelineEditorProps) {
   const { canWrite, onApplyOperations } = props
   const fps = props.timeline.sequence.fps
   const durationFrames = props.timeline.sequence.durationFrames
+  const labels = useMemo(() => ({ ...DEFAULT_TIMELINE_LABELS, ...props.labels }), [props.labels])
 
   // --- engine lifecycles ----------------------------------------------------
 
@@ -215,6 +230,9 @@ export function TimelineEditor(props: TimelineEditorProps) {
 
   const zoomMath = useMemo(() => createZoomMath({ minZoom: MIN_ZOOM, maxZoom: MAX_ZOOM }), [])
   const [zoom, setZoom] = useState(1)
+  // The fit-to-sequence zoom, captured on mount, so the zoom readout reads as a
+  // "% of fit" (100% = the whole cut visible) and the readout can snap back to it.
+  const [fitZoom, setFitZoom] = useState<number | undefined>(undefined)
   const trackViewportRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     // Initial zoom fits the whole sequence into the visible track viewport.
@@ -222,7 +240,9 @@ export function TimelineEditor(props: TimelineEditorProps) {
     if (!viewport) return
     const laneWidth = viewport.clientWidth - TRACK_HEADER_PX
     if (laneWidth <= 0) return
-    setZoom(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, laneWidth / durationFrames)))
+    const fit = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, laneWidth / durationFrames))
+    setFitZoom(fit)
+    setZoom(fit)
     // Fit once on mount; afterwards zoom belongs to the user.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -708,26 +728,34 @@ export function TimelineEditor(props: TimelineEditorProps) {
 
   return (
     <div className={`flex h-full min-h-0 flex-col bg-[var(--bg-input)] text-[var(--text-primary)] ${props.className ?? ''}`}>
-      <div className="flex min-h-0 flex-1">
-        <div className="flex min-w-0 flex-1 flex-col">
+      {/* Phone: the gesture-heavy editor doesn't fit, so show a short on-brand
+          gate instead of a squeezed canvas. The editor below is `sm`+ only. */}
+      <TimelineSmallScreenGate labels={props.labels} />
+      {/* lg+: editor and side panel sit side by side; below lg the panel stacks
+          under the editor so neither gets crushed. */}
+      <div className="hidden min-h-0 flex-1 flex-col sm:flex lg:flex-row">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <PreviewCanvas timeline={timeline} clock={clock} frameProvider={frameProvider} />
 
-          <div className="flex h-10 shrink-0 items-center gap-2 border-y border-[var(--border-default)] px-2">
+          <div aria-label="Timeline controls" className="flex h-11 shrink-0 items-center gap-1.5 overflow-x-auto border-y border-[var(--border-default)] px-2">
+            {/* Transport cluster: the one verb everyone looks for first, primary
+                and grouped with the timecode it drives. */}
             <button
               type="button"
               aria-label={isPlaying ? 'Pause' : 'Play'}
               onClick={togglePlayback}
-              className={TRANSPORT_BUTTON}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--brand-primary)] text-[hsl(var(--primary-foreground))] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              {isPlaying ? <PauseGlyph className="h-3.5 w-3.5" /> : <PlayGlyph className="h-3.5 w-3.5" />}
+              {isPlaying ? <PauseGlyph className="h-4 w-4" /> : <PlayGlyph className="h-4 w-4" />}
             </button>
-            <span className="font-mono text-xs tabular-nums text-[var(--text-secondary)]">
+            <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--text-secondary)]">
               {formatTimecode(playheadFrame, fps)}
               <span className="text-[var(--text-muted)]"> / {formatTimecode(timeline.sequence.durationFrames, fps)}</span>
             </span>
 
-            <div className="mx-1 h-4 w-px bg-[var(--border-default)]" />
+            <div className={CLUSTER_DIVIDER} />
 
+            {/* History + view cluster. */}
             <button type="button" aria-label="Undo" disabled={!stack.canUndo() || !canWrite} onClick={undoLast} className={TRANSPORT_BUTTON}>
               <UndoGlyph className="h-3.5 w-3.5" />
             </button>
@@ -746,17 +774,36 @@ export function TimelineEditor(props: TimelineEditorProps) {
 
             {canWrite ? (
               <>
-                <button type="button" aria-label="Split clip at playhead" disabled={!splittableClip} onClick={splitAtPlayhead} className={TRANSPORT_BUTTON}>
-                  <ScissorsGlyph className="h-3.5 w-3.5" />
+                <div className={CLUSTER_DIVIDER} />
+                {/* Edit-tool cluster: labeled verbs, distinct from transport. */}
+                <button type="button" aria-label={labels.splitClipAriaLabel} disabled={!splittableClip} onClick={splitAtPlayhead} className={EDIT_TOOL_BUTTON}>
+                  <ScissorsGlyph className="h-3.5 w-3.5 shrink-0" />
+                  <span className="hidden md:inline">{labels.splitClip}</span>
                 </button>
-                <button type="button" aria-label="Add caption at playhead" onClick={addCaptionAtPlayhead} className={TRANSPORT_BUTTON}>
-                  <CaptionPlusGlyph className="h-3.5 w-3.5" />
+                <button type="button" aria-label={labels.addCaptionAriaLabel} onClick={addCaptionAtPlayhead} className={EDIT_TOOL_BUTTON}>
+                  <CaptionPlusGlyph className="h-3.5 w-3.5 shrink-0" />
+                  <span className="hidden md:inline">{labels.addCaption}</span>
                 </button>
               </>
             ) : null}
 
-            <div className="flex-1" />
-            <ZoomControl zoomMath={zoomMath} zoom={zoom} onZoomChange={setZoom} />
+            <div className="min-w-2 flex-1" />
+            <ZoomControl zoomMath={zoomMath} zoom={zoom} onZoomChange={setZoom} fitZoom={fitZoom} />
+
+            {props.onCreateExport ? (
+              <>
+                <div className={CLUSTER_DIVIDER} />
+                <button
+                  type="button"
+                  aria-label={labels.createExport}
+                  onClick={props.onCreateExport}
+                  className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-[var(--brand-primary)] px-2.5 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[hsl(var(--primary)/0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <ExportGlyph className="h-3.5 w-3.5 shrink-0" />
+                  <span className="hidden md:inline">{labels.createExport}</span>
+                </button>
+              </>
+            ) : null}
           </div>
 
           {commitError ? (
@@ -787,17 +834,23 @@ export function TimelineEditor(props: TimelineEditorProps) {
 
               <div className="relative">
                 {sortedTracks.length === 0 ? (
-                  <div
-                    data-timeline-empty
-                    className="sticky left-0 flex min-h-[6rem] flex-col items-center justify-center gap-1.5 px-6 py-10 text-center"
-                    style={{ width: '100%' }}
-                  >
-                    <FilmGlyph className="h-6 w-6 text-[var(--text-muted)]" />
-                    <p className="text-sm font-medium text-[var(--text-secondary)]">This sequence has no tracks yet</p>
-                    <p className="max-w-xs text-xs text-[var(--text-muted)]">
-                      Add a video, audio, or caption track to start placing clips.
-                    </p>
-                  </div>
+                  <>
+                    {/* Ghost lanes keep time legible at rest: the ruler's
+                        timecodes sit over labeled Video / Captions lanes even
+                        before any track exists. */}
+                    <TimelineGhostLanes
+                      laneWidth={timelineWidth}
+                      videoLabel={labels.ghostVideoLane}
+                      captionLabel={labels.ghostCaptionLane}
+                    />
+                    <TimelineEmptyState
+                      labels={props.labels}
+                      brandedExport={props.brandedExport}
+                      {...(props.onStartFromTemplate ? { onStartFromTemplate: props.onStartFromTemplate } : {})}
+                      {...(props.onAddClip ? { onAddClip: props.onAddClip } : {})}
+                      {...(props.onAskAgent ? { onAskAgent: props.onAskAgent } : {})}
+                    />
+                  </>
                 ) : null}
                 {sortedTracks.map((track) => (
                   <TimelineTrackRow
@@ -833,7 +886,7 @@ export function TimelineEditor(props: TimelineEditorProps) {
         </div>
 
         {props.renderSidePanel ? (
-          <aside className="flex w-80 shrink-0 flex-col overflow-hidden border-l border-[var(--border-default)]">
+          <aside className="flex max-h-72 shrink-0 flex-col overflow-hidden border-t border-[var(--border-default)] lg:max-h-none lg:w-80 lg:border-l lg:border-t-0">
             {props.renderSidePanel({ selectedClips, playheadFrame })}
           </aside>
         ) : null}

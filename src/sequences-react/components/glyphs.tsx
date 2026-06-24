@@ -102,3 +102,10 @@ export const CaptionPlusGlyph = glyph(
     <path d="M12 9v6M9 12h6" />
   </>,
 )
+
+export const ExportGlyph = glyph(
+  <>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <path d="M12 3v12M8 7l4-4 4 4" />
+  </>,
+)

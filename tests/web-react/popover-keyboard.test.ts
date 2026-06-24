@@ -18,7 +18,7 @@ afterEach(cleanup)
 describe('popover keyboard model (EffortPicker)', () => {
   it('trigger advertises the ARIA popup contract and toggles aria-expanded', () => {
     render(createElement(EffortPicker, { value: 'medium', onChange: vi.fn() }))
-    const trigger = screen.getByRole('button', { name: /Medium/ })
+    const trigger = screen.getByRole('button', { name: /Standard/ })
     expect(trigger.getAttribute('aria-haspopup')).toBe('true')
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
     fireEvent.click(trigger)
@@ -28,7 +28,7 @@ describe('popover keyboard model (EffortPicker)', () => {
 
   it('Escape closes the popover and returns focus to the trigger', () => {
     render(createElement(EffortPicker, { value: 'medium', onChange: vi.fn() }))
-    const trigger = screen.getByRole('button', { name: /Medium/ })
+    const trigger = screen.getByRole('button', { name: /Standard/ })
     fireEvent.click(trigger)
     expect(screen.queryByRole('menu')).toBeTruthy()
     fireEvent.keyDown(document, { key: 'Escape' })
@@ -38,7 +38,7 @@ describe('popover keyboard model (EffortPicker)', () => {
 
   it('outside mousedown closes the popover', () => {
     render(createElement(EffortPicker, { value: 'medium', onChange: vi.fn() }))
-    fireEvent.click(screen.getByRole('button', { name: /Medium/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Standard/ }))
     expect(screen.queryByRole('menu')).toBeTruthy()
     fireEvent.mouseDown(document.body)
     expect(screen.queryByRole('menu')).toBeNull()
@@ -46,11 +46,11 @@ describe('popover keyboard model (EffortPicker)', () => {
 
   it('options expose selected state and a focus-visible ring', () => {
     render(createElement(EffortPicker, { value: 'high', onChange: vi.fn() }))
-    fireEvent.click(screen.getByRole('button', { name: /High/ }))
-    const selected = screen.getByRole('menuitemradio', { name: 'High' })
+    fireEvent.click(screen.getByRole('button', { name: /Extended/ }))
+    const selected = screen.getByRole('menuitemradio', { name: 'Extended' })
     expect(selected.getAttribute('aria-checked')).toBe('true')
     expect(selected.className).toContain('focus-visible:ring-2')
-    expect(screen.getByRole('menuitemradio', { name: 'Low' }).getAttribute('aria-checked')).toBe('false')
+    expect(screen.getByRole('menuitemradio', { name: 'Quick' }).getAttribute('aria-checked')).toBe('false')
   })
 
   it('Escape is inert while the popover is closed (no global key swallowing)', () => {

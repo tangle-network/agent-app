@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { BrandHeader } from '@tangle-network/agent-app/brand'
 import { CanvasRoute } from './routes/CanvasRoute'
 import { TimelineRoute } from './routes/TimelineRoute'
 import { ChatRoute } from './routes/ChatRoute'
@@ -6,9 +7,9 @@ import { ChatRoute } from './routes/ChatRoute'
 type ThemeName = 'light' | 'dark'
 
 const ROUTES = [
-  { path: '/canvas', label: 'Canvas' },
-  { path: '/timeline', label: 'Timeline' },
-  { path: '/chat', label: 'Chat' },
+  { path: '/canvas', label: 'Design' },
+  { path: '/timeline', label: 'Storyboard' },
+  { path: '/chat', label: 'Agent' },
 ] as const
 
 function applyTheme(theme: ThemeName) {
@@ -55,15 +56,15 @@ export function App() {
 
   return (
     <div className="flex h-full w-full flex-col bg-background text-foreground">
-      <header className="flex shrink-0 items-center gap-1 border-b border-border bg-card px-4 py-2">
-        <span className="mr-3 text-sm font-semibold">agent-app playground</span>
-        <nav className="flex items-center gap-1">
+      <BrandHeader title="agent-app playground">
+        <nav className="flex items-center gap-1" aria-label="Playground sections">
           {ROUTES.map((r) => (
             <button
               key={r.path}
               type="button"
               onClick={() => navigate(r.path)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              aria-current={path === r.path ? 'page' : undefined}
+              className={`inline-flex min-h-[44px] items-center rounded-md px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 path === r.path ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent/30'
               }`}
             >
@@ -71,15 +72,15 @@ export function App() {
             </button>
           ))}
         </nav>
-        <div className="flex-1" />
         <button
           type="button"
           onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
-          className="rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          className="ml-1 inline-flex min-h-[44px] items-center rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {theme === 'dark' ? 'Light' : 'Dark'} mode
         </button>
-      </header>
+      </BrandHeader>
       <main className="min-h-0 flex-1">
         {path === '/canvas' && <CanvasRoute />}
         {path === '/timeline' && <TimelineRoute />}

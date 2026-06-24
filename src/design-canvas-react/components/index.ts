@@ -15,6 +15,7 @@ export {
   type InsertGeneration,
 } from './CanvasInsertPanel'
 export { Workspace, WorkspaceView, type WorkspaceViewProps } from './Workspace'
+export { CanvasEmptyState, type CanvasEmptyStateProps } from './CanvasEmptyState'
 export { SelectionLayer, type SelectionLayerProps } from './SelectionLayer'
 export { PagesStrip, type PagesStripProps } from './PagesStrip'
 export { LayersPanel, type LayersPanelProps } from './LayersPanel'

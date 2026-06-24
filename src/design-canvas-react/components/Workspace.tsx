@@ -68,7 +68,9 @@ import {
   ungroupElementCommand,
 } from '../engine/commands'
 import type { MultiSetAttrsEntry } from '../engine/commands'
+import { DEFAULT_INSERT_TEMPLATES } from '../insert-builders'
 
+import { CanvasEmptyState } from './CanvasEmptyState'
 import { ElementNode } from './ElementNode'
 import { SelectionLayer } from './SelectionLayer'
 import { GridLayer } from './GridLayer'
@@ -140,6 +142,13 @@ export interface WorkspaceViewProps {
   onReady?(): void
   /** Konva render palette. Omitted → light defaults (byte-identical history). */
   render?: CanvasRenderPalette
+  /** Show the branded in-canvas empty state (three doors) while the active page
+   *  has no elements and the user can write. Default true. Set false to keep a
+   *  bare blank stage (e.g. when restoring a saved-but-intentionally-empty page). */
+  showEmptyState?: boolean
+  /** Focus/open the agent from the empty state's "Ask the agent" door. When
+   *  omitted that door is hidden — there is no agent surface to send them to. */
+  onAskAgent?(): void
 }
 
 // ---------------------------------------------------------------------------
@@ -159,6 +168,8 @@ export function WorkspaceView({
   fitOnMount = true,
   onReady,
   render = lightTheme.canvasRender,
+  showEmptyState = true,
+  onAskAgent,
 }: WorkspaceViewProps) {
   // Re-render when command stack changes state.
   const [, setTick] = useState(0)
@@ -531,6 +542,50 @@ export function WorkspaceView({
   }
 
   // -------------------------------------------------------------------------
+  // Empty-state doors — both insert real content through the shared stack, so
+  // they need no host wiring and are immediately undoable like any other edit.
+  // -------------------------------------------------------------------------
+
+  async function handleStartTemplate() {
+    if (!canWrite) return
+    const template = DEFAULT_INSERT_TEMPLATES[0]
+    if (!template) return
+    const ops = template.build({ pageId: activePageId, width: activePage.width, height: activePage.height })
+    for (const op of ops) {
+      if (op.type === 'add_element') {
+        await persist(addElementCommand({ pageId: op.pageId, element: op.element }))
+      }
+    }
+  }
+
+  async function handleAddElement() {
+    if (!canWrite) return
+    const width = Math.min(420, Math.round(activePage.width * 0.6)) || 320
+    const element: SceneElement = {
+      id: crypto.randomUUID(),
+      kind: 'text',
+      name: 'Text',
+      x: Math.max(0, Math.round((activePage.width - width) / 2)),
+      y: Math.max(0, Math.round(activePage.height / 2 - 24)),
+      rotation: 0,
+      opacity: 1,
+      locked: false,
+      visible: true,
+      width,
+      text: 'Double-click to edit',
+      fontFamily: 'Inter',
+      fontSize: 32,
+      fontStyle: 'normal',
+      fill: '#111827',
+      align: 'left',
+      lineHeight: 1.2,
+      letterSpacing: 0,
+    }
+    await persist(addElementCommand({ pageId: activePageId, element }))
+    stack.setView({ selectedElementIds: [element.id] })
+  }
+
+  // -------------------------------------------------------------------------
   // Keyboard
   // -------------------------------------------------------------------------
 
@@ -829,7 +884,9 @@ export function WorkspaceView({
       onPointerUp={handlePointerUp}
       onKeyDown={handleKeyDown}
       onKeyUp={handleKeyUp}
-      style={{ cursor: spaceHeldRef.current ? 'grab' : 'default' }}
+      // touch-action:none lets pointer pan/marquee/transform own the gesture on
+      // touch devices — without it the browser's native scroll/pinch fights every drag.
+      style={{ cursor: spaceHeldRef.current ? 'grab' : 'default', touchAction: 'none' }}
     >
       {/* Konva Stage */}
       <Stage
@@ -962,6 +1019,16 @@ export function WorkspaceView({
           onCancel={handleTextCancel}
         />
       )}
+
+      {/* Empty-state doors — only while the page is blank, the user can write,
+          and no gesture is mid-flight (so it never covers a live marquee). */}
+      {showEmptyState && canWrite && activePage.elements.length === 0 && !editingElementId ? (
+        <CanvasEmptyState
+          onStartTemplate={() => void handleStartTemplate()}
+          onAddElement={() => void handleAddElement()}
+          onAskAgent={onAskAgent}
+        />
+      ) : null}
     </div>
   )
 }

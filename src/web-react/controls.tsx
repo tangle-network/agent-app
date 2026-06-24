@@ -258,7 +258,7 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
       </button>
 
       {open && (
-        <div className="absolute bottom-full left-0 z-50 mb-2 w-[420px] overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+        <div className="absolute bottom-full left-0 z-50 mb-2 w-[420px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-card shadow-lg">
           <div className="border-b border-border px-3 py-2">
             <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
               <SearchGlyph className="h-3.5 w-3.5 text-muted-foreground" />
@@ -313,24 +313,43 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
 
 // ── EffortPicker ──────────────────────────────────────────────────────────
 
-const EFFORT_LEVELS = [
+/** One reasoning-budget level: the engine `id` is unchanged (the value the
+ *  product sends to the loop); only the user-facing `label` is renamed to the
+ *  plainer "how hard should it think" vocabulary from docs/product-surfaces.md.
+ *  `low`→Quick, `medium`→Standard, `high`→Extended. The mapping is overridable
+ *  via `EffortPickerProps.levels`, so a product can relabel without losing the
+ *  ids the runtime expects. */
+export interface EffortLevel {
+  id: string
+  label: string
+}
+
+export const DEFAULT_EFFORT_LEVELS: readonly EffortLevel[] = [
   { id: 'off', label: 'Off' },
-  { id: 'low', label: 'Low' },
-  { id: 'medium', label: 'Medium' },
-  { id: 'high', label: 'High' },
-] as const
+  { id: 'low', label: 'Quick' },
+  { id: 'medium', label: 'Standard' },
+  { id: 'high', label: 'Extended' },
+]
 
 export interface EffortPickerProps {
   value: string
   onChange: (id: string) => void
+  /** Selectable levels (engine id + user-facing label). Defaults to the plain
+   *  "Thinking" vocabulary; override to relabel without changing the ids the
+   *  runtime receives. */
+  levels?: readonly EffortLevel[]
+  /** Prefix shown before the active level on the pill — the "what is this"
+   *  context the bare value lacked. Default "Thinking". Pass '' to hide it. */
+  label?: string
 }
 
-/** Reasoning-effort selector pill, styled to match {@link ModelPicker}. Show
- *  it only when the selected model `supportsReasoning`. */
-export function EffortPicker({ value, onChange }: EffortPickerProps) {
+/** Thinking-budget selector pill, styled to match {@link ModelPicker}. Show
+ *  it only when the selected model `supportsReasoning`. "Thinking" is the
+ *  plain-English name for what was internally called "effort". */
+export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, label = 'Thinking' }: EffortPickerProps) {
   const [open, setOpen] = useState(false)
   const { containerRef, triggerProps } = usePopover(open, setOpen)
-  const selected = EFFORT_LEVELS.find((l) => l.id === value) ?? EFFORT_LEVELS[2]
+  const selected = levels.find((l) => l.id === value) ?? levels[2] ?? levels[0]
 
   return (
     <div ref={containerRef} className="relative inline-flex">
@@ -338,16 +357,19 @@ export function EffortPicker({ value, onChange }: EffortPickerProps) {
         type="button"
         {...triggerProps}
         onClick={() => setOpen(!open)}
-        title="Reasoning effort"
-        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+        title={label ? `${label} — how hard the agent reasons before answering` : 'Reasoning effort'}
+        className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
       >
         <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />
-        <span>{selected.label}</span>
+        <span>
+          {label ? <span className="text-muted-foreground">{label}: </span> : null}
+          {selected?.label}
+        </span>
         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
       </button>
       {open && (
-        <div role="menu" className="absolute bottom-full left-0 z-50 mb-2 w-36 overflow-hidden rounded-xl border border-border bg-card p-1 shadow-lg">
-          {EFFORT_LEVELS.map((l) => (
+        <div role="menu" className="absolute bottom-full left-0 z-50 mb-2 w-40 overflow-hidden rounded-xl border border-border bg-card p-1 shadow-lg">
+          {levels.map((l) => (
             <button
               key={l.id}
               type="button"
@@ -357,7 +379,7 @@ export function EffortPicker({ value, onChange }: EffortPickerProps) {
                 onChange(l.id)
                 setOpen(false)
               }}
-              className={`flex w-full items-center rounded-md px-3 py-2 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
+              className={`flex min-h-[40px] w-full items-center rounded-md px-3 py-2 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
                 l.id === value ? 'bg-primary/10 font-medium' : 'hover:bg-accent/30'
               }`}
             >

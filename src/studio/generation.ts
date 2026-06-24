@@ -2,11 +2,12 @@
 // only reads the connection status and the provider/connector identifiers, so
 // the logic layer declares its own shape instead of depending on the
 // design-system package. A sandbox-ui `IntegrationConnection` is assignable to
-// this (it carries all three fields).
+// this; `connectorId` is optional because the engine type leaves it undefined
+// for connections established without a named connector.
 export interface StudioIntegrationConnection {
   status: string
   providerId: string
-  connectorId: string
+  connectorId?: string
 }
 
 export type GenerationType = 'image' | 'video' | 'speech' | 'avatar' | 'transcription'
@@ -174,7 +175,8 @@ export function isDestinationConnected(
   connections: StudioIntegrationConnection[],
 ): boolean {
   return connections.some((connection) => connection.status === 'connected'
-    && (destination.providerIds.includes(connection.providerId) || destination.providerIds.includes(connection.connectorId)))
+    && (destination.providerIds.includes(connection.providerId)
+      || (connection.connectorId !== undefined && destination.providerIds.includes(connection.connectorId))))
 }
 
 export function selectedModelsWithDefaults(
