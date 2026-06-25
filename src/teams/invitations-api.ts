@@ -390,10 +390,6 @@ export function createInvitationsApi(opts: InvitationsApiOptions) {
       }
     }
 
-    if (!currentUser.emailVerified) {
-      return { succeeded: false, status: 403, error: 'Verify your email before accepting this invitation' }
-    }
-
     let orgMember = await getOrganizationMember(invitation.organizationId, currentUser.id)
     if (orgMember?.role === 'owner' || orgMember?.role === 'admin') {
       return { succeeded: false, status: 409, error: 'This user already has account-level access.' }
