@@ -21,6 +21,23 @@ const ASSIGNABLE: { value: WorkspaceRole; label: string }[] = [
   { value: 'admin', label: 'Admin' },
 ]
 
+const BADGE_BASE = 'inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-medium uppercase'
+
+// Lifecycle status: green = in, amber = awaiting, red = killed, muted = lapsed.
+const STATUS_BADGE: Record<InvitationView['status'], string> = {
+  accepted: 'border-[var(--surface-success-border)] bg-[var(--surface-success-bg)] text-[var(--surface-success-text)]',
+  pending: 'border-[var(--surface-warning-border)] bg-[var(--surface-warning-bg)] text-[var(--surface-warning-text)]',
+  revoked: 'border-[var(--surface-danger-border)] bg-[var(--surface-danger-bg)] text-[var(--surface-danger-text)]',
+  expired: 'border-[var(--border-default)] text-[var(--text-muted)]',
+}
+
+// Delivery status: red = bounced, amber = not yet attempted, muted = the normal happy path.
+const EMAIL_BADGE: Record<InvitationView['emailStatus'], string> = {
+  sent: 'border-[var(--border-default)] text-[var(--text-muted)]',
+  not_sent: 'border-[var(--surface-warning-border)] bg-[var(--surface-warning-bg)] text-[var(--surface-warning-text)]',
+  failed: 'border-[var(--surface-danger-border)] bg-[var(--surface-danger-bg)] text-[var(--surface-danger-text)]',
+}
+
 export function InvitationsPanel({
   invitations,
   currentRole,
@@ -179,18 +196,14 @@ function InvitationRow({ invitation, canManage, busy, onCopy, onResend, onRevoke
             {invitation.permissions} · expires {expiry}
           </p>
           {emailFailed && (
-            <p className="mt-1 text-xs text-[var(--text-danger)]">Email was not sent — copy the link to share it.</p>
+            <p className="mt-1 text-xs text-[var(--surface-danger-text)]">Email was not sent — copy the link to share it.</p>
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <span className="rounded border border-[var(--border-default)] px-2 py-0.5 text-[10px] uppercase text-[var(--text-secondary)]">
+          <span className={`${BADGE_BASE} ${STATUS_BADGE[invitation.status]}`}>
             {invitation.status}
           </span>
-          <span
-            className={`rounded border border-[var(--border-default)] px-2 py-0.5 text-[10px] uppercase ${
-              emailFailed ? 'text-[var(--text-danger)]' : 'text-[var(--text-muted)]'
-            }`}
-          >
+          <span className={`${BADGE_BASE} ${EMAIL_BADGE[invitation.emailStatus]}`}>
             {invitation.emailStatus.replace('_', ' ')}
           </span>
         </div>
