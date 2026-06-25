@@ -45,6 +45,7 @@ export default defineConfig({
     'teams/drizzle': 'src/teams/drizzle.ts',
     'teams/members-api': 'src/teams/members-api.ts',
     'teams/invitations-api': 'src/teams/invitations-api.ts',
+    'teams/resend': 'src/teams/resend.ts',
     'teams-react/index': 'src/teams-react/index.ts',
     'teams-react/lazy': 'src/teams-react/lazy.tsx',
     'intakes/index': 'src/intakes/index.ts',
@@ -64,7 +65,7 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   target: 'es2022',
-  external: ['react', 'react/jsx-runtime', 'konva', 'react-konva', '@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog', '@tangle-network/agent-eval', '@tangle-network/agent-knowledge', '@tangle-network/agent-runtime', '@tangle-network/sandbox', 'drizzle-orm', 'drizzle-orm/*', '@huggingface/transformers', '@tangle-network/sandbox-ui', '@tangle-network/sandbox-ui/*', '@tangle-network/ui', '@tangle-network/ui/*', 'lucide-react', 'react-router', '@radix-ui/react-dialog'],
+  external: ['react', 'react/jsx-runtime', 'konva', 'react-konva', '@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog', '@tangle-network/agent-eval', '@tangle-network/agent-knowledge', '@tangle-network/agent-runtime', '@tangle-network/sandbox', 'drizzle-orm', 'drizzle-orm/*', '@huggingface/transformers', '@tangle-network/sandbox-ui', '@tangle-network/sandbox-ui/*', '@tangle-network/ui', '@tangle-network/ui/*', 'lucide-react', 'react-router', '@radix-ui/react-dialog', 'resend'],
   // tokens.css is shipped raw (the ./styles subpath); copy it next to the
   // built theme entries so `import '@tangle-network/agent-app/styles'` resolves.
   onSuccess: 'cp src/theme/tokens.css dist/theme/tokens.css && cp src/studio-react/studio.css dist/studio-react/studio.css',

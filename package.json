@@ -254,6 +254,11 @@
       "import": "./dist/teams/invitations-api.js",
       "default": "./dist/teams/invitations-api.js"
     },
+    "./teams/resend": {
+      "types": "./dist/teams/resend.d.ts",
+      "import": "./dist/teams/resend.js",
+      "default": "./dist/teams/resend.js"
+    },
     "./teams-react": {
       "types": "./dist/teams-react/index.d.ts",
       "import": "./dist/teams-react/index.js",
@@ -351,6 +356,7 @@
     "react-dom": "^19.2.7",
     "react-konva": "^19.2.5",
     "react-router": "^7.15.1",
+    "resend": "^6.12.4",
     "tsup": "^8.0.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
@@ -369,7 +375,8 @@
     "lucide-react": ">=1",
     "react": ">=18",
     "react-konva": ">=18",
-    "react-router": ">=7"
+    "react-router": ">=7",
+    "resend": ">=6"
   },
   "peerDependenciesMeta": {
     "@huggingface/transformers": {
@@ -406,6 +413,9 @@
       "optional": true
     },
     "@radix-ui/react-dialog": {
+      "optional": true
+    },
+    "resend": {
       "optional": true
     }
   },
