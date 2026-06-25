@@ -207,24 +207,28 @@ describe('getPreview + acceptInvitation', () => {
     }
   })
 
-  it('rejects accept on email mismatch (403) and unverified email (403)', async () => {
+  it('rejects accept on email mismatch (403)', async () => {
     const deps = await seed()
-    await deps.db.insert(usersTable).values([
-      { id: 'inv-mismatch', name: 'X', email: 'wrong@x.com', emailVerified: true },
-      { id: 'inv-unverified', name: 'U', email: 'unverified@x.com', emailVerified: false },
-    ])
+    await deps.db.insert(usersTable).values({ id: 'inv-mismatch', name: 'X', email: 'wrong@x.com', emailVerified: true })
     const { api } = makeApi(deps)
     const a = await api.createInvitation({ workspaceId: 'ws-1', email: 'target@x.com', permissions: 'editor', invitedByUserId: 'owner-1', origin: ORIGIN })
     if (!a.succeeded) throw new Error('setup')
     const mismatch = await api.acceptInvitation({ token: a.value.invitation.token, userId: 'inv-mismatch' })
     expect(mismatch.succeeded).toBe(false)
     if (!mismatch.succeeded) expect(mismatch.status).toBe(403)
+  })
 
+  it('accepts a matching unverified invitee because the invite token proves inbox access', async () => {
+    const deps = await seed()
+    await deps.db.insert(usersTable).values({ id: 'inv-unverified', name: 'U', email: 'unverified@x.com', emailVerified: false })
+    const { api, adds } = makeApi(deps)
     const u = await api.createInvitation({ workspaceId: 'ws-1', email: 'unverified@x.com', permissions: 'editor', invitedByUserId: 'owner-1', origin: ORIGIN })
     if (!u.succeeded) throw new Error('setup')
-    const unverified = await api.acceptInvitation({ token: u.value.invitation.token, userId: 'inv-unverified' })
-    expect(unverified.succeeded).toBe(false)
-    if (!unverified.succeeded) expect(unverified.status).toBe(403)
+    const accepted = await api.acceptInvitation({ token: u.value.invitation.token, userId: 'inv-unverified' })
+    expect(accepted.succeeded).toBe(true)
+    if (accepted.succeeded) expect(accepted.value.workspaceId).toBe('ws-1')
+    await flushMicrotasks()
+    expect(adds).toEqual([{ workspaceId: 'ws-1', userId: 'inv-unverified', role: 'editor' }])
   })
 
   it('accepts a matching, verified invite → membership created, add sync fired, idempotent', async () => {
