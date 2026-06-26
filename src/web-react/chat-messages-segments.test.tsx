@@ -43,9 +43,10 @@ describe('ChatMessages segmented turns', () => {
     const { container } = render(<ChatMessages messages={[message]} />)
 
     const pre = indexIn(container, 'Checking the workflow format first.')
-    const schema = indexIn(container, 'get_workflow_schema')
+    // Unmapped tool names render as humanized titles, e.g. "Get workflow schema".
+    const schema = indexIn(container, 'Get workflow schema')
     const mid = indexIn(container, 'Now validating the definition.')
-    const validate = indexIn(container, 'validate_workflow')
+    const validate = indexIn(container, 'Validate workflow')
     const post = indexIn(container, 'Validated. Here is the plan.')
     // Every needle is present...
     expect(Math.min(pre, schema, mid, validate, post)).toBeGreaterThanOrEqual(0)
@@ -68,7 +69,7 @@ describe('ChatMessages segmented turns', () => {
     const { container } = render(<ChatMessages messages={[message]} />)
 
     const body = indexIn(container, 'All done.')
-    const tool = indexIn(container, 'list_workflows')
+    const tool = indexIn(container, 'List workflows')
     expect(body).toBeGreaterThanOrEqual(0)
     expect(tool).toBeGreaterThanOrEqual(0)
     // Legacy producers keep the prior layout: content first, tool chips after.
@@ -100,8 +101,8 @@ describe('ChatMessages segmented turns', () => {
     }
     const { container } = render(<ChatMessages messages={[message]} />)
     const text = container.textContent ?? ''
-    expect(text).toContain('list_skills')
-    expect(text.indexOf('After.')).toBeGreaterThan(text.indexOf('list_skills'))
+    expect(text).toContain('List skills')
+    expect(text.indexOf('After.')).toBeGreaterThan(text.indexOf('List skills'))
   })
 
   it('renders a toolCall not represented in segments rather than dropping it', () => {
@@ -114,7 +115,7 @@ describe('ChatMessages segmented turns', () => {
       toolCalls: [{ id: 'orphan', name: 'list_workflows', status: 'done' }],
     }
     const { container } = render(<ChatMessages messages={[message]} />)
-    expect(container.textContent).toContain('list_workflows')
+    expect(container.textContent).toContain('List workflows')
   })
 
   it('does not duplicate a toolCall already present as a segment', () => {
@@ -128,8 +129,23 @@ describe('ChatMessages segmented turns', () => {
       toolCalls: [{ id: 't1', name: 'validate_workflow', status: 'done' }],
     }
     const { container } = render(<ChatMessages messages={[message]} />)
-    const matches = (container.textContent ?? '').match(/validate_workflow/g) ?? []
+    const matches = (container.textContent ?? '').match(/Validate workflow/g) ?? []
     expect(matches).toHaveLength(1)
+  })
+
+  it('humanizes an unmapped tool name for the chip title', () => {
+    const message: ChatUiMessage = {
+      id: 'm1',
+      role: 'assistant',
+      content: '',
+      segments: [
+        { kind: 'tool', call: { id: 't1', name: 'get_credit_balance', status: 'done' } },
+      ],
+    }
+    const { container } = render(<ChatMessages messages={[message]} />)
+    // The snake_case slug shows as a sentence-cased label, never the raw name.
+    expect(container.textContent).toContain('Get credit balance')
+    expect(container.textContent).not.toContain('get_credit_balance')
   })
 
   it('does not leave the reasoning panel Thinking for a segmented message with empty content', () => {
