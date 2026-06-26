@@ -20,6 +20,7 @@ import {
   useRef,
   useState,
   type ErrorInfo,
+  type MouseEvent,
   type ReactNode,
 } from 'react'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -47,11 +48,45 @@ function collectFilePaths(nodes: VaultTreeNode[], into: Set<string>): Set<string
   return into
 }
 
-function countFiles(nodes: VaultTreeNode[]): number {
-  return nodes.reduce(
-    (sum, node) => (node.type === 'file' ? sum + 1 : sum + countFiles(node.children ?? [])),
-    0,
-  )
+function resolveFilePath(rawPath: string, filePaths: Set<string>): string | null {
+  if (filePaths.has(rawPath)) return rawPath
+  const path = rawPath.replace(/^\/+|\/+$/g, '')
+  return filePaths.has(path) ? path : null
+}
+
+function treeClickPath(event: MouseEvent<HTMLElement>): string | null {
+  const path = event.nativeEvent.composedPath?.() ?? []
+  for (const item of path) {
+    if (!(item instanceof HTMLElement)) continue
+    if (item.dataset.type !== 'item') continue
+    if (item.dataset.itemType !== 'file') return null
+    return item.dataset.itemPath ?? null
+  }
+
+  const target = event.target instanceof HTMLElement
+    ? event.target.closest('[data-type="item"]')
+    : null
+  if (!(target instanceof HTMLElement)) return null
+  if (target.dataset.itemType !== 'file') return null
+  return target.dataset.itemPath ?? null
+}
+
+// Case-insensitive name filter over the tree: files survive when their name
+// matches; a directory survives whole (with all its children) when its own name
+// matches, otherwise only when some descendant survives.
+function filterNodes(nodes: VaultTreeNode[], q: string): VaultTreeNode[] {
+  const out: VaultTreeNode[] = []
+  for (const node of nodes) {
+    if (node.type === 'file') {
+      if (node.name.toLowerCase().includes(q)) out.push(node)
+    } else if (node.name.toLowerCase().includes(q)) {
+      out.push(node)
+    } else {
+      const children = filterNodes(node.children ?? [], q)
+      if (children.length > 0) out.push({ ...node, children })
+    }
+  }
+  return out
 }
 
 class EditorErrorBoundary extends Component<{ children: ReactNode; onReset?: () => void }, { error: unknown }> {
@@ -119,6 +154,24 @@ function EmptyState() {
   )
 }
 
+function ReadErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+      <div>
+        <h3 className="text-sm font-medium text-foreground">Couldn't open this file</h3>
+        <p className="mt-1 max-w-md text-xs text-muted-foreground">{message}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60"
+      >
+        Retry
+      </button>
+    </div>
+  )
+}
+
 export function VaultPane(props: VaultPaneProps) {
   const {
     port,
@@ -149,6 +202,8 @@ export function VaultPane(props: VaultPaneProps) {
 
   const [selectedFile, setSelectedFile] = useState<VaultFile | null>(null)
   const [fileLoading, setFileLoading] = useState(false)
+  const [readError, setReadError] = useState<string | null>(null)
+  const [reloadNonce, setReloadNonce] = useState(0)
   const [saving, setSaving] = useState(false)
 
   const [editorMode, setEditorMode] = useState<VaultEditorMode>('rich')
@@ -163,16 +218,25 @@ export function VaultPane(props: VaultPaneProps) {
   const [deleting, setDeleting] = useState(false)
   const [dockOpen, setDockOpen] = useState(false)
   const [pendingNav, setPendingNav] = useState<PendingNav>(null)
+  const [query, setQuery] = useState('')
 
   const savedContentRef = useRef('')
   const loadedPathRef = useRef<string | null>(null)
 
   const filePaths = useMemo(() => collectFilePaths(tree, new Set<string>()), [tree])
+  const resolvedSelectedPath = useMemo(
+    () => selectedPath ? resolveFilePath(selectedPath, filePaths) : null,
+    [selectedPath, filePaths],
+  )
   const treeRoot = useMemo<VaultTreeNode>(
     () => ({ name: 'Vault', path: '', type: 'directory', children: tree }),
     [tree],
   )
-  const fileCount = useMemo(() => countFiles(tree), [tree])
+  const visibleRoot = useMemo<VaultTreeNode>(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return treeRoot
+    return { ...treeRoot, children: filterNodes(tree, q) }
+  }, [treeRoot, tree, query])
 
   const commitPath = useCallback(
     (next: string | null) => {
@@ -199,18 +263,35 @@ export function VaultPane(props: VaultPaneProps) {
     if (!selectedPath) {
       setSelectedFile(null)
       setFileLoading(false)
+      setReadError(null)
+      loadedPathRef.current = null
+      return
+    }
+    if (treeLoading) return
+    if (!resolvedSelectedPath) {
+      commitPath(null)
+      setSelectedFile(null)
+      setFileLoading(false)
+      setReadError(null)
       loadedPathRef.current = null
       return
     }
     let cancelled = false
-    const path = selectedPath
+    const path = resolvedSelectedPath
+    if (path !== selectedPath) commitPath(path)
     setFileLoading(true)
+    setReadError(null)
     void (async () => {
       try {
         const file = await port.readFile(path)
         if (!cancelled) setSelectedFile(file)
-      } catch {
-        if (!cancelled) setSelectedFile(null)
+      } catch (err) {
+        // Surface read failures instead of making them indistinguishable from
+        // the intentionally empty "no file selected" state.
+        if (!cancelled) {
+          setSelectedFile(null)
+          setReadError(err instanceof Error ? err.message : 'Failed to read file')
+        }
       } finally {
         if (!cancelled) setFileLoading(false)
       }
@@ -218,7 +299,7 @@ export function VaultPane(props: VaultPaneProps) {
     return () => {
       cancelled = true
     }
-  }, [port, selectedPath, refreshKey])
+  }, [port, selectedPath, resolvedSelectedPath, treeLoading, refreshKey, reloadNonce, commitPath])
 
   useEffect(() => {
     if (!selectedFile) {
@@ -251,6 +332,19 @@ export function VaultPane(props: VaultPaneProps) {
     },
     [isDirty, selectedPath, commitPath],
   )
+
+  // Some tree models keep their original selection callback while resetting
+  // paths internally. Keep the callable stable, but have it execute the latest
+  // file-path validation and dirty-guard logic.
+  const selectFileRef = useRef<(path: string) => void>(() => {})
+  selectFileRef.current = (rawPath: string) => {
+    const path = resolveFilePath(rawPath, filePaths)
+    if (path) {
+      guardedOpen(path)
+      return
+    }
+  }
+  const handleTreeSelect = useCallback((path: string) => selectFileRef.current(path), [])
 
   const guardedClose = useCallback(() => {
     if (isDirty) {
@@ -353,12 +447,16 @@ export function VaultPane(props: VaultPaneProps) {
     <EditorErrorBoundary onReset={() => { commitPath(null); setSelectedFile(null) }}>
       <div className={`flex min-h-0 flex-1 overflow-hidden ${className ?? ''}`}>
         <div className="flex w-[23rem] min-w-[23rem] flex-col border-r border-border bg-background">
-          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="text-sm font-semibold text-foreground">Vault</span>
-              <span className="text-xs text-muted-foreground">
-                {fileCount} file{fileCount === 1 ? '' : 's'}
-              </span>
+          <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+            <div className="min-w-0 flex-1">
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search…"
+                aria-label="Search vault"
+                className="h-8 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-primary/60"
+              />
             </div>
             <div className="flex shrink-0 items-center gap-1">
               {headerActions}
@@ -382,14 +480,20 @@ export function VaultPane(props: VaultPaneProps) {
               )}
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto">
+          <div
+            className="flex-1 overflow-y-auto"
+            onClickCapture={(event) => {
+              const path = treeClickPath(event)
+              if (path) handleTreeSelect(path)
+            }}
+          >
             {treeLoading ? (
               <TreeSkeleton />
             ) : (
               renderTree({
-                root: treeRoot,
-                selectedPath: selectedPath ?? undefined,
-                onSelect: (path) => { if (filePaths.has(path)) guardedOpen(path) },
+                root: visibleRoot,
+                selectedPath: resolvedSelectedPath ?? undefined,
+                onSelect: handleTreeSelect,
               })
             )}
           </div>
@@ -464,6 +568,8 @@ export function VaultPane(props: VaultPaneProps) {
           <div className="flex-1 overflow-hidden">
             {fileLoading ? (
               <EditorSkeleton />
+            ) : readError ? (
+              <ReadErrorState message={readError} onRetry={() => setReloadNonce((n) => n + 1)} />
             ) : selectedFile && canWrite && isMarkdownCapable && editorMode === 'source' ? (
               <SourceEditor
                 path={selectedFile.path}

@@ -183,6 +183,118 @@ describe('VaultPane — load + selection', () => {
     expect(screen.getByTestId('artifact').textContent).toContain('body A')
   })
 
+  it('opens a file when a shadow-DOM tree row click only exposes data attributes', async () => {
+    const inertTree = () =>
+      createElement(
+        'button',
+        {
+          type: 'button',
+          'data-testid': 'pierre-row',
+          'data-type': 'item',
+          'data-item-type': 'file',
+          'data-item-path': 'folder/c.md',
+        },
+        'c.md',
+      )
+
+    const { port } = mount({ renderTree: inertTree })
+    fireEvent.click(await screen.findByTestId('pierre-row'))
+
+    await waitFor(() => expect(port.readFile).toHaveBeenCalledWith('folder/c.md'))
+    await waitFor(() => expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('folder/c.md'))
+  })
+
+  it('opens after a tree renderer reuses its initial selection callback', async () => {
+    const listTree = vi.fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(TREE)
+    const port = fakePort({ listTree })
+    let capturedOnSelect: VaultTreeRenderProps['onSelect'] | null = null
+    const staleCallbackTree = (props: VaultTreeRenderProps) => {
+      capturedOnSelect ??= props.onSelect
+      function walk(nodes: VaultTreeNode[]): ReturnType<typeof createElement>[] {
+        return nodes.flatMap((n) => {
+          const self = createElement(
+            'button',
+            {
+              key: n.path,
+              type: 'button',
+              'data-testid': `tree-${n.path}`,
+              onClick: () => capturedOnSelect?.(n.path),
+            },
+            n.name,
+          )
+          return n.children ? [self, ...walk(n.children)] : [self]
+        })
+      }
+      return createElement('div', { 'data-testid': 'tree' }, ...walk([props.root]))
+    }
+    const el = (refreshKey: number) => createElement(VaultPane, {
+      port,
+      renderTree: staleCallbackTree,
+      renderArtifact,
+      codec: fmCodec,
+      refreshKey,
+    })
+    const { rerender } = render(el(1))
+    await waitFor(() => expect(listTree).toHaveBeenCalledTimes(1))
+
+    rerender(el(2))
+    fireEvent.click(await screen.findByTestId('tree-a.md'))
+
+    await waitFor(() => expect(port.readFile).toHaveBeenCalledWith('a.md'))
+    await waitFor(() => expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('a.md'))
+  })
+
+  it('ignores directory tree selections instead of reading them as files', async () => {
+    const readFile = vi.fn(async (path: string): Promise<VaultFile> => ({ path, content: 'folder body' }))
+    const port = fakePort({ readFile })
+    mount({ port })
+
+    fireEvent.click(await screen.findByTestId('tree-folder'))
+
+    await waitFor(() => expect(port.listTree).toHaveBeenCalled())
+    expect(readFile).not.toHaveBeenCalled()
+    expect(screen.getByText('Open a vault document')).toBeTruthy()
+  })
+
+  it('clears a controlled selected path that is not a file', async () => {
+    const onSelectedPathChange = vi.fn()
+    const readFile = vi.fn(async (path: string): Promise<VaultFile> => ({ path, content: 'loose path body' }))
+    const port = fakePort({ readFile })
+    render(
+      createElement(VaultPane, {
+        port,
+        renderTree,
+        renderArtifact,
+        codec: fmCodec,
+        selectedPath: 'folder',
+        onSelectedPathChange,
+      }),
+    )
+
+    await waitFor(() => expect(onSelectedPathChange).toHaveBeenCalledWith(null))
+    expect(readFile).not.toHaveBeenCalled()
+    expect(screen.getByTestId('tree-folder').getAttribute('data-selected')).toBe('false')
+  })
+
+  it('surfaces read failures instead of falling back to the empty state', async () => {
+    const readFile = vi.fn()
+      .mockRejectedValueOnce(new Error('read exploded'))
+      .mockResolvedValueOnce({ path: 'a.md', content: 'recovered A' })
+    const port = fakePort({ readFile })
+    mount({ port })
+
+    fireEvent.click(await screen.findByTestId('tree-a.md'))
+    await waitFor(() => expect(screen.getByText("Couldn't open this file")).toBeTruthy())
+    expect(screen.getByText('read exploded')).toBeTruthy()
+    expect(screen.queryByText('Open a vault document')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    await waitFor(() => expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('a.md'))
+    expect(screen.getByTestId('artifact').textContent).toContain('recovered A')
+  })
+
   it('renders the empty state with no selection', async () => {
     mount()
     await waitFor(() => expect(screen.getByText('Open a vault document')).toBeTruthy())
