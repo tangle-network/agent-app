@@ -20,6 +20,7 @@ import {
   useRef,
   useState,
   type ErrorInfo,
+  type MouseEvent,
   type ReactNode,
 } from 'react'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -45,6 +46,23 @@ function collectFilePaths(nodes: VaultTreeNode[], into: Set<string>): Set<string
     if (node.children) collectFilePaths(node.children, into)
   }
   return into
+}
+
+function treeClickPath(event: MouseEvent<HTMLElement>): string | null {
+  const path = event.nativeEvent.composedPath?.() ?? []
+  for (const item of path) {
+    if (!(item instanceof HTMLElement)) continue
+    if (item.dataset.type !== 'item') continue
+    if (item.dataset.itemType !== 'file') return null
+    return item.dataset.itemPath ?? null
+  }
+
+  const target = event.target instanceof HTMLElement
+    ? event.target.closest('[data-type="item"]')
+    : null
+  if (!(target instanceof HTMLElement)) return null
+  if (target.dataset.itemType !== 'file') return null
+  return target.dataset.itemPath ?? null
 }
 
 // Case-insensitive name filter over the tree: files survive when their name
@@ -130,6 +148,24 @@ function EmptyState() {
   )
 }
 
+function ReadErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+      <div>
+        <h3 className="text-sm font-medium text-foreground">Couldn't open this file</h3>
+        <p className="mt-1 max-w-md text-xs text-muted-foreground">{message}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60"
+      >
+        Retry
+      </button>
+    </div>
+  )
+}
+
 export function VaultPane(props: VaultPaneProps) {
   const {
     port,
@@ -160,6 +196,8 @@ export function VaultPane(props: VaultPaneProps) {
 
   const [selectedFile, setSelectedFile] = useState<VaultFile | null>(null)
   const [fileLoading, setFileLoading] = useState(false)
+  const [readError, setReadError] = useState<string | null>(null)
+  const [reloadNonce, setReloadNonce] = useState(0)
   const [saving, setSaving] = useState(false)
 
   const [editorMode, setEditorMode] = useState<VaultEditorMode>('rich')
@@ -215,18 +253,25 @@ export function VaultPane(props: VaultPaneProps) {
     if (!selectedPath) {
       setSelectedFile(null)
       setFileLoading(false)
+      setReadError(null)
       loadedPathRef.current = null
       return
     }
     let cancelled = false
     const path = selectedPath
     setFileLoading(true)
+    setReadError(null)
     void (async () => {
       try {
         const file = await port.readFile(path)
         if (!cancelled) setSelectedFile(file)
-      } catch {
-        if (!cancelled) setSelectedFile(null)
+      } catch (err) {
+        // Surface read failures instead of making them indistinguishable from
+        // the intentionally empty "no file selected" state.
+        if (!cancelled) {
+          setSelectedFile(null)
+          setReadError(err instanceof Error ? err.message : 'Failed to read file')
+        }
       } finally {
         if (!cancelled) setFileLoading(false)
       }
@@ -234,7 +279,7 @@ export function VaultPane(props: VaultPaneProps) {
     return () => {
       cancelled = true
     }
-  }, [port, selectedPath, refreshKey])
+  }, [port, selectedPath, refreshKey, reloadNonce])
 
   useEffect(() => {
     if (!selectedFile) {
@@ -267,6 +312,29 @@ export function VaultPane(props: VaultPaneProps) {
     },
     [isDirty, selectedPath, commitPath],
   )
+
+  // Some tree models keep their original selection callback while resetting
+  // paths internally. Keep the callable stable, but have it execute the latest
+  // file-path validation and dirty-guard logic.
+  const selectFileRef = useRef<(path: string) => void>(() => {})
+  selectFileRef.current = (rawPath: string) => {
+    if (filePaths.has(rawPath)) {
+      guardedOpen(rawPath)
+      return
+    }
+    const path = rawPath.replace(/^\/+|\/+$/g, '')
+    if (filePaths.has(path)) {
+      guardedOpen(path)
+      return
+    }
+    if (path) {
+      console.warn(`VaultPane: opening tree selection that is not in the current file tree: ${JSON.stringify(rawPath)}`)
+      guardedOpen(path)
+      return
+    }
+    console.warn(`VaultPane: tree selection is not a known file path: ${JSON.stringify(rawPath)}`)
+  }
+  const handleTreeSelect = useCallback((path: string) => selectFileRef.current(path), [])
 
   const guardedClose = useCallback(() => {
     if (isDirty) {
@@ -402,14 +470,20 @@ export function VaultPane(props: VaultPaneProps) {
               )}
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto">
+          <div
+            className="flex-1 overflow-y-auto"
+            onClickCapture={(event) => {
+              const path = treeClickPath(event)
+              if (path) handleTreeSelect(path)
+            }}
+          >
             {treeLoading ? (
               <TreeSkeleton />
             ) : (
               renderTree({
                 root: visibleRoot,
                 selectedPath: selectedPath ?? undefined,
-                onSelect: (path) => { if (filePaths.has(path)) guardedOpen(path) },
+                onSelect: handleTreeSelect,
               })
             )}
           </div>
@@ -484,6 +558,8 @@ export function VaultPane(props: VaultPaneProps) {
           <div className="flex-1 overflow-hidden">
             {fileLoading ? (
               <EditorSkeleton />
+            ) : readError ? (
+              <ReadErrorState message={readError} onRetry={() => setReloadNonce((n) => n + 1)} />
             ) : selectedFile && canWrite && isMarkdownCapable && editorMode === 'source' ? (
               <SourceEditor
                 path={selectedFile.path}
