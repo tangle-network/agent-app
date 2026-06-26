@@ -363,9 +363,24 @@ function blockKindOf(call: ChatToolCallInfo): BlockKind {
   return 'generic'
 }
 
+/** Humanize an otherwise-unmapped tool name for display: `get_credit_balance`
+ *  → "Get credit balance". Splits on separators and camelCase, then sentence-
+ *  cases — domain-agnostic, so a host's tool reads as a label without this
+ *  shared renderer knowing that host's tool taxonomy. Falls back to the raw name
+ *  when there's nothing to humanize. */
+function humanizeToolName(name: string): string {
+  const words = name
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+  if (!words) return name
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
 /** Human title for a call, derived from its real arguments. Proposals lead with
  *  the decision verb (docs/product-surfaces.md) rather than the internal tool
- *  taxonomy, so the user reads "Approve: publish …?" not "submit_proposal". */
+ *  taxonomy, so the user reads "Approve: publish …?" not "submit_proposal". An
+ *  unmapped tool falls back to its humanized name rather than the raw slug. */
 function friendlyToolTitle(call: ChatToolCallInfo): string {
   const a = call.args ?? {}
   switch (call.name) {
@@ -384,7 +399,7 @@ function friendlyToolTitle(call: ChatToolCallInfo): string {
     case 'add_citation':
       return `Cited ${String(a.path ?? '')}`
     default:
-      return call.name
+      return humanizeToolName(call.name)
   }
 }
 
@@ -878,6 +893,11 @@ function AssistantMessageImpl({
     const el = reasoningScrollRef.current
     if (el && streaming && !hasAnswerText) el.scrollTop = el.scrollHeight
   }, [reasoning, streaming, hasAnswerText])
+  // Live seconds while the model is reasoning before its answer starts, so a
+  // long thinking gap shows progress rather than a static "Thinking…".
+  const thinkingSeconds = useThinkingSeconds(
+    streaming && !!reasoning && !hasAnswerText,
+  )
 
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-3">
@@ -891,7 +911,9 @@ function AssistantMessageImpl({
         <details className="mb-2 rounded-lg border-l-2 border-border/70 bg-muted/20 px-3 py-2" open={!hasAnswerText}>
           <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
             {!hasAnswerText ? (
-              <span className="animate-pulse">Thinking…</span>
+              <span className="animate-pulse">
+                Thinking{thinkingSeconds >= 3 ? ` · ${thinkingSeconds}s` : '…'}
+              </span>
             ) : thinkMsRef.current != null ? (
               `Thought for ${Math.max(1, Math.round(thinkMsRef.current / 1000))}s`
             ) : (
@@ -949,12 +971,22 @@ function AssistantMessageImpl({
  */
 const AssistantMessage = memo(AssistantMessageImpl)
 
-function ThinkingRow({ agentLabel }: { agentLabel: string }) {
+/** Whole seconds elapsed while `active`, ticking once a second. Powers the live
+ *  "thinking" timers (the pre-first-token row and the reasoning box) so a long
+ *  thinking gap shows progress instead of a frozen label. Counts from when
+ *  `active` first turns true; freezes when it clears. */
+function useThinkingSeconds(active: boolean): number {
   const [seconds, setSeconds] = useState(0)
   useEffect(() => {
+    if (!active) return
     const id = setInterval(() => setSeconds((s) => s + 1), 1000)
     return () => clearInterval(id)
-  }, [])
+  }, [active])
+  return seconds
+}
+
+function ThinkingRow({ agentLabel }: { agentLabel: string }) {
+  const seconds = useThinkingSeconds(true)
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-3">
       <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{agentLabel}</p>
