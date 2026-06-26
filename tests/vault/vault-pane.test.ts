@@ -246,28 +246,36 @@ describe('VaultPane — load + selection', () => {
     await waitFor(() => expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('a.md'))
   })
 
-  it('opens a non-empty tree-emitted path even when local tree validation misses it', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  it('ignores directory tree selections instead of reading them as files', async () => {
+    const readFile = vi.fn(async (path: string): Promise<VaultFile> => ({ path, content: 'folder body' }))
+    const port = fakePort({ readFile })
+    mount({ port })
+
+    fireEvent.click(await screen.findByTestId('tree-folder'))
+
+    await waitFor(() => expect(port.listTree).toHaveBeenCalled())
+    expect(readFile).not.toHaveBeenCalled()
+    expect(screen.getByText('Open a vault document')).toBeTruthy()
+  })
+
+  it('clears a controlled selected path that is not a file', async () => {
+    const onSelectedPathChange = vi.fn()
     const readFile = vi.fn(async (path: string): Promise<VaultFile> => ({ path, content: 'loose path body' }))
     const port = fakePort({ readFile })
-    const loosePathTree = (props: VaultTreeRenderProps) =>
-      createElement(
-        'button',
-        {
-          type: 'button',
-          'data-testid': 'tree-loose',
-          onClick: () => props.onSelect('/loose/path.md'),
-        },
-        'loose',
-      )
+    render(
+      createElement(VaultPane, {
+        port,
+        renderTree,
+        renderArtifact,
+        codec: fmCodec,
+        selectedPath: 'folder',
+        onSelectedPathChange,
+      }),
+    )
 
-    mount({ port, renderTree: loosePathTree })
-    fireEvent.click(await screen.findByTestId('tree-loose'))
-
-    await waitFor(() => expect(readFile).toHaveBeenCalledWith('loose/path.md'))
-    await waitFor(() => expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('loose/path.md'))
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('opening tree selection'))
-    warn.mockRestore()
+    await waitFor(() => expect(onSelectedPathChange).toHaveBeenCalledWith(null))
+    expect(readFile).not.toHaveBeenCalled()
+    expect(screen.getByTestId('tree-folder').getAttribute('data-selected')).toBe('false')
   })
 
   it('surfaces read failures instead of falling back to the empty state', async () => {

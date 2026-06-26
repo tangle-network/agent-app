@@ -48,6 +48,12 @@ function collectFilePaths(nodes: VaultTreeNode[], into: Set<string>): Set<string
   return into
 }
 
+function resolveFilePath(rawPath: string, filePaths: Set<string>): string | null {
+  if (filePaths.has(rawPath)) return rawPath
+  const path = rawPath.replace(/^\/+|\/+$/g, '')
+  return filePaths.has(path) ? path : null
+}
+
 function treeClickPath(event: MouseEvent<HTMLElement>): string | null {
   const path = event.nativeEvent.composedPath?.() ?? []
   for (const item of path) {
@@ -218,6 +224,10 @@ export function VaultPane(props: VaultPaneProps) {
   const loadedPathRef = useRef<string | null>(null)
 
   const filePaths = useMemo(() => collectFilePaths(tree, new Set<string>()), [tree])
+  const resolvedSelectedPath = useMemo(
+    () => selectedPath ? resolveFilePath(selectedPath, filePaths) : null,
+    [selectedPath, filePaths],
+  )
   const treeRoot = useMemo<VaultTreeNode>(
     () => ({ name: 'Vault', path: '', type: 'directory', children: tree }),
     [tree],
@@ -257,8 +267,18 @@ export function VaultPane(props: VaultPaneProps) {
       loadedPathRef.current = null
       return
     }
+    if (treeLoading) return
+    if (!resolvedSelectedPath) {
+      commitPath(null)
+      setSelectedFile(null)
+      setFileLoading(false)
+      setReadError(null)
+      loadedPathRef.current = null
+      return
+    }
     let cancelled = false
-    const path = selectedPath
+    const path = resolvedSelectedPath
+    if (path !== selectedPath) commitPath(path)
     setFileLoading(true)
     setReadError(null)
     void (async () => {
@@ -279,7 +299,7 @@ export function VaultPane(props: VaultPaneProps) {
     return () => {
       cancelled = true
     }
-  }, [port, selectedPath, refreshKey, reloadNonce])
+  }, [port, selectedPath, resolvedSelectedPath, treeLoading, refreshKey, reloadNonce, commitPath])
 
   useEffect(() => {
     if (!selectedFile) {
@@ -318,21 +338,11 @@ export function VaultPane(props: VaultPaneProps) {
   // file-path validation and dirty-guard logic.
   const selectFileRef = useRef<(path: string) => void>(() => {})
   selectFileRef.current = (rawPath: string) => {
-    if (filePaths.has(rawPath)) {
-      guardedOpen(rawPath)
-      return
-    }
-    const path = rawPath.replace(/^\/+|\/+$/g, '')
-    if (filePaths.has(path)) {
-      guardedOpen(path)
-      return
-    }
+    const path = resolveFilePath(rawPath, filePaths)
     if (path) {
-      console.warn(`VaultPane: opening tree selection that is not in the current file tree: ${JSON.stringify(rawPath)}`)
       guardedOpen(path)
       return
     }
-    console.warn(`VaultPane: tree selection is not a known file path: ${JSON.stringify(rawPath)}`)
   }
   const handleTreeSelect = useCallback((path: string) => selectFileRef.current(path), [])
 
@@ -482,7 +492,7 @@ export function VaultPane(props: VaultPaneProps) {
             ) : (
               renderTree({
                 root: visibleRoot,
-                selectedPath: selectedPath ?? undefined,
+                selectedPath: resolvedSelectedPath ?? undefined,
                 onSelect: handleTreeSelect,
               })
             )}
