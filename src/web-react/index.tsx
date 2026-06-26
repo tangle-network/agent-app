@@ -975,10 +975,13 @@ const AssistantMessage = memo(AssistantMessageImpl)
  *  "thinking" timers (the pre-first-token row and the reasoning box) so a long
  *  thinking gap shows progress instead of a frozen label. Counts from when
  *  `active` first turns true; freezes when it clears. */
-function useThinkingSeconds(active: boolean): number {
+export function useThinkingSeconds(active: boolean): number {
   const [seconds, setSeconds] = useState(0)
   useEffect(() => {
     if (!active) return
+    // Reset on each (re)activation so a reused component resuming "thinking"
+    // counts from 0 rather than showing the prior phase's stale elapsed time.
+    setSeconds(0)
     const id = setInterval(() => setSeconds((s) => s + 1), 1000)
     return () => clearInterval(id)
   }, [active])
