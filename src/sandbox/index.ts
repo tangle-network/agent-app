@@ -732,17 +732,16 @@ export interface WriteProfileFilesOptions {
 }
 
 // The workspace-relative target for a deferred inline mount when it can be
-// materialized through the sidecar file API (`box.fs.write` — FILES rate group,
-// 300/min, whole-file, auto-mkdir) instead of the chunked terminal-exec path
-// (50/min); null when it must stay on exec. The file API resolves relative
-// paths from the workspace root and cannot set the executable bit, so
-// eligibility is: inline, non-executable, and a path that resolves under the
-// workspace root with no `..`/`.sidecar` segment. `~/…` is home-relative; agent
-// sandboxes set $HOME to the workspace root, so it maps to the same relative
-// target. Absolute (`/…`), bare `~`/`~user`, and executable mounts stay on exec.
+// materialized through the sidecar file API (`box.fs.writeMany` — FILES rate
+// group, 300/min, whole-file, auto-mkdir, mode-aware) instead of the chunked
+// terminal-exec path (50/min); null when it must stay on exec. The file API
+// resolves relative paths from the workspace root, so eligibility is: inline
+// and a path that resolves under the workspace root with no `..`/`.sidecar`
+// segment. `~/…` is home-relative; agent sandboxes set $HOME to the workspace
+// root, so it maps to the same relative target. Absolute (`/…`) and bare
+// `~`/`~user` mounts stay on exec.
 function fileApiTarget(mount: AgentProfileFileMount): string | null {
   if (mount.resource.kind !== 'inline') return null
-  if (mount.executable ?? PROFILE_BIN_DIR_RE.test(mount.path)) return null
   let rel: string
   if (mount.path.startsWith('~/')) rel = mount.path.slice(2)
   else if (mount.path.startsWith('/') || mount.path.startsWith('~')) return null
@@ -751,6 +750,10 @@ function fileApiTarget(mount: AgentProfileFileMount): string | null {
     return null
   }
   return rel
+}
+
+function profileFileMode(mount: AgentProfileFileMount): number | undefined {
+  return mount.executable ?? PROFILE_BIN_DIR_RE.test(mount.path) ? 0o755 : undefined
 }
 
 export async function writeProfileFilesToBox(
@@ -762,20 +765,27 @@ export async function writeProfileFilesToBox(
   const paceMs = options.paceMs ?? PROFILE_WRITE_PACE_MS
   const maxRetries = options.maxRetries ?? PROFILE_WRITE_MAX_RETRIES
   // The bulk of a profile corpus (skills, `~/.claude/skills/…`, config) is
-  // inline, non-executable, and workspace-relative — write it in ONE paced,
+  // inline and workspace-relative — write it in ONE paced,
   // retry-aware batch via the SDK's file API (`box.fs.writeMany`, FILES rate
   // group 300/min). The SDK owns the pacing + transient-retry this module used
-  // to hand-roll. Executables / absolute / bare-`~` paths can't use the file
-  // API (no +x, prefix-restricted), so they stay on the chunked exec path.
+  // to hand-roll. Absolute / bare-`~` paths can't use the file API
+  // (prefix-restricted), so they stay on the chunked exec path.
   // Capability-guarded: an SDK without `writeMany` (<0.9.0) routes everything
   // through exec, unchanged.
   const fileApiAvailable = typeof box.fs?.writeMany === 'function'
-  const viaFileApi: { path: string; content: string }[] = []
+  const viaFileApi: { path: string; content: string; mode?: number }[] = []
   const viaExec: AgentProfileFileMount[] = []
   for (const mount of files) {
     if (mount.resource.kind !== 'inline') continue
     const fileApiPath = fileApiAvailable ? fileApiTarget(mount) : null
-    if (fileApiPath !== null) viaFileApi.push({ path: fileApiPath, content: mount.resource.content ?? '' })
+    if (fileApiPath !== null) {
+      const mode = profileFileMode(mount)
+      viaFileApi.push({
+        path: fileApiPath,
+        content: mount.resource.content ?? '',
+        ...(mode !== undefined ? { mode } : {}),
+      })
+    }
     else viaExec.push(mount)
   }
   if (viaFileApi.length > 0) {
