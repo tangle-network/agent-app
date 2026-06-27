@@ -1804,17 +1804,16 @@ describe('writeProfileFilesToBox — file API transport', () => {
     ...(executable !== undefined ? { executable } : {}),
   })
 
-  // A box exposing BOTH box.fs.writeMany (file API batch) and box.exec, so the
-  // transport choice is asserted by which mock received the mounts. Pacing +
-  // transient-retry now live INSIDE the SDK's writeMany, so these tests assert
-  // the batch hand-off, not per-file retry (that is covered in the SDK's own
-  // sandbox-instance-filesystem suite).
+  // A box exposing BOTH mode-aware box.fs.writeMany (file API batch) and
+  // box.exec, so the transport choice is asserted by which mock received the
+  // mounts. Pacing + transient-retry live INSIDE the SDK's writeMany, so these
+  // tests assert the batch hand-off, not per-file retry.
   const dualBox = (
     over: { writeMany?: ReturnType<typeof vi.fn>; exec?: ReturnType<typeof vi.fn> } = {},
   ) => {
     const writeMany = over.writeMany ?? vi.fn().mockResolvedValue(undefined)
     const exec = over.exec ?? vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
-    const box = fakeBox({ exec, fs: { writeMany } } as unknown as Partial<SandboxInstance>)
+    const box = fakeBox({ exec, fs: { supportsWriteMode: true, writeMany } } as unknown as Partial<SandboxInstance>)
     return { box, writeMany, exec }
   }
 
@@ -1840,13 +1839,44 @@ describe('writeProfileFilesToBox — file API transport', () => {
     expect(exec).not.toHaveBeenCalled()
   })
 
-  it('keeps executable, bin-dir, absolute, and unsafe paths on the exec path', async () => {
+  it('batches executable and bin-dir files with executable mode, no exec', async () => {
     const { box, writeMany, exec } = dualBox()
     const res = await writeProfileFilesToBox(
       box,
       [
-        inlineMount('skills/run.sh', '#!/bin/sh\n', true), // explicit executable
-        inlineMount('bin/tool', 'x'), // bin dir → implicit executable
+        inlineMount('skills/run.sh', '#!/bin/sh\n', true),
+        inlineMount('bin/tool', 'x'),
+      ],
+      { paceMs: 0 },
+    )
+    expect(res.succeeded).toBe(true)
+    expect(writeMany).toHaveBeenCalledTimes(1)
+    expect(writeMany.mock.calls[0]![0]).toEqual([
+      { path: 'skills/run.sh', content: '#!/bin/sh\n', mode: 0o755 },
+      { path: 'bin/tool', content: 'x', mode: 0o755 },
+    ])
+    expect(exec).not.toHaveBeenCalled()
+  })
+
+  it('keeps executable files on exec when writeMany is not mode-aware', async () => {
+    const writeMany = vi.fn().mockResolvedValue(undefined)
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    const box = fakeBox({ exec, fs: { writeMany } } as unknown as Partial<SandboxInstance>)
+    const res = await writeProfileFilesToBox(
+      box,
+      [inlineMount('skills/run.sh', '#!/bin/sh\n', true)],
+      { paceMs: 0 },
+    )
+    expect(res.succeeded).toBe(true)
+    expect(writeMany).not.toHaveBeenCalled()
+    expect(exec).toHaveBeenCalled()
+  })
+
+  it('keeps absolute and unsafe paths on the exec path', async () => {
+    const { box, writeMany, exec } = dualBox()
+    const res = await writeProfileFilesToBox(
+      box,
+      [
         inlineMount('/usr/local/bin/gtm', 'x'), // absolute
         inlineMount('~weird', 'x'), // bare ~ / ~user form
         inlineMount('skills/../escape.md', 'x'), // .. segment
@@ -1877,20 +1907,36 @@ describe('writeProfileFilesToBox — file API transport', () => {
     expect(exec).not.toHaveBeenCalled()
   })
 
-  it('partitions a mixed corpus: eligible files batch via writeMany, executables via exec', async () => {
+  it('partitions a mixed corpus: workspace files batch via writeMany, unsupported paths via exec', async () => {
     const { box, writeMany, exec } = dualBox()
     const res = await writeProfileFilesToBox(
       box,
-      [inlineMount('skills/a.md', 'A'), inlineMount('skills/b.md', 'B'), inlineMount('bin/tool', 'x')],
+      [inlineMount('skills/a.md', 'A'), inlineMount('bin/tool', 'x'), inlineMount('/usr/local/bin/gtm', 'G')],
       { paceMs: 0 },
     )
     expect(res.succeeded).toBe(true)
     expect(writeMany).toHaveBeenCalledTimes(1)
     expect(writeMany.mock.calls[0]![0]).toEqual([
       { path: 'skills/a.md', content: 'A' },
-      { path: 'skills/b.md', content: 'B' },
+      { path: 'bin/tool', content: 'x', mode: 0o755 },
     ])
-    expect(exec).toHaveBeenCalled() // bin/tool (executable) went via exec
+    expect(exec).toHaveBeenCalled() // /usr/local/bin/gtm cannot use workspace file API
+  })
+
+  it('rewrites reused executable profile files via writeMany without bash/base64 exec', async () => {
+    const { box, writeMany, exec } = dualBox()
+    const res = await writeProfileFilesToBox(
+      box,
+      [inlineMount('skills/reused-tool.sh', '#!/bin/sh\necho reused\n', true)],
+      { paceMs: 0 },
+    )
+
+    expect(res.succeeded).toBe(true)
+    expect(writeMany).toHaveBeenCalledWith(
+      [{ path: 'skills/reused-tool.sh', content: '#!/bin/sh\necho reused\n', mode: 0o755 }],
+      expect.objectContaining({ paceMs: 0 }),
+    )
+    expect(exec).not.toHaveBeenCalled()
   })
 
   it('fails loud with the cause when writeMany rejects (SDK owns the retry)', async () => {
