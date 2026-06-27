@@ -368,7 +368,7 @@
     "@tangle-network/agent-integrations": ">=0.44.0",
     "@tangle-network/agent-knowledge": ">=1.7.0",
     "@tangle-network/agent-runtime": ">=0.76.0",
-    "@tangle-network/sandbox": ">=0.9.0",
+    "@tangle-network/sandbox": ">=0.9.4",
     "@tangle-network/sandbox-ui": ">=0.44.0",
     "drizzle-orm": ">=0.36",
     "konva": ">=9",

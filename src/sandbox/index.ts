@@ -733,13 +733,13 @@ export interface WriteProfileFilesOptions {
 
 // The workspace-relative target for a deferred inline mount when it can be
 // materialized through the sidecar file API (`box.fs.writeMany` — FILES rate
-// group, 300/min, whole-file, auto-mkdir, mode-aware) instead of the chunked
-// terminal-exec path (50/min); null when it must stay on exec. The file API
-// resolves relative paths from the workspace root, so eligibility is: inline
-// and a path that resolves under the workspace root with no `..`/`.sidecar`
-// segment. `~/…` is home-relative; agent sandboxes set $HOME to the workspace
-// root, so it maps to the same relative target. Absolute (`/…`) and bare
-// `~`/`~user` mounts stay on exec.
+// group, 300/min, whole-file, auto-mkdir) instead of the chunked terminal-exec
+// path (50/min); null when it must stay on exec. The file API resolves relative
+// paths from the workspace root, so eligibility is: inline and a path that
+// resolves under the workspace root with no `..`/`.sidecar` segment. `~/…` is
+// home-relative; agent sandboxes set $HOME to the workspace root, so it maps to
+// the same relative target. Absolute (`/…`) and bare `~`/`~user` mounts stay on
+// exec.
 function fileApiTarget(mount: AgentProfileFileMount): string | null {
   if (mount.resource.kind !== 'inline') return null
   let rel: string
@@ -780,7 +780,8 @@ export async function writeProfileFilesToBox(
   // to hand-roll. Absolute / bare-`~` paths can't use the file API
   // (prefix-restricted), so they stay on the chunked exec path.
   // Capability-guarded: SDKs without `writeMany` route everything through
-  // exec; SDKs without mode support keep executable files on exec.
+  // exec; SDKs before @tangle-network/sandbox 0.9.4 keep executable files on
+  // exec because they do not expose `supportsWriteMode` or forward file modes.
   const fileApiAvailable = typeof box.fs?.writeMany === 'function'
   const modeAwareFileApi = fileApiSupportsMode(box)
   const viaFileApi: { path: string; content: string; mode?: number }[] = []

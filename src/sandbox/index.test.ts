@@ -1804,11 +1804,10 @@ describe('writeProfileFilesToBox — file API transport', () => {
     ...(executable !== undefined ? { executable } : {}),
   })
 
-  // A box exposing BOTH box.fs.writeMany (file API batch) and box.exec, so the
-  // transport choice is asserted by which mock received the mounts. Pacing +
-  // transient-retry now live INSIDE the SDK's writeMany, so these tests assert
-  // the batch hand-off, not per-file retry (that is covered in the SDK's own
-  // sandbox-instance-filesystem suite).
+  // A box exposing BOTH mode-aware box.fs.writeMany (file API batch) and
+  // box.exec, so the transport choice is asserted by which mock received the
+  // mounts. Pacing + transient-retry live INSIDE the SDK's writeMany, so these
+  // tests assert the batch hand-off, not per-file retry.
   const dualBox = (
     over: { writeMany?: ReturnType<typeof vi.fn>; exec?: ReturnType<typeof vi.fn> } = {},
   ) => {
