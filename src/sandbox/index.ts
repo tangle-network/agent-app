@@ -752,8 +752,17 @@ function fileApiTarget(mount: AgentProfileFileMount): string | null {
   return rel
 }
 
+function isExecutableProfileFile(mount: AgentProfileFileMount): boolean {
+  return mount.executable ?? PROFILE_BIN_DIR_RE.test(mount.path)
+}
+
 function profileFileMode(mount: AgentProfileFileMount): number | undefined {
-  return mount.executable ?? PROFILE_BIN_DIR_RE.test(mount.path) ? 0o755 : undefined
+  return isExecutableProfileFile(mount) ? 0o755 : undefined
+}
+
+function fileApiSupportsMode(box: SandboxInstance): boolean {
+  const fs = box.fs as (SandboxInstance['fs'] & { supportsWriteMode?: boolean }) | undefined
+  return fs?.supportsWriteMode === true
 }
 
 export async function writeProfileFilesToBox(
@@ -770,15 +779,17 @@ export async function writeProfileFilesToBox(
   // group 300/min). The SDK owns the pacing + transient-retry this module used
   // to hand-roll. Absolute / bare-`~` paths can't use the file API
   // (prefix-restricted), so they stay on the chunked exec path.
-  // Capability-guarded: an SDK without `writeMany` (<0.9.0) routes everything
-  // through exec, unchanged.
+  // Capability-guarded: SDKs without `writeMany` route everything through
+  // exec; SDKs without mode support keep executable files on exec.
   const fileApiAvailable = typeof box.fs?.writeMany === 'function'
+  const modeAwareFileApi = fileApiSupportsMode(box)
   const viaFileApi: { path: string; content: string; mode?: number }[] = []
   const viaExec: AgentProfileFileMount[] = []
   for (const mount of files) {
     if (mount.resource.kind !== 'inline') continue
     const fileApiPath = fileApiAvailable ? fileApiTarget(mount) : null
-    if (fileApiPath !== null) {
+    const executable = isExecutableProfileFile(mount)
+    if (fileApiPath !== null && (!executable || modeAwareFileApi)) {
       const mode = profileFileMode(mount)
       viaFileApi.push({
         path: fileApiPath,
@@ -838,8 +849,7 @@ export async function writeProfileFilesToBox(
     }
     const expectedSha256 = createHash('sha256').update(content, 'utf8').digest('hex')
     const dir = path.replace(/\/[^/]*$/, '')
-    const isBin = PROFILE_BIN_DIR_RE.test(path)
-    const executable = mount.executable ?? isBin
+    const executable = isExecutableProfileFile(mount)
     const q = shellPath(path)
     const qb64 = shellPath(`${path}.b64`)
     const qtmp = shellPath(`${path}.tmp`)

@@ -1814,7 +1814,7 @@ describe('writeProfileFilesToBox — file API transport', () => {
   ) => {
     const writeMany = over.writeMany ?? vi.fn().mockResolvedValue(undefined)
     const exec = over.exec ?? vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
-    const box = fakeBox({ exec, fs: { writeMany } } as unknown as Partial<SandboxInstance>)
+    const box = fakeBox({ exec, fs: { supportsWriteMode: true, writeMany } } as unknown as Partial<SandboxInstance>)
     return { box, writeMany, exec }
   }
 
@@ -1857,6 +1857,20 @@ describe('writeProfileFilesToBox — file API transport', () => {
       { path: 'bin/tool', content: 'x', mode: 0o755 },
     ])
     expect(exec).not.toHaveBeenCalled()
+  })
+
+  it('keeps executable files on exec when writeMany is not mode-aware', async () => {
+    const writeMany = vi.fn().mockResolvedValue(undefined)
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    const box = fakeBox({ exec, fs: { writeMany } } as unknown as Partial<SandboxInstance>)
+    const res = await writeProfileFilesToBox(
+      box,
+      [inlineMount('skills/run.sh', '#!/bin/sh\n', true)],
+      { paceMs: 0 },
+    )
+    expect(res.succeeded).toBe(true)
+    expect(writeMany).not.toHaveBeenCalled()
+    expect(exec).toHaveBeenCalled()
   })
 
   it('keeps absolute and unsafe paths on the exec path', async () => {
