@@ -1879,8 +1879,10 @@ describe('writeProfileFilesToBox — file API transport', () => {
     const res = await writeProfileFilesToBox(
       box,
       [
-        inlineMount('/usr/local/bin/gtm', 'x'), // absolute
+        inlineMount('/usr/local/bin/gtm', 'x'), // absolute outside workspace home
         inlineMount('~weird', 'x'), // bare ~ / ~user form
+        inlineMount('~//escape', 'x'), // malformed home-relative absolute target
+        inlineMount('/home/agent//escape', 'x'), // malformed home absolute target
         inlineMount('skills/../escape.md', 'x'), // .. segment
         inlineMount('skills/.sidecar/x', 'x'), // .sidecar segment
       ],
@@ -1904,6 +1906,22 @@ describe('writeProfileFilesToBox — file API transport', () => {
     expect(writeMany).toHaveBeenCalledTimes(1)
     expect(writeMany).toHaveBeenCalledWith(
       [{ path: '.claude/skills/vault-audit/SKILL.md', content: '# audit' }],
+      expect.objectContaining({ paceMs: 0 }),
+    )
+    expect(exec).not.toHaveBeenCalled()
+  })
+
+  it('batches /home/agent absolute files via writeMany with the home prefix stripped', async () => {
+    const { box, writeMany, exec } = dualBox()
+    const res = await writeProfileFilesToBox(
+      box,
+      [inlineMount('/home/agent/tools/gtm-agent/bin/gtm', '#!/bin/sh\necho gtm\n', true)],
+      { paceMs: 0 },
+    )
+    expect(res.succeeded).toBe(true)
+    expect(writeMany).toHaveBeenCalledTimes(1)
+    expect(writeMany).toHaveBeenCalledWith(
+      [{ path: 'tools/gtm-agent/bin/gtm', content: '#!/bin/sh\necho gtm\n', mode: 0o755 }],
       expect.objectContaining({ paceMs: 0 }),
     )
     expect(exec).not.toHaveBeenCalled()
@@ -1994,6 +2012,25 @@ describe('sandbox tool install helpers', () => {
       },
     ])
     expect(files[0]!.path).not.toContain('/usr/local/bin')
+  })
+
+  it('writes default tool mounts through the file API', async () => {
+    const writeMany = vi.fn().mockResolvedValue(undefined)
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    const box = fakeBox({ exec, fs: { supportsWriteMode: true, writeMany } } as unknown as Partial<SandboxInstance>)
+    const files = buildSandboxToolFileMounts({
+      appName: 'gtm-agent',
+      tools: [{ name: 'gtm', content: '#!/bin/sh\necho hi' }],
+    })
+
+    const res = await writeProfileFilesToBox(box, files, { paceMs: 0 })
+
+    expect(res.succeeded).toBe(true)
+    expect(writeMany).toHaveBeenCalledWith(
+      [{ path: 'tools/gtm-agent/bin/gtm', content: '#!/bin/sh\necho hi', mode: 0o755 }],
+      expect.objectContaining({ paceMs: 0 }),
+    )
+    expect(exec).not.toHaveBeenCalled()
   })
 
   it('rejects unsafe app and tool path segments', () => {

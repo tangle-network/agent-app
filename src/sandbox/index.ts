@@ -736,17 +736,18 @@ export interface WriteProfileFilesOptions {
 // group, 300/min, whole-file, auto-mkdir) instead of the chunked terminal-exec
 // path (50/min); null when it must stay on exec. The file API resolves relative
 // paths from the workspace root, so eligibility is: inline and a path that
-// resolves under the workspace root with no `..`/`.sidecar` segment. `~/…` is
-// home-relative; agent sandboxes set $HOME to the workspace root, so it maps to
-// the same relative target. Absolute (`/…`) and bare `~`/`~user` mounts stay on
-// exec.
+// resolves under the workspace root with no `..`/`.sidecar` segment. `~/…` and
+// `/home/agent/…` are home-relative; agent sandboxes set $HOME to the workspace
+// root, so both map to the same relative target. Other absolute (`/…`) and bare
+// `~`/`~user` mounts stay on exec.
 function fileApiTarget(mount: AgentProfileFileMount): string | null {
   if (mount.resource.kind !== 'inline') return null
   let rel: string
   if (mount.path.startsWith('~/')) rel = mount.path.slice(2)
+  else if (mount.path.startsWith('/home/agent/')) rel = mount.path.slice('/home/agent/'.length)
   else if (mount.path.startsWith('/') || mount.path.startsWith('~')) return null
   else rel = mount.path
-  if (rel.length === 0 || rel.split('/').some((seg) => seg === '..' || seg === '.sidecar')) {
+  if (rel.length === 0 || rel.startsWith('/') || rel.split('/').some((seg) => seg === '..' || seg === '.sidecar')) {
     return null
   }
   return rel
