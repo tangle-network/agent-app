@@ -22,6 +22,7 @@ import { ChevronDown, POPOVER_OPTION_FOCUS, usePending } from './controls'
 import { BrandMark } from './brand-mark'
 
 export * from './chat-stream'
+export * from './chat-composer'
 export * from './provider-logo'
 export * from './smooth-text'
 export * from './mission-activity'
