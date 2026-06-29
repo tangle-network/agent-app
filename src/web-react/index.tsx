@@ -44,6 +44,9 @@ export {
   type AgentSessionControlsProps,
 } from './agent-session-controls'
 import type { CatalogModel } from '../runtime/model-catalog'
+// Re-export the model type the chat components consume, so a web-react consumer
+// imports it from here rather than the package root.
+export type { CatalogModel } from '../runtime/model-catalog'
 
 // ── metrics helpers ───────────────────────────────────────────────────────
 
