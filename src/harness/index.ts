@@ -12,7 +12,21 @@
  * plain string union (no sandbox dependency). The consumer owns storage — which
  * harness a workspace defaults to, which one a session locked — and maps the
  * resolved value onto the SDK's `backend.type`.
+ *
+ * Harness↔model COMPATIBILITY (which models a harness can run, snapping) is NOT defined here — it
+ * comes from `@tangle-network/agent-interface`, the single source of truth shared with the
+ * sandbox-ui pickers and the cli-bridge backends. This module owns the harness TAXONOMY + the
+ * session lock.
  */
+
+import {
+  harnessSupportsModel,
+  modelProvider,
+  preferredHarnessForModel,
+  snapHarnessToModel as aiSnapHarnessToModel,
+  snapModelToHarness as aiSnapModelToHarness,
+  type HarnessType,
+} from '@tangle-network/agent-interface'
 
 /** The known coding-agent backends. Mirrors `@tangle-network/sandbox`'s
  *  `BackendType`; kept structural so this module needs no sandbox dependency. */
@@ -89,80 +103,34 @@ export function resolveSessionHarness(input: ResolveSessionHarnessInput = {}): R
 }
 
 /**
- * Harness ↔ model compatibility policy — the ONE source of truth, server-side.
+ * Harness ↔ model compatibility + snapping — delegated to `@tangle-network/agent-interface`.
  *
- * Native CLI harnesses are vendor-locked: claude-code only drives Anthropic
- * models, codex only OpenAI, kimi-code only Moonshot. Router-backed harnesses
- * (opencode, etc.) accept any catalog model (`providers: null`). The pickers in
- * sandbox-ui keep the pair coherent in the UI; this is the same policy the SHELL
- * enforces so a bypassed/forged request can't pair claude-code with a gpt model
- * and fail at the sidecar. Operates on plain canonical ids ("provider/model") so
- * it stays substrate-free — no model-catalog or UI dependency.
+ * agent-app's `Harness` taxonomy is a superset of agent-interface's `HarnessType` (it carries
+ * `forge`/`cursor`, which agent-interface doesn't list). Those extra runners have no provider lock
+ * there, so they resolve as router-backed (any model) — the correct behavior — which makes the
+ * `as HarnessType` casts safe. The snap helpers only ever return a vendor-locked harness or
+ * `opencode`, all of which are valid `Harness` values.
  */
-export interface HarnessModelPolicy {
-  /** Canonical-id provider prefixes the harness can run; null = any. */
-  providers: readonly string[] | null
-  /** Snap-target patterns, best first; highest version within a pattern wins. */
-  preferred: readonly RegExp[]
-}
 
-export const HARNESS_MODEL_POLICIES: Partial<Record<Harness, HarnessModelPolicy>> = {
-  'claude-code': {
-    providers: ['anthropic'],
-    preferred: [/^anthropic\/claude-opus-[\d.-]+$/, /^anthropic\/claude-sonnet-[\d.-]+$/, /^anthropic\//],
-  },
-  codex: {
-    providers: ['openai'],
-    preferred: [/^openai\/gpt-\d+(\.\d+)?$/, /^openai\/gpt/, /^openai\//],
-  },
-  'kimi-code': { providers: ['moonshot'], preferred: [/^moonshot\//] },
-}
-
-/** Native harness for a model's provider (anthropic → claude-code, …). */
-export const PROVIDER_PREFERRED_HARNESS: Record<string, Harness> = {
-  anthropic: 'claude-code',
-  openai: 'codex',
-  moonshot: 'kimi-code',
-}
-
-/** Provider prefix of a canonical id ("anthropic/claude-…" → "anthropic"). */
-export function modelProvider(modelId: string): string | null {
-  const slash = modelId.indexOf('/')
-  return slash > 0 ? modelId.slice(0, slash) : null
-}
+export { modelProvider }
 
 /** Provider-less ids (sentinels like "default", or a session's own config) are
  *  compatible everywhere — every harness honors its own configuration. */
 export function isModelCompatibleWithHarness(harness: Harness, modelId: string): boolean {
-  const policy = HARNESS_MODEL_POLICIES[harness]
-  if (!policy || policy.providers === null) return true
-  const provider = modelProvider(modelId)
-  if (!provider) return true
-  return policy.providers.includes(provider)
+  return harnessSupportsModel(harness as HarnessType, modelId)
 }
-
-const numericDesc = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
 
 /** Keep `modelId` when the harness can run it; else the harness's best compatible
  *  catalog id (preferred patterns in order, highest version). When nothing in the
  *  catalog fits, return the original so the caller sees the incompatibility. */
 export function snapModelToHarness(harness: Harness, modelId: string, canonicalIds: readonly string[]): string {
-  if (isModelCompatibleWithHarness(harness, modelId)) return modelId
-  const policy = HARNESS_MODEL_POLICIES[harness]
-  if (!policy) return modelId
-  for (const pattern of policy.preferred) {
-    const matches = canonicalIds.filter((id) => pattern.test(id)).sort((a, b) => numericDesc.compare(b, a))
-    if (matches.length > 0) return matches[0]!
-  }
-  return canonicalIds.find((id) => isModelCompatibleWithHarness(harness, id)) ?? modelId
+  return aiSnapModelToHarness(harness as HarnessType, modelId, canonicalIds)
 }
 
 /** Keep the harness when it can run `modelId`; else the model's native harness
- *  (anthropic → claude-code, openai → codex), falling back to opencode. */
+ *  (anthropic → claude-code, openai → codex, moonshot → kimi-code), falling back to opencode. */
 export function snapHarnessToModel(harness: Harness, modelId: string): Harness {
-  if (isModelCompatibleWithHarness(harness, modelId)) return harness
-  const provider = modelProvider(modelId)
-  return (provider && PROVIDER_PREFERRED_HARNESS[provider]) || 'opencode'
+  return aiSnapHarnessToModel(harness as HarnessType, modelId) as Harness
 }
 
 /** Fail-loud server guard: throw when a harness is asked to run a model it can't.
@@ -171,9 +139,10 @@ export function snapHarnessToModel(harness: Harness, modelId: string): Harness {
 export function assertHarnessModelCompatible(harness: Harness, modelId: string): void {
   if (!isModelCompatibleWithHarness(harness, modelId)) {
     const provider = modelProvider(modelId)
+    const native = preferredHarnessForModel(modelId)
     throw new Error(
       `Harness "${harness}" cannot run model "${modelId}" (provider "${provider}"). ` +
-        `Use ${PROVIDER_PREFERRED_HARNESS[provider ?? ''] ?? 'a router-backed harness (opencode)'} or an allowed model.`,
+        `Use ${native ?? 'a router-backed harness (opencode)'} or an allowed model.`,
     )
   }
 }
