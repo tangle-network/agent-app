@@ -158,6 +158,11 @@
       "import": "./dist/web-react/index.js",
       "default": "./dist/web-react/index.js"
     },
+    "./assistant": {
+      "types": "./dist/assistant/index.d.ts",
+      "import": "./dist/assistant/index.js",
+      "default": "./dist/assistant/index.js"
+    },
     "./redact": {
       "types": "./dist/redact/index.d.ts",
       "import": "./dist/redact/index.js",
