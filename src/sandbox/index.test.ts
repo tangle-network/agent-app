@@ -445,6 +445,7 @@ describe('streamSandboxPrompt seam', () => {
       harness: 'opencode',
       effort: 'high',
       history: [{ role: 'assistant', content: 'prior' }],
+      requireVisibleAssistantOutput: true,
     })) {
       out.push(e)
     }
@@ -460,6 +461,7 @@ describe('streamSandboxPrompt seam', () => {
       baseUrl: 'https://router',
     })
     expect(opts.backend.profile.extensions.opencode.reasoningEffort).toBe('high')
+    expect(opts.requireVisibleAssistantOutput).toBe(true)
   })
 
   it('omits the model when provider resolution yields nothing', async () => {

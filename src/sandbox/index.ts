@@ -1504,6 +1504,7 @@ export interface StreamSandboxPromptOptions {
   extraMcp?: Record<string, AgentProfileMcpServer>
   signal?: AbortSignal
   timeoutMs?: number
+  requireVisibleAssistantOutput?: boolean
   // When true, an interactive question event throws instead of yielding —
   // detached (cron/mission-step) runs have no consumer to answer it.
   disallowQuestions?: boolean
@@ -1542,6 +1543,9 @@ export async function* streamSandboxPrompt(
     lastEventId: options?.lastEventId,
     ...(options?.signal ? { signal: options.signal } : {}),
     ...(options?.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+    ...(options?.requireVisibleAssistantOutput !== undefined
+      ? { requireVisibleAssistantOutput: options.requireVisibleAssistantOutput }
+      : {}),
     backend: {
       type: harness,
       profile: profileWithEffort,
