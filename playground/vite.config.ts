@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { createRequire } from 'node:module'
-import { dirname } from 'node:path'
+import { dirname, resolve } from 'node:path'
 
 const require = createRequire(import.meta.url)
 // Resolve each peer to the PLAYGROUND's own copy. agent-app is linked via
@@ -20,9 +20,17 @@ export default defineConfig({
   plugins: [react()],
   server: { port: 4321 },
   preview: { port: 4321 },
+  // The terminal panel (a lazy, never-rendered import here) drags in @xterm,
+  // which the playground doesn't install. Exclude agent-app from pre-bundling
+  // and alias the terminal subpath to a stub so the optimizer doesn't choke.
+  optimizeDeps: { exclude: ['@tangle-network/agent-app'] },
   resolve: {
     dedupe: ['react', 'react-dom', 'react-konva', 'konva'],
     alias: {
+      '@tangle-network/sandbox-ui/terminal': resolve(__dirname, 'terminal-stub.js'),
+      '@xterm/xterm': resolve(__dirname, 'terminal-stub.js'),
+      '@xterm/addon-fit': resolve(__dirname, 'terminal-stub.js'),
+      '@xterm/addon-web-links': resolve(__dirname, 'terminal-stub.js'),
       react: pkgDir('react'),
       'react-dom': pkgDir('react-dom'),
       'react-konva': pkgDir('react-konva'),
