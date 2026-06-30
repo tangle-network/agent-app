@@ -27,6 +27,7 @@ export default defineConfig({
     'platform/index': 'src/platform/index.ts',
     'web/index': 'src/web/index.ts',
     'web-react/index': 'src/web-react/index.tsx',
+    'composer/index': 'src/composer/index.ts',
     'assistant/index': 'src/assistant/index.ts',
     'brand/index': 'src/brand/index.tsx',
     'redact/index': 'src/redact/index.ts',
