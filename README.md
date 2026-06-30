@@ -32,10 +32,11 @@ pnpm add @tangle-network/agent-eval @tangle-network/agent-integrations
 
 | Peer | Required by | Range |
 |---|---|---|
-| `@tangle-network/agent-eval` | `/eval` | `>=0.50.0` |
+| `@tangle-network/agent-eval` | `/eval`, `/eval-campaign`, `/profile`, `/knowledge` | `>=0.100.0` |
+| `@tangle-network/agent-runtime` | `/runtime`, `/knowledge-loop`, runtime tool execution | `>=0.79.3` |
 | `@tangle-network/agent-integrations` | `/integrations`, `/tangle` | `>=0.32.0` |
 
-The substrate-free modules (`/runtime`, `/tools`, `/web`, `/crypto`, `/redact`, `/stream`, `/billing`) need no peers.
+Modules that do not import engine packages (`/tools`, `/web`, `/crypto`, `/redact`, `/stream`, `/billing`) need no peers.
 
 ## Quick start
 
