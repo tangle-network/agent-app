@@ -22,6 +22,7 @@ import { ChevronDown, POPOVER_OPTION_FOCUS, usePending } from './controls'
 import { BrandMark } from './brand-mark'
 
 export * from './chat-stream'
+export * from './chat-composer'
 export * from './provider-logo'
 export * from './smooth-text'
 export * from './mission-activity'
@@ -43,6 +44,9 @@ export {
   type AgentSessionControlsProps,
 } from './agent-session-controls'
 import type { CatalogModel } from '../runtime/model-catalog'
+// Re-export the model type the chat components consume, so a web-react consumer
+// imports it from here rather than the package root.
+export type { CatalogModel } from '../runtime/model-catalog'
 
 // ── metrics helpers ───────────────────────────────────────────────────────
 

@@ -3,6 +3,7 @@ import { BrandHeader } from '@tangle-network/agent-app/brand'
 import { CanvasRoute } from './routes/CanvasRoute'
 import { TimelineRoute } from './routes/TimelineRoute'
 import { ChatRoute } from './routes/ChatRoute'
+import { ComposerRoute } from './routes/ComposerRoute'
 
 type ThemeName = 'light' | 'dark'
 
@@ -10,6 +11,7 @@ const ROUTES = [
   { path: '/canvas', label: 'Design' },
   { path: '/timeline', label: 'Storyboard' },
   { path: '/chat', label: 'Agent' },
+  { path: '/composer', label: 'Composer' },
 ] as const
 
 function applyTheme(theme: ThemeName) {
@@ -85,6 +87,7 @@ export function App() {
         {path === '/canvas' && <CanvasRoute />}
         {path === '/timeline' && <TimelineRoute />}
         {path === '/chat' && <ChatRoute />}
+        {path === '/composer' && <ComposerRoute />}
       </main>
     </div>
   )

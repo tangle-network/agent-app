@@ -9,6 +9,9 @@ export default defineConfig({
     // scaffolder itself is exercised by `tests/create-agent-app.test.ts`.
     include: ['tests/**/*.test.{ts,tsx}', 'src/**/*.test.{ts,tsx}'],
     exclude: ['**/node_modules/**', '**/dist/**', 'create-agent-app/template/**'],
+    // Unmount @testing-library React trees between tests (this repo doesn't run
+    // with `globals: true`, so RTL's auto-cleanup hook isn't registered).
+    setupFiles: ['./src/test-setup.ts'],
     // Run test FILES one at a time. Parallel forks each load the full module
     // graph (React, TipTap, drizzle, better-sqlite3, konva) and accumulate heap
     // across the files they own; serializing bounds peak RSS to a single file

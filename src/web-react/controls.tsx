@@ -136,6 +136,14 @@ export interface ModelPickerProps {
   renderProviderBadge?: (provider: string) => ReactNode
   /** Section label for `featured` models. */
   recommendedLabel?: string
+  /** Pin a labeled section to the TOP of the list (above Recommended) for the
+   *  models a product wants surfaced first — e.g. a tuner app's own fine-tuned
+   *  models (`{ label: 'Your Fine-Tuned Models', match: (m) => m.provider === 'tuner' }`).
+   *  Matching models are shown only in this section, not duplicated below. */
+  priorityGroup?: {
+    label: string
+    match: (model: CatalogModel) => boolean
+  }
 }
 
 function formatPrice(p?: string): string | undefined {
@@ -202,7 +210,7 @@ function ModelRow({
  * first, then per-provider groups in catalogue order (the server already
  * sorts providers by tier).
  */
-export function ModelPicker({ value, onChange, models, loading, renderProviderBadge, recommendedLabel = 'Recommended' }: ModelPickerProps) {
+export function ModelPicker({ value, onChange, models, loading, renderProviderBadge, recommendedLabel = 'Recommended', priorityGroup }: ModelPickerProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const { containerRef, triggerProps } = usePopover(open, setOpen)
@@ -227,16 +235,18 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
   }, [models, query])
 
   const sections = useMemo(() => {
-    const recommended = models.filter((m) => m.featured)
+    const isPriority = priorityGroup ? (m: CatalogModel) => priorityGroup.match(m) : () => false
+    const priority = priorityGroup ? models.filter(isPriority) : []
+    const recommended = models.filter((m) => m.featured && !isPriority(m))
     const byProvider: Array<{ provider: string; items: CatalogModel[] }> = []
     for (const m of models) {
-      if (m.featured) continue
+      if (m.featured || isPriority(m)) continue
       const last = byProvider[byProvider.length - 1]
       if (last && last.provider === m.provider) last.items.push(m)
       else byProvider.push({ provider: m.provider, items: [m] })
     }
-    return { recommended, byProvider }
-  }, [models])
+    return { priority, recommended, byProvider }
+  }, [models, priorityGroup])
 
   const select = (id: string) => {
     onChange(id)
@@ -286,6 +296,14 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
             )}
             {!loading && !filtered && (
               <>
+                {priorityGroup && sections.priority.length > 0 && (
+                  <>
+                    <SectionHeader>{priorityGroup.label}</SectionHeader>
+                    {sections.priority.map((m) => (
+                      <ModelRow key={m.id} model={m} selected={m.id === value} onSelect={() => select(m.id)} renderProviderBadge={renderProviderBadge} />
+                    ))}
+                  </>
+                )}
                 {sections.recommended.length > 0 && (
                   <>
                     <SectionHeader>{recommendedLabel}</SectionHeader>
