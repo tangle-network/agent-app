@@ -96,8 +96,8 @@ describe('theme token contract', () => {
   // must have a dark override, or the dark theme silently inherits the light
   // value. Aliases re-theme automatically through the cascade, so they're exempt
   // and must NOT be redefined in the dark block. THEME_INVARIANT lists tokens
-  // intentionally identical across themes (currently none).
-  const THEME_INVARIANT: string[] = []
+  // intentionally identical across themes.
+  const THEME_INVARIANT = ['--radius-md']
 
   it('every concrete :root token has a dark override (light/dark parity)', () => {
     const css = readFileSync(cssPath, 'utf8')

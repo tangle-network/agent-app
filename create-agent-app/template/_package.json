@@ -15,11 +15,11 @@
     "@tangle-network/agent-app": "__AGENT_APP_VERSION__"
   },
   "peerDependencies": {
-    "@tangle-network/agent-eval": ">=0.50.0",
+    "@tangle-network/agent-eval": ">=0.100.0",
     "@tangle-network/agent-integrations": ">=0.32.0"
   },
   "devDependencies": {
-    "@tangle-network/agent-eval": "^0.70.0",
+    "@tangle-network/agent-eval": "^0.100.0",
     "@tangle-network/agent-integrations": "^0.32.0",
     "@types/node": "^25.6.0",
     "typescript": "^5.7.0",
