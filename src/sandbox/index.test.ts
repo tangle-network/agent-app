@@ -704,6 +704,7 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     expect(payload.storage).toEqual(storage)
     expect(payload.fromSnapshot).toBe('snap1')
     expect(payload.fromSandboxId).toBe('sb1')
+    expect(payload.idempotencyKey).toBe('box-w1')
   })
 
   it('bakes resolved model + childKeyMint override into backend.model', async () => {
@@ -756,6 +757,7 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     })
     await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', userId: 'abcdef1234', harness: 'opencode' })
     expect(createMock.mock.calls[0]![0].name).toBe('vault-ai-abcdef12')
+    expect(createMock.mock.calls[0]![0].idempotencyKey).toBe('vault-ai-abcdef12')
   })
 
   it('async scoped credentials mint a per-user client', async () => {

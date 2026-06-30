@@ -1381,6 +1381,7 @@ export async function ensureWorkspaceSandbox(
     name,
     image: resources.image,
     metadata: shell.metadata(harness),
+    idempotencyKey: name,
     ...(userId ? { permissions: { initialUsers: [{ userId, role }] } } : {}),
     env,
     secrets,
