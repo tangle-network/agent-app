@@ -36,6 +36,12 @@ const agentAppPreset = {
         muted: withForeground('muted'),
         accent: withForeground('accent'),
         destructive: withForeground('destructive'),
+        // MD3 surface ladder — wires sandbox-ui's `bg-surface-container*`
+        // utilities (used by AgentComposer + its pickers) onto the shadcn
+        // elevation triples, so those components render on-palette here.
+        'surface-container': 'hsl(var(--card))',
+        'surface-container-high': 'hsl(var(--popover))',
+        'surface-container-highest': 'hsl(var(--secondary))',
       },
     },
   },

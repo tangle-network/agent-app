@@ -60,6 +60,18 @@
   --border-default: hsl(var(--border));
   --brand-primary: hsl(var(--primary));
 
+  /* MD3 bridge — sandbox-ui chat/composer components (AgentComposer and its
+     pickers) are authored against the brand MD3 surface ladder + accent tokens.
+     Map them onto the shadcn triples here so those components theme from this
+     same source in any agent-app shell. Full colors via the triples, so the dark
+     scope re-themes them through the cascade. The `surface-container*` Tailwind
+     utilities are wired separately in the preset. */
+  --md3-outline-variant: hsl(var(--border));
+  --accent-surface-soft: hsl(var(--accent));
+  --accent-text: hsl(var(--accent-foreground));
+  --status-error: hsl(var(--destructive));
+  --radius-md: 0.5rem;
+
   /* canvas-only surfaces (not part of the shadcn vocabulary). Name matches the
      `--canvas-backdrop` the design-canvas Workspace references (with a #1a1a1a fallback). */
   --canvas-backdrop: hsl(240 7% 90%);

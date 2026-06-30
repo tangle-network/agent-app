@@ -40,7 +40,7 @@ describe('ChatComposer', () => {
 
   it('disables Send when empty and enables it once there is text', () => {
     render(<ChatComposer onSend={vi.fn()} />)
-    const send = screen.getByLabelText('Send message') as HTMLButtonElement
+    const send = screen.getByLabelText('Send') as HTMLButtonElement
     expect(send.disabled).toBe(true)
 
     type(screen.getByLabelText('Message input'), 'x')
@@ -51,7 +51,7 @@ describe('ChatComposer', () => {
     const onCancel = vi.fn()
     render(<ChatComposer onSend={vi.fn()} onCancel={onCancel} isStreaming />)
 
-    expect(screen.queryByLabelText('Send message')).toBeNull()
+    expect(screen.queryByLabelText('Send')).toBeNull()
     fireEvent.click(screen.getByLabelText('Stop response'))
     expect(onCancel).toHaveBeenCalledOnce()
   })
