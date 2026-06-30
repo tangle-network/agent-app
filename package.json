@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.42.19",
+  "version": "0.43.0",
   "packageManager": "pnpm@10.33.4",
   "description": "Application-shell framework for Tangle agent products: a bounded tool loop, the structured agent→app tool side channel, integration-hub client, per-workspace billing, and crypto — composed over the Tangle agent substrate through typed seams.",
   "keywords": [
@@ -347,10 +347,12 @@
     "@tangle-network/agent-interface": "^0.15.0",
     "@tangle-network/agent-knowledge": "^1.7.0",
     "@tangle-network/agent-runtime": "^0.76.0",
+    "@tangle-network/brand": "^0.6.0",
     "@tangle-network/sandbox": "^0.9.5",
-    "@tangle-network/sandbox-ui": "^0.59.0",
+    "@tangle-network/sandbox-ui": "^0.60.0",
     "@tangle-network/ui": "^4.1.0",
     "@testing-library/dom": "^10.4.1",
+    "@xyflow/react": "^12.0.0",
     "@testing-library/react": "^16.3.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.6.0",
@@ -380,8 +382,10 @@
     "@tangle-network/agent-interface": ">=0.15.0",
     "@tangle-network/agent-knowledge": ">=1.7.0",
     "@tangle-network/agent-runtime": ">=0.76.0",
+    "@tangle-network/brand": ">=0.6.0",
     "@tangle-network/sandbox": ">=0.9.4",
-    "@tangle-network/sandbox-ui": ">=0.59.0",
+    "@tangle-network/sandbox-ui": ">=0.60.0",
+    "@xyflow/react": ">=12.0.0",
     "drizzle-orm": ">=0.36",
     "konva": ">=9",
     "lucide-react": ">=1",
@@ -416,6 +420,12 @@
       "optional": true
     },
     "@tangle-network/sandbox-ui": {
+      "optional": true
+    },
+    "@tangle-network/brand": {
+      "optional": true
+    },
+    "@xyflow/react": {
       "optional": true
     },
     "react-router": {

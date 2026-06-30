@@ -14,5 +14,9 @@ export default {
     './index.html',
     './src/**/*.{ts,tsx}',
     './node_modules/@tangle-network/agent-app/dist/**/*.js',
+    // ChatComposer now renders sandbox-ui's AgentComposer, whose class strings
+    // live in sandbox-ui's dist — scan it too so those utilities generate. This
+    // is the consumer step the 0.43 migration documents.
+    './node_modules/@tangle-network/sandbox-ui/dist/**/*.js',
   ],
 }
