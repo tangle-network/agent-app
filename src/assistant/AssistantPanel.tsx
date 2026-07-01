@@ -227,11 +227,21 @@ export function AssistantPanel({
   const contentSignature = useMemo(() => {
     let sig = `${state.reasoning?.length ?? 0}|${state.status}`;
     for (const m of state.messages) {
-      sig += `|${m.text.length}`;
+      // `text` is typed non-null, but thread history is external data — guard so
+      // a malformed message can't throw and blank the panel.
+      sig += `|${m.text?.length ?? 0}`;
       if (m.tool) sig += `:${m.tool.status}`;
     }
+    // Pending proposal cards render in the transcript too, so a newly-inserted
+    // approval card must move the signature to scroll it into view.
+    for (const p of state.pendingProposals) sig += `|p:${p.callId}`;
     return sig;
-  }, [state.messages, state.reasoning, state.status]);
+  }, [
+    state.messages,
+    state.reasoning,
+    state.status,
+    state.pendingProposals,
+  ]);
   const { onScroll: handleConversationScroll } = useStickToBottom(logRef, {
     enabled: view === "chat",
     contentSignature,
