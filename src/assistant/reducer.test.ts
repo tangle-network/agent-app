@@ -113,12 +113,25 @@ describe("a capped turn is surfaced, never silent", () => {
       data: { turnId: "R9", status: "completed", capped: true },
     });
     expect(s.status).toBe("idle");
-    // The partial reply is kept, plus a status note telling the user it stopped
-    // at the step limit (so a partial answer isn't read as a complete one).
+    // The partial reply is kept, plus a status note telling the user it paused
+    // (so a partial answer isn't read as a complete one), and the `capped` flag
+    // drives the one-click Continue affordance.
     expect(assistantText(s)).toBe("Let me check…");
     const note = s.messages.at(-1);
     expect(note?.role).toBe("status");
-    expect(note?.text).toContain("step limit");
+    expect(note?.text.toLowerCase()).toContain("continue");
+    expect(s.capped).toBe(true);
+  });
+
+  it("clears capped when the next turn starts", () => {
+    let s = send(initialAssistantState(), "build me a complex workflow");
+    s = stream(s, {
+      type: "done",
+      data: { turnId: "R9", status: "completed", capped: true },
+    });
+    expect(s.capped).toBe(true);
+    s = send(s, "continue");
+    expect(s.capped).toBe(false);
   });
 
   it("adds no note on a normal (uncapped) completion", () => {

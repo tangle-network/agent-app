@@ -58,6 +58,10 @@ export interface AssistantState {
    *  reset at the start of each turn. Null when the model emits no reasoning. */
   reasoning: string | null;
   error: { code: string; message: string } | null;
+  /** True when the most-recent turn stopped at the per-turn step limit before the
+   *  model finished (a partial reply). Drives the one-click "Continue" affordance;
+   *  cleared when the next turn starts. */
+  capped: boolean;
 }
 
 export type AssistantAction =
@@ -119,6 +123,7 @@ export function initialAssistantState(): AssistantState {
     model: null,
     reasoning: null,
     error: null,
+    capped: false,
   };
 }
 
@@ -313,17 +318,19 @@ function applyStreamEvent(
 
     case "done": {
       let messages = dropEmptyStreaming(state.messages, state.streamingId);
-      // A capped turn hit the per-turn step limit before the model finished its
-      // plan (e.g. partway through authoring a workflow). Surface it as a status
-      // note so a partial reply is never mistaken for a complete answer, and the
-      // user knows they can ask it to continue (the thread keeps the context).
-      if (event.data.capped) {
+      // A capped turn stopped at the per-turn step limit before the model
+      // finished its plan (e.g. partway through authoring a workflow). Surface it
+      // as a status note so a partial reply is never mistaken for a complete
+      // answer; the `capped` flag drives a one-click Continue affordance (the
+      // thread keeps the full context, so continuing resumes where it left off).
+      const capped = event.data.capped === true;
+      if (capped) {
         messages = capMessages([
           ...messages,
           {
             id: `cap-${event.data.turnId}`,
             role: "status",
-            text: "I reached the step limit for this turn. Ask me to continue and I'll pick up where I left off.",
+            text: "Paused after a lot of steps — continue when you're ready and I'll pick up where I left off.",
           },
         ]);
       }
@@ -331,6 +338,7 @@ function applyStreamEvent(
         ...state,
         messages,
         streamingId: null,
+        capped,
         status: state.pendingProposals.length > 0 ? "awaiting_confirm" : "idle",
       };
     }
@@ -375,6 +383,8 @@ export function assistantReducer(
         // from this base, so they stay unique across turns.
         streamBaseId: action.assistantId,
         segmentSeq: 0,
+        // A new turn clears the prior turn's cap state (and its Continue button).
+        capped: false,
         usage: null,
         reasoning: null,
         error: null,

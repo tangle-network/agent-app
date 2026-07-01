@@ -11,7 +11,14 @@
  */
 
 import { History, MessageSquarePlus, Minus, Plus, X } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { CatalogModel } from "../runtime/model-catalog";
 import { ChatComposer, ModelPicker, type ToolDetailRenderers } from "../web-react";
 import { AssistantHistory } from "./AssistantHistory";
@@ -216,6 +223,51 @@ export function AssistantPanel({
     return () => document.removeEventListener("keydown", onKeyDownCapture, true);
   }, [view]);
 
+  // Auto-follow: keep the transcript pinned to the newest content as it streams,
+  // but yield the instant the user scrolls up to read — re-arming when they
+  // return to the bottom or a new turn/thread starts. Without this the panel
+  // stays put while tokens append below the fold and the user has to scroll by
+  // hand to watch a response.
+  const stickToBottomRef = useRef(true);
+  // A value that grows on every streamed token (each delta extends the last
+  // message's text), so the layout effect below re-runs as content arrives —
+  // not only when a whole message is added.
+  const streamedLength = useMemo(
+    () =>
+      state.messages.reduce((total, m) => total + m.text.length, 0) +
+      (state.reasoning?.length ?? 0),
+    [state.messages, state.reasoning],
+  );
+  // Re-arm at the start of a new streaming turn (streamingId null→id) or a thread
+  // switch, so a fresh response always follows from the top even if the user had
+  // scrolled up during the previous turn. A turn ENDING (id→null) does not
+  // re-arm, so it never yanks a user who scrolled up to read.
+  const prevStreamingRef = useRef<string | null>(state.streamingId);
+  const prevThreadRef = useRef<string | undefined>(state.threadId);
+  useEffect(() => {
+    const turnStarted =
+      state.streamingId != null && state.streamingId !== prevStreamingRef.current;
+    const threadChanged = state.threadId !== prevThreadRef.current;
+    prevStreamingRef.current = state.streamingId;
+    prevThreadRef.current = state.threadId;
+    if (turnStarted || threadChanged) stickToBottomRef.current = true;
+  }, [state.streamingId, state.threadId]);
+  // The user's scroll position drives whether we keep following. A programmatic
+  // scroll also fires this, so compare against a small slack rather than exact
+  // equality (sub-pixel rounding would otherwise unstick it).
+  const handleConversationScroll = () => {
+    const el = logRef.current;
+    if (!el) return;
+    stickToBottomRef.current =
+      el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+  };
+  // useLayoutEffect (pre-paint) so pinned content never flashes above the fold.
+  useLayoutEffect(() => {
+    if (view !== "chat" || !stickToBottomRef.current) return;
+    const el = logRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [view, streamedLength, state.status, state.messages.length]);
+
   // Prefer the just-settled turn's balance (from the usage event, immediate)
   // over the injected fetched balance, which may lag a turn behind.
   const effectiveBalance = state.usage?.balanceUsd ?? balanceUsd;
@@ -404,6 +456,7 @@ export function AssistantPanel({
         ref={logRef}
         tabIndex={-1}
         aria-label="Conversation"
+        onScroll={handleConversationScroll}
         // role="log" + aria-live announce streaming transcript updates; applied
         // only in the chat view so the history view's search box and buttons are
         // not announced as live conversation activity.
@@ -483,6 +536,34 @@ export function AssistantPanel({
           </button>
         </div>
       )}
+
+      {/* Continue: a capped turn stopped mid-plan (the step-limit backstop). One
+          click resumes it — the thread keeps the full context — instead of making
+          the user type "continue". Shown only when idle in the chat view; a new
+          turn (including this one) clears `capped`. */}
+      {state.capped &&
+        state.status === "idle" &&
+        !chat.restoring &&
+        view === "chat" && (
+          <div
+            role="status"
+            className="mx-4 mb-2 flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm"
+          >
+            <p className="min-w-0 flex-1 text-foreground">
+              Paused after a lot of steps.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setView("chat");
+                chat.send("continue");
+              }}
+              className="shrink-0 rounded-lg bg-primary px-3 py-1.5 font-semibold text-primary-foreground text-xs transition hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Continue
+            </button>
+          </div>
+        )}
 
       {/* Composer: the model picker sits directly above the input, so the model
           the next turn will use reads as part of the composer. */}
