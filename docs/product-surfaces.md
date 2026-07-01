@@ -228,7 +228,7 @@ it a *timeline* must be the first thing you see.
   this without losing my place."* First impression: state exactly what one more
   seat buys, in one sentence, with the price — no tier wall.
 
-### Workspace terminal (`workspace-terminal-panel`)
+### Workspace terminal (`web-react/terminal` -> `WorkspaceTerminalPanel`)
 - **Purpose / goal:** a live view into the sandbox session the agent is running
   in. Goal for the *power* user: *"see the raw truth when I need to debug."* Keep
   it opt-in and secondary — it's the inspection hatch, not the front door.
