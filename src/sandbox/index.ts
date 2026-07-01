@@ -9,6 +9,7 @@ import {
   type ScopedTokenScope,
   type StorageConfig,
   type PromptResult,
+  type ProvisionEvent,
 } from '@tangle-network/sandbox'
 import { createHash } from 'node:crypto'
 import {
@@ -364,6 +365,11 @@ export interface EnsureWorkspaceSandboxOptions {
   // When set, both the running-reuse and stopped-resume short-circuits are
   // skipped and any name-matched box is deleted before create.
   forceNew?: boolean
+  // Real-time provisioning progress from the SDK's SSE stream, forwarded from
+  // the `waitFor('running')` calls on the resume and cold-create paths. Callers
+  // surface it as live "warming up" status. Only fires while a box is actually
+  // being provisioned; a reused running box emits nothing.
+  onProgress?: (event: ProvisionEvent) => void
 }
 
 // Single-quote a string for safe interpolation into a shell command.
@@ -1217,13 +1223,14 @@ async function resumeStoppedBox(
   client: Sandbox,
   name: string,
   timeoutMs: number,
+  onProgress?: (event: ProvisionEvent) => void,
 ): Promise<Outcome<SandboxInstance | null>> {
   try {
     const stopped = await client.list({ status: 'stopped' })
     const match = stopped.find((s) => s.name === name) ?? null
     if (!match) return ok(null)
     await match.resume()
-    await match.waitFor('running', { timeoutMs })
+    await match.waitFor('running', { timeoutMs, ...(onProgress ? { onProgress } : {}) })
     return ok(match)
   } catch (err) {
     return fail(err)
@@ -1234,7 +1241,7 @@ export async function ensureWorkspaceSandbox(
   shell: SandboxRuntimeConfig,
   options: EnsureWorkspaceSandboxOptions,
 ): Promise<SandboxInstance> {
-  const { workspaceId, userId, harness, forceNew } = options
+  const { workspaceId, userId, harness, forceNew, onProgress } = options
   const scope: SandboxScope = { workspaceId, ...(userId ? { userId } : {}) }
   const creds = await shell.credentials(scope)
   if (!creds) throw new Error('sandbox credentials are required (apiKey/baseUrl)')
@@ -1300,7 +1307,7 @@ export async function ensureWorkspaceSandbox(
 
   // Stage 2 — stopped-box resume (skipped on forceNew or resumeStopped===false).
   if (!forceNew && shell.resumeStopped !== false) {
-    const resumed = await resumeStoppedBox(client, name, resumeTimeout)
+    const resumed = await resumeStoppedBox(client, name, resumeTimeout, onProgress)
     if (resumed.succeeded && resumed.value) {
       const box = await refreshRuntimeConnection(client, resumed.value)
       if (await isReusableBox(box, harness, shell.livenessProbe)) {
@@ -1400,7 +1407,7 @@ export async function ensureWorkspaceSandbox(
 
   let box = await client.create(payload)
 
-  await box.waitFor('running', { timeoutMs: 120_000 })
+  await box.waitFor('running', { timeoutMs: 120_000, ...(onProgress ? { onProgress } : {}) })
   box = await refreshRuntimeConnection(client, box)
 
   if (deferredFiles.length > 0) {
