@@ -218,18 +218,23 @@ export function AssistantPanel({
   }, [view]);
 
   // Auto-follow: pin the transcript to the newest content as it streams, yielding
-  // when the user scrolls up. `streamedLength` grows on every streamed token (each
-  // delta extends the last message's text); combined with the message count and
-  // status it drives the re-scroll signal. See `useStickToBottom`.
-  const streamedLength = useMemo(
-    () =>
-      state.messages.reduce((total, m) => total + m.text.length, 0) +
-      (state.reasoning?.length ?? 0),
-    [state.messages, state.reasoning],
-  );
+  // when the user scrolls up. `contentSignature` must move on EVERY visible
+  // transcript mutation so the follow re-runs: streamed text growth, a new
+  // message, reasoning growth, the turn's status, AND a tool card appearing or
+  // changing status (tool activity is carried on separate `tool` messages, so a
+  // text-length-only signature would miss a turn that streams tool cards before
+  // any answer text). See `useStickToBottom`.
+  const contentSignature = useMemo(() => {
+    let sig = `${state.reasoning?.length ?? 0}|${state.status}`;
+    for (const m of state.messages) {
+      sig += `|${m.text.length}`;
+      if (m.tool) sig += `:${m.tool.status}`;
+    }
+    return sig;
+  }, [state.messages, state.reasoning, state.status]);
   const { onScroll: handleConversationScroll } = useStickToBottom(logRef, {
     enabled: view === "chat",
-    contentSignature: `${streamedLength}|${state.messages.length}|${state.status}`,
+    contentSignature,
     streamingId: state.streamingId,
     threadId: state.threadId,
   });

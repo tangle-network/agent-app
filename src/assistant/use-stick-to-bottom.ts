@@ -40,13 +40,15 @@ export function useStickToBottom(
 
   // The user's scroll position drives whether we keep following. A programmatic
   // scroll also fires this, so compare against a small slack rather than exact
-  // equality.
+  // equality. Ignore scrolls while disabled: the same container is reused for
+  // the (disabled) history view, and scrolling that must not unstick the chat.
   const onScroll = useCallback(() => {
+    if (!enabled) return;
     const el = ref.current;
     if (!el) return;
     stuckRef.current =
       el.scrollHeight - el.scrollTop - el.clientHeight < STICK_SLACK_PX;
-  }, [ref]);
+  }, [ref, enabled]);
 
   // ONE layout effect (pre-paint) does the re-arm and then the scroll, in that
   // order. Re-arming here — not in a passive `useEffect` — is what makes a thread

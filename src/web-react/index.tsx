@@ -775,12 +775,19 @@ function SegmentText({
  *  flood the transcript. Below it, tool cards render inline as before. */
 const COLLAPSE_TOOL_RUN_AT = 3
 
-/** A tool call the user must not miss even in a settled run — a failure, or a
- *  card awaiting their approval. A run containing one is NEVER collapsed, so a
- *  failed or blocked turn can't hide behind a "Worked through N steps" summary
- *  and read as successful. */
+/** A tool call the user must not miss even in a settled run — a failure (by
+ *  status OR by an `ok:false` outcome, matching `ToolCallCard`'s own predicate),
+ *  a card awaiting their approval, or a tool still `running` after the turn has
+ *  settled (i.e. stuck / timed out). A run containing one is NEVER collapsed, so
+ *  a failed, blocked, or stuck turn can't hide behind a "Worked through N steps"
+ *  summary and read as successful. */
 function isImportantTool(call: ChatToolCallInfo): boolean {
-  return call.status === 'error' || pendingApprovalOf(call) !== null
+  return (
+    call.status === 'error' ||
+    call.status === 'running' ||
+    toolOutcomeOf(call)?.ok === false ||
+    pendingApprovalOf(call) !== null
+  )
 }
 
 /** Renders a turn's ordered text/tool segments interleaved. The trailing text

@@ -109,6 +109,22 @@ describe("useStickToBottom", () => {
     expect(el.scrollTop).toBe(2000);
   });
 
+  it("ignores scroll events while disabled, so the history view can't unstick the chat", () => {
+    const el = makeEl(1000, 400, 1000);
+    const ref = refOf(el);
+    const { result, rerender } = mount(ref, { ...base, enabled: false });
+    // Scroll away from the bottom WHILE disabled (the shared container showing
+    // the history view) — this must NOT unstick the chat's auto-follow.
+    el.scrollTop = 100;
+    act(() => result.current.onScroll());
+    // Back to the chat view with new content → still follows (the disabled scroll
+    // was ignored, so the stuck ref was never cleared).
+    rerender({ ...base, enabled: true, contentSignature: "1" });
+    el.scrollHeight = 1600;
+    rerender({ ...base, enabled: true, contentSignature: "2" });
+    expect(el.scrollTop).toBe(1600);
+  });
+
   it("does not follow while disabled (e.g. the history view is open)", () => {
     const el = makeEl(1000, 400, 0);
     const { rerender } = mount(refOf(el), { ...base, enabled: false });
