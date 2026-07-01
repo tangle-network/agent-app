@@ -84,9 +84,8 @@ describe("useStickToBottom", () => {
     el.scrollHeight = 1600;
     rerender({ ...base, contentSignature: "1" });
     expect(el.scrollTop).toBe(100);
-    // A NEW turn starts (streamingId change) → re-arm (passive effect)...
-    rerender({ ...base, contentSignature: "1", streamingId: "turn-b" });
-    // ...then its first content follows again.
+    // A NEW turn starts AND its first content lands in the SAME rerender — the
+    // re-arm must scroll it, not be deferred to a later render.
     el.scrollHeight = 2200;
     rerender({ ...base, contentSignature: "2", streamingId: "turn-b" });
     expect(el.scrollTop).toBe(2200);
@@ -101,8 +100,10 @@ describe("useStickToBottom", () => {
     el.scrollHeight = 1600;
     rerender({ ...base, contentSignature: "1" });
     expect(el.scrollTop).toBe(100);
-    // Switch threads → re-arm, then the loaded content follows.
-    rerender({ ...base, contentSignature: "1", threadId: "thread-2" });
+    // Switch threads AND load the new thread's content in the SAME rerender (the
+    // real path: a thread switch updates threadId and the messages together). The
+    // combined layout effect must re-arm THEN scroll — a deferred re-arm would
+    // leave the user stranded at the old position.
     el.scrollHeight = 2000;
     rerender({ ...base, contentSignature: "2", threadId: "thread-2" });
     expect(el.scrollTop).toBe(2000);
