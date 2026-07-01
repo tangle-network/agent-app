@@ -1,10 +1,9 @@
 /**
- * The canonical agent chat composer, re-exported from `@tangle-network/sandbox-ui`
- * so agent-app apps adopt the one shared input box — model · harness · effort ·
- * agent-profile, with harness↔model snapping — without each wiring sandbox-ui
- * directly. Opt-in subpath: importing it requires the (otherwise optional)
- * `@tangle-network/sandbox-ui` peer, so apps that don't use the composer pay
- * nothing. Prefer this over agent-app's legacy `web-react` composer for new UI.
+ * Sandbox-first chat composer, re-exported from `@tangle-network/sandbox-ui` so
+ * agent-app apps can opt into the full profile/model/sandbox-runner/reasoning
+ * control surface without wiring sandbox-ui directly. Router-only apps should
+ * use `@tangle-network/agent-app/web-react`; importing this subpath requires the
+ * otherwise optional `@tangle-network/sandbox-ui` peer.
  */
 export {
   AgentComposer,

@@ -158,6 +158,11 @@
       "import": "./dist/web-react/index.js",
       "default": "./dist/web-react/index.js"
     },
+    "./web-react/terminal": {
+      "types": "./dist/web-react/terminal.d.ts",
+      "import": "./dist/web-react/terminal.js",
+      "default": "./dist/web-react/terminal.js"
+    },
     "./composer": {
       "types": "./dist/composer/index.d.ts",
       "import": "./dist/composer/index.js",
