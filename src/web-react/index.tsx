@@ -775,6 +775,14 @@ function SegmentText({
  *  flood the transcript. Below it, tool cards render inline as before. */
 const COLLAPSE_TOOL_RUN_AT = 3
 
+/** A tool call the user must not miss even in a settled run — a failure, or a
+ *  card awaiting their approval. A run containing one is NEVER collapsed, so a
+ *  failed or blocked turn can't hide behind a "Worked through N steps" summary
+ *  and read as successful. */
+function isImportantTool(call: ChatToolCallInfo): boolean {
+  return call.status === 'error' || pendingApprovalOf(call) !== null
+}
+
 /** Renders a turn's ordered text/tool segments interleaved. The trailing text
  *  run carries the streaming caret; if the last segment is instead a tool, a
  *  trailing caret keeps the gap before the next run from looking frozen. Any
@@ -852,7 +860,9 @@ function SegmentedBody({
             showCaret={streaming && g.index === lastIndex}
             renderBody={renderBody}
           />
-        ) : !streaming && g.calls.length >= COLLAPSE_TOOL_RUN_AT ? (
+        ) : !streaming &&
+          g.calls.length >= COLLAPSE_TOOL_RUN_AT &&
+          !g.calls.some(isImportantTool) ? (
           <details
             key={`tools-${g.index}`}
             className="rounded-lg border-l-2 border-border/70 bg-muted/20 px-3 py-2"

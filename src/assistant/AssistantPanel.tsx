@@ -11,14 +11,7 @@
  */
 
 import { History, MessageSquarePlus, Minus, Plus, X } from "lucide-react";
-import {
-  type ReactNode,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogModel } from "../runtime/model-catalog";
 import { ChatComposer, ModelPicker, type ToolDetailRenderers } from "../web-react";
 import { AssistantHistory } from "./AssistantHistory";
@@ -31,6 +24,7 @@ import type { AssistantChat } from "./useAssistantChat";
 import { useAssistantModels } from "./useAssistantModels";
 import { useAssistantThreads } from "./useAssistantThreads";
 import { useFontScale } from "./usePanelPrefs";
+import { useStickToBottom } from "./use-stick-to-bottom";
 
 export interface AssistantPanelProps {
   chat: AssistantChat;
@@ -223,50 +217,22 @@ export function AssistantPanel({
     return () => document.removeEventListener("keydown", onKeyDownCapture, true);
   }, [view]);
 
-  // Auto-follow: keep the transcript pinned to the newest content as it streams,
-  // but yield the instant the user scrolls up to read — re-arming when they
-  // return to the bottom or a new turn/thread starts. Without this the panel
-  // stays put while tokens append below the fold and the user has to scroll by
-  // hand to watch a response.
-  const stickToBottomRef = useRef(true);
-  // A value that grows on every streamed token (each delta extends the last
-  // message's text), so the layout effect below re-runs as content arrives —
-  // not only when a whole message is added.
+  // Auto-follow: pin the transcript to the newest content as it streams, yielding
+  // when the user scrolls up. `streamedLength` grows on every streamed token (each
+  // delta extends the last message's text); combined with the message count and
+  // status it drives the re-scroll signal. See `useStickToBottom`.
   const streamedLength = useMemo(
     () =>
       state.messages.reduce((total, m) => total + m.text.length, 0) +
       (state.reasoning?.length ?? 0),
     [state.messages, state.reasoning],
   );
-  // Re-arm at the start of a new streaming turn (streamingId null→id) or a thread
-  // switch, so a fresh response always follows from the top even if the user had
-  // scrolled up during the previous turn. A turn ENDING (id→null) does not
-  // re-arm, so it never yanks a user who scrolled up to read.
-  const prevStreamingRef = useRef<string | null>(state.streamingId);
-  const prevThreadRef = useRef<string | undefined>(state.threadId);
-  useEffect(() => {
-    const turnStarted =
-      state.streamingId != null && state.streamingId !== prevStreamingRef.current;
-    const threadChanged = state.threadId !== prevThreadRef.current;
-    prevStreamingRef.current = state.streamingId;
-    prevThreadRef.current = state.threadId;
-    if (turnStarted || threadChanged) stickToBottomRef.current = true;
-  }, [state.streamingId, state.threadId]);
-  // The user's scroll position drives whether we keep following. A programmatic
-  // scroll also fires this, so compare against a small slack rather than exact
-  // equality (sub-pixel rounding would otherwise unstick it).
-  const handleConversationScroll = () => {
-    const el = logRef.current;
-    if (!el) return;
-    stickToBottomRef.current =
-      el.scrollHeight - el.scrollTop - el.clientHeight < 48;
-  };
-  // useLayoutEffect (pre-paint) so pinned content never flashes above the fold.
-  useLayoutEffect(() => {
-    if (view !== "chat" || !stickToBottomRef.current) return;
-    const el = logRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [view, streamedLength, state.status, state.messages.length]);
+  const { onScroll: handleConversationScroll } = useStickToBottom(logRef, {
+    enabled: view === "chat",
+    contentSignature: `${streamedLength}|${state.messages.length}|${state.status}`,
+    streamingId: state.streamingId,
+    threadId: state.threadId,
+  });
 
   // Prefer the just-settled turn's balance (from the usage event, immediate)
   // over the injected fetched balance, which may lag a turn behind.
@@ -556,6 +522,12 @@ export function AssistantPanel({
               type="button"
               onClick={() => {
                 setView("chat");
+                // Sends "continue" as an ordinary user message — the same words
+                // the prior capped-turn copy told users to type. Resume needs no
+                // special backend handling: the server replays the thread's full
+                // history on every turn, so the model picks up the interrupted
+                // work from context. (This is the automated form of that manual
+                // instruction, not a new magic string the backend must decode.)
                 chat.send("continue");
               }}
               className="shrink-0 rounded-lg bg-primary px-3 py-1.5 font-semibold text-primary-foreground text-xs transition hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
