@@ -111,8 +111,8 @@ describe('finalizeAssistantParts', () => {
     ])
     const finalized = finalizeAssistantParts(order, map, 'Hello world')
     expect(finalized.map((p) => p.type)).toEqual(['text', 'tool', 'text'])
-    expect(finalized[0].text).toBe('Hello ')
-    expect(finalized[2].text).toBe('world')
+    expect(finalized[0]?.text).toBe('Hello ')
+    expect(finalized[2]?.text).toBe('world')
   })
 
   it('treats trailing-whitespace differences as equal', () => {
@@ -144,7 +144,7 @@ describe('finalizeAssistantParts', () => {
       ['tool', 'call_1'],
       ['text', 't2'],
     ])
-    expect(finalized[2].text).toBe('a corrected final answer')
+    expect(finalized[2]?.text).toBe('a corrected final answer')
   })
 
   it('preserves interleaved order end to end', () => {
