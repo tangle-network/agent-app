@@ -1517,6 +1517,11 @@ export interface StreamSandboxPromptOptions {
   // When true, an interactive question event throws instead of yielding —
   // detached (cron/mission-step) runs have no consumer to answer it.
   disallowQuestions?: boolean
+  // Per-turn question/permission/plan channel toggles, forwarded VERBATIM into the
+  // backend config. agent-app does not validate kinds per harness — the sidecar fails
+  // session init loudly for unsupported ones; a local matrix would drift. Only honored
+  // on the streaming path; the detached box.prompt path (driveSandboxTurn) never sets it.
+  interactions?: { question?: boolean; permission?: boolean; plan?: boolean }
 }
 
 type StreamPromptOptions = Parameters<SandboxInstance['streamPrompt']>[1]
@@ -1559,6 +1564,7 @@ export async function* streamSandboxPrompt(
       type: harness,
       profile: profileWithEffort,
       ...(model ? { model } : {}),
+      ...(options?.interactions ? { interactions: options.interactions } : {}),
     },
   } as StreamPromptOptions)
 
@@ -1781,6 +1787,8 @@ export async function driveSandboxTurn(
       ...(options.executionId ? { executionId: options.executionId } : {}),
       ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
       ...(options.signal ? { signal: options.signal } : {}),
+      // Deliberately NO `interactions` here: detached turns (cron / mission steps) have
+      // no consumer to answer a question. Interactive Q&A is streaming-path only.
       backend: { type: harness, profile, ...(model ? { model } : {}) },
     } as Parameters<SandboxInstance['prompt']>[1])
     if (!result.success) return fail(new Error(result.error ?? 'sandbox turn failed'))
@@ -1829,6 +1837,9 @@ export function detectInteractiveQuestion(event: unknown): string | null {
   const props = asPlainRecord(root.properties)
   const body = props ?? data ?? root
   if (type === 'question.asked' || type === 'question') return firstQuestionText(body)
+  // Generic structured-interaction event (BackendConfig.interactions kinds surface as
+  // `interaction` events with a `kind` discriminator); treat kind:"question" as a question.
+  if (type === 'interaction' && body.kind === 'question') return firstQuestionText(body)
   const part = asPlainRecord(data?.part) ?? asPlainRecord(body.part)
   const tool =
     (typeof part?.tool === 'string' && part.tool) ||
