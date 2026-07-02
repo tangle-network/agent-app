@@ -88,17 +88,23 @@ export function normalizePersistedPart(rawPart: JsonRecord): JsonRecord | null {
   const type = String(rawPart.type ?? '')
 
   if (type === 'text') {
+    const id = asString(rawPart.id) ?? asString(rawPart.partId)
     return {
       type: 'text',
       text: asString(rawPart.text) ?? asString(rawPart.content) ?? '',
+      // id: per-segment identity from the harness; absent on legacy parts,
+      // which collapse to a single keyed segment. Never invented here.
+      ...(id ? { id } : {}),
     }
   }
 
   if (type === 'reasoning') {
+    const id = asString(rawPart.id) ?? asString(rawPart.partId)
     return {
       type: 'reasoning',
       text: asString(rawPart.text) ?? asString(rawPart.content) ?? '',
       time: normalizeTime(rawPart.time),
+      ...(id ? { id } : {}),
     }
   }
 
@@ -160,10 +166,13 @@ export function mergePersistedPart(existing: JsonRecord | undefined, incoming: J
   }
 
   if (type === 'text' && String(existing.type ?? '') === 'text') {
+    const existingText = String(existing.text ?? '')
+    const incomingText = String(incoming.text ?? '')
     return {
       ...existing,
       ...incoming,
-      text: delta ? `${String(existing.text ?? '')}${delta}` : String(incoming.text ?? ''),
+      // An empty snapshot never erases accumulated text (matches reasoning).
+      text: delta ? `${existingText}${delta}` : incomingText || existingText,
     }
   }
 
@@ -202,20 +211,48 @@ export function finalizeAssistantParts(
     .map((key) => partMap.get(key))
     .filter((part): part is JsonRecord => Boolean(part))
 
-  if (!parts.some((part) => String(part.type ?? '') === 'text')) {
+  const textParts = parts.filter((part) => String(part.type ?? '') === 'text')
+
+  if (textParts.length === 0) {
     if (finalText.trim()) {
       parts.push({ type: 'text', text: finalText })
     }
     return parts
   }
 
-  return parts.map((part) => {
-    if (String(part.type ?? '') !== 'text') return part
-    return {
-      ...part,
-      text: finalText || String(part.text ?? ''),
-    }
-  })
+  // Id-less text parts form a single logical stream — the final text is
+  // authoritative for it.
+  if (!textParts.some((part) => asString(part.id))) {
+    return parts.map((part) => {
+      if (String(part.type ?? '') !== 'text') return part
+      return {
+        ...part,
+        text: finalText || String(part.text ?? ''),
+      }
+    })
+  }
+
+  // Per-id text segments: invariant is concat(text parts) === persisted final
+  // text, so segment boundaries survive without duplicating the answer into
+  // every segment.
+  const joined = textParts.map((part) => String(part.text ?? '')).join('')
+  if (finalText === joined || finalText.trimEnd() === joined.trimEnd()) {
+    return parts
+  }
+
+  if (finalText.startsWith(joined)) {
+    // Final text extends the streamed segments (e.g. a failure diagnostic
+    // appended after the stream) — persist the remainder as a trailing
+    // id-less segment.
+    return [...parts, { type: 'text', text: finalText.slice(joined.length) }]
+  }
+
+  // Final text replaced the streamed text outright. Keep non-text chronology;
+  // collapse text to one authoritative segment at the last text position.
+  const lastTextPart = textParts[textParts.length - 1]
+  return parts
+    .filter((part) => String(part.type ?? '') !== 'text' || part === lastTextPart)
+    .map((part) => (part === lastTextPart ? { ...part, text: finalText } : part))
 }
 
 export function encodeEvent(encoder: TextEncoder, event: StreamEvent): Uint8Array {
