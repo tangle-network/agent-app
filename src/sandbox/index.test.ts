@@ -474,6 +474,30 @@ describe('streamSandboxPrompt seam', () => {
     const [, opts] = (box.streamPrompt as ReturnType<typeof vi.fn>).mock.calls[0]!
     expect(opts.backend.model).toBeUndefined()
   })
+
+  it('forwards interactions verbatim into backend when set', async () => {
+    async function* events() {
+      yield { type: 'result' }
+    }
+    const box = fakeBox({ streamPrompt: vi.fn().mockReturnValue(events()) })
+    for await (const _ of streamSandboxPrompt(shell(), box, 'hi', {
+      interactions: { question: true },
+    })) {
+      void _
+    }
+    const [, opts] = (box.streamPrompt as ReturnType<typeof vi.fn>).mock.calls[0]!
+    expect(opts.backend.interactions).toEqual({ question: true })
+  })
+
+  it('omits interactions from backend when not set', async () => {
+    async function* events() {
+      yield { type: 'result' }
+    }
+    const box = fakeBox({ streamPrompt: vi.fn().mockReturnValue(events()) })
+    for await (const _ of streamSandboxPrompt(shell(), box, 'hi')) void _
+    const [, opts] = (box.streamPrompt as ReturnType<typeof vi.fn>).mock.calls[0]!
+    expect(opts.backend.interactions).toBeUndefined()
+  })
 })
 
 describe('pure seam helpers', () => {
@@ -828,6 +852,12 @@ describe('stream classifiers', () => {
     ).toBe('pick one?')
     expect(detectInteractiveQuestion({ type: 'message.part.updated', data: { part: { type: 'text' } } })).toBeNull()
   })
+  it('detectInteractiveQuestion recognizes generic interaction/kind:question events', () => {
+    expect(
+      detectInteractiveQuestion({ type: 'interaction', data: { kind: 'question', questions: [{ question: 'pick?' }] } }),
+    ).toBe('pick?')
+    expect(detectInteractiveQuestion({ type: 'interaction', data: { kind: 'permission' } })).toBeNull()
+  })
 })
 
 describe('driveSandboxTurn', () => {
@@ -839,6 +869,13 @@ describe('driveSandboxTurn', () => {
     const failBox = fakeBox({ prompt: vi.fn().mockResolvedValue({ success: false, error: 'boom', durationMs: 1 }) })
     const r2 = await driveSandboxTurn(shell, failBox, 'go', { sessionId: 'sess1' })
     expect(r2.succeeded).toBe(false)
+  })
+  it('never forwards interactions to the detached box.prompt backend', async () => {
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' })
+    const box = fakeBox({ prompt: vi.fn().mockResolvedValue({ success: true, response: 'hi', durationMs: 1 }) })
+    await driveSandboxTurn(shell, box, 'go', { sessionId: 'sess1', interactions: { question: true } })
+    const [, opts] = (box.prompt as ReturnType<typeof vi.fn>).mock.calls[0]!
+    expect(opts.backend.interactions).toBeUndefined()
   })
 })
 
