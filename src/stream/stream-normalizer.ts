@@ -15,13 +15,16 @@ export function asString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined
 }
 
+export const MISSING_TOOL_TERMINAL_ERROR = 'Tool did not report a terminal result before the assistant turn completed.'
+export const MISSING_TOOL_TERMINAL_REASON = 'missing-tool-terminal'
+
 export function resolveToolId(part: JsonRecord): string {
   return String(
-    part.id ??
-      part.callID ??
+    part.callID ??
       part.callId ??
-      part.toolUseId ??
       part.toolCallId ??
+      part.toolUseId ??
+      part.id ??
       part.tool ??
       part.name ??
       `tool-${Date.now()}`,
@@ -106,6 +109,7 @@ export function normalizePersistedPart(rawPart: JsonRecord): JsonRecord | null {
     const state = asRecord(rawPart.state)
     const output = state?.output ?? rawPart.output
     const error = asString(state?.error ?? rawPart.error)
+    const callId = rawPart.callID ?? rawPart.callId ?? rawPart.toolCallId ?? rawPart.toolUseId
     const status =
       state?.status === 'completed' || rawPart.status === 'completed'
         ? 'completed'
@@ -119,10 +123,7 @@ export function normalizePersistedPart(rawPart: JsonRecord): JsonRecord | null {
       type: 'tool',
       id: resolveToolId(rawPart),
       tool: resolveToolName(rawPart),
-      callID:
-        rawPart.callID != null || rawPart.callId != null
-          ? String(rawPart.callID ?? rawPart.callId)
-          : undefined,
+      callID: callId != null ? String(callId) : undefined,
       state: {
         status,
         input: state?.input ?? rawPart.input,
@@ -179,18 +180,55 @@ export function mergePersistedPart(existing: JsonRecord | undefined, incoming: J
   }
 
   if (type === 'tool' && String(existing.type ?? '') === 'tool') {
+    const existingState = asRecord(existing.state)
+    const incomingState = asRecord(incoming.state)
+    const mergedState = {
+      ...(existingState ?? {}),
+      ...(incomingState ?? {}),
+    }
+
     return {
       ...existing,
       ...incoming,
+      callID: incoming.callID ?? existing.callID,
       state: {
-        ...(asRecord(existing.state) ?? {}),
-        ...(asRecord(incoming.state) ?? {}),
-        time: asRecord(incoming.state)?.time ?? asRecord(existing.state)?.time,
+        ...mergedState,
+        input: incomingState?.input !== undefined ? incomingState.input : existingState?.input,
+        output: incomingState?.output !== undefined ? incomingState.output : existingState?.output,
+        error: incomingState?.error !== undefined ? incomingState.error : existingState?.error,
+        metadata: incomingState?.metadata !== undefined ? incomingState.metadata : existingState?.metadata,
+        time: incomingState?.time ?? existingState?.time,
       },
     }
   }
 
   return incoming
+}
+
+export function terminalizeDanglingToolPart(part: JsonRecord): JsonRecord {
+  if (String(part.type ?? '') !== 'tool') return part
+
+  const state = asRecord(part.state) ?? {}
+  if (String(state.status ?? part.status ?? '') !== 'running') return part
+
+  const metadata = asRecord(state.metadata) ?? {}
+  return {
+    ...part,
+    state: {
+      ...state,
+      status: 'error',
+      error: asString(state.error ?? part.error) ?? MISSING_TOOL_TERMINAL_ERROR,
+      metadata: {
+        ...metadata,
+        terminalized: true,
+        terminalReason: MISSING_TOOL_TERMINAL_REASON,
+      },
+    },
+  }
+}
+
+export function terminalizeDanglingToolParts(parts: JsonRecord[]): JsonRecord[] {
+  return parts.map(terminalizeDanglingToolPart)
 }
 
 export function finalizeAssistantParts(
@@ -206,16 +244,43 @@ export function finalizeAssistantParts(
     if (finalText.trim()) {
       parts.push({ type: 'text', text: finalText })
     }
-    return parts
+    return terminalizeDanglingToolParts(parts)
   }
 
-  return parts.map((part) => {
+  return terminalizeDanglingToolParts(parts.map((part) => {
     if (String(part.type ?? '') !== 'text') return part
     return {
       ...part,
       text: finalText || String(part.text ?? ''),
     }
-  })
+  }))
+}
+
+function partStatus(part: JsonRecord | undefined): string {
+  const state = asRecord(part?.state)
+  return String(state?.status ?? part?.status ?? '')
+}
+
+export function terminalizeDanglingAssistantToolUpdates(
+  partOrder: string[],
+  partMap: Map<string, JsonRecord>,
+  finalText: string,
+): JsonRecord[] {
+  const finalizedParts = finalizeAssistantParts(partOrder, partMap, finalText)
+  const updates: JsonRecord[] = []
+
+  for (const part of finalizedParts) {
+    if (String(part.type ?? '') !== 'tool') continue
+
+    const key = getPartKey(part)
+    const existing = partMap.get(key)
+    if (partStatus(existing) !== 'running' || partStatus(part) === 'running') continue
+
+    partMap.set(key, mergePersistedPart(existing, part))
+    updates.push(part)
+  }
+
+  return updates
 }
 
 export function encodeEvent(encoder: TextEncoder, event: StreamEvent): Uint8Array {
