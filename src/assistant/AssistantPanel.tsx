@@ -24,6 +24,7 @@ import type { AssistantChat } from "./useAssistantChat";
 import { useAssistantModels } from "./useAssistantModels";
 import { useAssistantThreads } from "./useAssistantThreads";
 import { useFontScale } from "./usePanelPrefs";
+import { useStickToBottom } from "./use-stick-to-bottom";
 
 export interface AssistantPanelProps {
   chat: AssistantChat;
@@ -216,6 +217,38 @@ export function AssistantPanel({
     return () => document.removeEventListener("keydown", onKeyDownCapture, true);
   }, [view]);
 
+  // Auto-follow: pin the transcript to the newest content as it streams, yielding
+  // when the user scrolls up. `contentSignature` must move on EVERY visible
+  // transcript mutation so the follow re-runs: streamed text growth, a new
+  // message, reasoning growth, the turn's status, AND a tool card appearing or
+  // changing status (tool activity is carried on separate `tool` messages, so a
+  // text-length-only signature would miss a turn that streams tool cards before
+  // any answer text). See `useStickToBottom`.
+  const contentSignature = useMemo(() => {
+    let sig = `${state.reasoning?.length ?? 0}|${state.status}`;
+    for (const m of state.messages) {
+      // `text` is typed non-null, but thread history is external data — guard so
+      // a malformed message can't throw and blank the panel.
+      sig += `|${m.text?.length ?? 0}`;
+      if (m.tool) sig += `:${m.tool.status}`;
+    }
+    // Pending proposal cards render in the transcript too, so a newly-inserted
+    // approval card must move the signature to scroll it into view.
+    for (const p of state.pendingProposals) sig += `|p:${p.callId}`;
+    return sig;
+  }, [
+    state.messages,
+    state.reasoning,
+    state.status,
+    state.pendingProposals,
+  ]);
+  const { onScroll: handleConversationScroll } = useStickToBottom(logRef, {
+    enabled: view === "chat",
+    contentSignature,
+    streamingId: state.streamingId,
+    threadId: state.threadId,
+  });
+
   // Prefer the just-settled turn's balance (from the usage event, immediate)
   // over the injected fetched balance, which may lag a turn behind.
   const effectiveBalance = state.usage?.balanceUsd ?? balanceUsd;
@@ -404,6 +437,7 @@ export function AssistantPanel({
         ref={logRef}
         tabIndex={-1}
         aria-label="Conversation"
+        onScroll={handleConversationScroll}
         // role="log" + aria-live announce streaming transcript updates; applied
         // only in the chat view so the history view's search box and buttons are
         // not announced as live conversation activity.
@@ -483,6 +517,40 @@ export function AssistantPanel({
           </button>
         </div>
       )}
+
+      {/* Continue: a capped turn stopped mid-plan (the step-limit backstop). One
+          click resumes it — the thread keeps the full context — instead of making
+          the user type "continue". Shown only when idle in the chat view; a new
+          turn (including this one) clears `capped`. */}
+      {state.capped &&
+        state.status === "idle" &&
+        !chat.restoring &&
+        view === "chat" && (
+          <div
+            role="status"
+            className="mx-4 mb-2 flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm"
+          >
+            <p className="min-w-0 flex-1 text-foreground">
+              Paused after a lot of steps.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setView("chat");
+                // Sends "continue" as an ordinary user message — the same words
+                // the prior capped-turn copy told users to type. Resume needs no
+                // special backend handling: the server replays the thread's full
+                // history on every turn, so the model picks up the interrupted
+                // work from context. (This is the automated form of that manual
+                // instruction, not a new magic string the backend must decode.)
+                chat.send("continue");
+              }}
+              className="shrink-0 rounded-lg bg-primary px-3 py-1.5 font-semibold text-primary-foreground text-xs transition hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Continue
+            </button>
+          </div>
+        )}
 
       {/* Composer: the model picker sits directly above the input, so the model
           the next turn will use reads as part of the composer. */}

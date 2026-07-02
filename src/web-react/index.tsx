@@ -770,11 +770,32 @@ function SegmentText({
   )
 }
 
+/** A settled run of at least this many consecutive tool calls collapses into a
+ *  single "Worked through N steps" disclosure so a long multi-step turn does not
+ *  flood the transcript. Below it, tool cards render inline as before. */
+const COLLAPSE_TOOL_RUN_AT = 3
+
+/** A tool call the user must not miss even in a settled run — a failure (by
+ *  status OR by an `ok:false` outcome, matching `ToolCallCard`'s own predicate),
+ *  a card awaiting their approval, or a tool still `running` after the turn has
+ *  settled (i.e. stuck / timed out). A run containing one is NEVER collapsed, so
+ *  a failed, blocked, or stuck turn can't hide behind a "Worked through N steps"
+ *  summary and read as successful. */
+function isImportantTool(call: ChatToolCallInfo): boolean {
+  return (
+    call.status === 'error' ||
+    call.status === 'running' ||
+    toolOutcomeOf(call)?.ok === false ||
+    pendingApprovalOf(call) !== null
+  )
+}
+
 /** Renders a turn's ordered text/tool segments interleaved. The trailing text
  *  run carries the streaming caret; if the last segment is instead a tool, a
  *  trailing caret keeps the gap before the next run from looking frozen. Any
  *  `toolCalls` not represented in `segments` (a partially-migrated producer that
- *  set both) still render, so a tool chip is never silently dropped. */
+ *  set both) still render, so a tool chip is never silently dropped. A settled
+ *  run of many tool calls collapses into one disclosure — see below. */
 function SegmentedBody({
   segments,
   msg,
@@ -809,23 +830,61 @@ function SegmentedBody({
       renderers={toolRenderers}
     />
   )
+  // Group consecutive tool segments so a SETTLED run of many tool calls (a
+  // multi-step turn, e.g. workflow authoring) collapses into one disclosure
+  // instead of flooding the transcript with a card per step. While the turn is
+  // streaming nothing is grouped — live tool activity is exactly what the user
+  // wants to watch; the run collapses once the turn settles. Text runs (the
+  // actual answer) always render in full.
+  const groups: Array<
+    | { kind: 'text'; index: number; content: string }
+    | { kind: 'tools'; index: number; calls: ChatToolCallInfo[] }
+  > = []
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i]
+    if (!seg) continue
+    if (seg.kind === 'text') {
+      groups.push({ kind: 'text', index: i, content: seg.content })
+    } else {
+      const last = groups[groups.length - 1]
+      if (last && last.kind === 'tools') last.calls.push(seg.call)
+      else groups.push({ kind: 'tools', index: i, calls: [seg.call] })
+    }
+  }
+
   return (
     <div className="flex flex-col gap-2">
-      {segments.map((seg, i) =>
-        seg.kind === 'text' ? (
+      {groups.map((g) =>
+        g.kind === 'text' ? (
           <SegmentText
             // Segments only ever append within a turn, so the index is a stable
             // key — a finalized run keeps its slot as later runs/tools are added,
             // so its smooth-text state isn't reset.
-            key={`text-${i}`}
-            content={seg.content}
+            key={`text-${g.index}`}
+            content={g.content}
             // Only the trailing run of the live turn types out + shows the caret.
-            streaming={streaming && i === lastIndex}
-            showCaret={streaming && i === lastIndex}
+            streaming={streaming && g.index === lastIndex}
+            showCaret={streaming && g.index === lastIndex}
             renderBody={renderBody}
           />
+        ) : !streaming &&
+          g.calls.length >= COLLAPSE_TOOL_RUN_AT &&
+          !g.calls.some(isImportantTool) ? (
+          <details
+            key={`tools-${g.index}`}
+            className="rounded-lg border-l-2 border-border/70 bg-muted/20 px-3 py-2"
+          >
+            <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
+              Worked through {g.calls.length} steps
+            </summary>
+            <div className="mt-2 flex flex-col gap-2">
+              {g.calls.map(renderToolCard)}
+            </div>
+          </details>
         ) : (
-          renderToolCard(seg.call)
+          <div key={`tools-${g.index}`} className="flex flex-col gap-2">
+            {g.calls.map(renderToolCard)}
+          </div>
         ),
       )}
       {leftoverToolCalls.map(renderToolCard)}

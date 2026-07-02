@@ -223,6 +223,135 @@ describe('ChatMessages segmented turns', () => {
     expect(getByText('Start from a template')).toBeTruthy()
   })
 
+  it('collapses a SETTLED run of 3+ consecutive tool calls into one disclosure', () => {
+    const message: ChatUiMessage = {
+      id: 'm1',
+      role: 'assistant',
+      content: 'All set.',
+      segments: [
+        { kind: 'tool', call: { id: 't1', name: 'get_workflow_schema', status: 'done' } },
+        { kind: 'tool', call: { id: 't2', name: 'validate_workflow', status: 'done' } },
+        { kind: 'tool', call: { id: 't3', name: 'validate_workflow', status: 'done' } },
+        { kind: 'text', content: 'All set.' },
+      ],
+    }
+    const { container } = render(<ChatMessages messages={[message]} />)
+    // The run folds into one summary; the answer text is never collapsed.
+    expect(container.textContent).toContain('Worked through 3 steps')
+    expect(container.textContent).toContain('All set.')
+  })
+
+  it('does NOT collapse a run below the threshold (2 tools render inline)', () => {
+    const message: ChatUiMessage = {
+      id: 'm1',
+      role: 'assistant',
+      content: '',
+      segments: [
+        { kind: 'tool', call: { id: 't1', name: 'get_workflow_schema', status: 'done' } },
+        { kind: 'tool', call: { id: 't2', name: 'validate_workflow', status: 'done' } },
+      ],
+    }
+    const { container } = render(<ChatMessages messages={[message]} />)
+    expect(container.textContent).not.toContain('Worked through')
+    expect(container.textContent).toContain('Get workflow schema')
+    expect(container.textContent).toContain('Validate workflow')
+  })
+
+  it('does NOT collapse a 3+ run while the turn is still streaming (live activity stays visible)', () => {
+    const message: ChatUiMessage = {
+      id: 'm1',
+      role: 'assistant',
+      content: '',
+      segments: [
+        { kind: 'tool', call: { id: 't1', name: 'get_workflow_schema', status: 'done' } },
+        { kind: 'tool', call: { id: 't2', name: 'validate_workflow', status: 'done' } },
+        { kind: 'tool', call: { id: 't3', name: 'validate_workflow', status: 'running' } },
+      ],
+    }
+    // `loading` + last message → this turn is streaming.
+    const { container } = render(<ChatMessages messages={[message]} loading />)
+    expect(container.textContent).not.toContain('Worked through')
+  })
+
+  it('does NOT collapse a settled run containing a FAILED tool (a failure never hides)', () => {
+    const message: ChatUiMessage = {
+      id: 'm1',
+      role: 'assistant',
+      content: 'Done.',
+      segments: [
+        { kind: 'tool', call: { id: 't1', name: 'get_workflow_schema', status: 'done' } },
+        { kind: 'tool', call: { id: 't2', name: 'validate_workflow', status: 'error' } },
+        { kind: 'tool', call: { id: 't3', name: 'validate_workflow', status: 'done' } },
+        { kind: 'text', content: 'Done.' },
+      ],
+    }
+    const { container } = render(<ChatMessages messages={[message]} />)
+    expect(container.textContent).not.toContain('Worked through')
+  })
+
+  it('does NOT collapse a settled run containing a proposal awaiting approval', () => {
+    const message: ChatUiMessage = {
+      id: 'm1',
+      role: 'assistant',
+      content: '',
+      segments: [
+        { kind: 'tool', call: { id: 't1', name: 'get_workflow_schema', status: 'done' } },
+        { kind: 'tool', call: { id: 't2', name: 'list_workflows', status: 'done' } },
+        {
+          kind: 'tool',
+          call: {
+            id: 't3',
+            name: 'submit_proposal',
+            status: 'done',
+            result: { ok: true, result: { status: 'queued_for_approval', proposalId: 'p1' } },
+          },
+        },
+      ],
+    }
+    const { container } = render(
+      <ChatMessages messages={[message]} approval={{ onApprove: vi.fn(), onReject: vi.fn() }} />,
+    )
+    expect(container.textContent).not.toContain('Worked through')
+  })
+
+  it('does NOT collapse a settled run with a done tool that reported an ok:false outcome', () => {
+    const message: ChatUiMessage = {
+      id: 'm1',
+      role: 'assistant',
+      content: 'Done.',
+      segments: [
+        { kind: 'tool', call: { id: 't1', name: 'get_workflow_schema', status: 'done' } },
+        // status 'done' but a failed outcome — the card renders as failed, so it
+        // must not hide behind the collapse summary.
+        {
+          kind: 'tool',
+          call: { id: 't2', name: 'validate_workflow', status: 'done', result: { ok: false, message: 'bad' } },
+        },
+        { kind: 'tool', call: { id: 't3', name: 'validate_workflow', status: 'done' } },
+        { kind: 'text', content: 'Done.' },
+      ],
+    }
+    const { container } = render(<ChatMessages messages={[message]} />)
+    expect(container.textContent).not.toContain('Worked through')
+  })
+
+  it('does NOT collapse a settled run that still has a running tool (stuck / timed out)', () => {
+    const message: ChatUiMessage = {
+      id: 'm1',
+      role: 'assistant',
+      content: '',
+      segments: [
+        { kind: 'tool', call: { id: 't1', name: 'get_workflow_schema', status: 'done' } },
+        { kind: 'tool', call: { id: 't2', name: 'list_workflows', status: 'done' } },
+        { kind: 'tool', call: { id: 't3', name: 'validate_workflow', status: 'running' } },
+      ],
+    }
+    // No `loading` → the turn has settled, so a still-running tool is stuck and
+    // must stay visible rather than collapse.
+    const { container } = render(<ChatMessages messages={[message]} />)
+    expect(container.textContent).not.toContain('Worked through')
+  })
+
   it('shows a streaming caret when the live turn ends on a tool segment', () => {
     const message: ChatUiMessage = {
       id: 'm1',
