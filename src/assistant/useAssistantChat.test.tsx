@@ -158,6 +158,95 @@ describe("useAssistantChat", () => {
     });
   });
 
+  it("buffers queued stream events until the active turn settles", async () => {
+    const active = controllableSse();
+    const queued = controllableSse();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(active.response)
+      .mockResolvedValueOnce(queued.response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useAssistantChat("userA"), { wrapper });
+    act(() => {
+      result.current.send("first");
+    });
+    await act(async () => {
+      active.push('event: thread\ndata: {"threadId":"T","turnId":"R1"}\n\n');
+      active.push('event: delta\ndata: {"text":"active"}\n\n');
+    });
+    await waitFor(() => expect(result.current.state.status).toBe("streaming"));
+
+    act(() => {
+      result.current.send("second", { deliveryMode: "queue" });
+    });
+    await act(async () => {
+      queued.push('event: thread\ndata: {"threadId":"T","turnId":"R2"}\n\n');
+      queued.push('event: delta\ndata: {"text":"queued"}\n\n');
+    });
+    expect(result.current.state.messages.map((m) => m.text)).toEqual([
+      "first",
+      "active",
+    ]);
+
+    await act(async () => {
+      active.push(DONE);
+      active.close();
+    });
+    await waitFor(() =>
+      expect(result.current.state.messages.map((m) => m.text)).toContain(
+        "second",
+      ),
+    );
+    expect(result.current.state.messages.map((m) => m.text)).toEqual([
+      "first",
+      "active",
+      "second",
+      "queued",
+    ]);
+
+    await act(async () => {
+      queued.push('event: done\ndata: {"turnId":"R2","status":"completed"}\n\n');
+      queued.close();
+    });
+    await waitFor(() => expect(result.current.state.status).toBe("idle"));
+  });
+
+  it("aborts queued streams on reset", async () => {
+    const active = controllableSse();
+    const queued = controllableSse();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(active.response)
+      .mockResolvedValueOnce(queued.response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useAssistantChat("userA"), { wrapper });
+    act(() => {
+      result.current.send("first");
+    });
+    await act(async () => {
+      active.push('event: thread\ndata: {"threadId":"T","turnId":"R1"}\n\n');
+    });
+    await waitFor(() => expect(result.current.state.status).toBe("streaming"));
+
+    act(() => {
+      result.current.send("second", { deliveryMode: "queue" });
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const activeSignal = (fetchMock.mock.calls[0]![1] as { signal: AbortSignal })
+      .signal;
+    const queuedSignal = (fetchMock.mock.calls[1]![1] as { signal: AbortSignal })
+      .signal;
+
+    act(() => {
+      result.current.reset();
+    });
+
+    expect(activeSignal.aborted).toBe(true);
+    expect(queuedSignal.aborted).toBe(true);
+  });
+
   it("blocks a new send while a proposal is awaiting confirmation", async () => {
     const fetchMock = vi
       .fn()
