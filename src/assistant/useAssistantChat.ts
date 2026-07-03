@@ -30,7 +30,6 @@ interface PendingQueuedSend {
   ownerId: string | null;
   text: string;
   model?: string;
-  threadId?: string;
 }
 
 /** Host integration callbacks for {@link useAssistantChat}. */
@@ -296,7 +295,12 @@ export function useAssistantChat(
     ) {
       return;
     }
-    startChatStream(pending.text, "queue", pending.model, pending.threadId);
+    startChatStream(
+      pending.text,
+      "queue",
+      pending.model,
+      state.threadId ?? undefined,
+    );
   }, [state.status, state.pendingProposals.length, startChatStream]);
 
   // Restore the visible transcript for the persisted thread from the server,
@@ -386,6 +390,9 @@ export function useAssistantChat(
     // billable streams. Explicit queue is allowed through so the server can
     // append it behind the active response instead of forcing products to guard.
     if (sendingRef.current && !shouldQueue) return;
+    if (!shouldQueue && pendingQueuedSendRef.current) return;
+    // Single-slot hold: the server owns queue ordering; the hook only stores one
+    // follow-up until the active turn settles.
     if (shouldQueue && pendingQueuedSendRef.current) return;
     const text = message.trim();
     const current = stateRef.current;
@@ -408,7 +415,6 @@ export function useAssistantChat(
         ownerId: current.ownerId,
         text,
         model: selectedModelRef.current ?? undefined,
-        threadId: current.threadId ?? undefined,
       };
       return;
     }

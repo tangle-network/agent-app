@@ -166,6 +166,72 @@ describe("useAssistantChat", () => {
     });
   });
 
+  it("uses the active turn thread id when a queued send was captured before the thread event", async () => {
+    const active = controllableSse();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(active.response)
+      .mockResolvedValueOnce(sseResponse([DONE]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useAssistantChat("userA"), { wrapper });
+    act(() => {
+      result.current.send("first");
+    });
+    await waitFor(() => expect(result.current.state.status).toBe("streaming"));
+
+    act(() => {
+      result.current.send("second", { deliveryMode: "queue" });
+    });
+    await act(async () => {
+      active.push('event: thread\ndata: {"threadId":"T","turnId":"R1"}\n\n');
+      active.push(DONE);
+      active.close();
+    });
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const [, init] = fetchMock.mock.calls[1]!;
+    expect(JSON.parse((init as { body: string }).body)).toMatchObject({
+      message: "second",
+      deliveryMode: "queue",
+      threadId: "T",
+    });
+  });
+
+  it("keeps a pending queued send ahead of later default sends", async () => {
+    const active = controllableSse();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(active.response)
+      .mockResolvedValueOnce(sseResponse([DONE]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useAssistantChat("userA"), { wrapper });
+    act(() => {
+      result.current.send("first");
+    });
+    await act(async () => {
+      active.push('event: thread\ndata: {"threadId":"T","turnId":"R1"}\n\n');
+    });
+    await waitFor(() => expect(result.current.state.status).toBe("streaming"));
+
+    act(() => {
+      result.current.send("queued", { deliveryMode: "queue" });
+      result.current.send("jump ahead");
+    });
+    await act(async () => {
+      active.push(DONE);
+      active.close();
+    });
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const [, init] = fetchMock.mock.calls[1]!;
+    expect(JSON.parse((init as { body: string }).body)).toMatchObject({
+      message: "queued",
+      deliveryMode: "queue",
+    });
+  });
+
   it("plays queued transcript after the active turn settles", async () => {
     const active = controllableSse();
     const queued = controllableSse();
