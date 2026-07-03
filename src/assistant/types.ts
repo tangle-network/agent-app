@@ -7,9 +7,13 @@
 
 import type { ReactNode } from "react";
 
+export type AssistantDeliveryMode = "steering" | "queue";
+
 /** Request body for `POST /api/v1/assistant/chat`. */
 export interface ChatRequest {
   message: string;
+  /** How to deliver text when a session may already be active. Defaults to steering. */
+  deliveryMode?: AssistantDeliveryMode;
   /** Model slug to run this turn against; omit to use the server default. */
   model?: string;
   /** Omit to start a new thread; pass to continue an existing one. */

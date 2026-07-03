@@ -95,6 +95,38 @@ describe("useAssistantChat", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("sends steering delivery by default", () => {
+    const fetchMock = vi.fn().mockResolvedValue(sseResponse([DONE]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useAssistantChat("userA"), { wrapper });
+    act(() => {
+      result.current.send("hello");
+    });
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(JSON.parse((init as { body: string }).body)).toMatchObject({
+      message: "hello",
+      deliveryMode: "steering",
+    });
+  });
+
+  it("preserves explicit queue delivery from send options", () => {
+    const fetchMock = vi.fn().mockResolvedValue(sseResponse([DONE]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useAssistantChat("userA"), { wrapper });
+    act(() => {
+      result.current.send("wait your turn", { deliveryMode: "queue" });
+    });
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(JSON.parse((init as { body: string }).body)).toMatchObject({
+      message: "wait your turn",
+      deliveryMode: "queue",
+    });
+  });
+
   it("blocks a new send while a proposal is awaiting confirmation", async () => {
     const fetchMock = vi
       .fn()

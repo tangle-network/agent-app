@@ -15,7 +15,15 @@ import {
   initialAssistantState,
   selectVisibleState,
 } from "./reducer";
-import type { ChatMessage, PendingProposal } from "./types";
+import type {
+  AssistantDeliveryMode,
+  ChatMessage,
+  PendingProposal,
+} from "./types";
+
+export interface AssistantSendOptions {
+  deliveryMode?: AssistantDeliveryMode;
+}
 
 /** Host integration callbacks for {@link useAssistantChat}. */
 export interface UseAssistantChatOptions {
@@ -56,7 +64,7 @@ export interface AssistantChat {
   selectedModel: string | null;
   /** Choose the model for subsequent turns (persisted per user). */
   setModel: (model: string | null) => void;
-  send: (message: string) => void;
+  send: (message: string, options?: AssistantSendOptions) => void;
   stop: () => void;
   confirm: (proposal: PendingProposal) => Promise<void>;
   cancel: (proposal: PendingProposal) => void;
@@ -272,7 +280,7 @@ export function useAssistantChat(
     return () => abortRef.current?.abort();
   }, []);
 
-  const send = useCallback((message: string) => {
+  const send = useCallback((message: string, options?: AssistantSendOptions) => {
     // Synchronous in-flight guard — closes the window where two submits in the
     // same tick both read a not-yet-committed `idle` status and start two
     // billable streams.
@@ -307,6 +315,7 @@ export function useAssistantChat(
       .streamChat(
         {
           message: text,
+          deliveryMode: options?.deliveryMode ?? "steering",
           // null → omit, so the server applies its default model.
           model: selectedModelRef.current ?? undefined,
           threadId: current.threadId ?? undefined,
