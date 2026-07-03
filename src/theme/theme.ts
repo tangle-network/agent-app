@@ -193,6 +193,8 @@ export function themeToCssVars(theme: AgentAppTheme): Record<string, string> {
     '--text-danger': `hsl(${theme.destructive})`,
     '--border-default': `hsl(${theme.border})`,
     '--brand-primary': `hsl(${theme.primary})`,
+    '--editor-selection-background': `hsl(${theme.primary})`,
+    '--editor-selection-foreground': `hsl(${theme.background})`,
     '--canvas-backdrop': theme.canvasBackdrop,
   }
 }

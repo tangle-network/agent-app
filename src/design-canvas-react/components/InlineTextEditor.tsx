@@ -81,6 +81,7 @@ export function InlineTextEditor({
       defaultValue={element.text}
       onKeyDown={handleKeyDown}
       onBlur={handleBlur}
+      className="agent-app-edit-selection"
       style={{
         position: 'absolute',
         left: pos.left,

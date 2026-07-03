@@ -510,7 +510,7 @@ export function TimelineClipChip(props: TimelineClipChipProps) {
             event.stopPropagation()
           }}
           onBlur={commitText}
-          className="absolute inset-0 z-10 w-full bg-black/80 px-1.5 text-[11px] text-[var(--text-primary)] outline-none ring-1 ring-[var(--brand-primary)]"
+          className="agent-app-edit-selection absolute inset-0 z-10 w-full bg-black/80 px-1.5 text-[11px] text-[var(--text-primary)] outline-none ring-1 ring-[var(--brand-primary)]"
           aria-label="Caption text"
         />
       ) : null}

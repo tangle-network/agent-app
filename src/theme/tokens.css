@@ -59,6 +59,8 @@
   --text-warning: hsl(var(--warning));
   --border-default: hsl(var(--border));
   --brand-primary: hsl(var(--primary));
+  --editor-selection-background: hsl(var(--primary));
+  --editor-selection-foreground: hsl(var(--background));
 
   /* MD3 bridge — sandbox-ui chat/composer components (AgentComposer and its
      pickers) are authored against the brand MD3 surface ladder + accent tokens.
@@ -106,4 +108,9 @@
   --warning-foreground: 38 92% 12%;
 
   --canvas-backdrop: hsl(240 8% 5%);
+}
+
+.agent-app-edit-selection::selection {
+  background: var(--editor-selection-background);
+  color: var(--editor-selection-foreground);
 }

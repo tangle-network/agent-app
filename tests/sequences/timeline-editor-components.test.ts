@@ -328,6 +328,19 @@ describe('TimelineEditor', () => {
     expect(onApplyOperations).not.toHaveBeenCalled()
   })
 
+  it('uses high-contrast selected-text styling while editing caption chips', () => {
+    render(
+      createElement(TimelineEditor, {
+        timeline: fixtureTimeline(),
+        canWrite: true,
+        onApplyOperations: vi.fn(async () => {}),
+      }),
+    )
+    fireEvent.doubleClick(screen.getByLabelText('Hello caption'))
+    const input = screen.getByLabelText('Caption text') as HTMLInputElement
+    expect(input.className).toContain('agent-app-edit-selection')
+  })
+
   it('hides write controls when canWrite is false', () => {
     render(
       createElement(TimelineEditor, {

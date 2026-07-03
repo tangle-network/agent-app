@@ -11,7 +11,7 @@
  * never per-pixel.
  */
 
-import type { Bounds, SceneDocument, SceneElement } from '../design-canvas/model'
+import type { Bounds, SceneDocument, SceneElement, ScenePage } from '../design-canvas/model'
 import type { SceneOperation } from '../design-canvas/operations'
 import type { CanvasRenderPalette } from '../theme/theme'
 
@@ -187,7 +187,7 @@ export interface DesignCanvasProps {
   onSelectionChange?(elements: SceneElement[]): void
   /** Host panels: agent chat (right), asset/template browser (left). */
   renderAgentPanel?(ctx: { selectedElements: SceneElement[]; activePageId: string }): React.ReactNode
-  renderSidePanel?(): React.ReactNode
+  renderSidePanel?(ctx: { selectedElements: SceneElement[]; activePageId: string; activePage: ScenePage }): React.ReactNode
   /** Export hook — host persists the rendered blob (upload → asset row). */
   onExport?(result: { pageId: string; format: 'png' | 'jpeg'; dataUrl: string; pixelRatio: number }): Promise<void>
   /**

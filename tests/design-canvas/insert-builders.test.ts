@@ -119,4 +119,12 @@ describe('DEFAULT_INSERT_TEMPLATES', () => {
       expect(el.text.length).toBeGreaterThan(0)
     }
   })
+
+  it('text templates choose readable fills for dark pages', () => {
+    const darkPage = { ...PAGE, background: '#0f172a' }
+    const heading = DEFAULT_INSERT_TEMPLATES.find((t) => t.id === 'heading')!.build(darkPage)[0]!
+    const body = DEFAULT_INSERT_TEMPLATES.find((t) => t.id === 'body')!.build(darkPage)[0]!
+    expect(elementOf(heading)).toMatchObject({ kind: 'text', fill: '#f8fafc' })
+    expect(elementOf(body)).toMatchObject({ kind: 'text', fill: '#cbd5e1' })
+  })
 })
