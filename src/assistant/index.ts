@@ -14,6 +14,7 @@ export * from "./client-context";
 export {
   useAssistantChat,
   type AssistantChat,
+  type AssistantSendOptions,
   type UseAssistantChatOptions,
 } from "./useAssistantChat";
 export { useAssistantModels } from "./useAssistantModels";

@@ -291,9 +291,68 @@ describe("streamChat", () => {
     const [, init] = fetchMock.mock.calls[0]!;
     expect(JSON.parse(init.body)).toEqual({
       message: "continue",
+      deliveryMode: "steering",
       threadId: "T9",
       turnKey: "k1",
     });
+  });
+
+  it("defaults the chat delivery mode to steering", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      body: sseBody([
+        'event: done\ndata: {"turnId":"R","status":"completed"}\n\n',
+      ]),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await client.streamChat(
+      { message: "hi" },
+      () => {},
+      new AbortController().signal,
+    );
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(JSON.parse(init.body)).toMatchObject({
+      message: "hi",
+      deliveryMode: "steering",
+    });
+  });
+
+  it("preserves explicit queue delivery mode", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      body: sseBody([
+        'event: done\ndata: {"turnId":"R","status":"completed"}\n\n',
+      ]),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await client.streamChat(
+      { message: "later", deliveryMode: "queue" },
+      () => {},
+      new AbortController().signal,
+    );
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(JSON.parse(init.body)).toMatchObject({
+      message: "later",
+      deliveryMode: "queue",
+    });
+  });
+
+  it("rejects unknown delivery modes before sending", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      client.streamChat(
+        { message: "hi", deliveryMode: "bogus" as never },
+        () => {},
+        new AbortController().signal,
+      ),
+    ).rejects.toThrow("Invalid assistant delivery mode: bogus");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

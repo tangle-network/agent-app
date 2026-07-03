@@ -12,6 +12,7 @@
 
 import { readSSEEvents } from "./sse";
 import type {
+  AssistantDeliveryMode,
   AssistantStreamEvent,
   ChatMessage,
   ChatRequest,
@@ -93,6 +94,10 @@ export type ConfirmResult =
   | { ok: true; output: unknown; retryable?: boolean }
   | { ok: false; error: string };
 
+export class AssistantClientInputError extends Error {
+  readonly code = "INVALID_REQUEST";
+}
+
 /** The assistant network surface, bound to one host's transport config. */
 export interface AssistantClient {
   fetchModels(signal?: AbortSignal): Promise<AssistantModelsResult>;
@@ -115,6 +120,21 @@ export interface AssistantClient {
 }
 
 const EMPTY_MODELS: AssistantModels = { default: null, models: [] };
+
+const ASSISTANT_DELIVERY_MODES: ReadonlySet<string> = new Set([
+  "steering",
+  "queue",
+]);
+
+function resolveDeliveryMode(value: unknown): AssistantDeliveryMode {
+  if (value === undefined) return "steering";
+  if (typeof value === "string" && ASSISTANT_DELIVERY_MODES.has(value)) {
+    return value as AssistantDeliveryMode;
+  }
+  throw new AssistantClientInputError(
+    `Invalid assistant delivery mode: ${String(value)}`,
+  );
+}
 
 /** A parsed event payload narrowed to a plain (non-array) object, or null. The
  *  shared parser JSON-parses each `data:` payload; a non-object (e.g. a
@@ -520,6 +540,10 @@ export function createAssistantClient(
     },
 
     async streamChat(req, onEvent, signal) {
+      const body: ChatRequest = {
+        ...req,
+        deliveryMode: resolveDeliveryMode(req.deliveryMode),
+      };
       // Raw fetch, not `postJson`: that helper reads `res.json()`, which would
       // consume the body and defeat streaming. CSRF is covered the same way as
       // every other authenticated POST in the app — a SameSite cookie plus the
@@ -533,7 +557,7 @@ export function createAssistantClient(
           Accept: "text/event-stream",
         },
         credentials,
-        body: JSON.stringify(req),
+        body: JSON.stringify(body),
         signal,
       });
 
