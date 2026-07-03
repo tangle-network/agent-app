@@ -94,6 +94,10 @@ export type ConfirmResult =
   | { ok: true; output: unknown; retryable?: boolean }
   | { ok: false; error: string };
 
+export class AssistantClientInputError extends Error {
+  readonly code = "INVALID_REQUEST";
+}
+
 /** The assistant network surface, bound to one host's transport config. */
 export interface AssistantClient {
   fetchModels(signal?: AbortSignal): Promise<AssistantModelsResult>;
@@ -127,7 +131,9 @@ function resolveDeliveryMode(value: unknown): AssistantDeliveryMode {
   if (typeof value === "string" && ASSISTANT_DELIVERY_MODES.has(value)) {
     return value as AssistantDeliveryMode;
   }
-  throw new Error(`Invalid assistant delivery mode: ${String(value)}`);
+  throw new AssistantClientInputError(
+    `Invalid assistant delivery mode: ${String(value)}`,
+  );
 }
 
 /** A parsed event payload narrowed to a plain (non-array) object, or null. The

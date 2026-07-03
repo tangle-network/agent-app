@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { AssistantClientInputError } from "./client";
 import { useAssistantClient } from "./client-context";
 import { loadThread, saveThread } from "./persistence";
 import { resolveConfirmation } from "./presentation";
@@ -93,6 +94,7 @@ export function useAssistantChat(
   );
 
   const abortRef = useRef<AbortController | null>(null);
+  const streamControllersRef = useRef<Set<AbortController>>(new Set());
   // Aborts an in-flight thread-history restore when the user changes or the
   // panel unmounts, so a late response can't land in a different conversation.
   const historyAbortRef = useRef<AbortController | null>(null);
@@ -277,14 +279,23 @@ export function useAssistantChat(
 
   // Abort any in-flight stream on unmount so a closed panel stops billing.
   useEffect(() => {
-    return () => abortRef.current?.abort();
+    return () => {
+      for (const controller of streamControllersRef.current) {
+        controller.abort();
+      }
+      streamControllersRef.current.clear();
+      abortRef.current = null;
+    };
   }, []);
 
   const send = useCallback((message: string, options?: AssistantSendOptions) => {
+    const deliveryMode = options?.deliveryMode;
+    const shouldQueue = deliveryMode === "queue";
     // Synchronous in-flight guard — closes the window where two submits in the
     // same tick both read a not-yet-committed `idle` status and start two
-    // billable streams.
-    if (sendingRef.current) return;
+    // billable streams. Explicit queue is allowed through so the server can
+    // append it behind the active response instead of forcing products to guard.
+    if (sendingRef.current && !shouldQueue) return;
     const text = message.trim();
     const current = stateRef.current;
     // Refuse if the loaded conversation doesn't belong to the current user. This
@@ -295,27 +306,40 @@ export function useAssistantChat(
     // Refuse while a switched-to thread's transcript is still loading — sending
     // now would run a turn against context the user can't see yet.
     if (restoringRef.current) return;
-    // Refuse while a turn is streaming, or while a mutating proposal is awaiting
-    // the user's decision — a new turn must not abandon an unresolved proposal.
-    if (!text || current.status === "streaming") return;
+    // Refuse while a turn is streaming unless the caller explicitly queues the
+    // text behind it, or while a mutating proposal is awaiting the user's
+    // decision — a new turn must not abandon an unresolved proposal.
+    if (!text || (current.status === "streaming" && !shouldQueue)) return;
     if (current.pendingProposals.length > 0) return;
 
-    dispatch({
-      type: "send",
-      messageId: uuid(),
-      assistantId: uuid(),
-      text,
-    });
+    const messageId = uuid();
+    const assistantId = uuid();
+    let sentToReducer = false;
+    const dispatchSend = () => {
+      if (sentToReducer) return;
+      sentToReducer = true;
+      dispatch({
+        type: "send",
+        messageId,
+        assistantId,
+        text,
+      });
+    };
 
-    const seq = ++streamSeqRef.current;
+    if (!shouldQueue) dispatchSend();
+
+    const seq = shouldQueue ? streamSeqRef.current : ++streamSeqRef.current;
     const ac = new AbortController();
-    abortRef.current = ac;
-    sendingRef.current = true;
+    streamControllersRef.current.add(ac);
+    if (!shouldQueue) {
+      abortRef.current = ac;
+      sendingRef.current = true;
+    }
     clientRef.current
       .streamChat(
         {
           message: text,
-          deliveryMode: options?.deliveryMode ?? "steering",
+          deliveryMode,
           // null → omit, so the server applies its default model.
           model: selectedModelRef.current ?? undefined,
           threadId: current.threadId ?? undefined,
@@ -324,7 +348,9 @@ export function useAssistantChat(
         (event) => {
           // Drop events from a stream that has been superseded (new turn, stop,
           // reset, or user switch) so they cannot mutate unrelated state.
-          if (streamSeqRef.current === seq) dispatch({ type: "stream", event });
+          if (streamSeqRef.current !== seq) return;
+          if (shouldQueue) dispatchSend();
+          dispatch({ type: "stream", event });
         },
         ac.signal,
       )
@@ -333,26 +359,38 @@ export function useAssistantChat(
         // failure; a superseded stream is ignored entirely. Only surface a
         // genuine network/parse error for the still-current stream.
         if (ac.signal.aborted || streamSeqRef.current !== seq) return;
+        if (shouldQueue) dispatchSend();
         dispatch({
           type: "stream_failed",
           error: {
-            code: "NETWORK",
+            code:
+              err instanceof AssistantClientInputError
+                ? err.code
+                : "NETWORK",
             message:
               err instanceof Error ? err.message : "The connection failed",
           },
         });
       })
       .finally(() => {
+        streamControllersRef.current.delete(ac);
         // This stream is over (settled, failed, or aborted) — allow the next
         // send. A superseded stream clearing the flag is harmless: a newer send
         // already set its own.
-        if (streamSeqRef.current === seq) sendingRef.current = false;
+        if (!shouldQueue && streamSeqRef.current === seq) {
+          sendingRef.current = false;
+        }
+        if (abortRef.current === ac) abortRef.current = null;
       });
   }, []);
 
   const stop = useCallback(() => {
     streamSeqRef.current += 1;
-    abortRef.current?.abort();
+    for (const controller of streamControllersRef.current) {
+      controller.abort();
+    }
+    streamControllersRef.current.clear();
+    abortRef.current = null;
     sendingRef.current = false;
     dispatch({ type: "stopped" });
   }, []);

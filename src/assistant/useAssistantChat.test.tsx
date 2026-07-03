@@ -127,6 +127,37 @@ describe("useAssistantChat", () => {
     });
   });
 
+  it("allows explicit queue delivery while a turn is streaming", async () => {
+    const active = controllableSse();
+    const queued = controllableSse();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(active.response)
+      .mockResolvedValueOnce(queued.response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useAssistantChat("userA"), { wrapper });
+    act(() => {
+      result.current.send("first");
+    });
+    await act(async () => {
+      active.push('event: thread\ndata: {"threadId":"T","turnId":"R1"}\n\n');
+    });
+    await waitFor(() => expect(result.current.state.status).toBe("streaming"));
+
+    act(() => {
+      result.current.send("second", { deliveryMode: "queue" });
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [, init] = fetchMock.mock.calls[1]!;
+    expect(JSON.parse((init as { body: string }).body)).toMatchObject({
+      message: "second",
+      deliveryMode: "queue",
+      threadId: "T",
+    });
+  });
+
   it("blocks a new send while a proposal is awaiting confirmation", async () => {
     const fetchMock = vi
       .fn()
