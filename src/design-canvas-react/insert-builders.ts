@@ -31,6 +31,7 @@ export interface InsertPageGeometry {
   pageId: string
   width: number
   height: number
+  background?: string
 }
 
 /** Mint a DOM-safe element id. Prefers `crypto.randomUUID`; falls back to a
@@ -79,6 +80,31 @@ function baseAttrs(name: string, x: number, y: number) {
 /** Wrap a single element in an `add_element` op for the active page. */
 function addElementOp(pageId: string, element: SceneElement): SceneOperation {
   return { type: 'add_element', pageId, element }
+}
+
+function hexLuminance(color: string | undefined): number | null {
+  if (!color) return null
+  const raw = color.trim()
+  const hex = raw.startsWith('#') ? raw.slice(1) : ''
+  const full = hex.length === 3
+    ? hex.split('').map((ch) => ch + ch).join('')
+    : hex.length === 6
+      ? hex
+      : ''
+  if (!/^[0-9a-fA-F]{6}$/.test(full)) return null
+  const channels = [0, 2, 4].map((start) => parseInt(full.slice(start, start + 2), 16) / 255)
+  const [r, g, b] = channels.map((value) => (
+    value <= 0.03928 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4)
+  ))
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!
+}
+
+function pageTextFill(page: InsertPageGeometry, tone: 'primary' | 'secondary'): string {
+  const luminance = hexLuminance(page.background)
+  if (luminance !== null && luminance < 0.35) {
+    return tone === 'primary' ? '#f8fafc' : '#cbd5e1'
+  }
+  return tone === 'primary' ? '#111827' : '#374151'
 }
 
 /**
@@ -134,7 +160,7 @@ export const DEFAULT_INSERT_TEMPLATES: readonly InsertTemplate[] = [
         fontFamily: 'Inter',
         fontSize: 48,
         fontStyle: 'bold',
-        fill: '#111827',
+        fill: pageTextFill(page, 'primary'),
         align: 'left',
         lineHeight: 1.1,
         letterSpacing: 0,
@@ -156,7 +182,7 @@ export const DEFAULT_INSERT_TEMPLATES: readonly InsertTemplate[] = [
         fontFamily: 'Inter',
         fontSize: 20,
         fontStyle: 'normal',
-        fill: '#374151',
+        fill: pageTextFill(page, 'secondary'),
         align: 'left',
         lineHeight: 1.4,
         letterSpacing: 0,

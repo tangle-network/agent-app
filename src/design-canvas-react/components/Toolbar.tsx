@@ -1009,7 +1009,7 @@ function BleedControls({ page, canWrite, onSetPageProps, enableBleedLabel = 'Sho
       {(['top', 'right', 'bottom', 'left'] as const).map((side) => (
         <NumberInput
           key={side}
-          label={`Bleed ${side[0]!.toUpperCase()}`}
+          label={side[0]!.toUpperCase() + side.slice(1)}
           value={bleed[side]}
           min={0}
           onCommit={(v) => setBleedSide(side, v)}
@@ -1021,7 +1021,8 @@ function BleedControls({ page, canWrite, onSetPageProps, enableBleedLabel = 'Sho
         disabled={!canWrite}
         onClick={() => onSetPageProps({ bleed: null })}
         className={BTN}
-        title="Remove bleed"
+        title="Remove print bleed"
+        aria-label="Remove print bleed"
       >
         ×
       </button>

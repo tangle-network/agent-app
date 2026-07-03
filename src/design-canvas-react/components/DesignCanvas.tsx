@@ -542,7 +542,7 @@ export function DesignCanvas({
           surfaces regardless of what the integrator passes. */}
       {renderSidePanel && !review ? (
         <aside className="hidden w-64 shrink-0 flex-col overflow-hidden border-r border-[var(--border-default)] lg:flex">
-          {renderSidePanel()}
+          {renderSidePanel({ selectedElements, activePageId: activePage.id, activePage })}
         </aside>
       ) : null}
 

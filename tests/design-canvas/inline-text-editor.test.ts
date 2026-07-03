@@ -118,4 +118,19 @@ describe('InlineTextEditor', () => {
     expect(ta.style.top).toBe('120px') // 20 + 50*2
     expect(ta.style.width).toBe('400px') // 200*2
   })
+
+  it('uses the shared high-contrast edit-selection styling', () => {
+    const { container } = render(
+      createElement(InlineTextEditor, {
+        element: textEl(),
+        zoom: 1,
+        panX: 0,
+        panY: 0,
+        onCommit: vi.fn(),
+        onCancel: vi.fn(),
+      }),
+    )
+    const ta = container.querySelector('textarea') as HTMLTextAreaElement
+    expect(ta.className).toContain('agent-app-edit-selection')
+  })
 })

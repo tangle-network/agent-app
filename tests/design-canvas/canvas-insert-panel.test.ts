@@ -39,6 +39,19 @@ describe('tabs', () => {
     expect(screen.queryByText('Generations')).toBeNull()
   })
 
+  it('supports a templates-only insert rail when uploads are not wired', () => {
+    render(
+      createElement(CanvasInsertPanel, {
+        canWrite: true,
+        page: PAGE,
+        onInsert: vi.fn().mockResolvedValue(undefined),
+      }),
+    )
+    expect(screen.queryByText('Uploads')).toBeNull()
+    expect(screen.getByText('Templates')).toBeTruthy()
+    expect(screen.getByText('Heading')).toBeTruthy()
+  })
+
   it('shows Generations when a loader is provided', () => {
     setup({ loadGenerations: vi.fn().mockResolvedValue([]) })
     expect(screen.getByText('Generations')).toBeTruthy()
@@ -58,6 +71,7 @@ describe('upload → insert', () => {
     try {
       const { onInsert, onUploadImage } = setup()
       const file = new File([new Uint8Array([1, 2, 3])], 'pic.png', { type: 'image/png' })
+      fireEvent.click(screen.getByText('Uploads'))
       const input = document.querySelector('input[type=file]') as HTMLInputElement
       await act(async () => {
         fireEvent.change(input, { target: { files: [file] } })
@@ -84,6 +98,7 @@ describe('upload → insert', () => {
       createElement(CanvasInsertPanel, { canWrite: true, page: PAGE, onInsert, onUploadImage }),
     )
     const file = new File([new Uint8Array([1])], 'pic.png', { type: 'image/png' })
+    fireEvent.click(screen.getByText('Uploads'))
     const input = document.querySelector('input[type=file]') as HTMLInputElement
     await act(async () => {
       fireEvent.change(input, { target: { files: [file] } })

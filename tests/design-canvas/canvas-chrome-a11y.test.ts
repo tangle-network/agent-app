@@ -292,4 +292,23 @@ describe('PagesStrip drag reorder', () => {
     fireEvent.drop(first)
     expect(onReorderPage).not.toHaveBeenCalled()
   })
+
+  it('renders thumbnails with object-contain so page previews are not cropped', async () => {
+    render(
+      createElement(PagesStrip, {
+        pages: [makePage({ id: 'p0' })],
+        activePageId: 'p0',
+        canWrite: true,
+        renderThumbnail: vi.fn().mockResolvedValue('data:image/png;base64,AAAA'),
+        onSelectPage: vi.fn(),
+        onAddPage: vi.fn(),
+        onDuplicatePage: vi.fn(),
+        onDeletePage: vi.fn(),
+        onReorderPage: vi.fn(),
+      }),
+    )
+    const image = await screen.findByAltText('Page') as HTMLImageElement
+    expect(image.className).toContain('object-contain')
+    expect(image.className).not.toContain('object-cover')
+  })
 })

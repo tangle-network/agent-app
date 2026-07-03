@@ -289,3 +289,21 @@ describe('SelectControl (replaces native <select>)', () => {
     expect(onSetPageProps).toHaveBeenCalledWith({ width: 1280, height: 720 })
   })
 })
+
+describe('Print boundary controls', () => {
+  it('uses readable side labels instead of cryptic bleed abbreviations', () => {
+    setup({
+      selectedElements: [],
+      page: {
+        ...PAGE,
+        bleed: { top: 3, right: 3, bottom: 3, left: 3 },
+      },
+    })
+    for (const label of ['Top', 'Right', 'Bottom', 'Left']) {
+      expect(screen.getByText(label)).toBeTruthy()
+    }
+    expect(screen.queryByText('Bleed T')).toBeNull()
+    expect(screen.queryByText('Bleed R')).toBeNull()
+    expect(screen.getByLabelText('Remove print bleed')).toBeTruthy()
+  })
+})

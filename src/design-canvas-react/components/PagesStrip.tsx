@@ -102,7 +102,7 @@ export function PagesStrip({
         </div>
       ) : null}
       <div
-        className="flex h-[84px] items-center gap-2 overflow-x-auto px-2 pb-1"
+        className="flex h-[92px] items-center gap-2 overflow-x-auto px-2 pb-2 pt-2"
         aria-label="Pages"
       >
       {pages.map((page, index) => {
@@ -160,7 +160,7 @@ export function PagesStrip({
                 <img
                   src={thumbUrl}
                   alt={page.name}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-contain"
                   draggable={false}
                 />
               ) : (
@@ -178,7 +178,7 @@ export function PagesStrip({
 
             {/* Per-page action buttons — visible on hover or when active */}
             {canWrite && canManagePages ? (
-              <div className="pointer-events-none absolute -top-1 right-0 flex gap-0.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+              <div className="pointer-events-none absolute right-1 top-1 flex gap-0.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
                 <button
                   type="button"
                   aria-label={`Duplicate page ${page.name}`}

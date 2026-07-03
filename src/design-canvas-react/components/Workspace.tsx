@@ -550,12 +550,20 @@ export function WorkspaceView({
     if (!canWrite) return
     const template = DEFAULT_INSERT_TEMPLATES[0]
     if (!template) return
-    const ops = template.build({ pageId: activePageId, width: activePage.width, height: activePage.height })
+    const ops = template.build({
+      pageId: activePageId,
+      width: activePage.width,
+      height: activePage.height,
+      background: activePage.background,
+    })
+    const addedIds: string[] = []
     for (const op of ops) {
       if (op.type === 'add_element') {
         await persist(addElementCommand({ pageId: op.pageId, element: op.element }))
+        addedIds.push(op.element.id)
       }
     }
+    if (addedIds.length > 0) stack.setView({ selectedElementIds: addedIds })
   }
 
   async function handleAddElement() {

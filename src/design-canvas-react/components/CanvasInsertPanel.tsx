@@ -6,10 +6,10 @@
  *
  * Endpoints are per-app, so every I/O path is a callback — no product route is
  * hardcoded:
- *  - `onUploadImage(file) => Promise<url>` — the host stores the file and returns
- *    the src to insert. The url MUST be http(s) or a rooted `/api/` path
- *    (enforced by `assertSceneMediaSrc` before insertion); a `data:` url is
- *    rejected, matching the scene model's media boundary.
+ *  - `onUploadImage(file) => Promise<url>` — optional. When provided, the host
+ *    stores the file and returns the src to insert. The url MUST be http(s) or
+ *    a rooted `/api/` path (enforced by `assertSceneMediaSrc` before insertion);
+ *    a `data:` url is rejected, matching the scene model's media boundary.
  *  - `loadGenerations?()` — optional provider for "already generated in this
  *    workspace" images; omit to hide the tab.
  *  - `templates?` — optional template set; defaults to {@link DEFAULT_INSERT_TEMPLATES}.
@@ -50,7 +50,7 @@ export interface CanvasInsertPanelProps {
   /** Submit operations through the host's apply pipeline. */
   onInsert(operations: SceneOperation[]): Promise<unknown>
   /** Store an uploaded file and return its src (http(s) or rooted `/api/`). */
-  onUploadImage(file: File): Promise<string>
+  onUploadImage?(file: File): Promise<string>
   /** Optional provider for the Generations tab; omit to hide it. */
   loadGenerations?(): Promise<InsertGeneration[]>
   /** Drop-in templates; defaults to the built-in starter set. */
@@ -181,13 +181,25 @@ export function CanvasInsertPanel({
   accept = DEFAULT_ACCEPT,
   className,
 }: CanvasInsertPanelProps) {
-  const [tab, setTab] = useState<Tab>('uploads')
+  const [tab, setTab] = useState<Tab>(() => (templates.length > 0 ? 'templates' : 'uploads'))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const [generations, setGenerations] = useState<InsertGeneration[]>([])
   const [generationsLoaded, setGenerationsLoaded] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (tab === 'uploads' && !onUploadImage) {
+      setTab(templates.length > 0 ? 'templates' : loadGenerations ? 'generations' : 'uploads')
+    }
+    if (tab === 'templates' && templates.length === 0) {
+      setTab(onUploadImage ? 'uploads' : loadGenerations ? 'generations' : 'uploads')
+    }
+    if (tab === 'generations' && !loadGenerations) {
+      setTab(templates.length > 0 ? 'templates' : onUploadImage ? 'uploads' : 'templates')
+    }
+  }, [tab, templates.length, onUploadImage, loadGenerations])
 
   useEffect(() => {
     if (tab !== 'generations' || generationsLoaded || !loadGenerations) return
@@ -217,6 +229,7 @@ export function CanvasInsertPanel({
 
   async function handleFiles(files: FileList | File[]) {
     if (!canWrite || busy) return
+    if (!onUploadImage) return
     const list = Array.from(files).filter((f) => f.type.startsWith('image/'))
     if (list.length === 0) {
       setError('Only image files can be added to the canvas')
@@ -250,7 +263,7 @@ export function CanvasInsertPanel({
   }
 
   const tabs: Array<{ id: Tab; label: string; icon: (p: { className?: string }) => ReactElement; show: boolean }> = [
-    { id: 'uploads', label: 'Uploads', icon: ImageGlyph, show: true },
+    { id: 'uploads', label: 'Uploads', icon: ImageGlyph, show: !!onUploadImage },
     { id: 'templates', label: 'Templates', icon: ShapesGlyph, show: templates.length > 0 },
     { id: 'generations', label: 'Generations', icon: SparkleGlyph, show: !!loadGenerations },
   ]

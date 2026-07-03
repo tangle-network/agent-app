@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { DesignCanvasEditor } from '@tangle-network/agent-app/design-canvas-react'
+import { CanvasInsertPanel, DesignCanvasEditor } from '@tangle-network/agent-app/design-canvas-react'
 import { applySceneOperations } from '@tangle-network/agent-app/design-canvas'
 import type { SceneOperation } from '@tangle-network/agent-app/design-canvas'
 import { lightTheme, darkTheme } from '@tangle-network/agent-app/theme'
@@ -60,6 +60,18 @@ export function CanvasRoute() {
         rev={rev}
         canWrite
         onApplyOperations={onApplyOperations}
+        renderSidePanel={({ activePage }) => (
+          <CanvasInsertPanel
+            canWrite
+            page={{
+              pageId: activePage.id,
+              width: activePage.width,
+              height: activePage.height,
+              background: activePage.background,
+            }}
+            onInsert={onApplyOperations}
+          />
+        )}
         render={isDark ? darkTheme.canvasRender : lightTheme.canvasRender}
       />
     </div>
