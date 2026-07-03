@@ -18,7 +18,6 @@ import {
 } from "./reducer";
 import type {
   AssistantDeliveryMode,
-  AssistantStreamEvent,
   ChatMessage,
   PendingProposal,
 } from "./types";
@@ -27,13 +26,11 @@ export interface AssistantSendOptions {
   deliveryMode?: AssistantDeliveryMode;
 }
 
-interface QueuedPlayback {
-  seq: number;
-  dispatchSend: () => void;
-  events: AssistantStreamEvent[];
-  started: boolean;
-  completed: boolean;
-  error: { code: string; message: string } | null;
+interface PendingQueuedSend {
+  ownerId: string | null;
+  text: string;
+  model?: string;
+  threadId?: string;
 }
 
 /** Host integration callbacks for {@link useAssistantChat}. */
@@ -104,9 +101,7 @@ export function useAssistantChat(
   );
 
   const abortRef = useRef<AbortController | null>(null);
-  const streamControllersRef = useRef<Set<AbortController>>(new Set());
-  const queuedPlaybackRef = useRef<QueuedPlayback | null>(null);
-  const queuedSendInFlightRef = useRef(false);
+  const pendingQueuedSendRef = useRef<PendingQueuedSend | null>(null);
   // Aborts an in-flight thread-history restore when the user changes or the
   // panel unmounts, so a late response can't land in a different conversation.
   const historyAbortRef = useRef<AbortController | null>(null);
@@ -187,15 +182,77 @@ export function useAssistantChat(
   const selectedModelRef = useRef(selectedModel);
   selectedModelRef.current = selectedModel;
 
-  const abortAllStreams = useCallback(() => {
-    for (const controller of streamControllersRef.current) {
-      controller.abort();
-    }
-    streamControllersRef.current.clear();
-    abortRef.current = null;
-    queuedPlaybackRef.current = null;
-    queuedSendInFlightRef.current = false;
+  const clearPendingQueuedSend = useCallback(() => {
+    pendingQueuedSendRef.current = null;
   }, []);
+
+  const abortActiveStream = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  }, []);
+
+  const startChatStream = useCallback(
+    (
+      text: string,
+      deliveryMode: AssistantDeliveryMode | undefined,
+      model: string | undefined,
+      threadId: string | undefined,
+    ) => {
+      dispatch({
+        type: "send",
+        messageId: uuid(),
+        assistantId: uuid(),
+        text,
+      });
+
+      const seq = ++streamSeqRef.current;
+      const ac = new AbortController();
+      abortRef.current = ac;
+      sendingRef.current = true;
+      clientRef.current
+        .streamChat(
+          {
+            message: text,
+            deliveryMode,
+            // null → omit, so the server applies its default model.
+            model,
+            threadId,
+            turnKey: uuid(),
+          },
+          (event) => {
+            // Drop events from a stream that has been superseded (new turn,
+            // stop, reset, or user switch) so they cannot mutate unrelated state.
+            if (streamSeqRef.current === seq) dispatch({ type: "stream", event });
+          },
+          ac.signal,
+        )
+        .catch((err: unknown) => {
+          // A user-initiated abort is reported via the `stopped` action, not as a
+          // failure; a superseded stream is ignored entirely. Only surface a
+          // genuine network/parse error for the still-current stream.
+          if (ac.signal.aborted || streamSeqRef.current !== seq) return;
+          dispatch({
+            type: "stream_failed",
+            error: {
+              code:
+                err instanceof AssistantClientInputError
+                  ? err.code
+                  : "NETWORK",
+              message:
+                err instanceof Error ? err.message : "The connection failed",
+            },
+          });
+        })
+        .finally(() => {
+          // This stream is over (settled, failed, or aborted) — allow the next
+          // send. A superseded stream clearing the flag is harmless: a newer send
+          // already set its own.
+          if (streamSeqRef.current === seq) sendingRef.current = false;
+          if (abortRef.current === ac) abortRef.current = null;
+        });
+    },
+    [],
+  );
 
   // When the signed-in user changes under a mounted panel (auth refresh, or a
   // mount before auth resolved), invalidate the in-flight stream, abort it, and
@@ -205,7 +262,8 @@ export function useAssistantChat(
     if (hydratedUserRef.current === userId) return;
     streamSeqRef.current += 1;
     confirmSeqRef.current += 1;
-    abortAllStreams();
+    abortActiveStream();
+    clearPendingQueuedSend();
     // Abort a pending thread-history load and re-open the composer so a switch
     // that was mid-restore for the prior user doesn't leave the new user's
     // conversation wedged closed.
@@ -226,33 +284,20 @@ export function useAssistantChat(
       threadId: loadThread(userId).threadId,
       messages: [],
     });
-  }, [userId, abortAllStreams, setRestoringBoth]);
+  }, [userId, abortActiveStream, clearPendingQueuedSend, setRestoringBoth]);
 
   useEffect(() => {
-    const queued = queuedPlaybackRef.current;
-    if (!queued || queued.started || state.status === "streaming") return;
-    if (streamSeqRef.current !== queued.seq) {
-      queuedPlaybackRef.current = null;
-      queuedSendInFlightRef.current = false;
+    const pending = pendingQueuedSendRef.current;
+    if (!pending || state.status === "streaming") return;
+    pendingQueuedSendRef.current = null;
+    if (
+      pending.ownerId !== userIdRef.current ||
+      state.pendingProposals.length > 0
+    ) {
       return;
     }
-
-    queued.started = true;
-    sendingRef.current = true;
-    queued.dispatchSend();
-    for (const event of queued.events) {
-      dispatch({ type: "stream", event });
-    }
-    queued.events = [];
-    if (queued.error) {
-      dispatch({ type: "stream_failed", error: queued.error });
-    }
-    if (queued.completed) {
-      queuedPlaybackRef.current = null;
-      queuedSendInFlightRef.current = false;
-      sendingRef.current = false;
-    }
-  }, [state.status]);
+    startChatStream(pending.text, "queue", pending.model, pending.threadId);
+  }, [state.status, state.pendingProposals.length, startChatStream]);
 
   // Restore the visible transcript for the persisted thread from the server,
   // keyed by user (runs on mount and whenever the signed-in user changes). The
@@ -327,8 +372,11 @@ export function useAssistantChat(
 
   // Abort any in-flight stream on unmount so a closed panel stops billing.
   useEffect(() => {
-    return () => abortAllStreams();
-  }, [abortAllStreams]);
+    return () => {
+      abortActiveStream();
+      clearPendingQueuedSend();
+    };
+  }, [abortActiveStream, clearPendingQueuedSend]);
 
   const send = useCallback((message: string, options?: AssistantSendOptions) => {
     const deliveryMode = options?.deliveryMode;
@@ -338,7 +386,7 @@ export function useAssistantChat(
     // billable streams. Explicit queue is allowed through so the server can
     // append it behind the active response instead of forcing products to guard.
     if (sendingRef.current && !shouldQueue) return;
-    if (shouldQueue && queuedSendInFlightRef.current) return;
+    if (shouldQueue && pendingQueuedSendRef.current) return;
     const text = message.trim();
     const current = stateRef.current;
     // Refuse if the loaded conversation doesn't belong to the current user. This
@@ -352,151 +400,34 @@ export function useAssistantChat(
     // Refuse while a turn is streaming unless the caller explicitly queues the
     // text behind it, or while a mutating proposal is awaiting the user's
     // decision — a new turn must not abandon an unresolved proposal.
-    if (!text || (current.status === "streaming" && !shouldQueue)) return;
+    if (!text) return;
     if (current.pendingProposals.length > 0) return;
-
-    const messageId = uuid();
-    const assistantId = uuid();
-    let sentToReducer = false;
-    const dispatchSend = () => {
-      if (sentToReducer) return;
-      sentToReducer = true;
-      dispatch({
-        type: "send",
-        messageId,
-        assistantId,
+    if (current.status === "streaming") {
+      if (!shouldQueue) return;
+      pendingQueuedSendRef.current = {
+        ownerId: current.ownerId,
         text,
-      });
-    };
-
-    if (!shouldQueue) dispatchSend();
-
-    const seq = shouldQueue ? streamSeqRef.current : ++streamSeqRef.current;
-    const ac = new AbortController();
-    streamControllersRef.current.add(ac);
-    if (!shouldQueue) {
-      abortRef.current = ac;
-      sendingRef.current = true;
-    } else {
-      queuedSendInFlightRef.current = true;
-      queuedPlaybackRef.current = {
-        seq,
-        dispatchSend,
-        events: [],
-        started: false,
-        completed: false,
-        error: null,
+        model: selectedModelRef.current ?? undefined,
+        threadId: current.threadId ?? undefined,
       };
+      return;
     }
-    clientRef.current
-      .streamChat(
-        {
-          message: text,
-          deliveryMode,
-          // null → omit, so the server applies its default model.
-          model: selectedModelRef.current ?? undefined,
-          threadId: current.threadId ?? undefined,
-          turnKey: uuid(),
-        },
-        (event) => {
-          // Drop events from a stream that has been superseded (new turn, stop,
-          // reset, or user switch) so they cannot mutate unrelated state.
-          if (streamSeqRef.current !== seq) return;
-          if (shouldQueue) {
-            const queued = queuedPlaybackRef.current;
-            if (!queued || queued.seq !== seq) return;
-            if (!queued.started) {
-              queued.events.push(event);
-              if (stateRef.current.status !== "streaming") {
-                queued.started = true;
-                sendingRef.current = true;
-                queued.dispatchSend();
-                for (const bufferedEvent of queued.events) {
-                  dispatch({ type: "stream", event: bufferedEvent });
-                }
-                queued.events = [];
-                if (queued.completed) {
-                  queuedPlaybackRef.current = null;
-                  queuedSendInFlightRef.current = false;
-                  sendingRef.current = false;
-                }
-              }
-              return;
-            }
-          }
-          dispatch({ type: "stream", event });
-        },
-        ac.signal,
-      )
-      .catch((err: unknown) => {
-        // A user-initiated abort is reported via the `stopped` action, not as a
-        // failure; a superseded stream is ignored entirely. Only surface a
-        // genuine network/parse error for the still-current stream.
-        if (ac.signal.aborted || streamSeqRef.current !== seq) return;
-        if (shouldQueue) {
-          const queued = queuedPlaybackRef.current;
-          if (queued && !queued.started) {
-            queued.error = {
-              code:
-                err instanceof AssistantClientInputError
-                  ? err.code
-                  : "NETWORK",
-              message:
-                err instanceof Error ? err.message : "The connection failed",
-            };
-            queued.completed = true;
-            if (stateRef.current.status === "streaming") return;
-            queued.started = true;
-            queued.dispatchSend();
-            sendingRef.current = true;
-            dispatch({ type: "stream_failed", error: queued.error });
-            queuedPlaybackRef.current = null;
-            queuedSendInFlightRef.current = false;
-            sendingRef.current = false;
-            return;
-          }
-        }
-        dispatch({
-          type: "stream_failed",
-          error: {
-            code:
-              err instanceof AssistantClientInputError
-                ? err.code
-                : "NETWORK",
-            message:
-              err instanceof Error ? err.message : "The connection failed",
-          },
-        });
-      })
-      .finally(() => {
-        streamControllersRef.current.delete(ac);
-        if (shouldQueue) {
-          const queued = queuedPlaybackRef.current;
-          if (queued && queued.seq === seq) {
-            queued.completed = true;
-            if (queued.started) {
-              queuedPlaybackRef.current = null;
-              queuedSendInFlightRef.current = false;
-              sendingRef.current = false;
-            }
-          }
-        }
-        // This stream is over (settled, failed, or aborted) — allow the next
-        // send. A superseded stream clearing the flag is harmless: a newer send
-        // already set its own.
-        if (!shouldQueue && streamSeqRef.current === seq) {
-          sendingRef.current = false;
-        }
-        if (abortRef.current === ac) abortRef.current = null;
-      });
-  }, []);
+
+    startChatStream(
+      text,
+      deliveryMode,
+      selectedModelRef.current ?? undefined,
+      current.threadId ?? undefined,
+    );
+  }, [startChatStream]);
 
   const stop = useCallback(() => {
     streamSeqRef.current += 1;
-    abortAllStreams();
+    abortActiveStream();
+    clearPendingQueuedSend();
     sendingRef.current = false;
     dispatch({ type: "stopped" });
-  }, [abortAllStreams]);
+  }, [abortActiveStream, clearPendingQueuedSend]);
 
   const confirm = useCallback(async (proposal: PendingProposal) => {
     const pid = proposal.proposalId;
@@ -600,14 +531,15 @@ export function useAssistantChat(
   const reset = useCallback(() => {
     streamSeqRef.current += 1;
     confirmSeqRef.current += 1;
-    abortAllStreams();
+    abortActiveStream();
+    clearPendingQueuedSend();
     historyAbortRef.current?.abort();
     setRestoringBoth(false);
     sendingRef.current = false;
     confirmingRef.current.clear();
     setConfirmingIds(EMPTY_IDS);
     dispatch({ type: "reset" });
-  }, [abortAllStreams, setRestoringBoth]);
+  }, [abortActiveStream, clearPendingQueuedSend, setRestoringBoth]);
 
   // Open a past thread from the history switcher: invalidate any in-flight
   // stream/confirmation (so their late events can't land in the switched-to
@@ -633,7 +565,8 @@ export function useAssistantChat(
       }
       streamSeqRef.current += 1;
       confirmSeqRef.current += 1;
-      abortAllStreams();
+      abortActiveStream();
+      clearPendingQueuedSend();
       sendingRef.current = false;
       confirmingRef.current.clear();
       setConfirmingIds(EMPTY_IDS);
@@ -694,7 +627,7 @@ export function useAssistantChat(
           if (!ac.signal.aborted) setRestoringBoth(false);
         });
     },
-    [abortAllStreams, setRestoringBoth],
+    [abortActiveStream, clearPendingQueuedSend, setRestoringBoth],
   );
 
   // Choose the model for subsequent turns. The model preference is per user, not

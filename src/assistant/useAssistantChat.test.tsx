@@ -127,7 +127,7 @@ describe("useAssistantChat", () => {
     });
   });
 
-  it("allows explicit queue delivery while a turn is streaming", async () => {
+  it("delays explicit queue delivery until the active turn settles", async () => {
     const active = controllableSse();
     const queued = controllableSse();
     const fetchMock = vi
@@ -149,6 +149,14 @@ describe("useAssistantChat", () => {
       result.current.send("second", { deliveryMode: "queue" });
     });
 
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      active.push(DONE);
+      active.close();
+    });
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const [, init] = fetchMock.mock.calls[1]!;
     expect(JSON.parse((init as { body: string }).body)).toMatchObject({
@@ -158,7 +166,7 @@ describe("useAssistantChat", () => {
     });
   });
 
-  it("buffers queued stream events until the active turn settles", async () => {
+  it("plays queued transcript after the active turn settles", async () => {
     const active = controllableSse();
     const queued = controllableSse();
     const fetchMock = vi
@@ -180,10 +188,7 @@ describe("useAssistantChat", () => {
     act(() => {
       result.current.send("second", { deliveryMode: "queue" });
     });
-    await act(async () => {
-      queued.push('event: thread\ndata: {"threadId":"T","turnId":"R2"}\n\n');
-      queued.push('event: delta\ndata: {"text":"queued"}\n\n');
-    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(result.current.state.messages.map((m) => m.text)).toEqual([
       "first",
       "active",
@@ -192,6 +197,11 @@ describe("useAssistantChat", () => {
     await act(async () => {
       active.push(DONE);
       active.close();
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      queued.push('event: thread\ndata: {"threadId":"T","turnId":"R2"}\n\n');
+      queued.push('event: delta\ndata: {"text":"queued"}\n\n');
     });
     await waitFor(() =>
       expect(result.current.state.messages.map((m) => m.text)).toContain(
@@ -212,13 +222,12 @@ describe("useAssistantChat", () => {
     await waitFor(() => expect(result.current.state.status).toBe("idle"));
   });
 
-  it("aborts queued streams on reset", async () => {
+  it("drops pending queued sends on reset", async () => {
     const active = controllableSse();
-    const queued = controllableSse();
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(active.response)
-      .mockResolvedValueOnce(queued.response);
+      .mockResolvedValueOnce(sseResponse([DONE]));
     vi.stubGlobal("fetch", fetchMock);
 
     const { result } = renderHook(() => useAssistantChat("userA"), { wrapper });
@@ -233,10 +242,8 @@ describe("useAssistantChat", () => {
     act(() => {
       result.current.send("second", { deliveryMode: "queue" });
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     const activeSignal = (fetchMock.mock.calls[0]![1] as { signal: AbortSignal })
-      .signal;
-    const queuedSignal = (fetchMock.mock.calls[1]![1] as { signal: AbortSignal })
       .signal;
 
     act(() => {
@@ -244,7 +251,46 @@ describe("useAssistantChat", () => {
     });
 
     expect(activeSignal.aborted).toBe(true);
-    expect(queuedSignal.aborted).toBe(true);
+    await act(async () => {
+      active.close();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops a pending queued send when the active turn ends awaiting confirmation", async () => {
+    const active = controllableSse();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(active.response)
+      .mockResolvedValueOnce(sseResponse([DONE]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useAssistantChat("userA"), { wrapper });
+    act(() => {
+      result.current.send("first");
+    });
+    await act(async () => {
+      active.push('event: thread\ndata: {"threadId":"T","turnId":"R1"}\n\n');
+    });
+    await waitFor(() => expect(result.current.state.status).toBe("streaming"));
+
+    act(() => {
+      result.current.send("second", { deliveryMode: "queue" });
+    });
+    await act(async () => {
+      active.push(
+        'event: tool_proposal\ndata: {"proposalId":"p1","callId":"c1","name":"create_workflow","args":{}}\n\n',
+      );
+      active.push(
+        'event: done\ndata: {"turnId":"R1","status":"completed","proposed":true}\n\n',
+      );
+      active.close();
+    });
+
+    await waitFor(() =>
+      expect(result.current.state.status).toBe("awaiting_confirm"),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("blocks a new send while a proposal is awaiting confirmation", async () => {
