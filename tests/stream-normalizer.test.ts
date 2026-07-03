@@ -38,6 +38,54 @@ describe('normalizePersistedPart', () => {
     expect(bare).toEqual({ type: 'text', text: 'x' })
     expect(bare && 'id' in bare).toBe(false)
   })
+
+  it('normalizes failed tool statuses as terminal errors', () => {
+    expect(
+      normalizePersistedPart({
+        type: 'tool',
+        id: 'prt_x',
+        tool: 'bash',
+        callID: 'toolu_x',
+        state: { status: 'failed', input: {} },
+      }),
+    ).toMatchObject({
+      type: 'tool',
+      id: 'prt_x',
+      tool: 'bash',
+      callID: 'toolu_x',
+      state: { status: 'error', input: {}, error: undefined },
+    })
+
+    expect(
+      normalizePersistedPart({
+        type: 'tool',
+        id: 'prt_y',
+        tool: 'bash',
+        callID: 'toolu_y',
+        status: 'failed',
+      }),
+    ).toMatchObject({
+      type: 'tool',
+      id: 'prt_y',
+      state: { status: 'error', input: undefined, error: undefined },
+    })
+
+    expect(
+      normalizePersistedPart({
+        type: 'tool',
+        id: 'prt_z',
+        tool: 'bash',
+        callID: 'toolu_z',
+        state: { status: 'failed', input: { command: 'exit 1' }, error: 'exit 1' },
+      }),
+    ).toMatchObject({
+      state: {
+        status: 'error',
+        input: { command: 'exit 1' },
+        error: 'exit 1',
+      },
+    })
+  })
 })
 
 describe('getPartKey', () => {

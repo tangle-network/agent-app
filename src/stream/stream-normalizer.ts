@@ -112,10 +112,16 @@ export function normalizePersistedPart(rawPart: JsonRecord): JsonRecord | null {
     const state = asRecord(rawPart.state)
     const output = state?.output ?? rawPart.output
     const error = asString(state?.error ?? rawPart.error)
+    const terminalError =
+      state?.status === 'error' ||
+      state?.status === 'failed' ||
+      rawPart.status === 'error' ||
+      rawPart.status === 'failed' ||
+      Boolean(error)
     const status =
       state?.status === 'completed' || rawPart.status === 'completed'
         ? 'completed'
-        : state?.status === 'error' || rawPart.status === 'error' || error
+        : terminalError
           ? 'error'
           : output !== undefined
             ? 'completed'
