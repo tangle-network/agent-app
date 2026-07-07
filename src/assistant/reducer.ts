@@ -8,6 +8,7 @@
 import type {
   AssistantStreamEvent,
   ChatMessage,
+  ConnectionRequirementKind,
   PendingProposal,
   ToolOutcome,
   UsageInfo,
@@ -82,6 +83,16 @@ export type AssistantAction =
        *  integration). The card stays confirmable; the message is shown on it. */
       callId: string;
       message: string;
+    }
+  | {
+      type: "requirement_connected";
+      /** The proposal card whose requirement was just connected (its callId). */
+      callId: string;
+      /** Identity of the now-connected requirement, matched within the card's
+       *  own requirements. `kind` defaults to "integration" (the card's default)
+       *  when absent, so a requirement carrying no explicit kind still matches. */
+      provider: string;
+      kind?: ConnectionRequirementKind;
     }
   | { type: "stopped" }
   | {
@@ -454,6 +465,39 @@ export function assistantReducer(
               ? "idle"
               : state.status,
       };
+    }
+
+    case "requirement_connected": {
+      // Flip a single requirement to connected after the host completes an
+      // in-place connect, so the card reflects it without a history reload.
+      // Matched by (provider, kind) within the target proposal's own
+      // requirements, with the same kind default the card renders with. A no-op
+      // (same state reference) when the proposal or requirement is gone — the
+      // card may have been confirmed/cancelled while the connect was in flight —
+      // or already connected, so it never forces a needless re-render. Confirm
+      // gating is server-side regardless; this only keeps the card's status
+      // honest.
+      const kind = action.kind ?? "integration";
+      let changed = false;
+      const pendingProposals = state.pendingProposals.map((p) => {
+        if (p.callId !== action.callId || !p.requirements) return p;
+        let rowChanged = false;
+        const requirements = p.requirements.map((r) => {
+          if (
+            !r.connected &&
+            r.provider === action.provider &&
+            (r.kind ?? "integration") === kind
+          ) {
+            rowChanged = true;
+            return { ...r, connected: true };
+          }
+          return r;
+        });
+        if (!rowChanged) return p;
+        changed = true;
+        return { ...p, requirements };
+      });
+      return changed ? { ...state, pendingProposals } : state;
     }
 
     case "stopped":

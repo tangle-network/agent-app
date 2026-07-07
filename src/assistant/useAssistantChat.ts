@@ -19,6 +19,8 @@ import {
 import type {
   AssistantDeliveryMode,
   ChatMessage,
+  ConnectionRequirement,
+  ConnectRequirementResult,
   PendingProposal,
 } from "./types";
 
@@ -41,6 +43,19 @@ export interface UseAssistantChatOptions {
    * signal the platform used.
    */
   onWorkflowMutation?: () => void;
+  /**
+   * Called when the user activates a proposal requirement's connect affordance.
+   * The host runs whatever connect flow it owns — an OAuth popup, an api-key
+   * modal, an app install — and resolves whether the requirement is now
+   * satisfied; the card then flips that requirement to connected. Host-agnostic:
+   * the assistant never learns how the connection is made, so any host (platform,
+   * sandbox, intelligence, …) can supply its own. When omitted, the card falls
+   * back to navigating the requirement's connect target (see
+   * {@link ProposalCardProps.navigate}).
+   */
+  onConnectRequirement?: (
+    requirement: ConnectionRequirement,
+  ) => Promise<ConnectRequirementResult>;
 }
 
 const EMPTY_IDS: ReadonlySet<string> = new Set();
@@ -75,6 +90,17 @@ export interface AssistantChat {
   stop: () => void;
   confirm: (proposal: PendingProposal) => Promise<void>;
   cancel: (proposal: PendingProposal) => void;
+  /** True when the host supplied an in-place connect handler
+   *  ({@link UseAssistantChatOptions.onConnectRequirement}); the proposal card
+   *  uses this to offer in-place connect instead of navigating away. */
+  canConnectRequirement: boolean;
+  /** Run the host's in-place connect for one of a proposal's requirements and,
+   *  on success, flip that requirement to connected on the card. Resolves (a
+   *  no-op) when no host handler is set or the connect didn't complete. */
+  connectRequirement: (
+    proposal: PendingProposal,
+    requirement: ConnectionRequirement,
+  ) => Promise<void>;
   reset: () => void;
   /** Open an existing thread from history, loading its transcript. */
   switchThread: (threadId: string) => void;
@@ -147,6 +173,8 @@ export function useAssistantChat(
   // stable identities while still calling the latest-supplied handler.
   const onWorkflowMutationRef = useRef(options?.onWorkflowMutation);
   onWorkflowMutationRef.current = options?.onWorkflowMutation;
+  const onConnectRequirementRef = useRef(options?.onConnectRequirement);
+  onConnectRequirementRef.current = options?.onConnectRequirement;
 
   // Proposal ids whose confirmation request is in flight. The ref is the
   // synchronous guard against a double-click issuing a duplicate execute; the
@@ -534,6 +562,41 @@ export function useAssistantChat(
     });
   }, []);
 
+  const connectRequirement = useCallback(
+    async (proposal: PendingProposal, requirement: ConnectionRequirement) => {
+      const handler = onConnectRequirementRef.current;
+      if (!handler) return;
+      // Guard the flip against a conversation swap: if a user switch, reset, or
+      // thread switch replaces the conversation while the host's connect UI is
+      // open, the late result must not flip a requirement on a card that no
+      // longer belongs to this conversation. `confirmSeqRef` is the shared
+      // conversation generation those transitions bump; a send can't race here
+      // because sending is blocked while a proposal is pending.
+      const seq = confirmSeqRef.current;
+      // The handler is a host boundary: a rejection (or a malformed resolution)
+      // must not escape as an unhandled rejection through the card's fire-and-
+      // forget call. Swallow it and leave the requirement unconnected — the
+      // host owns surfacing its own connect errors, and Confirm re-checks
+      // server-side regardless.
+      let result: ConnectRequirementResult | undefined;
+      try {
+        result = await handler(requirement);
+      } catch {
+        return;
+      }
+      if (confirmSeqRef.current !== seq) return;
+      if (result?.connected) {
+        dispatch({
+          type: "requirement_connected",
+          callId: proposal.callId,
+          provider: requirement.provider,
+          kind: requirement.kind,
+        });
+      }
+    },
+    [],
+  );
+
   const reset = useCallback(() => {
     streamSeqRef.current += 1;
     confirmSeqRef.current += 1;
@@ -687,6 +750,8 @@ export function useAssistantChat(
     stop,
     confirm,
     cancel,
+    canConnectRequirement: Boolean(options?.onConnectRequirement),
+    connectRequirement,
     reset,
     switchThread,
     restoring,

@@ -421,6 +421,104 @@ describe("useAssistantChat", () => {
     expect(executeCalls).toHaveLength(1);
   });
 
+  const PROPOSAL_WITH_REQ = (connected = false) =>
+    sseResponse([
+      `event: tool_proposal\ndata: {"proposalId":"p1","callId":"c1","name":"create_workflow","args":{"yaml":"name: x"},"requirements":[{"provider":"slack","kind":"integration","connected":${connected}}]}\n\n`,
+      'event: done\ndata: {"turnId":"R","status":"completed","proposed":true}\n\n',
+    ]);
+
+  it("reports canConnectRequirement from whether a host handler is supplied", () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(sseResponse([DONE])));
+    const without = renderHook(() => useAssistantChat("userA"), { wrapper });
+    expect(without.result.current.canConnectRequirement).toBe(false);
+
+    const onConnectRequirement = vi.fn(async () => ({ connected: true }));
+    const withHandler = renderHook(
+      () => useAssistantChat("userA", { onConnectRequirement }),
+      { wrapper },
+    );
+    expect(withHandler.result.current.canConnectRequirement).toBe(true);
+  });
+
+  it("flips a requirement to connected after the host reports success", async () => {
+    const onConnectRequirement = vi.fn(async () => ({ connected: true }));
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(PROPOSAL_WITH_REQ())));
+
+    const { result } = renderHook(
+      () => useAssistantChat("userA", { onConnectRequirement }),
+      { wrapper },
+    );
+    act(() => {
+      result.current.send("make a workflow");
+    });
+    await waitFor(() =>
+      expect(result.current.state.pendingProposals).toHaveLength(1),
+    );
+    const proposal = result.current.state.pendingProposals[0]!;
+    const requirement = proposal.requirements![0]!;
+
+    await act(async () => {
+      await result.current.connectRequirement(proposal, requirement);
+    });
+
+    expect(onConnectRequirement).toHaveBeenCalledWith(requirement);
+    expect(result.current.state.pendingProposals[0]?.requirements).toEqual([
+      { provider: "slack", kind: "integration", connected: true },
+    ]);
+  });
+
+  it("leaves the requirement unconnected when the host connect does not complete", async () => {
+    const onConnectRequirement = vi.fn(async () => ({ connected: false }));
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(PROPOSAL_WITH_REQ())));
+
+    const { result } = renderHook(
+      () => useAssistantChat("userA", { onConnectRequirement }),
+      { wrapper },
+    );
+    act(() => {
+      result.current.send("make a workflow");
+    });
+    await waitFor(() =>
+      expect(result.current.state.pendingProposals).toHaveLength(1),
+    );
+    const proposal = result.current.state.pendingProposals[0]!;
+
+    await act(async () => {
+      await result.current.connectRequirement(
+        proposal,
+        proposal.requirements![0]!,
+      );
+    });
+
+    expect(result.current.state.pendingProposals[0]?.requirements).toEqual([
+      { provider: "slack", kind: "integration", connected: false },
+    ]);
+  });
+
+  it("connectRequirement is an inert no-op when no host handler is supplied", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(PROPOSAL_WITH_REQ())));
+
+    const { result } = renderHook(() => useAssistantChat("userA"), { wrapper });
+    act(() => {
+      result.current.send("make a workflow");
+    });
+    await waitFor(() =>
+      expect(result.current.state.pendingProposals).toHaveLength(1),
+    );
+    const proposal = result.current.state.pendingProposals[0]!;
+
+    await act(async () => {
+      await result.current.connectRequirement(
+        proposal,
+        proposal.requirements![0]!,
+      );
+    });
+
+    expect(result.current.state.pendingProposals[0]?.requirements).toEqual([
+      { provider: "slack", kind: "integration", connected: false },
+    ]);
+  });
+
   it("drops a prior user's late stream events after a user switch", async () => {
     const a = controllableSse();
     const fetchMock = vi.fn().mockResolvedValue(a.response);

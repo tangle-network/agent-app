@@ -295,6 +295,141 @@ describe("a proposed workflow shows its YAML and requires confirmation", () => {
   });
 });
 
+describe("requirement_connected flips a single requirement after an in-place connect", () => {
+  const yaml = "name: demo";
+  // A proposal carrying two requirements: a GitHub App install (github_app) and
+  // a Slack OAuth connection (integration). Connecting one must never flip the
+  // other, and the github_app requirement must stay distinct from any github
+  // integration requirement (matched by kind).
+  function twoReqProposal(): AssistantState {
+    let s = send(initialAssistantState(), "review my PRs");
+    s = stream(s, {
+      type: "tool_proposal",
+      data: {
+        proposalId: "prop_1",
+        callId: "call_1",
+        name: "create_workflow",
+        args: { yaml },
+        requirements: [
+          { provider: "github", kind: "github_app", connected: false },
+          { provider: "slack", kind: "integration", connected: false },
+        ],
+      },
+    });
+    return s;
+  }
+
+  it("flips only the matching (provider, kind) requirement to connected", () => {
+    const s = assistantReducer(twoReqProposal(), {
+      type: "requirement_connected",
+      callId: "call_1",
+      provider: "slack",
+      kind: "integration",
+    });
+    expect(s.pendingProposals[0]?.requirements).toEqual([
+      { provider: "github", kind: "github_app", connected: false },
+      { provider: "slack", kind: "integration", connected: true },
+    ]);
+  });
+
+  it("distinguishes a github_app requirement from a github integration", () => {
+    let s = send(initialAssistantState(), "review my PRs");
+    s = stream(s, {
+      type: "tool_proposal",
+      data: {
+        proposalId: "prop_1",
+        callId: "call_1",
+        name: "create_workflow",
+        args: { yaml },
+        requirements: [
+          { provider: "github", kind: "github_app", connected: false },
+          { provider: "github", kind: "integration", connected: false },
+        ],
+      },
+    });
+    s = assistantReducer(s, {
+      type: "requirement_connected",
+      callId: "call_1",
+      provider: "github",
+      kind: "integration",
+    });
+    expect(s.pendingProposals[0]?.requirements).toEqual([
+      { provider: "github", kind: "github_app", connected: false },
+      { provider: "github", kind: "integration", connected: true },
+    ]);
+  });
+
+  it("matches a kindless requirement with the default 'integration' kind", () => {
+    let s = send(initialAssistantState(), "review my PRs");
+    s = stream(s, {
+      type: "tool_proposal",
+      data: {
+        proposalId: "prop_1",
+        callId: "call_1",
+        name: "create_workflow",
+        args: { yaml },
+        requirements: [{ provider: "notion", connected: false }],
+      },
+    });
+    // Action carries no kind either; both default to "integration" and match.
+    s = assistantReducer(s, {
+      type: "requirement_connected",
+      callId: "call_1",
+      provider: "notion",
+    });
+    expect(s.pendingProposals[0]?.requirements).toEqual([
+      { provider: "notion", connected: true },
+    ]);
+  });
+
+  it("is a no-op (same reference) when the callId does not match a card", () => {
+    const before = twoReqProposal();
+    const after = assistantReducer(before, {
+      type: "requirement_connected",
+      callId: "no_such_call",
+      provider: "slack",
+      kind: "integration",
+    });
+    // Same reference: a late connect for a card that was already resolved or
+    // cancelled must not force a re-render.
+    expect(after).toBe(before);
+  });
+
+  it("is a no-op when the provider is not a requirement of the card", () => {
+    const before = twoReqProposal();
+    const after = assistantReducer(before, {
+      type: "requirement_connected",
+      callId: "call_1",
+      provider: "stripe",
+      kind: "integration",
+    });
+    expect(after).toBe(before);
+  });
+
+  it("is a no-op when the requirement is already connected", () => {
+    let s = send(initialAssistantState(), "review my PRs");
+    s = stream(s, {
+      type: "tool_proposal",
+      data: {
+        proposalId: "prop_1",
+        callId: "call_1",
+        name: "create_workflow",
+        args: { yaml },
+        requirements: [
+          { provider: "slack", kind: "integration", connected: true },
+        ],
+      },
+    });
+    const after = assistantReducer(s, {
+      type: "requirement_connected",
+      callId: "call_1",
+      provider: "slack",
+      kind: "integration",
+    });
+    expect(after).toBe(s);
+  });
+});
+
 describe("credit-exhausted surfaces the add-credits CTA", () => {
   it("stores the error and maps it to an Add credits action to billing", () => {
     let s = send(initialAssistantState(), "do a thing");

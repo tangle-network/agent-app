@@ -82,6 +82,20 @@ export interface ConnectionRequirement {
   connectUrl?: string | null;
 }
 
+/**
+ * Outcome of a host-driven, in-place connect for a single proposal requirement
+ * (see {@link AssistantDockProps.onConnectRequirement}). The host owns the whole
+ * connect experience — an OAuth popup, an api-key entry modal, an app install,
+ * and any error surfacing — and the assistant stays agnostic to how it happens:
+ * the host reports back only whether the requirement is now satisfied, which the
+ * card uses to flip that requirement to connected without a reload. `connected:
+ * false` (a failed or cancelled connect) leaves the card unchanged so the user
+ * can retry.
+ */
+export interface ConnectRequirementResult {
+  connected: boolean;
+}
+
 export interface ToolProposalEventData {
   /** Null only if the server has no proposal store wired (tools then unusable). */
   proposalId: string | null;
