@@ -46,6 +46,8 @@ function makeChat(over: Partial<AssistantState> = {}): AssistantChat {
     stop: vi.fn(),
     confirm: vi.fn(async () => {}),
     cancel: vi.fn(),
+    canConnectRequirement: false,
+    connectRequirement: vi.fn(async () => {}),
     reset: vi.fn(),
     switchThread: vi.fn(),
     restoring: false,
@@ -115,6 +117,83 @@ describe("AssistantPanel transcript seam", () => {
     // pending mutating action.
     expect(screen.getByRole("button", { name: "Confirm" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy();
+  });
+
+  it("wires a requirement's in-place connect to chat.connectRequirement when the host can connect", () => {
+    const requirement = {
+      provider: "slack",
+      kind: "integration" as const,
+      connected: false,
+    };
+    const proposalWithReq: PendingProposal = {
+      proposalId: "p1",
+      callId: "c1",
+      name: "create_workflow",
+      args: { yaml: "name: demo" },
+      requirements: [requirement],
+    };
+    const chat = makeChat({
+      status: "awaiting_confirm",
+      pendingProposals: [proposalWithReq],
+    });
+    chat.canConnectRequirement = true;
+
+    renderPanel(chat, (view) => (
+      <div>
+        {view.pendingProposals.map((p) => (
+          <div key={p.callId}>{view.renderProposal(p)}</div>
+        ))}
+      </div>
+    ));
+
+    fireEvent.click(screen.getByRole("button", { name: /Connect/ }));
+    expect(chat.connectRequirement).toHaveBeenCalledWith(
+      proposalWithReq,
+      requirement,
+    );
+  });
+
+  it("does not offer in-place connect when the host cannot connect (navigate fallback)", () => {
+    const openSpy = vi.spyOn(window, "open").mockReturnValue(null);
+    // An absolute connect target so the fallback opens a new tab (spied) rather
+    // than assigning window.location (which jsdom can't navigate).
+    const proposalWithReq: PendingProposal = {
+      proposalId: "p1",
+      callId: "c1",
+      name: "create_workflow",
+      args: { yaml: "name: demo" },
+      requirements: [
+        {
+          provider: "slack",
+          connected: false,
+          connectUrl: "https://example.com/connect/slack",
+        },
+      ],
+    };
+    const chat = makeChat({
+      status: "awaiting_confirm",
+      pendingProposals: [proposalWithReq],
+    });
+    // canConnectRequirement stays false (the makeChat default).
+
+    renderPanel(chat, (view) => (
+      <div>
+        {view.pendingProposals.map((p) => (
+          <div key={p.callId}>{view.renderProposal(p)}</div>
+        ))}
+      </div>
+    ));
+
+    fireEvent.click(screen.getByRole("button", { name: /Connect/ }));
+    // The panel passed no onConnect, so the card keeps its navigate/open fallback
+    // and never calls the host connect handler.
+    expect(chat.connectRequirement).not.toHaveBeenCalled();
+    expect(openSpy).toHaveBeenCalledWith(
+      "https://example.com/connect/slack",
+      "_blank",
+      "noopener,noreferrer",
+    );
+    openSpy.mockRestore();
   });
 
   it("reflects a live streaming turn in the view's isStreaming/isThinking flags", () => {

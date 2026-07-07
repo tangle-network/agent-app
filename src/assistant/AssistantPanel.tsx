@@ -282,6 +282,13 @@ export function AssistantPanel({
       onConfirm={() => chat.confirm(proposal)}
       onCancel={() => chat.cancel(proposal)}
       navigate={navigate}
+      // Offer in-place connect only when the host wired a handler; otherwise the
+      // card keeps its navigate-to-connect-target fallback.
+      onConnect={
+        chat.canConnectRequirement
+          ? (requirement) => chat.connectRequirement(proposal, requirement)
+          : undefined
+      }
       renderGraph={renderGraph}
     />
   );

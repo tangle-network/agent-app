@@ -11,7 +11,7 @@
  * host wires `renderGraph` from `./workflows`. Navigation is injected too.
  */
 
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { ProviderLogo } from "../web-react/provider-logo";
 import { describeProposal } from "./presentation";
 import { providerLabel } from "./provider-label";
@@ -25,6 +25,12 @@ export interface ProposalCardProps {
   onCancel: () => void;
   /** Host navigation for connect targets / the integrations page. */
   navigate?: (path: string) => void;
+  /** In-place connect handler for a requirement. When provided, a requirement's
+   *  connect affordance calls this (showing a busy state) instead of navigating
+   *  to `connectUrl`/the integrations page — the host runs its own connect flow
+   *  and the card flips the requirement to connected on success. Host-agnostic;
+   *  wired by the panel from {@link UseAssistantChatOptions.onConnectRequirement}. */
+  onConnect?: (requirement: ConnectionRequirement) => void | Promise<void>;
   /** Render the workflow YAML as a node graph (the `./workflows` WorkflowGraph).
    *  When absent, the YAML is shown as text. */
   renderGraph?: (yaml: string) => ReactNode;
@@ -36,6 +42,7 @@ export function ProposalCard({
   onConfirm,
   onCancel,
   navigate,
+  onConnect,
   renderGraph,
 }: ProposalCardProps) {
   const view = describeProposal(proposal);
@@ -127,6 +134,7 @@ export function ProposalCard({
                 key={`${r.provider}-${r.kind ?? "integration"}`}
                 req={r}
                 navigate={navigate}
+                onConnect={onConnect}
               />
             ))}
           </ul>
@@ -194,10 +202,24 @@ function openConnect(target: string, navigate?: (path: string) => void) {
 function RequirementRow({
   req,
   navigate,
+  onConnect,
 }: {
   req: ConnectionRequirement;
   navigate?: (path: string) => void;
+  onConnect?: (requirement: ConnectionRequirement) => void | Promise<void>;
 }) {
+  const [connecting, setConnecting] = useState(false);
+  // The connect can outlive the row (the card is resolved/cancelled while the
+  // host's connect UI is open), so guard the busy-state reset against a resolve
+  // on an unmounted row.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const label = providerLabel(req.provider);
   const isApp = req.kind === "github_app";
   const kindLabel = isApp ? `${label} App` : label;
@@ -212,6 +234,20 @@ function RequirementRow({
   // requirement on a deploy with no app slug) — show the status without a link.
   const canConnect = !req.connected && req.connectUrl !== null;
   const target = req.connectUrl ?? "/app/integrations";
+
+  // In-place connect when the host wired a handler; otherwise navigate to the
+  // requirement's connect target (the legacy, still-supported path for hosts
+  // that route the user to their own integrations surface).
+  const handleConnect = () => {
+    if (!onConnect) {
+      openConnect(target, navigate);
+      return;
+    }
+    setConnecting(true);
+    Promise.resolve(onConnect(req)).finally(() => {
+      if (mountedRef.current) setConnecting(false);
+    });
+  };
 
   return (
     <li className="flex items-center justify-between gap-2 text-xs">
@@ -238,10 +274,19 @@ function RequirementRow({
       {canConnect && (
         <button
           type="button"
-          onClick={() => openConnect(target, navigate)}
-          className="shrink-0 text-primary"
+          onClick={handleConnect}
+          disabled={connecting}
+          className="shrink-0 text-primary disabled:opacity-50"
         >
-          {isApp ? "Install" : "Connect"} →
+          {connecting ? (
+            isApp ? (
+              "Installing…"
+            ) : (
+              "Connecting…"
+            )
+          ) : (
+            <>{isApp ? "Install" : "Connect"} →</>
+          )}
         </button>
       )}
     </li>

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 import { ProposalCard } from "./ProposalCard";
 import type { ConnectionRequirement, PendingProposal } from "./types";
@@ -192,5 +192,74 @@ describe("ProposalCard", () => {
     // The label + status still render alongside the icon.
     expect(screen.getByText("GitHub App")).toBeTruthy();
     expect(screen.getByText("installed")).toBeTruthy();
+  });
+
+  it("calls the in-place connect handler instead of navigating when onConnect is set", () => {
+    const navigate = vi.fn();
+    const onConnect = vi.fn(() => Promise.resolve());
+    const req: ConnectionRequirement = { provider: "slack", connected: false };
+    render(
+      <ProposalCard
+        proposal={withReq(req)}
+        confirming={false}
+        onConfirm={noop}
+        onCancel={noop}
+        navigate={navigate}
+        onConnect={onConnect}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Connect/ }));
+    // In-place connect runs; the navigate/new-tab fallbacks stay untouched.
+    expect(onConnect).toHaveBeenCalledWith(req);
+    expect(navigate).not.toHaveBeenCalled();
+    expect(openSpy).not.toHaveBeenCalled();
+  });
+
+  it("shows a disabled busy state while the in-place connect is in flight", async () => {
+    let resolveConnect!: () => void;
+    const onConnect = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveConnect = resolve;
+        }),
+    );
+    render(
+      <ProposalCard
+        proposal={withReq({ provider: "slack", connected: false })}
+        confirming={false}
+        onConfirm={noop}
+        onCancel={noop}
+        onConnect={onConnect}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Connect/ }));
+    const busy = screen.getByRole("button", { name: /Connecting/ });
+    expect((busy as HTMLButtonElement).disabled).toBe(true);
+    // Once the host resolves, the row leaves the busy state (the parent flips the
+    // requirement to connected in the real flow; here the isolated card just
+    // restores the actionable button).
+    await act(async () => {
+      resolveConnect();
+    });
+    expect(screen.queryByRole("button", { name: /Connecting/ })).toBeNull();
+    expect(
+      (screen.getByRole("button", { name: /Connect/ }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
+  });
+
+  it("falls back to navigation when no onConnect handler is provided", () => {
+    const navigate = vi.fn();
+    render(
+      <ProposalCard
+        proposal={withReq({ provider: "slack", connected: false })}
+        confirming={false}
+        onConfirm={noop}
+        onCancel={noop}
+        navigate={navigate}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Connect/ }));
+    expect(navigate).toHaveBeenCalledWith("/app/integrations");
   });
 });

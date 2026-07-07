@@ -21,7 +21,11 @@ import type { ToolDetailRenderers } from "../web-react";
 import { AssistantPanel } from "./AssistantPanel";
 import { useAssistantLauncher } from "./launcher";
 import { ResizeHandle } from "./ResizeHandle";
-import type { AssistantTranscriptView } from "./types";
+import type {
+  AssistantTranscriptView,
+  ConnectionRequirement,
+  ConnectRequirementResult,
+} from "./types";
 import { useAssistantChat } from "./useAssistantChat";
 import { useIsDesktop, usePanelWidth } from "./usePanelPrefs";
 
@@ -36,6 +40,14 @@ export interface AssistantDockProps {
   renderGraph?: (yaml: string) => ReactNode;
   /** Called after a workflow-mutating tool is confirmed (host re-fetches its list). */
   onWorkflowMutation?: () => void;
+  /** In-place connect handler for a proposal's integration requirements. The host
+   *  runs its own connect flow (OAuth popup, api-key modal, app install) and
+   *  resolves whether the requirement is now satisfied; the proposal card then
+   *  flips it to connected. Host-agnostic — when omitted, the card falls back to
+   *  navigating the requirement's connect target via `navigate`. */
+  onConnectRequirement?: (
+    requirement: ConnectionRequirement,
+  ) => Promise<ConnectRequirementResult>;
   /** Markdown renderer for assistant message content (plain text when absent). */
   renderMarkdown?: (content: string) => ReactNode;
   /** Per-tool custom detail renderers for expanded tool cards in the transcript. */
@@ -64,12 +76,16 @@ export function AssistantDock({
   formatMoney,
   renderGraph,
   onWorkflowMutation,
+  onConnectRequirement,
   renderMarkdown,
   toolRenderers,
   renderTranscript,
 }: AssistantDockProps) {
   const { open, openAssistant, closeAssistant } = useAssistantLauncher();
-  const chat = useAssistantChat(userId, { onWorkflowMutation });
+  const chat = useAssistantChat(userId, {
+    onWorkflowMutation,
+    onConnectRequirement,
+  });
 
   const isDesktop = useIsDesktop();
   const { width, maxWidth, setWidth, previewWidth, nudgeWidth } =
