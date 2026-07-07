@@ -230,9 +230,12 @@ function RequirementRow({
     : isApp
       ? "not installed"
       : "not connected";
-  // connectUrl === null means "no connect target to offer" (e.g. a github_app
-  // requirement on a deploy with no app slug) — show the status without a link.
-  const canConnect = !req.connected && req.connectUrl !== null;
+  // A host handler makes the requirement actionable regardless of connectUrl (it
+  // owns the connect experience). Without one, `connectUrl === null` means "no
+  // connect target to offer" (e.g. a github_app requirement on a deploy with no
+  // app slug) — show the status without a link.
+  const canConnect =
+    !req.connected && (Boolean(onConnect) || req.connectUrl !== null);
   const target = req.connectUrl ?? "/app/integrations";
 
   // In-place connect when the host wired a handler; otherwise navigate to the
@@ -244,9 +247,22 @@ function RequirementRow({
       return;
     }
     setConnecting(true);
-    Promise.resolve(onConnect(req)).finally(() => {
+    // Call synchronously so a host that must open a popup does so inside the user
+    // gesture (popup-blocker safe). Contain BOTH a synchronous throw and an async
+    // rejection — this is a public prop — so a misbehaving handler can neither
+    // leak an unhandled rejection nor wedge the busy state.
+    let pending: void | Promise<void>;
+    try {
+      pending = onConnect(req);
+    } catch {
       if (mountedRef.current) setConnecting(false);
-    });
+      return;
+    }
+    void Promise.resolve(pending)
+      .catch(() => {})
+      .finally(() => {
+        if (mountedRef.current) setConnecting(false);
+      });
   };
 
   return (
