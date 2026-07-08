@@ -24,7 +24,7 @@ Each skill's *judgment* surface is itself an evolvable surface, optimized by the
 
 > *Did following this skill produce an eval that yielded real held-out lift, with no critical-dimension regression?*
 
-Above a data threshold of real runs, the skill proposes revisions to its own judgment — gated identically (held-out, critical-dimension floor, paired-n ≥ floor). **Invariants are the frozen surface; judgment is the evolvable surface.** A skill improving itself is just `surface-evolution` pointed inward.
+Above a data threshold of real runs, the skill proposes revisions to its own judgment — gated identically (held-out, critical-dimension floor, paired-n ≥ floor, and a footprint-matched placebo — the neutralization gate — that proves the lift came from content, not from added prompt/mount footprint). **Invariants are the frozen surface; judgment is the evolvable surface.** A skill improving itself is just `surface-evolution` pointed inward.
 
 ## The north-star: the agent builder, closed-loop
 
@@ -39,4 +39,4 @@ The fleet — **legal, tax, gtm, creative, insurance** — is the training distr
 - A skill that lists steps but has **no self-test** — you can't tell if following it worked.
 - An "invariant" that's really a **judgment call in disguise** — over-constraining; it should live in Judgment so the agent can adapt it per product.
 - A judgment surface with **no evolves-by hook** — it will rot, and nothing will notice.
-- A reported lift with **no held-out or no paired-n** — the slot machine. This is the one that ends the product.
+- A reported lift with **no held-out or no paired-n, or no footprint-matched placebo (neutralization)** — the slot machine. This is the one that ends the product.
