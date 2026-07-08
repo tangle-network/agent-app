@@ -6,11 +6,18 @@
  *   {kind:'event', event:{type:'text'|'reasoning'|'tool_call'|'usage', ...}}
  *   {kind:'tool_result', toolCallId, toolName, label, outcome}
  *   {type:'turn'|'metadata'|'error'|'turn_status', ...}          (route-level)
+ *   {type:'interaction', data:{request}}                         (sidecar ask)
  *
  * Replayed lines carry an extra `seq` — transparently ignored. Works for
  * router-backed and sandbox-backed chats alike: anything producing these
  * lines (live pump, queued follow, resume replay) feeds the same callbacks.
  */
+
+import {
+  interactionFromWireRequest,
+  parseInteractionRequest,
+  type ChatInteraction,
+} from './chat-interactions'
 
 export interface ChatStreamToolCall {
   toolCallId?: string
@@ -35,6 +42,11 @@ export interface ChatStreamCallbacks {
   onMetadata?: (data: Record<string, unknown>) => void
   /** A loop-level error event (the turn failed server-side). */
   onErrorEvent?: (message: string) => void
+  /** A sidecar interaction ask (kind: "question"/"plan"/…). The run is BLOCKED
+   *  in the broker until the user answers; a pending ask is "waiting on the
+   *  user", not "model working". Optional — a consumer that doesn't wire it
+   *  parses the same stream unchanged. */
+  onInteraction?: (interaction: ChatInteraction) => void
 }
 
 export interface ConsumeChatStreamResult {
@@ -114,6 +126,20 @@ export function dispatchChatStreamLine(line: string, cb: ChatStreamCallbacks): {
     case 'metadata':
       cb.onMetadata?.((evt.data ?? {}) as Record<string, unknown>)
       break
+    case 'interaction': {
+      // The run is now BLOCKED in the sidecar broker until this ask is
+      // answered, withdrawn, or times out. Validate the shape and surface the
+      // parsed ChatInteraction; a malformed ask is logged and skipped rather
+      // than half-surfaced.
+      const parsed = parseInteractionRequest(evt.data as Record<string, unknown> | undefined)
+      if (parsed.succeeded) {
+        cb.onInteraction?.(interactionFromWireRequest(parsed.value))
+        receivedContent = true
+      } else {
+        console.error('[chat-stream] dropping malformed interaction line:', parsed.error)
+      }
+      break
+    }
     case 'error':
       cb.onErrorEvent?.(String(evt.details ?? evt.error ?? 'Unknown stream error'))
       break
