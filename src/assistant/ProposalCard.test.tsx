@@ -373,4 +373,23 @@ describe("ProposalCard", () => {
     );
     expect(screen.getByRole("img", { name: "slack" })).toBeTruthy();
   });
+
+  it("falls back to the built-in mark (no crash) when renderProviderIcon throws", () => {
+    // An untrusted host callback that throws for an unrecognized provider must
+    // not take down the row — it degrades to the built-in ProviderLogo.
+    expect(() =>
+      render(
+        <ProposalCard
+          proposal={withReq({ provider: "slack", connected: false })}
+          confirming={false}
+          onConfirm={noop}
+          onCancel={noop}
+          renderProviderIcon={() => {
+            throw new Error("no such provider");
+          }}
+        />,
+      ),
+    ).not.toThrow();
+    expect(screen.getByRole("img", { name: "slack" })).toBeTruthy();
+  });
 });

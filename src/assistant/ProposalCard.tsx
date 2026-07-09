@@ -276,15 +276,23 @@ function RequirementRow({
       });
   };
 
+  // Host-supplied brand icon (its integrations catalog knows the real provider
+  // marks); fall back to the built-in model mark when the host didn't wire one or
+  // returns nothing for a provider it doesn't recognize. `renderProviderIcon` is
+  // an untrusted host callback run during render, so contain a throw (a host that
+  // indexes a catalog without guarding an unknown provider) the same way
+  // `onConnect` is contained above — one bad mark must not crash the card.
+  let providerIcon: ReactNode;
+  try {
+    providerIcon = renderProviderIcon?.(req.provider) ?? null;
+  } catch {
+    providerIcon = null;
+  }
+
   return (
     <li className="flex items-center justify-between gap-2 text-xs">
       <span className="flex min-w-0 items-center gap-2">
-        {/* Host-supplied brand icon (its integrations catalog knows the real
-            provider marks); fall back to the built-in model mark when the host
-            didn't wire one or doesn't recognize this provider. */}
-        {renderProviderIcon?.(req.provider) ?? (
-          <ProviderLogo provider={req.provider} size={16} />
-        )}
+        {providerIcon ?? <ProviderLogo provider={req.provider} size={16} />}
         <span className="truncate text-foreground">{kindLabel}</span>
         <span className="flex shrink-0 items-center gap-1">
           {/* Filled vs outlined dot is a non-color (shape) cue for the
