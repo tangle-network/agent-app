@@ -19,7 +19,7 @@ import type { AssistantModels } from "./client";
 import { isLowBalance, presentError } from "./presentation";
 import { ProposalCard } from "./ProposalCard";
 import { AssistantTranscript, assistantIsThinking } from "./transcript";
-import type { AssistantTranscriptView } from "./types";
+import type { AssistantTranscriptView, ConfirmedResult } from "./types";
 import type { AssistantChat } from "./useAssistantChat";
 import { useAssistantModels } from "./useAssistantModels";
 import { useAssistantThreads } from "./useAssistantThreads";
@@ -44,6 +44,10 @@ export interface AssistantPanelProps {
   renderMarkdown?: (content: string) => ReactNode;
   /** Per-tool custom detail renderers for expanded tool cards in the transcript. */
   toolRenderers?: ToolDetailRenderers;
+  /** Render a prominent card for a CONFIRMED tool's result (e.g. a one-time
+   *  API-key reveal for `create_api_key`), shown inline after the action's status
+   *  line. Ignored when a host swaps the whole transcript via `renderTranscript`. */
+  renderConfirmedResult?: (result: ConfirmedResult) => ReactNode;
   /** Swap ONLY the conversation rendering for a host-supplied renderer (e.g. a
    *  different chat-message component), while the panel keeps owning the header,
    *  composer, model picker, history, transport, and proposal orchestration.
@@ -149,6 +153,7 @@ export function AssistantPanel({
   renderGraph,
   renderMarkdown,
   toolRenderers,
+  renderConfirmedResult,
   renderTranscript,
 }: AssistantPanelProps) {
   const models = useAssistantModels();
@@ -480,6 +485,7 @@ export function AssistantPanel({
                 view={transcriptView}
                 renderMarkdown={renderMarkdown}
                 toolRenderers={toolRenderers}
+                renderConfirmedResult={renderConfirmedResult}
                 emptyState={
                   <p className="px-4 py-8 text-center text-muted-foreground text-sm">
                     {EMPTY_STATE}

@@ -421,6 +421,60 @@ describe("useAssistantChat", () => {
     expect(executeCalls).toHaveLength(1);
   });
 
+  it("retains a confirmed create_api_key secret on the resolved message, out of the status text", async () => {
+    // Regression for the lost-key bug: the execute response carries the one-time
+    // secret in `output.key`. The hook must keep that output on the resolving
+    // status message (so a host reveal card can show it) while the visible status
+    // text stays free of the secret.
+    const SECRET = "sk-tan-live-THE-SECRET-VALUE";
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes("/tools/execute")) {
+        return Promise.resolve(
+          jsonResponse({
+            success: true,
+            output: { id: "k1", key: SECRET, prefix: "sk-tan-live", name: "ci" },
+          }),
+        );
+      }
+      return Promise.resolve(
+        sseResponse([
+          'event: tool_proposal\ndata: {"proposalId":"p1","callId":"c1","name":"create_api_key","args":{"name":"ci"}}\n\n',
+          'event: done\ndata: {"turnId":"R","status":"completed","proposed":true}\n\n',
+        ]),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useAssistantChat("userA"), { wrapper });
+    act(() => {
+      result.current.send("make me an API key");
+    });
+    await waitFor(() =>
+      expect(result.current.state.pendingProposals).toHaveLength(1),
+    );
+    const proposal = result.current.state.pendingProposals[0]!;
+
+    await act(async () => {
+      await result.current.confirm(proposal);
+    });
+
+    const resolved = result.current.state.messages.find(
+      (m) => m.role === "status" && m.result != null,
+    );
+    expect(resolved).toBeDefined();
+    // The secret is retained for the reveal card…
+    expect(resolved?.result).toEqual({
+      name: "create_api_key",
+      output: { id: "k1", key: SECRET, prefix: "sk-tan-live", name: "ci" },
+      args: { name: "ci" },
+    });
+    // …but never leaks into the visible transcript text.
+    expect(resolved?.text).not.toContain(SECRET);
+    expect(
+      result.current.state.messages.every((m) => !m.text.includes(SECRET)),
+    ).toBe(true);
+  });
+
   const PROPOSAL_WITH_REQ = (connected = false) =>
     sseResponse([
       `event: tool_proposal\ndata: {"proposalId":"p1","callId":"c1","name":"create_workflow","args":{"yaml":"name: x"},"requirements":[{"provider":"slack","kind":"integration","connected":${connected}}]}\n\n`,

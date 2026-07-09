@@ -301,9 +301,11 @@ export function describeOutcome(name: string, output: unknown): string {
       return wf.enabled ? "Workflow enabled." : "Workflow disabled.";
     }
     case "create_api_key":
-      return o.prefix
-        ? `Created API key (${str(o.prefix)}…). Copy it from the API Keys page.`
-        : "API key created.";
+      // No "copy it from the API Keys page" instruction: a key's secret is shown
+      // ONLY once, at creation, and can't be retrieved from that page later. The
+      // secret rides `output.key` on the confirmed result and is surfaced by the
+      // host's reveal card (see ConfirmedResult); this line is just the record.
+      return o.prefix ? `Created API key (${str(o.prefix)}…).` : "API key created.";
     case "revoke_api_key":
       return "API key revoked.";
     case "invoke_integration":

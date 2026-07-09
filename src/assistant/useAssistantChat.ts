@@ -19,6 +19,7 @@ import {
 import type {
   AssistantDeliveryMode,
   ChatMessage,
+  ConfirmedResult,
   ConnectionRequirement,
   ConnectRequirementResult,
   PendingProposal,
@@ -508,10 +509,27 @@ export function useAssistantChat(
         return;
       }
       const { statusText, error } = resolveConfirmation(proposal.name, result);
+      // On a clean success, retain the tool's output on the resolving status
+      // message so the transcript can render a host card for it (e.g. a one-time
+      // API-key reveal). Only for an ok, non-error confirm — a domain failure
+      // (error != null) carries no result to show. The output lives ONLY in the
+      // in-memory transcript: it is never persisted (the transcript isn't cached)
+      // and never sent back to the model, so a one-time secret is shown once and
+      // gone on reload. `describeOutcome` always yields a non-empty statusText on
+      // success, so `status` is present to carry the result.
+      const status = statusText ? statusMessage(statusText) : null;
+      if (status && result.ok && !error) {
+        const confirmed: ConfirmedResult = {
+          name: proposal.name,
+          output: result.output,
+          args: proposal.args,
+        };
+        status.result = confirmed;
+      }
       dispatch({
         type: "proposal_resolved",
         callId: proposal.callId,
-        status: statusText ? statusMessage(statusText) : null,
+        status,
         error,
       });
       // A successful workflow mutation won't show on an already-open Workflows

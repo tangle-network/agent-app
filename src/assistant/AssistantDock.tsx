@@ -23,6 +23,7 @@ import { useAssistantLauncher } from "./launcher";
 import { ResizeHandle } from "./ResizeHandle";
 import type {
   AssistantTranscriptView,
+  ConfirmedResult,
   ConnectionRequirement,
   ConnectRequirementResult,
 } from "./types";
@@ -52,6 +53,11 @@ export interface AssistantDockProps {
   renderMarkdown?: (content: string) => ReactNode;
   /** Per-tool custom detail renderers for expanded tool cards in the transcript. */
   toolRenderers?: ToolDetailRenderers;
+  /** Render a prominent card for a CONFIRMED tool's result (e.g. a one-time
+   *  API-key reveal for `create_api_key`), shown inline after the action's status
+   *  line. The result's `output` may carry a one-time secret — see
+   *  {@link ConfirmedResult} for the never-persist/never-to-model contract. */
+  renderConfirmedResult?: (result: ConfirmedResult) => ReactNode;
   /** Swap the conversation rendering for a host-supplied renderer (see
    *  {@link AssistantPanelProps.renderTranscript}); the dock chrome, composer,
    *  transport, and proposal flow stay owned by the panel. */
@@ -79,6 +85,7 @@ export function AssistantDock({
   onConnectRequirement,
   renderMarkdown,
   toolRenderers,
+  renderConfirmedResult,
   renderTranscript,
 }: AssistantDockProps) {
   const { open, openAssistant, closeAssistant } = useAssistantLauncher();
@@ -199,6 +206,7 @@ export function AssistantDock({
           renderGraph={renderGraph}
           renderMarkdown={renderMarkdown}
           toolRenderers={toolRenderers}
+          renderConfirmedResult={renderConfirmedResult}
           renderTranscript={renderTranscript}
         />
         {isDesktop && (

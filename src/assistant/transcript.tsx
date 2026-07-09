@@ -22,6 +22,7 @@ import {
 import type { AssistantState } from "./reducer";
 import type {
   AssistantTranscriptView,
+  ConfirmedResult,
   PendingProposal,
   ToolOutcome,
 } from "./types";
@@ -57,6 +58,10 @@ export interface AdaptedTranscript {
   /** The current/most-recent turn's assistant message — where the turn cost line
    *  renders (it carries the turn's metrics), or null when there is none. */
   metricsHostId: string | null;
+  /** Confirmed-tool results to render under their (system) message, keyed by that
+   *  message's id — carried from a `status` message's retained `result` so a host
+   *  card (e.g. a one-time API-key reveal) renders inline right after the action. */
+  confirmedResults: Map<string, ConfirmedResult>;
 }
 
 /**
@@ -87,6 +92,7 @@ type TurnMessage = ChatUiMessage & { segments: ChatMessageSegment[] };
  */
 export function adaptTranscript(view: AssistantTranscriptView): AdaptedTranscript {
   const messages: ChatUiMessage[] = [];
+  const confirmedResults = new Map<string, ConfirmedResult>();
   let turn: TurnMessage | null = null;
   // The assistant message of the CURRENT turn — the one opened since the most
   // recent user message — or null when the live turn has produced no assistant
@@ -144,6 +150,10 @@ export function adaptTranscript(view: AssistantTranscriptView): AdaptedTranscrip
     } else {
       // `status` — an informational system note that ends the assistant turn.
       messages.push({ id: msg.id, role: "system", content: msg.text });
+      // A confirmed mutating tool that returned a renderable result attaches it
+      // to its status message; carry it out keyed by this system message's id so
+      // the host card renders inline right under the status line.
+      if (msg.result) confirmedResults.set(msg.id, msg.result);
       turn = null;
     }
   }
@@ -198,6 +208,7 @@ export function adaptTranscript(view: AssistantTranscriptView): AdaptedTranscrip
       currentTurnAssistant && !isEmptyShell(currentTurnAssistant)
         ? currentTurnAssistant.id
         : null,
+    confirmedResults,
   };
 }
 
@@ -224,6 +235,12 @@ export interface AssistantTranscriptProps {
   renderMarkdown?: (content: string) => ReactNode;
   /** Per-tool custom detail renderers for expanded tool cards. */
   toolRenderers?: ToolDetailRenderers;
+  /** Render a prominent card for a CONFIRMED tool's result, inline after its
+   *  status line (e.g. a one-time API-key reveal for `create_api_key`). Return
+   *  null to fall back to just the status line. Unlike `toolRenderers` (collapsed
+   *  detail for a read-only tool chip), this is shown expanded, so a one-time
+   *  secret is visible without a click. See {@link ConfirmedResult}. */
+  renderConfirmedResult?: (result: ConfirmedResult) => ReactNode;
   /** Zero-state shown for a fresh, non-streaming thread. */
   emptyState?: ReactNode;
 }
@@ -238,9 +255,10 @@ export function AssistantTranscript({
   view,
   renderMarkdown,
   toolRenderers,
+  renderConfirmedResult,
   emptyState,
 }: AssistantTranscriptProps) {
-  const { messages, proposalHostId, metricsHostId } = useMemo(
+  const { messages, proposalHostId, metricsHostId, confirmedResults } = useMemo(
     () => adaptTranscript(view),
     [view],
   );
@@ -280,6 +298,19 @@ export function AssistantTranscript({
               ))}
             </div>
           ) : null;
+        // A confirmed tool's host card, rendered inline under its status line
+        // (e.g. the one-time API-key reveal). Only when the host supplied a
+        // renderer AND it returns a node for this result — a renderer that
+        // returns null (a tool it doesn't handle) must add no wrapper, or every
+        // other confirmed tool would get an empty `mt-3` spacer under its status.
+        const confirmed = confirmedResults.get(message.id);
+        const confirmedNode =
+          confirmed && renderConfirmedResult
+            ? renderConfirmedResult(confirmed)
+            : null;
+        const confirmedCard = confirmedNode ? (
+          <div className="mt-3">{confirmedNode}</div>
+        ) : null;
         // The settled turn's at-cost figure, shown once under its assistant
         // bubble. Hidden while streaming and for a replayed (uncharged) turn.
         const cost =
@@ -291,9 +322,10 @@ export function AssistantTranscript({
               {formatTurnCost(view.usage.costUsd)} this turn
             </p>
           ) : null;
-        if (!proposals && !cost) return null;
+        if (!proposals && !cost && !confirmedCard) return null;
         return (
           <>
+            {confirmedCard}
             {proposals}
             {cost}
           </>
