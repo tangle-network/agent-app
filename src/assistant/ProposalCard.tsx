@@ -292,17 +292,15 @@ function RequirementRow({
           type="button"
           onClick={handleConnect}
           disabled={connecting}
-          className="shrink-0 text-primary disabled:opacity-50"
+          className="shrink-0 rounded border border-primary px-2 py-0.5 font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
         >
-          {connecting ? (
-            isApp ? (
-              "Installing…"
-            ) : (
-              "Connecting…"
-            )
-          ) : (
-            <>{isApp ? "Install" : "Connect"} →</>
-          )}
+          {connecting
+            ? isApp
+              ? "Installing…"
+              : "Connecting…"
+            : isApp
+              ? "Install"
+              : "Connect"}
         </button>
       )}
     </li>
