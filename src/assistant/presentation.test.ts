@@ -175,6 +175,20 @@ describe("describeOutcome", () => {
   it("has a sensible default for unknown tools", () => {
     expect(describeOutcome("mystery", {})).toBe("Action completed.");
   });
+
+  it("records a created API key by prefix without pointing at the (impossible) keys page", () => {
+    // The secret is shown ONCE at creation and is unreadable from the API Keys
+    // page afterwards, so the status line must not tell the user to copy it from
+    // there — the reveal card carries the secret instead.
+    const text = describeOutcome("create_api_key", {
+      prefix: "sk-tan-abc",
+      key: "sk-tan-abc-THE-SECRET",
+    });
+    expect(text).toBe("Created API key (sk-tan-abc…).");
+    expect(text).not.toContain("API Keys page");
+    // The one-time secret must never leak into the transcript status line.
+    expect(text).not.toContain("THE-SECRET");
+  });
 });
 
 describe("describeFailure", () => {

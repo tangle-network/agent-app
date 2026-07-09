@@ -162,6 +162,28 @@ export type ToolOutcome =
   | { ok: true; result?: unknown }
   | { ok: false; error?: { code: string; message: string } };
 
+/**
+ * The result of a CONFIRMED mutating tool, retained on the resolving `status`
+ * message so a host can render it prominently (e.g. a one-time API-key reveal).
+ *
+ * SECURITY: `output` may carry a one-time secret (e.g. a freshly minted API
+ * key). It lives ONLY in the in-memory transcript for the session — the message
+ * transcript is deliberately never cached (see `persistence.ts`) and is never
+ * sent back to the model (a turn request carries only the new user text, see
+ * {@link ChatRequest}). So the secret is shown once and is gone on reload,
+ * matching how a dedicated create-key page reveals a key exactly once. A host
+ * renderer must uphold the same contract: reveal-on-demand, never persist it.
+ */
+export interface ConfirmedResult {
+  /** The confirmed tool's name (e.g. "create_api_key"). */
+  name: string;
+  /** The tool's raw output. May contain a one-time secret — see the type doc. */
+  output: unknown;
+  /** The arguments the action was confirmed with, for a renderer that needs them
+   *  (e.g. the key's name). */
+  args?: unknown;
+}
+
 export interface ChatMessage {
   id: string;
   role: ChatRole;
@@ -174,6 +196,11 @@ export interface ChatMessage {
     args?: Record<string, unknown>;
     outcome?: ToolOutcome;
   };
+  /** Present only on a `status` message that resolved a confirmed mutating tool
+   *  which returned a renderable result — carries that result so the transcript
+   *  can render a host-supplied card (e.g. a one-time key reveal) next to the
+   *  status line. See {@link ConfirmedResult} for the one-time-secret contract. */
+  result?: ConfirmedResult;
 }
 
 /** A mutating action the assistant proposed, awaiting the user's confirmation. */
