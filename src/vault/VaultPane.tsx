@@ -23,6 +23,7 @@ import {
   type MouseEvent,
   type ReactNode,
 } from 'react'
+import { Download, Trash2 } from 'lucide-react'
 import { ConfirmDialog } from './ConfirmDialog'
 import type {
   VaultEditorMode,
@@ -186,6 +187,8 @@ export function VaultPane(props: VaultPaneProps) {
     dockToggle,
     refreshKey,
     headerActions,
+    onDownloadFile,
+    pathBarClassName,
   } = props
 
   const activeCodec = codec ?? IDENTITY_CODEC
@@ -501,8 +504,8 @@ export function VaultPane(props: VaultPaneProps) {
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {selectedFile && (
-            <div className="flex shrink-0 items-center justify-between border-b border-border bg-card px-4 py-1.5">
-              <span data-vault-path className="truncate text-xs text-muted-foreground">{selectedFile.path}</span>
+            <div className={`flex shrink-0 items-center justify-between border-b border-border px-4 py-1.5 ${pathBarClassName ?? 'bg-card'}`}>
+              <span data-vault-path className="truncate text-xs font-medium text-foreground">{selectedFile.path}</span>
               <div className="flex items-center gap-1">
                 {canWrite && isMarkdownCapable && (
                   <div className="mr-1 flex items-center gap-1">
@@ -551,15 +554,26 @@ export function VaultPane(props: VaultPaneProps) {
                     {dockToggleCfg.label}
                   </button>
                 )}
+                {onDownloadFile && (
+                  <button
+                    type="button"
+                    aria-label="Download this file"
+                    title="Download file"
+                    onClick={() => onDownloadFile(selectedFile)}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <Download className="h-4 w-4" />
+                  </button>
+                )}
                 {canWrite && (
                   <button
                     type="button"
                     aria-label="Delete this file"
                     title="Delete file"
                     onClick={() => setDeleteOpen(true)}
-                    className="p-1 text-muted-foreground transition-colors hover:text-destructive"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded text-destructive/70 transition-colors hover:bg-destructive/10 hover:text-destructive"
                   >
-                    ✕
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 )}
               </div>

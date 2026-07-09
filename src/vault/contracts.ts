@@ -151,6 +151,19 @@ export interface VaultPaneProps {
   /** Extra controls rendered in the tree-pane header (e.g. an upload button). */
   headerActions?: ReactNode
   /**
+   * When set, a download button renders in the open file's path row (before the
+   * delete action). The product owns the actual download (mime, blob) via this
+   * callback. Omit to hide the button — e.g. when a custom artifact renderer
+   * provides its own download affordance.
+   */
+  onDownloadFile?: (file: VaultFile) => void
+  /**
+   * Extra classes for the open file's path row (path + mode toggles + actions).
+   * Use to align its surface with the artifact chrome. Replaces the default
+   * `bg-card` when it carries a background utility.
+   */
+  pathBarClassName?: string
+  /**
    * When false, all write affordances (create / delete / save / source editor)
    * are hidden and the pane is read-only. Defaults to true.
    */
