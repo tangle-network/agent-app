@@ -99,4 +99,24 @@ describe("AssistantTranscript — confirmed-result card", () => {
     expect(screen.getByText("Created API key (sk-tan…).")).toBeTruthy();
     expect(screen.queryByText(/sk-tan-SECRET/)).toBeNull();
   });
+
+  it("adds no wrapper (no empty spacer) when the renderer returns null for a result", () => {
+    // A confirmed tool the host renderer doesn't handle (returns null) must not
+    // leave an empty margin box under its status line.
+    const { container } = render(
+      <AssistantTranscript
+        view={viewOf([
+          {
+            id: "s1",
+            role: "status",
+            text: "Workflow created.",
+            result: { name: "create_workflow", output: { ok: true } },
+          },
+        ])}
+        renderConfirmedResult={() => null}
+      />,
+    );
+    expect(screen.getByText("Workflow created.")).toBeTruthy();
+    expect(container.querySelector(".mt-3")).toBeNull();
+  });
 });

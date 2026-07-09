@@ -300,12 +300,17 @@ export function AssistantTranscript({
           ) : null;
         // A confirmed tool's host card, rendered inline under its status line
         // (e.g. the one-time API-key reveal). Only when the host supplied a
-        // renderer AND it returns something for this result.
+        // renderer AND it returns a node for this result — a renderer that
+        // returns null (a tool it doesn't handle) must add no wrapper, or every
+        // other confirmed tool would get an empty `mt-3` spacer under its status.
         const confirmed = confirmedResults.get(message.id);
-        const confirmedCard =
-          confirmed && renderConfirmedResult ? (
-            <div className="mt-3">{renderConfirmedResult(confirmed)}</div>
-          ) : null;
+        const confirmedNode =
+          confirmed && renderConfirmedResult
+            ? renderConfirmedResult(confirmed)
+            : null;
+        const confirmedCard = confirmedNode ? (
+          <div className="mt-3">{confirmedNode}</div>
+        ) : null;
         // The settled turn's at-cost figure, shown once under its assistant
         // bubble. Hidden while streaming and for a replayed (uncharged) turn.
         const cost =
