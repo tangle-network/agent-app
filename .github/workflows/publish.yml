@@ -57,7 +57,10 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - run: npm install -g npm@latest
+      # Pinned (not @latest): npm 12.0.0 (2026-07-08) broke `--provenance` with
+      # "MODULE_NOT_FOUND: Cannot find module 'sigstore'". 11.18.0 is the last
+      # known-good release (>= 11.5.1 for OIDC). Revisit once a fixed 12.x ships.
+      - run: npm install -g npm@11.18.0
 
       - name: Bump patch, commit, tag, push
         run: |
@@ -147,7 +150,9 @@ jobs:
       # id-token → registry-token exchange the trusted-publisher entry expects.
       # Safe here because agent-app has no `workspace:` protocol deps to leak
       # (peers are plain version ranges). The package ships only ./dist.
-      - run: npm install -g npm@latest
+      # Pinned (not @latest): npm 12.0.0 (2026-07-08) broke `--provenance`
+      # (sigstore MODULE_NOT_FOUND). 11.18.0 is the last known-good. Revisit on 12.x fix.
+      - run: npm install -g npm@11.18.0
       - run: npm --version
 
       # Idempotent: re-running a tag whose npm version is already published must
