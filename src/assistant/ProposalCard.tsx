@@ -8,7 +8,9 @@
  *
  * The body preview's graph is injected so this card — in the always-loaded
  * `./assistant` entry — doesn't pull the graph's `@xyflow/react` dependency; the
- * host wires `renderGraph` from `./workflows`. Navigation is injected too.
+ * host wires `renderGraph` from `./workflows`. Navigation and the integration
+ * provider icons (`renderProviderIcon`, from the host's integrations catalog)
+ * are injected too.
  */
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -34,6 +36,11 @@ export interface ProposalCardProps {
   /** Render the workflow YAML as a node graph (the `./workflows` WorkflowGraph).
    *  When absent, the YAML is shown as text. */
   renderGraph?: (yaml: string) => ReactNode;
+  /** Render the brand icon for an integration requirement's provider. The host
+   *  owns the provider→icon mapping (its integrations catalog); when absent, or
+   *  when it returns a nullish node for a provider it doesn't recognize, the row
+   *  falls back to the built-in {@link ProviderLogo} mark. */
+  renderProviderIcon?: (provider: string) => ReactNode;
 }
 
 export function ProposalCard({
@@ -44,6 +51,7 @@ export function ProposalCard({
   navigate,
   onConnect,
   renderGraph,
+  renderProviderIcon,
 }: ProposalCardProps) {
   const view = describeProposal(proposal);
   const [tab, setTab] = useState<"graph" | "yaml">("graph");
@@ -135,6 +143,7 @@ export function ProposalCard({
                 req={r}
                 navigate={navigate}
                 onConnect={onConnect}
+                renderProviderIcon={renderProviderIcon}
               />
             ))}
           </ul>
@@ -203,10 +212,12 @@ function RequirementRow({
   req,
   navigate,
   onConnect,
+  renderProviderIcon,
 }: {
   req: ConnectionRequirement;
   navigate?: (path: string) => void;
   onConnect?: (requirement: ConnectionRequirement) => void | Promise<void>;
+  renderProviderIcon?: (provider: string) => ReactNode;
 }) {
   const [connecting, setConnecting] = useState(false);
   // The connect can outlive the row (the card is resolved/cancelled while the
@@ -268,7 +279,12 @@ function RequirementRow({
   return (
     <li className="flex items-center justify-between gap-2 text-xs">
       <span className="flex min-w-0 items-center gap-2">
-        <ProviderLogo provider={req.provider} size={16} />
+        {/* Host-supplied brand icon (its integrations catalog knows the real
+            provider marks); fall back to the built-in model mark when the host
+            didn't wire one or doesn't recognize this provider. */}
+        {renderProviderIcon?.(req.provider) ?? (
+          <ProviderLogo provider={req.provider} size={16} />
+        )}
         <span className="truncate text-foreground">{kindLabel}</span>
         <span className="flex shrink-0 items-center gap-1">
           {/* Filled vs outlined dot is a non-color (shape) cue for the

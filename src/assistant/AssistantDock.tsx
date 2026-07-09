@@ -38,6 +38,10 @@ export interface AssistantDockProps {
   formatMoney?: (usd: number | null) => string;
   /** Render workflow YAML as a node graph in a proposal card. */
   renderGraph?: (yaml: string) => ReactNode;
+  /** Render the brand icon for a proposal requirement's integration provider.
+   *  The host owns the provider→icon mapping (its integrations catalog); when
+   *  absent, the card falls back to its built-in provider mark. */
+  renderProviderIcon?: (provider: string) => ReactNode;
   /** Called after a workflow-mutating tool is confirmed (host re-fetches its list). */
   onWorkflowMutation?: () => void;
   /** In-place connect handler for a proposal's integration requirements. The host
@@ -75,6 +79,7 @@ export function AssistantDock({
   balanceUsd = null,
   formatMoney,
   renderGraph,
+  renderProviderIcon,
   onWorkflowMutation,
   onConnectRequirement,
   renderMarkdown,
@@ -197,6 +202,7 @@ export function AssistantDock({
           balanceUsd={balanceUsd}
           formatMoney={formatMoney}
           renderGraph={renderGraph}
+          renderProviderIcon={renderProviderIcon}
           renderMarkdown={renderMarkdown}
           toolRenderers={toolRenderers}
           renderTranscript={renderTranscript}
