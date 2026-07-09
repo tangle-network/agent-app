@@ -329,4 +329,67 @@ describe("ProposalCard", () => {
         .disabled,
     ).toBe(false);
   });
+
+  it("renders the host-supplied provider icon when renderProviderIcon is wired", () => {
+    render(
+      <ProposalCard
+        proposal={withReq({ provider: "slack", connected: false })}
+        confirming={false}
+        onConfirm={noop}
+        onCancel={noop}
+        renderProviderIcon={(provider) => (
+          <span data-testid="host-icon">{provider}-brand</span>
+        )}
+      />,
+    );
+    // The host mark shows, and the built-in ProviderLogo fallback (an <svg
+    // role="img"> labelled with the provider) is not rendered.
+    expect(screen.getByTestId("host-icon").textContent).toBe("slack-brand");
+    expect(screen.queryByRole("img", { name: "slack" })).toBeNull();
+  });
+
+  it("falls back to the built-in provider mark when renderProviderIcon is absent or returns nothing", () => {
+    const { rerender } = render(
+      <ProposalCard
+        proposal={withReq({ provider: "slack", connected: false })}
+        confirming={false}
+        onConfirm={noop}
+        onCancel={noop}
+      />,
+    );
+    // No handler → the built-in ProviderLogo renders.
+    expect(screen.getByRole("img", { name: "slack" })).toBeTruthy();
+
+    // A handler that returns null for a provider it doesn't recognize also
+    // falls back rather than rendering an empty icon slot.
+    rerender(
+      <ProposalCard
+        proposal={withReq({ provider: "slack", connected: false })}
+        confirming={false}
+        onConfirm={noop}
+        onCancel={noop}
+        renderProviderIcon={() => null}
+      />,
+    );
+    expect(screen.getByRole("img", { name: "slack" })).toBeTruthy();
+  });
+
+  it("falls back to the built-in mark (no crash) when renderProviderIcon throws", () => {
+    // An untrusted host callback that throws for an unrecognized provider must
+    // not take down the row — it degrades to the built-in ProviderLogo.
+    expect(() =>
+      render(
+        <ProposalCard
+          proposal={withReq({ provider: "slack", connected: false })}
+          confirming={false}
+          onConfirm={noop}
+          onCancel={noop}
+          renderProviderIcon={() => {
+            throw new Error("no such provider");
+          }}
+        />,
+      ),
+    ).not.toThrow();
+    expect(screen.getByRole("img", { name: "slack" })).toBeTruthy();
+  });
 });

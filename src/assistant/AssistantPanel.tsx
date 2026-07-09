@@ -39,6 +39,9 @@ export interface AssistantPanelProps {
   /** Render workflow YAML as a node graph in a proposal card (the `./workflows`
    *  WorkflowGraph). When absent, proposals show YAML as text. */
   renderGraph?: (yaml: string) => ReactNode;
+  /** Render the brand icon for a proposal requirement's integration provider.
+   *  When absent, the card falls back to its built-in provider mark. */
+  renderProviderIcon?: (provider: string) => ReactNode;
   /** Markdown renderer for assistant message content. When absent, content
    *  renders as plain pre-wrapped text. */
   renderMarkdown?: (content: string) => ReactNode;
@@ -151,6 +154,7 @@ export function AssistantPanel({
   balanceUsd = null,
   formatMoney = defaultFormatMoney,
   renderGraph,
+  renderProviderIcon,
   renderMarkdown,
   toolRenderers,
   renderConfirmedResult,
@@ -295,6 +299,7 @@ export function AssistantPanel({
           : undefined
       }
       renderGraph={renderGraph}
+      renderProviderIcon={renderProviderIcon}
     />
   );
 
