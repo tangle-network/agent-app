@@ -217,6 +217,20 @@ export interface SandboxRestoreSpec {
   fromSandboxId: string
 }
 
+export interface StoppedSandboxResumeFailure {
+  box: SandboxInstance
+  error: Error
+  scope: SandboxScope
+  boxKey: string
+}
+
+export interface StoppedSandboxResumeRecovery {
+  // Used for both the replacement sandbox name and idempotency key.
+  replacementBoxKey: string
+  // undefined preserves the configured restore seam; null creates without one.
+  restore?: SandboxRestoreSpec | null
+}
+
 // Reuse health gate + sidecar liveness. The exec+timeout-race is generic; the
 // sidecarProcessPattern is harness-specific (which process is the live sidecar),
 // so it is a closure. Absent => no liveness probe (reuse on metadata.harness match).
@@ -269,6 +283,13 @@ export interface SandboxRuntimeConfig {
   webTerminalEnabled?: boolean
   // default true: try stopped-resume before create.
   resumeStopped?: boolean
+  // Product-owned retention/recovery policy after a stopped box fails to resume.
+  // Return ok(null) to preserve the original resume error. A replacement key is
+  // required before this shell creates a new box, so it cannot resolve the
+  // failed stopped box through the original idempotency identity.
+  recoverStoppedSandbox?: (
+    failure: StoppedSandboxResumeFailure,
+  ) => Promise<Outcome<StoppedSandboxResumeRecovery | null>>
   // default false: bake resolveModel() into backend.model at create.
   backendModelAtCreate?: boolean
   // default false: write the profile's `resources.files` INTO the box after it
@@ -959,6 +980,18 @@ async function listRunning(
   }
 }
 
+async function listStopped(
+  client: Sandbox,
+  name: string,
+): Promise<Outcome<SandboxInstance | null>> {
+  try {
+    const stopped = await client.list({ status: 'stopped' })
+    return ok(stopped.find((s) => s.name === name) ?? null)
+  } catch (err) {
+    return fail(err)
+  }
+}
+
 async function deleteBox(box: SandboxInstance): Promise<Outcome<void>> {
   try {
     await box.delete()
@@ -1217,21 +1250,16 @@ async function isReusableBox(
   return isBoxAlive(box, harness, probe)
 }
 
-// Resume a name-matched stopped box and wait for it to reach running. Returns
-// ok(null) when no stopped box matches the name.
+// Resume a stopped box and wait for it to reach running.
 async function resumeStoppedBox(
-  client: Sandbox,
-  name: string,
+  box: SandboxInstance,
   timeoutMs: number,
   onProgress?: (event: ProvisionEvent) => void,
-): Promise<Outcome<SandboxInstance | null>> {
+): Promise<Outcome<SandboxInstance>> {
   try {
-    const stopped = await client.list({ status: 'stopped' })
-    const match = stopped.find((s) => s.name === name) ?? null
-    if (!match) return ok(null)
-    await match.resume()
-    await match.waitFor('running', { timeoutMs, ...(onProgress ? { onProgress } : {}) })
-    return ok(match)
+    await box.resume()
+    await box.waitFor('running', { timeoutMs, ...(onProgress ? { onProgress } : {}) })
+    return ok(box)
   } catch (err) {
     return fail(err)
   }
@@ -1246,7 +1274,8 @@ export async function ensureWorkspaceSandbox(
   const creds = await shell.credentials(scope)
   if (!creds) throw new Error('sandbox credentials are required (apiKey/baseUrl)')
   const client = getClientFromCreds(creds)
-  const name = shell.boxKey ? shell.boxKey(scope) : shell.name(workspaceId)
+  let name = shell.boxKey ? shell.boxKey(scope) : shell.name(workspaceId)
+  let recoveryRestore: SandboxRestoreSpec | null | undefined
   const resources = shell.resources ?? DEFAULT_SANDBOX_RESOURCES
   const resumeTimeout = 120_000
 
@@ -1307,39 +1336,62 @@ export async function ensureWorkspaceSandbox(
 
   // Stage 2 — stopped-box resume (skipped on forceNew or resumeStopped===false).
   if (!forceNew && shell.resumeStopped !== false) {
-    const resumed = await resumeStoppedBox(client, name, resumeTimeout, onProgress)
-    if (resumed.succeeded && resumed.value) {
-      const box = await refreshRuntimeConnection(client, resumed.value)
-      if (await isReusableBox(box, harness, shell.livenessProbe)) {
-        const written = await materializeDeferredFilesForExistingBox(
-          shell,
-          client,
-          box,
-          'resumed',
-          name,
-          workspaceId,
-          userId,
-        )
-        if (!written.succeeded) {
-          throw deferredProfileWriteFailed('resumed', name, written.error)
+    const stopped = await listStopped(client, name)
+    if (!stopped.succeeded) throw stopped.error
+    if (stopped.value) {
+      const resumed = await resumeStoppedBox(stopped.value, resumeTimeout, onProgress)
+      if (!resumed.succeeded) {
+        if (!shell.recoverStoppedSandbox) throw resumed.error
+        const recovery = await shell.recoverStoppedSandbox({
+          box: stopped.value,
+          error: resumed.error,
+          scope,
+          boxKey: name,
+        })
+        if (!recovery.succeeded) throw recovery.error
+        if (!recovery.value) throw resumed.error
+        const replacementBoxKey = recovery.value.replacementBoxKey.trim()
+        if (!replacementBoxKey || replacementBoxKey === name) {
+          throw new Error(
+            `stopped sandbox recovery must return a fresh replacement box key for ${name}`,
+            { cause: resumed.error },
+          )
         }
-        const resumedBox = written.value
-        if (shell.bootstrap) {
-          const boot = await shell.bootstrap(resumedBox, scope)
-          if (!boot.succeeded) {
-            throw new Error(`bootstrap failed on resumed box ${name}`, { cause: boot.error })
+        name = replacementBoxKey
+        recoveryRestore = recovery.value.restore
+      } else {
+        const box = await refreshRuntimeConnection(client, resumed.value)
+        if (await isReusableBox(box, harness, shell.livenessProbe)) {
+          const written = await materializeDeferredFilesForExistingBox(
+            shell,
+            client,
+            box,
+            'resumed',
+            name,
+            workspaceId,
+            userId,
+          )
+          if (!written.succeeded) {
+            throw deferredProfileWriteFailed('resumed', name, written.error)
           }
+          const resumedBox = written.value
+          if (shell.bootstrap) {
+            const boot = await shell.bootstrap(resumedBox, scope)
+            if (!boot.succeeded) {
+              throw new Error(`bootstrap failed on resumed box ${name}`, { cause: boot.error })
+            }
+          }
+          return resumedBox
         }
-        return resumedBox
-      }
-      const dropped = await deleteBox(box)
-      if (!dropped.succeeded) {
-        throw new Error(
-          `resumed sandbox ${name} ` +
-            `(was ${String(box.metadata?.harness ?? 'unknown')}, want ${harness}, or unresponsive) ` +
-            `could not be deleted`,
-          { cause: dropped.error },
-        )
+        const dropped = await deleteBox(box)
+        if (!dropped.succeeded) {
+          throw new Error(
+            `resumed sandbox ${name} ` +
+              `(was ${String(box.metadata?.harness ?? 'unknown')}, want ${harness}, or unresponsive) ` +
+              `could not be deleted`,
+            { cause: dropped.error },
+          )
+        }
       }
     }
   }
@@ -1382,7 +1434,7 @@ export async function ensureWorkspaceSandbox(
   }
 
   const storage = shell.storage?.(buildCtx)
-  const restore = shell.restore?.(buildCtx)
+  const restore = recoveryRestore === undefined ? shell.restore?.(buildCtx) : recoveryRestore
 
   const payload = {
     name,

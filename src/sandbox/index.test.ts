@@ -252,7 +252,9 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
 
   it('deletes and recreates on harness mismatch', async () => {
     const stale = fakeBox({ name: 'box-w1', metadata: { harness: 'claude-code' } })
-    listMock.mockResolvedValue([stale])
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      Promise.resolve(status === 'running' ? [stale] : []),
+    )
     createMock.mockResolvedValue(fakeBox())
     await ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
     expect(stale.delete).toHaveBeenCalledTimes(1)
@@ -276,11 +278,13 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     expect(createMock).not.toHaveBeenCalled()
   })
 
-  it('creates fresh when list fails (list error does not abort provisioning)', async () => {
-    listMock.mockRejectedValue(new Error('list down'))
-    createMock.mockResolvedValue(fakeBox())
-    await ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
-    expect(createMock).toHaveBeenCalledTimes(1)
+  it('preserves a stopped-box lookup error instead of creating with the same identity', async () => {
+    const error = new Error('list down')
+    listMock.mockRejectedValue(error)
+    await expect(
+      ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' }),
+    ).rejects.toBe(error)
+    expect(createMock).not.toHaveBeenCalled()
   })
 
   it('refreshes when the created box has no runtimeUrl', async () => {
@@ -706,6 +710,200 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     expect(resume).toHaveBeenCalledOnce()
     expect(createMock).not.toHaveBeenCalled()
     expect(box).toBe(stopped)
+  })
+
+  it('preserves a typed egress recovery error from a stopped-box resume', async () => {
+    class EgressProxyRecoveryError extends Error {
+      readonly code = 'EGRESS_PROXY_RECOVERY_REQUIRED'
+      readonly status = 409
+      readonly phase = 'egress_proxy_recovery'
+
+      constructor() {
+        super('Egress proxy recovery required')
+        this.name = 'EgressProxyRecoveryError'
+      }
+    }
+
+    const error = new EgressProxyRecoveryError()
+    const stopped = fakeBox({
+      name: 'box-w1',
+      resume: vi.fn().mockRejectedValue(error),
+    })
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      Promise.resolve(status === 'stopped' ? [stopped] : []),
+    )
+
+    await expect(
+      ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }), {
+        workspaceId: 'w1',
+        harness: 'opencode',
+      }),
+    ).rejects.toBe(error)
+
+    expect(stopped.delete).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('preserves a generic stopped-box resume error instead of creating', async () => {
+    const error = new Error('resume unavailable')
+    const stopped = fakeBox({
+      name: 'box-w1',
+      resume: vi.fn().mockRejectedValue(error),
+    })
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      Promise.resolve(status === 'stopped' ? [stopped] : []),
+    )
+
+    await expect(
+      ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }), {
+        workspaceId: 'w1',
+        harness: 'opencode',
+      }),
+    ).rejects.toBe(error)
+
+    expect(stopped.delete).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('lets product recovery choose deletion, restore, and a fresh create identity', async () => {
+    const error = new Error('resume unavailable')
+    const stopped = fakeBox({
+      name: 'box-w1',
+      resume: vi.fn().mockRejectedValue(error),
+    })
+    const recovered = fakeBox({ name: 'box-w1-recovery' })
+    const restore = { fromSnapshot: 'snapshot-1', fromSandboxId: stopped.id }
+    const recoverStoppedSandbox = vi.fn(async (failure: { box: SandboxInstance }) => {
+      await failure.box.delete()
+      return {
+        succeeded: true as const,
+        value: {
+          replacementBoxKey: 'box-w1-recovery',
+          restore,
+        },
+      }
+    })
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      Promise.resolve(status === 'stopped' ? [stopped] : []),
+    )
+    createMock.mockResolvedValue(recovered)
+
+    await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      recoverStoppedSandbox,
+    }), { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(recoverStoppedSandbox).toHaveBeenCalledWith(expect.objectContaining({
+      box: stopped,
+      error,
+      boxKey: 'box-w1',
+      scope: { workspaceId: 'w1' },
+    }))
+    expect(stopped.delete).toHaveBeenCalledOnce()
+    expect(createMock).toHaveBeenCalledOnce()
+    expect(createMock.mock.calls[0]![0]).toMatchObject({
+      name: 'box-w1-recovery',
+      idempotencyKey: 'box-w1-recovery',
+      fromSnapshot: 'snapshot-1',
+      fromSandboxId: stopped.id,
+    })
+  })
+
+  it('lets product recovery decline and preserve the original resume error', async () => {
+    const error = new Error('resume unavailable')
+    const stopped = fakeBox({
+      name: 'box-w1',
+      resume: vi.fn().mockRejectedValue(error),
+    })
+    const recoverStoppedSandbox = vi.fn(async () => ({
+      succeeded: true as const,
+      value: null,
+    }))
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      Promise.resolve(status === 'stopped' ? [stopped] : []),
+    )
+
+    await expect(
+      ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+        recoverStoppedSandbox,
+      }), { workspaceId: 'w1', harness: 'opencode' }),
+    ).rejects.toBe(error)
+
+    expect(stopped.delete).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('preserves a failed product recovery outcome', async () => {
+    const resumeError = new Error('resume unavailable')
+    const recoveryError = new Error('snapshot failed')
+    const stopped = fakeBox({
+      name: 'box-w1',
+      resume: vi.fn().mockRejectedValue(resumeError),
+    })
+    const recoverStoppedSandbox = vi.fn(async () => ({
+      succeeded: false as const,
+      error: recoveryError,
+    }))
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      Promise.resolve(status === 'stopped' ? [stopped] : []),
+    )
+
+    await expect(
+      ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+        recoverStoppedSandbox,
+      }), { workspaceId: 'w1', harness: 'opencode' }),
+    ).rejects.toBe(recoveryError)
+
+    expect(stopped.delete).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('lets product recovery suppress a configured restore', async () => {
+    const error = new Error('resume unavailable')
+    const stopped = fakeBox({
+      name: 'box-w1',
+      resume: vi.fn().mockRejectedValue(error),
+    })
+    const recovered = fakeBox({ name: 'box-w1-recovery' })
+    const recoverStoppedSandbox = vi.fn(async () => ({
+      succeeded: true as const,
+      value: { replacementBoxKey: 'box-w1-recovery', restore: null },
+    }))
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      Promise.resolve(status === 'stopped' ? [stopped] : []),
+    )
+    createMock.mockResolvedValue(recovered)
+
+    await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      restore: () => ({ fromSnapshot: 'normal-snapshot', fromSandboxId: 'normal-sandbox' }),
+      recoverStoppedSandbox,
+    }), { workspaceId: 'w1', harness: 'opencode' })
+
+    const payload = createMock.mock.calls[0]![0]
+    expect(payload.fromSnapshot).toBeUndefined()
+    expect(payload.fromSandboxId).toBeUndefined()
+  })
+
+  it('rejects stopped-box recovery that reuses the failed create identity', async () => {
+    const error = new Error('resume unavailable')
+    const stopped = fakeBox({
+      name: 'box-w1',
+      resume: vi.fn().mockRejectedValue(error),
+    })
+    const recoverStoppedSandbox = vi.fn(async () => ({
+      succeeded: true as const,
+      value: { replacementBoxKey: 'box-w1' },
+    }))
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      Promise.resolve(status === 'stopped' ? [stopped] : []),
+    )
+
+    await expect(
+      ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+        recoverStoppedSandbox,
+      }), { workspaceId: 'w1', harness: 'opencode' }),
+    ).rejects.toThrow(/fresh replacement box key/)
+
+    expect(createMock).not.toHaveBeenCalled()
   })
 
   it('spreads storage + restore into the create payload', async () => {
