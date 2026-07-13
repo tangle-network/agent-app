@@ -175,6 +175,63 @@ describe('VaultPane — rich-editing seam', () => {
 })
 
 describe('VaultPane — load + selection', () => {
+  it('surfaces an initial tree failure, preserves controlled selection, and retries', async () => {
+    const error = new Error('list exploded')
+    const listTree = vi.fn()
+      .mockRejectedValueOnce(error)
+      .mockResolvedValueOnce(TREE)
+    const onOperationError = vi.fn()
+    const onSelectedPathChange = vi.fn()
+    const port = fakePort({ listTree })
+    mount({ port, selectedPath: 'a.md', onSelectedPathChange, onOperationError })
+
+    await waitFor(() => expect(screen.getByText("Couldn't load the Vault")).toBeTruthy())
+    expect(screen.getByText('list exploded')).toBeTruthy()
+    expect(screen.queryByTestId('tree')).toBeNull()
+    expect(onSelectedPathChange).not.toHaveBeenCalled()
+    expect(onOperationError).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'list',
+      phase: 'operation',
+      message: 'list exploded',
+      cause: error,
+    }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+
+    await waitFor(() => expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('a.md'))
+    expect(listTree).toHaveBeenCalledTimes(2)
+    expect(onSelectedPathChange).not.toHaveBeenCalled()
+  })
+
+  it('keeps the last tree visible when a refresh fails and retries the listing', async () => {
+    const error = new Error('refresh exploded')
+    const listTree = vi.fn()
+      .mockResolvedValueOnce(TREE)
+      .mockRejectedValueOnce(error)
+      .mockResolvedValueOnce(TREE)
+    const onOperationError = vi.fn()
+    const port = fakePort({ listTree })
+    mount({ port, onOperationError })
+
+    expect(await screen.findByTestId('tree-a.md')).toBeTruthy()
+    fireEvent.click(screen.getByLabelText('Refresh vault'))
+
+    await waitFor(() => expect(screen.getByText('refresh exploded')).toBeTruthy())
+    expect(screen.getByTestId('tree-a.md')).toBeTruthy()
+    expect(onOperationError).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'list',
+      phase: 'operation',
+      message: 'refresh exploded',
+      cause: error,
+    }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry vault refresh' }))
+
+    await waitFor(() => expect(screen.queryByText('refresh exploded')).toBeNull())
+    expect(screen.getByTestId('tree-a.md')).toBeTruthy()
+    expect(listTree).toHaveBeenCalledTimes(3)
+  })
+
   it('lists the tree on mount and opens a clicked file through the port', async () => {
     const { port } = mount()
     await waitFor(() => expect(port.listTree).toHaveBeenCalled())
@@ -279,16 +336,25 @@ describe('VaultPane — load + selection', () => {
   })
 
   it('surfaces read failures instead of falling back to the empty state', async () => {
+    const error = new Error('read exploded')
     const readFile = vi.fn()
-      .mockRejectedValueOnce(new Error('read exploded'))
+      .mockRejectedValueOnce(error)
       .mockResolvedValueOnce({ path: 'a.md', content: 'recovered A' })
     const port = fakePort({ readFile })
-    mount({ port })
+    const onOperationError = vi.fn()
+    mount({ port, onOperationError })
 
     fireEvent.click(await screen.findByTestId('tree-a.md'))
     await waitFor(() => expect(screen.getByText("Couldn't open this file")).toBeTruthy())
     expect(screen.getByText('read exploded')).toBeTruthy()
     expect(screen.queryByText('Open a vault document')).toBeNull()
+    expect(onOperationError).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'read',
+      phase: 'operation',
+      path: 'a.md',
+      message: 'read exploded',
+      cause: error,
+    }))
 
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
     await waitFor(() => expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('a.md'))
@@ -363,6 +429,58 @@ describe('VaultPane — dirty-guard state machine', () => {
     expect(screen.queryByRole('dialog', { name: 'Discard unsaved changes?' })).toBeNull()
   })
 
+  it('surfaces a save failure, preserves the source draft, and retries the current draft', async () => {
+    const error = new Error('save exploded')
+    const writeFile = vi.fn()
+      .mockRejectedValueOnce(error)
+      .mockResolvedValueOnce(undefined)
+    const onOperationError = vi.fn()
+    const port = fakePort({ writeFile })
+    mount({ port, onOperationError })
+    await openFile('a.md')
+    fireEvent.click(screen.getByLabelText('Edit as source'))
+    await typeSource('mutated A')
+
+    fireEvent.click(screen.getByRole('button', { name: /^Save/ }))
+
+    await waitFor(() => expect(screen.getByText('save exploded')).toBeTruthy())
+    expect((screen.getByLabelText('Source editor') as HTMLTextAreaElement).value).toBe('mutated A')
+    expect(screen.getByText('Unsaved changes')).toBeTruthy()
+    expect((screen.getByRole('button', { name: /^Save/ }) as HTMLButtonElement).disabled).toBe(false)
+    expect(onOperationError).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'save',
+      phase: 'operation',
+      path: 'a.md',
+      message: 'save exploded',
+      cause: error,
+    }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry save' }))
+
+    await waitFor(() => expect(screen.getByText('Saved')).toBeTruthy())
+    expect(writeFile).toHaveBeenNthCalledWith(2, 'a.md', 'mutated A')
+    expect(screen.queryByText('save exploded')).toBeNull()
+  })
+
+  it('shows the shared save alert for a host-rendered rich editor and allows dismissal', async () => {
+    const writeFile = vi.fn().mockRejectedValue(new Error('rich save exploded'))
+    const port = fakePort({ writeFile })
+    mount({ port, renderArtifact: richArtifact })
+    fireEvent.click(await screen.findByTestId('tree-a.md'))
+    await waitFor(() => expect(screen.getByTestId('rich-artifact').getAttribute('data-body')).toBe('body A'))
+    fireEvent.click(screen.getByTestId('rich-edit'))
+    await waitFor(() => expect(screen.getByTestId('rich-artifact').getAttribute('data-dirty')).toBe('true'))
+    fireEvent.click(screen.getByTestId('rich-save'))
+
+    await waitFor(() => expect(screen.getByText('rich save exploded')).toBeTruthy())
+    expect(screen.getByTestId('rich-artifact').getAttribute('data-dirty')).toBe('true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+
+    expect(screen.queryByText('rich save exploded')).toBeNull()
+    expect(screen.getByTestId('rich-artifact').getAttribute('data-dirty')).toBe('true')
+  })
+
   it('a clean file switches immediately with no prompt', async () => {
     mount()
     await openFile('a.md')
@@ -426,6 +544,150 @@ describe('VaultPane — create / delete call the port', () => {
     })
     expect(port.deleteFile).toHaveBeenCalledWith('a.md')
     await waitFor(() => expect(screen.getByText('Open a vault document')).toBeTruthy())
+  })
+
+  it('keeps the create dialog input after rejection and retries the mutation', async () => {
+    const error = new Error('create exploded')
+    const createdTree = [...TREE, { name: 'new.md', path: 'new.md', type: 'file' as const }]
+    const listTree = vi.fn()
+      .mockResolvedValueOnce(TREE)
+      .mockResolvedValueOnce(createdTree)
+    const createFile = vi.fn()
+      .mockRejectedValueOnce(error)
+      .mockResolvedValueOnce('new.md')
+    const onOperationError = vi.fn()
+    const port = fakePort({ listTree, createFile })
+    mount({ port, onOperationError })
+    await screen.findByTestId('tree-a.md')
+    fireEvent.click(screen.getByLabelText('New vault file'))
+    fireEvent.change(screen.getByLabelText('New file path'), { target: { value: 'new.md' } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+
+    await waitFor(() => expect(screen.getByText('create exploded')).toBeTruthy())
+    expect(screen.getByRole('dialog', { name: 'Create vault file' })).toBeTruthy()
+    expect((screen.getByLabelText('New file path') as HTMLInputElement).value).toBe('new.md')
+    expect((screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement).disabled).toBe(false)
+    expect(onOperationError).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'create',
+      phase: 'operation',
+      path: 'new.md',
+      message: 'create exploded',
+      cause: error,
+    }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Create vault file' })).toBeNull())
+    await waitFor(() => expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('new.md'))
+    expect(createFile).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the delete dialog and selection after rejection and retries the mutation', async () => {
+    const error = new Error('delete exploded')
+    const listTree = vi.fn()
+      .mockResolvedValueOnce(TREE)
+      .mockResolvedValueOnce(TREE.filter((node) => node.path !== 'a.md'))
+    const deleteFile = vi.fn()
+      .mockRejectedValueOnce(error)
+      .mockResolvedValueOnce(undefined)
+    const onOperationError = vi.fn()
+    const port = fakePort({ listTree, deleteFile })
+    mount({ port, onOperationError })
+    await openFile('a.md')
+    fireEvent.click(screen.getByLabelText('Delete this file'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete file' }))
+
+    await waitFor(() => expect(screen.getByText('delete exploded')).toBeTruthy())
+    expect(screen.getByRole('dialog', { name: 'Delete file?' })).toBeTruthy()
+    expect(currentPath()).toBe('a.md')
+    expect((screen.getByRole('button', { name: 'Delete file' }) as HTMLButtonElement).disabled).toBe(false)
+    expect(onOperationError).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'delete',
+      phase: 'operation',
+      path: 'a.md',
+      message: 'delete exploded',
+      cause: error,
+    }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete file' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete file?' })).toBeNull())
+    await waitFor(() => expect(screen.getByText('Open a vault document')).toBeTruthy())
+    expect(deleteFile).toHaveBeenCalledTimes(2)
+  })
+
+  it('reports create success followed by refresh failure and retries only the listing', async () => {
+    const error = new Error('post-create refresh exploded')
+    const createdTree = [...TREE, { name: 'new.md', path: 'new.md', type: 'file' as const }]
+    const listTree = vi.fn()
+      .mockResolvedValueOnce(TREE)
+      .mockRejectedValueOnce(error)
+      .mockResolvedValueOnce(createdTree)
+    const createFile = vi.fn().mockResolvedValue('new.md')
+    const onOperationError = vi.fn()
+    const port = fakePort({ listTree, createFile })
+    mount({ port, onOperationError })
+    await screen.findByTestId('tree-a.md')
+    fireEvent.click(screen.getByLabelText('New vault file'))
+    fireEvent.change(screen.getByLabelText('New file path'), { target: { value: 'new.md' } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+
+    await waitFor(() => expect(screen.getByText(/The file was created, but the Vault couldn't refresh/)).toBeTruthy())
+    expect(screen.queryByRole('dialog', { name: 'Create vault file' })).toBeNull()
+    expect(createFile).toHaveBeenCalledTimes(1)
+    expect(onOperationError).toHaveBeenCalledTimes(1)
+    expect(onOperationError).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'create',
+      phase: 'post-mutation-refresh',
+      path: 'new.md',
+      message: 'post-create refresh exploded',
+      cause: error,
+    }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry vault refresh' }))
+
+    await waitFor(() => expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('new.md'))
+    expect(createFile).toHaveBeenCalledTimes(1)
+    expect(listTree).toHaveBeenCalledTimes(3)
+  })
+
+  it('reports delete success followed by refresh failure and retries only the listing', async () => {
+    const error = new Error('post-delete refresh exploded')
+    const remainingTree = TREE.filter((node) => node.path !== 'a.md')
+    const listTree = vi.fn()
+      .mockResolvedValueOnce(TREE)
+      .mockRejectedValueOnce(error)
+      .mockResolvedValueOnce(remainingTree)
+    const deleteFile = vi.fn().mockResolvedValue(undefined)
+    const onOperationError = vi.fn()
+    const port = fakePort({ listTree, deleteFile })
+    mount({ port, onOperationError })
+    await openFile('a.md')
+    fireEvent.click(screen.getByLabelText('Delete this file'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete file' }))
+
+    await waitFor(() => expect(screen.getByText(/The file was deleted, but the Vault couldn't refresh/)).toBeTruthy())
+    expect(screen.getByText('Open a vault document')).toBeTruthy()
+    expect(deleteFile).toHaveBeenCalledTimes(1)
+    expect(onOperationError).toHaveBeenCalledTimes(1)
+    expect(onOperationError).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'delete',
+      phase: 'post-mutation-refresh',
+      path: 'a.md',
+      message: 'post-delete refresh exploded',
+      cause: error,
+    }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry vault refresh' }))
+
+    await waitFor(() => expect(screen.queryByText('post-delete refresh exploded')).toBeNull())
+    expect(screen.queryByTestId('tree-a.md')).toBeNull()
+    expect(deleteFile).toHaveBeenCalledTimes(1)
+    expect(listTree).toHaveBeenCalledTimes(3)
   })
 })
 

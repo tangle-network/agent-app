@@ -59,6 +59,24 @@ export interface VaultDataPort {
   deleteFile(path: string): Promise<void>
 }
 
+/** The Vault operation that failed at the product-owned data-port seam. */
+export type VaultOperation = 'list' | 'read' | 'save' | 'create' | 'delete'
+
+/** Whether the operation itself failed or a mutation succeeded but its
+ *  follow-up tree refresh did not. */
+export type VaultOperationPhase = 'operation' | 'post-mutation-refresh'
+
+/** Structured failure reported to an optional host observer. VaultPane always
+ *  renders its own recovery UI; this payload is for telemetry or additional
+ *  product presentation and never controls the pane's state machine. */
+export interface VaultOperationFailure {
+  operation: VaultOperation
+  phase: VaultOperationPhase
+  path?: string
+  message: string
+  cause: unknown
+}
+
 /**
  * The parsed form of a file's rich content. The pane stays agnostic about the
  * shape — it round-trips `serialize(parse(raw))` through the codec to compute
@@ -172,6 +190,9 @@ export interface VaultPaneProps {
   selectedPath?: string | null
   /** Notified whenever the selected path changes (including clear → null). */
   onSelectedPathChange?: (path: string | null) => void
+  /** Optional observer for structured data-port failures. VaultPane still owns
+   *  the visible error state and retry behavior when this is omitted. */
+  onOperationError?: (failure: VaultOperationFailure) => void
   /** Optional rich/source codec. Defaults to identity passthrough. */
   codec?: VaultMarkdownCodec
   className?: string

@@ -29,6 +29,9 @@ import type {
   VaultEditorMode,
   VaultFile,
   VaultMarkdownCodec,
+  VaultOperation,
+  VaultOperationFailure,
+  VaultOperationPhase,
   VaultPaneProps,
   VaultRichParts,
   VaultTreeNode,
@@ -40,6 +43,30 @@ const IDENTITY_CODEC: VaultMarkdownCodec = {
 }
 
 type PendingNav = { type: 'open'; path: string } | { type: 'close' } | null
+
+interface TreeRefreshContext {
+  operation: Extract<VaultOperation, 'list' | 'create' | 'delete'>
+  phase: VaultOperationPhase
+  path?: string
+  selectAfterRecovery?: string
+}
+
+interface TreeFailureState {
+  failure: VaultOperationFailure
+  context: TreeRefreshContext
+}
+
+const LIST_CONTEXT: TreeRefreshContext = { operation: 'list', phase: 'operation' }
+
+function operationMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback
+}
+
+function treeFailureMessage(failure: VaultOperationFailure): string {
+  if (failure.phase !== 'post-mutation-refresh') return failure.message
+  const completed = failure.operation === 'create' ? 'created' : 'deleted'
+  return `The file was ${completed}, but the Vault couldn't refresh. ${failure.message}`
+}
 
 function collectFilePaths(nodes: VaultTreeNode[], into: Set<string>): Set<string> {
   for (const node of nodes) {
@@ -173,6 +200,53 @@ function ReadErrorState({ message, onRetry }: { message: string; onRetry: () => 
   )
 }
 
+function TreeErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+      <div>
+        <h3 className="text-sm font-medium text-foreground">Couldn't load the Vault</h3>
+        <p className="mt-1 max-w-xs text-xs text-muted-foreground">{message}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60"
+      >
+        Retry
+      </button>
+    </div>
+  )
+}
+
+function OperationErrorAlert({
+  message,
+  retryLabel,
+  onRetry,
+  onDismiss,
+}: {
+  message: string
+  retryLabel: string
+  onRetry: () => void
+  onDismiss: () => void
+}) {
+  return (
+    <div
+      role="alert"
+      className="flex shrink-0 items-center justify-between gap-3 border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+    >
+      <span className="min-w-0 flex-1">{message}</span>
+      <div className="flex shrink-0 items-center gap-3">
+        <button type="button" aria-label={retryLabel} onClick={onRetry} className="font-medium underline-offset-2 hover:underline">
+          Retry
+        </button>
+        <button type="button" onClick={onDismiss} className="underline-offset-2 hover:underline">
+          Dismiss
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function VaultPane(props: VaultPaneProps) {
   const {
     port,
@@ -182,6 +256,7 @@ export function VaultPane(props: VaultPaneProps) {
     canWrite = true,
     selectedPath: controlledPath,
     onSelectedPathChange,
+    onOperationError,
     codec,
     className,
     dockToggle,
@@ -200,6 +275,8 @@ export function VaultPane(props: VaultPaneProps) {
 
   const [tree, setTree] = useState<VaultTreeNode[]>([])
   const [treeLoading, setTreeLoading] = useState(true)
+  const [treeLoaded, setTreeLoaded] = useState(false)
+  const [treeError, setTreeError] = useState<TreeFailureState | null>(null)
   const [internalPath, setInternalPath] = useState<string | null>(null)
   const selectedPath = controlled ? (controlledPath ?? null) : internalPath
 
@@ -208,6 +285,7 @@ export function VaultPane(props: VaultPaneProps) {
   const [readError, setReadError] = useState<string | null>(null)
   const [reloadNonce, setReloadNonce] = useState(0)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<VaultOperationFailure | null>(null)
 
   const [editorMode, setEditorMode] = useState<VaultEditorMode>('rich')
   const [richDraft, setRichDraft] = useState<VaultRichParts>('')
@@ -217,14 +295,18 @@ export function VaultPane(props: VaultPaneProps) {
   const [createOpen, setCreateOpen] = useState(false)
   const [newPath, setNewPath] = useState('')
   const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<VaultOperationFailure | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<VaultOperationFailure | null>(null)
   const [dockOpen, setDockOpen] = useState(false)
   const [pendingNav, setPendingNav] = useState<PendingNav>(null)
   const [query, setQuery] = useState('')
 
   const savedContentRef = useRef('')
   const loadedPathRef = useRef<string | null>(null)
+  const onOperationErrorRef = useRef(onOperationError)
+  onOperationErrorRef.current = onOperationError
 
   const filePaths = useMemo(() => collectFilePaths(tree, new Set<string>()), [tree])
   const resolvedSelectedPath = useMemo(
@@ -249,18 +331,66 @@ export function VaultPane(props: VaultPaneProps) {
     [controlled, onSelectedPathChange],
   )
 
-  const refresh = useCallback(async () => {
+  const reportFailure = useCallback((
+    operation: VaultOperation,
+    phase: VaultOperationPhase,
+    error: unknown,
+    fallback: string,
+    path?: string,
+  ): VaultOperationFailure => {
+    const failure: VaultOperationFailure = {
+      operation,
+      phase,
+      path,
+      message: operationMessage(error, fallback),
+      cause: error,
+    }
+    try {
+      onOperationErrorRef.current?.(failure)
+    } catch (callbackError) {
+      console.error('Vault onOperationError callback failed:', callbackError)
+    }
+    return failure
+  }, [])
+
+  const refresh = useCallback(async (context: TreeRefreshContext = LIST_CONTEXT): Promise<boolean> => {
     setTreeLoading(true)
+    setTreeError(null)
     try {
       setTree(await port.listTree())
+      setTreeLoaded(true)
+      return true
+    } catch (error) {
+      const failure = reportFailure(
+        context.operation,
+        context.phase,
+        error,
+        'Failed to load the Vault',
+        context.path,
+      )
+      setTreeError({ failure, context })
+      return false
     } finally {
       setTreeLoading(false)
     }
+  }, [port, reportFailure])
+
+  useEffect(() => {
+    setTree([])
+    setTreeLoaded(false)
+    setTreeError(null)
   }, [port])
 
   useEffect(() => {
     void refresh()
   }, [refresh, refreshKey])
+
+  const retryTree = useCallback(async () => {
+    if (!treeError) return
+    const { context } = treeError
+    const recovered = await refresh(context)
+    if (recovered && context.selectAfterRecovery) commitPath(context.selectAfterRecovery)
+  }, [treeError, refresh, commitPath])
 
   useEffect(() => {
     if (!selectedPath) {
@@ -270,7 +400,7 @@ export function VaultPane(props: VaultPaneProps) {
       loadedPathRef.current = null
       return
     }
-    if (treeLoading) return
+    if (treeLoading || !treeLoaded) return
     if (!resolvedSelectedPath) {
       commitPath(null)
       setSelectedFile(null)
@@ -292,8 +422,9 @@ export function VaultPane(props: VaultPaneProps) {
         // Surface read failures instead of making them indistinguishable from
         // the intentionally empty "no file selected" state.
         if (!cancelled) {
+          const failure = reportFailure('read', 'operation', err, 'Failed to read file', path)
           setSelectedFile(null)
-          setReadError(err instanceof Error ? err.message : 'Failed to read file')
+          setReadError(failure.message)
         }
       } finally {
         if (!cancelled) setFileLoading(false)
@@ -302,7 +433,7 @@ export function VaultPane(props: VaultPaneProps) {
     return () => {
       cancelled = true
     }
-  }, [port, selectedPath, resolvedSelectedPath, treeLoading, refreshKey, reloadNonce, commitPath])
+  }, [port, selectedPath, resolvedSelectedPath, treeLoading, treeLoaded, refreshKey, reloadNonce, commitPath, reportFailure])
 
   useEffect(() => {
     if (!selectedFile) {
@@ -312,6 +443,7 @@ export function VaultPane(props: VaultPaneProps) {
       setSourceDraft('')
       setEditorMode('rich')
       setIsDirty(false)
+      setSaveError(null)
       return
     }
     const pathChanged = loadedPathRef.current !== selectedFile.path
@@ -321,6 +453,7 @@ export function VaultPane(props: VaultPaneProps) {
     setSourceDraft(selectedFile.content)
     if (pathChanged) setEditorMode('rich')
     setIsDirty(false)
+    setSaveError(null)
     setDockOpen(false)
   }, [selectedFile, activeCodec])
 
@@ -404,6 +537,7 @@ export function VaultPane(props: VaultPaneProps) {
     if (!selectedFile) return
     const content = editorMode === 'source' ? sourceDraft : activeCodec.serialize(richDraft)
     setSaving(true)
+    setSaveError(null)
     try {
       await port.writeFile(selectedFile.path, content)
       savedContentRef.current = content
@@ -411,40 +545,79 @@ export function VaultPane(props: VaultPaneProps) {
       setSourceDraft(content)
       setRichDraft(activeCodec.parse(content))
       setIsDirty(false)
+    } catch (error) {
+      setSaveError(reportFailure('save', 'operation', error, 'Failed to save file', selectedFile.path))
     } finally {
       setSaving(false)
     }
-  }, [selectedFile, editorMode, sourceDraft, richDraft, activeCodec, port])
+  }, [selectedFile, editorMode, sourceDraft, richDraft, activeCodec, port, reportFailure])
 
   const handleCreate = useCallback(async () => {
     const trimmed = newPath.trim()
     if (!trimmed) return
     setCreating(true)
+    setCreateError(null)
     try {
       const created = await port.createFile(trimmed)
       setCreateOpen(false)
       setNewPath('')
-      await refresh()
-      commitPath(created)
+      const refreshed = await refresh({
+        operation: 'create',
+        phase: 'post-mutation-refresh',
+        path: created,
+        selectAfterRecovery: created,
+      })
+      if (refreshed) commitPath(created)
+    } catch (error) {
+      setCreateError(reportFailure('create', 'operation', error, 'Failed to create file', trimmed))
     } finally {
       setCreating(false)
     }
-  }, [newPath, port, refresh, commitPath])
+  }, [newPath, port, refresh, commitPath, reportFailure])
 
   const handleDelete = useCallback(async () => {
     if (!selectedFile) return
+    const path = selectedFile.path
     setDeleting(true)
+    setDeleteError(null)
     try {
-      await port.deleteFile(selectedFile.path)
+      await port.deleteFile(path)
       setDeleteOpen(false)
       setIsDirty(false)
       commitPath(null)
       setSelectedFile(null)
-      await refresh()
+      await refresh({ operation: 'delete', phase: 'post-mutation-refresh', path })
+    } catch (error) {
+      setDeleteError(reportFailure('delete', 'operation', error, 'Failed to delete file', path))
     } finally {
       setDeleting(false)
     }
-  }, [selectedFile, port, refresh, commitPath])
+  }, [selectedFile, port, refresh, commitPath, reportFailure])
+
+  let treeContent: ReactNode
+  if (treeLoading || (!treeLoaded && !treeError)) {
+    treeContent = <TreeSkeleton />
+  } else if (!treeLoaded && treeError) {
+    treeContent = <TreeErrorState message={treeFailureMessage(treeError.failure)} onRetry={() => void retryTree()} />
+  } else {
+    treeContent = (
+      <>
+        {treeError && (
+          <OperationErrorAlert
+            message={treeFailureMessage(treeError.failure)}
+            retryLabel="Retry vault refresh"
+            onRetry={() => void retryTree()}
+            onDismiss={() => setTreeError(null)}
+          />
+        )}
+        {renderTree({
+          root: visibleRoot,
+          selectedPath: resolvedSelectedPath ?? undefined,
+          onSelect: handleTreeSelect,
+        })}
+      </>
+    )
+  }
 
   return (
     <EditorErrorBoundary onReset={() => { commitPath(null); setSelectedFile(null) }}>
@@ -475,7 +648,7 @@ export function VaultPane(props: VaultPaneProps) {
                 <button
                   type="button"
                   aria-label="New vault file"
-                  onClick={() => setCreateOpen(true)}
+                  onClick={() => { setCreateError(null); setCreateOpen(true) }}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60"
                 >
                   +
@@ -490,15 +663,7 @@ export function VaultPane(props: VaultPaneProps) {
               if (path) handleTreeSelect(path)
             }}
           >
-            {treeLoading ? (
-              <TreeSkeleton />
-            ) : (
-              renderTree({
-                root: visibleRoot,
-                selectedPath: resolvedSelectedPath ?? undefined,
-                onSelect: handleTreeSelect,
-              })
-            )}
+            {treeContent}
           </div>
         </div>
 
@@ -570,7 +735,7 @@ export function VaultPane(props: VaultPaneProps) {
                     type="button"
                     aria-label="Delete this file"
                     title="Delete file"
-                    onClick={() => setDeleteOpen(true)}
+                    onClick={() => { setDeleteError(null); setDeleteOpen(true) }}
                     className="inline-flex h-7 w-7 items-center justify-center rounded text-destructive/70 transition-colors hover:bg-destructive/10 hover:text-destructive"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -578,6 +743,14 @@ export function VaultPane(props: VaultPaneProps) {
                 )}
               </div>
             </div>
+          )}
+          {selectedFile && saveError && (
+            <OperationErrorAlert
+              message={saveError.message}
+              retryLabel="Retry save"
+              onRetry={() => void saveCurrent()}
+              onDismiss={() => setSaveError(null)}
+            />
           )}
           <div className="flex-1 overflow-hidden">
             {fileLoading ? (
@@ -623,16 +796,19 @@ export function VaultPane(props: VaultPaneProps) {
           confirmLabel={creating ? 'Creating…' : 'Create'}
           confirmDisabled={creating || !newPath.trim()}
           onConfirm={() => void handleCreate()}
-          onCancel={() => { setCreateOpen(false); setNewPath('') }}
+          onCancel={() => { setCreateOpen(false); setNewPath(''); setCreateError(null) }}
         >
-          <input
-            value={newPath}
-            autoFocus
-            onChange={(e) => setNewPath(e.target.value)}
-            placeholder="e.g. playbooks/new-strategy.md"
-            aria-label="New file path"
-            className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-primary/60"
-          />
+          <div className="space-y-2">
+            <input
+              value={newPath}
+              autoFocus
+              onChange={(e) => setNewPath(e.target.value)}
+              placeholder="e.g. playbooks/new-strategy.md"
+              aria-label="New file path"
+              className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-primary/60"
+            />
+            {createError && <p role="alert" className="text-xs text-destructive">{createError.message}</p>}
+          </div>
         </ConfirmDialog>
 
         <ConfirmDialog
@@ -643,8 +819,10 @@ export function VaultPane(props: VaultPaneProps) {
           confirmDisabled={deleting}
           destructive
           onConfirm={() => void handleDelete()}
-          onCancel={() => setDeleteOpen(false)}
-        />
+          onCancel={() => { setDeleteOpen(false); setDeleteError(null) }}
+        >
+          {deleteError && <p role="alert" className="text-xs text-destructive">{deleteError.message}</p>}
+        </ConfirmDialog>
 
         <ConfirmDialog
           open={pendingNav !== null}
