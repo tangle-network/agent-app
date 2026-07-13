@@ -61,11 +61,18 @@ export function ComposerHero({
   workspaceId,
   integrationsHref,
   canManageIntegrations,
+  align = 'start',
+  surfaceClassName = 'bg-card',
   onGenerated,
 }: {
   workspaceId?: string
   integrationsHref?: string
   canManageIntegrations: boolean
+  /** Heading treatment: `center` (focus mode) vs `start` (composer as a left rail). */
+  align?: 'center' | 'start'
+  /** Background of the composer card. Host apps pass their own surface token so
+   *  the card can share a tone with the app shell (e.g. the sidebar). */
+  surfaceClassName?: string
   onGenerated: (generation: Generation) => void
 }) {
   const [type, setType] = useState<GenerationType>('image')
@@ -251,79 +258,86 @@ export function ComposerHero({
   }
 
   const mediaTypes = Object.entries(TYPE_CONFIG) as Array<[GenerationType, typeof TYPE_CONFIG[string]]>
-  const hasInlineParams = type === 'image' || type === 'video' || type === 'speech'
 
   return (
-    <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
-      <Field label="Media type" className="space-y-1.5">
-        <div
-          role="tablist"
-          aria-label="Generation type"
-          className="grid grid-cols-5 gap-1 rounded-lg border border-border bg-muted/40 p-1"
+    <section className={`rounded-2xl border border-border p-5 shadow-sm ${surfaceClassName}`}>
+      <div className={`mb-5 ${align === 'center' ? 'text-center' : 'text-left'}`}>
+        <h1
+          className={`font-semibold tracking-tight text-foreground transition-all duration-300 ${
+            align === 'center' ? 'text-xl' : 'text-base'
+          }`}
         >
-          {mediaTypes.map(([key, cfg]) => {
-            const Icon = cfg.icon
-            const active = type === key
-            return (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => changeType(key)}
-                className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium transition-all ${
-                  active
-                    ? 'bg-primary/15 text-primary shadow-sm ring-1 ring-inset ring-primary/30'
-                    : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground'
-                }`}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span className="truncate">{cfg.label}</span>
-              </button>
-            )
-          })}
-        </div>
-      </Field>
+          Media Generation
+        </h1>
+      </div>
+
+      <div role="tablist" aria-label="Generation type" className="grid grid-cols-5 gap-1.5">
+        {mediaTypes.map(([key, cfg]) => {
+          const Icon = cfg.icon
+          const active = type === key
+          return (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => changeType(key)}
+              className={`flex flex-col items-center gap-1.5 rounded-lg border px-1 pb-2 pt-2.5 text-[11px] transition-all ${
+                active
+                  ? 'border-primary/30 bg-primary/10 font-semibold text-primary'
+                  : 'border-border bg-background font-medium text-muted-foreground hover:border-foreground/20 hover:text-foreground'
+              }`}
+            >
+              <Icon className="h-[17px] w-[17px] shrink-0" />
+              <span className="truncate">{cfg.label}</span>
+            </button>
+          )
+        })}
+      </div>
 
       {type !== 'avatar' && (
-        <div className="mt-4 space-y-2">
-          <Label htmlFor="studio-prompt" className="block text-sm font-medium">
-            What do you want to create?
+        <div className="mt-5">
+          <Label
+            htmlFor="studio-prompt"
+            className="mb-1.5 block text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+          >
+            Prompt
           </Label>
-          <Textarea
-            id="studio-prompt"
-            value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-                event.preventDefault()
-                void generate()
-              }
-            }}
-            rows={4}
-            placeholder={type === 'transcription'
-              ? 'Optional vocabulary, speaker names, timestamp style, or context...'
-              : 'A vertical hero frame for a product launch teaser, dark cinematic lighting...'}
-            className="resize-none text-sm"
-          />
-          <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-            <span>Try:</span>
-            {SUGGESTIONS.map((suggestion) => (
-              <button
-                key={suggestion.label}
-                type="button"
-                onClick={() => {
-                  setPrompt(suggestion.prompt)
-                  changeType(suggestion.type)
-                }}
-                className="rounded-full border border-border bg-background px-2.5 py-1 text-xs text-foreground/80 transition-colors hover:border-primary/40 hover:bg-muted"
-              >
-                {suggestion.label}
-              </button>
-            ))}
+          <div className="rounded-xl border border-border bg-background transition-colors focus-within:border-primary/30 focus-within:ring-[3px] focus-within:ring-primary/10">
+            <textarea
+              id="studio-prompt"
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                  event.preventDefault()
+                  void generate()
+                }
+              }}
+              rows={4}
+              placeholder={type === 'transcription'
+                ? 'Optional vocabulary, speaker names, timestamp style, or context...'
+                : 'A vertical hero frame for a product launch teaser, dark cinematic lighting...'}
+              className="block min-h-[96px] w-full resize-none border-0 bg-transparent px-3.5 pb-1.5 pt-3 text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
+            />
+            <div className="flex flex-wrap items-center gap-1.5 px-2.5 pb-2.5">
+              {SUGGESTIONS.map((suggestion) => (
+                <button
+                  key={suggestion.label}
+                  type="button"
+                  onClick={() => {
+                    setPrompt(suggestion.prompt)
+                    changeType(suggestion.type)
+                  }}
+                  className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
+                >
+                  {suggestion.label}
+                </button>
+              ))}
+            </div>
           </div>
           {type === 'transcription' && (
-            <p className="text-xs text-muted-foreground">
+            <p className="mt-2 text-xs text-muted-foreground">
               Optional — biases the transcript's spelling, vocabulary, and speaker names. It isn't an instruction for the model to follow.
             </p>
           )}
@@ -349,36 +363,53 @@ export function ComposerHero({
         />
       )}
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <Field
-          label="Model"
-          htmlFor="studio-media-model"
-          className={`space-y-1.5 ${hasInlineParams ? '' : 'sm:col-span-2'}`}
-        >
-          <Select
-            value={selectedModel || undefined}
-            onValueChange={(value) => setSelectedModels((current) => ({ ...current, [type]: value }))}
-            disabled={mediaModelsLoading || Boolean(mediaModelsError) || modelsForType.length === 0}
-          >
-            <SelectTrigger id="studio-media-model" className="h-9 w-full">
-              <SelectValue placeholder={mediaModelsLoading ? 'Loading models…' : 'Select a model'} />
-            </SelectTrigger>
-            <SelectContent>
-              {modelsForType.map((model) => (
-                <SelectItem key={model.id} value={model.id} disabled={model.status === 'unavailable'}>
-                  <span className="flex w-full items-center justify-between gap-3">
-                    <span className="truncate">
-                      {model.name || model.id}{model.provider ? ` · ${model.provider}` : ''}
-                    </span>
-                    {model.status !== 'available' && (
-                      <span className="shrink-0 text-[10px] capitalize text-muted-foreground">{model.status}</span>
+      <div className="mt-5 space-y-3">
+        <div className="space-y-1.5">
+          <Field label="Model" htmlFor="studio-media-model">
+            <Select
+              value={selectedModel || undefined}
+              onValueChange={(value) => setSelectedModels((current) => ({ ...current, [type]: value }))}
+              disabled={mediaModelsLoading || Boolean(mediaModelsError) || modelsForType.length === 0}
+            >
+              <SelectTrigger id="studio-media-model" className="h-9 w-full bg-background">
+                {selectedModelOption ? (
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate">{selectedModelOption.name || selectedModelOption.id}</span>
+                    {selectedModelOption.provider && (
+                      <span className="shrink-0 text-muted-foreground">· {selectedModelOption.provider}</span>
+                    )}
+                    {selectedModelOption.status !== 'available' && (
+                      <span className="shrink-0 rounded-full bg-warning/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-warning">
+                        {selectedModelOption.status}
+                      </span>
                     )}
                   </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
+                ) : (
+                  <SelectValue placeholder={mediaModelsLoading ? 'Loading models…' : 'Select a model'} />
+                )}
+              </SelectTrigger>
+              <SelectContent className="bg-background">
+                {modelsForType.map((model) => (
+                  <SelectItem key={model.id} value={model.id} disabled={model.status === 'unavailable'}>
+                    <span className="flex w-full items-center justify-between gap-3">
+                      <span className="truncate">
+                        {model.name || model.id}{model.provider ? ` · ${model.provider}` : ''}
+                      </span>
+                      {model.status !== 'available' && (
+                        <span className="shrink-0 text-[10px] capitalize text-muted-foreground">{model.status}</span>
+                      )}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          {(mediaModelsError || modelMessage(selectedModelOption, mediaModelsLoading, modelsForType.length)) && (
+            <p className={`text-xs ${mediaModelsError || selectedModelOption?.status === 'unavailable' ? 'text-destructive' : 'text-muted-foreground'}`}>
+              {mediaModelsError ?? modelMessage(selectedModelOption, mediaModelsLoading, modelsForType.length)}
+            </p>
+          )}
+        </div>
         {type === 'image' && (
           <ImageComposer
             size={size}
@@ -406,18 +437,6 @@ export function ComposerHero({
         )}
       </div>
 
-      {(mediaModelsError || modelMessage(selectedModelOption, mediaModelsLoading, modelsForType.length)) && (
-        <p className={`mt-2 text-xs ${mediaModelsError || selectedModelOption?.status === 'unavailable' ? 'text-destructive' : 'text-muted-foreground'}`}>
-          {mediaModelsError ?? modelMessage(selectedModelOption, mediaModelsLoading, modelsForType.length)}
-        </p>
-      )}
-
-      {error && (
-        <div className="mt-3 rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-          {error}
-        </div>
-      )}
-
       <div className="mt-4 space-y-2">
         <ComposerDisclosure summary="Advanced options">
           <div className="grid gap-3 sm:grid-cols-2">
@@ -427,10 +446,11 @@ export function ComposerHero({
                 onChange={(event) => setNegativePrompt(event.target.value)}
                 rows={2}
                 placeholder="Avoid artifacts, off-style composition..."
+                className="bg-[var(--md3-surface-container-low)]"
               />
             </Field>
             <Field label="Save to">
-              <Input value={outputPath} onChange={(event) => setOutputPath(event.target.value)} />
+              <Input value={outputPath} onChange={(event) => setOutputPath(event.target.value)} className="bg-[var(--md3-surface-container-low)]" />
             </Field>
             {type === 'transcription' && (
               <TranscriptionOptions
@@ -481,7 +501,13 @@ export function ComposerHero({
         </ComposerDisclosure>
       </div>
 
-      <Button onClick={generate} disabled={!canSubmit} size="lg" className="mt-4 w-full">
+      {error && (
+        <div className="mt-4 rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+
+      <Button onClick={generate} disabled={!canSubmit} size="lg" className="mt-5 w-full">
         <Sparkles className="mr-2 h-4 w-4" />
         Generate
         <span className="ml-2 text-[10px] opacity-60">⌘↵</span>

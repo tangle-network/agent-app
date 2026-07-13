@@ -1,6 +1,6 @@
 import { Input } from '@tangle-network/sandbox-ui/primitives'
 import { MIN_IMAGE_COUNT, MAX_IMAGE_COUNT, normalizeImageCount } from '../studio'
-import { Field } from './composer-shell'
+import { Field, Stepper } from './composer-shell'
 
 export function ImageComposer({
   size,
@@ -18,10 +18,19 @@ export function ImageComposer({
   onImageCountChange: (value: number) => void
 }) {
   return (
-    <>
-      <Field label="Size"><Input value={size} onChange={(event) => onSizeChange(event.target.value)} /></Field>
-      <Field label="Quality"><Input value={quality} onChange={(event) => onQualityChange(event.target.value)} /></Field>
-      <Field label="Images"><Input type="number" min={MIN_IMAGE_COUNT} max={MAX_IMAGE_COUNT} value={imageCount} onChange={(event) => onImageCountChange(normalizeImageCount(event.target.value))} /></Field>
-    </>
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Size"><Input value={size} onChange={(event) => onSizeChange(event.target.value)} className="bg-background" /></Field>
+        <Field label="Quality"><Input value={quality} onChange={(event) => onQualityChange(event.target.value)} className="bg-background" /></Field>
+      </div>
+      <Field label="Images">
+        <Stepper
+          value={imageCount}
+          min={MIN_IMAGE_COUNT}
+          max={MAX_IMAGE_COUNT}
+          onChange={(value) => onImageCountChange(normalizeImageCount(value))}
+        />
+      </Field>
+    </div>
   )
 }

@@ -1,17 +1,14 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router'
 import {
-  Button, EmptyState,
+  Button,
   Tabs, TabsList, TabsTrigger,
 } from '@tangle-network/sandbox-ui/primitives'
-import { ArrowLeft, DollarSign, Film, FolderOpen, Sparkles, X } from 'lucide-react'
-import {
-  type Generation,
-  isGenerationType,
-} from '../studio'
+import { ArrowLeft, DollarSign, FolderOpen, X } from 'lucide-react'
+import { type Generation } from '../studio'
 import { TYPE_CONFIG } from './type-config'
 import { StudioSheet } from './studio-sheet'
-import { GenerationCard } from './generation-card'
+import { GenerationGrid, filterGenerations } from './generation-grid'
 import { GenerationDetail } from './generation-detail'
 
 export function LibraryDrawer({
@@ -35,10 +32,7 @@ export function LibraryDrawer({
   selected: Generation | null
   onSelect: (generation: Generation | null) => void
 }) {
-  const visible = useMemo(() => {
-    if (!typeFilter || !isGenerationType(typeFilter)) return generations
-    return generations.filter((generation) => generation.type === typeFilter)
-  }, [generations, typeFilter])
+  const visible = useMemo(() => filterGenerations(generations, typeFilter), [generations, typeFilter])
 
   return (
     <StudioSheet open={open} onOpenChange={onOpenChange} title="Asset library">
@@ -104,26 +98,7 @@ export function LibraryDrawer({
           </div>
 
           <div className="flex-1 overflow-y-auto p-4">
-            {visible.length === 0 ? (
-              <EmptyState
-                icon={typeFilter
-                  ? <Film className="h-8 w-8 text-muted-foreground/30" />
-                  : <Sparkles className="h-10 w-10 text-muted-foreground/30" />}
-                title={typeFilter
-                  ? `No ${TYPE_CONFIG[typeFilter]?.label ?? typeFilter} generations`
-                  : 'No generations yet'}
-                description={typeFilter
-                  ? 'Try a different filter or change the type in the composer.'
-                  : 'Everything you and the agent create lives here.'}
-                className="py-16"
-              />
-            ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {visible.map((generation) => (
-                  <GenerationCard key={generation.id} generation={generation} onSelect={onSelect} />
-                ))}
-              </div>
-            )}
+            <GenerationGrid generations={visible} typeFilter={typeFilter} onSelect={onSelect} />
           </div>
         </>
       )}

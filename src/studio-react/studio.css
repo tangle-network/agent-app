@@ -61,6 +61,62 @@
 }
 .animate-row-in { animation: studio-row-in 0.25s ease-out both; }
 
+/* ── Studio: inline split shell (composer ⇆ gallery) ──
+   The composer is the same card in both states. Toggling the parent's
+   data-library-open grows the gallery in from the right (flex-grow 0→1) and
+   narrows the composer from centered to a left rail. max-width:1400px caps the
+   whole cluster on wide screens so extra width becomes neutral gutter. */
+.studio-shell {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.studio-shell[data-library-open='true'] { gap: 24px; }
+
+.studio-composer {
+  flex: none;
+  width: 620px;
+  max-width: 100%;
+  transition: width 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.studio-shell[data-library-open='true'] .studio-composer {
+  width: 50%;
+  max-width: 560px;
+}
+
+/* max-height:0 while closed hard-clamps the gallery out of layout — the card
+   grid's own min track width otherwise generates real height and leaks it into
+   the page scroll even at opacity:0. */
+.studio-gallery {
+  flex-grow: 0;
+  flex-basis: 0;
+  min-width: 0;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateX(20px);
+  pointer-events: none;
+  transition:
+    flex-grow 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 0.24s ease,
+    transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.studio-shell[data-library-open='true'] .studio-gallery {
+  flex-grow: 1;
+  max-height: none;
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-composer,
+  .studio-gallery { transition: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .studio-sheet-content[data-state='open'],
   .studio-sheet-content[data-state='closed'],
