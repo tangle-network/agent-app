@@ -9,6 +9,6 @@ export function SpeechComposer({
   onVoiceChange: (value: string) => void
 }) {
   return (
-    <Field label="Voice"><Input value={voice} onChange={(event) => onVoiceChange(event.target.value)} /></Field>
+    <Field label="Voice"><Input value={voice} onChange={(event) => onVoiceChange(event.target.value)} className="bg-background" /></Field>
   )
 }

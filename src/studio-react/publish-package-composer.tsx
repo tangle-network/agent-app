@@ -73,7 +73,7 @@ export function PublishPackageComposer({
               className={`rounded-md border p-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                 active
                   ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
-                  : 'border-border hover:bg-muted/50'
+                  : 'border-border bg-[var(--md3-surface-container-low)] hover:bg-muted/50'
               }`}
             >
               <div className="flex items-center justify-between gap-2">
@@ -89,14 +89,14 @@ export function PublishPackageComposer({
         })}
       </div>
       <Field label="Caption" className="space-y-2">
-        <Textarea value={caption} onChange={(event) => onCaptionChange(event.target.value)} rows={3} placeholder="Write or generate the caption for selected destinations..." />
+        <Textarea value={caption} onChange={(event) => onCaptionChange(event.target.value)} rows={3} placeholder="Write or generate the caption for selected destinations..." className="bg-[var(--md3-surface-container-low)]" />
       </Field>
       <Field label="Description / CTA" className="space-y-2">
-        <Textarea value={postDescription} onChange={(event) => onDescriptionChange(event.target.value)} rows={2} placeholder="Release note, product context, link, or approval instruction..." />
+        <Textarea value={postDescription} onChange={(event) => onDescriptionChange(event.target.value)} rows={2} placeholder="Release note, product context, link, or approval instruction..." className="bg-[var(--md3-surface-container-low)]" />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Mentions" className="space-y-2">
-          <Input value={mentions} onChange={(event) => onMentionsChange(event.target.value)} placeholder="@creator, @partner" />
+          <Input value={mentions} onChange={(event) => onMentionsChange(event.target.value)} placeholder="@creator, @partner" className="bg-[var(--md3-surface-container-low)]" />
         </Field>
         <Field label="Cadence" className="space-y-2">
           <NativeSelect value={cadence} onChange={(event) => onCadenceChange(event.target.value)}>

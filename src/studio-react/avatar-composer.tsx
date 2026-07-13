@@ -24,6 +24,7 @@ export function AvatarComposer({
           value={audioUrl}
           onChange={(event) => onAudioUrlChange(event.target.value)}
           placeholder="https://cdn.example.com/source-audio.mp3"
+          className="bg-background"
         />
       </Field>
       <Field label="Image URL" htmlFor="studio-avatar-image-url">
@@ -32,6 +33,7 @@ export function AvatarComposer({
           value={imageUrl}
           onChange={(event) => onImageUrlChange(event.target.value)}
           placeholder="https://cdn.example.com/portrait.png"
+          className="bg-background"
         />
       </Field>
       <Field label="Avatar ID" htmlFor="studio-avatar-id">
@@ -40,6 +42,7 @@ export function AvatarComposer({
           value={avatarId}
           onChange={(event) => onAvatarIdChange(event.target.value)}
           placeholder="Optional provider avatar id"
+          className="bg-background"
         />
       </Field>
     </div>
