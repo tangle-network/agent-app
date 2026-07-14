@@ -6,6 +6,7 @@ export default defineConfig({
     'tools/index': 'src/tools/index.ts',
     'tangle/index': 'src/tangle/index.ts',
     'runtime/index': 'src/runtime/index.ts',
+    'catalog/index': 'src/catalog/index.ts',
     'eval/index': 'src/eval/index.ts',
     'eval-campaign/index': 'src/eval-campaign/index.ts',
     'knowledge/index': 'src/knowledge/index.ts',
