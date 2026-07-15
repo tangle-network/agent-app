@@ -1,11 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type {
   AgentProfile,
   AgentProfileFileMount,
   AgentProfileMcpServer,
 } from '@tangle-network/sandbox'
 import {
+  assertSystemPromptWithinBudget,
   composeAgentProfile,
+  DEFAULT_MAX_SYSTEM_PROMPT_BYTES,
+  largestPromptSections,
   makeEvolvableSection,
   stripComments,
   userSkillMounts,
@@ -215,5 +218,63 @@ describe('composeAgentProfile — canonical wire shape', () => {
   it('merges an instructions overlay onto the prompt', () => {
     const out = composeAgentProfile(BASE, {}, { instructions: ['per-turn directive'] })
     expect(out.prompt?.instructions).toContain('per-turn directive')
+  })
+})
+
+describe('composeAgentProfile — system-prompt byte budget', () => {
+  // Two markdown sections whose combined size blows the default 40KB budget;
+  // "Big Section" dominates so the error must name it first.
+  const OVER_BUDGET_PROMPT =
+    `# Big Section\n${'a'.repeat(45_000)}\n## Small Section\n${'b'.repeat(2_000)}`
+
+  it('passes an under-budget prompt through unchanged (default budget)', () => {
+    const out = composeAgentProfile(BASE, {}, { systemPrompt: 'short prompt' })
+    expect(out.prompt?.systemPrompt).toBe('short prompt')
+  })
+
+  it('REDS on a composed prompt over the default 40KB budget, reporting size and top sections', () => {
+    expect(() => composeAgentProfile(BASE, {}, { systemPrompt: OVER_BUDGET_PROMPT })).toThrow(
+      /is 4\d{4} bytes — over the 40000-byte budget[\s\S]*Big Section/,
+    )
+  })
+
+  it('respects a custom maxSystemPromptBytes', () => {
+    expect(() =>
+      composeAgentProfile(BASE, {}, { systemPrompt: 'x'.repeat(200) }, { maxSystemPromptBytes: 100 }),
+    ).toThrow(/over the 100-byte budget/)
+    // And a raised budget lets a known-big prompt through.
+    const out = composeAgentProfile(
+      BASE,
+      {},
+      { systemPrompt: OVER_BUDGET_PROMPT },
+      { maxSystemPromptBytes: 100_000 },
+    )
+    expect(out.prompt?.systemPrompt).toBe(OVER_BUDGET_PROMPT)
+  })
+
+  it('warnOnly downgrades the throw to a console.warn that still yells', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const out = composeAgentProfile(BASE, {}, { systemPrompt: OVER_BUDGET_PROMPT }, { warnOnly: true })
+      expect(out.prompt?.systemPrompt).toBe(OVER_BUDGET_PROMPT)
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(String(warn.mock.calls[0]?.[0])).toMatch(/over the 40000-byte budget/)
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('assertSystemPromptWithinBudget measures UTF-8 bytes, not code units', () => {
+    // 3 bytes per char in UTF-8; 40 chars over a 100-byte cap.
+    expect(() => assertSystemPromptWithinBudget('€'.repeat(40), { maxSystemPromptBytes: 100 })).toThrow(
+      /is 120 bytes/,
+    )
+    expect(DEFAULT_MAX_SYSTEM_PROMPT_BYTES).toBe(40_000)
+  })
+
+  it('largestPromptSections ranks heading-delimited sections by bytes, preamble included', () => {
+    const sections = largestPromptSections(`intro\n# A\n${'a'.repeat(50)}\n## B\n${'b'.repeat(500)}`)
+    expect(sections[0]).toEqual({ title: 'B', bytes: expect.any(Number) })
+    expect(sections.map((s) => s.title)).toEqual(['B', 'A', '(preamble)'])
   })
 })

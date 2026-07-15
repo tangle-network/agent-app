@@ -40,7 +40,10 @@ export interface ChatStreamCallbacks {
   onToolResult?: (result: ChatStreamToolResult) => void
   onUsage?: (usage: { promptTokens: number; completionTokens: number }) => void
   onMetadata?: (data: Record<string, unknown>) => void
-  /** A loop-level error event (the turn failed server-side). */
+  /** A loop-level error event (the turn failed server-side). Optional, but the
+   *  error never vanishes: when omitted, the message is synthesized into the
+   *  transcript via `onText` (rendered by ChatMessages as a text segment) and
+   *  logged with `console.error`. */
   onErrorEvent?: (message: string) => void
   /** A sidecar interaction ask (kind: "question"/"plan"/…). The run is BLOCKED
    *  in the broker until the user answers; a pending ask is "waiting on the
@@ -140,9 +143,22 @@ export function dispatchChatStreamLine(line: string, cb: ChatStreamCallbacks): {
       }
       break
     }
-    case 'error':
-      cb.onErrorEvent?.(String(evt.details ?? evt.error ?? 'Unknown stream error'))
+    case 'error': {
+      const message = String(evt.details ?? evt.error ?? 'Unknown stream error')
+      if (cb.onErrorEvent) {
+        cb.onErrorEvent(message)
+      } else {
+        // Fail loud when the consumer wired no onErrorEvent: a turn that fails
+        // server-side must not end as a silent empty answer. Synthesize the
+        // error into the transcript through the text channel (it lands as a
+        // text segment ChatMessages renders) and log it — the app that forgot
+        // the callback still shows the user an error row.
+        console.error('[chat-stream] unhandled stream error event:', message)
+        cb.onText?.(`\n\nThe agent hit an error and this turn stopped: ${message}`)
+        receivedContent = true
+      }
       break
+    }
     default:
       break // turn_status and unknown line types are non-content
   }

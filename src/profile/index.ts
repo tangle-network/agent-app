@@ -109,6 +109,74 @@ export interface ProfileOverlay {
   name?: string
 }
 
+/** Byte budget on the FINAL composed `prompt.systemPrompt`. Past this the
+ *  model degrades sharply (a 122,659-byte prompt shipped once and the model
+ *  returned empty answers), so the default gate throws well before that. */
+export const DEFAULT_MAX_SYSTEM_PROMPT_BYTES = 40_000
+
+/** Budget config for the composed system prompt. */
+export interface ComposeProfileBudget {
+  /** Byte cap on the composed `prompt.systemPrompt`.
+   *  Default {@link DEFAULT_MAX_SYSTEM_PROMPT_BYTES}. */
+  maxSystemPromptBytes?: number
+  /** Downgrade the over-budget throw to a `console.warn` — the escape hatch
+   *  for a product with a known-big prompt that must still ship (it yells on
+   *  every compose instead of blocking). */
+  warnOnly?: boolean
+}
+
+/** Largest markdown-heading-delimited sections of a prompt, by UTF-8 bytes.
+ *  Cheap heuristic: split on `#`-heading lines; the preamble before the first
+ *  heading reports as "(preamble)". */
+export function largestPromptSections(
+  prompt: string,
+  top = 3,
+): Array<{ title: string; bytes: number }> {
+  const encoder = new TextEncoder()
+  const sections: Array<{ title: string; bytes: number }> = []
+  let title = '(preamble)'
+  let start = 0
+  const flush = (end: number) => {
+    const body = prompt.slice(start, end)
+    if (body.trim()) sections.push({ title, bytes: encoder.encode(body).byteLength })
+  }
+  const headingRe = /^#{1,6}\s+(.+)$/gm
+  for (const match of prompt.matchAll(headingRe)) {
+    flush(match.index)
+    title = (match[1] ?? '').trim() || '(untitled section)'
+    start = match.index
+  }
+  flush(prompt.length)
+  return sections.sort((a, b) => b.bytes - a.bytes).slice(0, top)
+}
+
+/** Enforce {@link ComposeProfileBudget} on a composed system prompt: over
+ *  budget throws (or warns with `warnOnly`) with the actual size and the
+ *  top-3 largest sections. Exported so a product assembling its prompt
+ *  outside {@link composeAgentProfile} (e.g. via the `/prompt` assembler) can
+ *  run the same gate at its own final-composition point. */
+export function assertSystemPromptWithinBudget(
+  systemPrompt: string,
+  budget: ComposeProfileBudget = {},
+): void {
+  const max = budget.maxSystemPromptBytes ?? DEFAULT_MAX_SYSTEM_PROMPT_BYTES
+  const bytes = new TextEncoder().encode(systemPrompt).byteLength
+  if (bytes <= max) return
+  const sections = largestPromptSections(systemPrompt)
+    .map((s) => `"${s.title}" (${s.bytes}B)`)
+    .join(', ')
+  const message =
+    `composed systemPrompt is ${bytes} bytes — over the ${max}-byte budget ` +
+    `(oversized prompts degrade to empty answers). ` +
+    (sections ? `Largest sections: ${sections}. ` : '') +
+    `Trim the prompt, move content to skills/knowledge mounts, or raise maxSystemPromptBytes deliberately.`
+  if (budget.warnOnly) {
+    console.warn(`[profile] ${message}`)
+    return
+  }
+  throw new Error(message)
+}
+
 /** Project per-user skills onto SDK file mounts at the harness skill-discovery
  *  path. No tier gate — a user skill is mounted because the user added it.
  *  Sorted by path for determinism (matches {@link registrySkills}). */
@@ -140,11 +208,16 @@ export function userSkillMounts(userSkills: UserSkill[]): AgentProfileFileMount[
  * not a hand-rolled spread. `mergeAgentProfiles(base, overlay)` returns
  * `undefined` only when BOTH are `undefined`; `base` is always defined here, so
  * the result is non-`undefined` by construction and we assert that to the caller.
+ *
+ * The composed `prompt.systemPrompt` is byte-budgeted here — the single point
+ * where the FINAL prompt exists ({@link assertSystemPromptWithinBudget};
+ * default {@link DEFAULT_MAX_SYSTEM_PROMPT_BYTES}, `warnOnly` escape hatch).
  */
 export function composeAgentProfile(
   base: AgentProfile,
   channels: ProfileChannels = {},
   overlay: ProfileOverlay = {},
+  budget: ComposeProfileBudget = {},
 ): AgentProfile {
   const shellInput: ComposeShellResourcesInput = {
     skills: channels.skills,
@@ -174,6 +247,10 @@ export function composeAgentProfile(
   const merged = mergeAgentProfiles(base, overlayProfile)
   if (!merged)
     throw new Error('composeAgentProfile: mergeAgentProfiles returned undefined for a defined base')
+  // Byte-budget gate on the FINAL composed systemPrompt — this is the single
+  // point where every channel and overlay has been merged in.
+  const systemPrompt = merged.prompt?.systemPrompt
+  if (typeof systemPrompt === 'string') assertSystemPromptWithinBudget(systemPrompt, budget)
   return pruneEmptyResourceChannels(merged)
 }
 
