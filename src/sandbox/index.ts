@@ -1508,15 +1508,49 @@ export function resolveModel(
   }
 }
 
+// The SDK's SandboxInstance.streamPrompt/.prompt accept `string | PromptInputPart[]`
+// but the published package does not re-export the PromptInputPart type by name from
+// any of its entry points, so it's derived structurally off the method signature
+// itself — this stays in lockstep with the SDK's actual accepted shape.
+export type PromptInputPart = Extract<
+  Parameters<SandboxInstance['streamPrompt']>[0],
+  readonly unknown[]
+>[number]
+
+function historyTranscript(
+  history: Array<{ role: 'user' | 'assistant'; content: string }>,
+): string {
+  return history
+    .map((entry) => `${entry.role === 'assistant' ? 'Assistant' : 'User'}: ${entry.content}`)
+    .join('\n\n')
+}
+
 export function flattenHistory(
   message: string,
   history?: Array<{ role: 'user' | 'assistant'; content: string }>,
 ): string {
   if (!history?.length) return message
-  const transcript = history
-    .map((entry) => `${entry.role === 'assistant' ? 'Assistant' : 'User'}: ${entry.content}`)
-    .join('\n\n')
-  return `${transcript}\n\nUser: ${message}`
+  return `${historyTranscript(history)}\n\nUser: ${message}`
+}
+
+/**
+ * History-aware equivalent of flattenHistory for multimodal prompt parts: the
+ * transcript is folded into the first text part (image/file parts carry no
+ * text to prepend to) rather than replacing the message wholesale.
+ */
+export function mergeHistoryIntoParts(
+  parts: PromptInputPart[],
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>,
+): PromptInputPart[] {
+  if (!history?.length) return parts
+  const textIndex = parts.findIndex((part) => part.type === 'text')
+  if (textIndex === -1) {
+    throw new Error('mergeHistoryIntoParts requires at least one text part to carry the history')
+  }
+  const textPart = parts[textIndex] as Extract<PromptInputPart, { type: 'text' }>
+  const merged = [...parts]
+  merged[textIndex] = { ...textPart, text: `${historyTranscript(history)}\n\nUser: ${textPart.text}` }
+  return merged
 }
 
 export function mergeExtraMcp(
@@ -1581,7 +1615,7 @@ type StreamPromptOptions = Parameters<SandboxInstance['streamPrompt']>[1]
 export async function* streamSandboxPrompt(
   shell: SandboxRuntimeConfig,
   box: SandboxInstance,
-  message: string,
+  message: string | PromptInputPart[],
   options?: StreamSandboxPromptOptions,
 ): AsyncGenerator<unknown> {
   const harness = options?.harness ?? 'opencode'
@@ -1595,7 +1629,10 @@ export async function* streamSandboxPrompt(
   // if the UI snap was bypassed. Provider-less ids pass (session's own config).
   if (model?.model) assertHarnessModelCompatible(harness, model.model)
 
-  const prompt = flattenHistory(message, options?.history)
+  const prompt =
+    typeof message === 'string'
+      ? flattenHistory(message, options?.history)
+      : mergeHistoryIntoParts(message, options?.history)
 
   const appToolMcp = options?.appToolMcp ?? {}
   const extraMcp = mergeExtraMcp(appToolMcp, options?.baseProfileMcp ?? {}, options?.extraMcp)
@@ -1645,7 +1682,7 @@ export async function* streamSandboxPrompt(
 export async function runSandboxPrompt(
   shell: SandboxRuntimeConfig,
   box: SandboxInstance,
-  message: string,
+  message: string | PromptInputPart[],
   options?: StreamSandboxPromptOptions,
 ): Promise<string> {
   let fullText = ''
@@ -1816,7 +1853,7 @@ export async function mintSandboxScopedToken(
 export async function driveSandboxTurn(
   shell: SandboxRuntimeConfig,
   box: SandboxInstance,
-  message: string,
+  message: string | PromptInputPart[],
   options: StreamSandboxPromptOptions & { sessionId: string },
 ): Promise<Outcome<PromptResult>> {
   const harness = options.harness ?? 'opencode'
@@ -1825,7 +1862,10 @@ export async function driveSandboxTurn(
     modelApiKey: options.modelApiKey,
   })
   if (model?.model) assertHarnessModelCompatible(harness, model.model)
-  const prompt = flattenHistory(message, options.history)
+  const prompt =
+    typeof message === 'string'
+      ? flattenHistory(message, options.history)
+      : mergeHistoryIntoParts(message, options.history)
   const appToolMcp = options.appToolMcp ?? {}
   const extraMcp = mergeExtraMcp(appToolMcp, options.baseProfileMcp ?? {}, options.extraMcp)
   const profile = attachReasoningEffort(

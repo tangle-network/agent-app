@@ -41,6 +41,7 @@ import {
   streamSandboxPrompt,
   resolveModel,
   flattenHistory,
+  mergeHistoryIntoParts,
   mergeExtraMcp,
   attachReasoningEffort,
   syncSandboxMemberAdd,
@@ -65,6 +66,7 @@ import {
   SandboxRuntimeAuthRefreshError,
   type SandboxRuntimeConfig,
   type SecretStore,
+  type PromptInputPart,
 } from './index'
 import { resolveTangleExecutionEnvironment } from '../runtime/model'
 import type {
@@ -502,11 +504,66 @@ describe('streamSandboxPrompt seam', () => {
     const [, opts] = (box.streamPrompt as ReturnType<typeof vi.fn>).mock.calls[0]!
     expect(opts.backend.interactions).toBeUndefined()
   })
+
+  it('forwards a PromptInputPart[] message to box.streamPrompt with history folded into the text part', async () => {
+    async function* events() {
+      yield { type: 'result' }
+    }
+    const box = fakeBox({ streamPrompt: vi.fn().mockReturnValue(events()) })
+    const parts: PromptInputPart[] = [
+      { type: 'image', url: 'https://img/1.png' },
+      { type: 'text', text: 'describe this' },
+    ]
+    for await (const _ of streamSandboxPrompt(shell(), box, parts, {
+      history: [{ role: 'assistant', content: 'prior' }],
+    })) {
+      void _
+    }
+    const [prompt] = (box.streamPrompt as ReturnType<typeof vi.fn>).mock.calls[0]!
+    expect(Array.isArray(prompt)).toBe(true)
+    expect(prompt).toEqual([
+      { type: 'image', url: 'https://img/1.png' },
+      { type: 'text', text: 'Assistant: prior\n\nUser: describe this' },
+    ])
+  })
 })
 
 describe('pure seam helpers', () => {
   it('flattenHistory returns the bare message when no history', () => {
     expect(flattenHistory('x')).toBe('x')
+  })
+
+  it('mergeHistoryIntoParts returns the same parts when there is no history', () => {
+    const parts: PromptInputPart[] = [{ type: 'text', text: 'hi' }]
+    expect(mergeHistoryIntoParts(parts)).toBe(parts)
+    expect(mergeHistoryIntoParts(parts, [])).toBe(parts)
+  })
+
+  it('mergeHistoryIntoParts folds the transcript into the first text part, preserving other parts and order', () => {
+    const parts: PromptInputPart[] = [
+      { type: 'image', url: 'https://img/1.png' },
+      { type: 'text', text: 'describe this' },
+      { type: 'file', filename: 'notes.txt' },
+    ]
+    const merged = mergeHistoryIntoParts(parts, [
+      { role: 'user', content: 'earlier question' },
+      { role: 'assistant', content: 'earlier answer' },
+    ])
+    expect(merged).toEqual([
+      { type: 'image', url: 'https://img/1.png' },
+      {
+        type: 'text',
+        text: 'User: earlier question\n\nAssistant: earlier answer\n\nUser: describe this',
+      },
+      { type: 'file', filename: 'notes.txt' },
+    ])
+  })
+
+  it('mergeHistoryIntoParts throws fail-loud when parts contain no text part', () => {
+    const parts: PromptInputPart[] = [{ type: 'image', url: 'https://img/1.png' }]
+    expect(() => mergeHistoryIntoParts(parts, [{ role: 'user', content: 'prior' }])).toThrow(
+      /text part/,
+    )
   })
 
   it('mergeExtraMcp throws on a collision with app-tool or base profile servers', () => {
