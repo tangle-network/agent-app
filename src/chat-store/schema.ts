@@ -124,7 +124,16 @@ export function createChatTables<
   return { threads, messages }
 }
 
-export type ChatTables = ReturnType<typeof createChatTables>
+/**
+ * The base (no-extras) table pair, pinned via an instantiation expression:
+ * `ReturnType<typeof createChatTables>` on the bare generic substitutes the
+ * extras params with their CONSTRAINT (`Record<string,
+ * SQLiteColumnBuilderBase>`), stamping an index signature into the column map
+ * that widens every concrete column to `unknown`/`notNull: false` — concrete
+ * factory results then fail `extends ChatTables`. (`teams`' `createTeamTables`
+ * is non-generic, so its plain `ReturnType` never hits this.)
+ */
+export type ChatTables = ReturnType<typeof createChatTables<{}, {}>>
 
 export type ChatThreadRow = ChatTables['threads']['$inferSelect']
 export type ChatMessageRow = ChatTables['messages']['$inferSelect']
