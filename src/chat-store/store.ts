@@ -230,7 +230,9 @@ export function createChatStore<TTables extends ChatTables>(
 
       // Access is verified once per workspace the ids touch. Fail-closed: one
       // inaccessible workspace rejects the whole request before any delete.
-      const workspaceIds = [...new Set(rows.map((row) => row.workspaceId))]
+      // Sorted so the check order (and therefore which denial surfaces) is
+      // deterministic — row order follows random hex ids and varies per run.
+      const workspaceIds = [...new Set(rows.map((row) => row.workspaceId))].sort()
       for (const workspaceId of workspaceIds) {
         await assertAccess(workspaceId)
       }
