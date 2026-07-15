@@ -1,0 +1,7 @@
+/* An app's own override stylesheet, layered on top of the base tokens.css and
+ * passed via --extra-css / extraTokensCss. Defines the tokens the base file
+ * omits, so the checker should treat them as satisfied. */
+:root {
+  --popover: 0 0% 100%;
+  --nonexistent-token: 12 34% 56%;
+}

@@ -65,6 +65,8 @@ export default defineConfig({
     'vault/lazy': 'src/vault/lazy.tsx',
     'theme/index': 'src/theme/index.ts',
     'theme/tailwind-preset': 'src/theme/tailwind-preset.ts',
+    'theme-contract/index': 'src/theme-contract/index.ts',
+    'theme-contract/cli': 'src/theme-contract/cli.ts',
     'studio/index': 'src/studio/index.ts',
     'studio-react/index': 'src/studio-react/index.tsx',
   },

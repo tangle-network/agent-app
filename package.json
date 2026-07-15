@@ -359,7 +359,15 @@
       "import": "./dist/theme/tailwind-preset.js",
       "default": "./dist/theme/tailwind-preset.js"
     },
+    "./theme-contract": {
+      "types": "./dist/theme-contract/index.d.ts",
+      "import": "./dist/theme-contract/index.js",
+      "default": "./dist/theme-contract/index.js"
+    },
     "./styles": "./dist/theme/tokens.css"
+  },
+  "bin": {
+    "agent-app-theme-check": "./dist/theme-contract/cli.js"
   },
   "scripts": {
     "build": "tsup",
