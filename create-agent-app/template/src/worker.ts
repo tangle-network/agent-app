@@ -29,7 +29,9 @@ import {
   createOpenAICompatStreamTurn,
   type LoopEvent,
   type LoopMessage,
+  type LoopToolCall,
   type ToolLoopEvent,
+  type ToolLoopResult,
 } from '@tangle-network/agent-app/runtime'
 
 interface ChatRequest {
@@ -107,14 +109,17 @@ export default {
       systemPrompt: buildSystemPrompt(),
       userMessage: body.message,
       streamTurn: narrowToToolLoopEvents(createOpenAICompatStreamTurn({ ...app.resolveModel(), tools })),
-      executeToolCall: (call) => executor({ toolName: call.toolName, args: call.args }),
+      executeToolCall: (call: LoopToolCall) => executor({ toolName: call.toolName, args: call.args }),
       isExecutableTool: isAppToolName,
     })
 
     return new Response(
       JSON.stringify({
         text: result.finalText,
-        toolResults: result.toolResults.map((t) => ({ label: t.label, outcome: t.outcome })),
+        toolResults: result.toolResults.map((t: ToolLoopResult['toolResults'][number]) => ({
+          label: t.label,
+          outcome: t.outcome,
+        })),
         turns: result.turns,
       }),
       { headers: { 'Content-Type': 'application/json' } },
