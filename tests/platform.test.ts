@@ -10,6 +10,7 @@ import {
   isTangleBearerMissingError,
   resolveUserTangleHubBearer,
   resolveUserTangleHubBearerForUser,
+  guardResolution,
   TangleBearerMissingError,
   type HubClientLike,
   type HubProxyContext,
@@ -843,5 +844,21 @@ describe('createBetterAuthSessionCookieMinter', () => {
       authWith('__Secure-myapp.session_token', { domain: '.tangle.tools' }),
     )
     await expect(mint(mintArgs)).rejects.toThrow(/domain-scoped/)
+  })
+})
+
+describe('guardResolution', () => {
+  it('adapts a thrown-Response guard to { ok: false, response }', async () => {
+    const denied = Response.json({ error: 'Unauthorized' }, { status: 401 })
+    const result = await guardResolution(async () => {
+      throw denied
+    })
+    expect(result).toEqual({ ok: false, response: denied })
+  })
+
+  it('wraps a successful guard value and rethrows non-Response errors', async () => {
+    const session = { user: { id: 'u1' } }
+    expect(await guardResolution(async () => session)).toEqual({ ok: true, value: session })
+    await expect(guardResolution(async () => { throw new Error('db down') })).rejects.toThrow('db down')
   })
 })

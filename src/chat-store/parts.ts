@@ -196,6 +196,70 @@ export type ChatMessagePart =
  *  the persisted vocabulary. */
 export type StorableHarnessPartKind = HarnessWirePart['type'] & ChatMessagePart['type']
 
+/**
+ * The typed projection at the `/stream` → `/chat-store` boundary. The stream
+ * normalizers (`normalizePersistedPart`/`mergePersistedPart`/
+ * `finalizeAssistantParts`) deliberately produce untyped `JsonRecord`s — they
+ * normalize wire shapes and do not own the stored vocabulary. THIS module
+ * owns it, so this is where rows gain the `ChatMessagePart` type: each entry
+ * is validated against its kind's required fields and narrowed, junk is
+ * dropped, and — enforced by the exhaustiveness check below — no storable
+ * kind can silently fall out (the step-finish/interaction trap).
+ */
+export function toChatMessageParts(parts: Array<Record<string, unknown>>): ChatMessagePart[] {
+  const out: ChatMessagePart[] = []
+  for (const part of parts) {
+    const typed = toChatMessagePart(part)
+    if (typed) out.push(typed)
+  }
+  return out
+}
+
+const str = (value: unknown): value is string => typeof value === 'string'
+
+function toChatMessagePart(part: Record<string, unknown>): ChatMessagePart | null {
+  if (!part || typeof part !== 'object') return null
+  const type = part.type as ChatMessagePart['type'] | undefined
+  switch (type) {
+    case 'text':
+    case 'reasoning':
+      return str(part.text) ? (part as unknown as ChatTextPart | ChatReasoningPart) : null
+    case 'tool':
+      return str(part.id) && str(part.tool) && part.state && typeof part.state === 'object'
+        ? (part as unknown as ChatToolPart)
+        : null
+    case 'file':
+    case 'image':
+      return part as unknown as ChatFilePart | ChatImagePart
+    case 'subtask':
+      return str(part.prompt) && str(part.description) && str(part.agent)
+        ? (part as unknown as ChatSubtaskPart)
+        : null
+    case 'step-start':
+      return { type: 'step-start' }
+    case 'step-finish':
+      return part as unknown as ChatStepFinishPart
+    case 'interaction':
+      return str(part.id) && str(part.kind) && str(part.title) && str(part.status) &&
+        part.answerSpec && typeof part.answerSpec === 'object'
+        ? (part as unknown as ChatInteractionPart)
+        : null
+    case 'notice':
+      return str(part.id) && str(part.noticeKind) && str(part.text)
+        ? (part as unknown as ChatNoticePart)
+        : null
+    case undefined:
+      return null
+    default: {
+      // Compile-time exhaustiveness: a new ChatMessagePart kind that is not
+      // handled above makes `type` non-never here and this line fails.
+      const _exhaustive: never = type
+      void _exhaustive
+      return null
+    }
+  }
+}
+
 export function isChatToolPart(part: ChatMessagePart): part is ChatToolPart {
   return part.type === 'tool'
 }

@@ -47,6 +47,24 @@ export function createAuthGuard<Session>(opts: AuthGuardOptions<Session>): AuthG
   }
 }
 
+export type GuardResolution<T> = { ok: true; value: T } | { ok: false; response: Response }
+
+/**
+ * Adapt a guard that THROWS a Response (the quartet above — the router
+ * convention) to the `{ok: true, value} | {ok: false, response}` resolution
+ * shape the route factories take (`/chat-routes` `authorize`,
+ * `/interactions` `resolveConnection`, `/chat-routes` upload `authorize`).
+ * Every product wrote this try/catch by hand; it lives here once.
+ */
+export async function guardResolution<T>(run: () => Promise<T>): Promise<GuardResolution<T>> {
+  try {
+    return { ok: true, value: await run() }
+  } catch (err) {
+    if (err instanceof Response) return { ok: false, response: err }
+    throw err
+  }
+}
+
 /** Comma/whitespace separated → trimmed, lowercased, empties dropped. */
 export function parseAdminEmails(raw: string | null | undefined): string[] {
   return (raw ?? '')

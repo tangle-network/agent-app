@@ -143,6 +143,11 @@
       "import": "./dist/chat-store/index.js",
       "default": "./dist/chat-store/index.js"
     },
+    "./chat-routes": {
+      "types": "./dist/chat-routes/index.d.ts",
+      "import": "./dist/chat-routes/index.js",
+      "default": "./dist/chat-routes/index.js"
+    },
     "./crypto": {
       "types": "./dist/crypto/index.d.ts",
       "import": "./dist/crypto/index.js",

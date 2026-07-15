@@ -19,6 +19,15 @@ import {
   type ChatInteraction,
 } from './chat-interactions'
 
+// The `/chat-routes` wire contract, re-exported for turn-body construction —
+// `./chat-routes/wire` is import-free and browser-safe by design.
+export {
+  chatTurnRequestInit,
+  type ChatTurnFilePartInput,
+  type ChatTurnPartInput,
+  type ChatTurnRequestPayload,
+} from '../chat-routes/wire'
+
 export interface ChatStreamToolCall {
   toolCallId?: string
   toolName: string

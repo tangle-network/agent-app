@@ -105,6 +105,58 @@ describe('ChatComposer', () => {
     fireEvent.keyDown(document, { key: 'l', metaKey: true })
     expect(document.activeElement).toBe(input)
   })
+
+  it('emits ready file parts through onSendParts and skips non-ready ones', () => {
+    const onSendParts = vi.fn()
+    const readyPart = { type: 'image' as const, filename: 'chart.png', mediaType: 'image/png', url: 'data:image/png;base64,AAAA' }
+    render(
+      <ChatComposer
+        onSendParts={onSendParts}
+        onAttach={vi.fn()}
+        pendingFiles={[
+          { id: 'f1', name: 'chart.png', kind: 'file', status: 'ready', part: readyPart },
+          { id: 'f2', name: 'big.pdf', kind: 'file', status: 'uploading' },
+        ]}
+      />,
+    )
+    const input = screen.getByLabelText('Message input')
+    type(input, 'what is this?')
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(onSendParts).toHaveBeenCalledExactlyOnceWith('what is this?', [readyPart])
+  })
+
+  it('allows a file-only send when onSendParts is wired', () => {
+    const onSendParts = vi.fn()
+    const part = { type: 'file' as const, filename: 'doc.pdf', path: 'uploads/doc.pdf' }
+    render(
+      <ChatComposer
+        onSendParts={onSendParts}
+        onAttach={vi.fn()}
+        pendingFiles={[{ id: 'f1', name: 'doc.pdf', kind: 'file', status: 'ready', part }]}
+      />,
+    )
+    const send = screen.getByLabelText('Send') as HTMLButtonElement
+    expect(send.disabled).toBe(false)
+    fireEvent.click(send)
+    expect(onSendParts).toHaveBeenCalledExactlyOnceWith('', [part])
+  })
+
+  it('onSendParts takes precedence over onSend, and onSend keeps working alone', () => {
+    const onSend = vi.fn()
+    const onSendParts = vi.fn()
+    const { rerender } = render(<ChatComposer onSend={onSend} onSendParts={onSendParts} />)
+    const input = screen.getByLabelText('Message input')
+    type(input, 'both wired')
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onSendParts).toHaveBeenCalledExactlyOnceWith('both wired', [])
+    expect(onSend).not.toHaveBeenCalled()
+
+    rerender(<ChatComposer onSend={onSend} />)
+    type(screen.getByLabelText('Message input'), 'legacy path')
+    fireEvent.keyDown(screen.getByLabelText('Message input'), { key: 'Enter' })
+    expect(onSend).toHaveBeenCalledExactlyOnceWith('legacy path')
+  })
 })
 
 function model(partial: Partial<CatalogModel> & Pick<CatalogModel, 'id' | 'name' | 'provider'>): CatalogModel {
