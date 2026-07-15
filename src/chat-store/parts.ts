@@ -44,7 +44,9 @@ import type { Part as HarnessWirePart } from '@tangle-network/agent-interface'
 import type {
   ChatInteractionField,
   ChatInteractionStatus,
+  InteractionPersistedPart,
   NoticeKind,
+  NoticePersistedPart,
 } from '../web-react/chat-interactions'
 
 /** Start/end wall-clock millis, as normalized by `/stream`'s `normalizeTime`. */
@@ -167,6 +169,15 @@ export interface ChatNoticePart {
   noticeKind: NoticeKind
   text: string
 }
+
+// The "byte-matches" claims above, enforced at compile time: the interaction
+// contract's codec output types and the stored part types must stay mutually
+// assignable, so a codec field added on one side without the other fails here.
+type MutuallyAssignable<A extends B, B> = A
+type _CodecEmitsStorableInteractionPart = MutuallyAssignable<InteractionPersistedPart, ChatInteractionPart>
+type _StoredInteractionPartFeedsCodec = MutuallyAssignable<ChatInteractionPart, InteractionPersistedPart>
+type _CodecEmitsStorableNoticePart = MutuallyAssignable<NoticePersistedPart, ChatNoticePart>
+type _StoredNoticePartFeedsCodec = MutuallyAssignable<ChatNoticePart, NoticePersistedPart>
 
 export type ChatMessagePart =
   | ChatTextPart

@@ -226,9 +226,35 @@ export function noticePartKey(id: string): string {
 
 export type NoticeKind = 'warning' | 'auto-declined'
 
+/**
+ * Persisted-part shapes the codecs below produce — the SAME rows
+ * `/chat-store`'s `ChatInteractionPart`/`ChatNoticePart` store, typed at the
+ * source so a product pushing them into a `ChatMessagePart[]` transcript needs
+ * no cast. Type aliases (not interfaces) on purpose: the implicit index
+ * signature keeps them assignable to the `Record<string, unknown>` these
+ * codecs previously returned, so existing consumers stay source-compatible.
+ */
+export type InteractionPersistedPart = {
+  type: 'interaction'
+  id: string
+  kind: string
+  title: string
+  body?: string
+  answerSpec: { fields: ChatInteractionField[] }
+  status: ChatInteractionStatus
+  cancelReason?: string
+}
+
+export type NoticePersistedPart = {
+  type: 'notice'
+  id: string
+  noticeKind: NoticeKind
+  text: string
+}
+
 /** Builds the persisted/streamed `notice` part — a one-line transcript notice
  *  explaining an out-of-band event (warning, auto-declined interaction). */
-export function noticePart(noticeKind: NoticeKind, id: string, text: string): Record<string, unknown> {
+export function noticePart(noticeKind: NoticeKind, id: string, text: string): NoticePersistedPart {
   return { type: 'notice', id, noticeKind, text }
 }
 
@@ -249,7 +275,7 @@ export function interactionToPersistedPart(
   request: InteractionRequestWire,
   status: ChatInteractionStatus,
   cancelReason?: string,
-): Record<string, unknown> {
+): InteractionPersistedPart {
   return {
     type: 'interaction',
     id: request.id,
