@@ -21,6 +21,7 @@ export default defineConfig({
     'config/index': 'src/config/index.ts',
     'preset-cloudflare/index': 'src/preset-cloudflare/index.ts',
     'billing/index': 'src/billing/index.ts',
+    'chat-store/index': 'src/chat-store/index.ts',
     'crypto/index': 'src/crypto/index.ts',
     'stream/index': 'src/stream/index.ts',
     'integrations/index': 'src/integrations/index.ts',

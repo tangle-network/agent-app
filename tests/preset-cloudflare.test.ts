@@ -75,7 +75,8 @@ describe('PRESET_MIGRATION_SQL', () => {
     const tables = (env.raw.prepare(`SELECT name FROM sqlite_master WHERE type='table' ORDER BY name`).all() as { name: string }[]).map(
       (r) => r.name,
     )
-    expect(tables).toEqual(['deadlines', 'knowledge', 'proposals', 'threads', 'workspace_keys'])
+    // No `threads` table: `/chat-store` is the single thread-schema owner.
+    expect(tables).toEqual(['deadlines', 'knowledge', 'proposals', 'workspace_keys'])
     // Every contract column exists in its table.
     for (const spec of Object.values(PRESET_TABLES)) {
       const cols = new Set(
@@ -303,7 +304,7 @@ describe('createPresetDrizzleSchema', () => {
       real: () => col(),
     }
     const schema = createPresetDrizzleSchema(fake)
-    expect(built.sort()).toEqual(['deadlines', 'knowledge', 'proposals', 'threads', 'workspace_keys'])
-    expect(Object.keys(schema).sort()).toEqual(['deadlines', 'knowledge', 'proposals', 'threads', 'workspaceKeys'])
+    expect(built.sort()).toEqual(['deadlines', 'knowledge', 'proposals', 'workspace_keys'])
+    expect(Object.keys(schema).sort()).toEqual(['deadlines', 'knowledge', 'proposals', 'workspaceKeys'])
   })
 })
