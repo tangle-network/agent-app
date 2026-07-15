@@ -1,5 +1,5 @@
 {
-  "name": "create-agent-app",
+  "name": "@tangle-network/create-agent-app",
   "version": "0.1.0",
   "description": "Scaffold a new Tangle agent product on @tangle-network/agent-app: a filled agent.config skeleton, a wired chat route over the Cloudflare preset, an empty knowledge/ dir, and the agent-followable breadcrumb docs (AGENTS.md / CUSTOMIZE.md / KNOWLEDGE.md).",
   "keywords": [
@@ -12,6 +12,11 @@
   ],
   "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tangle-network/agent-app.git",
+    "directory": "create-agent-app"
+  },
   "bin": {
     "create-agent-app": "./index.mjs"
   },
@@ -19,6 +24,9 @@
     "index.mjs",
     "template"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=20"
   }
