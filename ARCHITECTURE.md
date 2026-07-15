@@ -26,7 +26,8 @@ navigable and is the seam a future package split would cut along.
         │  depends on ▼
   L0  Foundation          crypto · web · stream · redact · harness · missions · store
       (zero peers)         prompt · model-resolution · tangle · delegation · skills · knowledge
-                           integrations · billing · eval-campaign · assets · brand-extraction · studio
+                           integrations · interactions · billing · eval-campaign · assets
+                           brand-extraction · studio
 ```
 
 (`missions` sits at L0 — substrate-free, pure orchestration — but is consumed by
@@ -40,7 +41,9 @@ anywhere. `crypto` (AES-GCM fields) · `web` (request/body/rate-limit utils) ·
 `stream` (SSE normalize + resumable turn buffer) · `redact` (PII) · `harness` ·
 `missions` (durable step machine over a storage port) · `store` · `prompt` ·
 `model-resolution` · `tangle` (broker token) · `skills` ·
-`knowledge` · `integrations` (hub client) · `billing` (budget-capped keys) ·
+`knowledge` · `integrations` (hub client) · `interactions` (human-in-the-loop
+ask contract + sidecar client + answer-route factory; `agent-interface` types
+peer, structural connection) · `billing` (budget-capped keys) ·
 `eval-campaign` · `assets` · `brand-extraction` · `studio` (generation types).
 
 ### L1 — Core mechanism (depends on L0; substrate peers)
@@ -87,6 +90,7 @@ consumer of L0/L1 installs none of them): `konva`/`react-konva` → only
 | Resumable chat turns (buffer/replay/coalesce) | `stream` — see [`examples/resumable-turns.md`](./examples/resumable-turns.md) |
 | Flow traces / waterfalls | `trace` |
 | Chat UI + run/observability components | `web-react` |
+| Agent asks a human mid-run (question/plan cards, answer route) | `interactions` (server + contract) + `web-react` (cards/hook) |
 | Canvas editor UI | `design-canvas` (+ `-react`) |
 | Timeline / video editor | `sequences` (+ `-react`) |
 | Generation/studio UI | `studio` (+ `-react`) |
