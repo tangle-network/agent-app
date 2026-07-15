@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { consumeChatStream, dispatchChatStreamLine, streamChatTurn, type ChatStreamCallbacks } from '../src/web-react/chat-stream'
 
 function ndjsonBody(lines: unknown[], opts?: { failAfter?: number }): ReadableStream<Uint8Array> {
@@ -79,6 +79,35 @@ describe('consumeChatStream', () => {
     const { log, cb } = recorder()
     dispatchChatStreamLine(JSON.stringify({ type: 'error', error: 'Chat loop failed', details: 'boom' }), cb)
     expect(log).toEqual([['error', 'boom']])
+  })
+
+  it('fails loud when no onErrorEvent is wired: the error lands in the transcript and console.error', () => {
+    const texts: string[] = []
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const r = dispatchChatStreamLine(
+        JSON.stringify({ type: 'error', error: 'Chat loop failed', details: 'boom' }),
+        { onText: (t) => texts.push(t) },
+      )
+      // The turn must not end as a silent empty answer: the message reaches the
+      // text channel (a text segment ChatMessages renders) and counts as content.
+      expect(r.receivedContent).toBe(true)
+      expect(texts.join('')).toContain('boom')
+      expect(errorSpy).toHaveBeenCalledTimes(1)
+      expect(String(errorSpy.mock.calls[0]?.[1])).toContain('boom')
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+
+  it('an error with no callbacks at all still console.errors (never vanishes)', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      dispatchChatStreamLine(JSON.stringify({ type: 'error', error: 'boom' }), {})
+      expect(errorSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      errorSpy.mockRestore()
+    }
   })
 })
 

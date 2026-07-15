@@ -63,6 +63,11 @@ import {
   runSandboxToolPathSetup,
   splitDeferredProfileFiles,
   writeProfileFilesToBox,
+  assertProvisionPayloadWithinCap,
+  assertEnvWithinLimits,
+  PROVISION_PAYLOAD_MAX_BYTES,
+  ENV_VALUE_MAX_BYTES,
+  ENV_TOTAL_MAX_BYTES,
   SandboxRuntimeAuthRefreshError,
   type SandboxRuntimeConfig,
   type SecretStore,
@@ -695,6 +700,92 @@ describe('mintSandboxScopedToken', () => {
     const r = await mintSandboxScopedToken(box, { scope: 'session' })
     expect(r.succeeded).toBe(false)
     if (!r.succeeded) expect(r.error.message).toContain('403')
+  })
+})
+
+describe('provision S-cost gates', () => {
+  it('assertEnvWithinLimits REDS on a single env value over the per-entry cap, naming the variable', () => {
+    expect(() =>
+      assertEnvWithinLimits({ SMALL: 'ok', OPENCODE_CONFIG_CONTENT: 'x'.repeat(ENV_VALUE_MAX_BYTES) }),
+    ).toThrow(/OPENCODE_CONFIG_CONTENT is \d+ bytes[\s\S]*MAX_ARG_STRLEN/)
+  })
+
+  it('assertEnvWithinLimits REDS on total env size over the block cap, naming the largest entry', () => {
+    const env: Record<string, string> = {}
+    for (let i = 0; i < 4; i += 1) env[`VAR_${i}`] = 'x'.repeat(60_000)
+    env.VAR_3 = 'x'.repeat(61_000)
+    expect(() => assertEnvWithinLimits(env)).toThrow(
+      new RegExp(`env block is \\d+ bytes total — over the ${ENV_TOTAL_MAX_BYTES}-byte gate[\\s\\S]*VAR_3`),
+    )
+  })
+
+  it('assertEnvWithinLimits passes a normal env untouched', () => {
+    expect(() => assertEnvWithinLimits({ WORKSPACE_ID: 'w1', NODE_ENV: 'test' })).not.toThrow()
+  })
+
+  it('assertProvisionPayloadWithinCap REDS over 240KB with a per-section breakdown and the defer hint', () => {
+    const payload = {
+      env: { WORKSPACE_ID: 'w1' },
+      secrets: ['SECRET_A'],
+      backend: {
+        profile: {
+          name: 'big',
+          resources: {
+            files: [
+              { path: 'corpus.md', resource: { kind: 'inline', name: 'corpus', content: 'x'.repeat(280_000) } },
+            ],
+          },
+        } as AgentProfile,
+      },
+    }
+    expect(() => assertProvisionPayloadWithinCap(payload)).toThrow(
+      new RegExp(
+        `payload is \\d+ bytes — over the ${PROVISION_PAYLOAD_MAX_BYTES}-byte gate` +
+          `[\\s\\S]*profile=\\d+B \\(files=\\d+B\\), env=\\d+B, secrets=\\d+B` +
+          `[\\s\\S]*deferProfileFiles: true or move content to resources`,
+      ),
+    )
+  })
+
+  it('assertProvisionPayloadWithinCap passes an under-cap payload', () => {
+    expect(() =>
+      assertProvisionPayloadWithinCap({ env: { A: 'a' }, secrets: [], backend: { profile: PROFILE } }),
+    ).not.toThrow()
+  })
+
+  it('ensureWorkspaceSandbox rejects an over-cap payload BEFORE the create POST', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox())
+    const bigProfile: AgentProfile = {
+      name: 'big',
+      resources: {
+        files: [
+          { path: 'corpus.md', resource: { kind: 'inline', name: 'corpus', content: 'x'.repeat(280_000) } },
+        ],
+      },
+    } as AgentProfile
+    await expect(
+      ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'https://s' }, { profile: () => bigProfile }), {
+        workspaceId: 'w1',
+        harness: 'opencode',
+      }),
+    ).rejects.toThrow(/over the 240000-byte gate[\s\S]*deferProfileFiles/)
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('ensureWorkspaceSandbox rejects an E2BIG-class env var BEFORE the create POST', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox())
+    await expect(
+      ensureWorkspaceSandbox(
+        shellFor(
+          { apiKey: 'k', baseUrl: 'https://s' },
+          { env: async () => ({ OPENCODE_CONFIG_CONTENT: 'x'.repeat(130_000) }) },
+        ),
+        { workspaceId: 'w1', harness: 'opencode' },
+      ),
+    ).rejects.toThrow(/OPENCODE_CONFIG_CONTENT/)
+    expect(createMock).not.toHaveBeenCalled()
   })
 })
 
