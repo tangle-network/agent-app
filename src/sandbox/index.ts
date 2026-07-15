@@ -1035,12 +1035,22 @@ function utf8ByteLength(value: unknown): number {
     .byteLength
 }
 
+/** Structural slice of the profile the payload gate reads: it only measures
+ *  the profile's serialized size and names `resources.files` in the breakdown,
+ *  so callers composing a payload outside the SDK (products, tests) can pass a
+ *  plain object without casting through `AgentProfile`. */
+export interface ProvisionProfileSection {
+  resources?: { files?: readonly unknown[] }
+}
+
 /** The provision-payload sections the size gates need to see. Structural so
  *  the gate is testable without the SDK's (unexported) create-payload type. */
 export interface ProvisionPayloadSections {
   env?: Record<string, string>
   secrets?: readonly string[]
-  backend?: { profile?: AgentProfile }
+  /** `profile` may also be a named-profile string ref (the SDK's
+   *  `BackendConfig` union) — a string ref is tiny and has no files channel. */
+  backend?: { profile?: string | ProvisionProfileSection }
 }
 
 /**
@@ -1053,7 +1063,7 @@ export function assertProvisionPayloadWithinCap(payload: ProvisionPayloadSection
   const total = utf8ByteLength(payload)
   if (total <= PROVISION_PAYLOAD_MAX_BYTES) return
   const profile = payload.backend?.profile
-  const files = profile?.resources?.files ?? []
+  const files = (typeof profile === 'string' ? undefined : profile?.resources?.files) ?? []
   const breakdown =
     `profile=${utf8ByteLength(profile ?? null)}B ` +
     `(files=${utf8ByteLength(files)}B), ` +
@@ -1549,7 +1559,9 @@ export async function ensureWorkspaceSandbox(
   // provision body can never produce a working sandbox — fail loud here,
   // before the POST, with the offending section named.
   assertEnvWithinLimits(env)
-  assertProvisionPayloadWithinCap(payload as ProvisionPayloadSections)
+  // `?? {}` only narrows the SDK parameter's `| undefined`; the literal above
+  // is always defined. The structural sections type needs no cast.
+  assertProvisionPayloadWithinCap(payload ?? {})
 
   let box = await client.create(payload)
 
