@@ -1,0 +1,9 @@
+/* Minimal fixture tokens.css standing in for what a CONSUMER app ships.
+ * Deliberately defines --card / --foreground / --secondary but OMITS --popover
+ * and any --nonexistent-token, so the checker's two halves have something to
+ * catch. Not agent-app's real tokens.css — this is a controlled ground truth. */
+:root {
+  --card: 240 7% 97%;
+  --foreground: 0 0% 5%;
+  --secondary: 240 6% 93%;
+}

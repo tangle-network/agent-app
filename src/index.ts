@@ -31,6 +31,10 @@ export * from './web/index'
 export * from './redact/index'
 export * from './assets/index'
 export * from './theme/index'
+// `/theme-contract` (the CI token-completeness checker) reads the filesystem
+// (node:fs) — server-only, same as the other node-touching modules re-exported
+// here. `/theme` itself stays browser-clean (it's in the browser-safe manifest).
+export * from './theme-contract/index'
 // `/app-auth` is intentionally NOT re-exported here: it imports the optional
 // better-auth peer at module top (same rule as `/platform`, which stays
 // subpath-only for its structural seams).

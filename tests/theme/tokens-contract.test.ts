@@ -12,6 +12,8 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
+import { checkThemeContract } from '../../src/theme-contract/index'
+
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const cssPath = join(repoRoot, 'src', 'theme', 'tokens.css')
 const REACT_PKGS = ['design-canvas-react', 'sequences-react', 'studio-react', 'web-react']
@@ -26,32 +28,6 @@ function walk(dir: string): string[] {
     if (e.isDirectory()) return walk(p)
     return /\.(ts|tsx)$/.test(e.name) ? [p] : []
   })
-}
-
-function referencedVars(): Map<string, string[]> {
-  const map = new Map<string, string[]>()
-  for (const pkg of REACT_PKGS) {
-    for (const file of walk(join(repoRoot, 'src', pkg))) {
-      const text = readFileSync(file, 'utf8')
-      for (const m of text.matchAll(/var\(\s*(--[a-z0-9-]+)/gi)) {
-        const name = m[1]
-        if (!name) continue
-        const list = map.get(name) ?? []
-        list.push(file.replace(repoRoot + '/', ''))
-        map.set(name, list)
-      }
-    }
-  }
-  return map
-}
-
-function definedVars(): Set<string> {
-  const css = readFileSync(cssPath, 'utf8')
-  const defs = new Set<string>()
-  // A definition is `--name:` at the start of a (trimmed) line; RHS references
-  // like `hsl(var(--card))` are mid-line and never counted as definitions.
-  for (const m of css.matchAll(/^\s*(--[a-z0-9-]+)\s*:/gim)) if (m[1]) defs.add(m[1])
-  return defs
 }
 
 /** Extract the body of the first brace-balanced block whose header matches `re`. */
@@ -79,17 +55,19 @@ const isAlias = (value: string) => /hsl\(\s*var\(/i.test(value)
 
 describe('theme token contract', () => {
   it('every CSS var referenced by a React surface is defined in tokens.css', () => {
-    const used = referencedVars()
-    const defined = definedVars()
-    const missing = [...used.keys()]
-      .filter((v) => !defined.has(v))
-      .map((v) => `${v} (used in ${used.get(v)?.[0]})`)
-    expect(missing, `Undefined CSS vars referenced in components:\n${missing.join('\n')}`).toEqual([])
+    // Consumes the exported checker (single source of truth) against agent-app's
+    // OWN React surfaces — the same walk a consumer app runs on its own source.
+    const { missing } = checkThemeContract({
+      srcDirs: REACT_PKGS.map((p) => join(repoRoot, 'src', p)),
+      tokensCss: cssPath,
+    })
+    const rendered = missing.map((m) => `${m.varName} (used in ${m.referencedIn})`)
+    expect(rendered, `Undefined CSS vars referenced in components:\n${rendered.join('\n')}`).toEqual([])
   })
 
   it('tokens.css defines every canonical alias the canvas/sequences packages consume', () => {
-    const defined = definedVars()
-    expect(REQUIRED_ALIASES.filter((v) => !defined.has(v))).toEqual([])
+    const root = blockDefs(blockBody(readFileSync(cssPath, 'utf8'), /:root\s*\{/))
+    expect(REQUIRED_ALIASES.filter((v) => !root.has(v))).toEqual([])
   })
 
   // Every CONCRETE :root token (a literal value, not an `hsl(var(--…))` alias)
