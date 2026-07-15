@@ -53,6 +53,11 @@
       "import": "./dist/platform/index.js",
       "default": "./dist/platform/index.js"
     },
+    "./app-auth": {
+      "types": "./dist/app-auth/index.d.ts",
+      "import": "./dist/app-auth/index.js",
+      "default": "./dist/app-auth/index.js"
+    },
     "./runtime": {
       "types": "./dist/runtime/index.d.ts",
       "import": "./dist/runtime/index.js",
@@ -396,6 +401,7 @@
     "@tangle-network/sandbox": ">=0.9.7",
     "@tangle-network/sandbox-ui": ">=0.72.0",
     "@xyflow/react": ">=12.0.0",
+    "better-auth": ">=1.6.16",
     "drizzle-orm": ">=0.36",
     "konva": ">=9",
     "lucide-react": ">=1",
@@ -406,6 +412,9 @@
   },
   "peerDependenciesMeta": {
     "@huggingface/transformers": {
+      "optional": true
+    },
+    "better-auth": {
       "optional": true
     },
     "@tangle-network/agent-knowledge": {
