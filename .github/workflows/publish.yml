@@ -62,12 +62,29 @@ jobs:
       # known-good release (>= 11.5.1 for OIDC). Revisit once a fixed 12.x ships.
       - run: npm install -g npm@11.18.0
 
-      - name: Bump patch, commit, tag, push
+      # --atomic: branch + tag land together or not at all. --follow-tags is
+      # per-ref — during a merge train the HEAD:main push gets rejected while
+      # the tag ref is still accepted, orphaning a vX.Y.Z tag that poisons
+      # every later release run ("fatal: tag already exists"). On a lost race,
+      # undo the local bump and retry on fresh main; the newer merge's queued
+      # run then no-ops via the already-published check.
+      - name: Bump patch, commit, tag, push (atomic)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          npm version patch -m "chore(release): %s [skip release]"
-          git push origin HEAD:main --follow-tags
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset --hard origin/main
+            npm version patch -m "chore(release): %s [skip release]"
+            V=$(node -p "require('./package.json').version")
+            if git push --atomic origin HEAD:main "refs/tags/v$V"; then
+              exit 0
+            fi
+            echo "release push lost the race (attempt $attempt); retrying on fresh main"
+            git tag -d "v$V"
+          done
+          echo "::error::release push lost the race 3 times — check for an orphaned tag"
+          exit 1
 
       - name: Publish to npm (skip if already published)
         run: |
