@@ -30,8 +30,12 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
+    "bin",
     ".claude/skills"
   ],
+  "bin": {
+    "agent-app-preflight": "./bin/preflight.mjs"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -137,6 +141,11 @@
       "types": "./dist/billing/index.d.ts",
       "import": "./dist/billing/index.js",
       "default": "./dist/billing/index.js"
+    },
+    "./preflight": {
+      "types": "./dist/preflight/index.d.ts",
+      "import": "./dist/preflight/index.js",
+      "default": "./dist/preflight/index.js"
     },
     "./chat-store": {
       "types": "./dist/chat-store/index.d.ts",
