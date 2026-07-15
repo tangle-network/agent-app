@@ -11,9 +11,9 @@ jobs:
     env:
       # tsup generates .d.ts for ~38 entries in a worker thread (the `prepare`
       # script runs during install, and again in the build step); that worker
-      # needs ~4.7GB and OOMs at the default limit. The worker inherits
+      # needed ~4.7GB and has grown with the subpath count (OOMed at 6144 after the #191/#192 merges); 8192 matches the documented local build requirement. The worker inherits
       # NODE_OPTIONS, so set the heap once at the job level.
-      NODE_OPTIONS: --max-old-space-size=6144
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6

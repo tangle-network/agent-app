@@ -34,7 +34,7 @@ jobs:
       contents: write # push the version-bump commit + tag
       id-token: write # OIDC trusted publish + Sigstore provenance
     env:
-      NODE_OPTIONS: --max-old-space-size=6144
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v7
         with:
@@ -93,7 +93,7 @@ jobs:
       # ERR_WORKER_OUT_OF_MEMORY on the hosted runner. The worker inherits
       # NODE_OPTIONS, so a job-level heap covers install (prepare), test, and
       # build in one place.
-      NODE_OPTIONS: --max-old-space-size=6144
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -129,7 +129,7 @@ jobs:
     env:
       # Same DTS-worker heap need: this job runs `pnpm install` (prepare → tsup)
       # and `pnpm run build` before publishing.
-      NODE_OPTIONS: --max-old-space-size=6144
+      NODE_OPTIONS: --max-old-space-size=8192
     permissions:
       contents: read
       id-token: write
