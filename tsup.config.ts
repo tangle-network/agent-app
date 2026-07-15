@@ -26,6 +26,7 @@ export default defineConfig({
     'integrations/index': 'src/integrations/index.ts',
     'missions/index': 'src/missions/index.ts',
     'platform/index': 'src/platform/index.ts',
+    'app-auth/index': 'src/app-auth/index.ts',
     'web/index': 'src/web/index.ts',
     'web-react/index': 'src/web-react/index.tsx',
     'web-react/terminal': 'src/web-react/terminal.ts',
@@ -69,7 +70,7 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   target: 'es2022',
-  external: ['react', 'react/jsx-runtime', 'konva', 'react-konva', '@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog', '@tangle-network/agent-eval', '@tangle-network/agent-knowledge', '@tangle-network/agent-runtime', '@tangle-network/sandbox', 'drizzle-orm', 'drizzle-orm/*', '@huggingface/transformers', '@tangle-network/sandbox-ui', '@tangle-network/sandbox-ui/*', '@tangle-network/ui', '@tangle-network/ui/*', 'lucide-react', 'react-router', '@radix-ui/react-dialog', 'resend'],
+  external: ['react', 'react/jsx-runtime', 'konva', 'react-konva', '@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog', '@tangle-network/agent-eval', '@tangle-network/agent-knowledge', '@tangle-network/agent-runtime', '@tangle-network/sandbox', 'drizzle-orm', 'drizzle-orm/*', '@huggingface/transformers', '@tangle-network/sandbox-ui', '@tangle-network/sandbox-ui/*', '@tangle-network/ui', '@tangle-network/ui/*', 'lucide-react', 'react-router', '@radix-ui/react-dialog', 'resend', 'better-auth', 'better-auth/*'],
   // tokens.css is shipped raw (the ./styles subpath); copy it next to the
   // built theme entries so `import '@tangle-network/agent-app/styles'` resolves.
   onSuccess: 'cp src/theme/tokens.css dist/theme/tokens.css && cp src/studio-react/studio.css dist/studio-react/studio.css',

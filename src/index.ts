@@ -25,6 +25,9 @@ export * from './web/index'
 export * from './redact/index'
 export * from './assets/index'
 export * from './theme/index'
+// `/app-auth` is intentionally NOT re-exported here: it imports the optional
+// better-auth peer at module top (same rule as `/platform`, which stays
+// subpath-only for its structural seams).
 // `/web-react` and `/sequences-react` are intentionally NOT re-exported here:
 // they need the optional react peer and would drag JSX into every root-entry
 // consumer. `/sequences/drizzle` likewise stays subpath-only — it imports the
