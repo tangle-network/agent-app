@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.43.26",
+  "version": "0.43.27",
   "packageManager": "pnpm@10.33.4",
   "description": "Application-shell framework for Tangle agent products: a bounded tool loop, the structured agent→app tool side channel, integration-hub client, per-workspace billing, and crypto — composed over the Tangle agent substrate through typed seams.",
   "keywords": [
@@ -34,7 +34,7 @@
     ".claude/skills"
   ],
   "bin": {
-    "agent-app-preflight": "./bin/preflight.mjs"
+    "agent-app-theme-check": "./dist/theme-contract/cli.js"
   },
   "exports": {
     ".": {
@@ -374,9 +374,6 @@
       "default": "./dist/theme-contract/index.js"
     },
     "./styles": "./dist/theme/tokens.css"
-  },
-  "bin": {
-    "agent-app-theme-check": "./dist/theme-contract/cli.js"
   },
   "scripts": {
     "build": "tsup",
