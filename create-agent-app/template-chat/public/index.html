@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>__PROJECT_NAME__ — dev chat</title>
+<!--
+  The DEV chat page: a dependency-free client for the API this worker ships,
+  good enough to exercise auth, threads, multimodal turns, and streaming from
+  a browser today. It is NOT the product surface — build that in React with
+  @tangle-network/agent-app/web-react (ChatComposer, ChatMessages,
+  streamChatTurn, useChatInteractions), which owns reconnect/replay, question
+  cards, and the typed part renderers. See CUSTOMIZE.md step 5.
+-->
+<style>
+  :root { color-scheme: light dark; --border: #d0d3da; --muted: #6b7280; --accent: #4f46e5; }
+  @media (prefers-color-scheme: dark) { :root { --border: #333842; --muted: #9aa1ad; --accent: #818cf8; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; display: flex; height: 100dvh; }
+  aside { width: 240px; border-right: 1px solid var(--border); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  main { flex: 1; display: flex; flex-direction: column; }
+  header { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  #transcript { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .msg { max-width: 52rem; white-space: pre-wrap; }
+  .msg.user { align-self: flex-end; background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 10px; padding: 8px 12px; }
+  .msg .meta { font-size: 12px; color: var(--muted); }
+  .chip { display: inline-block; font-size: 12px; border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; margin: 2px 4px 2px 0; color: var(--muted); }
+  .reasoning { color: var(--muted); font-size: 13px; }
+  form.composer { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
+  textarea { flex: 1; resize: none; font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: inherit; }
+  button { font: inherit; border: 1px solid var(--border); background: transparent; color: inherit; border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .thread { text-align: left; border: none; padding: 6px 8px; border-radius: 6px; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .thread.active { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+  dialog { border: 1px solid var(--border); border-radius: 12px; padding: 20px; min-width: 320px; }
+  dialog form { display: flex; flex-direction: column; gap: 10px; }
+  dialog input { font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: inherit; }
+  #files { padding: 0 16px; }
+  .error { color: #dc2626; font-size: 13px; padding: 0 16px; }
+</style>
+</head>
+<body>
+<aside>
+  <button id="new-thread" class="primary">New thread</button>
+  <nav id="threads" style="overflow-y:auto"></nav>
+</aside>
+<main>
+  <header>
+    <strong>__PROJECT_NAME__ <span style="color:var(--muted);font-weight:400">dev chat</span></strong>
+    <span id="who" style="color:var(--muted);font-size:13px"></span>
+  </header>
+  <div id="transcript"></div>
+  <div id="files"></div>
+  <div id="error" class="error"></div>
+  <form class="composer" id="composer">
+    <button type="button" id="attach" title="Attach files">+</button>
+    <input type="file" id="file-input" multiple hidden />
+    <textarea id="input" rows="2" placeholder="Message the agent…"></textarea>
+    <button type="submit" class="primary">Send</button>
+  </form>
+</main>
+
+<dialog id="auth">
+  <form method="dialog" id="auth-form">
+    <strong id="auth-title">Sign in</strong>
+    <input id="email" type="email" placeholder="email" required autocomplete="email" />
+    <input id="password" type="password" placeholder="password" required minlength="8" autocomplete="current-password" />
+    <button class="primary" value="submit">Continue</button>
+    <button type="button" id="auth-toggle" style="border:none;color:var(--muted)">No account? Sign up</button>
+    <span id="auth-error" class="error" style="padding:0"></span>
+  </form>
+</dialog>
+
+<script type="module">
+const $ = (id) => document.getElementById(id)
+const state = { threadId: null, parts: [], signUp: false }
+
+const api = async (path, init) => {
+  const res = await fetch(path, { headers: { 'content-type': 'application/json' }, ...init })
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `${res.status} on ${path}`)
+  return res.json()
+}
+
+// ── auth ────────────────────────────────────────────────────────────────────
+async function ensureSession() {
+  const session = await fetch('/api/auth/get-session').then((r) => r.json()).catch(() => null)
+  if (session?.user) { $('who').textContent = session.user.email; return }
+  $('auth').showModal()
+  await new Promise((resolve) => {
+    $('auth-toggle').onclick = () => {
+      state.signUp = !state.signUp
+      $('auth-title').textContent = state.signUp ? 'Sign up' : 'Sign in'
+      $('auth-toggle').textContent = state.signUp ? 'Have an account? Sign in' : 'No account? Sign up'
+    }
+    $('auth-form').onsubmit = async (e) => {
+      e.preventDefault()
+      const email = $('email').value, password = $('password').value
+      try {
+        await api(`/api/auth/sign-${state.signUp ? 'up' : 'in'}/email`, {
+          method: 'POST',
+          body: JSON.stringify({ email, password, ...(state.signUp ? { name: email.split('@')[0] } : {}) }),
+        })
+        $('who').textContent = email
+        $('auth').close(); resolve()
+      } catch (err) { $('auth-error').textContent = err.message }
+    }
+  })
+}
+
+// ── threads + transcript ────────────────────────────────────────────────────
+async function loadThreads() {
+  const { threads } = await api('/api/threads')
+  $('threads').replaceChildren(...threads.map((t) => {
+    const b = document.createElement('button')
+    b.className = `thread${t.id === state.threadId ? ' active' : ''}`
+    b.textContent = t.title
+    b.onclick = () => openThread(t.id)
+    return b
+  }))
+}
+
+function row(role, text = '') {
+  const div = document.createElement('div')
+  div.className = `msg ${role}`
+  div.textContent = text
+  $('transcript').append(div)
+  div.scrollIntoView()
+  return div
+}
+
+// Chips are built with textContent — part fields are agent-produced strings
+// and must never be interpreted as markup.
+function chip(container, text) {
+  const wrap = document.createElement('div')
+  const span = document.createElement('span')
+  span.className = 'chip'
+  span.textContent = text
+  wrap.append(span)
+  container.append(wrap)
+}
+
+function renderParts(container, parts = []) {
+  for (const p of parts) {
+    if (p.type === 'tool') chip(container, `${p.tool ?? 'tool'} · ${p.state?.status ?? ''}`)
+    if (p.type === 'file' || p.type === 'image') chip(container, `📎 ${p.filename ?? p.path ?? p.type}`)
+  }
+}
+
+async function openThread(id) {
+  state.threadId = id
+  const { messages } = await api(`/api/threads/${id}/messages`)
+  $('transcript').replaceChildren()
+  for (const m of messages) {
+    const div = row(m.role, m.content)
+    renderParts(div, m.parts)
+    if (m.role === 'assistant' && m.inputTokens != null) {
+      const meta = document.createElement('div')
+      meta.className = 'meta'
+      meta.textContent = `${m.model ?? ''} · ${m.inputTokens}→${m.outputTokens} tokens`
+      div.append(meta)
+    }
+  }
+  loadThreads()
+}
+
+// ── uploads → prompt parts ──────────────────────────────────────────────────
+$('attach').onclick = () => $('file-input').click()
+$('file-input').onchange = async () => {
+  const form = new FormData()
+  for (const f of $('file-input').files) form.append('files', f)
+  const res = await fetch('/api/chat/upload', { method: 'POST', body: form })
+  if (!res.ok) { $('error').textContent = (await res.json()).error; return }
+  const { files } = await res.json()
+  state.parts.push(...files.map((f) => f.part))
+  $('files').replaceChildren(...state.parts.map((p) => Object.assign(document.createElement('span'), { className: 'chip', textContent: p.filename ?? p.path ?? p.type })))
+}
+
+// ── one streamed turn ───────────────────────────────────────────────────────
+// Minimal NDJSON consumer for the dev page. The production client is
+// streamChatTurn from @tangle-network/agent-app/web-react — it also resumes
+// via /api/chat/replay/:turnId after a dropped connection.
+async function runTurn(content, parts) {
+  const res = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ threadId: state.threadId, content, parts }),
+  })
+  if (!res.ok) { $('error').textContent = (await res.json()).error; return }
+  const assistant = row('assistant')
+  let text = ''
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  const handle = (line) => {
+    if (!line.trim()) return
+    let parsed; try { parsed = JSON.parse(line) } catch { return }
+    const evt = parsed.kind === 'event' ? parsed.event : parsed
+    if (evt.type === 'text') { text += evt.text; assistant.textContent = text }
+    else if (evt.type === 'reasoning') { /* keep the dev page quiet; web-react renders these */ }
+    else if (evt.type === 'tool_call') chip(assistant, `${evt.call?.toolName ?? 'tool'}…`)
+    else if (evt.type === 'error') $('error').textContent = String(evt.details ?? evt.error)
+    assistant.scrollIntoView()
+  }
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) { if (buffer.trim()) handle(buffer); break }
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n'); buffer = lines.pop() ?? ''
+    lines.forEach(handle)
+  }
+  openThread(state.threadId)
+}
+
+$('composer').onsubmit = async (e) => {
+  e.preventDefault()
+  const content = $('input').value.trim()
+  const parts = state.parts.splice(0)
+  if (!content && parts.length === 0) return
+  $('error').textContent = ''
+  $('files').replaceChildren()
+  $('input').value = ''
+  if (!state.threadId) {
+    const { thread } = await api('/api/threads', { method: 'POST', body: JSON.stringify({ firstMessage: content || 'New thread' }) })
+    state.threadId = thread.id
+  }
+  row('user', content)
+  await runTurn(content, parts).catch((err) => { $('error').textContent = err.message })
+}
+
+$('new-thread').onclick = () => { state.threadId = null; $('transcript').replaceChildren() }
+
+await ensureSession()
+await loadThreads()
+</script>
+</body>
+</html>

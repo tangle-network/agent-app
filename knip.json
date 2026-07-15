@@ -48,6 +48,7 @@
   "ignore": [
     ".worktrees/**",
     "create-agent-app/template/**",
+    "create-agent-app/template-chat/**",
     "playground/**"
   ],
   "ignoreBinaries": ["tsc"]

@@ -1,7 +1,7 @@
 {
   "name": "@tangle-network/create-agent-app",
   "version": "0.1.0",
-  "description": "Scaffold a new Tangle agent product on @tangle-network/agent-app: a filled agent.config skeleton, a wired chat route over the Cloudflare preset, an empty knowledge/ dir, and the agent-followable breadcrumb docs (AGENTS.md / CUSTOMIZE.md / KNOWLEDGE.md).",
+  "description": "Scaffold a new Tangle agent product on @tangle-network/agent-app: the tool-loop skeleton (default) or, with --chat, the assembled multimodal chat vertical (auth, chat store, streaming turns with replay, uploads, agent asks) with its own end-to-end test — plus the agent-followable breadcrumb docs (AGENTS.md / CUSTOMIZE.md).",
   "keywords": [
     "tangle",
     "ai-agent",
@@ -22,7 +22,8 @@
   },
   "files": [
     "index.mjs",
-    "template"
+    "template",
+    "template-chat"
   ],
   "publishConfig": {
     "access": "public"
