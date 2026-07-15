@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // create-agent-app — scaffold a new Tangle agent product on @tangle-network/agent-app.
 //
-// Dependency-light by design: Node built-ins only. The CLI copies the `template/`
-// tree verbatim, substitutes a small set of `__TOKEN__` placeholders, and renames
+// Dependency-light by design: Node built-ins only. The CLI copies one template
+// tree verbatim (`template/` by default, `template-chat/` with `--chat`),
+// substitutes a small set of `__TOKEN__` placeholders, and renames
 // files whose template name would otherwise interfere with tooling (a template's
 // own `package.json` must not be read by the scaffolder's package manager; a
 // template `gitignore` must not be applied to the scaffolder repo). The generated
@@ -17,7 +18,13 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const TEMPLATE_DIR = join(HERE, 'template')
+// Template variants: the default tool-loop skeleton, and `--chat` — the
+// assembled multimodal chat vertical (auth + chat-store + chat-routes +
+// sandbox producer + uploads + replay) from `examples/chat-app.md`.
+const TEMPLATES = {
+  default: join(HERE, 'template'),
+  chat: join(HERE, 'template-chat'),
+}
 
 // The agent-app version range the generated project depends on. Kept as a single
 // constant so a release bump touches one line.
@@ -39,6 +46,7 @@ function parseArgs(argv) {
     const a = argv[i]
     if (a === '--name') args.name = argv[++i]
     else if (a === '--agent-app-version') args.agentAppVersion = argv[++i]
+    else if (a === '--chat') args.template = 'chat'
     else if (a === '--force') args.force = true
     else if (a === '-h' || a === '--help') args.help = true
     else if (!a.startsWith('-')) args._.push(a)
@@ -54,6 +62,10 @@ function usage() {
     'Scaffolds a new Tangle agent product on @tangle-network/agent-app.',
     '',
     'Options:',
+    '  --chat                       Scaffold the multimodal chat variant instead: the',
+    '                               assembled chat vertical (auth, thread/message store,',
+    '                               streaming turns + replay, uploads, agent asks) with',
+    '                               its own end-to-end test. Default: the tool-loop skeleton.',
     '  --name <name>                Project name (default: the target dir basename).',
     '  --agent-app-version <range>  @tangle-network/agent-app version (default: ' + AGENT_APP_RANGE + ').',
     '  --force                      Write into a non-empty directory.',
@@ -62,7 +74,7 @@ function usage() {
     'After scaffolding:',
     '  cd <target-dir> && pnpm install',
     '  pnpm typecheck && pnpm test',
-    '  # then follow CUSTOMIZE.md: fill agent.config.ts, seed knowledge/, run pnpm knowledge:ingest',
+    '  # then follow CUSTOMIZE.md (each template ships its own fill-checklist)',
   ].join('\n')
 }
 
@@ -110,6 +122,7 @@ async function main() {
   const projectName = args.name ?? targetDir.split(/[\\/]/).pop()
   const packageName = toPackageName(projectName)
   const agentAppVersion = args.agentAppVersion ?? AGENT_APP_RANGE
+  const templateDir = TEMPLATES[args.template ?? 'default']
 
   if (existsSync(targetDir)) {
     const entries = await readdir(targetDir).catch(() => [])
@@ -129,9 +142,9 @@ async function main() {
     AGENT_APP_VERSION: agentAppVersion,
   }
 
-  const files = await walk(TEMPLATE_DIR)
+  const files = await walk(templateDir)
   for (const rel of files) {
-    const src = join(TEMPLATE_DIR, rel)
+    const src = join(templateDir, rel)
     // Resolve any renamed path segments (only basenames are renamed).
     const parts = rel.split(/[\\/]/)
     const baseName = parts[parts.length - 1]

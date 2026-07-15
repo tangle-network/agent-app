@@ -385,6 +385,7 @@
     "knip": "knip"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250620.0",
     "@radix-ui/react-dialog": "^1.1.15",
     "@tangle-network/agent-eval": "^0.100.0",
     "@tangle-network/agent-integrations": "^0.44.0",

@@ -1,0 +1,38 @@
+name = "__PACKAGE_NAME__"
+main = "src/worker.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# The dev chat page. Assets are served before the worker; /api/* falls
+# through to src/worker.ts.
+[assets]
+directory = "public"
+
+# D1 holds everything durable: auth, threads/messages, the turn buffer.
+# Setup: `wrangler d1 create __PACKAGE_NAME__`, paste the database_id, then
+# `pnpm db:migrate:local` (dev) / `pnpm db:migrate` (production).
+[[d1_databases]]
+binding = "DB"
+database_name = "__PACKAGE_NAME__"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+# R2 is OFF by default — uncomment (and the ARTIFACTS binding in src/env.ts)
+# only when the product needs artifact/object storage.
+# [[r2_buckets]]
+# binding = "ARTIFACTS"
+# bucket_name = "__PACKAGE_NAME__-artifacts"
+
+# prompts/system.md is imported as a Text module (see declarations.d.ts;
+# vitest mirrors this via the plugin in vitest.config.ts).
+[[rules]]
+type = "Text"
+globs = ["**/*.md"]
+fallthrough = true
+
+# Secrets live in .dev.vars locally and `wrangler secret put` in production:
+# BETTER_AUTH_SECRET, TANGLE_API_KEY, SANDBOX_API_KEY, SANDBOX_GATEWAY_URL.
+# See .dev.vars.example for the full list.
+[vars]
+BETTER_AUTH_URL = "http://localhost:8787"
+# MODEL_NAME = "REPLACE_WITH_MODEL"   # overrides config.model.default

@@ -1,0 +1,18 @@
+# Copy to .dev.vars for local development (never commit .dev.vars).
+# Production: `wrangler secret put <NAME>` for each secret.
+
+# better-auth HMAC secret — generate one: openssl rand -base64 32
+BETTER_AUTH_SECRET=REPLACE_WITH_RANDOM_SECRET
+
+# Tangle Router key the harness bills model calls against.
+TANGLE_API_KEY=
+# Optional router override; omit for the platform default.
+# TANGLE_ROUTER_URL=
+
+# Sandbox gateway credentials — the agent runs in a Tangle sandbox. Without
+# these every turn fails loud (there is no mock agent).
+SANDBOX_API_KEY=
+SANDBOX_GATEWAY_URL=
+
+# Model override without a redeploy (falls back to config.model.default).
+# MODEL_NAME=

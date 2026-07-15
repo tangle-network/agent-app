@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "types": ["@cloudflare/workers-types/2023-07-01", "node"]
+  },
+  "include": ["agent.config.ts", "declarations.d.ts", "src", "tests", "vitest.config.ts"]
+}

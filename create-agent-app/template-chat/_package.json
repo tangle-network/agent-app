@@ -1,0 +1,38 @@
+{
+  "name": "__PACKAGE_NAME__",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate": "wrangler d1 migrations apply __PACKAGE_NAME__ --remote",
+    "db:migrate:local": "wrangler d1 migrations apply __PACKAGE_NAME__ --local",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@tangle-network/agent-app": "__AGENT_APP_VERSION__",
+    "@tangle-network/agent-interface": "^0.15.0",
+    "@tangle-network/agent-runtime": "^0.79.3",
+    "@tangle-network/sandbox": "^0.10.5",
+    "better-auth": "^1.6.16",
+    "drizzle-orm": "^0.45.2"
+  },
+  "peerDependencies": {
+    "@tangle-network/agent-eval": ">=0.100.0",
+    "@tangle-network/agent-integrations": ">=0.44.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250620.0",
+    "@tangle-network/agent-eval": "^0.100.0",
+    "@tangle-network/agent-integrations": "^0.44.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.6.0",
+    "better-sqlite3": "^12.10.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0",
+    "wrangler": "^4.0.0"
+  }
+}

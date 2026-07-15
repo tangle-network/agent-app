@@ -3,12 +3,13 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     // The framework's own tests live in `tests/**` and co-located `src/**`.
-    // EXCLUDE `create-agent-app/template/**`: that is a scaffolder template whose
-    // tests run inside a GENERATED project, not here (they import the published
-    // `@tangle-network/agent-app`, absent in this repo's module graph). The
-    // scaffolder itself is exercised by `tests/create-agent-app.test.ts`.
+    // EXCLUDE `create-agent-app/template*/**`: those are scaffolder templates
+    // whose tests run inside a GENERATED project, not here (they import the
+    // published `@tangle-network/agent-app`, absent in this repo's module
+    // graph). The scaffolders themselves are exercised by
+    // `tests/create-agent-app.test.ts` / `tests/create-agent-app-chat.test.ts`.
     include: ['tests/**/*.test.{ts,tsx}', 'src/**/*.test.{ts,tsx}'],
-    exclude: ['**/node_modules/**', '**/dist/**', 'create-agent-app/template/**'],
+    exclude: ['**/node_modules/**', '**/dist/**', 'create-agent-app/template/**', 'create-agent-app/template-chat/**'],
     // Unmount @testing-library React trees between tests (this repo doesn't run
     // with `globals: true`, so RTL's auto-cleanup hook isn't registered).
     setupFiles: ['./src/test-setup.ts'],
