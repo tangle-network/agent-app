@@ -81,6 +81,11 @@ export interface D1Like {
 // handlers, and the accessor. Every table is workspace-scoped on `workspace_id`
 // (the accessor's default `where` column) so the knowledge `count` rule and the
 // tool writes agree without per-consumer wiring.
+//
+// Deliberately NOT here: chat thread/message tables. `/chat-store` is the
+// single thread-schema owner (`createChatTables` + `createChatStore`); the
+// preset once declared an unconsumed `threads` DDL, removed so two schemas
+// can't drift.
 // ---------------------------------------------------------------------------
 
 /** The preset table + column names — the contract the DDL, Drizzle schema,
@@ -98,15 +103,6 @@ export const PRESET_TABLES = {
       description: 'description',
       status: 'status',
       createdBy: 'created_by',
-      createdAt: 'created_at',
-    },
-  },
-  threads: {
-    name: 'threads',
-    columns: {
-      id: 'id',
-      workspaceId: 'workspace_id',
-      title: 'title',
       createdAt: 'created_at',
     },
   },
@@ -157,12 +153,6 @@ export const PRESET_TABLES = {
  * single-statement `prepare` accepts each. Matches {@link PRESET_TABLES} exactly.
  */
 export const PRESET_MIGRATION_SQL: readonly string[] = [
-  `CREATE TABLE IF NOT EXISTS threads (
-    id TEXT PRIMARY KEY,
-    workspace_id TEXT NOT NULL,
-    title TEXT,
-    created_at INTEGER NOT NULL
-  )`,
   `CREATE TABLE IF NOT EXISTS proposals (
     id TEXT PRIMARY KEY,
     workspace_id TEXT NOT NULL,
@@ -244,12 +234,6 @@ export function createPresetDrizzleSchema(d: DrizzleSqliteCoreLike) {
   const { sqliteTable, text, integer, real } = d
   const C = PRESET_TABLES
   return {
-    threads: sqliteTable(C.threads.name, {
-      id: text(C.threads.columns.id).primaryKey(),
-      workspaceId: text(C.threads.columns.workspaceId).notNull(),
-      title: text(C.threads.columns.title),
-      createdAt: integer(C.threads.columns.createdAt).notNull(),
-    }),
     proposals: sqliteTable(C.proposals.name, {
       id: text(C.proposals.columns.id).primaryKey(),
       workspaceId: text(C.proposals.columns.workspaceId).notNull(),
