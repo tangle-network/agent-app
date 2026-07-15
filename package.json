@@ -158,6 +158,11 @@
       "import": "./dist/integrations/index.js",
       "default": "./dist/integrations/index.js"
     },
+    "./interactions": {
+      "types": "./dist/interactions/index.d.ts",
+      "import": "./dist/interactions/index.js",
+      "default": "./dist/interactions/index.js"
+    },
     "./missions": {
       "types": "./dist/missions/index.d.ts",
       "import": "./dist/missions/index.js",
