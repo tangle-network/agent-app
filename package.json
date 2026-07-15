@@ -133,6 +133,11 @@
       "import": "./dist/billing/index.js",
       "default": "./dist/billing/index.js"
     },
+    "./chat-store": {
+      "types": "./dist/chat-store/index.d.ts",
+      "import": "./dist/chat-store/index.js",
+      "default": "./dist/chat-store/index.js"
+    },
     "./crypto": {
       "types": "./dist/crypto/index.d.ts",
       "import": "./dist/crypto/index.js",
