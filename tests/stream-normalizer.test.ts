@@ -95,6 +95,44 @@ describe('getPartKey', () => {
     expect(getPartKey({ type: 'text' })).toBe('text:current')
     expect(getPartKey({ type: 'reasoning' })).toBe('reasoning:current')
   })
+
+  it('keys other typed kinds in their own lane, never the text lane', () => {
+    expect(getPartKey({ type: 'file', id: 'f1' })).toBe('file:f1')
+    expect(getPartKey({ type: 'image' })).toBe('image:current')
+    expect(getPartKey({ type: 'step-finish' })).toBe('step-finish:current')
+    // Untyped legacy parts still fall back to the text lane.
+    expect(getPartKey({})).toBe('text:current')
+  })
+})
+
+describe('normalizePersistedPart — full storable vocabulary', () => {
+  it('projects file and image parts (no silent drop)', () => {
+    expect(normalizePersistedPart({
+      type: 'file', id: 'f1', filename: 'a.csv', mediaType: 'text/csv', path: 'out/a.csv', sessionID: 's', messageID: 'm',
+    })).toEqual({ type: 'file', id: 'f1', filename: 'a.csv', mediaType: 'text/csv', path: 'out/a.csv' })
+    expect(normalizePersistedPart({ type: 'image', url: 'data:image/png;base64,AA', mediaType: 'image/png' }))
+      .toEqual({ type: 'image', mediaType: 'image/png', url: 'data:image/png;base64,AA' })
+  })
+
+  it('keeps the step-finish usage receipt and step-start marker', () => {
+    expect(normalizePersistedPart({
+      type: 'step-finish', reason: 'stop', tokens: { input: 5, output: 2 }, cost: 0.01,
+    })).toEqual({ type: 'step-finish', reason: 'stop', tokens: { input: 5, output: 2 }, cost: 0.01 })
+    expect(normalizePersistedPart({ type: 'step-start', extra: 'stripped' })).toEqual({ type: 'step-start' })
+  })
+
+  it('projects subtask parts and passes system-authored interaction/notice parts through', () => {
+    expect(normalizePersistedPart({ type: 'subtask', prompt: 'p', description: 'd', agent: 'a', id: 's1' }))
+      .toEqual({ type: 'subtask', prompt: 'p', description: 'd', agent: 'a', id: 's1' })
+    const interaction = { type: 'interaction', id: 'i1', kind: 'question', title: 'T', answerSpec: { fields: [] }, status: 'pending' }
+    expect(normalizePersistedPart(interaction)).toEqual(interaction)
+    const notice = { type: 'notice', id: 'n1', noticeKind: 'warning', text: 'heads up' }
+    expect(normalizePersistedPart(notice)).toEqual(notice)
+  })
+
+  it('still returns null for unknown kinds', () => {
+    expect(normalizePersistedPart({ type: 'telemetry', blob: 1 })).toBeNull()
+  })
 })
 
 describe('mergePersistedPart', () => {

@@ -108,6 +108,53 @@ export function normalizePersistedPart(rawPart: JsonRecord): JsonRecord | null {
     }
   }
 
+  if (type === 'file' || type === 'image') {
+    const id = asString(rawPart.id) ?? asString(rawPart.partId)
+    return {
+      type,
+      ...(id ? { id } : {}),
+      ...(asString(rawPart.filename) ? { filename: asString(rawPart.filename) } : {}),
+      ...(asString(rawPart.mediaType) ? { mediaType: asString(rawPart.mediaType) } : {}),
+      ...(asString(rawPart.url) ? { url: asString(rawPart.url) } : {}),
+      ...(asString(rawPart.path) ? { path: asString(rawPart.path) } : {}),
+      ...(type === 'file' && asString(rawPart.content) ? { content: asString(rawPart.content) } : {}),
+    }
+  }
+
+  if (type === 'step-start') {
+    return { type: 'step-start' }
+  }
+
+  // The harness's per-step usage receipt. Dropping it here silently loses the
+  // turn's token/cost accounting from the persisted transcript.
+  if (type === 'step-finish') {
+    const tokens = asRecord(rawPart.tokens)
+    const cost = Number(rawPart.cost)
+    return {
+      type: 'step-finish',
+      ...(asString(rawPart.reason) ? { reason: asString(rawPart.reason) } : {}),
+      ...(tokens ? { tokens } : {}),
+      ...(Number.isFinite(cost) ? { cost } : {}),
+    }
+  }
+
+  if (type === 'subtask') {
+    const id = asString(rawPart.id) ?? asString(rawPart.partId)
+    return {
+      type: 'subtask',
+      prompt: asString(rawPart.prompt) ?? '',
+      description: asString(rawPart.description) ?? '',
+      agent: asString(rawPart.agent) ?? '',
+      ...(id ? { id } : {}),
+    }
+  }
+
+  // System-authored persisted parts (`/interactions` codecs) pass through
+  // verbatim when a producer routes them here — they are already projections.
+  if (type === 'interaction' || type === 'notice') {
+    return rawPart
+  }
+
   if (type === 'tool') {
     const state = asRecord(rawPart.state)
     const output = state?.output ?? rawPart.output
@@ -155,11 +202,10 @@ export function getPartKey(part: JsonRecord): string {
     return `tool:${resolveToolId(part)}`
   }
 
-  if (type === 'reasoning') {
-    return `reasoning:${String(part.id ?? part.partId ?? part.index ?? 'current')}`
-  }
-
-  return `text:${String(part.id ?? part.partId ?? part.index ?? 'current')}`
+  // Keyed by the part's OWN type so distinct kinds never merge into each
+  // other. Untyped parts fall back to the text lane (legacy shape).
+  const lane = type && type !== 'unknown' ? type : 'text'
+  return `${lane}:${String(part.id ?? part.partId ?? part.index ?? 'current')}`
 }
 
 export function mergePersistedPart(existing: JsonRecord | undefined, incoming: JsonRecord, delta?: string): JsonRecord {

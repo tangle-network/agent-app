@@ -77,6 +77,18 @@ function UploadGlyph({ className }: { className?: string }) {
 
 // ── component ──────────────────────────────────────────────────────────────
 
+/** Prompt-part descriptor an uploaded file carries (the upload route's
+ *  `UploadedChatFile.part`), echoed back in the turn body on send. Mirrors
+ *  `/chat-routes`' wire shape structurally — no server import here. */
+export interface ComposerFilePart {
+  type: 'image' | 'file'
+  filename?: string
+  mediaType?: string
+  url?: string
+  path?: string
+  content?: string
+}
+
 export interface ComposerFile {
   id: string
   name: string
@@ -85,12 +97,20 @@ export interface ComposerFile {
   /** Number of files inside, for a folder chip. */
   fileCount?: number
   status: 'pending' | 'uploading' | 'ready' | 'error'
+  /** Uploaded part descriptor; set once the upload route returns. Only
+   *  `status: 'ready'` files with a part travel on a parts-aware send. */
+  part?: ComposerFilePart
 }
 
 export interface ChatComposerProps {
   /** Send the trimmed, non-empty message. Attached files travel separately via
-   *  `onAttach` + `pendingFiles` (the host consumes and clears them on send). */
-  onSend: (message: string) => void
+   *  `onAttach` + `pendingFiles` (the host consumes and clears them on send).
+   *  Optional when `onSendParts` is wired. */
+  onSend?: (message: string) => void
+  /** Parts-aware send: receives the trimmed message plus the `part`
+   *  descriptors of every `ready` pending file. Takes precedence over
+   *  `onSend`; enables file-only sends (empty text, ≥1 ready part). */
+  onSendParts?: (message: string, parts: ComposerFilePart[]) => void
   /** Stop the in-flight turn; shown in place of Send while `isStreaming`. */
   onCancel?: () => void
   isStreaming?: boolean
@@ -131,6 +151,7 @@ const MAX_HEIGHT = 168
 
 export function ChatComposer({
   onSend,
+  onSendParts,
   onCancel,
   isStreaming = false,
   disabled = false,
@@ -192,14 +213,32 @@ export function ChatComposer({
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [focusShortcut, disabled])
 
-  const canSend = text.trim().length > 0 && !isStreaming && !disabled
+  const readyParts = pendingFiles
+    .filter((f) => f.status === 'ready' && f.part)
+    .map((f) => f.part as ComposerFilePart)
+
+  // Parts-aware sends allow a file-only message (empty text, ≥1 ready part).
+  const hasSendable = onSendParts
+    ? text.trim().length > 0 || readyParts.length > 0
+    : text.trim().length > 0
+  const canSend = hasSendable && !isStreaming && !disabled
 
   const send = useCallback(() => {
     const trimmed = text.trim()
-    if (!trimmed || isStreaming || disabled) return
-    onSend(trimmed)
+    if (isStreaming || disabled) return
+    if (onSendParts) {
+      const parts = pendingFiles
+        .filter((f) => f.status === 'ready' && f.part)
+        .map((f) => f.part as ComposerFilePart)
+      if (!trimmed && parts.length === 0) return
+      onSendParts(trimmed, parts)
+      setText('')
+      return
+    }
+    if (!trimmed) return
+    onSend?.(trimmed)
     setText('')
-  }, [text, isStreaming, disabled, onSend, setText])
+  }, [text, isStreaming, disabled, onSend, onSendParts, pendingFiles, setText])
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // Respect IME composition — Enter commits the candidate, it doesn't send.

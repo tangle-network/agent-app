@@ -210,30 +210,31 @@ export async function createMiniApp(options: MiniAppOptions = {}): Promise<MiniA
           }
 
           const raw = event.part
+          // The normalizer projects the FULL storable vocabulary (text/
+          // reasoning/tool plus file/image/step-start/step-finish/subtask);
+          // unknown kinds come back null and are skipped.
           const normalized = normalizePersistedPart(raw)
-          if (!normalized) {
-            // The normalizer owns only text/reasoning/tool; other canonical
-            // kinds (step-finish et al) persist verbatim.
-            if (String(raw.type ?? '') === 'step-finish') {
-              const tokens = (raw.tokens ?? {}) as {
-                input?: number; output?: number; reasoning?: number; cache?: { read?: number; write?: number }
-              }
-              state.receipt.seen = true
-              state.receipt.input += tokens.input ?? 0
-              state.receipt.output += tokens.output ?? 0
-              state.receipt.reasoning += tokens.reasoning ?? 0
-              state.receipt.cacheRead += tokens.cache?.read ?? 0
-              state.receipt.cacheWrite += tokens.cache?.write ?? 0
-              state.receipt.cost += typeof raw.cost === 'number' ? raw.cost : 0
-              state.tailParts.push(raw)
-              emit({
-                kind: 'event',
-                event: {
-                  type: 'usage',
-                  usage: { promptTokens: tokens.input ?? 0, completionTokens: tokens.output ?? 0 },
-                },
-              })
+          if (!normalized) continue
+
+          if (String(normalized.type ?? '') === 'step-finish') {
+            const tokens = (normalized.tokens ?? {}) as {
+              input?: number; output?: number; reasoning?: number; cache?: { read?: number; write?: number }
             }
+            state.receipt.seen = true
+            state.receipt.input += tokens.input ?? 0
+            state.receipt.output += tokens.output ?? 0
+            state.receipt.reasoning += tokens.reasoning ?? 0
+            state.receipt.cacheRead += tokens.cache?.read ?? 0
+            state.receipt.cacheWrite += tokens.cache?.write ?? 0
+            state.receipt.cost += typeof normalized.cost === 'number' ? normalized.cost : 0
+            state.tailParts.push(normalized)
+            emit({
+              kind: 'event',
+              event: {
+                type: 'usage',
+                usage: { promptTokens: tokens.input ?? 0, completionTokens: tokens.output ?? 0 },
+              },
+            })
             continue
           }
 
