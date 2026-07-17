@@ -88,7 +88,7 @@ consumer of L0/L1 installs none of them): `konva`/`react-konva` → only
 | Integration-hub `/exec` calls | `integrations` |
 | Per-workspace key mint/rotate/budget | `billing` |
 | Resumable chat turns (buffer/replay/coalesce) | `stream` — see [`examples/resumable-turns.md`](./examples/resumable-turns.md) |
-| The whole assembled chat turn route (auth → persist → stream → interactions) | `chat-routes` — `createChatTurnRoutes` (peer `agent-runtime`). Product seams: `turnLock` · `contextGate` · `beforeTurn` · `lifecycle` · `heartbeat` · `onRawEvent`, plus `transformFinalText` (pre-persist redaction over the final-text scalar AND every persisted TEXT part) and `onTurnComplete(failed, failureReason)` run-failure surfacing |
+| The whole assembled chat turn route (auth → persist → stream → interactions) | `chat-routes` — `createChatTurnRoutes` (peer `agent-runtime`). Product seams (`@experimental`, single-consumer/gtm #200: `turnLock` · `contextGate` · `beforeTurn` · `onRawEvent`; stable: `lifecycle` · `heartbeat`), plus `transformFinalText` (pre-persist redaction over the final-text scalar AND every persisted TEXT part) and `onTurnComplete(failed, failureReason)` run-failure surfacing |
 | Flow traces / waterfalls | `trace` |
 | Chat UI + run/observability components | `web-react` |
 | Agent asks a human mid-run (question/plan cards, answer route) | `interactions` (server + contract) + `web-react` (cards/hook) |
