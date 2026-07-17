@@ -389,6 +389,61 @@ describe('createChatTurnRoutes — product seams', () => {
     expect(rows).toHaveLength(0) // no user row when the lock is held
   })
 
+  it('transformFinalText: redacts the persisted text PARTS, not just the scalar finalText', async () => {
+    // The at-rest leak this closes: legal wires redactPII as transformFinalText;
+    // the engine redacts the scalar, but message.parts streamed straight off the
+    // producer kept the raw PII until now.
+    const redact = (text: string) => text.replaceAll('SSN 123', 'SSN [redacted]')
+    const { routes, rows, ctx, pending } = makeRoutes({
+      transformFinalText: redact,
+      produce: () =>
+        fakeProducer([{ type: 'text', text: 'Your SSN 123 is on file' }], 'Your SSN 123 is on file', {
+          assistantParts: () => [
+            { type: 'tool', id: 'c1', tool: 'lookup', state: { status: 'completed', output: { ok: true } } },
+            { type: 'text', text: 'Your SSN 123 is on file' },
+          ],
+        }),
+    })
+    await readLines((await routes.turn(turnRequest({ threadId: 't-1', content: 'q' }), ctx)).body!)
+    await Promise.all(pending)
+
+    const assistant = rows.find((r) => r.role === 'assistant')!
+    // Engine already redacts the scalar column...
+    expect(assistant.content).toBe('Your SSN [redacted] is on file')
+    // ...and now the persisted text PART is redacted too.
+    const textPart = (assistant.parts ?? []).find((p) => p.type === 'text') as { text: string } | undefined
+    expect(textPart?.text).toBe('Your SSN [redacted] is on file')
+    // No raw PII survives anywhere in the persisted parts.
+    expect(JSON.stringify(assistant.parts ?? [])).not.toContain('SSN 123')
+  })
+
+  it('onTurnComplete: reports failed:true + failureReason on a terminal error event (not a clean complete)', async () => {
+    const calls: Array<{ failed: boolean; failureReason?: string; finalText: string }> = []
+    const { routes, ctx, pending } = makeRoutes({
+      produce: () => fakeProducer([{ type: 'error', data: { message: 'model 402 payment required' } }], ''),
+      onTurnComplete: async ({ failed, failureReason, finalText }) => {
+        calls.push({ failed, ...(failureReason ? { failureReason } : {}), finalText })
+      },
+    })
+    await readLines((await routes.turn(turnRequest({ threadId: 't-1', content: 'q' }), ctx)).body!)
+    await Promise.all(pending)
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0]!.failed).toBe(true)
+    expect(calls[0]!.failureReason).toBe('model 402 payment required')
+  })
+
+  it('onTurnComplete: reports failed:false on a clean turn', async () => {
+    const seen: boolean[] = []
+    const { routes, ctx, pending } = makeRoutes({
+      produce: () => fakeProducer([{ type: 'text', text: 'ok' }], 'ok'),
+      onTurnComplete: async ({ failed }) => { seen.push(failed) },
+    })
+    await readLines((await routes.turn(turnRequest({ threadId: 't-1', content: 'q' }), ctx)).body!)
+    await Promise.all(pending)
+    expect(seen).toEqual([false])
+  })
+
   it('onRawEvent: observes producer events before the engine frames them', async () => {
     const raw: string[] = []
     const { routes, ctx, pending } = makeRoutes({

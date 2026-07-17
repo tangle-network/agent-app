@@ -208,6 +208,16 @@ export function getPartKey(part: JsonRecord): string {
   return `${lane}:${String(part.id ?? part.partId ?? part.index ?? 'current')}`
 }
 
+/** Shallow overlay that skips `undefined` incoming values, so a later partial
+ *  update never erases a field an earlier one captured. */
+function overlayDefined(base: JsonRecord, patch: JsonRecord): JsonRecord {
+  const out: JsonRecord = { ...base }
+  for (const [key, value] of Object.entries(patch)) {
+    if (value !== undefined) out[key] = value
+  }
+  return out
+}
+
 export function mergePersistedPart(existing: JsonRecord | undefined, incoming: JsonRecord, delta?: string): JsonRecord {
   const type = String(incoming.type ?? '')
   if (!existing) {
@@ -240,14 +250,24 @@ export function mergePersistedPart(existing: JsonRecord | undefined, incoming: J
   }
 
   if (type === 'tool' && String(existing.type ?? '') === 'tool') {
+    const existingState = asRecord(existing.state) ?? {}
+    const incomingState = asRecord(incoming.state) ?? {}
+    // Overlay only DEFINED incoming fields: a normalized tool part always
+    // carries `output`/`error` keys (undefined when not captured), so a plain
+    // spread would clobber a completed tool's output with a later empty update.
+    const mergedState = overlayDefined(existingState, incomingState)
+    // A partial update with no captured status/output/error normalizes to
+    // `running`; never let it downgrade a tool that already settled.
+    const existingStatus = String(existingState.status ?? '')
+    if (
+      (existingStatus === 'completed' || existingStatus === 'error') &&
+      String(incomingState.status ?? '') === 'running'
+    ) {
+      mergedState.status = existingStatus
+    }
     return {
-      ...existing,
-      ...incoming,
-      state: {
-        ...(asRecord(existing.state) ?? {}),
-        ...(asRecord(incoming.state) ?? {}),
-        time: asRecord(incoming.state)?.time ?? asRecord(existing.state)?.time,
-      },
+      ...overlayDefined(existing, incoming),
+      state: mergedState,
     }
   }
 

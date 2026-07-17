@@ -165,6 +165,38 @@ describe('mergePersistedPart', () => {
     const merged = mergePersistedPart(first, normalizePersistedPart({ type: 'text', id: 't1', text: '' })!)
     expect(merged.text).toBe('Hello')
   })
+
+  it('keeps a completed tool output when a later empty update arrives (no clobber)', () => {
+    const completed = normalizePersistedPart({
+      type: 'tool',
+      id: 'call_1',
+      tool: 'vault_search',
+      state: { status: 'completed', input: { q: 'lease' }, output: { hits: 2 } },
+    })!
+    // A later partial update for the same tool with no captured output/error —
+    // its normalized state carries `output: undefined`, `error: undefined`.
+    const laterEmpty = normalizePersistedPart({ type: 'tool', id: 'call_1', tool: 'vault_search' })!
+    const merged = mergePersistedPart(completed, laterEmpty)
+    const state = merged.state as Record<string, unknown>
+    // Captured output survives; the settled status is not downgraded to running.
+    expect(state.output).toEqual({ hits: 2 })
+    expect(state.status).toBe('completed')
+    expect(state.input).toEqual({ q: 'lease' })
+  })
+
+  it('keeps a tool error message when a later empty update arrives', () => {
+    const errored = normalizePersistedPart({
+      type: 'tool',
+      id: 'call_2',
+      tool: 'bash',
+      state: { status: 'error', input: { cmd: 'exit 1' }, error: 'exit 1' },
+    })!
+    const laterEmpty = normalizePersistedPart({ type: 'tool', id: 'call_2', tool: 'bash' })!
+    const merged = mergePersistedPart(errored, laterEmpty)
+    const state = merged.state as Record<string, unknown>
+    expect(state.error).toBe('exit 1')
+    expect(state.status).toBe('error')
+  })
 })
 
 describe('finalizeAssistantParts', () => {

@@ -137,6 +137,15 @@ export interface ChatTurnProduceArgs<TContext> {
  *  injected keepalive. Same shape the engine forwards verbatim. */
 type ChatRouteEvent = { type: string; data?: Record<string, unknown> }
 
+/** Best-effort human-readable cause from a terminal `error` /
+ *  `session.run.failed` event's `data`. */
+function failureReasonOf(data: Record<string, unknown> | undefined): string | undefined {
+  if (!data) return undefined
+  const message = data.message ?? data.error ?? data.reason
+  if (typeof message === 'string' && message.length > 0) return message
+  return undefined
+}
+
 /** Keepalive emitted while the producer is quiet (long tool calls, first-token
  *  wait) so client watchdogs stay re-armed. One is emitted each time
  *  `intervalMs` elapses with no producer event; the window resets on every real
@@ -249,9 +258,20 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
   /** Pre-persist transform of the final text (e.g. `/redact`'s `redactPII`).
    *  Live stream is never altered. */
   transformFinalText?(text: string): string | Promise<string>
-  /** Post-processing after a successful turn (billing, titles, audit). Errors
-   *  are swallowed by the engine — they never fail a streamed turn. */
-  onTurnComplete?(input: { identity: ChatTurnIdentity; finalText: string; context: TContext }): Promise<void>
+  /** Post-processing after a turn settles (billing, titles, audit). Fires with
+   *  `failed:true` + `failureReason` when the turn carried a terminal error
+   *  event (model 402 / rate-limit / server error) instead of a clean
+   *  completion, so products skip the deduct and render an error row rather
+   *  than billing an empty turn and marking it done. A turn that THROWS never
+   *  reaches this hook (the engine skips it on a producer throw). Errors are
+   *  swallowed by the engine — they never fail a streamed turn. */
+  onTurnComplete?(input: {
+    identity: ChatTurnIdentity
+    finalText: string
+    context: TContext
+    failed: boolean
+    failureReason?: string
+  }): Promise<void>
   /** Per-event side channel (product broadcast). The turn-buffer tap is
    *  already wired; this runs in addition. */
   onEvent?(event: { type: string; data?: Record<string, unknown> }, context: TContext): void | Promise<void>
@@ -367,11 +387,18 @@ async function* withStreamHeartbeat(
     let tick = 0
     for (;;) {
       let timer: ReturnType<typeof setTimeout> | undefined
-      const heartbeat = new Promise<'heartbeat'>((resolve) => {
-        timer = setTimeout(() => resolve('heartbeat'), intervalMs)
-      })
-      const winner = await Promise.race([pending.then(() => 'event' as const), heartbeat])
-      if (timer !== undefined) clearTimeout(timer)
+      let winner: 'event' | 'heartbeat'
+      try {
+        const heartbeat = new Promise<'heartbeat'>((resolve) => {
+          timer = setTimeout(() => resolve('heartbeat'), intervalMs)
+        })
+        winner = await Promise.race([pending.then(() => 'event' as const), heartbeat])
+      } finally {
+        // Clear the pending timer on EVERY exit — including a `pending`
+        // rejection — so a rejected source never orphans a setTimeout that
+        // keeps the runtime alive for up to `intervalMs`.
+        if (timer !== undefined) clearTimeout(timer)
+      }
       if (winner === 'heartbeat') {
         tick += 1
         yield makeEvent({ elapsedMs: Date.now() - windowStart, tick })
@@ -481,6 +508,49 @@ export function createChatTurnRoutes<TContext = void>(
       lockHandle = acquired.handle
     }
 
+    // Turn state, hoisted so the pre-stream `catch` can settle the lifecycle
+    // (fire `onTurnError`, close the span) even when a seam throws
+    // synchronously before the drain — the drain would otherwise be the only
+    // path that runs the terminal hook.
+    let producer: ChatTurnRouteProducer | undefined
+    let runFailed = false
+    // Data of the event that marked the run failed — handed to `onTurnError`
+    // when no drain throw supplies a richer cause.
+    let lastFailureData: Record<string, unknown> | undefined
+    let turnStartedAtMs = 0
+    let turnStarted = false
+    let lifecycleSettled = false
+
+    // Exactly one terminal lifecycle hook, after the turn settles (idempotent).
+    // Failure is this route's own verdict (`runFailed` from error/failed
+    // events, or a drain/sync throw), not the engine's envelope.
+    const fireTerminalLifecycle = async (failed: boolean, terminalError: unknown): Promise<void> => {
+      if (lifecycleSettled) return
+      lifecycleSettled = true
+      const lifecycle = options.lifecycle
+      if (!lifecycle) return
+      const durationMs = Date.now() - turnStartedAtMs
+      try {
+        if (failed) {
+          await lifecycle.onTurnError?.({
+            identity, executionId, turnStreamId, context, durationMs,
+            error: terminalError ?? lastFailureData ?? new Error('chat turn failed'),
+          })
+        } else {
+          await lifecycle.onTurnComplete?.({
+            identity, executionId, turnStreamId, context, durationMs,
+            finalText: producer?.finalText() ?? '',
+            usage: producer?.usage?.() ?? {},
+          })
+        }
+      } catch (err) {
+        log('[chat-routes] lifecycle terminal hook failed', {
+          turnId: turnStreamId,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+
     try {
       if (chatTurn.shouldInsertUserMessage) {
         await options.store.appendMessage({
@@ -520,13 +590,8 @@ export function createChatTurnRoutes<TContext = void>(
       const turnMarker = { type: 'turn', turnId: turnStreamId }
       await tap.onEvent(turnMarker)
 
-      let producer: ChatTurnRouteProducer | undefined
-      let runFailed = false
-      // Data of the event that marked the run failed — handed to `onTurnError`
-      // when no drain throw supplies a richer cause.
-      let lastFailureData: Record<string, unknown> | undefined
-
-      const turnStartedAtMs = Date.now()
+      turnStartedAtMs = Date.now()
+      turnStarted = true
       if (options.lifecycle?.onTurnStart) {
         try {
           await options.lifecycle.onTurnStart({
@@ -572,8 +637,23 @@ export function createChatTurnRoutes<TContext = void>(
           ...(options.transformFinalText ? { transformFinalText: options.transformFinalText } : {}),
           persistAssistantMessage: async ({ finalText }) => {
             // The typed boundary: stream-normalizer records → stored vocabulary
-            // (validating projection owned by /chat-store — no cast here).
-            const parts = producer?.assistantParts ? toChatMessageParts(producer.assistantParts()) : undefined
+            // (validating projection owned by /chat-store — no cast here). The
+            // scalar `finalText` arrives already transformed by the engine; the
+            // producer's text PARTS are raw, so the same transform must run over
+            // each text segment before persistence or a redaction (legal PII)
+            // leaks at rest through message.parts.
+            const rawParts = producer?.assistantParts ? producer.assistantParts() : undefined
+            const projected =
+              rawParts && options.transformFinalText
+                ? await Promise.all(
+                    rawParts.map(async (part) =>
+                      String((part as { type?: unknown }).type ?? '') === 'text'
+                        ? { ...part, text: await options.transformFinalText!(String((part as { text?: unknown }).text ?? '')) }
+                        : part,
+                    ),
+                  )
+                : rawParts
+            const parts = projected ? toChatMessageParts(projected) : undefined
             if (!finalText.trim() && (!parts || parts.length === 0)) return
             const usage = producer?.usage?.() ?? {}
             await options.store.appendMessage({
@@ -592,41 +672,24 @@ export function createChatTurnRoutes<TContext = void>(
           },
           ...(options.onTurnComplete
             ? {
+                // Wired into the engine's completion hook, which fires only when
+                // the stream ended without throwing. A terminal error EVENT
+                // (not a throw) still lands here — so surface `runFailed` so the
+                // product skips billing an errored turn instead of marking it
+                // complete with empty text.
                 onTurnComplete: ({ identity: turnIdentity, finalText }: { identity: ChatTurnIdentity; finalText: string }) =>
-                  options.onTurnComplete!({ identity: turnIdentity, finalText, context }),
+                  options.onTurnComplete!({
+                    identity: turnIdentity,
+                    finalText,
+                    context,
+                    failed: runFailed,
+                    ...(runFailed ? { failureReason: failureReasonOf(lastFailureData) } : {}),
+                  }),
               }
             : {}),
           ...(options.traceFlush ? { traceFlush: () => options.traceFlush!(context) } : {}),
         },
       })
-
-      // Exactly one terminal lifecycle hook, after the turn settles. Failure is
-      // this route's own verdict (`runFailed` from error/failed events, or a
-      // drain throw), not the engine's envelope.
-      const fireTerminalLifecycle = async (failed: boolean, drainError: unknown): Promise<void> => {
-        const lifecycle = options.lifecycle
-        if (!lifecycle) return
-        const durationMs = Date.now() - turnStartedAtMs
-        try {
-          if (failed) {
-            await lifecycle.onTurnError?.({
-              identity, executionId, turnStreamId, context, durationMs,
-              error: drainError ?? lastFailureData ?? new Error('chat turn failed'),
-            })
-          } else {
-            await lifecycle.onTurnComplete?.({
-              identity, executionId, turnStreamId, context, durationMs,
-              finalText: producer?.finalText() ?? '',
-              usage: producer?.usage?.() ?? {},
-            })
-          }
-        } catch (err) {
-          log('[chat-routes] lifecycle terminal hook failed', {
-            turnId: turnStreamId,
-            error: err instanceof Error ? err.message : String(err),
-          })
-        }
-      }
 
       // Tee: one branch to the live client, one drained under waitUntil so the
       // turn (and its buffering via onEvent) runs to completion after a client
@@ -680,7 +743,10 @@ export function createChatTurnRoutes<TContext = void>(
       })
     } catch (err) {
       // A throw before the turn began streaming (user-insert, gate, beforeTurn,
-      // lifecycle-start, tap setup): release the lock, then propagate.
+      // lifecycle-start, tap setup, engine construction, tee). If the turn had
+      // already started, settle the lifecycle with `onTurnError` (close the
+      // span) — the drain never ran to do it. Then release the lock, propagate.
+      if (turnStarted) await fireTerminalLifecycle(true, err)
       await releaseLock()
       throw err
     }
