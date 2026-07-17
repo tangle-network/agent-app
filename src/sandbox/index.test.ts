@@ -608,6 +608,35 @@ describe('pure seam helpers', () => {
   it('resolveModel returns undefined when no provider/model/key resolves', () => {
     expect(resolveModel({})).toBeUndefined()
   })
+
+  it('resolveModel keyless config stays undefined without allowKeylessModel', () => {
+    expect(
+      resolveModel({ providerName: 'openai-compat', modelName: 'm', routerBaseUrl: 'https://r' }),
+    ).toBeUndefined()
+  })
+
+  it('resolveModel allowKeylessModel emits metadata with NO apiKey property', () => {
+    const m = resolveModel({
+      providerName: 'openai-compat',
+      modelName: 'm',
+      routerBaseUrl: 'https://r',
+      allowKeylessModel: true,
+    })
+    expect(m).toEqual({ model: 'm', provider: 'openai-compat', baseUrl: 'https://r' })
+    expect(m && 'apiKey' in m).toBe(false)
+  })
+
+  it('resolveModel allowKeylessModel still round-trips a supplied key unchanged', () => {
+    const m = resolveModel(
+      { providerName: 'openai-compat', modelName: 'm', allowKeylessModel: true },
+      { modelApiKey: 'k1' },
+    )
+    expect(m).toEqual({ model: 'm', provider: 'openai-compat', apiKey: 'k1' })
+  })
+
+  it('resolveModel allowKeylessModel without explicit providerName stays undefined', () => {
+    expect(resolveModel({ modelName: 'm', allowKeylessModel: true })).toBeUndefined()
+  })
 })
 
 describe('member sync typed outcomes', () => {
@@ -1092,6 +1121,41 @@ describe('ensureWorkspaceSandbox — new seams', () => {
       model: 'm',
       apiKey: 'child-key',
     })
+  })
+
+  it('billingOwnerId is included in the create payload only when set', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { resumeStopped: false })
+    await ensureWorkspaceSandbox(shell, {
+      workspaceId: 'w1',
+      harness: 'opencode',
+      billingOwnerId: 'platform-user-7',
+    })
+    expect(createMock.mock.calls[0]![0].billingOwnerId).toBe('platform-user-7')
+
+    createMock.mockClear()
+    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+    expect('billingOwnerId' in createMock.mock.calls[0]![0]).toBe(false)
+  })
+
+  it('bakes keyless model metadata at create under allowKeylessModel (no apiKey field)', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      backendModelAtCreate: true,
+      resumeStopped: false,
+      provider: {
+        providerName: 'openai-compat',
+        modelName: 'm',
+        routerBaseUrl: 'https://router',
+        allowKeylessModel: true,
+      },
+    })
+    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+    const model = createMock.mock.calls[0]![0].backend.model
+    expect(model).toEqual({ model: 'm', provider: 'openai-compat', baseUrl: 'https://router' })
+    expect('apiKey' in model).toBe(false)
   })
 
   it('childKeyMint failure falls through to parent key (logged, not thrown)', async () => {

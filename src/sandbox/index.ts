@@ -193,6 +193,14 @@ export interface ProviderResolutionConfig {
   modelName?: string
   defaultModel?: string
   openaiApiKey?: string
+  // Opt-in: a resolvable provider+model WITHOUT an api key still yields model
+  // metadata (model/provider/baseUrl, no apiKey) instead of undefined. Keyless
+  // metadata makes the sandbox platform mint its OWN per-user router key at
+  // create (its requiresRouterKey gate), so turns bill the box's billing owner
+  // instead of a product-baked shared key. Requires an explicit providerName —
+  // provider inference from key presence cannot fire keyless. Default false:
+  // a keyless config resolves to undefined exactly as before.
+  allowKeylessModel?: boolean
 }
 
 export interface SandboxBuildContext {
@@ -391,6 +399,13 @@ export interface EnsureWorkspaceSandboxOptions {
   // surface it as live "warming up" status. Only fires while a box is actually
   // being provisioned; a reused running box emits nothing.
   onProgress?: (event: ProvisionEvent) => void
+  // Billing owner for the created box, forwarded VERBATIM on the create
+  // payload. The sandbox platform honors it only when the create-auth
+  // principal is a trusted first-party service; the box's usage then bills
+  // this platform user's wallet (the platform's per-user router-key mint)
+  // instead of the service account that authenticated the create. Omitted =>
+  // platform default (billing owner = create-auth principal) — unchanged.
+  billingOwnerId?: string
 }
 
 // Single-quote a string for safe interpolation into a shell command.
@@ -1367,7 +1382,7 @@ export async function ensureWorkspaceSandbox(
   shell: SandboxRuntimeConfig,
   options: EnsureWorkspaceSandboxOptions,
 ): Promise<SandboxInstance> {
-  const { workspaceId, userId, harness, forceNew, onProgress } = options
+  const { workspaceId, userId, harness, forceNew, onProgress, billingOwnerId } = options
   const scope: SandboxScope = { workspaceId, ...(userId ? { userId } : {}) }
   const creds = await shell.credentials(scope)
   if (!creds) throw new Error('sandbox credentials are required (apiKey/baseUrl)')
@@ -1539,6 +1554,9 @@ export async function ensureWorkspaceSandbox(
     image: resources.image,
     metadata: shell.metadata(harness),
     idempotencyKey: name,
+    // Passed through untyped (the SDK payload type predates it); the platform
+    // authz-gates it server-side and ignores it when unsupported.
+    ...(billingOwnerId ? { billingOwnerId } : {}),
     ...(userId ? { permissions: { initialUsers: [{ userId, role }] } } : {}),
     env,
     secrets,
@@ -1587,7 +1605,9 @@ export async function ensureWorkspaceSandbox(
 export interface ResolvedModel {
   model: string
   provider: string
-  apiKey: string
+  // Omitted only under `allowKeylessModel` — keyless metadata tells the
+  // sandbox platform to mint its own per-user router key for the box.
+  apiKey?: string
   baseUrl?: string
 }
 
@@ -1605,11 +1625,12 @@ export function resolveModel(
     c.modelName ??
     (provider === 'openai' || provider === 'openai-compat' ? c.defaultModel : undefined)
   const apiKey = explicitApiKey ?? (provider === 'openai' ? c.openaiApiKey : undefined)
-  if (!provider || !modelName || !apiKey) return undefined
+  if (!provider || !modelName) return undefined
+  if (!apiKey && !c.allowKeylessModel) return undefined
   return {
     model: modelName,
     provider,
-    apiKey,
+    ...(apiKey ? { apiKey } : {}),
     ...(explicitBaseUrl ? { baseUrl: explicitBaseUrl } : {}),
   }
 }
