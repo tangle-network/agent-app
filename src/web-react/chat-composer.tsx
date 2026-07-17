@@ -125,6 +125,13 @@ export interface ChatComposerProps {
   /** Initial text in uncontrolled mode; ignored when `value` is provided. */
   initialValue?: string
 
+  /** One-shot external prefill: when this becomes a non-null string the
+   *  composer adopts it as the draft (replacing any current draft), focuses the
+   *  input with the caret at the end, and reports consumption via
+   *  `onSeedApplied` so the host can clear its seed state. */
+  seed?: string | null
+  onSeedApplied?: () => void
+
   /** Inline controls (e.g. `<ModelPicker/>` + `<EffortPicker/>` or
    *  `<AgentSessionControls/>`). Rendered in a row above the input by default. */
   controls?: ReactNode
@@ -159,6 +166,8 @@ export function ChatComposer({
   value,
   onValueChange,
   initialValue,
+  seed,
+  onSeedApplied,
   controls,
   controlsPlacement = 'above',
   onAttach,
@@ -197,6 +206,48 @@ export function ChatComposer({
     if (!el) return
     el.style.height = 'auto'
     el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT)}px`
+  }, [text])
+
+  // Adopt a one-shot seed. Applies only when the `seed` PROP transitions to a
+  // new string (host sets it → consumed here → host clears it via
+  // onSeedApplied), so an unstable callback identity re-running this effect
+  // can never re-apply a still-set seed over the user's typing. Like
+  // `initialValue`, the seed is honored ONLY in uncontrolled mode — a
+  // controlled host drives its own `value` (which would shadow `setText`), so
+  // it seeds by updating that state itself.
+  const prevSeedRef = useRef<string | null>(null)
+  const pendingCaretRef = useRef<string | null>(null)
+  useEffect(() => {
+    const prev = prevSeedRef.current
+    prevSeedRef.current = seed ?? null
+    if (seed == null || seed === prev || isControlled) return
+    setText(seed)
+    onSeedApplied?.()
+    const el = textareaRef.current
+    if (el && el.value === seed) {
+      // The DOM already shows the seed — setText was a no-op (the user had
+      // typed the exact string), so no re-render is coming and the [text]
+      // effect below won't fire. Position the caret now instead of leaving a
+      // stranded pendingCaretRef.
+      el.focus()
+      el.setSelectionRange(seed.length, seed.length)
+    } else {
+      // Defer caret positioning until the seeded value renders (see below).
+      pendingCaretRef.current = seed
+    }
+  }, [seed, setText, onSeedApplied, isControlled])
+
+  // Focus + caret-to-end AFTER the seeded value has rendered into the DOM —
+  // setSelectionRange in the applying effect would run against the pre-render
+  // value and clamp the caret to the old text's length.
+  useEffect(() => {
+    if (pendingCaretRef.current == null || pendingCaretRef.current !== text)
+      return
+    pendingCaretRef.current = null
+    const el = textareaRef.current
+    if (!el) return
+    el.focus()
+    el.setSelectionRange(text.length, text.length)
   }, [text])
 
   // Cmd/Ctrl+L focuses the composer from anywhere — the shortcut the hint
