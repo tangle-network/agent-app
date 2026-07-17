@@ -8,7 +8,7 @@ import {
   type SandboxInstance,
   type ScopedTokenScope,
   type StorageConfig,
-  type PromptResult,
+  type TurnDriveResult,
   type ProvisionEvent,
 } from '@tangle-network/sandbox'
 import { createHash } from 'node:crypto'
@@ -1733,7 +1733,7 @@ export interface StreamSandboxPromptOptions {
   // Per-turn question/permission/plan channel toggles, forwarded VERBATIM into the
   // backend config. agent-app does not validate kinds per harness — the sidecar fails
   // session init loudly for unsupported ones; a local matrix would drift. Only honored
-  // on the streaming path; the detached box.prompt path (driveSandboxTurn) never sets it.
+  // on the streaming path; the detached driveTurn path (driveSandboxTurn) never sets it.
   interactions?: { question?: boolean; permission?: boolean; plan?: boolean }
 }
 
@@ -1974,15 +1974,44 @@ export async function mintSandboxScopedToken(
   }
 }
 
-// Detached single-turn advance. The SDK SandboxInstance has no `driveTurn`; the
-// non-streaming sibling of streamPrompt is box.prompt(message, opts) -> PromptResult.
-// Returns a typed Outcome so a failed turn is inspected, not swallowed.
+export interface DriveSandboxTurnOptions extends StreamSandboxPromptOptions {
+  /** Deterministic resume key — required. Every tick for the same logical turn
+   * MUST reuse it so a crash + re-drive finds the in-flight session instead of
+   * starting a second agent run. */
+  sessionId: string
+  /** Turn idempotency key for the platform's completed-turn cache. Defaults to
+   * `sessionId` (correct for the one-turn-per-session shape detached drivers use). */
+  turnId?: string
+  /** Wall-clock cap in ms from the session's start. A still-running session past
+   * the cap is cancelled and reported `failed` — bounds an unattended run (e.g. a
+   * turn that stalled on an interactive question nothing will answer). Omit for no cap. */
+  wallCapMs?: number
+}
+
+// One settle → poll → dispatch pass over a detached turn. Delegates to the SDK's
+// `box.driveTurn` (@tangle-network/sandbox ≥ 0.10.5) — the turn runs
+// fire-and-detached server-side and ONE invocation returns immediately with where
+// it stands. It never awaits the whole turn in-process, so it does not hold the
+// worker alive for the run's duration (the durability trap the older box.prompt
+// implementation quietly caused).
+//
+// This is the durable path for cron / mission-step / queue callers: re-invoke on
+// your own schedule (Workflow step, DO alarm, queue tick) with the SAME
+// `sessionId`. Dispatch is idempotent on it, so a crash + re-drive is a lookup,
+// not a second agent run.
+//
+// The Outcome boundary separates a retryable transport failure from a settled
+// turn: `fail` means the drive call itself threw (network blip — retry the tick);
+// `ok` carries the SDK's discriminated `TurnDriveResult` — inspect `.state`:
+//   - `running`   → the turn is still executing; re-tick after a delay of your choosing.
+//   - `completed` → terminal; `.text` / `.result` hold the payload.
+//   - `failed`    → terminal and deterministic; re-invoking will not change it (do not retry).
 export async function driveSandboxTurn(
   shell: SandboxRuntimeConfig,
   box: SandboxInstance,
   message: string | PromptInputPart[],
-  options: StreamSandboxPromptOptions & { sessionId: string },
-): Promise<Outcome<PromptResult>> {
+  options: DriveSandboxTurnOptions,
+): Promise<Outcome<TurnDriveResult>> {
   const harness = options.harness ?? 'opencode'
   const model = resolveModel(shell.provider, {
     model: options.model,
@@ -2001,17 +2030,18 @@ export async function driveSandboxTurn(
     options.effort,
   )
   try {
-    const result = await box.prompt(prompt, {
+    const drive = await box.driveTurn(prompt, {
       sessionId: options.sessionId,
+      ...(options.turnId ? { turnId: options.turnId } : {}),
+      ...(options.wallCapMs !== undefined ? { wallCapMs: options.wallCapMs } : {}),
       ...(options.executionId ? { executionId: options.executionId } : {}),
       ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
       ...(options.signal ? { signal: options.signal } : {}),
       // Deliberately NO `interactions` here: detached turns (cron / mission steps) have
       // no consumer to answer a question. Interactive Q&A is streaming-path only.
       backend: { type: harness, profile, ...(model ? { model } : {}) },
-    } as Parameters<SandboxInstance['prompt']>[1])
-    if (!result.success) return fail(new Error(result.error ?? 'sandbox turn failed'))
-    return ok(result)
+    } as Parameters<SandboxInstance['driveTurn']>[1])
+    return ok(drive)
   } catch (err) {
     return fail(err)
   }

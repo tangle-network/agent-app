@@ -1271,20 +1271,57 @@ describe('stream classifiers', () => {
 })
 
 describe('driveSandboxTurn', () => {
-  it('returns ok on success and fail on result.success=false', async () => {
+  it('delegates to box.driveTurn and surfaces the settled state (completed / failed)', async () => {
     const shell = shellFor({ apiKey: 'k', baseUrl: 'u' })
-    const okBox = fakeBox({ prompt: vi.fn().mockResolvedValue({ success: true, response: 'hi', durationMs: 1 }) })
+    const okBox = fakeBox({
+      driveTurn: vi.fn().mockResolvedValue({ state: 'completed', text: 'hi', result: { text: 'hi' } }),
+    })
     const r1 = await driveSandboxTurn(shell, okBox, 'go', { sessionId: 'sess1' })
     expect(r1.succeeded).toBe(true)
-    const failBox = fakeBox({ prompt: vi.fn().mockResolvedValue({ success: false, error: 'boom', durationMs: 1 }) })
+    expect(r1.succeeded && r1.value.state).toBe('completed')
+    // A deterministic `failed` turn is a settled state the caller inspects — not a
+    // thrown transport error — so the Outcome is still `ok`, carrying state:'failed'.
+    const failBox = fakeBox({
+      driveTurn: vi.fn().mockResolvedValue({ state: 'failed', error: 'boom' }),
+    })
     const r2 = await driveSandboxTurn(shell, failBox, 'go', { sessionId: 'sess1' })
-    expect(r2.succeeded).toBe(false)
+    expect(r2.succeeded).toBe(true)
+    expect(r2.succeeded && r2.value.state).toBe('failed')
   })
-  it('never forwards interactions to the detached box.prompt backend', async () => {
+  it('fails the Outcome when the drive call itself throws (retryable transport error)', async () => {
     const shell = shellFor({ apiKey: 'k', baseUrl: 'u' })
-    const box = fakeBox({ prompt: vi.fn().mockResolvedValue({ success: true, response: 'hi', durationMs: 1 }) })
-    await driveSandboxTurn(shell, box, 'go', { sessionId: 'sess1', interactions: { question: true } })
-    const [, opts] = (box.prompt as ReturnType<typeof vi.fn>).mock.calls[0]!
+    const box = fakeBox({ driveTurn: vi.fn().mockRejectedValue(new Error('network')) })
+    const r = await driveSandboxTurn(shell, box, 'go', { sessionId: 'sess1' })
+    expect(r.succeeded).toBe(false)
+  })
+  it('returns promptly on a still-running turn — does NOT block awaiting completion', async () => {
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' })
+    // A blocking box.prompt would never resolve on a mid-flight turn; the one-tick
+    // driver resolves immediately with state:'running' and never touches box.prompt.
+    const drive = vi.fn().mockResolvedValue({ state: 'running', elapsedMs: 5 })
+    const prompt = vi.fn(() => new Promise<never>(() => {}))
+    const box = fakeBox({ driveTurn: drive, prompt: prompt as never })
+    const r = await driveSandboxTurn(shell, box, 'go', { sessionId: 'sess1' })
+    expect(r.succeeded).toBe(true)
+    expect(r.succeeded && r.value.state).toBe('running')
+    expect(prompt).not.toHaveBeenCalled()
+    expect(drive).toHaveBeenCalledTimes(1)
+  })
+  it('forwards turnId + wallCapMs to box.driveTurn but never leaks interactions into the backend', async () => {
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' })
+    const box = fakeBox({
+      driveTurn: vi.fn().mockResolvedValue({ state: 'running', elapsedMs: 1 }),
+    })
+    await driveSandboxTurn(shell, box, 'go', {
+      sessionId: 'sess1',
+      turnId: 'turn-42',
+      wallCapMs: 60_000,
+      interactions: { question: true },
+    })
+    const [, opts] = (box.driveTurn as ReturnType<typeof vi.fn>).mock.calls[0]!
+    expect(opts.sessionId).toBe('sess1')
+    expect(opts.turnId).toBe('turn-42')
+    expect(opts.wallCapMs).toBe(60_000)
     expect(opts.backend.interactions).toBeUndefined()
   })
 })
