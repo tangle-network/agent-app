@@ -19,6 +19,16 @@
  * Handlers are web-standard `Request → Response` (Workers, Node 18+, Deno) —
  * no router import. Auth/access is one injected `authorize` seam, composable
  * with `/app-auth` guards but not coupled to them.
+ *
+ * Five optional product seams let a complex turn-orchestrator compose the
+ * vertical instead of hand-rolling a generator — each omittable to the exact
+ * behavior above: `turnLock` (single-flight acquire/release around the turn),
+ * `contextGate` (pre-producer domain-readiness short-circuit), `beforeTurn`
+ * (observe + augment the producer input), `lifecycle` (deterministic
+ * start/complete/error telemetry), `heartbeat` (keepalive during silent
+ * producer waits), plus `onRawEvent` (the raw producer events, for telemetry).
+ * `handleChatTurn` stays the engine — the seams only wrap its input, its
+ * producer stream, and its settle.
  */
 
 import { deriveExecutionId, handleChatTurn } from '@tangle-network/agent-runtime'
@@ -123,6 +133,81 @@ export interface ChatTurnProduceArgs<TContext> {
   priorMessages: PersistedChatMessageForTurn[]
 }
 
+/** One event as it crosses the route: the producer's own vocabulary, or an
+ *  injected keepalive. Same shape the engine forwards verbatim. */
+type ChatRouteEvent = { type: string; data?: Record<string, unknown> }
+
+/** Keepalive emitted while the producer is quiet (long tool calls, first-token
+ *  wait) so client watchdogs stay re-armed. One is emitted each time
+ *  `intervalMs` elapses with no producer event; the window resets on every real
+ *  event, so a chatty producer never triggers one. The product owns the event
+ *  shape (`type` + `data`). Omit → no keepalives (today's behavior). */
+export interface ChatTurnHeartbeat {
+  intervalMs: number
+  event(info: { elapsedMs: number; tick: number }): ChatRouteEvent
+}
+
+/** Patch a `beforeTurn` hook returns to augment the producer's input. Omitted
+ *  fields keep the route-assembled value; the product's `produce` still owns
+ *  the system prompt. */
+export interface ChatTurnInputPatch {
+  prompt?: string | ChatTurnPartInput[]
+  priorMessages?: PersistedChatMessageForTurn[]
+}
+
+/** Pre-turn readiness verdict — proceed, or short-circuit with the product's
+ *  own `Response` (e.g. a canned assistant reply asking for missing context).
+ *  Distinct from `authorize`: this gates domain readiness, not access. */
+export type ChatTurnGateResult =
+  | { proceed: true }
+  | { proceed: false; response: Response }
+
+/** Single-flight lock verdict — acquired (with an opaque handle passed back to
+ *  `release`), or already held (short-circuit with the product's 409-style
+ *  `Response`). */
+export type ChatTurnLockResult =
+  | { acquired: true; handle?: unknown }
+  | { acquired: false; response: Response }
+
+/** Async acquire/release wrapped around the turn. `acquire` runs before any
+ *  side effect; `release` runs once when the turn settles — including on a
+ *  short-circuit or a throw. */
+export interface ChatTurnLock<TContext> {
+  acquire(args: ChatTurnProduceArgs<TContext>): ChatTurnLockResult | Promise<ChatTurnLockResult>
+  release(handle: unknown): void | Promise<void>
+}
+
+interface ChatTurnLifecycleBase<TContext> {
+  identity: ChatTurnIdentity
+  executionId: string
+  turnStreamId: string
+  context: TContext
+}
+export interface ChatTurnLifecycleStart<TContext> extends ChatTurnLifecycleBase<TContext> {
+  startedAt: number
+}
+export interface ChatTurnLifecycleComplete<TContext> extends ChatTurnLifecycleBase<TContext> {
+  finalText: string
+  usage: ChatTurnUsage
+  durationMs: number
+}
+export interface ChatTurnLifecycleError<TContext> extends ChatTurnLifecycleBase<TContext> {
+  error: unknown
+  durationMs: number
+}
+
+/** Deterministic run telemetry: `onTurnStart` fires before the producer runs;
+ *  exactly one of `onTurnComplete` / `onTurnError` fires after the turn
+ *  settles, always after `onTurnStart`. Failure is derived from the turn's own
+ *  `error` / `session.run.failed` events (or a drain throw), not the engine's
+ *  lifecycle envelope. Hook errors are swallowed — telemetry never fails a
+ *  turn. */
+export interface ChatTurnLifecycle<TContext> {
+  onTurnStart?(info: ChatTurnLifecycleStart<TContext>): void | Promise<void>
+  onTurnComplete?(info: ChatTurnLifecycleComplete<TContext>): void | Promise<void>
+  onTurnError?(info: ChatTurnLifecycleError<TContext>): void | Promise<void>
+}
+
 export interface CreateChatTurnRoutesOptions<TContext = void> {
   /** Names the product in `deriveExecutionId` so retries land on the same
    *  substrate execution. */
@@ -141,6 +226,26 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
    *  wrapped in `createSandboxChatProducer`. Router/openai-compat lane: the
    *  product's own producer. May be async (box resolution). */
   produce(args: ChatTurnProduceArgs<TContext>): ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>
+  /** Single-flight lock acquired before any side effect and released once when
+   *  the turn settles (including short-circuit/throw). Omit → no lock. */
+  turnLock?: ChatTurnLock<TContext>
+  /** Pre-turn readiness gate that can short-circuit with a product `Response`
+   *  before the producer runs (the user row is already persisted). Runs after
+   *  `turnLock.acquire`, before `beforeTurn`. Omit → always proceed. */
+  contextGate?(args: ChatTurnProduceArgs<TContext>): ChatTurnGateResult | Promise<ChatTurnGateResult>
+  /** Observe the assembled producer input and optionally augment it (rewrite
+   *  the prompt / prior messages) before the producer runs. Omit → no change. */
+  beforeTurn?(args: ChatTurnProduceArgs<TContext>): ChatTurnInputPatch | void | Promise<ChatTurnInputPatch | void>
+  /** Deterministic run telemetry (start / complete / error) with identity and
+   *  timing. Omit → no telemetry. */
+  lifecycle?: ChatTurnLifecycle<TContext>
+  /** Keepalive injected while the producer is quiet. Omit → no keepalives. */
+  heartbeat?: ChatTurnHeartbeat
+  /** Observe each event the producer emits, before the engine frames it and
+   *  before any heartbeat injection (the raw sidecar-producer events, for
+   *  telemetry). Never alters the stream; errors are swallowed. Distinct from
+   *  `onEvent`, which sees the engine-framed stream incl. lifecycle envelopes. */
+  onRawEvent?(event: ChatRouteEvent, context: TContext): void | Promise<void>
   /** Pre-persist transform of the final text (e.g. `/redact`'s `redactPII`).
    *  Live stream is never altered. */
   transformFinalText?(text: string): string | Promise<string>
@@ -227,6 +332,63 @@ function userPartsWithFiles(
   return toChatMessageParts([...userParts, ...fileParts.map((part) => ({ ...part }))])
 }
 
+// ── producer-stream wrappers (heartbeat + raw tap) ───────────────────────────
+
+/** Fire `onRawEvent` for each producer event, before the engine frames it.
+ *  Best-effort — a telemetry throw is logged, never propagated. */
+async function* tapRawEvents(
+  source: AsyncIterable<ChatRouteEvent>,
+  onRawEvent: (event: ChatRouteEvent) => void | Promise<void>,
+  log: (message: string, meta?: Record<string, unknown>) => void,
+): AsyncGenerator<ChatRouteEvent, void, unknown> {
+  for await (const event of source) {
+    try {
+      await onRawEvent(event)
+    } catch (err) {
+      log('[chat-routes] onRawEvent failed', { error: err instanceof Error ? err.message : String(err) })
+    }
+    yield event
+  }
+}
+
+/** Inject a keepalive whenever `intervalMs` elapses with no source event. The
+ *  silent window (elapsed + tick) resets on every real event, so a producer
+ *  that keeps emitting never triggers a heartbeat. Closes the source on early
+ *  return, matching a `for await` over it. */
+async function* withStreamHeartbeat(
+  source: AsyncIterable<ChatRouteEvent>,
+  intervalMs: number,
+  makeEvent: (info: { elapsedMs: number; tick: number }) => ChatRouteEvent,
+): AsyncGenerator<ChatRouteEvent, void, unknown> {
+  const iterator = source[Symbol.asyncIterator]()
+  try {
+    let pending = iterator.next()
+    let windowStart = Date.now()
+    let tick = 0
+    for (;;) {
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const heartbeat = new Promise<'heartbeat'>((resolve) => {
+        timer = setTimeout(() => resolve('heartbeat'), intervalMs)
+      })
+      const winner = await Promise.race([pending.then(() => 'event' as const), heartbeat])
+      if (timer !== undefined) clearTimeout(timer)
+      if (winner === 'heartbeat') {
+        tick += 1
+        yield makeEvent({ elapsedMs: Date.now() - windowStart, tick })
+        continue
+      }
+      const result = await pending
+      if (result.done) return
+      yield result.value
+      pending = iterator.next()
+      windowStart = Date.now()
+      tick = 0
+    }
+  } finally {
+    await iterator.return?.()
+  }
+}
+
 // ── the factory ────────────────────────────────────────────────────────────
 
 export function createChatTurnRoutes<TContext = void>(
@@ -261,15 +423,6 @@ export function createChatTurnRoutes<TContext = void>(
     }))
     const chatTurn = resolveChatTurn({ existingMessages, userContent: content, turnId })
 
-    if (chatTurn.shouldInsertUserMessage) {
-      await options.store.appendMessage({
-        threadId: payload.threadId,
-        role: 'user',
-        content,
-        parts: userPartsWithFiles(chatTurn.userParts, fileParts),
-      })
-    }
-
     const identity: ChatTurnIdentity = {
       tenantId,
       sessionId: payload.threadId,
@@ -290,119 +443,247 @@ export function createChatTurnRoutes<TContext = void>(
           ? [{ type: 'text', text: content }, ...fileParts]
           : [...fileParts]
 
-    // Durability tap: every engine event buffers (coalesced) so a dropped
-    // client replays the tail. Live delivery rides the Response body, not the
-    // tap, so `write` is intentionally absent.
-    const tap = createBufferedTurnTap({
-      store: options.turnStore,
-      turnId: turnStreamId,
-      scopeId: payload.threadId,
-      coalesce: options.coalesceTurnEvents ?? coalesceDeltas,
-    })
-    const turnMarker = { type: 'turn', turnId: turnStreamId }
-    await tap.onEvent(turnMarker)
-
-    let producer: ChatTurnRouteProducer | undefined
-    let runFailed = false
-
-    const result = handleChatTurn({
+    // The producer input every pre-turn seam reads (and `beforeTurn` may
+    // rewrite). Mutated in place before the producer's deferred first pull.
+    let produceArgs: ChatTurnProduceArgs<TContext> = {
+      request,
+      body: payload,
       identity,
-      waitUntil: ctx?.waitUntil,
-      log,
-      hooks: {
-        // The engine wants a synchronous producer; box resolution is async —
-        // defer it into the generator's first pull.
-        produce: () => ({
-          stream: (async function* () {
-            producer = await options.produce({
-              request,
-              body: payload,
-              identity,
-              context,
-              prompt,
-              executionId,
-              turnStreamId,
-              priorMessages: chatTurn.priorMessages,
-            })
-            for await (const event of producer.stream) yield event
-          })(),
-          finalText: () => producer?.finalText() ?? '',
-        }),
-        onEvent: async (event) => {
-          if (event.type === 'session.run.failed' || event.type === 'error') runFailed = true
-          await tap.onEvent(event)
-          if (options.onEvent) await options.onEvent(event, context)
-        },
-        ...(options.transformFinalText ? { transformFinalText: options.transformFinalText } : {}),
-        persistAssistantMessage: async ({ finalText }) => {
-          // The typed boundary: stream-normalizer records → stored vocabulary
-          // (validating projection owned by /chat-store — no cast here).
-          const parts = producer?.assistantParts ? toChatMessageParts(producer.assistantParts()) : undefined
-          if (!finalText.trim() && (!parts || parts.length === 0)) return
-          const usage = producer?.usage?.() ?? {}
-          await options.store.appendMessage({
-            threadId: payload.threadId,
-            role: 'assistant',
-            content: finalText,
-            ...(parts && parts.length > 0 ? { parts } : {}),
-            ...(producer?.model ? { model: producer.model } : {}),
-            ...(usage.inputTokens !== undefined ? { inputTokens: usage.inputTokens } : {}),
-            ...(usage.outputTokens !== undefined ? { outputTokens: usage.outputTokens } : {}),
-            ...(usage.reasoningTokens !== undefined ? { reasoningTokens: usage.reasoningTokens } : {}),
-            ...(usage.cacheReadTokens !== undefined ? { cacheReadTokens: usage.cacheReadTokens } : {}),
-            ...(usage.cacheWriteTokens !== undefined ? { cacheWriteTokens: usage.cacheWriteTokens } : {}),
-            ...(usage.costUsd !== undefined ? { costUsd: usage.costUsd } : {}),
-          })
-        },
-        ...(options.onTurnComplete
-          ? {
-              onTurnComplete: ({ identity: turnIdentity, finalText }: { identity: ChatTurnIdentity; finalText: string }) =>
-                options.onTurnComplete!({ identity: turnIdentity, finalText, context }),
-            }
-          : {}),
-        ...(options.traceFlush ? { traceFlush: () => options.traceFlush!(context) } : {}),
-      },
-    })
+      context,
+      prompt,
+      executionId,
+      turnStreamId,
+      priorMessages: chatTurn.priorMessages,
+    }
 
-    // Tee: one branch to the live client, one drained under waitUntil so the
-    // turn (and its buffering via onEvent) runs to completion after a client
-    // drop — the engine body executes as it is pulled.
-    const [clientBody, drainBody] = result.body.tee()
-    const drained = (async () => {
-      const reader = drainBody.getReader()
+    // Single-flight lock: acquire before any side effect. `release` runs
+    // exactly once — in the drain's `finally` on a normal turn, or right here
+    // on a short-circuit / throw.
+    let lockAcquired = false
+    let lockHandle: unknown
+    let lockReleased = false
+    const releaseLock = async (): Promise<void> => {
+      if (!lockAcquired || lockReleased) return
+      lockReleased = true
       try {
-        for (;;) {
-          const { done } = await reader.read()
-          if (done) break
-        }
-        await tap.done(runFailed ? 'error' : 'complete')
+        await options.turnLock!.release(lockHandle)
       } catch (err) {
-        await tap.done('error')
-        log('[chat-routes] turn drain failed', {
+        log('[chat-routes] turnLock.release failed', {
           turnId: turnStreamId,
           error: err instanceof Error ? err.message : String(err),
         })
       }
-    })()
-    if (ctx?.waitUntil) ctx.waitUntil(drained)
-    else void drained.catch(() => {})
+    }
+    if (options.turnLock) {
+      const acquired = await options.turnLock.acquire(produceArgs)
+      if (!acquired.acquired) return acquired.response
+      lockAcquired = true
+      lockHandle = acquired.handle
+    }
 
-    // Announce the replay handle before the engine's first event.
-    const encoder = new TextEncoder()
-    const marker = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(encoder.encode(`${JSON.stringify(turnMarker)}\n`))
-        controller.close()
-      },
-    })
-    const body = concatStreams([marker, clientBody])
+    try {
+      if (chatTurn.shouldInsertUserMessage) {
+        await options.store.appendMessage({
+          threadId: payload.threadId,
+          role: 'user',
+          content,
+          parts: userPartsWithFiles(chatTurn.userParts, fileParts),
+        })
+      }
 
-    return new Response(body, {
-      headers: {
-        'Content-Type': result.contentType,
-        'Cache-Control': 'no-cache',
-      },
-    })
+      // Domain-readiness gate: may short-circuit with the product's own
+      // response before the producer runs. The user row above is kept (a real
+      // user turn); the gate's response is the assistant side of it.
+      if (options.contextGate) {
+        const gate = await options.contextGate(produceArgs)
+        if (!gate.proceed) {
+          await releaseLock()
+          return gate.response
+        }
+      }
+
+      // Observe + optionally augment the assembled producer input.
+      if (options.beforeTurn) {
+        const patch = await options.beforeTurn(produceArgs)
+        if (patch) produceArgs = { ...produceArgs, ...patch }
+      }
+
+      // Durability tap: every engine event buffers (coalesced) so a dropped
+      // client replays the tail. Live delivery rides the Response body, not the
+      // tap, so `write` is intentionally absent.
+      const tap = createBufferedTurnTap({
+        store: options.turnStore,
+        turnId: turnStreamId,
+        scopeId: payload.threadId,
+        coalesce: options.coalesceTurnEvents ?? coalesceDeltas,
+      })
+      const turnMarker = { type: 'turn', turnId: turnStreamId }
+      await tap.onEvent(turnMarker)
+
+      let producer: ChatTurnRouteProducer | undefined
+      let runFailed = false
+      // Data of the event that marked the run failed — handed to `onTurnError`
+      // when no drain throw supplies a richer cause.
+      let lastFailureData: Record<string, unknown> | undefined
+
+      const turnStartedAtMs = Date.now()
+      if (options.lifecycle?.onTurnStart) {
+        try {
+          await options.lifecycle.onTurnStart({
+            identity, executionId, turnStreamId, context, startedAt: turnStartedAtMs,
+          })
+        } catch (err) {
+          log('[chat-routes] lifecycle.onTurnStart failed', {
+            turnId: turnStreamId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        }
+      }
+
+      const result = handleChatTurn({
+        identity,
+        waitUntil: ctx?.waitUntil,
+        log,
+        hooks: {
+          // The engine wants a synchronous producer; box resolution is async —
+          // defer it into the generator's first pull.
+          produce: () => ({
+            stream: (async function* () {
+              producer = await options.produce(produceArgs)
+              let source: AsyncIterable<ChatRouteEvent> = producer.stream
+              if (options.onRawEvent) {
+                source = tapRawEvents(source, (event) => options.onRawEvent!(event, context), log)
+              }
+              if (options.heartbeat) {
+                source = withStreamHeartbeat(source, options.heartbeat.intervalMs, options.heartbeat.event)
+              }
+              for await (const event of source) yield event
+            })(),
+            finalText: () => producer?.finalText() ?? '',
+          }),
+          onEvent: async (event) => {
+            if (event.type === 'session.run.failed' || event.type === 'error') {
+              runFailed = true
+              lastFailureData = event.data
+            }
+            await tap.onEvent(event)
+            if (options.onEvent) await options.onEvent(event, context)
+          },
+          ...(options.transformFinalText ? { transformFinalText: options.transformFinalText } : {}),
+          persistAssistantMessage: async ({ finalText }) => {
+            // The typed boundary: stream-normalizer records → stored vocabulary
+            // (validating projection owned by /chat-store — no cast here).
+            const parts = producer?.assistantParts ? toChatMessageParts(producer.assistantParts()) : undefined
+            if (!finalText.trim() && (!parts || parts.length === 0)) return
+            const usage = producer?.usage?.() ?? {}
+            await options.store.appendMessage({
+              threadId: payload.threadId,
+              role: 'assistant',
+              content: finalText,
+              ...(parts && parts.length > 0 ? { parts } : {}),
+              ...(producer?.model ? { model: producer.model } : {}),
+              ...(usage.inputTokens !== undefined ? { inputTokens: usage.inputTokens } : {}),
+              ...(usage.outputTokens !== undefined ? { outputTokens: usage.outputTokens } : {}),
+              ...(usage.reasoningTokens !== undefined ? { reasoningTokens: usage.reasoningTokens } : {}),
+              ...(usage.cacheReadTokens !== undefined ? { cacheReadTokens: usage.cacheReadTokens } : {}),
+              ...(usage.cacheWriteTokens !== undefined ? { cacheWriteTokens: usage.cacheWriteTokens } : {}),
+              ...(usage.costUsd !== undefined ? { costUsd: usage.costUsd } : {}),
+            })
+          },
+          ...(options.onTurnComplete
+            ? {
+                onTurnComplete: ({ identity: turnIdentity, finalText }: { identity: ChatTurnIdentity; finalText: string }) =>
+                  options.onTurnComplete!({ identity: turnIdentity, finalText, context }),
+              }
+            : {}),
+          ...(options.traceFlush ? { traceFlush: () => options.traceFlush!(context) } : {}),
+        },
+      })
+
+      // Exactly one terminal lifecycle hook, after the turn settles. Failure is
+      // this route's own verdict (`runFailed` from error/failed events, or a
+      // drain throw), not the engine's envelope.
+      const fireTerminalLifecycle = async (failed: boolean, drainError: unknown): Promise<void> => {
+        const lifecycle = options.lifecycle
+        if (!lifecycle) return
+        const durationMs = Date.now() - turnStartedAtMs
+        try {
+          if (failed) {
+            await lifecycle.onTurnError?.({
+              identity, executionId, turnStreamId, context, durationMs,
+              error: drainError ?? lastFailureData ?? new Error('chat turn failed'),
+            })
+          } else {
+            await lifecycle.onTurnComplete?.({
+              identity, executionId, turnStreamId, context, durationMs,
+              finalText: producer?.finalText() ?? '',
+              usage: producer?.usage?.() ?? {},
+            })
+          }
+        } catch (err) {
+          log('[chat-routes] lifecycle terminal hook failed', {
+            turnId: turnStreamId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        }
+      }
+
+      // Tee: one branch to the live client, one drained under waitUntil so the
+      // turn (and its buffering via onEvent) runs to completion after a client
+      // drop — the engine body executes as it is pulled.
+      const [clientBody, drainBody] = result.body.tee()
+      const drained = (async () => {
+        const reader = drainBody.getReader()
+        let drainError: unknown
+        try {
+          for (;;) {
+            const { done } = await reader.read()
+            if (done) break
+          }
+        } catch (err) {
+          drainError = err
+          log('[chat-routes] turn drain failed', {
+            turnId: turnStreamId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        }
+        const failed = runFailed || drainError !== undefined
+        try {
+          await tap.done(failed ? 'error' : 'complete')
+        } catch (err) {
+          log('[chat-routes] turn buffer finalize failed', {
+            turnId: turnStreamId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        }
+        await fireTerminalLifecycle(failed, drainError)
+        await releaseLock()
+      })()
+      if (ctx?.waitUntil) ctx.waitUntil(drained)
+      else void drained.catch(() => {})
+
+      // Announce the replay handle before the engine's first event.
+      const encoder = new TextEncoder()
+      const marker = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(encoder.encode(`${JSON.stringify(turnMarker)}\n`))
+          controller.close()
+        },
+      })
+      const body = concatStreams([marker, clientBody])
+
+      return new Response(body, {
+        headers: {
+          'Content-Type': result.contentType,
+          'Cache-Control': 'no-cache',
+        },
+      })
+    } catch (err) {
+      // A throw before the turn began streaming (user-insert, gate, beforeTurn,
+      // lifecycle-start, tap setup): release the lock, then propagate.
+      await releaseLock()
+      throw err
+    }
   }
 
   async function replay(request: Request, params: { turnId: string }): Promise<Response> {

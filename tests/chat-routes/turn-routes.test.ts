@@ -246,6 +246,162 @@ describe('createChatTurnRoutes — buffered replay', () => {
   })
 })
 
+describe('createChatTurnRoutes — product seams', () => {
+  /** Read NDJSON lines off a live body until `predicate` is satisfied or EOF. */
+  async function drainUntil(
+    body: ReadableStream<Uint8Array>,
+    seen: Array<Record<string, unknown>>,
+    predicate: (seen: Array<Record<string, unknown>>) => boolean,
+  ): Promise<void> {
+    const reader = body.getReader()
+    const decoder = new TextDecoder()
+    while (!predicate(seen)) {
+      const { value, done } = await reader.read()
+      if (done) break
+      for (const line of decoder.decode(value).split('\n').filter((l) => l.trim())) {
+        seen.push(JSON.parse(line) as Record<string, unknown>)
+      }
+    }
+    reader.releaseLock()
+  }
+
+  it('heartbeat: emits keepalives while the producer is quiet, then stops on the first real event', async () => {
+    let releaseGate!: () => void
+    const gate = new Promise<void>((r) => { releaseGate = r })
+    const { routes, ctx, pending } = makeRoutes({
+      produce: () => ({
+        stream: (async function* () {
+          await gate // silent window — keepalives should fire here
+          yield { type: 'text', text: 'answer' }
+        })(),
+        finalText: () => 'answer',
+      }),
+      heartbeat: { intervalMs: 5, event: ({ tick }) => ({ type: 'keepalive', data: { tick } }) },
+    })
+
+    const res = await routes.turn(turnRequest({ threadId: 't-1', content: 'hi' }), ctx)
+    const seen: Array<Record<string, unknown>> = []
+    await drainUntil(res.body!, seen, (s) => s.filter((l) => l.type === 'keepalive').length >= 2)
+    expect(seen.filter((l) => l.type === 'keepalive').length).toBeGreaterThanOrEqual(2)
+
+    releaseGate()
+    await drainUntil(res.body!, seen, (s) => s.some((l) => l.type === 'text' && l.text === 'answer'))
+    await Promise.all(pending)
+
+    const answerIndex = seen.findIndex((l) => l.type === 'text' && l.text === 'answer')
+    expect(answerIndex).toBeGreaterThanOrEqual(0)
+    // Window resets on the real event and the producer then completes with no
+    // further silence — no keepalive may follow the answer.
+    expect(seen.slice(answerIndex).filter((l) => l.type === 'keepalive')).toHaveLength(0)
+  })
+
+  it('beforeTurn: observes the assembled input and rewrites the prompt + prior messages', async () => {
+    const produce = vi.fn((_args: ChatTurnProduceArgs<unknown>) => fakeProducer([{ type: 'text', text: 'ok' }], 'ok'))
+    const observed: Array<string | unknown[]> = []
+    const rewrittenPrior = [{ id: 'ctx', role: 'user' as const, content: 'injected', parts: null }]
+    const { routes, ctx, pending } = makeRoutes({
+      produce,
+      beforeTurn: (args) => {
+        observed.push(args.prompt)
+        return { prompt: 'rewritten', priorMessages: rewrittenPrior }
+      },
+    })
+
+    await readLines((await routes.turn(turnRequest({ threadId: 't-1', content: 'original' }), ctx)).body!)
+    await Promise.all(pending)
+
+    expect(observed).toEqual(['original']) // observed the route-assembled prompt
+    const args = produce.mock.calls[0]![0]
+    expect(args.prompt).toBe('rewritten')
+    expect(args.priorMessages).toEqual(rewrittenPrior)
+  })
+
+  it('lifecycle: onTurnStart→onTurnComplete on success, onTurnStart→onTurnError on failure, always ordered', async () => {
+    const events: string[] = []
+    const lifecycle = {
+      onTurnStart: () => { events.push('start') },
+      onTurnComplete: (info: { finalText: string; usage: { inputTokens?: number } }) =>
+        { events.push(`complete:${info.finalText}:${info.usage.inputTokens ?? 0}`) },
+      onTurnError: () => { events.push('error') },
+    }
+
+    const ok = makeRoutes({
+      lifecycle,
+      produce: () => fakeProducer([{ type: 'text', text: 'yo' }], 'yo', { usage: () => ({ inputTokens: 3 }) }),
+    })
+    await readLines((await ok.routes.turn(turnRequest({ threadId: 't-1', content: 'q' }), ok.ctx)).body!)
+    await Promise.all(ok.pending)
+    expect(events).toEqual(['start', 'complete:yo:3'])
+
+    events.length = 0
+    const bad = makeRoutes({
+      lifecycle,
+      produce: () => fakeProducer([{ type: 'error', data: { message: 'boom' } }], ''),
+    })
+    await readLines((await bad.routes.turn(turnRequest({ threadId: 't-2', content: 'q' }), bad.ctx)).body!)
+    await Promise.all(bad.pending)
+    expect(events).toEqual(['start', 'error'])
+  })
+
+  it('contextGate: short-circuits with the product response before the producer runs', async () => {
+    const produce = vi.fn(() => fakeProducer([{ type: 'text', text: 'should not run' }], 'x'))
+    const { routes, rows, ctx } = makeRoutes({
+      produce,
+      contextGate: async () => ({ proceed: false, response: Response.json({ needContext: true }, { status: 409 }) }),
+    })
+
+    const res = await routes.turn(turnRequest({ threadId: 't-1', content: 'hi' }), ctx)
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({ needContext: true })
+    expect(produce).not.toHaveBeenCalled()
+    // The user row is still recorded (a real user turn); no assistant row.
+    expect(rows.filter((r) => r.role === 'user')).toHaveLength(1)
+    expect(rows.filter((r) => r.role === 'assistant')).toHaveLength(0)
+  })
+
+  it('turnLock: acquires before the turn and releases in finally even when the turn throws', async () => {
+    const order: string[] = []
+    const turnLock = {
+      acquire: () => { order.push('acquire'); return { acquired: true as const, handle: 'h1' } },
+      release: (handle: unknown) => { order.push(`release:${String(handle)}`) },
+    }
+    const { routes, ctx } = makeRoutes({
+      turnLock,
+      beforeTurn: () => { order.push('beforeTurn'); throw new Error('kaboom') },
+    })
+
+    await expect(routes.turn(turnRequest({ threadId: 't-1', content: 'hi' }), ctx)).rejects.toThrow('kaboom')
+    expect(order).toEqual(['acquire', 'beforeTurn', 'release:h1'])
+  })
+
+  it('turnLock: rejects with the product response when already held (no producer run)', async () => {
+    const produce = vi.fn(() => fakeProducer([{ type: 'text', text: 'x' }], 'x'))
+    const { routes, rows, ctx } = makeRoutes({
+      produce,
+      turnLock: {
+        acquire: () => ({ acquired: false as const, response: Response.json({ code: 'in_flight' }, { status: 409 }) }),
+        release: () => {},
+      },
+    })
+    const res = await routes.turn(turnRequest({ threadId: 't-1', content: 'hi' }), ctx)
+    expect(res.status).toBe(409)
+    expect(produce).not.toHaveBeenCalled()
+    expect(rows).toHaveLength(0) // no user row when the lock is held
+  })
+
+  it('onRawEvent: observes producer events before the engine frames them', async () => {
+    const raw: string[] = []
+    const { routes, ctx, pending } = makeRoutes({
+      produce: () => fakeProducer([{ type: 'text', text: 'a' }, { type: 'text', text: 'b' }], 'ab'),
+      onRawEvent: (event) => { raw.push(event.type) },
+    })
+    await readLines((await routes.turn(turnRequest({ threadId: 't-1', content: 'hi' }), ctx)).body!)
+    await Promise.all(pending)
+    // Exactly the producer's own events — no engine lifecycle envelopes.
+    expect(raw).toEqual(['text', 'text'])
+  })
+})
+
 describe('createChatTurnRoutes — interactions composition', () => {
   function wireQuestion(id: string): InteractionRequestWire {
     return {
