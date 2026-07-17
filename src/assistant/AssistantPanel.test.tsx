@@ -704,3 +704,38 @@ describe("AssistantPanel model selection display", () => {
     expect(chat.setModel).not.toHaveBeenCalled();
   });
 });
+
+describe("AssistantPanel composer seed", () => {
+  it("forwards composerSeed into the composer and reports it applied", async () => {
+    const onComposerSeedApplied = vi.fn();
+    const { rerender } = render(
+      <AssistantClientProvider client={client}>
+        <AssistantPanel
+          chat={makeChat()}
+          userId="u1"
+          onClose={() => {}}
+          composerSeed={null}
+          onComposerSeedApplied={onComposerSeedApplied}
+        />
+      </AssistantClientProvider>,
+    );
+
+    rerender(
+      <AssistantClientProvider client={client}>
+        <AssistantPanel
+          chat={makeChat()}
+          userId="u1"
+          onClose={() => {}}
+          composerSeed="Draft this workflow"
+          onComposerSeedApplied={onComposerSeedApplied}
+        />
+      </AssistantClientProvider>,
+    );
+
+    const input = (await screen.findByLabelText(
+      "Message input",
+    )) as HTMLTextAreaElement;
+    expect(input.value).toBe("Draft this workflow");
+    expect(onComposerSeedApplied).toHaveBeenCalledOnce();
+  });
+});

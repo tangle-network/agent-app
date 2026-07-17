@@ -227,4 +227,56 @@ describe('ChatComposer seed', () => {
     expect(input.value).toBe('second ')
     expect(onSeedApplied).toHaveBeenCalledTimes(2)
   })
+
+  it('ignores the seed in controlled mode (the host drives value)', () => {
+    const onSeedApplied = vi.fn()
+    const onValueChange = vi.fn()
+    const { rerender } = render(
+      <ChatComposer
+        onSend={vi.fn()}
+        value="host text"
+        onValueChange={onValueChange}
+        seed={null}
+        onSeedApplied={onSeedApplied}
+      />,
+    )
+    const input = screen.getByLabelText('Message input') as HTMLTextAreaElement
+
+    rerender(
+      <ChatComposer
+        onSend={vi.fn()}
+        value="host text"
+        onValueChange={onValueChange}
+        seed="seeded "
+        onSeedApplied={onSeedApplied}
+      />,
+    )
+
+    // A controlled value is not clobbered, and consume-once does not fire —
+    // consistent with `initialValue` being ignored in controlled mode.
+    expect(input.value).toBe('host text')
+    expect(onSeedApplied).not.toHaveBeenCalled()
+    expect(onValueChange).not.toHaveBeenCalled()
+  })
+
+  it('positions the caret even when the seed equals the current text', () => {
+    const onSeedApplied = vi.fn()
+    const { rerender } = render(
+      <ChatComposer onSend={vi.fn()} seed={null} onSeedApplied={onSeedApplied} />,
+    )
+    const input = screen.getByLabelText('Message input') as HTMLTextAreaElement
+    // The user types the exact string the host is about to seed.
+    type(input, 'same text')
+
+    rerender(
+      <ChatComposer onSend={vi.fn()} seed="same text" onSeedApplied={onSeedApplied} />,
+    )
+
+    // setText is a no-op (value unchanged), but the caret is still placed at the
+    // end and consume-once still fires — no stranded pending-caret state.
+    expect(input.value).toBe('same text')
+    expect(onSeedApplied).toHaveBeenCalledOnce()
+    expect(document.activeElement).toBe(input)
+    expect(input.selectionStart).toBe(input.value.length)
+  })
 })

@@ -211,17 +211,31 @@ export function ChatComposer({
   // Adopt a one-shot seed. Applies only when the `seed` PROP transitions to a
   // new string (host sets it → consumed here → host clears it via
   // onSeedApplied), so an unstable callback identity re-running this effect
-  // can never re-apply a still-set seed over the user's typing.
+  // can never re-apply a still-set seed over the user's typing. Like
+  // `initialValue`, the seed is honored ONLY in uncontrolled mode — a
+  // controlled host drives its own `value` (which would shadow `setText`), so
+  // it seeds by updating that state itself.
   const prevSeedRef = useRef<string | null>(null)
   const pendingCaretRef = useRef<string | null>(null)
   useEffect(() => {
     const prev = prevSeedRef.current
     prevSeedRef.current = seed ?? null
-    if (seed == null || seed === prev) return
+    if (seed == null || seed === prev || isControlled) return
     setText(seed)
-    pendingCaretRef.current = seed
     onSeedApplied?.()
-  }, [seed, setText, onSeedApplied])
+    const el = textareaRef.current
+    if (el && el.value === seed) {
+      // The DOM already shows the seed — setText was a no-op (the user had
+      // typed the exact string), so no re-render is coming and the [text]
+      // effect below won't fire. Position the caret now instead of leaving a
+      // stranded pendingCaretRef.
+      el.focus()
+      el.setSelectionRange(seed.length, seed.length)
+    } else {
+      // Defer caret positioning until the seeded value renders (see below).
+      pendingCaretRef.current = seed
+    }
+  }, [seed, setText, onSeedApplied, isControlled])
 
   // Focus + caret-to-end AFTER the seeded value has rendered into the DOM —
   // setSelectionRange in the applying effect would run against the pre-render
