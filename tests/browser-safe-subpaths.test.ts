@@ -1,36 +1,84 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /**
- * Browser-safe subpath manifest (generalizes the old catalog-only walker).
- * Client components import these subpaths directly; if anything reachable from
- * one gains a Node-only or agent-runtime import, every consumer's client
- * bundle crashes on module load (legal-agent #256, tax-agent #372). Walk each
- * entrypoint's source import graph and fail loud on the first unsafe edge.
+ * Browser-safe subpath manifest — enumerated from package.json `exports`, not a
+ * top-level `*-react` readdir. Client components import these subpaths directly;
+ * if anything reachable from one gains a Node-only or agent-runtime import,
+ * every consumer's client bundle crashes on module load (legal-agent #256,
+ * tax-agent #372). The old readdir walked only top-level `*-react` DIRS, so
+ * NESTED browser entries (`web-react/terminal`, `design-canvas-react/engine`,
+ * every `*-react/lazy`, `vault/lazy`) were never checked — the exact blind spot
+ * that reopens the crash class. This derives the set straight from the shipped
+ * `exports` map instead, so a new nested react/lazy entry is covered the moment
+ * it is published.
  *
- * Deliberately EXCLUDED (server-side by design, Node imports are fine there):
- * runtime, sandbox, billing, tangle, eval, eval-campaign, store, platform,
- * teams (non-react), preset-cloudflare, tools, missions, knowledge,
- * knowledge-loop, skills, profile, run, harness drizzle/api entries, config,
- * composer, assistant, model-resolution, integrations, intakes (non-react),
- * sequences (non-react), design-canvas (non-react), vault, brand-extraction.
+ * Server-side subpaths (Node imports fine there) are simply not browser-intended
+ * and are excluded by the predicate below: runtime, sandbox, billing, tangle,
+ * eval(-campaign), store, platform, teams(non-react), preset-cloudflare, tools,
+ * missions, knowledge(-loop), skills, profile, run, config, composer, assistant,
+ * model-resolution, integrations, intakes/design-canvas/sequences (non-react),
+ * vault (non-lazy), brand-extraction, theme-contract (reads fs).
  */
-const BROWSER_SAFE_ENTRYPOINTS: Record<string, string> = {
-  catalog: 'src/catalog/index.ts',
-  'web-react': 'src/web-react/index.tsx',
-  theme: 'src/theme/index.ts',
-  stream: 'src/stream/index.ts',
-  trace: 'src/trace/index.ts',
-  redact: 'src/redact/index.ts',
-  crypto: 'src/crypto/index.ts',
-  web: 'src/web/index.ts',
-  harness: 'src/harness/index.ts',
-  'sequences-react': 'src/sequences-react/index.ts',
-  'design-canvas-react': 'src/design-canvas-react/index.ts',
-  'intakes-react': 'src/intakes-react/index.ts',
-  'teams-react': 'src/teams-react/index.ts',
-  'studio-react': 'src/studio-react/index.tsx',
+
+const ROOT = resolve(__dirname, '..')
+const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')) as {
+  exports: Record<string, { import?: string; default?: string } | string>
+}
+
+/** Non-react subpaths a client bundle imports directly (pure mechanism / data,
+ *  no engine, no node builtins). Kept explicit — these are stable and few; the
+ *  react/lazy family is derived dynamically below. */
+const BROWSER_NONREACT = new Set([
+  'catalog',
+  'theme',
+  'stream',
+  'trace',
+  'redact',
+  'crypto',
+  'web',
+  'harness',
+])
+
+/** Browser-intended when a client bundle imports it: the whole `*-react` family
+ *  (incl. nested `/engine`, `/lazy`, `/terminal`), any `/lazy` split
+ *  (browser-safe by construction), or a known pure-mechanism subpath. */
+function isBrowserIntended(subpath: string): boolean {
+  return /-react(\/|$)/.test(subpath) || subpath.endsWith('/lazy') || BROWSER_NONREACT.has(subpath)
+}
+
+function importTarget(entry: { import?: string; default?: string } | string): string | undefined {
+  return typeof entry === 'string' ? entry : entry.import ?? entry.default
+}
+
+/** `./dist/x/y.js` → the `src/x/y.{ts,tsx}` that produced it, or null. */
+function distToSrc(target: string): string | null {
+  const m = target.match(/^\.\/dist\/(.+)\.js$/)
+  if (!m) return null
+  for (const ext of ['ts', 'tsx']) {
+    const candidate = resolve(ROOT, 'src', `${m[1]}.${ext}`)
+    if (existsSync(candidate)) return candidate
+  }
+  return null
+}
+
+// { subpath -> src file } for every browser-intended export.
+const BROWSER_SAFE_ENTRYPOINTS: Record<string, string> = {}
+/** Browser-intended `.js` exports whose src file could not be resolved — a
+ *  walk blind spot; asserted empty below. */
+const UNRESOLVED: string[] = []
+for (const [key, entry] of Object.entries(pkg.exports)) {
+  const subpath = key.replace(/^\.\/?/, '') // "./web-react" -> "web-react", "." -> ""
+  if (!subpath || !isBrowserIntended(subpath)) continue
+  const target = importTarget(entry)
+  if (!target || target.endsWith('.css')) continue // CSS assets are not import graphs
+  const src = distToSrc(target)
+  if (!src) {
+    UNRESOLVED.push(`${key} -> ${target}`)
+    continue
+  }
+  BROWSER_SAFE_ENTRYPOINTS[subpath] = src
 }
 
 const FORBIDDEN = [/^node:/, /^@tangle-network\/agent-runtime/, /^child_process$/, /^fs$/, /^util$/]
@@ -60,7 +108,7 @@ function resolveLocal(fromFile: string, spec: string): string | null {
 
 function walk(entry: string): Set<string> {
   const seen = new Set<string>()
-  const queue = [resolve(__dirname, '..', entry)]
+  const queue = [entry]
   while (queue.length) {
     const file = queue.pop()!
     if (seen.has(file)) continue
@@ -82,12 +130,33 @@ function walk(entry: string): Set<string> {
 }
 
 describe('browser-safe subpath manifest', () => {
+  it('every browser-intended export resolves to a source file (no walk blind spot)', () => {
+    expect(UNRESOLVED, `unresolved browser-intended exports: ${UNRESOLVED.join(', ')}`).toEqual([])
+    expect(Object.keys(BROWSER_SAFE_ENTRYPOINTS).length).toBeGreaterThan(0)
+  })
+
   for (const [name, entry] of Object.entries(BROWSER_SAFE_ENTRYPOINTS)) {
     it(`${name} reaches no node builtins or agent-runtime imports`, () => {
       const seen = walk(entry)
       expect(seen.size).toBeGreaterThan(0)
     })
   }
+
+  it('covers the nested react/lazy entries the old readdir missed (#256/#372 class)', () => {
+    for (const required of [
+      'web-react/terminal',
+      'design-canvas-react/engine',
+      'design-canvas-react/lazy',
+      'teams-react/lazy',
+      'intakes-react/lazy',
+      'vault/lazy',
+    ]) {
+      expect(
+        BROWSER_SAFE_ENTRYPOINTS[required],
+        `${required} exists in exports but is missing from the browser-safe manifest`,
+      ).toBeDefined()
+    }
+  })
 
   it('the walk traverses into shared files, not just the entry module', () => {
     // catalog re-exports the model catalogue pipeline shared with /runtime;
@@ -98,18 +167,5 @@ describe('browser-safe subpath manifest', () => {
     const webReact = walk(BROWSER_SAFE_ENTRYPOINTS['web-react']!)
     expect([...webReact].some((f) => f.endsWith('web-react/chat-stream.ts'))).toBe(true)
     expect([...webReact].some((f) => f.endsWith('web-react/chat-interactions.ts'))).toBe(true)
-  })
-
-  it('every *-react subpath in src/ is covered by the manifest', () => {
-    const src = resolve(__dirname, '../src')
-    const reactDirs = readdirSync(src, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && d.name.endsWith('-react'))
-      .map((d) => d.name)
-    for (const dir of reactDirs) {
-      expect(
-        BROWSER_SAFE_ENTRYPOINTS[dir],
-        `src/${dir} exists but is missing from the browser-safe manifest`,
-      ).toBeDefined()
-    }
   })
 })
