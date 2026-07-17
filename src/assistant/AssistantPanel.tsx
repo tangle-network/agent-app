@@ -58,6 +58,12 @@ export interface AssistantPanelProps {
    *  absent, the built-in transcript (web-react `ChatMessages`) renders the
    *  conversation. */
   renderTranscript?: (view: AssistantTranscriptView) => ReactNode;
+  /** One-shot composer prefill from the host's launcher (e.g. a page's "Create
+   *  with assistant" button passing `openAssistant(seed)`). The panel adopts it
+   *  as the composer draft and calls `onComposerSeedApplied` once, so the host
+   *  clears its seed state (consume-once). */
+  composerSeed?: string | null;
+  onComposerSeedApplied?: () => void;
 }
 
 const EMPTY_STATE =
@@ -159,6 +165,8 @@ export function AssistantPanel({
   toolRenderers,
   renderConfirmedResult,
   renderTranscript,
+  composerSeed = null,
+  onComposerSeedApplied,
 }: AssistantPanelProps) {
   const models = useAssistantModels();
   const threads = useAssistantThreads(userId);
@@ -591,6 +599,8 @@ export function AssistantPanel({
           isStreaming={streaming}
           disabled={chat.restoring || state.status === "awaiting_confirm"}
           placeholder="Message the assistant…"
+          seed={composerSeed}
+          onSeedApplied={onComposerSeedApplied}
           controls={
             pickerModels.length > 0 ? (
               <ModelPicker

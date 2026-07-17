@@ -187,3 +187,40 @@ describe('ModelPicker priorityGroup', () => {
     expect(screen.getAllByText('My Fine-Tune')).toHaveLength(1)
   })
 })
+
+describe('ChatComposer seed', () => {
+  it('adopts a seed as the draft, focuses the input, and reports consumption', () => {
+    const onSeedApplied = vi.fn()
+    const { rerender } = render(
+      <ChatComposer onSend={vi.fn()} seed={null} onSeedApplied={onSeedApplied} />,
+    )
+    const input = screen.getByLabelText('Message input') as HTMLTextAreaElement
+
+    rerender(
+      <ChatComposer
+        onSend={vi.fn()}
+        seed="Build a workflow that uses `github.issues.create` to "
+        onSeedApplied={onSeedApplied}
+      />,
+    )
+
+    expect(input.value).toBe('Build a workflow that uses `github.issues.create` to ')
+    expect(onSeedApplied).toHaveBeenCalledOnce()
+    expect(document.activeElement).toBe(input)
+  })
+
+  it('applies a second seed after the first is cleared, replacing the draft', () => {
+    const onSeedApplied = vi.fn()
+    const { rerender } = render(
+      <ChatComposer onSend={vi.fn()} seed="first " onSeedApplied={onSeedApplied} />,
+    )
+    const input = screen.getByLabelText('Message input') as HTMLTextAreaElement
+    type(input, 'first plus edits')
+
+    rerender(<ChatComposer onSend={vi.fn()} seed={null} onSeedApplied={onSeedApplied} />)
+    rerender(<ChatComposer onSend={vi.fn()} seed="second " onSeedApplied={onSeedApplied} />)
+
+    expect(input.value).toBe('second ')
+    expect(onSeedApplied).toHaveBeenCalledTimes(2)
+  })
+})

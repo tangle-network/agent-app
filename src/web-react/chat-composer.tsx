@@ -125,6 +125,13 @@ export interface ChatComposerProps {
   /** Initial text in uncontrolled mode; ignored when `value` is provided. */
   initialValue?: string
 
+  /** One-shot external prefill: when this becomes a non-null string the
+   *  composer adopts it as the draft (replacing any current draft), focuses the
+   *  input with the caret at the end, and reports consumption via
+   *  `onSeedApplied` so the host can clear its seed state. */
+  seed?: string | null
+  onSeedApplied?: () => void
+
   /** Inline controls (e.g. `<ModelPicker/>` + `<EffortPicker/>` or
    *  `<AgentSessionControls/>`). Rendered in a row above the input by default. */
   controls?: ReactNode
@@ -159,6 +166,8 @@ export function ChatComposer({
   value,
   onValueChange,
   initialValue,
+  seed,
+  onSeedApplied,
   controls,
   controlsPlacement = 'above',
   onAttach,
@@ -198,6 +207,20 @@ export function ChatComposer({
     el.style.height = 'auto'
     el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT)}px`
   }, [text])
+
+  // Adopt a one-shot seed. Runs whenever the seed transitions to a string
+  // (host sets it → consumed here → host clears it via onSeedApplied), so a
+  // second seed while the composer stays mounted still applies.
+  useEffect(() => {
+    if (seed == null) return
+    setText(seed)
+    onSeedApplied?.()
+    const el = textareaRef.current
+    if (el) {
+      el.focus()
+      el.setSelectionRange(seed.length, seed.length)
+    }
+  }, [seed, setText, onSeedApplied])
 
   // Cmd/Ctrl+L focuses the composer from anywhere — the shortcut the hint
   // advertises. Scoped to when the shortcut is enabled and not disabled.

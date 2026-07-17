@@ -93,7 +93,8 @@ export function AssistantDock({
   renderConfirmedResult,
   renderTranscript,
 }: AssistantDockProps) {
-  const { open, openAssistant, closeAssistant } = useAssistantLauncher();
+  const { open, openAssistant, closeAssistant, seed, clearSeed } =
+    useAssistantLauncher();
   const chat = useAssistantChat(userId, {
     onWorkflowMutation,
     onConnectRequirement,
@@ -214,6 +215,8 @@ export function AssistantDock({
           toolRenderers={toolRenderers}
           renderConfirmedResult={renderConfirmedResult}
           renderTranscript={renderTranscript}
+          composerSeed={seed}
+          onComposerSeedApplied={clearSeed}
         />
         {isDesktop && (
           <ResizeHandle
