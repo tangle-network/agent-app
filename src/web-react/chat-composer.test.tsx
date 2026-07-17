@@ -207,6 +207,10 @@ describe('ChatComposer seed', () => {
     expect(input.value).toBe('Build a workflow that uses `github.issues.create` to ')
     expect(onSeedApplied).toHaveBeenCalledOnce()
     expect(document.activeElement).toBe(input)
+    // Caret must land at the END of the seeded text, positioned after the
+    // seeded value reached the DOM (not clamped against the pre-seed value).
+    expect(input.selectionStart).toBe(input.value.length)
+    expect(input.selectionEnd).toBe(input.value.length)
   })
 
   it('applies a second seed after the first is cleared, replacing the draft', () => {

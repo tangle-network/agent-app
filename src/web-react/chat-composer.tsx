@@ -208,19 +208,33 @@ export function ChatComposer({
     el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT)}px`
   }, [text])
 
-  // Adopt a one-shot seed. Runs whenever the seed transitions to a string
-  // (host sets it → consumed here → host clears it via onSeedApplied), so a
-  // second seed while the composer stays mounted still applies.
+  // Adopt a one-shot seed. Applies only when the `seed` PROP transitions to a
+  // new string (host sets it → consumed here → host clears it via
+  // onSeedApplied), so an unstable callback identity re-running this effect
+  // can never re-apply a still-set seed over the user's typing.
+  const prevSeedRef = useRef<string | null>(null)
+  const pendingCaretRef = useRef<string | null>(null)
   useEffect(() => {
-    if (seed == null) return
+    const prev = prevSeedRef.current
+    prevSeedRef.current = seed ?? null
+    if (seed == null || seed === prev) return
     setText(seed)
+    pendingCaretRef.current = seed
     onSeedApplied?.()
-    const el = textareaRef.current
-    if (el) {
-      el.focus()
-      el.setSelectionRange(seed.length, seed.length)
-    }
   }, [seed, setText, onSeedApplied])
+
+  // Focus + caret-to-end AFTER the seeded value has rendered into the DOM —
+  // setSelectionRange in the applying effect would run against the pre-render
+  // value and clamp the caret to the old text's length.
+  useEffect(() => {
+    if (pendingCaretRef.current == null || pendingCaretRef.current !== text)
+      return
+    pendingCaretRef.current = null
+    const el = textareaRef.current
+    if (!el) return
+    el.focus()
+    el.setSelectionRange(text.length, text.length)
+  }, [text])
 
   // Cmd/Ctrl+L focuses the composer from anywhere — the shortcut the hint
   // advertises. Scoped to when the shortcut is enabled and not disabled.
