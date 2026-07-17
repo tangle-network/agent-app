@@ -157,3 +157,69 @@ into the sandbox workspace and referenced by `path` (the ~1 MiB gateway body
 cap makes that two-step mandatory). Question cards render with
 `InteractionQuestionCard` + `useChatInteractions` and answer through
 `/api/chat/interactions` — see `/web-react`.
+
+## Advanced hooks (optional)
+
+A complex product turn-orchestrator does more than stream: it holds a
+single-flight lock, keeps the client alive through long tool calls, gates on
+domain readiness, and books telemetry. `createChatTurnRoutes` exposes five
+optional seams for exactly that — **omit any one and the route behaves exactly
+as above.** They compose with `authorize` / `produce` / `store` / `interactions`.
+
+```ts
+const routes = createChatTurnRoutes({
+  projectId: 'acme-agent',
+  authorize, store, turnStore, produce, // as above
+
+  // 1. Single-flight lock — acquired before any side effect, released once
+  //    when the turn settles (drain finish), on short-circuit, or on throw.
+  turnLock: {
+    acquire: async ({ identity, executionId }) => {
+      const got = await acquireLock(identity.tenantId, identity.sessionId, executionId)
+      return got.ok
+        ? { acquired: true, handle: got.lockId }
+        : { acquired: false, response: Response.json({ code: 'turn_in_flight' }, { status: 409 }) }
+    },
+    release: (lockId) => releaseLock(lockId as string),
+  },
+
+  // 2. Domain-readiness gate — short-circuit BEFORE the producer runs (the user
+  //    row is already persisted; return the assistant side of the turn).
+  contextGate: async ({ identity, prompt }) => {
+    const ready = await computeContextSufficiency(identity.tenantId)
+    return ready.ok ? { proceed: true } : { proceed: false, response: cannedAskForContext(ready.missing) }
+  },
+
+  // 3. Observe + augment the assembled input before the producer runs.
+  beforeTurn: async ({ prompt, priorMessages, identity }) => {
+    const composed = await composeSystemPromptWithCertified(identity.tenantId)
+    return { priorMessages: [systemMessage(composed), ...priorMessages] }
+  },
+
+  // 4. Deterministic run telemetry — start, then exactly one of complete/error.
+  lifecycle: {
+    onTurnStart: ({ identity, executionId }) => startRun(identity, executionId),
+    onTurnComplete: ({ finalText, usage, durationMs }) => endRun({ pass: true, finalText, usage, durationMs }),
+    onTurnError: ({ error, durationMs }) => endRun({ pass: false, error, durationMs }),
+  },
+
+  // 5. Keepalive while the producer is quiet (provisioning, first-token wait).
+  //    Window resets on every real event; a chatty producer never triggers one.
+  heartbeat: {
+    intervalMs: 5_000,
+    event: ({ elapsedMs }) => ({ type: 'run-phase', data: { phase: 'working', heartbeat: true, elapsedMs } }),
+  },
+
+  // Raw producer events for telemetry, before the engine frames them (distinct
+  // from `onEvent`, which sees the engine-framed stream incl. lifecycle).
+  onRawEvent: (event) => emitToTrace(event),
+})
+```
+
+Each seam replaces a slice a hand-rolled generator otherwise owns: the lock is
+the dual-scope session/workspace guard; `contextGate` is the sufficiency
+short-circuit; `beforeTurn` is the prompt-composition step; `lifecycle` is the
+`startRun`/`endRun`/`flush` triple (fires on failure too); `heartbeat` is the
+`withHeartbeat` wrapper around silent waits. `handleChatTurn` stays the turn
+engine underneath — these only wrap its input, its producer stream, and its
+settle.
