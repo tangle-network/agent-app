@@ -20,7 +20,7 @@
  * no router import. Auth/access is one injected `authorize` seam, composable
  * with `/app-auth` guards but not coupled to them.
  *
- * Five optional product seams let a complex turn-orchestrator compose the
+ * Six optional product seams let a complex turn-orchestrator compose the
  * vertical instead of hand-rolling a generator — each omittable to the exact
  * behavior above: `turnLock` (single-flight acquire/release around the turn),
  * `contextGate` (pre-producer domain-readiness short-circuit), `beforeTurn`
@@ -29,6 +29,14 @@
  * producer waits), plus `onRawEvent` (the raw producer events, for telemetry).
  * `handleChatTurn` stays the engine — the seams only wrap its input, its
  * producer stream, and its settle.
+ *
+ * Seam stability: `lifecycle` and `heartbeat` are generic and stable.
+ * `turnLock`, `contextGate`, `beforeTurn`, and `onRawEvent` are `@experimental`
+ * — proven by a single consumer (gtm's chat vertical, #200) and may change once
+ * a second consumer exercises them. They stay FLAT top-level options (not
+ * grouped under a `hooks` object): that grouping would break the shipped
+ * consumer's call for no mechanism gain, and this package's exports are
+ * additive-only.
  */
 
 import { deriveExecutionId, handleChatTurn } from '@tangle-network/agent-runtime'
@@ -236,14 +244,17 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
    *  product's own producer. May be async (box resolution). */
   produce(args: ChatTurnProduceArgs<TContext>): ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>
   /** Single-flight lock acquired before any side effect and released once when
-   *  the turn settles (including short-circuit/throw). Omit → no lock. */
+   *  the turn settles (including short-circuit/throw). Omit → no lock.
+   *  @experimental Single-consumer (gtm, #200); shape may change. */
   turnLock?: ChatTurnLock<TContext>
   /** Pre-turn readiness gate that can short-circuit with a product `Response`
    *  before the producer runs (the user row is already persisted). Runs after
-   *  `turnLock.acquire`, before `beforeTurn`. Omit → always proceed. */
+   *  `turnLock.acquire`, before `beforeTurn`. Omit → always proceed.
+   *  @experimental Single-consumer (gtm, #200); shape may change. */
   contextGate?(args: ChatTurnProduceArgs<TContext>): ChatTurnGateResult | Promise<ChatTurnGateResult>
   /** Observe the assembled producer input and optionally augment it (rewrite
-   *  the prompt / prior messages) before the producer runs. Omit → no change. */
+   *  the prompt / prior messages) before the producer runs. Omit → no change.
+   *  @experimental Single-consumer (gtm, #200); shape may change. */
   beforeTurn?(args: ChatTurnProduceArgs<TContext>): ChatTurnInputPatch | void | Promise<ChatTurnInputPatch | void>
   /** Deterministic run telemetry (start / complete / error) with identity and
    *  timing. Omit → no telemetry. */
@@ -253,7 +264,8 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
   /** Observe each event the producer emits, before the engine frames it and
    *  before any heartbeat injection (the raw sidecar-producer events, for
    *  telemetry). Never alters the stream; errors are swallowed. Distinct from
-   *  `onEvent`, which sees the engine-framed stream incl. lifecycle envelopes. */
+   *  `onEvent`, which sees the engine-framed stream incl. lifecycle envelopes.
+   *  @experimental Single-consumer (gtm, #200); shape may change. */
   onRawEvent?(event: ChatRouteEvent, context: TContext): void | Promise<void>
   /** Pre-persist transform of the final text (e.g. `/redact`'s `redactPII`).
    *  Live stream is never altered. */

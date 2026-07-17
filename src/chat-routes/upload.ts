@@ -11,6 +11,15 @@
  *     so a large file can never ride the prompt POST.
  *
  * The sink is structural (no sandbox-SDK import); products pass `box.fs`.
+ *
+ * @remarks Sole consumer today is the `--chat` scaffold (`create-agent-app
+ * --chat` → `template-chat/src/chat.ts`), the reference multimodal path. The
+ * fleet apps (gtm/tax/legal/insurance) each keep their OWN upload route into a
+ * durable vault (KV, or AES-GCM-encrypted R2) — a different persistence model
+ * from this route's inline-`data:`-or-ephemeral-sandbox-workspace split, so
+ * they don't (and shouldn't) route through it. This stays the scaffold's proven
+ * upload pattern, not a fleet primitive; keep that distinction in mind before
+ * widening its surface.
  */
 
 import type { ChatTurnFilePartInput } from './wire'
