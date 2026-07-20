@@ -960,6 +960,24 @@ export async function writeProfileFilesToBox(
 // box that already exists (reuse/resume paths). No-op unless the shell opts
 // into deferProfileFiles. Idempotent overwrite — a redeploy with new skills
 // refreshes the corpus on the next ensure call.
+// Box-metadata key holding the content hash of the deferred corpus that was
+// written to the box at CREATE. On reuse, an unchanged hash means the skills are
+// already on disk, so the (large, file-API) re-write can be skipped.
+const DEFERRED_CORPUS_HASH_KEY = 'agentAppDeferredCorpusHash'
+
+/** Stable content hash of the deferred file corpus (path + inline content).
+ *  Unchanged corpus ⇒ same hash; a new/edited/removed skill ⇒ different hash.
+ *  Exported for the reuse-skip test. */
+export function deferredCorpusHash(files: AgentProfileFileMount[]): string {
+  const norm = files
+    .map((f) => ({
+      p: f.path,
+      c: f.resource.kind === 'inline' ? ((f.resource as { content?: string }).content ?? '') : `ref:${f.resource.kind}`,
+    }))
+    .sort((a, b) => (a.p < b.p ? -1 : a.p > b.p ? 1 : 0))
+  return createHash('sha256').update(JSON.stringify(norm), 'utf8').digest('hex')
+}
+
 async function materializeDeferredFilesForExistingBox(
   shell: SandboxRuntimeConfig,
   client: Sandbox,
@@ -980,6 +998,16 @@ async function materializeDeferredFilesForExistingBox(
   const fullProfile = shell.profile({ extraFiles: files })
   const { deferredFiles } = splitDeferredProfileFiles(fullProfile)
   if (deferredFiles.length === 0) return ok(box)
+  // Skip the whole re-write when the corpus is UNCHANGED since the box was
+  // created with it. The skill corpus is large and the bulk goes through the
+  // file API (writeMany) UNCONDITIONALLY, so re-writing it on every reuse adds
+  // seconds of latency to each turn. The create payload stamps the corpus hash
+  // into box metadata; a matching hash means the skills are already on disk.
+  // Fail-safe: a missing or mismatched hash (e.g. a redeploy with new skills, or
+  // a box created before this optimization) WRITES — a stale skip is never
+  // risked. Reads metadata only, so no extra exec/round-trip.
+  const stampedHash = (box.metadata as Record<string, unknown> | undefined)?.[DEFERRED_CORPUS_HASH_KEY]
+  if (typeof stampedHash === 'string' && stampedHash === deferredCorpusHash(deferredFiles)) return ok(box)
   return writeDeferredFilesWithRuntimeAuthRefresh(client, box, deferredFiles, stage, name)
 }
 
@@ -1552,7 +1580,12 @@ export async function ensureWorkspaceSandbox(
   const payload = {
     name,
     image: resources.image,
-    metadata: shell.metadata(harness),
+    // Stamp the deferred-corpus hash so a later REUSE can skip re-writing an
+    // unchanged skill corpus (materializeDeferredFilesForExistingBox reads it).
+    metadata: {
+      ...shell.metadata(harness),
+      ...(deferredFiles.length > 0 ? { [DEFERRED_CORPUS_HASH_KEY]: deferredCorpusHash(deferredFiles) } : {}),
+    },
     idempotencyKey: name,
     // Passed through untyped (the SDK payload type predates it); the platform
     // authz-gates it server-side and ignores it when unsupported.
