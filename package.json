@@ -147,6 +147,11 @@
       "import": "./dist/preflight/index.js",
       "default": "./dist/preflight/index.js"
     },
+    "./object-store": {
+      "types": "./dist/object-store/index.d.ts",
+      "import": "./dist/object-store/index.js",
+      "default": "./dist/object-store/index.js"
+    },
     "./chat-store": {
       "types": "./dist/chat-store/index.d.ts",
       "import": "./dist/chat-store/index.js",
