@@ -22,6 +22,7 @@ export default defineConfig({
     'preset-cloudflare/index': 'src/preset-cloudflare/index.ts',
     'billing/index': 'src/billing/index.ts',
     'preflight/index': 'src/preflight/index.ts',
+    'object-store/index': 'src/object-store/index.ts',
     'chat-store/index': 'src/chat-store/index.ts',
     'chat-routes/index': 'src/chat-routes/index.ts',
     'crypto/index': 'src/crypto/index.ts',

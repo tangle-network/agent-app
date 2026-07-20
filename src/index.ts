@@ -17,6 +17,7 @@ export * from './config/index'
 export * from './preset-cloudflare/index'
 export * from './billing/index'
 export * from './preflight/index'
+export * from './object-store/index'
 // `/chat-store`'s drizzle factory + store stay subpath-only (they import the
 // optional drizzle-orm peer at module top); its pure pieces — the stored
 // `parts` vocabulary, title derivation, input error — are safe here.
