@@ -132,11 +132,13 @@ export type ChatTurnAuthorization<TContext> =
 
 export interface ChatTurnAuthorizeArgs {
   request: Request
-  intent: 'turn' | 'replay'
+  intent: 'turn' | 'replay' | 'running'
   /** Parsed, validated POST body (turn intent only). */
   body?: ChatTurnRequestPayload
   /** The buffered turn id being replayed (replay intent only). */
   turnId?: string
+  /** The thread whose running turns are being discovered (running intent only). */
+  threadId?: string
 }
 
 export interface ChatTurnProduceArgs<TContext> {
@@ -325,6 +327,11 @@ export interface ChatTurnRoutes {
   /** GET — replay a buffered turn from `?fromSeq=` (0 = everything), then
    *  follow it live until it completes. */
   replay(request: Request, params: { turnId: string }): Promise<Response>
+  /** GET `?threadId=` — the reconnect-discovery endpoint: the turn ids still
+   *  running on a thread, so a client that reloaded mid-turn can re-attach to
+   *  the live stream via {@link replay} instead of losing it. Returns `[]` when
+   *  the turn store cannot enumerate running turns (`listRunning` unimplemented). */
+  running(request: Request): Promise<Response>
   /** list/answer endpoints from `/interactions`; null when not configured. */
   interactions: InteractionAnswerRoute | null
 }
@@ -819,9 +826,22 @@ export function createChatTurnRoutes<TContext = void>(
     })
   }
 
+  async function running(request: Request): Promise<Response> {
+    const threadId = new URL(request.url).searchParams.get('threadId')?.trim()
+    if (!threadId) return Response.json({ error: 'Missing threadId' }, { status: 400 })
+    const auth = await options.authorize({ request, intent: 'running', threadId })
+    if (!auth.ok) return auth.response
+    // `listRunning` is optional on the store; a store that cannot enumerate
+    // running turns simply reports none — the client falls back to the persisted
+    // transcript, never to a hang.
+    const ids = (await options.turnStore.listRunning?.(threadId)) ?? []
+    return Response.json({ running: ids })
+  }
+
   return {
     turn,
     replay,
+    running,
     interactions: options.interactions ? createInteractionAnswerRoute(options.interactions) : null,
   }
 }
