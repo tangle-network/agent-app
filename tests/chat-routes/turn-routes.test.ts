@@ -145,6 +145,33 @@ describe('createChatTurnRoutes — turn', () => {
     expect(rows.filter((r) => r.role === 'user')).toHaveLength(1)
   })
 
+  it('authorize insertUserMessage:false suppresses the user-row insert but still runs the turn', async () => {
+    const produce = vi.fn(() => fakeProducer([{ type: 'text', text: 'ack' }], 'ack'))
+    const { routes, rows, ctx, pending } = makeRoutes({
+      produce,
+      authorize: async () => ({ ok: true, tenantId: 'ws-1', userId: 'user-1', context: undefined, insertUserMessage: false }),
+    })
+    await readLines((await routes.turn(turnRequest({ threadId: 't-1', content: 'synthetic follow-up' }), ctx)).body!)
+    await Promise.all(pending)
+
+    expect(produce).toHaveBeenCalledTimes(1)
+    expect(rows.filter((r) => r.role === 'user')).toHaveLength(0)
+    expect(rows.filter((r) => r.role === 'assistant')).toHaveLength(1)
+  })
+
+  it('authorize insertUserMessage:true cannot resurrect a deduped retry (AND-composition)', async () => {
+    const { routes, rows, ctx, pending } = makeRoutes({
+      authorize: async () => ({ ok: true, tenantId: 'ws-1', userId: 'user-1', context: undefined, insertUserMessage: true }),
+    })
+    const body = { threadId: 't-1', content: 'same', turnId: 'turn-abc' }
+    await readLines((await routes.turn(turnRequest(body), ctx)).body!)
+    await Promise.all(pending.splice(0))
+    await readLines((await routes.turn(turnRequest(body), ctx)).body!)
+    await Promise.all(pending.splice(0))
+
+    expect(rows.filter((r) => r.role === 'user')).toHaveLength(1)
+  })
+
   it('persists echoed file parts onto the user message and hands parts to the producer', async () => {
     const produce = vi.fn((_args: ChatTurnProduceArgs<unknown>) => fakeProducer([{ type: 'text', text: 'ok' }], 'ok'))
     const { routes, rows, ctx, pending } = makeRoutes({ produce })

@@ -114,7 +114,20 @@ export interface ChatTurnRouteProducer extends ChatTurnProducer {
 }
 
 export type ChatTurnAuthorization<TContext> =
-  | { ok: true; tenantId: string; userId: string; context: TContext }
+  | {
+      ok: true
+      tenantId: string
+      userId: string
+      context: TContext
+      /** When `false`, skip the `role:'user'` message insert for this turn — for
+       *  a product-dispatched / synthetic turn (e.g. a follow-up the product
+       *  raised itself) that must not surface a new user row. Composes with —
+       *  never overrides — the engine's retry-dedup: `authorize` runs before
+       *  turn identity is resolved, so it cannot tell a retry from a fresh turn;
+       *  a turn already deduped stays deduped. Omit / `true` → today's behavior.
+       *  @experimental Single-consumer; shape may change. */
+      insertUserMessage?: boolean
+    }
   | { ok: false; response: Response }
 
 export interface ChatTurnAuthorizeArgs {
@@ -564,7 +577,11 @@ export function createChatTurnRoutes<TContext = void>(
     }
 
     try {
-      if (chatTurn.shouldInsertUserMessage) {
+      // The product (via `authorize`) may suppress the user-row insert for a
+      // dispatched/synthetic turn. AND-composition: it can only subtract, never
+      // resurrect a turn the engine already deduped as a retry.
+      const insertUserMessage = chatTurn.shouldInsertUserMessage && (auth.insertUserMessage ?? true)
+      if (insertUserMessage) {
         await options.store.appendMessage({
           threadId: payload.threadId,
           role: 'user',
