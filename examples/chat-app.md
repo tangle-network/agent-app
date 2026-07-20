@@ -55,11 +55,18 @@ export function buildChat(env: Env) {
   })
 
   // The guard throws a JSON 401; guardResolution adapts it to {ok, response}.
-  const authorize = async ({ request }: { request: Request }) => {
+  // A dispatched/synthetic turn (e.g. a follow-up the product raised itself, not
+  // typed by the user) can set `insertUserMessage: false` to run the turn without
+  // surfacing a new `role:'user'` row. It only subtracts — the engine's retry
+  // dedup still applies — and defaults to today's behavior when omitted.
+  const authorize = async ({ request, body }: { request: Request; body?: { planFollowUp?: unknown } }) => {
     const auth = await guardResolution(() => requireApiUser(request))
     if (!auth.ok) return auth
     const { user } = auth.value
-    return { ok: true as const, tenantId: user.id, userId: user.id, context: { user } }
+    return {
+      ok: true as const, tenantId: user.id, userId: user.id, context: { user },
+      ...(body?.planFollowUp ? { insertUserMessage: false } : {}),
+    }
   }
 
   const routes = createChatTurnRoutes({
