@@ -99,6 +99,12 @@ export function createSandboxProduce(env: AppEnv) {
         effort: body.effort ?? config.model.effort,
         harness: config.harness,
         systemPrompt: config.systemPrompt,
+        // Durable by default: the run keeps executing server-side if the operator
+        // refreshes, closes the tab, or the Worker restarts mid-turn. On reopen
+        // the client re-attaches via GET /api/chat/running → /api/chat/replay, so
+        // nothing is lost. Drop this only for a run that should stop when the tab
+        // closes (e.g. a throwaway preview).
+        detach: true,
         interactions: config.interactions,
       }),
     })
