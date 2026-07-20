@@ -102,17 +102,21 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
    *  `userId`/`workspaceId`. */
   async function authorize(args: {
     request: Request
-    intent: 'turn' | 'replay'
+    intent: 'turn' | 'replay' | 'running'
     body?: Record<string, unknown>
+    threadId?: string
   }): Promise<ChatTurnAuthorization<void>> {
     const session = await requireUser(args.request)
     if (!session.ok) return session
     const { user } = session.value
-    if (args.intent === 'turn') {
-      const threadId = String(args.body?.threadId ?? '')
-      const thread = await store.getThread(threadId)
-      // Inaccessible reads are indistinguishable from missing ones — a
-      // cross-workspace probe must not learn the thread exists.
+    // `turn` and `running` are thread-scoped and MUST verify ownership: both name
+    // a thread the caller supplies (POST body for turn, `?threadId=` for running,
+    // whose response enumerates that thread's live turn ids). Inaccessible reads
+    // are indistinguishable from missing ones — a cross-workspace probe must not
+    // learn the thread exists.
+    if (args.intent === 'turn' || args.intent === 'running') {
+      const threadId = args.intent === 'turn' ? String(args.body?.threadId ?? '') : args.threadId
+      const thread = threadId ? await store.getThread(threadId) : null
       if (!thread || thread.workspaceId !== user.id) return { ok: false, response: notFound() }
     }
     // Replay authorizes on session only: turn ids are unguessable UUIDs minted

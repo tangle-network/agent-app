@@ -10,6 +10,7 @@
  *   GET  /api/threads/:id/messages      typed transcript (parts + usage)
  *   POST /api/chat                      run one turn (NDJSON stream)
  *   GET  /api/chat/replay/:turnId       replay a buffered turn (?fromSeq=)
+ *   GET  /api/chat/running              live turn ids on a thread (?threadId=)
  *   POST /api/chat/upload               multipart upload → prompt parts
  *   GET  /api/chat/interactions         outstanding agent asks (?threadId=)
  *   POST /api/chat/interactions         answer an ask
@@ -36,6 +37,9 @@ export default {
     }
     const replay = pathname.match(/^\/api\/chat\/replay\/([^/]+)$/)
     if (replay && method === 'GET') return app.routes.replay(request, { turnId: replay[1]! })
+    // Reconnect discovery: which turns are still live on a thread, so a page
+    // reloaded mid-turn re-attaches via /replay instead of losing the run.
+    if (pathname === '/api/chat/running' && method === 'GET') return app.routes.running(request)
     if (pathname === '/api/chat/upload' && method === 'POST') return app.upload(request)
     if (pathname === '/api/chat/interactions' && app.routes.interactions) {
       if (method === 'GET') return app.routes.interactions.list(request)
