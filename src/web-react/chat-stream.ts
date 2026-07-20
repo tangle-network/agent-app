@@ -153,7 +153,12 @@ export function dispatchChatStreamLine(line: string, cb: ChatStreamCallbacks): {
       break
     }
     case 'error': {
-      const message = String(evt.details ?? evt.error ?? 'Unknown stream error')
+      // The sandbox lane sends the reason as `{ type: 'error', data: { message } }`
+      // (mirrored by `session.run.failed`); older/edge lanes use a top-level
+      // `details`/`error`. Read `data.message` FIRST so a real failure surfaces
+      // to the operator instead of the useless "Unknown stream error".
+      const data = evt.data as { message?: string } | undefined
+      const message = String(data?.message ?? evt.details ?? evt.error ?? 'Unknown stream error')
       if (cb.onErrorEvent) {
         cb.onErrorEvent(message)
       } else {

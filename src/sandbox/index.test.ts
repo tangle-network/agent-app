@@ -62,6 +62,7 @@ import {
   buildSandboxToolPathSetupScript,
   runSandboxToolPathSetup,
   splitDeferredProfileFiles,
+  deferredCorpusHash,
   writeProfileFilesToBox,
   assertProvisionPayloadWithinCap,
   assertEnvWithinLimits,
@@ -1881,6 +1882,35 @@ describe('deferred profile files', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('ensureWorkspaceSandbox: reused box with a matching corpus hash SKIPS the deferred re-write', async () => {
+    const filesProfile = {
+      name: 'p',
+      resources: { files: [inlineMount('skills/seo.md', '# SEO')] },
+    } as unknown as AgentProfile
+    const { deferredFiles } = splitDeferredProfileFiles(filesProfile)
+    const hash = deferredCorpusHash(deferredFiles)
+    const writeMany = vi.fn().mockResolvedValue(undefined)
+    // Reused box already carries the corpus hash it was created with; liveness
+    // exec answers 'alive'. The re-write (writeMany) must NOT fire.
+    const running = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode', agentAppDeferredCorpusHash: hash },
+      exec: vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 }),
+      fs: { writeMany, supportsWriteMode: () => true } as never,
+    })
+    listMock.mockResolvedValue([running])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      deferProfileFiles: true,
+      profile: () => filesProfile,
+    })
+
+    const box = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(box).toBe(running)
+    expect(createMock).not.toHaveBeenCalled()
+    expect(writeMany).not.toHaveBeenCalled()
   })
 
   it('ensureWorkspaceSandbox: retries deferred writes on a resumed box', async () => {
