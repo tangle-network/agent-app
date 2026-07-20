@@ -1768,6 +1768,15 @@ export interface StreamSandboxPromptOptions {
   // session init loudly for unsupported ones; a local matrix would drift. Only honored
   // on the streaming path; the detached driveTurn path (driveSandboxTurn) never sets it.
   interactions?: { question?: boolean; permission?: boolean; plan?: boolean }
+  // Detach the run from THIS stream's lifetime. When true, dropping the stream —
+  // a Worker/isolate restart, a browser refresh, a network blip — does NOT cancel
+  // the run: the platform keeps executing it server-side and buffers its events,
+  // so a later reconnect (same `sessionId` + `lastEventId`) replays the tail and
+  // the run's result survives. This is what makes a WATCHED interactive turn
+  // durable — the run no longer dies with the Worker that opened it — while still
+  // streaming live (unlike the fire-and-forget `dispatchPrompt`/`driveTurn` path).
+  // Omit for a run where closing the tab should stop burning tokens.
+  detach?: boolean
 }
 
 type StreamPromptOptions = Parameters<SandboxInstance['streamPrompt']>[1]
@@ -1809,6 +1818,7 @@ export async function* streamSandboxPrompt(
     ...(options?.requireVisibleAssistantOutput !== undefined
       ? { requireVisibleAssistantOutput: options.requireVisibleAssistantOutput }
       : {}),
+    ...(options?.detach ? { detach: true } : {}),
     backend: {
       type: harness,
       profile: profileWithEffort,

@@ -273,6 +273,45 @@ describe('createChatTurnRoutes — buffered replay', () => {
   })
 })
 
+describe('createChatTurnRoutes — running discovery', () => {
+  it('reports a turn still running on the thread, then empty once it settles', async () => {
+    const { routes, turnStore } = makeRoutes()
+    // A turn buffering under this thread (what a detached, still-running turn
+    // looks like in the store after a client reload).
+    await turnStore.setStatus('turn-abc', 'running', 't-run')
+
+    const runningRes = await routes.running(new Request('http://app.test/api/chat/running?threadId=t-run'))
+    expect(runningRes.status).toBe(200)
+    expect(await runningRes.json()).toEqual({ running: ['turn-abc'] })
+
+    // A different thread's running turn is not reported here.
+    await turnStore.setStatus('turn-other', 'running', 't-other')
+    expect(
+      await (await routes.running(new Request('http://app.test/api/chat/running?threadId=t-run'))).json(),
+    ).toEqual({ running: ['turn-abc'] })
+
+    // Once the turn settles, discovery reports none — the client falls back to
+    // the persisted transcript.
+    await turnStore.setStatus('turn-abc', 'complete', 't-run')
+    expect(
+      await (await routes.running(new Request('http://app.test/api/chat/running?threadId=t-run'))).json(),
+    ).toEqual({ running: [] })
+  })
+
+  it('400s without a threadId and authorizes through the same seam', async () => {
+    const { routes } = makeRoutes({
+      authorize: async (args) =>
+        args.intent === 'running'
+          ? { ok: false, response: Response.json({ error: 'no' }, { status: 403 }) }
+          : { ok: true, tenantId: 'ws-1', userId: 'user-1', context: undefined },
+    })
+    expect((await routes.running(new Request('http://app.test/api/chat/running'))).status).toBe(400)
+    expect(
+      (await routes.running(new Request('http://app.test/api/chat/running?threadId=t-1'))).status,
+    ).toBe(403)
+  })
+})
+
 describe('createChatTurnRoutes — product seams', () => {
   /** Read NDJSON lines off a live body until `predicate` is satisfied or EOF. */
   async function drainUntil(
