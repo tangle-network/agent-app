@@ -6,6 +6,7 @@ import {
   mapInteractionRespondFailure,
   respondToSessionInteraction,
   validateInteractionAnswerBody,
+  type BeforeInteractionAnswerArgs,
   type InteractionConnectionResolution,
   type InteractionRequestWire,
   type SidecarInteractionsConnection,
@@ -272,6 +273,95 @@ describe('createInteractionAnswerRoute answer', () => {
       { id: 'ask-1', outcome: 'accepted', data: { q0: ['Formal'] } },
       { id: 'ask-2', outcome: 'accepted', data: { q0: ['Formal'] } },
     ])
+  })
+
+  it('runs beforeAnswer with the authoritative snapshot before any answer POST', async () => {
+    const sidecar = fakeSidecar([
+      wireQuestion('ask-1'),
+      wireQuestion('ask-2'),
+      wireQuestion('ask-3', { title: 'Different' }),
+    ])
+    const beforeAnswer = vi.fn(async (args: BeforeInteractionAnswerArgs) => {
+      expect(sidecar.calls.map((call) => call.method)).toEqual(['GET'])
+      expect(args.answer).toEqual({
+        ok: true,
+        id: 'ask-1',
+        outcome: 'accepted',
+        data: { q0: ['Formal'] },
+      })
+      expect(args.body).toMatchObject({ workspaceId: 'ws-1' })
+      expect(args.outstanding.map((item) => item.id)).toEqual(['ask-1', 'ask-2', 'ask-3'])
+      expect(args.answeredRequest?.id).toBe('ask-1')
+      expect(args.duplicateRequests.map((item) => item.id)).toEqual(['ask-2'])
+      expect(args.connection.sessionId).toBe('session-1')
+    })
+    const route = createInteractionAnswerRoute({
+      resolveConnection: async () => ({ ok: true, connection: connectionFor(sidecar) }),
+      beforeAnswer,
+      logger: { warn: vi.fn(), error: vi.fn() },
+    })
+
+    const response = await route.answer(answerRequest({
+      id: 'ask-1',
+      outcome: 'accepted',
+      data: { q0: ['Formal'] },
+      workspaceId: 'ws-1',
+    }))
+    expect(response.status).toBe(200)
+    expect(beforeAnswer).toHaveBeenCalledOnce()
+    expect(sidecar.calls.map((call) => call.method)).toEqual(['GET', 'POST', 'GET', 'POST', 'GET'])
+  })
+
+  it('does not answer or unblock when beforeAnswer fails', async () => {
+    const error = vi.fn()
+    const sidecar = fakeSidecar([wireQuestion('ask-1')])
+    const route = createInteractionAnswerRoute({
+      resolveConnection: async () => ({ ok: true, connection: connectionFor(sidecar) }),
+      beforeAnswer: async () => { throw new Error('storage unavailable') },
+      logger: { warn: vi.fn(), error },
+    })
+
+    const response = await route.answer(answerRequest({ id: 'ask-1', outcome: 'accepted', data: { q0: ['Formal'] } }))
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({
+      code: 'INTERACTION_BEFORE_ANSWER_FAILED',
+      error: 'Could not save the answer. Try again.',
+    })
+    expect(sidecar.calls.map((call) => call.method)).toEqual(['GET'])
+    expect(sidecar.outstanding.has('ask-1')).toBe(true)
+    expect(error).toHaveBeenCalledOnce()
+  })
+
+  it('does not run beforeAnswer or POST when the authoritative snapshot fails', async () => {
+    const beforeAnswer = vi.fn()
+    const sidecar = fakeSidecar([wireQuestion('ask-1')], {
+      listResponse: { status: 502, body: '<html>Bad Gateway</html>' },
+    })
+    const route = createInteractionAnswerRoute({
+      resolveConnection: async () => ({ ok: true, connection: connectionFor(sidecar) }),
+      beforeAnswer,
+      logger: { warn: vi.fn(), error: vi.fn() },
+    })
+
+    const response = await route.answer(answerRequest({ id: 'ask-1', outcome: 'accepted', data: { q0: ['Formal'] } }))
+    expect(response.status).toBe(503)
+    expect(beforeAnswer).not.toHaveBeenCalled()
+    expect(sidecar.calls.map((call) => call.method)).toEqual(['GET'])
+  })
+
+  it('does not persist or POST when the interaction is absent from the authoritative snapshot', async () => {
+    const beforeAnswer = vi.fn()
+    const sidecar = fakeSidecar([])
+    const route = createInteractionAnswerRoute({
+      resolveConnection: async () => ({ ok: true, connection: connectionFor(sidecar) }),
+      beforeAnswer,
+      logger: { warn: vi.fn(), error: vi.fn() },
+    })
+
+    const response = await route.answer(answerRequest({ id: 'ask-1', outcome: 'accepted', data: { q0: ['Formal'] } }))
+    expect(response.status).toBe(410)
+    expect(beforeAnswer).not.toHaveBeenCalled()
+    expect(sidecar.calls.map((call) => call.method)).toEqual(['GET'])
   })
 
   it.each([

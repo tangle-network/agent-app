@@ -29,6 +29,7 @@ import {
   isSafeInteractionFieldKey,
   questionInteractionContentSignature,
   type InteractionData,
+  type InteractionRequestWire,
 } from './contract'
 import {
   listSessionInteractions,
@@ -126,11 +127,28 @@ export interface ResolveInteractionConnectionArgs {
   body?: Record<string, unknown>
 }
 
+export interface BeforeInteractionAnswerArgs {
+  request: Request
+  /** Original parsed body, including product routing fields. */
+  body: Record<string, unknown>
+  /** Shared validation result; products never need to parse the answer again. */
+  answer: Extract<InteractionAnswerBodyValidation, { ok: true }>
+  connection: SidecarInteractionsConnection
+  /** The route's single authoritative pre-answer sidecar snapshot. */
+  outstanding: InteractionRequestWire[]
+  answeredRequest?: InteractionRequestWire
+  /** Content-identical questions that the shared route will also answer. */
+  duplicateRequests: InteractionRequestWire[]
+}
+
 export interface InteractionAnswerRouteOptions {
   /** Authenticate + authorize the caller and resolve the sidecar connection.
    *  This is the only product-supplied step: session auth, workspace/thread
    *  access, rate limiting, and box resolution all live here. */
   resolveConnection: (args: ResolveInteractionConnectionArgs) => Promise<InteractionConnectionResolution>
+  /** Product persistence seam that runs before the answer can unblock and
+   * finalize the agent turn. A throw aborts the request before any answer POST. */
+  beforeAnswer?: (args: BeforeInteractionAnswerArgs) => void | Promise<void>
   logger?: InteractionRouteLogger
 }
 
@@ -189,25 +207,59 @@ export function createInteractionAnswerRoute(options: InteractionAnswerRouteOpti
     // content-identical duplicates still outstanding afterwards (the agent may
     // have re-emitted the same question N times) can be answered the same way.
     const before = await listSessionInteractions(connection)
+    if (!before.succeeded && options.beforeAnswer) {
+      return mapInteractionRespondFailure(before.error, logger)
+    }
     const answeredRequest = before.succeeded ? before.value.find((item) => item.id === validation.id) : undefined
+    if (options.beforeAnswer && !answeredRequest) {
+      return mapInteractionRespondFailure(
+        { code: 'NOT_FOUND', message: 'interaction not found', status: 404 },
+        logger,
+      )
+    }
     const answeredSignature = answeredRequest
       ? questionInteractionContentSignature(interactionFromWireRequest(answeredRequest))
       : null
+    const duplicateRequests = before.succeeded && answeredSignature
+      ? before.value.filter((item) => item.id !== validation.id && (
+          questionInteractionContentSignature(interactionFromWireRequest(item)) === answeredSignature
+        ))
+      : []
+
+    if (options.beforeAnswer) {
+      try {
+        await options.beforeAnswer({
+          request,
+          body,
+          answer: validation,
+          connection,
+          outstanding: before.succeeded ? before.value : [],
+          ...(answeredRequest ? { answeredRequest } : {}),
+          duplicateRequests,
+        })
+      } catch (error) {
+        logger.error('[interactions] beforeAnswer failed:', error)
+        return Response.json(
+          { code: 'INTERACTION_BEFORE_ANSWER_FAILED', error: 'Could not save the answer. Try again.' },
+          { status: 503 },
+        )
+      }
+    }
 
     const result = await respondToSessionInteraction(connection, { id: validation.id, ...answerPayload })
     if (!result.succeeded) return mapInteractionRespondFailure(result.error, logger)
 
     let remaining = await listSessionInteractions(connection)
     if (remaining.succeeded && answeredSignature) {
-      const duplicateRequests = remaining.value.filter((item) => {
+      const remainingDuplicates = remaining.value.filter((item) => {
         if (item.id === validation.id) return false
         return questionInteractionContentSignature(interactionFromWireRequest(item)) === answeredSignature
       })
-      for (const duplicate of duplicateRequests) {
+      for (const duplicate of remainingDuplicates) {
         const duplicateResult = await respondToSessionInteraction(connection, { id: duplicate.id, ...answerPayload })
         if (!duplicateResult.succeeded) break
       }
-      if (duplicateRequests.length > 0) remaining = await listSessionInteractions(connection)
+      if (remainingDuplicates.length > 0) remaining = await listSessionInteractions(connection)
     }
 
     // Prove the run actually unblocked: neither the answered id nor any

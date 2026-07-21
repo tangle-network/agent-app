@@ -18,6 +18,10 @@ import {
   parseInteractionRequest,
 } from '../interactions/contract'
 import {
+  parsePlanSubmittedEvent,
+  planToPersistedPart,
+} from '../plans/index'
+import {
   asRecord,
   asString,
   finalizeAssistantParts,
@@ -226,6 +230,17 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
             kind: parsed.value.kind,
           })
         }
+        continue
+      }
+
+      if (event.type === 'plan.submitted') {
+        const parsed = parsePlanSubmittedEvent(record)
+        if (!parsed.succeeded) {
+          log('[chat-routes] dropping malformed plan.submitted event', { error: parsed.error })
+          continue
+        }
+        recordPersistedPart(planToPersistedPart(parsed.value), undefined)
+        yield event
         continue
       }
 

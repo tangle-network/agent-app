@@ -138,6 +138,42 @@ describe('createSandboxChatProducer', () => {
     expect(declineInteraction).toHaveBeenCalledExactlyOnceWith('p-1')
   })
 
+  it('forwards and persists live durable plan submissions without a session id', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([{
+        type: 'plan.submitted',
+        data: {
+          plan: {
+            id: 'plan-1',
+            revision: 1,
+            body: '1. Research\n2. Execute',
+            submittedAt: '2026-07-21T00:00:00.000Z',
+          },
+        },
+      }]),
+    })
+
+    expect(await drain(producer.stream)).toEqual([{
+      type: 'plan.submitted',
+      data: {
+        plan: {
+          id: 'plan-1',
+          revision: 1,
+          body: '1. Research\n2. Execute',
+          submittedAt: '2026-07-21T00:00:00.000Z',
+        },
+      },
+    }])
+    expect(producer.assistantParts?.()).toEqual([{
+      type: 'plan',
+      planId: 'plan-1',
+      revision: 1,
+      body: '1. Research\n2. Execute',
+      submittedAt: '2026-07-21T00:00:00.000Z',
+      status: 'pending',
+    }])
+  })
+
   it('forwards error and cancel events verbatim and drops malformed interactions', async () => {
     const log = vi.fn()
     const producer = createSandboxChatProducer({

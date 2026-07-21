@@ -1,3 +1,16 @@
+import {
+  canTransitionInteractionStatus,
+  persistedPartToInteraction,
+  type ChatInteractionStatus,
+} from '../interactions/contract'
+import {
+  canTransitionPlanStatus,
+  persistedPartToPlan,
+  planPartKey,
+  planToPersistedPart,
+  type ChatPlanStatus,
+} from '../plans/index'
+
 export type JsonRecord = Record<string, unknown>
 
 export interface StreamEvent {
@@ -149,9 +162,18 @@ export function normalizePersistedPart(rawPart: JsonRecord): JsonRecord | null {
     }
   }
 
-  // System-authored persisted parts (`/interactions` codecs) pass through
-  // verbatim when a producer routes them here — they are already projections.
-  if (type === 'interaction' || type === 'notice') {
+  if (type === 'interaction') {
+    return persistedPartToInteraction(rawPart) ? rawPart : null
+  }
+
+  if (type === 'plan') {
+    const plan = persistedPartToPlan(rawPart)
+    return plan ? { ...rawPart, ...planToPersistedPart(plan) } : null
+  }
+
+  // System-authored notices pass through verbatim; `/chat-store` owns their
+  // final typed validation before persistence.
+  if (type === 'notice') {
     return rawPart
   }
 
@@ -201,6 +223,7 @@ export function getPartKey(part: JsonRecord): string {
   if (type === 'tool') {
     return `tool:${resolveToolId(part)}`
   }
+  if (type === 'plan') return planPartKey(String(part.planId ?? ''))
 
   // Keyed by the part's OWN type so distinct kinds never merge into each
   // other. Untyped parts fall back to the text lane (legacy shape).
@@ -269,6 +292,39 @@ export function mergePersistedPart(existing: JsonRecord | undefined, incoming: J
       ...overlayDefined(existing, incoming),
       state: mergedState,
     }
+  }
+
+  if (type === 'interaction' && String(existing.type ?? '') === 'interaction') {
+    const merged = overlayDefined(existing, incoming)
+    const existingStatus = existing.status as ChatInteractionStatus | undefined
+    const incomingStatus = incoming.status as ChatInteractionStatus | undefined
+    if (
+      existingStatus &&
+      incomingStatus &&
+      existingStatus !== incomingStatus &&
+      !canTransitionInteractionStatus(existingStatus, incomingStatus)
+    ) {
+      merged.status = existingStatus
+    }
+    if (incoming.answers === undefined && existing.answers !== undefined) {
+      merged.answers = existing.answers
+    }
+    return merged
+  }
+
+  if (type === 'plan' && String(existing.type ?? '') === 'plan') {
+    const merged = overlayDefined(existing, incoming)
+    const existingStatus = existing.status as ChatPlanStatus | undefined
+    const incomingStatus = incoming.status as ChatPlanStatus | undefined
+    if (
+      existingStatus &&
+      incomingStatus &&
+      existingStatus !== incomingStatus &&
+      !canTransitionPlanStatus(existingStatus, incomingStatus)
+    ) {
+      merged.status = existingStatus
+    }
+    return merged
   }
 
   return incoming

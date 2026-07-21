@@ -182,6 +182,11 @@
       "import": "./dist/interactions/index.js",
       "default": "./dist/interactions/index.js"
     },
+    "./plans": {
+      "types": "./dist/plans/index.d.ts",
+      "import": "./dist/plans/index.js",
+      "default": "./dist/plans/index.js"
+    },
     "./missions": {
       "types": "./dist/missions/index.d.ts",
       "import": "./dist/missions/index.js",

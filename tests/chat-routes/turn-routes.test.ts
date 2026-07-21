@@ -8,6 +8,7 @@ import {
 } from '../../src/chat-routes/index'
 import type { ChatMessagePart } from '../../src/chat-store/parts'
 import type { InteractionRequestWire } from '../../src/interactions/index'
+import { planToPersistedPart, type ChatPlan } from '../../src/plans/index'
 import { createMemoryTurnEventStore } from '../../src/stream/index'
 
 // ── fakes ────────────────────────────────────────────────────────────────────
@@ -132,6 +133,25 @@ describe('createChatTurnRoutes — turn', () => {
       costUsd: 0.01,
     })
     expect(rows[1]!.parts).toEqual([{ type: 'text', text: 'answer' }])
+  })
+
+  it('persists a durable plan part returned by the producer', async () => {
+    const plan: ChatPlan = {
+      planId: 'plan-1',
+      revision: 1,
+      body: '1. Research\n2. Execute',
+      submittedAt: '2026-07-21T00:00:00.000Z',
+      status: 'pending',
+    }
+    const { routes, rows, ctx, pending } = makeRoutes({
+      produce: () => fakeProducer([{ type: 'plan.submitted', data: { plan } }], '', {
+        assistantParts: () => [planToPersistedPart(plan)],
+      }),
+    })
+    await readLines((await routes.turn(turnRequest({ threadId: 't-1', content: 'make a plan' }), ctx)).body!)
+    await Promise.all(pending)
+
+    expect(rows.find((row) => row.role === 'assistant')?.parts).toEqual([planToPersistedPart(plan)])
   })
 
   it('does not double-insert the user row on a retried turnId', async () => {

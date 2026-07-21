@@ -130,6 +130,22 @@ describe('normalizePersistedPart — full storable vocabulary', () => {
     expect(normalizePersistedPart(notice)).toEqual(notice)
   })
 
+  it('validates and preserves durable plan parts', () => {
+    const plan = {
+      type: 'plan',
+      planId: 'plan-1',
+      revision: 1,
+      body: 'Plan body',
+      submittedAt: '2026-07-21T00:00:00.000Z',
+      status: 'pending',
+    }
+    expect(normalizePersistedPart(plan)).toEqual(plan)
+    expect(normalizePersistedPart({ ...plan, planId: undefined, id: 'plan-1' }))
+      .toMatchObject({ planId: 'plan-1' })
+    expect(normalizePersistedPart({ ...plan, revision: 0 })).toBeNull()
+    expect(getPartKey(plan)).toBe('plan:plan-1')
+  })
+
   it('still returns null for unknown kinds', () => {
     expect(normalizePersistedPart({ type: 'telemetry', blob: 1 })).toBeNull()
   })
@@ -196,6 +212,32 @@ describe('mergePersistedPart', () => {
     const state = merged.state as Record<string, unknown>
     expect(state.error).toBe('exit 1')
     expect(state.status).toBe('error')
+  })
+
+  it('keeps durable plan and interaction statuses monotonic across stale replay', () => {
+    const approved = {
+      type: 'plan',
+      planId: 'plan-1',
+      revision: 1,
+      body: 'Plan',
+      submittedAt: '2026-07-21T00:00:00.000Z',
+      status: 'approved',
+      decidedAt: '2026-07-21T00:01:00.000Z',
+    }
+    expect(mergePersistedPart(approved, { ...approved, status: 'pending', decidedAt: undefined }))
+      .toEqual(approved)
+
+    const answered = {
+      type: 'interaction',
+      id: 'ask-1',
+      kind: 'question',
+      title: 'Question',
+      answerSpec: { fields: [] },
+      status: 'answered',
+      answers: { q0: ['Yes'] },
+    }
+    expect(mergePersistedPart(answered, { ...answered, status: 'pending', answers: undefined }))
+      .toEqual(answered)
   })
 })
 
