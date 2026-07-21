@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   createDurableChatEventProjection,
+  createDurablePlanRoutes,
   createDurableChatScope,
   InMemoryDurableChatStateStore,
   upsertDurableInteractionAsk,
@@ -53,6 +54,37 @@ describe('withDurableChatProjection', () => {
     expect(wrapped.assistantParts?.()).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'ask-old' }),
     ]))
+
+    const routes = createDurablePlanRoutes({
+      store,
+      authorize: async () => scope,
+      authority: {
+        current: async ({ planId }) => ({ plan: await store.getPlanProjection(scope, planId) }),
+        decide: async ({ planId, revision, decision }) => {
+          const submitted = (await store.getPlanProjection(scope, planId, revision))!
+          const plan = decision === 'approved'
+            ? { ...submitted, status: 'approved' as const, decidedAt: '2026-07-21T00:01:00.000Z' }
+            : {
+                ...submitted,
+                status: 'rejected' as const,
+                decidedAt: '2026-07-21T00:01:00.000Z',
+                feedback: 'Revise it',
+              }
+          return { plan, followUp: { turnId: 'follow-up-1', state: 'queued' } }
+        },
+      },
+      afterDecision: () => undefined,
+    })
+    const decision = await routes.decide(new Request('https://app.test/plan', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ planId: 'plan-1', revision: 1, decision: 'approved' }),
+    }))
+    expect(decision.status).toBe(200)
+    await expect(decision.json()).resolves.toMatchObject({
+      plan: { planId: 'plan-1', status: 'approved' },
+      receipt: { turnId: 'follow-up-1' },
+    })
   })
 
   it('does not let a stale projected revision replace a newer plan part', async () => {
