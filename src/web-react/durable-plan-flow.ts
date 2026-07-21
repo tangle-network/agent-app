@@ -95,7 +95,7 @@ function parseDecisionResult(value: unknown): DurablePlanDecisionResult | null {
   return {
     plan,
     ...(followUp ? { followUp } : {}),
-    idempotent: body.idempotent === true,
+    idempotent: body.idempotent === true || body.replayed === true,
     ...(body.projectionPending === true ? { projectionPending: true } : {}),
     ...(body.effectPending === true ? { effectPending: true } : {}),
   }
@@ -180,6 +180,7 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
   const [restoring, setRestoring] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const attachments = useRef(new Map<string, Promise<void>>())
+  const decisionInFlight = useRef(false)
 
   useEffect(() => setPlan(options.plan), [options.plan])
 
@@ -198,7 +199,8 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
   }, [options.attachFollowUp, options.onUpdated])
 
   const decide = useCallback(async (decision: DurablePlanDecision, feedback?: string) => {
-    if (deciding) return null
+    if (decisionInFlight.current) return null
+    decisionInFlight.current = true
     setDeciding(decision)
     setError(null)
     try {
@@ -218,9 +220,10 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
       setError(cause instanceof Error ? cause.message : 'Could not decide the plan.')
       return null
     } finally {
+      decisionInFlight.current = false
       setDeciding(null)
     }
-  }, [apply, deciding, options.client, options.onUpdated, plan.planId, plan.revision])
+  }, [apply, options.client, options.onUpdated, plan.planId, plan.revision])
 
   const restore = useCallback(async () => {
     setRestoring(true)

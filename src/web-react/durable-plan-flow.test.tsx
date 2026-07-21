@@ -60,6 +60,17 @@ describe('createDurablePlanDecisionClient', () => {
       { method: 'GET' },
     )
   })
+
+  it('normalizes the shared route replay marker as an idempotent result', async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
+      plan: result(true).plan,
+      receipt: { receiptId: 'receipt-1', turnId: 'turn-1', state: 'running' },
+      replayed: true,
+    }), { status: 200 })) as unknown as typeof fetch
+    const client = createDurablePlanDecisionClient({ url: '/api/plan', fetchImpl })
+    await expect(client.decide({ planId: 'plan-1', revision: 1, decision: 'approved' }))
+      .resolves.toEqual(result(true))
+  })
 })
 
 describe('useDurablePlanFlow', () => {
@@ -103,5 +114,25 @@ describe('useDurablePlanFlow', () => {
       await Promise.all([first, second])
     })
     expect(attach).toHaveBeenCalledTimes(1)
+  })
+
+  it('coalesces decisions submitted before React commits the busy state', async () => {
+    let release!: (value: DurablePlanDecisionResult) => void
+    const client = {
+      current: vi.fn(async () => result(true)),
+      decide: vi.fn(() => new Promise<DurablePlanDecisionResult>((resolve) => { release = resolve })),
+    }
+    const { result: hook } = renderHook(() => useDurablePlanFlow({ plan: pending, client }))
+    let first!: Promise<unknown>
+    let second!: Promise<unknown>
+    act(() => {
+      first = hook.current.decide('approved')
+      second = hook.current.decide('approved')
+    })
+    await act(async () => {
+      release(result())
+      await Promise.all([first, second])
+    })
+    expect(client.decide).toHaveBeenCalledTimes(1)
   })
 })
