@@ -332,6 +332,108 @@ describe('createInteractionAnswerRoute answer', () => {
     expect(error).toHaveBeenCalledOnce()
   })
 
+  it('settles durable answers only after sidecar acknowledgement', async () => {
+    const sidecar = fakeSidecar([wireQuestion('ask-1')])
+    const order: string[] = []
+    const route = createInteractionAnswerRoute({
+      resolveConnection: async () => ({ ok: true, connection: connectionFor(sidecar) }),
+      durable: {
+        guarantee: 'reconciled',
+        prepare: async () => { order.push('prepare'); return { intentKey: 'intent-1' } },
+        reconcile: async () => ({ settled: false }),
+        acknowledge: async () => { order.push('acknowledge') },
+        finalize: async () => { order.push('finalize') },
+      },
+      logger: { warn: vi.fn(), error: vi.fn() },
+    })
+
+    const response = await route.answer(answerRequest({
+      id: 'ask-1',
+      outcome: 'accepted',
+      data: { q0: ['Formal'] },
+      attemptKey: 'attempt-1',
+    }))
+    expect(response.status).toBe(200)
+    expect(order).toEqual(['prepare', 'acknowledge', 'finalize'])
+    expect(sidecar.calls.map((call) => call.method)).toEqual(['GET', 'POST', 'GET'])
+  })
+
+  it('requires an attempt key only when durable settlement is enabled', async () => {
+    const sidecar = fakeSidecar([wireQuestion('ask-1')])
+    const route = createInteractionAnswerRoute({
+      resolveConnection: async () => ({ ok: true, connection: connectionFor(sidecar) }),
+      durable: {
+        guarantee: 'reconciled',
+        prepare: async () => ({}),
+        reconcile: async () => ({ settled: false }),
+        acknowledge: async () => {},
+        finalize: async () => {},
+      },
+    })
+    const response = await route.answer(answerRequest({ id: 'ask-1', outcome: 'accepted' }))
+    expect(response.status).toBe(400)
+    expect(sidecar.calls).toEqual([])
+  })
+
+  it('reattaches an ambiguous retry through durable reconciliation', async () => {
+    const sidecar = fakeSidecar([])
+    const route = createInteractionAnswerRoute({
+      resolveConnection: async () => ({ ok: true, connection: connectionFor(sidecar) }),
+      durable: {
+        guarantee: 'reconciled',
+        prepare: async () => ({ intentKey: 'intent-1' }),
+        reconcile: async () => ({ settled: true }),
+        acknowledge: async () => {},
+        finalize: async () => {},
+      },
+    })
+    const response = await route.answer(answerRequest({
+      id: 'ask-1', outcome: 'accepted', data: { q0: ['Formal'] }, attemptKey: 'attempt-1',
+    }))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ ok: true, idempotent: true })
+    expect(sidecar.calls.map((call) => call.method)).toEqual(['GET'])
+  })
+
+  it('keeps an unresolved durable retry retryable instead of expiring it', async () => {
+    const sidecar = fakeSidecar([])
+    const route = createInteractionAnswerRoute({
+      resolveConnection: async () => ({ ok: true, connection: connectionFor(sidecar) }),
+      durable: {
+        guarantee: 'reconciled',
+        prepare: async () => ({ intentKey: 'intent-1' }),
+        reconcile: async () => ({ settled: false }),
+        acknowledge: async () => {},
+        finalize: async () => {},
+      },
+    })
+    const response = await route.answer(answerRequest({
+      id: 'ask-1', outcome: 'accepted', data: { q0: ['Formal'] }, attemptKey: 'attempt-1',
+    }))
+    expect(response.status).toBe(503)
+    expect(await response.json()).toMatchObject({ code: 'INTERACTION_RECONCILIATION_PENDING' })
+  })
+
+  it('returns retryable 503 after acknowledgement when durable finalization fails', async () => {
+    const sidecar = fakeSidecar([wireQuestion('ask-1')])
+    const route = createInteractionAnswerRoute({
+      resolveConnection: async () => ({ ok: true, connection: connectionFor(sidecar) }),
+      durable: {
+        guarantee: 'reconciled',
+        prepare: async () => ({}),
+        reconcile: async () => ({ settled: false }),
+        acknowledge: async () => {},
+        finalize: async () => { throw new Error('db unavailable') },
+      },
+      logger: { warn: vi.fn(), error: vi.fn() },
+    })
+    const response = await route.answer(answerRequest({
+      id: 'ask-1', outcome: 'accepted', data: { q0: ['Formal'] }, attemptKey: 'attempt-1',
+    }))
+    expect(response.status).toBe(503)
+    expect(await response.json()).toMatchObject({ code: 'INTERACTION_FINALIZE_FAILED' })
+  })
+
   it('does not run beforeAnswer or POST when the authoritative snapshot fails', async () => {
     const beforeAnswer = vi.fn()
     const sidecar = fakeSidecar([wireQuestion('ask-1')], {

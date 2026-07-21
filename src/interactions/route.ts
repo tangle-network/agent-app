@@ -141,6 +141,35 @@ export interface BeforeInteractionAnswerArgs {
   duplicateRequests: InteractionRequestWire[]
 }
 
+export interface DurableInteractionRouteArgs extends BeforeInteractionAnswerArgs {
+  /** Caller-created opaque identifier, stable across an ambiguous retry. */
+  attemptKey: string
+}
+
+/** Crash-recoverable persistence lifecycle for the answer route. The product
+ * binds this structural port to `/durable-chat` (or an equivalent durable
+ * store). Existing `beforeAnswer` behavior remains independent and unchanged. */
+export interface DurableInteractionRoutePersistence<TPrepared = unknown> {
+  guarantee: 'reconciled' | 'best-effort'
+  prepare(args: DurableInteractionRouteArgs): TPrepared | Promise<TPrepared>
+  /** Resolve an ambiguous retry (for example, the sidecar says the ask is
+   * already gone). Only `settled:true` permits the route to report success. */
+  reconcile(args: DurableInteractionRouteArgs & { prepared: TPrepared }):
+    | { settled: boolean }
+    | Promise<{ settled: boolean }>
+  /** Record the authority acknowledgement before terminal projection. */
+  acknowledge(args: DurableInteractionRouteArgs & {
+    prepared: TPrepared
+    duplicateIds: string[]
+  }): void | Promise<void>
+  /** Idempotently materialize terminal status and accepted values. */
+  finalize(args: DurableInteractionRouteArgs & {
+    prepared: TPrepared
+    duplicateIds: string[]
+  }): void | Promise<void>
+  fail?(args: DurableInteractionRouteArgs & { prepared: TPrepared; error: unknown }): void | Promise<void>
+}
+
 export interface InteractionAnswerRouteOptions {
   /** Authenticate + authorize the caller and resolve the sidecar connection.
    *  This is the only product-supplied step: session auth, workspace/thread
@@ -149,6 +178,9 @@ export interface InteractionAnswerRouteOptions {
   /** Product persistence seam that runs before the answer can unblock and
    * finalize the agent turn. A throw aborts the request before any answer POST. */
   beforeAnswer?: (args: BeforeInteractionAnswerArgs) => void | Promise<void>
+  /** Additive crash-recoverable settlement. When configured, POST requires an
+   * `attemptKey`; accepted values are finalized only after sidecar ack. */
+  durable?: DurableInteractionRoutePersistence
   logger?: InteractionRouteLogger
 }
 
@@ -188,6 +220,10 @@ export function createInteractionAnswerRoute(options: InteractionAnswerRouteOpti
     }
     const validation = validateInteractionAnswerBody(body)
     if (!validation.ok) return Response.json({ error: validation.error }, { status: 400 })
+    const attemptKey = typeof body.attemptKey === 'string' ? body.attemptKey.trim() : ''
+    if (options.durable && !attemptKey) {
+      return Response.json({ error: 'Missing attemptKey for durable interaction answer' }, { status: 400 })
+    }
 
     const resolution = await options.resolveConnection({ request, intent: 'answer', body })
     if (!resolution.ok) {
@@ -207,11 +243,11 @@ export function createInteractionAnswerRoute(options: InteractionAnswerRouteOpti
     // content-identical duplicates still outstanding afterwards (the agent may
     // have re-emitted the same question N times) can be answered the same way.
     const before = await listSessionInteractions(connection)
-    if (!before.succeeded && options.beforeAnswer) {
+    if (!before.succeeded && (options.beforeAnswer || options.durable)) {
       return mapInteractionRespondFailure(before.error, logger)
     }
     const answeredRequest = before.succeeded ? before.value.find((item) => item.id === validation.id) : undefined
-    if (options.beforeAnswer && !answeredRequest) {
+    if (options.beforeAnswer && !options.durable && !answeredRequest) {
       return mapInteractionRespondFailure(
         { code: 'NOT_FOUND', message: 'interaction not found', status: 404 },
         logger,
@@ -226,17 +262,19 @@ export function createInteractionAnswerRoute(options: InteractionAnswerRouteOpti
         ))
       : []
 
-    if (options.beforeAnswer) {
+    const lifecycleArgs: BeforeInteractionAnswerArgs = {
+      request,
+      body,
+      answer: validation,
+      connection,
+      outstanding: before.succeeded ? before.value : [],
+      ...(answeredRequest ? { answeredRequest } : {}),
+      duplicateRequests,
+    }
+
+    if (options.beforeAnswer && answeredRequest) {
       try {
-        await options.beforeAnswer({
-          request,
-          body,
-          answer: validation,
-          connection,
-          outstanding: before.succeeded ? before.value : [],
-          ...(answeredRequest ? { answeredRequest } : {}),
-          duplicateRequests,
-        })
+        await options.beforeAnswer(lifecycleArgs)
       } catch (error) {
         logger.error('[interactions] beforeAnswer failed:', error)
         return Response.json(
@@ -246,10 +284,64 @@ export function createInteractionAnswerRoute(options: InteractionAnswerRouteOpti
       }
     }
 
+    let prepared: unknown
+    const durableArgs = options.durable
+      ? { ...lifecycleArgs, attemptKey }
+      : null
+    if (options.durable && durableArgs) {
+      try {
+        prepared = await options.durable.prepare(durableArgs)
+      } catch (error) {
+        logger.error('[interactions] durable prepare failed:', error)
+        return Response.json(
+          { code: 'INTERACTION_PREPARE_FAILED', error: 'Could not prepare the answer. Try again.' },
+          { status: 503 },
+        )
+      }
+      if (!answeredRequest) {
+        let reconciled: { settled: boolean }
+        try {
+          reconciled = await options.durable.reconcile({ ...durableArgs, prepared })
+        } catch (error) {
+          logger.error('[interactions] durable reconcile failed:', error)
+          reconciled = { settled: false }
+        }
+        if (reconciled.settled) return Response.json({ ok: true, idempotent: true })
+        return Response.json(
+          { code: 'INTERACTION_RECONCILIATION_PENDING', error: 'The answer status is still being checked. Retry with the same attempt.' },
+          { status: 503 },
+        )
+      }
+    }
+
     const result = await respondToSessionInteraction(connection, { id: validation.id, ...answerPayload })
-    if (!result.succeeded) return mapInteractionRespondFailure(result.error, logger)
+    if (!result.succeeded) {
+      if (options.durable && durableArgs) {
+        let reconciled: { settled: boolean }
+        try {
+          reconciled = await options.durable.reconcile({ ...durableArgs, prepared })
+        } catch {
+          reconciled = { settled: false }
+        }
+        if (reconciled.settled) return Response.json({ ok: true, idempotent: true })
+        if (result.error.status === 404) {
+          return Response.json(
+            { code: 'INTERACTION_RECONCILIATION_PENDING', error: 'The answer status is still being checked. Retry with the same attempt.' },
+            { status: 503 },
+          )
+        }
+        try {
+          await options.durable.fail?.({ ...durableArgs, prepared, error: result.error })
+        } catch {
+          // The upstream failure remains authoritative; a persistence cleanup
+          // failure must not replace its client-facing mapping.
+        }
+      }
+      return mapInteractionRespondFailure(result.error, logger)
+    }
 
     let remaining = await listSessionInteractions(connection)
+    const acknowledgedDuplicateIds: string[] = []
     if (remaining.succeeded && answeredSignature) {
       const remainingDuplicates = remaining.value.filter((item) => {
         if (item.id === validation.id) return false
@@ -258,6 +350,7 @@ export function createInteractionAnswerRoute(options: InteractionAnswerRouteOpti
       for (const duplicate of remainingDuplicates) {
         const duplicateResult = await respondToSessionInteraction(connection, { id: duplicate.id, ...answerPayload })
         if (!duplicateResult.succeeded) break
+        acknowledgedDuplicateIds.push(duplicate.id)
       }
       if (remainingDuplicates.length > 0) remaining = await listSessionInteractions(connection)
     }
@@ -277,6 +370,27 @@ export function createInteractionAnswerRoute(options: InteractionAnswerRouteOpti
         { code: 'INTERACTION_STILL_PENDING', error: 'The agent did not accept the answer. Try answering again.' },
         { status: 503 },
       )
+    }
+
+    if (options.durable && durableArgs) {
+      try {
+        await options.durable.acknowledge({
+          ...durableArgs,
+          prepared,
+          duplicateIds: acknowledgedDuplicateIds,
+        })
+        await options.durable.finalize({
+          ...durableArgs,
+          prepared,
+          duplicateIds: acknowledgedDuplicateIds,
+        })
+      } catch (error) {
+        logger.error('[interactions] durable finalize failed:', error)
+        return Response.json(
+          { code: 'INTERACTION_FINALIZE_FAILED', error: 'The answer was accepted but is still being saved. Retry to reconcile it.' },
+          { status: 503 },
+        )
+      }
     }
 
     return Response.json({ ok: true })

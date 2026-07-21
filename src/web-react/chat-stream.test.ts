@@ -90,6 +90,27 @@ describe('dispatchChatStreamLine — interaction', () => {
     expect(fired).toBe(false)
     expect(result.receivedContent).toBe(false)
   })
+
+  it('surfaces interaction cancellation and durable plan lifecycle events', () => {
+    const cancellations: Array<{ id: string; reason?: string }> = []
+    const plans: Array<{ planId: string; status: string }> = []
+    dispatchChatStreamLine(JSON.stringify({
+      type: 'interaction.cancel',
+      data: { id: 'ask-1', reason: 'timeout' },
+    }), { onInteractionCancel: (cancel) => cancellations.push(cancel) })
+    dispatchChatStreamLine(JSON.stringify({
+      type: 'plan.submitted',
+      data: { plan: {
+        id: 'plan-1',
+        revision: 1,
+        body: 'Research first',
+        submittedAt: '2026-07-21T00:00:00.000Z',
+      } },
+    }), { onPlan: (plan) => plans.push(plan) })
+
+    expect(cancellations).toEqual([{ id: 'ask-1', reason: 'timeout' }])
+    expect(plans).toEqual([expect.objectContaining({ planId: 'plan-1', status: 'pending' })])
+  })
 })
 
 describe('consumeChatStream — interaction', () => {

@@ -4,6 +4,7 @@ import { act, cleanup, renderHook } from '@testing-library/react'
 
 import {
   cancelChatInteraction,
+  hydrateChatInteractions,
   resolveChatInteraction,
   restoreChatInteractions,
   terminalizePendingChatInteractions,
@@ -59,8 +60,8 @@ describe('interaction reducers', () => {
 
   it('marks local resolution forward-only', () => {
     const list = [question('a')]
-    const resolved = resolveChatInteraction(list, 'a', 'answered')
-    expect(resolved[0]?.status).toBe('answered')
+    const resolved = resolveChatInteraction(list, 'a', 'answered', { q0: ['Formal'] })
+    expect(resolved[0]).toMatchObject({ status: 'answered', answers: { q0: ['Formal'] } })
     expect(resolveChatInteraction(resolved, 'a', 'expired')).toBe(resolved)
   })
 
@@ -71,13 +72,26 @@ describe('interaction reducers', () => {
     expect(terminalizePendingChatInteractions(settled, 'expired')).toBe(settled)
   })
 
-  it('restores from the sidecar list: unlisted pending asks settle, listed ones appear once', () => {
+  it('restores outstanding asks without guessing how an unlisted ask settled', () => {
     const list = [question('gone'), question('kept', { title: 'Kept?' })]
     const restored = restoreChatInteractions(list, [wireRequest('kept', 'Kept?'), wireRequest('new', 'New ask?')])
-    expect(restored.find((item) => item.id === 'gone')?.status).toBe('answered')
+    expect(restored.find((item) => item.id === 'gone')?.status).toBe('pending')
     expect(restored.find((item) => item.id === 'kept')?.status).toBe('pending')
     expect(restored.find((item) => item.id === 'new')?.status).toBe('pending')
     expect(restored).toHaveLength(3)
+  })
+
+  it('replaces an obsolete duplicate id with the authoritative outstanding id', () => {
+    const restored = restoreChatInteractions([question('old-id')], [wireRequest('current-id')])
+    expect(restored).toEqual([expect.objectContaining({ id: 'current-id', status: 'pending' })])
+  })
+
+  it('hydrates terminal status and acknowledged answers from durable projections', () => {
+    const hydrated = hydrateChatInteractions(
+      [question('a')],
+      [question('a', { status: 'answered', answers: { q0: ['Formal'] } })],
+    )
+    expect(hydrated[0]).toMatchObject({ status: 'answered', answers: { q0: ['Formal'] } })
   })
 })
 
@@ -109,5 +123,17 @@ describe('useChatInteractions', () => {
       result.current.upsert(question('duplicate-id-same-content'))
     })
     expect(result.current.interactions).toHaveLength(1)
+  })
+
+  it('exposes durable hydration through the hook', () => {
+    const { result } = renderHook(() => useChatInteractions())
+    act(() => result.current.upsert(question('a')))
+    act(() => result.current.hydrate([
+      question('a', { status: 'answered', answers: { q0: ['Formal'] } }),
+    ]))
+    expect(result.current.interactions[0]).toMatchObject({
+      status: 'answered',
+      answers: { q0: ['Formal'] },
+    })
   })
 })

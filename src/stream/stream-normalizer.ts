@@ -313,6 +313,12 @@ export function mergePersistedPart(existing: JsonRecord | undefined, incoming: J
   }
 
   if (type === 'plan' && String(existing.type ?? '') === 'plan') {
+    const existingRevision = Number(existing.revision)
+    const incomingRevision = Number(incoming.revision)
+    if (Number.isInteger(existingRevision) && Number.isInteger(incomingRevision)) {
+      if (incomingRevision < existingRevision) return existing
+      if (incomingRevision > existingRevision) return incoming
+    }
     const merged = overlayDefined(existing, incoming)
     const existingStatus = existing.status as ChatPlanStatus | undefined
     const incomingStatus = incoming.status as ChatPlanStatus | undefined

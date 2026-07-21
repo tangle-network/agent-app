@@ -6,6 +6,7 @@ import {
   persistedPartToPlan,
   planFollowUpTurnId,
   planPartKey,
+  planRevisionKey,
   planToPersistedPart,
   type ChatPlan,
 } from '../src/plans/index'
@@ -77,9 +78,12 @@ describe('durable plan contract', () => {
 
   it('keeps stable keys and monotonic status transitions', () => {
     expect(planPartKey('plan-1')).toBe('plan:plan-1')
+    expect(planRevisionKey('plan-1', 2)).toBe('plan:plan-1:revision:2')
     expect(planFollowUpTurnId('plan-1', 'approved')).toBe('plan:plan-1:approved')
     expect(canTransitionPlanStatus('pending', 'approved')).toBe(true)
     expect(canTransitionPlanStatus('approved', 'pending')).toBe(false)
     expect(canTransitionPlanStatus('approved', 'rejected')).toBe(false)
+    expect(canTransitionPlanStatus('pending', 'preparing')).toBe(false)
+    expect(canTransitionPlanStatus('preparing', 'pending')).toBe(true)
   })
 })

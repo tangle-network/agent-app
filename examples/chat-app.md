@@ -19,6 +19,7 @@ Who owns each hop:
 | Buffered replay after a drop | `/stream` turn buffer (wired by default) |
 | Upload → `PromptInputPart` descriptors | `/chat-routes` (`createUploadRoute`) |
 | Ask answering (list/answer, 410 mapping, dedupe) | `/interactions` via `routes.interactions` |
+| Durable plan/question lifecycle | `/durable-chat` structural store + authority adapters |
 | Composer, stream consumption, cards | `/web-react` |
 
 ## Schema (drizzle + one migration constant)
@@ -164,6 +165,69 @@ into the sandbox workspace and referenced by `path` (the ~1 MiB gateway body
 cap makes that two-step mandatory). Question cards render with
 `InteractionQuestionCard` + `useChatInteractions` and answer through
 `/api/chat/interactions` — see `/web-react`.
+
+## Durable plan and question workflow
+
+Apps that need decisions and accepted answers to survive reloads bind one
+production `DurableChatStateStore` to the shared route/producer adapters. The
+store is product infrastructure (D1, Postgres, a Durable Object, or equivalent);
+agent-app owns the command/settlement protocol around it. The exported
+`InMemoryDurableChatStateStore` is intentionally only for tests and local demos.
+
+```ts
+import {
+  createDurableChatScope,
+  createDurableInteractionProjectionAdapter,
+  createDurableInteractionRoutePersistence,
+  createDurablePlanRoutes,
+} from '@tangle-network/agent-app/durable-chat'
+
+const scope = createDurableChatScope(`${workspaceId}/${threadId}`) // only after auth
+const interactionProjection = createDurableInteractionProjectionAdapter({ store: durableStore, scope })
+
+createSandboxChatProducer({
+  events,
+  interactionProjection,
+})
+
+createInteractionAnswerRoute({
+  resolveConnection,
+  durable: createDurableInteractionRoutePersistence({
+    store: durableStore,
+    guarantee: 'reconciled',
+    scope: async () => scope,
+    reconcileAuthority: ({ intent }) => lookupAnswerAcknowledgement(intent),
+  }),
+})
+
+const planRoutes = createDurablePlanRoutes({
+  store: durableStore,
+  authority: sandboxPlanAuthority,
+  authorize: async ({ request }) => authorizePlanScope(request),
+  afterDecision: ({ receipt, effectKey }) =>
+    applyPlanModePolicyIdempotently(receipt, effectKey),
+})
+```
+
+On the client, `ChatMessages` can render the canonical cards directly from
+persisted `message.parts`. `attachFollowUp` must be idempotent by the receipt id;
+the shared controller deliberately invokes it again after an idempotent POST or
+reload so a lost response cannot strand an already-dispatched execution.
+
+```tsx
+<ChatMessages
+  messages={messages}
+  durableCards={{
+    canWrite,
+    submitInteraction: createDurableInteractionAnswerSubmitter({
+      url: '/api/chat/interactions',
+      attempts: createSessionInteractionAttemptStore(sessionStorage),
+    }),
+    decidePlan: (plan, decision, feedback) =>
+      planControllers.get(plan.planId)!.decide(decision, feedback),
+  }}
+/>
+```
 
 ## Advanced hooks (optional)
 

@@ -8,7 +8,10 @@
 
 export const PLAN_SUBMITTED_EVENT = 'plan.submitted' as const
 
-export type ChatPlanStatus = 'pending' | 'approved' | 'rejected' | 'superseded' | 'withdrawn'
+/** Sandbox plan lifecycle. `preparing` is the transient submission state and
+ * is retained in the projection even though the chat card normally starts at
+ * `pending`. */
+export type ChatPlanStatus = 'preparing' | 'pending' | 'approved' | 'rejected' | 'superseded' | 'withdrawn'
 
 type ChatPlanBase = {
   /** The sandbox SDK calls this field `id`; the transcript projection names
@@ -18,10 +21,14 @@ type ChatPlanBase = {
   title?: string
   body: string
   submittedAt: string
+  /** Provider/Sandbox metadata is deliberately opaque to this package. */
+  metadata?: Record<string, unknown>
+  decidedBy?: string
 }
 
 /** Browser/persisted projection of the sandbox SDK's durable-plan union. */
 export type ChatPlan = ChatPlanBase & (
+  | { status: 'preparing' }
   | { status: 'pending' }
   | { status: 'approved'; decidedAt: string }
   | { status: 'rejected'; decidedAt: string; feedback: string }
@@ -37,6 +44,7 @@ export type ParsePlanSubmittedResult =
   | { succeeded: false; error: string }
 
 const PLAN_STATUSES: ReadonlySet<string> = new Set([
+  'preparing',
   'pending',
   'approved',
   'rejected',
@@ -80,9 +88,14 @@ function parsePlan(record: Record<string, unknown>, defaultStatus?: ChatPlanStat
     ...(typeof record.title === 'string' && record.title ? { title: record.title } : {}),
     body,
     submittedAt,
+    ...(record.metadata && typeof record.metadata === 'object' && !Array.isArray(record.metadata)
+      ? { metadata: record.metadata as Record<string, unknown> }
+      : {}),
+    ...(typeof record.decidedBy === 'string' && record.decidedBy ? { decidedBy: record.decidedBy } : {}),
   }
 
-  if (status === 'pending') return { ...common, status }
+  if (status === 'preparing') return { ...common, status: 'preparing' }
+  if (status === 'pending') return { ...common, status: 'pending' }
   if (status === 'approved') {
     const decidedAt = requiredString(record, 'decidedAt')
     return decidedAt ? { ...common, status, decidedAt } : null
@@ -111,13 +124,20 @@ export function planPartKey(planId: string): string {
   return `plan:${planId}`
 }
 
+export function planRevisionKey(planId: string, revision: number): string {
+  return `plan:${planId}:revision:${revision}`
+}
+
 export function planFollowUpTurnId(planId: string, outcome: 'approved' | 'rejected'): string {
   return `plan:${planId}:${outcome}`
 }
 
 /** Plan status is monotonic: only a pending plan can settle. */
 export function canTransitionPlanStatus(from: ChatPlanStatus, to: ChatPlanStatus): boolean {
-  return from === 'pending' && to !== 'pending'
+  if (from === to) return true
+  if (from === 'preparing') return to === 'pending' || to === 'superseded' || to === 'withdrawn'
+  if (from === 'pending') return to === 'approved' || to === 'rejected' || to === 'superseded' || to === 'withdrawn'
+  return false
 }
 
 export function planToPersistedPart(plan: ChatPlan): ChatPlanPersistedPart {

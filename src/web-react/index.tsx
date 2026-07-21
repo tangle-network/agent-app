@@ -20,6 +20,7 @@ import { useEffect, useMemo, useRef, useState, memo, type ReactNode } from 'reac
 import { useSmoothText } from './smooth-text'
 import { ChevronDown, POPOVER_OPTION_FOCUS, usePending } from './controls'
 import { BrandMark } from './brand-mark'
+import { DurableChatCards, type DurableChatCardsProps } from './durable-chat-cards'
 
 export * from './chat-stream'
 export * from './chat-interactions'
@@ -27,6 +28,10 @@ export * from './chat-composer'
 export * from './interaction-card-support'
 export * from './interaction-question-card'
 export * from './interaction-plan-card'
+export * from './durable-plan-flow'
+export * from './durable-plan-card'
+export * from './durable-chat-cards'
+export * from './durable-interaction-submit'
 export * from './use-chat-interactions'
 export * from './provider-logo'
 export * from './smooth-text'
@@ -205,6 +210,9 @@ export interface ChatUiMessage extends ChatMessageMetrics {
    *  present and non-empty it is rendered in place of `content` + `toolCalls`;
    *  both remain the fallback for producers that don't segment a turn. */
   segments?: ChatMessageSegment[]
+  /** Persisted assistant parts. When `ChatMessages.durableCards` is supplied,
+   * shared plan/question cards render directly from these projections. */
+  parts?: Array<Record<string, unknown>>
 }
 
 export interface ChatMessagesProps {
@@ -215,6 +223,9 @@ export interface ChatMessagesProps {
   renderMarkdown?: (content: string) => ReactNode
   /** Extra per-message content (artifacts, custom panels) appended after the body. */
   renderExtras?: (message: ChatUiMessage) => ReactNode
+  /** Canonical durable plan/question card wiring. Apps inject only transport,
+   * access, and optional visual callbacks; card selection/dedupe stays shared. */
+  durableCards?: Omit<DurableChatCardsProps, 'parts' | 'renderMarkdown'>
   userLabel?: string
   agentLabel?: string
   /** Render the trailing "agent is thinking" row. */
@@ -908,6 +919,7 @@ function AssistantMessageImpl({
   onToolCallClick,
   toolRenderers,
   renderExtras,
+  durableCards,
 }: {
   msg: ChatUiMessage
   streaming: boolean
@@ -918,6 +930,7 @@ function AssistantMessageImpl({
   onToolCallClick?: (call: ChatToolCallInfo, message: ChatUiMessage) => void
   toolRenderers?: ToolDetailRenderers
   renderExtras?: (message: ChatUiMessage) => ReactNode
+  durableCards?: Omit<DurableChatCardsProps, 'parts' | 'renderMarkdown'>
 }) {
   // Smooth reveal: chunky network slabs (model bursts, flush windows, replay
   // polls) paint as a continuous typewriter. Reasoning often arrives as one
@@ -1024,6 +1037,14 @@ function AssistantMessageImpl({
           )}
         </>
       )}
+      {durableCards && msg.parts && (
+        <DurableChatCards
+          {...durableCards}
+          parts={msg.parts}
+          renderMarkdown={renderBody}
+          className="mt-3"
+        />
+      )}
       {renderExtras?.(msg)}
     </div>
   )
@@ -1106,6 +1127,7 @@ export function ChatMessages({
   models = [],
   renderMarkdown,
   renderExtras,
+  durableCards,
   userLabel = 'User',
   agentLabel = 'Agent',
   loading,
@@ -1165,6 +1187,7 @@ export function ChatMessages({
             onToolCallClick={onToolCallClick}
             toolRenderers={toolRenderers}
             renderExtras={renderExtras}
+            durableCards={durableCards}
           />
         ),
       )}

@@ -227,6 +227,10 @@ describe('mergePersistedPart', () => {
     expect(mergePersistedPart(approved, { ...approved, status: 'pending', decidedAt: undefined }))
       .toEqual(approved)
 
+    const newer = { ...approved, revision: 2, status: 'pending', decidedAt: undefined }
+    expect(mergePersistedPart(newer, approved)).toEqual(newer)
+    expect(mergePersistedPart(approved, newer)).toEqual(newer)
+
     const answered = {
       type: 'interaction',
       id: 'ask-1',

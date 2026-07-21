@@ -25,10 +25,14 @@ describe('persisted interaction answers', () => {
     expect(parsed.value).toEqual({ tone: ['Formal'] })
   })
 
-  it('rejects unsafe keys and non-string-array values', () => {
+  it('accepts the full interaction value contract and rejects unsafe or nested values', () => {
     expect(parseInteractionAnswers(JSON.parse('{"__proto__":["x"]}'))).toMatchObject({ succeeded: false })
-    expect(parseInteractionAnswers({ tone: 'Formal' })).toMatchObject({ succeeded: false })
+    expect(parseInteractionAnswers({ tone: 'Formal', count: 2, confirmed: true })).toEqual({
+      succeeded: true,
+      value: { tone: 'Formal', count: 2, confirmed: true },
+    })
     expect(parseInteractionAnswers({ tone: [1] })).toMatchObject({ succeeded: false })
+    expect(parseInteractionAnswers({ tone: { nested: true } })).toMatchObject({ succeeded: false })
   })
 
   it('round-trips answers through the persisted interaction codec', () => {
@@ -39,7 +43,9 @@ describe('persisted interaction answers', () => {
       status: 'answered',
       answers: { tone: ['Formal'] },
     })
-    expect(persistedPartToInteraction({ ...part, answers: { tone: 'Formal' } })).toBeNull()
+    expect(persistedPartToInteraction({ ...part, answers: { tone: 'Formal' } })).toMatchObject({
+      answers: { tone: 'Formal' },
+    })
   })
 
   it('stamps only matching interaction parts and leaves inputs immutable', () => {

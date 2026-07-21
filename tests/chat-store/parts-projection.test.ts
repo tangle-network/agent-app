@@ -36,7 +36,7 @@ describe('toChatMessageParts — the /stream → /chat-store typed boundary', ()
       },
       {
         type: 'interaction', id: 'i1', kind: 'question', title: 'T',
-        answerSpec: { fields: [] }, status: 'answered', answers: { q0: 'invalid' },
+        answerSpec: { fields: [] }, status: 'answered', answers: { q0: { nested: 'invalid' } },
       },
       { noType: true },
     ])).toEqual([])

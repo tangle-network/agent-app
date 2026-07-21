@@ -187,6 +187,11 @@
       "import": "./dist/plans/index.js",
       "default": "./dist/plans/index.js"
     },
+    "./durable-chat": {
+      "types": "./dist/durable-chat/index.d.ts",
+      "import": "./dist/durable-chat/index.js",
+      "default": "./dist/durable-chat/index.js"
+    },
     "./missions": {
       "types": "./dist/missions/index.d.ts",
       "import": "./dist/missions/index.js",

@@ -14,8 +14,15 @@
  */
 
 import {
+  cancelStatusFor,
+  interactionPartKey,
+  interactionToPersistedPart,
   isRenderableInteractionKind,
+  parseInteractionCancel,
   parseInteractionRequest,
+  type InteractionCancelData,
+  type InteractionPersistedPart,
+  type InteractionRequestWire,
 } from '../interactions/contract'
 import {
   parsePlanSubmittedEvent,
@@ -47,6 +54,14 @@ export interface SandboxChatProducerOptions {
    *  session's sidecar connection). Without it, non-renderable asks are only
    *  logged — the run stays blocked until the broker times out. */
   declineInteraction?: (id: string) => Promise<void>
+  /** Optional durable lifecycle projection. The closure is already scoped by
+   * the product's authorized session context. Its materialized terminal parts
+   * replace live pending snapshots before assistant persistence. */
+  interactionProjection?: {
+    upsertAsk(request: InteractionRequestWire): void | Promise<void>
+    cancel(cancel: InteractionCancelData): void | Promise<void>
+    materialize(): InteractionPersistedPart[] | Promise<InteractionPersistedPart[]>
+  }
   log?: (message: string, meta?: Record<string, unknown>) => void
 }
 
@@ -210,6 +225,12 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
           continue
         }
         if (renderable(parsed.value.kind)) {
+          recordPersistedPart(
+            interactionToPersistedPart(parsed.value, 'pending'),
+            undefined,
+            interactionPartKey(parsed.value.id),
+          )
+          await options.interactionProjection?.upsertAsk(parsed.value)
           yield event
           continue
         }
@@ -230,6 +251,26 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
             kind: parsed.value.kind,
           })
         }
+        continue
+      }
+
+      if (event.type === 'interaction.cancel') {
+        const parsed = parseInteractionCancel(asRecord(record.data))
+        if (!parsed.succeeded) {
+          log('[chat-routes] dropping malformed interaction.cancel event', { error: parsed.error })
+          continue
+        }
+        const key = interactionPartKey(parsed.value.id)
+        const existing = partMap.get(key)
+        if (existing?.type === 'interaction' && existing.status === 'pending') {
+          recordPersistedPart({
+            ...existing,
+            status: cancelStatusFor(parsed.value.reason),
+            ...(parsed.value.reason ? { cancelReason: parsed.value.reason } : {}),
+          }, undefined, key)
+        }
+        await options.interactionProjection?.cancel(parsed.value)
+        yield event
         continue
       }
 
@@ -257,9 +298,15 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         continue
       }
 
-      // Everything else (interaction.cancel, error, lifecycle) forwards
+      // Everything else (error, lifecycle) forwards
       // verbatim — the client parser ignores unknown types.
       yield event
+    }
+
+    if (options.interactionProjection) {
+      for (const part of await options.interactionProjection.materialize()) {
+        recordPersistedPart(part, undefined, interactionPartKey(part.id))
+      }
     }
   }
 

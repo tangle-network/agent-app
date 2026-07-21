@@ -27,6 +27,7 @@ import {
   questionInteractionContentSignature,
   type ChatInteraction,
   type ChatInteractionStatus,
+  type InteractionAnswers,
   type InteractionCancelData,
   type InteractionRequestWire,
 } from './chat-interactions'
@@ -51,7 +52,18 @@ export function upsertChatInteraction(list: ChatInteraction[], interaction: Chat
     return [...list, interaction]
   }
   const existing = list[index]
-  if (!existing || isTerminalInteractionStatus(existing.status)) return list
+  if (!existing) return list
+  if (isTerminalInteractionStatus(existing.status)) {
+    if (
+      existing.status === interaction.status &&
+      (!existing.answers && interaction.answers || !existing.cancelReason && interaction.cancelReason)
+    ) {
+      const next = [...list]
+      next[index] = { ...existing, ...interaction }
+      return next
+    }
+    return list
+  }
   const next = [...list]
   next[index] = interaction
   return next
@@ -77,12 +89,13 @@ export function resolveChatInteraction(
   list: ChatInteraction[],
   id: string,
   status: Exclude<ChatInteractionStatus, 'pending'>,
+  answers?: InteractionAnswers,
 ): ChatInteraction[] {
   const index = list.findIndex((item) => item.id === id)
   const existing = list[index]
   if (!existing || existing.status !== 'pending') return list
   const next = [...list]
-  next[index] = { ...existing, status }
+  next[index] = { ...existing, status, ...(answers ? { answers } : {}) }
   return next
 }
 
@@ -96,20 +109,44 @@ export function terminalizePendingChatInteractions(
   return list.map((item) => (item.status === 'pending' ? { ...item, status } : item))
 }
 
-/** Reload restore from the answer route's GET list: every listed ask is
- *  outstanding (upserted pending), and every previously-pending ask the sidecar
- *  no longer lists was resolved while we were away (settled as answered). */
+/** Reload restore from the answer route's GET list. The list only proves which
+ * asks are still outstanding; absence cannot distinguish answered, withdrawn,
+ * expired, or a temporarily unavailable registry. Durable terminal parts are
+ * applied separately through `hydrateChatInteractions`. */
 export function restoreChatInteractions(
   list: ChatInteraction[],
   outstanding: InteractionRequestWire[],
 ): ChatInteraction[] {
-  const outstandingIds = new Set(outstanding.map((request) => request.id))
-  let next = list.map((item) =>
-    item.status === 'pending' && !outstandingIds.has(item.id) ? { ...item, status: 'answered' as const } : item)
+  let next = list
   for (const request of outstanding) {
-    next = upsertChatInteraction(next, interactionFromWireRequest(request))
+    const interaction = interactionFromWireRequest(request)
+    const exact = next.findIndex((item) => item.id === interaction.id)
+    if (exact !== -1) {
+      next = upsertChatInteraction(next, interaction)
+      continue
+    }
+    const signature = questionInteractionContentSignature(interaction)
+    const obsolete = signature
+      ? next.findIndex((item) => item.status === 'pending' && questionInteractionContentSignature(item) === signature)
+      : -1
+    if (obsolete === -1) {
+      next = [...next, interaction]
+      continue
+    }
+    next = [...next]
+    next[obsolete] = interaction
   }
   return next
+}
+
+/** Applies transcript/state-store projections after reload. Terminal state and
+ * acknowledged answer values enrich an existing pending card without relying
+ * on the sidecar's outstanding-list absence. */
+export function hydrateChatInteractions(
+  list: ChatInteraction[],
+  persisted: ChatInteraction[],
+): ChatInteraction[] {
+  return persisted.reduce(upsertChatInteraction, list)
 }
 
 export interface UseChatInteractionsResult {
@@ -122,9 +159,11 @@ export interface UseChatInteractionsResult {
   /** Wire to `interaction.cancel` events. */
   applyCancel: (cancel: InteractionCancelData) => void
   /** Wire to the cards' `onResolved`. */
-  markResolved: (id: string, status: Exclude<ChatInteractionStatus, 'pending'>) => void
+  markResolved: (id: string, status: Exclude<ChatInteractionStatus, 'pending'>, answers?: InteractionAnswers) => void
   /** Wire to the answer route's GET list after a reload/reconnect. */
   restore: (outstanding: InteractionRequestWire[]) => void
+  /** Apply durable transcript/state projections after a reload. */
+  hydrate: (persisted: ChatInteraction[]) => void
   /** Settle still-pending asks when the turn ends. */
   terminalizePending: (status: Extract<ChatInteractionStatus, 'answered' | 'expired'>) => void
   /** Drop everything (thread switch). */
@@ -140,11 +179,14 @@ export function useChatInteractions(): UseChatInteractionsResult {
   const applyCancel = useCallback((cancel: InteractionCancelData) => {
     setInteractions((prev) => cancelChatInteraction(prev, cancel))
   }, [])
-  const markResolved = useCallback((id: string, status: Exclude<ChatInteractionStatus, 'pending'>) => {
-    setInteractions((prev) => resolveChatInteraction(prev, id, status))
+  const markResolved = useCallback((id: string, status: Exclude<ChatInteractionStatus, 'pending'>, answers?: InteractionAnswers) => {
+    setInteractions((prev) => resolveChatInteraction(prev, id, status, answers))
   }, [])
   const restore = useCallback((outstanding: InteractionRequestWire[]) => {
     setInteractions((prev) => restoreChatInteractions(prev, outstanding))
+  }, [])
+  const hydrate = useCallback((persisted: ChatInteraction[]) => {
+    setInteractions((prev) => hydrateChatInteractions(prev, persisted))
   }, [])
   const terminalizePending = useCallback((status: Extract<ChatInteractionStatus, 'answered' | 'expired'>) => {
     setInteractions((prev) => terminalizePendingChatInteractions(prev, status))
@@ -153,5 +195,5 @@ export function useChatInteractions(): UseChatInteractionsResult {
 
   const pending = useMemo(() => interactions.filter((item) => item.status === 'pending'), [interactions])
 
-  return { interactions, pending, upsert, applyCancel, markResolved, restore, terminalizePending, reset }
+  return { interactions, pending, upsert, applyCancel, markResolved, restore, hydrate, terminalizePending, reset }
 }

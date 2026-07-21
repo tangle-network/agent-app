@@ -70,7 +70,11 @@ export type InteractionRequestWire = Omit<InteractionRequest, 'answerSpec'> & {
 export type ChatInteractionStatus = 'pending' | 'answered' | 'declined' | 'cancelled' | 'expired'
 
 /** Accepted field selections keyed by answer-spec field name. */
-export type InteractionAnswers = Record<string, string[]>
+/** Accepted answer values. Select fields historically used `string[]`; the
+ * wider scalar union is additive and lets durable stores preserve text,
+ * numeric, and boolean answer fields without coercion. */
+export type InteractionAnswerValue = string | number | boolean | string[]
+export type InteractionAnswers = Record<string, InteractionAnswerValue>
 
 export type ParseInteractionAnswersResult =
   | { succeeded: true; value: InteractionAnswers }
@@ -86,10 +90,12 @@ export function parseInteractionAnswers(value: unknown): ParseInteractionAnswers
     if (!isSafeInteractionFieldKey(key)) {
       return { succeeded: false, error: `interaction answers contain an unsafe field key: ${key}` }
     }
-    if (!Array.isArray(selection) || !selection.every((item) => typeof item === 'string')) {
-      return { succeeded: false, error: `interaction answer ${key} must be a string array` }
+    const valid = typeof selection === 'string' || typeof selection === 'number' || typeof selection === 'boolean' ||
+      (Array.isArray(selection) && selection.every((item) => typeof item === 'string'))
+    if (!valid) {
+      return { succeeded: false, error: `interaction answer ${key} must be a string, number, boolean, or string array` }
     }
-    answers[key] = [...selection]
+    answers[key] = Array.isArray(selection) ? [...selection] : selection
   }
   return { succeeded: true, value: answers }
 }

@@ -19,7 +19,7 @@
  * via `createInteractionAnswerSubmitter` (or any `SubmitInteractionAnswer`).
  */
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type {
   ChatInteraction,
   ChatInteractionField,
@@ -29,6 +29,7 @@ import type {
 import { isTerminalInteractionStatus } from './chat-interactions'
 import {
   buildAnswerData,
+  fieldValuesFromAnswers,
   hasSecretField,
   interactionStatusLabels,
   interactionTerminalNotes,
@@ -164,7 +165,11 @@ export interface InteractionQuestionCardProps {
   submitAnswer: SubmitInteractionAnswer
   /** Fired when this card resolves locally (answered, or discovered expired
    *  via a 410) so the stream/route state stays in sync. */
-  onResolved?: (id: string, status: Exclude<ChatInteractionStatus, 'pending'>) => void
+  onResolved?: (
+    id: string,
+    status: Exclude<ChatInteractionStatus, 'pending'>,
+    answers?: ChatInteraction['answers'],
+  ) => void
   /** Delivers a late answer (the ask expired/was withdrawn) as a fresh chat
    *  turn. Return/resolve `false` when the send was rejected so the card stays
    *  retryable. Omit to hide the late-answer affordance entirely. */
@@ -206,7 +211,8 @@ export function InteractionQuestionCard({
   onLateAnswer,
   className,
 }: InteractionQuestionCardProps) {
-  const [values, setValues] = useState<FieldValues>({})
+  const [values, setValues] = useState<FieldValues>(() =>
+    fieldValuesFromAnswers(interaction.fields, interaction.answers))
   const [submitting, setSubmitting] = useState(false)
   // Terminal state this card learned locally (submit success / 410) before the
   // stream part catches up. A terminal stream status always wins.
@@ -214,6 +220,11 @@ export function InteractionQuestionCard({
   const [lateAnswerSent, setLateAnswerSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const submitInFlightRef = useRef(false)
+
+  useEffect(() => {
+    if (!interaction.answers) return
+    setValues(fieldValuesFromAnswers(interaction.fields, interaction.answers))
+  }, [interaction.answers, interaction.fields])
 
   const status: ChatInteractionStatus = isTerminalInteractionStatus(interaction.status)
     ? interaction.status
@@ -269,7 +280,7 @@ export function InteractionQuestionCard({
       const result = await submitAnswer({ id: interaction.id, outcome: 'accepted', data: answerData })
       if (result.ok) {
         setLocalStatus('answered')
-        onResolved?.(interaction.id, 'answered')
+        onResolved?.(interaction.id, 'answered', answerData)
         return
       }
       if (result.expired) {
