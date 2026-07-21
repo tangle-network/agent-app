@@ -358,6 +358,88 @@ describe('createInteractionAnswerRoute answer', () => {
     expect(sidecar.calls.map((call) => call.method)).toEqual(['GET', 'POST', 'GET'])
   })
 
+  it('runs beforeAnswer once before durable settlement for a live interaction', async () => {
+    const sidecar = fakeSidecar([wireQuestion('ask-1')])
+    const order: string[] = []
+    const beforeAnswer = vi.fn(async () => { order.push('beforeAnswer') })
+    const route = createInteractionAnswerRoute({
+      resolveConnection: async () => ({ ok: true, connection: connectionFor(sidecar) }),
+      beforeAnswer,
+      durable: {
+        guarantee: 'reconciled',
+        prepare: async () => { order.push('prepare'); return { intentKey: 'intent-1' } },
+        reconcile: async () => { order.push('reconcile'); return { settled: false } },
+        acknowledge: async () => { order.push('acknowledge') },
+        finalize: async () => { order.push('finalize') },
+      },
+      logger: { warn: vi.fn(), error: vi.fn() },
+    })
+
+    const response = await route.answer(answerRequest({
+      id: 'ask-1', outcome: 'accepted', data: { q0: ['Formal'] }, attemptKey: 'attempt-1',
+    }))
+
+    expect(response.status).toBe(200)
+    expect(beforeAnswer).toHaveBeenCalledOnce()
+    expect(order).toEqual(['beforeAnswer', 'prepare', 'acknowledge', 'finalize'])
+    expect(sidecar.calls.map((call) => call.method)).toEqual(['GET', 'POST', 'GET'])
+  })
+
+  it('skips beforeAnswer and reconciles once when a durable retry has no live interaction', async () => {
+    const sidecar = fakeSidecar([])
+    const order: string[] = []
+    const beforeAnswer = vi.fn(async () => { order.push('beforeAnswer') })
+    const route = createInteractionAnswerRoute({
+      resolveConnection: async () => ({ ok: true, connection: connectionFor(sidecar) }),
+      beforeAnswer,
+      durable: {
+        guarantee: 'reconciled',
+        prepare: async () => { order.push('prepare'); return { intentKey: 'intent-1' } },
+        reconcile: async () => { order.push('reconcile'); return { settled: true } },
+        acknowledge: async () => { order.push('acknowledge') },
+        finalize: async () => { order.push('finalize') },
+      },
+      logger: { warn: vi.fn(), error: vi.fn() },
+    })
+
+    const response = await route.answer(answerRequest({
+      id: 'ask-1', outcome: 'accepted', data: { q0: ['Formal'] }, attemptKey: 'attempt-1',
+    }))
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ ok: true, idempotent: true })
+    expect(beforeAnswer).not.toHaveBeenCalled()
+    expect(order).toEqual(['prepare', 'reconcile'])
+    expect(sidecar.calls.map((call) => call.method)).toEqual(['GET'])
+  })
+
+  it('does not start durable settlement when beforeAnswer rejects a live interaction', async () => {
+    const sidecar = fakeSidecar([wireQuestion('ask-1')])
+    const prepare = vi.fn(async () => ({ intentKey: 'intent-1' }))
+    const route = createInteractionAnswerRoute({
+      resolveConnection: async () => ({ ok: true, connection: connectionFor(sidecar) }),
+      beforeAnswer: async () => { throw new Error('audit unavailable') },
+      durable: {
+        guarantee: 'reconciled',
+        prepare,
+        reconcile: async () => ({ settled: false }),
+        acknowledge: async () => {},
+        finalize: async () => {},
+      },
+      logger: { warn: vi.fn(), error: vi.fn() },
+    })
+
+    const response = await route.answer(answerRequest({
+      id: 'ask-1', outcome: 'accepted', data: { q0: ['Formal'] }, attemptKey: 'attempt-1',
+    }))
+
+    expect(response.status).toBe(503)
+    expect(await response.json()).toMatchObject({ code: 'INTERACTION_BEFORE_ANSWER_FAILED' })
+    expect(prepare).not.toHaveBeenCalled()
+    expect(sidecar.calls.map((call) => call.method)).toEqual(['GET'])
+    expect(sidecar.outstanding.has('ask-1')).toBe(true)
+  })
+
   it('requires an attempt key only when durable settlement is enabled', async () => {
     const sidecar = fakeSidecar([wireQuestion('ask-1')])
     const route = createInteractionAnswerRoute({

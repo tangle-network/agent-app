@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   createDurableChatEventProjection,
   createDurablePlanRoutes,
@@ -108,6 +108,61 @@ describe('withDurableChatProjection', () => {
     expect(wrapped.assistantParts?.()).toEqual([
       expect.objectContaining({ type: 'plan', planId: 'plan-1', revision: 2, body: 'Newest' }),
     ])
+  })
+
+  it('keeps forwarding events when projection observation fails and logs the failure', async () => {
+    const source: StreamEvent[] = [
+      { type: 'text', data: { text: 'still alive' } },
+      { type: 'result', data: { finalText: 'still alive' } },
+    ]
+    const producer: ChatTurnRouteProducer = {
+      stream: (async function* () {
+        yield* source
+      })(),
+      finalText: () => 'still alive',
+      assistantParts: () => [{ type: 'text', text: 'still alive' }],
+    }
+    const log = vi.fn()
+    const projection = {
+      observe: vi.fn().mockRejectedValueOnce(new Error('projection store unavailable')),
+      materialize: vi.fn().mockResolvedValue([]),
+    }
+    const wrapped = withDurableChatProjection(producer, projection, log)
+    const forwarded: StreamEvent[] = []
+    for await (const event of wrapped.stream) forwarded.push(event)
+
+    expect(forwarded).toEqual(source)
+    expect(projection.observe).toHaveBeenCalledTimes(source.length)
+    expect(log).toHaveBeenCalledOnce()
+    expect(log).toHaveBeenCalledWith('[chat-routes] durable projection observe failed', {
+      eventType: 'text',
+      error: 'projection store unavailable',
+    })
+  })
+
+  it('keeps the stream and producer parts when projection materialization fails', async () => {
+    const producer: ChatTurnRouteProducer = {
+      stream: (async function* () {
+        yield { type: 'text', data: { text: 'done' } }
+      })(),
+      finalText: () => 'done',
+      assistantParts: () => [{ type: 'text', text: 'done' }],
+    }
+    const log = vi.fn()
+    const projection = {
+      observe: vi.fn(),
+      materialize: vi.fn().mockRejectedValue(new Error('projection read unavailable')),
+    }
+    const wrapped = withDurableChatProjection(producer, projection, log)
+    const forwarded: StreamEvent[] = []
+    for await (const event of wrapped.stream) forwarded.push(event)
+
+    expect(forwarded).toEqual([{ type: 'text', data: { text: 'done' } }])
+    expect(wrapped.assistantParts?.()).toEqual([{ type: 'text', text: 'done' }])
+    expect(log).toHaveBeenCalledOnce()
+    expect(log).toHaveBeenCalledWith('[chat-routes] durable projection materialize failed', {
+      error: 'projection read unavailable',
+    })
   })
 
   it('ignores malformed and stale lifecycle events without aborting the stream', async () => {

@@ -112,6 +112,85 @@ describe('durable chat server contracts', () => {
     })
   })
 
+  it('returns the authoritative terminal snapshot as a conflict when it differs from the requested decision', async () => {
+    const store = new InMemoryDurableChatStateStore()
+    await store.putPlanProjection(scope, pending)
+    const authoritative: DurablePlanProjection = {
+      ...pending,
+      status: 'rejected',
+      decidedAt: '2026-01-01T00:01:00.000Z',
+      feedback: 'no',
+    }
+    const authority: DurablePlanAuthority = {
+      current: async () => ({ plan: authoritative }),
+      decide: async () => { throw new Error('response lost after a different decision committed') },
+    }
+    const routes = createDurablePlanRoutes({
+      store, authority, authorize: async () => scope, afterDecision: () => undefined,
+    })
+
+    const response = await routes.decide(new Request('https://app.test/plans/plan-1', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ planId: 'plan-1', revision: 1, decision: 'approved' }),
+    }))
+
+    expect(response.status).toBe(409)
+    expect(await json(response)).toMatchObject({
+      code: 'DURABLE_CHAT_CONFLICT',
+      error: 'plan is not pending',
+      plan: authoritative,
+    })
+    expect(await store.getPlanProjection(scope, pending.planId)).toEqual(authoritative)
+
+    const retry = await routes.decide(new Request('https://app.test/plans/plan-1', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ planId: 'plan-1', revision: 1, decision: 'approved' }),
+    }))
+    expect(retry.status).toBe(409)
+    expect(await json(retry)).toMatchObject({
+      code: 'DURABLE_CHAT_CONFLICT',
+      plan: authoritative,
+    })
+  })
+
+  it('keeps unavailable responses for absent, pending, and unreachable authority state', async () => {
+    const cases: Array<{
+      label: string
+      current: DurablePlanAuthority['current']
+    }> = [
+      { label: 'absent', current: async () => ({ plan: null }) },
+      { label: 'pending', current: async () => ({ plan: pending }) },
+      { label: 'unreachable', current: async () => { throw new Error('authority down') } },
+    ]
+
+    for (const { label, current } of cases) {
+      const store = new InMemoryDurableChatStateStore()
+      await store.putPlanProjection(scope, pending)
+      const routes = createDurablePlanRoutes({
+        store,
+        authority: {
+          current,
+          decide: async () => { throw new Error(`${label} decide failure`) },
+        },
+        authorize: async () => scope,
+        afterDecision: () => undefined,
+      })
+      const response = await routes.decide(new Request('https://app.test/plans/plan-1', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ planId: 'plan-1', revision: 1, decision: 'approved' }),
+      }))
+
+      expect(response.status, label).toBe(503)
+      expect(await json(response), label).toMatchObject({
+        code: 'DURABLE_CHAT_UNAVAILABLE',
+        error: 'plan authority unavailable',
+      })
+    }
+  })
+
   it('returns the committed receipt even when projection persistence fails', async () => {
     class FailingProjectionStore extends InMemoryDurableChatStateStore {
       fail = false

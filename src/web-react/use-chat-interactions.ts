@@ -109,13 +109,25 @@ export function terminalizePendingChatInteractions(
   return list.map((item) => (item.status === 'pending' ? { ...item, status } : item))
 }
 
-/** Reload restore from the answer route's GET list. The list only proves which
- * asks are still outstanding; absence cannot distinguish answered, withdrawn,
- * expired, or a temporarily unavailable registry. Durable terminal parts are
- * applied separately through `hydrateChatInteractions`. */
+export type ChatInteractionRestoreMode = 'legacy' | 'durable'
+
+export interface RestoreChatInteractionsOptions {
+  /**
+   * `legacy` settles pending asks absent from the sidecar list as answered,
+   * preserving the pre-durable restore contract. `durable` leaves them
+   * pending because absence is ambiguous until `hydrateChatInteractions`
+   * applies the durable projection.
+   */
+  mode?: ChatInteractionRestoreMode
+}
+
+/** Reload restore from the answer route's GET list. Legacy consumers retain
+ * the historical absence→answered behavior; durable consumers opt into the
+ * ambiguity-preserving mode and apply terminal parts through `hydrate`. */
 export function restoreChatInteractions(
   list: ChatInteraction[],
   outstanding: InteractionRequestWire[],
+  options: RestoreChatInteractionsOptions = {},
 ): ChatInteraction[] {
   let next = list
   for (const request of outstanding) {
@@ -135,6 +147,13 @@ export function restoreChatInteractions(
     }
     next = [...next]
     next[obsolete] = interaction
+  }
+  if (options.mode !== 'durable') {
+    const outstandingIds = new Set(outstanding.map((request) => request.id))
+    next = next.map((item) =>
+      item.status === 'pending' && !outstandingIds.has(item.id)
+        ? { ...item, status: 'answered' as const }
+        : item)
   }
   return next
 }
@@ -161,7 +180,7 @@ export interface UseChatInteractionsResult {
   /** Wire to the cards' `onResolved`. */
   markResolved: (id: string, status: Exclude<ChatInteractionStatus, 'pending'>, answers?: InteractionAnswers) => void
   /** Wire to the answer route's GET list after a reload/reconnect. */
-  restore: (outstanding: InteractionRequestWire[]) => void
+  restore: (outstanding: InteractionRequestWire[], options?: RestoreChatInteractionsOptions) => void
   /** Apply durable transcript/state projections after a reload. */
   hydrate: (persisted: ChatInteraction[]) => void
   /** Settle still-pending asks when the turn ends. */
@@ -170,7 +189,9 @@ export interface UseChatInteractionsResult {
   reset: () => void
 }
 
-export function useChatInteractions(): UseChatInteractionsResult {
+export type UseChatInteractionsOptions = RestoreChatInteractionsOptions
+
+export function useChatInteractions(options: UseChatInteractionsOptions = {}): UseChatInteractionsResult {
   const [interactions, setInteractions] = useState<ChatInteraction[]>([])
 
   const upsert = useCallback((interaction: ChatInteraction) => {
@@ -182,9 +203,11 @@ export function useChatInteractions(): UseChatInteractionsResult {
   const markResolved = useCallback((id: string, status: Exclude<ChatInteractionStatus, 'pending'>, answers?: InteractionAnswers) => {
     setInteractions((prev) => resolveChatInteraction(prev, id, status, answers))
   }, [])
-  const restore = useCallback((outstanding: InteractionRequestWire[]) => {
-    setInteractions((prev) => restoreChatInteractions(prev, outstanding))
-  }, [])
+  const restore = useCallback((outstanding: InteractionRequestWire[], restoreOptions?: RestoreChatInteractionsOptions) => {
+    setInteractions((prev) => restoreChatInteractions(prev, outstanding, {
+      mode: restoreOptions?.mode ?? options.mode,
+    }))
+  }, [options.mode])
   const hydrate = useCallback((persisted: ChatInteraction[]) => {
     setInteractions((prev) => hydrateChatInteractions(prev, persisted))
   }, [])

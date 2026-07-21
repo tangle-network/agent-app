@@ -92,10 +92,19 @@ export function createDurableInteractionAnswerSubmitter(
   const fetchImpl = options.fetchImpl ?? fetch
   return async (submission) => {
     const signature = interactionSubmissionSignature(submission)
-    let attemptKey = options.attempts.get(submission.id, signature)
-    if (!attemptKey) {
-      attemptKey = (options.createAttemptKey ?? defaultAttemptKey)()
-      options.attempts.set(submission.id, signature, attemptKey)
+    let attemptKey: string
+    try {
+      attemptKey = options.attempts.get(submission.id, signature) ?? ''
+      if (!attemptKey) {
+        attemptKey = (options.createAttemptKey ?? defaultAttemptKey)()
+        options.attempts.set(submission.id, signature, attemptKey)
+      }
+    } catch (cause) {
+      return {
+        ok: false,
+        expired: false,
+        message: cause instanceof Error ? cause.message : 'Failed to submit the answer',
+      }
     }
     const url = typeof options.url === 'function' ? options.url(submission) : options.url
     const extra = typeof options.body === 'function' ? options.body(submission) : options.body ?? {}

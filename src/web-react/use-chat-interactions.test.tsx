@@ -72,13 +72,27 @@ describe('interaction reducers', () => {
     expect(terminalizePendingChatInteractions(settled, 'expired')).toBe(settled)
   })
 
-  it('restores outstanding asks without guessing how an unlisted ask settled', () => {
+  it('preserves the legacy absence-to-answered restore behavior by default', () => {
     const list = [question('gone'), question('kept', { title: 'Kept?' })]
     const restored = restoreChatInteractions(list, [wireRequest('kept', 'Kept?'), wireRequest('new', 'New ask?')])
-    expect(restored.find((item) => item.id === 'gone')?.status).toBe('pending')
+    expect(restored.find((item) => item.id === 'gone')?.status).toBe('answered')
     expect(restored.find((item) => item.id === 'kept')?.status).toBe('pending')
     expect(restored.find((item) => item.id === 'new')?.status).toBe('pending')
     expect(restored).toHaveLength(3)
+  })
+
+  it('keeps absent asks pending in durable restore mode until hydration settles them', () => {
+    const list = [question('gone'), question('kept', { title: 'Kept?' })]
+    const restored = restoreChatInteractions(
+      list,
+      [wireRequest('kept', 'Kept?'), wireRequest('new', 'New ask?')],
+      { mode: 'durable' },
+    )
+    expect(restored.find((item) => item.id === 'gone')?.status).toBe('pending')
+    expect(restored.find((item) => item.id === 'kept')?.status).toBe('pending')
+    expect(restored.find((item) => item.id === 'new')?.status).toBe('pending')
+    expect(hydrateChatInteractions(restored, [question('gone', { status: 'answered' })])
+      .find((item) => item.id === 'gone')?.status).toBe('answered')
   })
 
   it('replaces an obsolete duplicate id with the authoritative outstanding id', () => {
@@ -135,5 +149,12 @@ describe('useChatInteractions', () => {
       status: 'answered',
       answers: { q0: ['Formal'] },
     })
+  })
+
+  it('uses durable restore mode configured on the hook', () => {
+    const { result } = renderHook(() => useChatInteractions({ mode: 'durable' }))
+    act(() => result.current.upsert(question('gone')))
+    act(() => result.current.restore([]))
+    expect(result.current.interactions[0]?.status).toBe('pending')
   })
 })

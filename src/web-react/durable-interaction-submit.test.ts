@@ -78,4 +78,23 @@ describe('createDurableInteractionAnswerSubmitter', () => {
     expect(attempts.get('ask-1', '{"answer":"first"}')).toBe('attempt-1')
     expect(attempts.get('ask-1', '{"answer":"second"}')).toBe('attempt-2')
   })
+
+  it('returns a retryable submit error when the attempt store cannot persist', async () => {
+    const fetchImpl = vi.fn() as unknown as typeof fetch
+    const attempts = {
+      get: () => null,
+      set: () => { throw new DOMException('storage full', 'QuotaExceededError') },
+      delete: () => {},
+    }
+    const submit = createDurableInteractionAnswerSubmitter({
+      url: '/api/interactions',
+      attempts,
+      createAttemptKey: () => 'attempt-storage-failure',
+      fetchImpl,
+    })
+
+    await expect(submit({ id: 'ask-1', outcome: 'accepted', data: { confirmed: true } }))
+      .resolves.toEqual({ ok: false, expired: false, message: 'storage full' })
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
 })

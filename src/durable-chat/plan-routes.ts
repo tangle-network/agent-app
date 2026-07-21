@@ -256,7 +256,11 @@ export function createDurablePlanRoutes(options: DurablePlanRouteOptions): Durab
           ...(!effectComplete ? { effectPending: true } : {}),
         })
       }
-      return Response.json({ code: 'DURABLE_CHAT_CONFLICT', error: 'plan is not pending' }, { status: 409 })
+      return Response.json({
+        code: 'DURABLE_CHAT_CONFLICT',
+        error: 'plan is not pending',
+        plan: local,
+      }, { status: 409 })
     }
     const opposite = parsed.decision === 'approved' ? 'rejected' : 'approved'
     const oppositeCommand = await options.store.getPlanCommand(scope, planCommandKey(parsed.planId, parsed.revision, opposite))
@@ -301,6 +305,25 @@ export function createDurablePlanRoutes(options: DurablePlanRouteOptions): Durab
             idempotent: true,
             receipt,
           }
+        } else if (reconciled.plan && reconciled.plan.status !== 'pending') {
+          // The authority has already moved this revision out of its pending
+          // state, but not to the decision this request asked for. Surface the
+          // authoritative snapshot so the client can converge instead of
+          // retrying an already-lost decision as if the authority were down.
+          let projectionPending = false
+          try {
+            await options.store.putPlanProjection(scope, reconciled.plan)
+          } catch (projectionError) {
+            projectionPending = true
+            logger.warn('[durable-chat] failed to reconcile conflicting plan projection:', projectionError)
+          }
+          return Response.json({
+            code: 'DURABLE_CHAT_CONFLICT',
+            error: 'plan is not pending',
+            plan: reconciled.plan,
+            ...(reconciled.receipt ? { receipt: reconciled.receipt } : {}),
+            ...(projectionPending ? { projectionPending: true } : {}),
+          }, { status: 409 })
         } else {
           return errorResponse(error, 'DURABLE_CHAT_UNAVAILABLE', 503, 'plan authority unavailable')
         }

@@ -6,21 +6,44 @@ export interface ChatRouteDurableProjection {
   materialize(): Array<Record<string, unknown>> | Promise<Array<Record<string, unknown>>>
 }
 
+export type ChatRouteDurableProjectionLogger =
+  (message: string, meta?: Record<string, unknown>) => void
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
 /** Adds durable lifecycle projection to any producer lane without moving its
  * transport into agent-app. The projection is observed inline and its
  * materialized parts replace same-key pending snapshots after the stream
- * drains. */
+ * drains. Projection persistence is best-effort for the live lane: a store
+ * outage must not terminate an otherwise healthy sandbox stream. Failures are
+ * reported through the optional logger so products can retain diagnostics. */
 export function withDurableChatProjection(
   producer: ChatTurnRouteProducer,
   projection: ChatRouteDurableProjection,
+  log: ChatRouteDurableProjectionLogger = (message, meta) => console.error(message, meta ?? ''),
 ): ChatTurnRouteProducer {
   let projected: Array<Record<string, unknown>> = []
   async function* stream(): AsyncGenerator<StreamEvent, void, unknown> {
     for await (const event of producer.stream) {
-      await projection.observe(event)
+      try {
+        await projection.observe(event)
+      } catch (error) {
+        log('[chat-routes] durable projection observe failed', {
+          eventType: event.type,
+          error: errorMessage(error),
+        })
+      }
       yield event
     }
-    projected = await projection.materialize()
+    try {
+      projected = await projection.materialize()
+    } catch (error) {
+      log('[chat-routes] durable projection materialize failed', {
+        error: errorMessage(error),
+      })
+    }
   }
   return {
     ...producer,
