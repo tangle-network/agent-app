@@ -104,6 +104,89 @@ export function assertPromptPartsWithinCap(
   )
 }
 
+// ── file mentions ────────────────────────────────────────────────────────
+//
+// A file mention (`@`-picked in the composer, sandbox-ui#184) is a path
+// reference into the workspace sandbox — no byte upload. These helpers turn
+// a resolved mention list into wire parts and the prompt pointer block that
+// tells the agent where to read them from.
+
+/** A file mention resolved from the composer's `@`-picker: the
+ *  workspace-relative path plus enough metadata to build a prompt part and
+ *  pointer text. `path` is the canonical identity — the mention pill's
+ *  `MentionItem.id` for the file kind (`/web-react`'s `useFileMentions`). */
+export interface FileMention {
+  path: string
+  name: string
+  size?: number
+}
+
+const MENTION_IMAGE_MEDIA_TYPES: ReadonlyMap<string, string> = new Map([
+  ['.png', 'image/png'],
+  ['.jpg', 'image/jpeg'],
+  ['.jpeg', 'image/jpeg'],
+  ['.gif', 'image/gif'],
+  ['.webp', 'image/webp'],
+  ['.svg', 'image/svg+xml'],
+  ['.bmp', 'image/bmp'],
+  ['.heic', 'image/heic'],
+  ['.heif', 'image/heif'],
+  ['.avif', 'image/avif'],
+])
+
+function extensionOf(path: string): string {
+  const base = path.split('/').filter(Boolean).pop() ?? path
+  const dot = base.lastIndexOf('.')
+  return dot > 0 ? base.slice(dot).toLowerCase() : ''
+}
+
+/** The `image/*` mime for a mention path by extension, or `undefined` for
+ *  anything not in the known image set (dispatched as `type: 'file'`). */
+export function mediaTypeForMentionPath(path: string): string | undefined {
+  return MENTION_IMAGE_MEDIA_TYPES.get(extensionOf(path))
+}
+
+export interface FileMentionsToPartsOptions {
+  /** Resolve a mention's workspace-relative path to the absolute path the
+   *  dispatched part should carry (e.g. a host prefixing the in-box vault
+   *  root). Default: identity — the path travels unchanged. */
+  resolvePath?: (path: string) => string
+}
+
+/** Maps resolved file mentions to path-only `ChatTurnFilePartInput`s —
+ *  `image` vs `file` by extension, and always a `path`, never a `url` (the
+ *  url/path XOR invariant: a mention is a sandbox path reference, never
+ *  inline bytes). */
+export function fileMentionsToParts(
+  mentions: readonly FileMention[],
+  opts: FileMentionsToPartsOptions = {},
+): ChatTurnFilePartInput[] {
+  const resolvePath = opts.resolvePath ?? ((path: string) => path)
+  return mentions.map((mention) => {
+    const mediaType = mediaTypeForMentionPath(mention.path)
+    const part: ChatTurnFilePartInput = {
+      type: mediaType ? 'image' : 'file',
+      filename: mention.name,
+      path: resolvePath(mention.path),
+    }
+    if (mediaType) part.mediaType = mediaType
+    return part
+  })
+}
+
+/** The agent-facing pointer block appended to the dispatched prompt — never
+ *  persisted in message `content`. Empty array → `''` so callers can append
+ *  unconditionally. This is the sole producer of that text: the current
+ *  turn's dispatch and any history projection built from the same mention
+ *  list both route through here, so the two can't drift apart. */
+export function buildMentionPromptBlock(
+  mentions: readonly Pick<FileMention, 'name' | 'path'>[],
+): string {
+  if (mentions.length === 0) return ''
+  const lines = mentions.map((m) => `- ${m.name} (${m.path})`)
+  return `\n\nMentioned files — read them from these paths:\n${lines.join('\n')}`
+}
+
 /** Validates the untyped `parts` array off the wire. Returns the typed parts
  *  or throws `ChatTurnInputError` (400) naming the offending entry. */
 export function parseChatTurnParts(raw: unknown): ChatTurnFilePartInput[] {
