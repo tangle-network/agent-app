@@ -181,4 +181,72 @@ describe('useFileMentions', () => {
 
     nowSpy.mockRestore()
   })
+
+  it('refresh() forces a re-fetch even when the cache is still within refreshAfterMs', async () => {
+    const first = readyResponse([{ path: 'old.ts', name: 'old.ts' }])
+    const second = readyResponse([{ path: 'new.ts', name: 'new.ts' }])
+    const fetchImpl = fetchReturning(first, second)
+
+    const { result } = renderHook(() =>
+      useFileMentions({ indexUrl: '/api/files', fetchImpl, refreshAfterMs: 5 * 60 * 1000 }),
+    )
+    await act(async () => {
+      await result.current.mention.fetchItems('')
+    })
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+
+    // Well within refreshAfterMs — a normal fetchItems call would not
+    // trigger a refetch here, but an explicit refresh() ignores the TTL.
+    await act(async () => {
+      await result.current.refresh()
+    })
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+
+    let items: MentionItem[] = []
+    await act(async () => {
+      items = await result.current.mention.fetchItems('')
+    })
+    expect(items.map((i) => i.id)).toEqual(['new.ts'])
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+  })
+
+  it('refresh() dedupes against an already-in-flight load', async () => {
+    const files = readyResponse([{ path: 'a.ts', name: 'a.ts' }])
+    let resolveFetch: (() => void) | undefined
+    const fetchImpl = vi.fn(async () => {
+      await new Promise<void>((resolve) => {
+        resolveFetch = resolve
+      })
+      return { ok: true, status: 200, json: async () => files } as unknown as Response
+    }) as unknown as typeof fetch
+
+    const { result } = renderHook(() => useFileMentions({ indexUrl: '/api/files', fetchImpl }))
+
+    let firstDone = false
+    let secondDone = false
+    act(() => {
+      void result.current.mention.fetchItems('').then(() => {
+        firstDone = true
+      })
+    })
+    act(() => {
+      void result.current.refresh().then(() => {
+        secondDone = true
+      })
+    })
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+    expect(firstDone).toBe(false)
+    expect(secondDone).toBe(false)
+
+    await act(async () => {
+      resolveFetch?.()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    await waitFor(() => expect(firstDone).toBe(true))
+    await waitFor(() => expect(secondDone).toBe(true))
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
 })

@@ -176,9 +176,9 @@ export function fileMentionsToParts(
 
 /** The agent-facing pointer block appended to the dispatched prompt — never
  *  persisted in message `content`. Empty array → `''` so callers can append
- *  unconditionally. Mirrors gtm-agent's `buildAttachmentPromptBlock`: the
- *  sole producer of this text, so the current turn's dispatch and any
- *  history projection built from the same mention list can't drift apart. */
+ *  unconditionally. This is the sole producer of that text: the current
+ *  turn's dispatch and any history projection built from the same mention
+ *  list both route through here, so the two can't drift apart. */
 export function buildMentionPromptBlock(
   mentions: readonly Pick<FileMention, 'name' | 'path'>[],
 ): string {

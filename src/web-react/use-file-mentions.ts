@@ -6,7 +6,9 @@
  * Fetches the index once per session from `indexUrl`, refreshes it in the
  * background whenever the popover opens (a `fetchItems` call) if the cached
  * copy has aged past `refreshAfterMs`, and answers every keystroke from an
- * in-memory fuzzy filter — no per-keystroke network round trip.
+ * in-memory fuzzy filter — no per-keystroke network round trip. The returned
+ * `refresh()` lets a caller force a re-fetch immediately instead of waiting
+ * on `refreshAfterMs` — e.g. right after the agent creates a file mid-session.
  *
  * `MentionItem`/the `mention` prop shape mirror the FROZEN contract from
  * sandbox-ui#184 structurally (no import: `/web-react` stays dependency-free
@@ -101,18 +103,35 @@ type IndexState =
  *  index endpoint the whole time the box is cold. */
 const RETRY_AFTER_MS = 3000
 
+/** Max popover results per query — enough to show a useful spread of matches
+ *  without pushing the fuzzy-filtered list past what a popover can usefully
+ *  render in one screen. */
+export const DEFAULT_MENTION_LIMIT = 20
+
+/** How long a `ready` index is served before a background refetch — long
+ *  enough that a full session's worth of popover opens don't repeatedly hit
+ *  the index endpoint, short enough that a stale listing doesn't linger too
+ *  far past workspace file changes. Callers who need the index current right
+ *  now (e.g. just after the agent creates a file) call `refresh()` instead of
+ *  waiting on this window. */
+export const INDEX_REFRESH_AFTER_MS = 5 * 60 * 1000
+
+/** Popover empty-state copy for a `ready` index whose query matched nothing.
+ *  Loading/warming/error states have their own copy — see `emptyTextFor`. */
+export const DEFAULT_MENTION_EMPTY_TEXT = 'No matching files'
+
 export interface UseFileMentionsOptions {
   /** GET endpoint returning `FileIndexResponse` (a `createSandboxFileIndexRoute`). */
   indexUrl: string
-  /** Max popover results per query. Default 20. */
+  /** Max popover results per query. Default {@link DEFAULT_MENTION_LIMIT}. */
   limit?: number
   /** How long a `ready` index is served without a background refetch.
-   *  Default 5 minutes. */
+   *  Default {@link INDEX_REFRESH_AFTER_MS}. */
   refreshAfterMs?: number
   /** `fetch` override for tests / non-global-fetch hosts. Default `fetch`. */
   fetchImpl?: typeof fetch
   /** Text shown in the popover's empty state once the index is loaded and
-   *  the query matched nothing. Default "No matching files". */
+   *  the query matched nothing. Default {@link DEFAULT_MENTION_EMPTY_TEXT}. */
   emptyText?: string
 }
 
@@ -124,6 +143,11 @@ export interface UseFileMentionsResult {
   mentions: FileMention[]
   /** Drop all currently-referenced mentions (e.g. after a successful send). */
   clearMentions: () => void
+  /** Force a re-fetch of the index right now, ignoring `refreshAfterMs` — for
+   *  example right after the agent creates a file mid-session, so the next
+   *  popover open sees it. Dedupes against an already-in-flight load rather
+   *  than firing a second request. */
+  refresh: () => Promise<void>
 }
 
 /** Never blocks — a `warming` or `error` index answers `fetchItems` with an
@@ -144,7 +168,12 @@ function emptyTextFor(state: IndexState, fallback: string): string {
 }
 
 export function useFileMentions(options: UseFileMentionsOptions): UseFileMentionsResult {
-  const { indexUrl, limit = 20, refreshAfterMs = 5 * 60 * 1000, emptyText = 'No matching files' } = options
+  const {
+    indexUrl,
+    limit = DEFAULT_MENTION_LIMIT,
+    refreshAfterMs = INDEX_REFRESH_AFTER_MS,
+    emptyText = DEFAULT_MENTION_EMPTY_TEXT,
+  } = options
   const fetchImpl = options.fetchImpl ?? fetch
 
   const [state, setState] = useState<IndexState>({ kind: 'idle' })
@@ -197,6 +226,14 @@ export function useFileMentions(options: UseFileMentionsOptions): UseFileMention
     return attempt
   }, [fetchImpl, indexUrl])
 
+  // `load()` itself never consults `refreshAfterMs` — that gate lives in
+  // `fetchItems` — so calling it directly here already bypasses the TTL. The
+  // in-flight dedup inside `load()` covers the case where a background
+  // refresh from `fetchItems` is already running.
+  const refresh = useCallback(async (): Promise<void> => {
+    await load()
+  }, [load])
+
   const fetchItems = useCallback(
     async (query: string): Promise<MentionItem[]> => {
       let current = stateRef.current
@@ -232,5 +269,5 @@ export function useFileMentions(options: UseFileMentionsOptions): UseFileMention
     [fetchItems, onMentionsChange, state, emptyText],
   )
 
-  return { mention, mentions, clearMentions }
+  return { mention, mentions, clearMentions, refresh }
 }
