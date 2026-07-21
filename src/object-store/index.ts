@@ -139,15 +139,20 @@ export function createR2ObjectStore({ bucket }: { bucket: R2LikeBucket }): Objec
 /**
  * Assert a single object-key path SEGMENT (an operator id, customer id, or
  * upload id) is safe to interpolate into a key, and return it. Throws on the
- * traversal / injection shapes: `..` anywhere, a leading `/`, a backslash, or an
- * empty segment. Consumers should call this on caller-supplied identifiers
- * BEFORE any `get`/`put` so an attacker-controlled id can never widen the key
- * beyond its own operator+customer prefix.
+ * traversal / injection shapes: `..` anywhere, ANY `/` (a segment must be a
+ * single path component — a leading, interior, or trailing slash all widen the
+ * key by injecting extra levels), a backslash, or an empty segment. Consumers
+ * should call this on caller-supplied identifiers BEFORE any `get`/`put` so an
+ * attacker-controlled id can never widen the key beyond its own operator+
+ * customer prefix.
  */
 export function assertSafeKeySegment(s: string): string {
   if (s.length === 0) throw new Error('object-store: empty key segment')
   if (s.includes('..')) throw new Error(`object-store: unsafe key segment (contains "..") — ${s}`)
-  if (s.startsWith('/')) throw new Error(`object-store: unsafe key segment (leading "/") — ${s}`)
+  // Reject ANY '/' — leading, interior, or trailing. A key segment is a single
+  // path component; an interior slash (`a/b`) would silently add a key level and
+  // widen the operator/customer prefix, so it is refused just like a leading one.
+  if (s.includes('/')) throw new Error(`object-store: unsafe key segment (contains "/") — ${s}`)
   if (s.includes('\\')) throw new Error(`object-store: unsafe key segment (backslash) — ${s}`)
   return s
 }

@@ -471,6 +471,11 @@ function proposalPreview(call: ChatToolCallInfo): { summary: string | null; meta
 
 function truncate(v: unknown, max = 240): string {
   const s = typeof v === 'string' ? v : JSON.stringify(v)
+  // JSON.stringify returns undefined (not a string) for undefined / functions /
+  // symbols — a non-envelope tool output (a bare string, or a result with no
+  // `.result`) lands here. Coerce to '' so we never read `.length` off undefined
+  // and crash the whole chat surface.
+  if (typeof s !== 'string') return ''
   return s.length > max ? `${s.slice(0, max)}…` : s
 }
 
@@ -513,7 +518,15 @@ function ShellDetail({ call }: { call: ChatToolCallInfo }) {
 
 /** Generic expanded detail: what was called, and what actually happened. */
 function DefaultToolDetail({ call }: { call: ChatToolCallInfo }) {
-  const outcome = toolOutcomeOf(call)
+  // A tool result is the `{ ok, result }` proposal envelope ONLY when it is an
+  // object. bash/skill/python outputs arrive as a bare string (or nothing at
+  // all), so reading `.ok`/`.result` off them is meaningless — those render as
+  // their raw value, not through the envelope branch.
+  const result: unknown = call.result
+  const envelope =
+    typeof result === 'object' && result !== null
+      ? (result as { ok?: boolean; result?: unknown; message?: string })
+      : null
   return (
     <div className="space-y-2">
       {call.args && Object.keys(call.args).length > 0 && (
@@ -522,20 +535,25 @@ function DefaultToolDetail({ call }: { call: ChatToolCallInfo }) {
           <KvRows data={call.args} />
         </div>
       )}
-      {outcome && (
+      {envelope ? (
         <div>
           <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            {outcome.ok === false ? 'Failed' : 'Result'}
+            {envelope.ok === false ? 'Failed' : 'Result'}
           </p>
-          {outcome.ok === false ? (
-            <p className="text-xs text-destructive">{outcome.message ?? 'Tool failed'}</p>
-          ) : outcome.result && typeof outcome.result === 'object' ? (
-            <KvRows data={outcome.result} />
-          ) : (
-            <p className="font-mono text-[11px] text-muted-foreground">{truncate(outcome.result)}</p>
-          )}
+          {envelope.ok === false ? (
+            <p className="text-xs text-destructive">{envelope.message ?? 'Tool failed'}</p>
+          ) : envelope.result && typeof envelope.result === 'object' ? (
+            <KvRows data={envelope.result as Record<string, unknown>} />
+          ) : envelope.result != null ? (
+            <p className="font-mono text-[11px] text-muted-foreground">{truncate(envelope.result)}</p>
+          ) : null}
         </div>
-      )}
+      ) : result != null ? (
+        <div>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Result</p>
+          <p className="font-mono text-[11px] text-muted-foreground">{truncate(result)}</p>
+        </div>
+      ) : null}
     </div>
   )
 }

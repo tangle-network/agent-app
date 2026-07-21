@@ -185,6 +185,18 @@ describe('objectKey / assertSafeKeySegment', () => {
     expect(() => objectKey({ operatorId: 'op', customerId: '../other', uploadId: 'u', filename: 'a' })).toThrow()
   })
 
+  it('rejects an interior / trailing "/" — a segment is a single path component', () => {
+    // No "..", no leading "/": the pre-hardening gaps. A bare interior slash
+    // would silently add a key level and widen the operator/customer prefix.
+    expect(() => assertSafeKeySegment('a/b')).toThrow()
+    expect(() => assertSafeKeySegment('op/../../attacker')).toThrow()
+    expect(() => assertSafeKeySegment('trailing/')).toThrow()
+    // And through the construction path: a customer id with an interior slash is
+    // refused rather than widening the key from op/customer/upload to op/a/b/upload.
+    expect(() => objectKey({ operatorId: 'op', customerId: 'cust/extra', uploadId: 'u', filename: 'a' })).toThrow()
+    expect(() => objectKey({ operatorId: 'op', uploadId: 'u1/u2', filename: 'a' })).toThrow()
+  })
+
   it('returns the segment on success (usable inline)', () => {
     expect(assertSafeKeySegment('op-123')).toBe('op-123')
   })
