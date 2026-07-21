@@ -20,13 +20,23 @@ import {
 } from './chat-interactions'
 
 // The `/chat-routes` wire contract, re-exported for turn-body construction —
-// `./chat-routes/wire` is import-free and browser-safe by design.
+// `./chat-routes/wire` and `./chat-routes/file-index`'s response types are
+// import-free and browser-safe by design.
 export {
   chatTurnRequestInit,
   type ChatTurnFilePartInput,
   type ChatTurnPartInput,
   type ChatTurnRequestPayload,
+  type FileMention,
+  fileMentionsToParts,
+  buildMentionPromptBlock,
+  mediaTypeForMentionPath,
 } from '../chat-routes/wire'
+export {
+  type FileIndexResponse,
+  type FileIndexReadyResponse,
+  type FileIndexWarmingResponse,
+} from '../chat-routes/file-index'
 
 export interface ChatStreamToolCall {
   toolCallId?: string
