@@ -29,6 +29,8 @@ export default defineConfig({
     'stream/index': 'src/stream/index.ts',
     'integrations/index': 'src/integrations/index.ts',
     'interactions/index': 'src/interactions/index.ts',
+    'plans/index': 'src/plans/index.ts',
+    'durable-chat/index': 'src/durable-chat/index.ts',
     'missions/index': 'src/missions/index.ts',
     'platform/index': 'src/platform/index.ts',
     'app-auth/index': 'src/app-auth/index.ts',

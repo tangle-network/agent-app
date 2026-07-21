@@ -14,9 +14,17 @@
  */
 
 import {
+  cancelStatusFor,
+  interactionPartKey,
+  interactionToPersistedPart,
   isRenderableInteractionKind,
+  parseInteractionCancel,
   parseInteractionRequest,
 } from '../interactions/contract'
+import {
+  parsePlanSubmittedEvent,
+  planToPersistedPart,
+} from '../plans/index'
 import {
   asRecord,
   asString,
@@ -206,6 +214,11 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
           continue
         }
         if (renderable(parsed.value.kind)) {
+          recordPersistedPart(
+            interactionToPersistedPart(parsed.value, 'pending'),
+            undefined,
+            interactionPartKey(parsed.value.id),
+          )
           yield event
           continue
         }
@@ -229,6 +242,36 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         continue
       }
 
+      if (event.type === 'interaction.cancel') {
+        const parsed = parseInteractionCancel(asRecord(record.data))
+        if (!parsed.succeeded) {
+          log('[chat-routes] dropping malformed interaction.cancel event', { error: parsed.error })
+          continue
+        }
+        const key = interactionPartKey(parsed.value.id)
+        const existing = partMap.get(key)
+        if (existing?.type === 'interaction' && existing.status === 'pending') {
+          recordPersistedPart({
+            ...existing,
+            status: cancelStatusFor(parsed.value.reason),
+            ...(parsed.value.reason ? { cancelReason: parsed.value.reason } : {}),
+          }, undefined, key)
+        }
+        yield event
+        continue
+      }
+
+      if (event.type === 'plan.submitted') {
+        const parsed = parsePlanSubmittedEvent(record)
+        if (!parsed.succeeded) {
+          log('[chat-routes] dropping malformed plan.submitted event', { error: parsed.error })
+          continue
+        }
+        recordPersistedPart(planToPersistedPart(parsed.value), undefined)
+        yield event
+        continue
+      }
+
       if (event.type === 'result') {
         const finalText = asString(event.data?.finalText)
         if (finalText) fullText = finalText
@@ -242,10 +285,11 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         continue
       }
 
-      // Everything else (interaction.cancel, error, lifecycle) forwards
+      // Everything else (error, lifecycle) forwards
       // verbatim — the client parser ignores unknown types.
       yield event
     }
+
   }
 
   return {

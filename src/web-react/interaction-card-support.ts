@@ -11,6 +11,7 @@ import type {
   ChatInteractionField,
   ChatInteractionStatus,
   ChatSelectField,
+  InteractionAnswers,
   InteractionData,
 } from './chat-interactions'
 
@@ -44,6 +45,30 @@ export function interactionTerminalNotes(
 // Answer building
 
 export type FieldValues = Record<string, { selected?: string[]; text?: string; custom?: string }>
+
+/** Converts acknowledged, persisted answers back into the local field state
+ * consumed by the shared cards. Persisted values are authoritative: this is
+ * intentionally used only when an interaction carries `answers`, never to
+ * guess an answer from the absence of an outstanding sidecar ask. */
+export function fieldValuesFromAnswers(
+  fields: ChatInteractionField[],
+  answers: InteractionAnswers | undefined,
+): FieldValues {
+  if (!answers) return {}
+  const values: FieldValues = {}
+  for (const field of fields) {
+    const answer = answers[field.name]
+    if (answer === undefined) continue
+    if (field.type === 'select') {
+      values[field.name] = { selected: Array.isArray(answer) ? [...answer] : [String(answer)] }
+    } else if (field.type === 'boolean') {
+      values[field.name] = { selected: [String(answer)] }
+    } else {
+      values[field.name] = { text: String(answer) }
+    }
+  }
+  return values
+}
 
 /** The submitted value for one field, or null when it has no answer yet. */
 export function fieldAnswer(field: ChatInteractionField, values: FieldValues): InteractionData[string] | null {

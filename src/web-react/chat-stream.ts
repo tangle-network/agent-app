@@ -15,9 +15,16 @@
 
 import {
   interactionFromWireRequest,
+  parseInteractionCancel,
   parseInteractionRequest,
   type ChatInteraction,
+  type InteractionCancelData,
 } from './chat-interactions'
+import {
+  parsePlanSubmittedEvent,
+  persistedPartToPlan,
+  type ChatPlan,
+} from '../plans/index'
 
 // The `/chat-routes` wire contract, re-exported for turn-body construction —
 // `./chat-routes/wire` and `./chat-routes/file-index`'s response types are
@@ -69,6 +76,10 @@ export interface ChatStreamCallbacks {
    *  user", not "model working". Optional — a consumer that doesn't wire it
    *  parses the same stream unchanged. */
   onInteraction?: (interaction: ChatInteraction) => void
+  /** A terminal withdrawal/timeout for a previously emitted interaction. */
+  onInteractionCancel?: (cancel: InteractionCancelData) => void
+  /** A durable-plan snapshot from any plan lifecycle event. */
+  onPlan?: (plan: ChatPlan) => void
 }
 
 export interface ConsumeChatStreamResult {
@@ -162,6 +173,16 @@ export function dispatchChatStreamLine(line: string, cb: ChatStreamCallbacks): {
       }
       break
     }
+    case 'interaction.cancel': {
+      const cancelled = parseInteractionCancel(evt.data as Record<string, unknown> | undefined)
+      if (cancelled.succeeded) {
+        cb.onInteractionCancel?.(cancelled.value)
+        receivedContent = true
+      } else {
+        console.error('[chat-stream] dropping malformed interaction.cancel line:', cancelled.error)
+      }
+      break
+    }
     case 'error': {
       // The sandbox lane sends the reason as `{ type: 'error', data: { message } }`
       // (mirrored by `session.run.failed`); older/edge lanes use a top-level
@@ -183,8 +204,25 @@ export function dispatchChatStreamLine(line: string, cb: ChatStreamCallbacks): {
       }
       break
     }
-    default:
+    default: {
+      if (typeof evt.type === 'string' && evt.type.startsWith('plan.')) {
+        const submitted = parsePlanSubmittedEvent(evt)
+        const planRecord = (
+          (evt.data as Record<string, unknown> | undefined)?.plan ??
+          (evt.properties as Record<string, unknown> | undefined)?.plan
+        ) as Record<string, unknown> | undefined
+        const plan = submitted.succeeded
+          ? submitted.value
+          : planRecord ? persistedPartToPlan({ type: 'plan', ...planRecord }) : null
+        if (plan) {
+          cb.onPlan?.(plan)
+          receivedContent = true
+        } else {
+          console.error('[chat-stream] dropping malformed durable plan line:', evt.type)
+        }
+      }
       break // turn_status and unknown line types are non-content
+    }
   }
   return { turnId, receivedContent }
 }

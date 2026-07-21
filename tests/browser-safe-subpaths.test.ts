@@ -39,6 +39,7 @@ const BROWSER_NONREACT = new Set([
   'crypto',
   'web',
   'harness',
+  'plans',
 ])
 
 /** Browser-intended when a client bundle imports it: the whole `*-react` family

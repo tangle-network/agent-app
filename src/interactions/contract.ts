@@ -69,6 +69,37 @@ export type InteractionRequestWire = Omit<InteractionRequest, 'answerSpec'> & {
 
 export type ChatInteractionStatus = 'pending' | 'answered' | 'declined' | 'cancelled' | 'expired'
 
+/** Accepted field selections keyed by answer-spec field name. */
+/** Accepted answer values. Select fields historically used `string[]`; the
+ * wider scalar union is additive and lets durable stores preserve text,
+ * numeric, and boolean answer fields without coercion. */
+export type InteractionAnswerValue = string | number | boolean | string[]
+export type InteractionAnswers = Record<string, InteractionAnswerValue>
+
+export type ParseInteractionAnswersResult =
+  | { succeeded: true; value: InteractionAnswers }
+  | { succeeded: false; error: string }
+
+/** Strictly validates and copies persisted answer selections. */
+export function parseInteractionAnswers(value: unknown): ParseInteractionAnswersResult {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { succeeded: false, error: 'interaction answers must be an object' }
+  }
+  const answers: InteractionAnswers = {}
+  for (const [key, selection] of Object.entries(value as Record<string, unknown>)) {
+    if (!isSafeInteractionFieldKey(key)) {
+      return { succeeded: false, error: `interaction answers contain an unsafe field key: ${key}` }
+    }
+    const valid = typeof selection === 'string' || typeof selection === 'number' || typeof selection === 'boolean' ||
+      (Array.isArray(selection) && selection.every((item) => typeof item === 'string'))
+    if (!valid) {
+      return { succeeded: false, error: `interaction answer ${key} must be a string, number, boolean, or string array` }
+    }
+    answers[key] = Array.isArray(selection) ? [...selection] : selection
+  }
+  return { succeeded: true, value: answers }
+}
+
 /** The client/persisted view of one ask. `fields` come verbatim off the wire. */
 export interface ChatInteraction {
   id: string
@@ -77,6 +108,8 @@ export interface ChatInteraction {
   body?: string
   fields: ChatInteractionField[]
   status: ChatInteractionStatus
+  /** Accepted selections, restored with the transcript after reload. */
+  answers?: InteractionAnswers
   /** Set when status came from an `interaction.cancel` (e.g. "timeout"). */
   cancelReason?: string
 }
@@ -242,6 +275,7 @@ export type InteractionPersistedPart = {
   body?: string
   answerSpec: { fields: ChatInteractionField[] }
   status: ChatInteractionStatus
+  answers?: InteractionAnswers
   cancelReason?: string
 }
 
@@ -275,7 +309,10 @@ export function interactionToPersistedPart(
   request: InteractionRequestWire,
   status: ChatInteractionStatus,
   cancelReason?: string,
+  answers?: InteractionAnswers,
 ): InteractionPersistedPart {
+  const parsedAnswers = answers === undefined ? undefined : parseInteractionAnswers(answers)
+  if (parsedAnswers && !parsedAnswers.succeeded) throw new TypeError(parsedAnswers.error)
   return {
     type: 'interaction',
     id: request.id,
@@ -284,8 +321,26 @@ export function interactionToPersistedPart(
     ...(request.body ? { body: request.body } : {}),
     answerSpec: { fields: request.answerSpec.fields },
     status,
+    ...(parsedAnswers?.succeeded ? { answers: parsedAnswers.value } : {}),
     ...(cancelReason ? { cancelReason } : {}),
   }
+}
+
+/** Stamps accepted values onto matching persisted interaction parts without
+ * mutating the caller's transcript or answer maps. */
+export function stampInteractionAnswers(
+  parts: Array<Record<string, unknown>>,
+  answersByInteractionId: Readonly<Record<string, InteractionAnswers>>,
+): Array<Record<string, unknown>> {
+  return parts.map((part) => {
+    if (String(part.type ?? '') !== 'interaction' || typeof part.id !== 'string') return part
+    if (!Object.prototype.hasOwnProperty.call(answersByInteractionId, part.id)) return part
+    const rawAnswers = answersByInteractionId[part.id]
+    if (rawAnswers === undefined) return part
+    const parsed = parseInteractionAnswers(rawAnswers)
+    if (!parsed.succeeded) throw new TypeError(parsed.error)
+    return { ...part, answers: parsed.value }
+  })
 }
 
 /** Reads a persisted/streamed `interaction` part back into a `ChatInteraction`.
@@ -299,7 +354,8 @@ export function persistedPartToInteraction(part: Record<string, unknown>): ChatI
   const fields = Array.isArray(answerSpec?.fields) ? (answerSpec.fields as ChatInteractionField[]) : null
   const status = part.status as ChatInteractionStatus | undefined
   const validStatus = status && ['pending', 'answered', 'declined', 'cancelled', 'expired'].includes(status)
-  if (!id || !kind || !fields || !validStatus) return null
+  const parsedAnswers = part.answers === undefined ? undefined : parseInteractionAnswers(part.answers)
+  if (!id || !kind || !fields || !validStatus || (parsedAnswers && !parsedAnswers.succeeded)) return null
   return {
     id,
     kind,
@@ -307,6 +363,7 @@ export function persistedPartToInteraction(part: Record<string, unknown>): ChatI
     ...(typeof part.body === 'string' && part.body ? { body: part.body } : {}),
     fields,
     status,
+    ...(parsedAnswers?.succeeded ? { answers: parsedAnswers.value } : {}),
     ...(typeof part.cancelReason === 'string' && part.cancelReason ? { cancelReason: part.cancelReason } : {}),
   }
 }

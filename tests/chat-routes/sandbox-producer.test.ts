@@ -136,6 +136,66 @@ describe('createSandboxChatProducer', () => {
     expect(events).toHaveLength(1)
     expect(events[0]).toMatchObject({ type: 'interaction', data: { request: { id: 'q-1', kind: 'question' } } })
     expect(declineInteraction).toHaveBeenCalledExactlyOnceWith('p-1')
+    expect(producer.assistantParts?.()).toEqual([expect.objectContaining({
+      type: 'interaction',
+      id: 'q-1',
+      status: 'pending',
+    })])
+  })
+
+  it('persists an explicit cancel outcome without inferring it from disappearance', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([
+        {
+          type: 'interaction',
+          data: { request: { id: 'q-1', kind: 'question', title: 'Need input', answerSpec: { fields: [] } } },
+        },
+        { type: 'interaction.cancel', data: { id: 'q-1', reason: 'timeout' } },
+      ]),
+    })
+    await drain(producer.stream)
+    expect(producer.assistantParts?.()).toEqual([expect.objectContaining({
+      type: 'interaction',
+      id: 'q-1',
+      status: 'expired',
+      cancelReason: 'timeout',
+    })])
+  })
+
+  it('forwards and persists live durable plan submissions without a session id', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([{
+        type: 'plan.submitted',
+        data: {
+          plan: {
+            id: 'plan-1',
+            revision: 1,
+            body: '1. Research\n2. Execute',
+            submittedAt: '2026-07-21T00:00:00.000Z',
+          },
+        },
+      }]),
+    })
+
+    expect(await drain(producer.stream)).toEqual([{
+      type: 'plan.submitted',
+      data: {
+        plan: {
+          id: 'plan-1',
+          revision: 1,
+          body: '1. Research\n2. Execute',
+          submittedAt: '2026-07-21T00:00:00.000Z',
+        },
+      },
+    }])
+    expect(producer.assistantParts?.()).toEqual([{
+      type: 'plan',
+      planId: 'plan-1',
+      revision: 1,
+      body: '1. Research\n2. Execute',
+      submittedAt: '2026-07-21T00:00:00.000Z',
+      status: 'pending',
+    }])
   })
 
   it('forwards error and cancel events verbatim and drops malformed interactions', async () => {

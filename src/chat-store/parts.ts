@@ -22,6 +22,8 @@
  *   `/web-react`'s chat-interactions contract (`interactionToPersistedPart`,
  *   `noticePart`) — type-only imports, one source of truth for their statuses
  *   and field shapes.
+ * - `plan`: the durable-plan projection in `/plans`, derived from the sandbox
+ *   SDK's authoritative plan lifecycle.
  *
  * `@tangle-network/agent-interface` exports the canonical wire `Part` union,
  * but its `PartBase` requires the `sessionID`/`messageID` stream envelope that
@@ -44,10 +46,17 @@ import type { Part as HarnessWirePart } from '@tangle-network/agent-interface'
 import type {
   ChatInteractionField,
   ChatInteractionStatus,
+  InteractionAnswers,
   InteractionPersistedPart,
   NoticeKind,
   NoticePersistedPart,
 } from '../web-react/chat-interactions'
+import { persistedPartToInteraction } from '../interactions/contract'
+import {
+  persistedPartToPlan,
+  planToPersistedPart,
+  type ChatPlanPersistedPart,
+} from '../plans/index'
 
 /** Start/end wall-clock millis, as normalized by `/stream`'s `normalizeTime`. */
 export interface ChatPartTime {
@@ -158,8 +167,11 @@ export interface ChatInteractionPart {
   body?: string
   answerSpec: { fields: ChatInteractionField[] }
   status: ChatInteractionStatus
+  answers?: InteractionAnswers
   cancelReason?: string
 }
+
+export type ChatPlanPart = ChatPlanPersistedPart
 
 /** Persisted one-line transcript notice — byte-matches `noticePart` in
  *  `/web-react`'s chat-interactions contract. */
@@ -178,6 +190,8 @@ type _CodecEmitsStorableInteractionPart = MutuallyAssignable<InteractionPersiste
 type _StoredInteractionPartFeedsCodec = MutuallyAssignable<ChatInteractionPart, InteractionPersistedPart>
 type _CodecEmitsStorableNoticePart = MutuallyAssignable<NoticePersistedPart, ChatNoticePart>
 type _StoredNoticePartFeedsCodec = MutuallyAssignable<ChatNoticePart, NoticePersistedPart>
+type _CodecEmitsStorablePlanPart = MutuallyAssignable<ChatPlanPersistedPart, ChatPlanPart>
+type _StoredPlanPartFeedsCodec = MutuallyAssignable<ChatPlanPart, ChatPlanPersistedPart>
 
 export type ChatMessagePart =
   | ChatTextPart
@@ -190,6 +204,7 @@ export type ChatMessagePart =
   | ChatStepFinishPart
   | ChatInteractionPart
   | ChatNoticePart
+  | ChatPlanPart
 
 /** Every canonical harness wire-part kind must be storable — compile-time
  *  guarantee that a new agent-interface part kind cannot silently fall out of
@@ -240,14 +255,15 @@ function toChatMessagePart(part: Record<string, unknown>): ChatMessagePart | nul
     case 'step-finish':
       return part as unknown as ChatStepFinishPart
     case 'interaction':
-      return str(part.id) && str(part.kind) && str(part.title) && str(part.status) &&
-        part.answerSpec && typeof part.answerSpec === 'object'
-        ? (part as unknown as ChatInteractionPart)
-        : null
+      return persistedPartToInteraction(part) ? (part as unknown as ChatInteractionPart) : null
     case 'notice':
       return str(part.id) && str(part.noticeKind) && str(part.text)
         ? (part as unknown as ChatNoticePart)
         : null
+    case 'plan': {
+      const plan = persistedPartToPlan(part)
+      return plan ? ({ ...part, ...planToPersistedPart(plan) } as ChatPlanPart) : null
+    }
     case undefined:
       return null
     default: {
@@ -270,6 +286,10 @@ export function isChatTextPart(part: ChatMessagePart): part is ChatTextPart {
 
 export function isChatInteractionPart(part: ChatMessagePart): part is ChatInteractionPart {
   return part.type === 'interaction'
+}
+
+export function isChatPlanPart(part: ChatMessagePart): part is ChatPlanPart {
+  return part.type === 'plan'
 }
 
 export function isChatStepFinishPart(part: ChatMessagePart): part is ChatStepFinishPart {

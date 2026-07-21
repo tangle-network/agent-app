@@ -124,8 +124,36 @@ describe('InteractionQuestionCard', () => {
       outcome: 'accepted',
       data: { q0: ['Formal'] },
     })
-    expect(onResolved).toHaveBeenCalledWith('int-1', 'answered')
+    expect(onResolved).toHaveBeenCalledWith('int-1', 'answered', { q0: ['Formal'] })
     expect(container.textContent).toContain('Answered')
+  })
+
+  it('hydrates acknowledged answers from persisted interaction state', () => {
+    const { container } = mount({
+      ...SELECT_INTERACTION,
+      status: 'answered',
+      answers: { q0: ['Formal'] },
+    })
+    expect((screen.getByLabelText('Formal') as HTMLInputElement).checked).toBe(true)
+    expect((screen.getByLabelText('Casual') as HTMLInputElement).checked).toBe(false)
+    expect(container.textContent).toContain('Answered')
+  })
+
+  it('resyncs fields when authoritative persisted answers arrive after mount', () => {
+    const submitAnswer = okSubmitter()
+    const { rerender } = render(
+      <InteractionQuestionCard interaction={SELECT_INTERACTION} canWrite submitAnswer={submitAnswer} />,
+    )
+    fireEvent.click(screen.getByLabelText('Casual'))
+    rerender(
+      <InteractionQuestionCard
+        interaction={{ ...SELECT_INTERACTION, status: 'answered', answers: { q0: ['Formal'] } }}
+        canWrite
+        submitAnswer={submitAnswer}
+      />,
+    )
+    expect((screen.getByLabelText('Formal') as HTMLInputElement).checked).toBe(true)
+    expect((screen.getByLabelText('Casual') as HTMLInputElement).checked).toBe(false)
   })
 
   it('submits a text answer as { q0: string }', async () => {

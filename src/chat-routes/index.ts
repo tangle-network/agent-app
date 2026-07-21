@@ -10,5 +10,6 @@
 export * from './wire'
 export * from './turn-routes'
 export * from './sandbox-producer'
+export * from './durable-projection'
 export * from './upload'
 export * from './file-index'
