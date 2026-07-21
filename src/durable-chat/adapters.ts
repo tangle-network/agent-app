@@ -36,8 +36,7 @@ export interface DurableInteractionProjectionAdapter {
   materialize(): Promise<InteractionPersistedPart[]>
 }
 
-/** Binds an authorized durable scope/store to the sandbox producer's optional
- * lifecycle projector. The producer remains storage-agnostic. */
+/** Binds an authorized durable scope/store to interaction lifecycle events. */
 export function createDurableInteractionProjectionAdapter(options: {
   store: DurablePlanStore
   scope: DurableChatScope
@@ -97,9 +96,8 @@ function eventRecord(value: unknown): Record<string, unknown> | null {
 }
 
 /** Event projector usable with any `ChatTurnRouteProducer` through
- * `withDurableChatProjection`; the sandbox producer's direct adapter is only a
- * convenience. It tracks this turn's identities so older thread state is not
- * copied into every assistant message. */
+ * `withDurableChatProjection`. It tracks this turn's identities so older
+ * thread state is not copied into every assistant message. */
 export function createDurableChatEventProjection(options: {
   store: DurablePlanStore
   scope: DurableChatScope

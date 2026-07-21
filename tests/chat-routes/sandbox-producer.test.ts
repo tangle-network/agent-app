@@ -143,41 +143,6 @@ describe('createSandboxChatProducer', () => {
     })])
   })
 
-  it('lets a durable projection materialize acknowledged answers', async () => {
-    const projection = {
-      upsertAsk: vi.fn(async () => {}),
-      cancel: vi.fn(async () => {}),
-      materialize: vi.fn(async () => [{
-        type: 'interaction' as const,
-        id: 'q-1',
-        kind: 'question',
-        title: 'Need input',
-        answerSpec: { fields: [] },
-        status: 'answered' as const,
-        answers: { confirmed: true },
-      }]),
-    }
-    const producer = createSandboxChatProducer({
-      events: feed([
-        {
-          type: 'interaction',
-          data: { request: { id: 'q-1', kind: 'question', title: 'Need input', answerSpec: { fields: [] } } },
-        },
-      ]),
-      interactionProjection: projection,
-    })
-
-    await drain(producer.stream)
-    expect(projection.upsertAsk).toHaveBeenCalledOnce()
-    expect(projection.cancel).not.toHaveBeenCalled()
-    expect(producer.assistantParts?.()).toEqual([expect.objectContaining({
-      type: 'interaction',
-      id: 'q-1',
-      status: 'answered',
-      answers: { confirmed: true },
-    })])
-  })
-
   it('persists an explicit cancel outcome without inferring it from disappearance', async () => {
     const producer = createSandboxChatProducer({
       events: feed([

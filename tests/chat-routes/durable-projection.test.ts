@@ -6,7 +6,11 @@ import {
   upsertDurableInteractionAsk,
   recordDurableInteractionAnswer,
 } from '../../src/durable-chat/index'
-import { withDurableChatProjection, type ChatTurnRouteProducer } from '../../src/chat-routes/index'
+import {
+  createSandboxChatProducer,
+  withDurableChatProjection,
+  type ChatTurnRouteProducer,
+} from '../../src/chat-routes/index'
 import type { StreamEvent } from '../../src/stream/index'
 
 async function* events(): AsyncGenerator<StreamEvent, void, unknown> {
@@ -33,11 +37,7 @@ describe('withDurableChatProjection', () => {
     await upsertDurableInteractionAsk(store, scope, {
       id: 'ask-old', kind: 'question', title: 'Old?', answerSpec: { fields: [] },
     })
-    const producer: ChatTurnRouteProducer = {
-      stream: events(),
-      finalText: () => '',
-      assistantParts: () => [],
-    }
+    const producer = createSandboxChatProducer({ events: events() })
     const wrapped = withDurableChatProjection(
       producer,
       createDurableChatEventProjection({ store, scope }),

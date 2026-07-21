@@ -20,9 +20,6 @@ import {
   isRenderableInteractionKind,
   parseInteractionCancel,
   parseInteractionRequest,
-  type InteractionCancelData,
-  type InteractionPersistedPart,
-  type InteractionRequestWire,
 } from '../interactions/contract'
 import {
   parsePlanSubmittedEvent,
@@ -54,14 +51,6 @@ export interface SandboxChatProducerOptions {
    *  session's sidecar connection). Without it, non-renderable asks are only
    *  logged — the run stays blocked until the broker times out. */
   declineInteraction?: (id: string) => Promise<void>
-  /** Optional durable lifecycle projection. The closure is already scoped by
-   * the product's authorized session context. Its materialized terminal parts
-   * replace live pending snapshots before assistant persistence. */
-  interactionProjection?: {
-    upsertAsk(request: InteractionRequestWire): void | Promise<void>
-    cancel(cancel: InteractionCancelData): void | Promise<void>
-    materialize(): InteractionPersistedPart[] | Promise<InteractionPersistedPart[]>
-  }
   log?: (message: string, meta?: Record<string, unknown>) => void
 }
 
@@ -230,7 +219,6 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
             undefined,
             interactionPartKey(parsed.value.id),
           )
-          await options.interactionProjection?.upsertAsk(parsed.value)
           yield event
           continue
         }
@@ -269,7 +257,6 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
             ...(parsed.value.reason ? { cancelReason: parsed.value.reason } : {}),
           }, undefined, key)
         }
-        await options.interactionProjection?.cancel(parsed.value)
         yield event
         continue
       }
@@ -303,11 +290,6 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
       yield event
     }
 
-    if (options.interactionProjection) {
-      for (const part of await options.interactionProjection.materialize()) {
-        recordPersistedPart(part, undefined, interactionPartKey(part.id))
-      }
-    }
   }
 
   return {

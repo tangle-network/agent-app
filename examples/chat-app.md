@@ -176,19 +176,22 @@ agent-app owns the command/settlement protocol around it. The exported
 
 ```ts
 import {
+  createSandboxChatProducer,
+  withDurableChatProjection,
+} from '@tangle-network/agent-app/chat-routes'
+import {
+  createDurableChatEventProjection,
   createDurableChatScope,
-  createDurableInteractionProjectionAdapter,
   createDurableInteractionRoutePersistence,
   createDurablePlanRoutes,
 } from '@tangle-network/agent-app/durable-chat'
+import { createInteractionAnswerRoute } from '@tangle-network/agent-app/interactions'
 
 const scope = createDurableChatScope(`${workspaceId}/${threadId}`) // only after auth
-const interactionProjection = createDurableInteractionProjectionAdapter({ store: durableStore, scope })
-
-createSandboxChatProducer({
-  events,
-  interactionProjection,
-})
+const producer = withDurableChatProjection(
+  createSandboxChatProducer({ events }),
+  createDurableChatEventProjection({ store: durableStore, scope }),
+)
 
 createInteractionAnswerRoute({
   resolveConnection,
