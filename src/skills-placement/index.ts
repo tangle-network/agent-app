@@ -32,6 +32,7 @@ import { composeSkills, type ComposedSkills, type SkillEntry } from '../skills/i
 const HARNESS_BRIDGE: Partial<Record<Harness, HarnessId>> = {
   opencode: 'opencode',
   'claude-code': 'claude-code',
+  nanoclaw: 'nanoclaw',
   'kimi-code': 'kimi-code',
   codex: 'codex',
   pi: 'pi',

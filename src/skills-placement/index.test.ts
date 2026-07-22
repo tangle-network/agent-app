@@ -18,6 +18,7 @@ const mod = available ? await import('./index') : null
 const EXPECTED_SKILL_DIR: Record<Harness, string | null> = {
   opencode: '.opencode/skills',
   'claude-code': '.claude/skills',
+  nanoclaw: '.claude/skills',
   'kimi-code': '.kimi/skills',
   codex: '.codex/skills',
   amp: null,
