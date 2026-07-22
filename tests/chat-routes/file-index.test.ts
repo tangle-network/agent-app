@@ -222,7 +222,15 @@ describe('createSandboxFileIndexRoute — a root that does not exist yet', () =>
     ['an auth failure', Object.assign(new Error('unauthorized'), { code: 'AUTH_ERROR' })],
     [
       'an ENOENT on some OTHER path inside the tree',
-      new FakeValidationError("ENOENT: no such file or directory, lstat '/home/agent/vault/gone/x.md'".replace('/home/agent/vault/gone', '/elsewhere')),
+      new FakeValidationError("ENOENT: no such file or directory, lstat '/home/agent/vault/gone/x.md'"),
+    ],
+    [
+      'an ENOENT on a prefix sibling of the root',
+      new FakeValidationError("ENOENT: no such file or directory, lstat '/home/agent/vault-old'"),
+    ],
+    [
+      'an ENOENT naming the root as some other syscall\'s operand',
+      new FakeValidationError("ENOENT: no such file or directory, unlink '/home/agent/vault'"),
     ],
     ['a plain error with no code', new Error('ENOENT: no such file or directory')],
     ['a non-Error rejection', 'ENOENT: no such file or directory /home/agent/vault'],

@@ -16,9 +16,12 @@
  *
  * The rules, in precedence order:
  *
- * 1. The session probe answered and the execution is TERMINAL ⇒ release. The
- *    authority on "is this turn still running" is whatever is actually running
- *    it; a terminal verdict is proof the lock outlived its turn.
+ * 1. The session probe answered and the execution is TERMINAL ⇒ release, once
+ *    the lock is past a short grace period. The authority on "is this turn
+ *    still running" is whatever is actually running it; a terminal verdict is
+ *    proof the lock outlived its turn — but only if the verdict is about THIS
+ *    turn, which is what the grace buys (see
+ *    {@link DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS}).
  * 2. The session probe answered and the execution is LIVE ⇒ hold, always.
  *    Nothing below may override this. The lock is doing exactly its job.
  * 3. The probes could not reach that authority at all — the sandbox could not
@@ -62,6 +65,32 @@ export type StaleTurnLockSessionProbeResult =
  */
 export const DEFAULT_STALE_TURN_LOCK_GRACE_MS = 5 * 60 * 1000
 
+/**
+ * Minimum age a lock must reach before a TERMINAL session verdict may release
+ * it.
+ *
+ * The session probe is keyed on the THREAD, not on the execution the lock
+ * holds: a sidecar that has nothing running reports `terminal` with
+ * `activeExecutionId: null`, so there is no id to match the lock against. The
+ * lock, meanwhile, is acquired BEFORE the box is ensured and before the
+ * execution registers with the sidecar. Between those two moments a second
+ * request that reconciles the lock asks the sidecar about a turn it has not
+ * heard of yet and gets back the PREVIOUS turn's terminal state — proof about
+ * the wrong execution. Releasing on that verdict hands the second request a
+ * lock the first one is still using, which is two concurrent turns on a scope
+ * whose single-flight guard just voted for itself.
+ *
+ * One minute covers the acquire → box-ensure → sidecar-registration window on
+ * a warm box (the cold-box case is Rule 3's, and has its own, much longer
+ * grace). Deliberately NOT
+ * {@link DEFAULT_STALE_TURN_LOCK_GRACE_MS}: this branch has a positive
+ * observation behind it, so it should recover fast, and stretching it to five
+ * minutes would leave a genuinely dead turn wedged for the whole window that
+ * the session probe exists to shortcut. Raising it delays recovery from a
+ * crashed turn; lowering it narrows the registration window it protects.
+ */
+export const DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS = 60 * 1000
+
 export interface ReconcileStaleTurnLockOptions {
   /** When the held lock was acquired (epoch ms). The grace period is measured
    *  from here, so it must be the LOCK's start, not the turn's. */
@@ -72,12 +101,22 @@ export interface ReconcileStaleTurnLockOptions {
   /** Ask the running box whether the execution is still live. Only called when
    *  `probeSandbox` reported `running`. A throw is treated as unreachable. */
   probeSession(): Promise<StaleTurnLockSessionProbeResult>
-  /** Release the lock. Returns whether the release actually landed — `false`
-   *  when the lock was already gone (someone else got there first), which is
-   *  reported, never treated as a release. */
-  release(): boolean | Promise<boolean>
-  /** Override {@link DEFAULT_STALE_TURN_LOCK_GRACE_MS}. */
+  /** Release the lock, fenced by the instant the releasing evidence was
+   *  observed. `fence.observedAt` is snapshotted BEFORE the probe that
+   *  justified the release, so a store that can compare it against the held
+   *  lock's start refuses to delete a SUCCESSOR lock acquired while the probe
+   *  was in flight. A store that cannot make that comparison may ignore the
+   *  fence, but must not substitute its own `Date.now()` — that timestamp is
+   *  by construction newer than any successor and makes the check vacuous.
+   *
+   *  Returns whether the release actually landed — `false` when the lock was
+   *  already gone (someone else got there first), which is reported, never
+   *  treated as a release. */
+  release(fence: { observedAt: number }): boolean | Promise<boolean>
+  /** Override {@link DEFAULT_STALE_TURN_LOCK_GRACE_MS} (Rule 3's fallback). */
   graceMs?: number
+  /** Override {@link DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS} (Rule 1's release). */
+  terminalGraceMs?: number
   /** Identity fields merged into every log line (workspace, thread, execution
    *  id — whatever makes the entry findable in the product's logs). */
   context?: Record<string, unknown>
@@ -126,9 +165,12 @@ export async function reconcileStaleTurnLock(
     })
   }
 
-  // Snapshot the clock BEFORE the probe: the release is only valid against the
+  // Snapshot the clock BEFORE the probe and use that one instant for BOTH the
+  // grace decision and the release fence: the release is only valid against the
   // lock as it was when the state was observed, not after an arbitrarily slow
-  // round trip.
+  // round trip. Re-reading the clock after the probe would let a slow round
+  // trip age the lock past the grace on paper, and would hand the store a fence
+  // newer than a successor lock acquired meanwhile.
   const observedAt = (options.now ?? Date.now)()
   let session: StaleTurnLockSessionProbeResult
   try {
@@ -155,8 +197,31 @@ export async function reconcileStaleTurnLock(
   // its job. Nothing below this point may override that.
   if (!session.terminal) return { released: false, diagnostics }
 
-  const released = await options.release()
-  return { released, diagnostics: { ...diagnostics, released, observedAt } }
+  // Terminal, but about WHICH execution? The probe is thread-keyed, so a lock
+  // younger than the registration window may be reading the previous turn's
+  // verdict — hold until it is old enough that the verdict has to be its own.
+  const terminalGraceMs = options.terminalGraceMs ?? DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS
+  const lockAgeMs = observedAt - options.lockStartedAt
+  if (lockAgeMs < terminalGraceMs) {
+    const log = options.log ?? ((message, meta) => console.warn(message, meta))
+    const withheld = {
+      ...diagnostics,
+      lockAgeMs,
+      terminalReleaseGraceMs: terminalGraceMs,
+      terminalReleaseWithheld: 'LOCK_WITHIN_TERMINAL_GRACE_PERIOD',
+    }
+    log('[chat-routes] stale turn lock held: terminal verdict but lock is younger than the registration window', {
+      ...(options.context ?? {}),
+      ...withheld,
+    })
+    return { released: false, diagnostics: withheld }
+  }
+
+  const released = await options.release({ observedAt })
+  return {
+    released,
+    diagnostics: { ...diagnostics, lockAgeMs, terminalReleaseGraceMs: terminalGraceMs, released, observedAt },
+  }
 }
 
 /**
@@ -165,6 +230,9 @@ export async function reconcileStaleTurnLock(
  * once it is old enough that it cannot belong to a turn still provisioning its
  * box — and say so either way, with the reason, the lock's age, and the grace
  * period it was measured against.
+ *
+ * One clock read (`at`) serves as the age gate AND the release fence here too,
+ * for the same reason the terminal branch uses `observedAt` for both.
  */
 async function forceReleaseUnreachable(
   options: ReconcileStaleTurnLockOptions,
@@ -189,7 +257,7 @@ async function forceReleaseUnreachable(
     return { released: false, diagnostics: { ...diagnostics, forceReleaseWithheld: 'LOCK_WITHIN_GRACE_PERIOD' } }
   }
 
-  const released = await options.release()
+  const released = await options.release({ observedAt: at })
   log('[chat-routes] force-released stale turn lock: sandbox unreachable, no turn can be executing', {
     ...(options.context ?? {}),
     ...diagnostics,

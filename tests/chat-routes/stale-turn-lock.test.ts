@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   DEFAULT_STALE_TURN_LOCK_GRACE_MS,
+  DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS,
   reconcileStaleTurnLock,
   type ReconcileStaleTurnLockOptions,
   type StaleTurnLockSandboxProbeResult,
@@ -23,6 +24,8 @@ function reconcile(
   release: ReturnType<typeof vi.fn>
   log: ReturnType<typeof vi.fn>
 } {
+  // Past DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS, so a terminal verdict releases
+  // unless a case opts into a younger lock.
   const { lockAgeMs = 90_000, ...rest } = over
   const release = vi.fn().mockResolvedValue(true)
   const log = vi.fn()
@@ -80,6 +83,61 @@ describe('reconcileStaleTurnLock: the session authority answers', () => {
     })
     expect(result.released).toBe(false)
     expect(release).toHaveBeenCalledTimes(1)
+  })
+
+  it('holds a freshly-acquired lock even on a terminal verdict — the probe is thread-keyed, not execution-keyed', async () => {
+    const { run, release, log } = reconcile({
+      // Inside the registration window: the sidecar has not heard of this
+      // execution yet, so `terminal` is a verdict about the PREVIOUS turn.
+      lockAgeMs: DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS - 1,
+      probeSession: async () => ({ reachable: true, terminal: true, diagnostics: { activeExecutionId: null } }),
+    })
+
+    const result = await run
+    expect(result.released).toBe(false)
+    expect(release).not.toHaveBeenCalled()
+    expect(result.diagnostics).toMatchObject({
+      sessionTerminal: true,
+      terminalReleaseWithheld: 'LOCK_WITHIN_TERMINAL_GRACE_PERIOD',
+      lockAgeMs: DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS - 1,
+      terminalReleaseGraceMs: DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS,
+    })
+    expect(String(log.mock.calls.at(-1)![0])).toContain('younger than the registration window')
+  })
+
+  it('releases on a terminal verdict once the lock is past the terminal grace', async () => {
+    const { run, release } = reconcile({ lockAgeMs: DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS })
+    const result = await run
+    expect(result.released).toBe(true)
+    expect(release).toHaveBeenCalledTimes(1)
+  })
+
+  it('honours a caller-supplied terminal grace period', async () => {
+    const held = await reconcile({ lockAgeMs: 10_000, terminalGraceMs: 30_000 }).run
+    expect(held.released).toBe(false)
+
+    const released = await reconcile({ lockAgeMs: 10_000, terminalGraceMs: 5_000 }).run
+    expect(released.released).toBe(true)
+  })
+
+  it('fences the release with the instant the state was observed, not a post-probe clock', async () => {
+    const { run, release } = reconcile({
+      // The probe takes 10 minutes of wall clock; the fence must still be the
+      // pre-probe snapshot, and the grace must be measured against it too.
+      now: () => NOW,
+      probeSession: async () => ({ reachable: true, terminal: true }),
+    })
+    await run
+    expect(release).toHaveBeenCalledWith({ observedAt: NOW })
+  })
+
+  it('fences the unreachable force-release too', async () => {
+    const { run, release } = reconcile({
+      probeSandbox: async () => ({ status: 'absent' }),
+      lockAgeMs: DEFAULT_STALE_TURN_LOCK_GRACE_MS + 1,
+    })
+    await run
+    expect(release).toHaveBeenCalledWith({ observedAt: NOW })
   })
 
   it('never probes the session when the box is not running', async () => {

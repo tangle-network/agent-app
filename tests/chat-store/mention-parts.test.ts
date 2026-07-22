@@ -26,6 +26,19 @@ describe('mentionInputToPart', () => {
     expect(
       mentionInputToPart({ path: 'a.md', name: 'a.md', size: Number.NaN }),
     ).not.toHaveProperty('size')
+    expect(
+      mentionInputToPart({ path: 'a.md', name: 'a.md', size: Number.POSITIVE_INFINITY }),
+    ).not.toHaveProperty('size')
+  })
+
+  // The converter is downstream of `parseFileMentions`, which already rejects
+  // negatives; it does NOT re-validate, and a negative therefore survives —
+  // pinned here so the split of responsibility stays deliberate, and so the
+  // read guard stays loose enough to accept what this can emit.
+  it('trusts its input: a negative size is carried through, not screened', () => {
+    const part = mentionInputToPart({ path: 'a.md', name: 'a.md', size: -1 })
+    expect(part).toHaveProperty('size', -1)
+    expect(isChatMentionPart(part)).toBe(true)
   })
 })
 
@@ -48,6 +61,22 @@ describe('isChatMentionPart', () => {
     expect(isChatMentionPart({ ...valid, mentionKind: 'video' })).toBe(false)
     expect(isChatMentionPart(null)).toBe(false)
     expect(isChatMentionPart('mention')).toBe(false)
+  })
+
+  // Symmetric with the wire validator: it rejects a blank name and a non-finite
+  // or non-numeric size, so a row carrying either is not a mention part here.
+  it('rejects a blank name the wire contract would never have accepted', () => {
+    expect(isChatMentionPart({ ...valid, name: '' })).toBe(false)
+    expect(isChatMentionPart({ ...valid, name: '   ' })).toBe(false)
+  })
+
+  it('rejects a size that is not a finite number — the field is typed, not decorative', () => {
+    expect(isChatMentionPart({ ...valid, size: '12' })).toBe(false)
+    expect(isChatMentionPart({ ...valid, size: null })).toBe(false)
+    expect(isChatMentionPart({ ...valid, size: Number.NaN })).toBe(false)
+    expect(isChatMentionPart({ ...valid, size: Number.POSITIVE_INFINITY })).toBe(false)
+    expect(isChatMentionPart({ ...valid, size: 12 })).toBe(true)
+    expect(isChatMentionPart({ ...valid, size: undefined })).toBe(true)
   })
 
   it('narrows a ChatMessagePart union member', () => {

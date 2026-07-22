@@ -2621,6 +2621,24 @@ describe('peekWorkspaceSandbox', () => {
       .resolves.toEqual({ status: 'running', box })
   })
 
+  it('prefers the box-key box over a display-name one, whatever order the platform lists them', async () => {
+    const byKey = fakeBox({ name: 'app:workspace:w1', status: 'running' })
+    const byDisplayName = fakeBox({ name: 'display-w1', status: 'stopped' })
+    // Listed display-name-first: an unordered `||` match would answer
+    // not-running for a workspace whose box is right there and running.
+    listMock.mockResolvedValue([byDisplayName, byKey])
+
+    await expect(peekWorkspaceSandbox(peekShell(), { workspaceId: 'w1' }))
+      .resolves.toEqual({ status: 'running', box: byKey })
+  })
+
+  it('lets a listing failure throw rather than manufacturing a status', async () => {
+    listMock.mockRejectedValue(new Error('platform unreachable'))
+
+    await expect(peekWorkspaceSandbox(peekShell(), { workspaceId: 'w1' }))
+      .rejects.toThrow('platform unreachable')
+  })
+
   it('reports absent when no box carries either identity', async () => {
     listMock.mockResolvedValue([fakeBox({ name: 'app:workspace:w2', status: 'running' })])
 

@@ -1443,15 +1443,26 @@ export type PeekWorkspaceSandboxOutcome =
  * of those spins a box up as a side effect of a read (legal-agent #509), and
  * costs the caller a cold start it never asked for.
  *
- * Matching is on BOTH the box key and the display name. `client.get(id)` keys
- * on the platform's opaque sandbox id, not the deterministic key a product
- * derives from a workspace, and is itself a `list().find` underneath — so a
- * lookup by identity has to list and match. Which of the two a box surfaces as
- * `name` depends on how it was created, so checking one alone reports `absent`
- * for a box that is right there.
+ * Matching is on BOTH the box key and the display name, IN THAT ORDER.
+ * `client.get(id)` keys on the platform's opaque sandbox id, not the
+ * deterministic key a product derives from a workspace, and is itself a
+ * `list().find` underneath — so a lookup by identity has to list and match.
+ * Provisioning here always stamps `name` with the box key, so the key is the
+ * authoritative match; the display-name pass exists only to adopt boxes on a
+ * host that predates that convention. The order matters: a single unordered
+ * `find` returns whichever the platform happens to list first, so a stopped
+ * display-name box could shadow a running box-key one and report
+ * `not-running` for a live workspace.
  *
  * Unlike `ensure`, this lists ALL statuses in one call: distinguishing "no box"
  * from "box is stopped" is the whole point, and a status-filtered list cannot.
+ *
+ * A `client.list()` rejection propagates RAW, unlike the `Outcome`-wrapping
+ * helpers `ensure` uses internally. That is deliberate: there is no honest
+ * outcome to map a listing failure onto — it is not `absent` and not
+ * `not-running`, and inventing one would have callers act on a status the
+ * platform never reported. Callers that must tolerate it say so explicitly
+ * (the stale-turn-lock policy documents "a throw is treated as unreachable").
  */
 export async function peekWorkspaceSandbox(
   shell: SandboxRuntimeConfig,
@@ -1460,7 +1471,7 @@ export async function peekWorkspaceSandbox(
   const { client, name } = await resolveWorkspaceSandboxClient(shell, options.workspaceId, options.userId)
   const displayName = shell.name(options.workspaceId)
   const boxes = await client.list()
-  const match = boxes.find((box) => box.name === name || box.name === displayName)
+  const match = boxes.find((box) => box.name === name) ?? boxes.find((box) => box.name === displayName)
   if (!match) return { status: 'absent' }
   if (match.status !== 'running') return { status: 'not-running', state: match.status, box: match }
   return { status: 'running', box: match }

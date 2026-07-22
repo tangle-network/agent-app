@@ -33,11 +33,16 @@ export interface MentionTextSegment {
 
 /** A character that could plausibly continue the SAME path/filename past a
  *  matched token. Without this lookahead a mention of `@a/b.md` would match
- *  inside the unrelated `@a/b.md.bak` and split it mid-filename. */
-const PATH_CONTINUATION_CHAR = /[A-Za-z0-9._\-/]/
+ *  inside the unrelated `@a/b.md.bak` and split it mid-filename.
+ *
+ *  Unicode-aware because the wire validator (`validateSandboxMentionPath`)
+ *  deliberately ALLOWS non-ASCII paths — in-box filenames are arbitrary. An
+ *  ASCII-only class here would accept input the segmenter then mangles. */
+const PATH_CONTINUATION_CHAR = /[\p{L}\p{N}._\-/]/u
 /** A character that, immediately BEFORE an `@`, means the `@` is part of a
- *  longer token (an email local part, a handle) rather than a mention start. */
-const WORD_CHAR = /[A-Za-z0-9]/
+ *  longer token (an email local part, a handle) rather than a mention start.
+ *  Unicode-aware for the same reason. */
+const WORD_CHAR = /[\p{L}\p{N}]/u
 
 /**
  * Split a message's text into plain-text and mention segments by matching

@@ -38,6 +38,23 @@ describe('shellQuote', () => {
   it('closes and reopens the quote around an embedded single quote', () => {
     expect(shellQuote("it's.png")).toBe(`'it'"'"'s.png'`)
   })
+
+  it('keeps a newline inside the quotes rather than ending the command', () => {
+    // A literal newline in a filename is legal on POSIX; unquoted it would
+    // split the exec into two commands.
+    expect(shellQuote('a\nrm -rf /\nb.png')).toBe("'a\nrm -rf /\nb.png'")
+  })
+
+  it('neutralises every metacharacter that could break out of the command', () => {
+    for (const raw of ['a;b', 'a && b', 'a | b', 'a > b', '$(id)', '`id`', 'a\\b', '*', 'a"b']) {
+      const quoted = shellQuote(raw)
+      // Exactly one opening and one closing quote, and no bare `'` in between:
+      // everything hazardous is inert content.
+      expect(quoted.startsWith("'")).toBe(true)
+      expect(quoted.endsWith("'")).toBe(true)
+      expect(quoted.slice(1, -1).includes("'")).toBe(false)
+    }
+  })
 })
 
 describe('statSandboxFileSize', () => {
@@ -130,6 +147,34 @@ describe('readSandboxBinaryBytes', () => {
     expect(outcome.succeeded).toBe(false)
     if (outcome.succeeded) return
     expect(outcome.error).toContain('could not decode file contents')
+  })
+
+  it('rejects out-of-alphabet characters instead of skipping them like Buffer would', async () => {
+    // The decoder choice is load-bearing: `Buffer.from(s, 'base64')` DROPS
+    // characters outside the alphabet, so this corrupted payload would decode
+    // to a plausible-looking 6 bytes and sail past the length check. Pinning
+    // Buffer's behaviour here means a swap back to it fails this test.
+    const corrupted = `${base64Of(payload).slice(0, 4)}*!${base64Of(payload).slice(4)}`
+    expect(Buffer.from(corrupted, 'base64').byteLength).toBe(payload.length)
+
+    const outcome = await readSandboxBinaryBytes(execBox(() => ok(corrupted)), '/a.png', payload.length)
+    expect(outcome.succeeded).toBe(false)
+    if (outcome.succeeded) return
+    expect(outcome.error).toContain('could not decode file contents')
+  })
+
+  it('rejects a payload that is longer than expected, not just shorter', async () => {
+    const box = execBox(() => ok(base64Of([...payload, 0x01, 0x02, 0x03])))
+    const outcome = await readSandboxBinaryBytes(box, '/a.png', payload.length)
+    expect(outcome.succeeded).toBe(false)
+    if (outcome.succeeded) return
+    expect(outcome.error).toContain(`expected ${payload.length}`)
+  })
+
+  it('quotes the path it reads, so an arbitrary in-box filename cannot inject', async () => {
+    const box = execBox(() => ok(base64Of(payload)))
+    await readSandboxBinaryBytes(box, "/home/a b/it's; rm -rf /.png", payload.length)
+    expect(box.exec).toHaveBeenCalledWith(`base64 '/home/a b/it'"'"'s; rm -rf /.png'`)
   })
 
   it('fails with stderr on a non-zero exit', async () => {

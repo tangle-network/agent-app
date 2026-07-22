@@ -334,15 +334,27 @@ export function isChatStepFinishPart(part: ChatMessagePart): part is ChatStepFin
 /** Widened to `unknown` — unlike its siblings this guard also runs over raw
  *  untyped stored rows (a transcript renderer reads `message.parts` before the
  *  typed projection), which is exactly what {@link mentionPartsFromMessageParts}
- *  needs. `path` and `name` carry the pill; a row missing either is unrenderable. */
+ *  needs. `path` and `name` carry the pill; a row missing either is unrenderable.
+ *
+ *  Mirrors the write contract exactly (`parseFileMention` in `/chat-routes`,
+ *  then {@link mentionInputToPart}): a blank `name` is rejected there and so is
+ *  rejected here, and `size` — optional, but typed `number` once present — is
+ *  type-checked so `'12'` or `null` cannot ride through the guard wearing a
+ *  type it does not have. Negative sizes are NOT re-rejected: the wire screens
+ *  them, `mentionInputToPart` trusts its input, and a read guard stricter than
+ *  what the writer can emit would drop rows it produced itself. */
 export function isChatMentionPart(part: unknown): part is ChatMentionPart {
   if (!part || typeof part !== 'object') return false
   const record = part as Record<string, unknown>
+  if (record.size !== undefined && (typeof record.size !== 'number' || !Number.isFinite(record.size))) {
+    return false
+  }
   return (
     record.type === 'mention' &&
     typeof record.path === 'string' &&
     record.path.length > 0 &&
     typeof record.name === 'string' &&
+    record.name.trim().length > 0 &&
     (record.mentionKind === 'image' || record.mentionKind === 'file')
   )
 }

@@ -165,9 +165,14 @@ function basename(path: string): string {
  * break any host feeding it a non-SDK handle.
  *
  * Deliberately narrow — the error code, `ENOENT`, the ENOENT message text, AND
- * the root path itself all have to line up. A permission error, a timeout, an
- * auth failure, or an ENOENT on some other path inside the tree is a real
- * failure and still surfaces.
+ * the failing syscall's own operand all have to line up. A permission error, a
+ * timeout, an auth failure, or an ENOENT on some other path inside the tree is
+ * a real failure and still surfaces.
+ *
+ * The operand is matched as the quoted `lstat '<root>'` clause rather than by
+ * substring, because the root is a PREFIX of everything under it: a plain
+ * `includes(root)` would also swallow an ENOENT on `<root>/gone/x.md`, and on
+ * a prefix sibling like `/home/agent-old/...`.
  */
 function isMissingRootError(err: unknown, root: string): boolean {
   if (!(err instanceof Error)) return false
@@ -175,8 +180,12 @@ function isMissingRootError(err: unknown, root: string): boolean {
   return (
     /ENOENT/.test(err.message) &&
     /no such file or directory/.test(err.message) &&
-    err.message.includes(root)
+    new RegExp(`\\blstat '${escapeRegExp(root)}'`).test(err.message)
   )
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 export function createSandboxFileIndexRoute(

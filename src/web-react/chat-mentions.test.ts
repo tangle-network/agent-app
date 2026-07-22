@@ -64,6 +64,34 @@ describe('segmentMentionContent', () => {
     expect(matched.size).toBe(0)
   })
 
+  // `validateSandboxMentionPath` deliberately accepts non-ASCII paths, so the
+  // segmenter's token boundaries have to agree with it or it mangles input the
+  // wire just ratified.
+  it('does not let a known unicode path swallow a longer unicode run', () => {
+    const part = mentionPart('目录/文档.md', '文档.md')
+    const { segments, matched } = segmentMentionContent('看 @目录/文档.md副本 吧', [part])
+    expect(segments).toEqual([{ type: 'text', text: '看 @目录/文档.md副本 吧' }])
+    expect(matched.size).toBe(0)
+  })
+
+  it('does not start a mention after a unicode word character', () => {
+    const part = mentionPart('a/b.md', 'b.md')
+    const { segments, matched } = segmentMentionContent('邮箱@a/b.md bar', [part])
+    expect(segments).toEqual([{ type: 'text', text: '邮箱@a/b.md bar' }])
+    expect(matched.size).toBe(0)
+  })
+
+  it('still pills a unicode path at a real token boundary', () => {
+    const part = mentionPart('目录/文档.md', '文档.md')
+    const { segments, matched } = segmentMentionContent('看 @目录/文档.md 吧', [part])
+    expect(segments).toEqual([
+      { type: 'text', text: '看 ' },
+      { type: 'mention', text: '@目录/文档.md', part },
+      { type: 'text', text: ' 吧' },
+    ])
+    expect(matched).toEqual(new Set([part]))
+  })
+
   it('matches every occurrence and reports only the parts actually found', () => {
     const found = mentionPart('a/b.md', 'b.md')
     const missing = mentionPart('a/c.md', 'c.md')
