@@ -10,6 +10,11 @@
  * `box.fs.tree`) — no SDK import here. `authorize` also carries the
  * cold-box signal: a sandbox that isn't running yet answers `{ status:
  * 'warming' }` directly, never provisions-and-waits inside this route.
+ *
+ * A box can also be running with its workspace root not yet materialised, which
+ * `authorize` cannot see; the route recognises that one signal off `fs.tree`
+ * and answers `warming` too, so every consumer gets the retry-and-wait state
+ * instead of a 500. Every other `tree()` failure propagates.
  */
 
 import type { FileMention } from './wire'
@@ -51,7 +56,9 @@ export interface FileIndexReadyResponse {
 
 /** Cold-box answer: no provisioning happened, no files were scanned. The
  *  client shows a warming state and retries — this route never blocks on a
- *  box coming up. */
+ *  box coming up. Two situations produce it: `authorize` reporting a box that
+ *  is not running, and a running box whose workspace root does not exist yet
+ *  (see `isMissingRootError`). */
 export interface FileIndexWarmingResponse {
   status: 'warming'
 }
@@ -143,6 +150,44 @@ function basename(path: string): string {
   return segments[segments.length - 1] ?? path
 }
 
+/**
+ * A box can answer `running` before it has materialised the workspace root —
+ * `authorize` has already committed to `ready` by then, so `fs.tree` is the
+ * first thing to notice, and it rejects with the sandbox SDK's
+ * `ValidationError` wrapping a box-side `ENOENT … lstat` on the root. That is
+ * the SAME "not usable yet" state `authorize` collapses onto `warming` for an
+ * absent or stopped box, just discovered one step later, so it gets the same
+ * answer instead of escaping as a 500.
+ *
+ * Matched STRUCTURALLY, not with `instanceof`: importing the SDK's error class
+ * would make `@tangle-network/sandbox` a hard dependency of a route factory
+ * whose entire `fs` seam is structural (`SandboxFileTreeSource`), and would
+ * break any host feeding it a non-SDK handle.
+ *
+ * Deliberately narrow — the error code, `ENOENT`, the ENOENT message text, AND
+ * the failing syscall's own operand all have to line up. A permission error, a
+ * timeout, an auth failure, or an ENOENT on some other path inside the tree is
+ * a real failure and still surfaces.
+ *
+ * The operand is matched as the quoted `lstat '<root>'` clause rather than by
+ * substring, because the root is a PREFIX of everything under it: a plain
+ * `includes(root)` would also swallow an ENOENT on `<root>/gone/x.md`, and on
+ * a prefix sibling like `/home/agent-old/...`.
+ */
+function isMissingRootError(err: unknown, root: string): boolean {
+  if (!(err instanceof Error)) return false
+  if ((err as { code?: unknown }).code !== 'VALIDATION_ERROR') return false
+  return (
+    /ENOENT/.test(err.message) &&
+    /no such file or directory/.test(err.message) &&
+    new RegExp(`\\blstat '${escapeRegExp(root)}'`).test(err.message)
+  )
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 export function createSandboxFileIndexRoute(
   options: CreateSandboxFileIndexRouteOptions,
 ): (request: Request) => Promise<Response> {
@@ -168,7 +213,13 @@ export function createSandboxFileIndexRoute(
       ? new Set([...staticIgnore, ...auth.ignore])
       : staticIgnore
 
-    const scan = await auth.fs.tree(auth.root, { maxDepth })
+    let scan: SandboxTreeResult
+    try {
+      scan = await auth.fs.tree(auth.root, { maxDepth })
+    } catch (err) {
+      if (!isMissingRootError(err, auth.root)) throw err
+      return Response.json({ status: 'warming' } satisfies FileIndexWarmingResponse)
+    }
     const filtered = scan.files.filter((f) => !isIgnored(relativeTo(scan.root, f.path), ignoreSegments))
     const truncated = scan.stats.truncated || filtered.length > maxEntries
     const files: FileMention[] = filtered.slice(0, maxEntries).map((f) => {

@@ -212,9 +212,11 @@ describe('createChatTurnRoutes — turn', () => {
     expect(args.executionId).toContain('test-app')
   })
 
-  it('rejects a body with neither content nor parts, and a missing threadId', async () => {
+  it('rejects a body with neither content nor parts nor mentions, and a missing threadId', async () => {
     const { routes, ctx } = makeRoutes()
-    expect((await routes.turn(turnRequest({ threadId: 't-1' }), ctx)).status).toBe(400)
+    const empty = await routes.turn(turnRequest({ threadId: 't-1' }), ctx)
+    expect(empty.status).toBe(400)
+    expect((await empty.json() as { error: string }).error).toContain('mentions')
     expect((await routes.turn(turnRequest({ content: 'x' }), ctx)).status).toBe(400)
   })
 
@@ -600,5 +602,127 @@ describe('createChatTurnRoutes — interactions composition', () => {
   it('is null when the product wires no interactions channel', () => {
     const { routes } = makeRoutes()
     expect(routes.interactions).toBeNull()
+  })
+})
+
+describe('createChatTurnRoutes — file mentions', () => {
+  it('persists mentions as their own parts, alongside text and file parts', async () => {
+    const { routes, rows, ctx, pending } = makeRoutes()
+    const res = await routes.turn(
+      turnRequest({
+        threadId: 't-mentions',
+        content: 'compare @docs/a.md with @assets/logo.png',
+        mentions: [
+          { path: 'docs/a.md', name: 'a.md' },
+          { path: 'assets/logo.png', name: 'logo.png', size: 42 },
+        ],
+      }),
+      ctx,
+    )
+    expect(res.status).toBe(200)
+    await readLines(res.body!)
+    await Promise.all(pending)
+
+    const user = rows.find((row) => row.role === 'user')!
+    expect(user.parts).toEqual([
+      { type: 'text', text: 'compare @docs/a.md with @assets/logo.png' },
+      { type: 'mention', mentionKind: 'file', path: 'docs/a.md', name: 'a.md' },
+      { type: 'mention', mentionKind: 'image', path: 'assets/logo.png', name: 'logo.png', size: 42 },
+    ])
+  })
+
+  it('hands the produce seam the VALIDATED, deduped mention list on the payload', async () => {
+    let seen: ChatTurnProduceArgs<void> | undefined
+    const { routes, ctx, pending } = makeRoutes({
+      produce: (args: ChatTurnProduceArgs<void>) => {
+        seen = args
+        return fakeProducer([], 'ok')
+      },
+    })
+    const res = await routes.turn(
+      turnRequest({
+        threadId: 't-mentions-2',
+        content: 'read @docs/a.md',
+        mentions: [
+          { path: 'docs/a.md', name: 'a.md', extra: 'dropped' },
+          { path: 'docs/a.md', name: 'again.md' },
+        ],
+      }),
+      ctx,
+    )
+    await readLines(res.body!)
+    await Promise.all(pending)
+
+    expect(seen?.body.mentions).toEqual([{ path: 'docs/a.md', name: 'a.md' }])
+  })
+
+  it('rejects a traversal path with a 400 before any side effect', async () => {
+    const { routes, rows, ctx } = makeRoutes()
+    const res = await routes.turn(
+      turnRequest({
+        threadId: 't-mentions-3',
+        content: 'read it',
+        mentions: [{ path: '../../etc/passwd', name: 'passwd' }],
+      }),
+      ctx,
+    )
+
+    expect(res.status).toBe(400)
+    expect((await res.json() as { error: string }).error).toContain('mentions[0]')
+    expect(rows).toHaveLength(0)
+  })
+
+  it('does not count mentions against the inline-parts byte budget (they are paths, not bytes)', async () => {
+    const { routes, ctx, pending } = makeRoutes({ maxInlinePartBytes: 32 })
+    const res = await routes.turn(
+      turnRequest({
+        threadId: 't-mentions-4',
+        content: 'go',
+        // A real (tiny) inline part, so the cap is genuinely exercised: with
+        // `parts` absent the assertion short-circuits on an empty list and the
+        // test would pass even with the cap removed.
+        parts: [{ type: 'file', filename: 't.txt', url: 'data:text/plain;base64,QUJD' }],
+        mentions: Array.from({ length: 8 }, (_, i) => ({
+          path: `docs/a-very-long-path-name-${i}.md`,
+          name: `a-very-long-path-name-${i}.md`,
+        })),
+      }),
+      ctx,
+    )
+    expect(res.status).toBe(200)
+    await readLines(res.body!)
+    await Promise.all(pending)
+  })
+
+  it('accepts a mentions-only turn — "@chart.png" with no prose is a real ask', async () => {
+    const { routes, rows, ctx, pending } = makeRoutes()
+    const res = await routes.turn(
+      turnRequest({
+        threadId: 't-mentions-only',
+        mentions: [{ path: 'reports/chart.png', name: 'chart.png' }],
+      }),
+      ctx,
+    )
+    expect(res.status).toBe(200)
+    await readLines(res.body!)
+    await Promise.all(pending)
+
+    // The empty text part is how EVERY content-less turn already persists (a
+    // parts-only turn produces the same leading part); mentions inherit it
+    // rather than introducing a shape of their own.
+    expect(rows.find((row) => row.role === 'user')!.parts).toEqual([
+      { type: 'text', text: '' },
+      { type: 'mention', mentionKind: 'image', path: 'reports/chart.png', name: 'chart.png' },
+    ])
+  })
+
+  it('leaves a turn without mentions byte-identical to before', async () => {
+    const { routes, rows, ctx, pending } = makeRoutes()
+    const res = await routes.turn(turnRequest({ threadId: 't-none', content: 'plain' }), ctx)
+    await readLines(res.body!)
+    await Promise.all(pending)
+
+    expect(rows.find((row) => row.role === 'user')!.parts)
+      .toEqual([{ type: 'text', text: 'plain' }])
   })
 })

@@ -89,6 +89,8 @@ consumer of L0/L1 installs none of them): `konva`/`react-konva` → only
 | Per-workspace key mint/rotate/budget | `billing` |
 | Resumable chat turns (buffer/replay/coalesce) | `stream` — see [`examples/resumable-turns.md`](./examples/resumable-turns.md) |
 | The whole assembled chat turn route (auth → persist → stream → interactions) | `chat-routes` — `createChatTurnRoutes` (peer `agent-runtime`). Product seams (`@experimental`, single-consumer/gtm #200: `turnLock` · `contextGate` · `beforeTurn` · `onRawEvent`; stable: `lifecycle` · `heartbeat`), plus `transformFinalText` (pre-persist redaction over the final-text scalar AND every persisted TEXT part) and `onTurnComplete(failed, failureReason)` run-failure surfacing |
+| `@`-file-mentions end to end | `chat-routes` — `createSandboxFileIndexRoute` (listing, answers `warming` for a cold box OR an unmaterialised root) · `parseFileMentions` (path/charset/count validation) · `fileMentionsToParts`/`buildMentionPromptBlock` (dispatch); `chat-store` — `ChatMentionPart` (persisted vocabulary); `web-react` — `useFileMentions` (picker) · `segmentMentionContent` (transcript pills) |
+| Recovering a turn lock whose holder died | `chat-routes` — `reconcileStaleTurnLock`, a policy over injected sandbox/session probes (no SDK); the probes stay in the product |
 | Flow traces / waterfalls | `trace` |
 | Chat UI + run/observability components | `web-react` |
 | Agent asks a human mid-run (question/plan cards, answer route) | `interactions` (server + contract) + `web-react` (cards/hook) |

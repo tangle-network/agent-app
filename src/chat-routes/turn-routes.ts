@@ -41,7 +41,7 @@
 
 import { deriveExecutionId, handleChatTurn } from '@tangle-network/agent-runtime'
 import type { ChatTurnIdentity, ChatTurnProducer } from '@tangle-network/agent-runtime'
-import { toChatMessageParts, type ChatMessagePart } from '../chat-store/parts'
+import { mentionInputToPart, toChatMessageParts, type ChatMessagePart } from '../chat-store/parts'
 import {
   createInteractionAnswerRoute,
   type InteractionAnswerRoute,
@@ -61,9 +61,11 @@ import {
   assertPromptPartsWithinCap,
   ChatTurnInputError,
   parseChatTurnParts,
+  parseFileMentions,
   type ChatTurnFilePartInput,
   type ChatTurnPartInput,
   type ChatTurnRequestPayload,
+  type FileMention,
 } from './wire'
 
 // ── seams ───────────────────────────────────────────────────────────────────
@@ -346,6 +348,7 @@ interface ParsedTurnBody {
   payload: ChatTurnRequestPayload
   content: string
   fileParts: ChatTurnFilePartInput[]
+  mentions: FileMention[]
   turnId: string | undefined
 }
 
@@ -356,8 +359,14 @@ function validateTurnBody(body: Record<string, unknown>, maxInlinePartBytes: num
   if (typeof rawContent !== 'string') throw new ChatTurnInputError('content must be a string')
   const content = rawContent.trim()
   const fileParts = parseChatTurnParts(body.parts)
-  if (!content && fileParts.length === 0) {
-    throw new ChatTurnInputError('Missing content (send text, parts, or both)')
+  // Path references, not bytes — validated for traversal/charset/count, never
+  // counted against the inline-parts byte budget below.
+  const mentions = parseFileMentions(body.mentions)
+  // A mention is a turn's whole payload often enough to count: "@chart.png"
+  // with no prose is a real ask, and the pointer block the mentions produce is
+  // prompt content the model reads.
+  if (!content && fileParts.length === 0 && mentions.length === 0) {
+    throw new ChatTurnInputError('Missing content (send text, parts, mentions, or any combination)')
   }
   assertPromptPartsWithinCap(fileParts, maxInlinePartBytes)
   let turnId: string | undefined
@@ -367,21 +376,38 @@ function validateTurnBody(body: Record<string, unknown>, maxInlinePartBytes: num
     throw new ChatTurnInputError(err instanceof Error ? err.message : 'Invalid turnId')
   }
   return {
-    payload: { ...body, threadId, content } as ChatTurnRequestPayload,
+    // The VALIDATED, deduped mention list replaces the raw one on the payload,
+    // so every downstream seam (`authorize`, `contextGate`, `beforeTurn`,
+    // `produce`) reads checked paths and never the request's own.
+    payload: { ...body, threadId, content, mentions } as ChatTurnRequestPayload,
     content,
     fileParts,
+    mentions,
     turnId,
   }
 }
 
 /** File parts persist onto the user message verbatim — the wire shape is the
- *  persisted `ChatFilePart`/`ChatImagePart` vocabulary already. The typed
- *  projection is `/chat-store`'s (same boundary as the assistant hop). */
+ *  persisted `ChatFilePart`/`ChatImagePart` vocabulary already. Mentions get
+ *  the one mapping step their own vocabulary needs. The typed projection is
+ *  `/chat-store`'s (same boundary as the assistant hop).
+ *
+ *  Mentions persist as parts rather than being folded into the prompt because
+ *  the prompt is not readable back: a retry rebuilds the turn from the stored
+ *  row, and a transcript draws its pills from it. Turning them INTO prompt
+ *  text stays the product's job — only the product knows how to resolve a
+ *  workspace-relative path to an in-box one (`fileMentionsToParts`'
+ *  `resolvePath` seam), so the route never dispatches them itself. */
 function userPartsWithFiles(
   userParts: Array<Record<string, unknown>>,
   fileParts: ChatTurnFilePartInput[],
+  mentions: FileMention[],
 ): ChatMessagePart[] {
-  return toChatMessageParts([...userParts, ...fileParts.map((part) => ({ ...part }))])
+  return toChatMessageParts([
+    ...userParts,
+    ...fileParts.map((part) => ({ ...part })),
+    ...mentions.map((mention) => ({ ...mentionInputToPart(mention) })),
+  ])
 }
 
 // ── producer-stream wrappers (heartbeat + raw tap) ───────────────────────────
@@ -466,7 +492,7 @@ export function createChatTurnRoutes<TContext = void>(
       if (err instanceof ChatTurnInputError) return errorResponse(err)
       throw err
     }
-    const { payload, content, fileParts, turnId } = parsed
+    const { payload, content, fileParts, mentions, turnId } = parsed
 
     const auth = await options.authorize({ request, intent: 'turn', body: payload })
     if (!auth.ok) return auth.response
@@ -593,7 +619,7 @@ export function createChatTurnRoutes<TContext = void>(
           threadId: payload.threadId,
           role: 'user',
           content,
-          parts: userPartsWithFiles(chatTurn.userParts, fileParts),
+          parts: userPartsWithFiles(chatTurn.userParts, fileParts, mentions),
         })
       }
 

@@ -19,6 +19,7 @@ describe('toChatMessageParts — the /stream → /chat-store typed boundary', ()
         type: 'plan', planId: 'p1', revision: 1, body: 'Plan',
         submittedAt: '2026-07-21T00:00:00.000Z', status: 'pending',
       },
+      { type: 'mention', mentionKind: 'file', path: 'docs/a.md', name: 'a.md' },
     ]
     const typed: ChatMessagePart[] = toChatMessageParts(oneOfEach)
     expect(typed.map((part) => part.type)).toEqual(oneOfEach.map((part) => part.type))
@@ -30,6 +31,7 @@ describe('toChatMessageParts — the /stream → /chat-store typed boundary', ()
       { type: 'text' }, // no text
       { type: 'tool', id: 'c1' }, // no tool/state
       { type: 'notice', id: 'n1' }, // no noticeKind/text
+      { type: 'mention', path: 'a.md', name: 'a.md' }, // no mentionKind
       {
         type: 'plan', planId: 'p1', revision: 0, body: 'Plan',
         submittedAt: '2026-07-21T00:00:00.000Z', status: 'pending',

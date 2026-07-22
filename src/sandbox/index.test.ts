@@ -37,6 +37,7 @@ import {
   getClient,
   resetClientCache,
   ensureWorkspaceSandbox,
+  peekWorkspaceSandbox,
   buildAppToolMcpServers,
   streamSandboxPrompt,
   resolveModel,
@@ -2578,5 +2579,98 @@ describe('sandbox tool install helpers', () => {
     const outcome = await runSandboxToolPathSetup(fakeBox({ exec: failExec }), { appName: 'gtm-agent' })
     expect(outcome.succeeded).toBe(false)
     if (!outcome.succeeded) expect(outcome.error.message).toContain('readonly')
+  })
+})
+
+describe('peekWorkspaceSandbox', () => {
+  const peekShell = () =>
+    shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
+      name: (workspaceId: string) => `display-${workspaceId}`,
+      boxKey: (scope: { workspaceId: string }) => `app:workspace:${scope.workspaceId}`,
+    })
+
+  it('never provisions, resumes, or deletes — it only lists', async () => {
+    const box = fakeBox({ name: 'app:workspace:w1', status: 'running' })
+    listMock.mockResolvedValue([box])
+
+    const peek = await peekWorkspaceSandbox(peekShell(), { workspaceId: 'w1' })
+
+    expect(peek).toEqual({ status: 'running', box })
+    expect(createMock).not.toHaveBeenCalled()
+    expect(box.delete).not.toHaveBeenCalled()
+    expect(box.waitFor).not.toHaveBeenCalled()
+    // One unfiltered list: absent vs stopped is the whole question, and a
+    // status-filtered listing cannot answer it.
+    expect(listMock).toHaveBeenCalledTimes(1)
+    expect(listMock.mock.calls[0]![0]).toBeUndefined()
+  })
+
+  it('matches on the box key', async () => {
+    const box = fakeBox({ name: 'app:workspace:w1', status: 'running' })
+    listMock.mockResolvedValue([fakeBox({ name: 'app:workspace:other' }), box])
+
+    await expect(peekWorkspaceSandbox(peekShell(), { workspaceId: 'w1' }))
+      .resolves.toEqual({ status: 'running', box })
+  })
+
+  it('matches on the display name too — a box may surface under either', async () => {
+    const box = fakeBox({ name: 'display-w1', status: 'running' })
+    listMock.mockResolvedValue([box])
+
+    await expect(peekWorkspaceSandbox(peekShell(), { workspaceId: 'w1' }))
+      .resolves.toEqual({ status: 'running', box })
+  })
+
+  it('prefers the box-key box over a display-name one, whatever order the platform lists them', async () => {
+    const byKey = fakeBox({ name: 'app:workspace:w1', status: 'running' })
+    const byDisplayName = fakeBox({ name: 'display-w1', status: 'stopped' })
+    // Listed display-name-first: an unordered `||` match would answer
+    // not-running for a workspace whose box is right there and running.
+    listMock.mockResolvedValue([byDisplayName, byKey])
+
+    await expect(peekWorkspaceSandbox(peekShell(), { workspaceId: 'w1' }))
+      .resolves.toEqual({ status: 'running', box: byKey })
+  })
+
+  it('lets a listing failure throw rather than manufacturing a status', async () => {
+    listMock.mockRejectedValue(new Error('platform unreachable'))
+
+    await expect(peekWorkspaceSandbox(peekShell(), { workspaceId: 'w1' }))
+      .rejects.toThrow('platform unreachable')
+  })
+
+  it('reports absent when no box carries either identity', async () => {
+    listMock.mockResolvedValue([fakeBox({ name: 'app:workspace:w2', status: 'running' })])
+
+    await expect(peekWorkspaceSandbox(peekShell(), { workspaceId: 'w1' }))
+      .resolves.toEqual({ status: 'absent' })
+  })
+
+  it('reports not-running with the platform state for a box that is there but stopped', async () => {
+    const box = fakeBox({ name: 'app:workspace:w1', status: 'stopped' })
+    listMock.mockResolvedValue([box])
+
+    await expect(peekWorkspaceSandbox(peekShell(), { workspaceId: 'w1' }))
+      .resolves.toEqual({ status: 'not-running', state: 'stopped', box })
+  })
+
+  it('resolves credentials through the same scoped seam as ensure', async () => {
+    const credentials = vi.fn().mockResolvedValue({ apiKey: 'k', baseUrl: 'https://s' })
+    listMock.mockResolvedValue([])
+
+    await peekWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'https://s' }, { credentials }), {
+      workspaceId: 'w1',
+      userId: 'u1',
+    })
+
+    expect(credentials).toHaveBeenCalledWith({ workspaceId: 'w1', userId: 'u1' })
+  })
+
+  it('fails loud when the shell cannot produce credentials', async () => {
+    await expect(
+      peekWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'https://s' }, { credentials: async () => null }), {
+        workspaceId: 'w1',
+      }),
+    ).rejects.toThrow(/credentials are required/)
   })
 })

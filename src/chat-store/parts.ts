@@ -24,6 +24,12 @@
  *   and field shapes.
  * - `plan`: the durable-plan projection in `/plans`, derived from the sandbox
  *   SDK's authoritative plan lifecycle.
+ * - `mention`: an `@`-picked reference to a file that already lives in the
+ *   workspace sandbox (`FileMention` in `/chat-routes`'s wire contract, plus
+ *   the image/file discriminant). Neither transport lane produces it — the
+ *   turn route persists it from the request's `mentions` field — but it is a
+ *   part a product persists into a transcript, so it belongs in this
+ *   vocabulary rather than in a parallel one.
  *
  * `@tangle-network/agent-interface` exports the canonical wire `Part` union,
  * but its `PartBase` requires the `sessionID`/`messageID` stream envelope that
@@ -57,6 +63,11 @@ import {
   planToPersistedPart,
   type ChatPlanPersistedPart,
 } from '../plans/index'
+// `./wire` is import-free by construction, so this edge costs the store
+// nothing and keeps ONE image-extension table for the whole mention layer.
+import { mentionKindForPath, type ChatMentionKind, type FileMention } from '../chat-routes/wire'
+
+export type { ChatMentionKind }
 
 /** Start/end wall-clock millis, as normalized by `/stream`'s `normalizeTime`. */
 export interface ChatPartTime {
@@ -182,6 +193,27 @@ export interface ChatNoticePart {
   text: string
 }
 
+/**
+ * A file the user `@`-mentioned on this turn: a workspace-relative path into
+ * the sandbox, never bytes. `type: 'mention'` is its own discriminant
+ * precisely so it does NOT collide with the `file`/`image` attachment parts —
+ * an attachment carries content the product uploaded, a mention points at
+ * something the box already has, and a transcript renders them differently
+ * (an inline pill, not an attachment card).
+ *
+ * `path` is the identity: mentioning one file twice in a turn folds to one
+ * part. `turnId` is optional and set by products that rebuild a turn's
+ * mentions on retry.
+ */
+export interface ChatMentionPart {
+  type: 'mention'
+  mentionKind: ChatMentionKind
+  path: string
+  name: string
+  size?: number
+  turnId?: string
+}
+
 // The "byte-matches" claims above, enforced at compile time: the interaction
 // contract's codec output types and the stored part types must stay mutually
 // assignable, so a codec field added on one side without the other fails here.
@@ -205,6 +237,7 @@ export type ChatMessagePart =
   | ChatInteractionPart
   | ChatNoticePart
   | ChatPlanPart
+  | ChatMentionPart
 
 /** Every canonical harness wire-part kind must be storable — compile-time
  *  guarantee that a new agent-interface part kind cannot silently fall out of
@@ -264,6 +297,8 @@ function toChatMessagePart(part: Record<string, unknown>): ChatMessagePart | nul
       const plan = persistedPartToPlan(part)
       return plan ? ({ ...part, ...planToPersistedPart(plan) } as ChatPlanPart) : null
     }
+    case 'mention':
+      return isChatMentionPart(part) ? part : null
     case undefined:
       return null
     default: {
@@ -294,4 +329,57 @@ export function isChatPlanPart(part: ChatMessagePart): part is ChatPlanPart {
 
 export function isChatStepFinishPart(part: ChatMessagePart): part is ChatStepFinishPart {
   return part.type === 'step-finish'
+}
+
+/** Widened to `unknown` — unlike its siblings this guard also runs over raw
+ *  untyped stored rows (a transcript renderer reads `message.parts` before the
+ *  typed projection), which is exactly what {@link mentionPartsFromMessageParts}
+ *  needs. `path` and `name` carry the pill; a row missing either is unrenderable.
+ *
+ *  Mirrors the write contract exactly (`parseFileMention` in `/chat-routes`,
+ *  then {@link mentionInputToPart}): a blank `name` is rejected there and so is
+ *  rejected here, and `size` — optional, but typed `number` once present — is
+ *  type-checked so `'12'` or `null` cannot ride through the guard wearing a
+ *  type it does not have. Negative sizes are NOT re-rejected: the wire screens
+ *  them, `mentionInputToPart` trusts its input, and a read guard stricter than
+ *  what the writer can emit would drop rows it produced itself. */
+export function isChatMentionPart(part: unknown): part is ChatMentionPart {
+  if (!part || typeof part !== 'object') return false
+  const record = part as Record<string, unknown>
+  if (record.size !== undefined && (typeof record.size !== 'number' || !Number.isFinite(record.size))) {
+    return false
+  }
+  return (
+    record.type === 'mention' &&
+    typeof record.path === 'string' &&
+    record.path.length > 0 &&
+    typeof record.name === 'string' &&
+    record.name.trim().length > 0 &&
+    (record.mentionKind === 'image' || record.mentionKind === 'file')
+  )
+}
+
+/** Every mention part on one message, in stored order. The projection a
+ *  transcript renderer runs before deciding which mentions the message text
+ *  already shows inline (see `segmentMentionContent` in `/web-react`). */
+export function mentionPartsFromMessageParts(
+  parts: ReadonlyArray<Record<string, unknown>> | ReadonlyArray<ChatMessagePart> | null | undefined,
+): ChatMentionPart[] {
+  if (!parts) return []
+  return (parts as ReadonlyArray<unknown>).filter(isChatMentionPart)
+}
+
+/** A validated wire mention (`parseFileMentions` in `/chat-routes`) as the
+ *  part the turn route persists. An absent/non-finite `size` is DROPPED rather
+ *  than stored as `undefined`, so a stored row never carries a key that means
+ *  nothing. */
+export function mentionInputToPart(input: FileMention): ChatMentionPart {
+  const part: ChatMentionPart = {
+    type: 'mention',
+    mentionKind: mentionKindForPath(input.path),
+    path: input.path,
+    name: input.name,
+  }
+  if (typeof input.size === 'number' && Number.isFinite(input.size)) part.size = input.size
+  return part
 }
