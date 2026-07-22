@@ -37,6 +37,14 @@ export interface ChatTurnRequestPayload {
   content?: string
   /** Non-text parts from the upload route, echoed back verbatim. */
   parts?: ChatTurnFilePartInput[]
+  /** `@`-picked file mentions for this turn — path references into the
+   *  workspace sandbox, NOT uploads, so they travel in their own field rather
+   *  than as `parts` entries. A product whose `parts` field is already spoken
+   *  for (an attachment sentinel) can still send mentions, and mentions
+   *  persist as their own `ChatMentionPart`s so a retry rebuilds them. The
+   *  route validates this field with {@link parseFileMentions} and replaces it
+   *  on the payload with the validated, deduped list. */
+  mentions?: FileMention[]
   model?: string
   effort?: 'auto' | 'low' | 'medium' | 'high'
   harness?: string
@@ -146,6 +154,20 @@ export function mediaTypeForMentionPath(path: string): string | undefined {
   return MENTION_IMAGE_MEDIA_TYPES.get(extensionOf(path))
 }
 
+/** The image/file split a mention is rendered and persisted under — the
+ *  composer pill's icon, the dispatched part's `type`, and
+ *  `ChatMentionPart.mentionKind` are all this one value. */
+export type ChatMentionKind = 'image' | 'file'
+
+/** `image` when the path's extension is in the known image set (the same table
+ *  {@link mediaTypeForMentionPath} reads), `file` otherwise. Exported so a
+ *  client that needs only the discriminant — a pill icon, a persisted part's
+ *  `mentionKind` — never re-declares the extension table; two frozen copies of
+ *  one mime table is how one gains a format and the other doesn't. */
+export function mentionKindForPath(path: string): ChatMentionKind {
+  return mediaTypeForMentionPath(path) ? 'image' : 'file'
+}
+
 export interface FileMentionsToPartsOptions {
   /** Resolve a mention's workspace-relative path to the absolute path the
    *  dispatched part should carry (e.g. a host prefixing the in-box vault
@@ -185,6 +207,120 @@ export function buildMentionPromptBlock(
   if (mentions.length === 0) return ''
   const lines = mentions.map((m) => `- ${m.name} (${m.path})`)
   return `\n\nMentioned files — read them from these paths:\n${lines.join('\n')}`
+}
+
+// ── mention validation ───────────────────────────────────────────────────
+//
+// This package owns BOTH ends of the mention path contract — it emits paths
+// from `createSandboxFileIndexRoute` and consumes them in `fileMentionsToParts`
+// / `buildMentionPromptBlock` — so the validation belongs here rather than in
+// each app that wires the pair up. A mention names a file that already exists
+// in the sandbox, so validation is a pure path/charset/count check with no
+// I/O: existence is proven later, when the agent reads the path and the turn
+// fails loudly if it is gone.
+
+/** Hard cap on mentions per turn. Bounds the prompt pointer block, the
+ *  persisted parts, and whatever media budget a dispatch draws from them. */
+export const MENTION_MAX_COUNT = 16
+
+/** Longest mention display name accepted — bounds the pointer-block text and
+ *  the transcript pill label. */
+const MAX_MENTION_NAME_LENGTH = 256
+/** Longest mention path accepted. */
+const MAX_MENTION_PATH_LENGTH = 1024
+
+export type SandboxMentionPathCheck =
+  | { succeeded: true }
+  | { succeeded: false; error: string }
+
+/**
+ * Validate a workspace-relative sandbox mention path. Rejects traversal (a
+ * `..` path segment), absolute paths (leading `/`), backslashes, and null
+ * bytes — the four ways a path picked in a client can escape the root the
+ * index route scanned.
+ *
+ * Spaces and unicode are deliberately ALLOWED: in-box filenames are arbitrary,
+ * and an ASCII-only charset would silently drop real files from a feature
+ * whose whole job is naming them.
+ */
+export function validateSandboxMentionPath(path: unknown): SandboxMentionPathCheck {
+  if (typeof path !== 'string' || path.length === 0) {
+    return { succeeded: false, error: 'mention path must be a non-empty string' }
+  }
+  if (path.length > MAX_MENTION_PATH_LENGTH) {
+    return { succeeded: false, error: `mention path must not exceed ${MAX_MENTION_PATH_LENGTH} characters` }
+  }
+  if (path.includes('\0')) {
+    return { succeeded: false, error: 'mention path must not contain null bytes' }
+  }
+  if (path.includes('\\')) {
+    return { succeeded: false, error: 'mention path must not contain backslashes' }
+  }
+  if (path.startsWith('/')) {
+    return { succeeded: false, error: 'mention path must be workspace-relative, not absolute' }
+  }
+  if (path.split('/').some((segment) => segment === '..')) {
+    return { succeeded: false, error: 'mention path must not contain ".." segments' }
+  }
+  return { succeeded: true }
+}
+
+function parseFileMention(value: unknown, index: number): FileMention {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new ChatTurnInputError(`mentions[${index}] must be an object`)
+  }
+  const record = value as Record<string, unknown>
+
+  const pathCheck = validateSandboxMentionPath(record.path)
+  if (!pathCheck.succeeded) throw new ChatTurnInputError(`mentions[${index}]: ${pathCheck.error}`)
+
+  const name = record.name
+  if (typeof name !== 'string' || !name.trim()) {
+    throw new ChatTurnInputError(`mentions[${index}].name must be a non-empty string`)
+  }
+  if (name.length > MAX_MENTION_NAME_LENGTH) {
+    throw new ChatTurnInputError(`mentions[${index}].name must not exceed ${MAX_MENTION_NAME_LENGTH} characters`)
+  }
+
+  const size = record.size
+  if (size !== undefined) {
+    if (typeof size !== 'number' || !Number.isFinite(size)) {
+      throw new ChatTurnInputError(`mentions[${index}].size must be a finite number`)
+    }
+    if (size < 0) {
+      throw new ChatTurnInputError(`mentions[${index}].size must not be negative`)
+    }
+  }
+
+  return { path: record.path as string, name, ...(typeof size === 'number' ? { size } : {}) }
+}
+
+/**
+ * Validates the untyped `mentions` array off the wire, mirroring
+ * {@link parseChatTurnParts}: the typed list, or `ChatTurnInputError` (400)
+ * naming the offending entry. Never sanitizes-and-continues — a traversal path
+ * is a rejected request, not a trimmed one.
+ *
+ * A path repeated within one turn is deduped to its first occurrence rather
+ * than rejected: mentioning the same file twice is plausible user input, not
+ * an attack.
+ */
+export function parseFileMentions(raw: unknown): FileMention[] {
+  if (raw === undefined || raw === null) return []
+  if (!Array.isArray(raw)) throw new ChatTurnInputError('mentions must be an array')
+  if (raw.length > MENTION_MAX_COUNT) {
+    throw new ChatTurnInputError(`mentions must not exceed ${MENTION_MAX_COUNT} entries`)
+  }
+
+  const mentions: FileMention[] = []
+  const seenPaths = new Set<string>()
+  for (let index = 0; index < raw.length; index += 1) {
+    const mention = parseFileMention(raw[index], index)
+    if (seenPaths.has(mention.path)) continue
+    seenPaths.add(mention.path)
+    mentions.push(mention)
+  }
+  return mentions
 }
 
 /** Validates the untyped `parts` array off the wire. Returns the typed parts

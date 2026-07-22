@@ -145,6 +145,7 @@ describe('ChatMessagePart — canonical coverage', () => {
       },
       { type: 'step-finish', tokens: { input: 10, output: 20, reasoning: 3, cache: { read: 5, write: 1 } }, cost: 0.02 },
       { type: 'interaction', id: 'i-1', kind: 'question', title: 'Pick', answerSpec: { fields: [] }, status: 'answered' },
+      { type: 'mention', mentionKind: 'image', path: 'assets/logo.png', name: 'logo.png', size: 42 },
     ]
     const [message] = await db.insert(tables.messages)
       .values({ threadId: thread!.id, role: 'assistant', content: 'answer', parts })

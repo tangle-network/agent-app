@@ -38,6 +38,7 @@ export {
   fileMentionsToParts,
   buildMentionPromptBlock,
   mediaTypeForMentionPath,
+  mentionKindForPath,
 } from '../chat-routes/wire'
 export {
   type FileIndexResponse,
