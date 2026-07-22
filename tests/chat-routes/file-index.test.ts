@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   createSandboxFileIndexRoute,
@@ -164,5 +164,69 @@ describe('createSandboxFileIndexRoute', () => {
     await route(indexRequest())
     await route(indexRequest())
     expect(treeCalls).toBe(2)
+  })
+})
+
+// A box that is running but has not materialised its workspace root yet: the
+// SDK rejects `tree()` with a ValidationError wrapping the box-side ENOENT.
+class FakeValidationError extends Error {
+  readonly code = 'VALIDATION_ERROR'
+  constructor(message: string) {
+    super(message)
+    this.name = 'ValidationError'
+  }
+}
+
+function throwingFs(error: unknown): SandboxFileTreeSource {
+  return {
+    async tree() {
+      throw error
+    },
+  }
+}
+
+function routeOver(error: unknown, root = '/home/agent/vault') {
+  return createSandboxFileIndexRoute({
+    authorize: async () => ({ status: 'ready', fs: throwingFs(error), root }),
+  })
+}
+
+describe('createSandboxFileIndexRoute — a root that does not exist yet', () => {
+  it('answers warming instead of letting the ENOENT escape as a 500', async () => {
+    const route = routeOver(
+      new FakeValidationError("ENOENT: no such file or directory, lstat '/home/agent/vault'"),
+    )
+    const res = await route(indexRequest())
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ status: 'warming' })
+  })
+
+  it('never caches the warming answer as a ready body', async () => {
+    const put = vi.fn()
+    const route = createSandboxFileIndexRoute({
+      authorize: async () => ({
+        status: 'ready',
+        fs: throwingFs(new FakeValidationError("ENOENT: no such file or directory, lstat '/root'")),
+        root: '/root',
+        cacheKey: 'ws-1',
+      }),
+      cache: { get: async () => null, put },
+    })
+    await route(indexRequest())
+    expect(put).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['a permission error', new FakeValidationError("EACCES: permission denied, lstat '/home/agent/vault'")],
+    ['a timeout', Object.assign(new Error('tree timed out after 30000ms'), { code: 'TIMEOUT' })],
+    ['an auth failure', Object.assign(new Error('unauthorized'), { code: 'AUTH_ERROR' })],
+    [
+      'an ENOENT on some OTHER path inside the tree',
+      new FakeValidationError("ENOENT: no such file or directory, lstat '/home/agent/vault/gone/x.md'".replace('/home/agent/vault/gone', '/elsewhere')),
+    ],
+    ['a plain error with no code', new Error('ENOENT: no such file or directory')],
+    ['a non-Error rejection', 'ENOENT: no such file or directory /home/agent/vault'],
+  ])('still surfaces %s', async (_label, error) => {
+    await expect(routeOver(error)(indexRequest())).rejects.toBeTruthy()
   })
 })
