@@ -602,3 +602,99 @@ describe('createChatTurnRoutes — interactions composition', () => {
     expect(routes.interactions).toBeNull()
   })
 })
+
+describe('createChatTurnRoutes — file mentions', () => {
+  it('persists mentions as their own parts, alongside text and file parts', async () => {
+    const { routes, rows, ctx, pending } = makeRoutes()
+    const res = await routes.turn(
+      turnRequest({
+        threadId: 't-mentions',
+        content: 'compare @docs/a.md with @assets/logo.png',
+        mentions: [
+          { path: 'docs/a.md', name: 'a.md' },
+          { path: 'assets/logo.png', name: 'logo.png', size: 42 },
+        ],
+      }),
+      ctx,
+    )
+    expect(res.status).toBe(200)
+    await readLines(res.body!)
+    await Promise.all(pending)
+
+    const user = rows.find((row) => row.role === 'user')!
+    expect(user.parts).toEqual([
+      { type: 'text', text: 'compare @docs/a.md with @assets/logo.png' },
+      { type: 'mention', mentionKind: 'file', path: 'docs/a.md', name: 'a.md' },
+      { type: 'mention', mentionKind: 'image', path: 'assets/logo.png', name: 'logo.png', size: 42 },
+    ])
+  })
+
+  it('hands the produce seam the VALIDATED, deduped mention list on the payload', async () => {
+    let seen: ChatTurnProduceArgs<void> | undefined
+    const { routes, ctx, pending } = makeRoutes({
+      produce: (args: ChatTurnProduceArgs<void>) => {
+        seen = args
+        return fakeProducer([], 'ok')
+      },
+    })
+    const res = await routes.turn(
+      turnRequest({
+        threadId: 't-mentions-2',
+        content: 'read @docs/a.md',
+        mentions: [
+          { path: 'docs/a.md', name: 'a.md', extra: 'dropped' },
+          { path: 'docs/a.md', name: 'again.md' },
+        ],
+      }),
+      ctx,
+    )
+    await readLines(res.body!)
+    await Promise.all(pending)
+
+    expect(seen?.body.mentions).toEqual([{ path: 'docs/a.md', name: 'a.md' }])
+  })
+
+  it('rejects a traversal path with a 400 before any side effect', async () => {
+    const { routes, rows, ctx } = makeRoutes()
+    const res = await routes.turn(
+      turnRequest({
+        threadId: 't-mentions-3',
+        content: 'read it',
+        mentions: [{ path: '../../etc/passwd', name: 'passwd' }],
+      }),
+      ctx,
+    )
+
+    expect(res.status).toBe(400)
+    expect((await res.json() as { error: string }).error).toContain('mentions[0]')
+    expect(rows).toHaveLength(0)
+  })
+
+  it('does not count mentions against the inline-parts byte budget (they are paths, not bytes)', async () => {
+    const { routes, ctx, pending } = makeRoutes({ maxInlinePartBytes: 32 })
+    const res = await routes.turn(
+      turnRequest({
+        threadId: 't-mentions-4',
+        content: 'go',
+        mentions: Array.from({ length: 8 }, (_, i) => ({
+          path: `docs/a-very-long-path-name-${i}.md`,
+          name: `a-very-long-path-name-${i}.md`,
+        })),
+      }),
+      ctx,
+    )
+    expect(res.status).toBe(200)
+    await readLines(res.body!)
+    await Promise.all(pending)
+  })
+
+  it('leaves a turn without mentions byte-identical to before', async () => {
+    const { routes, rows, ctx, pending } = makeRoutes()
+    const res = await routes.turn(turnRequest({ threadId: 't-none', content: 'plain' }), ctx)
+    await readLines(res.body!)
+    await Promise.all(pending)
+
+    expect(rows.find((row) => row.role === 'user')!.parts)
+      .toEqual([{ type: 'text', text: 'plain' }])
+  })
+})
