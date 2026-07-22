@@ -38,6 +38,7 @@ import type {
   AgentProfile,
   AgentProfileFileMount,
   AgentProfileMcpServer,
+  AgentProfileResourceRef,
 } from '@tangle-network/sandbox'
 import { mergeAgentProfiles } from '@tangle-network/sandbox'
 import { profile } from '@tangle-network/agent-eval'
@@ -78,6 +79,17 @@ export interface ProfileChannels {
   userSkills?: UserSkill[]
   /** Final skip filter applied to the composed mount list by mount `path`. */
   filesPredicate?: (mount: AgentProfileFileMount) => boolean
+  /** Typed `resources.skills` channel — refs the platform materializer places
+   *  at the harness-native skill dir (see {@link skillRefs} and
+   *  `@tangle-network/agent-app/skills-placement`'s `composeSkillsForHarness`).
+   *  The successor to path-baked mounts: `registry`/`userSkills` above mount
+   *  files at the hardcoded claude-code path via {@link skillMountPath};
+   *  `skillRefs` instead rides the provider-neutral `resources.skills` field
+   *  the platform resolves per harness. */
+  skillRefs?: AgentProfileResourceRef[]
+  /** Tier passed to {@link registrySkills} for the `registry` channel.
+   *  Previously hardcoded `'free'`; default unchanged. */
+  registryTier?: string
 }
 
 /** A per-user / per-workspace skill: an id and an inline `SKILL.md` body. The
@@ -223,7 +235,9 @@ export function composeAgentProfile(
     skills: channels.skills,
     knowledge: channels.knowledge,
     evolvable: channels.evolvable,
-    registry: channels.registry ? registrySkills(channels.registry) : undefined,
+    registry: channels.registry
+      ? registrySkills(channels.registry, channels.registryTier ?? 'free')
+      : undefined,
     predicate: channels.filesPredicate,
   }
   const channelFiles = composeShellResources(shellInput)
@@ -241,7 +255,10 @@ export function composeAgentProfile(
     ...(overlay.name ? { name: overlay.name } : {}),
     ...(Object.keys(promptOverlay).length > 0 ? { prompt: promptOverlay } : {}),
     ...(overlay.mcp ? { mcp: overlay.mcp } : {}),
-    resources: { files },
+    resources: {
+      files,
+      ...(channels.skillRefs && channels.skillRefs.length > 0 ? { skills: channels.skillRefs } : {}),
+    },
   }
 
   const merged = mergeAgentProfiles(base, overlayProfile)
@@ -312,17 +329,29 @@ export function makeEvolvableSection(input: EvolvableSectionInput): profile.Agen
 }
 
 export {
+  assertSkillDeliveryDisjoint,
   composeShellResources,
+  composeSkills,
   corpusSkills,
   loadMarkdownCorpus,
+  parseCorpusSkills,
+  parseSkillFrontmatter,
   registrySkills,
+  renderInlineSkills,
+  renderSkillIndex,
+  skillEntryFromMarkdown,
   skillMountPath,
+  skillRefs,
 } from '../skills/index'
 export type {
+  ComposedSkills,
   ComposeShellResourcesInput,
   CorpusEntry,
   CorpusLoadResult,
   GlobModules,
   LoadCorpusOptions,
+  ParsedSkill,
+  SkillDeliveryMode,
   SkillEntry,
+  SkillFrontmatter,
 } from '../skills/index'

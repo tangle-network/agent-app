@@ -92,6 +92,11 @@
       "import": "./dist/skills/index.js",
       "default": "./dist/skills/index.js"
     },
+    "./skills-placement": {
+      "types": "./dist/skills-placement/index.d.ts",
+      "import": "./dist/skills-placement/index.js",
+      "default": "./dist/skills-placement/index.js"
+    },
     "./profile": {
       "types": "./dist/profile/index.d.ts",
       "import": "./dist/profile/index.js",
@@ -406,17 +411,18 @@
     "@tangle-network/agent-integrations": "^0.44.0",
     "@tangle-network/agent-interface": "^0.15.0",
     "@tangle-network/agent-knowledge": "^1.7.0",
+    "@tangle-network/agent-profile-materialize": "^0.6.0",
     "@tangle-network/agent-runtime": "^0.79.3",
     "@tangle-network/brand": "^1.0.0",
     "@tangle-network/sandbox": "^0.10.5",
     "@tangle-network/sandbox-ui": "^0.72.0",
     "@tangle-network/ui": "^11.0.0",
     "@testing-library/dom": "^10.4.1",
-    "@xyflow/react": "^12.0.0",
     "@testing-library/react": "^16.3.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.6.0",
     "@types/react": "^19.0.0",
+    "@xyflow/react": "^12.0.0",
     "better-auth": "^1.6.16",
     "better-sqlite3": "^12.10.0",
     "drizzle-orm": "^0.45.2",
@@ -441,6 +447,7 @@
     "@tangle-network/agent-integrations": ">=0.44.0",
     "@tangle-network/agent-interface": ">=0.15.0",
     "@tangle-network/agent-knowledge": ">=1.7.0",
+    "@tangle-network/agent-profile-materialize": ">=0.6.0",
     "@tangle-network/agent-runtime": ">=0.79.3",
     "@tangle-network/brand": ">=1.0.0",
     "@tangle-network/sandbox": ">=0.9.7",
@@ -463,6 +470,9 @@
       "optional": true
     },
     "@tangle-network/agent-knowledge": {
+      "optional": true
+    },
+    "@tangle-network/agent-profile-materialize": {
       "optional": true
     },
     "@tangle-network/agent-runtime": {
