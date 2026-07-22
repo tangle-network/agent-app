@@ -9,14 +9,17 @@
  * the text is the message's OWN mention parts, so one message can never render
  * a pill for a path another message mentioned.
  *
- * `ChatMentionPart` is re-exported here as a type so a browser bundle gets the
- * mention vocabulary without importing `/chat-store`, whose barrel pulls the
- * drizzle peer.
+ * `ChatMentionPart` and the runtime helpers `mentionInputToPart` /
+ * `mentionPartsFromMessageParts` are re-exported here from `../chat-store/parts`
+ * directly (not the `/chat-store` barrel), so a browser bundle gets the mention
+ * vocabulary and its converters without importing `/chat-store`, whose barrel
+ * pulls the drizzle peer.
  */
 
-import type { ChatMentionKind, ChatMentionPart } from '../chat-store/parts'
+import { mentionInputToPart, mentionPartsFromMessageParts, type ChatMentionKind, type ChatMentionPart } from '../chat-store/parts'
 
 export type { ChatMentionKind, ChatMentionPart }
+export { mentionInputToPart, mentionPartsFromMessageParts }
 
 /** One run of a segmented message: literal prose, or a matched mention with
  *  the part that produced it. `text` for a mention segment is the token as it
