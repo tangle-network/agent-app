@@ -39,6 +39,13 @@ export {
   buildMentionPromptBlock,
   mediaTypeForMentionPath,
   mentionKindForPath,
+  type ChatAttachmentKind,
+  type ChatAttachmentInput,
+  DISPATCH_REQUEST_MAX_BYTES,
+  DISPATCH_STRUCTURAL_RESERVE_BYTES,
+  DISPATCH_MAX_PARTS,
+  DISPATCH_MAX_MEDIA_PARTS,
+  base64WireLen,
 } from '../chat-routes/wire'
 export {
   type FileIndexResponse,

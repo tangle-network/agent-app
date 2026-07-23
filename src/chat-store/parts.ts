@@ -65,9 +65,15 @@ import {
 } from '../plans/index'
 // `./wire` is import-free by construction, so this edge costs the store
 // nothing and keeps ONE image-extension table for the whole mention layer.
-import { mentionKindForPath, type ChatMentionKind, type FileMention } from '../chat-routes/wire'
+import {
+  mentionKindForPath,
+  type ChatAttachmentInput,
+  type ChatAttachmentKind,
+  type ChatMentionKind,
+  type FileMention,
+} from '../chat-routes/wire'
 
-export type { ChatMentionKind }
+export type { ChatMentionKind, ChatAttachmentKind }
 
 /** Start/end wall-clock millis, as normalized by `/stream`'s `normalizeTime`. */
 export interface ChatPartTime {
@@ -114,11 +120,15 @@ export interface ChatToolPart {
 }
 
 /** Union of the sidecar's legacy (path-based) and AI-SDK (url-based) file
- *  shapes; response-side every field besides `type` is optional. */
+ *  shapes; response-side every field besides `type` is optional. `name` is the
+ *  attachment-flavored display label an uploaded/promoted file carries (see
+ *  {@link ChatAttachmentPart}) — absent on a harness-emitted file part, which
+ *  uses `filename`. */
 export interface ChatFilePart {
   type: 'file'
   id?: string
   filename?: string
+  name?: string
   mediaType?: string
   url?: string
   path?: string
@@ -128,6 +138,7 @@ export interface ChatFilePart {
 export interface ChatImagePart {
   type: 'image'
   filename?: string
+  name?: string
   mediaType?: string
   url?: string
   path?: string
@@ -382,4 +393,156 @@ export function mentionInputToPart(input: FileMention): ChatMentionPart {
   }
   if (typeof input.size === 'number' && Number.isFinite(input.size)) part.size = input.size
   return part
+}
+
+// ── attachments ──────────────────────────────────────────────────────────
+//
+// An attachment is a file the product uploaded into its own store (vault /
+// object-store) ahead of the turn — content the box did not already have,
+// unlike a `@`-mention. It persists NOT as a new `ChatMessagePart` union
+// member but as an attachment-flavored `file`/`image` part: `type` is the
+// existing `image`/`file` discriminant, with `path` + `name` load-bearing.
+// That reuse is deliberate — a transcript already renders `file`/`image`
+// parts, and `toChatMessagePart` passes them through by cast (fields survive),
+// so an attachment slots into the same stored `parts` array without a parallel
+// vocabulary. These helpers own the input→part projection, the path-keyed
+// stream key, and the agent-facing prompt block, all byte-identical to the gtm
+// source they were lifted from (gtm-agent#618 adoption reproduces its rows and
+// dispatched prompt bytes through them).
+
+/** `image` for any `image/*` mime, `file` for everything else (including an
+ *  absent/empty mime) — the same split the composer and the persisted-part
+ *  discriminant both key on. */
+export function attachmentKindForMime(mime?: string): ChatAttachmentKind {
+  return mime?.startsWith('image/') ? 'image' : 'file'
+}
+
+/** Stream/transcript part key for an attachment — ONE declaration, owned by
+ *  `/stream`'s normalizer (whose `getPartKey` routes path-bearing file/image
+ *  parts through it). Re-exported here (not redefined) so the root barrel's
+ *  star-exports of both modules resolve to the same symbol instead of
+ *  colliding (TS2308 in the dts build). */
+export { attachmentPartKey } from '../stream/stream-normalizer'
+
+/**
+ * Persisted attachment part: structurally an attachment-flavored `ChatFilePart`
+ * / `ChatImagePart` (`path` + `name` promoted to required) rather than a
+ * separate union member — see the section note above. The index signature keeps
+ * it a `Record<string, unknown>` so it drops into the same untyped `parts`
+ * arrays every other stored part rides in, and lets the `type`-driven
+ * constructors below build it without union-discriminant gymnastics.
+ */
+export interface ChatAttachmentPart {
+  type: ChatAttachmentKind
+  path: string
+  name: string
+  size?: number
+  mediaType?: string
+  turnId?: string
+  [key: string]: unknown
+}
+
+/** True for any `image`/`file` part carrying a non-empty string `path`.
+ *  DELIBERATELY also matches a sidecar path-bearing file part (a mention-style
+ *  `file` part with only `path`) — the guard is a structural attachment shape,
+ *  not proof of provenance; a caller that needs to exclude those filters
+ *  upstream. The `path.length > 0` check diverges from gtm's original guard
+ *  (which only checked `typeof`), mirroring sibling {@link isChatMentionPart}:
+ *  read-side robustness against a stored `{type:'file', path:''}` row — which
+ *  would otherwise render a malformed `(vault: )` pointer line — justifies the
+ *  small divergence from byte-for-byte gtm parity here; no legitimate write
+ *  path ever produces an empty `path`. */
+export function isChatAttachmentPart(part: unknown): part is ChatAttachmentPart {
+  if (!part || typeof part !== 'object') return false
+  const record = part as Record<string, unknown>
+  return (
+    (record.type === 'image' || record.type === 'file') &&
+    typeof record.path === 'string' &&
+    record.path.length > 0
+  )
+}
+
+/** Drop absent/empty optional fields rather than persisting `undefined`/`''`
+ *  — keeps stored parts minimal. */
+export function attachmentInputToPart(input: ChatAttachmentInput): ChatAttachmentPart {
+  const part: ChatAttachmentPart = { type: input.kind, path: input.path, name: input.name }
+  if (typeof input.size === 'number' && Number.isFinite(input.size)) part.size = input.size
+  if (input.mediaType) part.mediaType = input.mediaType
+  return part
+}
+
+/** Every attachment part on one message's stored `parts`, in stored order. */
+export function attachmentPartsFromMessageParts(
+  parts: ReadonlyArray<Record<string, unknown>> | null | undefined,
+): ChatAttachmentPart[] {
+  if (!parts) return []
+  return parts.filter(isChatAttachmentPart)
+}
+
+/** gtm's exact default header for {@link buildAttachmentPromptBlock} — kept
+ *  byte-identical because it feeds dispatched prompts (gtm-agent#618
+ *  reproduces the prompt bytes through this module). Override only with intent. */
+export const DEFAULT_ATTACHMENT_PROMPT_HEADER =
+  'Attached files (already saved to the workspace vault — read them from these paths):'
+
+/** Same C0-control/DEL sweep as `/chat-routes`'s `resolve-attachments.ts`
+ *  (kept as a separate literal rather than a shared import — this module is
+ *  the read side and must stay usable over PERSISTED rows the wire validator
+ *  never saw). Replaced with a single space, not stripped or collapsed: this
+ *  is defense-in-depth for legacy/corrupt stored rows that bypassed wire
+ *  validation, not the primary control — a name/path a `resolveChatAttachments`
+ *  call validated today never contains one, so this is a no-op on legitimate
+ *  input and gtm byte-compat holds. */
+const PROMPT_BLOCK_CONTROL_CHARS = /[\x00-\x1F\x7F]/g
+
+/**
+ * The agent-facing pointer block appended to the dispatched prompt — never
+ * persisted in `message.content`. Empty array → `''` so callers can append
+ * unconditionally. The sole producer of this text: both the current turn's
+ * dispatch and history projection ({@link historyContentWithAttachments}) build
+ * it from here, so the two can never drift. `header` overrides the first line
+ * ({@link DEFAULT_ATTACHMENT_PROMPT_HEADER}); the per-file line format is fixed.
+ *
+ * Every interpolated `name`/`path` is swept for control characters first
+ * (newline/carriage-return/tab included) and each one replaced with a single
+ * space — a single-line-per-file guarantee. Without it, a control character
+ * riding through on a PERSISTED row (`historyContentWithAttachments` reads
+ * whatever is already stored; a legacy or hand-edited row was never re-checked
+ * against `resolveChatAttachments`) could inject extra lines — fabricated
+ * pointer entries or instructions — into a prompt the agent trusts verbatim.
+ * The wire-side validator is the primary control; this is the backstop for
+ * rows it never saw.
+ */
+export function buildAttachmentPromptBlock(
+  atts: ReadonlyArray<Pick<ChatAttachmentPart, 'name' | 'path'>>,
+  header: string = DEFAULT_ATTACHMENT_PROMPT_HEADER,
+): string {
+  if (atts.length === 0) return ''
+  const clean = (value: string) => value.replace(PROMPT_BLOCK_CONTROL_CHARS, ' ')
+  const lines = atts.map((a) => `- ${clean(a.name)} (vault: ${clean(a.path)})`)
+  return `\n\n${header}\n${lines.join('\n')}`
+}
+
+/**
+ * History projection for a persisted message: `content` unchanged when it
+ * carries no attachment parts, else the block is appended once. The
+ * no-double-annotation guarantee holds under the invariant that the block is
+ * never persisted INTO `message.content` — it is appended only at read time,
+ * by this function and the current turn's dispatch, both sourcing from
+ * `attachmentPartsFromMessageParts` — never by content inspection. This
+ * function does not (and cannot) detect an already-embedded block by scanning
+ * `content` for its text: a message whose stored `content` happens to already
+ * contain the block's bytes, alongside attachment parts, still gets the block
+ * appended a second time. See the pinned test for that boundary.
+ */
+export function historyContentWithAttachments(
+  message: {
+    content: string
+    parts?: ReadonlyArray<Record<string, unknown>> | null
+  },
+  header?: string,
+): string {
+  const attachmentParts = attachmentPartsFromMessageParts(message.parts)
+  if (attachmentParts.length === 0) return message.content
+  return `${message.content}${buildAttachmentPromptBlock(attachmentParts, header)}`
 }
