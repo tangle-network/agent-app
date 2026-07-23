@@ -80,8 +80,10 @@ export interface SandboxChatProducerOptions {
    *  resolves through the same failure path as any other rejection, rather
    *  than being persisted raw and unpromoted) — so the product can durably
    *  write the bytes and swap in a path-bearing part before the raw url ever
-   *  reaches the persisted transcript. Keyed per `id ?? url` and memoized by
-   *  PROMISE (not result), so re-emitted snapshot events for the same part —
+   *  reaches the persisted transcript. Keyed per source-prefixed `id:<id>` /
+   *  `url:<url>` (an `id` and a `url` sharing the same text must never collide
+   *  onto one memo entry) and memoized by PROMISE (not result), so re-emitted
+   *  snapshot events for the same part —
    *  the harness resends the whole part on every update, not just deltas —
    *  fold onto the one in-flight or settled attempt rather than promoting
    *  twice or racing two concurrent writes; a raw part with neither `id` nor
@@ -254,19 +256,34 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
 
         if (partType === 'file' && options.promoteFilePart) {
           const promote = options.promoteFilePart
-          const memoKey = asString(part.id) ?? asString(part.url)
+          // Prefixed by source (`id:`/`url:`) rather than the bare raw string —
+          // an `id` and a `url` that happen to share the same text (e.g. both
+          // `"abc"`) would otherwise collide onto one memo entry and fold two
+          // unrelated parts' promotions together. Internal Map key only; never
+          // observable outside this module.
+          const rawId = asString(part.id)
+          const rawUrl = asString(part.url)
+          const memoKey = rawId ? `id:${rawId}` : rawUrl ? `url:${rawUrl}` : undefined
           // Always invoke the callback for a `file` part when one is wired —
           // gtm never skips promotion outright, even for a part with neither
           // `id` nor `url` (it simply fails "carries no url" and resolves
           // through the ordinary failure path). Memoization by PROMISE only
           // applies when there is something to key it on; keyless parts are
           // invoked un-memoized, once per occurrence.
+          //
+          // `Promise.resolve().then(...)` (rather than calling `promote(part)`
+          // directly) so a SYNC throw from a non-async `promoteFilePart` is
+          // captured into the promise chain instead of escaping this function
+          // call outright — `.catch` below only ever sees a rejection, never a
+          // thrown exception that unwinds past `attempt()`.
           const attempt = (): Promise<FilePartPromotionOutcome> =>
-            promote(part).catch((err) => {
-              const reason = err instanceof Error ? err.message : String(err)
-              log('[chat-routes] file part promotion threw', { key: memoKey ?? '(keyless)', error: reason })
-              return { succeeded: false as const, reason }
-            })
+            Promise.resolve()
+              .then(() => promote(part))
+              .catch((err) => {
+                const reason = err instanceof Error ? err.message : String(err)
+                log('[chat-routes] file part promotion threw', { key: memoKey ?? '(keyless)', error: reason })
+                return { succeeded: false as const, reason }
+              })
 
           let pending: Promise<FilePartPromotionOutcome>
           if (memoKey) {

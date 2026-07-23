@@ -274,8 +274,41 @@ describe('createSandboxChatProducer', () => {
     expect(promoteFilePart).toHaveBeenCalledOnce()
     expect(log).toHaveBeenCalledWith(
       '[chat-routes] file part promotion threw',
-      expect.objectContaining({ key: 'f1', error: 'vault write failed' }),
+      expect.objectContaining({ key: 'id:f1', error: 'vault write failed' }),
     )
+    expect(events).toEqual([{ type: 'text', text: 'still here' }])
+    expect(producer.assistantParts?.()).toEqual([
+      { type: 'file', id: 'f1', filename: 'out.csv', url: 'data:text/csv;base64,AA' },
+      expect.objectContaining({ type: 'text', text: 'still here' }),
+    ])
+  })
+
+  it('falls back to the raw file part and keeps draining when the promotion callback throws SYNCHRONOUSLY (not via a rejected promise)', async () => {
+    // A non-async callback whose body throws before ever returning a promise —
+    // `promote(part)` itself throws, so a bare `.catch` on its return value has
+    // nothing to attach to. The producer must wrap the call so this still
+    // resolves through the same `{succeeded:false}` path as a rejected promise.
+    const log = vi.fn()
+    const promoteFilePart = vi.fn((): Promise<never> => {
+      throw new Error('sync boom')
+    })
+    const producer = createSandboxChatProducer({
+      events: feed([
+        partUpdated({ type: 'file', id: 'f1', filename: 'out.csv', url: 'data:text/csv;base64,AA' }),
+        partUpdated({ type: 'text', id: 't1', text: 'still here' }, 'still here'),
+      ]),
+      promoteFilePart,
+      log,
+    })
+    const events = await drain(producer.stream)
+
+    expect(promoteFilePart).toHaveBeenCalledOnce()
+    expect(log).toHaveBeenCalledWith(
+      '[chat-routes] file part promotion threw',
+      expect.objectContaining({ key: 'id:f1', error: 'sync boom' }),
+    )
+    // The raw part persists (the fallback path) and the stream keeps draining
+    // past the synchronous throw instead of the whole generator dying.
     expect(events).toEqual([{ type: 'text', text: 'still here' }])
     expect(producer.assistantParts?.()).toEqual([
       { type: 'file', id: 'f1', filename: 'out.csv', url: 'data:text/csv;base64,AA' },
@@ -333,6 +366,36 @@ describe('createSandboxChatProducer', () => {
     await drain(producer.stream)
 
     expect(promoteFilePart).toHaveBeenCalledTimes(2)
+  })
+
+  it('persists both promoted parts on the success path for two keyless occurrences, keyed per their own outcome.key (no memo collapse)', async () => {
+    let call = 0
+    const promoteFilePart = vi.fn(async () => {
+      call += 1
+      return {
+        succeeded: true as const,
+        part: { type: 'file', filename: `mystery-${call}.bin`, path: `vault/mystery-${call}.bin` },
+        key: `attachment:vault/mystery-${call}.bin`,
+      }
+    })
+    const producer = createSandboxChatProducer({
+      events: feed([
+        partUpdated({ type: 'file', filename: 'mystery.bin' }),
+        partUpdated({ type: 'file', filename: 'mystery.bin' }),
+      ]),
+      promoteFilePart,
+    })
+    await drain(producer.stream)
+
+    expect(promoteFilePart).toHaveBeenCalledTimes(2)
+    // Each keyless occurrence is its own un-memoized attempt, so both
+    // promoted parts land in the transcript under their own `getPartKey`
+    // (here, the outcome's own `key`) rather than one collapsing onto the
+    // other's memo entry.
+    expect(producer.assistantParts?.()).toEqual([
+      { type: 'file', filename: 'mystery-1.bin', path: 'vault/mystery-1.bin' },
+      { type: 'file', filename: 'mystery-2.bin', path: 'vault/mystery-2.bin' },
+    ])
   })
 
   it('persists the substituted part (e.g. a warning notice) on failure, never the raw url-bearing part', async () => {

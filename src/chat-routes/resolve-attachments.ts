@@ -53,16 +53,36 @@ function isAttachmentKind(value: unknown): value is ChatAttachmentKind {
   return value === 'image' || value === 'file'
 }
 
+/** C0 control characters (0x00–0x1F) plus DEL (0x7F) — covers `\n`/`\r`/`\t`.
+ *  A `name` or `path` carrying one of these has no legitimate use here and
+ *  everything to gain from an attacker: {@link buildAttachmentPromptBlock} in
+ *  `/chat-store` renders both fields verbatim into the dispatched agent
+ *  prompt, so an embedded newline fabricates new prompt lines (a
+ *  prompt-injection vector) rather than naming a file. Rejected at this
+ *  boundary — not merely neutralized downstream — so the wire never accepts
+ *  the input in the first place; a legitimate name/path never contains one. */
+const CONTROL_CHARS = /[\x00-\x1F\x7F]/
+
 /**
  * Default path validator when a caller supplies none. Rejects the ways a path
  * picked in a client can escape the store root — traversal (`..` segment),
- * absolute (leading `/`), backslashes, null bytes — plus a dotfile/hidden
- * segment (a leading `.` on any segment). Generalized from gtm's
- * `validateVaultFilePath`, in the spirit of `validateSandboxMentionPath`.
+ * absolute (leading `/`), backslashes, null bytes, control characters (see
+ * {@link CONTROL_CHARS} — a path also feeds {@link buildAttachmentPromptBlock}'s
+ * `(vault: ${path})` pointer, so it is exposed to the same injection surface as
+ * `name`) — plus a dotfile/hidden segment (a leading `.` on any segment).
+ * Generalized from gtm's `validateVaultFilePath`, in the spirit of
+ * `validateSandboxMentionPath` (`/chat-routes`'s wire mention-path validator) —
+ * but the dotfile rejection here is INTENTIONALLY stricter than that sibling:
+ * an uploaded attachment path is sanitized store-relative storage the product
+ * itself assigned, whereas a mention path points at a file that already exists
+ * in the sandbox and may legitimately live under a dotfile segment. A caller
+ * that needs gtm's exact (looser) rule can supply `validatePath` to override
+ * this default entirely.
  */
 export function defaultValidateAttachmentPath(path: string): AttachmentPathCheck {
   if (path.includes('\0')) return { succeeded: false, error: 'attachment path must not contain null bytes' }
   if (path.includes('\\')) return { succeeded: false, error: 'attachment path must not contain backslashes' }
+  if (CONTROL_CHARS.test(path)) return { succeeded: false, error: 'attachment path must not contain control characters' }
   if (path.startsWith('/')) return { succeeded: false, error: 'attachment path must be store-relative, not absolute' }
   const segments = path.split('/')
   if (segments.some((segment) => segment === '..')) {
@@ -94,6 +114,9 @@ function parseAttachmentInput(
   }
   if (name.length > MAX_ATTACHMENT_NAME_LENGTH) {
     return { succeeded: false, error: `attachments[${index}].name must not exceed ${MAX_ATTACHMENT_NAME_LENGTH} characters` }
+  }
+  if (CONTROL_CHARS.test(name)) {
+    return { succeeded: false, error: `attachments[${index}].name must not contain control characters` }
   }
   const size = record.size
   if (typeof size !== 'number' || !Number.isFinite(size)) {

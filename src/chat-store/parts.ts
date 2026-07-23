@@ -442,14 +442,24 @@ export interface ChatAttachmentPart {
   [key: string]: unknown
 }
 
-/** True for any `image`/`file` part carrying a string `path`. DELIBERATELY
- *  also matches a sidecar path-bearing file part (a mention-style `file` part
- *  with only `path`) — the guard is a structural attachment shape, not proof of
- *  provenance; a caller that needs to exclude those filters upstream. */
+/** True for any `image`/`file` part carrying a non-empty string `path`.
+ *  DELIBERATELY also matches a sidecar path-bearing file part (a mention-style
+ *  `file` part with only `path`) — the guard is a structural attachment shape,
+ *  not proof of provenance; a caller that needs to exclude those filters
+ *  upstream. The `path.length > 0` check diverges from gtm's original guard
+ *  (which only checked `typeof`), mirroring sibling {@link isChatMentionPart}:
+ *  read-side robustness against a stored `{type:'file', path:''}` row — which
+ *  would otherwise render a malformed `(vault: )` pointer line — justifies the
+ *  small divergence from byte-for-byte gtm parity here; no legitimate write
+ *  path ever produces an empty `path`. */
 export function isChatAttachmentPart(part: unknown): part is ChatAttachmentPart {
   if (!part || typeof part !== 'object') return false
   const record = part as Record<string, unknown>
-  return (record.type === 'image' || record.type === 'file') && typeof record.path === 'string'
+  return (
+    (record.type === 'image' || record.type === 'file') &&
+    typeof record.path === 'string' &&
+    record.path.length > 0
+  )
 }
 
 /** Drop absent/empty optional fields rather than persisting `undefined`/`''`
@@ -475,6 +485,16 @@ export function attachmentPartsFromMessageParts(
 export const DEFAULT_ATTACHMENT_PROMPT_HEADER =
   'Attached files (already saved to the workspace vault — read them from these paths):'
 
+/** Same C0-control/DEL sweep as `/chat-routes`'s `resolve-attachments.ts`
+ *  (kept as a separate literal rather than a shared import — this module is
+ *  the read side and must stay usable over PERSISTED rows the wire validator
+ *  never saw). Replaced with a single space, not stripped or collapsed: this
+ *  is defense-in-depth for legacy/corrupt stored rows that bypassed wire
+ *  validation, not the primary control — a name/path a `resolveChatAttachments`
+ *  call validated today never contains one, so this is a no-op on legitimate
+ *  input and gtm byte-compat holds. */
+const PROMPT_BLOCK_CONTROL_CHARS = /[\x00-\x1F\x7F]/g
+
 /**
  * The agent-facing pointer block appended to the dispatched prompt — never
  * persisted in `message.content`. Empty array → `''` so callers can append
@@ -482,20 +502,38 @@ export const DEFAULT_ATTACHMENT_PROMPT_HEADER =
  * dispatch and history projection ({@link historyContentWithAttachments}) build
  * it from here, so the two can never drift. `header` overrides the first line
  * ({@link DEFAULT_ATTACHMENT_PROMPT_HEADER}); the per-file line format is fixed.
+ *
+ * Every interpolated `name`/`path` is swept for control characters first
+ * (newline/carriage-return/tab included) and each one replaced with a single
+ * space — a single-line-per-file guarantee. Without it, a control character
+ * riding through on a PERSISTED row (`historyContentWithAttachments` reads
+ * whatever is already stored; a legacy or hand-edited row was never re-checked
+ * against `resolveChatAttachments`) could inject extra lines — fabricated
+ * pointer entries or instructions — into a prompt the agent trusts verbatim.
+ * The wire-side validator is the primary control; this is the backstop for
+ * rows it never saw.
  */
 export function buildAttachmentPromptBlock(
   atts: ReadonlyArray<Pick<ChatAttachmentPart, 'name' | 'path'>>,
   header: string = DEFAULT_ATTACHMENT_PROMPT_HEADER,
 ): string {
   if (atts.length === 0) return ''
-  const lines = atts.map((a) => `- ${a.name} (vault: ${a.path})`)
+  const clean = (value: string) => value.replace(PROMPT_BLOCK_CONTROL_CHARS, ' ')
+  const lines = atts.map((a) => `- ${clean(a.name)} (vault: ${clean(a.path)})`)
   return `\n\n${header}\n${lines.join('\n')}`
 }
 
 /**
  * History projection for a persisted message: `content` unchanged when it
- * carries no attachment parts (a message that already has the pointer block
- * inline must never be double-annotated), else the block is appended once.
+ * carries no attachment parts, else the block is appended once. The
+ * no-double-annotation guarantee holds under the invariant that the block is
+ * never persisted INTO `message.content` — it is appended only at read time,
+ * by this function and the current turn's dispatch, both sourcing from
+ * `attachmentPartsFromMessageParts` — never by content inspection. This
+ * function does not (and cannot) detect an already-embedded block by scanning
+ * `content` for its text: a message whose stored `content` happens to already
+ * contain the block's bytes, alongside attachment parts, still gets the block
+ * appended a second time. See the pinned test for that boundary.
  */
 export function historyContentWithAttachments(
   message: {
