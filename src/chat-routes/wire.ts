@@ -29,6 +29,29 @@ export interface ChatTurnFilePartInput {
 
 export type ChatTurnPartInput = ChatTurnTextPartInput | ChatTurnFilePartInput
 
+/** The image/file split an attachment is rendered and persisted under — the
+ *  same discriminant as {@link ChatMentionKind}, but a distinct name because an
+ *  attachment carries content the product uploaded (`ChatAttachmentInput`)
+ *  while a mention points at a file the box already has. Defined HERE (the
+ *  import-free layer) so `ChatAttachmentInput` can reference it and the client
+ *  composer imports it without pulling the persisted-part vocabulary;
+ *  `/chat-store`'s parts module re-exports it alongside the attachment helpers. */
+export type ChatAttachmentKind = 'image' | 'file'
+
+/** `POST` turn-body entry describing a file already uploaded to the product's
+ *  store (vault/object-store) — distinct from an inline {@link
+ *  ChatTurnFilePartInput} (which carries bytes) and from a {@link FileMention}
+ *  (a sandbox path the box already holds). The route resolves this field with
+ *  {@link resolveChatAttachments}: every path is re-validated and every size is
+ *  re-derived from the stored body, so nothing here is trusted as sent. */
+export interface ChatAttachmentInput {
+  path: string
+  name: string
+  size: number
+  mediaType: string
+  kind: ChatAttachmentKind
+}
+
 /** POST body for the turn route. `content` may be empty when `parts` carry the
  *  message (an image-only send). Product routing fields (workspaceId etc.) ride
  *  alongside and are read by the product's `authorize` seam. */
@@ -45,6 +68,12 @@ export interface ChatTurnRequestPayload {
    *  route validates this field with {@link parseFileMentions} and replaces it
    *  on the payload with the validated, deduped list. */
   mentions?: FileMention[]
+  /** Files uploaded to the product's store ahead of the turn — path
+   *  references, NOT inline bytes (those ride `parts`). Validated and
+   *  size-re-derived by {@link resolveChatAttachments} into persistable
+   *  attachment parts; a product whose `parts` field is spoken for by inline
+   *  uploads still sends store-backed files here. */
+  attachments?: ChatAttachmentInput[]
   model?: string
   effort?: 'auto' | 'low' | 'medium' | 'high'
   harness?: string
@@ -73,6 +102,68 @@ export function chatTurnRequestInit(payload: ChatTurnRequestPayload): RequestIni
 // env-size gates).
 
 export const INLINE_PARTS_MAX_BYTES = 950_000
+
+// ── dispatch (parts[]) budget vocabulary ────────────────────────────────────
+//
+// The default caps `buildDispatchParts` sizes an attachment/mention dispatch
+// against — the sidecar/proxy limits an assembled `parts` array crosses, one
+// step past `INLINE_PARTS_MAX_BYTES` (which gates the raw turn BODY). Grouped
+// here, in the import-free layer, so the numbers are one overridable
+// vocabulary the client can read and a product can tune per call rather than
+// constants buried in the server module. NOTE: these model sidecar/proxy caps,
+// not a product's MIME accept-list or vault bucketing — those are DOMAIN
+// values the product supplies, never defaulted here.
+
+/** Hard cap on the whole `/prompt` request body as it crosses the sandbox
+ *  proxy — smaller in practice than a raw-file write cap because a dispatch
+ *  carries several inline parts plus the flattened history in one request. */
+export const DISPATCH_REQUEST_MAX_BYTES = 1024 * 1024
+
+/** Bytes reserved off the top of {@link DISPATCH_REQUEST_MAX_BYTES} for the
+ *  JSON structure around the parts array (keys, delimiters, per-part
+ *  `type`/`filename`/`mediaType` fields) that {@link base64WireLen} does not
+ *  account for — keeps the inline budget off the exact proxy cap where one
+ *  stray byte trips the 413. */
+export const DISPATCH_STRUCTURAL_RESERVE_BYTES = 64 * 1024
+
+/** Sidecar's hard cap on the `parts` array of one prompt request — a dispatch
+ *  must never assemble more parts than this or the whole turn 400s. */
+export const DISPATCH_MAX_PARTS = 64
+
+/** Product-side cap on media parts per dispatch (current turn + carried
+ *  history), well under {@link DISPATCH_MAX_PARTS}. History trimming that keeps
+ *  a transcript's native media under this is a PRODUCT concern (the pointer
+ *  block keeps trimmed media reachable); `buildDispatchParts` enforces only the
+ *  total {@link DISPATCH_MAX_PARTS} cap. */
+export const DISPATCH_MAX_MEDIA_PARTS = 24
+
+/** Size a base64-encoded string occupies on the wire given the raw
+ *  (pre-encoding) byte length: base64 packs 3 raw bytes into 4 output
+ *  characters, rounded up to the next multiple of 4. */
+export function base64WireLen(byteLen: number): number {
+  return Math.ceil(byteLen / 3) * 4
+}
+
+/**
+ * Render a raw byte count as a human-readable size (`512B`, `3KB`, `12MB
+ * 500KB`). Ported EXACTLY from gtm-agent's `attachment-limits.ts` — byte-
+ * identical implementation, not a reinterpretation — so `resolve-attachments`'s
+ * and `promote-file-part`'s error strings match gtm's wording verbatim. Lives
+ * in the import-free wire layer (not `resolve-attachments.ts` alone) because
+ * BOTH the aggregate-cap message here and the per-file oversize message in
+ * `promote-file-part.ts` need it; a browser composer wanting the same
+ * formatting for a client-side pre-check can also import it with no engine
+ * pulled in.
+ */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`
+  if (bytes >= 1024 * 1024) {
+    const megabytes = Math.floor(bytes / (1024 * 1024))
+    const remainder = bytes % (1024 * 1024)
+    return remainder === 0 ? `${megabytes}MB` : `${megabytes}MB ${formatBytes(remainder)}`
+  }
+  return `${Math.round(bytes / 1024)}KB`
+}
 
 export class ChatTurnInputError extends Error {
   constructor(message: string, readonly status = 400, readonly code = 'INVALID_CHAT_TURN') {

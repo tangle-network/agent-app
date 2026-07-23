@@ -198,6 +198,147 @@ describe('createSandboxChatProducer', () => {
     }])
   })
 
+  it('promotes a file part exactly once across duplicate stream events and drops the raw url-bearing part', async () => {
+    const promoteFilePart = vi.fn(async (raw: Record<string, unknown>) => ({
+      succeeded: true as const,
+      part: { type: 'file', id: raw.id, filename: raw.filename, path: `vault/${raw.filename}` },
+      key: `attachment:vault/${raw.filename}`,
+    }))
+    const producer = createSandboxChatProducer({
+      events: feed([
+        partUpdated({ type: 'file', id: 'f1', filename: 'out.csv', url: 'data:text/csv;base64,AA' }),
+        // Duplicate re-emission of the same part (same id) — must fold onto
+        // the first promotion, not trigger a second one.
+        partUpdated({ type: 'file', id: 'f1', filename: 'out.csv', url: 'data:text/csv;base64,AA' }),
+      ]),
+      promoteFilePart,
+    })
+    await drain(producer.stream)
+
+    expect(promoteFilePart).toHaveBeenCalledOnce()
+    expect(producer.assistantParts?.()).toEqual([
+      { type: 'file', id: 'f1', filename: 'out.csv', path: 'vault/out.csv' },
+    ])
+  })
+
+  it('falls back to persisting the raw file part when promotion reports failure', async () => {
+    const promoteFilePart = vi.fn(async () => ({ succeeded: false as const, reason: 'too large' }))
+    const producer = createSandboxChatProducer({
+      events: feed([
+        partUpdated({ type: 'file', id: 'f1', filename: 'out.csv', url: 'data:text/csv;base64,AA' }),
+      ]),
+      promoteFilePart,
+    })
+    const events = await drain(producer.stream)
+
+    expect(events).toEqual([])
+    expect(promoteFilePart).toHaveBeenCalledOnce()
+    expect(producer.assistantParts?.()).toEqual([
+      { type: 'file', id: 'f1', filename: 'out.csv', url: 'data:text/csv;base64,AA' },
+    ])
+  })
+
+  it('falls back to the raw file part and keeps draining when the promotion callback throws', async () => {
+    const log = vi.fn()
+    const promoteFilePart = vi.fn(async () => {
+      throw new Error('vault write failed')
+    })
+    const producer = createSandboxChatProducer({
+      events: feed([
+        partUpdated({ type: 'file', id: 'f1', filename: 'out.csv', url: 'data:text/csv;base64,AA' }),
+        partUpdated({ type: 'text', id: 't1', text: 'still here' }, 'still here'),
+      ]),
+      promoteFilePart,
+      log,
+    })
+    const events = await drain(producer.stream)
+
+    expect(promoteFilePart).toHaveBeenCalledOnce()
+    expect(log).toHaveBeenCalledWith(
+      '[chat-routes] file part promotion threw',
+      expect.objectContaining({ key: 'f1', error: 'vault write failed' }),
+    )
+    expect(events).toEqual([{ type: 'text', text: 'still here' }])
+    expect(producer.assistantParts?.()).toEqual([
+      { type: 'file', id: 'f1', filename: 'out.csv', url: 'data:text/csv;base64,AA' },
+      expect.objectContaining({ type: 'text', text: 'still here' }),
+    ])
+  })
+
+  it('leaves file/image persistence byte-identical to today when promoteFilePart is not wired', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([
+        partUpdated({ type: 'text', id: 't1', text: 'see the chart' }, 'see the chart'),
+        partUpdated({ type: 'file', id: 'f1', filename: 'out.csv', mediaType: 'text/csv', path: 'outputs/out.csv' }),
+        partUpdated({ type: 'image', filename: 'plot.png', mediaType: 'image/png', url: 'data:image/png;base64,AA' }),
+        { type: 'result', data: { finalText: 'see the chart' } },
+      ]),
+    })
+    await drain(producer.stream)
+
+    expect(producer.assistantParts?.()).toEqual([
+      expect.objectContaining({ type: 'text', text: 'see the chart' }),
+      { type: 'file', id: 'f1', filename: 'out.csv', mediaType: 'text/csv', path: 'outputs/out.csv' },
+      { type: 'image', filename: 'plot.png', mediaType: 'image/png', url: 'data:image/png;base64,AA' },
+    ])
+  })
+
+  it('invokes promotion (un-memoized) for a file part with neither id nor url', async () => {
+    // gtm never skips promotion outright — a part with no id/url still gets
+    // routed through the callback, which fails "carries no url" on its own;
+    // there is simply nothing to key a memo on, so each occurrence is its own
+    // un-memoized attempt.
+    const promoteFilePart = vi.fn(async () => ({ succeeded: true as const, part: { type: 'file' } }))
+    const producer = createSandboxChatProducer({
+      events: feed([
+        partUpdated({ type: 'file', filename: 'mystery.bin' }),
+      ]),
+      promoteFilePart,
+    })
+    await drain(producer.stream)
+
+    expect(promoteFilePart).toHaveBeenCalledOnce()
+    expect(producer.assistantParts?.()).toEqual([
+      { type: 'file' },
+    ])
+  })
+
+  it('invokes promotion again (not memoized) on a second keyless occurrence', async () => {
+    const promoteFilePart = vi.fn(async () => ({ succeeded: false as const, reason: 'no url' }))
+    const producer = createSandboxChatProducer({
+      events: feed([
+        partUpdated({ type: 'file', filename: 'mystery.bin' }),
+        partUpdated({ type: 'file', filename: 'mystery.bin' }),
+      ]),
+      promoteFilePart,
+    })
+    await drain(producer.stream)
+
+    expect(promoteFilePart).toHaveBeenCalledTimes(2)
+  })
+
+  it('persists the substituted part (e.g. a warning notice) on failure, never the raw url-bearing part', async () => {
+    const noticePart = { type: 'notice', kind: 'warning', id: 'file-1', text: 'Could not attach out.csv: too large' }
+    const promoteFilePart = vi.fn(async () => ({
+      succeeded: false as const,
+      reason: 'too large',
+      part: noticePart,
+    }))
+    const producer = createSandboxChatProducer({
+      events: feed([
+        partUpdated({ type: 'file', id: 'f1', filename: 'out.csv', url: 'data:text/csv;base64,AA' }),
+      ]),
+      promoteFilePart,
+    })
+    await drain(producer.stream)
+
+    expect(promoteFilePart).toHaveBeenCalledOnce()
+    expect(producer.assistantParts?.()).toEqual([noticePart])
+    // The raw url-bearing part must be absent — it never reaches the transcript.
+    const persisted = producer.assistantParts?.() ?? []
+    expect(persisted.some((p) => 'url' in p)).toBe(false)
+  })
+
   it('forwards error and cancel events verbatim and drops malformed interactions', async () => {
     const log = vi.fn()
     const producer = createSandboxChatProducer({

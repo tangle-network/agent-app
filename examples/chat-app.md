@@ -18,6 +18,7 @@ Who owns each hop:
 | Sandbox events → client vocabulary + persisted parts | `/chat-routes` (`createSandboxChatProducer`) |
 | Buffered replay after a drop | `/stream` turn buffer (wired by default) |
 | Upload → `PromptInputPart` descriptors | `/chat-routes` (`createUploadRoute`) |
+| Store-backed attachments (validate, dispatch, promote) | `/chat-routes` (`resolveChatAttachments`, `buildDispatchParts`, `promoteAgentFilePart`) |
 | Ask answering (list/answer, 410 mapping, dedupe) | `/interactions` via `routes.interactions` |
 | Durable plan/question lifecycle | `/durable-chat` structural store + authority adapters |
 | Composer, stream consumption, cards | `/web-react` |
@@ -165,6 +166,64 @@ into the sandbox workspace and referenced by `path` (the ~1 MiB gateway body
 cap makes that two-step mandatory). Question cards render with
 `InteractionQuestionCard` + `useChatInteractions` and answer through
 `/api/chat/interactions` — see `/web-react`.
+
+## Attachments (store-backed files, #224)
+
+An attachment is a file the product already saved to its own store (vault /
+`/object-store`) ahead of the turn — distinct from an inline upload part (which
+carries bytes) and from a `@`-mention (a path the sandbox already holds). Every
+path is re-validated and every size re-derived from the STORED body, never the
+client-reported one. Storage is REQUIRED injection — `ReadAttachmentFn` /
+`WriteAttachmentFn` (`./attachment-store`) — there is no default store.
+
+```ts
+import {
+  resolveChatAttachments, buildDispatchParts, promoteAgentFilePart, createSandboxChatProducer,
+} from '@tangle-network/agent-app/chat-routes'
+import type { ReadAttachmentFn, WriteAttachmentFn } from '@tangle-network/agent-app/chat-routes'
+import { createR2ObjectStore } from '@tangle-network/agent-app/object-store' // or a fleet's own vault adapter
+
+const store = createR2ObjectStore({ bucket: env.ATTACHMENTS })
+
+const readAttachment: ReadAttachmentFn = async (scopeId, path) => {
+  const obj = await store.get(`${scopeId}/${path}`)
+  if (!obj) return { ok: false, reason: 'not found' }
+  const bytes = new Uint8Array(await new Response(obj.stream()).arrayBuffer())
+  return { ok: true, size: obj.size, bytes, mediaType: obj.contentType }
+}
+
+const writeAttachment: WriteAttachmentFn = async (scopeId, path, content, { mediaType }) => {
+  const bytes = typeof content === 'string' ? Uint8Array.from(atob(content), (c) => c.charCodeAt(0)) : content
+  await store.put(`${scopeId}/${path}`, bytes, { contentType: mediaType })
+  return { ok: true }
+}
+
+// In the turn route, before dispatch: validate the wire `attachments` field
+// and re-derive size, then fold it into the dispatched prompt parts.
+const resolved = await resolveChatAttachments(body.attachments, { scopeId: identity.tenantId, readAttachment })
+if (!resolved.succeeded) return Response.json({ error: resolved.error }, { status: 400 })
+
+const dispatch = await buildDispatchParts({
+  text, attachments: resolved.value, mentions, history, systemPrompt, profileWireBytes,
+  scopeId: identity.tenantId, readAttachment,
+  resolveAttachmentPath: (path) => `/workspace/${path}`,
+})
+if (!dispatch.succeeded) return Response.json({ error: dispatch.error }, { status: 413 })
+
+// In the producer: promote harness-emitted files into the same store instead of
+// persisting a transient data:/sandbox-path url.
+createSandboxChatProducer({
+  events,
+  promoteFilePart: (raw) => promoteAgentFilePart({
+    raw, box, scopeId: identity.tenantId, sessionId: identity.sessionId, writeAttachment,
+  }),
+})
+```
+
+`/object-store` is a ready-made backend for both seams when a product has no
+vault of its own; fleet apps that already have one (gtm's KV vault) inject
+their own `ReadAttachmentFn`/`WriteAttachmentFn` instead of this module — the
+seams are storage-agnostic by design.
 
 ## Durable plan and question workflow
 
