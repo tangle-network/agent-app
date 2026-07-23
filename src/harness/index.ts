@@ -33,6 +33,7 @@ import {
 export const KNOWN_HARNESSES = [
   'opencode',
   'claude-code',
+  'nanoclaw',
   'kimi-code',
   'codex',
   'amp',

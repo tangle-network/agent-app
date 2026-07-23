@@ -30,6 +30,9 @@ importers:
       '@tangle-network/agent-knowledge':
         specifier: ^1.7.0
         version: 1.7.0(@tangle-network/sandbox@0.10.5(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)
+      '@tangle-network/agent-profile-materialize':
+        specifier: ^0.6.0
+        version: 0.6.0
       '@tangle-network/agent-runtime':
         specifier: ^0.79.3
         version: 0.79.3(@tangle-network/agent-eval@0.100.0(typescript@5.9.3))(@tangle-network/agent-interface@0.15.0)(@tangle-network/sandbox@0.10.5(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))
@@ -1336,10 +1339,16 @@ packages:
   '@tangle-network/agent-interface@0.27.0':
     resolution: {integrity: sha512-4W7CQGQw56TMRpCvlFLHL/c86lOxsg+D6GtcYFlMwp9Ab8Zhtyt3P/XDM/bsQstj68AubQeHpAT5LixFjpeE6g==}
 
+  '@tangle-network/agent-interface@0.31.0':
+    resolution: {integrity: sha512-OvP8OebhbFd4d/Mxt1QDPAckJdBIA9omxoXU17dBbyEwhZKsiM6rbuOPaPDcv0Sf4koNLI25CfOYuzqlDR6ypQ==}
+
   '@tangle-network/agent-knowledge@1.7.0':
     resolution: {integrity: sha512-F+a21T2UMW7HVj1Dt6Sv5GqjEQXWUshsVftRpStW1t0bVG0/1aT6DeHYKok1lLmi+D8WZnC0CNXPdb+LyxC/iA==}
     engines: {node: '>=20'}
     hasBin: true
+
+  '@tangle-network/agent-profile-materialize@0.6.0':
+    resolution: {integrity: sha512-OCzibIl9N3jAGSQyTu2/cfDs6TSLV2uMT6KXYizKtuf093s5aTQBEAoGZDLrcKcgcWY3M7LL4Gdzm58OvaC9Aw==}
 
   '@tangle-network/agent-runtime@0.44.0':
     resolution: {integrity: sha512-uMzWcziIV+SsgvdvvnnSobaFYZuYXQ3KRfvq9h9kHglVLtPoUGH78ypCnyn5QQIccTk4gjSenAHC5Iy076DkQg==}
@@ -4248,6 +4257,11 @@ snapshots:
       '@noble/hashes': 1.8.0
       zod: 4.4.3
 
+  '@tangle-network/agent-interface@0.31.0':
+    dependencies:
+      '@noble/hashes': 1.8.0
+      zod: 4.4.3
+
   '@tangle-network/agent-knowledge@1.7.0(@tangle-network/sandbox@0.10.5(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)':
     dependencies:
       '@tangle-network/agent-eval': 0.79.0(@tangle-network/sandbox@0.10.5(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)
@@ -4262,6 +4276,10 @@ snapshots:
       - openai
       - typescript
       - utf-8-validate
+
+  '@tangle-network/agent-profile-materialize@0.6.0':
+    dependencies:
+      '@tangle-network/agent-interface': 0.31.0
 
   '@tangle-network/agent-runtime@0.44.0(@tangle-network/agent-eval@0.79.0(@tangle-network/sandbox@0.10.5(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/agent-knowledge@1.7.0(@tangle-network/sandbox@0.10.5(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3))(@tangle-network/sandbox@0.10.5(viem@2.52.0(typescript@5.9.3)(zod@4.4.3)))':
     dependencies:

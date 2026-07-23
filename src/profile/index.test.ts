@@ -7,9 +7,12 @@ import type {
 import {
   assertSystemPromptWithinBudget,
   composeAgentProfile,
+  composeSkills,
   DEFAULT_MAX_SYSTEM_PROMPT_BYTES,
   largestPromptSections,
   makeEvolvableSection,
+  parseCorpusSkills,
+  skillRefs,
   stripComments,
   userSkillMounts,
   type ProfileChannels,
@@ -157,6 +160,75 @@ describe('composeAgentProfile — overlay (mcp / prompt / name)', () => {
     composeAgentProfile(BASE, { skills: CORPUS, userSkills: USER_SKILLS }, { name: 'x' })
     expect(must(BASE.resources).files?.length).toBe(baseFiles)
     expect(BASE.name).toBe('base-agent')
+  })
+})
+
+describe('composeAgentProfile — resources.skills channel', () => {
+  const SKILL_ENTRIES: SkillEntry[] = [
+    {
+      id: 'human-prose',
+      name: 'Human Prose',
+      description: 'free',
+      tier: 'free',
+      skillMd: '---\nid: human-prose\n---\n\nfree body\n',
+    },
+  ]
+
+  it('sets resources.skills from channels.skillRefs; resources.files stays identical to a call without it', () => {
+    const refs = skillRefs(SKILL_ENTRIES)
+    const withRefs = composeAgentProfile(BASE, { skillRefs: refs })
+    const without = composeAgentProfile(BASE, {})
+    expect(must(withRefs.resources).skills).toEqual(refs)
+    expect(must(withRefs.resources).files).toEqual(must(without.resources).files)
+  })
+
+  it('omits resources.skills entirely when no skillRefs are given (pruning)', () => {
+    const out = composeAgentProfile(BASE, {})
+    expect(Object.prototype.hasOwnProperty.call(out.resources ?? {}, 'skills')).toBe(false)
+  })
+
+  it('registryTier passthrough: a "paid" registryTier mounts the paid entry; default still mounts only free', () => {
+    const paidOnly = composeAgentProfile(BASE, { registry: REGISTRY, registryTier: 'paid' })
+    const paidPaths = must(paidOnly.resources).files?.map((m) => m.path) ?? []
+    expect(paidPaths).toContain('~/.claude/skills/efiling/SKILL.md')
+    expect(paidPaths).not.toContain('~/.claude/skills/human-prose/SKILL.md')
+
+    const defaultOut = composeAgentProfile(BASE, { registry: REGISTRY })
+    const defaultPaths = must(defaultOut.resources).files?.map((m) => m.path) ?? []
+    expect(defaultPaths).toContain('~/.claude/skills/human-prose/SKILL.md')
+    expect(defaultPaths).not.toContain('~/.claude/skills/efiling/SKILL.md')
+  })
+
+  it('end-to-end golden: composeSkills(mounted) refs and its rendered index section agree on ids', () => {
+    const skills = parseCorpusSkills([
+      {
+        id: 'icp-definition',
+        key: 'skills/icp-definition/SKILL.md',
+        content: '---\nname: ICP Definition\ndescription: Define the ideal customer profile.\n---\n\nBody.\n',
+      },
+      {
+        id: 'pricing-analysis',
+        key: 'skills/pricing-analysis/SKILL.md',
+        content: '---\nname: Pricing Analysis\ndescription: Analyze pricing tiers.\n---\n\nBody.\n',
+      },
+    ])
+    const composed = composeSkills({ skills, mode: 'mounted', skillDir: '.opencode/skills' })
+    const out = composeAgentProfile(BASE, { skillRefs: composed.refs })
+
+    // Mirrors how a product folds composeSkills' promptSection into its own
+    // base string before calling composeAgentProfile (assembleSystemPrompt-style
+    // concatenation: base + already-`\n\n`-prefixed section).
+    const finalPrompt = `${BASE.prompt?.systemPrompt}${composed.promptSection}`
+
+    const refIds = (must(out.resources).skills ?? [])
+      .map((r) => (r as { name: string }).name)
+      .sort()
+    const sectionIds = skills
+      .map((s) => s.id)
+      .filter((id) => finalPrompt.includes(`${id}/SKILL.md`))
+      .sort()
+    expect(sectionIds).toEqual(refIds)
+    expect(refIds).toEqual(['icp-definition', 'pricing-analysis'])
   })
 })
 

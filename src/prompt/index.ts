@@ -32,7 +32,8 @@
  * `@tangle-network/agent-app/skills` subpath loads the corpus and returns file
  * mounts (`AgentProfileFileMount[]`); the PRODUCT renders any `## Skills` text
  * section and folds it into `base` before calling this assembler. This module
- * never renders a skills heading.
+ * never renders a skills heading — `@tangle-network/agent-app/skills`'s
+ * `renderInlineSkills`/`renderSkillIndex` are the source of that section text.
  */
 
 /** Inputs to {@link assembleSystemPrompt}. */

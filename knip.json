@@ -10,6 +10,7 @@
     "src/knowledge/index.ts",
     "src/knowledge-loop/index.ts",
     "src/skills/index.ts",
+    "src/skills-placement/index.ts",
     "src/profile/index.ts",
     "src/prompt/index.ts",
     "src/model-resolution/index.ts",
@@ -51,5 +52,8 @@
     "create-agent-app/template-chat/**",
     "playground/**"
   ],
-  "ignoreBinaries": ["tsc"]
+  "ignoreBinaries": ["tsc"],
+  "ignoreDependencies": [
+    "@tangle-network/agent-profile-materialize"
+  ]
 }
