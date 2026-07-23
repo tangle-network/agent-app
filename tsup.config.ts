@@ -27,6 +27,7 @@ export default defineConfig({
     'chat-routes/index': 'src/chat-routes/index.ts',
     'crypto/index': 'src/crypto/index.ts',
     'stream/index': 'src/stream/index.ts',
+    'turn-stream/index': 'src/turn-stream/index.ts',
     'integrations/index': 'src/integrations/index.ts',
     'interactions/index': 'src/interactions/index.ts',
     'plans/index': 'src/plans/index.ts',
