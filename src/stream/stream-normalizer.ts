@@ -218,12 +218,22 @@ export function normalizePersistedPart(rawPart: JsonRecord): JsonRecord | null {
   return null
 }
 
+/** Stream/transcript part key for a promoted (path-bearing) attachment,
+ *  keyed on its storage path — re-emitting the same path folds into the same
+ *  segment instead of duplicating it. */
+export function attachmentPartKey(path: string): string {
+  return `attachment:${path}`
+}
+
 export function getPartKey(part: JsonRecord): string {
   const type = String(part.type ?? 'unknown')
   if (type === 'tool') {
     return `tool:${resolveToolId(part)}`
   }
   if (type === 'plan') return planPartKey(String(part.planId ?? ''))
+  if ((type === 'file' || type === 'image') && asString(part.path)) {
+    return attachmentPartKey(String(part.path))
+  }
 
   // Keyed by the part's OWN type so distinct kinds never merge into each
   // other. Untyped parts fall back to the text lane (legacy shape).
@@ -336,7 +346,80 @@ export function mergePersistedPart(existing: JsonRecord | undefined, incoming: J
   return incoming
 }
 
-export function finalizeAssistantParts(
+export const MISSING_TOOL_TERMINAL_ERROR = 'Tool did not report a terminal result before the assistant turn completed.'
+export const MISSING_TOOL_TERMINAL_REASON = 'missing-tool-terminal'
+
+/** Closes a tool part left `running` when a stream ended abnormally: settles
+ *  it as a terminal `error` and stamps `state.metadata.terminalized` so the
+ *  synthetic settlement is distinguishable from a real tool failure. Parts
+ *  that already settled (and non-tool parts) pass through untouched. */
+export function terminalizeDanglingToolPart(part: JsonRecord): JsonRecord {
+  if (String(part.type ?? '') !== 'tool') return part
+
+  const state = asRecord(part.state) ?? {}
+  if (String(state.status ?? part.status ?? '') !== 'running') return part
+
+  const metadata = asRecord(state.metadata) ?? {}
+  return {
+    ...part,
+    state: {
+      ...state,
+      status: 'error',
+      error: asString(state.error ?? part.error) ?? MISSING_TOOL_TERMINAL_ERROR,
+      metadata: {
+        ...metadata,
+        terminalized: true,
+        terminalReason: MISSING_TOOL_TERMINAL_REASON,
+      },
+    },
+  }
+}
+
+export function terminalizeDanglingToolParts(parts: JsonRecord[]): JsonRecord[] {
+  return parts.map(terminalizeDanglingToolPart)
+}
+
+/** Settles still-pending interaction parts at persist time. The broker
+ *  guarantees a resolved question either answered (run unblocked, no cancel
+ *  event) or cancelled/timed out (cancel event already updated the part), so
+ *  the success path finalizes remaining pendings as `answered` and the
+ *  failure/terminalize paths as `expired`. */
+export function finalizePendingInteractionParts(
+  parts: JsonRecord[],
+  outcome: Extract<ChatInteractionStatus, 'answered' | 'expired'>,
+): JsonRecord[] {
+  return parts.map((part) => {
+    if (String(part.type ?? '') !== 'interaction') return part
+    if (String(part.status ?? '') !== 'pending') return part
+    return { ...part, status: outcome }
+  })
+}
+
+/** Collapses text-part artifacts of unstable upstream segment identity: the
+ *  same text arriving under two keys (id-less delta stream, then an
+ *  id-bearing snapshot) folds into two segments, and interleaved empty
+ *  segments survive as blank parts. Consecutive identical text parts merge
+ *  into one; empty text parts drop when any non-empty text part exists. */
+export function collapseRedundantTextParts(parts: JsonRecord[]): JsonRecord[] {
+  const hasNonEmptyText = parts.some(
+    (part) => String(part.type ?? '') === 'text' && String(part.text ?? '').trim().length > 0,
+  )
+  const collapsed: JsonRecord[] = []
+  for (const part of parts) {
+    if (String(part.type ?? '') !== 'text') {
+      collapsed.push(part)
+      continue
+    }
+    const text = String(part.text ?? '')
+    if (hasNonEmptyText && text.trim().length === 0) continue
+    const previous = collapsed[collapsed.length - 1]
+    if (previous && String(previous.type ?? '') === 'text' && String(previous.text ?? '') === text) continue
+    collapsed.push(part)
+  }
+  return collapsed
+}
+
+function assembleAssistantParts(
   partOrder: string[],
   partMap: Map<string, JsonRecord>,
   finalText: string,
@@ -387,6 +470,49 @@ export function finalizeAssistantParts(
   return parts
     .filter((part) => String(part.type ?? '') !== 'text' || part === lastTextPart)
     .map((part) => (part === lastTextPart ? { ...part, text: finalText } : part))
+}
+
+export function finalizeAssistantParts(
+  partOrder: string[],
+  partMap: Map<string, JsonRecord>,
+  finalText: string,
+): JsonRecord[] {
+  // A stream that ended abnormally can leave tool parts `running` — never
+  // persist one; collapsing then removes the duplicate/blank text segments an
+  // unstable upstream segment identity produced.
+  return collapseRedundantTextParts(terminalizeDanglingToolParts(
+    assembleAssistantParts(partOrder, partMap, finalText),
+  ))
+}
+
+function partStatus(part: JsonRecord | undefined): string {
+  const state = asRecord(part?.state)
+  return String(state?.status ?? part?.status ?? '')
+}
+
+/** Finalizes, then folds each synthetic tool settlement back into `partMap`
+ *  and returns just those updates — the shape a streaming loop needs to emit
+ *  closing `message.part.updated` frames for tools the stream never settled. */
+export function terminalizeDanglingAssistantToolUpdates(
+  partOrder: string[],
+  partMap: Map<string, JsonRecord>,
+  finalText: string,
+): JsonRecord[] {
+  const finalizedParts = finalizeAssistantParts(partOrder, partMap, finalText)
+  const updates: JsonRecord[] = []
+
+  for (const part of finalizedParts) {
+    if (String(part.type ?? '') !== 'tool') continue
+
+    const key = getPartKey(part)
+    const existing = partMap.get(key)
+    if (partStatus(existing) !== 'running' || partStatus(part) === 'running') continue
+
+    partMap.set(key, mergePersistedPart(existing, part))
+    updates.push(part)
+  }
+
+  return updates
 }
 
 export function encodeEvent(encoder: TextEncoder, event: StreamEvent): Uint8Array {
