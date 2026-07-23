@@ -172,6 +172,11 @@
       "import": "./dist/stream/index.js",
       "default": "./dist/stream/index.js"
     },
+    "./turn-stream": {
+      "types": "./dist/turn-stream/index.d.ts",
+      "import": "./dist/turn-stream/index.js",
+      "default": "./dist/turn-stream/index.js"
+    },
     "./integrations": {
       "types": "./dist/integrations/index.d.ts",
       "import": "./dist/integrations/index.js",

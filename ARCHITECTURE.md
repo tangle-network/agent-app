@@ -54,7 +54,8 @@ agent→app side channel; `defineAppTool` registers product tools here)* ·
 *(per-turn streaming)* · `trace` → missions *(flow observability)* · `config` →
 knowledge/runtime · `knowledge-loop` → config · `profile` → skills · `run` →
 harness · `platform` → billing/runtime/web · `preset-cloudflare` →
-billing/crypto/knowledge/tools/web.
+billing/crypto/knowledge/tools/web · `turn-stream` → stream/chat-routes
+*(shared DO-backed turn replay/broadcast/lock; structural Cloudflare, server-only)*.
 
 ### L2 — Data / domain (depends on L1/L0; `drizzle-orm` peer)
 Persistence-backed domains. `design-canvas` → tools/web · `sequences` →
@@ -91,6 +92,7 @@ consumer of L0/L1 installs none of them): `konva`/`react-konva` → only
 | The whole assembled chat turn route (auth → persist → stream → interactions) | `chat-routes` — `createChatTurnRoutes` (peer `agent-runtime`). Product seams (`@experimental`, single-consumer/gtm #200: `turnLock` · `contextGate` · `beforeTurn` · `onRawEvent`; stable: `lifecycle` · `heartbeat`), plus `transformFinalText` (pre-persist redaction over the final-text scalar AND every persisted TEXT part) and `onTurnComplete(failed, failureReason)` run-failure surfacing |
 | `@`-file-mentions end to end | `chat-routes` — `createSandboxFileIndexRoute` (listing, answers `warming` for a cold box OR an unmaterialised root) · `parseFileMentions` (path/charset/count validation) · `fileMentionsToParts`/`buildMentionPromptBlock` (dispatch); `chat-store` — `ChatMentionPart` (persisted vocabulary); `web-react` — `useFileMentions` (picker) · `segmentMentionContent` (transcript pills) |
 | Recovering a turn lock whose holder died | `chat-routes` — `reconcileStaleTurnLock`, a policy over injected sandbox/session probes (no SDK); the probes stay in the product |
+| Durable turn replay + live-viewer fanout + the single-flight turn lock (production) | `turn-stream` — re-export `TurnStreamDO` from the worker entry, wire `createDurableObjectTurnEventStore` into `turnStore`, `createDurableTurnLock` into `turnLock`, `createTurnStreamUpgradeHandler` before the router |
 | Flow traces / waterfalls | `trace` |
 | Chat UI + run/observability components | `web-react` |
 | Agent asks a human mid-run (question/plan cards, answer route) | `interactions` (server + contract) + `web-react` (cards/hook) |
