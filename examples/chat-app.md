@@ -122,6 +122,9 @@ export async function handleChat(request: Request, env: Env, ctx: ExecutionConte
   if (url.pathname === '/api/chat' && request.method === 'POST') return routes.turn(request, ctx)
   const replay = url.pathname.match(/^\/api\/chat\/replay\/([^/]+)$/)
   if (replay) return routes.replay(request, { turnId: replay[1]! })
+  // Reconnect discovery: a client that dropped mid-turn asks which turn id is
+  // live for its thread, then replays it. Returns the running turn id or null.
+  if (url.pathname === '/api/chat/running' && request.method === 'GET') return routes.running(request)
   if (url.pathname === '/api/chat/upload') return upload(request)
   if (url.pathname === '/api/chat/interactions' && request.method === 'GET') return routes.interactions!.list(request)
   if (url.pathname === '/api/chat/interactions' && request.method === 'POST') return routes.interactions!.answer(request)
@@ -295,17 +298,33 @@ reload so a lost response cannot strand an already-dispatched execution.
 
 A complex product turn-orchestrator does more than stream: it holds a
 single-flight lock, keeps the client alive through long tool calls, gates on
-domain readiness, and books telemetry. `createChatTurnRoutes` exposes five
+domain readiness, and books telemetry. `createChatTurnRoutes` exposes six
 optional seams for exactly that — **omit any one and the route behaves exactly
 as above.** They compose with `authorize` / `produce` / `store` / `interactions`.
+
+**Stability** — two of the six are stable; the other four are `@experimental`:
+
+| Seam | Stability |
+| --- | --- |
+| `lifecycle` | **stable** — safe to depend on |
+| `heartbeat` | **stable** — safe to depend on |
+| `turnLock` | `@experimental` |
+| `contextGate` | `@experimental` |
+| `beforeTurn` | `@experimental` |
+| `onRawEvent` | `@experimental` |
+
+The `@experimental` seams are single-consumer today (proven by gtm, #200) and
+kept flat/top-level for back-compat; their shape may still change without a
+major bump. (The `authorize` result's `insertUserMessage` flag — used above for
+dispatched/synthetic follow-up turns — is `@experimental` for the same reason.)
 
 ```ts
 const routes = createChatTurnRoutes({
   projectId: 'acme-agent',
   authorize, store, turnStore, produce, // as above
 
-  // 1. Single-flight lock — acquired before any side effect, released once
-  //    when the turn settles (drain finish), on short-circuit, or on throw.
+  // 1. [@experimental] Single-flight lock — acquired before any side effect,
+  //    released once when the turn settles (drain finish), short-circuit, throw.
   turnLock: {
     acquire: async ({ identity, executionId }) => {
       const got = await acquireLock(identity.tenantId, identity.sessionId, executionId)
@@ -316,35 +335,35 @@ const routes = createChatTurnRoutes({
     release: (lockId) => releaseLock(lockId as string),
   },
 
-  // 2. Domain-readiness gate — short-circuit BEFORE the producer runs (the user
-  //    row is already persisted; return the assistant side of the turn).
+  // 2. [@experimental] Domain-readiness gate — short-circuit BEFORE the producer
+  //    runs (the user row is already persisted; return the assistant side).
   contextGate: async ({ identity, prompt }) => {
     const ready = await computeContextSufficiency(identity.tenantId)
     return ready.ok ? { proceed: true } : { proceed: false, response: cannedAskForContext(ready.missing) }
   },
 
-  // 3. Observe + augment the assembled input before the producer runs.
+  // 3. [@experimental] Observe + augment the assembled input before the producer runs.
   beforeTurn: async ({ prompt, priorMessages, identity }) => {
     const composed = await composeSystemPromptWithCertified(identity.tenantId)
     return { priorMessages: [systemMessage(composed), ...priorMessages] }
   },
 
-  // 4. Deterministic run telemetry — start, then exactly one of complete/error.
+  // 4. [stable] Deterministic run telemetry — start, then exactly one of complete/error.
   lifecycle: {
     onTurnStart: ({ identity, executionId }) => startRun(identity, executionId),
     onTurnComplete: ({ finalText, usage, durationMs }) => endRun({ pass: true, finalText, usage, durationMs }),
     onTurnError: ({ error, durationMs }) => endRun({ pass: false, error, durationMs }),
   },
 
-  // 5. Keepalive while the producer is quiet (provisioning, first-token wait).
-  //    Window resets on every real event; a chatty producer never triggers one.
+  // 5. [stable] Keepalive while the producer is quiet (provisioning, first-token
+  //    wait). Window resets on every real event; a chatty producer never fires one.
   heartbeat: {
     intervalMs: 5_000,
     event: ({ elapsedMs }) => ({ type: 'run-phase', data: { phase: 'working', heartbeat: true, elapsedMs } }),
   },
 
-  // Raw producer events for telemetry, before the engine frames them (distinct
-  // from `onEvent`, which sees the engine-framed stream incl. lifecycle).
+  // 6. [@experimental] Raw producer events for telemetry, before the engine frames
+  //    them (distinct from `onEvent`, which sees the engine-framed stream incl. lifecycle).
   onRawEvent: (event) => emitToTrace(event),
 })
 ```
