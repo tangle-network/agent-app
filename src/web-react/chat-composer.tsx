@@ -264,29 +264,25 @@ export function ChatComposer({
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [focusShortcut, disabled])
 
-  const readyParts = pendingFiles
-    .filter((f) => f.status === 'ready' && f.part)
-    .map((f) => f.part as ComposerFilePart)
-
-  // Parts-aware sends allow a file-only message (empty text, ≥1 ready part).
-  const hasSendable = onSendParts
-    ? text.trim().length > 0 || readyParts.length > 0
-    : text.trim().length > 0
+  // A ready file counts as sendable content even without a `part`: store-backed
+  // attachments (`useComposerAttachments`) carry no prompt part — their
+  // references ride the turn body's `attachments` field — but a file-only
+  // message must still be sendable.
+  const readyFileCount = pendingFiles.filter((f) => f.status === 'ready').length
+  const hasSendable = text.trim().length > 0 || readyFileCount > 0
   const canSend = hasSendable && !isStreaming && !disabled
 
   const send = useCallback(() => {
     const trimmed = text.trim()
     if (isStreaming || disabled) return
+    const readyFiles = pendingFiles.filter((f) => f.status === 'ready')
+    if (!trimmed && readyFiles.length === 0) return
     if (onSendParts) {
-      const parts = pendingFiles
-        .filter((f) => f.status === 'ready' && f.part)
-        .map((f) => f.part as ComposerFilePart)
-      if (!trimmed && parts.length === 0) return
+      const parts = readyFiles.filter((f) => f.part).map((f) => f.part as ComposerFilePart)
       onSendParts(trimmed, parts)
       setText('')
       return
     }
-    if (!trimmed) return
     onSend?.(trimmed)
     setText('')
   }, [text, isStreaming, disabled, onSend, onSendParts, pendingFiles, setText])

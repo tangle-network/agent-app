@@ -31,8 +31,13 @@ function fakeFetchFile() {
   return { fetchFile, calls }
 }
 
+/** Structural Response stub: Node's undici `Response` rejects a jsdom `Blob`
+ *  body on CI ("object.stream is not a function"), and `loadAttachmentFile`
+ *  only reads `ok`/`status`/`blob()`. */
 function blobResponse(body: BlobPart[], init?: ResponseInit): Response {
-  return new Response(new Blob(body), init)
+  const status = init?.status ?? 200
+  const blob = new Blob(body)
+  return { ok: status >= 200 && status < 300, status, blob: async () => blob } as unknown as Response
 }
 
 beforeEach(() => {
