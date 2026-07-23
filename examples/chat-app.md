@@ -225,6 +225,80 @@ vault of its own; fleet apps that already have one (gtm's KV vault) inject
 their own `ReadAttachmentFn`/`WriteAttachmentFn` instead of this module — the
 seams are storage-agnostic by design.
 
+## Attachment upload + composer + transcript (#234)
+
+#224 above is the store-backed attachment vertical's read/dispatch half; this
+is the other half — the upload route, the composer's staged-upload hook, and
+the transcript renderer — so a fleet app no longer hand-rolls its own vault
+upload route to get there.
+
+### Server: hardened durable-store upload route
+
+```ts
+import { createAttachmentUploadRoute } from '@tangle-network/agent-app/chat-routes'
+
+const uploadAttachment = createAttachmentUploadRoute({
+  authorize: async ({ request }) => {
+    const auth = await authorize({ request }) // same seam as the turn route: auth + rate-limit + scope
+    if (!auth.ok) return auth
+    return { ok: true as const, scopeId: auth.tenantId }
+  },
+  writeAttachment, // the same #224 writeAttachment defined above
+})
+```
+
+`authorize` owns auth, rate limiting (a 429 rides `{ok:false, response}`
+exactly like a 401), and the store scope — never a query param. A raw-bytes
+download route reads back through the matching `readAttachment`:
+
+```ts
+async function downloadAttachment(request: Request, scopeId: string) {
+  const path = new URL(request.url).searchParams.get('path') ?? ''
+  const attachment = await readAttachment(scopeId, path)
+  if (!attachment.ok) return new Response('Not found', { status: 404 })
+  return new Response(attachment.bytes, { headers: { 'content-type': attachment.mediaType } })
+}
+```
+
+### Client: staged-upload composer hook
+
+```tsx
+import { ChatComposer, useComposerAttachments } from '@tangle-network/agent-app/web-react'
+
+const attachments = useComposerAttachments({
+  uploadUrl: '/api/chat/attachments',
+  onReject: (reason) => toast(reason),
+})
+
+<ChatComposer
+  pendingFiles={attachments.composerFiles}
+  onAttach={(files) => attachments.addFiles(files)}
+  onSend={(text) => streamChatTurn({
+    start: () => fetch('/api/chat', chatTurnRequestInit({ threadId, content: text, attachments: attachments.references })),
+    resume: (turnId, fromSeq) => fetch(`/api/chat/replay/${turnId}?fromSeq=${fromSeq}`),
+    callbacks: { onText: appendDelta },
+  })}
+/>
+```
+
+`references` is the server's pass-through `ChatAttachmentInput[]` — it rides
+straight onto the turn body's `attachments` field with no client-side recompute
+of size or mime; the server already derived both from the sniffed bytes.
+
+### Transcript: raw-bytes attachment renderer
+
+```tsx
+<ChatMessages
+  messages={messages}
+  resolveAttachmentUrl={(part) => `/api/chat/attachments/file?path=${encodeURIComponent(part.path)}`}
+  ...
+/>
+```
+
+`resolveAttachmentUrl` is additive — omit it and `ChatMessages` renders exactly
+as before. `MessageAttachments` is also exported standalone for a transcript
+that renders attachments outside `ChatMessages`.
+
 ## Durable plan and question workflow
 
 Apps that need decisions and accepted answers to survive reloads bind one

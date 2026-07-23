@@ -16,9 +16,10 @@
  * behavior-identical for gtm-agent#618 adoption.
  */
 
-import { formatBytes, type ChatAttachmentInput, type ChatAttachmentKind } from './wire'
+import type { ChatAttachmentInput, ChatAttachmentKind } from './wire'
 import { attachmentInputToPart, type ChatAttachmentPart } from '../chat-store/parts'
 import type { ReadAttachmentFn } from './attachment-store'
+import { ATTACHMENT_MAX_COUNT, MAX_ATTACHMENT_TOTAL_BYTES, attachmentTotalSizeErrorMessage } from './attachment-validation'
 
 export type ResolveChatAttachmentsResult =
   | { succeeded: true; value: ChatAttachmentPart[] }
@@ -30,24 +31,9 @@ export type AttachmentPathCheck =
   | { succeeded: true }
   | { succeeded: false; error: string }
 
-/** Most files a single request may carry. */
-export const ATTACHMENT_MAX_COUNT = 10
-
-/** Aggregate raw-byte ceiling across one message's attachments. */
-export const MAX_ATTACHMENT_TOTAL_BYTES = 25 * 1024 * 1024
-
 /** Longest attachment display name accepted — bounds what gets echoed into the
  *  prompt block and rendered as a chip label. */
 const MAX_ATTACHMENT_NAME_LENGTH = 256
-
-/** Human-readable error for a message whose combined attachments exceed the
- *  aggregate raw-byte ceiling. Ported to match gtm's `attachmentTotalSizeErrorMessage`
- *  (attachment-limits.ts:93-95) verbatim, via the shared {@link formatBytes} —
- *  e.g. "Attachments total 25MB; each message is limited to 25MB", not raw
- *  byte counts. */
-export function attachmentTotalSizeErrorMessage(totalBytes: number, limitBytes: number): string {
-  return `Attachments total ${formatBytes(totalBytes)}; each message is limited to ${formatBytes(limitBytes)}`
-}
 
 function isAttachmentKind(value: unknown): value is ChatAttachmentKind {
   return value === 'image' || value === 'file'

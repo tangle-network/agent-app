@@ -21,6 +21,8 @@ import { useSmoothText } from './smooth-text'
 import { ChevronDown, POPOVER_OPTION_FOCUS, usePending } from './controls'
 import { BrandMark } from './brand-mark'
 import { DurableChatCards, type DurableChatCardsProps } from './durable-chat-cards'
+import { attachmentPartsFromMessageParts, type ChatAttachmentPart } from './chat-attachments'
+import { MessageAttachments } from './message-attachments'
 
 export * from './chat-stream'
 export * from './chat-interactions'
@@ -36,6 +38,8 @@ export * from './use-chat-interactions'
 export * from './use-file-mentions'
 export * from './chat-mentions'
 export * from './chat-attachments'
+export * from './message-attachments'
+export * from './use-composer-attachments'
 export * from './provider-logo'
 export * from './smooth-text'
 export * from './mission-activity'
@@ -259,6 +263,12 @@ export interface ChatMessagesProps {
    *  preserve the current layout; pass `{ title }` (or your own node via
    *  `header`) to show the Tangle mark + product title in the chat shell. */
   header?: ReactNode
+  /** Resolve a raw-bytes download URL for one attachment part. When set, any
+   *  message carrying attachment parts (`file`/`image` parts with a `path`,
+   *  see `attachmentPartsFromMessageParts`) renders them as a `MessageAttachments`
+   *  row next to the bubble — thumbnails for images, download chips for files.
+   *  Absent → today's rendering, byte-identical (no attachment row). */
+  resolveAttachmentUrl?: (part: ChatAttachmentPart) => string
 }
 
 /** One starting "door" in the chat first-run state — a concrete, labeled action
@@ -941,6 +951,7 @@ function AssistantMessageImpl({
   toolRenderers,
   renderExtras,
   durableCards,
+  resolveAttachmentUrl,
 }: {
   msg: ChatUiMessage
   streaming: boolean
@@ -952,6 +963,7 @@ function AssistantMessageImpl({
   toolRenderers?: ToolDetailRenderers
   renderExtras?: (message: ChatUiMessage) => ReactNode
   durableCards?: Omit<DurableChatCardsProps, 'parts' | 'renderMarkdown'>
+  resolveAttachmentUrl?: (part: ChatAttachmentPart) => string
 }) {
   // Smooth reveal: chunky network slabs (model bursts, flush windows, replay
   // polls) paint as a continuous typewriter. Reasoning often arrives as one
@@ -1067,6 +1079,15 @@ function AssistantMessageImpl({
         />
       )}
       {renderExtras?.(msg)}
+      {resolveAttachmentUrl && attachmentPartsFromMessageParts(msg.parts).length > 0 && (
+        <div className="mt-2">
+          <MessageAttachments
+            parts={attachmentPartsFromMessageParts(msg.parts)}
+            resolveFileUrl={resolveAttachmentUrl}
+            justify="start"
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -1160,6 +1181,7 @@ export function ChatMessages({
   renderEmpty,
   emptyState,
   header,
+  resolveAttachmentUrl,
 }: ChatMessagesProps) {
   // Stabilize the fallback renderer's identity so it doesn't change every
   // render — otherwise the memoized `AssistantMessage` (and its per-frame body
@@ -1194,6 +1216,15 @@ export function ChatMessages({
               <div className="rounded-2xl rounded-tr-md bg-primary/10 px-4 py-2.5 text-base leading-relaxed">
                 <p className="whitespace-pre-wrap">{msg.content}</p>
               </div>
+              {resolveAttachmentUrl && attachmentPartsFromMessageParts(msg.parts).length > 0 && (
+                <div className="mt-1.5">
+                  <MessageAttachments
+                    parts={attachmentPartsFromMessageParts(msg.parts)}
+                    resolveFileUrl={resolveAttachmentUrl}
+                    justify="end"
+                  />
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -1209,6 +1240,7 @@ export function ChatMessages({
             toolRenderers={toolRenderers}
             renderExtras={renderExtras}
             durableCards={durableCards}
+            resolveAttachmentUrl={resolveAttachmentUrl}
           />
         ),
       )}

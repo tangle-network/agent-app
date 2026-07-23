@@ -13,13 +13,16 @@
  * The sink is structural (no sandbox-SDK import); products pass `box.fs`.
  *
  * @remarks Sole consumer today is the `--chat` scaffold (`create-agent-app
- * --chat` → `template-chat/src/chat.ts`), the reference multimodal path. The
- * fleet apps (gtm/tax/legal/insurance) each keep their OWN upload route into a
- * durable vault (KV, or AES-GCM-encrypted R2) — a different persistence model
- * from this route's inline-`data:`-or-ephemeral-sandbox-workspace split, so
- * they don't (and shouldn't) route through it. This stays the scaffold's proven
- * upload pattern, not a fleet primitive; keep that distinction in mind before
- * widening its surface.
+ * --chat` → `template-chat/src/chat.ts`), the reference multimodal path — its
+ * inline-`data:`-or-ephemeral-sandbox-workspace split stays the scaffold's
+ * proven upload pattern, not a fleet primitive; keep that distinction in mind
+ * before widening its surface. Fleet apps with a durable store of their own
+ * (KV, or AES-GCM-encrypted R2) no longer need to hand-roll a vault upload
+ * route: `createAttachmentUploadRoute` (`./attachment-upload`, agent-app#234)
+ * is the shared hardened path for that persistence model — a content-sniffed
+ * type gate, two-phase atomic batch writes, and per-kind/aggregate size caps,
+ * all seamed through an injected `WriteAttachmentFn`. Point readers there
+ * instead of widening this route to cover both models.
  */
 
 import type { ChatTurnFilePartInput } from './wire'
