@@ -142,6 +142,48 @@ describe('ChatComposer', () => {
     expect(onSendParts).toHaveBeenCalledExactlyOnceWith('', [part])
   })
 
+  it('allows an attachments-only send for ready files without a part (store-backed references)', () => {
+    const onSendParts = vi.fn()
+    render(
+      <ChatComposer
+        onSendParts={onSendParts}
+        onAttach={vi.fn()}
+        pendingFiles={[{ id: 'f1', name: 'doc.pdf', kind: 'file', status: 'ready' }]}
+      />,
+    )
+    const send = screen.getByLabelText('Send') as HTMLButtonElement
+    expect(send.disabled).toBe(false)
+    fireEvent.click(send)
+    // No prompt part travels — the reference rides the turn body's `attachments`.
+    expect(onSendParts).toHaveBeenCalledExactlyOnceWith('', [])
+  })
+
+  it('allows an attachments-only send through plain onSend when a ready file is staged', () => {
+    const onSend = vi.fn()
+    render(
+      <ChatComposer
+        onSend={onSend}
+        onAttach={vi.fn()}
+        pendingFiles={[{ id: 'f1', name: 'doc.pdf', kind: 'file', status: 'ready' }]}
+      />,
+    )
+    const send = screen.getByLabelText('Send') as HTMLButtonElement
+    expect(send.disabled).toBe(false)
+    fireEvent.click(send)
+    expect(onSend).toHaveBeenCalledExactlyOnceWith('')
+  })
+
+  it('keeps Send disabled while a staged file is still uploading and no text is typed', () => {
+    render(
+      <ChatComposer
+        onSendParts={vi.fn()}
+        onAttach={vi.fn()}
+        pendingFiles={[{ id: 'f1', name: 'doc.pdf', kind: 'file', status: 'uploading' }]}
+      />,
+    )
+    expect((screen.getByLabelText('Send') as HTMLButtonElement).disabled).toBe(true)
+  })
+
   it('onSendParts takes precedence over onSend, and onSend keeps working alone', () => {
     const onSend = vi.fn()
     const onSendParts = vi.fn()

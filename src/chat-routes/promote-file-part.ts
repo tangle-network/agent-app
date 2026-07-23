@@ -26,6 +26,7 @@ import {
 } from '../sandbox/binary-read'
 import { attachmentKindForMime, type ChatAttachmentKind, type ChatAttachmentPart } from '../chat-store/parts'
 import type { WriteAttachmentFn } from './attachment-store'
+import { sanitizeAttachmentFileName } from './attachment-validation'
 import { formatBytes } from './wire'
 
 /** Default ceiling on a promoted file's raw (pre-encoding) byte size. */
@@ -107,20 +108,6 @@ export function sniffMimeFromName(filename: string): string {
   const ext = filename.split('.').pop()?.toLowerCase()
   if (!ext) return 'text/plain'
   return EXT_TO_MIME[ext] ?? 'text/plain'
-}
-
-/**
- * Rewrite a filename into a store-path-safe charset (`A-Za-z0-9._-`). Runs of
- * unsupported characters collapse to one `-`; leading dots/dashes are stripped
- * so the name can't read as a hidden segment. The original name is preserved on
- * the returned part, so sanitization loses nothing.
- */
-function sanitizeAttachmentFileName(name: string): string {
-  const sanitized = name
-    .trim()
-    .replace(/[^A-Za-z0-9._-]+/g, '-')
-    .replace(/^[.-]+/, '')
-  return sanitized || 'file'
 }
 
 /** Decode base64 with `atob` (not `Buffer.from`, which SKIPS out-of-alphabet

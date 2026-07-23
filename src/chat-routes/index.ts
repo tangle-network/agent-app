@@ -8,6 +8,8 @@
  */
 
 export * from './wire'
+export * from './binary-sniff'
+export * from './attachment-validation'
 export * from './turn-routes'
 export * from './stale-turn-lock'
 export * from './sandbox-producer'
@@ -16,5 +18,6 @@ export * from './upload'
 export * from './file-index'
 export * from './attachment-store'
 export * from './resolve-attachments'
+export * from './attachment-upload'
 export * from './dispatch-parts'
 export * from './promote-file-part'

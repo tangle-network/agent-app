@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
+import { resolveChatAttachments } from '../../src/chat-routes/resolve-attachments'
 import {
-  resolveChatAttachments,
   ATTACHMENT_MAX_COUNT,
   attachmentTotalSizeErrorMessage,
   MAX_ATTACHMENT_TOTAL_BYTES,
-} from '../../src/chat-routes/resolve-attachments'
+} from '../../src/chat-routes/attachment-validation'
 import type { AttachmentReadResult, ReadAttachmentFn } from '../../src/chat-routes/attachment-store'
 
 // gtm's `resolve-attachments.test.ts` mocked the vault module and fed
