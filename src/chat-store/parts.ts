@@ -417,12 +417,12 @@ export function attachmentKindForMime(mime?: string): ChatAttachmentKind {
   return mime?.startsWith('image/') ? 'image' : 'file'
 }
 
-/** Stream/transcript part key for an attachment, keyed on its store path — a
- *  promoted attachment is idempotent per path, so re-emitting the same path
- *  folds into the same segment instead of duplicating it. */
-export function attachmentPartKey(path: string): string {
-  return `attachment:${path}`
-}
+/** Stream/transcript part key for an attachment — ONE declaration, owned by
+ *  `/stream`'s normalizer (whose `getPartKey` routes path-bearing file/image
+ *  parts through it). Re-exported here (not redefined) so the root barrel's
+ *  star-exports of both modules resolve to the same symbol instead of
+ *  colliding (TS2308 in the dts build). */
+export { attachmentPartKey } from '../stream/stream-normalizer'
 
 /**
  * Persisted attachment part: structurally an attachment-flavored `ChatFilePart`
