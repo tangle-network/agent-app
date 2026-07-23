@@ -67,6 +67,24 @@ describe('createSandboxChatProducer', () => {
     expect(parts[0]).toMatchObject({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'completed', output: '3 hits' } })
   })
 
+  it('terminalizes a tool left running when the stream ends abnormally', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([
+        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'running', input: { q: 'x' } } }),
+        // Stream ends here — no tool_result, no result event.
+      ]),
+    })
+    await drain(producer.stream)
+
+    const parts = producer.assistantParts?.() ?? []
+    expect(parts[0]).toMatchObject({
+      type: 'tool',
+      id: 'call-1',
+      state: { status: 'error', metadata: { terminalized: true } },
+    })
+    expect(parts.some((p) => (p.state as Record<string, unknown> | undefined)?.status === 'running')).toBe(false)
+  })
+
   it('accumulates the usage receipt from step-finish parts and emits a usage line', async () => {
     const producer = createSandboxChatProducer({
       events: feed([

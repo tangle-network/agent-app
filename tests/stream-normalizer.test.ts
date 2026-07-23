@@ -1,9 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import {
+  attachmentPartKey,
+  collapseRedundantTextParts,
   finalizeAssistantParts,
+  finalizePendingInteractionParts,
   getPartKey,
+  MISSING_TOOL_TERMINAL_ERROR,
+  MISSING_TOOL_TERMINAL_REASON,
   mergePersistedPart,
   normalizePersistedPart,
+  terminalizeDanglingAssistantToolUpdates,
+  terminalizeDanglingToolPart,
+  terminalizeDanglingToolParts,
   type JsonRecord,
 } from '../src/stream/stream-normalizer'
 
@@ -325,5 +333,145 @@ describe('finalizeAssistantParts', () => {
       ['reasoning', 'r2'],
       ['text', 't1'],
     ])
+  })
+})
+
+describe('terminalizeDanglingToolParts', () => {
+  it('settles a running tool part as a terminal error with terminalized metadata', () => {
+    const terminalized = terminalizeDanglingToolPart({
+      type: 'tool',
+      id: 'call_1',
+      tool: 'search',
+      state: { status: 'running', input: { q: 'x' }, metadata: { origin: 'agent' } },
+    })
+    expect(terminalized.state).toEqual({
+      status: 'error',
+      input: { q: 'x' },
+      error: MISSING_TOOL_TERMINAL_ERROR,
+      metadata: { origin: 'agent', terminalized: true, terminalReason: MISSING_TOOL_TERMINAL_REASON },
+    })
+  })
+
+  it('preserves an already-captured error message', () => {
+    const terminalized = terminalizeDanglingToolPart({
+      type: 'tool',
+      id: 'call_1',
+      tool: 'search',
+      state: { status: 'running', error: 'network reset' },
+    })
+    expect((terminalized.state as JsonRecord).error).toBe('network reset')
+    expect((terminalized.state as JsonRecord).status).toBe('error')
+  })
+
+  it('passes settled tool parts and non-tool parts through untouched', () => {
+    const completed = { type: 'tool', id: 'call_1', tool: 'search', state: { status: 'completed', output: 'ok' } }
+    const errored = { type: 'tool', id: 'call_2', tool: 'search', state: { status: 'error', error: 'boom' } }
+    const text = { type: 'text', text: 'hello' }
+    expect(terminalizeDanglingToolParts([completed, errored, text])).toEqual([completed, errored, text])
+  })
+
+  it('finalizeAssistantParts leaves no running tool part after an abnormal stream end', () => {
+    const { order, map } = buildParts([
+      { type: 'text', id: 't1', text: 'working on it' },
+      { type: 'tool', id: 'call_1', tool: 'search', state: { status: 'running', input: { q: 'x' } } },
+    ])
+    const finalized = finalizeAssistantParts(order, map, 'working on it')
+    const tool = finalized.find((part) => part.type === 'tool')
+    expect((tool?.state as JsonRecord).status).toBe('error')
+    expect((tool?.state as JsonRecord).error).toBe(MISSING_TOOL_TERMINAL_ERROR)
+    expect(
+      finalized.some((part) => part.type === 'tool' && (part.state as JsonRecord)?.status === 'running'),
+    ).toBe(false)
+  })
+})
+
+describe('terminalizeDanglingAssistantToolUpdates', () => {
+  it('returns only the dangling settlements and folds them back into the map', () => {
+    const { order, map } = buildParts([
+      { type: 'tool', id: 'call_1', tool: 'read', state: { status: 'running', input: { path: 'a.md' } } },
+      { type: 'tool', id: 'call_1', tool: 'read', state: { status: 'completed', output: 'one' } },
+      { type: 'tool', id: 'call_2', tool: 'read', state: { status: 'running', input: { path: 'b.md' } } },
+    ])
+
+    const updates = terminalizeDanglingAssistantToolUpdates(order, map, 'final text')
+
+    expect(updates).toHaveLength(1)
+    expect(updates[0]?.id).toBe('call_2')
+    expect((updates[0]?.state as JsonRecord).status).toBe('error')
+
+    expect((map.get('tool:call_1')?.state as JsonRecord).status).toBe('completed')
+    expect((map.get('tool:call_2')?.state as JsonRecord).status).toBe('error')
+  })
+
+  it('returns nothing when every tool settled', () => {
+    const { order, map } = buildParts([
+      { type: 'tool', id: 'call_1', tool: 'read', state: { status: 'completed', output: 'one' } },
+    ])
+    expect(terminalizeDanglingAssistantToolUpdates(order, map, 'done')).toEqual([])
+  })
+})
+
+describe('collapseRedundantTextParts', () => {
+  it('folds consecutive identical text parts into one', () => {
+    const collapsed = collapseRedundantTextParts([
+      { type: 'text', text: 'answer' },
+      { type: 'text', id: 't1', text: 'answer' },
+      { type: 'tool', id: 'call_1', tool: 'search', state: { status: 'completed' } },
+    ])
+    expect(collapsed).toEqual([
+      { type: 'text', text: 'answer' },
+      { type: 'tool', id: 'call_1', tool: 'search', state: { status: 'completed' } },
+    ])
+  })
+
+  it('drops empty text parts only when a non-empty text part exists', () => {
+    expect(
+      collapseRedundantTextParts([
+        { type: 'text', text: '' },
+        { type: 'text', text: 'real' },
+      ]),
+    ).toEqual([{ type: 'text', text: 'real' }])
+
+    // All-empty text survives (nothing better to show).
+    expect(collapseRedundantTextParts([{ type: 'text', text: '' }])).toEqual([{ type: 'text', text: '' }])
+  })
+})
+
+describe('finalizePendingInteractionParts', () => {
+  const PENDING = { type: 'interaction', id: 'int-1', kind: 'question', status: 'pending' }
+
+  it('settles only pending interaction parts with the given outcome', () => {
+    const parts = [
+      { ...PENDING },
+      { ...PENDING, id: 'int-2', status: 'expired' },
+      { type: 'text', text: 'hi' },
+    ]
+    const answered = finalizePendingInteractionParts(parts, 'answered')
+    expect(answered[0]?.status).toBe('answered')
+    expect(answered[1]?.status).toBe('expired')
+    expect(answered[2]).toEqual({ type: 'text', text: 'hi' })
+
+    const expired = finalizePendingInteractionParts([{ ...PENDING }], 'expired')
+    expect(expired[0]?.status).toBe('expired')
+  })
+})
+
+describe('attachment part keys', () => {
+  it('keys path-bearing file/image parts by their storage path', () => {
+    expect(getPartKey({ type: 'image', path: 'assets/agent/shot.png' })).toBe('attachment:assets/agent/shot.png')
+    expect(getPartKey({ type: 'file', path: 'uploads/agent/note.txt' })).toBe(attachmentPartKey('uploads/agent/note.txt'))
+  })
+
+  it('folds re-emissions of the same path into one part', () => {
+    const { order, map } = buildParts([
+      { type: 'image', path: 'assets/shot.png', name: 'shot.png' },
+      { type: 'image', path: 'assets/shot.png', name: 'shot.png', mediaType: 'image/png' },
+    ])
+    expect(order).toEqual(['attachment:assets/shot.png'])
+    expect(map.get('attachment:assets/shot.png')).toMatchObject({ mediaType: 'image/png' })
+  })
+
+  it('keeps the legacy lane key for path-less file/image parts', () => {
+    expect(getPartKey({ type: 'file', id: 'f1', url: 'https://example.com/a.pdf' })).toBe('file:f1')
   })
 })

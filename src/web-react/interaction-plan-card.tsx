@@ -19,6 +19,7 @@ import {
   fieldAnswer,
   interactionStatusLabels,
   interactionTerminalNotes,
+  isLateAnswerableStatus,
   type FieldValues,
   type SubmitInteractionAnswer,
 } from './interaction-card-support'
@@ -50,6 +51,15 @@ export interface InteractionPlanCardProps {
   /** Fired when this card resolves locally (approved/rejected, or discovered
    *  expired via a 410) so the stream/route state stays in sync. */
   onResolved?: (id: string, status: Exclude<ChatInteractionStatus, 'pending'>) => void
+  /** Fired when the user asks the agent to re-submit an expired/withdrawn plan
+   *  as a new chat turn. Receives the interaction so a callback shared across
+   *  cards (e.g. via DurableChatCards) knows which plan fired. Return/resolve
+   *  `false` (or throw) to report the send failed and keep the affordance
+   *  retryable. Omit to hide it entirely. */
+  onReRequest?: (interaction: ChatInteraction) => boolean | void | Promise<boolean | void>
+  /** Overrides the default re-request button label
+   *  ("Ask agent to re-submit the plan" — gtm's exact current copy). */
+  reRequestLabel?: string
   /** Renders the plan body (markdown). Falls back to pre-wrapped plain text. */
   renderMarkdown?: (markdown: string) => ReactNode
   className?: string
@@ -65,6 +75,8 @@ const TERMINAL_NOTES = interactionTerminalNotes('plan', {
   declined: 'The agent was asked to revise the plan.',
 })
 
+const DEFAULT_RE_REQUEST_LABEL = 'Ask agent to re-submit the plan'
+
 /** Body height (px) beyond which the plan collapses behind a "Show full plan"
  *  control so a long plan doesn't dominate the transcript. */
 const COLLAPSED_MAX_HEIGHT = 320
@@ -74,21 +86,26 @@ export function InteractionPlanCard({
   canWrite,
   submitAnswer,
   onResolved,
+  onReRequest,
+  reRequestLabel,
   renderMarkdown,
   className,
 }: InteractionPlanCardProps) {
   const [values, setValues] = useState<FieldValues>({})
   const [expanded, setExpanded] = useState(false)
-  const [submitting, setSubmitting] = useState<'approve' | 'reject' | null>(null)
+  const [submitting, setSubmitting] = useState<'approve' | 'reject' | 'requesting' | null>(null)
   // Terminal state this card learned locally (resolved / 410) before the
   // stream part catches up. A terminal stream status always wins.
   const [localStatus, setLocalStatus] = useState<Exclude<ChatInteractionStatus, 'pending'> | null>(null)
+  const [reRequested, setReRequested] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const submitInFlightRef = useRef(false)
 
   const status: ChatInteractionStatus = isTerminalInteractionStatus(interaction.status)
     ? interaction.status
     : localStatus ?? interaction.status
+  const reRequestable = isLateAnswerableStatus(status) && onReRequest !== undefined
+  const canReRequest = canWrite && reRequestable && !reRequested
   const disabled = !canWrite || status !== 'pending' || submitting !== null
 
   // Approve sends whatever the producer's answerSpec requires; an empty or
@@ -130,6 +147,27 @@ export function InteractionPlanCard({
       submitInFlightRef.current = false
       setSubmitting(null)
     }
+  }
+
+  async function requestReSubmission() {
+    if (submitInFlightRef.current || !canReRequest || !onReRequest) return
+    submitInFlightRef.current = true
+    setSubmitting('requesting')
+    setError(null)
+    let accepted: boolean | void
+    try {
+      accepted = await onReRequest(interaction)
+    } catch {
+      accepted = false
+    } finally {
+      submitInFlightRef.current = false
+      setSubmitting(null)
+    }
+    if (accepted === false) {
+      setError('The re-request was not sent. Try again.')
+      return
+    }
+    setReRequested(true)
   }
 
   const terminalNote = TERMINAL_NOTES[status]
@@ -209,6 +247,19 @@ export function InteractionPlanCard({
 
       {error && <p className="mt-3 text-xs text-destructive">{error}</p>}
       {terminalNote && <p className="mt-3 text-xs text-muted-foreground">{terminalNote}</p>}
+
+      {canReRequest && (
+        <div className="mt-4 flex items-center justify-end">
+          <InteractionActionButton variant="outline" onClick={() => void requestReSubmission()} disabled={submitting !== null}>
+            {submitting === 'requesting' ? 'Asking…' : reRequestLabel ?? DEFAULT_RE_REQUEST_LABEL}
+          </InteractionActionButton>
+        </div>
+      )}
+      {reRequested && (
+        <div className="mt-4 flex items-center justify-end">
+          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><CheckGlyph className="h-3 w-3" />Re-submission requested</span>
+        </div>
+      )}
 
       {status === 'pending' && (
         <div className="mt-4 flex items-center justify-end gap-2">
