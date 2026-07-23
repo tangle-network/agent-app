@@ -12,6 +12,7 @@ The substrate packages — `@tangle-network/agent-runtime`, `agent-eval`, `agent
 
 - **Structured tool side channel** — `submit_proposal` (approval-gated), `schedule_followup`, `render_ui`, `add_citation`, exposed as validated tool calls over three surfaces (HTTP route, per-turn MCP server, agent-runtime executor). No fenced-text parsing.
 - **Bounded tool loop** — `runAppToolLoop` / `streamAppToolLoop`: stream a turn → collect tool calls → dispatch → fold results back → re-run, capped. Substrate-free behind a `streamTurn` seam, so it drives a sandboxed agent, a Worker, or an in-browser copilot unchanged.
+- **Assembled chat vertical** — `createChatTurnRoutes` wires auth → thread/message store → streaming turn with buffered replay → uploads → sidecar question answering into one route factory, over `authorize` / `produce` / `store` / `interactions` seams. No hand-rolled orchestration. See [`examples/chat-app.md`](./examples/chat-app.md).
 - **Sandbox-optional** — the same tools, billing, eval, and loop work without a container. A `fetch`-only adapter maps any OpenAI-compatible stream (Tangle Router, tcloud) into the loop. See [`examples/browser-copilot.md`](./examples/browser-copilot.md).
 - **Resumable turns (sandbox-free path)** — for a browser/edge copilot streaming the Router directly, buffer a turn so a dropped tab loses nothing and a reconnecting client replays the tail. **Sandbox products don't need this** — the sandbox SDK already buffers + replays sessions (`streamPrompt` + `lastEventId`). See [`examples/resumable-turns.md`](./examples/resumable-turns.md).
 - **Composes the engine, never forks it** — `/eval` re-exports `@tangle-network/agent-eval`'s verifier; `/integrations` wraps the hub; `/tangle` and `/billing` take the tcloud client as a structural contract. Engines are **peer dependencies** — you pin the version, nothing is bundled.
@@ -96,6 +97,8 @@ const streamTurn = createOpenAICompatStreamTurn({ ...cfg, tools })
 
 The full three-transport walkthrough (Tangle Router, tcloud, Vercel AI SDK) is in [`examples/browser-copilot.md`](./examples/browser-copilot.md).
 
+Building the full **server chat vertical** instead — auth, thread/message tables, a streaming turn with buffered replay, uploads, and sidecar question answering — is the job of `createChatTurnRoutes` (`/chat-routes`) and the modules around it. The end-to-end assembly, including the durable plan/question workflow and the client composer, is in [`examples/chat-app.md`](./examples/chat-app.md).
+
 ## How it's organised
 
 One rule decides where anything lives:
@@ -127,6 +130,20 @@ Each is an independent entry point — import only what you use.
 | [`/web`](src/web) | Request-boundary utilities: `parseJsonObjectBody`, `requireString`, `extractRequestContext`, `checkRateLimit`, `addSecurityHeaders`. |
 | [`/stream`](src/stream) | SSE normalization and turn identity: `normalizeToolEvent`, `resolveChatTurn`, `encodeEvent`, message-part merging. |
 | [`/redact`](src/redact) | `redactForIngestion` — PII redaction before content leaves the boundary. |
+
+**The chat vertical** — the assembled server chat stack. Wire it with [`examples/chat-app.md`](./examples/chat-app.md).
+
+| Subpath | What it gives you |
+|---|---|
+| [`/chat-routes`](src/chat-routes) | `createChatTurnRoutes` — the assembled turn vertical: NDJSON `turn` + buffered `replay` + `running` reconnect-discovery + composed `interactions` answer endpoints, over `authorize` / `produce` / `store` seams. Plus `createSandboxChatProducer`, `createUploadRoute`, `createSandboxFileIndexRoute`, `withDurableChatProjection`, and the import-free `./wire` contract (`chatTurnRequestInit`, `ChatTurnRequestPayload`). Composes agent-runtime's `handleChatTurn`; subpath-only (not re-exported from the root). |
+| [`/chat-store`](src/chat-store) | `createChatTables` + `createChatStore` — drizzle thread/message persistence behind the `ChatStore` port, and the canonical `ChatMessagePart` parts vocabulary (`toChatMessageParts`, part guards). The drizzle store/schema is subpath-only. |
+| [`/interactions`](src/interactions) | Human-in-the-loop ask channel: `createInteractionAnswerRoute` (list/answer endpoint factory — validation, 410 mapping, duplicate-answer safety), the server sidecar client, and the shared `ChatInteraction` wire/persisted-part contract + codecs. Composes `@tangle-network/agent-interface` types. |
+| [`/durable-chat`](src/durable-chat) | Durable plan/question workflow around the authoritative channels: `createDurablePlanRoutes`, `createDurableChatScope`, `createDurableChatEventProjection`, `createDurableInteractionRoutePersistence`, the `DurablePlanStore` port, and `InMemoryDurableChatStateStore` (tests/demos only — production supplies the store). |
+| [`/plans`](src/plans) | Browser-safe durable-plan chat projection: `parsePlanSubmittedEvent`, `planToPersistedPart` / `persistedPartToPlan`, `canTransitionPlanStatus`, and the `ChatPlan` union. Byte-matches the SDK's `SandboxSession.plan()`. |
+| [`/object-store`](src/object-store) | Content-addressed durable attachment store: the `ObjectStore` port + `createR2ObjectStore`, `signObjectUrl` / `verifyObjectUrl`, `createProxiedArtifactRoute`, `objectKey`. |
+| [`/app-auth`](src/app-auth) | `createAppAuth` — better-auth config factory + request guards (`requireApiUser`) over the standard users/sessions/accounts/verifications tables; composes `/platform`'s SSO cookie minter. Optional `better-auth` peer; subpath-only. |
+| [`/sandbox`](src/sandbox) | Workspace sandbox provisioning + turn streaming: `ensureWorkspaceSandbox` / `peekWorkspaceSandbox`, `streamSandboxPrompt` / `runSandboxPrompt`, `createWorkspaceSandboxManager`, and terminal / runtime-proxy handlers. Peer `@tangle-network/sandbox`; subpath-only. |
+| [`/platform`](src/platform) | Tangle platform glue: cross-site SSO (`createTangleSsoHandlers`), request guards (`createAuthGuard`, `guardResolution`), the hub proxy, and seat billing. |
 
 The root entry (`@tangle-network/agent-app`) re-exports every module, but importing the subpath keeps your bundle to what you use.
 
