@@ -52,9 +52,11 @@ export interface InteractionPlanCardProps {
    *  expired via a 410) so the stream/route state stays in sync. */
   onResolved?: (id: string, status: Exclude<ChatInteractionStatus, 'pending'>) => void
   /** Fired when the user asks the agent to re-submit an expired/withdrawn plan
-   *  as a new chat turn. Return/resolve `false` (or throw) to report the send
-   *  failed and keep the affordance retryable. Omit to hide it entirely. */
-  onReRequest?: () => boolean | void | Promise<boolean | void>
+   *  as a new chat turn. Receives the interaction so a callback shared across
+   *  cards (e.g. via DurableChatCards) knows which plan fired. Return/resolve
+   *  `false` (or throw) to report the send failed and keep the affordance
+   *  retryable. Omit to hide it entirely. */
+  onReRequest?: (interaction: ChatInteraction) => boolean | void | Promise<boolean | void>
   /** Overrides the default re-request button label
    *  ("Ask agent to re-submit the plan" — gtm's exact current copy). */
   reRequestLabel?: string
@@ -154,7 +156,7 @@ export function InteractionPlanCard({
     setError(null)
     let accepted: boolean | void
     try {
-      accepted = await onReRequest()
+      accepted = await onReRequest(interaction)
     } catch {
       accepted = false
     } finally {

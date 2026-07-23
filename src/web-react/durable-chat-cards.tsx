@@ -51,8 +51,9 @@ export interface DurableChatCardsProps {
   onInteractionResolved?: (id: string, status: Exclude<ChatInteraction['status'], 'pending'>, answers?: InteractionAnswers) => void
   onLateAnswer?: (message: string) => boolean | void | Promise<boolean | void>
   /** Fired when the user asks the agent to re-submit an expired/withdrawn
-   *  plan card as a new chat turn. Omit to hide the affordance entirely. */
-  onReRequest?: () => boolean | void | Promise<boolean | void>
+   *  plan card as a new chat turn; receives that card's interaction. Omit to
+   *  hide the affordance entirely. */
+  onReRequest?: (interaction: ChatInteraction) => boolean | void | Promise<boolean | void>
   /** Overrides the default re-request button label. */
   reRequestLabel?: string
   renderMarkdown?: (markdown: string) => ReactNode

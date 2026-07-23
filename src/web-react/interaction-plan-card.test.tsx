@@ -23,7 +23,7 @@ function mount(
     canWrite?: boolean
     submitAnswer?: SubmitInteractionAnswer
     onResolved?: (id: string, status: string) => void
-    onReRequest?: () => boolean | void | Promise<boolean | void>
+    onReRequest?: (interaction: ChatInteraction) => boolean | void | Promise<boolean | void>
     reRequestLabel?: string
     renderMarkdown?: (markdown: string) => React.ReactNode
   } = {},
@@ -137,11 +137,12 @@ describe('InteractionPlanCard', () => {
 
   it('shows and fires the re-request affordance for an expired plan', async () => {
     const onReRequest = vi.fn(() => true)
-    const { container } = mount({ ...PLAN_INTERACTION, status: 'expired' }, { onReRequest })
+    const expired: ChatInteraction = { ...PLAN_INTERACTION, status: 'expired' }
+    const { container } = mount(expired, { onReRequest })
     fireEvent.click(screen.getByRole('button', { name: 'Ask agent to re-submit the plan' }))
     await flush()
 
-    expect(onReRequest).toHaveBeenCalledOnce()
+    expect(onReRequest).toHaveBeenCalledExactlyOnceWith(expired)
     expect(screen.queryByRole('button', { name: /re-submit/i })).toBeNull()
     expect(container.textContent).toContain('Re-submission requested')
   })
@@ -158,6 +159,18 @@ describe('InteractionPlanCard', () => {
 
   it('keeps the re-request affordance retryable when the send is rejected', async () => {
     const { container } = mount({ ...PLAN_INTERACTION, status: 'expired' }, { onReRequest: () => false })
+    fireEvent.click(screen.getByRole('button', { name: 'Ask agent to re-submit the plan' }))
+    await flush()
+
+    expect(container.textContent).toContain('The re-request was not sent. Try again.')
+    expect(container.textContent).not.toContain('Re-submission requested')
+    expect((screen.getByRole('button', { name: 'Ask agent to re-submit the plan' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('keeps the re-request affordance retryable when the callback throws', async () => {
+    const { container } = mount({ ...PLAN_INTERACTION, status: 'expired' }, {
+      onReRequest: () => { throw new Error('boom') },
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Ask agent to re-submit the plan' }))
     await flush()
 
