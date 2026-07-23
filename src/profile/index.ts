@@ -334,6 +334,7 @@ export {
   composeSkills,
   corpusSkills,
   loadMarkdownCorpus,
+  mergeComposedSkills,
   parseCorpusSkills,
   parseSkillFrontmatter,
   registrySkills,

@@ -5,6 +5,7 @@ import {
   composeSkills,
   corpusSkills,
   loadMarkdownCorpus,
+  mergeComposedSkills,
   parseCorpusSkills,
   parseSkillFrontmatter,
   registrySkills,
@@ -389,12 +390,21 @@ describe('composeSkills', () => {
     const result = composeSkills({ skills: RENDER_SKILLS, mode: 'inline' })
     expect(result.refs).toEqual([])
     expect(result.promptSection).toContain('### Write Like a Human')
+    expect(result.inlineIds).toEqual(['human-prose', 'efiling'])
+    expect(result.mountedIds).toEqual([])
   })
 
   it('mounted mode returns skillRefs plus the index section', () => {
     const result = composeSkills({ skills: RENDER_SKILLS, mode: 'mounted', skillDir: '.opencode/skills' })
     expect(result.refs.map((r) => r.name)).toEqual(['efiling', 'human-prose'])
     expect(result.promptSection).toContain('.opencode/skills/human-prose/SKILL.md')
+    expect(result.inlineIds).toEqual([])
+    expect(result.mountedIds).toEqual(['human-prose', 'efiling'])
+  })
+
+  it('delivered ids honor the tier filter', () => {
+    const result = composeSkills({ skills: RENDER_SKILLS, mode: 'inline', tier: 'paid' })
+    expect(result.inlineIds).toEqual(['efiling'])
   })
 
   it('mounted mode throws when skillDir is null or undefined', () => {
@@ -404,6 +414,24 @@ describe('composeSkills', () => {
     expect(() => composeSkills({ skills: RENDER_SKILLS, mode: 'mounted' })).toThrow(
       /cannot receive skill files/,
     )
+  })
+})
+
+describe('mergeComposedSkills', () => {
+  it('concatenates refs, prompt sections, and delivered ids in batch order', () => {
+    const a = composeSkills({ skills: [RENDER_SKILLS[0]!], mode: 'mounted', skillDir: '.opencode/skills' })
+    const b = composeSkills({ skills: [RENDER_SKILLS[1]!], mode: 'mounted', skillDir: '.opencode/skills' })
+    const merged = mergeComposedSkills([a, b])
+    expect(merged.refs.map((r) => r.name)).toEqual(['human-prose', 'efiling'])
+    expect(merged.promptSection).toBe(`${a.promptSection}${b.promptSection}`)
+    expect(merged.mountedIds).toEqual(['human-prose', 'efiling'])
+    expect(merged.inlineIds).toEqual([])
+  })
+
+  it('throws naming the id when a skill is delivered both inline and mounted', () => {
+    const inline = composeSkills({ skills: [RENDER_SKILLS[0]!], mode: 'inline' })
+    const mounted = composeSkills({ skills: RENDER_SKILLS, mode: 'mounted', skillDir: '.opencode/skills' })
+    expect(() => mergeComposedSkills([inline, mounted])).toThrow(/human-prose/)
   })
 })
 

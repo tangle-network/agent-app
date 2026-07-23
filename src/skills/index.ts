@@ -26,7 +26,8 @@
  * typed `resources.skills` channel (`AgentProfileResourceRef[]`) plus an index
  * section that just names the file, and lets the platform materializer place it
  * at the harness-native skill dir. `composeSkills` builds either shape;
- * `assertSkillDeliveryDisjoint` catches a skill accidentally delivered both
+ * `mergeComposedSkills` combines batches and throws (via
+ * `assertSkillDeliveryDisjoint`) on a skill accidentally delivered both
  * ways. Picking WHICH harnesses can take `mounted` delivery is platform-bound
  * (see `@tangle-network/agent-app/skills-placement`) and deliberately kept out
  * of this substrate-free module.
@@ -606,10 +607,15 @@ export type SkillDeliveryMode = 'inline' | 'mounted'
 
 /** The output of {@link composeSkills}: the refs to attach to
  *  `resources.skills` (empty for `inline`) and the prompt section to fold into
- *  the system prompt (already carries its own leading `\n\n`, or `''`). */
+ *  the system prompt (already carries its own leading `\n\n`, or `''`).
+ *  `inlineIds`/`mountedIds` record which (tier-filtered) skills were delivered
+ *  in each mode so {@link mergeComposedSkills} can enforce the modes stay
+ *  disjoint when batches are combined. */
 export interface ComposedSkills {
   refs: AgentProfileResourceRef[]
   promptSection: string
+  inlineIds: string[]
+  mountedIds: string[]
 }
 
 /** Inputs to {@link composeSkills}. */
@@ -635,8 +641,14 @@ export interface ComposeSkillsInput {
  */
 export function composeSkills(input: ComposeSkillsInput): ComposedSkills {
   const { skills, mode, tier, heading } = input
+  const deliveredIds = (tier ? skills.filter((s) => s.tier === tier) : skills).map((s) => s.id)
   if (mode === 'inline') {
-    return { refs: [], promptSection: renderInlineSkills({ skills, tier, heading }) }
+    return {
+      refs: [],
+      promptSection: renderInlineSkills({ skills, tier, heading }),
+      inlineIds: deliveredIds,
+      mountedIds: [],
+    }
   }
   if (!input.skillDir) {
     throw new Error(
@@ -647,6 +659,8 @@ export function composeSkills(input: ComposeSkillsInput): ComposedSkills {
   return {
     refs: skillRefs(skills, { tier }),
     promptSection: renderSkillIndex({ skills, skillDir: input.skillDir, tier, heading }),
+    inlineIds: [],
+    mountedIds: deliveredIds,
   }
 }
 
@@ -665,4 +679,24 @@ export function assertSkillDeliveryDisjoint(
       `assertSkillDeliveryDisjoint: skill id(s) delivered both inline and mounted: ${overlap.join(', ')}`,
     )
   }
+}
+
+/**
+ * Combine multiple {@link ComposedSkills} batches (e.g. a built-in corpus and
+ * an installed catalog) into one, concatenating refs and prompt sections in
+ * batch order. This is the seam where inline and mounted deliveries can first
+ * collide, so it applies {@link assertSkillDeliveryDisjoint} — a skill id
+ * delivered inline by one batch and mounted by another throws instead of
+ * reaching the agent twice. Merge through this rather than spreading batch
+ * fields by hand.
+ */
+export function mergeComposedSkills(batches: ComposedSkills[]): ComposedSkills {
+  const merged: ComposedSkills = {
+    refs: batches.flatMap((b) => b.refs),
+    promptSection: batches.map((b) => b.promptSection).join(''),
+    inlineIds: batches.flatMap((b) => b.inlineIds),
+    mountedIds: batches.flatMap((b) => b.mountedIds),
+  }
+  assertSkillDeliveryDisjoint(merged.inlineIds, merged.mountedIds)
+  return merged
 }
