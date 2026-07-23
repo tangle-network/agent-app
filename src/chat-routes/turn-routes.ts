@@ -30,10 +30,11 @@
  * `handleChatTurn` stays the engine — the seams only wrap its input, its
  * producer stream, and its settle.
  *
- * Seam stability: `lifecycle` and `heartbeat` are generic and stable.
- * `turnLock`, `contextGate`, `beforeTurn`, and `onRawEvent` are `@experimental`
- * — proven by a single consumer (gtm's chat vertical, #200) and may change once
- * a second consumer exercises them. They stay FLAT top-level options (not
+ * Seam stability: `lifecycle`, `heartbeat`, and `turnLock` are generic and
+ * stable (`turnLock` graduated with `/turn-stream`'s shared DO adapter, #221).
+ * `contextGate`, `beforeTurn`, and `onRawEvent` are `@experimental` — proven
+ * by a single consumer (gtm's chat vertical, #200) and may change once a
+ * second consumer exercises them. They stay FLAT top-level options (not
  * grouped under a `hooks` object): that grouping would break the shipped
  * consumer's call for no mechanism gain, and this package's exports are
  * additive-only.
@@ -252,7 +253,8 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
   authorize(args: ChatTurnAuthorizeArgs): Promise<ChatTurnAuthorization<TContext>>
   /** Thread/message persistence (`/chat-store`'s store or a product adapter). */
   store: ChatTurnMessageStore
-  /** Turn-event buffer (`createD1TurnEventStore(env.DB)` in production,
+  /** Turn-event buffer (`createD1TurnEventStore(env.DB)` or `/turn-stream`'s
+   *  `createDurableObjectTurnEventStore(env.TURN_STREAM_DO)` in production,
    *  `createMemoryTurnEventStore()` in tests). Wired by default — every turn
    *  is buffered and replayable. */
   turnStore: TurnEventStore
@@ -261,8 +263,9 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
    *  product's own producer. May be async (box resolution). */
   produce(args: ChatTurnProduceArgs<TContext>): ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>
   /** Single-flight lock acquired before any side effect and released once when
-   *  the turn settles (including short-circuit/throw). Omit → no lock.
-   *  @experimental Single-consumer (gtm, #200); shape may change. */
+   *  the turn settles (including short-circuit/throw). `/turn-stream`'s
+   *  `createDurableTurnLock` is the shared DO-backed implementation. Omit →
+   *  no lock. */
   turnLock?: ChatTurnLock<TContext>
   /** Pre-turn readiness gate that can short-circuit with a product `Response`
    *  before the producer runs (the user row is already persisted). Runs after
