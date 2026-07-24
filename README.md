@@ -13,10 +13,10 @@ The substrate packages — `@tangle-network/agent-runtime`, `agent-eval`, `agent
 ## Highlights
 
 - **Structured tool side channel** — `submit_proposal` (approval-gated), `schedule_followup`, `render_ui`, `add_citation`, exposed as validated tool calls over three surfaces (HTTP route, per-turn MCP server, agent-runtime executor). No fenced-text parsing.
-- **Bounded tool loop** — `runAppToolLoop` / `streamAppToolLoop`: stream a turn → collect tool calls → dispatch → fold results back → re-run, capped. Substrate-free behind a `streamTurn` seam, so it drives a sandboxed agent, a Worker, or an in-browser copilot unchanged.
+- **Bounded tool loop** — `runAppToolLoop` / `streamAppToolLoop`: stream a turn → collect tool calls → dispatch → fold results back → re-run, capped. These are 1:1 aliases of `@tangle-network/agent-runtime`'s `runToolLoop` / `streamToolLoop` (the engine owns the loop; this package adds no logic on that path). Substrate-free behind a `streamTurn` seam, so it drives a sandboxed agent, a Worker, or an in-browser copilot unchanged.
 - **Assembled chat vertical** — `createChatTurnRoutes` wires auth → thread/message store → streaming turn with buffered replay → uploads → sidecar question answering into one route factory, over `authorize` / `produce` / `store` / `interactions` seams. No hand-rolled orchestration. See [`examples/chat-app.md`](./examples/chat-app.md).
 - **Sandbox-optional** — the same tools, billing, eval, and loop work without a container. A `fetch`-only adapter maps any OpenAI-compatible stream (Tangle Router, tcloud) into the loop. See [`examples/browser-copilot.md`](./examples/browser-copilot.md).
-- **Resumable turns (sandbox-free path)** — for a browser/edge copilot streaming the Router directly, buffer a turn so a dropped tab loses nothing and a reconnecting client replays the tail. **Sandbox products don't need this** — the sandbox SDK already buffers + replays sessions (`streamPrompt` + `lastEventId`). See [`examples/resumable-turns.md`](./examples/resumable-turns.md).
+- **Resumable turns (sandbox-free path)** — for a browser/edge copilot streaming the Router directly, buffer a turn so a dropped tab loses nothing and a reconnecting client replays the tail. **Sandbox products don't need this** — the sandbox SDK already buffers + replays sessions (server-side reconnect via `box.streamPrompt`'s `lastEventId`; browser-direct via `box.mintScopedToken()` + `SessionGatewayClient`). See [`examples/resumable-turns.md`](./examples/resumable-turns.md).
 - **Composes the engine, never forks it** — `/eval` re-exports `@tangle-network/agent-eval`'s verifier; `/integrations` wraps the hub; `/tangle` and `/billing` take the tcloud client as a structural contract. Engines are **peer dependencies** — you pin the version, nothing is bundled.
 - **ESM, typed, zero runtime deps** in the substrate-free modules (`/runtime`, `/web`, `/crypto`, `/redact`, `/stream`). Ships with `.d.ts` and npm [provenance](https://www.npmjs.com/package/@tangle-network/agent-app#provenance).
 
@@ -36,10 +36,16 @@ pnpm add @tangle-network/agent-eval @tangle-network/agent-integrations
 | Peer | Required by | Range |
 |---|---|---|
 | `@tangle-network/agent-eval` | `/eval`, `/eval-campaign`, `/profile`, `/knowledge` | `>=0.100.0` |
-| `@tangle-network/agent-runtime` | `/runtime`, `/knowledge-loop`, runtime tool execution | `>=0.79.3` |
-| `@tangle-network/agent-integrations` | `/integrations`, `/tangle` | `>=0.32.0` |
+| `@tangle-network/agent-runtime` | `/runtime`, `/chat-routes` | `>=0.79.3` |
+| `@tangle-network/agent-integrations` | `/integrations` | `>=0.44.0` |
+| `@tangle-network/agent-interface` | `/interactions`, `/chat-store`, `/harness` | `>=0.15.0` |
+| `@tangle-network/sandbox` | `/sandbox`, `/profile`, `/skills` | `>=0.9.7` |
+| `@tangle-network/agent-knowledge` | `/knowledge-loop` | `>=1.7.0` |
+| `@tangle-network/agent-profile-materialize` | `/skills-placement` | `>=0.6.0` |
 
-Modules that do not import engine packages (`/tools`, `/web`, `/crypto`, `/redact`, `/stream`, `/billing`) need no peers.
+All of these except `agent-eval`, `agent-integrations`, and `agent-interface` are declared **optional** peers, so a product that never imports the subpath installs nothing. `driveSandboxTurn` (`/sandbox`) calls `box.driveTurn`, which the SDK added in **0.10.5** — above the declared floor, so pin `@tangle-network/sandbox >= 0.10.5` yourself if you use it.
+
+Modules that import no engine package (`/tools`, `/web`, `/crypto`, `/redact`, `/stream`, `/billing`, `/tangle` — the last two take their client as a structural contract) need no peers.
 
 ## Quick start
 
@@ -117,11 +123,13 @@ Three decisions cover most of the surface.
 
 **1. How does the turn run?** Pick the transport by who's watching, not by feature.
 
+Each primitive is written `package → symbol`; three packages ship similarly-named turn functions, and AGENTS.md has the full [primitive table and the `runLoop` name-collision note](./AGENTS.md#turn-execution-primitives--which-one-when).
+
 | Your turn | Use | Why |
 |---|---|---|
-| **Interactive** — a user is watching a chat or copilot | `streamPrompt` held open for the turn; the sandbox gateway lets the browser attach directly | Worker lifetime ≈ turn length; a dropped tab replays the buffered tail on reconnect. |
-| **Autonomous** — a mission step, queue job, cron, or inbound email, with nobody watching | `dispatchPrompt({ detach: true })` + poll from a durable driver. `runDetachedTurn` (`/chat-routes`) bridges that detached run into the live buffer, so a browser opening the session mid-run still tails it token-by-token | No consumer exists and Workers die in minutes; the platform runs the turn server-side and a crash re-dispatch is a lookup, not a second run. |
-| **Eval / CI** — a long-lived harness process | `runAppToolLoop` / `streamPrompt` in-process | The process outlives the run; durability adds nothing — a failed run is re-run, not resumed. |
+| **Interactive** — a user is watching a chat or copilot | sandbox → `box.streamPrompt()` held open for the turn, wrapped here as `streamSandboxPrompt` (`/sandbox`); for the browser leg, sandbox → `box.mintScopedToken()` + `SessionGatewayClient` (`@tangle-network/sandbox/session-gateway`) attaches the tab directly | Worker lifetime ≈ turn length; a dropped tab replays the buffered tail on reconnect. |
+| **Autonomous** — a mission step, queue job, cron, or inbound email, with nobody watching | sandbox → `box.driveTurn()`, wrapped here as `driveSandboxTurn` (`/sandbox`), ticked from a durable driver; drop to raw `box.dispatchPrompt({ detach: true })` + `box.findCompletedTurn(turnId, { sessionId })` only when one pass is too coarse. `runDetachedTurn` (`/chat-routes`) bridges that detached run into the live buffer, so a browser opening the session mid-run still tails it token-by-token | No consumer exists and Workers die in minutes; the platform runs the turn server-side and a crash re-dispatch is a lookup, not a second run. |
+| **Eval / CI** — a long-lived harness process | sandbox → `box.streamPrompt()` for a sandboxed harness; agent-runtime (root) → `runToolLoop` / `streamToolLoop` for an in-process model turn — `runAppToolLoop` / `streamAppToolLoop` (`/runtime`) are 1:1 aliases of those, not a second implementation | The process outlives the run; durability adds nothing — a failed run is re-run, not resumed. |
 
 **2. Assembled or à la carte?** `createChatTurnRoutes` (`/chat-routes`) wires the whole server chat turn — auth, store, streaming, replay, uploads, interactions — over typed seams. Reach for the individual modules (`/stream`, `/chat-store`, `/interactions`) only to compose something the assembled route doesn't cover.
 
