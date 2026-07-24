@@ -46,11 +46,12 @@ export * from './theme-contract/index'
 // its browser-safe wire contract is re-exported via `/web-react`.
 // `/web-react` and `/sequences-react` are intentionally NOT re-exported here:
 // they need the optional react peer and would drag JSX into every root-entry
-// consumer. `/sequences/drizzle` likewise stays subpath-only — it imports the
-// optional drizzle-orm peer at module top.
+// consumer.
 export * from './trace/index'
-export * from './sequences/index'
-// `/design-canvas/drizzle` and `/design-canvas-react` are intentionally NOT
-// re-exported here: drizzle imports the optional peer at module top; react and
-// konva are optional peers pulled in only by the design-canvas-react subpath.
-export * from './design-canvas/index'
+// `/sequences` and `/design-canvas` are app-specific FEATURE surfaces (timeline
+// editing, a design canvas), not shell mechanism every product wants — so they
+// are NOT re-exported from the root. Import them explicitly when a product opts
+// in: `@tangle-network/agent-app/sequences`, `@tangle-network/agent-app/design-canvas`.
+// This keeps the root entry to shared mechanism instead of every product's
+// features. (Their `/drizzle` + `-react` variants were already subpath-only for
+// the optional drizzle / react / konva peers.)
