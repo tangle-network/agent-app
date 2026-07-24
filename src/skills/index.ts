@@ -637,7 +637,8 @@ export interface ComposeSkillsInput {
  * directory); a null/absent one throws rather than silently falling back, so
  * the caller resolves the fallback deliberately (see
  * `@tangle-network/agent-app/skills-placement`'s `composeSkillsForHarness`,
- * which does exactly that).
+ * whose own default is to throw rather than choose `inline` for you — inline
+ * is a narrow, explicitly opted-into fallback, not a co-equal mode).
  */
 export function composeSkills(input: ComposeSkillsInput): ComposedSkills {
   const { skills, mode, tier, heading } = input
