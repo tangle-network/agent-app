@@ -8,6 +8,8 @@ The application-shell layer for building agent products on the Tangle stack.
 
 The substrate packages — `@tangle-network/agent-runtime`, `agent-eval`, `agent-integrations`, `tcloud`, `sandbox` — are the **engine**. This package is the **shell**: the chat tool-loop, the structured agent→app side channel, the integration-hub client, per-workspace billing, field crypto, and the web boundary utilities that every agent app otherwise rewrites by hand. You supply your domain through typed seams; the package supplies the mechanism and imports none of your code.
 
+**Who it's for:** engineers building an agent product on the Tangle sandbox — a chat app, a copilot, an autonomous worker — who want the shell (chat routes, streaming, durability, approvals, billing, the tool side channel) as composable pieces instead of a per-app rewrite. It is **not** an agent framework or a model SDK: the reasoning lives in the sandbox agent; agent-app is everything around it — the turn plumbing, durability, and money.
+
 ## Highlights
 
 - **Structured tool side channel** — `submit_proposal` (approval-gated), `schedule_followup`, `render_ui`, `add_citation`, exposed as validated tool calls over three surfaces (HTTP route, per-turn MCP server, agent-runtime executor). No fenced-text parsing.
@@ -109,43 +111,47 @@ One rule decides where anything lives:
 
 Everything here is reached through a typed seam — `AppToolHandlers`, `AppToolTaxonomy`, `streamTurn`, `executeToolCall`, `verifyToken`, `KeyProvisioner` / `WorkspaceKeyStore` / `KeyCrypto`. The package never imports product code and never hard-codes a domain value (a proposal type, a premium, a disclaimer); each is a parameter. New capability arrives as a new subpath, never a breaking change to an existing one.
 
+## Choosing a path
+
+Three decisions cover most of the surface.
+
+**1. How does the turn run?** Pick the transport by who's watching, not by feature.
+
+| Your turn | Use | Why |
+|---|---|---|
+| **Interactive** — a user is watching a chat or copilot | `streamPrompt` held open for the turn; the sandbox gateway lets the browser attach directly | Worker lifetime ≈ turn length; a dropped tab replays the buffered tail on reconnect. |
+| **Autonomous** — a mission step, queue job, cron, or inbound email, with nobody watching | `dispatchPrompt({ detach: true })` + poll from a durable driver. `runDetachedTurn` (`/chat-routes`) bridges that detached run into the live buffer, so a browser opening the session mid-run still tails it token-by-token | No consumer exists and Workers die in minutes; the platform runs the turn server-side and a crash re-dispatch is a lookup, not a second run. |
+| **Eval / CI** — a long-lived harness process | `runAppToolLoop` / `streamPrompt` in-process | The process outlives the run; durability adds nothing — a failed run is re-run, not resumed. |
+
+**2. Assembled or à la carte?** `createChatTurnRoutes` (`/chat-routes`) wires the whole server chat turn — auth, store, streaming, replay, uploads, interactions — over typed seams. Reach for the individual modules (`/stream`, `/chat-store`, `/interactions`) only to compose something the assembled route doesn't cover.
+
+**3. Sandbox or sandbox-free?** The tools, billing, eval, and loop all work without a container: `createOpenAICompatStreamTurn` maps any OpenAI-compatible endpoint into the loop for a browser or edge copilot. Reach for `/sandbox` only when the turn needs a real container — bash, files, sub-agents, MCP.
+
 ## Modules
 
-Each is an independent entry point — import only what you use.
+Each subpath is an independent entry point — import only what you use; the root re-exports everything, but a subpath import keeps your bundle to what you touch.
 
-| Subpath | What it gives you |
-|---|---|
-| [`/tools`](src/tools) | The structured agent→app side channel: `buildAppToolOpenAITools`, `createAppToolRuntimeExecutor`, `handleAppToolRequest` (HTTP), `buildAppToolMcpServer` / `buildHttpMcpServer` (MCP), `createCapabilityToken` + `authenticateToolRequest` (capability auth), `ToolInputError`. |
-| [`/runtime`](src/runtime) | `runAppToolLoop` / `streamAppToolLoop` (bounded tool loop), `resolveTangleModelConfig` (Tangle Router / Anthropic BYOK), and `toLoopEvents` / `createOpenAICompatStreamTurn` (OpenAI-compat stream → loop events, with fragmented tool-call args reassembled). |
-| [`/integrations`](src/integrations) | Integration-hub client: `HubExecClient`, `resolveIntegrationAction`, `invokeIntegrationHub`. Composes `@tangle-network/agent-integrations`. |
-| [`/eval`](src/eval) | `producedFromToolEvents` (bridge tool events into the eval verifier) and `createTokenRecallChecker` (deterministic content check). Re-exports `@tangle-network/agent-eval`'s `verifyCompletion`, `extractProducedState`, `weightedComposite`, `createLlmCorrectnessChecker`. |
-| [`/tangle`](src/tangle) | App-registration consent URL (`buildConsentUrl`) and a cached, auto-refreshing broker-token provider (`createBrokerTokenProvider`). Structural over the tcloud client. |
-| [`/billing`](src/billing) | `createWorkspaceKeyManager` — mint / rotate / roll over / report usage on per-workspace, budget-capped model keys. Seams for provisioner, store, and crypto. |
-| [`/crypto`](src/crypto) | AES-GCM field encryption: `encryptAesGcm`, `decryptAesGcm`, `createFieldCrypto`. Key supplied by the caller. |
-| [`/missions`](src/missions) | Durable multi-step mission orchestration over a `MissionStorePort` seam: guarded status/step machine, idempotent plan engine with budget/approval gates, `:::mission` parser, the client-safe live-event reducer, and the canonical `StepAgentActivity` per-step delegated-run lane. |
-| [`/trace`](src/trace) | Flow observability: `buildFlowTrace` + ASCII `renderWaterfall`/`renderHistogram`; the mission trace bridge (`createMissionTraceContext`, `childSpanContext`, `traceEnv`) whose ids/env a delegated run inherits; and delegation→FlowSpan converters (`delegationActivityToFlowSpans`, `loopTraceEventsToFlowSpans`, `composeMissionFlowTrace`). |
-| [`/web-react`](src/web-react) | Router-safe React chat components: `ChatComposer`, `ModelPicker`, `EffortPicker`, `ChatMessages`, `RunDrillIn`, plus observability surfaces — `MissionActivityLane`, `AgentActivityPanel`, `FlowWaterfall`. This path must not import sandbox-only UI. |
-| [`/composer`](src/composer) | Sandbox-first `AgentComposer` and profile/model/sandbox-runner controls re-exported from `@tangle-network/sandbox-ui/chat`. Use when the chat owns a sandbox profile or needs the full sandbox composer. |
-| `/web-react/terminal` | Sandbox terminal React components, including `WorkspaceTerminalPanel`. Import this explicit path only for container/terminal views. |
-| [`/web`](src/web) | Request-boundary utilities: `parseJsonObjectBody`, `requireString`, `extractRequestContext`, `checkRateLimit`, `addSecurityHeaders`. |
-| [`/stream`](src/stream) | SSE normalization and turn identity: `normalizeToolEvent`, `resolveChatTurn`, `encodeEvent`, message-part merging. |
-| [`/redact`](src/redact) | `redactForIngestion` — PII redaction before content leaves the boundary. |
+The **complete, always-current reference** — every published subpath, its exported symbols, and its internal dependencies — is generated into **[`docs/CODEMAP.md`](./docs/CODEMAP.md)** and kept honest by a CI check (regenerate with `pnpm docs:gen`). Start with the core entry points:
 
-**The chat vertical** — the assembled server chat stack. Wire it with [`examples/chat-app.md`](./examples/chat-app.md).
+**Run a turn**
+- [`/tools`](src/tools) — the structured agent→app side channel (proposals, follow-ups, citations, UI) as validated tool calls, over HTTP / MCP / runtime-executor surfaces.
+- [`/runtime`](src/runtime) — the bounded tool loop; the same loop drives a sandbox agent, a Worker, or an in-browser copilot behind one `streamTurn` seam.
 
-| Subpath | What it gives you |
-|---|---|
-| [`/chat-routes`](src/chat-routes) | `createChatTurnRoutes` — the assembled turn vertical: NDJSON `turn` + buffered `replay` + `running` reconnect-discovery + composed `interactions` answer endpoints, over `authorize` / `produce` / `store` seams. Plus `createSandboxChatProducer`, `createUploadRoute`, `createSandboxFileIndexRoute`, `withDurableChatProjection`, and the import-free `./wire` contract (`chatTurnRequestInit`, `ChatTurnRequestPayload`). Composes agent-runtime's `handleChatTurn`; subpath-only (not re-exported from the root). |
-| [`/chat-store`](src/chat-store) | `createChatTables` + `createChatStore` — drizzle thread/message persistence behind the `ChatStore` port, and the canonical `ChatMessagePart` parts vocabulary (`toChatMessageParts`, part guards). The drizzle store/schema is subpath-only. |
-| [`/interactions`](src/interactions) | Human-in-the-loop ask channel: `createInteractionAnswerRoute` (list/answer endpoint factory — validation, 410 mapping, duplicate-answer safety), the server sidecar client, and the shared `ChatInteraction` wire/persisted-part contract + codecs. Composes `@tangle-network/agent-interface` types. |
-| [`/durable-chat`](src/durable-chat) | Durable plan/question workflow around the authoritative channels: `createDurablePlanRoutes`, `createDurableChatScope`, `createDurableChatEventProjection`, `createDurableInteractionRoutePersistence`, the `DurablePlanStore` port, and `InMemoryDurableChatStateStore` (tests/demos only — production supplies the store). |
-| [`/plans`](src/plans) | Browser-safe durable-plan chat projection: `parsePlanSubmittedEvent`, `planToPersistedPart` / `persistedPartToPlan`, `canTransitionPlanStatus`, and the `ChatPlan` union. Byte-matches the SDK's `SandboxSession.plan()`. |
-| [`/object-store`](src/object-store) | Content-addressed durable attachment store: the `ObjectStore` port + `createR2ObjectStore`, `signObjectUrl` / `verifyObjectUrl`, `createProxiedArtifactRoute`, `objectKey`. |
-| [`/app-auth`](src/app-auth) | `createAppAuth` — better-auth config factory + request guards (`requireApiUser`) over the standard users/sessions/accounts/verifications tables; composes `/platform`'s SSO cookie minter. Optional `better-auth` peer; subpath-only. |
-| [`/sandbox`](src/sandbox) | Workspace sandbox provisioning + turn streaming: `ensureWorkspaceSandbox` / `peekWorkspaceSandbox`, `streamSandboxPrompt` / `runSandboxPrompt`, `createWorkspaceSandboxManager`, and terminal / runtime-proxy handlers. Peer `@tangle-network/sandbox`; subpath-only. |
-| [`/platform`](src/platform) | Tangle platform glue: cross-site SSO (`createTangleSsoHandlers`), request guards (`createAuthGuard`, `guardResolution`), the hub proxy, and seat billing. |
+**The server chat vertical** ([`examples/chat-app.md`](./examples/chat-app.md))
+- [`/chat-routes`](src/chat-routes) — `createChatTurnRoutes`: auth → store → streaming turn with buffered replay → uploads → sidecar question answering, assembled. Plus `runDetachedTurn` for autonomous turns a browser can still watch live.
+- [`/chat-store`](src/chat-store) · [`/interactions`](src/interactions) · [`/durable-chat`](src/durable-chat) · [`/plans`](src/plans) — persistence, human-in-the-loop asks, and the durable plan/question workflow around them.
 
-The root entry (`@tangle-network/agent-app`) re-exports every module, but importing the subpath keeps your bundle to what you use.
+**On the sandbox**
+- [`/sandbox`](src/sandbox) — workspace provisioning + turn streaming.
+- [`/missions`](src/missions) — durable multi-step orchestration: sequencing, budgets, approval gates, schedules.
+
+**React surfaces**
+- [`/web-react`](src/web-react) — router-safe chat + observability components (never imports sandbox-only UI); [`/composer`](src/composer) when the chat owns a full sandbox profile.
+
+**Utilities (zero-dependency)**
+- [`/web`](src/web) · [`/stream`](src/stream) · [`/crypto`](src/crypto) · [`/redact`](src/redact) — request boundary, SSE normalization, field crypto, PII redaction.
+
+See **[`docs/CODEMAP.md`](./docs/CODEMAP.md)** for the rest — `/billing`, `/tangle`, `/object-store`, `/trace`, `/theme`, `/eval`, `/app-auth`, `/platform`, and more.
 
 ### Missions: id shape and product columns
 
