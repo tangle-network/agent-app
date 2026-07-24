@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   createChatTurnRoutes,
+  createSandboxChatProducer,
   type ChatTurnMessageStore,
   type ChatTurnProduceArgs,
   type ChatTurnRouteProducer,
@@ -519,6 +520,48 @@ describe('createChatTurnRoutes — product seams', () => {
     expect(calls).toHaveLength(1)
     expect(calls[0]!.failed).toBe(true)
     expect(calls[0]!.failureReason).toBe('model 402 payment required')
+  })
+
+  it('persists partial content and reports failed:true when the producer catches a severed stream', async () => {
+    const calls: Array<{ failed: boolean; failureReason?: string; finalText: string }> = []
+    const { routes, rows, ctx, pending } = makeRoutes({
+      produce: () => createSandboxChatProducer({
+        events: (async function* () {
+          yield {
+            type: 'message.part.updated',
+            data: { part: { type: 'text', id: 't1', text: 'Partial answer' }, delta: 'Partial answer' },
+          }
+          throw new Error('connection dropped')
+        })(),
+        log: () => {},
+      }),
+      onTurnComplete: async ({ failed, failureReason, finalText }) => {
+        calls.push({ failed, ...(failureReason ? { failureReason } : {}), finalText })
+      },
+    })
+
+    const response = await routes.turn(turnRequest({ threadId: 't-severed', content: 'q' }), ctx)
+    const lines = await readLines(response.body!)
+    await Promise.all(pending)
+
+    expect(lines).toContainEqual(expect.objectContaining({
+      type: 'error',
+      data: expect.objectContaining({ code: 'sandbox.stream_failed' }),
+    }))
+    const assistant = rows.find((row) => row.role === 'assistant')
+    expect(assistant?.content).toContain('Partial answer')
+    expect(assistant?.content).toContain('The sandbox model stream stopped before a clean completion.')
+    expect(assistant?.parts).toEqual([
+      expect.objectContaining({
+        type: 'text',
+        text: expect.stringContaining('Partial answer\n\n---\nThe sandbox model stream stopped'),
+      }),
+    ])
+    expect(calls).toEqual([expect.objectContaining({
+      failed: true,
+      failureReason: expect.stringContaining('connection dropped'),
+      finalText: expect.stringContaining('Partial answer'),
+    })])
   })
 
   it('onTurnComplete: reports failed:false on a clean turn', async () => {

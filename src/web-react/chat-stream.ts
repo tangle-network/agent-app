@@ -3,7 +3,7 @@
  * app's chat UI hand-rolls (and breaks). Normalizes the three line shapes the
  * agent-app chat routes emit:
  *
- *   {kind:'event', event:{type:'text'|'reasoning'|'tool_call'|'usage', ...}}
+ *   {kind:'event', event:{type:'text'|'reasoning'|'tool_call'|'usage'|'notice'|'error', ...}}
  *   {kind:'tool_result', toolCallId, toolName, label, outcome}
  *   {type:'turn'|'metadata'|'error'|'turn_status', ...}          (route-level)
  *   {type:'interaction', data:{request}}                         (sidecar ask)
@@ -34,6 +34,16 @@ export {
   type ChatTurnFilePartInput,
   type ChatTurnPartInput,
   type ChatTurnRequestPayload,
+  type ProducerTextEvent,
+  type ProducerReasoningEvent,
+  type ProducerToolCallEvent,
+  type ProducerToolResultEvent,
+  type ProducerUsageEvent,
+  type ProducerNoticeEvent,
+  type ProducerErrorEvent,
+  type ProducerPassthroughEventType,
+  type ProducerPassthroughEvent,
+  type ProducerWireEvent,
   type FileMention,
   fileMentionsToParts,
   buildMentionPromptBlock,
@@ -73,7 +83,15 @@ export interface ChatStreamCallbacks {
   onToolCall?: (call: ChatStreamToolCall) => void
   onToolResult?: (result: ChatStreamToolResult) => void
   onUsage?: (usage: { promptTokens: number; completionTokens: number }) => void
+  onNotice?: (notice: { id: string; noticeKind: 'warning' | 'auto-declined'; text: string }) => void
   onMetadata?: (data: Record<string, unknown>) => void
+  /** Structured detail from a loop-level error event. Fired alongside the
+   *  legacy string-only `onErrorEvent` callback. */
+  onErrorEventDetail?: (detail: {
+    message: string
+    code?: string
+    details?: Record<string, unknown>
+  }) => void
   /** A loop-level error event (the turn failed server-side). Optional, but the
    *  error never vanishes: when omitted, the message is synthesized into the
    *  transcript via `onText` (rendered by ChatMessages as a text segment) and
@@ -164,6 +182,17 @@ export function dispatchChatStreamLine(line: string, cb: ChatStreamCallbacks): {
       if (u) cb.onUsage?.({ promptTokens: u.promptTokens ?? 0, completionTokens: u.completionTokens ?? 0 })
       break
     }
+    case 'notice': {
+      if (
+        typeof evt.id === 'string' &&
+        (evt.noticeKind === 'warning' || evt.noticeKind === 'auto-declined') &&
+        typeof evt.text === 'string'
+      ) {
+        cb.onNotice?.({ id: evt.id, noticeKind: evt.noticeKind, text: evt.text })
+        receivedContent = true
+      }
+      break
+    }
     case 'metadata':
       cb.onMetadata?.((evt.data ?? {}) as Record<string, unknown>)
       break
@@ -196,8 +225,17 @@ export function dispatchChatStreamLine(line: string, cb: ChatStreamCallbacks): {
       // (mirrored by `session.run.failed`); older/edge lanes use a top-level
       // `details`/`error`. Read `data.message` FIRST so a real failure surfaces
       // to the operator instead of the useless "Unknown stream error".
-      const data = evt.data as { message?: string } | undefined
+      const data = evt.data as {
+        message?: string
+        code?: string
+        details?: Record<string, unknown>
+      } | undefined
       const message = String(data?.message ?? evt.details ?? evt.error ?? 'Unknown stream error')
+      cb.onErrorEventDetail?.({
+        message,
+        ...(typeof data?.code === 'string' ? { code: data.code } : {}),
+        ...(data?.details && typeof data.details === 'object' ? { details: data.details } : {}),
+      })
       if (cb.onErrorEvent) {
         cb.onErrorEvent(message)
       } else {

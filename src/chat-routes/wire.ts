@@ -29,6 +29,94 @@ export interface ChatTurnFilePartInput {
 
 export type ChatTurnPartInput = ChatTurnTextPartInput | ChatTurnFilePartInput
 
+// ── producer stream vocabulary ───────────────────────────────────────────────
+
+export interface ProducerTextEvent {
+  type: 'text'
+  text: string
+}
+
+export interface ProducerReasoningEvent {
+  type: 'reasoning'
+  text: string
+}
+
+export interface ProducerToolCallEvent {
+  type: 'tool_call'
+  call: {
+    toolCallId: string
+    toolName: string
+    args: Record<string, unknown>
+  }
+}
+
+export interface ProducerToolResultEvent {
+  type: 'tool_result'
+  toolCallId: string
+  toolName: string
+  outcome: {
+    ok: boolean
+    result?: unknown
+    message?: string
+  }
+}
+
+export interface ProducerUsageEvent {
+  type: 'usage'
+  usage: {
+    promptTokens: number
+    completionTokens: number
+  }
+}
+
+export interface ProducerNoticeEvent {
+  type: 'notice'
+  id: string
+  /** Kept inline with `/interactions`' `NoticeKind` so this file stays import-free. */
+  noticeKind: 'warning' | 'auto-declined'
+  text: string
+}
+
+export interface ProducerErrorEvent {
+  type: 'error'
+  data: {
+    message: string
+    code?: string
+    details?: Record<string, unknown>
+  }
+}
+
+/** Stable raw lifecycle/interaction/plan/route events forwarded unchanged. */
+export type ProducerPassthroughEventType =
+  | 'turn'
+  | 'metadata'
+  | 'interaction'
+  | 'interaction.cancel'
+  | 'plan.submitted'
+  | 'done'
+  | 'warning'
+  | 'session.run.started'
+  | 'session.run.completed'
+  | 'session.run.failed'
+  | 'turn_status'
+
+export interface ProducerPassthroughEvent {
+  type: ProducerPassthroughEventType
+  data?: Record<string, unknown>
+  /** Route markers and raw passthroughs may carry `turnId`, `status`, `seq`, etc. */
+  [key: string]: unknown
+}
+
+export type ProducerWireEvent =
+  | ProducerTextEvent
+  | ProducerReasoningEvent
+  | ProducerToolCallEvent
+  | ProducerToolResultEvent
+  | ProducerUsageEvent
+  | ProducerNoticeEvent
+  | ProducerErrorEvent
+  | ProducerPassthroughEvent
+
 /** The image/file split an attachment is rendered and persisted under — the
  *  same discriminant as {@link ChatMentionKind}, but a distinct name because an
  *  attachment carries content the product uploaded (`ChatAttachmentInput`)

@@ -10,6 +10,25 @@ async function* feed(events: Array<Record<string, unknown>>): AsyncGenerator<unk
   for (const event of events) yield event
 }
 
+async function* throwingFeed(events: Array<Record<string, unknown>>, error: Error): AsyncGenerator<unknown> {
+  for (const event of events) yield event
+  throw error
+}
+
+function interaction(id: string, kind: string): Record<string, unknown> {
+  return {
+    type: 'interaction',
+    data: {
+      request: {
+        id,
+        kind,
+        title: 'Need input',
+        answerSpec: { fields: [] },
+      },
+    },
+  }
+}
+
 async function drain(stream: AsyncGenerator<{ type: string }, void, unknown>) {
   const out: Array<Record<string, unknown>> = []
   for await (const event of stream) out.push(event as Record<string, unknown>)
@@ -113,6 +132,107 @@ describe('createSandboxChatProducer', () => {
     ])
   })
 
+  it('uses rich terminal done usage and emits the authoritative token totals', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([{
+        type: 'done',
+        data: {
+          tokenUsage: {
+            inputTokens: '101',
+            outputTokens: 22,
+            reasoningTokens: 7,
+            cacheReadInputTokens: 11,
+            cacheCreationInputTokens: 4,
+          },
+          totalCostUsd: '0.123',
+        },
+      }]),
+    })
+
+    expect(await drain(producer.stream)).toEqual([
+      { type: 'usage', usage: { promptTokens: 101, completionTokens: 22 } },
+      expect.objectContaining({ type: 'done' }),
+    ])
+    expect(producer.usage?.()).toEqual({
+      inputTokens: 101,
+      outputTokens: 22,
+      reasoningTokens: 7,
+      cacheReadTokens: 11,
+      cacheWriteTokens: 4,
+      costUsd: 0.123,
+    })
+  })
+
+  it('lets later parseable done usage override result usage', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([
+        { type: 'result', data: { tokenUsage: { inputTokens: 10, outputTokens: 2, cost: 0.01 } } },
+        { type: 'done', data: { tokenUsage: { inputTokens: 20, outputTokens: 5 }, totalCostUsd: 0.02 } },
+      ]),
+    })
+
+    expect(await drain(producer.stream)).toEqual([
+      { type: 'usage', usage: { promptTokens: 10, completionTokens: 2 } },
+      { type: 'usage', usage: { promptTokens: 20, completionTokens: 5 } },
+      expect.objectContaining({ type: 'done' }),
+    ])
+    expect(producer.usage?.()).toEqual({ inputTokens: 20, outputTokens: 5, costUsd: 0.02 })
+  })
+
+  it('retains prior usage when done carries no parseable terminal usage', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([
+        partUpdated({ type: 'step-finish', tokens: { input: 8, output: 3 }, cost: 0.04 }),
+        { type: 'done', data: { tokenUsage: { inputTokens: 'bad', outputTokens: 9 } } },
+      ]),
+    })
+
+    expect(await drain(producer.stream)).toEqual([
+      { type: 'usage', usage: { promptTokens: 8, completionTokens: 3 } },
+      expect.objectContaining({ type: 'done' }),
+    ])
+    expect(producer.usage?.()).toEqual({ inputTokens: 8, outputTokens: 3, costUsd: 0.04 })
+  })
+
+  it('maps rich result tokenUsage fields while keeping result swallowed', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([{
+        type: 'result',
+        data: {
+          tokenUsage: {
+            inputTokens: 44,
+            outputTokens: 12,
+            reasoningTokens: 3,
+            cacheReadInputTokens: 6,
+            cacheCreationInputTokens: 2,
+            cost: 0.08,
+          },
+        },
+      }]),
+    })
+
+    expect(await drain(producer.stream)).toEqual([
+      { type: 'usage', usage: { promptTokens: 44, completionTokens: 12 } },
+    ])
+    expect(producer.usage?.()).toEqual({
+      inputTokens: 44,
+      outputTokens: 12,
+      reasoningTokens: 3,
+      cacheReadTokens: 6,
+      cacheWriteTokens: 2,
+      costUsd: 0.08,
+    })
+  })
+
+  it('keeps the legacy result.data.usage override as a fallback', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([{ type: 'result', data: { usage: { inputTokens: 9, outputTokens: 4 } } }]),
+    })
+
+    expect(await drain(producer.stream)).toEqual([])
+    expect(producer.usage?.()).toEqual({ inputTokens: 9, outputTokens: 4 })
+  })
+
   it('persists file/image parts from the stream into the transcript projection', async () => {
     const producer = createSandboxChatProducer({
       events: feed([
@@ -133,32 +253,89 @@ describe('createSandboxChatProducer', () => {
 
   it('forwards renderable asks and auto-declines non-renderable ones', async () => {
     const declineInteraction = vi.fn(async () => {})
-    const ask = (id: string, kind: string) => ({
-      type: 'interaction',
-      data: {
-        request: {
-          id,
-          kind,
-          title: 'Need input',
-          answerSpec: { fields: [] },
-        },
-      },
-    })
     const producer = createSandboxChatProducer({
-      events: feed([ask('q-1', 'question'), ask('p-1', 'permission')]),
+      events: feed([interaction('q-1', 'question'), interaction('p-1', 'permission')]),
       declineInteraction,
       log: () => {},
     })
     const events = await drain(producer.stream)
 
-    expect(events).toHaveLength(1)
-    expect(events[0]).toMatchObject({ type: 'interaction', data: { request: { id: 'q-1', kind: 'question' } } })
+    expect(events).toEqual([
+      interaction('q-1', 'question'),
+      {
+        type: 'notice',
+        id: 'auto-declined-p-1',
+        noticeKind: 'auto-declined',
+        text: 'The agent requested permission approval — auto-declined by policy.',
+      },
+    ])
     expect(declineInteraction).toHaveBeenCalledExactlyOnceWith('p-1')
-    expect(producer.assistantParts?.()).toEqual([expect.objectContaining({
-      type: 'interaction',
-      id: 'q-1',
-      status: 'pending',
-    })])
+    expect(producer.assistantParts?.()).toEqual([
+      expect.objectContaining({
+        type: 'interaction',
+        id: 'q-1',
+        status: 'answered',
+      }),
+      {
+        type: 'notice',
+        id: 'auto-declined-p-1',
+        noticeKind: 'auto-declined',
+        text: 'The agent requested permission approval — auto-declined by policy.',
+      },
+    ])
+  })
+
+  it('persists and emits the failed auto-decline notice when decline throws', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([interaction('p-2', 'permission')]),
+      declineInteraction: async () => { throw new Error('broker down') },
+      log: () => {},
+    })
+
+    const notice = {
+      type: 'notice',
+      id: 'auto-declined-p-2',
+      noticeKind: 'auto-declined',
+      text: 'The agent requested permission approval; declining it failed — it will expire on its own.',
+    }
+    expect(await drain(producer.stream)).toEqual([notice])
+    expect(producer.assistantParts?.()).toEqual([notice])
+  })
+
+  it('persists and emits the failed auto-decline notice when no decline callback is wired', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([interaction('p-3', 'permission')]),
+      log: () => {},
+    })
+
+    const notice = {
+      type: 'notice',
+      id: 'auto-declined-p-3',
+      noticeKind: 'auto-declined',
+      text: 'The agent requested permission approval; declining it failed — it will expire on its own.',
+    }
+    expect(await drain(producer.stream)).toEqual([notice])
+    expect(producer.assistantParts?.()).toEqual([notice])
+  })
+
+  it('gates plan asks through isRenderableInteraction while still forwarding questions', async () => {
+    const declineInteraction = vi.fn(async () => {})
+    const producer = createSandboxChatProducer({
+      events: feed([interaction('plan-1', 'plan'), interaction('q-2', 'question')]),
+      isRenderableInteraction: (kind) => kind === 'question',
+      declineInteraction,
+    })
+
+    const events = await drain(producer.stream)
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'notice',
+        id: 'auto-declined-plan-1',
+        noticeKind: 'auto-declined',
+      }),
+      interaction('q-2', 'question'),
+    ])
+    expect(declineInteraction).toHaveBeenCalledExactlyOnceWith('plan-1')
   })
 
   it('persists an explicit cancel outcome without inferring it from disappearance', async () => {
@@ -420,21 +597,200 @@ describe('createSandboxChatProducer', () => {
     expect(persisted.some((p) => 'url' in p)).toBe(false)
   })
 
-  it('forwards error and cancel events verbatim and drops malformed interactions', async () => {
+  it('persists and emits warning notices while preserving raw warning forwarding', async () => {
+    const rawWarning = { type: 'warning', data: { code: 'FILE_DENIED', message: 'Outside workspace' } }
+    const producer = createSandboxChatProducer({ events: feed([rawWarning]) })
+
+    expect(await drain(producer.stream)).toEqual([
+      {
+        type: 'notice',
+        id: 'warning-1',
+        noticeKind: 'warning',
+        text: 'FILE_DENIED: Outside workspace',
+      },
+      rawWarning,
+    ])
+    expect(producer.assistantParts?.()).toEqual([{
+      type: 'notice',
+      id: 'warning-1',
+      noticeKind: 'warning',
+      text: 'FILE_DENIED: Outside workspace',
+    }])
+  })
+
+  it('composes raw errors after visible output and forwards the original error last', async () => {
+    const rawError = { type: 'error', data: { message: 'upstream reset', retryable: false } }
+    const producer = createSandboxChatProducer({
+      events: feed([
+        partUpdated({ type: 'text', id: 't1', text: 'Partial answer' }, 'Partial answer'),
+        rawError,
+      ]),
+    })
+
+    const events = await drain(producer.stream)
+    expect(events).toEqual([
+      { type: 'text', text: 'Partial answer' },
+      {
+        type: 'text',
+        text: '\n\n---\nThe sandbox model stream stopped before a clean completion.\n\nError: upstream reset',
+      },
+      rawError,
+    ])
+    expect(producer.finalText()).toBe(
+      'Partial answer\n\n---\nThe sandbox model stream stopped before a clean completion.\n\nError: upstream reset',
+    )
+    expect(producer.assistantParts?.()).toEqual([{
+      type: 'text',
+      text: 'Partial answer\n\n---\nThe sandbox model stream stopped before a clean completion.\n\nError: upstream reset',
+    }])
+  })
+
+  it('composes a no-visible-answer error without a separator', async () => {
+    const rawError = { type: 'error', data: { error: 'model rejected' } }
+    const producer = createSandboxChatProducer({ events: feed([rawError]) })
+
+    expect(await drain(producer.stream)).toEqual([
+      {
+        type: 'text',
+        text: 'The sandbox agent returned an error before producing a visible answer.\n\nError: model rejected',
+      },
+      rawError,
+    ])
+    expect(producer.finalText()).not.toContain('---')
+  })
+
+  it('settles a dangling tool live and in persistence when a raw error arrives', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([
+        partUpdated({ type: 'tool', id: 'call-2', tool: 'search', state: { status: 'running', input: { q: 'x' } } }),
+        { type: 'error', data: { message: 'stream failed' } },
+      ]),
+    })
+
+    const events = await drain(producer.stream)
+    expect(events).toEqual([
+      { type: 'tool_call', call: { toolCallId: 'call-2', toolName: 'search', args: { q: 'x' } } },
+      expect.objectContaining({ type: 'text' }),
+      {
+        type: 'tool_result',
+        toolCallId: 'call-2',
+        toolName: 'search',
+        outcome: {
+          ok: false,
+          message: 'Tool did not report a terminal result before the assistant turn completed.',
+        },
+      },
+      { type: 'error', data: { message: 'stream failed' } },
+    ])
+    expect(producer.assistantParts?.()).toEqual([
+      expect.objectContaining({
+        type: 'tool',
+        id: 'call-2',
+        state: {
+          status: 'error',
+          input: { q: 'x' },
+          error: 'Tool did not report a terminal result before the assistant turn completed.',
+          metadata: {
+            terminalized: true,
+            terminalReason: 'missing-tool-terminal',
+          },
+        },
+      }),
+      expect.objectContaining({ type: 'text' }),
+    ])
+  })
+
+  it('terminalizes each dangling tool only once when error is followed by done', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([
+        partUpdated({ type: 'tool', id: 'call-3', tool: 'search', state: { status: 'running', input: {} } }),
+        { type: 'error', data: { message: 'failed' } },
+        { type: 'done', data: {} },
+      ]),
+    })
+
+    const events = await drain(producer.stream)
+    expect(events.filter((event) => event.type === 'tool_result')).toHaveLength(1)
+    expect(events.at(-1)).toEqual({ type: 'done', data: {} })
+  })
+
+  it('catches a severed stream, persists partial content, and emits a structured failure normally', async () => {
+    const streamError = Object.assign(new Error('socket severed'), {
+      streamMessage: 'sandbox stream disconnected',
+      diagnostics: { sessionId: 's-1', lastEventId: 'evt-9' },
+    })
+    const producer = createSandboxChatProducer({
+      events: throwingFeed([
+        partUpdated({ type: 'text', id: 't1', text: 'Partial' }, 'Partial'),
+        partUpdated({ type: 'tool', id: 'call-4', tool: 'fetch', state: { status: 'running', input: {} } }),
+      ], streamError),
+      log: () => {},
+    })
+
+    const events = await drain(producer.stream)
+    const structuredError = events.at(-1) as {
+      type: string
+      data: { message: string; code: string; details: { failureNote: string } }
+    }
+    expect(events.filter((event) => event.type === 'tool_result')).toEqual([
+      expect.objectContaining({
+        toolCallId: 'call-4',
+        outcome: expect.objectContaining({ ok: false }),
+      }),
+    ])
+    expect(structuredError.type).toBe('error')
+    expect(structuredError.data.code).toBe('sandbox.stream_failed')
+    expect(structuredError.data.message).toContain('Please retry')
+    expect(structuredError.data.details.failureNote).toContain('sandbox stream disconnected')
+    expect(structuredError.data.details.failureNote).toContain('"lastEventId":"evt-9"')
+    expect(producer.finalText()).toContain('Partial\n\n---\nThe sandbox model stream stopped')
+    expect(producer.assistantParts?.()).toEqual([
+      expect.objectContaining({
+        type: 'text',
+        text: expect.stringContaining('Partial\n\n---\nThe sandbox model stream stopped'),
+      }),
+      expect.objectContaining({
+        type: 'tool',
+        id: 'call-4',
+        state: expect.objectContaining({ status: 'error', metadata: expect.objectContaining({ terminalized: true }) }),
+      }),
+    ])
+  })
+
+  it('finalizes pending interactions as expired on error and answered on clean completion', async () => {
+    const failed = createSandboxChatProducer({
+      events: feed([interaction('q-expired', 'question'), { type: 'error', data: { message: 'failed' } }]),
+    })
+    await drain(failed.stream)
+    expect(failed.assistantParts?.()).toContainEqual(expect.objectContaining({
+      type: 'interaction',
+      id: 'q-expired',
+      status: 'expired',
+    }))
+
+    const clean = createSandboxChatProducer({
+      events: feed([interaction('q-answered', 'question'), { type: 'done', data: {} }]),
+    })
+    await drain(clean.stream)
+    expect(clean.assistantParts?.()).toContainEqual(expect.objectContaining({
+      type: 'interaction',
+      id: 'q-answered',
+      status: 'answered',
+    }))
+  })
+
+  it('still drops malformed interactions while forwarding valid cancel events', async () => {
     const log = vi.fn()
     const producer = createSandboxChatProducer({
       events: feed([
         { type: 'interaction', data: {} },
         { type: 'interaction.cancel', data: { id: 'q-1', reason: 'timeout' } },
-        { type: 'error', details: 'boom' },
       ]),
       log,
     })
-    const events = await drain(producer.stream)
 
-    expect(events).toEqual([
+    expect(await drain(producer.stream)).toEqual([
       { type: 'interaction.cancel', data: { id: 'q-1', reason: 'timeout' } },
-      { type: 'error', details: 'boom' },
     ])
     expect(log).toHaveBeenCalledOnce()
   })

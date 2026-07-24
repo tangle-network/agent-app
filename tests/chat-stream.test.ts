@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from 'vitest'
-import { consumeChatStream, dispatchChatStreamLine, streamChatTurn, type ChatStreamCallbacks } from '../src/web-react/chat-stream'
+import {
+  consumeChatStream,
+  dispatchChatStreamLine,
+  streamChatTurn,
+  type ChatStreamCallbacks,
+  type ProducerWireEvent,
+} from '../src/web-react/chat-stream'
 
 function ndjsonBody(lines: unknown[], opts?: { failAfter?: number }): ReadableStream<Uint8Array> {
   const enc = new TextEncoder()
@@ -17,6 +23,10 @@ function ndjsonBody(lines: unknown[], opts?: { failAfter?: number }): ReadableSt
       controller.enqueue(enc.encode(JSON.stringify(lines[i++]) + '\n'))
     },
   })
+}
+
+function wireText(event: ProducerWireEvent): string | undefined {
+  return event.type === 'text' ? event.text : undefined
 }
 
 function recorder() {
@@ -46,6 +56,11 @@ const TURN_LINES = [
 ]
 
 describe('consumeChatStream', () => {
+  it('keeps ProducerWireEvent discriminated by its type field', () => {
+    expect(wireText({ type: 'text', text: 'hello' })).toBe('hello')
+    expect(wireText({ type: 'done', data: {}, seq: 4 })).toBeUndefined()
+  })
+
   it('normalizes live, replayed (seq), and route-level line shapes', async () => {
     const { log, cb } = recorder()
     const result = await consumeChatStream(ndjsonBody(TURN_LINES), cb)
@@ -79,6 +94,54 @@ describe('consumeChatStream', () => {
     const { log, cb } = recorder()
     dispatchChatStreamLine(JSON.stringify({ type: 'error', error: 'Chat loop failed', details: 'boom' }), cb)
     expect(log).toEqual([['error', 'boom']])
+  })
+
+  it('dispatches flattened notice events', () => {
+    const notices: unknown[] = []
+    const result = dispatchChatStreamLine(JSON.stringify({
+      type: 'notice',
+      id: 'warning-1',
+      noticeKind: 'warning',
+      text: 'FILE_DENIED: Outside workspace',
+    }), { onNotice: (notice) => notices.push(notice) })
+
+    expect(notices).toEqual([{
+      id: 'warning-1',
+      noticeKind: 'warning',
+      text: 'FILE_DENIED: Outside workspace',
+    }])
+    expect(result.receivedContent).toBe(true)
+  })
+
+  it('dispatches structured error detail alongside the legacy message callback', () => {
+    const messages: string[] = []
+    const details: unknown[] = []
+    dispatchChatStreamLine(JSON.stringify({
+      type: 'error',
+      data: {
+        message: 'Please retry',
+        code: 'sandbox.stream_failed',
+        details: { failureNote: 'sandbox-stream: reset' },
+      },
+    }), {
+      onErrorEvent: (message) => messages.push(message),
+      onErrorEventDetail: (detail) => details.push(detail),
+    })
+
+    expect(messages).toEqual(['Please retry'])
+    expect(details).toEqual([{
+      message: 'Please retry',
+      code: 'sandbox.stream_failed',
+      details: { failureNote: 'sandbox-stream: reset' },
+    }])
+  })
+
+  it('keeps the legacy error callback path unchanged without a detail callback', () => {
+    const messages: string[] = []
+    dispatchChatStreamLine(JSON.stringify({ type: 'error', data: { message: 'legacy path' } }), {
+      onErrorEvent: (message) => messages.push(message),
+    })
+    expect(messages).toEqual(['legacy path'])
   })
 
   it('fails loud when no onErrorEvent is wired: the error lands in the transcript and console.error', () => {

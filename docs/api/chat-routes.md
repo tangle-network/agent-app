@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-121 exports.
+131 exports.
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
@@ -684,6 +684,86 @@ number
 
 ```ts
 (raw: unknown) => FileMention[]
+```
+
+### `ProducerErrorEvent`
+
+`interface`
+
+```ts
+interface ProducerErrorEvent
+```
+
+### `ProducerNoticeEvent`
+
+`interface`
+
+```ts
+interface ProducerNoticeEvent
+```
+
+### `ProducerPassthroughEvent`
+
+`interface`
+
+```ts
+interface ProducerPassthroughEvent
+```
+
+### `ProducerPassthroughEventType`
+
+`type` — Stable raw lifecycle/interaction/plan/route events forwarded unchanged.
+
+```ts
+type ProducerPassthroughEventType
+```
+
+### `ProducerReasoningEvent`
+
+`interface`
+
+```ts
+interface ProducerReasoningEvent
+```
+
+### `ProducerTextEvent`
+
+`interface`
+
+```ts
+interface ProducerTextEvent
+```
+
+### `ProducerToolCallEvent`
+
+`interface`
+
+```ts
+interface ProducerToolCallEvent
+```
+
+### `ProducerToolResultEvent`
+
+`interface`
+
+```ts
+interface ProducerToolResultEvent
+```
+
+### `ProducerUsageEvent`
+
+`interface`
+
+```ts
+interface ProducerUsageEvent
+```
+
+### `ProducerWireEvent`
+
+`type`
+
+```ts
+type ProducerWireEvent
 ```
 
 ### `PROMOTE_MAX_FILE_BYTES`
