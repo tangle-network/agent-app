@@ -7,11 +7,15 @@ every event as it's produced so a reconnecting client can replay the tail.
 ## ⚠️ First: are you on the sandbox? Then you almost certainly DON'T need this.
 
 **The `@tangle-network/sandbox` SDK already buffers + replays session streams.**
-`streamPrompt` / `dispatchPrompt` buffer events server-side; a reconnecting
-client replays with `lastEventId` (the `Last-Event-ID` header), and
-`findCompletedTurn` is the idempotent completion check. Both gtm-agent and
-creative-agent already use this — **do not hand-roll the buffer below over a
-sandbox session.** See the `sandbox-sdk-integration` guidance.
+`box.streamPrompt` / `box.dispatchPrompt` buffer events server-side; a
+reconnecting **worker** resumes by passing `lastEventId` (forwarded as the
+`Last-Event-ID` header), a **browser** attaches directly with
+`box.mintScopedToken()` + `SessionGatewayClient`
+(`@tangle-network/sandbox/session-gateway`, WebSocket, replay from
+`lastEventId`), and `box.findCompletedTurn(turnId, { sessionId })` is the
+idempotent completion check. Both gtm-agent and creative-agent already use this
+— **do not hand-roll the buffer below over a sandbox session.** See the
+`sandbox-sdk-integration` guidance.
 
 **This module is the resume story for the SANDBOX-FREE path only** — a browser or
 edge copilot streaming the Tangle Router (or any OpenAI-compatible endpoint)
@@ -30,9 +34,9 @@ It is pure mechanism behind a storage seam — no peers. Storage is a
 
 | You're running… | Use this? |
 | --- | --- |
-| **Sandbox-backed turn** (most products) | **No** — the SDK gateway already buffers + replays (`streamPrompt` + `lastEventId`). Use that. |
+| **Sandbox-backed turn** (most products) | **No** — the SDK already buffers + replays: `box.streamPrompt` + `lastEventId` for a worker, `box.mintScopedToken()` + `SessionGatewayClient` for a browser. Use those. |
 | **Sandbox-free interactive turn** (browser/edge copilot on the Router directly) | **Yes** — there's no gateway; this is your resume mechanism. |
-| **Autonomous turn** (mission, queue, cron) | Prefer `dispatchPrompt({ detach: true })` + poll. Buffer only if you also stream it to a watcher AND aren't sandbox-backed. |
+| **Autonomous turn** (mission, queue, cron) | Prefer `box.driveTurn()` (agent-app's `driveSandboxTurn`) ticked from a durable driver, or raw `box.dispatchPrompt({ detach: true })` + poll. Buffer only if you also stream it to a watcher AND aren't sandbox-backed — and then use `runDetachedTurn` (`/chat-routes`), which does exactly that bridge. |
 | **Eval / CI** (long-lived process) | **No** — the harness is the consumer and outlives the run; a failed run is re-run, not resumed. |
 
 ## Pick a transport — who owns the producer?
