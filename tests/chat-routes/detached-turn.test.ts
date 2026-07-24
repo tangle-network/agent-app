@@ -230,16 +230,28 @@ describe('runDetachedTurn', () => {
     expect(res.state).toBe('completed')
   })
 
-  it('settles error and rethrows when the stream throws mid-turn', async () => {
+  it('settles a thrown sandbox stream as a failed result with partial content', async () => {
     const store = createMemoryTurnEventStore()
     async function* events(): AsyncGenerator<unknown> {
       yield partUpdated({ type: 'text', id: 'x1', text: 'oops' }, 'oops')
       throw new Error('stream died')
     }
 
-    await expect(
-      runDetachedTurn({ store, turnId: 't1', scopeId: 'thread-1', events: events() }),
-    ).rejects.toThrow('stream died')
+    const result = await runDetachedTurn({
+      store,
+      turnId: 't1',
+      scopeId: 'thread-1',
+      events: events(),
+      log: () => {},
+    })
+
+    expect(result).toMatchObject({
+      state: 'failed',
+      text: expect.stringContaining('oops'),
+      error: expect.stringContaining('stream died'),
+      cached: false,
+    })
+    expect(result.text).toContain('The sandbox model stream stopped before a clean completion.')
     expect(await store.getStatus('t1')).toBe('error')
   })
 })

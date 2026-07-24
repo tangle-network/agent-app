@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-220 exports.
+230 exports.
 
 ### `activityTone`
 
@@ -1356,6 +1356,86 @@ type ParseInteractionResult
 
 ```ts
 (part: Record<string, unknown>) => ChatInteraction | null
+```
+
+### `ProducerErrorEvent`
+
+`interface`
+
+```ts
+interface ProducerErrorEvent
+```
+
+### `ProducerNoticeEvent`
+
+`interface`
+
+```ts
+interface ProducerNoticeEvent
+```
+
+### `ProducerPassthroughEvent`
+
+`interface`
+
+```ts
+interface ProducerPassthroughEvent
+```
+
+### `ProducerPassthroughEventType`
+
+`type` — Stable raw lifecycle/interaction/plan/route events forwarded unchanged.
+
+```ts
+type ProducerPassthroughEventType
+```
+
+### `ProducerReasoningEvent`
+
+`interface`
+
+```ts
+interface ProducerReasoningEvent
+```
+
+### `ProducerTextEvent`
+
+`interface`
+
+```ts
+interface ProducerTextEvent
+```
+
+### `ProducerToolCallEvent`
+
+`interface`
+
+```ts
+interface ProducerToolCallEvent
+```
+
+### `ProducerToolResultEvent`
+
+`interface`
+
+```ts
+interface ProducerToolResultEvent
+```
+
+### `ProducerUsageEvent`
+
+`interface`
+
+```ts
+interface ProducerUsageEvent
+```
+
+### `ProducerWireEvent`
+
+`type`
+
+```ts
+type ProducerWireEvent
 ```
 
 ### `ProposalApprovalHandlers`

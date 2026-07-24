@@ -80,8 +80,13 @@ export function buildChat(env: Env) {
       const box = await ensureWorkspaceSandbox(shell, {
         workspaceId: identity.tenantId, userId: identity.userId, harness: 'opencode',
       })
+      const planEnabled = body.enablePlans === true
       return createSandboxChatProducer({
         model: body.model,
+        // No separate producer planMode option: close over the product's
+        // per-turn policy and auto-decline plan asks no card will render.
+        isRenderableInteraction: (kind) =>
+          kind === 'question' || (kind === 'plan' && planEnabled),
         events: streamSandboxPrompt(shell, box, prompt, {
           sessionId: identity.sessionId, executionId,
           model: body.model, effort: body.effort,
@@ -156,7 +161,14 @@ function Chat({ threadId }: { threadId: string }) {
     await streamChatTurn({
       start: () => fetch('/api/chat', chatTurnRequestInit({ threadId, content, parts })),
       resume: (turnId, fromSeq) => fetch(`/api/chat/replay/${turnId}?fromSeq=${fromSeq}`),
-      callbacks: { onText: appendDelta, onToolCall: showToolChip, onInteraction: showQuestionCard },
+      callbacks: {
+        onText: appendDelta,
+        onToolCall: showToolChip,
+        onInteraction: showQuestionCard,
+        onNotice: ({ noticeKind, text }) => showTranscriptNotice(noticeKind, text),
+        onErrorEvent: (message) => showTurnError(message), // existing string path
+        onErrorEventDetail: ({ code, details }) => recordFailureDetail(code, details),
+      },
     })
   }
 
@@ -169,6 +181,13 @@ into the sandbox workspace and referenced by `path` (the ~1 MiB gateway body
 cap makes that two-step mandatory). Question cards render with
 `InteractionQuestionCard` + `useChatInteractions` and answer through
 `/api/chat/interactions` — see `/web-react`.
+
+The producer keeps the flattened stream vocabulary: `text`, `reasoning`,
+`tool_call`, `tool_result`, and `usage`, plus additive `notice` lines and
+structured `{ type: 'error', data: { message, code?, details? } }` lines.
+`onNotice` consumes visible warning/auto-decline notices;
+`onErrorEventDetail` receives the structured fields while the existing
+`onErrorEvent(message)` callback continues to fire unchanged.
 
 ## Attachments (store-backed files, #224)
 

@@ -95,8 +95,8 @@ export interface DetachedTurnOptions {
 
 export interface DetachedTurnResult {
   /** `completed` — clean drain: persist + bill. `failed` — a terminal error
-   *  EVENT in the stream: skip billing, render an error row. (A stream that
-   *  THROWS re-throws out of `runDetachedTurn` instead of returning here.) */
+   *  event, including the producer's structured `sandbox.stream_failed` event
+   *  when the raw sandbox stream throws: skip billing, render an error row. */
   state: 'completed' | 'failed'
   text: string
   /** The structured assistant body to persist (tool calls, file/plan/interaction
