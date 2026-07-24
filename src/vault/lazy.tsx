@@ -10,6 +10,7 @@ import type { VaultPaneProps } from './contracts'
 
 export type { VaultPaneProps }
 
+/** Resolve VaultPane component lazily to optimize loading and improve performance */
 export const VaultPaneLazy = lazy(
   () => import('./VaultPane').then((m) => ({ default: m.VaultPane })),
 )

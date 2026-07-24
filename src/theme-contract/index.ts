@@ -50,6 +50,7 @@ import { type Dirent, existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+/** Define options for scanning source directories and CSS token files in a theme contract */
 export interface ThemeContractOptions {
   /** Consumer source directories to scan for token references (recursively). */
   srcDirs: string[]
@@ -72,6 +73,7 @@ export interface ThemeContractOptions {
   allowlist?: string[]
 }
 
+/** Describe a missing theme contract variable and where it was referenced */
 export interface ThemeContractMiss {
   /** The undefined custom property, e.g. `--popover`. */
   varName: string
@@ -83,6 +85,7 @@ export interface ThemeContractMiss {
   referencedIn: string
 }
 
+/** Describe the result of validating a theme contract including success status and missing items */
 export interface ThemeContractResult {
   ok: boolean
   missing: ThemeContractMiss[]

@@ -96,6 +96,7 @@ export interface MemberSyncSeam {
   remove?(input: { workspaceId: string; userId: string }): Promise<void> | void
 }
 
+/** Define configuration options for managing team members and workspace access APIs */
 export interface MembersApiOptions {
   db: TeamDatabase
   tables: TeamTables
@@ -109,6 +110,7 @@ export interface MembersApiOptions {
   memberSyncSeam?: MemberSyncSeam
 }
 
+/** Define the structure of a workspace member entry with identification, role, and status details */
 export interface MemberListEntry {
   id: string
   userId: string | null

@@ -21,6 +21,7 @@ import {
 } from './types'
 import { canTransitionPlanStatus, planFollowUpTurnId } from '../plans/index'
 
+/** Resolve authorization status for durable plans using scopes, responses, or nullish values */
 export type DurablePlanAuthorization =
   | DurableChatScope
   | { scope: DurableChatScope }
@@ -28,12 +29,14 @@ export type DurablePlanAuthorization =
   | null
   | undefined
 
+/** Define arguments for authorizing durable plan route requests with operation and optional plan ID */
 export interface DurablePlanRouteAuthorizeArgs {
   request: Request
   operation: 'current' | 'decide'
   planId?: string
 }
 
+/** Define options for durable plan routing including store, authority, authorization, and idempotent side effect handling */
 export interface DurablePlanRouteOptions {
   store: DurablePlanStore
   authority: DurablePlanAuthority
@@ -52,6 +55,7 @@ export interface DurablePlanRouteOptions {
   logger?: Pick<Console, 'warn' | 'error'>
 }
 
+/** Define routes handling durable plan requests with current and decide methods */
 export interface DurablePlanRoutes {
   current(request: Request): Promise<Response>
   decide(request: Request): Promise<Response>
@@ -132,6 +136,7 @@ function recoverReceipt(
   })
 }
 
+/** Build durable plan routes with authorization and effect handling based on provided options */
 export function createDurablePlanRoutes(options: DurablePlanRouteOptions): DurablePlanRoutes {
   const now = options.now ?? (() => new Date().toISOString())
   const logger = options.logger ?? console

@@ -32,6 +32,7 @@ export function requireString(body: JsonObject, field: string): string | Respons
   return v
 }
 
+/** Define the context of a request including IP address, user agent, timestamp, and request ID */
 export interface RequestContext {
   ipAddress: string
   userAgent: string
@@ -60,6 +61,7 @@ export interface KvLike {
   put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>
 }
 
+/** Describe the outcome of a rate limit check including allowance, remaining count, and reset time */
 export interface RateLimitResult {
   allowed: boolean
   remaining: number
@@ -117,6 +119,7 @@ function parseRateLimitState(raw: string | null): number[] | typeof POISONED_STA
   return parsed.filter((t): t is number => typeof t === 'number' && Number.isFinite(t))
 }
 
+/** Define options for configuring cookie attributes and behavior */
 export interface CookieOptions {
   name: string
   /** Default '/'. */
@@ -167,6 +170,7 @@ export function readCookieValue(cookieHeader: string | null, name: string): stri
   return null
 }
 
+/** Define options for configuring security-related HTTP headers including disclaimers and retention labels */
 export interface SecurityHeaderOptions {
   /** Product disclaimer (e.g. "AI-powered tool. Not legal advice."). Omitted if absent. */
   disclaimer?: string

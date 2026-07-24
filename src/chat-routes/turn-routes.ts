@@ -116,6 +116,7 @@ export interface ChatTurnRouteProducer extends ChatTurnProducer {
   model?: string
 }
 
+/** Resolve authorization status and context for a chat turn including tenant and user identification */
 export type ChatTurnAuthorization<TContext> =
   | {
       ok: true
@@ -133,6 +134,7 @@ export type ChatTurnAuthorization<TContext> =
     }
   | { ok: false; response: Response }
 
+/** Define arguments required to authorize a chat turn based on intent and request details */
 export interface ChatTurnAuthorizeArgs {
   request: Request
   intent: 'turn' | 'replay' | 'running'
@@ -144,6 +146,7 @@ export interface ChatTurnAuthorizeArgs {
   threadId?: string
 }
 
+/** Define the arguments required to produce a chat turn with context and messaging details */
 export interface ChatTurnProduceArgs<TContext> {
   request: Request
   body: ChatTurnRequestPayload
@@ -218,14 +221,17 @@ interface ChatTurnLifecycleBase<TContext> {
   turnStreamId: string
   context: TContext
 }
+/** Define lifecycle start event with context and timestamp for a chat turn */
 export interface ChatTurnLifecycleStart<TContext> extends ChatTurnLifecycleBase<TContext> {
   startedAt: number
 }
+/** Define the structure representing the completion state of a chat turn lifecycle with usage data */
 export interface ChatTurnLifecycleComplete<TContext> extends ChatTurnLifecycleBase<TContext> {
   finalText: string
   usage: ChatTurnUsage
   durationMs: number
 }
+/** Represent an error occurring during a chat turn lifecycle with context and duration information */
 export interface ChatTurnLifecycleError<TContext> extends ChatTurnLifecycleBase<TContext> {
   error: unknown
   durationMs: number
@@ -243,6 +249,7 @@ export interface ChatTurnLifecycle<TContext> {
   onTurnError?(info: ChatTurnLifecycleError<TContext>): void | Promise<void>
 }
 
+/** Define options to configure chat turn routes including authorization, storage, and event buffering */
 export interface CreateChatTurnRoutesOptions<TContext = void> {
   /** Names the product in `deriveExecutionId` so retries land on the same
    *  substrate execution. */
@@ -323,6 +330,7 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
   log?: (message: string, meta?: Record<string, unknown>) => void
 }
 
+/** Define routes to run, replay, and list running chat turns with streaming and reconnect support */
 export interface ChatTurnRoutes {
   /** POST — run one turn, streaming NDJSON. First line is
    *  `{type:'turn', turnId}` (the replay handle); the rest is the engine's
@@ -479,6 +487,7 @@ async function* withStreamHeartbeat(
 
 // ── the factory ────────────────────────────────────────────────────────────
 
+/** Build chat turn routes to handle and validate incoming chat requests with optional logging */
 export function createChatTurnRoutes<TContext = void>(
   options: CreateChatTurnRoutesOptions<TContext>,
 ): ChatTurnRoutes {

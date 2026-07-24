@@ -96,6 +96,7 @@ export type AnswerRejectionReason =
   | 'invalid-email'
   | 'unknown-question'
 
+/** Describe validation outcome of an answer including success status and optional rejection reason */
 export interface AnswerValidationResult {
   ok: boolean
   reason?: AnswerRejectionReason

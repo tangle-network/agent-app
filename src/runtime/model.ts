@@ -17,12 +17,16 @@ export interface TangleModelConfig {
   baseUrl: string
 }
 
+/** Define the environment context for executing Tangle operations */
 export type TangleExecutionEnvironment = 'development' | 'staging' | 'production' | 'test'
+/** Resolve the source of the Tangle execution key as either local environment or user input */
 export type TangleExecutionKeySource = 'local-env' | 'user'
+/** Define error codes for Tangle execution key issues related to API key and account connection */
 export type TangleExecutionKeyErrorCode =
   | 'local_tangle_api_key_required'
   | 'tangle_account_not_connected'
 
+/** Resolve options for model configuration including environment variables and default router base URL */
 export interface ResolveModelOptions {
   /** Env to read (defaults to process.env). */
   env?: Record<string, string | undefined>
@@ -30,6 +34,7 @@ export interface ResolveModelOptions {
   defaultRouterBaseUrl?: string
 }
 
+/** Resolve options for retrieving user API keys within a specific Tangle execution environment */
 export interface ResolveUserTangleExecutionKeyOptions {
   /** Deployment context. Only local development may fall back to env keys. */
   environment?: TangleExecutionEnvironment
@@ -39,6 +44,7 @@ export interface ResolveUserTangleExecutionKeyOptions {
   getUserApiKey: () => string | null | undefined | Promise<string | null | undefined>
 }
 
+/** Resolve options for retrieving a user's Tangle execution key with environment and API key access parameters */
 export interface ResolveUserTangleExecutionKeyForUserOptions<UserId = string> {
   userId: UserId
   environment?: TangleExecutionEnvironment
@@ -46,11 +52,13 @@ export interface ResolveUserTangleExecutionKeyForUserOptions<UserId = string> {
   getUserApiKey: (userId: UserId) => string | null | undefined | Promise<string | null | undefined>
 }
 
+/** Define a resolved key combining an API key with its Tangle execution source */
 export interface ResolvedTangleExecutionKey {
   apiKey: string
   source: TangleExecutionKeySource
 }
 
+/** Resolve options for retrieving a Tangle developer or user API key based on environment and context */
 export interface ResolveTangleDevOrUserKeyOptions {
   /** Deployment context. Only local development may use the env key. */
   environment?: TangleExecutionEnvironment
@@ -60,6 +68,7 @@ export interface ResolveTangleDevOrUserKeyOptions {
   getUserApiKey: () => string | null | undefined | Promise<string | null | undefined>
 }
 
+/** Represent HTTP error response containing status, error message, and specific error code */
 export interface TangleExecutionKeyHttpError {
   status: number
   body: {
@@ -68,12 +77,14 @@ export interface TangleExecutionKeyHttpError {
   }
 }
 
+/** Define configuration options for creating a Tangle router model including API key and model details */
 export interface CreateTangleRouterModelConfigOptions {
   apiKey: string
   model: string
   baseUrl?: string
 }
 
+/** Define options for configuring billing enforcement environment variables and overrides */
 export interface TangleBillingEnforcementOptions {
   /** Env to read (defaults to process.env). */
   env?: Record<string, string | undefined>
@@ -84,7 +95,9 @@ export interface TangleBillingEnforcementOptions {
   enforcementEnvVar?: string
 }
 
+/** Provide the default base URL for the Tangle router API endpoint */
 export const DEFAULT_TANGLE_ROUTER_BASE_URL = 'https://router.tangle.tools/v1'
+/** Define the default environment variable name for Tangle billing enforcement */
 export const DEFAULT_TANGLE_BILLING_ENFORCEMENT_ENV_VAR = 'TANGLE_BILLING_ENFORCEMENT'
 
 function requireEnv(env: Record<string, string | undefined>, name: string): string {
@@ -93,6 +106,7 @@ function requireEnv(env: Record<string, string | undefined>, name: string): stri
   return value
 }
 
+/** Resolve a string by trimming whitespace or returning null if empty or undefined */
 export function trimOrNull(value: string | null | undefined): string | null {
   const trimmed = value?.trim()
   return trimmed ? trimmed : null
@@ -102,6 +116,7 @@ function isTangleExecutionKeyErrorCode(value: unknown): value is TangleExecution
   return value === 'local_tangle_api_key_required' || value === 'tangle_account_not_connected'
 }
 
+/** Represent execution key errors with specific codes and HTTP status information */
 export class TangleExecutionKeyError extends Error {
   readonly code: TangleExecutionKeyErrorCode
   readonly status: number
@@ -114,6 +129,7 @@ export class TangleExecutionKeyError extends Error {
   }
 }
 
+/** Identify whether an error is a TangleExecutionKeyError based on its properties and type */
 export function isTangleExecutionKeyError(error: unknown): error is TangleExecutionKeyError {
   return error instanceof TangleExecutionKeyError
     || (
@@ -126,6 +142,7 @@ export function isTangleExecutionKeyError(error: unknown): error is TangleExecut
     )
 }
 
+/** Resolve the current Tangle execution environment based on provided or process environment variables */
 export function resolveTangleExecutionEnvironment(
   env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
 ): TangleExecutionEnvironment {
@@ -158,6 +175,7 @@ export function isTangleBillingEnforcementDisabled(
   return resolveTangleExecutionEnvironment(env) === 'development'
 }
 
+/** Resolve and format TangleExecutionKey HTTP errors into a standardized error object or return null */
 export function tangleExecutionKeyHttpError(error: unknown): TangleExecutionKeyHttpError | null {
   if (!isTangleExecutionKeyError(error)) return null
   return {
@@ -223,6 +241,7 @@ export async function resolveUserTangleExecutionKey(
   )
 }
 
+/** Resolve the Tangle execution key for a specified user using provided environment and API key options */
 export async function resolveUserTangleExecutionKeyForUser<UserId = string>(
   opts: ResolveUserTangleExecutionKeyForUserOptions<UserId>,
 ): Promise<ResolvedTangleExecutionKey> {

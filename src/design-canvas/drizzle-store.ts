@@ -37,6 +37,7 @@ import type {
  *  and schema generics so better-sqlite3, D1, and libsql handles all fit. */
 export type DesignCanvasDatabase = BaseSQLiteDatabase<'sync' | 'async', any, any>
 
+/** Define options for creating a Drizzle scene store including database, tables, and scope */
 export interface CreateDrizzleSceneStoreOptions {
   db: DesignCanvasDatabase
   tables: DesignCanvasTables
@@ -45,6 +46,7 @@ export interface CreateDrizzleSceneStoreOptions {
 
 const DEFAULT_LIST_LIMIT = 50
 
+/** Create a scene store configured with database tables and scoped to a specific document and workspace */
 export function createDrizzleSceneStore(options: CreateDrizzleSceneStoreOptions): SceneStore {
   const { db, tables, scope } = options
   const { designDocuments, designDecisions, designExports } = tables

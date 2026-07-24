@@ -18,14 +18,19 @@ export const MIN_SEQUENCE_CLIP_FRAMES = 1
  *  agent-decision lane rendered as markers, never as media. */
 export type SequenceTrackKind = 'video' | 'audio' | 'caption' | 'reference' | 'agent'
 
+/** Define sequence status as one of the specific lifecycle stages draft, active, exporting, or archived */
 export type SequenceStatus = 'draft' | 'active' | 'exporting' | 'archived'
 
+/** Define export formats available for sequence data including video, subtitle, and metadata types */
 export type SequenceExportFormat = 'mp4' | 'otio' | 'xml' | 'edl' | 'vtt' | 'srt' | 'contact_sheet'
 
+/** Represent export status of a sequence as queued, processing, completed, failed, or cancelled */
 export type SequenceExportStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled'
 
+/** Define media types allowed in a sequence including video, image, and audio */
 export type SequenceMediaKind = 'video' | 'image' | 'audio'
 
+/** Describe metadata and properties of a media sequence including dimensions, duration, and status */
 export interface SequenceMeta {
   id: string
   title: string
@@ -38,6 +43,7 @@ export interface SequenceMeta {
   metadata: Record<string, unknown>
 }
 
+/** Define properties and state for a sequence track including id, kind, name, order, and flags */
 export interface SequenceTrack {
   id: string
   kind: SequenceTrackKind
@@ -60,6 +66,7 @@ export interface SequenceClipMedia {
   providerStatus?: 'queued' | 'processing' | 'completed' | 'failed'
 }
 
+/** Define properties for a media sequence clip including timing, source, track, and caption details */
 export interface SequenceClip {
   id: string
   trackId: string
@@ -97,6 +104,7 @@ export interface SequenceDecision {
   createdAt: Date
 }
 
+/** Describe a record representing the export details and status of a sequence */
 export interface SequenceExportRecord {
   id: string
   format: SequenceExportFormat
@@ -129,18 +137,21 @@ export interface SequenceFrameSnapshot {
 // Frame math
 // ---------------------------------------------------------------------------
 
+/** Convert seconds to the nearest whole number of frames based on frames per second */
 export function secondsToFrames(seconds: number, fps: number): number {
   if (!Number.isFinite(seconds) || seconds < 0) throw new Error('seconds must be a non-negative finite number')
   assertFps(fps)
   return Math.round(seconds * fps)
 }
 
+/** Convert a frame count to seconds based on the given frames per second rate */
 export function framesToSeconds(frames: number, fps: number): number {
   if (!Number.isInteger(frames) || frames < 0) throw new Error('frames must be a non-negative integer')
   assertFps(fps)
   return frames / fps
 }
 
+/** Format a number of seconds into a string with integer or two-decimal precision suffix s */
 export function formatSeconds(seconds: number): string {
   return Number.isInteger(seconds) ? `${seconds}s` : `${seconds.toFixed(2)}s`
 }
@@ -156,16 +167,19 @@ export function formatTimecode(frames: number, fps: number): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}.${String(residualFrames).padStart(2, '0')}`
 }
 
+/** Define the start frame and duration in frames for a timeline clip's bounds */
 export interface TimelineClipBounds {
   startFrame: number
   durationFrames: number
 }
 
+/** Define a time range with inclusive start and end frame numbers */
 export interface TimelineInterval {
   startFrame: number
   endFrame: number
 }
 
+/** Clamp the clip start frame within the valid range of the sequence duration and clip length */
 export function clampClipStart(input: {
   startFrame: number
   durationFrames: number
@@ -176,6 +190,7 @@ export function clampClipStart(input: {
   return Math.max(0, Math.min(input.sequenceDurationFrames - input.durationFrames, input.startFrame))
 }
 
+/** Clamp clip duration to fit within sequence bounds and minimum length constraints */
 export function clampClipDuration(input: {
   startFrame: number
   durationFrames: number
@@ -188,6 +203,7 @@ export function clampClipDuration(input: {
   return Math.max(MIN_SEQUENCE_CLIP_FRAMES, Math.min(input.durationFrames, input.sequenceDurationFrames - input.startFrame))
 }
 
+/** Validate that a clip's start and duration fit within the sequence duration without overflow */
 export function assertClipFitsSequence(input: {
   startFrame: number
   durationFrames: number

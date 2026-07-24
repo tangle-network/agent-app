@@ -236,6 +236,7 @@ export function stepActivityFlowTrace(
   }
 }
 
+/** Define a step in a mission flow with id, intent, optional status, start time, and duration */
 export interface MissionFlowStep {
   id: string
   intent: string

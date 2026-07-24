@@ -23,23 +23,27 @@ import type { OrganizationRole } from '../roles'
 import type { TeamDatabase } from './access'
 import type { OrganizationMemberRow, OrganizationRow, TeamTables } from './schema'
 
+/** Define the structure for a user within a personal organization context */
 export interface EnsurePersonalOrganizationUser {
   id: string
   name?: string | null
   email?: string | null
 }
 
+/** Describe a personal organization result including organization, member, and role details */
 export interface PersonalOrganizationResult {
   organization: OrganizationRow
   member: OrganizationMemberRow
   role: OrganizationRole
 }
 
+/** Define options required to create a personal organization including database and tables references */
 export interface CreatePersonalOrganizationOptions {
   db: TeamDatabase
   tables: TeamTables
 }
 
+/** Ensure a user has a personal organization by creating or retrieving it as needed */
 export function createEnsurePersonalOrganization(opts: CreatePersonalOrganizationOptions) {
   const { db, tables } = opts
   const { organizations, organizationMembers } = tables

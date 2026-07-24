@@ -25,6 +25,7 @@ export interface TransformerNode {
   rotation: number
 }
 
+/** Define baked node attributes including position, size, and rotation with collapsed scale */
 export interface BakedNodeAttrs {
   x: number
   y: number

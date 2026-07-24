@@ -39,6 +39,7 @@ export type ChatPlan = ChatPlanBase & (
 /** Canonical transcript part for one durable plan. */
 export type ChatPlanPersistedPart = ChatPlan & { type: 'plan' }
 
+/** Resolve the result of parsing a plan submission into success with value or failure with error */
 export type ParsePlanSubmittedResult =
   | { succeeded: true; value: ChatPlan }
   | { succeeded: false; error: string }
@@ -120,14 +121,17 @@ function parsePlan(record: Record<string, unknown>, defaultStatus?: ChatPlanStat
     : null
 }
 
+/** Generate a unique key string for a given plan identifier */
 export function planPartKey(planId: string): string {
   return `plan:${planId}`
 }
 
+/** Generate a unique key string for a plan based on its ID and revision number */
 export function planRevisionKey(planId: string, revision: number): string {
   return `plan:${planId}:revision:${revision}`
 }
 
+/** Generate a unique follow-up turn ID based on the plan ID and its outcome */
 export function planFollowUpTurnId(planId: string, outcome: 'approved' | 'rejected'): string {
   return `plan:${planId}:${outcome}`
 }
@@ -140,10 +144,12 @@ export function canTransitionPlanStatus(from: ChatPlanStatus, to: ChatPlanStatus
   return false
 }
 
+/** Resolve a ChatPlan into its persisted part representation for storage or transmission */
 export function planToPersistedPart(plan: ChatPlan): ChatPlanPersistedPart {
   return { type: 'plan', ...plan }
 }
 
+/** Resolve a persisted part object into a ChatPlan or return null if the type is not 'plan */
 export function persistedPartToPlan(part: Record<string, unknown>): ChatPlan | null {
   if (String(part.type ?? '') !== 'plan') return null
   return parsePlan(part)

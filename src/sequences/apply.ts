@@ -72,6 +72,7 @@ export async function applySequenceOperations(
   return results
 }
 
+/** Apply a sequence operation to update the store and timeline asynchronously */
 export async function applySequenceOperation(
   store: SequenceStore,
   timeline: SequenceTimeline,

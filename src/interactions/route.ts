@@ -41,8 +41,10 @@ import {
 // A client resolves an ask by answering (`accepted`) or refusing (`declined`).
 // Withdrawal (`cancelled`) is an agent/broker outcome delivered via the
 // `interaction.cancel` event, never a client POST, so it is not accepted here.
+/** Define possible outcomes for an interaction client as accepted or declined */
 export type InteractionClientOutcome = 'accepted' | 'declined'
 
+/** Validate interaction answer body and return success with data or failure with error message */
 export type InteractionAnswerBodyValidation =
   | { ok: true; id: string; outcome: InteractionClientOutcome; data?: InteractionData }
   | { ok: false; error: string }
@@ -76,6 +78,7 @@ export function validateInteractionAnswerBody(body: Record<string, unknown>): In
   return { ok: true, id, outcome, data }
 }
 
+/** Provide logging methods for warnings and errors in interaction routes */
 export type InteractionRouteLogger = Pick<Console, 'warn' | 'error'>
 
 /** Sidecar error → the client-actionable contract. Every "the ask is gone"
@@ -119,6 +122,7 @@ export type InteractionConnectionResolution =
   | { ok: false; response: Response }
   | { ok: false; unavailable: string }
 
+/** Define arguments required to resolve interaction connections based on request and intent */
 export interface ResolveInteractionConnectionArgs {
   request: Request
   intent: 'list' | 'answer'
@@ -127,6 +131,7 @@ export interface ResolveInteractionConnectionArgs {
   body?: Record<string, unknown>
 }
 
+/** Describe the arguments provided before processing an interaction answer including request, body, and connection details */
 export interface BeforeInteractionAnswerArgs {
   request: Request
   /** Original parsed body, including product routing fields. */
@@ -141,6 +146,7 @@ export interface BeforeInteractionAnswerArgs {
   duplicateRequests: InteractionRequestWire[]
 }
 
+/** Define arguments for durable interaction routes including a stable caller-created attempt key */
 export interface DurableInteractionRouteArgs extends BeforeInteractionAnswerArgs {
   /** Caller-created opaque identifier, stable across an ambiguous retry. */
   attemptKey: string
@@ -170,6 +176,7 @@ export interface DurableInteractionRoutePersistence<TPrepared = unknown> {
   fail?(args: DurableInteractionRouteArgs & { prepared: TPrepared; error: unknown }): void | Promise<void>
 }
 
+/** Define options to authenticate, authorize, and manage persistence for interaction answer routes */
 export interface InteractionAnswerRouteOptions {
   /** Authenticate + authorize the caller and resolve the sidecar connection.
    *  This is the only product-supplied step: session auth, workspace/thread
@@ -184,6 +191,7 @@ export interface InteractionAnswerRouteOptions {
   logger?: InteractionRouteLogger
 }
 
+/** Define routes to list outstanding interactions and resolve answers for live turns */
 export interface InteractionAnswerRoute {
   /** GET — outstanding interactions for a live turn. Failures return an empty
    *  list with an explicit `unavailable` code: the caller is a best-effort
@@ -196,6 +204,7 @@ export interface InteractionAnswerRoute {
   answer: (request: Request) => Promise<Response>
 }
 
+/** Create an interaction answer route that handles listing and resolving interaction requests */
 export function createInteractionAnswerRoute(options: InteractionAnswerRouteOptions): InteractionAnswerRoute {
   const logger = options.logger ?? console
 

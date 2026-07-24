@@ -9,6 +9,7 @@ export type AppToolRuntimeExecutor = (call: {
   args: Record<string, unknown>
 }) => Promise<AppToolOutcome>
 
+/** Define options for executing runtime tasks with a trusted per-turn context */
 export interface RuntimeExecutorOptions extends DispatchOptions {
   /** The trusted per-turn context — supplied directly (not from headers), since
    *  the runtime path has no HTTP request. */

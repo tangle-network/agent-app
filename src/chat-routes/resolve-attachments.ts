@@ -21,6 +21,7 @@ import { attachmentInputToPart, type ChatAttachmentPart } from '../chat-store/pa
 import type { ReadAttachmentFn } from './attachment-store'
 import { ATTACHMENT_MAX_COUNT, MAX_ATTACHMENT_TOTAL_BYTES, attachmentTotalSizeErrorMessage } from './attachment-validation'
 
+/** Resolve the result of chat attachment processing with success status and corresponding data or error */
 export type ResolveChatAttachmentsResult =
   | { succeeded: true; value: ChatAttachmentPart[] }
   | { succeeded: false; error: string }
@@ -126,6 +127,7 @@ function parseAttachmentInput(
   return { succeeded: true, value: { path, name, size, mediaType, kind } }
 }
 
+/** Define options to resolve and validate chat attachments with size, count, and path constraints */
 export interface ResolveChatAttachmentsOptions {
   /** The product's workspace/tenant key, passed to `readAttachment`. */
   scopeId: string

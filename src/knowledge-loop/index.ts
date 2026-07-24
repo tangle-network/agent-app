@@ -110,6 +110,7 @@ export interface KnowledgeDecider {
   (input: KnowledgeDeciderInput): Promise<KnowledgeDecision> | KnowledgeDecision
 }
 
+/** Define the input parameters required to decide knowledge proposals within an agent-knowledge loop */
 export interface KnowledgeDeciderInput {
   /** The agent-knowledge loop context for this iteration. */
   context: KnowledgeResearchLoopContext
@@ -125,6 +126,7 @@ export interface KnowledgeDeciderInput {
   driver?: KnowledgeLoopDriver
 }
 
+/** Define a decision containing a candidate and the gate's verdict on that candidate */
 export interface KnowledgeDecision {
   /** The candidate the policy produced (may be empty to end the loop). */
   candidate: KnowledgeCandidate
@@ -146,6 +148,7 @@ export interface KnowledgeLoopDriver {
   }): Promise<{ finalText: string }>
 }
 
+/** Define dependencies required to create and run a knowledge processing loop */
 export interface CreateKnowledgeLoopDeps {
   /**
    * The knowledge-base root the loop reads/writes (an agent-knowledge layout).

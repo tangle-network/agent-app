@@ -18,13 +18,16 @@
 
 import { KNOWN_HARNESSES, type Harness } from '../harness/index'
 
+/** Define execution mode as either router or sandbox */
 export type ExecutionMode = 'router' | 'sandbox'
 
 /** The router pseudo-harness — the absence of a sandbox backend. Not a member
  *  of `KNOWN_HARNESSES`; callers may pass it explicitly instead of null. */
 export const ROUTER_HARNESS = 'router' as const
+/** Provide a type alias for the ROUTER_HARNESS constant to enable consistent router harness usage */
 export type RouterHarness = typeof ROUTER_HARNESS
 
+/** Resolve a ProfileHarness as a Harness, RouterHarness, null, or undefined value */
 export type ProfileHarness = Harness | RouterHarness | null | undefined
 
 /**

@@ -10,6 +10,7 @@
 import type { TranscriptionProvider, TranscriptionSegment } from '../contracts'
 import type { AudioBufferLike } from './waveform'
 
+/** Provide the default Whisper model identifier for ONNX community large v3 turbo */
 export const DEFAULT_WHISPER_MODEL = 'onnx-community/whisper-large-v3-turbo'
 
 /** Whisper models are trained on 16 kHz mono — decoding through a 16 kHz
@@ -24,6 +25,7 @@ interface WhisperChunk {
   timestamp: [number, number | null]
 }
 
+/** Define the structure for transcribed text output with optional segmented chunks */
 export interface WhisperOutput {
   text: string
   chunks?: WhisperChunk[]
@@ -124,6 +126,7 @@ async function fetchMonoAudio(mediaUrl: string): Promise<{ samples: Float32Array
   return { samples: mixdownToMono(decoded), durationSeconds: decoded.duration }
 }
 
+/** Create a Whisper-based transcription provider with optional model configuration */
 export function createWhisperTranscriptionProvider(opts?: { model?: string }): TranscriptionProvider {
   const model = opts?.model ?? DEFAULT_WHISPER_MODEL
   let availability: boolean | null = null

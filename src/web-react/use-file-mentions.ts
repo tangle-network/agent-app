@@ -120,6 +120,7 @@ export const INDEX_REFRESH_AFTER_MS = 5 * 60 * 1000
  *  Loading/warming/error states have their own copy — see `emptyTextFor`. */
 export const DEFAULT_MENTION_EMPTY_TEXT = 'No matching files'
 
+/** Define options for configuring file mention fetching, caching, and display behavior */
 export interface UseFileMentionsOptions {
   /** GET endpoint returning `FileIndexResponse` (a `createSandboxFileIndexRoute`). */
   indexUrl: string
@@ -135,6 +136,7 @@ export interface UseFileMentionsOptions {
   emptyText?: string
 }
 
+/** Provide properties and methods to manage and refresh file mentions in a composer interface */
 export interface UseFileMentionsResult {
   /** Spread straight into `AgentComposer`'s `mention` prop. */
   mention: ComposerMentionProp
@@ -167,6 +169,7 @@ function emptyTextFor(state: IndexState, fallback: string): string {
   }
 }
 
+/** Resolve and manage file mention data with configurable fetching and state handling */
 export function useFileMentions(options: UseFileMentionsOptions): UseFileMentionsResult {
   const {
     indexUrl,

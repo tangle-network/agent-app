@@ -35,6 +35,7 @@ export const INTERACTION_RESOLVED_EVENT = 'interaction.resolved' as const
  *  A pure default; a product may substitute its own renderable set. */
 const RENDERABLE_INTERACTION_KINDS: ReadonlySet<string> = new Set(['question', 'plan'])
 
+/** Resolve if the given interaction kind is renderable within the application context */
 export function isRenderableInteractionKind(kind: string): boolean {
   return RENDERABLE_INTERACTION_KINDS.has(kind)
 }
@@ -54,9 +55,11 @@ export function isSafeInteractionFieldKey(key: string): boolean {
 // its write-in input, and `parseInteractionRequest` returns the RAW payload
 // (schema-validated, not schema-parsed) so the flag survives.
 
+/** Extract select-type interaction fields and optionally allow custom values */
 export type ChatSelectField = Extract<InteractionField, { type: 'select' }> & {
   allowCustom?: boolean
 }
+/** Resolve a chat interaction field excluding select types or including chat select fields */
 export type ChatInteractionField = Exclude<InteractionField, { type: 'select' }> | ChatSelectField
 
 /** `InteractionRequest` whose select fields may carry `allowCustom`. */
@@ -67,6 +70,7 @@ export type InteractionRequestWire = Omit<InteractionRequest, 'answerSpec'> & {
 // ---------------------------------------------------------------------------
 // Interaction lifecycle
 
+/** Define possible statuses representing the state of a chat interaction */
 export type ChatInteractionStatus = 'pending' | 'answered' | 'declined' | 'cancelled' | 'expired'
 
 /** Accepted field selections keyed by answer-spec field name. */
@@ -74,8 +78,10 @@ export type ChatInteractionStatus = 'pending' | 'answered' | 'declined' | 'cance
  * wider scalar union is additive and lets durable stores preserve text,
  * numeric, and boolean answer fields without coercion. */
 export type InteractionAnswerValue = string | number | boolean | string[]
+/** Map interaction identifiers to their corresponding answer values */
 export type InteractionAnswers = Record<string, InteractionAnswerValue>
 
+/** Resolve the result of parsing interaction answers with success status and corresponding data or error message */
 export type ParseInteractionAnswersResult =
   | { succeeded: true; value: InteractionAnswers }
   | { succeeded: false; error: string }
@@ -114,6 +120,7 @@ export interface ChatInteraction {
   cancelReason?: string
 }
 
+/** Resolve if the interaction status is a terminal state excluding pending */
 export function isTerminalInteractionStatus(status: ChatInteractionStatus): boolean {
   return status !== 'pending'
 }
@@ -157,6 +164,7 @@ export function questionInteractionContentSignature(interaction: ChatInteraction
   }))
 }
 
+/** Remove duplicate question interactions based on their content signature to ensure uniqueness */
 export function dedupeQuestionInteractionsByContent(interactions: ChatInteraction[]): ChatInteraction[] {
   const seen = new Set<string>()
   return interactions.filter((interaction) => {
@@ -172,6 +180,7 @@ export function dedupeQuestionInteractionsByContent(interactions: ChatInteractio
 // Wire parsing — typed outcomes, fail loud at the caller (log + skip; never a
 // half-rendered card).
 
+/** Resolve interaction parsing outcome as success with value or failure with error message */
 export type ParseInteractionResult =
   | { succeeded: true; value: InteractionRequestWire }
   | { succeeded: false; error: string }
@@ -191,11 +200,13 @@ export function parseInteractionRequest(data: Record<string, unknown> | undefine
   return { succeeded: true, value: request as InteractionRequestWire }
 }
 
+/** Describe data required to cancel an interaction including its identifier and optional reason */
 export interface InteractionCancelData {
   id: string
   reason?: string
 }
 
+/** Parse interaction cancel data and return success status with parsed value or error message */
 export function parseInteractionCancel(
   data: Record<string, unknown> | undefined,
 ): { succeeded: true; value: InteractionCancelData } | { succeeded: false; error: string } {
@@ -211,12 +222,14 @@ export function parseInteractionCancel(
 // decides what it means. No interpretation here; the sidecar validates answers
 // fail-closed (invalid free text on an option-only ask → 400).
 
+/** Determine if a chat interaction field allows free text input */
 export function fieldAcceptsFreeText(field: ChatInteractionField): boolean {
   if (field.type === 'text') return true
   if (field.type === 'select') return (field as ChatSelectField).allowCustom === true
   return false
 }
 
+/** Define the structure for delivering answers linked to a specific chat interaction and field */
 export interface ComposerAnswerDelivery {
   interactionId: string
   field: ChatInteractionField
@@ -249,14 +262,17 @@ export function composerAnswerData(field: ChatInteractionField, text: string): I
 // Part keys + codecs (persisted `messages.parts` entries and live stream parts
 // share these shapes).
 
+/** Generate a unique key string for an interaction using the given identifier */
 export function interactionPartKey(id: string): string {
   return `interaction:${id}`
 }
 
+/** Generate a unique key string for a notice using the given identifier */
 export function noticePartKey(id: string): string {
   return `notice:${id}`
 }
 
+/** Define specific string literals representing different kinds of notices */
 export type NoticeKind = 'warning' | 'auto-declined'
 
 /**
@@ -279,6 +295,7 @@ export type InteractionPersistedPart = {
   cancelReason?: string
 }
 
+/** Define a persisted notice part with type, id, kind, and text properties */
 export type NoticePersistedPart = {
   type: 'notice'
   id: string

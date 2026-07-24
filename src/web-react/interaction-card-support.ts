@@ -44,6 +44,7 @@ export function interactionTerminalNotes(
 // ---------------------------------------------------------------------------
 // Answer building
 
+/** Define a record mapping field names to objects with optional selected, text, and custom string arrays or values */
 export type FieldValues = Record<string, { selected?: string[]; text?: string; custom?: string }>
 
 /** Converts acknowledged, persisted answers back into the local field state
@@ -108,6 +109,7 @@ export function buildAnswerData(fields: ChatInteractionField[], values: FieldVal
 // a NEW chat turn carrying the question context, so the user's typed answer is
 // never dropped on the floor.
 
+/** Determine if a status is late answerable by checking if it is expired or cancelled */
 export function isLateAnswerableStatus(status: ChatInteractionStatus): boolean {
   return status === 'expired' || status === 'cancelled'
 }
@@ -159,7 +161,9 @@ export function lateAnswerMessage(interaction: ChatInteraction, data: Interactio
 // ---------------------------------------------------------------------------
 // Submit plumbing
 
+/** Define the timeout duration in milliseconds for submitting an interaction */
 export const INTERACTION_SUBMIT_TIMEOUT_MS = 30_000
+/** Provide the timeout message displayed when the agent cannot be reached during interaction submission */
 export const INTERACTION_SUBMIT_TIMEOUT_MESSAGE = 'Could not reach the agent. Try again.'
 
 /** One card submission: which ask, resolved how, with what answers. */
@@ -169,6 +173,7 @@ export interface InteractionAnswerSubmission {
   data?: InteractionData
 }
 
+/** Resolve the result of an interaction submission indicating success or failure with details */
 export type InteractionSubmitResult =
   | { ok: true }
   | { ok: false; expired: boolean; message: string }
@@ -194,6 +199,7 @@ export async function responseErrorMessage(res: Response): Promise<{ code?: stri
   return { message: `Answer failed (${res.status})` }
 }
 
+/** Define options for submitting interaction answers including URL, body, timeout, and fetch implementation */
 export interface InteractionAnswerSubmitterOptions {
   /** The product's answer route (the POST half of `createInteractionAnswerRoute`).
    *  A function when the URL carries the session (e.g. `/api/sessions/${id}/interactions`). */

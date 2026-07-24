@@ -22,6 +22,7 @@ import type { AnySQLiteColumn, AnySQLiteTable } from 'drizzle-orm/sqlite-core'
 /** A product table referenced by FK — only the `id` column is touched. */
 export type SequenceParentTable = AnySQLiteTable & { id: AnySQLiteColumn }
 
+/** Define options for creating sequence-related database tables including workspace and user tables */
 export interface CreateSequenceTablesOptions {
   workspaceTable: SequenceParentTable
   userTable: SequenceParentTable
@@ -37,6 +38,7 @@ const createdAt = () => integer('created_at', { mode: 'timestamp' }).notNull().d
 
 const updatedAt = () => integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`)
 
+/** Build SQLite sequence tables with defined columns and relationships based on provided options */
 export function createSequenceTables(opts: CreateSequenceTablesOptions) {
   const { workspaceTable, userTable, generationTable, assetTable } = opts
 
@@ -142,10 +144,16 @@ export function createSequenceTables(opts: CreateSequenceTablesOptions) {
   return { sequences, sequenceTracks, sequenceClips, sequenceDecisions, sequenceExports }
 }
 
+/** Resolve sequence tables by invoking the createSequenceTables factory function */
 export type SequenceTables = ReturnType<typeof createSequenceTables>
 
+/** Resolve a sequence row by inferring the selected fields from the sequences table */
 export type SequenceRow = SequenceTables['sequences']['$inferSelect']
+/** Resolve the selected sequence track row from the sequenceTracks table */
 export type SequenceTrackRow = SequenceTables['sequenceTracks']['$inferSelect']
+/** Resolve the selected fields of sequence clips from the sequence tables data structure */
 export type SequenceClipRow = SequenceTables['sequenceClips']['$inferSelect']
+/** Resolve a sequence decision row from the sequenceDecisions table data */
 export type SequenceDecisionRow = SequenceTables['sequenceDecisions']['$inferSelect']
+/** Resolve a row type representing exported sequence data from sequenceExports table */
 export type SequenceExportRow = SequenceTables['sequenceExports']['$inferSelect']

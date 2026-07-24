@@ -54,6 +54,7 @@ export type SequenceDatabase = BaseSQLiteDatabase<'sync' | 'async', any, any>
  *  of clip rows. Keyed by clip id; clips absent from the map carry no media. */
 export type SequenceMediaResolver = (clipRows: SequenceClipRow[]) => Promise<Map<string, SequenceClipMedia>>
 
+/** Define options for creating a Drizzle sequence store including database, tables, scope, and media resolver */
 export interface CreateDrizzleSequenceStoreOptions {
   db: SequenceDatabase
   tables: SequenceTables
@@ -63,6 +64,7 @@ export interface CreateDrizzleSequenceStoreOptions {
 
 const DEFAULT_LIST_LIMIT = 50
 
+/** Create a sequence store scoped to a specific sequence and workspace with database access and media resolution */
 export function createDrizzleSequenceStore(options: CreateDrizzleSequenceStoreOptions): SequenceStore {
   const { db, tables, scope, resolveMedia } = options
   const { sequences, sequenceTracks, sequenceClips, sequenceDecisions, sequenceExports } = tables

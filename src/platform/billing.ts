@@ -11,6 +11,7 @@
 
 import type { PlatformBillingClient, PlatformIdentity } from '../billing/index'
 
+/** Define available subscription tiers for the TanglePlan service */
 export type TanglePlanTier = 'free' | 'pro' | 'enterprise'
 
 /** 'pro' | 'enterprise' pass through; anything else (null, unknown) → 'free'. */
@@ -18,6 +19,7 @@ export function normalizeTanglePlanTier(plan: string | null | undefined): Tangle
   return plan === 'pro' || plan === 'enterprise' ? plan : 'free'
 }
 
+/** Represent platform billing HTTP errors with status code and detailed message */
 export class PlatformBillingHttpError extends Error {
   constructor(
     readonly status: number,
@@ -37,6 +39,7 @@ export function isPlatformBillingHttpError(error: unknown): error is PlatformBil
   )
 }
 
+/** Define HTTP options for platform billing including base URL, service token, product slug, fetch implementation, and timeout */
 export interface PlatformBillingHttpOptions {
   /** Platform root, e.g. https://id.tangle.tools (trailing slashes stripped). */
   baseUrl: string
@@ -50,17 +53,20 @@ export interface PlatformBillingHttpOptions {
   timeoutMs?: number
 }
 
+/** Describe subscription tier and status information for a platform user */
 export interface PlatformSubscriptionInfo {
   tier: TanglePlanTier
   status: string | null
 }
 
+/** Describe the platform balance and lifetime spending with an optional update timestamp */
 export interface PlatformBalanceSnapshot {
   balance: number
   lifetimeSpent: number
   updatedAt?: string
 }
 
+/** Describe a product's usage and spending metrics on the platform */
 export interface PlatformUsageProductRow {
   product: string | null
   totalSpent: number
@@ -93,6 +99,7 @@ export interface ProductEntitlement {
   onFreeTier: boolean
 }
 
+/** Define methods to interact with platform billing endpoints using user or service authentication */
 export interface PlatformBillingHttp {
   /** GET /v1/plans/current (user bearer). */
   getSubscription(userApiKey: string): Promise<PlatformSubscriptionInfo>
@@ -116,6 +123,7 @@ export interface PlatformBillingHttp {
   seatCheckoutUrl(productId: string): string
 }
 
+/** Create a PlatformBillingHttp instance configured with given options and default behaviors */
 export function createPlatformBillingHttp(opts: PlatformBillingHttpOptions): PlatformBillingHttp {
   const baseUrl = opts.baseUrl.replace(/\/+$/, '')
   if (!baseUrl) throw new Error('PlatformBillingHttpOptions.baseUrl is required')
@@ -247,17 +255,20 @@ export function seatCheckoutUrl(baseUrl: string, productId: string): string {
 
 // ── Tier policy + composed state ────────────────────────────────────────────
 
+/** Define policy settings for concurrency and overage allowance in a tangle tier */
 export interface TangleTierPolicy {
   concurrency: number
   overageAllowed: boolean
 }
 
+/** Define default concurrency and overage policies for each TanglePlanTier level */
 export const DEFAULT_TANGLE_TIER_POLICY: Record<TanglePlanTier, TangleTierPolicy> = {
   free: { concurrency: 1, overageAllowed: false },
   pro: { concurrency: Number.POSITIVE_INFINITY, overageAllowed: true },
   enterprise: { concurrency: Number.POSITIVE_INFINITY, overageAllowed: true },
 }
 
+/** Describe the state of a Tangle plan tier including subscription, balance, spending, and concurrency details */
 export interface TangleTierState {
   tier: TanglePlanTier
   subscriptionStatus: string | null
@@ -313,6 +324,7 @@ export const FREE_TIER_SPEND_CAP_USD = 2
  */
 export const DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR = 'SEAT_BILLING_ENABLED'
 
+/** Define options to configure seat billing flag environment variables and override flag name */
 export interface SeatBillingFlagOptions {
   env?: Record<string, string | undefined>
   /** Override the flag name; default {@link DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR}. */
@@ -378,6 +390,7 @@ export function isProductEntitled(ent: ProductEntitlement): boolean {
 
 // ── Bridge onto the /billing seam ───────────────────────────────────────────
 
+/** Define a contract for resolving platform identities based on user identifiers */
 export interface PlatformIdentityStore {
   resolveIdentity(userId: string): Promise<PlatformIdentity | null>
 }

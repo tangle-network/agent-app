@@ -14,6 +14,7 @@
 
 import type { SequenceExportFormat, SequenceTrackKind } from './model'
 
+/** Define an operation to place a media clip with timing, track, and playback options */
 export interface PlaceClipOperation {
   type: 'place_clip'
   /** Omitted → first unlocked track matching the media kind. */
@@ -35,6 +36,7 @@ export interface PlaceClipOperation {
   metadata?: Record<string, unknown>
 }
 
+/** Add a caption with optional language, timing, and track placement details */
 export interface AddCaptionOperation {
   type: 'add_caption'
   text: string
@@ -48,6 +50,7 @@ export interface AddCaptionOperation {
   trackId?: string
 }
 
+/** Resolve an operation to move a clip to a new start frame and optional track */
 export interface MoveClipOperation {
   type: 'move_clip'
   clipId: string
@@ -55,6 +58,7 @@ export interface MoveClipOperation {
   trackId?: string
 }
 
+/** Define an operation to trim a clip by adjusting its start, duration, and optional source in/out points */
 export interface TrimClipOperation {
   type: 'trim_clip'
   clipId: string
@@ -69,6 +73,7 @@ export interface TrimClipOperation {
   sourceOutFrame?: number | null
 }
 
+/** Split a clip at a specified frame inside the clip to create two separate segments */
 export interface SplitClipOperation {
   type: 'split_clip'
   clipId: string
@@ -76,6 +81,7 @@ export interface SplitClipOperation {
   atFrame: number
 }
 
+/** Resolve an operation to set clipboard text with optional language and clip identifier */
 export interface SetClipTextOperation {
   type: 'set_clip_text'
   clipId: string
@@ -83,34 +89,40 @@ export interface SetClipTextOperation {
   language?: string
 }
 
+/** Define an operation to enable or disable a clip by its identifier */
 export interface SetClipDisabledOperation {
   type: 'set_clip_disabled'
   clipId: string
   disabled: boolean
 }
 
+/** Represent a delete clip operation with a specified clip identifier */
 export interface DeleteClipOperation {
   type: 'delete_clip'
   clipId: string
 }
 
+/** Define an operation to create a new sequence track with a specified kind and name */
 export interface CreateTrackOperation {
   type: 'create_track'
   kind: SequenceTrackKind
   name: string
 }
 
+/** Define an operation to extend a sequence by a specified number of frames */
 export interface ExtendSequenceOperation {
   type: 'extend_sequence'
   durationFrames: number
 }
 
+/** Define the structure for a queue export operation with format and optional metadata */
 export interface QueueExportOperation {
   type: 'queue_export'
   format: SequenceExportFormat
   metadata?: Record<string, unknown>
 }
 
+/** Represent sequence editing actions for manipulating clips, tracks, captions, and exports */
 export type SequenceOperation =
   | PlaceClipOperation
   | AddCaptionOperation
@@ -131,8 +143,10 @@ export interface SequencePlan {
   operations: SequenceOperation[]
 }
 
+/** Extract the type of operation from a sequence operation object */
 export type SequenceOperationType = SequenceOperation['type']
 
+/** List all valid sequence operation types used in editing workflows */
 export const SEQUENCE_OPERATION_TYPES: readonly SequenceOperationType[] = [
   'place_clip',
   'add_caption',

@@ -15,8 +15,10 @@
 
 import { assertMediaUrl } from '../web'
 
+/** Define the current version number of the scene schema */
 export const SCENE_SCHEMA_VERSION = 1
 
+/** Define the structure and properties of a scene document including version, title, pages, settings, and metadata */
 export interface SceneDocument {
   schemaVersion: typeof SCENE_SCHEMA_VERSION
   title: string
@@ -25,6 +27,7 @@ export interface SceneDocument {
   metadata: Record<string, unknown>
 }
 
+/** Define settings for scene export including print conversion factor for unit calculations */
 export interface SceneSettings {
   /** Print conversion factor for mm↔px math at export; 96 = CSS default. */
   dpi: number
@@ -45,6 +48,7 @@ export interface PageGuides {
   horizontal: number[]
 }
 
+/** Define the structure and properties of a scene page including layout, background, and elements */
 export interface ScenePage {
   id: string
   name: string
@@ -78,6 +82,7 @@ export interface SceneElementBase {
   slot?: string
 }
 
+/** Define a rectangular scene element with size, fill, optional stroke, and corner radius properties */
 export interface RectElement extends SceneElementBase {
   kind: 'rect'
   width: number
@@ -88,6 +93,7 @@ export interface RectElement extends SceneElementBase {
   cornerRadius?: number
 }
 
+/** Define properties for an ellipse element including dimensions, fill, and optional stroke details */
 export interface EllipseElement extends SceneElementBase {
   kind: 'ellipse'
   width: number
@@ -97,6 +103,7 @@ export interface EllipseElement extends SceneElementBase {
   strokeWidth?: number
 }
 
+/** Define a line element with points, stroke, stroke width, and optional dash pattern */
 export interface LineElement extends SceneElementBase {
   kind: 'line'
   /** Flat [x0, y0, x1, y1, ...] relative to (x, y); ≥ 2 points. */
@@ -106,6 +113,7 @@ export interface LineElement extends SceneElementBase {
   dash?: number[]
 }
 
+/** Define properties for a text element including content, style, alignment, and layout parameters */
 export interface TextElement extends SceneElementBase {
   kind: 'text'
   text: string
@@ -120,6 +128,7 @@ export interface TextElement extends SceneElementBase {
   letterSpacing: number
 }
 
+/** Define properties for an image element including source, dimensions, and fit mode */
 export interface ImageElement extends SceneElementBase {
   kind: 'image'
   width: number
@@ -141,11 +150,13 @@ export interface VideoElement extends SceneElementBase {
   posterSrc?: string
 }
 
+/** Define a group element that contains multiple child scene elements */
 export interface GroupElement extends SceneElementBase {
   kind: 'group'
   children: SceneElement[]
 }
 
+/** Represent a graphical element in a scene including shapes, text, media, or groups */
 export type SceneElement =
   | RectElement
   | EllipseElement
@@ -155,8 +166,10 @@ export type SceneElement =
   | VideoElement
   | GroupElement
 
+/** Extract the kind property from a SceneElement to identify its element type */
 export type SceneElementKind = SceneElement['kind']
 
+/** Define all valid kinds of scene elements used in the application */
 export const SCENE_ELEMENT_KINDS: readonly SceneElementKind[] = [
   'rect', 'ellipse', 'line', 'text', 'image', 'video', 'group',
 ] as const
@@ -165,6 +178,7 @@ export const SCENE_ELEMENT_KINDS: readonly SceneElementKind[] = [
 // Geometry
 // ---------------------------------------------------------------------------
 
+/** Define rectangular boundaries with position and size properties */
 export interface Bounds {
   x: number
   y: number
@@ -214,6 +228,7 @@ export function elementExtent(element: SceneElement): { width: number; height: n
   }
 }
 
+/** Estimate the height of multiline text based on font size and line height */
 export function estimateTextHeight(element: Pick<TextElement, 'text' | 'fontSize' | 'lineHeight'>): number {
   const lines = element.text.length === 0 ? 1 : element.text.split('\n').length
   return lines * element.fontSize * element.lineHeight
@@ -243,6 +258,7 @@ export function elementAabb(element: SceneElement): Bounds {
   return { x: element.x + minX, y: element.y + minY, width: maxX - minX, height: maxY - minY }
 }
 
+/** Determine if two rectangular bounds overlap or intersect each other */
 export function boundsIntersect(a: Bounds, b: Bounds): boolean {
   return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
 }
@@ -251,6 +267,7 @@ export function boundsIntersect(a: Bounds, b: Bounds): boolean {
 // Lookup + traversal
 // ---------------------------------------------------------------------------
 
+/** Resolve and return a page by ID from a document or throw an error if not found */
 export function requirePage(document: SceneDocument, pageId: string): ScenePage {
   const page = document.pages.find((candidate) => candidate.id === pageId)
   if (!page) throw new Error(`page ${pageId} not found in document`)
@@ -273,6 +290,7 @@ export function findElement(page: ScenePage, elementId: string): { element: Scen
   return null
 }
 
+/** Resolve and return the element, its owner array, and index from the page by element ID */
 export function requireElement(page: ScenePage, elementId: string): { element: SceneElement; owner: SceneElement[]; index: number } {
   const found = findElement(page, elementId)
   if (!found) throw new Error(`element ${elementId} not found on page ${page.id}`)
@@ -301,6 +319,7 @@ export function collectSlots(document: SceneDocument): Map<string, { pageId: str
 // Construction
 // ---------------------------------------------------------------------------
 
+/** Define options to configure a new page including name, dimensions, and background color */
 export interface NewPageOptions {
   name?: string
   width?: number
@@ -308,6 +327,7 @@ export interface NewPageOptions {
   background?: string
 }
 
+/** Create a new empty SceneDocument with a title and optional initial page settings */
 export function createEmptyDocument(title: string, page?: NewPageOptions): SceneDocument {
   return {
     schemaVersion: SCENE_SCHEMA_VERSION,
@@ -318,6 +338,7 @@ export function createEmptyDocument(title: string, page?: NewPageOptions): Scene
   }
 }
 
+/** Create a new ScenePage with specified options and a unique identifier */
 export function createPage(options: NewPageOptions, id: string): ScenePage {
   const width = options.width ?? 1080
   const height = options.height ?? 1080
@@ -335,10 +356,12 @@ export function createPage(options: NewPageOptions, id: string): ScenePage {
   }
 }
 
+/** Assert that a value is a positive finite number and throw an error with a label if not */
 export function assertPositiveFinite(value: number, label: string): void {
   if (!Number.isFinite(value) || value <= 0) throw new Error(`${label} must be a positive finite number`)
 }
 
+/** Assert that a value is a finite number and throw an error with a label if not */
 export function assertFinite(value: number, label: string): void {
   if (!Number.isFinite(value)) throw new Error(`${label} must be a finite number`)
 }
@@ -349,6 +372,7 @@ export function assertFinite(value: number, label: string): void {
 const HEX_COLOR = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/
 const RGB_COLOR = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)$/
 
+/** Validate that a string is a hex, rgb(a), or 'transparent' color and throw an error if not */
 export function assertColor(value: string, label: string): void {
   if (value === 'transparent' || HEX_COLOR.test(value)) return
   const rgb = RGB_COLOR.exec(value)

@@ -13,6 +13,7 @@
  *  values (10, 50, 100, 500…) are always available as label boundaries. */
 const TICK_STEP_CANDIDATES_PX = [1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000] as const
 
+/** Define spacing and visibility rules for major and minor ticks in a coordinate system */
 export interface TickStep {
   /** Document-coordinate step between major ticks. */
   major: number
@@ -58,6 +59,7 @@ export function selectTickStep(input: {
   return { major, minor, drawMinor }
 }
 
+/** Define a ruler tick with a position and optional label for measurement markings */
 export interface RulerTick {
   /** Position in document coordinates. */
   position: number

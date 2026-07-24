@@ -42,6 +42,7 @@ export interface EditorTimelineState {
   scrollLeft: number
 }
 
+/** Manage and track command execution with undo, redo, state subscription, and timeline reset capabilities */
 export interface CommandStack {
   execute(command: TimelineCommand): void
   undo(): void
@@ -68,11 +69,13 @@ export interface ZoomMath {
   maxZoom: number
 }
 
+/** Define a point in a timeline where snapping occurs based on frame and kind */
 export interface SnapPoint {
   frame: number
   kind: 'clip-start' | 'clip-end' | 'playhead' | 'sequence-end'
 }
 
+/** Describe the result of snapping a point to a frame including success status and snapped point details */
 export interface SnapResult {
   frame: number
   snapped: boolean
@@ -120,6 +123,7 @@ export interface WaveformData {
   durationSeconds: number
 }
 
+/** Represent a segment of transcription with text and start and end times in seconds */
 export interface TranscriptionSegment {
   text: string
   startSeconds: number
@@ -169,6 +173,7 @@ export interface TimelineEditorLabels {
   ghostCaptionLane?: string
 }
 
+/** Define properties and callbacks for editing and applying operations on a sequence timeline */
 export interface TimelineEditorProps {
   timeline: SequenceTimeline
   canWrite: boolean
@@ -206,6 +211,7 @@ export interface TimelineEditorProps {
   className?: string
 }
 
+/** Provide default labels and accessibility text for timeline editor UI elements */
 export const DEFAULT_TIMELINE_LABELS: Required<TimelineEditorLabels> = {
   splitClip: 'Split here',
   splitClipAriaLabel: 'Split clip at playhead',

@@ -32,6 +32,7 @@ import { formatBytes } from './wire'
 /** Default ceiling on a promoted file's raw (pre-encoding) byte size. */
 export const PROMOTE_MAX_FILE_BYTES = 10 * 1024 * 1024
 
+/** Define the structure for a raw file part with optional metadata and media type information */
 export interface RawAgentFilePart {
   type: 'file'
   id?: string
@@ -43,6 +44,7 @@ export interface RawAgentFilePart {
   url?: string
 }
 
+/** Resolve the result of promoting a file part with success status and relevant data or error details */
 export type PromoteFilePartResult =
   | { succeeded: true; part: ChatAttachmentPart }
   | { succeeded: false; filename: string; reason: string }
@@ -249,6 +251,7 @@ function defaultBuildAttachmentPath(args: AttachmentPathArgs): string {
   return `uploads/agent/${args.date}/${base}-${args.hash8}${extension}`
 }
 
+/** Define options for promoting a part of an agent file within a specific session and scope */
 export interface PromoteAgentFilePartOptions {
   raw: RawAgentFilePart
   /** The turn's box — required only to promote a sandbox-path part; a `data:`
@@ -270,6 +273,7 @@ export interface PromoteAgentFilePartOptions {
   now?: () => Date
 }
 
+/** Promote a part of an agent file with optional byte limits and MIME type detection */
 export async function promoteAgentFilePart(options: PromoteAgentFilePartOptions): Promise<PromoteFilePartResult> {
   const maxBytes = options.maxBytes ?? PROMOTE_MAX_FILE_BYTES
   const sniffMime = options.sniffMime ?? sniffMimeFromName

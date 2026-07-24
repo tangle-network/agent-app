@@ -32,6 +32,7 @@ import type { ResolvedAgentProfile } from './agent'
 
 const defaultRefreshMs = 300_000
 
+/** Define configuration options for delivering certified artifacts to a specified tenant target */
 export interface CertifiedDeliveryConfig {
   /** The tenant target whose certified artifacts to deliver (the agent id). */
   target: string
@@ -45,6 +46,7 @@ export interface CertifiedDeliveryConfig {
   fetchImpl?: typeof fetch
 }
 
+/** Resolve and manage certified profiles with refresh and composition capabilities */
 export interface CertifiedDelivery {
   /** The `composeProfile` transform to pass to `createAgentRuntime`. Applies the
    *  cached certified profile to the base surfaces; refreshes on the cadence. */

@@ -30,6 +30,7 @@ function isGreyish(hex: string): boolean {
   return max - min < 18
 }
 
+/** Define a color palette with background, surface, text, and accent colors for UI elements */
 export interface DecidedPalette {
   /** Lightest neutral — page background. */
   background?: string
@@ -80,6 +81,7 @@ export function decidePalette(palette: BrandColor[]): DecidedPalette {
   return result
 }
 
+/** Define font selections for display and body text with optional BrandFont properties */
 export interface DecidedFonts {
   display?: BrandFont
   body?: BrandFont

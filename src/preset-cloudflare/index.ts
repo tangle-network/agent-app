@@ -285,6 +285,7 @@ export function createPresetDrizzleSchema(d: DrizzleSqliteCoreLike) {
  *  Cloudflare `KVNamespace` satisfies it. Artifacts are stored under their path. */
 export type VaultKv = KvLike
 
+/** Define configuration options for handling preset tools including database, vault, and optional utilities */
 export interface PresetToolHandlerOptions {
   /** The D1 database (Cloudflare `D1Database` satisfies {@link D1Like}). */
   db: D1Like
@@ -405,6 +406,7 @@ export function createPresetToolHandlers(opts: PresetToolHandlerOptions): AppToo
 // D1-backed KnowledgeStateAccessor
 // ---------------------------------------------------------------------------
 
+/** Define options for accessing preset knowledge scoped to a specific workspace and configuration */
 export interface PresetKnowledgeAccessorOptions {
   db: D1Like
   /** The active workspace — every `count` is scoped to it. */
@@ -523,6 +525,7 @@ export function createPresetWorkspaceKeyStore(db: D1Like): WorkspaceKeyStore {
   }
 }
 
+/** Define preset billing options including database, provisioner, encryption key, budget, and optional settings */
 export interface PresetBillingOptions {
   db: D1Like
   /** The key provisioner (`@tangle-network/tcloud`'s client satisfies it structurally). */

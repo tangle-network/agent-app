@@ -7,6 +7,7 @@ import {
   type SubmitInteractionAnswer,
 } from './interaction-card-support'
 
+/** Manage storage and retrieval of interaction attempt keys by interaction and submission identifiers */
 export interface InteractionAttemptStore {
   get(interactionId: string, submissionSignature: string): string | null
   set(interactionId: string, submissionSignature: string, attemptKey: string): void
@@ -28,6 +29,7 @@ function storedAttempts(storage: Pick<Storage, 'getItem'>, key: string): Record<
   }
 }
 
+/** Create a session-based store to manage interaction attempts using provided storage and optional namespace */
 export function createSessionInteractionAttemptStore(
   storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>,
   namespace = 'agent-app:interaction-attempt',
@@ -50,6 +52,7 @@ export function createSessionInteractionAttemptStore(
   }
 }
 
+/** Create an in-memory store to manage interaction attempts keyed by ID and signature */
 export function createMemoryInteractionAttemptStore(): InteractionAttemptStore {
   const attempts = new Map<string, string>()
   const key = (id: string, signature: string) => `${id}\u0000${signature}`
@@ -68,10 +71,12 @@ function stableValue(value: unknown): unknown {
     .map(([key, nested]) => [key, stableValue(nested)]))
 }
 
+/** Generate a stable string signature from an interaction answer submission */
 export function interactionSubmissionSignature(submission: InteractionAnswerSubmission): string {
   return JSON.stringify(stableValue(submission))
 }
 
+/** Define options for submitting durable interaction answers with attempt tracking and optional key creation */
 export interface DurableInteractionAnswerSubmitterOptions extends InteractionAnswerSubmitterOptions {
   attempts: InteractionAttemptStore
   createAttemptKey?: () => string

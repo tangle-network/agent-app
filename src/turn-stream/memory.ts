@@ -40,6 +40,7 @@ export interface MemoryTurnStreamSocket extends TurnStreamSocket {
   readonly closed: boolean
 }
 
+/** Define an in-memory channel for streaming turn-based data with viewer socket connection support */
 export interface MemoryTurnStreamChannel {
   /** Attach a viewer socket to this channel (bypasses the HTTP 101 — the
    *  upgrade handshake is Cloudflare-runtime-only) and run its `sync`. */
@@ -47,6 +48,7 @@ export interface MemoryTurnStreamChannel {
   readonly instance: TurnStreamDO
 }
 
+/** Provide an interface to manage channels and namespaces for memory-based turn stream testing */
 export interface MemoryTurnStreamHarness {
   namespace: TurnStreamNamespaceLike
   /** The channel (creating its DO instance if needed) for a channel key —

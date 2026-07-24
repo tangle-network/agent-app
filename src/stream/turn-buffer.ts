@@ -18,12 +18,14 @@
 
 export type TurnStatus = 'running' | 'complete' | 'error'
 
+/** Represent a buffered turn event with a sequence number and serialized event data */
 export interface BufferedTurnEvent {
   seq: number
   /** The serialized event line (JSON string, no trailing newline). */
   event: string
 }
 
+/** Manage and query turn events and their lifecycle statuses within a scoped event store */
 export interface TurnEventStore {
   append(turnId: string, events: BufferedTurnEvent[]): Promise<void>
   read(turnId: string, fromSeq: number): Promise<BufferedTurnEvent[]>
@@ -119,6 +121,7 @@ export function coalesceChatStreamEvents(events: unknown[]): unknown[] {
 
 // ── buffering core (the tap) ────────────────────────────────────────────────
 
+/** Define options for buffering and flushing turn events with optional live client delivery and event coalescing */
 export interface BufferedTurnOptions {
   store: TurnEventStore
   turnId: string
@@ -218,6 +221,7 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
 
 // ── pump (producer side) ──────────────────────────────────────────────────
 
+/** Define options to pump data from an asynchronous iterable source with buffered turn control */
 export interface PumpBufferedTurnOptions extends BufferedTurnOptions {
   source: AsyncIterable<unknown>
 }
@@ -243,6 +247,7 @@ export async function pumpBufferedTurn(opts: PumpBufferedTurnOptions): Promise<v
 
 // ── replay (consumer side) ────────────────────────────────────────────────
 
+/** Define options for replaying turn events with control over sequence, polling, and timeout */
 export interface ReplayTurnEventsOptions {
   store: TurnEventStore
   turnId: string
@@ -320,6 +325,7 @@ CREATE INDEX IF NOT EXISTS idx_turn_status_scope ON turn_status (scopeId, status
  *  deployments). SQLite ignores a duplicate-add error if already applied. */
 export const TURN_STATUS_SCOPE_MIGRATION_SQL = `ALTER TABLE turn_status ADD COLUMN scopeId TEXT;`
 
+/** Resolve a TurnEventStore that appends and reads turn events using a D1-like database interface */
 export function createD1TurnEventStore(db: D1LikeForTurns): TurnEventStore {
   return {
     async append(turnId, events) {

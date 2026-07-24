@@ -14,6 +14,7 @@ export interface FlowSpan {
   meta?: Record<string, unknown>
 }
 
+/** Describe the structure of a flow trace including spans, timing, tokens, cost, and tool calls */
 export interface FlowTrace {
   spans: FlowSpan[]
   totalMs: number

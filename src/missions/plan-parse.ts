@@ -26,17 +26,20 @@ export const DEFAULT_MISSION_STEP_KINDS: readonly string[] = [
   'best-effort',
 ]
 
+/** Define the structure representing a parsed mission step with id, kind, and intent fields */
 export interface ParsedMissionStep {
   id: string
   kind: string
   intent: string
 }
 
+/** Describe a mission with a title and an ordered list of parsed steps */
 export interface ParsedMission {
   title: string
   steps: ParsedMissionStep[]
 }
 
+/** Define options to specify allowed lowercase step kinds for parsing mission blocks */
 export interface ParseMissionBlocksOptions {
   /** Allowed step kinds (lowercase). Default {@link DEFAULT_MISSION_STEP_KINDS}. */
   kinds?: readonly string[]

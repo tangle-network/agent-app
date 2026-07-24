@@ -36,6 +36,7 @@ export type SceneAttrsPatch = Partial<Omit<SceneElement, 'id' | 'kind' | 'childr
   fit?: 'fill' | 'cover' | 'contain'
 }
 
+/** Define an operation to add a scene element to a page with optional index and parent group */
 export interface AddElementOperation {
   type: 'add_element'
   pageId: string
@@ -48,6 +49,7 @@ export interface AddElementOperation {
   parentGroupId?: string
 }
 
+/** Define an operation to update attributes of a specific element on a page */
 export interface SetAttrsOperation {
   type: 'set_attrs'
   pageId: string
@@ -55,6 +57,7 @@ export interface SetAttrsOperation {
   attrs: SceneAttrsPatch
 }
 
+/** Resolve an operation to reorder an element within its current owner by specifying the target index */
 export interface ReorderElementOperation {
   type: 'reorder_element'
   pageId: string
@@ -63,12 +66,14 @@ export interface ReorderElementOperation {
   toIndex: number
 }
 
+/** Resolve deletion of a specific element from a page by its identifiers */
 export interface DeleteElementOperation {
   type: 'delete_element'
   pageId: string
   elementId: string
 }
 
+/** Group elements by grouping two or more sibling elements in their current z-order under a new group ID */
 export interface GroupElementsOperation {
   type: 'group_elements'
   pageId: string
@@ -79,12 +84,14 @@ export interface GroupElementsOperation {
   name?: string
 }
 
+/** Resolve an operation to ungroup elements within a specified page and group context */
 export interface UngroupElementOperation {
   type: 'ungroup_element'
   pageId: string
   groupId: string
 }
 
+/** Define an operation to add a new page with an optional position and caller-minted page ID */
 export interface AddPageOperation {
   type: 'add_page'
   /** Caller-minted page id. */
@@ -94,6 +101,7 @@ export interface AddPageOperation {
   index?: number
 }
 
+/** Define an operation to duplicate a page with a new caller-specified page ID */
 export interface DuplicatePageOperation {
   type: 'duplicate_page'
   sourcePageId: string
@@ -101,17 +109,20 @@ export interface DuplicatePageOperation {
   pageId: string
 }
 
+/** Represent a delete page operation with a specified page identifier */
 export interface DeletePageOperation {
   type: 'delete_page'
   pageId: string
 }
 
+/** Represent an operation to reorder a page by moving it to a specified index */
 export interface ReorderPageOperation {
   type: 'reorder_page'
   pageId: string
   toIndex: number
 }
 
+/** Define an operation to set or update properties of a page including size, background, and bleed */
 export interface SetPagePropsOperation {
   type: 'set_page_props'
   pageId: string
@@ -123,12 +134,14 @@ export interface SetPagePropsOperation {
   bleed?: PageBleed | null
 }
 
+/** Resolve an operation to set guides on a specific page by its identifier */
 export interface SetPageGuidesOperation {
   type: 'set_page_guides'
   pageId: string
   guides: PageGuides
 }
 
+/** Define an operation to bind or unbind a unique slot to an element on a specific page */
 export interface BindSlotOperation {
   type: 'bind_slot'
   pageId: string
@@ -144,11 +157,13 @@ export interface ApplyDataOperation {
   bindings: Record<string, string>
 }
 
+/** Define an operation to set the document title to a specified string */
 export interface SetDocumentTitleOperation {
   type: 'set_document_title'
   title: string
 }
 
+/** Represent operations that modify scenes by adding, updating, reordering, grouping, or deleting elements and pages */
 export type SceneOperation =
   | AddElementOperation
   | SetAttrsOperation
@@ -166,13 +181,16 @@ export type SceneOperation =
   | ApplyDataOperation
   | SetDocumentTitleOperation
 
+/** Define a plan summarizing a scene with its description and associated operations */
 export interface ScenePlan {
   summary: string
   operations: SceneOperation[]
 }
 
+/** Extract the type property from a SceneOperation to represent its operation type */
 export type SceneOperationType = SceneOperation['type']
 
+/** Define all valid operation types for scene manipulation in the application */
 export const SCENE_OPERATION_TYPES: readonly SceneOperationType[] = [
   'add_element',
   'set_attrs',

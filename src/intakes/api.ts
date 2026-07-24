@@ -40,6 +40,7 @@ export interface CurrentIntakeView {
   progress: { answered: number; total: number }
 }
 
+/** Define configuration options for initializing the intake API with store and graph components */
 export interface IntakeApiOptions {
   store: IntakeStore
   graph: IntakeGraph

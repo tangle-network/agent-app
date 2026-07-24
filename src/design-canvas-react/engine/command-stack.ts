@@ -43,6 +43,7 @@ export interface SceneCommandStackWithReapply extends SceneCommandStack {
   reundo(command: SceneCommand): void
 }
 
+/** Create a command stack for scene editing with reapply capabilities based on the given document and page ID */
 export function createSceneCommandStack(document: SceneDocument, activePageId: string): SceneCommandStackWithReapply {
   let state: EditorSceneState = {
     document,

@@ -5,6 +5,7 @@ import {
   type TerminalProxyIdentity,
 } from './terminal-proxy-token'
 
+/** Define the shape of a workspace sandbox instance including its connection details and status */
 export interface WorkspaceSandboxInstanceLike {
   id: string
   name?: string
@@ -23,11 +24,13 @@ export interface WorkspaceSandboxInstanceLike {
 // concrete `ensureWorkspaceSandbox` in ./index, which is bound to the
 // @tangle-network/sandbox client). Kept as a public export — external
 // consumers compose it; removing it would be a breaking change.
+/** Define the context containing workspace and user identifiers for sandbox environment operations */
 export interface WorkspaceSandboxEnsureContext {
   workspaceId: string
   userId: string
 }
 
+/** Define configuration options for managing and interacting with workspace sandboxes */
 export interface WorkspaceSandboxManagerOptions<TClient, TBox extends WorkspaceSandboxInstanceLike, TEnsureOptions = void> {
   getClient: (ctx: WorkspaceSandboxEnsureContext) => Promise<TClient> | TClient
   nameForWorkspace: (workspaceId: string, ctx: WorkspaceSandboxEnsureContext) => string
@@ -45,6 +48,7 @@ export interface WorkspaceSandboxManagerOptions<TClient, TBox extends WorkspaceS
   onListError?: (error: unknown, ctx: WorkspaceSandboxEnsureContext) => void
 }
 
+/** Manage workspace sandboxes by ensuring their creation and retrieval for specified users */
 export interface WorkspaceSandboxManager<TBox extends WorkspaceSandboxInstanceLike, TEnsureOptions = void> {
   ensureWorkspaceSandbox: (
     workspaceId: string,
@@ -53,6 +57,7 @@ export interface WorkspaceSandboxManager<TBox extends WorkspaceSandboxInstanceLi
   ) => Promise<TBox>
 }
 
+/** Create a manager to handle workspace sandbox instances with client and options configuration */
 export function createWorkspaceSandboxManager<TClient, TBox extends WorkspaceSandboxInstanceLike, TEnsureOptions = void>(
   opts: WorkspaceSandboxManagerOptions<TClient, TBox, TEnsureOptions>,
 ): WorkspaceSandboxManager<TBox, TEnsureOptions> {
@@ -91,14 +96,17 @@ export function createWorkspaceSandboxManager<TClient, TBox extends WorkspaceSan
   }
 }
 
+/** Define options for generating a sandbox terminal token including secret and expiration settings */
 export interface SandboxTerminalTokenOptions {
   secret?: string
   expiresInMs?: number
   now?: () => number
 }
 
+/** Resolve the identity type used for sandbox terminal token subjects */
 export type SandboxTerminalTokenSubject = TerminalProxyIdentity
 
+/** Provide token and expiration details for a sandbox terminal session */
 export interface SandboxTerminalTokenResult {
   token: string
   expiresAt: Date
@@ -113,6 +121,7 @@ const BEARER_SUBPROTOCOL_PREFIX = 'bearer.'
 // in-flight browser terminal sessions right after rollout.
 const LEGACY_TERMINAL_TOKEN_PREFIX = 'sbxt_'
 
+/** Generate a sandbox terminal token for a given subject with specified options */
 export async function createSandboxTerminalToken(
   subject: SandboxTerminalTokenSubject,
   opts: SandboxTerminalTokenOptions,
@@ -128,6 +137,7 @@ export async function createSandboxTerminalToken(
   return minted.value
 }
 
+/** Verify the validity of a sandbox terminal token against the expected identity and options */
 export async function verifySandboxTerminalToken(
   token: string,
   expected: SandboxTerminalTokenSubject,
@@ -142,10 +152,12 @@ export async function verifySandboxTerminalToken(
   return verifyTerminalProxyToken(secret ?? '', normalized, expected, now)
 }
 
+/** Represent an authenticated user within a sandbox environment with a unique identifier */
 export interface AuthenticatedSandboxUser {
   id: string
 }
 
+/** Define options to handle workspace sandbox connections with user authentication and access control */
 export interface WorkspaceSandboxConnectionHandlerOptions<TBox extends WorkspaceSandboxInstanceLike> {
   requireUser: (request: Request) => Promise<AuthenticatedSandboxUser>
   requireWorkspaceAccess: (args: { request: Request; userId: string; workspaceId: string }) => Promise<void>
@@ -156,6 +168,7 @@ export interface WorkspaceSandboxConnectionHandlerOptions<TBox extends Workspace
   exposeDirectSidecar?: boolean
 }
 
+/** Define arguments required to establish a workspace sandbox connection */
 export interface WorkspaceSandboxConnectionArgs {
   request: Request
   params: {
@@ -163,6 +176,7 @@ export interface WorkspaceSandboxConnectionArgs {
   }
 }
 
+/** Create a handler to resolve workspace sandbox connections with user and access validation */
 export function createWorkspaceSandboxConnectionHandler<TBox extends WorkspaceSandboxInstanceLike>(
   opts: WorkspaceSandboxConnectionHandlerOptions<TBox>,
 ) {
@@ -235,17 +249,20 @@ export function createWorkspaceSandboxConnectionHandler<TBox extends WorkspaceSa
   }
 }
 
+/** Define credentials required to access the sandbox API environment */
 export interface SandboxApiCredentials {
   baseUrl: string
   apiKey: string
 }
 
+/** Define a connection configuration for sandbox runtime including URL and optional server-side auth token */
 export interface SandboxRuntimeConnection {
   runtimeUrl: string
   /** Server-side sidecar bearer. Must authorize terminal routes; never expose it to browser code. */
   authToken?: string
 }
 
+/** Define options for handling workspace sandbox runtime proxy including user, access, credentials, and connection retrieval */
 export interface WorkspaceSandboxRuntimeProxyHandlerOptions {
   requireUser: (request: Request) => Promise<AuthenticatedSandboxUser>
   requireWorkspaceAccess: (args: { request: Request; userId: string; workspaceId: string; sandboxId: string }) => Promise<void>
@@ -256,6 +273,7 @@ export interface WorkspaceSandboxRuntimeProxyHandlerOptions {
   forwardHeaders?: string[]
 }
 
+/** Define arguments for proxying runtime requests within a workspace sandbox environment */
 export interface WorkspaceSandboxRuntimeProxyArgs {
   request: Request
   params: {
@@ -265,6 +283,7 @@ export interface WorkspaceSandboxRuntimeProxyArgs {
   }
 }
 
+/** Create a proxy handler to resolve sandbox runtime requests with user and workspace access validation */
 export function createWorkspaceSandboxRuntimeProxyHandler(opts: WorkspaceSandboxRuntimeProxyHandlerOptions) {
   return async function handleWorkspaceSandboxRuntimeProxy({ request, params }: WorkspaceSandboxRuntimeProxyArgs): Promise<Response> {
     const user = await opts.requireUser(request)
@@ -348,6 +367,7 @@ export function createWorkspaceSandboxRuntimeProxyHandler(opts: WorkspaceSandbox
 const SANDBOX_TERMINAL_WS_PATHNAME =
   /^\/api\/workspaces\/([^/]+)\/sandbox\/runtime\/([^/]+)\/(terminals\/[^/]+\/ws)$/
 
+/** Define the structure for matching a sandbox terminal WebSocket with workspace and path details */
 export interface SandboxTerminalWsMatch {
   workspaceId: string
   sandboxId: string
@@ -383,6 +403,7 @@ export function isSandboxTerminalWsUpgrade(request: Request): boolean {
   }
 }
 
+/** Define options to handle user authentication, workspace access, and sandbox API credential retrieval */
 export interface WorkspaceSandboxTerminalUpgradeHandlerOptions {
   requireUser: (request: Request) => Promise<AuthenticatedSandboxUser>
   requireWorkspaceAccess: (args: { request: Request; userId: string; workspaceId: string; sandboxId: string }) => Promise<void>
@@ -458,6 +479,7 @@ export function createWorkspaceSandboxTerminalUpgradeHandler(opts: WorkspaceSand
 
 const DEFAULT_RUNTIME_PROXY_HEADERS = ['accept', 'content-type', 'last-event-id', 'x-session-id']
 
+/** Build proxy headers for sandbox runtime including authorization and forwarded headers */
 export function buildSandboxRuntimeProxyHeaders(source: Headers, sandboxApiKey: string, forwardHeaders = DEFAULT_RUNTIME_PROXY_HEADERS): Headers {
   const headers = new Headers()
   headers.set('Authorization', `Bearer ${sandboxApiKey}`)
@@ -468,12 +490,14 @@ export function buildSandboxRuntimeProxyHeaders(source: Headers, sandboxApiKey: 
   return headers
 }
 
+/** Encode a runtime path by URI-encoding each valid segment and returning null for invalid segments */
 export function encodeSandboxRuntimePath(runtimePath: string): string | null {
   const segments = runtimePath.split('/')
   if (segments.some((segment) => !segment || segment === '.' || segment === '..')) return null
   return segments.map((segment) => encodeURIComponent(segment)).join('/')
 }
 
+/** Extract the token from a bearer authorization string or return null if invalid or missing */
 export function bearerToken(value: string | null): string | null {
   if (!value) return null
   const trimmed = value.trim()
@@ -486,6 +510,7 @@ export function bearerToken(value: string | null): string | null {
   return trimmed
 }
 
+/** Resolve and decode a bearer token from a comma-separated subprotocol string or return null */
 export function bearerSubprotocolToken(value: string | null): string | null {
   if (!value) return null
   for (const part of value.split(',')) {
@@ -503,6 +528,7 @@ export function bearerSubprotocolToken(value: string | null): string | null {
   return null
 }
 
+/** Resolve the terminal token from request headers using Authorization or Sec-WebSocket-Protocol fields */
 export function terminalTokenFromRequest(headers: Headers): string | null {
   return bearerToken(headers.get('Authorization')) ?? bearerSubprotocolToken(headers.get('Sec-WebSocket-Protocol'))
 }

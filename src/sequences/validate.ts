@@ -79,6 +79,7 @@ const MEDIA_KINDS: Record<SequenceMediaKind, true> = {
  *  without shipping a full registry. */
 const LANGUAGE_TAG = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/
 
+/** Validate each operation in a sequence against the timeline and context, throwing detailed errors on failure */
 export function validateSequenceOperations(
   timeline: SequenceTimeline,
   operations: SequenceOperation[],
@@ -95,6 +96,7 @@ export function validateSequenceOperations(
   })
 }
 
+/** Validate a sequence operation against the timeline and context to ensure correctness */
 export function validateSequenceOperation(
   timeline: SequenceTimeline,
   operation: SequenceOperation,
@@ -132,6 +134,7 @@ export function validateSequenceOperation(
   }
 }
 
+/** Validate the properties and constraints of a PlaceClipOperation within a SequenceTimeline */
 export function validatePlaceClip(timeline: SequenceTimeline, operation: PlaceClipOperation): void {
   if (operation.label.trim().length === 0) throw new Error('label must be non-empty')
   if (operation.media) {
@@ -148,6 +151,7 @@ export function validatePlaceClip(timeline: SequenceTimeline, operation: PlaceCl
   resolvePlaceClipTrack(timeline, operation)
 }
 
+/** Validate the parameters and context of an AddCaptionOperation within a sequence timeline */
 export function validateAddCaption(
   timeline: SequenceTimeline,
   operation: AddCaptionOperation,
@@ -169,6 +173,7 @@ export function validateAddCaption(
   }
 }
 
+/** Validate that a clip move operation is within bounds and targets a compatible unlocked track */
 export function validateMoveClip(timeline: SequenceTimeline, operation: MoveClipOperation): void {
   const { clip, track } = requireMutableClip(timeline, operation.clipId)
   assertOperationBounds(timeline, { startFrame: operation.startFrame, durationFrames: clip.durationFrames })
@@ -181,6 +186,7 @@ export function validateMoveClip(timeline: SequenceTimeline, operation: MoveClip
   }
 }
 
+/** Validate that a trim clip operation respects timeline bounds and source frame constraints */
 export function validateTrimClip(timeline: SequenceTimeline, operation: TrimClipOperation): void {
   const { clip } = requireMutableClip(timeline, operation.clipId)
   if (operation.sourceInFrame !== undefined) assertSourceInFrame(operation.sourceInFrame)
@@ -194,6 +200,7 @@ export function validateTrimClip(timeline: SequenceTimeline, operation: TrimClip
   assertSourceWindow(sourceInFrame, sourceOutFrame, operation.durationFrames)
 }
 
+/** Validate that a split operation on a clip is within valid frame boundaries and conditions */
 export function validateSplitClip(timeline: SequenceTimeline, operation: SplitClipOperation): void {
   const { clip } = requireMutableClip(timeline, operation.clipId)
   if (!Number.isInteger(operation.atFrame)) throw new Error('atFrame must be an integer')
@@ -208,6 +215,7 @@ export function validateSplitClip(timeline: SequenceTimeline, operation: SplitCl
   }
 }
 
+/** Validate that a SetClipTextOperation targets a caption clip with non-empty text and valid language tag */
 export function validateSetClipText(timeline: SequenceTimeline, operation: SetClipTextOperation): void {
   const { track } = requireMutableClip(timeline, operation.clipId)
   if (track.kind !== 'caption') {
@@ -219,19 +227,23 @@ export function validateSetClipText(timeline: SequenceTimeline, operation: SetCl
   if (operation.language !== undefined) assertLanguageTag(operation.language)
 }
 
+/** Validate that the clip can be disabled within the given timeline and operation constraints */
 export function validateSetClipDisabled(timeline: SequenceTimeline, operation: SetClipDisabledOperation): void {
   requireMutableClip(timeline, operation.clipId)
 }
 
+/** Validate that the clip to delete exists and is mutable in the given timeline */
 export function validateDeleteClip(timeline: SequenceTimeline, operation: DeleteClipOperation): void {
   requireMutableClip(timeline, operation.clipId)
 }
 
+/** Validate that a CreateTrackOperation has a supported kind and a non-empty name */
 export function validateCreateTrack(operation: CreateTrackOperation): void {
   if (!(operation.kind in TRACK_KINDS)) throw new Error(`unsupported track kind ${JSON.stringify(operation.kind)}`)
   if (operation.name.trim().length === 0) throw new Error('name must be non-empty')
 }
 
+/** Validate that the extend sequence operation has a positive duration and exceeds the last clip end frame */
 export function validateExtendSequence(timeline: SequenceTimeline, operation: ExtendSequenceOperation): void {
   if (!Number.isInteger(operation.durationFrames) || operation.durationFrames <= 0) {
     throw new Error('durationFrames must be a positive integer')
@@ -242,6 +254,7 @@ export function validateExtendSequence(timeline: SequenceTimeline, operation: Ex
   }
 }
 
+/** Validate that the queue export operation uses a supported export format */
 export function validateQueueExport(operation: QueueExportOperation): void {
   if (!(operation.format in EXPORT_FORMATS)) {
     throw new Error(`unsupported export format ${JSON.stringify(operation.format)}`)
@@ -429,6 +442,7 @@ function describeJsonValue(value: unknown): string {
 // Resolution helpers — shared with ./apply
 // ---------------------------------------------------------------------------
 
+/** Resolve caption target by specifying an existing track or creating a new one with language and name */
 export type CaptionTargetResolution =
   | { kind: 'existing'; track: SequenceTrack }
   | { kind: 'create'; language: string; name: string }

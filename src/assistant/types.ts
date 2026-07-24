@@ -7,6 +7,7 @@
 
 import type { ReactNode } from "react";
 
+/** Define delivery modes for assistant interaction as either steering or queue */
 export type AssistantDeliveryMode = "steering" | "queue";
 
 /** Request body for `POST /api/v1/assistant/chat`. */
@@ -24,6 +25,7 @@ export interface ChatRequest {
 
 // --- Server SSE event payloads (one per `event:` name) ----------------------
 
+/** Describe the structure of data representing a thread event with optional model information */
 export interface ThreadEventData {
   threadId: string;
   turnId: string;
@@ -31,6 +33,7 @@ export interface ThreadEventData {
   model?: string | null;
 }
 
+/** Define data structure representing a delta event with associated text content */
 export interface DeltaEventData {
   text: string;
 }
@@ -52,6 +55,7 @@ export interface ToolCallEventData {
   args?: Record<string, unknown>;
 }
 
+/** Describe event data emitted after a tool execution completes with success or error details */
 export interface ToolResultEventData {
   callId: string;
   name: string;
@@ -96,6 +100,7 @@ export interface ConnectRequirementResult {
   connected: boolean;
 }
 
+/** Describe the data structure for events proposing tool usage with optional integration requirements */
 export interface ToolProposalEventData {
   /** Null only if the server has no proposal store wired (tools then unusable). */
   proposalId: string | null;
@@ -107,6 +112,7 @@ export interface ToolProposalEventData {
   requirements?: ConnectionRequirement[];
 }
 
+/** Describe usage event data including tokens, cost, balance, duration, and replay status */
 export interface UsageEventData {
   promptTokens: number | null;
   completionTokens: number | null;
@@ -119,6 +125,7 @@ export interface UsageEventData {
   replayed?: boolean;
 }
 
+/** Describe the data emitted when a process turn completes including status and optional flags */
 export interface DoneEventData {
   turnId: string;
   status: string;
@@ -128,6 +135,7 @@ export interface DoneEventData {
   capped?: boolean;
 }
 
+/** Describe error event data including code and message fields */
 export interface ErrorEventData {
   code: string;
   message: string;
@@ -184,6 +192,7 @@ export interface ConfirmedResult {
   args?: unknown;
 }
 
+/** Define the structure and properties of a chat message including optional tool activity details */
 export interface ChatMessage {
   id: string;
   role: ChatRole;
@@ -218,6 +227,7 @@ export interface PendingProposal {
   retryError?: string | null;
 }
 
+/** Describe usage cost, balance, token counts, duration, and replay status for a settled turn */
 export interface UsageInfo {
   costUsd: number | null;
   balanceUsd: number | null;

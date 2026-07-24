@@ -22,6 +22,7 @@ import {
   hmacSha256Base64Url,
 } from '../crypto/web-token'
 
+/** Define options for creating and verifying capability tokens including secret and prefix */
 export interface CapabilityTokenOptions {
   /** Shared HMAC secret. When absent, mint returns undefined / verify returns false. */
   secret?: string
@@ -49,6 +50,7 @@ export async function verifyCapabilityToken(userId: string, token: string, opts:
   return constantTimeEqual(token, expected)
 }
 
+/** Define options for capability tokens that expire after a specified lifetime in milliseconds */
 export interface ExpiringCapabilityTokenOptions extends CapabilityTokenOptions {
   /** Token lifetime. Expired tokens verify false regardless of signature. */
   expiresInMs: number

@@ -11,6 +11,7 @@
 
 import type { PlaybackClock } from '../contracts'
 
+/** Define configuration settings for playback clock including frames per second and total duration frames */
 export interface PlaybackClockConfig {
   fps: number
   durationFrames: number
@@ -43,6 +44,7 @@ function now(): number {
   return perf.now()
 }
 
+/** Create a playback clock that manages frame timing and playback state based on configuration */
 export function createPlaybackClock(config: PlaybackClockConfig): PlaybackClock {
   if (!Number.isInteger(config.fps) || config.fps <= 0) {
     throw new Error(`fps must be a positive integer, got ${config.fps}`)

@@ -130,6 +130,7 @@ const MAX_SCOPE_TURNS = 100
 
 // ── the DO ──────────────────────────────────────────────────────────────────
 
+/** Define options to override default TTL and event limits for TURN stream DO operations */
 export interface TurnStreamDOOptions {
   /** Override {@link TURN_LOCK_TTL_MS}. */
   lockTtlMs?: number
@@ -139,6 +140,7 @@ export interface TurnStreamDOOptions {
   activityTtlMs?: number
 }
 
+/** Manage per-turn segments and track active threads with durable event storage */
 export class TurnStreamDO {
   protected readonly state: TurnStreamDOState
   protected readonly env: unknown

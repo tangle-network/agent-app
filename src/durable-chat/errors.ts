@@ -1,3 +1,4 @@
+/** Define error codes representing possible Durable Chat failure scenarios */
 export type DurableChatErrorCode =
   | 'DURABLE_CHAT_BAD_REQUEST'
   | 'DURABLE_CHAT_UNAUTHORIZED'
@@ -21,6 +22,7 @@ export class DurableChatError extends Error {
   }
 }
 
+/** Represent conflict errors occurring in durable chat state management */
 export class DurableChatConflictError extends DurableChatError {
   constructor(message = 'durable chat state conflict', details?: unknown) {
     super('DURABLE_CHAT_CONFLICT', message, 409, details)
@@ -28,6 +30,7 @@ export class DurableChatConflictError extends DurableChatError {
   }
 }
 
+/** Represent unavailable durable chat authority errors with status code 503 */
 export class DurableChatUnavailableError extends DurableChatError {
   constructor(message = 'durable chat authority unavailable', details?: unknown) {
     super('DURABLE_CHAT_UNAVAILABLE', message, 503, details)
@@ -35,6 +38,7 @@ export class DurableChatUnavailableError extends DurableChatError {
   }
 }
 
+/** Represent durable chat errors indicating the chat plan is no longer available */
 export class DurableChatGoneError extends DurableChatError {
   constructor(message = 'durable chat plan is gone', details?: unknown) {
     super('DURABLE_CHAT_GONE', message, 410, details)

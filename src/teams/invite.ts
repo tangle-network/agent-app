@@ -36,8 +36,10 @@ export interface InviteTokenState {
   expiresAt?: Date | number | null
 }
 
+/** Define possible reasons for rejecting an invite including acceptance, expiration, or email mismatch */
 export type InviteRejectionReason = 'already-accepted' | 'expired' | 'email-mismatch'
 
+/** Represent the outcome of validating an invite with success status and optional rejection reason */
 export interface InviteValidationResult {
   ok: boolean
   reason?: InviteRejectionReason

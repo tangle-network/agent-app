@@ -69,6 +69,7 @@ export interface CanvasRenderPalette {
   brokenStroke: string
 }
 
+/** Define a light color theme with specific background, foreground, and accent color values */
 export const lightTheme: AgentAppTheme = {
   background: '0 0% 100%',
   foreground: '0 0% 5%',
@@ -109,6 +110,7 @@ export const lightTheme: AgentAppTheme = {
   },
 }
 
+/** Define a dark color scheme for the Agent app interface with specific background and foreground hues */
 export const darkTheme: AgentAppTheme = {
   background: '240 8% 5%',
   foreground: '240 6% 93%',

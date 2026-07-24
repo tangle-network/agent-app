@@ -54,6 +54,7 @@ import type {
 // Public entry
 // ---------------------------------------------------------------------------
 
+/** Validate each scene operation against the document and throw detailed errors for invalid operations */
 export function validateSceneOperations(document: SceneDocument, operations: SceneOperation[]): void {
   operations.forEach((operation, index) => {
     try {
@@ -65,6 +66,7 @@ export function validateSceneOperations(document: SceneDocument, operations: Sce
   })
 }
 
+/** Validate a scene operation against the document to ensure it meets required constraints */
 export function validateSceneOperation(document: SceneDocument, operation: SceneOperation): void {
   switch (operation.type) {
     case 'add_element':

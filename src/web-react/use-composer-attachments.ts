@@ -65,6 +65,7 @@ interface StagedAttachment {
   errorMessage?: string
 }
 
+/** Define options for configuring file upload behavior and handling in a composer component */
 export interface UseComposerAttachmentsOptions {
   /** Simple upload target: every file POSTs here. Ignored when
    *  `buildUploadRequest` is provided. */
@@ -100,6 +101,7 @@ export interface UseComposerAttachmentsOptions {
   enabled?: boolean
 }
 
+/** Provide staged file chips, ready attachments, and methods to add, retry, or drop composer files */
 export interface UseComposerAttachmentsResult {
   /** Chip models for `ChatComposer`'s `pendingFiles` prop, one per staged
    *  file — `kind` is always `'file'` (agent-app's `ComposerFile.kind`

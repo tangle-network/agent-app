@@ -24,12 +24,14 @@ import type {
   SequenceTrackKind,
 } from './model'
 
+/** Define properties for a new sequence track including kind, name, and optional sort order */
 export interface NewSequenceTrack {
   kind: SequenceTrackKind
   name: string
   sortOrder?: number
 }
 
+/** Define properties for a new sequence clip including timing, labels, and optional metadata */
 export interface NewSequenceClip {
   trackId: string
   label: string
@@ -44,6 +46,7 @@ export interface NewSequenceClip {
   metadata?: Record<string, unknown>
 }
 
+/** Define optional properties to update or patch a sequence clip's attributes in a timeline */
 export interface SequenceClipPatch {
   trackId?: string
   label?: string
@@ -57,6 +60,7 @@ export interface SequenceClipPatch {
   metadata?: Record<string, unknown>
 }
 
+/** Define the structure for a new sequence decision with optional metadata and acceptance status */
 export interface NewSequenceDecision {
   clipId?: string | null
   kind: SequenceDecision['kind']
@@ -66,6 +70,7 @@ export interface NewSequenceDecision {
   metadata?: Record<string, unknown>
 }
 
+/** Manage sequences by providing methods to get timelines, clips, and modify tracks and clips */
 export interface SequenceStore {
   /** Full aggregate: sequence meta + tracks + clips with resolved media. */
   getTimeline(): Promise<SequenceTimeline>

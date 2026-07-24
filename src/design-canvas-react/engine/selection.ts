@@ -62,6 +62,7 @@ function pointInBounds(b: Bounds, x: number, y: number): boolean {
   return x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height
 }
 
+/** Define options to configure marquee selection behavior including containment requirements */
 export interface MarqueeSelectOptions {
   /** When true, the element's AABB must be fully inside the marquee; default is
    *  intersection (any overlap selects). */
@@ -120,6 +121,7 @@ function boundsContain(outer: Bounds, inner: Bounds): boolean {
 const NUDGE_NORMAL_PX = 1
 const NUDGE_SHIFT_PX = 10
 
+/** Represent horizontal and vertical displacement values for nudging elements */
 export interface NudgeDelta {
   dx: number
   dy: number

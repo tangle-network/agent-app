@@ -44,6 +44,7 @@ function cacheFor(client: AssistantClient): ModelCache {
   return entry;
 }
 
+/** Resolve and return the current assistant models from the per-client cache with immediate client swap updates */
 export function useAssistantModels(): AssistantModels {
   const client = useAssistantClient();
   // The per-client cache is the source of truth; `bump` just forces a re-read

@@ -19,6 +19,7 @@ import { sql } from 'drizzle-orm'
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import type { TeamParentTable } from './schema'
 
+/** Define options for creating a workspace invitation table with user, workspace, and organization references */
 export interface CreateWorkspaceInvitationTableOptions {
   /** The product's user table — `invitedByUserId` references `userTable.id`. */
   userTable: TeamParentTable
@@ -28,6 +29,7 @@ export interface CreateWorkspaceInvitationTableOptions {
   organizationTable: TeamParentTable
 }
 
+/** Build a workspace invitation table with defined columns and foreign key constraints */
 export function createWorkspaceInvitationTable(opts: CreateWorkspaceInvitationTableOptions) {
   const { userTable, workspaceTable, organizationTable } = opts
 
@@ -56,5 +58,7 @@ export function createWorkspaceInvitationTable(opts: CreateWorkspaceInvitationTa
   return { workspaceInvitations }
 }
 
+/** Resolve the structure of workspace invitation tables from the creation function */
 export type WorkspaceInvitationTables = ReturnType<typeof createWorkspaceInvitationTable>
+/** Resolve the structure of a workspace invitation row from the workspaceInvitations table */
 export type WorkspaceInvitationRow = WorkspaceInvitationTables['workspaceInvitations']['$inferSelect']

@@ -29,6 +29,7 @@ import { ok, fail, type Outcome } from './outcome'
 export type { Outcome } from './outcome'
 export * from './binary-read'
 
+/** Define client credentials for accessing the sandbox environment with API key and base URL */
 export interface SandboxClientCredentials {
   apiKey: string
   baseUrl: string
@@ -41,6 +42,7 @@ export interface SandboxClientCredentials {
  */
 export type SandboxCredentialEnvironment = TangleExecutionEnvironment
 
+/** Resolve options for obtaining sandbox client credentials from environment variables and classification */
 export interface ResolveSandboxClientCredentialsOptions {
   /**
    * Environment object to read from. Defaults to process.env when available.
@@ -141,6 +143,7 @@ function resolveDirectSandboxCredentials(
   return null
 }
 
+/** Resolve sandbox client credentials based on environment and provided options asynchronously */
 export async function resolveSandboxClientCredentials(
   options: ResolveSandboxClientCredentialsOptions = {},
 ): Promise<SandboxClientCredentials> {
@@ -178,6 +181,7 @@ export async function resolveSandboxClientCredentials(
   )
 }
 
+/** Define configuration parameters for sandbox resource allocation and lifecycle management */
 export interface SandboxResourceConfig {
   image: string
   cpuCores: number
@@ -187,6 +191,7 @@ export interface SandboxResourceConfig {
   idleTimeoutSeconds: number
 }
 
+/** Define configuration options for resolving a provider and its model with optional API keys and routing details */
 export interface ProviderResolutionConfig {
   routerBaseUrl?: string
   apiKey?: string
@@ -204,6 +209,7 @@ export interface ProviderResolutionConfig {
   allowKeylessModel?: boolean
 }
 
+/** Define the context for building a sandbox including workspace, integrations, and optional user ID */
 export interface SandboxBuildContext {
   workspaceId: string
   connectedIntegrationIds: string[]
@@ -215,17 +221,20 @@ export type { StorageConfig }
 
 // Scope handed to per-identity seams. workspaceId is always present; userId is
 // present when the lifecycle op carries one. Workspace-keyed products ignore userId.
+/** Define a scope containing workspace and optional user identifiers for sandbox environments */
 export interface SandboxScope {
   workspaceId: string
   userId?: string
 }
 
 // Snapshot RESTORE-on-create. Returned alongside storage; undefined => fresh box.
+/** Define the specification for restoring a sandbox from a snapshot or another sandbox ID */
 export interface SandboxRestoreSpec {
   fromSnapshot: string
   fromSandboxId: string
 }
 
+/** Describe the failure details when resuming a stopped sandbox instance */
 export interface StoppedSandboxResumeFailure {
   box: SandboxInstance
   error: Error
@@ -233,6 +242,7 @@ export interface StoppedSandboxResumeFailure {
   boxKey: string
 }
 
+/** Define the structure for resuming a stopped sandbox with replacement key and optional restore options */
 export interface StoppedSandboxResumeRecovery {
   // Used for both the replacement sandbox name and idempotency key.
   replacementBoxKey: string
@@ -243,12 +253,14 @@ export interface StoppedSandboxResumeRecovery {
 // Reuse health gate + sidecar liveness. The exec+timeout-race is generic; the
 // sidecarProcessPattern is harness-specific (which process is the live sidecar),
 // so it is a closure. Absent => no liveness probe (reuse on metadata.harness match).
+/** Define configuration for liveness probes including sidecar process pattern and optional timeouts */
 export interface LivenessProbeConfig {
   sidecarProcessPattern: (harness: Harness) => string
   execTimeoutMs?: number
   psTimeoutMs?: number
 }
 
+/** Define options for composing a user profile including prompts, files, servers, and name */
 export interface ProfileComposeOptions {
   systemPrompt?: string
   extraFiles?: AgentProfileFileMount[]
@@ -256,6 +268,7 @@ export interface ProfileComposeOptions {
   name?: string
 }
 
+/** Define runtime configuration methods for sandbox environments including credentials, metadata, and permissions */
 export interface SandboxRuntimeConfig {
   // Widened to accept an optional scope and be async so a per-user key can be
   // minted. The sync, no-arg form still satisfies the type (back-compat).
@@ -316,6 +329,7 @@ export interface SandboxRuntimeConfig {
   deferProfileFiles?: boolean
 }
 
+/** Define default resource limits and settings for sandbox environments */
 export const DEFAULT_SANDBOX_RESOURCES: SandboxResourceConfig = {
   image: 'universal',
   cpuCores: 2,
@@ -344,6 +358,7 @@ function getClientFromCreds(creds: SandboxClientCredentials): Sandbox {
 // Sync client for non-scoped callers (secretStoreFromClient etc.). Resolves
 // credentials with no scope; throws if the seam returns a Promise — scoped
 // products must use the async ensureWorkspaceSandbox path.
+/** Resolve a synchronous sandbox client from provided runtime configuration credentials */
 export function getClient(shell: SandboxRuntimeConfig): Sandbox {
   const creds = shell.credentials()
   if (creds && typeof (creds as Promise<unknown>).then === 'function') {
@@ -353,16 +368,19 @@ export function getClient(shell: SandboxRuntimeConfig): Sandbox {
   return getClientFromCreds(creds as SandboxClientCredentials)
 }
 
+/** Reset the client cache to clear stored data and force fresh retrieval */
 export function resetClientCache(): void {
   _cached = null
 }
 
+/** Describe an application tool with its name, unique key, and description */
 export interface AppToolDescriptor {
   tool: AppToolName
   key: string
   description: string
 }
 
+/** Define options for building MCP server configurations in the app tool environment */
 export interface BuildAppToolMcpServersOptions {
   tools: AppToolDescriptor[]
   baseUrl: string
@@ -371,6 +389,7 @@ export interface BuildAppToolMcpServersOptions {
   headerNames?: ToolHeaderNames
 }
 
+/** Build a mapping of MCP server profiles keyed by tool identifiers from provided options */
 export function buildAppToolMcpServers(
   options: BuildAppToolMcpServersOptions,
 ): Record<string, AgentProfileMcpServer> {
@@ -388,6 +407,7 @@ export function buildAppToolMcpServers(
   return entries
 }
 
+/** Define options for ensuring a workspace sandbox with provisioning and progress handling */
 export interface EnsureWorkspaceSandboxOptions {
   workspaceId: string
   userId?: string
@@ -414,18 +434,21 @@ function shellSingleQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`
 }
 
+/** Define the specification for a sandbox tool including its name, content, and optional executability */
 export interface SandboxToolSpec {
   name: string
   content: string
   executable?: boolean
 }
 
+/** Define options for resolving sandbox tool paths including appName, baseDir, and binDir */
 export interface SandboxToolPathOptions {
   appName: string
   baseDir?: string
   binDir?: string
 }
 
+/** Define options for building sandbox tool file mounts including tool specifications and paths */
 export interface BuildSandboxToolFileMountsOptions extends SandboxToolPathOptions {
   tools: readonly SandboxToolSpec[]
 }
@@ -449,6 +472,7 @@ function normalizeSandboxToolDir(value: string, label: string): string {
   return dir === '' ? '/' : dir
 }
 
+/** Resolve the root directory path for a sandbox tool based on provided options */
 export function sandboxToolRootDir(options: SandboxToolPathOptions): string {
   const appName = normalizeSandboxToolSegment(options.appName, 'sandbox tool appName')
   const baseDir = normalizeSandboxToolDir(
@@ -458,17 +482,20 @@ export function sandboxToolRootDir(options: SandboxToolPathOptions): string {
   return `${baseDir}/${appName}`
 }
 
+/** Resolve the binary directory path for a sandbox tool based on provided options */
 export function sandboxToolBinDir(options: SandboxToolPathOptions): string {
   normalizeSandboxToolSegment(options.appName, 'sandbox tool appName')
   if (options.binDir) return normalizeSandboxToolDir(options.binDir, 'sandbox tool binDir')
   return `${sandboxToolRootDir(options)}/bin`
 }
 
+/** Resolve the file system path to a specified sandbox tool based on given options */
 export function sandboxToolPath(options: SandboxToolPathOptions & { toolName: string }): string {
   const toolName = normalizeSandboxToolSegment(options.toolName, 'sandbox tool name')
   return `${sandboxToolBinDir(options)}/${toolName}`
 }
 
+/** Build file mounts for sandbox tools based on provided options and tool configurations */
 export function buildSandboxToolFileMounts(
   options: BuildSandboxToolFileMountsOptions,
 ): AgentProfileFileMount[] {
@@ -482,6 +509,7 @@ export function buildSandboxToolFileMounts(
   })
 }
 
+/** Build a shell script that sets up and exports the sandbox tool binary directory in user profiles */
 export function buildSandboxToolPathSetupScript(options: SandboxToolPathOptions): string {
   const binDir = sandboxToolBinDir(options)
   const exportLine = `export PATH=${binDir}:$PATH`
@@ -498,6 +526,7 @@ export function buildSandboxToolPathSetupScript(options: SandboxToolPathOptions)
   ].join('\n')
 }
 
+/** Resolve the sandbox environment PATH setup by executing the configuration script with given options */
 export async function runSandboxToolPathSetup(
   box: SandboxInstance,
   options: SandboxToolPathOptions,
@@ -537,6 +566,7 @@ function shellPath(path: string): string {
 // written into a running box and the rest (non-inline refs that the
 // orchestrator must resolve, so they stay in the create payload). Returns the
 // inline set to defer and a profile copy with those inline files removed.
+/** Split profile files into inline deferred files and a lean profile without them */
 export function splitDeferredProfileFiles(
   profile: AgentProfile,
 ): { leanProfile: AgentProfile; deferredFiles: AgentProfileFileMount[] } {
@@ -741,6 +771,7 @@ function deferredProfileWriteFailed(stage: 'new' | 'reused' | 'resumed', name: s
 
 type ExistingBoxStage = 'reused' | 'resumed'
 
+/** Represent an error thrown when sandbox runtime authentication refresh fails for a specific stage and name */
 export class SandboxRuntimeAuthRefreshError extends Error {
   constructor(stage: ExistingBoxStage, name: string, detail: string, cause?: unknown) {
     super(`${stage} sandbox auth refresh failed for ${name}: ${detail}`, { cause })
@@ -765,6 +796,7 @@ export class SandboxRuntimeAuthRefreshError extends Error {
 // exec-plane request can never park the caller (and thus never park provisioning).
 // A small pace between execs keeps the burst rate below the proxy throttle that
 // triggers the hang.
+/** Define options to control execution timeout, pacing, and retry behavior when writing profile files */
 export interface WriteProfileFilesOptions {
   // Hard ceiling per exec (ms). A hung/wedged exec is abandoned and retried.
   execTimeoutMs?: number
@@ -809,6 +841,7 @@ function fileApiSupportsMode(box: SandboxInstance): boolean {
   return fs?.supportsWriteMode === true
 }
 
+/** Write profile files to a sandbox with pacing, retries, and optional execution timeout handling */
 export async function writeProfileFilesToBox(
   box: SandboxInstance,
   files: AgentProfileFileMount[],
@@ -1477,6 +1510,7 @@ export async function peekWorkspaceSandbox(
   return { status: 'running', box: match }
 }
 
+/** Resolve or create a workspace sandbox instance with optional reuse and progress tracking */
 export async function ensureWorkspaceSandbox(
   shell: SandboxRuntimeConfig,
   options: EnsureWorkspaceSandboxOptions,
@@ -1704,6 +1738,7 @@ export async function ensureWorkspaceSandbox(
   return box
 }
 
+/** Represent a fully configured model with optional API key and base URL for sandbox platform integration */
 export interface ResolvedModel {
   model: string
   provider: string
@@ -1713,6 +1748,7 @@ export interface ResolvedModel {
   baseUrl?: string
 }
 
+/** Resolve and return the appropriate model configuration based on provider settings and optional overrides */
 export function resolveModel(
   config: ProviderResolutionConfig | undefined,
   override?: { model?: string; modelApiKey?: string },
@@ -1741,6 +1777,7 @@ export function resolveModel(
 // but the published package does not re-export the PromptInputPart type by name from
 // any of its entry points, so it's derived structurally off the method signature
 // itself — this stays in lockstep with the SDK's actual accepted shape.
+/** Extract a single element type from the array parameter of SandboxInstance's streamPrompt method */
 export type PromptInputPart = Extract<
   Parameters<SandboxInstance['streamPrompt']>[0],
   readonly unknown[]
@@ -1754,6 +1791,7 @@ function historyTranscript(
     .join('\n\n')
 }
 
+/** Build a single string combining conversation history and the current user message */
 export function flattenHistory(
   message: string,
   history?: Array<{ role: 'user' | 'assistant'; content: string }>,
@@ -1782,6 +1820,7 @@ export function mergeHistoryIntoParts(
   return merged
 }
 
+/** Resolve conflicts and merge extra MCP profiles into the app tool MCP without overwriting existing keys */
 export function mergeExtraMcp(
   appToolMcp: Record<string, AgentProfileMcpServer>,
   baseProfileMcp: Record<string, AgentProfileMcpServer>,
@@ -1795,6 +1834,7 @@ export function mergeExtraMcp(
   return { ...appToolMcp, ...(extra ?? {}) }
 }
 
+/** Attach a specified reasoning effort level to an agent profile for a given harness */
 export function attachReasoningEffort(
   profile: AgentProfile,
   harness: Harness,
@@ -1813,6 +1853,7 @@ export function attachReasoningEffort(
   }
 }
 
+/** Define options for configuring and controlling a streaming sandbox prompt session */
 export interface StreamSandboxPromptOptions {
   sessionId?: string
   executionId?: string
@@ -1850,6 +1891,7 @@ export interface StreamSandboxPromptOptions {
 
 type StreamPromptOptions = Parameters<SandboxInstance['streamPrompt']>[1]
 
+/** Resolve and stream AI-generated responses from a sandboxed environment based on input messages and options */
 export async function* streamSandboxPrompt(
   shell: SandboxRuntimeConfig,
   box: SandboxInstance,
@@ -1918,6 +1960,7 @@ export async function* streamSandboxPrompt(
   }
 }
 
+/** Resolve a sandbox prompt by streaming and aggregating message parts into a complete string */
 export async function runSandboxPrompt(
   shell: SandboxRuntimeConfig,
   box: SandboxInstance,
@@ -1955,12 +1998,15 @@ export async function runSandboxPrompt(
 // @tangle-network/sandbox). The product's role-mapping seam must produce one of
 // these; binding the seam's return type to the union makes a wrong mapping a
 // compile error rather than a runtime 400 from the orchestrator.
+/** Define permission levels for sandbox access and control */
 export type SandboxPermissionLevel = 'owner' | 'admin' | 'developer' | 'viewer'
 
+/** Map workspace roles to corresponding sandbox permission levels */
 export interface MemberSyncSeam {
   roleToSandboxRole: (workspaceRole: string) => SandboxPermissionLevel
 }
 
+/** Resolve adding a user with a specific role to a sandbox and return the operation outcome */
 export async function syncSandboxMemberAdd(
   box: SandboxInstance,
   seam: MemberSyncSeam,
@@ -1975,6 +2021,7 @@ export async function syncSandboxMemberAdd(
   }
 }
 
+/** Remove a member from the sandbox while preserving their home directory and handle the outcome */
 export async function syncSandboxMemberRemove(
   box: SandboxInstance,
   userId: string,
@@ -1987,6 +2034,7 @@ export async function syncSandboxMemberRemove(
   }
 }
 
+/** Synchronize a sandbox member's role by updating permissions based on the provided role mapping */
 export async function syncSandboxMemberRole(
   box: SandboxInstance,
   seam: MemberSyncSeam,
@@ -2001,6 +2049,7 @@ export async function syncSandboxMemberRole(
   }
 }
 
+/** Define methods to create, update, retrieve, and delete secrets asynchronously */
 export interface SecretStore {
   create: (name: string, value: string) => Promise<void>
   update: (name: string, value: string) => Promise<void>
@@ -2008,6 +2057,7 @@ export interface SecretStore {
   delete: (name: string) => Promise<void>
 }
 
+/** Resolve a SecretStore interface using the provided SandboxRuntimeConfig shell */
 export function secretStoreFromClient(shell: SandboxRuntimeConfig): SecretStore {
   const client = getClient(shell)
   return {
@@ -2024,6 +2074,7 @@ export function secretStoreFromClient(shell: SandboxRuntimeConfig): SecretStore 
   }
 }
 
+/** Resolve storing a secret by creating or updating it in the given SecretStore */
 export async function storeSecret(
   store: SecretStore,
   name: string,
@@ -2042,6 +2093,7 @@ export async function storeSecret(
   }
 }
 
+/** Resolve a secret value from the store by its name and return the outcome asynchronously */
 export async function readSecret(store: SecretStore, name: string): Promise<Outcome<string>> {
   try {
     return ok(await store.get(name))
@@ -2050,6 +2102,7 @@ export async function readSecret(store: SecretStore, name: string): Promise<Outc
   }
 }
 
+/** Delete a secret by name from the given secret store and return the operation outcome */
 export async function deleteSecret(store: SecretStore, name: string): Promise<Outcome<void>> {
   try {
     await store.delete(name)
@@ -2059,6 +2112,7 @@ export async function deleteSecret(store: SecretStore, name: string): Promise<Ou
   }
 }
 
+/** Represent a token with its expiration date and associated scope */
 export interface ScopedTokenResult {
   token: string
   expiresAt: Date
@@ -2086,6 +2140,7 @@ export async function mintSandboxScopedToken(
   }
 }
 
+/** Define options to manage deterministic session resumption and turn idempotency in sandboxed drive turns */
 export interface DriveSandboxTurnOptions extends StreamSandboxPromptOptions {
   /** Deterministic resume key — required. Every tick for the same logical turn
    * MUST reuse it so a crash + re-drive finds the in-flight session instead of
@@ -2118,6 +2173,7 @@ export interface DriveSandboxTurnOptions extends StreamSandboxPromptOptions {
 //   - `running`   → the turn is still executing; re-tick after a delay of your choosing.
 //   - `completed` → terminal; `.text` / `.result` hold the payload.
 //   - `failed`    → terminal and deterministic; re-invoking will not change it (do not retry).
+/** Resolve a sandbox turn by processing a message with given configuration and options */
 export async function driveSandboxTurn(
   shell: SandboxRuntimeConfig,
   box: SandboxInstance,
@@ -2163,6 +2219,7 @@ export async function driveSandboxTurn(
 // that finished with error/other/unknown is a truncated turn, not a completed one.
 const SEVERED_FINISH_REASONS = new Set(['error', 'other', 'unknown'])
 
+/** Define transitions marking the start or finish of a sandbox step with associated details */
 export type SandboxStepTransition =
   | { kind: 'step-start' }
   | { kind: 'step-finish'; reason: string; severed: boolean }
@@ -2171,6 +2228,7 @@ function asPlainRecord(v: unknown): Record<string, unknown> | null {
   return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null
 }
 
+/** Resolve the severed stream event to a corresponding sandbox step transition or null */
 export function classifySeveredStream(event: unknown): SandboxStepTransition | null {
   const root = asPlainRecord(event)
   if (!root || root.type !== 'message.part.updated') return null
@@ -2183,6 +2241,7 @@ export function classifySeveredStream(event: unknown): SandboxStepTransition | n
   return { kind: 'step-finish', reason, severed: SEVERED_FINISH_REASONS.has(reason) }
 }
 
+/** Determine if an event is a terminal prompt event with type 'result' or 'done */
 export function isTerminalPromptEvent(event: unknown): boolean {
   const t = asPlainRecord(event)?.type
   return t === 'result' || t === 'done'
@@ -2190,6 +2249,7 @@ export function isTerminalPromptEvent(event: unknown): boolean {
 
 // Interactive-question detector. Returns the question text or null. Used by
 // streamSandboxPrompt when disallowQuestions is set.
+/** Resolve the interactive question text from a structured event or return null if none found */
 export function detectInteractiveQuestion(event: unknown): string | null {
   const root = asPlainRecord(event)
   if (!root) return null

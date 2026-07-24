@@ -29,8 +29,10 @@ export type MissionStatus =
   | 'aborted'
   | 'cancelled'
 
+/** Define possible statuses for a mission step during its execution lifecycle */
 export type MissionStepStatus = 'pending' | 'running' | 'waiting_approval' | 'done' | 'failed'
 
+/** Define the structure and state details of a mission step within a workflow system */
 export interface MissionStep {
   id: string
   /** What the step should accomplish — an intent, never an implementation. */
@@ -49,6 +51,7 @@ export interface MissionStep {
   resultRef?: string
 }
 
+/** Define the structure for tracking mission token usage, cost, duration, and LLM call counts */
 export interface MissionCostLedger {
   tokensIn: number
   tokensOut: number
@@ -209,6 +212,7 @@ const ZERO_LEDGER: MissionCostLedger = {
   llmCalls: 0,
 }
 
+/** Define input parameters for creating a mission including optional deterministic id and unique plan steps */
 export interface CreateMissionInput {
   /** Explicit row id. Omit to use the service's id generator. Pass a
    *  DETERMINISTIC id (derived from the originating turn) when the caller may
@@ -239,6 +243,7 @@ export interface CreateMissionInput {
   extras?: Record<string, unknown>
 }
 
+/** Define a patch to update the status and optional metadata of a step in a process */
 export interface SetStepStatusPatch {
   sublabel?: string
   resultRef?: string
@@ -257,11 +262,13 @@ export interface SetStepStatusPatch {
   }
 }
 
+/** Define input parameters to complete a mission with status and optional summary */
 export interface CompleteMissionInput {
   ok: boolean
   summary?: string
 }
 
+/** Define methods to create, retrieve, and update missions with controlled engine binding and metadata merging */
 export interface MissionService {
   createMission(input: CreateMissionInput): Promise<MissionRecord>
   getMission(id: string): Promise<MissionRecord | null>
@@ -302,6 +309,7 @@ export interface MissionService {
   complete(id: string, input: CompleteMissionInput): Promise<MissionOutcome<MissionRecord>>
 }
 
+/** Define options for configuring mission service behavior including storage, time, and ID generation */
 export interface MissionServiceOptions {
   store: MissionStorePort
   /** Injectable clock (epoch ms). Default `Date.now`. */
@@ -325,6 +333,7 @@ function lostRace<T>(id: string): MissionOutcome<T> {
   return { succeeded: false, error: `Mission ${id} changed concurrently`, conflict: true }
 }
 
+/** Create a mission service that manages mission records and audit events with customizable options */
 export function createMissionService(options: MissionServiceOptions): MissionService {
   const { store } = options
   const now = options.now ?? (() => Date.now())
@@ -658,6 +667,7 @@ export function createMissionService(options: MissionServiceOptions): MissionSer
 
 // ── in-memory store ──────────────────────────────────────────────────────────
 
+/** Define an in-memory mission store that tracks events and allows direct record writes */
 export interface InMemoryMissionStore extends MissionStorePort {
   /** The full audit trail, append order. */
   events(): MissionAuditEvent[]

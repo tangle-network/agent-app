@@ -55,6 +55,7 @@ export interface BuildAppToolsOptions {
   customTools?: readonly import('./registry').AppToolDefinition[]
 }
 
+/** Define the arguments required to submit a proposal including type, title, description, and approval status */
 export interface SubmitProposalArgs {
   type: string
   title: string
@@ -64,6 +65,7 @@ export interface SubmitProposalArgs {
    *  true. Products don't set this; dispatch owns it — fail-closed. */
   regulated?: boolean
 }
+/** Describe the result of submitting a proposal including deduplication and execution status */
 export interface SubmitProposalResult {
   proposalId: string
   /** True when an identical (workspace, title) proposal already existed. */
@@ -77,21 +79,25 @@ export interface SubmitProposalResult {
   [extra: string]: unknown
 }
 
+/** Define arguments required to schedule a follow-up with optional priority */
 export interface ScheduleFollowupArgs {
   title: string
   dueDate: string
   priority?: string
 }
+/** Define the result structure for scheduling a follow-up with unique identification and due date */
 export interface ScheduleFollowupResult {
   id: string
   dueDate: string
   deduped: boolean
 }
 
+/** Define arguments required to render a UI including title and schema */
 export interface RenderUiArgs {
   title: string
   schema: unknown
 }
+/** Describe the result of rendering UI including the artifact path and exact persisted content */
 export interface RenderUiResult {
   /** The persisted artifact path. */
   path: string
@@ -100,11 +106,13 @@ export interface RenderUiResult {
   content: string
 }
 
+/** Define arguments required to add a citation including path, quote, and optional label */
 export interface AddCitationArgs {
   path: string
   quote: string
   label?: string
 }
+/** Represent the result of adding a citation including its identifier and location path */
 export interface AddCitationResult {
   citationId: string
   path: string

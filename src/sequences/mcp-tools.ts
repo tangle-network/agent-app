@@ -51,6 +51,7 @@ export interface SequenceMcpToolEnv {
   playheadFrame: number
 }
 
+/** Define a tool with metadata and a run method for processing input within a specific environment */
 export interface SequenceMcpToolDefinition {
   name: string
   description: string
@@ -62,10 +63,13 @@ export interface SequenceMcpToolDefinition {
 // Enumerations (value-level twins of the model's type unions)
 // ---------------------------------------------------------------------------
 
+/** Define supported export formats for sequence outputs including video, subtitle, and metadata types */
 export const SEQUENCE_EXPORT_FORMATS = ['mp4', 'otio', 'xml', 'edl', 'vtt', 'srt', 'contact_sheet'] as const satisfies readonly SequenceExportFormat[]
 
+/** Define immutable sequence track kinds for video, audio, caption, reference, and agent */
 export const SEQUENCE_TRACK_KINDS = ['video', 'audio', 'caption', 'reference', 'agent'] as const satisfies readonly SequenceTrackKind[]
 
+/** Define the allowed media kinds for sequences including video, image, and audio */
 export const SEQUENCE_MEDIA_KINDS = ['video', 'image', 'audio'] as const satisfies readonly SequenceMediaKind[]
 
 /** Largest accepted `add_captions` batch — bounds one decision row / one
@@ -361,6 +365,7 @@ const CLIP_ID_SCHEMA = { type: 'string', description: 'Clip id from get_timeline
 // The registry
 // ---------------------------------------------------------------------------
 
+/** Resolve an array of immutable sequence MCP tool definitions for timeline and frame operations */
 export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
   {
     name: 'get_timeline_state',
@@ -780,6 +785,7 @@ export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
   },
 ]
 
+/** Resolve the SequenceMcpToolDefinition matching the given name or return undefined */
 export function findSequenceMcpTool(name: string): SequenceMcpToolDefinition | undefined {
   return SEQUENCE_MCP_TOOLS.find((tool) => tool.name === name)
 }

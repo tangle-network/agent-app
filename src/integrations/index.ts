@@ -29,6 +29,7 @@ export type HubExecResult =
   | { succeeded: true; result: unknown }
   | { succeeded: false; code: HubExecErrorCode; message: string; approval?: unknown }
 
+/** Define configuration options for initializing a Hub execution client */
 export interface HubExecClientOptions {
   /** Platform base URL (e.g. `TANGLE_PLATFORM_URL`). */
   baseUrl: string
@@ -116,16 +117,19 @@ export class HubExecClient {
   }
 }
 
+/** Define input parameters for invoking a hub tool with user ID, tool name, and optional arguments */
 export interface HubInvokeInput {
   userId: string
   /** The MCP tool name the agent called (`int_<provider>_<connector>_<action>`). */
   toolName: string
   args?: Record<string, unknown>
 }
+/** Describe the outcome of a hub invocation including status and response body */
 export interface HubInvokeOutcome {
   status: number
   body: Record<string, unknown>
 }
+/** Define dependencies for invoking hub operations including API key resolution and optional configuration */
 export interface HubInvokeDeps {
   /** Resolve the user's Tangle API key (the hub principal bearer). Required —
    *  the product binds its own session-key resolver. Null → user not linked. */

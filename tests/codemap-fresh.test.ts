@@ -1,12 +1,11 @@
 /**
- * The code-map staleness gate. `docs/CODEMAP.md` + `docs/api/*.md` are generated
- * from `tsup.config.ts` `entry` and the TypeScript export graph by
- * `scripts/gen-codemap.mjs`. This runs the generator's `--check` mode, which
- * regenerates in memory and exits non-zero the moment the committed docs drift
- * from the current source — a new subpath, a renamed export, a changed signature,
- * or a removed page. Fix by running `pnpm docs:gen` and committing the result.
- * Mirrors the intent of `tests/theme/tokens-contract.test.ts`: the generator IS
- * the single source of truth; this test just enforces adoption.
+ * The code-map staleness gate. `docs/CODEMAP.md` + `docs/api/*.md` + `docs/llms.txt`
+ * + `docs/codemap.json` are generated from the TypeScript export graph by
+ * `@tangle-network/agent-docs` (this repo dogfoods its own doc tool). This runs
+ * `agent-docs --check`, which regenerates in memory and exits non-zero the moment
+ * the committed docs drift from the current source — a new subpath, a renamed
+ * export, a changed signature, a removed page. Fix by running `pnpm docs:gen`
+ * (= `agent-docs`) and committing the result.
  */
 
 import { spawnSync } from 'node:child_process'
@@ -16,12 +15,14 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
-const script = join(repoRoot, 'scripts', 'gen-codemap.mjs')
+const cli = join(repoRoot, 'node_modules', '@tangle-network', 'agent-docs', 'dist', 'cli.js')
 
 describe('codemap freshness', () => {
-  it('committed docs/CODEMAP.md + docs/api/*.md match the current source', () => {
-    const res = spawnSync(process.execPath, [script, '--check'], { encoding: 'utf8' })
+  // Spawns the generator over the whole source tree; the walk scales with the
+  // number of documented exports, so give it well over vitest's 5s default.
+  it('committed docs match the current source (agent-docs --check)', () => {
+    const res = spawnSync(process.execPath, [cli, '--repo', repoRoot, '--check'], { cwd: repoRoot, encoding: 'utf8' })
     const detail = `${res.stdout ?? ''}${res.stderr ?? ''}`.trim()
-    expect(res.status, `codemap --check failed — run \`pnpm docs:gen\` and commit:\n${detail}`).toBe(0)
-  })
+    expect(res.status, `agent-docs --check failed — run \`pnpm docs:gen\` and commit:\n${detail}`).toBe(0)
+  }, 60_000)
 })

@@ -28,6 +28,7 @@ export interface DatabaseProvider<DB> {
   reset(): void
 }
 
+/** Define options for configuring database provider behavior including error messaging */
 export interface DatabaseProviderOptions {
   /** Error thrown when `db` is accessed before injection. Keep the product's
    *  existing wording so callers see a familiar message. */
@@ -80,23 +81,27 @@ export function createDatabaseProvider<DB extends object>(
 // `KVNamespace` satisfies it structurally, so prod passes the binding unchanged,
 // and `createInMemoryKV()` supplies the portable adapter for sandbox/eval.
 
+/** Describe the result of listing keys with completion status and optional pagination cursor */
 export interface KVListResult {
   keys: { name: string }[]
   list_complete: boolean
   cursor?: string
 }
 
+/** Define options for storing a key-value pair with expiration and metadata settings */
 export interface KVPutOptions {
   expiration?: number
   expirationTtl?: number
   metadata?: unknown
 }
 
+/** Resolve a key-value pair retrieval including its associated metadata and value */
 export interface KVGetWithMetadataResult {
   value: string | null
   metadata: unknown | null
 }
 
+/** Define a key-value store interface for asynchronous data retrieval, storage, deletion, and listing */
 export interface KVStore {
   get(key: string): Promise<string | null>
   /** Read a value with its stored metadata (e.g. the vault's encrypted/hasPII flags). */

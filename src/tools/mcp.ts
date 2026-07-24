@@ -24,6 +24,7 @@ export interface AppToolMcpServer {
   metadata: { description: string }
 }
 
+/** Define configuration options for building an HTTP MCP server including path, baseUrl, token, context, and description */
 export interface BuildHttpMcpServerOptions {
   /** Route path on the app the sandbox POSTs to (e.g. `/api/tools/propose`). */
   path: string
@@ -130,6 +131,7 @@ export function buildScopedMcpServerEntry(
   }
 }
 
+/** Define configuration options required to build an MCP server including tool, baseUrl, token, and context */
 export interface BuildMcpServerOptions {
   /** A built-in app tool name, or a product-registered {@link AppToolDefinition}.
    *  A custom tool supplies its route via `AppToolDefinition.path` (or `paths`). */

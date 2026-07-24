@@ -50,6 +50,7 @@ export interface IntakeState {
   completedAt: Date | null
 }
 
+/** Define error codes representing specific intake validation failures */
 export type IntakeErrorCode = 'invalid-answer' | 'unknown-question' | 'incomplete' | 'stale-graph'
 
 /** Thrown by store mutations on a refused write — callers map it to a 4xx. */
@@ -172,6 +173,7 @@ function createScopedStore(opts: ScopedStoreOptions): IntakeStore {
   return { get, save, complete }
 }
 
+/** Define options required to create a user intake store for onboarding data collection */
 export interface CreateUserIntakeStoreOptions {
   db: IntakeDatabase
   /** The user-intake table from createIntakeTables. */
@@ -194,6 +196,7 @@ export function createUserIntakeStore(opts: CreateUserIntakeStoreOptions): Intak
   })
 }
 
+/** Define options required to create a project intake store including database, table, graph, and workspace ID */
 export interface CreateProjectIntakeStoreOptions {
   db: IntakeDatabase
   /** The project-intake table from createIntakeTables (workspace scope). */

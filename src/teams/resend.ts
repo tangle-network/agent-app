@@ -15,6 +15,7 @@ import { Resend } from 'resend'
 import { renderInvitationEmail } from './invitations'
 import type { SendInvitationEmailSeam } from './invitations-api'
 
+/** Define options for sending a resend invitation including sender address and optional API key */
 export interface ResendInvitationSenderOptions {
   /** RFC-5322 From header, e.g. `GTM Agent <noreply@gtm.tangle.tools>`. */
   from: string

@@ -10,6 +10,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+/** Define configuration options for controlling smooth text reveal animation rates */
 export interface SmoothRevealOptions {
   /** Baseline reveal rate when nearly caught up. Default 90 chars/s. */
   baseCharsPerSecond?: number

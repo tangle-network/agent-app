@@ -20,11 +20,13 @@ import { CANVAS_MCP_TOOLS } from './mcp-tools'
 import type { DesignCanvasMcpToolEnv } from './mcp-tools'
 import { createMcpToolHandler } from '../tools/mcp-rpc'
 
+/** Describe design canvas MCP server information including name and version */
 export interface DesignCanvasMcpServerInfo {
   name: string
   version: string
 }
 
+/** Define options for creating a design canvas MCP handler including store, ID minting, and optional server info */
 export interface CreateDesignCanvasMcpHandlerOptions {
   /** Already scoped + authorized for one (workspace, document, actor). */
   store: SceneStore
@@ -35,6 +37,7 @@ export interface CreateDesignCanvasMcpHandlerOptions {
   serverInfo?: DesignCanvasMcpServerInfo
 }
 
+/** Create a request handler for the design canvas MCP tool with specified options */
 export function createDesignCanvasMcpHandler(
   opts: CreateDesignCanvasMcpHandlerOptions,
 ): (request: Request) => Promise<Response> {

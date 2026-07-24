@@ -120,6 +120,7 @@ export async function recordDurableInteractionAnswer(
   })
 }
 
+/** Define options for creating durable interaction settlement factories including store and optional reconcile authority */
 export interface DurableInteractionSettlementFactoryOptions extends DurableInteractionSettlementOptions {
   store: DurablePlanStore
   /** Optional authority lookup used by `reconcile`; returning null leaves the
@@ -199,6 +200,9 @@ export function durableInteractionIntentKey(scope: DurableChatScope, interaction
   return intentKey(scope, interactionId, attemptKey)
 }
 
+/** Resolve and upsert a durable interaction ask in the store with optional event and timing parameters */
 export const applyDurableInteractionAsk = upsertDurableInteractionAsk
+/** Resolve cancellation of a durable interaction with optional reason and event details */
 export const applyDurableInteractionCancel = recordDurableInteractionCancel
+/** Resolve and record the outcome and answers of a durable interaction within the given store and scope */
 export const applyDurableInteractionAnswer = recordDurableInteractionAnswer

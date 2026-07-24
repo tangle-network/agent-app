@@ -17,6 +17,7 @@ const DEFAULT_SESSION_COOKIE = 'better-auth.session_token'
 
 // ── Signed state ────────────────────────────────────────────────────────────
 
+/** Define configuration options for managing SSO state including secret, lifetime, and clock injection */
 export interface SsoStateConfig {
   /** HMAC-SHA256 secret (e.g. the app's auth secret). */
   secret: string
@@ -81,6 +82,7 @@ export async function verifySignedSsoState(state: string, config: SsoStateConfig
 
 // ── Seams ───────────────────────────────────────────────────────────────────
 
+/** Describe the result of exchanging SSO credentials including API key, user info, and optional plan details */
 export interface TangleSsoExchangeResult {
   apiKey: string
   user: { id: string; email: string; name?: string | null }
@@ -191,6 +193,7 @@ export interface BetterAuthSessionCookieSource {
   }>
 }
 
+/** Define options to customize warning behavior for shadowed cookie names in authentication sessions */
 export interface BetterAuthSessionCookieMinterOptions {
   /** Receives the shadowed-cookie-name warning (see below). Default
    *  console.warn. */
@@ -261,6 +264,7 @@ export function createBetterAuthSessionCookieMinter(
 
 // ── Handlers ────────────────────────────────────────────────────────────────
 
+/** Define configuration options for handling Tangle SSO authentication and session management */
 export interface TangleSsoHandlerOptions {
   auth: TangleSsoAuthClient
   store: TangleSsoAccountStore
@@ -306,6 +310,7 @@ export interface TangleSsoHandlerOptions {
   now?: () => number
 }
 
+/** Define handlers for SSO start and callback routes managing authentication flow and session cookies */
 export interface TangleSsoHandlers {
   /** GET start route: mint + sign state, set the state cookie, 302 to the
    *  platform authorize URL. `?redirect=` carries the post-login path. */
@@ -357,6 +362,7 @@ function parseStateCookiePayload(raw: string | null): StateCookiePayload | null 
   }
 }
 
+/** Create Tangle SSO handlers to manage authentication state, callbacks, and session cookies */
 export function createTangleSsoHandlers(opts: TangleSsoHandlerOptions): TangleSsoHandlers {
   if (!opts.stateSecret) throw new Error('TangleSsoHandlerOptions.stateSecret is required')
   if (!opts.callbackUrl) throw new Error('TangleSsoHandlerOptions.callbackUrl is required')

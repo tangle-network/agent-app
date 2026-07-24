@@ -30,6 +30,7 @@ export interface ToolCapability {
   toolGroups?: readonly string[]
 }
 
+/** Resolve options for determining tool capabilities based on taxonomy, capabilities, and enabled IDs */
 export interface ResolveToolCapabilitiesOptions {
   taxonomy: AppToolTaxonomy
   /** The product's full capability registry. */
@@ -44,6 +45,7 @@ export interface ResolveToolCapabilitiesOptions {
   baseProposalTypes?: readonly string[]
 }
 
+/** Describe resolved capabilities including proposal types and product tool groups to expose */
 export interface ResolvedToolCapabilities {
   /** Proposal types to keep — feed to {@link restrictTaxonomy}. */
   proposalTypes: string[]

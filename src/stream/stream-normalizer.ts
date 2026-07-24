@@ -11,23 +11,28 @@ import {
   type ChatPlanStatus,
 } from '../plans/index'
 
+/** Represent a JSON-compatible object with string keys and values of any type */
 export type JsonRecord = Record<string, unknown>
 
+/** Define an event object carrying a type and optional JSON data payload */
 export interface StreamEvent {
   type: string
   data?: JsonRecord
 }
 
+/** Resolve an unknown value to a JsonRecord if it is a non-array object or return undefined */
 export function asRecord(value: unknown): JsonRecord | undefined {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as JsonRecord
     : undefined
 }
 
+/** Resolve a non-empty string from a value or return undefined */
 export function asString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined
 }
 
+/** Resolve a unique tool identifier from various possible properties or generate a fallback ID */
 export function resolveToolId(part: JsonRecord): string {
   return String(
     part.id ??
@@ -41,10 +46,12 @@ export function resolveToolId(part: JsonRecord): string {
   )
 }
 
+/** Resolve the tool name from a JSON record using tool, name, or a default value */
 export function resolveToolName(part: JsonRecord): string {
   return String(part.tool ?? part.name ?? 'tool')
 }
 
+/** Resolve time properties from various keys into a normalized record with numeric start and end fields */
 export function normalizeTime(value: unknown): JsonRecord | undefined {
   const record = asRecord(value)
   if (!record) return undefined
@@ -59,6 +66,7 @@ export function normalizeTime(value: unknown): JsonRecord | undefined {
   }
 }
 
+/** Normalize tool-related events into a standardized message.part.updated format */
 export function normalizeToolEvent(event: StreamEvent): StreamEvent {
   if (event.type === 'tool_call' || event.type === 'tool.call') {
     const data = event.data ?? {}
@@ -97,6 +105,7 @@ export function normalizeToolEvent(event: StreamEvent): StreamEvent {
   return event
 }
 
+/** Normalize a persisted part object by standardizing its structure and fields */
 export function normalizePersistedPart(rawPart: JsonRecord): JsonRecord | null {
   const type = String(rawPart.type ?? '')
 
@@ -225,6 +234,7 @@ export function attachmentPartKey(path: string): string {
   return `attachment:${path}`
 }
 
+/** Resolve a unique key string for a part based on its type and identifying properties */
 export function getPartKey(part: JsonRecord): string {
   const type = String(part.type ?? 'unknown')
   if (type === 'tool') {
@@ -251,6 +261,7 @@ function overlayDefined(base: JsonRecord, patch: JsonRecord): JsonRecord {
   return out
 }
 
+/** Merge incoming JSON with existing persisted data, applying delta for text types when provided */
 export function mergePersistedPart(existing: JsonRecord | undefined, incoming: JsonRecord, delta?: string): JsonRecord {
   const type = String(incoming.type ?? '')
   if (!existing) {
@@ -346,7 +357,9 @@ export function mergePersistedPart(existing: JsonRecord | undefined, incoming: J
   return incoming
 }
 
+/** Resolve errors when a tool fails to report a terminal result before the assistant turn ends */
 export const MISSING_TOOL_TERMINAL_ERROR = 'Tool did not report a terminal result before the assistant turn completed.'
+/** Provide the reason identifier for a missing tool in the terminal environment */
 export const MISSING_TOOL_TERMINAL_REASON = 'missing-tool-terminal'
 
 /** Closes a tool part left `running` when a stream ended abnormally: settles
@@ -375,6 +388,7 @@ export function terminalizeDanglingToolPart(part: JsonRecord): JsonRecord {
   }
 }
 
+/** Resolve dangling tool parts into terminal forms within the given JSON records array */
 export function terminalizeDanglingToolParts(parts: JsonRecord[]): JsonRecord[] {
   return parts.map(terminalizeDanglingToolPart)
 }
@@ -472,6 +486,7 @@ function assembleAssistantParts(
     .map((part) => (part === lastTextPart ? { ...part, text: finalText } : part))
 }
 
+/** Resolve and clean up assistant parts by terminalizing and collapsing redundant segments */
 export function finalizeAssistantParts(
   partOrder: string[],
   partMap: Map<string, JsonRecord>,
@@ -515,6 +530,7 @@ export function terminalizeDanglingAssistantToolUpdates(
   return updates
 }
 
+/** Encode a StreamEvent object into a Uint8Array using the provided TextEncoder */
 export function encodeEvent(encoder: TextEncoder, event: StreamEvent): Uint8Array {
   return encoder.encode(`${JSON.stringify(event)}\n`)
 }

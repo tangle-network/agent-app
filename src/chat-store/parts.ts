@@ -89,6 +89,7 @@ export interface ChatTextPart {
   id?: string
 }
 
+/** Define a reasoning part of a chat with text content and optional metadata fields */
 export interface ChatReasoningPart {
   type: 'reasoning'
   text: string
@@ -101,6 +102,7 @@ export interface ChatReasoningPart {
  *  terminal form `/stream`'s `normalizePersistedPart` settles on. */
 export type ChatToolStatus = 'pending' | 'running' | 'completed' | 'error' | 'failed'
 
+/** Describe the current state and data of a chat tool including status, input, output, and metadata */
 export interface ChatToolState {
   status: ChatToolStatus
   input?: unknown
@@ -111,6 +113,7 @@ export interface ChatToolState {
   time?: ChatPartTime
 }
 
+/** Define a chat component representing a tool with its state and optional call identifier */
 export interface ChatToolPart {
   type: 'tool'
   id: string
@@ -135,6 +138,7 @@ export interface ChatFilePart {
   content?: string
 }
 
+/** Define properties for an image part within a chat message including optional metadata fields */
 export interface ChatImagePart {
   type: 'image'
   filename?: string
@@ -144,6 +148,7 @@ export interface ChatImagePart {
   path?: string
 }
 
+/** Define a subtask part of a chat with prompt, description, agent, and optional identifier */
 export interface ChatSubtaskPart {
   type: 'subtask'
   prompt: string
@@ -172,6 +177,7 @@ export interface ChatUsageTokens {
   }
 }
 
+/** Define a chat step finish part indicating completion with optional reason, tokens, and cost */
 export interface ChatStepFinishPart {
   type: 'step-finish'
   reason?: string
@@ -193,6 +199,7 @@ export interface ChatInteractionPart {
   cancelReason?: string
 }
 
+/** Resolve a chat plan part by aliasing it to the persisted chat plan part type */
 export type ChatPlanPart = ChatPlanPersistedPart
 
 /** Persisted one-line transcript notice — byte-matches `noticePart` in
@@ -236,6 +243,7 @@ type _StoredNoticePartFeedsCodec = MutuallyAssignable<ChatNoticePart, NoticePers
 type _CodecEmitsStorablePlanPart = MutuallyAssignable<ChatPlanPersistedPart, ChatPlanPart>
 type _StoredPlanPartFeedsCodec = MutuallyAssignable<ChatPlanPart, ChatPlanPersistedPart>
 
+/** Represent parts of a chat message including text, reasoning, tools, files, images, subtasks, steps, interactions, notices, plans, and mentions */
 export type ChatMessagePart =
   | ChatTextPart
   | ChatReasoningPart
@@ -322,22 +330,27 @@ function toChatMessagePart(part: Record<string, unknown>): ChatMessagePart | nul
   }
 }
 
+/** Resolve whether a ChatMessagePart is specifically a ChatToolPart based on its type property */
 export function isChatToolPart(part: ChatMessagePart): part is ChatToolPart {
   return part.type === 'tool'
 }
 
+/** Resolve whether a chat message part is a text part based on its type property */
 export function isChatTextPart(part: ChatMessagePart): part is ChatTextPart {
   return part.type === 'text'
 }
 
+/** Resolve whether a ChatMessagePart is a ChatInteractionPart based on its type property */
 export function isChatInteractionPart(part: ChatMessagePart): part is ChatInteractionPart {
   return part.type === 'interaction'
 }
 
+/** Resolve whether a chat message part is a persisted chat plan part */
 export function isChatPlanPart(part: ChatMessagePart): part is ChatPlanPart {
   return part.type === 'plan'
 }
 
+/** Determine if a chat message part represents the completion of a chat step */
 export function isChatStepFinishPart(part: ChatMessagePart): part is ChatStepFinishPart {
   return part.type === 'step-finish'
 }

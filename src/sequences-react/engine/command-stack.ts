@@ -17,6 +17,7 @@ import type { CommandStack, EditorTimelineState, TimelineCommand } from '../cont
 /** Oldest entries are dropped past this bound; redo is cleared on execute. */
 export const COMMAND_HISTORY_LIMIT = 200
 
+/** Create a command stack managing undo and redo operations for a given timeline */
 export function createCommandStack(initial: SequenceTimeline): CommandStack {
   /** View fields start at their neutral values; the host layer owns volatile
    *  view state and treats these as initials, not a live channel. */

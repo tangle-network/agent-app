@@ -20,6 +20,7 @@ export * from './mission-flow'
 
 import type { FlowSpan, FlowTrace } from './flow-types'
 
+/** Represent a timed event with a timestamp and associated event data */
 export interface TimedEvent {
   /** ms since turn start (`_t` stamped by pumpBufferedTurn). */
   t: number
@@ -155,6 +156,7 @@ export function renderWaterfall(trace: FlowTrace, opts?: { width?: number }): st
   return lines.join('\n')
 }
 
+/** Summarize key statistics of a numerical distribution including count, min, percentiles, and max */
 export interface DistributionSummary {
   n: number
   min: number
@@ -163,6 +165,7 @@ export interface DistributionSummary {
   max: number
 }
 
+/** Summarize numeric values into a distribution summary including count, min, median, 90th percentile, and max */
 export function summarize(values: number[]): DistributionSummary {
   const sorted = [...values].sort((a, b) => a - b)
   const q = (p: number) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))] ?? 0

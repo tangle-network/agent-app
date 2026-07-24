@@ -19,6 +19,7 @@ export interface IntakeView {
   progress: { answered: number; total: number }
 }
 
+/** Define properties and callbacks for managing the intake interview flow and user interactions */
 export interface IntakeInterviewProps {
   view: IntakeView
   /**

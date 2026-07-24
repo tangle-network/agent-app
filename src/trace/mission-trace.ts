@@ -22,6 +22,7 @@ export interface MissionTraceContext {
   rootSpanId: string
 }
 
+/** Define context information for a step span including trace, span, and parent span identifiers */
 export interface StepSpanContext {
   traceId: string
   /** 16-hex span id of this step attempt (or any nested unit of work). */

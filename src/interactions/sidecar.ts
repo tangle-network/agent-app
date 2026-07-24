@@ -12,6 +12,7 @@
 
 import type { InteractionData, InteractionOutcome, InteractionRequestWire } from './contract'
 
+/** Describe error details including code, message, and upstream HTTP status for sidecar interactions */
 export interface SidecarInteractionsError {
   code: string
   message: string
@@ -19,6 +20,7 @@ export interface SidecarInteractionsError {
   status: number
 }
 
+/** Represent the outcome of sidecar interactions with success or error details */
 export type SidecarInteractionsResult<T> =
   | { succeeded: true; value: T }
   | { succeeded: false; error: SidecarInteractionsError }

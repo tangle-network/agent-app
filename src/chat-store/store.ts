@@ -33,6 +33,7 @@ export type ChatDatabase = BaseSQLiteDatabase<'sync' | 'async', any, any> & {
  *  users or roles itself. */
 export type WorkspaceAccessCheck = (workspaceId: string) => void | Promise<void>
 
+/** Define input parameters for listing threads within a workspace with pagination options */
 export interface ListThreadsInput {
   workspaceId: string
   /** Clamped to 1..200; default 50 (legal's list route semantics). */
@@ -41,6 +42,7 @@ export interface ListThreadsInput {
   offset?: number
 }
 
+/** Represent a paginated collection of chat threads with total count and pagination details */
 export interface ListThreadsResult<TThread = ChatThreadRow> {
   threads: TThread[]
   total: number
@@ -48,6 +50,7 @@ export interface ListThreadsResult<TThread = ChatThreadRow> {
   offset: number
 }
 
+/** Define input parameters required to create a new thread in a workspace */
 export interface CreateThreadInput {
   workspaceId: string
   /** Title source when `title` is absent: first non-empty line, 80-char cap
@@ -63,6 +66,7 @@ export interface CreateThreadInput {
   extras?: Record<string, unknown>
 }
 
+/** Define input parameters for appending a message to a chat thread with optional metadata */
 export interface AppendMessageInput {
   threadId: string
   role: 'user' | 'assistant' | 'system' | 'tool'
@@ -80,17 +84,20 @@ export interface AppendMessageInput {
   extras?: Record<string, unknown>
 }
 
+/** Define options to configure message listing with optional limit and offset parameters */
 export interface ListMessagesOptions {
   limit?: number
   offset?: number
 }
 
+/** Define input for bulk deleting threads with access checks per workspace */
 export interface BulkDeleteThreadsInput {
   ids: string[]
   /** Called once per distinct workspace the ids touch, before ANY delete. */
   assertAccess: WorkspaceAccessCheck
 }
 
+/** Manage chat threads and messages with operations for listing, creating, updating, and deleting data */
 export interface ChatStore<TThread = ChatThreadRow, TMessage = ChatMessageRow> {
   listThreads(input: ListThreadsInput): Promise<ListThreadsResult<TThread>>
   getThread(threadId: string): Promise<TThread | null>
@@ -135,6 +142,7 @@ function clampOffset(offset: number | undefined): number {
   return Math.max(value, 0)
 }
 
+/** Create a chat store managing threads and messages based on the provided database and tables */
 export function createChatStore<TTables extends ChatTables>(
   db: ChatDatabase,
   tables: TTables,
