@@ -14,9 +14,9 @@
  * the interactive lane uses (`createBufferedTurnTap`) with the same producer
  * mapping (`createSandboxChatProducer`), so an autonomous run is watchable
  * token-by-token exactly like an interactive one — while staying durable
- * (a durable driver re-invokes it after a crash; a completed turn short-circuits
- * instead of re-streaming). Products supply only the domain seams: the raw
- * sandbox event stream, the turn store, and the ids.
+ * (a durable driver re-invokes it after a crash; a turn that finished
+ * server-side short-circuits instead of re-streaming). Products supply only the
+ * domain seams: the raw sandbox event stream, the turn store, and the ids.
  *
  * This is app-shell mechanism (turn durability + live projection), not engine:
  * it owns no loop logic and imports no SDK — the event source is an injected
@@ -28,15 +28,27 @@ import {
   createBufferedTurnTap,
   type TurnEventStore,
 } from '../stream/index'
-import { createSandboxChatProducer } from './sandbox-producer'
+import {
+  createSandboxChatProducer,
+  type SandboxChatProducerOptions,
+} from './sandbox-producer'
 import type { ChatTurnUsage } from './turn-routes'
 
-/** Authoritative final receipt for a turn whose live stream carried no usage
- *  (some harness paths only expose tokens via the completed-turn record, e.g.
- *  `box.findCompletedTurn(turnId)`). */
+/** The normalized structured message body (tool-call / file / plan / interaction
+ *  parts) that `/chat-store` persists as the durable assistant row — the same
+ *  shape `createSandboxChatProducer().assistantParts()` returns. */
+export type DetachedTurnParts = Array<Record<string, unknown>>
+
+/** Authoritative final receipt for a turn that finished server-side, or whose
+ *  live stream carried no usage (some harness paths only expose tokens via the
+ *  completed-turn record, e.g. `box.findCompletedTurn(turnId)`). */
 export interface DetachedTurnFinal {
   text?: string
   usage?: ChatTurnUsage
+  /** The structured parts to persist when this receipt IS the result (the
+   *  cached / finished-server-side path). Omitted when the record only carries
+   *  a usage receipt. */
+  parts?: DetachedTurnParts
 }
 
 export interface DetachedTurnOptions {
@@ -54,23 +66,47 @@ export interface DetachedTurnOptions {
   model?: string
   /** Per-flush buffer coalescer. Default `coalesceDeltas`. */
   coalesce?: (events: unknown[]) => unknown[]
-  /** Authoritative final receipt, consulted twice: (a) as the cached result
-   *  when the turn already completed (idempotent re-invoke), and (b) as a
-   *  fallback when a clean run's stream carried no usage/text. */
+  /** Which ask kinds the product renders a card for; anything else is
+   *  auto-declined via {@link declineInteraction}. Forwarded to the producer. */
+  isRenderableInteraction?: SandboxChatProducerOptions['isRenderableInteraction']
+  /** Resolve a non-renderable ask so the run never hangs in the broker. An
+   *  autonomous turn has NO human watching to answer an ask, so a caller that
+   *  omits this risks the run blocking until the broker times out — wire it for
+   *  any unattended run. Forwarded to the producer. */
+  declineInteraction?: SandboxChatProducerOptions['declineInteraction']
+  /** Opt-in eager promotion of harness-emitted `file` parts. Forwarded to the
+   *  producer (see its docs). */
+  promoteFilePart?: SandboxChatProducerOptions['promoteFilePart']
+  /** Authoritative final receipt, consulted whenever a re-invoke finds a prior
+   *  buffer: (a) an already-`complete` turn returns it as the cached result,
+   *  (b) a `running` turn (crash mid-run) uses it to detect a run that finished
+   *  server-side, and (c) a clean run whose stream carried no usage/text falls
+   *  back to it. Typically `() => box.findCompletedTurn(turnId)`. */
   completedResult?: () => Promise<DetachedTurnFinal | null | undefined>
+  /** Clear the prior partial buffer for `turnId` before a genuine re-stream.
+   *  A crash mid-run leaves buffered rows at seqs 1..N with status `running`;
+   *  re-streaming restarts the tap's seq at 0 and would duplicate/interleave
+   *  rows. Wire this (delete `turnId`'s buffered events) so a retry is clean.
+   *  Unset, a re-stream over a `running` buffer is still attempted but logged
+   *  as a possible-duplication hazard. */
+  resetBuffer?: (turnId: string) => Promise<void>
   log?: (message: string, meta?: Record<string, unknown>) => void
 }
 
 export interface DetachedTurnResult {
   /** `completed` — clean drain: persist + bill. `failed` — a terminal error
-   *  event or a thrown stream: skip billing, render an error row. */
+   *  EVENT in the stream: skip billing, render an error row. (A stream that
+   *  THROWS re-throws out of `runDetachedTurn` instead of returning here.) */
   state: 'completed' | 'failed'
   text: string
+  /** The structured assistant body to persist (tool calls, file/plan/interaction
+   *  parts). Empty array when the run produced none. */
+  parts: DetachedTurnParts
   usage: ChatTurnUsage
   /** Present when `state === 'failed'`. */
   error?: string
-  /** True when the turn had already completed and this call returned the cached
-   *  result WITHOUT re-streaming (durable-driver retry after a crash). */
+  /** True when a prior buffer meant this call returned a cached/finished result
+   *  WITHOUT re-streaming (durable-driver retry after a crash). */
   cached: boolean
 }
 
@@ -87,11 +123,25 @@ function hasUsage(usage: ChatTurnUsage): boolean {
   return typeof usage.inputTokens === 'number' && usage.inputTokens > 0
 }
 
+function cachedResultFrom(final: DetachedTurnFinal | null): DetachedTurnResult {
+  return {
+    state: 'completed',
+    text: final?.text ?? '',
+    parts: final?.parts ?? [],
+    usage: final?.usage ?? {},
+    cached: true,
+  }
+}
+
 /**
  * Stream a detached turn into the live turn-event buffer, durably.
  *
  * - Idempotent: an already-`complete` turn returns the cached result without
  *   re-streaming (a second event sequence would collide with the buffered one).
+ * - Crash-safe: a `running` turn (a prior attempt crashed mid-tap) consults
+ *   `completedResult` to detect a run that finished server-side; only a run that
+ *   genuinely did not complete is re-streamed, and then over a `resetBuffer`-
+ *   cleared buffer so seqs don't corrupt.
  * - Marks the turn `running` under `scopeId` so a mid-run browser finds it.
  * - Settles `complete`/`error` so the client stops tailing and billing/render
  *   can branch on `state`.
@@ -99,10 +149,48 @@ function hasUsage(usage: ChatTurnUsage): boolean {
 export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<DetachedTurnResult> {
   const { store, turnId, scopeId } = opts
 
-  const prior = await store.getStatus(turnId).catch(() => null)
-  if (prior === 'complete') {
-    const final = opts.completedResult ? await opts.completedResult().catch(() => null) : null
-    return { state: 'completed', text: final?.text ?? '', usage: final?.usage ?? {}, cached: true }
+  const completed = async (): Promise<DetachedTurnFinal | null> => {
+    if (!opts.completedResult) return null
+    try {
+      return (await opts.completedResult()) ?? null
+    } catch (err) {
+      opts.log?.('[chat-routes] runDetachedTurn completedResult lookup failed', { turnId, err: String(err) })
+      return null
+    }
+  }
+
+  let prior: string | null = null
+  try {
+    prior = await store.getStatus(turnId)
+  } catch (err) {
+    // A transient store blip must NOT silently fall through to a full re-stream
+    // (which would duplicate a completed turn's buffer) — surface it.
+    opts.log?.('[chat-routes] runDetachedTurn getStatus failed; treating as no prior', { turnId, err: String(err) })
+  }
+
+  if (prior === 'complete') return cachedResultFrom(await completed())
+
+  if (prior === 'running') {
+    // A prior attempt marked the turn running and then this worker crashed. The
+    // detached SESSION may have finished server-side while we were gone — the
+    // authoritative check is `completedResult` (findCompletedTurn). If it
+    // completed, settle the stuck `running` buffer and return it.
+    const final = await completed()
+    if (final) {
+      await store.setStatus(turnId, 'complete', scopeId).catch((err) => {
+        opts.log?.('[chat-routes] runDetachedTurn failed to settle a completed running turn', { turnId, err: String(err) })
+      })
+      return cachedResultFrom(final)
+    }
+    // Genuine re-run: clear the partial buffer first, or the fresh tap's seq
+    // (restarting at 0) interleaves with the orphaned rows.
+    if (opts.resetBuffer) {
+      await opts.resetBuffer(turnId).catch((err) => {
+        opts.log?.('[chat-routes] runDetachedTurn resetBuffer failed; re-stream may duplicate rows', { turnId, err: String(err) })
+      })
+    } else {
+      opts.log?.('[chat-routes] runDetachedTurn re-streaming over a running buffer without resetBuffer; rows may duplicate', { turnId })
+    }
   }
 
   const tap = createBufferedTurnTap({
@@ -118,6 +206,9 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
   const producer = createSandboxChatProducer({
     events: opts.events,
     model: opts.model,
+    isRenderableInteraction: opts.isRenderableInteraction,
+    declineInteraction: opts.declineInteraction,
+    promoteFilePart: opts.promoteFilePart,
     log: opts.log,
   })
 
@@ -135,14 +226,17 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
   }
 
   const text = producer.finalText?.() ?? ''
+  const parts = producer.assistantParts?.() ?? []
   let usage: ChatTurnUsage = producer.usage?.() ?? {}
 
   if (!runError && !hasUsage(usage)) {
-    const final = opts.completedResult ? await opts.completedResult().catch(() => null) : null
+    const final = await completed()
     if (final?.usage) usage = { ...usage, ...final.usage }
-    if (!text && final?.text) return { state: 'completed', text: final.text, usage, cached: false }
+    if (!text && final?.text) {
+      return { state: 'completed', text: final.text, parts: final.parts ?? parts, usage, cached: false }
+    }
   }
 
-  if (runError) return { state: 'failed', text, usage, error: runError, cached: false }
-  return { state: 'completed', text, usage, cached: false }
+  if (runError) return { state: 'failed', text, parts, usage, error: runError, cached: false }
+  return { state: 'completed', text, parts, usage, cached: false }
 }
