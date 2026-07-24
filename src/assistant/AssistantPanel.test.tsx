@@ -462,6 +462,28 @@ describe("toPickerModels", () => {
     // The labelled catalog row is kept (not replaced by a slug-only stub).
     expect(out[0]!.name).toBe("GPT-5.4");
   });
+
+  it("threads the catalog prompt price into the picker's per-token pricing", () => {
+    // The catalog gives a per-MILLION prompt price; the picker's ModelRow
+    // multiplies pricing.prompt by 1e6, so the wire form must be per-token.
+    const out = toPickerModels(
+      models({
+        models: [
+          { slug: "openai/gpt-5.4", label: "GPT-5.4", promptUsdPerMillion: 3 },
+        ],
+      }),
+      null,
+    );
+    expect(out[0]!.pricing).toEqual({ prompt: String(3 / 1_000_000) });
+  });
+
+  it("omits pricing when the catalog carries no price", () => {
+    const out = toPickerModels(
+      models({ models: [{ slug: "x/y", label: "Y" }] }),
+      null,
+    );
+    expect("pricing" in out[0]!).toBe(false);
+  });
 });
 
 describe("nextModelSelection", () => {
@@ -702,6 +724,20 @@ describe("AssistantPanel model selection display", () => {
     renderWithModels(chat, catalog);
     await screen.findByRole("button", { name: /GPT-5\.4/ });
     expect(chat.setModel).not.toHaveBeenCalled();
+  });
+
+  it("shows each model's prompt price in the open picker so cost is visible", async () => {
+    const priced: AssistantModels = {
+      default: "openai/gpt-5.4",
+      models: [
+        { slug: "openai/gpt-5.4", label: "GPT-5.4", promptUsdPerMillion: 3 },
+      ],
+    };
+    renderWithModels(makeChat(), priced);
+    // Open the picker from its trigger; the row renders the compact "$3/M" that
+    // the sandbox surface used to drop by stripping the catalog price.
+    fireEvent.click(await screen.findByRole("button", { name: /GPT-5\.4/ }));
+    expect(await screen.findByText("$3/M")).toBeTruthy();
   });
 });
 

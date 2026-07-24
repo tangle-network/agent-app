@@ -91,9 +91,9 @@ function defaultFormatMoney(usd: number | null): string {
  * catalog) stays selectable until the user changes it or the server rejects it,
  * which is when `useAssistantChat` clears it.
  *
- * An absent context window is omitted rather than passed as `undefined`; pricing
- * is omitted entirely because the catalog carries only a prompt price, which the
- * picker's "prompt / completion" line would misreport as a free completion.
+ * An absent context window or price is omitted rather than passed as `undefined`.
+ * The catalog's `promptUsdPerMillion` is converted to the picker's per-token
+ * `pricing.prompt` wire form; each row then shows a single "$X/M" prompt price.
  */
 /** The provider segment of a canonical, provider-prefixed slug
  *  ("anthropic/claude-…" → "anthropic"); "other" when the slug isn't prefixed.
@@ -107,7 +107,12 @@ export function toPickerModels(
   models: AssistantModels,
   selected: string | null,
 ): CatalogModel[] {
-  const row = (slug: string, label?: string, contextTokens?: number): CatalogModel => ({
+  const row = (
+    slug: string,
+    label?: string,
+    contextTokens?: number,
+    promptUsdPerMillion?: number,
+  ): CatalogModel => ({
     id: slug,
     name: label ?? slug,
     provider: providerOf(slug),
@@ -115,9 +120,12 @@ export function toPickerModels(
     supportsReasoning: false,
     featured: false,
     ...(contextTokens != null ? { contextLength: contextTokens } : {}),
+    ...(promptUsdPerMillion != null
+      ? { pricing: { prompt: String(promptUsdPerMillion / 1_000_000) } }
+      : {}),
   });
   const mapped: CatalogModel[] = models.models.map((m) =>
-    row(m.slug, m.label, m.contextTokens),
+    row(m.slug, m.label, m.contextTokens, m.promptUsdPerMillion),
   );
   for (const slug of [models.default, selected]) {
     if (slug && !mapped.some((m) => m.id === slug)) mapped.push(row(slug));
