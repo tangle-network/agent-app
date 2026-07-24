@@ -19,9 +19,11 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const script = join(repoRoot, 'scripts', 'gen-codemap.mjs')
 
 describe('codemap freshness', () => {
+  // Spawns the generator over the whole source tree; the walk scales with the
+  // number of documented exports, so give it well over vitest's 5s default.
   it('committed docs/CODEMAP.md + docs/api/*.md match the current source', () => {
     const res = spawnSync(process.execPath, [script, '--check'], { encoding: 'utf8' })
     const detail = `${res.stdout ?? ''}${res.stderr ?? ''}`.trim()
     expect(res.status, `codemap --check failed — run \`pnpm docs:gen\` and commit:\n${detail}`).toBe(0)
-  })
+  }, 60_000)
 })
