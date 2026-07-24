@@ -6,6 +6,7 @@
 
 import type { SceneElement, ScenePage } from '../../design-canvas/model'
 
+/** Describe a layer row with its element, depth, grouping, ownership, and parent group details */
 export interface LayerRow {
   element: SceneElement
   depth: number

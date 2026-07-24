@@ -8,7 +8,7 @@ Source: `src/sandbox/index.ts`
 
 ### `AppToolDescriptor`
 
-`interface`
+`interface` — Describe an application tool with its name, unique key, and description
 
 ```ts
 interface AppToolDescriptor
@@ -32,7 +32,7 @@ interface AppToolDescriptor
 
 ### `attachReasoningEffort`
 
-`function`
+`function` — Attach a specified reasoning effort level to an agent profile for a given harness
 
 ```ts
 (profile: AgentProfile, harness: "opencode" | "claude-code" | "nanoclaw" | "kimi-code" | "codex" | "amp" | "factory-dro…
@@ -40,7 +40,7 @@ interface AppToolDescriptor
 
 ### `AuthenticatedSandboxUser`
 
-`interface`
+`interface` — Represent an authenticated user within a sandbox environment with a unique identifier
 
 ```ts
 interface AuthenticatedSandboxUser
@@ -48,7 +48,7 @@ interface AuthenticatedSandboxUser
 
 ### `bearerSubprotocolToken`
 
-`function`
+`function` — Resolve and decode a bearer token from a comma-separated subprotocol string or return null
 
 ```ts
 (value: string | null) => string | null
@@ -56,7 +56,7 @@ interface AuthenticatedSandboxUser
 
 ### `bearerToken`
 
-`function`
+`function` — Extract the token from a bearer authorization string or return null if invalid or missing
 
 ```ts
 (value: string | null) => string | null
@@ -64,7 +64,7 @@ interface AuthenticatedSandboxUser
 
 ### `buildAppToolMcpServers`
 
-`function`
+`function` — Build a mapping of MCP server profiles keyed by tool identifiers from provided options
 
 ```ts
 (options: BuildAppToolMcpServersOptions) => Record<string, AgentProfileMcpServer>
@@ -72,7 +72,7 @@ interface AuthenticatedSandboxUser
 
 ### `BuildAppToolMcpServersOptions`
 
-`interface`
+`interface` — Define options for building MCP server configurations in the app tool environment
 
 ```ts
 interface BuildAppToolMcpServersOptions
@@ -80,7 +80,7 @@ interface BuildAppToolMcpServersOptions
 
 ### `buildSandboxRuntimeProxyHeaders`
 
-`function`
+`function` — Build proxy headers for sandbox runtime including authorization and forwarded headers
 
 ```ts
 (source: Headers, sandboxApiKey: string, forwardHeaders?: string[]) => Headers
@@ -88,7 +88,7 @@ interface BuildAppToolMcpServersOptions
 
 ### `buildSandboxToolFileMounts`
 
-`function`
+`function` — Build file mounts for sandbox tools based on provided options and tool configurations
 
 ```ts
 (options: BuildSandboxToolFileMountsOptions) => AgentProfileFileMount[]
@@ -96,7 +96,7 @@ interface BuildAppToolMcpServersOptions
 
 ### `BuildSandboxToolFileMountsOptions`
 
-`interface`
+`interface` — Define options for building sandbox tool file mounts including tool specifications and paths
 
 ```ts
 interface BuildSandboxToolFileMountsOptions
@@ -104,7 +104,7 @@ interface BuildSandboxToolFileMountsOptions
 
 ### `buildSandboxToolPathSetupScript`
 
-`function`
+`function` — Build a shell script that sets up and exports the sandbox tool binary directory in user profiles
 
 ```ts
 (options: SandboxToolPathOptions) => string
@@ -112,7 +112,7 @@ interface BuildSandboxToolFileMountsOptions
 
 ### `classifySeveredStream`
 
-`function`
+`function` — Resolve the severed stream event to a corresponding sandbox step transition or null
 
 ```ts
 (event: unknown) => SandboxStepTransition | null
@@ -120,7 +120,7 @@ interface BuildSandboxToolFileMountsOptions
 
 ### `createSandboxTerminalToken`
 
-`function`
+`function` — Generate a sandbox terminal token for a given subject with specified options
 
 ```ts
 (subject: TerminalProxyIdentity, opts: SandboxTerminalTokenOptions) => Promise<SandboxTerminalTokenResult>
@@ -128,7 +128,7 @@ interface BuildSandboxToolFileMountsOptions
 
 ### `createWorkspaceSandboxConnectionHandler`
 
-`function`
+`function` — Create a handler to resolve workspace sandbox connections with user and access validation
 
 ```ts
 <TBox extends WorkspaceSandboxInstanceLike>(opts: WorkspaceSandboxConnectionHandlerOptions<TBox>) => ({ request, params…
@@ -136,7 +136,7 @@ interface BuildSandboxToolFileMountsOptions
 
 ### `createWorkspaceSandboxManager`
 
-`function`
+`function` — Create a manager to handle workspace sandbox instances with client and options configuration
 
 ```ts
 <TClient, TBox extends WorkspaceSandboxInstanceLike, TEnsureOptions = void>(opts: WorkspaceSandboxManagerOptions<TClien…
@@ -144,7 +144,7 @@ interface BuildSandboxToolFileMountsOptions
 
 ### `createWorkspaceSandboxRuntimeProxyHandler`
 
-`function`
+`function` — Create a proxy handler to resolve sandbox runtime requests with user and workspace access validation
 
 ```ts
 (opts: WorkspaceSandboxRuntimeProxyHandlerOptions) => ({ request, params }: WorkspaceSandboxRuntimeProxyArgs) => Promis…
@@ -160,7 +160,7 @@ interface BuildSandboxToolFileMountsOptions
 
 ### `DEFAULT_SANDBOX_RESOURCES`
 
-`const`
+`const` — Define default resource limits and settings for sandbox environments
 
 ```ts
 SandboxResourceConfig
@@ -176,7 +176,7 @@ SandboxResourceConfig
 
 ### `deleteSecret`
 
-`function`
+`function` — Delete a secret by name from the given secret store and return the operation outcome
 
 ```ts
 (store: SecretStore, name: string) => Promise<Outcome<void>>
@@ -184,7 +184,7 @@ SandboxResourceConfig
 
 ### `detectInteractiveQuestion`
 
-`function`
+`function` — Resolve the interactive question text from a structured event or return null if none found
 
 ```ts
 (event: unknown) => string | null
@@ -192,7 +192,7 @@ SandboxResourceConfig
 
 ### `driveSandboxTurn`
 
-`function`
+`function` — Resolve a sandbox turn by processing a message with given configuration and options
 
 ```ts
 (shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | PromptInputPart[], options: DriveSandboxTurnOptio…
@@ -200,7 +200,7 @@ SandboxResourceConfig
 
 ### `DriveSandboxTurnOptions`
 
-`interface`
+`interface` — Define options to manage deterministic session resumption and turn idempotency in sandboxed drive turns
 
 ```ts
 interface DriveSandboxTurnOptions
@@ -208,7 +208,7 @@ interface DriveSandboxTurnOptions
 
 ### `encodeSandboxRuntimePath`
 
-`function`
+`function` — Encode a runtime path by URI-encoding each valid segment and returning null for invalid segments
 
 ```ts
 (runtimePath: string) => string | null
@@ -216,7 +216,7 @@ interface DriveSandboxTurnOptions
 
 ### `ensureWorkspaceSandbox`
 
-`function`
+`function` — Resolve or create a workspace sandbox instance with optional reuse and progress tracking
 
 ```ts
 (shell: SandboxRuntimeConfig, options: EnsureWorkspaceSandboxOptions) => Promise<SandboxInstance>
@@ -224,7 +224,7 @@ interface DriveSandboxTurnOptions
 
 ### `EnsureWorkspaceSandboxOptions`
 
-`interface`
+`interface` — Define options for ensuring a workspace sandbox with provisioning and progress handling
 
 ```ts
 interface EnsureWorkspaceSandboxOptions
@@ -248,7 +248,7 @@ interface EnsureWorkspaceSandboxOptions
 
 ### `flattenHistory`
 
-`function`
+`function` — Build a single string combining conversation history and the current user message
 
 ```ts
 (message: string, history?: { role: "user" | "assistant"; content: string; }[] | undefined) => string
@@ -256,7 +256,7 @@ interface EnsureWorkspaceSandboxOptions
 
 ### `getClient`
 
-`function`
+`function` — Resolve a synchronous sandbox client from provided runtime configuration credentials
 
 ```ts
 (shell: SandboxRuntimeConfig) => SandboxClient
@@ -272,7 +272,7 @@ interface EnsureWorkspaceSandboxOptions
 
 ### `isTerminalPromptEvent`
 
-`function`
+`function` — Determine if an event is a terminal prompt event with type 'result' or 'done
 
 ```ts
 (event: unknown) => boolean
@@ -280,7 +280,7 @@ interface EnsureWorkspaceSandboxOptions
 
 ### `LivenessProbeConfig`
 
-`interface`
+`interface` — Define configuration for liveness probes including sidecar process pattern and optional timeouts
 
 ```ts
 interface LivenessProbeConfig
@@ -296,7 +296,7 @@ interface LivenessProbeConfig
 
 ### `MemberSyncSeam`
 
-`interface`
+`interface` — Map workspace roles to corresponding sandbox permission levels
 
 ```ts
 interface MemberSyncSeam
@@ -304,7 +304,7 @@ interface MemberSyncSeam
 
 ### `mergeExtraMcp`
 
-`function`
+`function` — Resolve conflicts and merge extra MCP profiles into the app tool MCP without overwriting existing keys
 
 ```ts
 (appToolMcp: Record<string, AgentProfileMcpServer>, baseProfileMcp: Record<string, AgentProfileMcpServer>, extra: Recor…
@@ -328,7 +328,7 @@ interface MemberSyncSeam
 
 ### `mintTerminalProxyToken`
 
-`function`
+`function` — Generate a signed token for TerminalProxyIdentity with an expiration based on TTL milliseconds
 
 ```ts
 (secret: string, identity: TerminalProxyIdentity, ttlMs?: number, now?: () => number) => Promise<Outcome<{ token: strin…
@@ -336,7 +336,7 @@ interface MemberSyncSeam
 
 ### `Outcome`
 
-`type`
+`type` — Represent success or failure of an operation with corresponding value or error information
 
 ```ts
 type Outcome
@@ -360,7 +360,7 @@ type PeekWorkspaceSandboxOutcome
 
 ### `ProfileComposeOptions`
 
-`interface`
+`interface` — Define options for composing a user profile including prompts, files, servers, and name
 
 ```ts
 interface ProfileComposeOptions
@@ -368,7 +368,7 @@ interface ProfileComposeOptions
 
 ### `PromptInputPart`
 
-`type`
+`type` — Extract a single element type from the array parameter of SandboxInstance's streamPrompt method
 
 ```ts
 type PromptInputPart
@@ -376,7 +376,7 @@ type PromptInputPart
 
 ### `ProviderResolutionConfig`
 
-`interface`
+`interface` — Define configuration options for resolving a provider and its model with optional API keys and routing details
 
 ```ts
 interface ProviderResolutionConfig
@@ -416,7 +416,7 @@ interface ProvisionProfileSection
 
 ### `readSecret`
 
-`function`
+`function` — Resolve a secret value from the store by its name and return the outcome asynchronously
 
 ```ts
 (store: SecretStore, name: string) => Promise<Outcome<string>>
@@ -424,7 +424,7 @@ interface ProvisionProfileSection
 
 ### `resetClientCache`
 
-`function`
+`function` — Reset the client cache to clear stored data and force fresh retrieval
 
 ```ts
 () => void
@@ -432,7 +432,7 @@ interface ProvisionProfileSection
 
 ### `ResolvedModel`
 
-`interface`
+`interface` — Represent a fully configured model with optional API key and base URL for sandbox platform integration
 
 ```ts
 interface ResolvedModel
@@ -440,7 +440,7 @@ interface ResolvedModel
 
 ### `resolveModel`
 
-`function`
+`function` — Resolve and return the appropriate model configuration based on provider settings and optional overrides
 
 ```ts
 (config: ProviderResolutionConfig | undefined, override?: { model?: string | undefined; modelApiKey?: string | undefine…
@@ -448,7 +448,7 @@ interface ResolvedModel
 
 ### `resolveSandboxClientCredentials`
 
-`function`
+`function` — Resolve sandbox client credentials based on environment and provided options asynchronously
 
 ```ts
 (options?: ResolveSandboxClientCredentialsOptions) => Promise<SandboxClientCredentials>
@@ -456,7 +456,7 @@ interface ResolvedModel
 
 ### `ResolveSandboxClientCredentialsOptions`
 
-`interface`
+`interface` — Resolve options for obtaining sandbox client credentials from environment variables and classification
 
 ```ts
 interface ResolveSandboxClientCredentialsOptions
@@ -464,7 +464,7 @@ interface ResolveSandboxClientCredentialsOptions
 
 ### `runSandboxPrompt`
 
-`function`
+`function` — Resolve a sandbox prompt by streaming and aggregating message parts into a complete string
 
 ```ts
 (shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | PromptInputPart[], options?: StreamSandboxPromptO…
@@ -472,7 +472,7 @@ interface ResolveSandboxClientCredentialsOptions
 
 ### `runSandboxToolPathSetup`
 
-`function`
+`function` — Resolve the sandbox environment PATH setup by executing the configuration script with given options
 
 ```ts
 (box: SandboxInstance, options: SandboxToolPathOptions) => Promise<Outcome<void>>
@@ -480,7 +480,7 @@ interface ResolveSandboxClientCredentialsOptions
 
 ### `SandboxApiCredentials`
 
-`interface`
+`interface` — Define credentials required to access the sandbox API environment
 
 ```ts
 interface SandboxApiCredentials
@@ -488,7 +488,7 @@ interface SandboxApiCredentials
 
 ### `SandboxBuildContext`
 
-`interface`
+`interface` — Define the context for building a sandbox including workspace, integrations, and optional user ID
 
 ```ts
 interface SandboxBuildContext
@@ -496,7 +496,7 @@ interface SandboxBuildContext
 
 ### `SandboxClientCredentials`
 
-`interface`
+`interface` — Define client credentials for accessing the sandbox environment with API key and base URL
 
 ```ts
 interface SandboxClientCredentials
@@ -520,7 +520,7 @@ interface SandboxExecChannel
 
 ### `SandboxExecOptions`
 
-`interface`
+`interface` — Define options to execute code within a sandbox environment with optional session control
 
 ```ts
 interface SandboxExecOptions
@@ -528,7 +528,7 @@ interface SandboxExecOptions
 
 ### `SandboxFileBytesOutcome`
 
-`type`
+`type` — Represent the outcome of reading sandbox file bytes with success status and corresponding data or error
 
 ```ts
 type SandboxFileBytesOutcome
@@ -536,7 +536,7 @@ type SandboxFileBytesOutcome
 
 ### `SandboxFileSizeOutcome`
 
-`type`
+`type` — Resolve the outcome of a sandbox file size check with success status and value or error message
 
 ```ts
 type SandboxFileSizeOutcome
@@ -544,7 +544,7 @@ type SandboxFileSizeOutcome
 
 ### `SandboxPermissionLevel`
 
-`type`
+`type` — Define permission levels for sandbox access and control
 
 ```ts
 type SandboxPermissionLevel
@@ -552,7 +552,7 @@ type SandboxPermissionLevel
 
 ### `SandboxResourceConfig`
 
-`interface`
+`interface` — Define configuration parameters for sandbox resource allocation and lifecycle management
 
 ```ts
 interface SandboxResourceConfig
@@ -560,7 +560,7 @@ interface SandboxResourceConfig
 
 ### `SandboxRestoreSpec`
 
-`interface`
+`interface` — Define the specification for restoring a sandbox from a snapshot or another sandbox ID
 
 ```ts
 interface SandboxRestoreSpec
@@ -568,7 +568,7 @@ interface SandboxRestoreSpec
 
 ### `SandboxRuntimeAuthRefreshError`
 
-`class`
+`class` — Represent an error thrown when sandbox runtime authentication refresh fails for a specific stage and name
 
 ```ts
 class SandboxRuntimeAuthRefreshError
@@ -576,7 +576,7 @@ class SandboxRuntimeAuthRefreshError
 
 ### `SandboxRuntimeConfig`
 
-`interface`
+`interface` — Define runtime configuration methods for sandbox environments including credentials, metadata, and permissions
 
 ```ts
 interface SandboxRuntimeConfig
@@ -584,7 +584,7 @@ interface SandboxRuntimeConfig
 
 ### `SandboxRuntimeConnection`
 
-`interface`
+`interface` — Define a connection configuration for sandbox runtime including URL and optional server-side auth token
 
 ```ts
 interface SandboxRuntimeConnection
@@ -592,7 +592,7 @@ interface SandboxRuntimeConnection
 
 ### `SandboxScope`
 
-`interface`
+`interface` — Define a scope containing workspace and optional user identifiers for sandbox environments
 
 ```ts
 interface SandboxScope
@@ -600,7 +600,7 @@ interface SandboxScope
 
 ### `SandboxStepTransition`
 
-`type`
+`type` — Define transitions marking the start or finish of a sandbox step with associated details
 
 ```ts
 type SandboxStepTransition
@@ -608,7 +608,7 @@ type SandboxStepTransition
 
 ### `SandboxTerminalTokenOptions`
 
-`interface`
+`interface` — Define options for generating a sandbox terminal token including secret and expiration settings
 
 ```ts
 interface SandboxTerminalTokenOptions
@@ -616,7 +616,7 @@ interface SandboxTerminalTokenOptions
 
 ### `SandboxTerminalTokenResult`
 
-`interface`
+`interface` — Provide token and expiration details for a sandbox terminal session
 
 ```ts
 interface SandboxTerminalTokenResult
@@ -624,7 +624,7 @@ interface SandboxTerminalTokenResult
 
 ### `SandboxTerminalTokenSubject`
 
-`type`
+`type` — Resolve the identity type used for sandbox terminal token subjects
 
 ```ts
 type SandboxTerminalTokenSubject
@@ -632,7 +632,7 @@ type SandboxTerminalTokenSubject
 
 ### `SandboxTerminalWsMatch`
 
-`interface`
+`interface` — Define the structure for matching a sandbox terminal WebSocket with workspace and path details
 
 ```ts
 interface SandboxTerminalWsMatch
@@ -640,7 +640,7 @@ interface SandboxTerminalWsMatch
 
 ### `sandboxToolBinDir`
 
-`function`
+`function` — Resolve the binary directory path for a sandbox tool based on provided options
 
 ```ts
 (options: SandboxToolPathOptions) => string
@@ -648,7 +648,7 @@ interface SandboxTerminalWsMatch
 
 ### `sandboxToolPath`
 
-`function`
+`function` — Resolve the file system path to a specified sandbox tool based on given options
 
 ```ts
 (options: SandboxToolPathOptions & { toolName: string; }) => string
@@ -656,7 +656,7 @@ interface SandboxTerminalWsMatch
 
 ### `SandboxToolPathOptions`
 
-`interface`
+`interface` — Define options for resolving sandbox tool paths including appName, baseDir, and binDir
 
 ```ts
 interface SandboxToolPathOptions
@@ -664,7 +664,7 @@ interface SandboxToolPathOptions
 
 ### `sandboxToolRootDir`
 
-`function`
+`function` — Resolve the root directory path for a sandbox tool based on provided options
 
 ```ts
 (options: SandboxToolPathOptions) => string
@@ -672,7 +672,7 @@ interface SandboxToolPathOptions
 
 ### `SandboxToolSpec`
 
-`interface`
+`interface` — Define the specification for a sandbox tool including its name, content, and optional executability
 
 ```ts
 interface SandboxToolSpec
@@ -680,7 +680,7 @@ interface SandboxToolSpec
 
 ### `ScopedTokenResult`
 
-`interface`
+`interface` — Represent a token with its expiration date and associated scope
 
 ```ts
 interface ScopedTokenResult
@@ -688,7 +688,7 @@ interface ScopedTokenResult
 
 ### `SecretStore`
 
-`interface`
+`interface` — Define methods to create, update, retrieve, and delete secrets asynchronously
 
 ```ts
 interface SecretStore
@@ -696,7 +696,7 @@ interface SecretStore
 
 ### `secretStoreFromClient`
 
-`function`
+`function` — Resolve a SecretStore interface using the provided SandboxRuntimeConfig shell
 
 ```ts
 (shell: SandboxRuntimeConfig) => SecretStore
@@ -712,7 +712,7 @@ interface SecretStore
 
 ### `splitDeferredProfileFiles`
 
-`function`
+`function` — Split profile files into inline deferred files and a lean profile without them
 
 ```ts
 (profile: AgentProfile) => { leanProfile: AgentProfile; deferredFiles: AgentProfileFileMount[]; }
@@ -728,7 +728,7 @@ interface SecretStore
 
 ### `StoppedSandboxResumeFailure`
 
-`interface`
+`interface` — Describe the failure details when resuming a stopped sandbox instance
 
 ```ts
 interface StoppedSandboxResumeFailure
@@ -736,7 +736,7 @@ interface StoppedSandboxResumeFailure
 
 ### `StoppedSandboxResumeRecovery`
 
-`interface`
+`interface` — Define the structure for resuming a stopped sandbox with replacement key and optional restore options
 
 ```ts
 interface StoppedSandboxResumeRecovery
@@ -752,7 +752,7 @@ interface StorageConfig
 
 ### `storeSecret`
 
-`function`
+`function` — Resolve storing a secret by creating or updating it in the given SecretStore
 
 ```ts
 (store: SecretStore, name: string, value: string) => Promise<Outcome<void>>
@@ -760,7 +760,7 @@ interface StorageConfig
 
 ### `streamSandboxPrompt`
 
-`function`
+`function` — Resolve and stream AI-generated responses from a sandboxed environment based on input messages and options
 
 ```ts
 (shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | PromptInputPart[], options?: StreamSandboxPromptO…
@@ -768,7 +768,7 @@ interface StorageConfig
 
 ### `StreamSandboxPromptOptions`
 
-`interface`
+`interface` — Define options for configuring and controlling a streaming sandbox prompt session
 
 ```ts
 interface StreamSandboxPromptOptions
@@ -776,7 +776,7 @@ interface StreamSandboxPromptOptions
 
 ### `syncSandboxMemberAdd`
 
-`function`
+`function` — Resolve adding a user with a specific role to a sandbox and return the operation outcome
 
 ```ts
 (box: SandboxInstance, seam: MemberSyncSeam, userId: string, role: string) => Promise<Outcome<void>>
@@ -784,7 +784,7 @@ interface StreamSandboxPromptOptions
 
 ### `syncSandboxMemberRemove`
 
-`function`
+`function` — Remove a member from the sandbox while preserving their home directory and handle the outcome
 
 ```ts
 (box: SandboxInstance, userId: string) => Promise<Outcome<void>>
@@ -792,7 +792,7 @@ interface StreamSandboxPromptOptions
 
 ### `syncSandboxMemberRole`
 
-`function`
+`function` — Synchronize a sandbox member's role by updating permissions based on the provided role mapping
 
 ```ts
 (box: SandboxInstance, seam: MemberSyncSeam, userId: string, role: string) => Promise<Outcome<void>>
@@ -800,7 +800,7 @@ interface StreamSandboxPromptOptions
 
 ### `TerminalProxyIdentity`
 
-`interface`
+`interface` — Define identity details for a terminal proxy including user, workspace, and sandbox identifiers
 
 ```ts
 interface TerminalProxyIdentity
@@ -808,7 +808,7 @@ interface TerminalProxyIdentity
 
 ### `terminalTokenFromRequest`
 
-`function`
+`function` — Resolve the terminal token from request headers using Authorization or Sec-WebSocket-Protocol fields
 
 ```ts
 (headers: Headers) => string | null
@@ -816,7 +816,7 @@ interface TerminalProxyIdentity
 
 ### `verifySandboxTerminalToken`
 
-`function`
+`function` — Verify the validity of a sandbox terminal token against the expected identity and options
 
 ```ts
 (token: string, expected: TerminalProxyIdentity, opts: SandboxTerminalTokenOptions) => Promise<boolean>
@@ -824,7 +824,7 @@ interface TerminalProxyIdentity
 
 ### `verifyTerminalProxyToken`
 
-`function`
+`function` — Verify the authenticity and validity of a terminal proxy token against expected identity and timestamp
 
 ```ts
 (secret: string, token: string, expected: TerminalProxyIdentity, now?: () => number) => Promise<boolean>
@@ -832,7 +832,7 @@ interface TerminalProxyIdentity
 
 ### `WorkspaceSandboxConnectionArgs`
 
-`interface`
+`interface` — Define arguments required to establish a workspace sandbox connection
 
 ```ts
 interface WorkspaceSandboxConnectionArgs
@@ -840,7 +840,7 @@ interface WorkspaceSandboxConnectionArgs
 
 ### `WorkspaceSandboxConnectionHandlerOptions`
 
-`interface`
+`interface` — Define options to handle workspace sandbox connections with user authentication and access control
 
 ```ts
 interface WorkspaceSandboxConnectionHandlerOptions
@@ -848,7 +848,7 @@ interface WorkspaceSandboxConnectionHandlerOptions
 
 ### `WorkspaceSandboxEnsureContext`
 
-`interface`
+`interface` — Define the context containing workspace and user identifiers for sandbox environment operations
 
 ```ts
 interface WorkspaceSandboxEnsureContext
@@ -856,7 +856,7 @@ interface WorkspaceSandboxEnsureContext
 
 ### `WorkspaceSandboxInstanceLike`
 
-`interface`
+`interface` — Define the shape of a workspace sandbox instance including its connection details and status
 
 ```ts
 interface WorkspaceSandboxInstanceLike
@@ -864,7 +864,7 @@ interface WorkspaceSandboxInstanceLike
 
 ### `WorkspaceSandboxManager`
 
-`interface`
+`interface` — Manage workspace sandboxes by ensuring their creation and retrieval for specified users
 
 ```ts
 interface WorkspaceSandboxManager
@@ -872,7 +872,7 @@ interface WorkspaceSandboxManager
 
 ### `WorkspaceSandboxManagerOptions`
 
-`interface`
+`interface` — Define configuration options for managing and interacting with workspace sandboxes
 
 ```ts
 interface WorkspaceSandboxManagerOptions
@@ -880,7 +880,7 @@ interface WorkspaceSandboxManagerOptions
 
 ### `WorkspaceSandboxRuntimeProxyArgs`
 
-`interface`
+`interface` — Define arguments for proxying runtime requests within a workspace sandbox environment
 
 ```ts
 interface WorkspaceSandboxRuntimeProxyArgs
@@ -888,7 +888,7 @@ interface WorkspaceSandboxRuntimeProxyArgs
 
 ### `WorkspaceSandboxRuntimeProxyHandlerOptions`
 
-`interface`
+`interface` — Define options for handling workspace sandbox runtime proxy including user, access, credentials, and connection retrieval
 
 ```ts
 interface WorkspaceSandboxRuntimeProxyHandlerOptions
@@ -896,7 +896,7 @@ interface WorkspaceSandboxRuntimeProxyHandlerOptions
 
 ### `WorkspaceSandboxTerminalUpgradeHandlerOptions`
 
-`interface`
+`interface` — Define options to handle user authentication, workspace access, and sandbox API credential retrieval
 
 ```ts
 interface WorkspaceSandboxTerminalUpgradeHandlerOptions
@@ -904,7 +904,7 @@ interface WorkspaceSandboxTerminalUpgradeHandlerOptions
 
 ### `WriteProfileFilesOptions`
 
-`interface`
+`interface` — Define options to control execution timeout, pacing, and retry behavior when writing profile files
 
 ```ts
 interface WriteProfileFilesOptions
@@ -912,7 +912,7 @@ interface WriteProfileFilesOptions
 
 ### `writeProfileFilesToBox`
 
-`function`
+`function` — Write profile files to a sandbox with pacing, retries, and optional execution timeout handling
 
 ```ts
 (box: SandboxInstance, files: AgentProfileFileMount[], options?: WriteProfileFilesOptions) => Promise<Outcome<void>>

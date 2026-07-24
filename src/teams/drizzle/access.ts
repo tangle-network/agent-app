@@ -45,6 +45,7 @@ export interface WorkspaceAccessTable {
   updatedAt: any
 }
 
+/** Define options required to create access with database, tables, and workspace table references */
 export interface CreateAccessOptions {
   db: TeamDatabase
   tables: TeamTables
@@ -52,6 +53,7 @@ export interface CreateAccessOptions {
   workspaceTable: TeamParentTable & WorkspaceAccessTable
 }
 
+/** Define access details including workspace data, organization info, member info, and role within workspace */
 export interface WorkspaceAccess {
   workspace: Record<string, unknown>
   organization: OrganizationRow
@@ -59,18 +61,21 @@ export interface WorkspaceAccess {
   role: WorkspaceRole
 }
 
+/** Describe a user's workspace details including organization and role information */
 export interface UserWorkspaceSummary extends Record<string, unknown> {
   organizationId: string
   organizationName: string
   role: WorkspaceRole
 }
 
+/** Define methods to retrieve and enforce user access permissions within workspaces */
 export interface WorkspaceAccessApi {
   getWorkspaceAccess(workspaceId: string, userId: string, minRole?: WorkspaceRole): Promise<WorkspaceAccess | null>
   requireWorkspaceAccess(workspaceId: string, userId: string, minRole?: WorkspaceRole): Promise<WorkspaceAccess>
   listUserWorkspaces(userId: string): Promise<UserWorkspaceSummary[]>
 }
 
+/** Create workspace access API to manage user roles and permissions within a workspace */
 export function createWorkspaceAccess(opts: CreateAccessOptions): WorkspaceAccessApi {
   const { db, tables, workspaceTable } = opts
   const { organizations, organizationMembers, workspaceMembers } = tables
@@ -165,22 +170,26 @@ export function createWorkspaceAccess(opts: CreateAccessOptions): WorkspaceAcces
   return { getWorkspaceAccess, requireWorkspaceAccess, listUserWorkspaces }
 }
 
+/** Define access details linking an organization, its member, and the member's role */
 export interface OrganizationAccess {
   organization: OrganizationRow
   member: OrganizationMemberRow
   role: OrganizationRole
 }
 
+/** Define methods to retrieve and enforce user access levels within an organization */
 export interface OrganizationAccessApi {
   getOrganizationAccess(organizationId: string, userId: string, minRole?: OrganizationRole): Promise<OrganizationAccess | null>
   requireOrganizationAccess(organizationId: string, userId: string, minRole?: OrganizationRole): Promise<OrganizationAccess>
 }
 
+/** Define options required to create access for an organization including database and tables */
 export interface CreateOrganizationAccessOptions {
   db: TeamDatabase
   tables: TeamTables
 }
 
+/** Resolve organization access API with specified database and table options */
 export function createOrganizationAccess(opts: CreateOrganizationAccessOptions): OrganizationAccessApi {
   const { db, tables } = opts
   const { organizations, organizationMembers } = tables

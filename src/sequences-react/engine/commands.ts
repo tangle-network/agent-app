@@ -99,6 +99,7 @@ function removeClip(state: EditorTimelineState, clipId: string, context: string)
 // move_clip
 // ---------------------------------------------------------------------------
 
+/** Define input parameters to move a clip within a timeline including optional track and resolver */
 export interface MoveClipInput {
   timeline: SequenceTimeline
   clipId: string
@@ -145,6 +146,7 @@ export function moveClipCommand(input: MoveClipInput): TimelineCommand {
 // trim_clip
 // ---------------------------------------------------------------------------
 
+/** Define input parameters for trimming a clip within a sequence timeline */
 export interface TrimClipInput {
   timeline: SequenceTimeline
   clipId: string
@@ -197,6 +199,7 @@ export function trimClipCommand(input: TrimClipInput): TimelineCommand {
 // place_clip
 // ---------------------------------------------------------------------------
 
+/** Define input parameters required to place a clip within a sequence timeline */
 export interface PlaceClipInput {
   timeline: SequenceTimeline
   /** Caller-minted optimistic id for the local clip (see module header). */
@@ -214,6 +217,7 @@ export interface PlaceClipInput {
   resolveClipId?: ClipIdResolver
 }
 
+/** Resolve and validate clip placement parameters to create a timeline command */
 export function placeClipCommand(input: PlaceClipInput): TimelineCommand {
   const context = 'place_clip'
   assertNewClipId(input.timeline, input.clipId, context)
@@ -271,6 +275,7 @@ export function placeClipCommand(input: PlaceClipInput): TimelineCommand {
 // delete_clip
 // ---------------------------------------------------------------------------
 
+/** Define input parameters required to delete a clip from a sequence timeline */
 export interface DeleteClipInput {
   timeline: SequenceTimeline
   clipId: string
@@ -336,6 +341,7 @@ export function deleteClipCommand(input: DeleteClipInput): TimelineCommand {
 // split_clip
 // ---------------------------------------------------------------------------
 
+/** Define input parameters for splitting a clip at a specific frame within a timeline */
 export interface SplitClipInput {
   timeline: SequenceTimeline
   clipId: string
@@ -409,6 +415,7 @@ export function splitClipCommand(input: SplitClipInput): TimelineCommand {
 // add_caption
 // ---------------------------------------------------------------------------
 
+/** Define input parameters for adding a caption clip to a sequence timeline */
 export interface AddCaptionInput {
   timeline: SequenceTimeline
   /** Caller-minted optimistic id for the local caption clip. */
@@ -423,6 +430,7 @@ export interface AddCaptionInput {
   resolveClipId?: ClipIdResolver
 }
 
+/** Resolve a command to add a caption to a specified caption track within a timeline */
 export function addCaptionCommand(input: AddCaptionInput): TimelineCommand {
   const context = 'add_caption'
   assertNewClipId(input.timeline, input.clipId, context)
@@ -477,6 +485,7 @@ export function addCaptionCommand(input: AddCaptionInput): TimelineCommand {
 // set_clip_text
 // ---------------------------------------------------------------------------
 
+/** Define input parameters for setting text and optional language on a specific clip in a timeline */
 export interface SetClipTextInput {
   timeline: SequenceTimeline
   clipId: string
@@ -542,6 +551,7 @@ export function setClipTextCommand(input: SetClipTextInput): TimelineCommand {
 // set_clip_disabled (toggle)
 // ---------------------------------------------------------------------------
 
+/** Define input parameters to toggle the disabled state of a clip within a timeline */
 export interface ToggleClipDisabledInput {
   timeline: SequenceTimeline
   clipId: string

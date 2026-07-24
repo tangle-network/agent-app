@@ -102,6 +102,7 @@ export type FetchLike = (url: string, init?: { signal?: AbortSignal; headers?: R
   headers?: { get(name: string): string | null }
 }>
 
+/** Define options for extracting brand kit data including HTML input, fetch method, timeout, and list limits */
 export interface ExtractBrandKitOptions {
   /** Raw HTML for the page. When supplied, no network fetch happens — used by
    *  tests and by callers that already hold the HTML. */

@@ -3,9 +3,11 @@ import type { AppToolTaxonomy, BuildAppToolsOptions } from './types'
 /** The four canonical app-tool names. Stable identifiers the model calls in
  *  both the sandbox (MCP server name) and runtime (function-tool name) paths. */
 export const APP_TOOL_NAMES = ['submit_proposal', 'schedule_followup', 'render_ui', 'add_citation'] as const
+/** Resolve a valid application tool name from the predefined list of tool names */
 export type AppToolName = (typeof APP_TOOL_NAMES)[number]
 
 const NAME_SET = new Set<string>(APP_TOOL_NAMES)
+/** Determine if a string matches a valid application tool name */
 export function isAppToolName(name: string): name is AppToolName {
   return NAME_SET.has(name)
 }

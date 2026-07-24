@@ -42,12 +42,15 @@ export function isTerminalRunEvent(type: string): boolean {
 //   scope      `scope:${scopeId}`           — running-turn index for a thread,
 //              backing `TurnEventStore.listRunning`.
 
+/** Define the scope level for acquiring a turn lock within thread or workspace contexts */
 export type TurnLockScope = 'thread' | 'workspace'
 
+/** Generate a unique string key combining workspace and thread identifiers */
 export function threadChannelKey(workspaceId: string, threadId: string): string {
   return `${workspaceId}:${threadId}`
 }
 
+/** Generate a unique channel key based on the given workspace identifier */
 export function workspaceChannelKey(workspaceId: string): string {
   return workspaceId
 }
@@ -60,22 +63,26 @@ export function turnLockChannelKey(workspaceId: string, threadId: string, scope:
   return scope === 'workspace' ? workspaceChannelKey(workspaceId) : threadChannelKey(workspaceId, threadId)
 }
 
+/** Generate a storage channel key string for a given turn identifier */
 export function turnStorageChannelKey(turnId: string): string {
   return `turn:${turnId}`
 }
 
+/** Generate a unique channel key string based on the provided scope identifier */
 export function scopeIndexChannelKey(scopeId: string): string {
   return `scope:${scopeId}`
 }
 
 // ── segment store (reconnect replay over a live socket) ─────────────────────
 
+/** Represent a segment of a turn containing events, sequence limit, and terminal status */
 export interface TurnSegment {
   events: TurnStreamEvent[]
   maxSeq: number
   terminal: boolean
 }
 
+/** Define a store managing segments and tracking the active execution identifier */
 export interface SegmentStore {
   segments: Map<string, TurnSegment>
   activeExecutionId: string | null
@@ -93,6 +100,7 @@ export const MAX_RECENT_CREATED = 50
  *  `end` broadcast can't leave a permanently-stuck "responding" dot. */
 export const ACTIVITY_TTL_MS = 15 * 60 * 1000
 
+/** Create a SegmentStore with initialized segments and no active execution ID */
 export function createSegmentStore(): SegmentStore {
   return { segments: new Map(), activeExecutionId: null }
 }
@@ -186,6 +194,7 @@ export interface DurableTurnLock {
   releasePending?: boolean
 }
 
+/** Define input parameters required to acquire a turn-based lock in a workspace thread */
 export interface TurnLockAcquireInput {
   workspaceId: string
   threadId: string
@@ -195,10 +204,12 @@ export interface TurnLockAcquireInput {
   turnId?: string
 }
 
+/** Resolve the result of attempting to acquire a turn lock indicating success or active lock status */
 export type TurnLockAcquireResult =
   | { acquired: true; lock: DurableTurnLock }
   | { acquired: false; active: DurableTurnLock }
 
+/** Define input parameters required to release a turn lock in a specific workspace thread */
 export interface TurnLockReleaseInput {
   workspaceId: string
   threadId: string
@@ -228,6 +239,7 @@ export function activeTurnLock(stored: DurableTurnLock | undefined, now: number)
   return lock.expiresAt > now ? lock : null
 }
 
+/** Create a durable turn lock object with timing and scope based on input parameters */
 export function createTurnLock(input: TurnLockAcquireInput, now: number, ttlMs = TURN_LOCK_TTL_MS): DurableTurnLock {
   return {
     workspaceId: input.workspaceId,
@@ -283,6 +295,7 @@ export function interruptedReleaseApplies(
 // existed there, so a product deletes its fork by re-pointing a binding, not
 // by re-speaking a protocol.
 
+/** Provide constant paths for managing chat turn streams and locks */
 export const TURN_STREAM_PATHS = {
   broadcast: '/broadcast',
   lockAcquire: '/chat-turn-lock/acquire',

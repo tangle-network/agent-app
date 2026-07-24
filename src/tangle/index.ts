@@ -40,6 +40,7 @@ export interface BrokerTokenMinter {
   mintBrokerToken(input: { clientId: string; clientSecret: string; grantId: string; ttlSeconds?: number }): Promise<BrokerToken>
 }
 
+/** Define input parameters required to generate a consent URL for OAuth authorization */
 export interface ConsentUrlInput {
   /** Platform base URL (e.g. https://id.tangle.tools). */
   endpoint: string
@@ -72,6 +73,7 @@ export function buildConsentUrl(input: ConsentUrlInput): string {
   return `${base}/cross-site/app-consent?${params.toString()}`
 }
 
+/** Define options for configuring a broker token provider including client credentials and token management settings */
 export interface BrokerTokenProviderOptions {
   client: BrokerTokenMinter
   clientId: string
@@ -87,6 +89,7 @@ export interface BrokerTokenProviderOptions {
   now?: () => number
 }
 
+/** Provide and refresh broker bearer tokens, allowing forced token invalidation */
 export interface BrokerTokenProvider {
   /** A valid `sk-tan-broker-` bearer, minting/refreshing as needed. */
   getToken(): Promise<string>

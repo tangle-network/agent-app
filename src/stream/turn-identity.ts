@@ -1,5 +1,6 @@
 import type { JsonRecord } from './stream-normalizer'
 
+/** Define the structure of a chat message stored for a specific conversation turn */
 export interface PersistedChatMessageForTurn {
   id: string
   role: 'user' | 'assistant' | 'system' | 'tool'
@@ -7,6 +8,7 @@ export interface PersistedChatMessageForTurn {
   parts: Array<Record<string, unknown>> | null
 }
 
+/** Represent a chat turn with resolved user message insertion and prior message context */
 export interface ResolvedChatTurn {
   turnIndex: number
   shouldInsertUserMessage: boolean
@@ -14,6 +16,7 @@ export interface ResolvedChatTurn {
   userParts: JsonRecord[]
 }
 
+/** Normalize and validate a client turn ID string ensuring it meets format and length requirements */
 export function normalizeClientTurnId(value: unknown): string | undefined {
   if (value === undefined || value === null) return undefined
   if (typeof value !== 'string') throw new Error('turnId must be a string')
@@ -26,12 +29,14 @@ export function normalizeClientTurnId(value: unknown): string | undefined {
   return trimmed
 }
 
+/** Build an array of text parts with optional turn ID for user input */
 export function buildUserTextParts(text: string, turnId: string | undefined): JsonRecord[] {
   const part: JsonRecord = { type: 'text', text }
   if (turnId) part.turnId = turnId
   return [part]
 }
 
+/** Resolve whether a message contains any part with the specified turn ID */
 export function messageHasTurnId(message: PersistedChatMessageForTurn, turnId: string): boolean {
   for (const part of message.parts ?? []) {
     if (part && typeof part === 'object' && String(part.turnId ?? '') === turnId) {
@@ -41,6 +46,7 @@ export function messageHasTurnId(message: PersistedChatMessageForTurn, turnId: s
   return false
 }
 
+/** Resolve a chat turn by determining message reuse and constructing user message parts */
 export function resolveChatTurn(input: {
   existingMessages: PersistedChatMessageForTurn[]
   userContent: string

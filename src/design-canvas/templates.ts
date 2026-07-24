@@ -27,8 +27,10 @@ import {
 // Slot surface
 // ---------------------------------------------------------------------------
 
+/** Define allowed string literals representing different slot fill kinds */
 export type SlotFillKind = 'text' | 'src' | 'color'
 
+/** Define a slot template specifying its name, page, element, and fill characteristics */
 export interface TemplateSlot {
   name: string
   pageId: string
@@ -94,6 +96,7 @@ export function validateBindings(
 // Template instantiation
 // ---------------------------------------------------------------------------
 
+/** Define options for instantiating a document with title, optional bindings, and custom id minting */
 export interface InstantiateOptions {
   /** Human-readable title for the new document. */
   title: string

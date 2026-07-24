@@ -8,7 +8,7 @@ Source: `src/index.ts`
 
 ### `AddCaptionOperation`
 
-`interface`
+`interface` — Add a caption with optional language, timing, and track placement details
 
 ```ts
 interface AddCaptionOperation
@@ -16,7 +16,7 @@ interface AddCaptionOperation
 
 ### `AddCitationArgs`
 
-`interface`
+`interface` — Define arguments required to add a citation including path, quote, and optional label
 
 ```ts
 interface AddCitationArgs
@@ -24,7 +24,7 @@ interface AddCitationArgs
 
 ### `AddCitationResult`
 
-`interface`
+`interface` — Represent the result of adding a citation including its identifier and location path
 
 ```ts
 interface AddCitationResult
@@ -32,7 +32,7 @@ interface AddCitationResult
 
 ### `AddElementOperation`
 
-`interface`
+`interface` — Define an operation to add a scene element to a page with optional index and parent group
 
 ```ts
 interface AddElementOperation
@@ -40,7 +40,7 @@ interface AddElementOperation
 
 ### `AddPageOperation`
 
-`interface`
+`interface` — Define an operation to add a new page with an optional position and caller-minted page ID
 
 ```ts
 interface AddPageOperation
@@ -104,7 +104,7 @@ interface AgentKnowledgeConfig
 
 ### `AgentRuntime`
 
-`interface`
+`interface` — Resolve and stream tool execution loops with final results and intermediate events for agent runtime
 
 ```ts
 interface AgentRuntime
@@ -128,7 +128,7 @@ interface AgentTaxonomyConfig
 
 ### `AgentTurnOptions`
 
-`interface`
+`interface` — Define options for configuring a single agent turn including context, prior messages, prompts, and event handlers
 
 ```ts
 interface AgentTurnOptions
@@ -176,7 +176,7 @@ interface ApplyDataOperation
 
 ### `applyDurableInteractionAnswer`
 
-`function`
+`function` — Resolve and record the outcome and answers of a durable interaction within the given store and scope
 
 ```ts
 (store: DurablePlanStore, scope: DurableChatScope, interactionId: string, outcome: "declined" | "accepted", answers?: R…
@@ -184,7 +184,7 @@ interface ApplyDataOperation
 
 ### `applyDurableInteractionAsk`
 
-`function`
+`function` — Resolve and upsert a durable interaction ask in the store with optional event and timing parameters
 
 ```ts
 (store: DurablePlanStore, scope: DurableChatScope, request: InteractionRequestWire, options?: { eventId?: string | unde…
@@ -192,7 +192,7 @@ interface ApplyDataOperation
 
 ### `applyDurableInteractionCancel`
 
-`function`
+`function` — Resolve cancellation of a durable interaction with optional reason and event details
 
 ```ts
 (store: DurablePlanStore, scope: DurableChatScope, interactionId: string, reason?: string | undefined, options?: { even…
@@ -224,7 +224,7 @@ interface ApplyDataOperation
 
 ### `ApplySceneOptions`
 
-`interface`
+`interface` — Resolve element ID conflicts by providing fresh unique identifiers during scene application
 
 ```ts
 interface ApplySceneOptions
@@ -232,7 +232,7 @@ interface ApplySceneOptions
 
 ### `applySequenceOperation`
 
-`function`
+`function` — Apply a sequence operation to update the store and timeline asynchronously
 
 ```ts
 (store: SequenceStore, timeline: SequenceTimeline, op: SequenceOperation, ctx: SequenceOperationContext) => Promise<...>
@@ -248,7 +248,7 @@ interface ApplySceneOptions
 
 ### `ApprovalEvent`
 
-`interface`
+`interface` — Describe an approval event with action details, user info, and optional edited fields
 
 ```ts
 interface ApprovalEvent
@@ -256,7 +256,7 @@ interface ApprovalEvent
 
 ### `ApprovalEventSchema`
 
-`const`
+`const` — Validate approval event data including asset, action, user, timestamp, and optional fields
 
 ```ts
 ZodObject<{ assetId: ZodString; variantId: ZodOptional<ZodString>; action: ZodEnum<{ scheduled: "scheduled"; approved:…
@@ -280,7 +280,7 @@ interface AppToolDefinition
 
 ### `AppToolDescriptor`
 
-`interface`
+`interface` — Describe an application tool with its name, unique key, and description
 
 ```ts
 interface AppToolDescriptor
@@ -312,7 +312,7 @@ interface AppToolMcpServer
 
 ### `AppToolName`
 
-`type`
+`type` — Resolve a valid application tool name from the predefined list of tool names
 
 ```ts
 type AppToolName
@@ -360,7 +360,7 @@ interface AppToolTaxonomy
 
 ### `asRecord`
 
-`function`
+`function` — Resolve an unknown value to a JsonRecord if it is a non-array object or return undefined
 
 ```ts
 (value: unknown) => JsonRecord | undefined
@@ -368,7 +368,7 @@ interface AppToolTaxonomy
 
 ### `assertClipFitsSequence`
 
-`function`
+`function` — Validate that a clip's start and duration fit within the sequence duration without overflow
 
 ```ts
 (input: { startFrame: number; durationFrames: number; sequenceDurationFrames: number; label: string; }) => void
@@ -376,7 +376,7 @@ interface AppToolTaxonomy
 
 ### `assertColor`
 
-`function`
+`function` — Validate that a string is a hex, rgb(a), or 'transparent' color and throw an error if not
 
 ```ts
 (value: string, label: string) => void
@@ -392,7 +392,7 @@ interface AppToolTaxonomy
 
 ### `assertFinite`
 
-`function`
+`function` — Assert that a value is a finite number and throw an error with a label if not
 
 ```ts
 (value: number, label: string) => void
@@ -416,7 +416,7 @@ interface AppToolTaxonomy
 
 ### `assertPositiveFinite`
 
-`function`
+`function` — Assert that a value is a positive finite number and throw an error with a label if not
 
 ```ts
 (value: number, label: string) => void
@@ -456,7 +456,7 @@ interface AppToolTaxonomy
 
 ### `AssetContentMap`
 
-`type`
+`type` — Map asset keys to their corresponding content types for various media and copy formats
 
 ```ts
 type AssetContentMap
@@ -464,7 +464,7 @@ type AssetContentMap
 
 ### `AssetFormat`
 
-`type`
+`type` — Define valid asset format strings for various media and copy types
 
 ```ts
 type AssetFormat
@@ -472,7 +472,7 @@ type AssetFormat
 
 ### `AssetSpec`
 
-`interface`
+`interface` — Define the structure and metadata for an asset including its format, brand, content, and status
 
 ```ts
 interface AssetSpec
@@ -480,7 +480,7 @@ interface AssetSpec
 
 ### `AssetStatus`
 
-`type`
+`type` — Define possible states representing the lifecycle status of an asset
 
 ```ts
 type AssetStatus
@@ -488,7 +488,7 @@ type AssetStatus
 
 ### `AssetVariant`
 
-`interface`
+`interface` — Describe an asset variant with identification, approval status, and edit history details
 
 ```ts
 interface AssetVariant
@@ -496,7 +496,7 @@ interface AssetVariant
 
 ### `asString`
 
-`function`
+`function` — Resolve a non-empty string from a value or return undefined
 
 ```ts
 (value: unknown) => string | undefined
@@ -536,7 +536,7 @@ interface AssetVariant
 
 ### `attachReasoningEffort`
 
-`function`
+`function` — Attach a specified reasoning effort level to an agent profile for a given harness
 
 ```ts
 (profile: AgentProfile, harness: "opencode" | "claude-code" | "nanoclaw" | "kimi-code" | "codex" | "amp" | "factory-dro…
@@ -544,7 +544,7 @@ interface AssetVariant
 
 ### `AuthenticatedSandboxUser`
 
-`interface`
+`interface` — Represent an authenticated user within a sandbox environment with a unique identifier
 
 ```ts
 interface AuthenticatedSandboxUser
@@ -552,7 +552,7 @@ interface AuthenticatedSandboxUser
 
 ### `AuthenticateOptions`
 
-`interface`
+`interface` — Define options to verify bearer tokens and customize authentication header names
 
 ```ts
 interface AuthenticateOptions
@@ -568,7 +568,7 @@ interface AuthenticateOptions
 
 ### `bearerSubprotocolToken`
 
-`function`
+`function` — Resolve and decode a bearer token from a comma-separated subprotocol string or return null
 
 ```ts
 (value: string | null) => string | null
@@ -576,7 +576,7 @@ interface AuthenticateOptions
 
 ### `bearerToken`
 
-`function`
+`function` — Extract the token from a bearer authorization string or return null if invalid or missing
 
 ```ts
 (value: string | null) => string | null
@@ -584,7 +584,7 @@ interface AuthenticateOptions
 
 ### `BeforeInteractionAnswerArgs`
 
-`interface`
+`interface` — Describe the arguments provided before processing an interaction answer including request, body, and connection details
 
 ```ts
 interface BeforeInteractionAnswerArgs
@@ -592,7 +592,7 @@ interface BeforeInteractionAnswerArgs
 
 ### `BindSlotOperation`
 
-`interface`
+`interface` — Define an operation to bind or unbind a unique slot to an element on a specific page
 
 ```ts
 interface BindSlotOperation
@@ -616,7 +616,7 @@ interface BindSlotOperation
 
 ### `Bounds`
 
-`interface`
+`interface` — Define rectangular boundaries with position and size properties
 
 ```ts
 interface Bounds
@@ -624,7 +624,7 @@ interface Bounds
 
 ### `boundsIntersect`
 
-`function`
+`function` — Determine if two rectangular bounds overlap or intersect each other
 
 ```ts
 (a: Bounds, b: Bounds) => boolean
@@ -632,7 +632,7 @@ interface Bounds
 
 ### `BrandTokens`
 
-`interface`
+`interface` — Define brand identity tokens including colors, font, logo, business name, and voice
 
 ```ts
 interface BrandTokens
@@ -640,7 +640,7 @@ interface BrandTokens
 
 ### `BrandTokensSchema`
 
-`const`
+`const` — Validate brand token properties including colors, font, logo URL, business name, and voice
 
 ```ts
 ZodObject<{ primaryColor: ZodString; accentColor: ZodString; textColor: ZodString; fontFamily: ZodString; logoUrl: ZodO…
@@ -664,7 +664,7 @@ interface BrokerTokenMinter
 
 ### `BrokerTokenProvider`
 
-`interface`
+`interface` — Provide and refresh broker bearer tokens, allowing forced token invalidation
 
 ```ts
 interface BrokerTokenProvider
@@ -672,7 +672,7 @@ interface BrokerTokenProvider
 
 ### `BrokerTokenProviderOptions`
 
-`interface`
+`interface` — Define options for configuring a broker token provider including client credentials and token management settings
 
 ```ts
 interface BrokerTokenProviderOptions
@@ -688,7 +688,7 @@ interface BrokerTokenProviderOptions
 
 ### `BufferedTurnEvent`
 
-`interface`
+`interface` — Represent a buffered turn event with a sequence number and serialized event data
 
 ```ts
 interface BufferedTurnEvent
@@ -696,7 +696,7 @@ interface BufferedTurnEvent
 
 ### `BufferedTurnOptions`
 
-`interface`
+`interface` — Define options for buffering and flushing turn events with optional live client delivery and event coalescing
 
 ```ts
 interface BufferedTurnOptions
@@ -728,7 +728,7 @@ interface BufferedTurnTap
 
 ### `buildAppToolMcpServers`
 
-`function`
+`function` — Build a mapping of MCP server profiles keyed by tool identifiers from provided options
 
 ```ts
 (options: BuildAppToolMcpServersOptions) => Record<string, AgentProfileMcpServer>
@@ -736,7 +736,7 @@ interface BufferedTurnTap
 
 ### `BuildAppToolMcpServersOptions`
 
-`interface`
+`interface` — Define options for building MCP server configurations in the app tool environment
 
 ```ts
 interface BuildAppToolMcpServersOptions
@@ -776,7 +776,7 @@ interface BuildAppToolsOptions
 
 ### `BuildCaptionChunksOptions`
 
-`interface`
+`interface` — Define options to configure caption chunk size, duration, and frame rate constraints
 
 ```ts
 interface BuildCaptionChunksOptions
@@ -816,7 +816,7 @@ interface BuildCaptionChunksOptions
 
 ### `BuildDesignCanvasMcpServerEntryOptions`
 
-`type`
+`type` — Build scoped MCP server entry options for the design canvas environment
 
 ```ts
 type BuildDesignCanvasMcpServerEntryOptions
@@ -848,7 +848,7 @@ type BuildDesignCanvasMcpServerEntryOptions
 
 ### `BuildHttpMcpServerOptions`
 
-`interface`
+`interface` — Define configuration options for building an HTTP MCP server including path, baseUrl, token, context, and description
 
 ```ts
 interface BuildHttpMcpServerOptions
@@ -864,7 +864,7 @@ interface BuildHttpMcpServerOptions
 
 ### `BuildMcpServerOptions`
 
-`interface`
+`interface` — Define configuration options required to build an MCP server including tool, baseUrl, token, and context
 
 ```ts
 interface BuildMcpServerOptions
@@ -888,7 +888,7 @@ interface BuildMcpServerOptions
 
 ### `BuildRedactedDocumentOptions`
 
-`interface`
+`interface` — Define options to encrypt text and specify patterns for redacting sensitive document content
 
 ```ts
 interface BuildRedactedDocumentOptions
@@ -896,7 +896,7 @@ interface BuildRedactedDocumentOptions
 
 ### `buildSandboxRuntimeProxyHeaders`
 
-`function`
+`function` — Build proxy headers for sandbox runtime including authorization and forwarded headers
 
 ```ts
 (source: Headers, sandboxApiKey: string, forwardHeaders?: string[]) => Headers
@@ -904,7 +904,7 @@ interface BuildRedactedDocumentOptions
 
 ### `buildSandboxToolFileMounts`
 
-`function`
+`function` — Build file mounts for sandbox tools based on provided options and tool configurations
 
 ```ts
 (options: BuildSandboxToolFileMountsOptions) => AgentProfileFileMount[]
@@ -912,7 +912,7 @@ interface BuildRedactedDocumentOptions
 
 ### `BuildSandboxToolFileMountsOptions`
 
-`interface`
+`interface` — Define options for building sandbox tool file mounts including tool specifications and paths
 
 ```ts
 interface BuildSandboxToolFileMountsOptions
@@ -920,7 +920,7 @@ interface BuildSandboxToolFileMountsOptions
 
 ### `buildSandboxToolPathSetupScript`
 
-`function`
+`function` — Build a shell script that sets up and exports the sandbox tool binary directory in user profiles
 
 ```ts
 (options: SandboxToolPathOptions) => string
@@ -944,7 +944,7 @@ interface BuildSandboxToolFileMountsOptions
 
 ### `BuildSequencesMcpServerEntryOptions`
 
-`type`
+`type` — Extend ScopedMcpServerEntryOptions to configure MCP server entry options for sequence building
 
 ```ts
 type BuildSequencesMcpServerEntryOptions
@@ -960,7 +960,7 @@ type BuildSequencesMcpServerEntryOptions
 
 ### `buildUserTextParts`
 
-`function`
+`function` — Build an array of text parts with optional turn ID for user input
 
 ```ts
 (text: string, turnId: string | undefined) => JsonRecord[]
@@ -1008,7 +1008,7 @@ type BuildSequencesMcpServerEntryOptions
 
 ### `CANVAS_ELEMENT_KINDS`
 
-`const`
+`const` — Provide a readonly array of string identifiers representing canvas element kinds
 
 ```ts
 readonly string[]
@@ -1016,7 +1016,7 @@ readonly string[]
 
 ### `CANVAS_MCP_TOOL_NAMES`
 
-`const`
+`const` — Extract names of all tools from the CANVAS_MCP_TOOLS array
 
 ```ts
 string[]
@@ -1024,7 +1024,7 @@ string[]
 
 ### `CANVAS_MCP_TOOLS`
 
-`const`
+`const` — Provide a collection of MCP tool definitions for manipulating and querying the design canvas environment
 
 ```ts
 McpToolDefinition<DesignCanvasMcpToolEnv>[]
@@ -1040,7 +1040,7 @@ interface CanvasRenderPalette
 
 ### `CapabilityTokenOptions`
 
-`interface`
+`interface` — Define options for creating and verifying capability tokens including secret and prefix
 
 ```ts
 interface CapabilityTokenOptions
@@ -1072,7 +1072,7 @@ interface CaptionCoverageEntry
 
 ### `CaptionExportOptions`
 
-`interface`
+`interface` — Define options to export captions filtered by an optional BCP-47 language tag
 
 ```ts
 interface CaptionExportOptions
@@ -1080,7 +1080,7 @@ interface CaptionExportOptions
 
 ### `CaptionTargetResolution`
 
-`type`
+`type` — Resolve caption target by specifying an existing track or creating a new one with language and name
 
 ```ts
 type CaptionTargetResolution
@@ -1096,7 +1096,7 @@ type CaptionTargetResolution
 
 ### `CatalogModel`
 
-`interface`
+`interface` — Define the structure and capabilities of a catalog item with optional pricing and feature flags
 
 ```ts
 interface CatalogModel
@@ -1104,7 +1104,7 @@ interface CatalogModel
 
 ### `CertifiedDelivery`
 
-`interface`
+`interface` — Resolve and manage certified profiles with refresh and composition capabilities
 
 ```ts
 interface CertifiedDelivery
@@ -1112,7 +1112,7 @@ interface CertifiedDelivery
 
 ### `CertifiedDeliveryConfig`
 
-`interface`
+`interface` — Define configuration options for delivering certified artifacts to a specified tenant target
 
 ```ts
 interface CertifiedDeliveryConfig
@@ -1128,7 +1128,7 @@ readonly ChannelPreset[]
 
 ### `ChannelPreset`
 
-`interface`
+`interface` — Define a preset configuration for a channel including its id, label, width, and height
 
 ```ts
 interface ChannelPreset
@@ -1136,7 +1136,7 @@ interface ChannelPreset
 
 ### `ChannelPresetId`
 
-`type`
+`type` — Resolve a valid channel preset identifier from the predefined channel presets array
 
 ```ts
 type ChannelPresetId
@@ -1144,7 +1144,7 @@ type ChannelPresetId
 
 ### `ChannelScaleResult`
 
-`interface`
+`interface` — Define the pixel ratio and horizontal offset for scaling a Konva stage to a channel preset size
 
 ```ts
 interface ChannelScaleResult
@@ -1176,7 +1176,7 @@ interface ChatFilePart
 
 ### `ChatImagePart`
 
-`interface`
+`interface` — Define properties for an image part within a chat message including optional metadata fields
 
 ```ts
 interface ChatImagePart
@@ -1192,7 +1192,7 @@ interface ChatInteraction
 
 ### `ChatInteractionField`
 
-`type`
+`type` — Resolve a chat interaction field excluding select types or including chat select fields
 
 ```ts
 type ChatInteractionField
@@ -1208,7 +1208,7 @@ interface ChatInteractionPart
 
 ### `ChatInteractionStatus`
 
-`type`
+`type` — Define possible statuses representing the state of a chat interaction
 
 ```ts
 type ChatInteractionStatus
@@ -1232,7 +1232,7 @@ interface ChatMentionPart
 
 ### `ChatMessagePart`
 
-`type`
+`type` — Represent parts of a chat message including text, reasoning, tools, files, images, subtasks, steps, interactions, notices, plans, and mentions
 
 ```ts
 type ChatMessagePart
@@ -1264,7 +1264,7 @@ type ChatPlan
 
 ### `ChatPlanPart`
 
-`type`
+`type` — Resolve a chat plan part by aliasing it to the persisted chat plan part type
 
 ```ts
 type ChatPlanPart
@@ -1288,7 +1288,7 @@ type ChatPlanStatus
 
 ### `ChatReasoningPart`
 
-`interface`
+`interface` — Define a reasoning part of a chat with text content and optional metadata fields
 
 ```ts
 interface ChatReasoningPart
@@ -1296,7 +1296,7 @@ interface ChatReasoningPart
 
 ### `ChatSelectField`
 
-`type`
+`type` — Extract select-type interaction fields and optionally allow custom values
 
 ```ts
 type ChatSelectField
@@ -1304,7 +1304,7 @@ type ChatSelectField
 
 ### `ChatStepFinishPart`
 
-`interface`
+`interface` — Define a chat step finish part indicating completion with optional reason, tokens, and cost
 
 ```ts
 interface ChatStepFinishPart
@@ -1328,7 +1328,7 @@ class ChatStoreInputError
 
 ### `ChatSubtaskPart`
 
-`interface`
+`interface` — Define a subtask part of a chat with prompt, description, agent, and optional identifier
 
 ```ts
 interface ChatSubtaskPart
@@ -1344,7 +1344,7 @@ interface ChatTextPart
 
 ### `ChatToolPart`
 
-`interface`
+`interface` — Define a chat component representing a tool with its state and optional call identifier
 
 ```ts
 interface ChatToolPart
@@ -1352,7 +1352,7 @@ interface ChatToolPart
 
 ### `ChatToolState`
 
-`interface`
+`interface` — Describe the current state and data of a chat tool including status, input, output, and metadata
 
 ```ts
 interface ChatToolState
@@ -1408,7 +1408,7 @@ interface ChatUsageTokens
 
 ### `clampClipDuration`
 
-`function`
+`function` — Clamp clip duration to fit within sequence bounds and minimum length constraints
 
 ```ts
 (input: { startFrame: number; durationFrames: number; sequenceDurationFrames: number; }) => number
@@ -1416,7 +1416,7 @@ interface ChatUsageTokens
 
 ### `clampClipStart`
 
-`function`
+`function` — Clamp the clip start frame within the valid range of the sequence duration and clip length
 
 ```ts
 (input: { startFrame: number; durationFrames: number; sequenceDurationFrames: number; }) => number
@@ -1424,7 +1424,7 @@ interface ChatUsageTokens
 
 ### `classifySeveredStream`
 
-`function`
+`function` — Resolve the severed stream event to a corresponding sandbox step transition or null
 
 ```ts
 (event: unknown) => SandboxStepTransition | null
@@ -1480,7 +1480,7 @@ interface ChatUsageTokens
 
 ### `CompleteMissionInput`
 
-`interface`
+`interface` — Define input parameters to complete a mission with status and optional summary
 
 ```ts
 interface CompleteMissionInput
@@ -1528,7 +1528,7 @@ interface CompletionVerdict
 
 ### `ComposerAnswerDelivery`
 
-`interface`
+`interface` — Define the structure for delivering answers linked to a specific chat interaction and field
 
 ```ts
 interface ComposerAnswerDelivery
@@ -1536,7 +1536,7 @@ interface ComposerAnswerDelivery
 
 ### `ConsentUrlInput`
 
-`interface`
+`interface` — Define input parameters required to generate a consent URL for OAuth authorization
 
 ```ts
 interface ConsentUrlInput
@@ -1544,7 +1544,7 @@ interface ConsentUrlInput
 
 ### `ContactSheetEntry`
 
-`interface`
+`interface` — Describe a single entry in a contact sheet with timing and media source details
 
 ```ts
 interface ContactSheetEntry
@@ -1552,7 +1552,7 @@ interface ContactSheetEntry
 
 ### `ContactSheetManifest`
 
-`interface`
+`interface` — Define the structure for a contact sheet manifest including metadata and entries
 
 ```ts
 interface ContactSheetManifest
@@ -1560,7 +1560,7 @@ interface ContactSheetManifest
 
 ### `ConversionMetrics`
 
-`interface`
+`interface` — Define metrics for tracking impressions, clicks, conversions, and related rates
 
 ```ts
 interface ConversionMetrics
@@ -1568,7 +1568,7 @@ interface ConversionMetrics
 
 ### `ConversionMetricsSchema`
 
-`const`
+`const` — Validate conversion metrics with nonnegative impressions, clicks, conversions, CTR, and CVR fields
 
 ```ts
 ZodObject<{ impressions: ZodNumber; clicks: ZodNumber; conversions: ZodNumber; ctr: ZodNumber; cvr: ZodNumber; }, $stri…
@@ -1576,7 +1576,7 @@ ZodObject<{ impressions: ZodNumber; clicks: ZodNumber; conversions: ZodNumber; c
 
 ### `CookieOptions`
 
-`interface`
+`interface` — Define options for configuring cookie attributes and behavior
 
 ```ts
 interface CookieOptions
@@ -1584,7 +1584,7 @@ interface CookieOptions
 
 ### `CopyContent`
 
-`interface`
+`interface` — Define the structure for content with headline, body, platform, and optional hashtags and character count
 
 ```ts
 interface CopyContent
@@ -1592,7 +1592,7 @@ interface CopyContent
 
 ### `CopyContentSchema`
 
-`const`
+`const` — Validate and parse copy content with headline, body, optional hashtags, platform, and character count
 
 ```ts
 ZodObject<{ headline: ZodString; body: ZodString; hashtags: ZodOptional<ZodArray<ZodString>>; platform: ZodEnum<{ x: "x…
@@ -1600,7 +1600,7 @@ ZodObject<{ headline: ZodString; body: ZodString; hashtags: ZodOptional<ZodArray
 
 ### `CopyPlatform`
 
-`type`
+`type` — Define platform options for copy content across various social media and communication channels
 
 ```ts
 type CopyPlatform
@@ -1624,7 +1624,7 @@ type CorrectnessChecker
 
 ### `CreateAgentRuntimeOptions`
 
-`interface`
+`interface` — Define options for creating an agent runtime including model config and optional profile transformation
 
 ```ts
 interface CreateAgentRuntimeOptions
@@ -1680,7 +1680,7 @@ interface CreateAgentRuntimeOptions
 
 ### `createD1TurnEventStore`
 
-`function`
+`function` — Resolve a TurnEventStore that appends and reads turn events using a D1-like database interface
 
 ```ts
 (db: D1LikeForTurns) => TurnEventStore
@@ -1688,7 +1688,7 @@ interface CreateAgentRuntimeOptions
 
 ### `createDesignCanvasMcpHandler`
 
-`function`
+`function` — Create a request handler for the design canvas MCP tool with specified options
 
 ```ts
 (opts: CreateDesignCanvasMcpHandlerOptions) => (request: Request) => Promise<Response>
@@ -1696,7 +1696,7 @@ interface CreateAgentRuntimeOptions
 
 ### `CreateDesignCanvasMcpHandlerOptions`
 
-`interface`
+`interface` — Define options for creating a design canvas MCP handler including store, ID minting, and optional server info
 
 ```ts
 interface CreateDesignCanvasMcpHandlerOptions
@@ -1712,7 +1712,7 @@ interface CreateDesignCanvasMcpHandlerOptions
 
 ### `createDurableChatScope`
 
-`function`
+`function` — Create a durable chat scope from a non-empty string value
 
 ```ts
 (value: string) => DurableChatScope
@@ -1736,7 +1736,7 @@ interface CreateDesignCanvasMcpHandlerOptions
 
 ### `CreateDurableInteractionRoutePersistenceOptions`
 
-`type`
+`type` — Define options for durable interaction route persistence with reconciliation guarantees and authority functions
 
 ```ts
 type CreateDurableInteractionRoutePersistenceOptions
@@ -1752,7 +1752,7 @@ type CreateDurableInteractionRoutePersistenceOptions
 
 ### `createDurablePlanRoutes`
 
-`function`
+`function` — Build durable plan routes with authorization and effect handling based on provided options
 
 ```ts
 (options: DurablePlanRouteOptions) => DurablePlanRoutes
@@ -1760,7 +1760,7 @@ type CreateDurableInteractionRoutePersistenceOptions
 
 ### `createEmptyDocument`
 
-`function`
+`function` — Create a new empty SceneDocument with a title and optional initial page settings
 
 ```ts
 (title: string, page?: NewPageOptions | undefined) => SceneDocument
@@ -1784,7 +1784,7 @@ type CreateDurableInteractionRoutePersistenceOptions
 
 ### `createInMemoryDurableChatStateStore`
 
-`function`
+`function` — Create an in-memory durable chat state store for managing chat session data efficiently
 
 ```ts
 () => InMemoryDurableChatStateStore
@@ -1800,7 +1800,7 @@ type CreateDurableInteractionRoutePersistenceOptions
 
 ### `createInteractionAnswerRoute`
 
-`function`
+`function` — Create an interaction answer route that handles listing and resolving interaction requests
 
 ```ts
 (options: InteractionAnswerRouteOptions) => InteractionAnswerRoute
@@ -1816,7 +1816,7 @@ type CreateDurableInteractionRoutePersistenceOptions
 
 ### `CreateKnowledgeLoopDeps`
 
-`interface`
+`interface` — Define dependencies required to create and run a knowledge processing loop
 
 ```ts
 interface CreateKnowledgeLoopDeps
@@ -1840,7 +1840,7 @@ interface CreateKnowledgeLoopDeps
 
 ### `CreateMcpToolHandlerOptions`
 
-`interface`
+`interface` — Define options for creating a handler that manages MCP tools with environment support
 
 ```ts
 interface CreateMcpToolHandlerOptions
@@ -1856,7 +1856,7 @@ interface CreateMcpToolHandlerOptions
 
 ### `createMissionEngine`
 
-`function`
+`function` — Create a mission engine configured with options to manage mission execution and error handling
 
 ```ts
 (options: MissionEngineOptions) => MissionEngine
@@ -1864,7 +1864,7 @@ interface CreateMcpToolHandlerOptions
 
 ### `CreateMissionInput`
 
-`interface`
+`interface` — Define input parameters for creating a mission including optional deterministic id and unique plan steps
 
 ```ts
 interface CreateMissionInput
@@ -1872,7 +1872,7 @@ interface CreateMissionInput
 
 ### `createMissionService`
 
-`function`
+`function` — Create a mission service that manages mission records and audit events with customizable options
 
 ```ts
 (options: MissionServiceOptions) => MissionService
@@ -1896,7 +1896,7 @@ interface CreateMissionInput
 
 ### `createPage`
 
-`function`
+`function` — Create a new ScenePage with specified options and a unique identifier
 
 ```ts
 (options: NewPageOptions, id: string) => ScenePage
@@ -1904,7 +1904,7 @@ interface CreateMissionInput
 
 ### `createPlatformBalanceManager`
 
-`function`
+`function` — Create a platform balance manager to handle user plan limits and state based on provided options
 
 ```ts
 <Plan extends string>(opts: PlatformBalanceManagerOptions<Plan>) => PlatformBalanceManager<Plan>
@@ -1976,7 +1976,7 @@ interface CreateMissionInput
 
 ### `createSandboxTerminalToken`
 
-`function`
+`function` — Generate a sandbox terminal token for a given subject with specified options
 
 ```ts
 (subject: TerminalProxyIdentity, opts: SandboxTerminalTokenOptions) => Promise<SandboxTerminalTokenResult>
@@ -1984,7 +1984,7 @@ interface CreateMissionInput
 
 ### `createSequencesMcpHandler`
 
-`function`
+`function` — Create a handler to process MCP sequence requests with optional playhead frame and server info
 
 ```ts
 (opts: CreateSequencesMcpHandlerOptions) => (request: Request) => Promise<Response>
@@ -1992,7 +1992,7 @@ interface CreateMissionInput
 
 ### `CreateSequencesMcpHandlerOptions`
 
-`interface`
+`interface` — Define options for creating sequences MCP handler including store, playhead frame, and server info
 
 ```ts
 interface CreateSequencesMcpHandlerOptions
@@ -2016,7 +2016,7 @@ interface CreateSequencesMcpHandlerOptions
 
 ### `CreateTangleRouterModelConfigOptions`
 
-`interface`
+`interface` — Define configuration options for creating a Tangle router model including API key and model details
 
 ```ts
 interface CreateTangleRouterModelConfigOptions
@@ -2040,7 +2040,7 @@ interface CreateTangleRouterModelConfigOptions
 
 ### `CreateTrackOperation`
 
-`interface`
+`interface` — Define an operation to create a new sequence track with a specified kind and name
 
 ```ts
 interface CreateTrackOperation
@@ -2048,7 +2048,7 @@ interface CreateTrackOperation
 
 ### `createWorkspaceKeyManager`
 
-`function`
+`function` — Create a workspace key manager that handles key provisioning and budget tracking
 
 ```ts
 (opts: WorkspaceKeyManagerOptions) => WorkspaceKeyManager
@@ -2056,7 +2056,7 @@ interface CreateTrackOperation
 
 ### `createWorkspaceSandboxConnectionHandler`
 
-`function`
+`function` — Create a handler to resolve workspace sandbox connections with user and access validation
 
 ```ts
 <TBox extends WorkspaceSandboxInstanceLike>(opts: WorkspaceSandboxConnectionHandlerOptions<TBox>) => ({ request, params…
@@ -2064,7 +2064,7 @@ interface CreateTrackOperation
 
 ### `createWorkspaceSandboxManager`
 
-`function`
+`function` — Create a manager to handle workspace sandbox instances with client and options configuration
 
 ```ts
 <TClient, TBox extends WorkspaceSandboxInstanceLike, TEnsureOptions = void>(opts: WorkspaceSandboxManagerOptions<TClien…
@@ -2072,7 +2072,7 @@ interface CreateTrackOperation
 
 ### `createWorkspaceSandboxRuntimeProxyHandler`
 
-`function`
+`function` — Create a proxy handler to resolve sandbox runtime requests with user and workspace access validation
 
 ```ts
 (opts: WorkspaceSandboxRuntimeProxyHandlerOptions) => ({ request, params }: WorkspaceSandboxRuntimeProxyArgs) => Promis…
@@ -2120,7 +2120,7 @@ interface D1PreparedLike
 
 ### `darkTheme`
 
-`const`
+`const` — Define a dark color scheme for the Agent app interface with specific background and foreground hues
 
 ```ts
 AgentAppTheme
@@ -2160,7 +2160,7 @@ AgentAppTheme
 
 ### `dedupeQuestionInteractionsByContent`
 
-`function`
+`function` — Remove duplicate question interactions based on their content signature to ensure uniqueness
 
 ```ts
 (interactions: ChatInteraction[]) => ChatInteraction[]
@@ -2184,7 +2184,7 @@ Record<"submit_proposal" | "schedule_followup" | "render_ui" | "add_citation", s
 
 ### `DEFAULT_DESIGN_CANVAS_MCP_DESCRIPTION`
 
-`const`
+`const` — Describe the live visual asset editor capabilities for the current design document using CSS pixel coordinates
 
 ```ts
 "Live visual asset editor for the current design document: read scene state, add/move/resize/delete elements, manage pa…
@@ -2192,7 +2192,7 @@ Record<"submit_proposal" | "schedule_followup" | "render_ui" | "add_citation", s
 
 ### `DEFAULT_HARNESS`
 
-`const`
+`const` — Define the default harness to use for code execution and testing environments
 
 ```ts
 "opencode" | "claude-code" | "nanoclaw" | "kimi-code" | "codex" | "amp" | "factory-droids" | "pi" | "hermes" | "forge"…
@@ -2200,7 +2200,7 @@ Record<"submit_proposal" | "schedule_followup" | "render_ui" | "add_citation", s
 
 ### `DEFAULT_HEADER_NAMES`
 
-`const`
+`const` — Provide default HTTP header names for user, workspace, and thread identification
 
 ```ts
 ToolHeaderNames
@@ -2224,7 +2224,7 @@ readonly RedactionPattern[]
 
 ### `DEFAULT_SANDBOX_RESOURCES`
 
-`const`
+`const` — Define default resource limits and settings for sandbox environments
 
 ```ts
 SandboxResourceConfig
@@ -2232,7 +2232,7 @@ SandboxResourceConfig
 
 ### `DEFAULT_SEQUENCES_MCP_DESCRIPTION`
 
-`const`
+`const` — Describe live timeline editor features for current video sequence including clip and caption management
 
 ```ts
 "Live timeline editor for the current video sequence: read timeline state, place/move/trim/split clips, add captions, m…
@@ -2240,7 +2240,7 @@ SandboxResourceConfig
 
 ### `DEFAULT_TANGLE_BILLING_ENFORCEMENT_ENV_VAR`
 
-`const`
+`const` — Define the default environment variable name for Tangle billing enforcement
 
 ```ts
 "TANGLE_BILLING_ENFORCEMENT"
@@ -2248,7 +2248,7 @@ SandboxResourceConfig
 
 ### `DEFAULT_TANGLE_ROUTER_BASE_URL`
 
-`const`
+`const` — Provide the default base URL for the Tangle router API endpoint
 
 ```ts
 "https://router.tangle.tools/v1"
@@ -2296,7 +2296,7 @@ SandboxResourceConfig
 
 ### `DeleteClipOperation`
 
-`interface`
+`interface` — Represent a delete clip operation with a specified clip identifier
 
 ```ts
 interface DeleteClipOperation
@@ -2304,7 +2304,7 @@ interface DeleteClipOperation
 
 ### `DeleteElementOperation`
 
-`interface`
+`interface` — Resolve deletion of a specific element from a page by its identifiers
 
 ```ts
 interface DeleteElementOperation
@@ -2312,7 +2312,7 @@ interface DeleteElementOperation
 
 ### `DeletePageOperation`
 
-`interface`
+`interface` — Represent a delete page operation with a specified page identifier
 
 ```ts
 interface DeletePageOperation
@@ -2320,7 +2320,7 @@ interface DeletePageOperation
 
 ### `deleteSecret`
 
-`function`
+`function` — Delete a secret by name from the given secret store and return the operation outcome
 
 ```ts
 (store: SecretStore, name: string) => Promise<Outcome<void>>
@@ -2352,7 +2352,7 @@ interface DeriveKeyOptions
 
 ### `DesignCanvasMcpServerInfo`
 
-`interface`
+`interface` — Describe design canvas MCP server information including name and version
 
 ```ts
 interface DesignCanvasMcpServerInfo
@@ -2360,7 +2360,7 @@ interface DesignCanvasMcpServerInfo
 
 ### `DesignCanvasMcpToolEnv`
 
-`interface`
+`interface` — Define the environment for MCP tool with a scene store and ID minting function
 
 ```ts
 interface DesignCanvasMcpToolEnv
@@ -2368,7 +2368,7 @@ interface DesignCanvasMcpToolEnv
 
 ### `detectInteractiveQuestion`
 
-`function`
+`function` — Resolve the interactive question text from a structured event or return null if none found
 
 ```ts
 (event: unknown) => string | null
@@ -2392,7 +2392,7 @@ interface DesignCanvasMcpToolEnv
 
 ### `DispatchOptions`
 
-`interface`
+`interface` — Define options for dispatching tools including handlers, taxonomy, custom tools, and approval policies
 
 ```ts
 interface DispatchOptions
@@ -2400,7 +2400,7 @@ interface DispatchOptions
 
 ### `DistributionSummary`
 
-`interface`
+`interface` — Summarize key statistics of a numerical distribution including count, min, percentiles, and max
 
 ```ts
 interface DistributionSummary
@@ -2408,7 +2408,7 @@ interface DistributionSummary
 
 ### `driveSandboxTurn`
 
-`function`
+`function` — Resolve a sandbox turn by processing a message with given configuration and options
 
 ```ts
 (shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | PromptInputPart[], options: DriveSandboxTurnOptio…
@@ -2416,7 +2416,7 @@ interface DistributionSummary
 
 ### `DriveSandboxTurnOptions`
 
-`interface`
+`interface` — Define options to manage deterministic session resumption and turn idempotency in sandboxed drive turns
 
 ```ts
 interface DriveSandboxTurnOptions
@@ -2440,7 +2440,7 @@ interface DrizzleSqliteCoreLike
 
 ### `DuplicatePageOperation`
 
-`interface`
+`interface` — Define an operation to duplicate a page with a new caller-specified page ID
 
 ```ts
 interface DuplicatePageOperation
@@ -2448,7 +2448,7 @@ interface DuplicatePageOperation
 
 ### `DurableAnswerIntentJournal`
 
-`type`
+`type` — Provide durable methods to manage the lifecycle of answer intents in a plan store
 
 ```ts
 type DurableAnswerIntentJournal
@@ -2456,7 +2456,7 @@ type DurableAnswerIntentJournal
 
 ### `DurableAnswerIntentRecord`
 
-`interface`
+`interface` — Define the structure for recording durable answer intent details and their states
 
 ```ts
 interface DurableAnswerIntentRecord
@@ -2464,7 +2464,7 @@ interface DurableAnswerIntentRecord
 
 ### `DurableAnswerIntentState`
 
-`type`
+`type` — Define possible states for a durable answer intent lifecycle
 
 ```ts
 type DurableAnswerIntentState
@@ -2472,7 +2472,7 @@ type DurableAnswerIntentState
 
 ### `DurableChatConflictError`
 
-`class`
+`class` — Represent conflict errors occurring in durable chat state management
 
 ```ts
 class DurableChatConflictError
@@ -2488,7 +2488,7 @@ class DurableChatError
 
 ### `DurableChatErrorCode`
 
-`type`
+`type` — Define error codes representing possible Durable Chat failure scenarios
 
 ```ts
 type DurableChatErrorCode
@@ -2496,7 +2496,7 @@ type DurableChatErrorCode
 
 ### `DurableChatEventProjection`
 
-`interface`
+`interface` — Resolve chat events and materialize their state into durable records
 
 ```ts
 interface DurableChatEventProjection
@@ -2504,7 +2504,7 @@ interface DurableChatEventProjection
 
 ### `DurableChatGoneError`
 
-`class`
+`class` — Represent durable chat errors indicating the chat plan is no longer available
 
 ```ts
 class DurableChatGoneError
@@ -2520,7 +2520,7 @@ type DurableChatScope
 
 ### `durableChatScopeKey`
 
-`function`
+`function` — Resolve a valid durable chat scope key from the given scope input
 
 ```ts
 (scope: DurableChatScope) => string
@@ -2536,7 +2536,7 @@ type DurableChatStateStore
 
 ### `DurableChatUnavailableError`
 
-`class`
+`class` — Represent unavailable durable chat authority errors with status code 503
 
 ```ts
 class DurableChatUnavailableError
@@ -2544,7 +2544,7 @@ class DurableChatUnavailableError
 
 ### `DurableFollowUpReceipt`
 
-`interface`
+`interface` — Define a durable receipt capturing stable identifiers and state for follow-up decisions
 
 ```ts
 interface DurableFollowUpReceipt
@@ -2552,7 +2552,7 @@ interface DurableFollowUpReceipt
 
 ### `DurableInteractionAcknowledgement`
 
-`interface`
+`interface` — Represent durable acknowledgement of an interaction with optional authority, status, and timestamp fields
 
 ```ts
 interface DurableInteractionAcknowledgement
@@ -2560,7 +2560,7 @@ interface DurableInteractionAcknowledgement
 
 ### `DurableInteractionGuarantee`
 
-`type`
+`type` — Define interaction durability levels to specify reconciliation or best-effort guarantees
 
 ```ts
 type DurableInteractionGuarantee
@@ -2576,7 +2576,7 @@ type DurableInteractionGuarantee
 
 ### `DurableInteractionProjection`
 
-`interface`
+`interface` — Define a durable chat interaction projection with idempotent event tracking and optional tombstone flag
 
 ```ts
 interface DurableInteractionProjection
@@ -2584,7 +2584,7 @@ interface DurableInteractionProjection
 
 ### `DurableInteractionProjectionAdapter`
 
-`interface`
+`interface` — Define methods to manage durable interaction projections including upsert, cancel, and materialize operations
 
 ```ts
 interface DurableInteractionProjectionAdapter
@@ -2592,7 +2592,7 @@ interface DurableInteractionProjectionAdapter
 
 ### `DurableInteractionRouteArgs`
 
-`interface`
+`interface` — Define arguments for durable interaction routes including a stable caller-created attempt key
 
 ```ts
 interface DurableInteractionRouteArgs
@@ -2608,7 +2608,7 @@ interface DurableInteractionRoutePersistence
 
 ### `DurableInteractionSettlement`
 
-`interface`
+`interface` — Manage durable interaction lifecycles by preparing, acknowledging, finalizing, aborting, and reconciling intents
 
 ```ts
 interface DurableInteractionSettlement
@@ -2616,7 +2616,7 @@ interface DurableInteractionSettlement
 
 ### `DurableInteractionSettlementFactoryOptions`
 
-`interface`
+`interface` — Define options for creating durable interaction settlement factories including store and optional reconcile authority
 
 ```ts
 interface DurableInteractionSettlementFactoryOptions
@@ -2624,7 +2624,7 @@ interface DurableInteractionSettlementFactoryOptions
 
 ### `DurableInteractionSettlementOptions`
 
-`interface`
+`interface` — Define options for durable interaction settlement including attempt key, guarantee, and timestamp provider
 
 ```ts
 interface DurableInteractionSettlementOptions
@@ -2640,7 +2640,7 @@ interface DurablePlanAuthority
 
 ### `DurablePlanAuthorityCurrentResult`
 
-`interface`
+`interface` — Represent the current authoritative state and optional receipt of a durable plan authority
 
 ```ts
 interface DurablePlanAuthorityCurrentResult
@@ -2648,7 +2648,7 @@ interface DurablePlanAuthorityCurrentResult
 
 ### `DurablePlanAuthorityDecision`
 
-`type`
+`type` — Resolve durable plan authority decisions including approval, rejection, or predefined durable decisions
 
 ```ts
 type DurablePlanAuthorityDecision
@@ -2656,7 +2656,7 @@ type DurablePlanAuthorityDecision
 
 ### `DurablePlanAuthorityResult`
 
-`interface`
+`interface` — Describe the outcome of an authority's durable plan decision including follow-up and metadata
 
 ```ts
 interface DurablePlanAuthorityResult
@@ -2664,7 +2664,7 @@ interface DurablePlanAuthorityResult
 
 ### `DurablePlanAuthorization`
 
-`type`
+`type` — Resolve authorization status for durable plans using scopes, responses, or nullish values
 
 ```ts
 type DurablePlanAuthorization
@@ -2672,7 +2672,7 @@ type DurablePlanAuthorization
 
 ### `DurablePlanCommandJournal`
 
-`type`
+`type` — Pick essential methods to manage and record durable plan command operations
 
 ```ts
 type DurablePlanCommandJournal
@@ -2680,7 +2680,7 @@ type DurablePlanCommandJournal
 
 ### `DurablePlanCommandKey`
 
-`type`
+`type` — Represent a unique identifier key for durable plan commands
 
 ```ts
 type DurablePlanCommandKey
@@ -2688,7 +2688,7 @@ type DurablePlanCommandKey
 
 ### `DurablePlanCommandRecord`
 
-`interface`
+`interface` — Define the structure for recording durable plan commands with associated metadata and state information
 
 ```ts
 interface DurablePlanCommandRecord
@@ -2696,7 +2696,7 @@ interface DurablePlanCommandRecord
 
 ### `DurablePlanCommandState`
 
-`type`
+`type` — Define possible states for a durable plan command in its lifecycle
 
 ```ts
 type DurablePlanCommandState
@@ -2704,7 +2704,7 @@ type DurablePlanCommandState
 
 ### `DurablePlanDecision`
 
-`type`
+`type` — Represent durable plan outcomes as either approved or rejected
 
 ```ts
 type DurablePlanDecision
@@ -2712,7 +2712,7 @@ type DurablePlanDecision
 
 ### `DurablePlanEffectRecord`
 
-`interface`
+`interface` — Define the structure for recording the state and metadata of a durable plan effect
 
 ```ts
 interface DurablePlanEffectRecord
@@ -2728,7 +2728,7 @@ type DurablePlanProjection
 
 ### `DurablePlanRouteAuthorizeArgs`
 
-`interface`
+`interface` — Define arguments for authorizing durable plan route requests with operation and optional plan ID
 
 ```ts
 interface DurablePlanRouteAuthorizeArgs
@@ -2736,7 +2736,7 @@ interface DurablePlanRouteAuthorizeArgs
 
 ### `DurablePlanRouteOptions`
 
-`interface`
+`interface` — Define options for durable plan routing including store, authority, authorization, and idempotent side effect handling
 
 ```ts
 interface DurablePlanRouteOptions
@@ -2744,7 +2744,7 @@ interface DurablePlanRouteOptions
 
 ### `DurablePlanRoutes`
 
-`interface`
+`interface` — Define routes handling durable plan requests with current and decide methods
 
 ```ts
 interface DurablePlanRoutes
@@ -2752,7 +2752,7 @@ interface DurablePlanRoutes
 
 ### `DurablePlanStateStore`
 
-`type`
+`type` — Represent durable storage for plan state management with persistence and reliability guarantees
 
 ```ts
 type DurablePlanStateStore
@@ -2760,7 +2760,7 @@ type DurablePlanStateStore
 
 ### `DurablePlanStore`
 
-`interface`
+`interface` — Manage durable storage and retrieval of plan projections, commands, and effects within a scoped context
 
 ```ts
 interface DurablePlanStore
@@ -2784,7 +2784,7 @@ interface DurablePlanStore
 
 ### `EllipseElement`
 
-`interface`
+`interface` — Define properties for an ellipse element including dimensions, fill, and optional stroke details
 
 ```ts
 interface EllipseElement
@@ -2792,7 +2792,7 @@ interface EllipseElement
 
 ### `EmailBodySection`
 
-`interface`
+`interface` — Define the structure for the body section of an email containing plain text content
 
 ```ts
 interface EmailBodySection
@@ -2800,7 +2800,7 @@ interface EmailBodySection
 
 ### `EmailContent`
 
-`interface`
+`interface` — Define the structure for email content including subject, optional preheader, and sections
 
 ```ts
 interface EmailContent
@@ -2808,7 +2808,7 @@ interface EmailContent
 
 ### `EmailContentSchema`
 
-`const`
+`const` — Validate and parse email content objects with subject, optional preheader, and sections
 
 ```ts
 ZodObject<{ subject: ZodString; preheader: ZodOptional<ZodString>; sections: ZodArray<ZodDiscriminatedUnion<[ZodObject<…
@@ -2816,7 +2816,7 @@ ZodObject<{ subject: ZodString; preheader: ZodOptional<ZodString>; sections: Zod
 
 ### `EmailCtaSection`
 
-`interface`
+`interface` — Define a call-to-action section with label, URL, and optional subtext for email content
 
 ```ts
 interface EmailCtaSection
@@ -2824,7 +2824,7 @@ interface EmailCtaSection
 
 ### `EmailDividerSection`
 
-`interface`
+`interface` — Define a section representing a divider in an email layout
 
 ```ts
 interface EmailDividerSection
@@ -2832,7 +2832,7 @@ interface EmailDividerSection
 
 ### `EmailFeatureSection`
 
-`interface`
+`interface` — Define a feature section with headline, description, and optional image for email content
 
 ```ts
 interface EmailFeatureSection
@@ -2840,7 +2840,7 @@ interface EmailFeatureSection
 
 ### `EmailHeroSection`
 
-`interface`
+`interface` — Define the structure for a hero section in an email with headline, image, and call-to-action fields
 
 ```ts
 interface EmailHeroSection
@@ -2848,7 +2848,7 @@ interface EmailHeroSection
 
 ### `EmailSection`
 
-`type`
+`type` — Define a union type representing different sections of an email template
 
 ```ts
 type EmailSection
@@ -2856,7 +2856,7 @@ type EmailSection
 
 ### `EmailTestimonialSection`
 
-`interface`
+`interface` — Define the structure for an email testimonial section with quote, author, and optional details
 
 ```ts
 interface EmailTestimonialSection
@@ -2864,7 +2864,7 @@ interface EmailTestimonialSection
 
 ### `encodeEvent`
 
-`function`
+`function` — Encode a StreamEvent object into a Uint8Array using the provided TextEncoder
 
 ```ts
 (encoder: TextEncoder, event: StreamEvent) => Uint8Array<ArrayBufferLike>
@@ -2872,7 +2872,7 @@ interface EmailTestimonialSection
 
 ### `encodeSandboxRuntimePath`
 
-`function`
+`function` — Encode a runtime path by URI-encoding each valid segment and returning null for invalid segments
 
 ```ts
 (runtimePath: string) => string | null
@@ -2904,7 +2904,7 @@ interface EmailTestimonialSection
 
 ### `ensureWorkspaceSandbox`
 
-`function`
+`function` — Resolve or create a workspace sandbox instance with optional reuse and progress tracking
 
 ```ts
 (shell: SandboxRuntimeConfig, options: EnsureWorkspaceSandboxOptions) => Promise<SandboxInstance>
@@ -2912,7 +2912,7 @@ interface EmailTestimonialSection
 
 ### `EnsureWorkspaceSandboxOptions`
 
-`interface`
+`interface` — Define options for ensuring a workspace sandbox with provisioning and progress handling
 
 ```ts
 interface EnsureWorkspaceSandboxOptions
@@ -2936,7 +2936,7 @@ interface EnsureWorkspaceSandboxOptions
 
 ### `estimateTextHeight`
 
-`function`
+`function` — Estimate the height of multiline text based on font size and line height
 
 ```ts
 (element: Pick<TextElement, "text" | "fontSize" | "lineHeight">) => number
@@ -2944,7 +2944,7 @@ interface EnsureWorkspaceSandboxOptions
 
 ### `ExpiringCapabilityTokenOptions`
 
-`interface`
+`interface` — Define options for capability tokens that expire after a specified lifetime in milliseconds
 
 ```ts
 interface ExpiringCapabilityTokenOptions
@@ -2952,7 +2952,7 @@ interface ExpiringCapabilityTokenOptions
 
 ### `EXPORT_PRESETS`
 
-`const`
+`const` — Provide predefined export configurations for various social media and image formats
 
 ```ts
 Record<string, ExportPreset>
@@ -2960,7 +2960,7 @@ Record<string, ExportPreset>
 
 ### `ExportCropRect`
 
-`interface`
+`interface` — Define crop rectangle coordinates and dimensions for exporting content within page bounds
 
 ```ts
 interface ExportCropRect
@@ -2968,7 +2968,7 @@ interface ExportCropRect
 
 ### `ExportFormat`
 
-`type`
+`type` — Define supported image export formats as PNG or JPEG
 
 ```ts
 type ExportFormat
@@ -2984,7 +2984,7 @@ interface ExportPreset
 
 ### `ExtendSequenceOperation`
 
-`interface`
+`interface` — Define an operation to extend a sequence by a specified number of frames
 
 ```ts
 interface ExtendSequenceOperation
@@ -3016,7 +3016,7 @@ interface ExtendSequenceOperation
 
 ### `fieldAcceptsFreeText`
 
-`function`
+`function` — Determine if a chat interaction field allows free text input
 
 ```ts
 (field: ChatInteractionField) => boolean
@@ -3024,7 +3024,7 @@ interface ExtendSequenceOperation
 
 ### `finalizeAssistantParts`
 
-`function`
+`function` — Resolve and clean up assistant parts by terminalizing and collapsing redundant segments
 
 ```ts
 (partOrder: string[], partMap: Map<string, JsonRecord>, finalText: string) => JsonRecord[]
@@ -3040,7 +3040,7 @@ interface ExtendSequenceOperation
 
 ### `findCanvasMcpTool`
 
-`function`
+`function` — Find the canvas MCP tool definition matching the given name or return undefined
 
 ```ts
 (name: string) => McpToolDefinition<DesignCanvasMcpToolEnv> | undefined
@@ -3064,7 +3064,7 @@ interface ExtendSequenceOperation
 
 ### `findPreset`
 
-`function`
+`function` — Resolve a size preset by its identifier or return null if not found
 
 ```ts
 (id: string) => SizePreset | null
@@ -3072,7 +3072,7 @@ interface ExtendSequenceOperation
 
 ### `findSequenceMcpTool`
 
-`function`
+`function` — Resolve the SequenceMcpToolDefinition matching the given name or return undefined
 
 ```ts
 (name: string) => SequenceMcpToolDefinition | undefined
@@ -3080,7 +3080,7 @@ interface ExtendSequenceOperation
 
 ### `flattenHistory`
 
-`function`
+`function` — Build a single string combining conversation history and the current user message
 
 ```ts
 (message: string, history?: { role: "user" | "assistant"; content: string; }[] | undefined) => string
@@ -3096,7 +3096,7 @@ interface FlowSpan
 
 ### `FlowTrace`
 
-`interface`
+`interface` — Describe the structure of a flow trace including spans, timing, tokens, cost, and tool calls
 
 ```ts
 interface FlowTrace
@@ -3112,7 +3112,7 @@ interface FlowTrace
 
 ### `formatSeconds`
 
-`function`
+`function` — Format a number of seconds into a string with integer or two-decimal precision suffix s
 
 ```ts
 (seconds: number) => string
@@ -3128,7 +3128,7 @@ interface FlowTrace
 
 ### `framesToSeconds`
 
-`function`
+`function` — Convert a frame count to seconds based on the given frames per second rate
 
 ```ts
 (frames: number, fps: number) => number
@@ -3136,7 +3136,7 @@ interface FlowTrace
 
 ### `getClient`
 
-`function`
+`function` — Resolve a synchronous sandbox client from provided runtime configuration credentials
 
 ```ts
 (shell: SandboxRuntimeConfig) => SandboxClient
@@ -3144,7 +3144,7 @@ interface FlowTrace
 
 ### `getPartKey`
 
-`function`
+`function` — Resolve a unique key string for a part based on its type and identifying properties
 
 ```ts
 (part: JsonRecord) => string
@@ -3152,7 +3152,7 @@ interface FlowTrace
 
 ### `GroupElement`
 
-`interface`
+`interface` — Define a group element that contains multiple child scene elements
 
 ```ts
 interface GroupElement
@@ -3160,7 +3160,7 @@ interface GroupElement
 
 ### `GroupElementsOperation`
 
-`interface`
+`interface` — Group elements by grouping two or more sibling elements in their current z-order under a new group ID
 
 ```ts
 interface GroupElementsOperation
@@ -3176,7 +3176,7 @@ interface GroupElementsOperation
 
 ### `HandleToolRequestOptions`
 
-`interface`
+`interface` — Define options for handling tool requests including tool identification and token verification
 
 ```ts
 interface HandleToolRequestOptions
@@ -3184,7 +3184,7 @@ interface HandleToolRequestOptions
 
 ### `Harness`
 
-`type`
+`type` — Resolve a valid harness identifier from the predefined KNOWN_HARNESSES array
 
 ```ts
 type Harness
@@ -3208,7 +3208,7 @@ type Harness
 
 ### `HttpHeadProbeConfig`
 
-`interface`
+`interface` — Define configuration options for performing an HTTP HEAD probe to check URL availability
 
 ```ts
 interface HttpHeadProbeConfig
@@ -3224,7 +3224,7 @@ class HubExecClient
 
 ### `HubExecClientOptions`
 
-`interface`
+`interface` — Define configuration options for initializing a Hub execution client
 
 ```ts
 interface HubExecClientOptions
@@ -3248,7 +3248,7 @@ type HubExecResult
 
 ### `HubInvokeDeps`
 
-`interface`
+`interface` — Define dependencies for invoking hub operations including API key resolution and optional configuration
 
 ```ts
 interface HubInvokeDeps
@@ -3256,7 +3256,7 @@ interface HubInvokeDeps
 
 ### `HubInvokeInput`
 
-`interface`
+`interface` — Define input parameters for invoking a hub tool with user ID, tool name, and optional arguments
 
 ```ts
 interface HubInvokeInput
@@ -3264,7 +3264,7 @@ interface HubInvokeInput
 
 ### `HubInvokeOutcome`
 
-`interface`
+`interface` — Describe the outcome of a hub invocation including status and response body
 
 ```ts
 interface HubInvokeOutcome
@@ -3272,7 +3272,7 @@ interface HubInvokeOutcome
 
 ### `ImageBackground`
 
-`type`
+`type` — Define image background styles as color, gradient, or image with optional overlay settings
 
 ```ts
 type ImageBackground
@@ -3280,7 +3280,7 @@ type ImageBackground
 
 ### `ImageContent`
 
-`interface`
+`interface` — Define the structure for image content containing an array of image slides
 
 ```ts
 interface ImageContent
@@ -3288,7 +3288,7 @@ interface ImageContent
 
 ### `ImageContentSchema`
 
-`const`
+`const` — Validate image content with an array of one or more slides containing background details
 
 ```ts
 ZodObject<{ slides: ZodArray<ZodObject<{ background: ZodDiscriminatedUnion<[ZodObject<{ type: ZodLiteral<"color">; valu…
@@ -3296,7 +3296,7 @@ ZodObject<{ slides: ZodArray<ZodObject<{ background: ZodDiscriminatedUnion<[ZodO
 
 ### `ImageElement`
 
-`interface`
+`interface` — Define properties for an image element including source, dimensions, and fit mode
 
 ```ts
 interface ImageElement
@@ -3304,7 +3304,7 @@ interface ImageElement
 
 ### `ImageImageLayer`
 
-`interface`
+`interface` — Define properties for an image layer including position, size, URL, and optional opacity
 
 ```ts
 interface ImageImageLayer
@@ -3312,7 +3312,7 @@ interface ImageImageLayer
 
 ### `ImageLayer`
 
-`type`
+`type` — Resolve a union type representing different kinds of image layers
 
 ```ts
 type ImageLayer
@@ -3320,7 +3320,7 @@ type ImageLayer
 
 ### `ImageLayerType`
 
-`type`
+`type` — Define image layer categories for text, image, shape, or logo elements
 
 ```ts
 type ImageLayerType
@@ -3328,7 +3328,7 @@ type ImageLayerType
 
 ### `ImageLogoLayer`
 
-`interface`
+`interface` — Define properties for positioning and sizing a logo image layer in a layout
 
 ```ts
 interface ImageLogoLayer
@@ -3336,7 +3336,7 @@ interface ImageLogoLayer
 
 ### `ImageShapeLayer`
 
-`interface`
+`interface` — Define properties for a shape layer representing rectangular or circular image elements
 
 ```ts
 interface ImageShapeLayer
@@ -3344,7 +3344,7 @@ interface ImageShapeLayer
 
 ### `ImageSlide`
 
-`interface`
+`interface` — Define the structure for an image slide with a background and multiple layers
 
 ```ts
 interface ImageSlide
@@ -3352,7 +3352,7 @@ interface ImageSlide
 
 ### `ImageTextLayer`
 
-`interface`
+`interface` — Define properties for a text layer with position, style, and alignment options in an image
 
 ```ts
 interface ImageTextLayer
@@ -3376,7 +3376,7 @@ typeof InMemoryDurableChatStateStore
 
 ### `InMemoryMissionStore`
 
-`interface`
+`interface` — Define an in-memory mission store that tracks events and allows direct record writes
 
 ```ts
 interface InMemoryMissionStore
@@ -3384,7 +3384,7 @@ interface InMemoryMissionStore
 
 ### `InstantiateOptions`
 
-`interface`
+`interface` — Define options for instantiating a document with title, optional bindings, and custom id minting
 
 ```ts
 interface InstantiateOptions
@@ -3424,7 +3424,7 @@ interface InstantiateOptions
 
 ### `InteractionAnswerBodyValidation`
 
-`type`
+`type` — Validate interaction answer body and return success with data or failure with error message
 
 ```ts
 type InteractionAnswerBodyValidation
@@ -3432,7 +3432,7 @@ type InteractionAnswerBodyValidation
 
 ### `InteractionAnswerRoute`
 
-`interface`
+`interface` — Define routes to list outstanding interactions and resolve answers for live turns
 
 ```ts
 interface InteractionAnswerRoute
@@ -3440,7 +3440,7 @@ interface InteractionAnswerRoute
 
 ### `InteractionAnswerRouteOptions`
 
-`interface`
+`interface` — Define options to authenticate, authorize, and manage persistence for interaction answer routes
 
 ```ts
 interface InteractionAnswerRouteOptions
@@ -3448,7 +3448,7 @@ interface InteractionAnswerRouteOptions
 
 ### `InteractionAnswers`
 
-`type`
+`type` — Map interaction identifiers to their corresponding answer values
 
 ```ts
 type InteractionAnswers
@@ -3464,7 +3464,7 @@ type InteractionAnswerValue
 
 ### `InteractionCancelData`
 
-`interface`
+`interface` — Describe data required to cancel an interaction including its identifier and optional reason
 
 ```ts
 interface InteractionCancelData
@@ -3472,7 +3472,7 @@ interface InteractionCancelData
 
 ### `InteractionClientOutcome`
 
-`type`
+`type` — Define possible outcomes for an interaction client as accepted or declined
 
 ```ts
 type InteractionClientOutcome
@@ -3512,7 +3512,7 @@ type InteractionOutcome
 
 ### `interactionPartKey`
 
-`function`
+`function` — Generate a unique key string for an interaction using the given identifier
 
 ```ts
 (id: string) => string
@@ -3544,7 +3544,7 @@ type InteractionRequestWire
 
 ### `InteractionRouteLogger`
 
-`type`
+`type` — Provide logging methods for warnings and errors in interaction routes
 
 ```ts
 type InteractionRouteLogger
@@ -3568,7 +3568,7 @@ type InteractionRouteLogger
 
 ### `isAppToolName`
 
-`function`
+`function` — Determine if a string matches a valid application tool name
 
 ```ts
 (name: string) => name is "submit_proposal" | "schedule_followup" | "render_ui" | "add_citation"
@@ -3584,7 +3584,7 @@ type InteractionRouteLogger
 
 ### `isChatInteractionPart`
 
-`function`
+`function` — Resolve whether a ChatMessagePart is a ChatInteractionPart based on its type property
 
 ```ts
 (part: ChatMessagePart) => part is ChatInteractionPart
@@ -3600,7 +3600,7 @@ type InteractionRouteLogger
 
 ### `isChatPlanPart`
 
-`function`
+`function` — Resolve whether a chat message part is a persisted chat plan part
 
 ```ts
 (part: ChatMessagePart) => part is ChatPlanPersistedPart
@@ -3608,7 +3608,7 @@ type InteractionRouteLogger
 
 ### `isChatStepFinishPart`
 
-`function`
+`function` — Determine if a chat message part represents the completion of a chat step
 
 ```ts
 (part: ChatMessagePart) => part is ChatStepFinishPart
@@ -3616,7 +3616,7 @@ type InteractionRouteLogger
 
 ### `isChatTextPart`
 
-`function`
+`function` — Resolve whether a chat message part is a text part based on its type property
 
 ```ts
 (part: ChatMessagePart) => part is ChatTextPart
@@ -3624,7 +3624,7 @@ type InteractionRouteLogger
 
 ### `isChatToolPart`
 
-`function`
+`function` — Resolve whether a ChatMessagePart is specifically a ChatToolPart based on its type property
 
 ```ts
 (part: ChatMessagePart) => part is ChatToolPart
@@ -3632,7 +3632,7 @@ type InteractionRouteLogger
 
 ### `isHarness`
 
-`function`
+`function` — Determine if a value is a recognized harness string identifier
 
 ```ts
 (value: unknown) => value is "opencode" | "claude-code" | "nanoclaw" | "kimi-code" | "codex" | "amp" | "factory-droids"…
@@ -3664,7 +3664,7 @@ type InteractionRouteLogger
 
 ### `isRenderableInteractionKind`
 
-`function`
+`function` — Resolve if the given interaction kind is renderable within the application context
 
 ```ts
 (kind: string) => boolean
@@ -3696,7 +3696,7 @@ type InteractionRouteLogger
 
 ### `isTangleExecutionKeyError`
 
-`function`
+`function` — Identify whether an error is a TangleExecutionKeyError based on its properties and type
 
 ```ts
 (error: unknown) => error is TangleExecutionKeyError
@@ -3704,7 +3704,7 @@ type InteractionRouteLogger
 
 ### `isTerminalInteractionStatus`
 
-`function`
+`function` — Resolve if the interaction status is a terminal state excluding pending
 
 ```ts
 (status: ChatInteractionStatus) => boolean
@@ -3712,7 +3712,7 @@ type InteractionRouteLogger
 
 ### `isTerminalPromptEvent`
 
-`function`
+`function` — Determine if an event is a terminal prompt event with type 'result' or 'done
 
 ```ts
 (event: unknown) => boolean
@@ -3728,7 +3728,7 @@ type JsonObject
 
 ### `JsonRecord`
 
-`type`
+`type` — Represent a JSON-compatible object with string keys and values of any type
 
 ```ts
 type JsonRecord
@@ -3768,7 +3768,7 @@ interface KnowledgeDecider
 
 ### `KnowledgeDeciderInput`
 
-`interface`
+`interface` — Define the input parameters required to decide knowledge proposals within an agent-knowledge loop
 
 ```ts
 interface KnowledgeDeciderInput
@@ -3776,7 +3776,7 @@ interface KnowledgeDeciderInput
 
 ### `KnowledgeDecision`
 
-`interface`
+`interface` — Define a decision containing a candidate and the gate's verdict on that candidate
 
 ```ts
 interface KnowledgeDecision
@@ -3816,7 +3816,7 @@ interface KnowledgeLoopDriver
 
 ### `KnowledgeRequirementSpec`
 
-`interface`
+`interface` — Define the criteria and conditions required to satisfy a specific knowledge requirement
 
 ```ts
 interface KnowledgeRequirementSpec
@@ -3824,7 +3824,7 @@ interface KnowledgeRequirementSpec
 
 ### `KnowledgeSignal`
 
-`interface`
+`interface` — Define a signal representing knowledge with confidence level and optional supporting evidence
 
 ```ts
 interface KnowledgeSignal
@@ -3864,7 +3864,7 @@ interface KvLike
 
 ### `LanguageFanoutOptions`
 
-`interface`
+`interface` — Define options to specify target languages and an optional source language for fan-out operations
 
 ```ts
 interface LanguageFanoutOptions
@@ -3880,7 +3880,7 @@ interface LanguageFanoutOptions
 
 ### `lightTheme`
 
-`const`
+`const` — Define a light color theme with specific background, foreground, and accent color values
 
 ```ts
 AgentAppTheme
@@ -3888,7 +3888,7 @@ AgentAppTheme
 
 ### `LineElement`
 
-`interface`
+`interface` — Define a line element with points, stroke, stroke width, and optional dash pattern
 
 ```ts
 interface LineElement
@@ -3912,7 +3912,7 @@ interface LineElement
 
 ### `LivenessProbeConfig`
 
-`interface`
+`interface` — Define configuration for liveness probes including sidecar process pattern and optional timeouts
 
 ```ts
 interface LivenessProbeConfig
@@ -4016,7 +4016,7 @@ readonly ["2025-06-18", "2025-03-26", "2024-11-05"]
 
 ### `McpProtocolVersion`
 
-`type`
+`type` — Resolve a valid protocol version from the predefined MCP_PROTOCOL_VERSIONS array
 
 ```ts
 type McpProtocolVersion
@@ -4024,7 +4024,7 @@ type McpProtocolVersion
 
 ### `McpServerInfo`
 
-`interface`
+`interface` — Describe the structure of server information including name and version
 
 ```ts
 interface McpServerInfo
@@ -4040,7 +4040,7 @@ interface McpToolDefinition
 
 ### `MemberSyncSeam`
 
-`interface`
+`interface` — Map workspace roles to corresponding sandbox permission levels
 
 ```ts
 interface MemberSyncSeam
@@ -4064,7 +4064,7 @@ interface MemberSyncSeam
 
 ### `mergeExtraMcp`
 
-`function`
+`function` — Resolve conflicts and merge extra MCP profiles into the app tool MCP without overwriting existing keys
 
 ```ts
 (appToolMcp: Record<string, AgentProfileMcpServer>, baseProfileMcp: Record<string, AgentProfileMcpServer>, extra: Recor…
@@ -4088,7 +4088,7 @@ interface MemberSyncSeam
 
 ### `mergePersistedPart`
 
-`function`
+`function` — Merge incoming JSON with existing persisted data, applying delta for text types when provided
 
 ```ts
 (existing: JsonRecord | undefined, incoming: JsonRecord, delta?: string | undefined) => JsonRecord
@@ -4104,7 +4104,7 @@ interface MemberSyncSeam
 
 ### `messageHasTurnId`
 
-`function`
+`function` — Resolve whether a message contains any part with the specified turn ID
 
 ```ts
 (message: PersistedChatMessageForTurn, turnId: string) => boolean
@@ -4128,7 +4128,7 @@ interface MemberSyncSeam
 
 ### `mintTerminalProxyToken`
 
-`function`
+`function` — Generate a signed token for TerminalProxyIdentity with an expiration based on TTL milliseconds
 
 ```ts
 (secret: string, identity: TerminalProxyIdentity, ttlMs?: number, now?: () => number) => Promise<Outcome<{ token: strin…
@@ -4136,7 +4136,7 @@ interface MemberSyncSeam
 
 ### `MISSING_TOOL_TERMINAL_ERROR`
 
-`const`
+`const` — Resolve errors when a tool fails to report a terminal result before the assistant turn ends
 
 ```ts
 "Tool did not report a terminal result before the assistant turn completed."
@@ -4144,7 +4144,7 @@ interface MemberSyncSeam
 
 ### `MISSING_TOOL_TERMINAL_REASON`
 
-`const`
+`const` — Provide the reason identifier for a missing tool in the terminal environment
 
 ```ts
 "missing-tool-terminal"
@@ -4184,7 +4184,7 @@ class MissionConcurrencyError
 
 ### `MissionCostLedger`
 
-`interface`
+`interface` — Define the structure for tracking mission token usage, cost, duration, and LLM call counts
 
 ```ts
 interface MissionCostLedger
@@ -4192,7 +4192,7 @@ interface MissionCostLedger
 
 ### `MissionEngine`
 
-`interface`
+`interface` — Resolve mission plan steps with concurrency control and durable state management
 
 ```ts
 interface MissionEngine
@@ -4200,7 +4200,7 @@ interface MissionEngine
 
 ### `MissionEngineOptions`
 
-`interface`
+`interface` — Define configuration options for initializing and controlling the mission engine behavior
 
 ```ts
 interface MissionEngineOptions
@@ -4208,7 +4208,7 @@ interface MissionEngineOptions
 
 ### `MissionEventSink`
 
-`interface`
+`interface` — Handle mission stream events by processing emitted MissionStreamEvent objects
 
 ```ts
 interface MissionEventSink
@@ -4216,7 +4216,7 @@ interface MissionEventSink
 
 ### `MissionFlowStep`
 
-`interface`
+`interface` — Define a step in a mission flow with id, intent, optional status, start time, and duration
 
 ```ts
 interface MissionFlowStep
@@ -4224,7 +4224,7 @@ interface MissionFlowStep
 
 ### `MissionGateKind`
 
-`type`
+`type` — Define mission gate categories as step, budget, or volume
 
 ```ts
 type MissionGateKind
@@ -4232,7 +4232,7 @@ type MissionGateKind
 
 ### `MissionGateOptions`
 
-`interface`
+`interface` — Define configuration options for mission gating including approvals, step classification, and action limits
 
 ```ts
 interface MissionGateOptions
@@ -4256,7 +4256,7 @@ type MissionOutcome
 
 ### `MissionPlanRunOptions`
 
-`interface`
+`interface` — Define options to control mission plan execution with optional pre-step veto logic
 
 ```ts
 interface MissionPlanRunOptions
@@ -4280,7 +4280,7 @@ interface MissionRecord
 
 ### `MissionService`
 
-`interface`
+`interface` — Define methods to create, retrieve, and update missions with controlled engine binding and metadata merging
 
 ```ts
 interface MissionService
@@ -4288,7 +4288,7 @@ interface MissionService
 
 ### `MissionServiceOptions`
 
-`interface`
+`interface` — Define options for configuring mission service behavior including storage, time, and ID generation
 
 ```ts
 interface MissionServiceOptions
@@ -4312,7 +4312,7 @@ type MissionStatus
 
 ### `MissionStep`
 
-`interface`
+`interface` — Define the structure and state details of a mission step within a workflow system
 
 ```ts
 interface MissionStep
@@ -4328,7 +4328,7 @@ interface MissionStepState
 
 ### `MissionStepStatus`
 
-`type`
+`type` — Define possible statuses for a mission step during its execution lifecycle
 
 ```ts
 type MissionStepStatus
@@ -4352,7 +4352,7 @@ type MissionStreamEvent
 
 ### `MissionStreamStatus`
 
-`type`
+`type` — Define possible statuses representing the current state of a mission stream
 
 ```ts
 type MissionStreamStatus
@@ -4368,7 +4368,7 @@ interface MissionStreamStep
 
 ### `MissionStreamStepStatus`
 
-`type`
+`type` — Define possible status values for a mission stream step
 
 ```ts
 type MissionStreamStepStatus
@@ -4400,7 +4400,7 @@ interface MissionUpdatePatch
 
 ### `ModelCatalog`
 
-`interface`
+`interface` — Define a catalog containing models with a default ID and fetch timestamp
 
 ```ts
 interface ModelCatalog
@@ -4416,7 +4416,7 @@ interface ModelCatalog
 
 ### `MoveClipOperation`
 
-`interface`
+`interface` — Resolve an operation to move a clip to a new start frame and optional track
 
 ```ts
 interface MoveClipOperation
@@ -4424,7 +4424,7 @@ interface MoveClipOperation
 
 ### `NewPageOptions`
 
-`interface`
+`interface` — Define options to configure a new page including name, dimensions, and background color
 
 ```ts
 interface NewPageOptions
@@ -4432,7 +4432,7 @@ interface NewPageOptions
 
 ### `NewSceneDecision`
 
-`interface`
+`interface` — Define the structure for decisions related to creating a new scene with instructions and optional details
 
 ```ts
 interface NewSceneDecision
@@ -4440,7 +4440,7 @@ interface NewSceneDecision
 
 ### `NewSequenceClip`
 
-`interface`
+`interface` — Define properties for a new sequence clip including timing, labels, and optional metadata
 
 ```ts
 interface NewSequenceClip
@@ -4448,7 +4448,7 @@ interface NewSequenceClip
 
 ### `NewSequenceDecision`
 
-`interface`
+`interface` — Define the structure for a new sequence decision with optional metadata and acceptance status
 
 ```ts
 interface NewSequenceDecision
@@ -4456,7 +4456,7 @@ interface NewSequenceDecision
 
 ### `NewSequenceTrack`
 
-`interface`
+`interface` — Define properties for a new sequence track including kind, name, and optional sort order
 
 ```ts
 interface NewSequenceTrack
@@ -4472,7 +4472,7 @@ MissionEventSink
 
 ### `normalizeClientTurnId`
 
-`function`
+`function` — Normalize and validate a client turn ID string ensuring it meets format and length requirements
 
 ```ts
 (value: unknown) => string | undefined
@@ -4496,7 +4496,7 @@ MissionEventSink
 
 ### `normalizePersistedPart`
 
-`function`
+`function` — Normalize a persisted part object by standardizing its structure and fields
 
 ```ts
 (rawPart: JsonRecord) => JsonRecord | null
@@ -4504,7 +4504,7 @@ MissionEventSink
 
 ### `normalizePlanDecision`
 
-`function`
+`function` — Normalize input value to a standardized DurablePlanDecision or return null for invalid inputs
 
 ```ts
 (value: unknown) => DurablePlanDecision | null
@@ -4512,7 +4512,7 @@ MissionEventSink
 
 ### `normalizeTime`
 
-`function`
+`function` — Resolve time properties from various keys into a normalized record with numeric start and end fields
 
 ```ts
 (value: unknown) => JsonRecord | undefined
@@ -4520,7 +4520,7 @@ MissionEventSink
 
 ### `normalizeToolEvent`
 
-`function`
+`function` — Normalize tool-related events into a standardized message.part.updated format
 
 ```ts
 (event: StreamEvent) => StreamEvent
@@ -4528,7 +4528,7 @@ MissionEventSink
 
 ### `NoticeKind`
 
-`type`
+`type` — Define specific string literals representing different kinds of notices
 
 ```ts
 type NoticeKind
@@ -4544,7 +4544,7 @@ type NoticeKind
 
 ### `noticePartKey`
 
-`function`
+`function` — Generate a unique key string for a notice using the given identifier
 
 ```ts
 (id: string) => string
@@ -4552,7 +4552,7 @@ type NoticeKind
 
 ### `NoticePersistedPart`
 
-`type`
+`type` — Define a persisted notice part with type, id, kind, and text properties
 
 ```ts
 type NoticePersistedPart
@@ -4592,7 +4592,7 @@ interface ObjectStore
 
 ### `OpenAICompatStreamTurnOptions`
 
-`interface`
+`interface` — Define options for configuring an OpenAI-compatible streaming chat turn including API details and tools
 
 ```ts
 interface OpenAICompatStreamTurnOptions
@@ -4616,7 +4616,7 @@ interface OpenAIStreamChunk
 
 ### `OtioClip`
 
-`interface`
+`interface` — Define a clip object with metadata, source range, and media reference according to OTIO schema
 
 ```ts
 interface OtioClip
@@ -4624,7 +4624,7 @@ interface OtioClip
 
 ### `OtioExternalReference`
 
-`interface`
+`interface` — Define the structure for an external media reference with schema, URL, and optional time range
 
 ```ts
 interface OtioExternalReference
@@ -4632,7 +4632,7 @@ interface OtioExternalReference
 
 ### `OtioGap`
 
-`interface`
+`interface` — Define the structure for a gap element with schema, name, and source time range properties
 
 ```ts
 interface OtioGap
@@ -4640,7 +4640,7 @@ interface OtioGap
 
 ### `OtioMissingReference`
 
-`interface`
+`interface` — Represent missing references in OTIO with a fixed schema identifier
 
 ```ts
 interface OtioMissingReference
@@ -4648,7 +4648,7 @@ interface OtioMissingReference
 
 ### `OtioRationalTime`
 
-`interface`
+`interface` — Represent a rational time value with a specific rate and numeric value for OTIO schema
 
 ```ts
 interface OtioRationalTime
@@ -4656,7 +4656,7 @@ interface OtioRationalTime
 
 ### `OtioStack`
 
-`interface`
+`interface` — Represent a stack container holding a named collection of OtioTrack children
 
 ```ts
 interface OtioStack
@@ -4664,7 +4664,7 @@ interface OtioStack
 
 ### `OtioTimeline`
 
-`interface`
+`interface` — Define the structure of a timeline with metadata, tracks, and global start time in OTIO format
 
 ```ts
 interface OtioTimeline
@@ -4672,7 +4672,7 @@ interface OtioTimeline
 
 ### `OtioTimeRange`
 
-`interface`
+`interface` — Define a time range with a start time and duration using OtioRationalTime values
 
 ```ts
 interface OtioTimeRange
@@ -4680,7 +4680,7 @@ interface OtioTimeRange
 
 ### `OtioTrack`
 
-`interface`
+`interface` — Define a track containing video or audio clips with metadata and child elements
 
 ```ts
 interface OtioTrack
@@ -4688,7 +4688,7 @@ interface OtioTrack
 
 ### `Outcome`
 
-`type`
+`type` — Represent success or failure of an operation with corresponding value or error information
 
 ```ts
 type Outcome
@@ -4736,7 +4736,7 @@ interface ParsedIntegrationAction
 
 ### `ParsedMission`
 
-`interface`
+`interface` — Describe a mission with a title and an ordered list of parsed steps
 
 ```ts
 interface ParsedMission
@@ -4744,7 +4744,7 @@ interface ParsedMission
 
 ### `ParsedMissionStep`
 
-`interface`
+`interface` — Define the structure representing a parsed mission step with id, kind, and intent fields
 
 ```ts
 interface ParsedMissionStep
@@ -4760,7 +4760,7 @@ interface ParsedMissionStep
 
 ### `ParseInteractionAnswersResult`
 
-`type`
+`type` — Resolve the result of parsing interaction answers with success status and corresponding data or error message
 
 ```ts
 type ParseInteractionAnswersResult
@@ -4768,7 +4768,7 @@ type ParseInteractionAnswersResult
 
 ### `parseInteractionCancel`
 
-`function`
+`function` — Parse interaction cancel data and return success status with parsed value or error message
 
 ```ts
 (data: Record<string, unknown> | undefined) => { succeeded: true; value: InteractionCancelData; } | { succeeded: false;…
@@ -4784,7 +4784,7 @@ type ParseInteractionAnswersResult
 
 ### `ParseInteractionResult`
 
-`type`
+`type` — Resolve interaction parsing outcome as success with value or failure with error message
 
 ```ts
 type ParseInteractionResult
@@ -4808,7 +4808,7 @@ type ParseInteractionResult
 
 ### `ParseMissionBlocksOptions`
 
-`interface`
+`interface` — Define options to specify allowed lowercase step kinds for parsing mission blocks
 
 ```ts
 interface ParseMissionBlocksOptions
@@ -4824,7 +4824,7 @@ interface ParseMissionBlocksOptions
 
 ### `ParsePlanSubmittedResult`
 
-`type`
+`type` — Resolve the result of parsing a plan submission into success with value or failure with error
 
 ```ts
 type ParsePlanSubmittedResult
@@ -4864,7 +4864,7 @@ type PeekWorkspaceSandboxOutcome
 
 ### `PersistedChatMessageForTurn`
 
-`interface`
+`interface` — Define the structure of a chat message stored for a specific conversation turn
 
 ```ts
 interface PersistedChatMessageForTurn
@@ -4880,7 +4880,7 @@ interface PersistedChatMessageForTurn
 
 ### `persistedPartToPlan`
 
-`function`
+`function` — Resolve a persisted part object into a ChatPlan or return null if the type is not 'plan
 
 ```ts
 (part: Record<string, unknown>) => ChatPlan | null
@@ -4888,7 +4888,7 @@ interface PersistedChatMessageForTurn
 
 ### `PlaceClipOperation`
 
-`interface`
+`interface` — Define an operation to place a media clip with timing, track, and playback options
 
 ```ts
 interface PlaceClipOperation
@@ -4904,7 +4904,7 @@ interface PlaceClipOperation
 
 ### `planAuthorityIdempotencyKey`
 
-`function`
+`function` — Generate a unique idempotency key for a plan authority based on scope, plan, revision, and decision
 
 ```ts
 (scope: DurableChatScope, planId: string, revision: number, decision: DurablePlanDecision) => string
@@ -4912,7 +4912,7 @@ interface PlaceClipOperation
 
 ### `planCommandKey`
 
-`function`
+`function` — Generate a unique key string for a plan command using plan ID, revision, and decision
 
 ```ts
 (planId: string, revision: number, decision: DurablePlanDecision) => string
@@ -4920,7 +4920,7 @@ interface PlaceClipOperation
 
 ### `planEffectKey`
 
-`function`
+`function` — Generate a unique string key representing the effect of a plan decision within a given scope and revision
 
 ```ts
 (scope: DurableChatScope, planId: string, revision: number, decision: DurablePlanDecision) => string
@@ -4928,7 +4928,7 @@ interface PlaceClipOperation
 
 ### `planFollowUpTurnId`
 
-`function`
+`function` — Generate a unique follow-up turn ID based on the plan ID and its outcome
 
 ```ts
 (planId: string, outcome: "approved" | "rejected") => string
@@ -4960,7 +4960,7 @@ type PlanOutcome
 
 ### `planPartKey`
 
-`function`
+`function` — Generate a unique key string for a given plan identifier
 
 ```ts
 (planId: string) => string
@@ -4968,7 +4968,7 @@ type PlanOutcome
 
 ### `planRevisionKey`
 
-`function`
+`function` — Generate a unique key string for a plan based on its ID and revision number
 
 ```ts
 (planId: string, revision: number) => string
@@ -4976,7 +4976,7 @@ type PlanOutcome
 
 ### `planToPersistedPart`
 
-`function`
+`function` — Resolve a ChatPlan into its persisted part representation for storage or transmission
 
 ```ts
 (plan: ChatPlan) => ChatPlanPersistedPart
@@ -4992,7 +4992,7 @@ interface PlatformBalanceInfo
 
 ### `PlatformBalanceManager`
 
-`interface`
+`interface` — Manage user plans and balances including state retrieval, billing authorization, deduction, and usage tracking
 
 ```ts
 interface PlatformBalanceManager
@@ -5000,7 +5000,7 @@ interface PlatformBalanceManager
 
 ### `PlatformBalanceManagerOptions`
 
-`interface`
+`interface` — Define configuration options for managing platform balance based on billing plans
 
 ```ts
 interface PlatformBalanceManagerOptions
@@ -5064,7 +5064,7 @@ interface PreflightReport
 
 ### `PreparedDurableInteractionAnswer`
 
-`interface`
+`interface` — Define a structured response containing scope, settlement, and intent for durable interactions
 
 ```ts
 interface PreparedDurableInteractionAnswer
@@ -5088,7 +5088,7 @@ readonly string[]
 
 ### `PresetBillingOptions`
 
-`interface`
+`interface` — Define preset billing options including database, provisioner, encryption key, budget, and optional settings
 
 ```ts
 interface PresetBillingOptions
@@ -5096,7 +5096,7 @@ interface PresetBillingOptions
 
 ### `PresetKnowledgeAccessorOptions`
 
-`interface`
+`interface` — Define options for accessing preset knowledge scoped to a specific workspace and configuration
 
 ```ts
 interface PresetKnowledgeAccessorOptions
@@ -5104,7 +5104,7 @@ interface PresetKnowledgeAccessorOptions
 
 ### `PresetToolHandlerOptions`
 
-`interface`
+`interface` — Define configuration options for handling preset tools including database, vault, and optional utilities
 
 ```ts
 interface PresetToolHandlerOptions
@@ -5128,7 +5128,7 @@ interface ProducedState
 
 ### `ProfileComposeOptions`
 
-`interface`
+`interface` — Define options for composing a user profile including prompts, files, servers, and name
 
 ```ts
 interface ProfileComposeOptions
@@ -5136,7 +5136,7 @@ interface ProfileComposeOptions
 
 ### `PromptInputPart`
 
-`type`
+`type` — Extract a single element type from the array parameter of SandboxInstance's streamPrompt method
 
 ```ts
 type PromptInputPart
@@ -5144,7 +5144,7 @@ type PromptInputPart
 
 ### `ProviderResolutionConfig`
 
-`interface`
+`interface` — Define configuration options for resolving a provider and its model with optional API keys and routing details
 
 ```ts
 interface ProviderResolutionConfig
@@ -5184,7 +5184,7 @@ interface ProvisionProfileSection
 
 ### `PumpBufferedTurnOptions`
 
-`interface`
+`interface` — Define options to pump data from an asynchronous iterable source with buffered turn control
 
 ```ts
 interface PumpBufferedTurnOptions
@@ -5208,7 +5208,7 @@ interface PutObjectOptions
 
 ### `QueueExportOperation`
 
-`interface`
+`interface` — Define the structure for a queue export operation with format and optional metadata
 
 ```ts
 interface QueueExportOperation
@@ -5240,7 +5240,7 @@ interface R2LikeObjectHead
 
 ### `RateLimitResult`
 
-`interface`
+`interface` — Describe the outcome of a rate limit check including allowance, remaining count, and reset time
 
 ```ts
 interface RateLimitResult
@@ -5264,7 +5264,7 @@ interface RateLimitResult
 
 ### `readSecret`
 
-`function`
+`function` — Resolve a secret value from the store by its name and return the outcome asynchronously
 
 ```ts
 (store: SecretStore, name: string) => Promise<Outcome<string>>
@@ -5296,7 +5296,7 @@ interface RateLimitResult
 
 ### `RectElement`
 
-`interface`
+`interface` — Define a rectangular scene element with size, fill, optional stroke, and corner radius properties
 
 ```ts
 interface RectElement
@@ -5312,7 +5312,7 @@ type RedactedDocSegment
 
 ### `RedactedDocument`
 
-`interface`
+`interface` — Define a document composed of multiple redacted content segments
 
 ```ts
 interface RedactedDocument
@@ -5328,7 +5328,7 @@ interface RedactedDocument
 
 ### `RedactForIngestionOptions`
 
-`interface`
+`interface` — Define options to customize sensitive data redaction patterns and key names for ingestion
 
 ```ts
 interface RedactForIngestionOptions
@@ -5368,7 +5368,7 @@ interface RedactionSpan
 
 ### `RenderUiArgs`
 
-`interface`
+`interface` — Define arguments required to render a UI including title and schema
 
 ```ts
 interface RenderUiArgs
@@ -5376,7 +5376,7 @@ interface RenderUiArgs
 
 ### `RenderUiResult`
 
-`interface`
+`interface` — Describe the result of rendering UI including the artifact path and exact persisted content
 
 ```ts
 interface RenderUiResult
@@ -5392,7 +5392,7 @@ interface RenderUiResult
 
 ### `ReorderElementOperation`
 
-`interface`
+`interface` — Resolve an operation to reorder an element within its current owner by specifying the target index
 
 ```ts
 interface ReorderElementOperation
@@ -5400,7 +5400,7 @@ interface ReorderElementOperation
 
 ### `ReorderPageOperation`
 
-`interface`
+`interface` — Represent an operation to reorder a page by moving it to a specified index
 
 ```ts
 interface ReorderPageOperation
@@ -5416,7 +5416,7 @@ interface ReorderPageOperation
 
 ### `ReplayTurnEventsOptions`
 
-`interface`
+`interface` — Define options for replaying turn events with control over sequence, polling, and timeout
 
 ```ts
 interface ReplayTurnEventsOptions
@@ -5424,7 +5424,7 @@ interface ReplayTurnEventsOptions
 
 ### `RequestContext`
 
-`interface`
+`interface` — Define the context of a request including IP address, user agent, timestamp, and request ID
 
 ```ts
 interface RequestContext
@@ -5440,7 +5440,7 @@ interface RequestContext
 
 ### `requireElement`
 
-`function`
+`function` — Resolve and return the element, its owner array, and index from the page by element ID
 
 ```ts
 (page: ScenePage, elementId: string) => { element: SceneElement; owner: SceneElement[]; index: number; }
@@ -5448,7 +5448,7 @@ interface RequestContext
 
 ### `requirePage`
 
-`function`
+`function` — Resolve and return a page by ID from a document or throw an error if not found
 
 ```ts
 (document: SceneDocument, pageId: string) => ScenePage
@@ -5464,7 +5464,7 @@ interface RequestContext
 
 ### `resetClientCache`
 
-`function`
+`function` — Reset the client cache to clear stored data and force fresh retrieval
 
 ```ts
 () => void
@@ -5488,7 +5488,7 @@ interface RequestContext
 
 ### `resolveChatTurn`
 
-`function`
+`function` — Resolve a chat turn by determining message reuse and constructing user message parts
 
 ```ts
 (input: { existingMessages: PersistedChatMessageForTurn[]; userContent: string; turnId?: string | undefined; }) => Reso…
@@ -5504,7 +5504,7 @@ interface ResolvedAgentProfile
 
 ### `ResolvedChatTurn`
 
-`interface`
+`interface` — Represent a chat turn with resolved user message insertion and prior message context
 
 ```ts
 interface ResolvedChatTurn
@@ -5512,7 +5512,7 @@ interface ResolvedChatTurn
 
 ### `ResolvedModel`
 
-`interface`
+`interface` — Represent a fully configured model with optional API key and base URL for sandbox platform integration
 
 ```ts
 interface ResolvedModel
@@ -5520,7 +5520,7 @@ interface ResolvedModel
 
 ### `ResolvedSessionHarness`
 
-`interface`
+`interface` — Represent resolved session state including harness, lock status, and swap attempt flag
 
 ```ts
 interface ResolvedSessionHarness
@@ -5528,7 +5528,7 @@ interface ResolvedSessionHarness
 
 ### `ResolvedTangleExecutionKey`
 
-`interface`
+`interface` — Define a resolved key combining an API key with its Tangle execution source
 
 ```ts
 interface ResolvedTangleExecutionKey
@@ -5536,7 +5536,7 @@ interface ResolvedTangleExecutionKey
 
 ### `ResolvedToolCapabilities`
 
-`interface`
+`interface` — Describe resolved capabilities including proposal types and product tool groups to expose
 
 ```ts
 interface ResolvedToolCapabilities
@@ -5552,7 +5552,7 @@ interface ResolvedToolCapabilities
 
 ### `ResolveInteractionConnectionArgs`
 
-`interface`
+`interface` — Define arguments required to resolve interaction connections based on request and intent
 
 ```ts
 interface ResolveInteractionConnectionArgs
@@ -5560,7 +5560,7 @@ interface ResolveInteractionConnectionArgs
 
 ### `resolveModel`
 
-`function`
+`function` — Resolve and return the appropriate model configuration based on provider settings and optional overrides
 
 ```ts
 (config: ProviderResolutionConfig | undefined, override?: { model?: string | undefined; modelApiKey?: string | undefine…
@@ -5568,7 +5568,7 @@ interface ResolveInteractionConnectionArgs
 
 ### `ResolveModelOptions`
 
-`interface`
+`interface` — Resolve options for model configuration including environment variables and default router base URL
 
 ```ts
 interface ResolveModelOptions
@@ -5584,7 +5584,7 @@ interface ResolveModelOptions
 
 ### `resolveSandboxClientCredentials`
 
-`function`
+`function` — Resolve sandbox client credentials based on environment and provided options asynchronously
 
 ```ts
 (options?: ResolveSandboxClientCredentialsOptions) => Promise<SandboxClientCredentials>
@@ -5592,7 +5592,7 @@ interface ResolveModelOptions
 
 ### `ResolveSandboxClientCredentialsOptions`
 
-`interface`
+`interface` — Resolve options for obtaining sandbox client credentials from environment variables and classification
 
 ```ts
 interface ResolveSandboxClientCredentialsOptions
@@ -5608,7 +5608,7 @@ interface ResolveSandboxClientCredentialsOptions
 
 ### `ResolveSessionHarnessInput`
 
-`interface`
+`interface` — Resolve input options to determine the appropriate session harness to use
 
 ```ts
 interface ResolveSessionHarnessInput
@@ -5624,7 +5624,7 @@ interface ResolveSessionHarnessInput
 
 ### `ResolveTangleDevOrUserKeyOptions`
 
-`interface`
+`interface` — Resolve options for retrieving a Tangle developer or user API key based on environment and context
 
 ```ts
 interface ResolveTangleDevOrUserKeyOptions
@@ -5632,7 +5632,7 @@ interface ResolveTangleDevOrUserKeyOptions
 
 ### `resolveTangleExecutionEnvironment`
 
-`function`
+`function` — Resolve the current Tangle execution environment based on provided or process environment variables
 
 ```ts
 (env?: Record<string, string | undefined>) => TangleExecutionEnvironment
@@ -5656,7 +5656,7 @@ interface ResolveTangleDevOrUserKeyOptions
 
 ### `ResolveToolCapabilitiesOptions`
 
-`interface`
+`interface` — Resolve options for determining tool capabilities based on taxonomy, capabilities, and enabled IDs
 
 ```ts
 interface ResolveToolCapabilitiesOptions
@@ -5664,7 +5664,7 @@ interface ResolveToolCapabilitiesOptions
 
 ### `resolveToolId`
 
-`function`
+`function` — Resolve a unique tool identifier from various possible properties or generate a fallback ID
 
 ```ts
 (part: JsonRecord) => string
@@ -5672,7 +5672,7 @@ interface ResolveToolCapabilitiesOptions
 
 ### `resolveToolName`
 
-`function`
+`function` — Resolve the tool name from a JSON record using tool, name, or a default value
 
 ```ts
 (part: JsonRecord) => string
@@ -5688,7 +5688,7 @@ interface ResolveToolCapabilitiesOptions
 
 ### `resolveUserTangleExecutionKeyForUser`
 
-`function`
+`function` — Resolve the Tangle execution key for a specified user using provided environment and API key options
 
 ```ts
 <UserId = string>(opts: ResolveUserTangleExecutionKeyForUserOptions<UserId>) => Promise<ResolvedTangleExecutionKey>
@@ -5696,7 +5696,7 @@ interface ResolveToolCapabilitiesOptions
 
 ### `ResolveUserTangleExecutionKeyForUserOptions`
 
-`interface`
+`interface` — Resolve options for retrieving a user's Tangle execution key with environment and API key access parameters
 
 ```ts
 interface ResolveUserTangleExecutionKeyForUserOptions
@@ -5704,7 +5704,7 @@ interface ResolveUserTangleExecutionKeyForUserOptions
 
 ### `ResolveUserTangleExecutionKeyOptions`
 
-`interface`
+`interface` — Resolve options for retrieving user API keys within a specific Tangle execution environment
 
 ```ts
 interface ResolveUserTangleExecutionKeyOptions
@@ -5736,7 +5736,7 @@ class RetryableStepError
 
 ### `RevealResult`
 
-`interface`
+`interface` — Describe the outcome of a reveal operation including success status, value, and failure reason
 
 ```ts
 interface RevealResult
@@ -5752,7 +5752,7 @@ interface RevealResult
 
 ### `RevealSpanOptions`
 
-`interface`
+`interface` — Define options to decrypt, authorize, and audit the reveal of a span segment
 
 ```ts
 interface RevealSpanOptions
@@ -5776,7 +5776,7 @@ interface RevealSpanOptions
 
 ### `RouterChatProbeConfig`
 
-`interface`
+`interface` — Define configuration options for probing an LLM router with authentication and model details
 
 ```ts
 interface RouterChatProbeConfig
@@ -5808,7 +5808,7 @@ interface RouterModel
 
 ### `runSandboxPrompt`
 
-`function`
+`function` — Resolve a sandbox prompt by streaming and aggregating message parts into a complete string
 
 ```ts
 (shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | PromptInputPart[], options?: StreamSandboxPromptO…
@@ -5816,7 +5816,7 @@ interface RouterModel
 
 ### `runSandboxToolPathSetup`
 
-`function`
+`function` — Resolve the sandbox environment PATH setup by executing the configuration script with given options
 
 ```ts
 (box: SandboxInstance, options: SandboxToolPathOptions) => Promise<Outcome<void>>
@@ -5832,7 +5832,7 @@ type RuntimeEventLike
 
 ### `RuntimeExecutorOptions`
 
-`interface`
+`interface` — Define options for executing runtime tasks with a trusted per-turn context
 
 ```ts
 interface RuntimeExecutorOptions
@@ -5848,7 +5848,7 @@ interface RuntimeExecutorOptions
 
 ### `SandboxApiCredentials`
 
-`interface`
+`interface` — Define credentials required to access the sandbox API environment
 
 ```ts
 interface SandboxApiCredentials
@@ -5864,7 +5864,7 @@ interface SandboxApiCredentials
 
 ### `SandboxAuthProbeConfig`
 
-`interface`
+`interface` — Define configuration options for probing sandbox authentication endpoints
 
 ```ts
 interface SandboxAuthProbeConfig
@@ -5872,7 +5872,7 @@ interface SandboxAuthProbeConfig
 
 ### `SandboxBuildContext`
 
-`interface`
+`interface` — Define the context for building a sandbox including workspace, integrations, and optional user ID
 
 ```ts
 interface SandboxBuildContext
@@ -5880,7 +5880,7 @@ interface SandboxBuildContext
 
 ### `SandboxClientCredentials`
 
-`interface`
+`interface` — Define client credentials for accessing the sandbox environment with API key and base URL
 
 ```ts
 interface SandboxClientCredentials
@@ -5904,7 +5904,7 @@ type SandboxDispatch
 
 ### `SandboxDispatchDoneResult`
 
-`interface`
+`interface` — Define the result of a completed sandbox dispatch including artifact reference and optional cost details
 
 ```ts
 interface SandboxDispatchDoneResult
@@ -5920,7 +5920,7 @@ interface SandboxDispatchInProgressResult
 
 ### `SandboxDispatchInput`
 
-`interface`
+`interface` — Define input parameters for dispatching a mission step in the sandbox environment
 
 ```ts
 interface SandboxDispatchInput
@@ -5928,7 +5928,7 @@ interface SandboxDispatchInput
 
 ### `SandboxDispatchResult`
 
-`type`
+`type` — Resolve the result of a sandbox dispatch as done or in progress
 
 ```ts
 type SandboxDispatchResult
@@ -5944,7 +5944,7 @@ interface SandboxExecChannel
 
 ### `SandboxExecOptions`
 
-`interface`
+`interface` — Define options to execute code within a sandbox environment with optional session control
 
 ```ts
 interface SandboxExecOptions
@@ -5952,7 +5952,7 @@ interface SandboxExecOptions
 
 ### `SandboxFileBytesOutcome`
 
-`type`
+`type` — Represent the outcome of reading sandbox file bytes with success status and corresponding data or error
 
 ```ts
 type SandboxFileBytesOutcome
@@ -5960,7 +5960,7 @@ type SandboxFileBytesOutcome
 
 ### `SandboxFileSizeOutcome`
 
-`type`
+`type` — Resolve the outcome of a sandbox file size check with success status and value or error message
 
 ```ts
 type SandboxFileSizeOutcome
@@ -5968,7 +5968,7 @@ type SandboxFileSizeOutcome
 
 ### `SandboxPermissionLevel`
 
-`type`
+`type` — Define permission levels for sandbox access and control
 
 ```ts
 type SandboxPermissionLevel
@@ -5976,7 +5976,7 @@ type SandboxPermissionLevel
 
 ### `SandboxResourceConfig`
 
-`interface`
+`interface` — Define configuration parameters for sandbox resource allocation and lifecycle management
 
 ```ts
 interface SandboxResourceConfig
@@ -5984,7 +5984,7 @@ interface SandboxResourceConfig
 
 ### `SandboxRestoreSpec`
 
-`interface`
+`interface` — Define the specification for restoring a sandbox from a snapshot or another sandbox ID
 
 ```ts
 interface SandboxRestoreSpec
@@ -5992,7 +5992,7 @@ interface SandboxRestoreSpec
 
 ### `SandboxRuntimeAuthRefreshError`
 
-`class`
+`class` — Represent an error thrown when sandbox runtime authentication refresh fails for a specific stage and name
 
 ```ts
 class SandboxRuntimeAuthRefreshError
@@ -6000,7 +6000,7 @@ class SandboxRuntimeAuthRefreshError
 
 ### `SandboxRuntimeConfig`
 
-`interface`
+`interface` — Define runtime configuration methods for sandbox environments including credentials, metadata, and permissions
 
 ```ts
 interface SandboxRuntimeConfig
@@ -6008,7 +6008,7 @@ interface SandboxRuntimeConfig
 
 ### `SandboxRuntimeConnection`
 
-`interface`
+`interface` — Define a connection configuration for sandbox runtime including URL and optional server-side auth token
 
 ```ts
 interface SandboxRuntimeConnection
@@ -6016,7 +6016,7 @@ interface SandboxRuntimeConnection
 
 ### `SandboxScope`
 
-`interface`
+`interface` — Define a scope containing workspace and optional user identifiers for sandbox environments
 
 ```ts
 interface SandboxScope
@@ -6024,7 +6024,7 @@ interface SandboxScope
 
 ### `SandboxStepTransition`
 
-`type`
+`type` — Define transitions marking the start or finish of a sandbox step with associated details
 
 ```ts
 type SandboxStepTransition
@@ -6032,7 +6032,7 @@ type SandboxStepTransition
 
 ### `SandboxTerminalTokenOptions`
 
-`interface`
+`interface` — Define options for generating a sandbox terminal token including secret and expiration settings
 
 ```ts
 interface SandboxTerminalTokenOptions
@@ -6040,7 +6040,7 @@ interface SandboxTerminalTokenOptions
 
 ### `SandboxTerminalTokenResult`
 
-`interface`
+`interface` — Provide token and expiration details for a sandbox terminal session
 
 ```ts
 interface SandboxTerminalTokenResult
@@ -6048,7 +6048,7 @@ interface SandboxTerminalTokenResult
 
 ### `SandboxTerminalTokenSubject`
 
-`type`
+`type` — Resolve the identity type used for sandbox terminal token subjects
 
 ```ts
 type SandboxTerminalTokenSubject
@@ -6056,7 +6056,7 @@ type SandboxTerminalTokenSubject
 
 ### `SandboxTerminalWsMatch`
 
-`interface`
+`interface` — Define the structure for matching a sandbox terminal WebSocket with workspace and path details
 
 ```ts
 interface SandboxTerminalWsMatch
@@ -6064,7 +6064,7 @@ interface SandboxTerminalWsMatch
 
 ### `sandboxToolBinDir`
 
-`function`
+`function` — Resolve the binary directory path for a sandbox tool based on provided options
 
 ```ts
 (options: SandboxToolPathOptions) => string
@@ -6072,7 +6072,7 @@ interface SandboxTerminalWsMatch
 
 ### `sandboxToolPath`
 
-`function`
+`function` — Resolve the file system path to a specified sandbox tool based on given options
 
 ```ts
 (options: SandboxToolPathOptions & { toolName: string; }) => string
@@ -6080,7 +6080,7 @@ interface SandboxTerminalWsMatch
 
 ### `SandboxToolPathOptions`
 
-`interface`
+`interface` — Define options for resolving sandbox tool paths including appName, baseDir, and binDir
 
 ```ts
 interface SandboxToolPathOptions
@@ -6088,7 +6088,7 @@ interface SandboxToolPathOptions
 
 ### `sandboxToolRootDir`
 
-`function`
+`function` — Resolve the root directory path for a sandbox tool based on provided options
 
 ```ts
 (options: SandboxToolPathOptions) => string
@@ -6096,7 +6096,7 @@ interface SandboxToolPathOptions
 
 ### `SandboxToolSpec`
 
-`interface`
+`interface` — Define the specification for a sandbox tool including its name, content, and optional executability
 
 ```ts
 interface SandboxToolSpec
@@ -6136,7 +6136,7 @@ type SatisfiedByRule
 
 ### `SCENE_ELEMENT_KINDS`
 
-`const`
+`const` — Define all valid kinds of scene elements used in the application
 
 ```ts
 readonly ("text" | "image" | "rect" | "video" | "ellipse" | "line" | "group")[]
@@ -6144,7 +6144,7 @@ readonly ("text" | "image" | "rect" | "video" | "ellipse" | "line" | "group")[]
 
 ### `SCENE_OPERATION_TYPES`
 
-`const`
+`const` — Define all valid operation types for scene manipulation in the application
 
 ```ts
 readonly ("add_element" | "set_attrs" | "reorder_element" | "delete_element" | "group_elements" | "ungroup_element" | "…
@@ -6152,7 +6152,7 @@ readonly ("add_element" | "set_attrs" | "reorder_element" | "delete_element" | "
 
 ### `SCENE_SCHEMA_VERSION`
 
-`const`
+`const` — Define the current version number of the scene schema
 
 ```ts
 1
@@ -6160,7 +6160,7 @@ readonly ("add_element" | "set_attrs" | "reorder_element" | "delete_element" | "
 
 ### `SceneApplyResult`
 
-`type`
+`type` — Represent the result of applying changes to a scene as an element, page, or entire document
 
 ```ts
 type SceneApplyResult
@@ -6176,7 +6176,7 @@ type SceneAttrsPatch
 
 ### `SceneDecision`
 
-`interface`
+`interface` — Define the structure for decisions made within a scene including type, instructions, and metadata
 
 ```ts
 interface SceneDecision
@@ -6184,7 +6184,7 @@ interface SceneDecision
 
 ### `SceneDocument`
 
-`interface`
+`interface` — Define the structure and properties of a scene document including version, title, pages, settings, and metadata
 
 ```ts
 interface SceneDocument
@@ -6192,7 +6192,7 @@ interface SceneDocument
 
 ### `SceneDocumentRecord`
 
-`interface`
+`interface` — Represent a scene document with its current revision number for version tracking
 
 ```ts
 interface SceneDocumentRecord
@@ -6200,7 +6200,7 @@ interface SceneDocumentRecord
 
 ### `SceneElement`
 
-`type`
+`type` — Represent a graphical element in a scene including shapes, text, media, or groups
 
 ```ts
 type SceneElement
@@ -6216,7 +6216,7 @@ interface SceneElementBase
 
 ### `SceneElementKind`
 
-`type`
+`type` — Extract the kind property from a SceneElement to identify its element type
 
 ```ts
 type SceneElementKind
@@ -6224,7 +6224,7 @@ type SceneElementKind
 
 ### `SceneExportFormat`
 
-`type`
+`type` — Define supported formats for exporting a scene including image and JSON options
 
 ```ts
 type SceneExportFormat
@@ -6232,7 +6232,7 @@ type SceneExportFormat
 
 ### `SceneExportRecord`
 
-`interface`
+`interface` — Describe a scene export with its status, format, metadata, and result information
 
 ```ts
 interface SceneExportRecord
@@ -6240,7 +6240,7 @@ interface SceneExportRecord
 
 ### `SceneOperation`
 
-`type`
+`type` — Represent operations that modify scenes by adding, updating, reordering, grouping, or deleting elements and pages
 
 ```ts
 type SceneOperation
@@ -6248,7 +6248,7 @@ type SceneOperation
 
 ### `SceneOperationType`
 
-`type`
+`type` — Extract the type property from a SceneOperation to represent its operation type
 
 ```ts
 type SceneOperationType
@@ -6256,7 +6256,7 @@ type SceneOperationType
 
 ### `ScenePage`
 
-`interface`
+`interface` — Define the structure and properties of a scene page including layout, background, and elements
 
 ```ts
 interface ScenePage
@@ -6264,7 +6264,7 @@ interface ScenePage
 
 ### `ScenePlan`
 
-`interface`
+`interface` — Define a plan summarizing a scene with its description and associated operations
 
 ```ts
 interface ScenePlan
@@ -6272,7 +6272,7 @@ interface ScenePlan
 
 ### `SceneSettings`
 
-`interface`
+`interface` — Define settings for scene export including print conversion factor for unit calculations
 
 ```ts
 interface SceneSettings
@@ -6280,7 +6280,7 @@ interface SceneSettings
 
 ### `SceneStore`
 
-`interface`
+`interface` — Manage scene documents, decisions, and exports with atomic save and revision control
 
 ```ts
 interface SceneStore
@@ -6296,7 +6296,7 @@ interface SceneStoreScope
 
 ### `ScheduleFollowupArgs`
 
-`interface`
+`interface` — Define arguments required to schedule a follow-up with optional priority
 
 ```ts
 interface ScheduleFollowupArgs
@@ -6304,7 +6304,7 @@ interface ScheduleFollowupArgs
 
 ### `ScheduleFollowupResult`
 
-`interface`
+`interface` — Define the result structure for scheduling a follow-up with unique identification and due date
 
 ```ts
 interface ScheduleFollowupResult
@@ -6320,7 +6320,7 @@ interface ScopedMcpServerEntryOptions
 
 ### `ScopedTokenResult`
 
-`interface`
+`interface` — Represent a token with its expiration date and associated scope
 
 ```ts
 interface ScopedTokenResult
@@ -6328,7 +6328,7 @@ interface ScopedTokenResult
 
 ### `secondsToFrames`
 
-`function`
+`function` — Convert seconds to the nearest whole number of frames based on frames per second
 
 ```ts
 (seconds: number, fps: number) => number
@@ -6336,7 +6336,7 @@ interface ScopedTokenResult
 
 ### `SecretStore`
 
-`interface`
+`interface` — Define methods to create, update, retrieve, and delete secrets asynchronously
 
 ```ts
 interface SecretStore
@@ -6344,7 +6344,7 @@ interface SecretStore
 
 ### `secretStoreFromClient`
 
-`function`
+`function` — Resolve a SecretStore interface using the provided SandboxRuntimeConfig shell
 
 ```ts
 (shell: SandboxRuntimeConfig) => SecretStore
@@ -6352,7 +6352,7 @@ interface SecretStore
 
 ### `SecurityHeaderOptions`
 
-`interface`
+`interface` — Define options for configuring security-related HTTP headers including disclaimers and retention labels
 
 ```ts
 interface SecurityHeaderOptions
@@ -6360,7 +6360,7 @@ interface SecurityHeaderOptions
 
 ### `SEQUENCE_EXPORT_FORMATS`
 
-`const`
+`const` — Define supported export formats for sequence outputs including video, subtitle, and metadata types
 
 ```ts
 readonly ["mp4", "otio", "xml", "edl", "vtt", "srt", "contact_sheet"]
@@ -6368,7 +6368,7 @@ readonly ["mp4", "otio", "xml", "edl", "vtt", "srt", "contact_sheet"]
 
 ### `SEQUENCE_MCP_TOOLS`
 
-`const`
+`const` — Resolve an array of immutable sequence MCP tool definitions for timeline and frame operations
 
 ```ts
 readonly SequenceMcpToolDefinition[]
@@ -6376,7 +6376,7 @@ readonly SequenceMcpToolDefinition[]
 
 ### `SEQUENCE_MEDIA_KINDS`
 
-`const`
+`const` — Define the allowed media kinds for sequences including video, image, and audio
 
 ```ts
 readonly ["video", "image", "audio"]
@@ -6384,7 +6384,7 @@ readonly ["video", "image", "audio"]
 
 ### `SEQUENCE_OPERATION_TYPES`
 
-`const`
+`const` — List all valid sequence operation types used in editing workflows
 
 ```ts
 readonly ("place_clip" | "add_caption" | "move_clip" | "trim_clip" | "split_clip" | "set_clip_text" | "set_clip_disable…
@@ -6392,7 +6392,7 @@ readonly ("place_clip" | "add_caption" | "move_clip" | "trim_clip" | "split_clip
 
 ### `SEQUENCE_TRACK_KINDS`
 
-`const`
+`const` — Define immutable sequence track kinds for video, audio, caption, reference, and agent
 
 ```ts
 readonly ["video", "audio", "caption", "reference", "agent"]
@@ -6408,7 +6408,7 @@ type SequenceApplyResult
 
 ### `SequenceClip`
 
-`interface`
+`interface` — Define properties for a media sequence clip including timing, source, track, and caption details
 
 ```ts
 interface SequenceClip
@@ -6424,7 +6424,7 @@ interface SequenceClipMedia
 
 ### `SequenceClipPatch`
 
-`interface`
+`interface` — Define optional properties to update or patch a sequence clip's attributes in a timeline
 
 ```ts
 interface SequenceClipPatch
@@ -6440,7 +6440,7 @@ interface SequenceDecision
 
 ### `SequenceExportFormat`
 
-`type`
+`type` — Define export formats available for sequence data including video, subtitle, and metadata types
 
 ```ts
 type SequenceExportFormat
@@ -6448,7 +6448,7 @@ type SequenceExportFormat
 
 ### `SequenceExportRecord`
 
-`interface`
+`interface` — Describe a record representing the export details and status of a sequence
 
 ```ts
 interface SequenceExportRecord
@@ -6456,7 +6456,7 @@ interface SequenceExportRecord
 
 ### `SequenceExportStatus`
 
-`type`
+`type` — Represent export status of a sequence as queued, processing, completed, failed, or cancelled
 
 ```ts
 type SequenceExportStatus
@@ -6472,7 +6472,7 @@ interface SequenceFrameSnapshot
 
 ### `SequenceMcpToolDefinition`
 
-`interface`
+`interface` — Define a tool with metadata and a run method for processing input within a specific environment
 
 ```ts
 interface SequenceMcpToolDefinition
@@ -6488,7 +6488,7 @@ interface SequenceMcpToolEnv
 
 ### `SequenceMediaKind`
 
-`type`
+`type` — Define media types allowed in a sequence including video, image, and audio
 
 ```ts
 type SequenceMediaKind
@@ -6496,7 +6496,7 @@ type SequenceMediaKind
 
 ### `SequenceMeta`
 
-`interface`
+`interface` — Describe metadata and properties of a media sequence including dimensions, duration, and status
 
 ```ts
 interface SequenceMeta
@@ -6504,7 +6504,7 @@ interface SequenceMeta
 
 ### `SequenceOperation`
 
-`type`
+`type` — Represent sequence editing actions for manipulating clips, tracks, captions, and exports
 
 ```ts
 type SequenceOperation
@@ -6520,7 +6520,7 @@ interface SequenceOperationContext
 
 ### `SequenceOperationType`
 
-`type`
+`type` — Extract the type of operation from a sequence operation object
 
 ```ts
 type SequenceOperationType
@@ -6544,7 +6544,7 @@ readonly ["2025-06-18", "2025-03-26", "2024-11-05"]
 
 ### `SequencesMcpServerInfo`
 
-`interface`
+`interface` — Describe server information including name and version for Sequences MCP integration
 
 ```ts
 interface SequencesMcpServerInfo
@@ -6552,7 +6552,7 @@ interface SequencesMcpServerInfo
 
 ### `SequenceStatus`
 
-`type`
+`type` — Define sequence status as one of the specific lifecycle stages draft, active, exporting, or archived
 
 ```ts
 type SequenceStatus
@@ -6560,7 +6560,7 @@ type SequenceStatus
 
 ### `SequenceStore`
 
-`interface`
+`interface` — Manage sequences by providing methods to get timelines, clips, and modify tracks and clips
 
 ```ts
 interface SequenceStore
@@ -6584,7 +6584,7 @@ interface SequenceTimeline
 
 ### `SequenceTrack`
 
-`interface`
+`interface` — Define properties and state for a sequence track including id, kind, name, order, and flags
 
 ```ts
 interface SequenceTrack
@@ -6608,7 +6608,7 @@ type SequenceTrackKind
 
 ### `SetAttrsOperation`
 
-`interface`
+`interface` — Define an operation to update attributes of a specific element on a page
 
 ```ts
 interface SetAttrsOperation
@@ -6616,7 +6616,7 @@ interface SetAttrsOperation
 
 ### `SetClipDisabledOperation`
 
-`interface`
+`interface` — Define an operation to enable or disable a clip by its identifier
 
 ```ts
 interface SetClipDisabledOperation
@@ -6624,7 +6624,7 @@ interface SetClipDisabledOperation
 
 ### `SetClipTextOperation`
 
-`interface`
+`interface` — Resolve an operation to set clipboard text with optional language and clip identifier
 
 ```ts
 interface SetClipTextOperation
@@ -6632,7 +6632,7 @@ interface SetClipTextOperation
 
 ### `SetDocumentTitleOperation`
 
-`interface`
+`interface` — Define an operation to set the document title to a specified string
 
 ```ts
 interface SetDocumentTitleOperation
@@ -6640,7 +6640,7 @@ interface SetDocumentTitleOperation
 
 ### `SetPageGuidesOperation`
 
-`interface`
+`interface` — Resolve an operation to set guides on a specific page by its identifier
 
 ```ts
 interface SetPageGuidesOperation
@@ -6648,7 +6648,7 @@ interface SetPageGuidesOperation
 
 ### `SetPagePropsOperation`
 
-`interface`
+`interface` — Define an operation to set or update properties of a page including size, background, and bleed
 
 ```ts
 interface SetPagePropsOperation
@@ -6656,7 +6656,7 @@ interface SetPagePropsOperation
 
 ### `SetStepStatusPatch`
 
-`interface`
+`interface` — Define a patch to update the status and optional metadata of a step in a process
 
 ```ts
 interface SetStepStatusPatch
@@ -6664,7 +6664,7 @@ interface SetStepStatusPatch
 
 ### `SharedBillingState`
 
-`interface`
+`interface` — Define shared billing state including user ID, plan, balances, concurrency, and overage permission
 
 ```ts
 interface SharedBillingState
@@ -6688,7 +6688,7 @@ interface SidecarInteractionsConnection
 
 ### `SidecarInteractionsError`
 
-`interface`
+`interface` — Describe error details including code, message, and upstream HTTP status for sidecar interactions
 
 ```ts
 interface SidecarInteractionsError
@@ -6696,7 +6696,7 @@ interface SidecarInteractionsError
 
 ### `SidecarInteractionsResult`
 
-`type`
+`type` — Represent the outcome of sidecar interactions with success or error details
 
 ```ts
 type SidecarInteractionsResult
@@ -6720,7 +6720,7 @@ interface SignObjectUrlArgs
 
 ### `SIZE_PRESETS`
 
-`const`
+`const` — Provide predefined size presets for social, presentation, and print categories
 
 ```ts
 readonly SizePreset[]
@@ -6728,7 +6728,7 @@ readonly SizePreset[]
 
 ### `SizePreset`
 
-`interface`
+`interface` — Define size presets with identifiers, labels, categories, and dimensions for various media types
 
 ```ts
 interface SizePreset
@@ -6736,7 +6736,7 @@ interface SizePreset
 
 ### `SlotFillKind`
 
-`type`
+`type` — Define allowed string literals representing different slot fill kinds
 
 ```ts
 type SlotFillKind
@@ -6768,7 +6768,7 @@ type SlotFillKind
 
 ### `SplitClipOperation`
 
-`interface`
+`interface` — Split a clip at a specified frame inside the clip to create two separate segments
 
 ```ts
 interface SplitClipOperation
@@ -6776,7 +6776,7 @@ interface SplitClipOperation
 
 ### `splitDeferredProfileFiles`
 
-`function`
+`function` — Split profile files into inline deferred files and a lean profile without them
 
 ```ts
 (profile: AgentProfile) => { leanProfile: AgentProfile; deferredFiles: AgentProfileFileMount[]; }
@@ -6784,7 +6784,7 @@ interface SplitClipOperation
 
 ### `stablePlanReceipt`
 
-`function`
+`function` — Resolve a durable follow-up receipt ensuring idempotency for a given plan decision and revision
 
 ```ts
 (scope: DurableChatScope, planId: string, revision: number, decision: DurablePlanDecision, result: Pick<DurablePlanAuth…
@@ -6856,7 +6856,7 @@ type StepOutcome
 
 ### `StepSpanContext`
 
-`interface`
+`interface` — Define context information for a step span including trace, span, and parent span identifiers
 
 ```ts
 interface StepSpanContext
@@ -6864,7 +6864,7 @@ interface StepSpanContext
 
 ### `StoppedSandboxResumeFailure`
 
-`interface`
+`interface` — Describe the failure details when resuming a stopped sandbox instance
 
 ```ts
 interface StoppedSandboxResumeFailure
@@ -6872,7 +6872,7 @@ interface StoppedSandboxResumeFailure
 
 ### `StoppedSandboxResumeRecovery`
 
-`interface`
+`interface` — Define the structure for resuming a stopped sandbox with replacement key and optional restore options
 
 ```ts
 interface StoppedSandboxResumeRecovery
@@ -6896,7 +6896,7 @@ interface StorageConfig
 
 ### `storeApplyScenePlan`
 
-`function`
+`function` — Resolve and apply a scene plan to the store with specified actor context and generate results
 
 ```ts
 (store: SceneStore, plan: ScenePlan, opts: { actorKind: "human_edit" | "agent_edit" | "agent_proposal" | "export" | "no…
@@ -6904,7 +6904,7 @@ interface StorageConfig
 
 ### `storeSecret`
 
-`function`
+`function` — Resolve storing a secret by creating or updating it in the given SecretStore
 
 ```ts
 (store: SecretStore, name: string, value: string) => Promise<Outcome<void>>
@@ -6928,7 +6928,7 @@ interface StreamAppToolLoopOptions
 
 ### `StreamEvent`
 
-`interface`
+`interface` — Define an event object carrying a type and optional JSON data payload
 
 ```ts
 interface StreamEvent
@@ -6944,7 +6944,7 @@ type StreamLoopYield
 
 ### `streamSandboxPrompt`
 
-`function`
+`function` — Resolve and stream AI-generated responses from a sandboxed environment based on input messages and options
 
 ```ts
 (shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | PromptInputPart[], options?: StreamSandboxPromptO…
@@ -6952,7 +6952,7 @@ type StreamLoopYield
 
 ### `StreamSandboxPromptOptions`
 
-`interface`
+`interface` — Define options for configuring and controlling a streaming sandbox prompt session
 
 ```ts
 interface StreamSandboxPromptOptions
@@ -6960,7 +6960,7 @@ interface StreamSandboxPromptOptions
 
 ### `SubmitProposalArgs`
 
-`interface`
+`interface` — Define the arguments required to submit a proposal including type, title, description, and approval status
 
 ```ts
 interface SubmitProposalArgs
@@ -6968,7 +6968,7 @@ interface SubmitProposalArgs
 
 ### `SubmitProposalResult`
 
-`interface`
+`interface` — Describe the result of submitting a proposal including deduplication and execution status
 
 ```ts
 interface SubmitProposalResult
@@ -6976,7 +6976,7 @@ interface SubmitProposalResult
 
 ### `summarize`
 
-`function`
+`function` — Summarize numeric values into a distribution summary including count, min, median, 90th percentile, and max
 
 ```ts
 (values: number[]) => DistributionSummary
@@ -7024,7 +7024,7 @@ type SurfacePermissionValue
 
 ### `SurfaceRegistry`
 
-`interface`
+`interface` — Resolve and build the overlay for a given surface kind within a turn context
 
 ```ts
 interface SurfaceRegistry
@@ -7032,7 +7032,7 @@ interface SurfaceRegistry
 
 ### `syncSandboxMemberAdd`
 
-`function`
+`function` — Resolve adding a user with a specific role to a sandbox and return the operation outcome
 
 ```ts
 (box: SandboxInstance, seam: MemberSyncSeam, userId: string, role: string) => Promise<Outcome<void>>
@@ -7040,7 +7040,7 @@ interface SurfaceRegistry
 
 ### `syncSandboxMemberRemove`
 
-`function`
+`function` — Remove a member from the sandbox while preserving their home directory and handle the outcome
 
 ```ts
 (box: SandboxInstance, userId: string) => Promise<Outcome<void>>
@@ -7048,7 +7048,7 @@ interface SurfaceRegistry
 
 ### `syncSandboxMemberRole`
 
-`function`
+`function` — Synchronize a sandbox member's role by updating permissions based on the provided role mapping
 
 ```ts
 (box: SandboxInstance, seam: MemberSyncSeam, userId: string, role: string) => Promise<Outcome<void>>
@@ -7056,7 +7056,7 @@ interface SurfaceRegistry
 
 ### `TangleBillingEnforcementOptions`
 
-`interface`
+`interface` — Define options for configuring billing enforcement environment variables and overrides
 
 ```ts
 interface TangleBillingEnforcementOptions
@@ -7064,7 +7064,7 @@ interface TangleBillingEnforcementOptions
 
 ### `TangleExecutionEnvironment`
 
-`type`
+`type` — Define the environment context for executing Tangle operations
 
 ```ts
 type TangleExecutionEnvironment
@@ -7072,7 +7072,7 @@ type TangleExecutionEnvironment
 
 ### `TangleExecutionKeyError`
 
-`class`
+`class` — Represent execution key errors with specific codes and HTTP status information
 
 ```ts
 class TangleExecutionKeyError
@@ -7080,7 +7080,7 @@ class TangleExecutionKeyError
 
 ### `TangleExecutionKeyErrorCode`
 
-`type`
+`type` — Define error codes for Tangle execution key issues related to API key and account connection
 
 ```ts
 type TangleExecutionKeyErrorCode
@@ -7088,7 +7088,7 @@ type TangleExecutionKeyErrorCode
 
 ### `tangleExecutionKeyHttpError`
 
-`function`
+`function` — Resolve and format TangleExecutionKey HTTP errors into a standardized error object or return null
 
 ```ts
 (error: unknown) => TangleExecutionKeyHttpError | null
@@ -7096,7 +7096,7 @@ type TangleExecutionKeyErrorCode
 
 ### `TangleExecutionKeyHttpError`
 
-`interface`
+`interface` — Represent HTTP error response containing status, error message, and specific error code
 
 ```ts
 interface TangleExecutionKeyHttpError
@@ -7104,7 +7104,7 @@ interface TangleExecutionKeyHttpError
 
 ### `TangleExecutionKeySource`
 
-`type`
+`type` — Resolve the source of the Tangle execution key as either local environment or user input
 
 ```ts
 type TangleExecutionKeySource
@@ -7136,7 +7136,7 @@ interface TcloudKeyClient
 
 ### `TemplateSlot`
 
-`interface`
+`interface` — Define a slot template specifying its name, page, element, and fill characteristics
 
 ```ts
 interface TemplateSlot
@@ -7160,7 +7160,7 @@ interface TemplateSlot
 
 ### `terminalizeDanglingToolParts`
 
-`function`
+`function` — Resolve dangling tool parts into terminal forms within the given JSON records array
 
 ```ts
 (parts: JsonRecord[]) => JsonRecord[]
@@ -7168,7 +7168,7 @@ interface TemplateSlot
 
 ### `TerminalProxyIdentity`
 
-`interface`
+`interface` — Define identity details for a terminal proxy including user, workspace, and sandbox identifiers
 
 ```ts
 interface TerminalProxyIdentity
@@ -7176,7 +7176,7 @@ interface TerminalProxyIdentity
 
 ### `terminalTokenFromRequest`
 
-`function`
+`function` — Resolve the terminal token from request headers using Authorization or Sec-WebSocket-Protocol fields
 
 ```ts
 (headers: Headers) => string | null
@@ -7184,7 +7184,7 @@ interface TerminalProxyIdentity
 
 ### `TextElement`
 
-`interface`
+`interface` — Define properties for a text element including content, style, alignment, and layout parameters
 
 ```ts
 interface TextElement
@@ -7200,7 +7200,7 @@ interface TextElement
 
 ### `ThemeContractMiss`
 
-`interface`
+`interface` — Describe a missing theme contract variable and where it was referenced
 
 ```ts
 interface ThemeContractMiss
@@ -7208,7 +7208,7 @@ interface ThemeContractMiss
 
 ### `ThemeContractOptions`
 
-`interface`
+`interface` — Define options for scanning source directories and CSS token files in a theme contract
 
 ```ts
 interface ThemeContractOptions
@@ -7216,7 +7216,7 @@ interface ThemeContractOptions
 
 ### `ThemeContractResult`
 
-`interface`
+`interface` — Describe the result of validating a theme contract including success status and missing items
 
 ```ts
 interface ThemeContractResult
@@ -7240,7 +7240,7 @@ interface ThemeContractResult
 
 ### `TimedEvent`
 
-`interface`
+`interface` — Represent a timed event with a timestamp and associated event data
 
 ```ts
 interface TimedEvent
@@ -7256,7 +7256,7 @@ interface TimedEvent
 
 ### `TimelineClipBounds`
 
-`interface`
+`interface` — Define the start frame and duration in frames for a timeline clip's bounds
 
 ```ts
 interface TimelineClipBounds
@@ -7264,7 +7264,7 @@ interface TimelineClipBounds
 
 ### `TimelineInterval`
 
-`interface`
+`interface` — Define a time range with inclusive start and end frame numbers
 
 ```ts
 interface TimelineInterval
@@ -7288,7 +7288,7 @@ interface TimelineInterval
 
 ### `ToolAuthResult`
 
-`type`
+`type` — Represent the result of tool authentication with success context or failure response
 
 ```ts
 type ToolAuthResult
@@ -7368,7 +7368,7 @@ interface TranscriptSegment
 
 ### `TrimClipOperation`
 
-`interface`
+`interface` — Define an operation to trim a clip by adjusting its start, duration, and optional source in/out points
 
 ```ts
 interface TrimClipOperation
@@ -7376,7 +7376,7 @@ interface TrimClipOperation
 
 ### `trimOrNull`
 
-`function`
+`function` — Resolve a string by trimming whitespace or returning null if empty or undefined
 
 ```ts
 (value: string | null | undefined) => string | null
@@ -7400,7 +7400,7 @@ interface TrimClipOperation
 
 ### `TurnEventStore`
 
-`interface`
+`interface` — Manage and query turn events and their lifecycle statuses within a scoped event store
 
 ```ts
 interface TurnEventStore
@@ -7416,7 +7416,7 @@ type TurnStatus
 
 ### `UngroupElementOperation`
 
-`interface`
+`interface` — Resolve an operation to ungroup elements within a specified page and group context
 
 ```ts
 interface UngroupElementOperation
@@ -7432,7 +7432,7 @@ interface UngroupElementOperation
 
 ### `validateAddCaption`
 
-`function`
+`function` — Validate the parameters and context of an AddCaptionOperation within a sequence timeline
 
 ```ts
 (timeline: SequenceTimeline, operation: AddCaptionOperation, ctx: SequenceOperationContext) => void
@@ -7448,7 +7448,7 @@ interface UngroupElementOperation
 
 ### `validateCreateTrack`
 
-`function`
+`function` — Validate that a CreateTrackOperation has a supported kind and a non-empty name
 
 ```ts
 (operation: CreateTrackOperation) => void
@@ -7456,7 +7456,7 @@ interface UngroupElementOperation
 
 ### `validateDeleteClip`
 
-`function`
+`function` — Validate that the clip to delete exists and is mutable in the given timeline
 
 ```ts
 (timeline: SequenceTimeline, operation: DeleteClipOperation) => void
@@ -7464,7 +7464,7 @@ interface UngroupElementOperation
 
 ### `validateExtendSequence`
 
-`function`
+`function` — Validate that the extend sequence operation has a positive duration and exceeds the last clip end frame
 
 ```ts
 (timeline: SequenceTimeline, operation: ExtendSequenceOperation) => void
@@ -7480,7 +7480,7 @@ interface UngroupElementOperation
 
 ### `validateMoveClip`
 
-`function`
+`function` — Validate that a clip move operation is within bounds and targets a compatible unlocked track
 
 ```ts
 (timeline: SequenceTimeline, operation: MoveClipOperation) => void
@@ -7488,7 +7488,7 @@ interface UngroupElementOperation
 
 ### `validatePlaceClip`
 
-`function`
+`function` — Validate the properties and constraints of a PlaceClipOperation within a SequenceTimeline
 
 ```ts
 (timeline: SequenceTimeline, operation: PlaceClipOperation) => void
@@ -7496,7 +7496,7 @@ interface UngroupElementOperation
 
 ### `validateQueueExport`
 
-`function`
+`function` — Validate that the queue export operation uses a supported export format
 
 ```ts
 (operation: QueueExportOperation) => void
@@ -7504,7 +7504,7 @@ interface UngroupElementOperation
 
 ### `validateSceneOperation`
 
-`function`
+`function` — Validate a scene operation against the document to ensure it meets required constraints
 
 ```ts
 (document: SceneDocument, operation: SceneOperation) => void
@@ -7512,7 +7512,7 @@ interface UngroupElementOperation
 
 ### `validateSceneOperations`
 
-`function`
+`function` — Validate each scene operation against the document and throw detailed errors for invalid operations
 
 ```ts
 (document: SceneDocument, operations: SceneOperation[]) => void
@@ -7520,7 +7520,7 @@ interface UngroupElementOperation
 
 ### `validateSequenceOperation`
 
-`function`
+`function` — Validate a sequence operation against the timeline and context to ensure correctness
 
 ```ts
 (timeline: SequenceTimeline, operation: SequenceOperation, ctx: SequenceOperationContext) => void
@@ -7528,7 +7528,7 @@ interface UngroupElementOperation
 
 ### `validateSequenceOperations`
 
-`function`
+`function` — Validate each operation in a sequence against the timeline and context, throwing detailed errors on failure
 
 ```ts
 (timeline: SequenceTimeline, operations: SequenceOperation[], ctx: SequenceOperationContext) => void
@@ -7536,7 +7536,7 @@ interface UngroupElementOperation
 
 ### `validateSetClipDisabled`
 
-`function`
+`function` — Validate that the clip can be disabled within the given timeline and operation constraints
 
 ```ts
 (timeline: SequenceTimeline, operation: SetClipDisabledOperation) => void
@@ -7544,7 +7544,7 @@ interface UngroupElementOperation
 
 ### `validateSetClipText`
 
-`function`
+`function` — Validate that a SetClipTextOperation targets a caption clip with non-empty text and valid language tag
 
 ```ts
 (timeline: SequenceTimeline, operation: SetClipTextOperation) => void
@@ -7560,7 +7560,7 @@ interface UngroupElementOperation
 
 ### `validateSplitClip`
 
-`function`
+`function` — Validate that a split operation on a clip is within valid frame boundaries and conditions
 
 ```ts
 (timeline: SequenceTimeline, operation: SplitClipOperation) => void
@@ -7568,7 +7568,7 @@ interface UngroupElementOperation
 
 ### `validateTrimClip`
 
-`function`
+`function` — Validate that a trim clip operation respects timeline bounds and source frame constraints
 
 ```ts
 (timeline: SequenceTimeline, operation: TrimClipOperation) => void
@@ -7624,7 +7624,7 @@ type VerifyObjectUrlResult
 
 ### `verifySandboxTerminalToken`
 
-`function`
+`function` — Verify the validity of a sandbox terminal token against the expected identity and options
 
 ```ts
 (token: string, expected: TerminalProxyIdentity, opts: SandboxTerminalTokenOptions) => Promise<boolean>
@@ -7632,7 +7632,7 @@ type VerifyObjectUrlResult
 
 ### `verifyTerminalProxyToken`
 
-`function`
+`function` — Verify the authenticity and validity of a terminal proxy token against expected identity and timestamp
 
 ```ts
 (secret: string, token: string, expected: TerminalProxyIdentity, now?: () => number) => Promise<boolean>
@@ -7640,7 +7640,7 @@ type VerifyObjectUrlResult
 
 ### `VideoCaption`
 
-`interface`
+`interface` — Define video caption segments with start and end times and associated text content
 
 ```ts
 interface VideoCaption
@@ -7648,7 +7648,7 @@ interface VideoCaption
 
 ### `VideoContent`
 
-`interface`
+`interface` — Describe video content including duration, scenes, optional audio, captions, and rendered URL
 
 ```ts
 interface VideoContent
@@ -7656,7 +7656,7 @@ interface VideoContent
 
 ### `VideoContentSchema`
 
-`const`
+`const` — Define the schema for validating video content including duration, scenes, audio, captions, and rendered URL
 
 ```ts
 ZodObject<{ durationSeconds: ZodNumber; scenes: ZodArray<ZodDiscriminatedUnion<[ZodObject<{ type: ZodLiteral<"text-anim…
@@ -7664,7 +7664,7 @@ ZodObject<{ durationSeconds: ZodNumber; scenes: ZodArray<ZodDiscriminatedUnion<[
 
 ### `VideoCountdownScene`
 
-`interface`
+`interface` — Define a countdown scene with duration, start time, and optional label for video sequences
 
 ```ts
 interface VideoCountdownScene
@@ -7680,7 +7680,7 @@ interface VideoElement
 
 ### `VideoImageRevealScene`
 
-`interface`
+`interface` — Define a scene that reveals an image with optional caption over a specified duration
 
 ```ts
 interface VideoImageRevealScene
@@ -7688,7 +7688,7 @@ interface VideoImageRevealScene
 
 ### `VideoScene`
 
-`type`
+`type` — Resolve a video scene as one of several specific animation or reveal types
 
 ```ts
 type VideoScene
@@ -7696,7 +7696,7 @@ type VideoScene
 
 ### `VideoSlideScene`
 
-`interface`
+`interface` — Define a video slide scene with duration and associated image slide details
 
 ```ts
 interface VideoSlideScene
@@ -7704,7 +7704,7 @@ interface VideoSlideScene
 
 ### `VideoTextAnimationScene`
 
-`interface`
+`interface` — Define properties for a video scene displaying animated text with optional background and effects
 
 ```ts
 interface VideoTextAnimationScene
@@ -7736,7 +7736,7 @@ type WithAgentActivity
 
 ### `WorkspaceKeyManager`
 
-`interface`
+`interface` — Manage workspace keys by ensuring, rotating, and tracking usage of active child-key secrets
 
 ```ts
 interface WorkspaceKeyManager
@@ -7744,7 +7744,7 @@ interface WorkspaceKeyManager
 
 ### `WorkspaceKeyManagerOptions`
 
-`interface`
+`interface` — Define configuration options for managing workspace keys including provisioning, storage, and cryptography
 
 ```ts
 interface WorkspaceKeyManagerOptions
@@ -7768,7 +7768,7 @@ interface WorkspaceKeyStore
 
 ### `WorkspaceModelKeyUsage`
 
-`interface`
+`interface` — Describe usage and budget details for a workspace model key including expiration and exhaustion status
 
 ```ts
 interface WorkspaceModelKeyUsage
@@ -7776,7 +7776,7 @@ interface WorkspaceModelKeyUsage
 
 ### `WorkspaceSandboxConnectionArgs`
 
-`interface`
+`interface` — Define arguments required to establish a workspace sandbox connection
 
 ```ts
 interface WorkspaceSandboxConnectionArgs
@@ -7784,7 +7784,7 @@ interface WorkspaceSandboxConnectionArgs
 
 ### `WorkspaceSandboxConnectionHandlerOptions`
 
-`interface`
+`interface` — Define options to handle workspace sandbox connections with user authentication and access control
 
 ```ts
 interface WorkspaceSandboxConnectionHandlerOptions
@@ -7792,7 +7792,7 @@ interface WorkspaceSandboxConnectionHandlerOptions
 
 ### `WorkspaceSandboxEnsureContext`
 
-`interface`
+`interface` — Define the context containing workspace and user identifiers for sandbox environment operations
 
 ```ts
 interface WorkspaceSandboxEnsureContext
@@ -7800,7 +7800,7 @@ interface WorkspaceSandboxEnsureContext
 
 ### `WorkspaceSandboxInstanceLike`
 
-`interface`
+`interface` — Define the shape of a workspace sandbox instance including its connection details and status
 
 ```ts
 interface WorkspaceSandboxInstanceLike
@@ -7808,7 +7808,7 @@ interface WorkspaceSandboxInstanceLike
 
 ### `WorkspaceSandboxManager`
 
-`interface`
+`interface` — Manage workspace sandboxes by ensuring their creation and retrieval for specified users
 
 ```ts
 interface WorkspaceSandboxManager
@@ -7816,7 +7816,7 @@ interface WorkspaceSandboxManager
 
 ### `WorkspaceSandboxManagerOptions`
 
-`interface`
+`interface` — Define configuration options for managing and interacting with workspace sandboxes
 
 ```ts
 interface WorkspaceSandboxManagerOptions
@@ -7824,7 +7824,7 @@ interface WorkspaceSandboxManagerOptions
 
 ### `WorkspaceSandboxRuntimeProxyArgs`
 
-`interface`
+`interface` — Define arguments for proxying runtime requests within a workspace sandbox environment
 
 ```ts
 interface WorkspaceSandboxRuntimeProxyArgs
@@ -7832,7 +7832,7 @@ interface WorkspaceSandboxRuntimeProxyArgs
 
 ### `WorkspaceSandboxRuntimeProxyHandlerOptions`
 
-`interface`
+`interface` — Define options for handling workspace sandbox runtime proxy including user, access, credentials, and connection retrieval
 
 ```ts
 interface WorkspaceSandboxRuntimeProxyHandlerOptions
@@ -7840,7 +7840,7 @@ interface WorkspaceSandboxRuntimeProxyHandlerOptions
 
 ### `WorkspaceSandboxTerminalUpgradeHandlerOptions`
 
-`interface`
+`interface` — Define options to handle user authentication, workspace access, and sandbox API credential retrieval
 
 ```ts
 interface WorkspaceSandboxTerminalUpgradeHandlerOptions
@@ -7848,7 +7848,7 @@ interface WorkspaceSandboxTerminalUpgradeHandlerOptions
 
 ### `WriteProfileFilesOptions`
 
-`interface`
+`interface` — Define options to control execution timeout, pacing, and retry behavior when writing profile files
 
 ```ts
 interface WriteProfileFilesOptions
@@ -7856,7 +7856,7 @@ interface WriteProfileFilesOptions
 
 ### `writeProfileFilesToBox`
 
-`function`
+`function` — Write profile files to a sandbox with pacing, retries, and optional execution timeout handling
 
 ```ts
 (box: SandboxInstance, files: AgentProfileFileMount[], options?: WriteProfileFilesOptions) => Promise<Outcome<void>>

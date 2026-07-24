@@ -16,7 +16,7 @@ Source: `src/theme-contract/index.ts`
 
 ### `ThemeContractMiss`
 
-`interface`
+`interface` — Describe a missing theme contract variable and where it was referenced
 
 ```ts
 interface ThemeContractMiss
@@ -24,7 +24,7 @@ interface ThemeContractMiss
 
 ### `ThemeContractOptions`
 
-`interface`
+`interface` — Define options for scanning source directories and CSS token files in a theme contract
 
 ```ts
 interface ThemeContractOptions
@@ -32,7 +32,7 @@ interface ThemeContractOptions
 
 ### `ThemeContractResult`
 
-`interface`
+`interface` — Describe the result of validating a theme contract including success status and missing items
 
 ```ts
 interface ThemeContractResult

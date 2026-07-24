@@ -8,6 +8,7 @@ import { ok, fail, type Outcome } from './outcome'
 
 // Terminal-proxy HMAC token. Identity tuple is generic; the secret comes from a
 // closure (fail-loud if absent).
+/** Define identity details for a terminal proxy including user, workspace, and sandbox identifiers */
 export interface TerminalProxyIdentity {
   userId: string
   workspaceId: string
@@ -16,6 +17,7 @@ export interface TerminalProxyIdentity {
 
 const TERMINAL_PROXY_TOKEN_TTL_MS = 15 * 60 * 1000
 
+/** Generate a signed token for TerminalProxyIdentity with an expiration based on TTL milliseconds */
 export async function mintTerminalProxyToken(
   secret: string,
   identity: TerminalProxyIdentity,
@@ -33,6 +35,7 @@ export async function mintTerminalProxyToken(
   return ok({ token: `${encoded}.${sig}`, expiresAt })
 }
 
+/** Verify the authenticity and validity of a terminal proxy token against expected identity and timestamp */
 export async function verifyTerminalProxyToken(
   secret: string,
   token: string,

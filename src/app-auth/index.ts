@@ -45,6 +45,7 @@ export interface AppAuthEmailClient {
   }
 }
 
+/** Define email configuration for app authentication including client, sender, verification, and warning options */
 export interface AppAuthEmailConfig {
   /** A Resend-style client, or a lazy getter returning null when the API key
    *  is absent (the products' dev default — mail is skipped with a warning,
@@ -66,6 +67,7 @@ export interface AppAuthSocialProviderConfig {
   clientSecret?: string
 }
 
+/** Define social authentication configuration options for GitHub and Google providers */
 export interface AppAuthSocialConfig {
   github?: AppAuthSocialProviderConfig
   google?: AppAuthSocialProviderConfig
@@ -99,6 +101,7 @@ export interface AppAuthSsoConfig {
   log?: (message: string, error?: unknown) => void
 }
 
+/** Define the structure for application authentication data including users, sessions, accounts, and verifications */
 export interface AppAuthSchema {
   users: unknown
   sessions: unknown
@@ -106,6 +109,7 @@ export interface AppAuthSchema {
   verifications: unknown
 }
 
+/** Define configuration settings for app authentication including app name, base URL, secrets, and trusted origins */
 export interface AppAuthConfig {
   /** Product name — used in email subjects and as the cookie-prefix default. */
   appName: string
@@ -163,6 +167,7 @@ export interface AppAuthSession {
   user: User
 }
 
+/** Define authentication guard with session retrieval and optional SSO handlers for app requests */
 export interface AppAuth extends AuthGuard<AppAuthSession> {
   auth: AppAuthInstance
   /** `auth.api.getSession` over a `Request` — the seam the guards consume. */

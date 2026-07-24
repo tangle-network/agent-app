@@ -8,7 +8,7 @@ Source: `src/web-react/terminal.ts`
 
 ### `SandboxTerminalConnection`
 
-`interface`
+`interface` — Define the connection details and status for a sandbox terminal session
 
 ```ts
 interface SandboxTerminalConnection
@@ -16,7 +16,7 @@ interface SandboxTerminalConnection
 
 ### `SandboxTerminalConnectionResponse`
 
-`interface`
+`interface` — Define the response structure for a sandbox terminal connection including URLs, token, status, and errors
 
 ```ts
 interface SandboxTerminalConnectionResponse
@@ -48,7 +48,7 @@ type TerminalStatusTone
 
 ### `useSandboxTerminalConnection`
 
-`function`
+`function` — Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling
 
 ```ts
 (opts: UseSandboxTerminalConnectionOptions) => UseSandboxTerminalConnectionResult
@@ -56,7 +56,7 @@ type TerminalStatusTone
 
 ### `UseSandboxTerminalConnectionOptions`
 
-`interface`
+`interface` — Define options for configuring a sandbox terminal connection including workspace ID and connection parameters
 
 ```ts
 interface UseSandboxTerminalConnectionOptions
@@ -64,7 +64,7 @@ interface UseSandboxTerminalConnectionOptions
 
 ### `UseSandboxTerminalConnectionResult`
 
-`interface`
+`interface` — Resolve sandbox terminal connection status and provide a method to initiate the connection
 
 ```ts
 interface UseSandboxTerminalConnectionResult

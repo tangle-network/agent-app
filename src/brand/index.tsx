@@ -17,6 +17,7 @@
  */
 import type { ReactNode } from 'react'
 
+/** Define properties to customize the logo variant, size, style, and icon display options */
 export interface LogoProps {
   /** Reserved for future lockups; only the default ('sandbox') exists today. */
   variant?: 'sandbox'
@@ -114,6 +115,7 @@ export function Logo({ variant = 'sandbox', size = 'md', className, iconOnly = f
   )
 }
 
+/** Define properties for a brand header including optional title, children, and CSS class name */
 export interface BrandHeaderProps {
   /** Product name rendered next to the knot. Omit for a mark-only header. */
   title?: string

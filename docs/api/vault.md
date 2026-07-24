@@ -112,7 +112,7 @@ type VaultOperationPhase
 
 ### `VaultPaneProps`
 
-`interface`
+`interface` — Define the properties and render methods for the vault pane UI components
 
 ```ts
 interface VaultPaneProps

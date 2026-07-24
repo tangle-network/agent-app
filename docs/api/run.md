@@ -8,7 +8,7 @@ Source: `src/run/index.ts`
 
 ### `ExecutionMode`
 
-`type`
+`type` — Define execution mode as either router or sandbox
 
 ```ts
 type ExecutionMode
@@ -32,7 +32,7 @@ type ExecutionMode
 
 ### `ProfileHarness`
 
-`type`
+`type` — Resolve a ProfileHarness as a Harness, RouterHarness, null, or undefined value
 
 ```ts
 type ProfileHarness
@@ -56,7 +56,7 @@ type ProfileHarness
 
 ### `RouterHarness`
 
-`type`
+`type` — Provide a type alias for the ROUTER_HARNESS constant to enable consistent router harness usage
 
 ```ts
 type RouterHarness

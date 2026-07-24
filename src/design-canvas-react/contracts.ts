@@ -19,6 +19,7 @@ import type { CanvasRenderPalette } from '../theme/theme'
 // Engine: state + command stack
 // ---------------------------------------------------------------------------
 
+/** Define the state of the editor scene including document, view settings, and selection details */
 export interface EditorSceneState {
   document: SceneDocument
   activePageId: string
@@ -35,6 +36,7 @@ export interface EditorSceneState {
   showBleed: boolean
 }
 
+/** Define a command with execution, undo, and operation methods for scene editing and persistence */
 export interface SceneCommand {
   label: string
   execute(state: EditorSceneState): EditorSceneState
@@ -49,6 +51,7 @@ export interface SceneCommand {
   inverseOperations(): SceneOperation[]
 }
 
+/** Manage and track scene commands with undo, redo, and state subscription capabilities */
 export interface SceneCommandStack {
   execute(command: SceneCommand): void
   /** Apply the top-of-done-stack inverse and return the command (callers use
@@ -88,19 +91,23 @@ export interface SceneCommandStack {
 // Engine: snapping
 // ---------------------------------------------------------------------------
 
+/** Define snap target categories for aligning elements within a layout system */
 export type SnapTargetKind = 'grid' | 'element-edge' | 'element-center' | 'page-edge' | 'page-center' | 'guide'
 
+/** Define a target position and kind for snapping elements on a page */
 export interface SnapTarget {
   /** Page-coordinate position of the snap line. */
   position: number
   kind: SnapTargetKind
 }
 
+/** Define vertical and horizontal collections of snap targets for alignment purposes */
 export interface SnapTargets {
   vertical: SnapTarget[]
   horizontal: SnapTarget[]
 }
 
+/** Define the result of a snap operation including coordinates and active snap lines */
 export interface SnapResult {
   x: number
   y: number
@@ -109,6 +116,7 @@ export interface SnapResult {
   activeHorizontal: SnapTarget | null
 }
 
+/** Resolve snapping targets and apply snapping logic to moving elements within the editor scene */
 export interface SnapEngine {
   /** Collect targets for a gesture: other elements' edges/centers, page
    *  edges/center, saved guides, and grid lines when enabled. `excludeIds`
@@ -122,6 +130,7 @@ export interface SnapEngine {
 // Engine: zoom + pan
 // ---------------------------------------------------------------------------
 
+/** Define methods and properties to calculate zoom and pan transformations between document and screen coordinates */
 export interface ZoomPanMath {
   minZoom: number
   maxZoom: number
@@ -138,6 +147,7 @@ export interface ZoomPanMath {
 // Components: the editor's public props
 // ---------------------------------------------------------------------------
 
+/** Resolve the result of applying a scene update including revision and optional normalized document */
 export interface ApplySceneResult {
   rev: number
   /** Present when the server re-minted ids or normalized the document; the
@@ -171,6 +181,7 @@ export interface ExportTriggerOptions {
  */
 export type DesignCanvasMode = 'edit' | 'review'
 
+/** Define properties and callbacks for configuring and controlling the design canvas editor */
 export interface DesignCanvasProps {
   document: SceneDocument
   /** Revision the document was loaded at; threaded through saves. */

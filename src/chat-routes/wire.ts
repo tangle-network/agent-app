@@ -27,20 +27,24 @@ export interface ChatTurnFilePartInput {
   content?: string
 }
 
+/** Resolve input as either a text part or a file part of a chat turn */
 export type ChatTurnPartInput = ChatTurnTextPartInput | ChatTurnFilePartInput
 
 // ── producer stream vocabulary ───────────────────────────────────────────────
 
+/** Represent a text event produced by a source with a fixed type and associated text content */
 export interface ProducerTextEvent {
   type: 'text'
   text: string
 }
 
+/** Define an event representing reasoning output with a fixed type and associated text */
 export interface ProducerReasoningEvent {
   type: 'reasoning'
   text: string
 }
 
+/** Represent an event triggered by a producer tool call with its identifier, name, and arguments */
 export interface ProducerToolCallEvent {
   type: 'tool_call'
   call: {
@@ -50,6 +54,7 @@ export interface ProducerToolCallEvent {
   }
 }
 
+/** Describe the structure of an event representing the result of a producer tool call */
 export interface ProducerToolResultEvent {
   type: 'tool_result'
   toolCallId: string
@@ -61,6 +66,7 @@ export interface ProducerToolResultEvent {
   }
 }
 
+/** Describe usage event with prompt and completion token counts for a producer */
 export interface ProducerUsageEvent {
   type: 'usage'
   usage: {
@@ -69,6 +75,7 @@ export interface ProducerUsageEvent {
   }
 }
 
+/** Define the structure for a producer notice event with type, id, kind, and text fields */
 export interface ProducerNoticeEvent {
   type: 'notice'
   id: string
@@ -77,6 +84,7 @@ export interface ProducerNoticeEvent {
   text: string
 }
 
+/** Represent an error event emitted by a producer containing message, code, and optional details */
 export interface ProducerErrorEvent {
   type: 'error'
   data: {
@@ -100,6 +108,7 @@ export type ProducerPassthroughEventType =
   | 'session.run.failed'
   | 'turn_status'
 
+/** Define an event carrying passthrough data with flexible properties for producer communication */
 export interface ProducerPassthroughEvent {
   type: ProducerPassthroughEventType
   data?: Record<string, unknown>
@@ -107,6 +116,7 @@ export interface ProducerPassthroughEvent {
   [key: string]: unknown
 }
 
+/** Represent events emitted by a producer during its operation for processing and handling */
 export type ProducerWireEvent =
   | ProducerTextEvent
   | ProducerReasoningEvent
@@ -189,6 +199,7 @@ export function chatTurnRequestInit(payload: ChatTurnRequestPayload): RequestIni
 // (same fail-loud-at-the-choke-point style as /sandbox's provision-payload and
 // env-size gates).
 
+/** Define the maximum byte size allowed for inline parts in data processing */
 export const INLINE_PARTS_MAX_BYTES = 950_000
 
 // ── dispatch (parts[]) budget vocabulary ────────────────────────────────────
@@ -253,6 +264,7 @@ export function formatBytes(bytes: number): string {
   return `${Math.round(bytes / 1024)}KB`
 }
 
+/** Represent errors for invalid chat turn inputs with status and code properties */
 export class ChatTurnInputError extends Error {
   constructor(message: string, readonly status = 400, readonly code = 'INVALID_CHAT_TURN') {
     super(message)
@@ -269,6 +281,7 @@ function partByteSize(part: ChatTurnPartInput): number {
   return bytes
 }
 
+/** Calculate the total byte size of an array of chat turn parts */
 export function promptPartsByteSize(parts: ChatTurnPartInput[]): number {
   return parts.reduce((total, part) => total + partByteSize(part), 0)
 }
@@ -347,6 +360,7 @@ export function mentionKindForPath(path: string): ChatMentionKind {
   return mediaTypeForMentionPath(path) ? 'image' : 'file'
 }
 
+/** Define options to resolve mention paths when converting file mentions to parts */
 export interface FileMentionsToPartsOptions {
   /** Resolve a mention's workspace-relative path to the absolute path the
    *  dispatched part should carry (e.g. a host prefixing the in-box vault
@@ -408,6 +422,7 @@ const MAX_MENTION_NAME_LENGTH = 256
 /** Longest mention path accepted. */
 const MAX_MENTION_PATH_LENGTH = 1024
 
+/** Represent the result of a sandbox mention path check indicating success or failure with an error message */
 export type SandboxMentionPathCheck =
   | { succeeded: true }
   | { succeeded: false; error: string }

@@ -30,6 +30,7 @@ import {
   planToPersistedPart,
 } from '../plans/index'
 
+/** Define methods to manage durable interaction projections including upsert, cancel, and materialize operations */
 export interface DurableInteractionProjectionAdapter {
   upsertAsk(request: InteractionRequestWire): Promise<void>
   cancel(cancel: InteractionCancelData): Promise<void>
@@ -81,6 +82,7 @@ export function createDurableInteractionProjectionAdapter(options: {
   }
 }
 
+/** Resolve chat events and materialize their state into durable records */
 export interface DurableChatEventProjection {
   observe(event: unknown): void | Promise<void>
   materialize(): Array<Record<string, unknown>> | Promise<Array<Record<string, unknown>>>
@@ -152,6 +154,7 @@ export function createDurableChatEventProjection(options: {
   }
 }
 
+/** Define a structured response containing scope, settlement, and intent for durable interactions */
 export interface PreparedDurableInteractionAnswer {
   scope: DurableChatScope
   settlement: DurableInteractionSettlement
@@ -164,6 +167,7 @@ interface DurableInteractionRoutePersistenceBase {
   now?: () => string
 }
 
+/** Define options for durable interaction route persistence with reconciliation guarantees and authority functions */
 export type CreateDurableInteractionRoutePersistenceOptions =
   | (DurableInteractionRoutePersistenceBase & {
       guarantee: 'reconciled'

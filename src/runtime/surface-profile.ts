@@ -83,6 +83,7 @@ export function defineSurfaceKind<TCtx>(opts: {
   return { kind: opts.kind, build: opts.build }
 }
 
+/** Resolve and build the overlay for a given surface kind within a turn context */
 export interface SurfaceRegistry {
   /** Build the overlay for one turn. Throws on an unknown kind — an unknown
    *  surface is a routing bug (client and server registries drifted), and

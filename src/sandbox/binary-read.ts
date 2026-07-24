@@ -23,15 +23,18 @@ export interface SandboxExecChannel {
   ): Promise<{ stdout: string; stderr: string; exitCode: number }>
 }
 
+/** Define options to execute code within a sandbox environment with optional session control */
 export interface SandboxExecOptions {
   /** Run inside a named session rather than the box's default one. */
   sessionId?: string
 }
 
+/** Resolve the outcome of a sandbox file size check with success status and value or error message */
 export type SandboxFileSizeOutcome =
   | { succeeded: true; value: number }
   | { succeeded: false; error: string }
 
+/** Represent the outcome of reading sandbox file bytes with success status and corresponding data or error */
 export type SandboxFileBytesOutcome =
   | { succeeded: true; value: { bytes: Uint8Array; size: number } }
   | { succeeded: false; error: string }

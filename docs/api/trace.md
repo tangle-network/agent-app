@@ -48,7 +48,7 @@ Source: `src/trace/index.ts`
 
 ### `DistributionSummary`
 
-`interface`
+`interface` — Summarize key statistics of a numerical distribution including count, min, percentiles, and max
 
 ```ts
 interface DistributionSummary
@@ -64,7 +64,7 @@ interface FlowSpan
 
 ### `FlowTrace`
 
-`interface`
+`interface` — Describe the structure of a flow trace including spans, timing, tokens, cost, and tool calls
 
 ```ts
 interface FlowTrace
@@ -88,7 +88,7 @@ interface LoopTraceEventLike
 
 ### `MissionFlowStep`
 
-`interface`
+`interface` — Define a step in a mission flow with id, intent, optional status, start time, and duration
 
 ```ts
 interface MissionFlowStep
@@ -128,7 +128,7 @@ interface MissionTraceContext
 
 ### `StepSpanContext`
 
-`interface`
+`interface` — Define context information for a step span including trace, span, and parent span identifiers
 
 ```ts
 interface StepSpanContext
@@ -136,7 +136,7 @@ interface StepSpanContext
 
 ### `summarize`
 
-`function`
+`function` — Summarize numeric values into a distribution summary including count, min, median, 90th percentile, and max
 
 ```ts
 (values: number[]) => DistributionSummary
@@ -144,7 +144,7 @@ interface StepSpanContext
 
 ### `TimedEvent`
 
-`interface`
+`interface` — Represent a timed event with a timestamp and associated event data
 
 ```ts
 interface TimedEvent

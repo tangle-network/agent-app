@@ -8,6 +8,7 @@
 
 import { isTangleBillingEnforcementDisabled } from '../runtime/model'
 
+/** Define options for configuring authentication guard behavior and session retrieval */
 export interface AuthGuardOptions<Session> {
   /** e.g. a better-auth `auth.api.getSession` wrapped by the app. */
   getSession(request: Request): Promise<Session | null | undefined>
@@ -15,6 +16,7 @@ export interface AuthGuardOptions<Session> {
   loginPath?: string
 }
 
+/** Resolve user authentication and session requirements for page and API requests */
 export interface AuthGuard<Session> {
   /** Page guard — throws a 302 redirect Response to `loginPath`. */
   requireUser(request: Request): Promise<Session>
@@ -25,6 +27,7 @@ export interface AuthGuard<Session> {
   getOptionalSession(request: Request): Promise<Session | null>
 }
 
+/** Create an authentication guard that enforces session presence and handles unauthorized access responses */
 export function createAuthGuard<Session>(opts: AuthGuardOptions<Session>): AuthGuard<Session> {
   const loginPath = opts.loginPath ?? '/login'
 
@@ -47,6 +50,7 @@ export function createAuthGuard<Session>(opts: AuthGuardOptions<Session>): AuthG
   }
 }
 
+/** Resolve a value or an HTTP response indicating failure in a guarded operation */
 export type GuardResolution<T> = { ok: true; value: T } | { ok: false; response: Response }
 
 /**
@@ -73,6 +77,7 @@ export function parseAdminEmails(raw: string | null | undefined): string[] {
     .filter(Boolean)
 }
 
+/** Define options to resolve user session and control access based on allowed admin emails */
 export interface AdminGuardOptions<Session> {
   requireUser(request: Request): Promise<Session>
   emailOf(session: Session): string | null | undefined
@@ -93,11 +98,13 @@ export function createAdminGuard<Session>(opts: AdminGuardOptions<Session>): (re
   }
 }
 
+/** Describe the billable balance state including overage permission and remaining USD balance */
 export interface BillableBalanceState {
   overageAllowed: boolean
   remainingBalanceUsd: number
 }
 
+/** Define options to assert and customize billable balance enforcement behavior */
 export interface AssertBillableBalanceOptions {
   env?: Record<string, string | undefined>
   /** App-specific enforcement override flag (e.g. 'GTM_BILLING_ENFORCEMENT'),

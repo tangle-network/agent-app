@@ -8,7 +8,7 @@ Source: `src/vault/lazy.tsx`
 
 ### `VaultPaneLazy`
 
-`function`
+`function` — Resolve VaultPane component lazily to optimize loading and improve performance
 
 ```ts
 LazyExoticComponent<(props: VaultPaneProps) => Element>
@@ -16,7 +16,7 @@ LazyExoticComponent<(props: VaultPaneProps) => Element>
 
 ### `VaultPaneProps`
 
-`interface`
+`interface` — Define the properties and render methods for the vault pane UI components
 
 ```ts
 interface VaultPaneProps

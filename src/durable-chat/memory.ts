@@ -289,6 +289,7 @@ export class InMemoryDurableChatStateStore implements DurablePlanStore {
  * store rather than a state store. Both names refer to the same non-production
  * reference implementation. */
 export const InMemoryDurableChatStore = InMemoryDurableChatStateStore
+/** Create an in-memory durable chat state store for managing chat session data efficiently */
 export function createInMemoryDurableChatStateStore(): InMemoryDurableChatStateStore {
   return new InMemoryDurableChatStateStore()
 }

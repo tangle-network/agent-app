@@ -16,17 +16,25 @@
  */
 
 export const WORKSPACE_ROLES = ['viewer', 'editor', 'admin', 'owner'] as const
+/** Resolve the union type of all possible workspace role string literals from WORKSPACE_ROLES array */
 export type WorkspaceRole = typeof WORKSPACE_ROLES[number]
 
+/** Define the list of roles that can be assigned within a workspace */
 export const ASSIGNABLE_WORKSPACE_ROLES = ['viewer', 'editor', 'admin'] as const
+/** Resolve the set of roles that can be assigned within a workspace */
 export type AssignableWorkspaceRole = typeof ASSIGNABLE_WORKSPACE_ROLES[number]
 
+/** Define the set of fixed roles available within an organization */
 export const ORGANIZATION_ROLES = ['owner', 'admin', 'member', 'billing'] as const
+/** Resolve a role string from the predefined list of organization roles */
 export type OrganizationRole = typeof ORGANIZATION_ROLES[number]
 
+/** Define access levels for workspace collaboration as either read or write */
 export type WorkspaceCollaborationAccess = 'read' | 'write'
+/** Define user roles available within a sandbox workspace environment */
 export type SandboxWorkspaceRole = 'owner' | 'admin' | 'developer' | 'viewer'
 
+/** Map workspace roles to their corresponding hierarchical rank values */
 export const WORKSPACE_ROLE_RANK: Record<WorkspaceRole, number> = {
   viewer: 0,
   editor: 1,
@@ -34,6 +42,7 @@ export const WORKSPACE_ROLE_RANK: Record<WorkspaceRole, number> = {
   owner: 3,
 }
 
+/** Map organization roles to their hierarchical rank for permission and access control purposes */
 export const ORGANIZATION_ROLE_RANK: Record<OrganizationRole, number> = {
   member: 0,
   billing: 1,
@@ -51,6 +60,7 @@ export function hasOrganizationRole(actual: OrganizationRole, minimum: Organizat
   return ORGANIZATION_ROLE_RANK[actual] >= ORGANIZATION_ROLE_RANK[minimum]
 }
 
+/** Determine if a value is a valid assignable workspace role among viewer, editor, or admin */
 export function isAssignableWorkspaceRole(value: unknown): value is AssignableWorkspaceRole {
   return typeof value === 'string' && ASSIGNABLE_WORKSPACE_ROLES.includes(value as AssignableWorkspaceRole)
 }
@@ -81,10 +91,12 @@ export function canManageWorkspaceMemberRole(actorRole: WorkspaceRole, targetRol
   return actorRole === 'owner' || !hasWorkspaceRole(targetRole, actorRole)
 }
 
+/** Map a workspace role to the corresponding collaboration access level */
 export function workspaceRoleToCollaborationAccess(role: WorkspaceRole): WorkspaceCollaborationAccess {
   return role === 'viewer' ? 'read' : 'write'
 }
 
+/** Map a workspace role to its corresponding sandbox workspace role */
 export function workspaceRoleToSandboxRole(role: WorkspaceRole): SandboxWorkspaceRole {
   const mapping: Record<WorkspaceRole, SandboxWorkspaceRole> = {
     owner: 'owner',

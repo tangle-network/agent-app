@@ -8,7 +8,7 @@ Source: `src/app-auth/index.ts`
 
 ### `AppAuth`
 
-`interface`
+`interface` — Define authentication guard with session retrieval and optional SSO handlers for app requests
 
 ```ts
 interface AppAuth
@@ -16,7 +16,7 @@ interface AppAuth
 
 ### `AppAuthConfig`
 
-`interface`
+`interface` — Define configuration settings for app authentication including app name, base URL, secrets, and trusted origins
 
 ```ts
 interface AppAuthConfig
@@ -32,7 +32,7 @@ interface AppAuthEmailClient
 
 ### `AppAuthEmailConfig`
 
-`interface`
+`interface` — Define email configuration for app authentication including client, sender, verification, and warning options
 
 ```ts
 interface AppAuthEmailConfig
@@ -48,7 +48,7 @@ type AppAuthInstance
 
 ### `AppAuthSchema`
 
-`interface`
+`interface` — Define the structure for application authentication data including users, sessions, accounts, and verifications
 
 ```ts
 interface AppAuthSchema
@@ -64,7 +64,7 @@ interface AppAuthSession
 
 ### `AppAuthSocialConfig`
 
-`interface`
+`interface` — Define social authentication configuration options for GitHub and Google providers
 
 ```ts
 interface AppAuthSocialConfig

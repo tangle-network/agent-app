@@ -73,6 +73,7 @@ export interface ResolvedAgentProfile {
   extraTools: unknown[]
 }
 
+/** Define options for creating an agent runtime including model config and optional profile transformation */
 export interface CreateAgentRuntimeOptions {
   /** The model endpoint the turns stream from. */
   model: AgentRuntimeModelConfig
@@ -105,6 +106,7 @@ export interface CreateAgentRuntimeOptions {
   isOtherExecutableTool?: (toolName: string) => boolean
 }
 
+/** Define options for configuring a single agent turn including context, prior messages, prompts, and event handlers */
 export interface AgentTurnOptions {
   /** The trusted per-turn context (who/where the turn runs as). */
   ctx: AppToolContext
@@ -116,6 +118,7 @@ export interface AgentTurnOptions {
   onProduced?: (event: AppToolProducedEvent) => void
 }
 
+/** Resolve and stream tool execution loops with final results and intermediate events for agent runtime */
 export interface AgentRuntime {
   /** Run the bounded tool loop to completion; resolve with final text + every
    *  executed tool outcome. */

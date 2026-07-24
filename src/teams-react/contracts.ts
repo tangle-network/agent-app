@@ -22,6 +22,7 @@ export interface MemberView {
   inherited?: boolean
 }
 
+/** Define properties and callbacks for managing members and their roles in a workspace panel */
 export interface MembersPanelProps {
   members: MemberView[]
   /** The viewer's effective role — gates which controls are interactive. */
@@ -55,6 +56,7 @@ export interface InvitationView {
   inviteUrl: string
 }
 
+/** Define properties and callbacks for managing workspace invitations and user roles */
 export interface InvitationsPanelProps {
   invitations: InvitationView[]
   /** The viewer's effective role — gates whether the invite controls are interactive. */
@@ -71,8 +73,10 @@ export interface InvitationsPanelProps {
   onNotice?(notice: { kind: 'success' | 'error'; message: string }): void
 }
 
+/** Define possible statuses for the acceptance state of an invitation */
 export type InviteAcceptStatus = 'pending' | 'invalid' | 'already-accepted' | 'expired' | 'revoked'
 
+/** Describe details of an accepted invite including status, workspace, inviter, role, emails, and expiration */
 export interface InviteAcceptDetails {
   status: InviteAcceptStatus
   /** Workspace the invite grants access to. */
@@ -91,6 +95,7 @@ export interface InviteAcceptDetails {
   needsEmailVerification?: boolean
 }
 
+/** Define properties and callbacks for handling invite acceptance and navigation actions on the invite page */
 export interface InviteAcceptPageProps {
   details: InviteAcceptDetails
   /** Accept the invite; resolve with the workspace to navigate to. */

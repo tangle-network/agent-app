@@ -47,12 +47,15 @@ export const KNOWN_HARNESSES = [
   'cli-base',
 ] as const
 
+/** Resolve a valid harness identifier from the predefined KNOWN_HARNESSES array */
 export type Harness = (typeof KNOWN_HARNESSES)[number]
 
+/** Define the default harness to use for code execution and testing environments */
 export const DEFAULT_HARNESS: Harness = 'opencode'
 
 const HARNESS_SET: ReadonlySet<string> = new Set(KNOWN_HARNESSES)
 
+/** Determine if a value is a recognized harness string identifier */
 export function isHarness(value: unknown): value is Harness {
   return typeof value === 'string' && HARNESS_SET.has(value)
 }
@@ -62,6 +65,7 @@ export function coerceHarness(value: unknown, fallback: Harness = DEFAULT_HARNES
   return isHarness(value) ? value : fallback
 }
 
+/** Resolve input options to determine the appropriate session harness to use */
 export interface ResolveSessionHarnessInput {
   /** The harness already locked to this session (recorded at its first turn). */
   sessionHarness?: unknown
@@ -73,6 +77,7 @@ export interface ResolveSessionHarnessInput {
   fallback?: Harness
 }
 
+/** Represent resolved session state including harness, lock status, and swap attempt flag */
 export interface ResolvedSessionHarness {
   /** The harness to actually run — the locked one when the session already has it. */
   harness: Harness

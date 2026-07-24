@@ -8,7 +8,7 @@ Source: `src/durable-chat/index.ts`
 
 ### `applyDurableInteractionAnswer`
 
-`function`
+`function` — Resolve and record the outcome and answers of a durable interaction within the given store and scope
 
 ```ts
 (store: DurablePlanStore, scope: DurableChatScope, interactionId: string, outcome: "declined" | "accepted", answers?: R…
@@ -16,7 +16,7 @@ Source: `src/durable-chat/index.ts`
 
 ### `applyDurableInteractionAsk`
 
-`function`
+`function` — Resolve and upsert a durable interaction ask in the store with optional event and timing parameters
 
 ```ts
 (store: DurablePlanStore, scope: DurableChatScope, request: InteractionRequestWire, options?: { eventId?: string | unde…
@@ -24,7 +24,7 @@ Source: `src/durable-chat/index.ts`
 
 ### `applyDurableInteractionCancel`
 
-`function`
+`function` — Resolve cancellation of a durable interaction with optional reason and event details
 
 ```ts
 (store: DurablePlanStore, scope: DurableChatScope, interactionId: string, reason?: string | undefined, options?: { even…
@@ -40,7 +40,7 @@ Source: `src/durable-chat/index.ts`
 
 ### `createDurableChatScope`
 
-`function`
+`function` — Create a durable chat scope from a non-empty string value
 
 ```ts
 (value: string) => DurableChatScope
@@ -64,7 +64,7 @@ Source: `src/durable-chat/index.ts`
 
 ### `CreateDurableInteractionRoutePersistenceOptions`
 
-`type`
+`type` — Define options for durable interaction route persistence with reconciliation guarantees and authority functions
 
 ```ts
 type CreateDurableInteractionRoutePersistenceOptions
@@ -80,7 +80,7 @@ type CreateDurableInteractionRoutePersistenceOptions
 
 ### `createDurablePlanRoutes`
 
-`function`
+`function` — Build durable plan routes with authorization and effect handling based on provided options
 
 ```ts
 (options: DurablePlanRouteOptions) => DurablePlanRoutes
@@ -88,7 +88,7 @@ type CreateDurableInteractionRoutePersistenceOptions
 
 ### `createInMemoryDurableChatStateStore`
 
-`function`
+`function` — Create an in-memory durable chat state store for managing chat session data efficiently
 
 ```ts
 () => InMemoryDurableChatStateStore
@@ -96,7 +96,7 @@ type CreateDurableInteractionRoutePersistenceOptions
 
 ### `DurableAnswerIntentJournal`
 
-`type`
+`type` — Provide durable methods to manage the lifecycle of answer intents in a plan store
 
 ```ts
 type DurableAnswerIntentJournal
@@ -104,7 +104,7 @@ type DurableAnswerIntentJournal
 
 ### `DurableAnswerIntentRecord`
 
-`interface`
+`interface` — Define the structure for recording durable answer intent details and their states
 
 ```ts
 interface DurableAnswerIntentRecord
@@ -112,7 +112,7 @@ interface DurableAnswerIntentRecord
 
 ### `DurableAnswerIntentState`
 
-`type`
+`type` — Define possible states for a durable answer intent lifecycle
 
 ```ts
 type DurableAnswerIntentState
@@ -120,7 +120,7 @@ type DurableAnswerIntentState
 
 ### `DurableChatConflictError`
 
-`class`
+`class` — Represent conflict errors occurring in durable chat state management
 
 ```ts
 class DurableChatConflictError
@@ -136,7 +136,7 @@ class DurableChatError
 
 ### `DurableChatErrorCode`
 
-`type`
+`type` — Define error codes representing possible Durable Chat failure scenarios
 
 ```ts
 type DurableChatErrorCode
@@ -144,7 +144,7 @@ type DurableChatErrorCode
 
 ### `DurableChatEventProjection`
 
-`interface`
+`interface` — Resolve chat events and materialize their state into durable records
 
 ```ts
 interface DurableChatEventProjection
@@ -152,7 +152,7 @@ interface DurableChatEventProjection
 
 ### `DurableChatGoneError`
 
-`class`
+`class` — Represent durable chat errors indicating the chat plan is no longer available
 
 ```ts
 class DurableChatGoneError
@@ -168,7 +168,7 @@ type DurableChatScope
 
 ### `durableChatScopeKey`
 
-`function`
+`function` — Resolve a valid durable chat scope key from the given scope input
 
 ```ts
 (scope: DurableChatScope) => string
@@ -184,7 +184,7 @@ type DurableChatStateStore
 
 ### `DurableChatUnavailableError`
 
-`class`
+`class` — Represent unavailable durable chat authority errors with status code 503
 
 ```ts
 class DurableChatUnavailableError
@@ -192,7 +192,7 @@ class DurableChatUnavailableError
 
 ### `DurableFollowUpReceipt`
 
-`interface`
+`interface` — Define a durable receipt capturing stable identifiers and state for follow-up decisions
 
 ```ts
 interface DurableFollowUpReceipt
@@ -200,7 +200,7 @@ interface DurableFollowUpReceipt
 
 ### `DurableInteractionAcknowledgement`
 
-`interface`
+`interface` — Represent durable acknowledgement of an interaction with optional authority, status, and timestamp fields
 
 ```ts
 interface DurableInteractionAcknowledgement
@@ -208,7 +208,7 @@ interface DurableInteractionAcknowledgement
 
 ### `DurableInteractionGuarantee`
 
-`type`
+`type` — Define interaction durability levels to specify reconciliation or best-effort guarantees
 
 ```ts
 type DurableInteractionGuarantee
@@ -224,7 +224,7 @@ type DurableInteractionGuarantee
 
 ### `DurableInteractionProjection`
 
-`interface`
+`interface` — Define a durable chat interaction projection with idempotent event tracking and optional tombstone flag
 
 ```ts
 interface DurableInteractionProjection
@@ -232,7 +232,7 @@ interface DurableInteractionProjection
 
 ### `DurableInteractionProjectionAdapter`
 
-`interface`
+`interface` — Define methods to manage durable interaction projections including upsert, cancel, and materialize operations
 
 ```ts
 interface DurableInteractionProjectionAdapter
@@ -240,7 +240,7 @@ interface DurableInteractionProjectionAdapter
 
 ### `DurableInteractionSettlement`
 
-`interface`
+`interface` — Manage durable interaction lifecycles by preparing, acknowledging, finalizing, aborting, and reconciling intents
 
 ```ts
 interface DurableInteractionSettlement
@@ -248,7 +248,7 @@ interface DurableInteractionSettlement
 
 ### `DurableInteractionSettlementFactoryOptions`
 
-`interface`
+`interface` — Define options for creating durable interaction settlement factories including store and optional reconcile authority
 
 ```ts
 interface DurableInteractionSettlementFactoryOptions
@@ -256,7 +256,7 @@ interface DurableInteractionSettlementFactoryOptions
 
 ### `DurableInteractionSettlementOptions`
 
-`interface`
+`interface` — Define options for durable interaction settlement including attempt key, guarantee, and timestamp provider
 
 ```ts
 interface DurableInteractionSettlementOptions
@@ -272,7 +272,7 @@ interface DurablePlanAuthority
 
 ### `DurablePlanAuthorityCurrentResult`
 
-`interface`
+`interface` — Represent the current authoritative state and optional receipt of a durable plan authority
 
 ```ts
 interface DurablePlanAuthorityCurrentResult
@@ -280,7 +280,7 @@ interface DurablePlanAuthorityCurrentResult
 
 ### `DurablePlanAuthorityDecision`
 
-`type`
+`type` — Resolve durable plan authority decisions including approval, rejection, or predefined durable decisions
 
 ```ts
 type DurablePlanAuthorityDecision
@@ -288,7 +288,7 @@ type DurablePlanAuthorityDecision
 
 ### `DurablePlanAuthorityResult`
 
-`interface`
+`interface` — Describe the outcome of an authority's durable plan decision including follow-up and metadata
 
 ```ts
 interface DurablePlanAuthorityResult
@@ -296,7 +296,7 @@ interface DurablePlanAuthorityResult
 
 ### `DurablePlanAuthorization`
 
-`type`
+`type` — Resolve authorization status for durable plans using scopes, responses, or nullish values
 
 ```ts
 type DurablePlanAuthorization
@@ -304,7 +304,7 @@ type DurablePlanAuthorization
 
 ### `DurablePlanCommandJournal`
 
-`type`
+`type` — Pick essential methods to manage and record durable plan command operations
 
 ```ts
 type DurablePlanCommandJournal
@@ -312,7 +312,7 @@ type DurablePlanCommandJournal
 
 ### `DurablePlanCommandKey`
 
-`type`
+`type` — Represent a unique identifier key for durable plan commands
 
 ```ts
 type DurablePlanCommandKey
@@ -320,7 +320,7 @@ type DurablePlanCommandKey
 
 ### `DurablePlanCommandRecord`
 
-`interface`
+`interface` — Define the structure for recording durable plan commands with associated metadata and state information
 
 ```ts
 interface DurablePlanCommandRecord
@@ -328,7 +328,7 @@ interface DurablePlanCommandRecord
 
 ### `DurablePlanCommandState`
 
-`type`
+`type` — Define possible states for a durable plan command in its lifecycle
 
 ```ts
 type DurablePlanCommandState
@@ -336,7 +336,7 @@ type DurablePlanCommandState
 
 ### `DurablePlanDecision`
 
-`type`
+`type` — Represent durable plan outcomes as either approved or rejected
 
 ```ts
 type DurablePlanDecision
@@ -344,7 +344,7 @@ type DurablePlanDecision
 
 ### `DurablePlanEffectRecord`
 
-`interface`
+`interface` — Define the structure for recording the state and metadata of a durable plan effect
 
 ```ts
 interface DurablePlanEffectRecord
@@ -360,7 +360,7 @@ type DurablePlanProjection
 
 ### `DurablePlanRouteAuthorizeArgs`
 
-`interface`
+`interface` — Define arguments for authorizing durable plan route requests with operation and optional plan ID
 
 ```ts
 interface DurablePlanRouteAuthorizeArgs
@@ -368,7 +368,7 @@ interface DurablePlanRouteAuthorizeArgs
 
 ### `DurablePlanRouteOptions`
 
-`interface`
+`interface` — Define options for durable plan routing including store, authority, authorization, and idempotent side effect handling
 
 ```ts
 interface DurablePlanRouteOptions
@@ -376,7 +376,7 @@ interface DurablePlanRouteOptions
 
 ### `DurablePlanRoutes`
 
-`interface`
+`interface` — Define routes handling durable plan requests with current and decide methods
 
 ```ts
 interface DurablePlanRoutes
@@ -384,7 +384,7 @@ interface DurablePlanRoutes
 
 ### `DurablePlanStateStore`
 
-`type`
+`type` — Represent durable storage for plan state management with persistence and reliability guarantees
 
 ```ts
 type DurablePlanStateStore
@@ -392,7 +392,7 @@ type DurablePlanStateStore
 
 ### `DurablePlanStore`
 
-`interface`
+`interface` — Manage durable storage and retrieval of plan projections, commands, and effects within a scoped context
 
 ```ts
 interface DurablePlanStore
@@ -416,7 +416,7 @@ typeof InMemoryDurableChatStateStore
 
 ### `normalizePlanDecision`
 
-`function`
+`function` — Normalize input value to a standardized DurablePlanDecision or return null for invalid inputs
 
 ```ts
 (value: unknown) => DurablePlanDecision | null
@@ -424,7 +424,7 @@ typeof InMemoryDurableChatStateStore
 
 ### `planAuthorityIdempotencyKey`
 
-`function`
+`function` — Generate a unique idempotency key for a plan authority based on scope, plan, revision, and decision
 
 ```ts
 (scope: DurableChatScope, planId: string, revision: number, decision: DurablePlanDecision) => string
@@ -432,7 +432,7 @@ typeof InMemoryDurableChatStateStore
 
 ### `planCommandKey`
 
-`function`
+`function` — Generate a unique key string for a plan command using plan ID, revision, and decision
 
 ```ts
 (planId: string, revision: number, decision: DurablePlanDecision) => string
@@ -440,7 +440,7 @@ typeof InMemoryDurableChatStateStore
 
 ### `planEffectKey`
 
-`function`
+`function` — Generate a unique string key representing the effect of a plan decision within a given scope and revision
 
 ```ts
 (scope: DurableChatScope, planId: string, revision: number, decision: DurablePlanDecision) => string
@@ -448,7 +448,7 @@ typeof InMemoryDurableChatStateStore
 
 ### `PreparedDurableInteractionAnswer`
 
-`interface`
+`interface` — Define a structured response containing scope, settlement, and intent for durable interactions
 
 ```ts
 interface PreparedDurableInteractionAnswer
@@ -472,7 +472,7 @@ interface PreparedDurableInteractionAnswer
 
 ### `stablePlanReceipt`
 
-`function`
+`function` — Resolve a durable follow-up receipt ensuring idempotency for a given plan decision and revision
 
 ```ts
 (scope: DurableChatScope, planId: string, revision: number, decision: DurablePlanDecision, result: Pick<DurablePlanAuth…

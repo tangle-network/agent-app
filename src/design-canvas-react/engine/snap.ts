@@ -26,6 +26,7 @@ const KIND_PRIORITY: Record<SnapTargetKind, number> = {
   'grid':           5,
 }
 
+/** Build a SnapEngine instance to manage snapping targets and behavior within an editor scene */
 export function createSnapEngine(): SnapEngine {
   return {
     collectTargets(state: EditorSceneState, excludeIds: string[]): SnapTargets {

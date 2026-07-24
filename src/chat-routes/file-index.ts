@@ -41,6 +41,7 @@ export interface SandboxFileTreeSource {
   tree(path: string, options?: { maxDepth?: number }): Promise<SandboxTreeResult>
 }
 
+/** Describe a ready file index response with workspace-relative entries and truncation status */
 export interface FileIndexReadyResponse {
   status: 'ready'
   /** Workspace-relative entries. Same shape as `FileMention` (`./wire`) so a
@@ -63,6 +64,7 @@ export interface FileIndexWarmingResponse {
   status: 'warming'
 }
 
+/** Resolve a response indicating the file index is either ready or warming up */
 export type FileIndexResponse = FileIndexReadyResponse | FileIndexWarmingResponse
 
 /** Short-TTL cache seam so repeat popover opens in the same session don't
@@ -73,6 +75,7 @@ export interface FileIndexCache {
   put(key: string, value: FileIndexReadyResponse, options?: { ttlSeconds?: number }): Promise<void> | void
 }
 
+/** Define authorization details and parameters for indexing a file workspace with optional caching and ignore rules */
 export type FileIndexAuthorization =
   | {
       status: 'ready'
@@ -90,6 +93,7 @@ export type FileIndexAuthorization =
   | { status: 'warming' }
   | { status: 'denied'; response: Response }
 
+/** Define options to authorize and configure sandbox file index route behavior */
 export interface CreateSandboxFileIndexRouteOptions {
   /** Authenticate the caller, resolve the sandbox `fs` handle, and signal a
    *  cold box — never provisions or waits. */
@@ -188,6 +192,7 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+/** Resolve a sandbox file index route with authorization, caching, and configurable depth and entries limits */
 export function createSandboxFileIndexRoute(
   options: CreateSandboxFileIndexRouteOptions,
 ): (request: Request) => Promise<Response> {

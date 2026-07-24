@@ -51,6 +51,7 @@ const SENSITIVE_KEYS = new Set([
   'phone',
 ])
 
+/** Define options to customize sensitive data redaction patterns and key names for ingestion */
 export interface RedactForIngestionOptions {
   /** Extra patterns appended to {@link DEFAULT_REDACTION_PATTERNS} for the
    *  string-level scrub (e.g. credit-card). Additive — defaults still apply. */
@@ -203,10 +204,12 @@ export type RedactedDocSegment =
   | { type: 'text'; text: string }
   | { type: 'redacted'; id: string; kind: string; cipher: string }
 
+/** Define a document composed of multiple redacted content segments */
 export interface RedactedDocument {
   segments: RedactedDocSegment[]
 }
 
+/** Define options to encrypt text and specify patterns for redacting sensitive document content */
 export interface BuildRedactedDocumentOptions {
   /** Encrypt one original span value. Wire it to `agent-app/crypto`
    *  (`encryptWithKey` / `createFieldCrypto`). The cipher is what's stored. */
@@ -237,6 +240,7 @@ export async function buildRedactedDocument(
   return { segments }
 }
 
+/** Define options to decrypt, authorize, and audit the reveal of a span segment */
 export interface RevealSpanOptions {
   /** Decrypt a span cipher. Wire to `agent-app/crypto` (`decryptWithKey`). */
   decrypt: (cipher: string) => string | Promise<string>
@@ -246,6 +250,7 @@ export interface RevealSpanOptions {
   onReveal?: (segment: { id: string; kind: string }) => void | Promise<void>
 }
 
+/** Describe the outcome of a reveal operation including success status, value, and failure reason */
 export interface RevealResult {
   ok: boolean
   value?: string

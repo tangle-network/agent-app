@@ -24,7 +24,7 @@ Source: `src/knowledge/index.ts`
 
 ### `KnowledgeRequirementSpec`
 
-`interface`
+`interface` — Define the criteria and conditions required to satisfy a specific knowledge requirement
 
 ```ts
 interface KnowledgeRequirementSpec
@@ -32,7 +32,7 @@ interface KnowledgeRequirementSpec
 
 ### `KnowledgeSignal`
 
-`interface`
+`interface` — Define a signal representing knowledge with confidence level and optional supporting evidence
 
 ```ts
 interface KnowledgeSignal

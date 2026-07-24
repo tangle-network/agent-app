@@ -17,6 +17,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { AssistantClient, AssistantThreadSummary } from "./client";
 import { useAssistantClient } from "./client-context";
 
+/** Manage and interact with a list of assistant threads including loading, refreshing, and removing threads */
 export interface AssistantThreads {
   threads: AssistantThreadSummary[];
   loading: boolean;
@@ -44,6 +45,7 @@ interface ThreadsState {
   ownerClient: AssistantClient | null;
 }
 
+/** Resolve and manage assistant threads state for a given user including pending deletions and refresh logic */
 export function useAssistantThreads(userId: string | null): AssistantThreads {
   const client = useAssistantClient();
   const userRef = useRef(userId);

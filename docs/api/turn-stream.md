@@ -8,7 +8,7 @@ Source: `src/turn-stream/index.ts`
 
 ### `acquireDurableTurnLock`
 
-`function`
+`function` — Acquire a durable turn lock in the specified namespace with given input parameters
 
 ```ts
 (namespace: TurnStreamNamespaceLike, input: AcquireDurableTurnLockInput) => Promise<TurnLockAcquireResult>
@@ -16,7 +16,7 @@ Source: `src/turn-stream/index.ts`
 
 ### `AcquireDurableTurnLockInput`
 
-`interface`
+`interface` — Define input parameters required to acquire a durable turn lock in a workspace thread context
 
 ```ts
 interface AcquireDurableTurnLockInput
@@ -88,7 +88,7 @@ number
 
 ### `CreateDurableTurnLockOptions`
 
-`interface`
+`interface` — Define options for creating a durable turn lock with customizable scope and identification methods
 
 ```ts
 interface CreateDurableTurnLockOptions
@@ -104,7 +104,7 @@ interface CreateDurableTurnLockOptions
 
 ### `createSegmentStore`
 
-`function`
+`function` — Create a SegmentStore with initialized segments and no active execution ID
 
 ```ts
 () => SegmentStore
@@ -112,7 +112,7 @@ interface CreateDurableTurnLockOptions
 
 ### `createTurnLock`
 
-`function`
+`function` — Create a durable turn lock object with timing and scope based on input parameters
 
 ```ts
 (input: TurnLockAcquireInput, now: number, ttlMs?: number) => DurableTurnLock
@@ -128,7 +128,7 @@ interface CreateDurableTurnLockOptions
 
 ### `CreateTurnStreamUpgradeHandlerOptions`
 
-`interface`
+`interface` — Define options for creating a TURN stream upgrade handler including namespace, path, and authorization logic
 
 ```ts
 interface CreateTurnStreamUpgradeHandlerOptions
@@ -176,7 +176,7 @@ interface DurableTurnLock
 
 ### `MemoryTurnStreamChannel`
 
-`interface`
+`interface` — Define an in-memory channel for streaming turn-based data with viewer socket connection support
 
 ```ts
 interface MemoryTurnStreamChannel
@@ -184,7 +184,7 @@ interface MemoryTurnStreamChannel
 
 ### `MemoryTurnStreamHarness`
 
-`interface`
+`interface` — Provide an interface to manage channels and namespaces for memory-based turn stream testing
 
 ```ts
 interface MemoryTurnStreamHarness
@@ -216,7 +216,7 @@ interface MemoryTurnStreamSocket
 
 ### `ReconcileStaleDurableTurnLockOptions`
 
-`interface`
+`interface` — Define options to reconcile stale durable turn locks with context, namespace, workspace, and active lock details
 
 ```ts
 interface ReconcileStaleDurableTurnLockOptions
@@ -224,7 +224,7 @@ interface ReconcileStaleDurableTurnLockOptions
 
 ### `releaseDurableTurnLock`
 
-`function`
+`function` — Release a durable turn lock and indicate if the release was successful or deferred
 
 ```ts
 (namespace: TurnStreamNamespaceLike, input: TurnLockReleaseInput) => Promise<{ released: boolean; deferred?: boolean |…
@@ -240,7 +240,7 @@ interface ReconcileStaleDurableTurnLockOptions
 
 ### `ReleaseInterruptedDurableTurnLockInput`
 
-`interface`
+`interface` — Define input parameters to release an interrupted durable turn lock in a workspace or thread
 
 ```ts
 interface ReleaseInterruptedDurableTurnLockInput
@@ -256,7 +256,7 @@ interface ReleaseInterruptedDurableTurnLockInput
 
 ### `scopeIndexChannelKey`
 
-`function`
+`function` — Generate a unique channel key string based on the provided scope identifier
 
 ```ts
 (scopeId: string) => string
@@ -264,7 +264,7 @@ interface ReleaseInterruptedDurableTurnLockInput
 
 ### `SegmentStore`
 
-`interface`
+`interface` — Define a store managing segments and tracking the active execution identifier
 
 ```ts
 interface SegmentStore
@@ -272,7 +272,7 @@ interface SegmentStore
 
 ### `threadChannelKey`
 
-`function`
+`function` — Generate a unique string key combining workspace and thread identifiers
 
 ```ts
 (workspaceId: string, threadId: string) => string
@@ -288,7 +288,7 @@ number
 
 ### `TURN_STREAM_PATHS`
 
-`const`
+`const` — Provide constant paths for managing chat turn streams and locks
 
 ```ts
 { readonly broadcast: "/broadcast"; readonly lockAcquire: "/chat-turn-lock/acquire"; readonly lockRelease: "/chat-turn-…
@@ -312,7 +312,7 @@ number
 
 ### `TurnLockAcquireInput`
 
-`interface`
+`interface` — Define input parameters required to acquire a turn-based lock in a workspace thread
 
 ```ts
 interface TurnLockAcquireInput
@@ -320,7 +320,7 @@ interface TurnLockAcquireInput
 
 ### `TurnLockAcquireResult`
 
-`type`
+`type` — Resolve the result of attempting to acquire a turn lock indicating success or active lock status
 
 ```ts
 type TurnLockAcquireResult
@@ -352,7 +352,7 @@ interface TurnLockInterruptedReleaseInput
 
 ### `TurnLockReleaseInput`
 
-`interface`
+`interface` — Define input parameters required to release a turn lock in a specific workspace thread
 
 ```ts
 interface TurnLockReleaseInput
@@ -360,7 +360,7 @@ interface TurnLockReleaseInput
 
 ### `TurnLockScope`
 
-`type`
+`type` — Define the scope level for acquiring a turn lock within thread or workspace contexts
 
 ```ts
 type TurnLockScope
@@ -384,7 +384,7 @@ type TurnLockSeamResult
 
 ### `TurnSegment`
 
-`interface`
+`interface` — Represent a segment of a turn containing events, sequence limit, and terminal status
 
 ```ts
 interface TurnSegment
@@ -392,7 +392,7 @@ interface TurnSegment
 
 ### `turnStorageChannelKey`
 
-`function`
+`function` — Generate a storage channel key string for a given turn identifier
 
 ```ts
 (turnId: string) => string
@@ -400,7 +400,7 @@ interface TurnSegment
 
 ### `TurnStreamDO`
 
-`class`
+`class` — Manage per-turn segments and track active threads with durable event storage
 
 ```ts
 class TurnStreamDO
@@ -408,7 +408,7 @@ class TurnStreamDO
 
 ### `TurnStreamDOOptions`
 
-`interface`
+`interface` — Define options to override default TTL and event limits for TURN stream DO operations
 
 ```ts
 interface TurnStreamDOOptions
@@ -456,7 +456,7 @@ interface TurnStreamStorage
 
 ### `TurnStreamStubLike`
 
-`interface`
+`interface` — Resolve a stub interface for handling fetch requests with optional initialization parameters
 
 ```ts
 interface TurnStreamStubLike
@@ -464,7 +464,7 @@ interface TurnStreamStubLike
 
 ### `TurnStreamUpgradeAuthorization`
 
-`type`
+`type` — Represent success or failure of a TURN stream upgrade authorization with optional response data
 
 ```ts
 type TurnStreamUpgradeAuthorization
@@ -472,7 +472,7 @@ type TurnStreamUpgradeAuthorization
 
 ### `workspaceChannelKey`
 
-`function`
+`function` — Generate a unique channel key based on the given workspace identifier
 
 ```ts
 (workspaceId: string) => string

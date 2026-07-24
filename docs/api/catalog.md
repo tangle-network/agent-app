@@ -16,7 +16,7 @@ Source: `src/catalog/index.ts`
 
 ### `CatalogModel`
 
-`interface`
+`interface` — Define the structure and capabilities of a catalog item with optional pricing and feature flags
 
 ```ts
 interface CatalogModel
@@ -32,7 +32,7 @@ interface CatalogModel
 
 ### `ModelCatalog`
 
-`interface`
+`interface` — Define a catalog containing models with a default ID and fetch timestamp
 
 ```ts
 interface ModelCatalog

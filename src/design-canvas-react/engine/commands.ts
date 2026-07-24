@@ -43,6 +43,7 @@ function applyOp(state: EditorSceneState, op: SceneOperation): EditorSceneState 
 // add_element  /  inverse = delete_element
 // ---------------------------------------------------------------------------
 
+/** Define input parameters for adding a scene element with optional index and parent group ID */
 export interface AddElementInput {
   pageId: string
   element: SceneElement
@@ -52,6 +53,7 @@ export interface AddElementInput {
   parentGroupId?: string
 }
 
+/** Create a command to add an element to a scene with optional positioning and grouping */
 export function addElementCommand(input: AddElementInput): SceneCommand {
   const addOp: SceneOperation = {
     type: 'add_element',
@@ -79,6 +81,7 @@ export function addElementCommand(input: AddElementInput): SceneCommand {
 // set_attrs  — THE gesture command (one undo step per drag/transform)
 // ---------------------------------------------------------------------------
 
+/** Define input parameters for setting element attributes within a specific page context */
 export interface SetAttrsInput {
   pageId: string
   elementId: string
@@ -88,6 +91,7 @@ export interface SetAttrsInput {
   priorAttrs: SceneAttrsPatch
 }
 
+/** Create a command to set attributes on a scene element with undo capability */
 export function setAttrsCommand(input: SetAttrsInput): SceneCommand {
   const forwardOp: SceneOperation = {
     type: 'set_attrs',
@@ -115,6 +119,7 @@ export function setAttrsCommand(input: SetAttrsInput): SceneCommand {
 // multi-select set_attrs  — N set_attrs ops, one undo step
 // ---------------------------------------------------------------------------
 
+/** Define an entry linking page and element IDs with current and prior scene attribute patches */
 export interface MultiSetAttrsEntry {
   pageId: string
   elementId: string
@@ -122,6 +127,7 @@ export interface MultiSetAttrsEntry {
   priorAttrs: SceneAttrsPatch
 }
 
+/** Build a scene command to set multiple attributes on elements across pages */
 export function multiSetAttrsCommand(entries: MultiSetAttrsEntry[]): SceneCommand {
   if (entries.length === 0) throw new Error('multiSetAttrsCommand: entries must not be empty')
 
@@ -151,12 +157,14 @@ export function multiSetAttrsCommand(entries: MultiSetAttrsEntry[]): SceneComman
 // reorder_element
 // ---------------------------------------------------------------------------
 
+/** Define input parameters to reorder an element within a page */
 export interface ReorderElementInput {
   pageId: string
   elementId: string
   toIndex: number
 }
 
+/** Resolve a command to reorder an element within a scene by moving it to a specified index */
 export function reorderElementCommand(input: ReorderElementInput): SceneCommand {
   // Capture the element's current index at construction for the inverse
   let capturedFromIndex: number | null = null
@@ -210,12 +218,14 @@ export function reorderElementCommand(input: ReorderElementInput): SceneCommand 
 // delete_element  /  inverse = add_element (full snapshot + index + parent)
 // ---------------------------------------------------------------------------
 
+/** Define input parameters required to delete an element from a specific page in a document */
 export interface DeleteElementInput {
   document: SceneDocument
   pageId: string
   elementId: string
 }
 
+/** Resolve a command to delete an element from a specified page in the document */
 export function deleteElementCommand(input: DeleteElementInput): SceneCommand {
   const page = requirePage(input.document, input.pageId)
   const { element, owner, index } = requireElement(page, input.elementId)
@@ -273,6 +283,7 @@ function findGroupWithChildren(elements: SceneElement[], target: SceneElement[])
 // group_elements  /  inverse = ungroup_element
 // ---------------------------------------------------------------------------
 
+/** Define input parameters for grouping elements within a scene document on a specific page */
 export interface GroupElementsInput {
   document: SceneDocument
   pageId: string
@@ -281,6 +292,7 @@ export interface GroupElementsInput {
   name?: string
 }
 
+/** Create a command to group multiple elements into a single group within a scene */
 export function groupElementsCommand(input: GroupElementsInput): SceneCommand {
   if (input.elementIds.length < 2) {
     throw new Error('groupElementsCommand: requires ≥ 2 elementIds')
@@ -321,12 +333,14 @@ export function groupElementsCommand(input: GroupElementsInput): SceneCommand {
 // ungroup_element  /  inverse = group_elements (re-using original ids)
 // ---------------------------------------------------------------------------
 
+/** Define input parameters required to ungroup elements within a specific page and group */
 export interface UngroupElementInput {
   document: SceneDocument
   pageId: string
   groupId: string
 }
 
+/** Resolve a command to ungroup a group element into its child elements within a scene */
 export function ungroupElementCommand(input: UngroupElementInput): SceneCommand {
   const page = requirePage(input.document, input.pageId)
   const { element } = requireElement(page, input.groupId)
@@ -367,12 +381,14 @@ export function ungroupElementCommand(input: UngroupElementInput): SceneCommand 
 // Page commands
 // ---------------------------------------------------------------------------
 
+/** Define input parameters for adding a new page with optional settings and position index */
 export interface AddPageInput {
   pageId: string
   options?: import('../../design-canvas/model').NewPageOptions
   index?: number
 }
 
+/** Create a command to add a page with optional settings and index in the scene */
 export function addPageCommand(input: AddPageInput): SceneCommand {
   const addOp: SceneOperation = {
     type: 'add_page',
@@ -399,6 +415,7 @@ export function addPageCommand(input: AddPageInput): SceneCommand {
   }
 }
 
+/** Define input parameters required to duplicate a page within a scene document */
 export interface DuplicatePageInput {
   document: SceneDocument
   sourcePageId: string
@@ -406,6 +423,7 @@ export interface DuplicatePageInput {
   pageId: string
 }
 
+/** Create a command to duplicate a page and prepare its deletion operation in the scene */
 export function duplicatePageCommand(input: DuplicatePageInput): SceneCommand {
   requirePage(input.document, input.sourcePageId)
 
@@ -432,11 +450,13 @@ export function duplicatePageCommand(input: DuplicatePageInput): SceneCommand {
   }
 }
 
+/** Define input parameters required to delete a page from a scene document */
 export interface DeletePageInput {
   document: SceneDocument
   pageId: string
 }
 
+/** Delete a page from a document ensuring it is not the last remaining page */
 export function deletePageCommand(input: DeletePageInput): SceneCommand {
   if (input.document.pages.length <= 1) {
     throw new Error('deletePageCommand: cannot delete the last page')
@@ -501,11 +521,13 @@ export function deletePageCommand(input: DeletePageInput): SceneCommand {
   }
 }
 
+/** Define input parameters to reorder a page by specifying its ID and target index */
 export interface ReorderPageInput {
   pageId: string
   toIndex: number
 }
 
+/** Create a command to reorder a page to a specified index within a scene */
 export function reorderPageCommand(input: ReorderPageInput): SceneCommand {
   let capturedFromIndex: number | null = null
 
@@ -541,6 +563,7 @@ export function reorderPageCommand(input: ReorderPageInput): SceneCommand {
   }
 }
 
+/** Define input parameters for setting properties on a specific page within a scene document */
 export interface SetPagePropsInput {
   document: SceneDocument
   pageId: string
@@ -553,6 +576,7 @@ export interface SetPagePropsInput {
   }
 }
 
+/** Build a command to update page properties based on the provided input */
 export function setPagePropsCommand(input: SetPagePropsInput): SceneCommand {
   const page = requirePage(input.document, input.pageId)
   const prior: NonNullable<import('../../design-canvas/operations').SetPagePropsOperation> = {
@@ -580,12 +604,14 @@ export function setPagePropsCommand(input: SetPagePropsInput): SceneCommand {
   }
 }
 
+/** Define input parameters for setting guides on a specific page within a document */
 export interface SetPageGuidesInput {
   document: SceneDocument
   pageId: string
   guides: import('../../design-canvas/model').PageGuides
 }
 
+/** Create a command to update page guides with undo support */
 export function setPageGuidesCommand(input: SetPageGuidesInput): SceneCommand {
   const page = requirePage(input.document, input.pageId)
   const priorGuides = structuredClone(page.guides)
@@ -614,6 +640,7 @@ export function setPageGuidesCommand(input: SetPageGuidesInput): SceneCommand {
 // bind_slot
 // ---------------------------------------------------------------------------
 
+/** Define input parameters for binding a slot within a scene document element */
 export interface BindSlotInput {
   document: SceneDocument
   pageId: string
@@ -621,6 +648,7 @@ export interface BindSlotInput {
   slot: string | null
 }
 
+/** Bind a slot to an element within a page and generate the corresponding scene command */
 export function bindSlotCommand(input: BindSlotInput): SceneCommand {
   const page = requirePage(input.document, input.pageId)
   const { element } = requireElement(page, input.elementId)
@@ -652,11 +680,13 @@ export function bindSlotCommand(input: BindSlotInput): SceneCommand {
 // set_document_title
 // ---------------------------------------------------------------------------
 
+/** Define input parameters for setting the title of a scene document */
 export interface SetDocumentTitleInput {
   document: SceneDocument
   title: string
 }
 
+/** Resolve a command to rename a document title with undo and redo operations */
 export function setDocumentTitleCommand(input: SetDocumentTitleInput): SceneCommand {
   const priorTitle = input.document.title
 

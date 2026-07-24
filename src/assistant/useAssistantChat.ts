@@ -25,6 +25,7 @@ import type {
   PendingProposal,
 } from "./types";
 
+/** Define options for configuring how the assistant sends messages */
 export interface AssistantSendOptions {
   deliveryMode?: AssistantDeliveryMode;
 }
@@ -79,6 +80,7 @@ function uuid(): string {
   return crypto.randomUUID();
 }
 
+/** Define the structure and behavior of an assistant chat session with state, model selection, and message handling */
 export interface AssistantChat {
   state: AssistantState;
   /** Proposal ids whose confirmation is currently in flight (for disabling). */
@@ -110,6 +112,7 @@ export interface AssistantChat {
   restoring: boolean;
 }
 
+/** Manage assistant chat state and interactions for a given user ID with optional configurations */
 export function useAssistantChat(
   userId: string | null,
   options?: UseAssistantChatOptions,

@@ -48,7 +48,7 @@ type ChatPlanStatus
 
 ### `ParsePlanSubmittedResult`
 
-`type`
+`type` — Resolve the result of parsing a plan submission into success with value or failure with error
 
 ```ts
 type ParsePlanSubmittedResult
@@ -56,7 +56,7 @@ type ParsePlanSubmittedResult
 
 ### `persistedPartToPlan`
 
-`function`
+`function` — Resolve a persisted part object into a ChatPlan or return null if the type is not 'plan
 
 ```ts
 (part: Record<string, unknown>) => ChatPlan | null
@@ -72,7 +72,7 @@ type ParsePlanSubmittedResult
 
 ### `planFollowUpTurnId`
 
-`function`
+`function` — Generate a unique follow-up turn ID based on the plan ID and its outcome
 
 ```ts
 (planId: string, outcome: "approved" | "rejected") => string
@@ -80,7 +80,7 @@ type ParsePlanSubmittedResult
 
 ### `planPartKey`
 
-`function`
+`function` — Generate a unique key string for a given plan identifier
 
 ```ts
 (planId: string) => string
@@ -88,7 +88,7 @@ type ParsePlanSubmittedResult
 
 ### `planRevisionKey`
 
-`function`
+`function` — Generate a unique key string for a plan based on its ID and revision number
 
 ```ts
 (planId: string, revision: number) => string
@@ -96,7 +96,7 @@ type ParsePlanSubmittedResult
 
 ### `planToPersistedPart`
 
-`function`
+`function` — Resolve a ChatPlan into its persisted part representation for storage or transmission
 
 ```ts
 (plan: ChatPlan) => ChatPlanPersistedPart

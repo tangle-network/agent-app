@@ -66,6 +66,7 @@ export type { CatalogModel } from '../runtime/model-catalog'
 
 // ── metrics helpers ───────────────────────────────────────────────────────
 
+/** Describe metrics related to a chat message including model, token counts, and duration */
 export interface ChatMessageMetrics {
   modelUsed?: string
   promptTokens?: number
@@ -112,6 +113,7 @@ export interface ToolRunRecord {
   steps: ToolRunStep[]
 }
 
+/** Define properties required to run a drill and handle its closure event */
 export interface RunDrillInProps {
   run: ToolRunRecord
   onClose: () => void
@@ -178,6 +180,7 @@ export function RunDrillIn({ run, onClose }: RunDrillInProps) {
 
 // ── ChatMessages ──────────────────────────────────────────────────────────
 
+/** Describe the structure and state of a tool call within a chat interaction */
 export interface ChatToolCallInfo {
   id: string
   name: string
@@ -207,6 +210,7 @@ export type ChatMessageSegment =
   | { kind: 'text'; content: string }
   | { kind: 'tool'; call: ChatToolCallInfo }
 
+/** Describe the structure and properties of a chat message with roles, content, and optional metadata */
 export interface ChatUiMessage extends ChatMessageMetrics {
   id: string
   role: 'user' | 'assistant' | 'system'
@@ -222,6 +226,7 @@ export interface ChatUiMessage extends ChatMessageMetrics {
   parts?: Array<Record<string, unknown>>
 }
 
+/** Define properties for rendering chat messages with optional models, markdown, extras, and durable cards */
 export interface ChatMessagesProps {
   messages: ChatUiMessage[]
   /** Catalogue models, for per-message cost from pricing. Pass [] to skip cost. */
@@ -279,6 +284,7 @@ export interface ChatEmptyDoor {
   onSelect: () => void
 }
 
+/** Define properties for rendering the chat empty state with customizable text and starting doors */
 export interface ChatEmptyStateProps {
   /** Product name shown next to the Tangle mark. Default "Agent". */
   productName?: string
@@ -332,6 +338,7 @@ export function ChatEmptyState({
   )
 }
 
+/** Handle approval and rejection actions for proposals with asynchronous support */
 export interface ProposalApprovalHandlers {
   onApprove: (proposalId: string, toolCallId: string) => void | Promise<void>
   onReject: (proposalId: string, toolCallId: string) => void | Promise<void>

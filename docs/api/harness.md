@@ -24,7 +24,7 @@ Source: `src/harness/index.ts`
 
 ### `DEFAULT_HARNESS`
 
-`const`
+`const` — Define the default harness to use for code execution and testing environments
 
 ```ts
 "opencode" | "claude-code" | "nanoclaw" | "kimi-code" | "codex" | "amp" | "factory-droids" | "pi" | "hermes" | "forge"…
@@ -32,7 +32,7 @@ Source: `src/harness/index.ts`
 
 ### `Harness`
 
-`type`
+`type` — Resolve a valid harness identifier from the predefined KNOWN_HARNESSES array
 
 ```ts
 type Harness
@@ -40,7 +40,7 @@ type Harness
 
 ### `isHarness`
 
-`function`
+`function` — Determine if a value is a recognized harness string identifier
 
 ```ts
 (value: unknown) => value is "opencode" | "claude-code" | "nanoclaw" | "kimi-code" | "codex" | "amp" | "factory-droids"…
@@ -72,7 +72,7 @@ readonly ["opencode", "claude-code", "nanoclaw", "kimi-code", "codex", "amp", "f
 
 ### `ResolvedSessionHarness`
 
-`interface`
+`interface` — Represent resolved session state including harness, lock status, and swap attempt flag
 
 ```ts
 interface ResolvedSessionHarness
@@ -88,7 +88,7 @@ interface ResolvedSessionHarness
 
 ### `ResolveSessionHarnessInput`
 
-`interface`
+`interface` — Resolve input options to determine the appropriate session harness to use
 
 ```ts
 interface ResolveSessionHarnessInput

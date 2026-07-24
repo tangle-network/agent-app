@@ -33,6 +33,7 @@ export interface CaptionChunk {
   durationFrames: number
 }
 
+/** Define options to configure caption chunk size, duration, and frame rate constraints */
 export interface BuildCaptionChunksOptions {
   /** Upper bound on words per caption; segments split on word boundaries. */
   maxWordsPerChunk?: number
@@ -147,6 +148,7 @@ export function normalizeLanguageTag(tag: string): string {
   return normalized
 }
 
+/** Define options to specify target languages and an optional source language for fan-out operations */
 export interface LanguageFanoutOptions {
   languages: string[]
   /** Excluded from the plan (exact normalized match only — 'en' does not

@@ -8,7 +8,7 @@ Source: `src/platform/index.ts`
 
 ### `AdminGuardOptions`
 
-`interface`
+`interface` — Define options to resolve user session and control access based on allowed admin emails
 
 ```ts
 interface AdminGuardOptions
@@ -24,7 +24,7 @@ interface AdminGuardOptions
 
 ### `AssertBillableBalanceOptions`
 
-`interface`
+`interface` — Define options to assert and customize billable balance enforcement behavior
 
 ```ts
 interface AssertBillableBalanceOptions
@@ -32,7 +32,7 @@ interface AssertBillableBalanceOptions
 
 ### `AuthGuard`
 
-`interface`
+`interface` — Resolve user authentication and session requirements for page and API requests
 
 ```ts
 interface AuthGuard
@@ -40,7 +40,7 @@ interface AuthGuard
 
 ### `AuthGuardOptions`
 
-`interface`
+`interface` — Define options for configuring authentication guard behavior and session retrieval
 
 ```ts
 interface AuthGuardOptions
@@ -48,7 +48,7 @@ interface AuthGuardOptions
 
 ### `BetterAuthSessionCookieMinterOptions`
 
-`interface`
+`interface` — Define options to customize warning behavior for shadowed cookie names in authentication sessions
 
 ```ts
 interface BetterAuthSessionCookieMinterOptions
@@ -64,7 +64,7 @@ interface BetterAuthSessionCookieSource
 
 ### `BillableBalanceState`
 
-`interface`
+`interface` — Describe the billable balance state including overage permission and remaining USD balance
 
 ```ts
 interface BillableBalanceState
@@ -80,7 +80,7 @@ interface BillableBalanceState
 
 ### `createAuthGuard`
 
-`function`
+`function` — Create an authentication guard that enforces session presence and handles unauthorized access responses
 
 ```ts
 <Session>(opts: AuthGuardOptions<Session>) => AuthGuard<Session>
@@ -96,7 +96,7 @@ interface BillableBalanceState
 
 ### `createHubProxyRoutes`
 
-`function`
+`function` — Resolve hub proxy routes with authentication and error handling based on the given context
 
 ```ts
 (ctx: HubProxyContext) => HubProxyRoutes
@@ -104,7 +104,7 @@ interface BillableBalanceState
 
 ### `createPlatformBillingHttp`
 
-`function`
+`function` — Create a PlatformBillingHttp instance configured with given options and default behaviors
 
 ```ts
 (opts: PlatformBillingHttpOptions) => PlatformBillingHttp
@@ -128,7 +128,7 @@ interface BillableBalanceState
 
 ### `createTangleSsoHandlers`
 
-`function`
+`function` — Create Tangle SSO handlers to manage authentication state, callbacks, and session cookies
 
 ```ts
 (opts: TangleSsoHandlerOptions) => TangleSsoHandlers
@@ -144,7 +144,7 @@ interface BillableBalanceState
 
 ### `DEFAULT_TANGLE_TIER_POLICY`
 
-`const`
+`const` — Define default concurrency and overage policies for each TanglePlanTier level
 
 ```ts
 Record<TanglePlanTier, TangleTierPolicy>
@@ -176,7 +176,7 @@ Record<TanglePlanTier, TangleTierPolicy>
 
 ### `GuardResolution`
 
-`type`
+`type` — Resolve a value or an HTTP response indicating failure in a guarded operation
 
 ```ts
 type GuardResolution
@@ -192,7 +192,7 @@ interface HubClientLike
 
 ### `HubProxyContext`
 
-`interface`
+`interface` — Define methods to require user ID, get bearer token, and create a hub client bound to the bearer
 
 ```ts
 interface HubProxyContext
@@ -200,7 +200,7 @@ interface HubProxyContext
 
 ### `HubProxyRouteArgs`
 
-`interface`
+`interface` — Define arguments for configuring a proxy route with request and optional parameters
 
 ```ts
 interface HubProxyRouteArgs
@@ -208,7 +208,7 @@ interface HubProxyRouteArgs
 
 ### `HubProxyRoutes`
 
-`interface`
+`interface` — Define routes for hub proxy handling catalog, connections, healthchecks, and authorization actions
 
 ```ts
 interface HubProxyRoutes
@@ -272,7 +272,7 @@ interface HubProxyRoutes
 
 ### `PlatformBalanceSnapshot`
 
-`interface`
+`interface` — Describe the platform balance and lifetime spending with an optional update timestamp
 
 ```ts
 interface PlatformBalanceSnapshot
@@ -280,7 +280,7 @@ interface PlatformBalanceSnapshot
 
 ### `PlatformBillingHttp`
 
-`interface`
+`interface` — Define methods to interact with platform billing endpoints using user or service authentication
 
 ```ts
 interface PlatformBillingHttp
@@ -288,7 +288,7 @@ interface PlatformBillingHttp
 
 ### `PlatformBillingHttpError`
 
-`class`
+`class` — Represent platform billing HTTP errors with status code and detailed message
 
 ```ts
 class PlatformBillingHttpError
@@ -296,7 +296,7 @@ class PlatformBillingHttpError
 
 ### `PlatformBillingHttpOptions`
 
-`interface`
+`interface` — Define HTTP options for platform billing including base URL, service token, product slug, fetch implementation, and timeout
 
 ```ts
 interface PlatformBillingHttpOptions
@@ -304,7 +304,7 @@ interface PlatformBillingHttpOptions
 
 ### `PlatformIdentityStore`
 
-`interface`
+`interface` — Define a contract for resolving platform identities based on user identifiers
 
 ```ts
 interface PlatformIdentityStore
@@ -312,7 +312,7 @@ interface PlatformIdentityStore
 
 ### `PlatformSubscriptionInfo`
 
-`interface`
+`interface` — Describe subscription tier and status information for a platform user
 
 ```ts
 interface PlatformSubscriptionInfo
@@ -320,7 +320,7 @@ interface PlatformSubscriptionInfo
 
 ### `PlatformUsageProductRow`
 
-`interface`
+`interface` — Describe a product's usage and spending metrics on the platform
 
 ```ts
 interface PlatformUsageProductRow
@@ -344,7 +344,7 @@ interface ProductEntitlement
 
 ### `ResolvedTangleHubBearer`
 
-`interface`
+`interface` — Represent a resolved bearer token with its associated TangleHub bearer source
 
 ```ts
 interface ResolvedTangleHubBearer
@@ -360,7 +360,7 @@ interface ResolvedTangleHubBearer
 
 ### `resolveUserTangleHubBearerForUser`
 
-`function`
+`function` — Resolve the TangleHub bearer token for a specified user based on provided options
 
 ```ts
 <UserId = string>(opts: ResolveUserTangleHubBearerForUserOptions<UserId>) => Promise<ResolvedTangleHubBearer>
@@ -368,7 +368,7 @@ interface ResolvedTangleHubBearer
 
 ### `ResolveUserTangleHubBearerForUserOptions`
 
-`interface`
+`interface` — Resolve options for retrieving a TangleHub bearer token for a specified user
 
 ```ts
 interface ResolveUserTangleHubBearerForUserOptions
@@ -376,7 +376,7 @@ interface ResolveUserTangleHubBearerForUserOptions
 
 ### `ResolveUserTangleHubBearerOptions`
 
-`interface`
+`interface` — Resolve options required to obtain a user's TangleHub bearer token including environment and API key retrieval
 
 ```ts
 interface ResolveUserTangleHubBearerOptions
@@ -384,7 +384,7 @@ interface ResolveUserTangleHubBearerOptions
 
 ### `SeatBillingFlagOptions`
 
-`interface`
+`interface` — Define options to configure seat billing flag environment variables and override flag name
 
 ```ts
 interface SeatBillingFlagOptions
@@ -416,7 +416,7 @@ type SeatStatus
 
 ### `SsoStateConfig`
 
-`interface`
+`interface` — Define configuration options for managing SSO state including secret, lifetime, and clock injection
 
 ```ts
 interface SsoStateConfig
@@ -424,7 +424,7 @@ interface SsoStateConfig
 
 ### `TangleBearerMissingError`
 
-`class`
+`class` — Represent missing Tangle platform link error for a specified user ID
 
 ```ts
 class TangleBearerMissingError
@@ -440,7 +440,7 @@ type TangleHubBearerSource
 
 ### `TanglePlanTier`
 
-`type`
+`type` — Define available subscription tiers for the TanglePlan service
 
 ```ts
 type TanglePlanTier
@@ -464,7 +464,7 @@ interface TangleSsoAuthClient
 
 ### `TangleSsoExchangeResult`
 
-`interface`
+`interface` — Describe the result of exchanging SSO credentials including API key, user info, and optional plan details
 
 ```ts
 interface TangleSsoExchangeResult
@@ -472,7 +472,7 @@ interface TangleSsoExchangeResult
 
 ### `TangleSsoHandlerOptions`
 
-`interface`
+`interface` — Define configuration options for handling Tangle SSO authentication and session management
 
 ```ts
 interface TangleSsoHandlerOptions
@@ -480,7 +480,7 @@ interface TangleSsoHandlerOptions
 
 ### `TangleSsoHandlers`
 
-`interface`
+`interface` — Define handlers for SSO start and callback routes managing authentication flow and session cookies
 
 ```ts
 interface TangleSsoHandlers
@@ -504,7 +504,7 @@ class TangleSsoUserCreateError
 
 ### `TangleTierPolicy`
 
-`interface`
+`interface` — Define policy settings for concurrency and overage allowance in a tangle tier
 
 ```ts
 interface TangleTierPolicy
@@ -512,7 +512,7 @@ interface TangleTierPolicy
 
 ### `TangleTierState`
 
-`interface`
+`interface` — Describe the state of a Tangle plan tier including subscription, balance, spending, and concurrency details
 
 ```ts
 interface TangleTierState

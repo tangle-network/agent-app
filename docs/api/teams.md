@@ -8,7 +8,7 @@ Source: `src/teams/index.ts`
 
 ### `ASSIGNABLE_WORKSPACE_ROLES`
 
-`const`
+`const` — Define the list of roles that can be assigned within a workspace
 
 ```ts
 readonly ["viewer", "editor", "admin"]
@@ -16,7 +16,7 @@ readonly ["viewer", "editor", "admin"]
 
 ### `AssignableWorkspaceRole`
 
-`type`
+`type` — Resolve the set of roles that can be assigned within a workspace
 
 ```ts
 type AssignableWorkspaceRole
@@ -48,7 +48,7 @@ type AssignableWorkspaceRole
 
 ### `getInvitationExpiresAt`
 
-`function`
+`function` — Calculate the expiration date of an invitation based on the given or current date
 
 ```ts
 (now?: Date) => Date
@@ -72,7 +72,7 @@ type AssignableWorkspaceRole
 
 ### `INVITATION_EXPIRY_DAYS`
 
-`const`
+`const` — Define the number of days before an invitation expires
 
 ```ts
 7
@@ -80,7 +80,7 @@ type AssignableWorkspaceRole
 
 ### `InvitationEmailBrand`
 
-`interface`
+`interface` — Define the structure for an invitation email brand including the RFC-5322 From header
 
 ```ts
 interface InvitationEmailBrand
@@ -88,7 +88,7 @@ interface InvitationEmailBrand
 
 ### `InvitationEmailStatus`
 
-`type`
+`type` — Define possible statuses for the sending state of an invitation email
 
 ```ts
 type InvitationEmailStatus
@@ -104,7 +104,7 @@ type InvitationPermission
 
 ### `InvitationStatus`
 
-`type`
+`type` — Define possible states for an invitation's lifecycle including pending, accepted, expired, and revoked
 
 ```ts
 type InvitationStatus
@@ -112,7 +112,7 @@ type InvitationStatus
 
 ### `InviteRejectionReason`
 
-`type`
+`type` — Define possible reasons for rejecting an invite including acceptance, expiration, or email mismatch
 
 ```ts
 type InviteRejectionReason
@@ -128,7 +128,7 @@ interface InviteTokenState
 
 ### `inviteUrlForToken`
 
-`function`
+`function` — Generate an invite URL by combining the origin with an encoded token
 
 ```ts
 (origin: string, token: string) => string
@@ -136,7 +136,7 @@ interface InviteTokenState
 
 ### `InviteValidationResult`
 
-`interface`
+`interface` — Represent the outcome of validating an invite with success status and optional rejection reason
 
 ```ts
 interface InviteValidationResult
@@ -144,7 +144,7 @@ interface InviteValidationResult
 
 ### `isAssignableWorkspaceRole`
 
-`function`
+`function` — Determine if a value is a valid assignable workspace role among viewer, editor, or admin
 
 ```ts
 (value: unknown) => value is "viewer" | "editor" | "admin"
@@ -160,7 +160,7 @@ interface InviteValidationResult
 
 ### `normalizeInvitationEmail`
 
-`function`
+`function` — Normalize an invitation email by trimming whitespace and converting to lowercase
 
 ```ts
 (email: string) => string
@@ -168,7 +168,7 @@ interface InviteValidationResult
 
 ### `ORGANIZATION_ROLE_RANK`
 
-`const`
+`const` — Map organization roles to their hierarchical rank for permission and access control purposes
 
 ```ts
 Record<"admin" | "owner" | "member" | "billing", number>
@@ -176,7 +176,7 @@ Record<"admin" | "owner" | "member" | "billing", number>
 
 ### `ORGANIZATION_ROLES`
 
-`const`
+`const` — Define the set of fixed roles available within an organization
 
 ```ts
 readonly ["owner", "admin", "member", "billing"]
@@ -184,7 +184,7 @@ readonly ["owner", "admin", "member", "billing"]
 
 ### `OrganizationRole`
 
-`type`
+`type` — Resolve a role string from the predefined list of organization roles
 
 ```ts
 type OrganizationRole
@@ -200,7 +200,7 @@ type OrganizationRole
 
 ### `parseInvitationPermission`
 
-`function`
+`function` — Resolve invitation permission from a string or return null if invalid
 
 ```ts
 (value: string | undefined) => "viewer" | "editor" | "admin" | null
@@ -208,7 +208,7 @@ type OrganizationRole
 
 ### `RenderedInvitationEmail`
 
-`interface`
+`interface` — Define the structure of a fully rendered invitation email with sender, subject, and content fields
 
 ```ts
 interface RenderedInvitationEmail
@@ -224,7 +224,7 @@ interface RenderedInvitationEmail
 
 ### `RenderInvitationEmailInput`
 
-`interface`
+`interface` — Define input data required to render an invitation email template
 
 ```ts
 interface RenderInvitationEmailInput
@@ -240,7 +240,7 @@ interface RenderInvitationEmailInput
 
 ### `SandboxWorkspaceRole`
 
-`type`
+`type` — Define user roles available within a sandbox workspace environment
 
 ```ts
 type SandboxWorkspaceRole
@@ -256,7 +256,7 @@ type SandboxWorkspaceRole
 
 ### `WORKSPACE_ROLE_RANK`
 
-`const`
+`const` — Map workspace roles to their corresponding hierarchical rank values
 
 ```ts
 Record<"viewer" | "editor" | "admin" | "owner", number>
@@ -272,7 +272,7 @@ readonly ["viewer", "editor", "admin", "owner"]
 
 ### `WorkspaceCollaborationAccess`
 
-`type`
+`type` — Define access levels for workspace collaboration as either read or write
 
 ```ts
 type WorkspaceCollaborationAccess
@@ -280,7 +280,7 @@ type WorkspaceCollaborationAccess
 
 ### `WorkspaceRole`
 
-`type`
+`type` — Resolve the union type of all possible workspace role string literals from WORKSPACE_ROLES array
 
 ```ts
 type WorkspaceRole
@@ -288,7 +288,7 @@ type WorkspaceRole
 
 ### `workspaceRoleToCollaborationAccess`
 
-`function`
+`function` — Map a workspace role to the corresponding collaboration access level
 
 ```ts
 (role: "viewer" | "editor" | "admin" | "owner") => WorkspaceCollaborationAccess
@@ -296,7 +296,7 @@ type WorkspaceRole
 
 ### `workspaceRoleToSandboxRole`
 
-`function`
+`function` — Map a workspace role to its corresponding sandbox workspace role
 
 ```ts
 (role: "viewer" | "editor" | "admin" | "owner") => SandboxWorkspaceRole

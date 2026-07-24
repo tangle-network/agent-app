@@ -15,11 +15,13 @@ import {
 /** Hub bearer provenance mirrors the execution-key source union. */
 export type TangleHubBearerSource = TangleExecutionKeySource
 
+/** Represent a resolved bearer token with its associated TangleHub bearer source */
 export interface ResolvedTangleHubBearer {
   bearer: string
   source: TangleHubBearerSource
 }
 
+/** Resolve options required to obtain a user's TangleHub bearer token including environment and API key retrieval */
 export interface ResolveUserTangleHubBearerOptions {
   userId: string
   /** Deployment context. Only local development may use env credentials. */
@@ -30,6 +32,7 @@ export interface ResolveUserTangleHubBearerOptions {
   getUserApiKey: () => string | null | undefined | Promise<string | null | undefined>
 }
 
+/** Resolve options for retrieving a TangleHub bearer token for a specified user */
 export interface ResolveUserTangleHubBearerForUserOptions<UserId = string> {
   userId: UserId
   environment?: TangleExecutionEnvironment
@@ -37,6 +40,7 @@ export interface ResolveUserTangleHubBearerForUserOptions<UserId = string> {
   getUserApiKey: (userId: UserId) => string | null | undefined | Promise<string | null | undefined>
 }
 
+/** Represent missing Tangle platform link error for a specified user ID */
 export class TangleBearerMissingError extends Error {
   constructor(readonly userId: string) {
     super(`No Tangle platform link for user ${userId}`)
@@ -64,6 +68,7 @@ export async function resolveUserTangleHubBearer(
   throw new TangleBearerMissingError(opts.userId)
 }
 
+/** Resolve the TangleHub bearer token for a specified user based on provided options */
 export async function resolveUserTangleHubBearerForUser<UserId = string>(
   opts: ResolveUserTangleHubBearerForUserOptions<UserId>,
 ): Promise<ResolvedTangleHubBearer> {
@@ -108,6 +113,7 @@ export interface HubClientLike {
   listHealthchecks(): Promise<unknown>
 }
 
+/** Define methods to require user ID, get bearer token, and create a hub client bound to the bearer */
 export interface HubProxyContext {
   /** Resolve the authenticated user id. Throw the app's own auth Response /
    *  redirect to reject — it propagates untouched. */
@@ -118,11 +124,13 @@ export interface HubProxyContext {
   createHubClient(bearer: string): HubClientLike
 }
 
+/** Define arguments for configuring a proxy route with request and optional parameters */
 export interface HubProxyRouteArgs {
   request: Request
   params?: Record<string, string | undefined>
 }
 
+/** Define routes for hub proxy handling catalog, connections, healthchecks, and authorization actions */
 export interface HubProxyRoutes {
   /** GET → `{ catalog }`. */
   catalog(args: HubProxyRouteArgs): Promise<Response>
@@ -144,6 +152,7 @@ interface StartAuthBody {
   requestedScopes?: string[]
 }
 
+/** Resolve hub proxy routes with authentication and error handling based on the given context */
 export function createHubProxyRoutes(ctx: HubProxyContext): HubProxyRoutes {
   /** Auth runs OUTSIDE the proxy try/catch so the app's auth throw (redirect
    *  Response etc.) is never swallowed; bearer + platform errors are mapped. */

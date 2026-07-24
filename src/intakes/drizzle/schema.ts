@@ -29,6 +29,7 @@ import type { AnySQLiteColumn, AnySQLiteTable } from 'drizzle-orm/sqlite-core'
 /** A product table referenced by FK — only the `id` column is touched. */
 export type IntakeParentTable = AnySQLiteTable & { id: AnySQLiteColumn }
 
+/** Define options for creating intake tables including user and optional workspace references */
 export interface CreateIntakeTablesOptions {
   /** The product's user table — user-intake rows reference `userTable.id`. */
   userTable: IntakeParentTable
@@ -98,7 +99,9 @@ export function createIntakeTables<O extends CreateIntakeTablesOptions>(
   return result as IntakeTables<O>
 }
 
+/** Resolve the structure and data of a user intake table based on the createUserIntakeTable function */
 export type UserIntakeTable = ReturnType<typeof createUserIntakeTable>
+/** Resolve the structure and data of the project intake table from the factory function */
 export type ProjectIntakeTable = ReturnType<typeof createProjectIntakeTable>
 
 /**
@@ -113,5 +116,7 @@ export type IntakeTables<O extends CreateIntakeTablesOptions> =
 /** The union table shape, for code that handles either scope generically. */
 export type AnyIntakeTables = { userIntake: UserIntakeTable; projectIntake?: ProjectIntakeTable }
 
+/** Infer and represent a selected row from the UserIntakeTable data structure */
 export type UserIntakeRow = UserIntakeTable['$inferSelect']
+/** Resolve the selected data structure for a project intake table row */
 export type ProjectIntakeRow = ProjectIntakeTable['$inferSelect']

@@ -8,7 +8,7 @@ Source: `src/sequences-react/index.ts`
 
 ### `addCaptionCommand`
 
-`function`
+`function` — Resolve a command to add a caption to a specified caption track within a timeline
 
 ```ts
 (input: AddCaptionInput) => TimelineCommand
@@ -16,7 +16,7 @@ Source: `src/sequences-react/index.ts`
 
 ### `AddCaptionInput`
 
-`interface`
+`interface` — Define input parameters for adding a caption clip to a sequence timeline
 
 ```ts
 interface AddCaptionInput
@@ -32,7 +32,7 @@ interface AddCaptionInput
 
 ### `ApplySnapOptions`
 
-`interface`
+`interface` — Define options to configure snapping behavior including zoom, threshold, and exclusion criteria
 
 ```ts
 interface ApplySnapOptions
@@ -136,7 +136,7 @@ interface ClipTrimCommit
 
 ### `CommandStack`
 
-`interface`
+`interface` — Manage and track command execution with undo, redo, state subscription, and timeline reset capabilities
 
 ```ts
 interface CommandStack
@@ -168,7 +168,7 @@ interface CommandStack
 
 ### `createCommandStack`
 
-`function`
+`function` — Create a command stack managing undo and redo operations for a given timeline
 
 ```ts
 (initial: SequenceTimeline) => CommandStack
@@ -192,7 +192,7 @@ interface CommandStack
 
 ### `createPlaybackClock`
 
-`function`
+`function` — Create a playback clock that manages frame timing and playback state based on configuration
 
 ```ts
 (config: PlaybackClockConfig) => PlaybackClock
@@ -208,7 +208,7 @@ interface CommandStack
 
 ### `createWhisperTranscriptionProvider`
 
-`function`
+`function` — Create a Whisper-based transcription provider with optional model configuration
 
 ```ts
 (opts?: { model?: string | undefined; } | undefined) => TranscriptionProvider
@@ -216,7 +216,7 @@ interface CommandStack
 
 ### `createZoomMath`
 
-`function`
+`function` — Create a ZoomMath object that validates config and calculates zoom ratio within bounds
 
 ```ts
 (config: ZoomMathConfig) => ZoomMath
@@ -224,7 +224,7 @@ interface CommandStack
 
 ### `DEFAULT_MAX_MEDIA_ELEMENTS`
 
-`const`
+`const` — Define the default maximum number of media elements allowed in a collection
 
 ```ts
 4
@@ -232,7 +232,7 @@ interface CommandStack
 
 ### `DEFAULT_TIMELINE_LABELS`
 
-`const`
+`const` — Provide default labels and accessibility text for timeline editor UI elements
 
 ```ts
 Required<TimelineEditorLabels>
@@ -240,7 +240,7 @@ Required<TimelineEditorLabels>
 
 ### `DEFAULT_WHISPER_MODEL`
 
-`const`
+`const` — Provide the default Whisper model identifier for ONNX community large v3 turbo
 
 ```ts
 "onnx-community/whisper-large-v3-turbo"
@@ -256,7 +256,7 @@ Required<TimelineEditorLabels>
 
 ### `DeleteClipInput`
 
-`interface`
+`interface` — Define input parameters required to delete a clip from a sequence timeline
 
 ```ts
 interface DeleteClipInput
@@ -280,7 +280,7 @@ interface EditorTimelineState
 
 ### `FrameRect`
 
-`interface`
+`interface` — Define a rectangular frame with position and size properties x, y, width, and height
 
 ```ts
 interface FrameRect
@@ -336,7 +336,7 @@ interface LetterboxRect
 
 ### `MediaElementPool`
 
-`interface`
+`interface` — Manage a pool of media elements to acquire, check, count, and dispose resources efficiently
 
 ```ts
 interface MediaElementPool
@@ -360,7 +360,7 @@ interface MediaElementPool
 
 ### `MoveClipInput`
 
-`interface`
+`interface` — Define input parameters to move a clip within a timeline including optional track and resolver
 
 ```ts
 interface MoveClipInput
@@ -384,7 +384,7 @@ interface MoveDragInput
 
 ### `needsSeek`
 
-`function`
+`function` — Determine if seeking is required based on the difference between current and target times
 
 ```ts
 (currentTimeSeconds: number, targetSeconds: number) => boolean
@@ -400,7 +400,7 @@ interface MoveDragInput
 
 ### `placeClipCommand`
 
-`function`
+`function` — Resolve and validate clip placement parameters to create a timeline command
 
 ```ts
 (input: PlaceClipInput) => TimelineCommand
@@ -408,7 +408,7 @@ interface MoveDragInput
 
 ### `PlaceClipInput`
 
-`interface`
+`interface` — Define input parameters required to place a clip within a sequence timeline
 
 ```ts
 interface PlaceClipInput
@@ -424,7 +424,7 @@ interface PlaybackClock
 
 ### `PlaybackClockConfig`
 
-`interface`
+`interface` — Define configuration settings for playback clock including frames per second and total duration frames
 
 ```ts
 interface PlaybackClockConfig
@@ -432,7 +432,7 @@ interface PlaybackClockConfig
 
 ### `PooledElementLease`
 
-`interface`
+`interface` — Manage a leased element from a pool and release it to enable LRU eviction
 
 ```ts
 interface PooledElementLease
@@ -504,7 +504,7 @@ LazyExoticComponent<(props: TimelineEditorProps) => Element>
 
 ### `SetClipTextInput`
 
-`interface`
+`interface` — Define input parameters for setting text and optional language on a specific clip in a timeline
 
 ```ts
 interface SetClipTextInput
@@ -536,7 +536,7 @@ interface SnapIndicatorLineProps
 
 ### `SnapPoint`
 
-`interface`
+`interface` — Define a point in a timeline where snapping occurs based on frame and kind
 
 ```ts
 interface SnapPoint
@@ -544,7 +544,7 @@ interface SnapPoint
 
 ### `SnapResult`
 
-`interface`
+`interface` — Describe the result of snapping a point to a frame including success status and snapped point details
 
 ```ts
 interface SnapResult
@@ -560,7 +560,7 @@ interface SnapResult
 
 ### `SplitClipInput`
 
-`interface`
+`interface` — Define input parameters for splitting a clip at a specific frame within a timeline
 
 ```ts
 interface SplitClipInput
@@ -608,7 +608,7 @@ interface TimelineEditorLabels
 
 ### `TimelineEditorProps`
 
-`interface`
+`interface` — Define properties and callbacks for editing and applying operations on a sequence timeline
 
 ```ts
 interface TimelineEditorProps
@@ -728,7 +728,7 @@ interface TimelineTrackRowProps
 
 ### `ToggleClipDisabledInput`
 
-`interface`
+`interface` — Define input parameters to toggle the disabled state of a clip within a timeline
 
 ```ts
 interface ToggleClipDisabledInput
@@ -744,7 +744,7 @@ interface TranscriptionProvider
 
 ### `TranscriptionSegment`
 
-`interface`
+`interface` — Represent a segment of transcription with text and start and end times in seconds
 
 ```ts
 interface TranscriptionSegment
@@ -760,7 +760,7 @@ interface TranscriptionSegment
 
 ### `TrimClipInput`
 
-`interface`
+`interface` — Define input parameters for trimming a clip within a sequence timeline
 
 ```ts
 interface TrimClipInput
@@ -832,7 +832,7 @@ interface WaveformData
 
 ### `WhisperOutput`
 
-`interface`
+`interface` — Define the structure for transcribed text output with optional segmented chunks
 
 ```ts
 interface WhisperOutput
@@ -864,7 +864,7 @@ interface ZoomMath
 
 ### `ZoomMathConfig`
 
-`interface`
+`interface` — Define configuration settings for minimum and maximum zoom levels
 
 ```ts
 interface ZoomMathConfig

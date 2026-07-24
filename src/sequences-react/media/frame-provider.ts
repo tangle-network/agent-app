@@ -11,6 +11,7 @@
 
 import type { VideoFrameProvider } from '../contracts'
 
+/** Define the default maximum number of media elements allowed in a collection */
 export const DEFAULT_MAX_MEDIA_ELEMENTS = 4
 
 /** Half a frame at 30fps. Seeks closer than this repaint the decoder's
@@ -21,6 +22,7 @@ export const SEEK_TOLERANCE_SECONDS = 1 / 60
  *  the draw REJECTS rather than painting whatever frame happens to be up. */
 export const SEEK_TIMEOUT_MS = 5_000
 
+/** Define a rectangular frame with position and size properties x, y, width, and height */
 export interface FrameRect {
   x: number
   y: number
@@ -52,6 +54,7 @@ export function containFitRect(
   }
 }
 
+/** Determine if seeking is required based on the difference between current and target times */
 export function needsSeek(currentTimeSeconds: number, targetSeconds: number): boolean {
   return Math.abs(currentTimeSeconds - targetSeconds) >= SEEK_TOLERANCE_SECONDS
 }
@@ -60,12 +63,14 @@ export function needsSeek(currentTimeSeconds: number, targetSeconds: number): bo
 // LRU element pool
 // ---------------------------------------------------------------------------
 
+/** Manage a leased element from a pool and release it to enable LRU eviction */
 export interface PooledElementLease<T> {
   element: T
   /** Unpins the element; idle elements become LRU-evictable. Idempotent. */
   release(): void
 }
 
+/** Manage a pool of media elements to acquire, check, count, and dispose resources efficiently */
 export interface MediaElementPool<T> {
   acquire(url: string): PooledElementLease<T>
   has(url: string): boolean

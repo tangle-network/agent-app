@@ -8,7 +8,7 @@ Source: `src/assets/index.ts`
 
 ### `ApprovalEvent`
 
-`interface`
+`interface` — Describe an approval event with action details, user info, and optional edited fields
 
 ```ts
 interface ApprovalEvent
@@ -16,7 +16,7 @@ interface ApprovalEvent
 
 ### `ApprovalEventSchema`
 
-`const`
+`const` — Validate approval event data including asset, action, user, timestamp, and optional fields
 
 ```ts
 ZodObject<{ assetId: ZodString; variantId: ZodOptional<ZodString>; action: ZodEnum<{ scheduled: "scheduled"; approved:…
@@ -24,7 +24,7 @@ ZodObject<{ assetId: ZodString; variantId: ZodOptional<ZodString>; action: ZodEn
 
 ### `AssetContentMap`
 
-`type`
+`type` — Map asset keys to their corresponding content types for various media and copy formats
 
 ```ts
 type AssetContentMap
@@ -32,7 +32,7 @@ type AssetContentMap
 
 ### `AssetFormat`
 
-`type`
+`type` — Define valid asset format strings for various media and copy types
 
 ```ts
 type AssetFormat
@@ -40,7 +40,7 @@ type AssetFormat
 
 ### `AssetSpec`
 
-`interface`
+`interface` — Define the structure and metadata for an asset including its format, brand, content, and status
 
 ```ts
 interface AssetSpec
@@ -48,7 +48,7 @@ interface AssetSpec
 
 ### `AssetStatus`
 
-`type`
+`type` — Define possible states representing the lifecycle status of an asset
 
 ```ts
 type AssetStatus
@@ -56,7 +56,7 @@ type AssetStatus
 
 ### `AssetVariant`
 
-`interface`
+`interface` — Describe an asset variant with identification, approval status, and edit history details
 
 ```ts
 interface AssetVariant
@@ -64,7 +64,7 @@ interface AssetVariant
 
 ### `BrandTokens`
 
-`interface`
+`interface` — Define brand identity tokens including colors, font, logo, business name, and voice
 
 ```ts
 interface BrandTokens
@@ -72,7 +72,7 @@ interface BrandTokens
 
 ### `BrandTokensSchema`
 
-`const`
+`const` — Validate brand token properties including colors, font, logo URL, business name, and voice
 
 ```ts
 ZodObject<{ primaryColor: ZodString; accentColor: ZodString; textColor: ZodString; fontFamily: ZodString; logoUrl: ZodO…
@@ -80,7 +80,7 @@ ZodObject<{ primaryColor: ZodString; accentColor: ZodString; textColor: ZodStrin
 
 ### `ConversionMetrics`
 
-`interface`
+`interface` — Define metrics for tracking impressions, clicks, conversions, and related rates
 
 ```ts
 interface ConversionMetrics
@@ -88,7 +88,7 @@ interface ConversionMetrics
 
 ### `ConversionMetricsSchema`
 
-`const`
+`const` — Validate conversion metrics with nonnegative impressions, clicks, conversions, CTR, and CVR fields
 
 ```ts
 ZodObject<{ impressions: ZodNumber; clicks: ZodNumber; conversions: ZodNumber; ctr: ZodNumber; cvr: ZodNumber; }, $stri…
@@ -96,7 +96,7 @@ ZodObject<{ impressions: ZodNumber; clicks: ZodNumber; conversions: ZodNumber; c
 
 ### `CopyContent`
 
-`interface`
+`interface` — Define the structure for content with headline, body, platform, and optional hashtags and character count
 
 ```ts
 interface CopyContent
@@ -104,7 +104,7 @@ interface CopyContent
 
 ### `CopyContentSchema`
 
-`const`
+`const` — Validate and parse copy content with headline, body, optional hashtags, platform, and character count
 
 ```ts
 ZodObject<{ headline: ZodString; body: ZodString; hashtags: ZodOptional<ZodArray<ZodString>>; platform: ZodEnum<{ x: "x…
@@ -112,7 +112,7 @@ ZodObject<{ headline: ZodString; body: ZodString; hashtags: ZodOptional<ZodArray
 
 ### `CopyPlatform`
 
-`type`
+`type` — Define platform options for copy content across various social media and communication channels
 
 ```ts
 type CopyPlatform
@@ -120,7 +120,7 @@ type CopyPlatform
 
 ### `EmailBodySection`
 
-`interface`
+`interface` — Define the structure for the body section of an email containing plain text content
 
 ```ts
 interface EmailBodySection
@@ -128,7 +128,7 @@ interface EmailBodySection
 
 ### `EmailContent`
 
-`interface`
+`interface` — Define the structure for email content including subject, optional preheader, and sections
 
 ```ts
 interface EmailContent
@@ -136,7 +136,7 @@ interface EmailContent
 
 ### `EmailContentSchema`
 
-`const`
+`const` — Validate and parse email content objects with subject, optional preheader, and sections
 
 ```ts
 ZodObject<{ subject: ZodString; preheader: ZodOptional<ZodString>; sections: ZodArray<ZodDiscriminatedUnion<[ZodObject<…
@@ -144,7 +144,7 @@ ZodObject<{ subject: ZodString; preheader: ZodOptional<ZodString>; sections: Zod
 
 ### `EmailCtaSection`
 
-`interface`
+`interface` — Define a call-to-action section with label, URL, and optional subtext for email content
 
 ```ts
 interface EmailCtaSection
@@ -152,7 +152,7 @@ interface EmailCtaSection
 
 ### `EmailDividerSection`
 
-`interface`
+`interface` — Define a section representing a divider in an email layout
 
 ```ts
 interface EmailDividerSection
@@ -160,7 +160,7 @@ interface EmailDividerSection
 
 ### `EmailFeatureSection`
 
-`interface`
+`interface` — Define a feature section with headline, description, and optional image for email content
 
 ```ts
 interface EmailFeatureSection
@@ -168,7 +168,7 @@ interface EmailFeatureSection
 
 ### `EmailHeroSection`
 
-`interface`
+`interface` — Define the structure for a hero section in an email with headline, image, and call-to-action fields
 
 ```ts
 interface EmailHeroSection
@@ -176,7 +176,7 @@ interface EmailHeroSection
 
 ### `EmailSection`
 
-`type`
+`type` — Define a union type representing different sections of an email template
 
 ```ts
 type EmailSection
@@ -184,7 +184,7 @@ type EmailSection
 
 ### `EmailTestimonialSection`
 
-`interface`
+`interface` — Define the structure for an email testimonial section with quote, author, and optional details
 
 ```ts
 interface EmailTestimonialSection
@@ -192,7 +192,7 @@ interface EmailTestimonialSection
 
 ### `ImageBackground`
 
-`type`
+`type` — Define image background styles as color, gradient, or image with optional overlay settings
 
 ```ts
 type ImageBackground
@@ -200,7 +200,7 @@ type ImageBackground
 
 ### `ImageContent`
 
-`interface`
+`interface` — Define the structure for image content containing an array of image slides
 
 ```ts
 interface ImageContent
@@ -208,7 +208,7 @@ interface ImageContent
 
 ### `ImageContentSchema`
 
-`const`
+`const` — Validate image content with an array of one or more slides containing background details
 
 ```ts
 ZodObject<{ slides: ZodArray<ZodObject<{ background: ZodDiscriminatedUnion<[ZodObject<{ type: ZodLiteral<"color">; valu…
@@ -216,7 +216,7 @@ ZodObject<{ slides: ZodArray<ZodObject<{ background: ZodDiscriminatedUnion<[ZodO
 
 ### `ImageImageLayer`
 
-`interface`
+`interface` — Define properties for an image layer including position, size, URL, and optional opacity
 
 ```ts
 interface ImageImageLayer
@@ -224,7 +224,7 @@ interface ImageImageLayer
 
 ### `ImageLayer`
 
-`type`
+`type` — Resolve a union type representing different kinds of image layers
 
 ```ts
 type ImageLayer
@@ -232,7 +232,7 @@ type ImageLayer
 
 ### `ImageLayerType`
 
-`type`
+`type` — Define image layer categories for text, image, shape, or logo elements
 
 ```ts
 type ImageLayerType
@@ -240,7 +240,7 @@ type ImageLayerType
 
 ### `ImageLogoLayer`
 
-`interface`
+`interface` — Define properties for positioning and sizing a logo image layer in a layout
 
 ```ts
 interface ImageLogoLayer
@@ -248,7 +248,7 @@ interface ImageLogoLayer
 
 ### `ImageShapeLayer`
 
-`interface`
+`interface` — Define properties for a shape layer representing rectangular or circular image elements
 
 ```ts
 interface ImageShapeLayer
@@ -256,7 +256,7 @@ interface ImageShapeLayer
 
 ### `ImageSlide`
 
-`interface`
+`interface` — Define the structure for an image slide with a background and multiple layers
 
 ```ts
 interface ImageSlide
@@ -264,7 +264,7 @@ interface ImageSlide
 
 ### `ImageTextLayer`
 
-`interface`
+`interface` — Define properties for a text layer with position, style, and alignment options in an image
 
 ```ts
 interface ImageTextLayer
@@ -288,7 +288,7 @@ interface ImageTextLayer
 
 ### `VideoCaption`
 
-`interface`
+`interface` — Define video caption segments with start and end times and associated text content
 
 ```ts
 interface VideoCaption
@@ -296,7 +296,7 @@ interface VideoCaption
 
 ### `VideoContent`
 
-`interface`
+`interface` — Describe video content including duration, scenes, optional audio, captions, and rendered URL
 
 ```ts
 interface VideoContent
@@ -304,7 +304,7 @@ interface VideoContent
 
 ### `VideoContentSchema`
 
-`const`
+`const` — Define the schema for validating video content including duration, scenes, audio, captions, and rendered URL
 
 ```ts
 ZodObject<{ durationSeconds: ZodNumber; scenes: ZodArray<ZodDiscriminatedUnion<[ZodObject<{ type: ZodLiteral<"text-anim…
@@ -312,7 +312,7 @@ ZodObject<{ durationSeconds: ZodNumber; scenes: ZodArray<ZodDiscriminatedUnion<[
 
 ### `VideoCountdownScene`
 
-`interface`
+`interface` — Define a countdown scene with duration, start time, and optional label for video sequences
 
 ```ts
 interface VideoCountdownScene
@@ -320,7 +320,7 @@ interface VideoCountdownScene
 
 ### `VideoImageRevealScene`
 
-`interface`
+`interface` — Define a scene that reveals an image with optional caption over a specified duration
 
 ```ts
 interface VideoImageRevealScene
@@ -328,7 +328,7 @@ interface VideoImageRevealScene
 
 ### `VideoScene`
 
-`type`
+`type` — Resolve a video scene as one of several specific animation or reveal types
 
 ```ts
 type VideoScene
@@ -336,7 +336,7 @@ type VideoScene
 
 ### `VideoSlideScene`
 
-`interface`
+`interface` — Define a video slide scene with duration and associated image slide details
 
 ```ts
 interface VideoSlideScene
@@ -344,7 +344,7 @@ interface VideoSlideScene
 
 ### `VideoTextAnimationScene`
 
-`interface`
+`interface` — Define properties for a video scene displaying animated text with optional background and effects
 
 ```ts
 interface VideoTextAnimationScene

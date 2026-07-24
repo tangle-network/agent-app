@@ -16,7 +16,7 @@ Source: `src/redact/index.ts`
 
 ### `BuildRedactedDocumentOptions`
 
-`interface`
+`interface` — Define options to encrypt text and specify patterns for redacting sensitive document content
 
 ```ts
 interface BuildRedactedDocumentOptions
@@ -56,7 +56,7 @@ type RedactedDocSegment
 
 ### `RedactedDocument`
 
-`interface`
+`interface` — Define a document composed of multiple redacted content segments
 
 ```ts
 interface RedactedDocument
@@ -72,7 +72,7 @@ interface RedactedDocument
 
 ### `RedactForIngestionOptions`
 
-`interface`
+`interface` — Define options to customize sensitive data redaction patterns and key names for ingestion
 
 ```ts
 interface RedactForIngestionOptions
@@ -96,7 +96,7 @@ interface RedactionSpan
 
 ### `RevealResult`
 
-`interface`
+`interface` — Describe the outcome of a reveal operation including success status, value, and failure reason
 
 ```ts
 interface RevealResult
@@ -112,7 +112,7 @@ interface RevealResult
 
 ### `RevealSpanOptions`
 
-`interface`
+`interface` — Define options to decrypt, authorize, and audit the reveal of a span segment
 
 ```ts
 interface RevealSpanOptions

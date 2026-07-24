@@ -8,7 +8,7 @@ Source: `src/theme/tailwind-preset.ts`
 
 ### `default`
 
-`const`
+`const` — Define a preset configuration for dark mode and extended theme colors with foreground variants
 
 ```ts
 { darkMode: [string, string]; theme: { extend: { colors: { background: string; foreground: string; border: string; inpu…

@@ -85,6 +85,7 @@ const EXTENSION_IMPLIES_SNIFFED_MIME: Readonly<Record<string, string>> = {
   pdf: 'application/pdf',
 }
 
+/** Represent the result of checking an attachment's type with success or specific failure details */
 export type AttachmentTypeCheckResult =
   | { succeeded: true }
   | { succeeded: false; code: 'attachment_type_mismatch' | 'attachment_type_not_allowed'; message: string }

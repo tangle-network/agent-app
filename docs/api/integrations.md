@@ -16,7 +16,7 @@ class HubExecClient
 
 ### `HubExecClientOptions`
 
-`interface`
+`interface` — Define configuration options for initializing a Hub execution client
 
 ```ts
 interface HubExecClientOptions
@@ -40,7 +40,7 @@ type HubExecResult
 
 ### `HubInvokeDeps`
 
-`interface`
+`interface` — Define dependencies for invoking hub operations including API key resolution and optional configuration
 
 ```ts
 interface HubInvokeDeps
@@ -48,7 +48,7 @@ interface HubInvokeDeps
 
 ### `HubInvokeInput`
 
-`interface`
+`interface` — Define input parameters for invoking a hub tool with user ID, tool name, and optional arguments
 
 ```ts
 interface HubInvokeInput
@@ -56,7 +56,7 @@ interface HubInvokeInput
 
 ### `HubInvokeOutcome`
 
-`interface`
+`interface` — Describe the outcome of a hub invocation including status and response body
 
 ```ts
 interface HubInvokeOutcome

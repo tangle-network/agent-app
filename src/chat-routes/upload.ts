@@ -41,6 +41,7 @@ export interface SandboxUploadSink {
   write(path: string, content: string, options?: { encoding?: 'utf8' | 'base64' }): Promise<unknown>
 }
 
+/** Resolve upload authorization status and provide upload destination or error response */
 export type UploadAuthorization =
   | {
       ok: true
@@ -52,6 +53,7 @@ export type UploadAuthorization =
     }
   | { ok: false; response: Response }
 
+/** Define options to authorize uploads and configure file size limits and upload directory */
 export interface CreateUploadRouteOptions {
   /** Authenticate the caller and resolve the sandbox file sink (usually
    *  `ensureWorkspaceSandbox(...)` → `box.fs`). */
@@ -85,6 +87,7 @@ export function sanitizeUploadFilename(name: string): string {
 
 const BASE64_CHUNK = 0x8000
 
+/** Convert a Uint8Array of bytes into a base64-encoded string */
 export function bytesToBase64(bytes: Uint8Array): string {
   let binary = ''
   for (let offset = 0; offset < bytes.length; offset += BASE64_CHUNK) {
@@ -97,6 +100,7 @@ function uploadError(status: number, code: string, error: string): Response {
   return Response.json({ code, error }, { status })
 }
 
+/** Create an upload route handler that authorizes requests and processes file uploads with size limits */
 export function createUploadRoute(options: CreateUploadRouteOptions): (request: Request) => Promise<Response> {
   const inlineMaxBytes = options.inlineMaxBytes ?? UPLOAD_INLINE_MAX_BYTES
   const maxFileBytes = options.maxFileBytes ?? UPLOAD_MAX_FILE_BYTES

@@ -104,7 +104,7 @@ readonly string[]
 
 ### `PresetBillingOptions`
 
-`interface`
+`interface` — Define preset billing options including database, provisioner, encryption key, budget, and optional settings
 
 ```ts
 interface PresetBillingOptions
@@ -112,7 +112,7 @@ interface PresetBillingOptions
 
 ### `PresetKnowledgeAccessorOptions`
 
-`interface`
+`interface` — Define options for accessing preset knowledge scoped to a specific workspace and configuration
 
 ```ts
 interface PresetKnowledgeAccessorOptions
@@ -120,7 +120,7 @@ interface PresetKnowledgeAccessorOptions
 
 ### `PresetToolHandlerOptions`
 
-`interface`
+`interface` — Define configuration options for handling preset tools including database, vault, and optional utilities
 
 ```ts
 interface PresetToolHandlerOptions

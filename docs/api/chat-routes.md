@@ -80,7 +80,7 @@ type AttachmentReadResult
 
 ### `AttachmentTypeCheckResult`
 
-`type`
+`type` — Represent the result of checking an attachment's type with success or specific failure details
 
 ```ts
 type AttachmentTypeCheckResult
@@ -112,7 +112,7 @@ type AttachmentWriteResult
 
 ### `buildDispatchParts`
 
-`function`
+`function` — Build dispatch parts from input by resolving mentions, paths, and applying size constraints asynchronously
 
 ```ts
 (input: BuildDispatchPartsInput) => Promise<DispatchPartsOutcome>
@@ -120,7 +120,7 @@ type AttachmentWriteResult
 
 ### `BuildDispatchPartsInput`
 
-`interface`
+`interface` — Build input parameters for dispatching chat message parts including text, attachments, mentions, and history
 
 ```ts
 interface BuildDispatchPartsInput
@@ -136,7 +136,7 @@ interface BuildDispatchPartsInput
 
 ### `bytesToBase64`
 
-`function`
+`function` — Convert a Uint8Array of bytes into a base64-encoded string
 
 ```ts
 (bytes: Uint8Array<ArrayBufferLike>) => string
@@ -168,7 +168,7 @@ type ChatMentionKind
 
 ### `ChatRouteDurableProjection`
 
-`interface`
+`interface` — Resolve chat route events and materialize their durable state records
 
 ```ts
 interface ChatRouteDurableProjection
@@ -176,7 +176,7 @@ interface ChatRouteDurableProjection
 
 ### `ChatRouteDurableProjectionLogger`
 
-`type`
+`type` — Log chat route projection messages with optional metadata for durable processing
 
 ```ts
 type ChatRouteDurableProjectionLogger
@@ -184,7 +184,7 @@ type ChatRouteDurableProjectionLogger
 
 ### `ChatTurnAuthorization`
 
-`type`
+`type` — Resolve authorization status and context for a chat turn including tenant and user identification
 
 ```ts
 type ChatTurnAuthorization
@@ -192,7 +192,7 @@ type ChatTurnAuthorization
 
 ### `ChatTurnAuthorizeArgs`
 
-`interface`
+`interface` — Define arguments required to authorize a chat turn based on intent and request details
 
 ```ts
 interface ChatTurnAuthorizeArgs
@@ -224,7 +224,7 @@ interface ChatTurnHeartbeat
 
 ### `ChatTurnInputError`
 
-`class`
+`class` — Represent errors for invalid chat turn inputs with status and code properties
 
 ```ts
 class ChatTurnInputError
@@ -248,7 +248,7 @@ interface ChatTurnLifecycle
 
 ### `ChatTurnLifecycleComplete`
 
-`interface`
+`interface` — Define the structure representing the completion state of a chat turn lifecycle with usage data
 
 ```ts
 interface ChatTurnLifecycleComplete
@@ -256,7 +256,7 @@ interface ChatTurnLifecycleComplete
 
 ### `ChatTurnLifecycleError`
 
-`interface`
+`interface` — Represent an error occurring during a chat turn lifecycle with context and duration information
 
 ```ts
 interface ChatTurnLifecycleError
@@ -264,7 +264,7 @@ interface ChatTurnLifecycleError
 
 ### `ChatTurnLifecycleStart`
 
-`interface`
+`interface` — Define lifecycle start event with context and timestamp for a chat turn
 
 ```ts
 interface ChatTurnLifecycleStart
@@ -296,7 +296,7 @@ interface ChatTurnMessageStore
 
 ### `ChatTurnPartInput`
 
-`type`
+`type` — Resolve input as either a text part or a file part of a chat turn
 
 ```ts
 type ChatTurnPartInput
@@ -304,7 +304,7 @@ type ChatTurnPartInput
 
 ### `ChatTurnProduceArgs`
 
-`interface`
+`interface` — Define the arguments required to produce a chat turn with context and messaging details
 
 ```ts
 interface ChatTurnProduceArgs
@@ -336,7 +336,7 @@ interface ChatTurnRouteProducer
 
 ### `ChatTurnRoutes`
 
-`interface`
+`interface` — Define routes to run, replay, and list running chat turns with streaming and reconnect support
 
 ```ts
 interface ChatTurnRoutes
@@ -368,7 +368,7 @@ interface ChatTurnUsage
 
 ### `createAttachmentUploadRoute`
 
-`function`
+`function` — Resolve an attachment upload route handler with customizable limits and validation options
 
 ```ts
 (options: CreateAttachmentUploadRouteOptions) => (request: Request) => Promise<Response>
@@ -376,7 +376,7 @@ interface ChatTurnUsage
 
 ### `CreateAttachmentUploadRouteOptions`
 
-`interface`
+`interface` — Define options to authorize, write, and limit attachment uploads in a route
 
 ```ts
 interface CreateAttachmentUploadRouteOptions
@@ -384,7 +384,7 @@ interface CreateAttachmentUploadRouteOptions
 
 ### `createChatTurnRoutes`
 
-`function`
+`function` — Build chat turn routes to handle and validate incoming chat requests with optional logging
 
 ```ts
 <TContext = void>(options: CreateChatTurnRoutesOptions<TContext>) => ChatTurnRoutes
@@ -392,7 +392,7 @@ interface CreateAttachmentUploadRouteOptions
 
 ### `CreateChatTurnRoutesOptions`
 
-`interface`
+`interface` — Define options to configure chat turn routes including authorization, storage, and event buffering
 
 ```ts
 interface CreateChatTurnRoutesOptions
@@ -400,7 +400,7 @@ interface CreateChatTurnRoutesOptions
 
 ### `createSandboxChatProducer`
 
-`function`
+`function` — Create a sandbox chat producer that manages chat turn routing with logging and interaction rendering options
 
 ```ts
 (options: SandboxChatProducerOptions) => ChatTurnRouteProducer
@@ -408,7 +408,7 @@ interface CreateChatTurnRoutesOptions
 
 ### `createSandboxFileIndexRoute`
 
-`function`
+`function` — Resolve a sandbox file index route with authorization, caching, and configurable depth and entries limits
 
 ```ts
 (options: CreateSandboxFileIndexRouteOptions) => (request: Request) => Promise<Response>
@@ -416,7 +416,7 @@ interface CreateChatTurnRoutesOptions
 
 ### `CreateSandboxFileIndexRouteOptions`
 
-`interface`
+`interface` — Define options to authorize and configure sandbox file index route behavior
 
 ```ts
 interface CreateSandboxFileIndexRouteOptions
@@ -424,7 +424,7 @@ interface CreateSandboxFileIndexRouteOptions
 
 ### `createUploadRoute`
 
-`function`
+`function` — Create an upload route handler that authorizes requests and processes file uploads with size limits
 
 ```ts
 (options: CreateUploadRouteOptions) => (request: Request) => Promise<Response>
@@ -432,7 +432,7 @@ interface CreateSandboxFileIndexRouteOptions
 
 ### `CreateUploadRouteOptions`
 
-`interface`
+`interface` — Define options to authorize uploads and configure file size limits and upload directory
 
 ```ts
 interface CreateUploadRouteOptions
@@ -472,7 +472,7 @@ interface DetachedTurnFinal
 
 ### `DetachedTurnOptions`
 
-`interface`
+`interface` — Define options for managing and projecting a detached turn event stream in a session
 
 ```ts
 interface DetachedTurnOptions
@@ -488,7 +488,7 @@ type DetachedTurnParts
 
 ### `DetachedTurnResult`
 
-`interface`
+`interface` — Describe the result of a detached turn including state, text, parts, usage, and optional error or cache flag
 
 ```ts
 interface DetachedTurnResult
@@ -528,7 +528,7 @@ number
 
 ### `DispatchPartsOutcome`
 
-`type`
+`type` — Resolve the outcome of dispatching parts with success status and corresponding value or error message
 
 ```ts
 type DispatchPartsOutcome
@@ -536,7 +536,7 @@ type DispatchPartsOutcome
 
 ### `FileIndexAuthorization`
 
-`type`
+`type` — Define authorization details and parameters for indexing a file workspace with optional caching and ignore rules
 
 ```ts
 type FileIndexAuthorization
@@ -552,7 +552,7 @@ interface FileIndexCache
 
 ### `FileIndexReadyResponse`
 
-`interface`
+`interface` — Describe a ready file index response with workspace-relative entries and truncation status
 
 ```ts
 interface FileIndexReadyResponse
@@ -560,7 +560,7 @@ interface FileIndexReadyResponse
 
 ### `FileIndexResponse`
 
-`type`
+`type` — Resolve a response indicating the file index is either ready or warming up
 
 ```ts
 type FileIndexResponse
@@ -592,7 +592,7 @@ interface FileMention
 
 ### `FileMentionsToPartsOptions`
 
-`interface`
+`interface` — Define options to resolve mention paths when converting file mentions to parts
 
 ```ts
 interface FileMentionsToPartsOptions
@@ -616,7 +616,7 @@ type FilePartPromotionOutcome
 
 ### `INLINE_PARTS_MAX_BYTES`
 
-`const`
+`const` — Define the maximum byte size allowed for inline parts in data processing
 
 ```ts
 950000
@@ -688,7 +688,7 @@ number
 
 ### `ProducerErrorEvent`
 
-`interface`
+`interface` — Represent an error event emitted by a producer containing message, code, and optional details
 
 ```ts
 interface ProducerErrorEvent
@@ -696,7 +696,7 @@ interface ProducerErrorEvent
 
 ### `ProducerNoticeEvent`
 
-`interface`
+`interface` — Define the structure for a producer notice event with type, id, kind, and text fields
 
 ```ts
 interface ProducerNoticeEvent
@@ -704,7 +704,7 @@ interface ProducerNoticeEvent
 
 ### `ProducerPassthroughEvent`
 
-`interface`
+`interface` — Define an event carrying passthrough data with flexible properties for producer communication
 
 ```ts
 interface ProducerPassthroughEvent
@@ -720,7 +720,7 @@ type ProducerPassthroughEventType
 
 ### `ProducerReasoningEvent`
 
-`interface`
+`interface` — Define an event representing reasoning output with a fixed type and associated text
 
 ```ts
 interface ProducerReasoningEvent
@@ -728,7 +728,7 @@ interface ProducerReasoningEvent
 
 ### `ProducerTextEvent`
 
-`interface`
+`interface` — Represent a text event produced by a source with a fixed type and associated text content
 
 ```ts
 interface ProducerTextEvent
@@ -736,7 +736,7 @@ interface ProducerTextEvent
 
 ### `ProducerToolCallEvent`
 
-`interface`
+`interface` — Represent an event triggered by a producer tool call with its identifier, name, and arguments
 
 ```ts
 interface ProducerToolCallEvent
@@ -744,7 +744,7 @@ interface ProducerToolCallEvent
 
 ### `ProducerToolResultEvent`
 
-`interface`
+`interface` — Describe the structure of an event representing the result of a producer tool call
 
 ```ts
 interface ProducerToolResultEvent
@@ -752,7 +752,7 @@ interface ProducerToolResultEvent
 
 ### `ProducerUsageEvent`
 
-`interface`
+`interface` — Describe usage event with prompt and completion token counts for a producer
 
 ```ts
 interface ProducerUsageEvent
@@ -760,7 +760,7 @@ interface ProducerUsageEvent
 
 ### `ProducerWireEvent`
 
-`type`
+`type` — Represent events emitted by a producer during its operation for processing and handling
 
 ```ts
 type ProducerWireEvent
@@ -776,7 +776,7 @@ number
 
 ### `promoteAgentFilePart`
 
-`function`
+`function` — Promote a part of an agent file with optional byte limits and MIME type detection
 
 ```ts
 (options: PromoteAgentFilePartOptions) => Promise<PromoteFilePartResult>
@@ -784,7 +784,7 @@ number
 
 ### `PromoteAgentFilePartOptions`
 
-`interface`
+`interface` — Define options for promoting a part of an agent file within a specific session and scope
 
 ```ts
 interface PromoteAgentFilePartOptions
@@ -792,7 +792,7 @@ interface PromoteAgentFilePartOptions
 
 ### `PromoteFilePartResult`
 
-`type`
+`type` — Resolve the result of promoting a file part with success status and relevant data or error details
 
 ```ts
 type PromoteFilePartResult
@@ -800,7 +800,7 @@ type PromoteFilePartResult
 
 ### `PromptInputPart`
 
-`type`
+`type` — Extract a single element type from the array parameter of SandboxInstance's streamPrompt method
 
 ```ts
 type PromptInputPart
@@ -808,7 +808,7 @@ type PromptInputPart
 
 ### `promptPartsByteSize`
 
-`function`
+`function` — Calculate the total byte size of an array of chat turn parts
 
 ```ts
 (parts: ChatTurnPartInput[]) => number
@@ -816,7 +816,7 @@ type PromptInputPart
 
 ### `RawAgentFilePart`
 
-`interface`
+`interface` — Define the structure for a raw file part with optional metadata and media type information
 
 ```ts
 interface RawAgentFilePart
@@ -832,7 +832,7 @@ type ReadAttachmentFn
 
 ### `ReadSandboxMentionFn`
 
-`type`
+`type` — Resolve sandbox mention details by reading from a specified path with optional byte reading
 
 ```ts
 type ReadSandboxMentionFn
@@ -848,7 +848,7 @@ type ReadSandboxMentionFn
 
 ### `ReconcileStaleTurnLockOptions`
 
-`interface`
+`interface` — Resolve options for probing and releasing stale TURN locks based on lock start time and sandbox state
 
 ```ts
 interface ReconcileStaleTurnLockOptions
@@ -856,7 +856,7 @@ interface ReconcileStaleTurnLockOptions
 
 ### `ReconcileStaleTurnLockResult`
 
-`interface`
+`interface` — Describe the outcome of reconciling a stale turn lock including release status and diagnostics
 
 ```ts
 interface ReconcileStaleTurnLockResult
@@ -872,7 +872,7 @@ interface ReconcileStaleTurnLockResult
 
 ### `ResolveChatAttachmentsOptions`
 
-`interface`
+`interface` — Define options to resolve and validate chat attachments with size, count, and path constraints
 
 ```ts
 interface ResolveChatAttachmentsOptions
@@ -880,7 +880,7 @@ interface ResolveChatAttachmentsOptions
 
 ### `ResolveChatAttachmentsResult`
 
-`type`
+`type` — Resolve the result of chat attachment processing with success status and corresponding data or error
 
 ```ts
 type ResolveChatAttachmentsResult
@@ -896,7 +896,7 @@ type ResolveChatAttachmentsResult
 
 ### `SandboxChatProducerOptions`
 
-`interface`
+`interface` — Define options for producing sandbox chat events with rendering and interaction controls
 
 ```ts
 interface SandboxChatProducerOptions
@@ -912,7 +912,7 @@ interface SandboxFileTreeSource
 
 ### `SandboxMentionPathCheck`
 
-`type`
+`type` — Represent the result of a sandbox mention path check indicating success or failure with an error message
 
 ```ts
 type SandboxMentionPathCheck
@@ -1016,7 +1016,7 @@ number
 
 ### `UploadAuthorization`
 
-`type`
+`type` — Resolve upload authorization status and provide upload destination or error response
 
 ```ts
 type UploadAuthorization

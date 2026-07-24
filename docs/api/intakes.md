@@ -16,7 +16,7 @@ type AnswerRejectionReason
 
 ### `AnswerValidationResult`
 
-`interface`
+`interface` — Describe validation outcome of an answer including success status and optional rejection reason
 
 ```ts
 interface AnswerValidationResult

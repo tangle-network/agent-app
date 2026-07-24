@@ -64,6 +64,7 @@ import { validateSceneOperations } from './validate'
 // Result types
 // ---------------------------------------------------------------------------
 
+/** Represent the result of applying changes to a scene as an element, page, or entire document */
 export type SceneApplyResult =
   | { kind: 'element'; pageId: string; element: SceneElement }
   | { kind: 'page'; page: ScenePage }
@@ -73,6 +74,7 @@ export type SceneApplyResult =
 // Options
 // ---------------------------------------------------------------------------
 
+/** Resolve element ID conflicts by providing fresh unique identifiers during scene application */
 export interface ApplySceneOptions {
   /**
    * Provides fresh ids when duplicate_page re-mints element ids. Never called
@@ -144,6 +146,7 @@ function isStaleRevError(err: unknown): boolean {
   return err instanceof Error && /stale rev/i.test(err.message)
 }
 
+/** Resolve and apply a scene plan to the store with specified actor context and generate results */
 export async function storeApplyScenePlan(
   store: SceneStore,
   plan: ScenePlan,

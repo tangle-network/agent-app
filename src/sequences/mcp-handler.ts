@@ -28,11 +28,13 @@ import type { McpToolDefinition } from '../tools/mcp-rpc'
  *  name to keep the public surface stable without a second source of truth. */
 export { MCP_PROTOCOL_VERSIONS as SEQUENCES_MCP_PROTOCOL_VERSIONS } from '../tools/mcp-rpc'
 
+/** Describe server information including name and version for Sequences MCP integration */
 export interface SequencesMcpServerInfo {
   name: string
   version: string
 }
 
+/** Define options for creating sequences MCP handler including store, playhead frame, and server info */
 export interface CreateSequencesMcpHandlerOptions {
   /** Already scoped + authorized for one (workspace, sequence, actor). */
   store: SequenceStore
@@ -42,6 +44,7 @@ export interface CreateSequencesMcpHandlerOptions {
   serverInfo?: SequencesMcpServerInfo
 }
 
+/** Create a handler to process MCP sequence requests with optional playhead frame and server info */
 export function createSequencesMcpHandler(
   opts: CreateSequencesMcpHandlerOptions,
 ): (request: Request) => Promise<Response> {

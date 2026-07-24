@@ -91,6 +91,7 @@ export const DEFAULT_STALE_TURN_LOCK_GRACE_MS = 5 * 60 * 1000
  */
 export const DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS = 60 * 1000
 
+/** Resolve options for probing and releasing stale TURN locks based on lock start time and sandbox state */
 export interface ReconcileStaleTurnLockOptions {
   /** When the held lock was acquired (epoch ms). The grace period is measured
    *  from here, so it must be the LOCK's start, not the turn's. */
@@ -127,6 +128,7 @@ export interface ReconcileStaleTurnLockOptions {
   now?(): number
 }
 
+/** Describe the outcome of reconciling a stale turn lock including release status and diagnostics */
 export interface ReconcileStaleTurnLockResult {
   released: boolean
   /** Why the policy decided what it did — the probe's own diagnostics on the

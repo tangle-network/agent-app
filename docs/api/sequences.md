@@ -8,7 +8,7 @@ Source: `src/sequences/index.ts`
 
 ### `AddCaptionOperation`
 
-`interface`
+`interface` — Add a caption with optional language, timing, and track placement details
 
 ```ts
 interface AddCaptionOperation
@@ -16,7 +16,7 @@ interface AddCaptionOperation
 
 ### `applySequenceOperation`
 
-`function`
+`function` — Apply a sequence operation to update the store and timeline asynchronously
 
 ```ts
 (store: SequenceStore, timeline: SequenceTimeline, op: SequenceOperation, ctx: SequenceOperationContext) => Promise<...>
@@ -32,7 +32,7 @@ interface AddCaptionOperation
 
 ### `assertClipFitsSequence`
 
-`function`
+`function` — Validate that a clip's start and duration fit within the sequence duration without overflow
 
 ```ts
 (input: { startFrame: number; durationFrames: number; sequenceDurationFrames: number; label: string; }) => void
@@ -56,7 +56,7 @@ interface AddCaptionOperation
 
 ### `BuildCaptionChunksOptions`
 
-`interface`
+`interface` — Define options to configure caption chunk size, duration, and frame rate constraints
 
 ```ts
 interface BuildCaptionChunksOptions
@@ -96,7 +96,7 @@ interface BuildCaptionChunksOptions
 
 ### `BuildSequencesMcpServerEntryOptions`
 
-`type`
+`type` — Extend ScopedMcpServerEntryOptions to configure MCP server entry options for sequence building
 
 ```ts
 type BuildSequencesMcpServerEntryOptions
@@ -144,7 +144,7 @@ interface CaptionCoverageEntry
 
 ### `CaptionExportOptions`
 
-`interface`
+`interface` — Define options to export captions filtered by an optional BCP-47 language tag
 
 ```ts
 interface CaptionExportOptions
@@ -152,7 +152,7 @@ interface CaptionExportOptions
 
 ### `CaptionTargetResolution`
 
-`type`
+`type` — Resolve caption target by specifying an existing track or creating a new one with language and name
 
 ```ts
 type CaptionTargetResolution
@@ -176,7 +176,7 @@ type CaptionTargetResolution
 
 ### `clampClipDuration`
 
-`function`
+`function` — Clamp clip duration to fit within sequence bounds and minimum length constraints
 
 ```ts
 (input: { startFrame: number; durationFrames: number; sequenceDurationFrames: number; }) => number
@@ -184,7 +184,7 @@ type CaptionTargetResolution
 
 ### `clampClipStart`
 
-`function`
+`function` — Clamp the clip start frame within the valid range of the sequence duration and clip length
 
 ```ts
 (input: { startFrame: number; durationFrames: number; sequenceDurationFrames: number; }) => number
@@ -192,7 +192,7 @@ type CaptionTargetResolution
 
 ### `ContactSheetEntry`
 
-`interface`
+`interface` — Describe a single entry in a contact sheet with timing and media source details
 
 ```ts
 interface ContactSheetEntry
@@ -200,7 +200,7 @@ interface ContactSheetEntry
 
 ### `ContactSheetManifest`
 
-`interface`
+`interface` — Define the structure for a contact sheet manifest including metadata and entries
 
 ```ts
 interface ContactSheetManifest
@@ -208,7 +208,7 @@ interface ContactSheetManifest
 
 ### `createSequencesMcpHandler`
 
-`function`
+`function` — Create a handler to process MCP sequence requests with optional playhead frame and server info
 
 ```ts
 (opts: CreateSequencesMcpHandlerOptions) => (request: Request) => Promise<Response>
@@ -216,7 +216,7 @@ interface ContactSheetManifest
 
 ### `CreateSequencesMcpHandlerOptions`
 
-`interface`
+`interface` — Define options for creating sequences MCP handler including store, playhead frame, and server info
 
 ```ts
 interface CreateSequencesMcpHandlerOptions
@@ -224,7 +224,7 @@ interface CreateSequencesMcpHandlerOptions
 
 ### `CreateTrackOperation`
 
-`interface`
+`interface` — Define an operation to create a new sequence track with a specified kind and name
 
 ```ts
 interface CreateTrackOperation
@@ -232,7 +232,7 @@ interface CreateTrackOperation
 
 ### `DEFAULT_SEQUENCES_MCP_DESCRIPTION`
 
-`const`
+`const` — Describe live timeline editor features for current video sequence including clip and caption management
 
 ```ts
 "Live timeline editor for the current video sequence: read timeline state, place/move/trim/split clips, add captions, m…
@@ -240,7 +240,7 @@ interface CreateTrackOperation
 
 ### `DeleteClipOperation`
 
-`interface`
+`interface` — Represent a delete clip operation with a specified clip identifier
 
 ```ts
 interface DeleteClipOperation
@@ -248,7 +248,7 @@ interface DeleteClipOperation
 
 ### `ExtendSequenceOperation`
 
-`interface`
+`interface` — Define an operation to extend a sequence by a specified number of frames
 
 ```ts
 interface ExtendSequenceOperation
@@ -256,7 +256,7 @@ interface ExtendSequenceOperation
 
 ### `findSequenceMcpTool`
 
-`function`
+`function` — Resolve the SequenceMcpToolDefinition matching the given name or return undefined
 
 ```ts
 (name: string) => SequenceMcpToolDefinition | undefined
@@ -264,7 +264,7 @@ interface ExtendSequenceOperation
 
 ### `formatSeconds`
 
-`function`
+`function` — Format a number of seconds into a string with integer or two-decimal precision suffix s
 
 ```ts
 (seconds: number) => string
@@ -280,7 +280,7 @@ interface ExtendSequenceOperation
 
 ### `framesToSeconds`
 
-`function`
+`function` — Convert a frame count to seconds based on the given frames per second rate
 
 ```ts
 (frames: number, fps: number) => number
@@ -288,7 +288,7 @@ interface ExtendSequenceOperation
 
 ### `LanguageFanoutOptions`
 
-`interface`
+`interface` — Define options to specify target languages and an optional source language for fan-out operations
 
 ```ts
 interface LanguageFanoutOptions
@@ -320,7 +320,7 @@ interface LanguageFanoutOptions
 
 ### `MoveClipOperation`
 
-`interface`
+`interface` — Resolve an operation to move a clip to a new start frame and optional track
 
 ```ts
 interface MoveClipOperation
@@ -328,7 +328,7 @@ interface MoveClipOperation
 
 ### `NewSequenceClip`
 
-`interface`
+`interface` — Define properties for a new sequence clip including timing, labels, and optional metadata
 
 ```ts
 interface NewSequenceClip
@@ -336,7 +336,7 @@ interface NewSequenceClip
 
 ### `NewSequenceDecision`
 
-`interface`
+`interface` — Define the structure for a new sequence decision with optional metadata and acceptance status
 
 ```ts
 interface NewSequenceDecision
@@ -344,7 +344,7 @@ interface NewSequenceDecision
 
 ### `NewSequenceTrack`
 
-`interface`
+`interface` — Define properties for a new sequence track including kind, name, and optional sort order
 
 ```ts
 interface NewSequenceTrack
@@ -360,7 +360,7 @@ interface NewSequenceTrack
 
 ### `OtioClip`
 
-`interface`
+`interface` — Define a clip object with metadata, source range, and media reference according to OTIO schema
 
 ```ts
 interface OtioClip
@@ -368,7 +368,7 @@ interface OtioClip
 
 ### `OtioExternalReference`
 
-`interface`
+`interface` — Define the structure for an external media reference with schema, URL, and optional time range
 
 ```ts
 interface OtioExternalReference
@@ -376,7 +376,7 @@ interface OtioExternalReference
 
 ### `OtioGap`
 
-`interface`
+`interface` — Define the structure for a gap element with schema, name, and source time range properties
 
 ```ts
 interface OtioGap
@@ -384,7 +384,7 @@ interface OtioGap
 
 ### `OtioMissingReference`
 
-`interface`
+`interface` — Represent missing references in OTIO with a fixed schema identifier
 
 ```ts
 interface OtioMissingReference
@@ -392,7 +392,7 @@ interface OtioMissingReference
 
 ### `OtioRationalTime`
 
-`interface`
+`interface` — Represent a rational time value with a specific rate and numeric value for OTIO schema
 
 ```ts
 interface OtioRationalTime
@@ -400,7 +400,7 @@ interface OtioRationalTime
 
 ### `OtioStack`
 
-`interface`
+`interface` — Represent a stack container holding a named collection of OtioTrack children
 
 ```ts
 interface OtioStack
@@ -408,7 +408,7 @@ interface OtioStack
 
 ### `OtioTimeline`
 
-`interface`
+`interface` — Define the structure of a timeline with metadata, tracks, and global start time in OTIO format
 
 ```ts
 interface OtioTimeline
@@ -416,7 +416,7 @@ interface OtioTimeline
 
 ### `OtioTimeRange`
 
-`interface`
+`interface` — Define a time range with a start time and duration using OtioRationalTime values
 
 ```ts
 interface OtioTimeRange
@@ -424,7 +424,7 @@ interface OtioTimeRange
 
 ### `OtioTrack`
 
-`interface`
+`interface` — Define a track containing video or audio clips with metadata and child elements
 
 ```ts
 interface OtioTrack
@@ -440,7 +440,7 @@ interface OtioTrack
 
 ### `PlaceClipOperation`
 
-`interface`
+`interface` — Define an operation to place a media clip with timing, track, and playback options
 
 ```ts
 interface PlaceClipOperation
@@ -456,7 +456,7 @@ interface PlaceClipOperation
 
 ### `QueueExportOperation`
 
-`interface`
+`interface` — Define the structure for a queue export operation with format and optional metadata
 
 ```ts
 interface QueueExportOperation
@@ -488,7 +488,7 @@ interface QueueExportOperation
 
 ### `secondsToFrames`
 
-`function`
+`function` — Convert seconds to the nearest whole number of frames based on frames per second
 
 ```ts
 (seconds: number, fps: number) => number
@@ -496,7 +496,7 @@ interface QueueExportOperation
 
 ### `SEQUENCE_EXPORT_FORMATS`
 
-`const`
+`const` — Define supported export formats for sequence outputs including video, subtitle, and metadata types
 
 ```ts
 readonly ["mp4", "otio", "xml", "edl", "vtt", "srt", "contact_sheet"]
@@ -504,7 +504,7 @@ readonly ["mp4", "otio", "xml", "edl", "vtt", "srt", "contact_sheet"]
 
 ### `SEQUENCE_MCP_TOOLS`
 
-`const`
+`const` — Resolve an array of immutable sequence MCP tool definitions for timeline and frame operations
 
 ```ts
 readonly SequenceMcpToolDefinition[]
@@ -512,7 +512,7 @@ readonly SequenceMcpToolDefinition[]
 
 ### `SEQUENCE_MEDIA_KINDS`
 
-`const`
+`const` — Define the allowed media kinds for sequences including video, image, and audio
 
 ```ts
 readonly ["video", "image", "audio"]
@@ -520,7 +520,7 @@ readonly ["video", "image", "audio"]
 
 ### `SEQUENCE_OPERATION_TYPES`
 
-`const`
+`const` — List all valid sequence operation types used in editing workflows
 
 ```ts
 readonly ("place_clip" | "add_caption" | "move_clip" | "trim_clip" | "split_clip" | "set_clip_text" | "set_clip_disable…
@@ -528,7 +528,7 @@ readonly ("place_clip" | "add_caption" | "move_clip" | "trim_clip" | "split_clip
 
 ### `SEQUENCE_TRACK_KINDS`
 
-`const`
+`const` — Define immutable sequence track kinds for video, audio, caption, reference, and agent
 
 ```ts
 readonly ["video", "audio", "caption", "reference", "agent"]
@@ -544,7 +544,7 @@ type SequenceApplyResult
 
 ### `SequenceClip`
 
-`interface`
+`interface` — Define properties for a media sequence clip including timing, source, track, and caption details
 
 ```ts
 interface SequenceClip
@@ -560,7 +560,7 @@ interface SequenceClipMedia
 
 ### `SequenceClipPatch`
 
-`interface`
+`interface` — Define optional properties to update or patch a sequence clip's attributes in a timeline
 
 ```ts
 interface SequenceClipPatch
@@ -576,7 +576,7 @@ interface SequenceDecision
 
 ### `SequenceExportFormat`
 
-`type`
+`type` — Define export formats available for sequence data including video, subtitle, and metadata types
 
 ```ts
 type SequenceExportFormat
@@ -584,7 +584,7 @@ type SequenceExportFormat
 
 ### `SequenceExportRecord`
 
-`interface`
+`interface` — Describe a record representing the export details and status of a sequence
 
 ```ts
 interface SequenceExportRecord
@@ -592,7 +592,7 @@ interface SequenceExportRecord
 
 ### `SequenceExportStatus`
 
-`type`
+`type` — Represent export status of a sequence as queued, processing, completed, failed, or cancelled
 
 ```ts
 type SequenceExportStatus
@@ -608,7 +608,7 @@ interface SequenceFrameSnapshot
 
 ### `SequenceMcpToolDefinition`
 
-`interface`
+`interface` — Define a tool with metadata and a run method for processing input within a specific environment
 
 ```ts
 interface SequenceMcpToolDefinition
@@ -624,7 +624,7 @@ interface SequenceMcpToolEnv
 
 ### `SequenceMediaKind`
 
-`type`
+`type` — Define media types allowed in a sequence including video, image, and audio
 
 ```ts
 type SequenceMediaKind
@@ -632,7 +632,7 @@ type SequenceMediaKind
 
 ### `SequenceMeta`
 
-`interface`
+`interface` — Describe metadata and properties of a media sequence including dimensions, duration, and status
 
 ```ts
 interface SequenceMeta
@@ -640,7 +640,7 @@ interface SequenceMeta
 
 ### `SequenceOperation`
 
-`type`
+`type` — Represent sequence editing actions for manipulating clips, tracks, captions, and exports
 
 ```ts
 type SequenceOperation
@@ -656,7 +656,7 @@ interface SequenceOperationContext
 
 ### `SequenceOperationType`
 
-`type`
+`type` — Extract the type of operation from a sequence operation object
 
 ```ts
 type SequenceOperationType
@@ -680,7 +680,7 @@ readonly ["2025-06-18", "2025-03-26", "2024-11-05"]
 
 ### `SequencesMcpServerInfo`
 
-`interface`
+`interface` — Describe server information including name and version for Sequences MCP integration
 
 ```ts
 interface SequencesMcpServerInfo
@@ -688,7 +688,7 @@ interface SequencesMcpServerInfo
 
 ### `SequenceStatus`
 
-`type`
+`type` — Define sequence status as one of the specific lifecycle stages draft, active, exporting, or archived
 
 ```ts
 type SequenceStatus
@@ -696,7 +696,7 @@ type SequenceStatus
 
 ### `SequenceStore`
 
-`interface`
+`interface` — Manage sequences by providing methods to get timelines, clips, and modify tracks and clips
 
 ```ts
 interface SequenceStore
@@ -720,7 +720,7 @@ interface SequenceTimeline
 
 ### `SequenceTrack`
 
-`interface`
+`interface` — Define properties and state for a sequence track including id, kind, name, order, and flags
 
 ```ts
 interface SequenceTrack
@@ -736,7 +736,7 @@ type SequenceTrackKind
 
 ### `SetClipDisabledOperation`
 
-`interface`
+`interface` — Define an operation to enable or disable a clip by its identifier
 
 ```ts
 interface SetClipDisabledOperation
@@ -744,7 +744,7 @@ interface SetClipDisabledOperation
 
 ### `SetClipTextOperation`
 
-`interface`
+`interface` — Resolve an operation to set clipboard text with optional language and clip identifier
 
 ```ts
 interface SetClipTextOperation
@@ -760,7 +760,7 @@ interface SetClipTextOperation
 
 ### `SplitClipOperation`
 
-`interface`
+`interface` — Split a clip at a specified frame inside the clip to create two separate segments
 
 ```ts
 interface SplitClipOperation
@@ -768,7 +768,7 @@ interface SplitClipOperation
 
 ### `TimelineClipBounds`
 
-`interface`
+`interface` — Define the start frame and duration in frames for a timeline clip's bounds
 
 ```ts
 interface TimelineClipBounds
@@ -776,7 +776,7 @@ interface TimelineClipBounds
 
 ### `TimelineInterval`
 
-`interface`
+`interface` — Define a time range with inclusive start and end frame numbers
 
 ```ts
 interface TimelineInterval
@@ -800,7 +800,7 @@ interface TranscriptSegment
 
 ### `TrimClipOperation`
 
-`interface`
+`interface` — Define an operation to trim a clip by adjusting its start, duration, and optional source in/out points
 
 ```ts
 interface TrimClipOperation
@@ -808,7 +808,7 @@ interface TrimClipOperation
 
 ### `validateAddCaption`
 
-`function`
+`function` — Validate the parameters and context of an AddCaptionOperation within a sequence timeline
 
 ```ts
 (timeline: SequenceTimeline, operation: AddCaptionOperation, ctx: SequenceOperationContext) => void
@@ -816,7 +816,7 @@ interface TrimClipOperation
 
 ### `validateCreateTrack`
 
-`function`
+`function` — Validate that a CreateTrackOperation has a supported kind and a non-empty name
 
 ```ts
 (operation: CreateTrackOperation) => void
@@ -824,7 +824,7 @@ interface TrimClipOperation
 
 ### `validateDeleteClip`
 
-`function`
+`function` — Validate that the clip to delete exists and is mutable in the given timeline
 
 ```ts
 (timeline: SequenceTimeline, operation: DeleteClipOperation) => void
@@ -832,7 +832,7 @@ interface TrimClipOperation
 
 ### `validateExtendSequence`
 
-`function`
+`function` — Validate that the extend sequence operation has a positive duration and exceeds the last clip end frame
 
 ```ts
 (timeline: SequenceTimeline, operation: ExtendSequenceOperation) => void
@@ -840,7 +840,7 @@ interface TrimClipOperation
 
 ### `validateMoveClip`
 
-`function`
+`function` — Validate that a clip move operation is within bounds and targets a compatible unlocked track
 
 ```ts
 (timeline: SequenceTimeline, operation: MoveClipOperation) => void
@@ -848,7 +848,7 @@ interface TrimClipOperation
 
 ### `validatePlaceClip`
 
-`function`
+`function` — Validate the properties and constraints of a PlaceClipOperation within a SequenceTimeline
 
 ```ts
 (timeline: SequenceTimeline, operation: PlaceClipOperation) => void
@@ -856,7 +856,7 @@ interface TrimClipOperation
 
 ### `validateQueueExport`
 
-`function`
+`function` — Validate that the queue export operation uses a supported export format
 
 ```ts
 (operation: QueueExportOperation) => void
@@ -864,7 +864,7 @@ interface TrimClipOperation
 
 ### `validateSequenceOperation`
 
-`function`
+`function` — Validate a sequence operation against the timeline and context to ensure correctness
 
 ```ts
 (timeline: SequenceTimeline, operation: SequenceOperation, ctx: SequenceOperationContext) => void
@@ -872,7 +872,7 @@ interface TrimClipOperation
 
 ### `validateSequenceOperations`
 
-`function`
+`function` — Validate each operation in a sequence against the timeline and context, throwing detailed errors on failure
 
 ```ts
 (timeline: SequenceTimeline, operations: SequenceOperation[], ctx: SequenceOperationContext) => void
@@ -880,7 +880,7 @@ interface TrimClipOperation
 
 ### `validateSetClipDisabled`
 
-`function`
+`function` — Validate that the clip can be disabled within the given timeline and operation constraints
 
 ```ts
 (timeline: SequenceTimeline, operation: SetClipDisabledOperation) => void
@@ -888,7 +888,7 @@ interface TrimClipOperation
 
 ### `validateSetClipText`
 
-`function`
+`function` — Validate that a SetClipTextOperation targets a caption clip with non-empty text and valid language tag
 
 ```ts
 (timeline: SequenceTimeline, operation: SetClipTextOperation) => void
@@ -896,7 +896,7 @@ interface TrimClipOperation
 
 ### `validateSplitClip`
 
-`function`
+`function` — Validate that a split operation on a clip is within valid frame boundaries and conditions
 
 ```ts
 (timeline: SequenceTimeline, operation: SplitClipOperation) => void
@@ -904,7 +904,7 @@ interface TrimClipOperation
 
 ### `validateTrimClip`
 
-`function`
+`function` — Validate that a trim clip operation respects timeline bounds and source frame constraints
 
 ```ts
 (timeline: SequenceTimeline, operation: TrimClipOperation) => void

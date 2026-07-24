@@ -16,7 +16,7 @@ Source: `src/brand/index.tsx`
 
 ### `BrandHeaderProps`
 
-`interface`
+`interface` — Define properties for a brand header including optional title, children, and CSS class name
 
 ```ts
 interface BrandHeaderProps
@@ -32,7 +32,7 @@ interface BrandHeaderProps
 
 ### `LogoProps`
 
-`interface`
+`interface` — Define properties to customize the logo variant, size, style, and icon display options
 
 ```ts
 interface LogoProps

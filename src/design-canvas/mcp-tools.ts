@@ -34,6 +34,7 @@ import type { McpToolDefinition } from '../tools/mcp-rpc'
 // Tool env
 // ---------------------------------------------------------------------------
 
+/** Define the environment for MCP tool with a scene store and ID minting function */
 export interface DesignCanvasMcpToolEnv {
   store: SceneStore
   mintId: () => string
@@ -220,6 +221,7 @@ const colorProp = (label: string) => ({ type: 'string', description: `${label} �
 // Tool implementations
 // ---------------------------------------------------------------------------
 
+/** Provide a collection of MCP tool definitions for manipulating and querying the design canvas environment */
 const CANVAS_MCP_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] = [
 
   // ─── read ────────────────────────────────────────────────────────────────
@@ -1003,11 +1005,14 @@ const CANVAS_MCP_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] = [
 
 export { CANVAS_MCP_TOOLS }
 
+/** Find the canvas MCP tool definition matching the given name or return undefined */
 export function findCanvasMcpTool(
   name: string,
 ): McpToolDefinition<DesignCanvasMcpToolEnv> | undefined {
   return CANVAS_MCP_TOOLS.find((tool) => tool.name === name)
 }
 
+/** Extract names of all tools from the CANVAS_MCP_TOOLS array */
 export const CANVAS_MCP_TOOL_NAMES = CANVAS_MCP_TOOLS.map((t) => t.name)
+/** Provide a readonly array of string identifiers representing canvas element kinds */
 export const CANVAS_ELEMENT_KINDS: readonly string[] = SCENE_ELEMENT_KINDS

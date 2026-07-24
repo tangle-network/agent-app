@@ -24,7 +24,7 @@ interface BrokerTokenMinter
 
 ### `BrokerTokenProvider`
 
-`interface`
+`interface` — Provide and refresh broker bearer tokens, allowing forced token invalidation
 
 ```ts
 interface BrokerTokenProvider
@@ -32,7 +32,7 @@ interface BrokerTokenProvider
 
 ### `BrokerTokenProviderOptions`
 
-`interface`
+`interface` — Define options for configuring a broker token provider including client credentials and token management settings
 
 ```ts
 interface BrokerTokenProviderOptions
@@ -48,7 +48,7 @@ interface BrokerTokenProviderOptions
 
 ### `ConsentUrlInput`
 
-`interface`
+`interface` — Define input parameters required to generate a consent URL for OAuth authorization
 
 ```ts
 interface ConsentUrlInput

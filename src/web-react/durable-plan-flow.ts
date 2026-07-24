@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChatPlan } from '../plans/index'
 
+/** Represent durable plan decisions as either approved or rejected */
 export type DurablePlanDecision = 'approved' | 'rejected'
 
 /** Stable authority receipt for the follow-up turn dispatched by a plan
@@ -14,6 +15,7 @@ export interface DurablePlanFollowUpReceipt {
   state: string
 }
 
+/** Describe the result of a durable plan decision including plan details and pending statuses */
 export interface DurablePlanDecisionResult {
   plan: ChatPlan
   followUp?: DurablePlanFollowUpReceipt
@@ -22,6 +24,7 @@ export interface DurablePlanDecisionResult {
   effectPending?: boolean
 }
 
+/** Define input parameters for making a durable plan decision including optional feedback */
 export interface DurablePlanDecisionInput {
   planId: string
   revision: number
@@ -29,16 +32,19 @@ export interface DurablePlanDecisionInput {
   feedback?: string
 }
 
+/** Define input parameters for retrieving the current durable plan including optional revision number */
 export interface DurablePlanCurrentInput {
   planId: string
   revision?: number
 }
 
+/** Define methods to obtain and decide durable plan decisions asynchronously */
 export interface DurablePlanDecisionClient {
   current: (input: DurablePlanCurrentInput) => Promise<DurablePlanDecisionResult>
   decide: (input: DurablePlanDecisionInput) => Promise<DurablePlanDecisionResult>
 }
 
+/** Represent errors from DurablePlanClient operations including status, code, and current plan details */
 export class DurablePlanClientError extends Error {
   constructor(
     message: string,
@@ -51,6 +57,7 @@ export class DurablePlanClientError extends Error {
   }
 }
 
+/** Define configuration options for creating a durable plan decision client */
 export interface DurablePlanDecisionClientOptions {
   url: string | ((input: DurablePlanCurrentInput | DurablePlanDecisionInput) => string)
   body?: Record<string, unknown> | ((input: DurablePlanDecisionInput) => Record<string, unknown>)
@@ -153,6 +160,7 @@ export function createDurablePlanDecisionClient(
   }
 }
 
+/** Define options to configure durable plan flow with plan, client, and optional callbacks */
 export interface UseDurablePlanFlowOptions {
   plan: ChatPlan
   client: DurablePlanDecisionClient
@@ -161,6 +169,7 @@ export interface UseDurablePlanFlowOptions {
   onUpdated?: (plan: ChatPlan) => void
 }
 
+/** Define the result and actions for managing a durable plan flow including decisions, restoration, and error handling */
 export interface UseDurablePlanFlowResult {
   plan: ChatPlan
   deciding: DurablePlanDecision | null

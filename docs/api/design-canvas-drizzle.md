@@ -8,7 +8,7 @@ Source: `src/design-canvas/drizzle.ts`
 
 ### `createDesignCanvasTables`
 
-`function`
+`function` — Build SQLite tables for design documents with workspace and user references
 
 ```ts
 (opts: CreateDesignCanvasTablesOptions) => { designDocuments: SQLiteTableWithColumns<{ name: "design_document"; schema:…
@@ -16,7 +16,7 @@ Source: `src/design-canvas/drizzle.ts`
 
 ### `CreateDesignCanvasTablesOptions`
 
-`interface`
+`interface` — Define options for creating design canvas tables including workspace and user table configurations
 
 ```ts
 interface CreateDesignCanvasTablesOptions
@@ -24,7 +24,7 @@ interface CreateDesignCanvasTablesOptions
 
 ### `createDrizzleSceneStore`
 
-`function`
+`function` — Create a scene store configured with database tables and scoped to a specific document and workspace
 
 ```ts
 (options: CreateDrizzleSceneStoreOptions) => SceneStore
@@ -32,7 +32,7 @@ interface CreateDesignCanvasTablesOptions
 
 ### `CreateDrizzleSceneStoreOptions`
 
-`interface`
+`interface` — Define options for creating a Drizzle scene store including database, tables, and scope
 
 ```ts
 interface CreateDrizzleSceneStoreOptions
@@ -56,7 +56,7 @@ type DesignCanvasParentTable
 
 ### `DesignCanvasTables`
 
-`type`
+`type` — Resolve the structure and data of design canvas tables for rendering and manipulation
 
 ```ts
 type DesignCanvasTables
@@ -64,7 +64,7 @@ type DesignCanvasTables
 
 ### `DesignDecisionRow`
 
-`type`
+`type` — Resolve a design decision row from the design decisions table selection
 
 ```ts
 type DesignDecisionRow
@@ -72,7 +72,7 @@ type DesignDecisionRow
 
 ### `DesignDocumentRow`
 
-`type`
+`type` — Resolve the selected structure of a design document row from design canvas tables
 
 ```ts
 type DesignDocumentRow
@@ -80,7 +80,7 @@ type DesignDocumentRow
 
 ### `DesignExportRow`
 
-`type`
+`type` — Resolve the selected fields of designExports from DesignCanvasTables
 
 ```ts
 type DesignExportRow

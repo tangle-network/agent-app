@@ -32,7 +32,7 @@ interface DatabaseProvider
 
 ### `DatabaseProviderOptions`
 
-`interface`
+`interface` — Define options for configuring database provider behavior including error messaging
 
 ```ts
 interface DatabaseProviderOptions
@@ -40,7 +40,7 @@ interface DatabaseProviderOptions
 
 ### `KVGetWithMetadataResult`
 
-`interface`
+`interface` — Resolve a key-value pair retrieval including its associated metadata and value
 
 ```ts
 interface KVGetWithMetadataResult
@@ -48,7 +48,7 @@ interface KVGetWithMetadataResult
 
 ### `KVListResult`
 
-`interface`
+`interface` — Describe the result of listing keys with completion status and optional pagination cursor
 
 ```ts
 interface KVListResult
@@ -56,7 +56,7 @@ interface KVListResult
 
 ### `KVPutOptions`
 
-`interface`
+`interface` — Define options for storing a key-value pair with expiration and metadata settings
 
 ```ts
 interface KVPutOptions
@@ -64,7 +64,7 @@ interface KVPutOptions
 
 ### `KVStore`
 
-`interface`
+`interface` — Define a key-value store interface for asynchronous data retrieval, storage, deletion, and listing
 
 ```ts
 interface KVStore

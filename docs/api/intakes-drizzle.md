@@ -24,7 +24,7 @@ type AnyIntakeTables
 
 ### `CreateIntakeTablesOptions`
 
-`interface`
+`interface` — Define options for creating intake tables including user and optional workspace references
 
 ```ts
 interface CreateIntakeTablesOptions
@@ -40,7 +40,7 @@ interface CreateIntakeTablesOptions
 
 ### `CreateProjectIntakeStoreOptions`
 
-`interface`
+`interface` — Define options required to create a project intake store including database, table, graph, and workspace ID
 
 ```ts
 interface CreateProjectIntakeStoreOptions
@@ -56,7 +56,7 @@ interface CreateProjectIntakeStoreOptions
 
 ### `CreateUserIntakeStoreOptions`
 
-`interface`
+`interface` — Define options required to create a user intake store for onboarding data collection
 
 ```ts
 interface CreateUserIntakeStoreOptions
@@ -80,7 +80,7 @@ class IntakeError
 
 ### `IntakeErrorCode`
 
-`type`
+`type` — Define error codes representing specific intake validation failures
 
 ```ts
 type IntakeErrorCode
@@ -120,7 +120,7 @@ type IntakeTables
 
 ### `ProjectIntakeRow`
 
-`type`
+`type` — Resolve the selected data structure for a project intake table row
 
 ```ts
 type ProjectIntakeRow
@@ -128,7 +128,7 @@ type ProjectIntakeRow
 
 ### `ProjectIntakeTable`
 
-`type`
+`type` — Resolve the structure and data of the project intake table from the factory function
 
 ```ts
 type ProjectIntakeTable
@@ -136,7 +136,7 @@ type ProjectIntakeTable
 
 ### `UserIntakeRow`
 
-`type`
+`type` — Infer and represent a selected row from the UserIntakeTable data structure
 
 ```ts
 type UserIntakeRow
@@ -144,7 +144,7 @@ type UserIntakeRow
 
 ### `UserIntakeTable`
 
-`type`
+`type` — Resolve the structure and data of a user intake table based on the createUserIntakeTable function
 
 ```ts
 type UserIntakeTable

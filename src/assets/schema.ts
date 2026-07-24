@@ -3,6 +3,7 @@ import type { AssetSpec, AssetFormat } from './types'
 
 // --- Brand ---
 
+/** Validate brand token properties including colors, font, logo URL, business name, and voice */
 export const BrandTokensSchema = z.object({
   primaryColor: z.string(),
   accentColor: z.string(),
@@ -64,6 +65,7 @@ const EmailSectionSchema = z.discriminatedUnion('type', [
   EmailDividerSectionSchema,
 ])
 
+/** Validate and parse email content objects with subject, optional preheader, and sections */
 export const EmailContentSchema = z.object({
   subject: z.string(),
   preheader: z.string().optional(),
@@ -130,6 +132,7 @@ const ImageSlideSchema = z.object({
   layers: z.array(ImageLayerSchema),
 })
 
+/** Validate image content with an array of one or more slides containing background details */
 export const ImageContentSchema = z.object({
   slides: z.array(ImageSlideSchema).min(1),
 })
@@ -178,6 +181,7 @@ const VideoCaptionSchema = z.object({
   text: z.string(),
 })
 
+/** Define the schema for validating video content including duration, scenes, audio, captions, and rendered URL */
 export const VideoContentSchema = z.object({
   durationSeconds: z.number().positive(),
   scenes: z.array(VideoSceneSchema).min(1),
@@ -188,6 +192,7 @@ export const VideoContentSchema = z.object({
 
 // --- Copy ---
 
+/** Validate and parse copy content with headline, body, optional hashtags, platform, and character count */
 export const CopyContentSchema = z.object({
   headline: z.string(),
   body: z.string(),
@@ -198,6 +203,7 @@ export const CopyContentSchema = z.object({
 
 // --- Approval ---
 
+/** Validate approval event data including asset, action, user, timestamp, and optional fields */
 export const ApprovalEventSchema = z.object({
   assetId: z.string(),
   variantId: z.string().optional(),
@@ -207,6 +213,7 @@ export const ApprovalEventSchema = z.object({
   timestamp: z.string(),
 })
 
+/** Validate conversion metrics with nonnegative impressions, clicks, conversions, CTR, and CVR fields */
 export const ConversionMetricsSchema = z.object({
   impressions: z.number().nonnegative(),
   clicks: z.number().nonnegative(),

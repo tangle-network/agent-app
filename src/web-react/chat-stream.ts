@@ -63,12 +63,14 @@ export {
   type FileIndexWarmingResponse,
 } from '../chat-routes/file-index'
 
+/** Define the structure for a chat tool call including optional ID, name, and arguments object */
 export interface ChatStreamToolCall {
   toolCallId?: string
   toolName: string
   args: Record<string, unknown>
 }
 
+/** Describe the result of a chat stream tool including its outcome and optional metadata fields */
 export interface ChatStreamToolResult {
   toolCallId?: string
   toolName?: string
@@ -76,6 +78,7 @@ export interface ChatStreamToolResult {
   outcome: { ok: boolean; result?: unknown; code?: string; message?: string }
 }
 
+/** Define callbacks to handle events and data during a chat streaming session */
 export interface ChatStreamCallbacks {
   onTurnId?: (turnId: string) => void
   onText?: (delta: string) => void
@@ -108,6 +111,7 @@ export interface ChatStreamCallbacks {
   onPlan?: (plan: ChatPlan) => void
 }
 
+/** Represent the result of consuming a chat stream including turn ID and content reception status */
 export interface ConsumeChatStreamResult {
   turnId: string | null
   /** True when any text/reasoning/tool activity was received. */
@@ -308,6 +312,7 @@ export async function consumeChatStream(
   return { turnId, receivedContent }
 }
 
+/** Define options for managing and resuming streaming chat interactions with callbacks */
 export interface StreamChatOptions {
   /** Start the turn (POST the chat request); must return a streaming Response. */
   start: () => Promise<Response>
