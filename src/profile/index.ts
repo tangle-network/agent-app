@@ -135,6 +135,34 @@ export interface ComposeProfileBudget {
    *  for a product with a known-big prompt that must still ship (it yells on
    *  every compose instead of blocking). */
   warnOnly?: boolean
+  /** Required to raise {@link maxSystemPromptBytes} above
+   *  {@link DEFAULT_MAX_SYSTEM_PROMPT_BYTES} or to set {@link warnOnly}: a
+   *  written reason naming what stays inline and why it cannot be mounted.
+   *  Weakening the cap is a product decision that outlives the person making
+   *  it, and the usual cause is reference material concatenated into the prompt
+   *  that belongs in `resources.files`; demanding the sentence here keeps that
+   *  from happening by accident. */
+  overBudgetReason?: string
+}
+
+/** Reject a budget that weakens the cap without stating why. Runs before the
+ *  size check so it fires on every compose, not only once a prompt has already
+ *  grown past the raised ceiling. */
+function assertBudgetPolicy(budget: ComposeProfileBudget): void {
+  const raisedCap =
+    budget.maxSystemPromptBytes !== undefined &&
+    budget.maxSystemPromptBytes > DEFAULT_MAX_SYSTEM_PROMPT_BYTES
+  if (!raisedCap && !budget.warnOnly) return
+  if ((budget.overBudgetReason ?? '').trim() !== '') return
+  const weakened = raisedCap
+    ? `maxSystemPromptBytes ${budget.maxSystemPromptBytes} exceeds the ${DEFAULT_MAX_SYSTEM_PROMPT_BYTES}-byte default`
+    : 'warnOnly downgrades the over-budget throw to a warning'
+  throw new Error(
+    `${weakened} without an overBudgetReason. Oversized system prompts degrade toward empty answers, so the cap is not a formality. ` +
+      'Before raising it: rank the prompt with largestPromptSections() — reference material (playbooks, checklists, corpora) belongs in resources.files ' +
+      "via corpusSkills()/userSkillMounts() or composeSkills({ mode: 'mounted' }), which puts the bodies on disk in the sandbox and leaves a short index in the prompt. " +
+      'Only content the agent must obey without a tool call should stay inline. If the prompt is genuinely irreducible, set overBudgetReason to the sentence that says so.',
+  )
 }
 
 /** Largest markdown-heading-delimited sections of a prompt, by UTF-8 bytes.
@@ -171,6 +199,7 @@ export function assertSystemPromptWithinBudget(
   systemPrompt: string,
   budget: ComposeProfileBudget = {},
 ): void {
+  assertBudgetPolicy(budget)
   const max = budget.maxSystemPromptBytes ?? DEFAULT_MAX_SYSTEM_PROMPT_BYTES
   const bytes = new TextEncoder().encode(systemPrompt).byteLength
   if (bytes <= max) return
@@ -181,7 +210,8 @@ export function assertSystemPromptWithinBudget(
     `composed systemPrompt is ${bytes} bytes — over the ${max}-byte budget ` +
     `(oversized prompts degrade to empty answers). ` +
     (sections ? `Largest sections: ${sections}. ` : '') +
-    `Trim the prompt, move content to skills/knowledge mounts, or raise maxSystemPromptBytes deliberately.`
+    `Move reference material to resources.files (corpusSkills/userSkillMounts, or composeSkills({ mode: 'mounted' })) so the bodies land on disk in the sandbox ` +
+    `and the prompt keeps only an index; keep inline only what the agent must obey without a tool call. Raising maxSystemPromptBytes requires an overBudgetReason.`
   if (budget.warnOnly) {
     console.warn(`[profile] ${message}`)
     return
