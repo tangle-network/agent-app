@@ -8,7 +8,7 @@ Source: `src/chat-store/index.ts`
 
 ### `AppendMessageInput`
 
-`interface`
+`interface` — Define input parameters for appending a message to a chat thread with optional metadata
 
 ```ts
 interface AppendMessageInput
@@ -64,7 +64,7 @@ interface AppendMessageInput
 
 ### `BulkDeleteThreadsInput`
 
-`interface`
+`interface` — Define input for bulk deleting threads with access checks per workspace
 
 ```ts
 interface BulkDeleteThreadsInput
@@ -104,7 +104,7 @@ interface ChatFilePart
 
 ### `ChatImagePart`
 
-`interface`
+`interface` — Define properties for an image part within a chat message including optional metadata fields
 
 ```ts
 interface ChatImagePart
@@ -136,7 +136,7 @@ interface ChatMentionPart
 
 ### `ChatMessagePart`
 
-`type`
+`type` — Represent parts of a chat message including text, reasoning, tools, files, images, subtasks, steps, interactions, notices, plans, and mentions
 
 ```ts
 type ChatMessagePart
@@ -144,7 +144,7 @@ type ChatMessagePart
 
 ### `ChatMessageRow`
 
-`type`
+`type` — Resolve the selected structure of a chat message row from the messages table
 
 ```ts
 type ChatMessageRow
@@ -176,7 +176,7 @@ interface ChatPartTime
 
 ### `ChatPlanPart`
 
-`type`
+`type` — Resolve a chat plan part by aliasing it to the persisted chat plan part type
 
 ```ts
 type ChatPlanPart
@@ -184,7 +184,7 @@ type ChatPlanPart
 
 ### `ChatReasoningPart`
 
-`interface`
+`interface` — Define a reasoning part of a chat with text content and optional metadata fields
 
 ```ts
 interface ChatReasoningPart
@@ -192,7 +192,7 @@ interface ChatReasoningPart
 
 ### `ChatStepFinishPart`
 
-`interface`
+`interface` — Define a chat step finish part indicating completion with optional reason, tokens, and cost
 
 ```ts
 interface ChatStepFinishPart
@@ -208,7 +208,7 @@ interface ChatStepStartPart
 
 ### `ChatStore`
 
-`interface`
+`interface` — Manage chat threads and messages with operations for listing, creating, updating, and deleting data
 
 ```ts
 interface ChatStore
@@ -224,7 +224,7 @@ class ChatStoreInputError
 
 ### `ChatSubtaskPart`
 
-`interface`
+`interface` — Define a subtask part of a chat with prompt, description, agent, and optional identifier
 
 ```ts
 interface ChatSubtaskPart
@@ -248,7 +248,7 @@ interface ChatTextPart
 
 ### `ChatThreadRow`
 
-`type`
+`type` — Resolve the selected fields of a chat thread row from the chat threads table
 
 ```ts
 type ChatThreadRow
@@ -256,7 +256,7 @@ type ChatThreadRow
 
 ### `ChatToolPart`
 
-`interface`
+`interface` — Define a chat component representing a tool with its state and optional call identifier
 
 ```ts
 interface ChatToolPart
@@ -264,7 +264,7 @@ interface ChatToolPart
 
 ### `ChatToolState`
 
-`interface`
+`interface` — Describe the current state and data of a chat tool including status, input, output, and metadata
 
 ```ts
 interface ChatToolState
@@ -288,7 +288,7 @@ interface ChatUsageTokens
 
 ### `createChatStore`
 
-`function`
+`function` — Create a chat store managing threads and messages based on the provided database and tables
 
 ```ts
 <TTables extends ChatTables>(db: ChatDatabase, tables: TTables) => ChatStore<TTables["threads"]["$inferSelect"], TTable…
@@ -296,7 +296,7 @@ interface ChatUsageTokens
 
 ### `createChatTables`
 
-`function`
+`function` — Build chat-related SQLite tables with customizable thread and message columns
 
 ```ts
 <TThreadExtras extends Record<string, SQLiteColumnBuilderBase> = {}, TMessageExtras extends Record<string, SQLiteColumn…
@@ -304,7 +304,7 @@ interface ChatUsageTokens
 
 ### `CreateChatTablesOptions`
 
-`interface`
+`interface` — Define options to customize chat thread and message table creation including workspace and naming prefixes
 
 ```ts
 interface CreateChatTablesOptions
@@ -312,7 +312,7 @@ interface CreateChatTablesOptions
 
 ### `CreateThreadInput`
 
-`interface`
+`interface` — Define input parameters required to create a new thread in a workspace
 
 ```ts
 interface CreateThreadInput
@@ -344,7 +344,7 @@ interface CreateThreadInput
 
 ### `isChatInteractionPart`
 
-`function`
+`function` — Resolve whether a ChatMessagePart is a ChatInteractionPart based on its type property
 
 ```ts
 (part: ChatMessagePart) => part is ChatInteractionPart
@@ -360,7 +360,7 @@ interface CreateThreadInput
 
 ### `isChatPlanPart`
 
-`function`
+`function` — Resolve whether a chat message part is a persisted chat plan part
 
 ```ts
 (part: ChatMessagePart) => part is ChatPlanPersistedPart
@@ -368,7 +368,7 @@ interface CreateThreadInput
 
 ### `isChatStepFinishPart`
 
-`function`
+`function` — Determine if a chat message part represents the completion of a chat step
 
 ```ts
 (part: ChatMessagePart) => part is ChatStepFinishPart
@@ -376,7 +376,7 @@ interface CreateThreadInput
 
 ### `isChatTextPart`
 
-`function`
+`function` — Resolve whether a chat message part is a text part based on its type property
 
 ```ts
 (part: ChatMessagePart) => part is ChatTextPart
@@ -384,7 +384,7 @@ interface CreateThreadInput
 
 ### `isChatToolPart`
 
-`function`
+`function` — Resolve whether a ChatMessagePart is specifically a ChatToolPart based on its type property
 
 ```ts
 (part: ChatMessagePart) => part is ChatToolPart
@@ -392,7 +392,7 @@ interface CreateThreadInput
 
 ### `ListMessagesOptions`
 
-`interface`
+`interface` — Define options to configure message listing with optional limit and offset parameters
 
 ```ts
 interface ListMessagesOptions
@@ -400,7 +400,7 @@ interface ListMessagesOptions
 
 ### `ListThreadsInput`
 
-`interface`
+`interface` — Define input parameters for listing threads within a workspace with pagination options
 
 ```ts
 interface ListThreadsInput
@@ -408,7 +408,7 @@ interface ListThreadsInput
 
 ### `ListThreadsResult`
 
-`interface`
+`interface` — Represent a paginated collection of chat threads with total count and pagination details
 
 ```ts
 interface ListThreadsResult
@@ -432,7 +432,7 @@ interface ListThreadsResult
 
 ### `NewChatMessageRow`
 
-`type`
+`type` — Resolve the type for inserting a new chat message row into the messages table
 
 ```ts
 type NewChatMessageRow
@@ -440,7 +440,7 @@ type NewChatMessageRow
 
 ### `NewChatThreadRow`
 
-`type`
+`type` — Resolve the type for inserting a new chat thread row into the threads table
 
 ```ts
 type NewChatThreadRow

@@ -72,7 +72,7 @@ interface DecidedBrandKit
 
 ### `DecidedFonts`
 
-`interface`
+`interface` — Define font selections for display and body text with optional BrandFont properties
 
 ```ts
 interface DecidedFonts
@@ -80,7 +80,7 @@ interface DecidedFonts
 
 ### `DecidedPalette`
 
-`interface`
+`interface` — Define a color palette with background, surface, text, and accent colors for UI elements
 
 ```ts
 interface DecidedPalette
@@ -112,7 +112,7 @@ interface DecidedPalette
 
 ### `ExtractBrandKitOptions`
 
-`interface`
+`interface` — Define options for extracting brand kit data including HTML input, fetch method, timeout, and list limits
 
 ```ts
 interface ExtractBrandKitOptions

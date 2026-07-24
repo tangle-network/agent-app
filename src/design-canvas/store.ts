@@ -14,12 +14,14 @@
 
 import type { SceneDocument } from './model'
 
+/** Represent a scene document with its current revision number for version tracking */
 export interface SceneDocumentRecord {
   document: SceneDocument
   /** Monotonic revision; increments on every successful save. */
   rev: number
 }
 
+/** Define the structure for decisions made within a scene including type, instructions, and metadata */
 export interface SceneDecision {
   id: string
   kind: 'human_edit' | 'agent_edit' | 'agent_proposal' | 'export' | 'note'
@@ -29,6 +31,7 @@ export interface SceneDecision {
   createdAt: Date
 }
 
+/** Define the structure for decisions related to creating a new scene with instructions and optional details */
 export interface NewSceneDecision {
   kind: SceneDecision['kind']
   instruction: string
@@ -36,8 +39,10 @@ export interface NewSceneDecision {
   metadata?: Record<string, unknown>
 }
 
+/** Define supported formats for exporting a scene including image and JSON options */
 export type SceneExportFormat = 'png' | 'jpeg' | 'json'
 
+/** Describe a scene export with its status, format, metadata, and result information */
 export interface SceneExportRecord {
   id: string
   format: SceneExportFormat
@@ -47,6 +52,7 @@ export interface SceneExportRecord {
   createdAt: Date
 }
 
+/** Manage scene documents, decisions, and exports with atomic save and revision control */
 export interface SceneStore {
   /** Current document + revision. */
   getDocument(): Promise<SceneDocumentRecord>

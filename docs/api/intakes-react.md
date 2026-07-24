@@ -16,7 +16,7 @@ Source: `src/intakes-react/index.ts`
 
 ### `IntakeInterviewProps`
 
-`interface`
+`interface` — Define properties and callbacks for managing the intake interview flow and user interactions
 
 ```ts
 interface IntakeInterviewProps

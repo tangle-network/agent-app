@@ -9,6 +9,7 @@ import type {
   AppToolTaxonomy,
 } from './types'
 
+/** Define options for dispatching tools including handlers, taxonomy, custom tools, and approval policies */
 export interface DispatchOptions {
   handlers: AppToolHandlers
   taxonomy: AppToolTaxonomy

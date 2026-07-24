@@ -168,7 +168,7 @@ type AttachmentFileResult
 
 ### `CatalogModel`
 
-`interface`
+`interface` — Define the structure and capabilities of a catalog item with optional pricing and feature flags
 
 ```ts
 interface CatalogModel
@@ -232,7 +232,7 @@ interface ChatEmptyDoor
 
 ### `ChatEmptyStateProps`
 
-`interface`
+`interface` — Define properties for rendering the chat empty state with customizable text and starting doors
 
 ```ts
 interface ChatEmptyStateProps
@@ -248,7 +248,7 @@ interface ChatInteraction
 
 ### `ChatInteractionField`
 
-`type`
+`type` — Resolve a chat interaction field excluding select types or including chat select fields
 
 ```ts
 type ChatInteractionField
@@ -256,7 +256,7 @@ type ChatInteractionField
 
 ### `ChatInteractionRestoreMode`
 
-`type`
+`type` — Define modes for restoring chat interactions with legacy or durable strategies
 
 ```ts
 type ChatInteractionRestoreMode
@@ -264,7 +264,7 @@ type ChatInteractionRestoreMode
 
 ### `ChatInteractionStatus`
 
-`type`
+`type` — Define possible statuses representing the state of a chat interaction
 
 ```ts
 type ChatInteractionStatus
@@ -288,7 +288,7 @@ interface ChatMentionPart
 
 ### `ChatMessageMetrics`
 
-`interface`
+`interface` — Describe metrics related to a chat message including model, token counts, and duration
 
 ```ts
 interface ChatMessageMetrics
@@ -312,7 +312,7 @@ type ChatMessageSegment
 
 ### `ChatMessagesProps`
 
-`interface`
+`interface` — Define properties for rendering chat messages with optional models, markdown, extras, and durable cards
 
 ```ts
 interface ChatMessagesProps
@@ -320,7 +320,7 @@ interface ChatMessagesProps
 
 ### `ChatSelectField`
 
-`type`
+`type` — Extract select-type interaction fields and optionally allow custom values
 
 ```ts
 type ChatSelectField
@@ -328,7 +328,7 @@ type ChatSelectField
 
 ### `ChatStreamCallbacks`
 
-`interface`
+`interface` — Define callbacks to handle events and data during a chat streaming session
 
 ```ts
 interface ChatStreamCallbacks
@@ -336,7 +336,7 @@ interface ChatStreamCallbacks
 
 ### `ChatStreamToolCall`
 
-`interface`
+`interface` — Define the structure for a chat tool call including optional ID, name, and arguments object
 
 ```ts
 interface ChatStreamToolCall
@@ -344,7 +344,7 @@ interface ChatStreamToolCall
 
 ### `ChatStreamToolResult`
 
-`interface`
+`interface` — Describe the result of a chat stream tool including its outcome and optional metadata fields
 
 ```ts
 interface ChatStreamToolResult
@@ -352,7 +352,7 @@ interface ChatStreamToolResult
 
 ### `ChatToolCallInfo`
 
-`interface`
+`interface` — Describe the structure and state of a tool call within a chat interaction
 
 ```ts
 interface ChatToolCallInfo
@@ -368,7 +368,7 @@ interface ChatTurnFilePartInput
 
 ### `ChatTurnPartInput`
 
-`type`
+`type` — Resolve input as either a text part or a file part of a chat turn
 
 ```ts
 type ChatTurnPartInput
@@ -392,7 +392,7 @@ interface ChatTurnRequestPayload
 
 ### `ChatUiMessage`
 
-`interface`
+`interface` — Describe the structure and properties of a chat message with roles, content, and optional metadata
 
 ```ts
 interface ChatUiMessage
@@ -416,7 +416,7 @@ interface ChatUiMessage
 
 ### `ComposerAnswerDelivery`
 
-`interface`
+`interface` — Define the structure for delivering answers linked to a specific chat interaction and field
 
 ```ts
 interface ComposerAnswerDelivery
@@ -456,7 +456,7 @@ interface ComposerMentionProp
 
 ### `ConsumeChatStreamResult`
 
-`interface`
+`interface` — Represent the result of consuming a chat stream including turn ID and content reception status
 
 ```ts
 interface ConsumeChatStreamResult
@@ -488,7 +488,7 @@ interface ConsumeChatStreamResult
 
 ### `createMemoryInteractionAttemptStore`
 
-`function`
+`function` — Create an in-memory store to manage interaction attempts keyed by ID and signature
 
 ```ts
 () => InteractionAttemptStore
@@ -496,7 +496,7 @@ interface ConsumeChatStreamResult
 
 ### `createSessionInteractionAttemptStore`
 
-`function`
+`function` — Create a session-based store to manage interaction attempts using provided storage and optional namespace
 
 ```ts
 (storage: Pick<Storage, "getItem" | "setItem" | "removeItem">, namespace?: string) => InteractionAttemptStore
@@ -504,7 +504,7 @@ interface ConsumeChatStreamResult
 
 ### `dedupeQuestionInteractionsByContent`
 
-`function`
+`function` — Remove duplicate question interactions based on their content signature to ensure uniqueness
 
 ```ts
 (interactions: ChatInteraction[]) => ChatInteraction[]
@@ -608,7 +608,7 @@ interface DurableChatCardsProps
 
 ### `DurableInteractionAnswerSubmitterOptions`
 
-`interface`
+`interface` — Define options for submitting durable interaction answers with attempt tracking and optional key creation
 
 ```ts
 interface DurableInteractionAnswerSubmitterOptions
@@ -632,7 +632,7 @@ interface DurablePlanCardProps
 
 ### `DurablePlanClientError`
 
-`class`
+`class` — Represent errors from DurablePlanClient operations including status, code, and current plan details
 
 ```ts
 class DurablePlanClientError
@@ -640,7 +640,7 @@ class DurablePlanClientError
 
 ### `DurablePlanCurrentInput`
 
-`interface`
+`interface` — Define input parameters for retrieving the current durable plan including optional revision number
 
 ```ts
 interface DurablePlanCurrentInput
@@ -648,7 +648,7 @@ interface DurablePlanCurrentInput
 
 ### `DurablePlanDecision`
 
-`type`
+`type` — Represent durable plan decisions as either approved or rejected
 
 ```ts
 type DurablePlanDecision
@@ -656,7 +656,7 @@ type DurablePlanDecision
 
 ### `DurablePlanDecisionClient`
 
-`interface`
+`interface` — Define methods to obtain and decide durable plan decisions asynchronously
 
 ```ts
 interface DurablePlanDecisionClient
@@ -664,7 +664,7 @@ interface DurablePlanDecisionClient
 
 ### `DurablePlanDecisionClientOptions`
 
-`interface`
+`interface` — Define configuration options for creating a durable plan decision client
 
 ```ts
 interface DurablePlanDecisionClientOptions
@@ -672,7 +672,7 @@ interface DurablePlanDecisionClientOptions
 
 ### `DurablePlanDecisionInput`
 
-`interface`
+`interface` — Define input parameters for making a durable plan decision including optional feedback
 
 ```ts
 interface DurablePlanDecisionInput
@@ -680,7 +680,7 @@ interface DurablePlanDecisionInput
 
 ### `DurablePlanDecisionResult`
 
-`interface`
+`interface` — Describe the result of a durable plan decision including plan details and pending statuses
 
 ```ts
 interface DurablePlanDecisionResult
@@ -720,7 +720,7 @@ interface EffortPickerProps
 
 ### `fieldAcceptsFreeText`
 
-`function`
+`function` — Determine if a chat interaction field allows free text input
 
 ```ts
 (field: ChatInteractionField) => boolean
@@ -736,7 +736,7 @@ interface EffortPickerProps
 
 ### `FieldValues`
 
-`type`
+`type` — Define a record mapping field names to objects with optional selected, text, and custom string arrays or values
 
 ```ts
 type FieldValues
@@ -752,7 +752,7 @@ type FieldValues
 
 ### `FileIndexReadyResponse`
 
-`interface`
+`interface` — Describe a ready file index response with workspace-relative entries and truncation status
 
 ```ts
 interface FileIndexReadyResponse
@@ -760,7 +760,7 @@ interface FileIndexReadyResponse
 
 ### `FileIndexResponse`
 
-`type`
+`type` — Resolve a response indicating the file index is either ready or warming up
 
 ```ts
 type FileIndexResponse
@@ -888,7 +888,7 @@ number
 
 ### `INTERACTION_SUBMIT_TIMEOUT_MESSAGE`
 
-`const`
+`const` — Provide the timeout message displayed when the agent cannot be reached during interaction submission
 
 ```ts
 "Could not reach the agent. Try again."
@@ -896,7 +896,7 @@ number
 
 ### `INTERACTION_SUBMIT_TIMEOUT_MS`
 
-`const`
+`const` — Define the timeout duration in milliseconds for submitting an interaction
 
 ```ts
 30000
@@ -912,7 +912,7 @@ number
 
 ### `InteractionAnswers`
 
-`type`
+`type` — Map interaction identifiers to their corresponding answer values
 
 ```ts
 type InteractionAnswers
@@ -928,7 +928,7 @@ interface InteractionAnswerSubmission
 
 ### `InteractionAnswerSubmitterOptions`
 
-`interface`
+`interface` — Define options for submitting interaction answers including URL, body, timeout, and fetch implementation
 
 ```ts
 interface InteractionAnswerSubmitterOptions
@@ -944,7 +944,7 @@ type InteractionAnswerValue
 
 ### `InteractionAttemptStore`
 
-`interface`
+`interface` — Manage storage and retrieval of interaction attempt keys by interaction and submission identifiers
 
 ```ts
 interface InteractionAttemptStore
@@ -968,7 +968,7 @@ type InteractionBadgeVariant
 
 ### `InteractionCancelData`
 
-`interface`
+`interface` — Describe data required to cancel an interaction including its identifier and optional reason
 
 ```ts
 interface InteractionCancelData
@@ -1000,7 +1000,7 @@ type InteractionOutcome
 
 ### `interactionPartKey`
 
-`function`
+`function` — Generate a unique key string for an interaction using the given identifier
 
 ```ts
 (id: string) => string
@@ -1072,7 +1072,7 @@ type InteractionRequestWire
 
 ### `interactionSubmissionSignature`
 
-`function`
+`function` — Generate a stable string signature from an interaction answer submission
 
 ```ts
 (submission: InteractionAnswerSubmission) => string
@@ -1080,7 +1080,7 @@ type InteractionRequestWire
 
 ### `InteractionSubmitResult`
 
-`type`
+`type` — Resolve the result of an interaction submission indicating success or failure with details
 
 ```ts
 type InteractionSubmitResult
@@ -1112,7 +1112,7 @@ type InteractionSubmitResult
 
 ### `isLateAnswerableStatus`
 
-`function`
+`function` — Determine if a status is late answerable by checking if it is expired or cancelled
 
 ```ts
 (status: ChatInteractionStatus) => boolean
@@ -1120,7 +1120,7 @@ type InteractionSubmitResult
 
 ### `isRenderableInteractionKind`
 
-`function`
+`function` — Resolve if the given interaction kind is renderable within the application context
 
 ```ts
 (kind: string) => boolean
@@ -1136,7 +1136,7 @@ type InteractionSubmitResult
 
 ### `isTerminalInteractionStatus`
 
-`function`
+`function` — Resolve if the interaction status is a terminal state excluding pending
 
 ```ts
 (status: ChatInteractionStatus) => boolean
@@ -1272,7 +1272,7 @@ interface ModelPickerProps
 
 ### `NoticeKind`
 
-`type`
+`type` — Define specific string literals representing different kinds of notices
 
 ```ts
 type NoticeKind
@@ -1288,7 +1288,7 @@ type NoticeKind
 
 ### `noticePartKey`
 
-`function`
+`function` — Generate a unique key string for a notice using the given identifier
 
 ```ts
 (id: string) => string
@@ -1296,7 +1296,7 @@ type NoticeKind
 
 ### `NoticePersistedPart`
 
-`type`
+`type` — Define a persisted notice part with type, id, kind, and text properties
 
 ```ts
 type NoticePersistedPart
@@ -1312,7 +1312,7 @@ type NoticePersistedPart
 
 ### `ParseInteractionAnswersResult`
 
-`type`
+`type` — Resolve the result of parsing interaction answers with success status and corresponding data or error message
 
 ```ts
 type ParseInteractionAnswersResult
@@ -1320,7 +1320,7 @@ type ParseInteractionAnswersResult
 
 ### `parseInteractionCancel`
 
-`function`
+`function` — Parse interaction cancel data and return success status with parsed value or error message
 
 ```ts
 (data: Record<string, unknown> | undefined) => { succeeded: true; value: InteractionCancelData; } | { succeeded: false;…
@@ -1336,7 +1336,7 @@ type ParseInteractionAnswersResult
 
 ### `ParseInteractionResult`
 
-`type`
+`type` — Resolve interaction parsing outcome as success with value or failure with error message
 
 ```ts
 type ParseInteractionResult
@@ -1360,7 +1360,7 @@ type ParseInteractionResult
 
 ### `ProducerErrorEvent`
 
-`interface`
+`interface` — Represent an error event emitted by a producer containing message, code, and optional details
 
 ```ts
 interface ProducerErrorEvent
@@ -1368,7 +1368,7 @@ interface ProducerErrorEvent
 
 ### `ProducerNoticeEvent`
 
-`interface`
+`interface` — Define the structure for a producer notice event with type, id, kind, and text fields
 
 ```ts
 interface ProducerNoticeEvent
@@ -1376,7 +1376,7 @@ interface ProducerNoticeEvent
 
 ### `ProducerPassthroughEvent`
 
-`interface`
+`interface` — Define an event carrying passthrough data with flexible properties for producer communication
 
 ```ts
 interface ProducerPassthroughEvent
@@ -1392,7 +1392,7 @@ type ProducerPassthroughEventType
 
 ### `ProducerReasoningEvent`
 
-`interface`
+`interface` — Define an event representing reasoning output with a fixed type and associated text
 
 ```ts
 interface ProducerReasoningEvent
@@ -1400,7 +1400,7 @@ interface ProducerReasoningEvent
 
 ### `ProducerTextEvent`
 
-`interface`
+`interface` — Represent a text event produced by a source with a fixed type and associated text content
 
 ```ts
 interface ProducerTextEvent
@@ -1408,7 +1408,7 @@ interface ProducerTextEvent
 
 ### `ProducerToolCallEvent`
 
-`interface`
+`interface` — Represent an event triggered by a producer tool call with its identifier, name, and arguments
 
 ```ts
 interface ProducerToolCallEvent
@@ -1416,7 +1416,7 @@ interface ProducerToolCallEvent
 
 ### `ProducerToolResultEvent`
 
-`interface`
+`interface` — Describe the structure of an event representing the result of a producer tool call
 
 ```ts
 interface ProducerToolResultEvent
@@ -1424,7 +1424,7 @@ interface ProducerToolResultEvent
 
 ### `ProducerUsageEvent`
 
-`interface`
+`interface` — Describe usage event with prompt and completion token counts for a producer
 
 ```ts
 interface ProducerUsageEvent
@@ -1432,7 +1432,7 @@ interface ProducerUsageEvent
 
 ### `ProducerWireEvent`
 
-`type`
+`type` — Represent events emitted by a producer during its operation for processing and handling
 
 ```ts
 type ProducerWireEvent
@@ -1440,7 +1440,7 @@ type ProducerWireEvent
 
 ### `ProposalApprovalHandlers`
 
-`interface`
+`interface` — Handle approval and rejection actions for proposals with asynchronous support
 
 ```ts
 interface ProposalApprovalHandlers
@@ -1520,7 +1520,7 @@ interface QuestionOptionListProps
 
 ### `RestoreChatInteractionsOptions`
 
-`interface`
+`interface` — Define options to control how chat interactions are restored during the restore process
 
 ```ts
 interface RestoreChatInteractionsOptions
@@ -1536,7 +1536,7 @@ interface RestoreChatInteractionsOptions
 
 ### `RunDrillInProps`
 
-`interface`
+`interface` — Define properties required to run a drill and handle its closure event
 
 ```ts
 interface RunDrillInProps
@@ -1544,7 +1544,7 @@ interface RunDrillInProps
 
 ### `SandboxTerminalConnection`
 
-`interface`
+`interface` — Define the connection details and status for a sandbox terminal session
 
 ```ts
 interface SandboxTerminalConnection
@@ -1552,7 +1552,7 @@ interface SandboxTerminalConnection
 
 ### `SandboxTerminalConnectionResponse`
 
-`interface`
+`interface` — Define the response structure for a sandbox terminal connection including URLs, token, status, and errors
 
 ```ts
 interface SandboxTerminalConnectionResponse
@@ -1584,7 +1584,7 @@ interface SeatPaywallProps
 
 ### `SmoothRevealOptions`
 
-`interface`
+`interface` — Define configuration options for controlling smooth text reveal animation rates
 
 ```ts
 interface SmoothRevealOptions
@@ -1600,7 +1600,7 @@ interface SmoothRevealOptions
 
 ### `StreamChatOptions`
 
-`interface`
+`interface` — Define options for managing and resuming streaming chat interactions with callbacks
 
 ```ts
 interface StreamChatOptions
@@ -1680,7 +1680,7 @@ interface ToolRunStep
 
 ### `useChatInteractions`
 
-`function`
+`function` — Manage chat interactions state with upsert, cancel, resolve, and restore capabilities
 
 ```ts
 (options?: RestoreChatInteractionsOptions) => UseChatInteractionsResult
@@ -1688,7 +1688,7 @@ interface ToolRunStep
 
 ### `UseChatInteractionsOptions`
 
-`type`
+`type` — Resolve options for restoring chat interactions from previous sessions
 
 ```ts
 type UseChatInteractionsOptions
@@ -1696,7 +1696,7 @@ type UseChatInteractionsOptions
 
 ### `UseChatInteractionsResult`
 
-`interface`
+`interface` — Resolve and manage chat interactions with methods to update, cancel, mark resolved, and restore state
 
 ```ts
 interface UseChatInteractionsResult
@@ -1712,7 +1712,7 @@ interface UseChatInteractionsResult
 
 ### `UseComposerAttachmentsOptions`
 
-`interface`
+`interface` — Define options for configuring file upload behavior and handling in a composer component
 
 ```ts
 interface UseComposerAttachmentsOptions
@@ -1720,7 +1720,7 @@ interface UseComposerAttachmentsOptions
 
 ### `UseComposerAttachmentsResult`
 
-`interface`
+`interface` — Provide staged file chips, ready attachments, and methods to add, retry, or drop composer files
 
 ```ts
 interface UseComposerAttachmentsResult
@@ -1736,7 +1736,7 @@ interface UseComposerAttachmentsResult
 
 ### `UseDurablePlanFlowOptions`
 
-`interface`
+`interface` — Define options to configure durable plan flow with plan, client, and optional callbacks
 
 ```ts
 interface UseDurablePlanFlowOptions
@@ -1744,7 +1744,7 @@ interface UseDurablePlanFlowOptions
 
 ### `UseDurablePlanFlowResult`
 
-`interface`
+`interface` — Define the result and actions for managing a durable plan flow including decisions, restoration, and error handling
 
 ```ts
 interface UseDurablePlanFlowResult
@@ -1752,7 +1752,7 @@ interface UseDurablePlanFlowResult
 
 ### `useFileMentions`
 
-`function`
+`function` — Resolve and manage file mention data with configurable fetching and state handling
 
 ```ts
 (options: UseFileMentionsOptions) => UseFileMentionsResult
@@ -1760,7 +1760,7 @@ interface UseDurablePlanFlowResult
 
 ### `UseFileMentionsOptions`
 
-`interface`
+`interface` — Define options for configuring file mention fetching, caching, and display behavior
 
 ```ts
 interface UseFileMentionsOptions
@@ -1768,7 +1768,7 @@ interface UseFileMentionsOptions
 
 ### `UseFileMentionsResult`
 
-`interface`
+`interface` — Provide properties and methods to manage and refresh file mentions in a composer interface
 
 ```ts
 interface UseFileMentionsResult
@@ -1792,7 +1792,7 @@ interface UseFileMentionsResult
 
 ### `useSandboxTerminalConnection`
 
-`function`
+`function` — Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling
 
 ```ts
 (opts: UseSandboxTerminalConnectionOptions) => UseSandboxTerminalConnectionResult
@@ -1800,7 +1800,7 @@ interface UseFileMentionsResult
 
 ### `UseSandboxTerminalConnectionOptions`
 
-`interface`
+`interface` — Define options for configuring a sandbox terminal connection including workspace ID and connection parameters
 
 ```ts
 interface UseSandboxTerminalConnectionOptions
@@ -1808,7 +1808,7 @@ interface UseSandboxTerminalConnectionOptions
 
 ### `UseSandboxTerminalConnectionResult`
 
-`interface`
+`interface` — Resolve sandbox terminal connection status and provide a method to initiate the connection
 
 ```ts
 interface UseSandboxTerminalConnectionResult

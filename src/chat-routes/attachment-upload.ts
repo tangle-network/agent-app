@@ -53,6 +53,7 @@ export type AttachmentUploadAuthorization =
   | { ok: true; scopeId: string; writeAttachment?: WriteAttachmentFn }
   | { ok: false; response: Response }
 
+/** Define options to authorize, write, and limit attachment uploads in a route */
 export interface CreateAttachmentUploadRouteOptions {
   /** Authenticate the caller, rate-limit, and resolve the store scope
    *  (workspace/tenant id) — never a query param. */
@@ -93,6 +94,7 @@ function attachmentUploadError(status: number, code: string, message: string, pa
   )
 }
 
+/** Resolve an attachment upload route handler with customizable limits and validation options */
 export function createAttachmentUploadRoute(
   options: CreateAttachmentUploadRouteOptions,
 ): (request: Request) => Promise<Response> {

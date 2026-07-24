@@ -208,7 +208,7 @@ interface StudioWorkspaceProps
 
 ### `TYPE_CONFIG`
 
-`const`
+`const` — Map type keys to their corresponding configuration objects including labels, icons, and colors
 
 ```ts
 Record<string, TypeConfig>
@@ -216,7 +216,7 @@ Record<string, TypeConfig>
 
 ### `TypeConfig`
 
-`interface`
+`interface` — Define configuration options for a type including label, icon, and color properties
 
 ```ts
 interface TypeConfig
@@ -224,7 +224,7 @@ interface TypeConfig
 
 ### `typeConfigFor`
 
-`function`
+`function` — Resolve the configuration object for a given type or return the default image configuration
 
 ```ts
 (type: string) => TypeConfig

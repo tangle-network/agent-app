@@ -10,14 +10,17 @@ import type { MembersPanelProps, InvitationsPanelProps, InviteAcceptPageProps } 
 
 export type { MembersPanelProps, InvitationsPanelProps, InviteAcceptPageProps }
 
+/** Load MembersPanel component lazily to optimize initial rendering performance */
 export const MembersPanelLazy = lazy(
   () => import('./components/MembersPanel').then((m) => ({ default: m.MembersPanel })),
 )
 
+/** Load InvitationsPanel component lazily to optimize initial rendering performance */
 export const InvitationsPanelLazy = lazy(
   () => import('./components/InvitationsPanel').then((m) => ({ default: m.InvitationsPanel })),
 )
 
+/** Load InviteAcceptPage component lazily for optimized code splitting and performance */
 export const InviteAcceptPageLazy = lazy(
   () => import('./components/InviteAcceptPage').then((m) => ({ default: m.InviteAcceptPage })),
 )

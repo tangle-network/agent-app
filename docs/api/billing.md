@@ -8,7 +8,7 @@ Source: `src/billing/index.ts`
 
 ### `createPlatformBalanceManager`
 
-`function`
+`function` — Create a platform balance manager to handle user plan limits and state based on provided options
 
 ```ts
 <Plan extends string>(opts: PlatformBalanceManagerOptions<Plan>) => PlatformBalanceManager<Plan>
@@ -24,7 +24,7 @@ Source: `src/billing/index.ts`
 
 ### `createWorkspaceKeyManager`
 
-`function`
+`function` — Create a workspace key manager that handles key provisioning and budget tracking
 
 ```ts
 (opts: WorkspaceKeyManagerOptions) => WorkspaceKeyManager
@@ -64,7 +64,7 @@ interface PlatformBalanceInfo
 
 ### `PlatformBalanceManager`
 
-`interface`
+`interface` — Manage user plans and balances including state retrieval, billing authorization, deduction, and usage tracking
 
 ```ts
 interface PlatformBalanceManager
@@ -72,7 +72,7 @@ interface PlatformBalanceManager
 
 ### `PlatformBalanceManagerOptions`
 
-`interface`
+`interface` — Define configuration options for managing platform balance based on billing plans
 
 ```ts
 interface PlatformBalanceManagerOptions
@@ -104,7 +104,7 @@ interface PlatformProductUsage
 
 ### `SharedBillingState`
 
-`interface`
+`interface` — Define shared billing state including user ID, plan, balances, concurrency, and overage permission
 
 ```ts
 interface SharedBillingState
@@ -120,7 +120,7 @@ interface TcloudKeyClient
 
 ### `WorkspaceKeyManager`
 
-`interface`
+`interface` — Manage workspace keys by ensuring, rotating, and tracking usage of active child-key secrets
 
 ```ts
 interface WorkspaceKeyManager
@@ -128,7 +128,7 @@ interface WorkspaceKeyManager
 
 ### `WorkspaceKeyManagerOptions`
 
-`interface`
+`interface` — Define configuration options for managing workspace keys including provisioning, storage, and cryptography
 
 ```ts
 interface WorkspaceKeyManagerOptions
@@ -152,7 +152,7 @@ interface WorkspaceKeyStore
 
 ### `WorkspaceModelKeyUsage`
 
-`interface`
+`interface` — Describe usage and budget details for a workspace model key including expiration and exhaustion status
 
 ```ts
 interface WorkspaceModelKeyUsage

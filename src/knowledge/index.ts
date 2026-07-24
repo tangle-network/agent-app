@@ -38,6 +38,7 @@ export type SatisfiedByRule =
   | { anyOf: SatisfiedByRule[] }
   | { allOf: SatisfiedByRule[] }
 
+/** Define the criteria and conditions required to satisfy a specific knowledge requirement */
 export interface KnowledgeRequirementSpec {
   id: string
   description: string
@@ -66,6 +67,7 @@ export interface KnowledgeStateAccessor {
   count: (query: { table: string; where?: string; statusIn?: string[] }) => number | Promise<number>
 }
 
+/** Define a signal representing knowledge with confidence level and optional supporting evidence */
 export interface KnowledgeSignal {
   confidence: number
   evidence?: string

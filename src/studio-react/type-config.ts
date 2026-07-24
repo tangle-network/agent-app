@@ -1,5 +1,6 @@
 import { Film, FileText, Image, Mic, Video } from 'lucide-react'
 
+/** Define configuration options for a type including label, icon, and color properties */
 export interface TypeConfig {
   label: string
   icon: typeof Image
@@ -9,6 +10,7 @@ export interface TypeConfig {
 const IMAGE: TypeConfig = { label: 'Image', icon: Image, color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' }
 
 // string-keyed so list cards can index by Generation.type
+/** Map type keys to their corresponding configuration objects including labels, icons, and colors */
 export const TYPE_CONFIG: Record<string, TypeConfig> = {
   image: IMAGE,
   video: { label: 'Video', icon: Video, color: 'bg-red-500/10 text-red-600 border-red-500/20' },
@@ -20,6 +22,7 @@ export const TYPE_CONFIG: Record<string, TypeConfig> = {
 // Safe lookup for an arbitrary `Generation.type` — always defined (the table is
 // declared `Record<string, …>`, so a raw index is `T | undefined`). Falls back
 // to the image config, matching the prior `?? TYPE_CONFIG.image` call sites.
+/** Resolve the configuration object for a given type or return the default image configuration */
 export function typeConfigFor(type: string): TypeConfig {
   return TYPE_CONFIG[type] ?? IMAGE
 }

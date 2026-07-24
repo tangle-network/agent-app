@@ -37,6 +37,7 @@ export function isExportHiddenNodeName(name: string): boolean {
 // Crop rect + pixel ratio resolution
 // ---------------------------------------------------------------------------
 
+/** Define parameters required to resolve export settings including crop, pixel ratio, type, and quality */
 export interface ResolvedExportParams {
   cropRect: ExportCropRect
   pixelRatio: number

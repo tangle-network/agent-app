@@ -109,8 +109,10 @@ export function terminalizePendingChatInteractions(
   return list.map((item) => (item.status === 'pending' ? { ...item, status } : item))
 }
 
+/** Define modes for restoring chat interactions with legacy or durable strategies */
 export type ChatInteractionRestoreMode = 'legacy' | 'durable'
 
+/** Define options to control how chat interactions are restored during the restore process */
 export interface RestoreChatInteractionsOptions {
   /**
    * `legacy` settles pending asks absent from the sidecar list as answered,
@@ -168,6 +170,7 @@ export function hydrateChatInteractions(
   return persisted.reduce(upsertChatInteraction, list)
 }
 
+/** Resolve and manage chat interactions with methods to update, cancel, mark resolved, and restore state */
 export interface UseChatInteractionsResult {
   /** All known interactions, insertion-ordered. */
   interactions: ChatInteraction[]
@@ -189,8 +192,10 @@ export interface UseChatInteractionsResult {
   reset: () => void
 }
 
+/** Resolve options for restoring chat interactions from previous sessions */
 export type UseChatInteractionsOptions = RestoreChatInteractionsOptions
 
+/** Manage chat interactions state with upsert, cancel, resolve, and restore capabilities */
 export function useChatInteractions(options: UseChatInteractionsOptions = {}): UseChatInteractionsResult {
   const [interactions, setInteractions] = useState<ChatInteraction[]>([])
 

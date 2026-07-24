@@ -35,6 +35,7 @@ import {
 
 // ── structural namespace ────────────────────────────────────────────────────
 
+/** Resolve a stub interface for handling fetch requests with optional initialization parameters */
 export interface TurnStreamStubLike {
   fetch(input: Request | string, init?: RequestInit): Promise<Response>
 }
@@ -132,6 +133,7 @@ export function createDurableObjectTurnEventStore(namespace: TurnStreamNamespace
 
 // ── lock primitives (usable outside the route seam too) ─────────────────────
 
+/** Define input parameters required to acquire a durable turn lock in a workspace thread context */
 export interface AcquireDurableTurnLockInput {
   workspaceId: string
   threadId: string
@@ -142,6 +144,7 @@ export interface AcquireDurableTurnLockInput {
   lockId?: string
 }
 
+/** Acquire a durable turn lock in the specified namespace with given input parameters */
 export async function acquireDurableTurnLock(
   namespace: TurnStreamNamespaceLike,
   input: AcquireDurableTurnLockInput,
@@ -158,6 +161,7 @@ export async function acquireDurableTurnLock(
   return result.body
 }
 
+/** Release a durable turn lock and indicate if the release was successful or deferred */
 export async function releaseDurableTurnLock(
   namespace: TurnStreamNamespaceLike,
   input: TurnLockReleaseInput,
@@ -166,6 +170,7 @@ export async function releaseDurableTurnLock(
   return postJsonOk(namespace, key, TURN_STREAM_PATHS.lockRelease, input)
 }
 
+/** Define input parameters to release an interrupted durable turn lock in a workspace or thread */
 export interface ReleaseInterruptedDurableTurnLockInput {
   workspaceId: string
   threadId: string
@@ -198,6 +203,7 @@ export async function releaseInterruptedDurableTurnLock(
 
 // ── stale-lock reconciliation against the DO ────────────────────────────────
 
+/** Define options to reconcile stale durable turn locks with context, namespace, workspace, and active lock details */
 export interface ReconcileStaleDurableTurnLockOptions
   extends Pick<
     ReconcileStaleTurnLockOptions,
@@ -252,6 +258,7 @@ export type TurnLockSeamResult =
   | { acquired: true; handle?: unknown }
   | { acquired: false; response: Response }
 
+/** Define options for creating a durable turn lock with customizable scope and identification methods */
 export interface CreateDurableTurnLockOptions<TContext> {
   namespace: TurnStreamNamespaceLike
   /** Which lane serializes this turn: `'workspace'` (shared sandbox — one
@@ -433,8 +440,10 @@ export async function broadcastThreadCreated(
 
 // ── WebSocket upgrade forwarder (worker entry) ──────────────────────────────
 
+/** Represent success or failure of a TURN stream upgrade authorization with optional response data */
 export type TurnStreamUpgradeAuthorization = { ok: true } | { ok: false; response: Response }
 
+/** Define options for creating a TURN stream upgrade handler including namespace, path, and authorization logic */
 export interface CreateTurnStreamUpgradeHandlerOptions {
   namespace: TurnStreamNamespaceLike
   /** The worker route serving the stream. Default `/api/session-stream`. */

@@ -179,6 +179,7 @@ function trimTrailingSlash(url: string): string {
 
 // --- Standard probe builders --------------------------------------------------
 
+/** Define configuration options for probing an LLM router with authentication and model details */
 export interface RouterChatProbeConfig {
   /** LLM router base URL (LiteLLM / OpenAI-compatible), e.g. `https://router…`. */
   baseUrl: string
@@ -233,6 +234,7 @@ export function routerChatProbe(config: RouterChatProbeConfig): PreflightProbe {
   }
 }
 
+/** Define configuration options for probing sandbox authentication endpoints */
 export interface SandboxAuthProbeConfig {
   /** Sandbox API base URL. */
   baseUrl: string
@@ -277,6 +279,7 @@ export function sandboxAuthProbe(config: SandboxAuthProbeConfig): PreflightProbe
   }
 }
 
+/** Define configuration options for performing an HTTP HEAD probe to check URL availability */
 export interface HttpHeadProbeConfig {
   /** Probe name in the report. */
   name: string

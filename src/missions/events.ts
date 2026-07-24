@@ -19,6 +19,7 @@
 
 import type { StepAgentActivity } from './agent-activity'
 
+/** Handle mission stream events by processing emitted MissionStreamEvent objects */
 export interface MissionEventSink {
   emit(event: MissionStreamEvent): void
 }
@@ -41,6 +42,7 @@ export interface MissionStreamStep {
   status: MissionStreamStepStatus
 }
 
+/** Define possible status values for a mission stream step */
 export type MissionStreamStepStatus =
   | 'pending'
   | 'running'
@@ -48,6 +50,7 @@ export type MissionStreamStepStatus =
   | 'failed'
   | 'waiting_approval'
 
+/** Define possible statuses representing the current state of a mission stream */
 export type MissionStreamStatus =
   | 'scheduled'
   | 'running'

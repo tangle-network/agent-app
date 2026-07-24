@@ -18,10 +18,12 @@
  */
 
 export const MCP_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'] as const
+/** Resolve a valid protocol version from the predefined MCP_PROTOCOL_VERSIONS array */
 export type McpProtocolVersion = (typeof MCP_PROTOCOL_VERSIONS)[number]
 
 const LATEST_PROTOCOL_VERSION: McpProtocolVersion = MCP_PROTOCOL_VERSIONS[0]
 
+/** Describe the structure of server information including name and version */
 export interface McpServerInfo {
   name: string
   version: string
@@ -38,6 +40,7 @@ export interface McpToolDefinition<TEnv = Record<string, never>> {
   run(args: Record<string, unknown>, env: TEnv): Promise<unknown>
 }
 
+/** Define options for creating a handler that manages MCP tools with environment support */
 export interface CreateMcpToolHandlerOptions<TEnv = Record<string, never>> {
   serverInfo: McpServerInfo
   /** Full tool list; order IS the tools/list order. */

@@ -14,6 +14,7 @@
 
 import type { Bounds, PageBleed, ScenePage } from './model'
 
+/** Define size presets with identifiers, labels, categories, and dimensions for various media types */
 export interface SizePreset {
   id: string
   label: string
@@ -22,6 +23,7 @@ export interface SizePreset {
   height: number
 }
 
+/** Provide predefined size presets for social, presentation, and print categories */
 export const SIZE_PRESETS: readonly SizePreset[] = [
   // Social
   { id: 'instagram-square', label: 'Instagram — Square', category: 'social', width: 1080, height: 1080 },
@@ -42,6 +44,7 @@ export const SIZE_PRESETS: readonly SizePreset[] = [
   { id: 'us-letter-portrait', label: 'US Letter Portrait', category: 'print', width: 850, height: 1100 },
 ] as const
 
+/** Resolve a size preset by its identifier or return null if not found */
 export function findPreset(id: string): SizePreset | null {
   return SIZE_PRESETS.find((p) => p.id === id) ?? null
 }
@@ -56,6 +59,7 @@ export function matchPreset(width: number, height: number): SizePreset | null {
 // Export quality presets
 // ---------------------------------------------------------------------------
 
+/** Define supported image export formats as PNG or JPEG */
 export type ExportFormat = 'png' | 'jpeg'
 
 /**
@@ -78,6 +82,7 @@ export interface ExportPreset {
   format: ExportFormat
 }
 
+/** Provide predefined export configurations for various social media and image formats */
 export const EXPORT_PRESETS: Record<string, ExportPreset> = {
   'instagram-square': {
     name: 'Instagram square (1080×1080)',
@@ -133,6 +138,7 @@ export const EXPORT_PRESETS: Record<string, ExportPreset> = {
 // Crop + scale math (pure, no canvas context)
 // ---------------------------------------------------------------------------
 
+/** Define crop rectangle coordinates and dimensions for exporting content within page bounds */
 export interface ExportCropRect {
   /** Page-coordinate origin. Negative when bleed extends outside page bounds. */
   x: number
@@ -185,6 +191,7 @@ export function scaleForPreset(preset: ExportPreset, cropRect: ExportCropRect): 
 // Channel-size presets (fixed output resolutions for the export UI)
 // ---------------------------------------------------------------------------
 
+/** Define a preset configuration for a channel including its id, label, width, and height */
 export interface ChannelPreset {
   id: string
   label: string
@@ -208,6 +215,7 @@ export const CHANNEL_PRESETS: readonly ChannelPreset[] = [
   { id: 'a4_print_2480x3508', label: 'A4 Print (2480×3508 · 300 dpi)',  width: 2480, height: 3508 },
 ] as const
 
+/** Resolve a valid channel preset identifier from the predefined channel presets array */
 export type ChannelPresetId = (typeof CHANNEL_PRESETS)[number]['id']
 
 /** Throws when the id is unknown — callers should only pass ids sourced from
@@ -226,6 +234,7 @@ export function requireChannelPreset(id: string): ChannelPreset {
 // Letterbox scale math (page → channel preset, centered contain)
 // ---------------------------------------------------------------------------
 
+/** Define the pixel ratio and horizontal offset for scaling a Konva stage to a channel preset size */
 export interface ChannelScaleResult {
   /**
    * Konva stage pixelRatio: the stage logical size stays at page dimensions;

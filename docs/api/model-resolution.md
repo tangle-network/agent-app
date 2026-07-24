@@ -8,7 +8,7 @@ Source: `src/model-resolution/index.ts`
 
 ### `catalogIdsForModel`
 
-`function`
+`function` — Resolve unique catalog IDs associated with a given model including its canonical form if applicable
 
 ```ts
 (model: ModelInfo) => string[]
@@ -16,7 +16,7 @@ Source: `src/model-resolution/index.ts`
 
 ### `ChatModelSource`
 
-`type`
+`type` — Define possible origins for the chat model configuration values
 
 ```ts
 type ChatModelSource
@@ -24,7 +24,7 @@ type ChatModelSource
 
 ### `ChatModelValidationFailure`
 
-`interface`
+`interface` — Describe a failed chat model validation result with an error message
 
 ```ts
 interface ChatModelValidationFailure
@@ -32,7 +32,7 @@ interface ChatModelValidationFailure
 
 ### `ChatModelValidationResult`
 
-`type`
+`type` — Resolve the outcome of validating a chat model as either success or failure
 
 ```ts
 type ChatModelValidationResult
@@ -40,7 +40,7 @@ type ChatModelValidationResult
 
 ### `ChatModelValidationSuccess`
 
-`interface`
+`interface` — Represent successful chat model validation with a true status and a validated string value
 
 ```ts
 interface ChatModelValidationSuccess
@@ -48,7 +48,7 @@ interface ChatModelValidationSuccess
 
 ### `cleanModelId`
 
-`function`
+`function` — Resolve and return a trimmed string model ID or undefined for invalid or empty input
 
 ```ts
 (value: unknown) => string | undefined
@@ -56,7 +56,7 @@ interface ChatModelValidationSuccess
 
 ### `isWellFormedModelId`
 
-`function`
+`function` — Validate if a model ID string conforms to length and character format requirements
 
 ```ts
 (modelId: string) => boolean
@@ -88,7 +88,7 @@ interface ModelInfo
 
 ### `ResolveChatModelInput`
 
-`interface`
+`interface` — Resolve the effective chat model input by prioritizing request, workspace, environment, and default models
 
 ```ts
 interface ResolveChatModelInput
@@ -96,7 +96,7 @@ interface ResolveChatModelInput
 
 ### `ResolvedChatModel`
 
-`interface`
+`interface` — Resolve a chat model with its identifier and source information
 
 ```ts
 interface ResolvedChatModel
@@ -112,7 +112,7 @@ interface ResolvedChatModel
 
 ### `ValidateChatModelIdInput`
 
-`interface`
+`interface` — Define input parameters for validating chat model IDs with optional allowlist and catalog access details
 
 ```ts
 interface ValidateChatModelIdInput

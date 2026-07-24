@@ -97,6 +97,7 @@ export interface KeyCrypto {
   decrypt(encrypted: string): Promise<string>
 }
 
+/** Define configuration options for managing workspace keys including provisioning, storage, and cryptography */
 export interface WorkspaceKeyManagerOptions {
   provisioner: KeyProvisioner
   store: WorkspaceKeyStore
@@ -109,6 +110,7 @@ export interface WorkspaceKeyManagerOptions {
   product?: string
 }
 
+/** Describe usage and budget details for a workspace model key including expiration and exhaustion status */
 export interface WorkspaceModelKeyUsage {
   keyId: string
   budgetUsd: number
@@ -118,6 +120,7 @@ export interface WorkspaceModelKeyUsage {
   exhausted: boolean
 }
 
+/** Manage workspace keys by ensuring, rotating, and tracking usage of active child-key secrets */
 export interface WorkspaceKeyManager {
   /** The workspace's active child-key secret, provisioning one if absent/expired. */
   ensureKey(workspaceId: string, opts?: { budgetUsd?: number }): Promise<string>
@@ -217,6 +220,7 @@ export interface PlatformBillingClient<Plan extends string> {
   deduct(input: { platformUserId: string; amountUsd: number; type: string; description: string; referenceId: string }): Promise<void>
 }
 
+/** Define shared billing state including user ID, plan, balances, concurrency, and overage permission */
 export interface SharedBillingState<Plan extends string> {
   /** Platform user id, or null when the user has no Tangle SSO account. */
   platformUserId: string | null
@@ -228,6 +232,7 @@ export interface SharedBillingState<Plan extends string> {
   overageAllowed: boolean
 }
 
+/** Define configuration options for managing platform balance based on billing plans */
 export interface PlatformBalanceManagerOptions<Plan extends string> {
   client: PlatformBillingClient<Plan>
   /** Plan → limits map (the product's pricing). */
@@ -238,6 +243,7 @@ export interface PlatformBalanceManagerOptions<Plan extends string> {
   productSlug: string
 }
 
+/** Manage user plans and balances including state retrieval, billing authorization, deduction, and usage tracking */
 export interface PlatformBalanceManager<Plan extends string> {
   /** Resolve the user's plan + balance. Unlinked or platform-outage users fail
    *  CLOSED: free plan, zero remaining balance — a billable run is never started
@@ -253,6 +259,7 @@ export interface PlatformBalanceManager<Plan extends string> {
   getProductUsage(userId: string): Promise<{ spentUsd: number; transactionCount: number }>
 }
 
+/** Create a platform balance manager to handle user plan limits and state based on provided options */
 export function createPlatformBalanceManager<Plan extends string>(
   opts: PlatformBalanceManagerOptions<Plan>,
 ): PlatformBalanceManager<Plan> {
@@ -317,6 +324,7 @@ export function createPlatformBalanceManager<Plan extends string>(
   return { getState, canStartBillableTurn, deduct, getProductUsage }
 }
 
+/** Create a workspace key manager that handles key provisioning and budget tracking */
 export function createWorkspaceKeyManager(opts: WorkspaceKeyManagerOptions): WorkspaceKeyManager {
   const clock = opts.now ?? (() => new Date())
   const product = opts.product ?? 'router'

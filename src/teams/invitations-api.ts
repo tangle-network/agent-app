@@ -55,7 +55,9 @@ export interface SendInvitationEmailInput {
   inviteUrl: string
   expiresAt: Date
 }
+/** Represent the outcome of sending an invitation email with success status and optional error message */
 export type SendInvitationEmailResult = { succeeded: true } | { succeeded: false; error: string }
+/** Resolve sending an invitation email and return the result asynchronously */
 export interface SendInvitationEmailSeam {
   (input: SendInvitationEmailInput): Promise<SendInvitationEmailResult>
 }
@@ -73,6 +75,7 @@ export interface InvitationWorkspaceTable {
   name: any
 }
 
+/** Define configuration options required to manage workspace invitations and related data sources */
 export interface InvitationsApiOptions {
   db: TeamDatabase
   tables: TeamTables
@@ -91,6 +94,7 @@ export interface InvitationsApiOptions {
   productDisplayName?: string
 }
 
+/** Represent a workspace invitation with details about inviter, permissions, status, and timestamps */
 export interface WorkspaceInvitationView {
   id: string
   workspaceId: string
@@ -109,6 +113,7 @@ export interface WorkspaceInvitationView {
   lastSentAt: Date | null
 }
 
+/** Describe the structure of an invitation preview with workspace, email, permissions, status, and expiration details */
 export interface InvitationPreview {
   workspaceId: string
   workspaceName: string
@@ -119,6 +124,7 @@ export interface InvitationPreview {
   expiresAt: Date
 }
 
+/** Resolve the result of an invitation as success with a value or failure with status and error details */
 export type InvitationOutcome<T> =
   | { succeeded: true; value: T }
   | { succeeded: false; status: number; error: string }

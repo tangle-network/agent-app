@@ -17,6 +17,7 @@ const withForeground = (name: string) => ({
   foreground: `hsl(var(--${name}-foreground))`,
 })
 
+/** Define a preset configuration for dark mode and extended theme colors with foreground variants */
 const agentAppPreset = {
   darkMode: ['class', '[data-theme="dark"]'] as [string, string],
   theme: {

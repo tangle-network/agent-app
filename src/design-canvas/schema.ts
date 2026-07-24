@@ -21,6 +21,7 @@ import type { SceneDocument } from './model'
 /** A product table referenced by FK — only the `id` column is touched. */
 export type DesignCanvasParentTable = AnySQLiteTable & { id: AnySQLiteColumn }
 
+/** Define options for creating design canvas tables including workspace and user table configurations */
 export interface CreateDesignCanvasTablesOptions {
   workspaceTable: DesignCanvasParentTable
   userTable: DesignCanvasParentTable
@@ -34,6 +35,7 @@ const createdAt = () => integer('created_at', { mode: 'timestamp' }).notNull().d
 
 const updatedAt = () => integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`)
 
+/** Build SQLite tables for design documents with workspace and user references */
 export function createDesignCanvasTables(opts: CreateDesignCanvasTablesOptions) {
   const { workspaceTable, userTable } = opts
 
@@ -88,8 +90,12 @@ export function createDesignCanvasTables(opts: CreateDesignCanvasTablesOptions) 
   return { designDocuments, designDecisions, designExports }
 }
 
+/** Resolve the structure and data of design canvas tables for rendering and manipulation */
 export type DesignCanvasTables = ReturnType<typeof createDesignCanvasTables>
 
+/** Resolve the selected structure of a design document row from design canvas tables */
 export type DesignDocumentRow = DesignCanvasTables['designDocuments']['$inferSelect']
+/** Resolve a design decision row from the design decisions table selection */
 export type DesignDecisionRow = DesignCanvasTables['designDecisions']['$inferSelect']
+/** Resolve the selected fields of designExports from DesignCanvasTables */
 export type DesignExportRow = DesignCanvasTables['designExports']['$inferSelect']

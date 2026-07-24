@@ -24,7 +24,7 @@ interface EnforceSeatSeam
 
 ### `MemberListEntry`
 
-`interface`
+`interface` — Define the structure of a workspace member entry with identification, role, and status details
 
 ```ts
 interface MemberListEntry
@@ -40,7 +40,7 @@ interface MembersApiActor
 
 ### `MembersApiOptions`
 
-`interface`
+`interface` — Define configuration options for managing team members and workspace access APIs
 
 ```ts
 interface MembersApiOptions

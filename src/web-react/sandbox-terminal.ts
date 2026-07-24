@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+/** Define the connection details and status for a sandbox terminal session */
 export interface SandboxTerminalConnection {
   runtimeUrl: string | null
   sidecarUrl: string | null
@@ -11,6 +12,7 @@ export interface SandboxTerminalConnection {
   sandboxId?: string
 }
 
+/** Define the response structure for a sandbox terminal connection including URLs, token, status, and errors */
 export interface SandboxTerminalConnectionResponse {
   runtimeUrl?: string
   sidecarUrl?: string
@@ -21,6 +23,7 @@ export interface SandboxTerminalConnectionResponse {
   sandboxId?: string
 }
 
+/** Define options for configuring a sandbox terminal connection including workspace ID and connection parameters */
 export interface UseSandboxTerminalConnectionOptions {
   workspaceId: string
   connectionUrl?: string | ((workspaceId: string) => string)
@@ -30,6 +33,7 @@ export interface UseSandboxTerminalConnectionOptions {
   tokenRefreshSkewMs?: number
 }
 
+/** Resolve sandbox terminal connection status and provide a method to initiate the connection */
 export interface UseSandboxTerminalConnectionResult extends SandboxTerminalConnection {
   connect: () => Promise<void>
 }
@@ -48,6 +52,7 @@ const EMPTY_CONNECTION: SandboxTerminalConnection = {
   loading: false,
 }
 
+/** Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling */
 export function useSandboxTerminalConnection(opts: UseSandboxTerminalConnectionOptions): UseSandboxTerminalConnectionResult {
   const [conn, setConn] = useState<SandboxTerminalConnection>(EMPTY_CONNECTION)
   const mountedRef = useRef(false)

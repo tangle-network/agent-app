@@ -43,12 +43,14 @@ import { noopEventSink, type MissionEventSink, type MissionStreamEvent } from '.
  */
 export type SandboxDispatch = (input: SandboxDispatchInput) => Promise<SandboxDispatchResult>
 
+/** Define input parameters for dispatching a mission step in the sandbox environment */
 export interface SandboxDispatchInput {
   mission: MissionRecord
   step: MissionStep
   stepIndex: number
 }
 
+/** Define the result of a completed sandbox dispatch including artifact reference and optional cost details */
 export interface SandboxDispatchDoneResult {
   kind?: 'done'
   /** Small pointer at the produced artifact/output (vault path, asset id, exec
@@ -78,6 +80,7 @@ export interface SandboxDispatchInProgressResult {
   sublabel?: string
 }
 
+/** Resolve the result of a sandbox dispatch as done or in progress */
 export type SandboxDispatchResult = SandboxDispatchDoneResult | SandboxDispatchInProgressResult
 
 /** Outcome of running a single step. `cached` distinguishes a replay/skip
@@ -102,6 +105,7 @@ type StepGateOutcome =
   | { kind: 'continue' }
   | { kind: 'halted'; status: MissionStatus; reason: string }
 
+/** Define options to control mission plan execution with optional pre-step veto logic */
 export interface MissionPlanRunOptions {
   /** Pre-step veto (kill switch, schedule window). A non-null return pauses the
    *  mission with that reason before the step's side effect starts. */
@@ -138,6 +142,7 @@ export class RetryableStepError extends Error {
  *  the gated step; everything else keeps the mission parked. */
 export type MissionProposalResolution = 'pending' | 'approved' | 'rejected' | 'executed' | 'ignored'
 
+/** Define mission gate categories as step, budget, or volume */
 export type MissionGateKind = 'step' | 'budget' | 'volume'
 
 /** Product classification of one step. Returned by
@@ -184,6 +189,7 @@ export interface MissionApprovalsPort {
   countExternalActionProposals(missionId: string): Promise<number>
 }
 
+/** Define configuration options for mission gating including approvals, step classification, and action limits */
 export interface MissionGateOptions {
   approvals: MissionApprovalsPort
   /** Which steps need human approval, and as what. Return null for an ungated
@@ -194,6 +200,7 @@ export interface MissionGateOptions {
   externalActionCap?: number
 }
 
+/** Define configuration options for initializing and controlling the mission engine behavior */
 export interface MissionEngineOptions {
   service: MissionService
   /** Per-step USD estimate. Load-bearing twice: the budget gate parks on it
@@ -216,6 +223,7 @@ export interface MissionEngineOptions {
   nonFatalStepKinds?: readonly string[]
 }
 
+/** Resolve mission plan steps with concurrency control and durable state management */
 export interface MissionEngine {
   /** Run exactly one plan step. Idempotent: re-invoking for a step already
    *  `done` returns the cached pointer without re-dispatching. A lost guarded
@@ -299,6 +307,7 @@ function terminalMissionEvent(
   }
 }
 
+/** Create a mission engine configured with options to manage mission execution and error handling */
 export function createMissionEngine(options: MissionEngineOptions): MissionEngine {
   const { service, estimateStepCostUsd, gates } = options
   const sink = options.sink ?? noopEventSink

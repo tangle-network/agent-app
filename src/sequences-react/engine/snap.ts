@@ -30,6 +30,7 @@ export function collectSnapPoints(timeline: SequenceTimeline, playheadFrame: num
   return points.sort((a, b) => a.frame - b.frame || a.kind.localeCompare(b.kind))
 }
 
+/** Define options to configure snapping behavior including zoom, threshold, and exclusion criteria */
 export interface ApplySnapOptions {
   /** Pixels per frame — converts the pixel threshold into frames. */
   zoom: number

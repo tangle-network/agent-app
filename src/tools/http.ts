@@ -3,6 +3,7 @@ import { dispatchAppTool, outcomeStatus, type DispatchOptions } from './dispatch
 import type { AppToolName } from './openai'
 import type { AppToolDefinition } from './registry'
 
+/** Define options for handling tool requests including tool identification and token verification */
 export interface HandleToolRequestOptions extends DispatchOptions {
   /** Which app tool this route serves — a built-in name or a product-registered
    *  {@link AppToolDefinition} (auto-added to `customTools` for dispatch). */

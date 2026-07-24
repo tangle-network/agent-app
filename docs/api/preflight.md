@@ -24,7 +24,7 @@ Source: `src/preflight/index.ts`
 
 ### `HttpHeadProbeConfig`
 
-`interface`
+`interface` — Define configuration options for performing an HTTP HEAD probe to check URL availability
 
 ```ts
 interface HttpHeadProbeConfig
@@ -72,7 +72,7 @@ interface PreflightReport
 
 ### `RouterChatProbeConfig`
 
-`interface`
+`interface` — Define configuration options for probing an LLM router with authentication and model details
 
 ```ts
 interface RouterChatProbeConfig
@@ -96,7 +96,7 @@ interface RouterChatProbeConfig
 
 ### `SandboxAuthProbeConfig`
 
-`interface`
+`interface` — Define configuration options for probing sandbox authentication endpoints
 
 ```ts
 interface SandboxAuthProbeConfig

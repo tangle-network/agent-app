@@ -26,6 +26,7 @@ import type { AnySQLiteColumn, AnySQLiteTable } from 'drizzle-orm/sqlite-core'
 /** A product table referenced by FK — only the `id` column is touched. */
 export type TeamParentTable = AnySQLiteTable & { id: AnySQLiteColumn }
 
+/** Define options specifying user and workspace tables for creating team-related tables */
 export interface CreateTeamTablesOptions {
   /** The product's user table — org/member rows reference `userTable.id`. */
   userTable: TeamParentTable
@@ -39,6 +40,7 @@ const createdAt = () => integer('created_at', { mode: 'timestamp' }).notNull().d
 
 const updatedAt = () => integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`)
 
+/** Build SQLite tables for organizations and related team structures using provided options */
 export function createTeamTables(opts: CreateTeamTablesOptions) {
   const { userTable, workspaceTable } = opts
 
@@ -87,8 +89,12 @@ export function createTeamTables(opts: CreateTeamTablesOptions) {
   return { organizations, organizationMembers, workspaceMembers }
 }
 
+/** Resolve team tables by deriving the return type of createTeamTables */
 export type TeamTables = ReturnType<typeof createTeamTables>
 
+/** Resolve the structure of an organization row from the organizations table in TeamTables */
 export type OrganizationRow = TeamTables['organizations']['$inferSelect']
+/** Resolve the structure of an organization member row from the team tables selection */
 export type OrganizationMemberRow = TeamTables['organizationMembers']['$inferSelect']
+/** Resolve a workspace member row with selected fields from the workspaceMembers table */
 export type WorkspaceMemberRow = TeamTables['workspaceMembers']['$inferSelect']

@@ -40,6 +40,7 @@ export interface RouterModel {
   }
 }
 
+/** Define the structure and capabilities of a catalog item with optional pricing and feature flags */
 export interface CatalogModel {
   id: string
   name: string
@@ -52,6 +53,7 @@ export interface CatalogModel {
   featured: boolean
 }
 
+/** Define a catalog containing models with a default ID and fetch timestamp */
 export interface ModelCatalog {
   defaultModelId: string | null
   fetchedAt: string

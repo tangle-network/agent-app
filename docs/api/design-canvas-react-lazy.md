@@ -32,7 +32,7 @@ LazyExoticComponent<(props: DesignCanvasProps) => Element>
 
 ### `DesignCanvasProps`
 
-`interface`
+`interface` — Define properties and callbacks for configuring and controlling the design canvas editor
 
 ```ts
 interface DesignCanvasProps

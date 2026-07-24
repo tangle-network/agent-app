@@ -16,7 +16,7 @@ Source: `src/assistant/index.ts`
 
 ### `AssistantChat`
 
-`interface`
+`interface` — Define the structure and behavior of an assistant chat session with state, model selection, and message handling
 
 ```ts
 interface AssistantChat
@@ -40,7 +40,7 @@ interface AssistantClientConfig
 
 ### `AssistantClientInputError`
 
-`class`
+`class` — Represent invalid client input errors with a specific code INVALID_REQUEST
 
 ```ts
 class AssistantClientInputError
@@ -56,7 +56,7 @@ class AssistantClientInputError
 
 ### `AssistantDeliveryMode`
 
-`type`
+`type` — Define delivery modes for assistant interaction as either steering or queue
 
 ```ts
 type AssistantDeliveryMode
@@ -104,7 +104,7 @@ interface AssistantLauncher
 
 ### `AssistantModelOption`
 
-`interface`
+`interface` — Define options for an assistant model including identifier, label, pricing, and context tokens
 
 ```ts
 interface AssistantModelOption
@@ -112,7 +112,7 @@ interface AssistantModelOption
 
 ### `AssistantModels`
 
-`interface`
+`interface` — Define the structure for assistant model options including a default model slug and available models
 
 ```ts
 interface AssistantModels
@@ -144,7 +144,7 @@ interface AssistantPanelProps
 
 ### `AssistantSendOptions`
 
-`interface`
+`interface` — Define options for configuring how the assistant sends messages
 
 ```ts
 interface AssistantSendOptions
@@ -160,7 +160,7 @@ type AssistantStreamEvent
 
 ### `AssistantThreads`
 
-`interface`
+`interface` — Manage and interact with a list of assistant threads including loading, refreshing, and removing threads
 
 ```ts
 interface AssistantThreads
@@ -200,7 +200,7 @@ interface AssistantTranscriptView
 
 ### `ChatMessage`
 
-`interface`
+`interface` — Define the structure and properties of a chat message including optional tool activity details
 
 ```ts
 interface ChatMessage
@@ -232,7 +232,7 @@ interface ConfirmedResult
 
 ### `ConfirmResult`
 
-`type`
+`type` — Represent the outcome of a confirmation process with success or failure details
 
 ```ts
 type ConfirmResult
@@ -272,7 +272,7 @@ interface ConnectRequirementResult
 
 ### `DeltaEventData`
 
-`interface`
+`interface` — Define data structure representing a delta event with associated text content
 
 ```ts
 interface DeltaEventData
@@ -280,7 +280,7 @@ interface DeltaEventData
 
 ### `DoneEventData`
 
-`interface`
+`interface` — Describe the data emitted when a process turn completes including status and optional flags
 
 ```ts
 interface DoneEventData
@@ -288,7 +288,7 @@ interface DoneEventData
 
 ### `ErrorEventData`
 
-`interface`
+`interface` — Describe error event data including code and message fields
 
 ```ts
 interface ErrorEventData
@@ -328,7 +328,7 @@ interface ReasoningEventData
 
 ### `ThreadEventData`
 
-`interface`
+`interface` — Describe the structure of data representing a thread event with optional model information
 
 ```ts
 interface ThreadEventData
@@ -368,7 +368,7 @@ type ToolOutcome
 
 ### `ToolProposalEventData`
 
-`interface`
+`interface` — Describe the data structure for events proposing tool usage with optional integration requirements
 
 ```ts
 interface ToolProposalEventData
@@ -376,7 +376,7 @@ interface ToolProposalEventData
 
 ### `ToolResultEventData`
 
-`interface`
+`interface` — Describe event data emitted after a tool execution completes with success or error details
 
 ```ts
 interface ToolResultEventData
@@ -384,7 +384,7 @@ interface ToolResultEventData
 
 ### `UsageEventData`
 
-`interface`
+`interface` — Describe usage event data including tokens, cost, balance, duration, and replay status
 
 ```ts
 interface UsageEventData
@@ -392,7 +392,7 @@ interface UsageEventData
 
 ### `UsageInfo`
 
-`interface`
+`interface` — Describe usage cost, balance, token counts, duration, and replay status for a settled turn
 
 ```ts
 interface UsageInfo
@@ -400,7 +400,7 @@ interface UsageInfo
 
 ### `useAssistantChat`
 
-`function`
+`function` — Manage assistant chat state and interactions for a given user ID with optional configurations
 
 ```ts
 (userId: string | null, options?: UseAssistantChatOptions | undefined) => AssistantChat
@@ -432,7 +432,7 @@ interface UseAssistantChatOptions
 
 ### `useAssistantModels`
 
-`function`
+`function` — Resolve and return the current assistant models from the per-client cache with immediate client swap updates
 
 ```ts
 () => AssistantModels
@@ -440,7 +440,7 @@ interface UseAssistantChatOptions
 
 ### `useAssistantThreads`
 
-`function`
+`function` — Resolve and manage assistant threads state for a given user including pending deletions and refresh logic
 
 ```ts
 (userId: string | null) => AssistantThreads

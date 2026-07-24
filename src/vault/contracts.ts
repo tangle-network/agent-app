@@ -150,6 +150,7 @@ export interface VaultDockToggle {
 /** The two editor surfaces the pane switches between for editable text files. */
 export type VaultEditorMode = 'rich' | 'source'
 
+/** Define the properties and render methods for the vault pane UI components */
 export interface VaultPaneProps {
   /** Product-owned data access. */
   port: VaultDataPort

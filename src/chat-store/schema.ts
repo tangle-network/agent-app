@@ -46,6 +46,7 @@ import type { ChatMessagePart } from './parts'
 /** A product table referenced by FK — only the `id` column is touched. */
 export type ChatParentTable = AnySQLiteTable & { id: AnySQLiteColumn }
 
+/** Define options to customize chat thread and message table creation including workspace and naming prefixes */
 export interface CreateChatTablesOptions<
   TThreadExtras extends Record<string, SQLiteColumnBuilderBase> = {},
   TMessageExtras extends Record<string, SQLiteColumnBuilderBase> = {},
@@ -73,6 +74,7 @@ const createdAt = () => integer('created_at', { mode: 'timestamp' }).notNull().d
 
 const updatedAt = () => integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`)
 
+/** Build chat-related SQLite tables with customizable thread and message columns */
 export function createChatTables<
   TThreadExtras extends Record<string, SQLiteColumnBuilderBase> = {},
   TMessageExtras extends Record<string, SQLiteColumnBuilderBase> = {},
@@ -135,7 +137,11 @@ export function createChatTables<
  */
 export type ChatTables = ReturnType<typeof createChatTables<{}, {}>>
 
+/** Resolve the selected fields of a chat thread row from the chat threads table */
 export type ChatThreadRow = ChatTables['threads']['$inferSelect']
+/** Resolve the selected structure of a chat message row from the messages table */
 export type ChatMessageRow = ChatTables['messages']['$inferSelect']
+/** Resolve the type for inserting a new chat thread row into the threads table */
 export type NewChatThreadRow = ChatTables['threads']['$inferInsert']
+/** Resolve the type for inserting a new chat message row into the messages table */
 export type NewChatMessageRow = ChatTables['messages']['$inferInsert']

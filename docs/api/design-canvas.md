@@ -8,7 +8,7 @@ Source: `src/design-canvas/index.ts`
 
 ### `AddElementOperation`
 
-`interface`
+`interface` — Define an operation to add a scene element to a page with optional index and parent group
 
 ```ts
 interface AddElementOperation
@@ -16,7 +16,7 @@ interface AddElementOperation
 
 ### `AddPageOperation`
 
-`interface`
+`interface` — Define an operation to add a new page with an optional position and caller-minted page ID
 
 ```ts
 interface AddPageOperation
@@ -56,7 +56,7 @@ interface ApplyDataOperation
 
 ### `ApplySceneOptions`
 
-`interface`
+`interface` — Resolve element ID conflicts by providing fresh unique identifiers during scene application
 
 ```ts
 interface ApplySceneOptions
@@ -64,7 +64,7 @@ interface ApplySceneOptions
 
 ### `assertColor`
 
-`function`
+`function` — Validate that a string is a hex, rgb(a), or 'transparent' color and throw an error if not
 
 ```ts
 (value: string, label: string) => void
@@ -72,7 +72,7 @@ interface ApplySceneOptions
 
 ### `assertFinite`
 
-`function`
+`function` — Assert that a value is a finite number and throw an error with a label if not
 
 ```ts
 (value: number, label: string) => void
@@ -80,7 +80,7 @@ interface ApplySceneOptions
 
 ### `assertPositiveFinite`
 
-`function`
+`function` — Assert that a value is a positive finite number and throw an error with a label if not
 
 ```ts
 (value: number, label: string) => void
@@ -96,7 +96,7 @@ interface ApplySceneOptions
 
 ### `BindSlotOperation`
 
-`interface`
+`interface` — Define an operation to bind or unbind a unique slot to an element on a specific page
 
 ```ts
 interface BindSlotOperation
@@ -120,7 +120,7 @@ interface BindSlotOperation
 
 ### `Bounds`
 
-`interface`
+`interface` — Define rectangular boundaries with position and size properties
 
 ```ts
 interface Bounds
@@ -128,7 +128,7 @@ interface Bounds
 
 ### `boundsIntersect`
 
-`function`
+`function` — Determine if two rectangular bounds overlap or intersect each other
 
 ```ts
 (a: Bounds, b: Bounds) => boolean
@@ -144,7 +144,7 @@ interface Bounds
 
 ### `BuildDesignCanvasMcpServerEntryOptions`
 
-`type`
+`type` — Build scoped MCP server entry options for the design canvas environment
 
 ```ts
 type BuildDesignCanvasMcpServerEntryOptions
@@ -152,7 +152,7 @@ type BuildDesignCanvasMcpServerEntryOptions
 
 ### `CANVAS_ELEMENT_KINDS`
 
-`const`
+`const` — Provide a readonly array of string identifiers representing canvas element kinds
 
 ```ts
 readonly string[]
@@ -160,7 +160,7 @@ readonly string[]
 
 ### `CANVAS_MCP_TOOL_NAMES`
 
-`const`
+`const` — Extract names of all tools from the CANVAS_MCP_TOOLS array
 
 ```ts
 string[]
@@ -168,7 +168,7 @@ string[]
 
 ### `CANVAS_MCP_TOOLS`
 
-`const`
+`const` — Provide a collection of MCP tool definitions for manipulating and querying the design canvas environment
 
 ```ts
 McpToolDefinition<DesignCanvasMcpToolEnv>[]
@@ -184,7 +184,7 @@ readonly ChannelPreset[]
 
 ### `ChannelPreset`
 
-`interface`
+`interface` — Define a preset configuration for a channel including its id, label, width, and height
 
 ```ts
 interface ChannelPreset
@@ -192,7 +192,7 @@ interface ChannelPreset
 
 ### `ChannelPresetId`
 
-`type`
+`type` — Resolve a valid channel preset identifier from the predefined channel presets array
 
 ```ts
 type ChannelPresetId
@@ -200,7 +200,7 @@ type ChannelPresetId
 
 ### `ChannelScaleResult`
 
-`interface`
+`interface` — Define the pixel ratio and horizontal offset for scaling a Konva stage to a channel preset size
 
 ```ts
 interface ChannelScaleResult
@@ -216,7 +216,7 @@ interface ChannelScaleResult
 
 ### `createDesignCanvasMcpHandler`
 
-`function`
+`function` — Create a request handler for the design canvas MCP tool with specified options
 
 ```ts
 (opts: CreateDesignCanvasMcpHandlerOptions) => (request: Request) => Promise<Response>
@@ -224,7 +224,7 @@ interface ChannelScaleResult
 
 ### `CreateDesignCanvasMcpHandlerOptions`
 
-`interface`
+`interface` — Define options for creating a design canvas MCP handler including store, ID minting, and optional server info
 
 ```ts
 interface CreateDesignCanvasMcpHandlerOptions
@@ -232,7 +232,7 @@ interface CreateDesignCanvasMcpHandlerOptions
 
 ### `createEmptyDocument`
 
-`function`
+`function` — Create a new empty SceneDocument with a title and optional initial page settings
 
 ```ts
 (title: string, page?: NewPageOptions | undefined) => SceneDocument
@@ -240,7 +240,7 @@ interface CreateDesignCanvasMcpHandlerOptions
 
 ### `createPage`
 
-`function`
+`function` — Create a new ScenePage with specified options and a unique identifier
 
 ```ts
 (options: NewPageOptions, id: string) => ScenePage
@@ -248,7 +248,7 @@ interface CreateDesignCanvasMcpHandlerOptions
 
 ### `DEFAULT_DESIGN_CANVAS_MCP_DESCRIPTION`
 
-`const`
+`const` — Describe the live visual asset editor capabilities for the current design document using CSS pixel coordinates
 
 ```ts
 "Live visual asset editor for the current design document: read scene state, add/move/resize/delete elements, manage pa…
@@ -256,7 +256,7 @@ interface CreateDesignCanvasMcpHandlerOptions
 
 ### `DeleteElementOperation`
 
-`interface`
+`interface` — Resolve deletion of a specific element from a page by its identifiers
 
 ```ts
 interface DeleteElementOperation
@@ -264,7 +264,7 @@ interface DeleteElementOperation
 
 ### `DeletePageOperation`
 
-`interface`
+`interface` — Represent a delete page operation with a specified page identifier
 
 ```ts
 interface DeletePageOperation
@@ -272,7 +272,7 @@ interface DeletePageOperation
 
 ### `DesignCanvasMcpServerInfo`
 
-`interface`
+`interface` — Describe design canvas MCP server information including name and version
 
 ```ts
 interface DesignCanvasMcpServerInfo
@@ -280,7 +280,7 @@ interface DesignCanvasMcpServerInfo
 
 ### `DesignCanvasMcpToolEnv`
 
-`interface`
+`interface` — Define the environment for MCP tool with a scene store and ID minting function
 
 ```ts
 interface DesignCanvasMcpToolEnv
@@ -288,7 +288,7 @@ interface DesignCanvasMcpToolEnv
 
 ### `DuplicatePageOperation`
 
-`interface`
+`interface` — Define an operation to duplicate a page with a new caller-specified page ID
 
 ```ts
 interface DuplicatePageOperation
@@ -312,7 +312,7 @@ interface DuplicatePageOperation
 
 ### `EllipseElement`
 
-`interface`
+`interface` — Define properties for an ellipse element including dimensions, fill, and optional stroke details
 
 ```ts
 interface EllipseElement
@@ -320,7 +320,7 @@ interface EllipseElement
 
 ### `estimateTextHeight`
 
-`function`
+`function` — Estimate the height of multiline text based on font size and line height
 
 ```ts
 (element: Pick<TextElement, "text" | "fontSize" | "lineHeight">) => number
@@ -328,7 +328,7 @@ interface EllipseElement
 
 ### `EXPORT_PRESETS`
 
-`const`
+`const` — Provide predefined export configurations for various social media and image formats
 
 ```ts
 Record<string, ExportPreset>
@@ -336,7 +336,7 @@ Record<string, ExportPreset>
 
 ### `ExportCropRect`
 
-`interface`
+`interface` — Define crop rectangle coordinates and dimensions for exporting content within page bounds
 
 ```ts
 interface ExportCropRect
@@ -344,7 +344,7 @@ interface ExportCropRect
 
 ### `ExportFormat`
 
-`type`
+`type` — Define supported image export formats as PNG or JPEG
 
 ```ts
 type ExportFormat
@@ -360,7 +360,7 @@ interface ExportPreset
 
 ### `findCanvasMcpTool`
 
-`function`
+`function` — Find the canvas MCP tool definition matching the given name or return undefined
 
 ```ts
 (name: string) => McpToolDefinition<DesignCanvasMcpToolEnv> | undefined
@@ -376,7 +376,7 @@ interface ExportPreset
 
 ### `findPreset`
 
-`function`
+`function` — Resolve a size preset by its identifier or return null if not found
 
 ```ts
 (id: string) => SizePreset | null
@@ -384,7 +384,7 @@ interface ExportPreset
 
 ### `GroupElement`
 
-`interface`
+`interface` — Define a group element that contains multiple child scene elements
 
 ```ts
 interface GroupElement
@@ -392,7 +392,7 @@ interface GroupElement
 
 ### `GroupElementsOperation`
 
-`interface`
+`interface` — Group elements by grouping two or more sibling elements in their current z-order under a new group ID
 
 ```ts
 interface GroupElementsOperation
@@ -400,7 +400,7 @@ interface GroupElementsOperation
 
 ### `ImageElement`
 
-`interface`
+`interface` — Define properties for an image element including source, dimensions, and fit mode
 
 ```ts
 interface ImageElement
@@ -408,7 +408,7 @@ interface ImageElement
 
 ### `InstantiateOptions`
 
-`interface`
+`interface` — Define options for instantiating a document with title, optional bindings, and custom id minting
 
 ```ts
 interface InstantiateOptions
@@ -424,7 +424,7 @@ interface InstantiateOptions
 
 ### `LineElement`
 
-`interface`
+`interface` — Define a line element with points, stroke, stroke width, and optional dash pattern
 
 ```ts
 interface LineElement
@@ -448,7 +448,7 @@ interface LineElement
 
 ### `NewPageOptions`
 
-`interface`
+`interface` — Define options to configure a new page including name, dimensions, and background color
 
 ```ts
 interface NewPageOptions
@@ -456,7 +456,7 @@ interface NewPageOptions
 
 ### `NewSceneDecision`
 
-`interface`
+`interface` — Define the structure for decisions related to creating a new scene with instructions and optional details
 
 ```ts
 interface NewSceneDecision
@@ -480,7 +480,7 @@ interface PageGuides
 
 ### `RectElement`
 
-`interface`
+`interface` — Define a rectangular scene element with size, fill, optional stroke, and corner radius properties
 
 ```ts
 interface RectElement
@@ -488,7 +488,7 @@ interface RectElement
 
 ### `ReorderElementOperation`
 
-`interface`
+`interface` — Resolve an operation to reorder an element within its current owner by specifying the target index
 
 ```ts
 interface ReorderElementOperation
@@ -496,7 +496,7 @@ interface ReorderElementOperation
 
 ### `ReorderPageOperation`
 
-`interface`
+`interface` — Represent an operation to reorder a page by moving it to a specified index
 
 ```ts
 interface ReorderPageOperation
@@ -512,7 +512,7 @@ interface ReorderPageOperation
 
 ### `requireElement`
 
-`function`
+`function` — Resolve and return the element, its owner array, and index from the page by element ID
 
 ```ts
 (page: ScenePage, elementId: string) => { element: SceneElement; owner: SceneElement[]; index: number; }
@@ -520,7 +520,7 @@ interface ReorderPageOperation
 
 ### `requirePage`
 
-`function`
+`function` — Resolve and return a page by ID from a document or throw an error if not found
 
 ```ts
 (document: SceneDocument, pageId: string) => ScenePage
@@ -544,7 +544,7 @@ interface ReorderPageOperation
 
 ### `SCENE_ELEMENT_KINDS`
 
-`const`
+`const` — Define all valid kinds of scene elements used in the application
 
 ```ts
 readonly ("text" | "image" | "rect" | "video" | "ellipse" | "line" | "group")[]
@@ -552,7 +552,7 @@ readonly ("text" | "image" | "rect" | "video" | "ellipse" | "line" | "group")[]
 
 ### `SCENE_OPERATION_TYPES`
 
-`const`
+`const` — Define all valid operation types for scene manipulation in the application
 
 ```ts
 readonly ("add_element" | "set_attrs" | "reorder_element" | "delete_element" | "group_elements" | "ungroup_element" | "…
@@ -560,7 +560,7 @@ readonly ("add_element" | "set_attrs" | "reorder_element" | "delete_element" | "
 
 ### `SCENE_SCHEMA_VERSION`
 
-`const`
+`const` — Define the current version number of the scene schema
 
 ```ts
 1
@@ -568,7 +568,7 @@ readonly ("add_element" | "set_attrs" | "reorder_element" | "delete_element" | "
 
 ### `SceneApplyResult`
 
-`type`
+`type` — Represent the result of applying changes to a scene as an element, page, or entire document
 
 ```ts
 type SceneApplyResult
@@ -584,7 +584,7 @@ type SceneAttrsPatch
 
 ### `SceneDecision`
 
-`interface`
+`interface` — Define the structure for decisions made within a scene including type, instructions, and metadata
 
 ```ts
 interface SceneDecision
@@ -592,7 +592,7 @@ interface SceneDecision
 
 ### `SceneDocument`
 
-`interface`
+`interface` — Define the structure and properties of a scene document including version, title, pages, settings, and metadata
 
 ```ts
 interface SceneDocument
@@ -600,7 +600,7 @@ interface SceneDocument
 
 ### `SceneDocumentRecord`
 
-`interface`
+`interface` — Represent a scene document with its current revision number for version tracking
 
 ```ts
 interface SceneDocumentRecord
@@ -608,7 +608,7 @@ interface SceneDocumentRecord
 
 ### `SceneElement`
 
-`type`
+`type` — Represent a graphical element in a scene including shapes, text, media, or groups
 
 ```ts
 type SceneElement
@@ -624,7 +624,7 @@ interface SceneElementBase
 
 ### `SceneElementKind`
 
-`type`
+`type` — Extract the kind property from a SceneElement to identify its element type
 
 ```ts
 type SceneElementKind
@@ -632,7 +632,7 @@ type SceneElementKind
 
 ### `SceneExportFormat`
 
-`type`
+`type` — Define supported formats for exporting a scene including image and JSON options
 
 ```ts
 type SceneExportFormat
@@ -640,7 +640,7 @@ type SceneExportFormat
 
 ### `SceneExportRecord`
 
-`interface`
+`interface` — Describe a scene export with its status, format, metadata, and result information
 
 ```ts
 interface SceneExportRecord
@@ -648,7 +648,7 @@ interface SceneExportRecord
 
 ### `SceneOperation`
 
-`type`
+`type` — Represent operations that modify scenes by adding, updating, reordering, grouping, or deleting elements and pages
 
 ```ts
 type SceneOperation
@@ -656,7 +656,7 @@ type SceneOperation
 
 ### `SceneOperationType`
 
-`type`
+`type` — Extract the type property from a SceneOperation to represent its operation type
 
 ```ts
 type SceneOperationType
@@ -664,7 +664,7 @@ type SceneOperationType
 
 ### `ScenePage`
 
-`interface`
+`interface` — Define the structure and properties of a scene page including layout, background, and elements
 
 ```ts
 interface ScenePage
@@ -672,7 +672,7 @@ interface ScenePage
 
 ### `ScenePlan`
 
-`interface`
+`interface` — Define a plan summarizing a scene with its description and associated operations
 
 ```ts
 interface ScenePlan
@@ -680,7 +680,7 @@ interface ScenePlan
 
 ### `SceneSettings`
 
-`interface`
+`interface` — Define settings for scene export including print conversion factor for unit calculations
 
 ```ts
 interface SceneSettings
@@ -688,7 +688,7 @@ interface SceneSettings
 
 ### `SceneStore`
 
-`interface`
+`interface` — Manage scene documents, decisions, and exports with atomic save and revision control
 
 ```ts
 interface SceneStore
@@ -704,7 +704,7 @@ interface SceneStoreScope
 
 ### `SetAttrsOperation`
 
-`interface`
+`interface` — Define an operation to update attributes of a specific element on a page
 
 ```ts
 interface SetAttrsOperation
@@ -712,7 +712,7 @@ interface SetAttrsOperation
 
 ### `SetDocumentTitleOperation`
 
-`interface`
+`interface` — Define an operation to set the document title to a specified string
 
 ```ts
 interface SetDocumentTitleOperation
@@ -720,7 +720,7 @@ interface SetDocumentTitleOperation
 
 ### `SetPageGuidesOperation`
 
-`interface`
+`interface` — Resolve an operation to set guides on a specific page by its identifier
 
 ```ts
 interface SetPageGuidesOperation
@@ -728,7 +728,7 @@ interface SetPageGuidesOperation
 
 ### `SetPagePropsOperation`
 
-`interface`
+`interface` — Define an operation to set or update properties of a page including size, background, and bleed
 
 ```ts
 interface SetPagePropsOperation
@@ -736,7 +736,7 @@ interface SetPagePropsOperation
 
 ### `SIZE_PRESETS`
 
-`const`
+`const` — Provide predefined size presets for social, presentation, and print categories
 
 ```ts
 readonly SizePreset[]
@@ -744,7 +744,7 @@ readonly SizePreset[]
 
 ### `SizePreset`
 
-`interface`
+`interface` — Define size presets with identifiers, labels, categories, and dimensions for various media types
 
 ```ts
 interface SizePreset
@@ -752,7 +752,7 @@ interface SizePreset
 
 ### `SlotFillKind`
 
-`type`
+`type` — Define allowed string literals representing different slot fill kinds
 
 ```ts
 type SlotFillKind
@@ -760,7 +760,7 @@ type SlotFillKind
 
 ### `storeApplyScenePlan`
 
-`function`
+`function` — Resolve and apply a scene plan to the store with specified actor context and generate results
 
 ```ts
 (store: SceneStore, plan: ScenePlan, opts: { actorKind: "human_edit" | "agent_edit" | "agent_proposal" | "export" | "no…
@@ -768,7 +768,7 @@ type SlotFillKind
 
 ### `TemplateSlot`
 
-`interface`
+`interface` — Define a slot template specifying its name, page, element, and fill characteristics
 
 ```ts
 interface TemplateSlot
@@ -776,7 +776,7 @@ interface TemplateSlot
 
 ### `TextElement`
 
-`interface`
+`interface` — Define properties for a text element including content, style, alignment, and layout parameters
 
 ```ts
 interface TextElement
@@ -784,7 +784,7 @@ interface TextElement
 
 ### `UngroupElementOperation`
 
-`interface`
+`interface` — Resolve an operation to ungroup elements within a specified page and group context
 
 ```ts
 interface UngroupElementOperation
@@ -800,7 +800,7 @@ interface UngroupElementOperation
 
 ### `validateSceneOperation`
 
-`function`
+`function` — Validate a scene operation against the document to ensure it meets required constraints
 
 ```ts
 (document: SceneDocument, operation: SceneOperation) => void
@@ -808,7 +808,7 @@ interface UngroupElementOperation
 
 ### `validateSceneOperations`
 
-`function`
+`function` — Validate each scene operation against the document and throw detailed errors for invalid operations
 
 ```ts
 (document: SceneDocument, operations: SceneOperation[]) => void

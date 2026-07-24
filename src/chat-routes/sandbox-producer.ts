@@ -62,6 +62,7 @@ export type FilePartPromotionOutcome =
   | { succeeded: true; part: Record<string, unknown>; key?: string }
   | { succeeded: false; reason: string; part?: Record<string, unknown>; key?: string }
 
+/** Define options for producing sandbox chat events with rendering and interaction controls */
 export interface SandboxChatProducerOptions {
   /** The raw sandbox event stream (e.g. `streamSandboxPrompt(...)`). */
   events: AsyncIterable<unknown>
@@ -239,6 +240,7 @@ function sandboxStreamFailureDiagnostic(error: unknown): {
   return { userMessage, failureNote }
 }
 
+/** Create a sandbox chat producer that manages chat turn routing with logging and interaction rendering options */
 export function createSandboxChatProducer(options: SandboxChatProducerOptions): ChatTurnRouteProducer {
   const log = options.log ?? ((message, meta) => console.error(message, meta ?? ''))
   const renderable = options.isRenderableInteraction ?? isRenderableInteractionKind

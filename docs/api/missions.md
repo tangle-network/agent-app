@@ -40,7 +40,7 @@ Source: `src/missions/index.ts`
 
 ### `CompleteMissionInput`
 
-`interface`
+`interface` — Define input parameters to complete a mission with status and optional summary
 
 ```ts
 interface CompleteMissionInput
@@ -56,7 +56,7 @@ interface CompleteMissionInput
 
 ### `createMissionEngine`
 
-`function`
+`function` — Create a mission engine configured with options to manage mission execution and error handling
 
 ```ts
 (options: MissionEngineOptions) => MissionEngine
@@ -64,7 +64,7 @@ interface CompleteMissionInput
 
 ### `CreateMissionInput`
 
-`interface`
+`interface` — Define input parameters for creating a mission including optional deterministic id and unique plan steps
 
 ```ts
 interface CreateMissionInput
@@ -72,7 +72,7 @@ interface CreateMissionInput
 
 ### `createMissionService`
 
-`function`
+`function` — Create a mission service that manages mission records and audit events with customizable options
 
 ```ts
 (options: MissionServiceOptions) => MissionService
@@ -88,7 +88,7 @@ readonly string[]
 
 ### `InMemoryMissionStore`
 
-`interface`
+`interface` — Define an in-memory mission store that tracks events and allows direct record writes
 
 ```ts
 interface InMemoryMissionStore
@@ -152,7 +152,7 @@ class MissionConcurrencyError
 
 ### `MissionCostLedger`
 
-`interface`
+`interface` — Define the structure for tracking mission token usage, cost, duration, and LLM call counts
 
 ```ts
 interface MissionCostLedger
@@ -160,7 +160,7 @@ interface MissionCostLedger
 
 ### `MissionEngine`
 
-`interface`
+`interface` — Resolve mission plan steps with concurrency control and durable state management
 
 ```ts
 interface MissionEngine
@@ -168,7 +168,7 @@ interface MissionEngine
 
 ### `MissionEngineOptions`
 
-`interface`
+`interface` — Define configuration options for initializing and controlling the mission engine behavior
 
 ```ts
 interface MissionEngineOptions
@@ -176,7 +176,7 @@ interface MissionEngineOptions
 
 ### `MissionEventSink`
 
-`interface`
+`interface` — Handle mission stream events by processing emitted MissionStreamEvent objects
 
 ```ts
 interface MissionEventSink
@@ -184,7 +184,7 @@ interface MissionEventSink
 
 ### `MissionGateKind`
 
-`type`
+`type` — Define mission gate categories as step, budget, or volume
 
 ```ts
 type MissionGateKind
@@ -192,7 +192,7 @@ type MissionGateKind
 
 ### `MissionGateOptions`
 
-`interface`
+`interface` — Define configuration options for mission gating including approvals, step classification, and action limits
 
 ```ts
 interface MissionGateOptions
@@ -216,7 +216,7 @@ type MissionOutcome
 
 ### `MissionPlanRunOptions`
 
-`interface`
+`interface` — Define options to control mission plan execution with optional pre-step veto logic
 
 ```ts
 interface MissionPlanRunOptions
@@ -240,7 +240,7 @@ interface MissionRecord
 
 ### `MissionService`
 
-`interface`
+`interface` — Define methods to create, retrieve, and update missions with controlled engine binding and metadata merging
 
 ```ts
 interface MissionService
@@ -248,7 +248,7 @@ interface MissionService
 
 ### `MissionServiceOptions`
 
-`interface`
+`interface` — Define options for configuring mission service behavior including storage, time, and ID generation
 
 ```ts
 interface MissionServiceOptions
@@ -272,7 +272,7 @@ type MissionStatus
 
 ### `MissionStep`
 
-`interface`
+`interface` — Define the structure and state details of a mission step within a workflow system
 
 ```ts
 interface MissionStep
@@ -288,7 +288,7 @@ interface MissionStepState
 
 ### `MissionStepStatus`
 
-`type`
+`type` — Define possible statuses for a mission step during its execution lifecycle
 
 ```ts
 type MissionStepStatus
@@ -312,7 +312,7 @@ type MissionStreamEvent
 
 ### `MissionStreamStatus`
 
-`type`
+`type` — Define possible statuses representing the current state of a mission stream
 
 ```ts
 type MissionStreamStatus
@@ -328,7 +328,7 @@ interface MissionStreamStep
 
 ### `MissionStreamStepStatus`
 
-`type`
+`type` — Define possible status values for a mission stream step
 
 ```ts
 type MissionStreamStepStatus
@@ -360,7 +360,7 @@ MissionEventSink
 
 ### `ParsedMission`
 
-`interface`
+`interface` — Describe a mission with a title and an ordered list of parsed steps
 
 ```ts
 interface ParsedMission
@@ -368,7 +368,7 @@ interface ParsedMission
 
 ### `ParsedMissionStep`
 
-`interface`
+`interface` — Define the structure representing a parsed mission step with id, kind, and intent fields
 
 ```ts
 interface ParsedMissionStep
@@ -384,7 +384,7 @@ interface ParsedMissionStep
 
 ### `ParseMissionBlocksOptions`
 
-`interface`
+`interface` — Define options to specify allowed lowercase step kinds for parsing mission blocks
 
 ```ts
 interface ParseMissionBlocksOptions
@@ -432,7 +432,7 @@ type SandboxDispatch
 
 ### `SandboxDispatchDoneResult`
 
-`interface`
+`interface` — Define the result of a completed sandbox dispatch including artifact reference and optional cost details
 
 ```ts
 interface SandboxDispatchDoneResult
@@ -448,7 +448,7 @@ interface SandboxDispatchInProgressResult
 
 ### `SandboxDispatchInput`
 
-`interface`
+`interface` — Define input parameters for dispatching a mission step in the sandbox environment
 
 ```ts
 interface SandboxDispatchInput
@@ -456,7 +456,7 @@ interface SandboxDispatchInput
 
 ### `SandboxDispatchResult`
 
-`type`
+`type` — Resolve the result of a sandbox dispatch as done or in progress
 
 ```ts
 type SandboxDispatchResult
@@ -464,7 +464,7 @@ type SandboxDispatchResult
 
 ### `SetStepStatusPatch`
 
-`interface`
+`interface` — Define a patch to update the status and optional metadata of a step in a process
 
 ```ts
 interface SetStepStatusPatch

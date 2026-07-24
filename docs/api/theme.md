@@ -24,7 +24,7 @@ interface CanvasRenderPalette
 
 ### `darkTheme`
 
-`const`
+`const` — Define a dark color scheme for the Agent app interface with specific background and foreground hues
 
 ```ts
 AgentAppTheme
@@ -32,7 +32,7 @@ AgentAppTheme
 
 ### `lightTheme`
 
-`const`
+`const` — Define a light color theme with specific background, foreground, and accent color values
 
 ```ts
 AgentAppTheme

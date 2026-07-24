@@ -8,7 +8,7 @@ Source: `src/studio/index.ts`
 
 ### `buildGenerationRequestBody`
 
-`function`
+`function` — Build the request body object for a generation operation from provided fields
 
 ```ts
 (fields: GenerationRequestFields) => Record<string, unknown>
@@ -16,7 +16,7 @@ Source: `src/studio/index.ts`
 
 ### `buildPublishPackage`
 
-`function`
+`function` — Build a PublishPackage object from caption, description, mentions, cadence, and destinations inputs
 
 ```ts
 ({ caption, postDescription, mentions, cadence, destinations, }: { caption: string; postDescription: string; mentions:…
@@ -24,7 +24,7 @@ Source: `src/studio/index.ts`
 
 ### `CADENCES`
 
-`const`
+`const` — Provide an array of predefined cadence options for scheduling or approval processes
 
 ```ts
 string[]
@@ -32,7 +32,7 @@ string[]
 
 ### `DESTINATIONS`
 
-`const`
+`const` — List available social media platforms with their publishing fields and provider identifiers
 
 ```ts
 PublishDestination[]
@@ -40,7 +40,7 @@ PublishDestination[]
 
 ### `failedOptimisticGeneration`
 
-`function`
+`function` — Mark a generation as failed with updated status and error information
 
 ```ts
 (generation: Generation) => Generation
@@ -48,7 +48,7 @@ PublishDestination[]
 
 ### `Generation`
 
-`interface`
+`interface` — Define the structure for a generation entity including its metadata and creation details
 
 ```ts
 interface Generation
@@ -56,7 +56,7 @@ interface Generation
 
 ### `GENERATION_TYPES`
 
-`const`
+`const` — Provide an array of supported generation types for media and content processing
 
 ```ts
 readonly GenerationType[]
@@ -64,7 +64,7 @@ readonly GenerationType[]
 
 ### `generationError`
 
-`function`
+`function` — Resolve and return the first user-safe error message from generation metadata or null if none exist
 
 ```ts
 (generation: Generation) => string | null
@@ -72,7 +72,7 @@ readonly GenerationType[]
 
 ### `generationMergeKey`
 
-`function`
+`function` — Resolve a unique merge key from a generation using batch slot or client request ID
 
 ```ts
 (generation: Generation) => string | null
@@ -80,7 +80,7 @@ readonly GenerationType[]
 
 ### `GenerationRequestFields`
 
-`interface`
+`interface` — Define fields required to configure and request various types of media generation
 
 ```ts
 interface GenerationRequestFields
@@ -88,7 +88,7 @@ interface GenerationRequestFields
 
 ### `generationStatus`
 
-`function`
+`function` — Resolve the current status of a generation based on its metadata and result fields
 
 ```ts
 (generation: Generation) => GenerationStatus
@@ -96,7 +96,7 @@ interface GenerationRequestFields
 
 ### `GenerationStatus`
 
-`type`
+`type` — Define possible states representing the progress of a generation process
 
 ```ts
 type GenerationStatus
@@ -104,7 +104,7 @@ type GenerationStatus
 
 ### `GenerationType`
 
-`type`
+`type` — Define generation categories for media including image, video, speech, avatar, and transcription
 
 ```ts
 type GenerationType
@@ -112,7 +112,7 @@ type GenerationType
 
 ### `generationVaultPath`
 
-`function`
+`function` — Resolve the vault path string from a Generation object or return null if unavailable
 
 ```ts
 (generation: Generation) => string | null
@@ -120,7 +120,7 @@ type GenerationType
 
 ### `isDestinationConnected`
 
-`function`
+`function` — Determine if a destination has any active connections in the given list of studio integration connections
 
 ```ts
 (destination: PublishDestination, connections: StudioIntegrationConnection[]) => boolean
@@ -128,7 +128,7 @@ type GenerationType
 
 ### `isGenerationType`
 
-`function`
+`function` — Resolve whether a string value matches a valid GenerationType
 
 ```ts
 (value: string) => value is GenerationType
@@ -136,7 +136,7 @@ type GenerationType
 
 ### `isLocalGeneration`
 
-`function`
+`function` — Determine if a generation ID indicates a local generation
 
 ```ts
 (generation: Generation) => boolean
@@ -144,7 +144,7 @@ type GenerationType
 
 ### `isPublishPackage`
 
-`function`
+`function` — Determine if a value conforms to the PublishPackage structure with optional metadata fields
 
 ```ts
 (value: unknown) => value is { caption?: string | undefined; description?: string | undefined; mentions?: string[] | un…
@@ -152,7 +152,7 @@ type GenerationType
 
 ### `latestBatchOf`
 
-`function`
+`function` — Resolve and return the latest batch of generations grouped and sorted by client request ID and output index
 
 ```ts
 (generations: Generation[]) => Generation[]
@@ -160,7 +160,7 @@ type GenerationType
 
 ### `MAX_IMAGE_COUNT`
 
-`const`
+`const` — Define the maximum number of images allowed for upload or display
 
 ```ts
 4
@@ -168,7 +168,7 @@ type GenerationType
 
 ### `MediaModelCatalogResponse`
 
-`interface`
+`interface` — Represent media model catalog with default values, model options, and optional error message
 
 ```ts
 interface MediaModelCatalogResponse
@@ -176,7 +176,7 @@ interface MediaModelCatalogResponse
 
 ### `MediaModelOption`
 
-`interface`
+`interface` — Describe media model option properties including id, name, type, status, and optional provider and reason
 
 ```ts
 interface MediaModelOption
@@ -184,7 +184,7 @@ interface MediaModelOption
 
 ### `MediaModelStatus`
 
-`type`
+`type` — Define possible status values for a media model's availability and accessibility
 
 ```ts
 type MediaModelStatus
@@ -192,7 +192,7 @@ type MediaModelStatus
 
 ### `mergeLiveGeneration`
 
-`function`
+`function` — Merge a new generation into the current list by replacing or prepending it based on matching keys
 
 ```ts
 (current: Generation[], generation: Generation) => Generation[]
@@ -200,7 +200,7 @@ type MediaModelStatus
 
 ### `mergeLoaderAndLive`
 
-`function`
+`function` — Merge two Generation arrays prioritizing live entries and matching by merge keys or IDs
 
 ```ts
 (loader: Generation[], live: Generation[]) => Generation[]
@@ -208,7 +208,7 @@ type MediaModelStatus
 
 ### `MIN_IMAGE_COUNT`
 
-`const`
+`const` — Define the minimum number of images required for processing or validation
 
 ```ts
 1
@@ -216,7 +216,7 @@ type MediaModelStatus
 
 ### `modelMessage`
 
-`function`
+`function` — Resolve the appropriate status message for a media model based on loading state and availability
 
 ```ts
 (model: MediaModelOption | undefined, loading: boolean, count: number) => string | null
@@ -224,7 +224,7 @@ type MediaModelStatus
 
 ### `normalizeImageCount`
 
-`function`
+`function` — Normalize a value to a finite integer within the allowed image count range
 
 ```ts
 (value: unknown) => number
@@ -232,7 +232,7 @@ type MediaModelStatus
 
 ### `optimisticGeneration`
 
-`function`
+`function` — Generate content optimistically based on input parameters and optional model and output details
 
 ```ts
 ({ type, prompt, model, clientRequestId, outputIndex, outputCount, }: { type: GenerationType; prompt: string; model?: s…
@@ -240,7 +240,7 @@ type MediaModelStatus
 
 ### `outputPathFor`
 
-`function`
+`function` — Resolve the output directory path based on the specified generation type
 
 ```ts
 (type: GenerationType) => string
@@ -248,7 +248,7 @@ type MediaModelStatus
 
 ### `preferredModelId`
 
-`function`
+`function` — Resolve the preferred model ID for a given generation type from the media model catalog
 
 ```ts
 (type: GenerationType, catalog: MediaModelCatalogResponse | null) => string | undefined
@@ -256,7 +256,7 @@ type MediaModelStatus
 
 ### `PublishDestination`
 
-`interface`
+`interface` — Define a destination for publishing content with identifiers, label, provider IDs, and fields
 
 ```ts
 interface PublishDestination
@@ -264,7 +264,7 @@ interface PublishDestination
 
 ### `PublishPackage`
 
-`interface`
+`interface` — Define the structure for configuring package publishing details and evaluation criteria
 
 ```ts
 interface PublishPackage
@@ -272,7 +272,7 @@ interface PublishPackage
 
 ### `relativeTime`
 
-`function`
+`function` — Resolve a human-readable relative time string from a given date or return an empty string if null
 
 ```ts
 (date: Date | null) => string
@@ -280,7 +280,7 @@ interface PublishPackage
 
 ### `selectedModelsWithDefaults`
 
-`function`
+`function` — Resolve selected models by applying defaults for missing or unavailable entries in the catalog
 
 ```ts
 (current: Partial<Record<GenerationType, string>>, catalog: MediaModelCatalogResponse) => Partial<Record<GenerationType…
@@ -288,7 +288,7 @@ interface PublishPackage
 
 ### `StudioIntegrationConnection`
 
-`interface`
+`interface` — Define the structure for a studio integration connection with status and provider identifiers
 
 ```ts
 interface StudioIntegrationConnection
@@ -296,7 +296,7 @@ interface StudioIntegrationConnection
 
 ### `userSafeGenerationMessage`
 
-`function`
+`function` — Resolve a user-safe generation message by filtering sensitive or error-related content
 
 ```ts
 (message?: string | undefined) => string

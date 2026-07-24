@@ -8,7 +8,7 @@ Source: `src/intakes-react/lazy.tsx`
 
 ### `IntakeInterviewLazy`
 
-`function`
+`function` — Load IntakeInterview component lazily to optimize initial application rendering
 
 ```ts
 LazyExoticComponent<({ view: initialView, onAnswer, onComplete, onDone, onNotice, }: IntakeInterviewProps) => Element>
@@ -16,7 +16,7 @@ LazyExoticComponent<({ view: initialView, onAnswer, onComplete, onDone, onNotice
 
 ### `IntakeInterviewProps`
 
-`interface`
+`interface` — Define properties and callbacks for managing the intake interview flow and user interactions
 
 ```ts
 interface IntakeInterviewProps

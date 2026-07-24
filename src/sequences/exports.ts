@@ -29,6 +29,7 @@ import {
 // Captions: SRT / WebVTT
 // ---------------------------------------------------------------------------
 
+/** Define options to export captions filtered by an optional BCP-47 language tag */
 export interface CaptionExportOptions {
   /** BCP-47 tag; matched case-insensitively against `clip.language`. Clips
    *  with no language never match a language-scoped export. */
@@ -167,18 +168,21 @@ function frameToEdlTimecode(frame: number, fps: number): string {
 // OpenTimelineIO
 // ---------------------------------------------------------------------------
 
+/** Represent a rational time value with a specific rate and numeric value for OTIO schema */
 export interface OtioRationalTime {
   OTIO_SCHEMA: 'RationalTime.1'
   rate: number
   value: number
 }
 
+/** Define a time range with a start time and duration using OtioRationalTime values */
 export interface OtioTimeRange {
   OTIO_SCHEMA: 'TimeRange.1'
   start_time: OtioRationalTime
   duration: OtioRationalTime
 }
 
+/** Define the structure for an external media reference with schema, URL, and optional time range */
 export interface OtioExternalReference {
   OTIO_SCHEMA: 'ExternalReference.1'
   target_url: string
@@ -186,16 +190,19 @@ export interface OtioExternalReference {
   available_range: OtioTimeRange | null
 }
 
+/** Represent missing references in OTIO with a fixed schema identifier */
 export interface OtioMissingReference {
   OTIO_SCHEMA: 'MissingReference.1'
 }
 
+/** Define the structure for a gap element with schema, name, and source time range properties */
 export interface OtioGap {
   OTIO_SCHEMA: 'Gap.1'
   name: string
   source_range: OtioTimeRange
 }
 
+/** Define a clip object with metadata, source range, and media reference according to OTIO schema */
 export interface OtioClip {
   OTIO_SCHEMA: 'Clip.2'
   name: string
@@ -204,6 +211,7 @@ export interface OtioClip {
   metadata: Record<string, unknown>
 }
 
+/** Define a track containing video or audio clips with metadata and child elements */
 export interface OtioTrack {
   OTIO_SCHEMA: 'Track.1'
   name: string
@@ -212,12 +220,14 @@ export interface OtioTrack {
   children: Array<OtioClip | OtioGap>
 }
 
+/** Represent a stack container holding a named collection of OtioTrack children */
 export interface OtioStack {
   OTIO_SCHEMA: 'Stack.1'
   name: string
   children: OtioTrack[]
 }
 
+/** Define the structure of a timeline with metadata, tracks, and global start time in OTIO format */
 export interface OtioTimeline {
   OTIO_SCHEMA: 'Timeline.1'
   name: string
@@ -342,6 +352,7 @@ function timeRange(startValue: number, durationValue: number, rate: number): Oti
 // Contact-sheet manifest
 // ---------------------------------------------------------------------------
 
+/** Describe a single entry in a contact sheet with timing and media source details */
 export interface ContactSheetEntry {
   clipId: string
   trackId: string
@@ -358,6 +369,7 @@ export interface ContactSheetEntry {
   mediaKind: SequenceMediaKind
 }
 
+/** Define the structure for a contact sheet manifest including metadata and entries */
 export interface ContactSheetManifest {
   sequenceId: string
   title: string

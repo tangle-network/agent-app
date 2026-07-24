@@ -8,7 +8,7 @@ Source: `src/interactions/index.ts`
 
 ### `BeforeInteractionAnswerArgs`
 
-`interface`
+`interface` — Describe the arguments provided before processing an interaction answer including request, body, and connection details
 
 ```ts
 interface BeforeInteractionAnswerArgs
@@ -40,7 +40,7 @@ interface ChatInteraction
 
 ### `ChatInteractionField`
 
-`type`
+`type` — Resolve a chat interaction field excluding select types or including chat select fields
 
 ```ts
 type ChatInteractionField
@@ -48,7 +48,7 @@ type ChatInteractionField
 
 ### `ChatInteractionStatus`
 
-`type`
+`type` — Define possible statuses representing the state of a chat interaction
 
 ```ts
 type ChatInteractionStatus
@@ -56,7 +56,7 @@ type ChatInteractionStatus
 
 ### `ChatSelectField`
 
-`type`
+`type` — Extract select-type interaction fields and optionally allow custom values
 
 ```ts
 type ChatSelectField
@@ -80,7 +80,7 @@ type ChatSelectField
 
 ### `ComposerAnswerDelivery`
 
-`interface`
+`interface` — Define the structure for delivering answers linked to a specific chat interaction and field
 
 ```ts
 interface ComposerAnswerDelivery
@@ -88,7 +88,7 @@ interface ComposerAnswerDelivery
 
 ### `createInteractionAnswerRoute`
 
-`function`
+`function` — Create an interaction answer route that handles listing and resolving interaction requests
 
 ```ts
 (options: InteractionAnswerRouteOptions) => InteractionAnswerRoute
@@ -96,7 +96,7 @@ interface ComposerAnswerDelivery
 
 ### `dedupeQuestionInteractionsByContent`
 
-`function`
+`function` — Remove duplicate question interactions based on their content signature to ensure uniqueness
 
 ```ts
 (interactions: ChatInteraction[]) => ChatInteraction[]
@@ -104,7 +104,7 @@ interface ComposerAnswerDelivery
 
 ### `DurableInteractionRouteArgs`
 
-`interface`
+`interface` — Define arguments for durable interaction routes including a stable caller-created attempt key
 
 ```ts
 interface DurableInteractionRouteArgs
@@ -120,7 +120,7 @@ interface DurableInteractionRoutePersistence
 
 ### `fieldAcceptsFreeText`
 
-`function`
+`function` — Determine if a chat interaction field allows free text input
 
 ```ts
 (field: ChatInteractionField) => boolean
@@ -152,7 +152,7 @@ interface DurableInteractionRoutePersistence
 
 ### `InteractionAnswerBodyValidation`
 
-`type`
+`type` — Validate interaction answer body and return success with data or failure with error message
 
 ```ts
 type InteractionAnswerBodyValidation
@@ -160,7 +160,7 @@ type InteractionAnswerBodyValidation
 
 ### `InteractionAnswerRoute`
 
-`interface`
+`interface` — Define routes to list outstanding interactions and resolve answers for live turns
 
 ```ts
 interface InteractionAnswerRoute
@@ -168,7 +168,7 @@ interface InteractionAnswerRoute
 
 ### `InteractionAnswerRouteOptions`
 
-`interface`
+`interface` — Define options to authenticate, authorize, and manage persistence for interaction answer routes
 
 ```ts
 interface InteractionAnswerRouteOptions
@@ -176,7 +176,7 @@ interface InteractionAnswerRouteOptions
 
 ### `InteractionAnswers`
 
-`type`
+`type` — Map interaction identifiers to their corresponding answer values
 
 ```ts
 type InteractionAnswers
@@ -192,7 +192,7 @@ type InteractionAnswerValue
 
 ### `InteractionCancelData`
 
-`interface`
+`interface` — Describe data required to cancel an interaction including its identifier and optional reason
 
 ```ts
 interface InteractionCancelData
@@ -200,7 +200,7 @@ interface InteractionCancelData
 
 ### `InteractionClientOutcome`
 
-`type`
+`type` — Define possible outcomes for an interaction client as accepted or declined
 
 ```ts
 type InteractionClientOutcome
@@ -240,7 +240,7 @@ type InteractionOutcome
 
 ### `interactionPartKey`
 
-`function`
+`function` — Generate a unique key string for an interaction using the given identifier
 
 ```ts
 (id: string) => string
@@ -272,7 +272,7 @@ type InteractionRequestWire
 
 ### `InteractionRouteLogger`
 
-`type`
+`type` — Provide logging methods for warnings and errors in interaction routes
 
 ```ts
 type InteractionRouteLogger
@@ -288,7 +288,7 @@ type InteractionRouteLogger
 
 ### `isRenderableInteractionKind`
 
-`function`
+`function` — Resolve if the given interaction kind is renderable within the application context
 
 ```ts
 (kind: string) => boolean
@@ -304,7 +304,7 @@ type InteractionRouteLogger
 
 ### `isTerminalInteractionStatus`
 
-`function`
+`function` — Resolve if the interaction status is a terminal state excluding pending
 
 ```ts
 (status: ChatInteractionStatus) => boolean
@@ -328,7 +328,7 @@ type InteractionRouteLogger
 
 ### `NoticeKind`
 
-`type`
+`type` — Define specific string literals representing different kinds of notices
 
 ```ts
 type NoticeKind
@@ -344,7 +344,7 @@ type NoticeKind
 
 ### `noticePartKey`
 
-`function`
+`function` — Generate a unique key string for a notice using the given identifier
 
 ```ts
 (id: string) => string
@@ -352,7 +352,7 @@ type NoticeKind
 
 ### `NoticePersistedPart`
 
-`type`
+`type` — Define a persisted notice part with type, id, kind, and text properties
 
 ```ts
 type NoticePersistedPart
@@ -368,7 +368,7 @@ type NoticePersistedPart
 
 ### `ParseInteractionAnswersResult`
 
-`type`
+`type` — Resolve the result of parsing interaction answers with success status and corresponding data or error message
 
 ```ts
 type ParseInteractionAnswersResult
@@ -376,7 +376,7 @@ type ParseInteractionAnswersResult
 
 ### `parseInteractionCancel`
 
-`function`
+`function` — Parse interaction cancel data and return success status with parsed value or error message
 
 ```ts
 (data: Record<string, unknown> | undefined) => { succeeded: true; value: InteractionCancelData; } | { succeeded: false;…
@@ -392,7 +392,7 @@ type ParseInteractionAnswersResult
 
 ### `ParseInteractionResult`
 
-`type`
+`type` — Resolve interaction parsing outcome as success with value or failure with error message
 
 ```ts
 type ParseInteractionResult
@@ -416,7 +416,7 @@ type ParseInteractionResult
 
 ### `ResolveInteractionConnectionArgs`
 
-`interface`
+`interface` — Define arguments required to resolve interaction connections based on request and intent
 
 ```ts
 interface ResolveInteractionConnectionArgs
@@ -440,7 +440,7 @@ interface SidecarInteractionsConnection
 
 ### `SidecarInteractionsError`
 
-`interface`
+`interface` — Describe error details including code, message, and upstream HTTP status for sidecar interactions
 
 ```ts
 interface SidecarInteractionsError
@@ -448,7 +448,7 @@ interface SidecarInteractionsError
 
 ### `SidecarInteractionsResult`
 
-`type`
+`type` — Represent the outcome of sidecar interactions with success or error details
 
 ```ts
 type SidecarInteractionsResult

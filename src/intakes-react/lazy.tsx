@@ -10,6 +10,7 @@ import type { IntakeInterviewProps } from './contracts'
 
 export type { IntakeInterviewProps }
 
+/** Load IntakeInterview component lazily to optimize initial application rendering */
 export const IntakeInterviewLazy = lazy(
   () => import('./components/IntakeInterview').then((m) => ({ default: m.IntakeInterview })),
 )

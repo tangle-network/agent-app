@@ -8,7 +8,7 @@ Source: `src/stream/index.ts`
 
 ### `asRecord`
 
-`function`
+`function` — Resolve an unknown value to a JsonRecord if it is a non-array object or return undefined
 
 ```ts
 (value: unknown) => JsonRecord | undefined
@@ -16,7 +16,7 @@ Source: `src/stream/index.ts`
 
 ### `asString`
 
-`function`
+`function` — Resolve a non-empty string from a value or return undefined
 
 ```ts
 (value: unknown) => string | undefined
@@ -32,7 +32,7 @@ Source: `src/stream/index.ts`
 
 ### `BufferedTurnEvent`
 
-`interface`
+`interface` — Represent a buffered turn event with a sequence number and serialized event data
 
 ```ts
 interface BufferedTurnEvent
@@ -40,7 +40,7 @@ interface BufferedTurnEvent
 
 ### `BufferedTurnOptions`
 
-`interface`
+`interface` — Define options for buffering and flushing turn events with optional live client delivery and event coalescing
 
 ```ts
 interface BufferedTurnOptions
@@ -56,7 +56,7 @@ interface BufferedTurnTap
 
 ### `buildUserTextParts`
 
-`function`
+`function` — Build an array of text parts with optional turn ID for user input
 
 ```ts
 (text: string, turnId: string | undefined) => JsonRecord[]
@@ -96,7 +96,7 @@ interface BufferedTurnTap
 
 ### `createD1TurnEventStore`
 
-`function`
+`function` — Resolve a TurnEventStore that appends and reads turn events using a D1-like database interface
 
 ```ts
 (db: D1LikeForTurns) => TurnEventStore
@@ -120,7 +120,7 @@ interface D1LikeForTurns
 
 ### `encodeEvent`
 
-`function`
+`function` — Encode a StreamEvent object into a Uint8Array using the provided TextEncoder
 
 ```ts
 (encoder: TextEncoder, event: StreamEvent) => Uint8Array<ArrayBufferLike>
@@ -128,7 +128,7 @@ interface D1LikeForTurns
 
 ### `finalizeAssistantParts`
 
-`function`
+`function` — Resolve and clean up assistant parts by terminalizing and collapsing redundant segments
 
 ```ts
 (partOrder: string[], partMap: Map<string, JsonRecord>, finalText: string) => JsonRecord[]
@@ -144,7 +144,7 @@ interface D1LikeForTurns
 
 ### `getPartKey`
 
-`function`
+`function` — Resolve a unique key string for a part based on its type and identifying properties
 
 ```ts
 (part: JsonRecord) => string
@@ -152,7 +152,7 @@ interface D1LikeForTurns
 
 ### `JsonRecord`
 
-`type`
+`type` — Represent a JSON-compatible object with string keys and values of any type
 
 ```ts
 type JsonRecord
@@ -160,7 +160,7 @@ type JsonRecord
 
 ### `mergePersistedPart`
 
-`function`
+`function` — Merge incoming JSON with existing persisted data, applying delta for text types when provided
 
 ```ts
 (existing: JsonRecord | undefined, incoming: JsonRecord, delta?: string | undefined) => JsonRecord
@@ -168,7 +168,7 @@ type JsonRecord
 
 ### `messageHasTurnId`
 
-`function`
+`function` — Resolve whether a message contains any part with the specified turn ID
 
 ```ts
 (message: PersistedChatMessageForTurn, turnId: string) => boolean
@@ -176,7 +176,7 @@ type JsonRecord
 
 ### `MISSING_TOOL_TERMINAL_ERROR`
 
-`const`
+`const` — Resolve errors when a tool fails to report a terminal result before the assistant turn ends
 
 ```ts
 "Tool did not report a terminal result before the assistant turn completed."
@@ -184,7 +184,7 @@ type JsonRecord
 
 ### `MISSING_TOOL_TERMINAL_REASON`
 
-`const`
+`const` — Provide the reason identifier for a missing tool in the terminal environment
 
 ```ts
 "missing-tool-terminal"
@@ -192,7 +192,7 @@ type JsonRecord
 
 ### `normalizeClientTurnId`
 
-`function`
+`function` — Normalize and validate a client turn ID string ensuring it meets format and length requirements
 
 ```ts
 (value: unknown) => string | undefined
@@ -200,7 +200,7 @@ type JsonRecord
 
 ### `normalizePersistedPart`
 
-`function`
+`function` — Normalize a persisted part object by standardizing its structure and fields
 
 ```ts
 (rawPart: JsonRecord) => JsonRecord | null
@@ -208,7 +208,7 @@ type JsonRecord
 
 ### `normalizeTime`
 
-`function`
+`function` — Resolve time properties from various keys into a normalized record with numeric start and end fields
 
 ```ts
 (value: unknown) => JsonRecord | undefined
@@ -216,7 +216,7 @@ type JsonRecord
 
 ### `normalizeToolEvent`
 
-`function`
+`function` — Normalize tool-related events into a standardized message.part.updated format
 
 ```ts
 (event: StreamEvent) => StreamEvent
@@ -224,7 +224,7 @@ type JsonRecord
 
 ### `PersistedChatMessageForTurn`
 
-`interface`
+`interface` — Define the structure of a chat message stored for a specific conversation turn
 
 ```ts
 interface PersistedChatMessageForTurn
@@ -240,7 +240,7 @@ interface PersistedChatMessageForTurn
 
 ### `PumpBufferedTurnOptions`
 
-`interface`
+`interface` — Define options to pump data from an asynchronous iterable source with buffered turn control
 
 ```ts
 interface PumpBufferedTurnOptions
@@ -256,7 +256,7 @@ interface PumpBufferedTurnOptions
 
 ### `ReplayTurnEventsOptions`
 
-`interface`
+`interface` — Define options for replaying turn events with control over sequence, polling, and timeout
 
 ```ts
 interface ReplayTurnEventsOptions
@@ -264,7 +264,7 @@ interface ReplayTurnEventsOptions
 
 ### `resolveChatTurn`
 
-`function`
+`function` — Resolve a chat turn by determining message reuse and constructing user message parts
 
 ```ts
 (input: { existingMessages: PersistedChatMessageForTurn[]; userContent: string; turnId?: string | undefined; }) => Reso…
@@ -272,7 +272,7 @@ interface ReplayTurnEventsOptions
 
 ### `ResolvedChatTurn`
 
-`interface`
+`interface` — Represent a chat turn with resolved user message insertion and prior message context
 
 ```ts
 interface ResolvedChatTurn
@@ -280,7 +280,7 @@ interface ResolvedChatTurn
 
 ### `resolveToolId`
 
-`function`
+`function` — Resolve a unique tool identifier from various possible properties or generate a fallback ID
 
 ```ts
 (part: JsonRecord) => string
@@ -288,7 +288,7 @@ interface ResolvedChatTurn
 
 ### `resolveToolName`
 
-`function`
+`function` — Resolve the tool name from a JSON record using tool, name, or a default value
 
 ```ts
 (part: JsonRecord) => string
@@ -296,7 +296,7 @@ interface ResolvedChatTurn
 
 ### `StreamEvent`
 
-`interface`
+`interface` — Define an event object carrying a type and optional JSON data payload
 
 ```ts
 interface StreamEvent
@@ -320,7 +320,7 @@ interface StreamEvent
 
 ### `terminalizeDanglingToolParts`
 
-`function`
+`function` — Resolve dangling tool parts into terminal forms within the given JSON records array
 
 ```ts
 (parts: JsonRecord[]) => JsonRecord[]
@@ -344,7 +344,7 @@ interface StreamEvent
 
 ### `TurnEventStore`
 
-`interface`
+`interface` — Manage and query turn events and their lifecycle statuses within a scoped event store
 
 ```ts
 interface TurnEventStore

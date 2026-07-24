@@ -24,7 +24,7 @@ interface CurrentIntakeView
 
 ### `IntakeApiOptions`
 
-`interface`
+`interface` — Define configuration options for initializing the intake API with store and graph components
 
 ```ts
 interface IntakeApiOptions

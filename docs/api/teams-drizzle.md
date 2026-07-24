@@ -8,7 +8,7 @@ Source: `src/teams/drizzle.ts`
 
 ### `CreateAccessOptions`
 
-`interface`
+`interface` — Define options required to create access with database, tables, and workspace table references
 
 ```ts
 interface CreateAccessOptions
@@ -16,7 +16,7 @@ interface CreateAccessOptions
 
 ### `createEnsurePersonalOrganization`
 
-`function`
+`function` — Ensure a user has a personal organization by creating or retrieving it as needed
 
 ```ts
 (opts: CreatePersonalOrganizationOptions) => (user: EnsurePersonalOrganizationUser) => Promise<PersonalOrganizationResu…
@@ -24,7 +24,7 @@ interface CreateAccessOptions
 
 ### `createOrganizationAccess`
 
-`function`
+`function` — Resolve organization access API with specified database and table options
 
 ```ts
 (opts: CreateOrganizationAccessOptions) => OrganizationAccessApi
@@ -32,7 +32,7 @@ interface CreateAccessOptions
 
 ### `CreateOrganizationAccessOptions`
 
-`interface`
+`interface` — Define options required to create access for an organization including database and tables
 
 ```ts
 interface CreateOrganizationAccessOptions
@@ -40,7 +40,7 @@ interface CreateOrganizationAccessOptions
 
 ### `CreatePersonalOrganizationOptions`
 
-`interface`
+`interface` — Define options required to create a personal organization including database and tables references
 
 ```ts
 interface CreatePersonalOrganizationOptions
@@ -48,7 +48,7 @@ interface CreatePersonalOrganizationOptions
 
 ### `createTeamTables`
 
-`function`
+`function` — Build SQLite tables for organizations and related team structures using provided options
 
 ```ts
 (opts: CreateTeamTablesOptions) => { organizations: SQLiteTableWithColumns<{ name: "organization"; schema: undefined; c…
@@ -56,7 +56,7 @@ interface CreatePersonalOrganizationOptions
 
 ### `CreateTeamTablesOptions`
 
-`interface`
+`interface` — Define options specifying user and workspace tables for creating team-related tables
 
 ```ts
 interface CreateTeamTablesOptions
@@ -64,7 +64,7 @@ interface CreateTeamTablesOptions
 
 ### `createWorkspaceAccess`
 
-`function`
+`function` — Create workspace access API to manage user roles and permissions within a workspace
 
 ```ts
 (opts: CreateAccessOptions) => WorkspaceAccessApi
@@ -72,7 +72,7 @@ interface CreateTeamTablesOptions
 
 ### `createWorkspaceInvitationTable`
 
-`function`
+`function` — Build a workspace invitation table with defined columns and foreign key constraints
 
 ```ts
 (opts: CreateWorkspaceInvitationTableOptions) => { workspaceInvitations: SQLiteTableWithColumns<{ name: "workspace_invi…
@@ -80,7 +80,7 @@ interface CreateTeamTablesOptions
 
 ### `CreateWorkspaceInvitationTableOptions`
 
-`interface`
+`interface` — Define options for creating a workspace invitation table with user, workspace, and organization references
 
 ```ts
 interface CreateWorkspaceInvitationTableOptions
@@ -88,7 +88,7 @@ interface CreateWorkspaceInvitationTableOptions
 
 ### `EnsurePersonalOrganizationUser`
 
-`interface`
+`interface` — Define the structure for a user within a personal organization context
 
 ```ts
 interface EnsurePersonalOrganizationUser
@@ -96,7 +96,7 @@ interface EnsurePersonalOrganizationUser
 
 ### `OrganizationAccess`
 
-`interface`
+`interface` — Define access details linking an organization, its member, and the member's role
 
 ```ts
 interface OrganizationAccess
@@ -104,7 +104,7 @@ interface OrganizationAccess
 
 ### `OrganizationAccessApi`
 
-`interface`
+`interface` — Define methods to retrieve and enforce user access levels within an organization
 
 ```ts
 interface OrganizationAccessApi
@@ -112,7 +112,7 @@ interface OrganizationAccessApi
 
 ### `OrganizationMemberRow`
 
-`type`
+`type` — Resolve the structure of an organization member row from the team tables selection
 
 ```ts
 type OrganizationMemberRow
@@ -120,7 +120,7 @@ type OrganizationMemberRow
 
 ### `OrganizationRow`
 
-`type`
+`type` — Resolve the structure of an organization row from the organizations table in TeamTables
 
 ```ts
 type OrganizationRow
@@ -128,7 +128,7 @@ type OrganizationRow
 
 ### `PersonalOrganizationResult`
 
-`interface`
+`interface` — Describe a personal organization result including organization, member, and role details
 
 ```ts
 interface PersonalOrganizationResult
@@ -152,7 +152,7 @@ type TeamParentTable
 
 ### `TeamTables`
 
-`type`
+`type` — Resolve team tables by deriving the return type of createTeamTables
 
 ```ts
 type TeamTables
@@ -160,7 +160,7 @@ type TeamTables
 
 ### `UserWorkspaceSummary`
 
-`interface`
+`interface` — Describe a user's workspace details including organization and role information
 
 ```ts
 interface UserWorkspaceSummary
@@ -168,7 +168,7 @@ interface UserWorkspaceSummary
 
 ### `WorkspaceAccess`
 
-`interface`
+`interface` — Define access details including workspace data, organization info, member info, and role within workspace
 
 ```ts
 interface WorkspaceAccess
@@ -176,7 +176,7 @@ interface WorkspaceAccess
 
 ### `WorkspaceAccessApi`
 
-`interface`
+`interface` — Define methods to retrieve and enforce user access permissions within workspaces
 
 ```ts
 interface WorkspaceAccessApi
@@ -192,7 +192,7 @@ interface WorkspaceAccessTable
 
 ### `WorkspaceInvitationRow`
 
-`type`
+`type` — Resolve the structure of a workspace invitation row from the workspaceInvitations table
 
 ```ts
 type WorkspaceInvitationRow
@@ -200,7 +200,7 @@ type WorkspaceInvitationRow
 
 ### `WorkspaceInvitationTables`
 
-`type`
+`type` — Resolve the structure of workspace invitation tables from the creation function
 
 ```ts
 type WorkspaceInvitationTables
@@ -208,7 +208,7 @@ type WorkspaceInvitationTables
 
 ### `WorkspaceMemberRow`
 
-`type`
+`type` — Resolve a workspace member row with selected fields from the workspaceMembers table
 
 ```ts
 type WorkspaceMemberRow

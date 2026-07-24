@@ -8,7 +8,7 @@ Source: `src/tools/index.ts`
 
 ### `AddCitationArgs`
 
-`interface`
+`interface` — Define arguments required to add a citation including path, quote, and optional label
 
 ```ts
 interface AddCitationArgs
@@ -16,7 +16,7 @@ interface AddCitationArgs
 
 ### `AddCitationResult`
 
-`interface`
+`interface` — Represent the result of adding a citation including its identifier and location path
 
 ```ts
 interface AddCitationResult
@@ -64,7 +64,7 @@ interface AppToolMcpServer
 
 ### `AppToolName`
 
-`type`
+`type` — Resolve a valid application tool name from the predefined list of tool names
 
 ```ts
 type AppToolName
@@ -104,7 +104,7 @@ interface AppToolTaxonomy
 
 ### `AuthenticateOptions`
 
-`interface`
+`interface` — Define options to verify bearer tokens and customize authentication header names
 
 ```ts
 interface AuthenticateOptions
@@ -152,7 +152,7 @@ interface BuildAppToolsOptions
 
 ### `BuildHttpMcpServerOptions`
 
-`interface`
+`interface` — Define configuration options for building an HTTP MCP server including path, baseUrl, token, context, and description
 
 ```ts
 interface BuildHttpMcpServerOptions
@@ -160,7 +160,7 @@ interface BuildHttpMcpServerOptions
 
 ### `BuildMcpServerOptions`
 
-`interface`
+`interface` — Define configuration options required to build an MCP server including tool, baseUrl, token, and context
 
 ```ts
 interface BuildMcpServerOptions
@@ -176,7 +176,7 @@ interface BuildMcpServerOptions
 
 ### `CapabilityTokenOptions`
 
-`interface`
+`interface` — Define options for creating and verifying capability tokens including secret and prefix
 
 ```ts
 interface CapabilityTokenOptions
@@ -216,7 +216,7 @@ interface CapabilityTokenOptions
 
 ### `CreateMcpToolHandlerOptions`
 
-`interface`
+`interface` — Define options for creating a handler that manages MCP tools with environment support
 
 ```ts
 interface CreateMcpToolHandlerOptions
@@ -240,7 +240,7 @@ Record<"submit_proposal" | "schedule_followup" | "render_ui" | "add_citation", s
 
 ### `DEFAULT_HEADER_NAMES`
 
-`const`
+`const` — Provide default HTTP header names for user, workspace, and thread identification
 
 ```ts
 ToolHeaderNames
@@ -264,7 +264,7 @@ ToolHeaderNames
 
 ### `DispatchOptions`
 
-`interface`
+`interface` — Define options for dispatching tools including handlers, taxonomy, custom tools, and approval policies
 
 ```ts
 interface DispatchOptions
@@ -272,7 +272,7 @@ interface DispatchOptions
 
 ### `ExpiringCapabilityTokenOptions`
 
-`interface`
+`interface` — Define options for capability tokens that expire after a specified lifetime in milliseconds
 
 ```ts
 interface ExpiringCapabilityTokenOptions
@@ -296,7 +296,7 @@ interface ExpiringCapabilityTokenOptions
 
 ### `HandleToolRequestOptions`
 
-`interface`
+`interface` — Define options for handling tool requests including tool identification and token verification
 
 ```ts
 interface HandleToolRequestOptions
@@ -304,7 +304,7 @@ interface HandleToolRequestOptions
 
 ### `isAppToolName`
 
-`function`
+`function` — Determine if a string matches a valid application tool name
 
 ```ts
 (name: string) => name is "submit_proposal" | "schedule_followup" | "render_ui" | "add_citation"
@@ -320,7 +320,7 @@ readonly ["2025-06-18", "2025-03-26", "2024-11-05"]
 
 ### `McpProtocolVersion`
 
-`type`
+`type` — Resolve a valid protocol version from the predefined MCP_PROTOCOL_VERSIONS array
 
 ```ts
 type McpProtocolVersion
@@ -328,7 +328,7 @@ type McpProtocolVersion
 
 ### `McpServerInfo`
 
-`interface`
+`interface` — Describe the structure of server information including name and version
 
 ```ts
 interface McpServerInfo
@@ -368,7 +368,7 @@ interface OpenAIFunctionTool
 
 ### `RenderUiArgs`
 
-`interface`
+`interface` — Define arguments required to render a UI including title and schema
 
 ```ts
 interface RenderUiArgs
@@ -376,7 +376,7 @@ interface RenderUiArgs
 
 ### `RenderUiResult`
 
-`interface`
+`interface` — Describe the result of rendering UI including the artifact path and exact persisted content
 
 ```ts
 interface RenderUiResult
@@ -384,7 +384,7 @@ interface RenderUiResult
 
 ### `ResolvedToolCapabilities`
 
-`interface`
+`interface` — Describe resolved capabilities including proposal types and product tool groups to expose
 
 ```ts
 interface ResolvedToolCapabilities
@@ -400,7 +400,7 @@ interface ResolvedToolCapabilities
 
 ### `ResolveToolCapabilitiesOptions`
 
-`interface`
+`interface` — Resolve options for determining tool capabilities based on taxonomy, capabilities, and enabled IDs
 
 ```ts
 interface ResolveToolCapabilitiesOptions
@@ -416,7 +416,7 @@ interface ResolveToolCapabilitiesOptions
 
 ### `RuntimeExecutorOptions`
 
-`interface`
+`interface` — Define options for executing runtime tasks with a trusted per-turn context
 
 ```ts
 interface RuntimeExecutorOptions
@@ -424,7 +424,7 @@ interface RuntimeExecutorOptions
 
 ### `ScheduleFollowupArgs`
 
-`interface`
+`interface` — Define arguments required to schedule a follow-up with optional priority
 
 ```ts
 interface ScheduleFollowupArgs
@@ -432,7 +432,7 @@ interface ScheduleFollowupArgs
 
 ### `ScheduleFollowupResult`
 
-`interface`
+`interface` — Define the result structure for scheduling a follow-up with unique identification and due date
 
 ```ts
 interface ScheduleFollowupResult
@@ -448,7 +448,7 @@ interface ScopedMcpServerEntryOptions
 
 ### `SubmitProposalArgs`
 
-`interface`
+`interface` — Define the arguments required to submit a proposal including type, title, description, and approval status
 
 ```ts
 interface SubmitProposalArgs
@@ -456,7 +456,7 @@ interface SubmitProposalArgs
 
 ### `SubmitProposalResult`
 
-`interface`
+`interface` — Describe the result of submitting a proposal including deduplication and execution status
 
 ```ts
 interface SubmitProposalResult
@@ -464,7 +464,7 @@ interface SubmitProposalResult
 
 ### `ToolAuthResult`
 
-`type`
+`type` — Represent the result of tool authentication with success context or failure response
 
 ```ts
 type ToolAuthResult

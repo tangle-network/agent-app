@@ -42,6 +42,7 @@ export interface AssistantClientConfig {
   headers?: () => Record<string, string>;
 }
 
+/** Define options for an assistant model including identifier, label, pricing, and context tokens */
 export interface AssistantModelOption {
   slug: string;
   label: string;
@@ -51,6 +52,7 @@ export interface AssistantModelOption {
   contextTokens?: number;
 }
 
+/** Define the structure for assistant model options including a default model slug and available models */
 export interface AssistantModels {
   /** The slug the server uses when a turn selects no model. */
   default: string | null;
@@ -90,10 +92,12 @@ export type ThreadHistoryResult =
   | { status: "gone" }
   | { status: "error" };
 
+/** Represent the outcome of a confirmation process with success or failure details */
 export type ConfirmResult =
   | { ok: true; output: unknown; retryable?: boolean }
   | { ok: false; error: string };
 
+/** Represent invalid client input errors with a specific code INVALID_REQUEST */
 export class AssistantClientInputError extends Error {
   readonly code = "INVALID_REQUEST";
 }

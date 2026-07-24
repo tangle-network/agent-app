@@ -8,7 +8,7 @@ Source: `src/teams-react/lazy.tsx`
 
 ### `InvitationsPanelLazy`
 
-`function`
+`function` — Load InvitationsPanel component lazily to optimize initial rendering performance
 
 ```ts
 LazyExoticComponent<({ invitations, currentRole, onInvite, onResend, onRevoke, onCopy, onNotice, }: InvitationsPanelPro…
@@ -16,7 +16,7 @@ LazyExoticComponent<({ invitations, currentRole, onInvite, onResend, onRevoke, o
 
 ### `InvitationsPanelProps`
 
-`interface`
+`interface` — Define properties and callbacks for managing workspace invitations and user roles
 
 ```ts
 interface InvitationsPanelProps
@@ -24,7 +24,7 @@ interface InvitationsPanelProps
 
 ### `InviteAcceptPageLazy`
 
-`function`
+`function` — Load InviteAcceptPage component lazily for optimized code splitting and performance
 
 ```ts
 LazyExoticComponent<({ details, onAccept, onNavigate, onResendVerification }: InviteAcceptPageProps) => Element>
@@ -32,7 +32,7 @@ LazyExoticComponent<({ details, onAccept, onNavigate, onResendVerification }: In
 
 ### `InviteAcceptPageProps`
 
-`interface`
+`interface` — Define properties and callbacks for handling invite acceptance and navigation actions on the invite page
 
 ```ts
 interface InviteAcceptPageProps
@@ -40,7 +40,7 @@ interface InviteAcceptPageProps
 
 ### `MembersPanelLazy`
 
-`function`
+`function` — Load MembersPanel component lazily to optimize initial rendering performance
 
 ```ts
 LazyExoticComponent<({ members, currentRole, onInvite, onChangeRole, onRemove, onNotice, showInviteForm, }: MembersPane…
@@ -48,7 +48,7 @@ LazyExoticComponent<({ members, currentRole, onInvite, onChangeRole, onRemove, o
 
 ### `MembersPanelProps`
 
-`interface`
+`interface` — Define properties and callbacks for managing members and their roles in a workspace panel
 
 ```ts
 interface MembersPanelProps

@@ -16,7 +16,7 @@ Source: `src/teams-react/index.ts`
 
 ### `InvitationsPanelProps`
 
-`interface`
+`interface` — Define properties and callbacks for managing workspace invitations and user roles
 
 ```ts
 interface InvitationsPanelProps
@@ -32,7 +32,7 @@ interface InvitationView
 
 ### `InviteAcceptDetails`
 
-`interface`
+`interface` — Describe details of an accepted invite including status, workspace, inviter, role, emails, and expiration
 
 ```ts
 interface InviteAcceptDetails
@@ -48,7 +48,7 @@ interface InviteAcceptDetails
 
 ### `InviteAcceptPageProps`
 
-`interface`
+`interface` — Define properties and callbacks for handling invite acceptance and navigation actions on the invite page
 
 ```ts
 interface InviteAcceptPageProps
@@ -56,7 +56,7 @@ interface InviteAcceptPageProps
 
 ### `InviteAcceptStatus`
 
-`type`
+`type` — Define possible statuses for the acceptance state of an invitation
 
 ```ts
 type InviteAcceptStatus
@@ -72,7 +72,7 @@ type InviteAcceptStatus
 
 ### `MembersPanelProps`
 
-`interface`
+`interface` — Define properties and callbacks for managing members and their roles in a workspace panel
 
 ```ts
 interface MembersPanelProps

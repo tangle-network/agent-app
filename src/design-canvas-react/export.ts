@@ -59,6 +59,7 @@ interface KonvaStageLike {
 // Raster export
 // ---------------------------------------------------------------------------
 
+/** Define options to export a page as a data URL with format, pixel ratio, bleed, and preset settings */
 export interface ExportPageDataUrlOptions {
   format: 'png' | 'jpeg'
   pixelRatio?: number

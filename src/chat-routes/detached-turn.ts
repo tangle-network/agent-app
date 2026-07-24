@@ -51,6 +51,7 @@ export interface DetachedTurnFinal {
   parts?: DetachedTurnParts
 }
 
+/** Define options for managing and projecting a detached turn event stream in a session */
 export interface DetachedTurnOptions {
   store: TurnEventStore
   turnId: string
@@ -93,6 +94,7 @@ export interface DetachedTurnOptions {
   log?: (message: string, meta?: Record<string, unknown>) => void
 }
 
+/** Describe the result of a detached turn including state, text, parts, usage, and optional error or cache flag */
 export interface DetachedTurnResult {
   /** `completed` — clean drain: persist + bill. `failed` — a terminal error
    *  event, including the producer's structured `sandbox.stream_failed` event

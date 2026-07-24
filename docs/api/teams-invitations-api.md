@@ -24,7 +24,7 @@ interface EnforceSeatSeam
 
 ### `InvitationOutcome`
 
-`type`
+`type` — Resolve the result of an invitation as success with a value or failure with status and error details
 
 ```ts
 type InvitationOutcome
@@ -32,7 +32,7 @@ type InvitationOutcome
 
 ### `InvitationPreview`
 
-`interface`
+`interface` — Describe the structure of an invitation preview with workspace, email, permissions, status, and expiration details
 
 ```ts
 interface InvitationPreview
@@ -40,7 +40,7 @@ interface InvitationPreview
 
 ### `InvitationsApiOptions`
 
-`interface`
+`interface` — Define configuration options required to manage workspace invitations and related data sources
 
 ```ts
 interface InvitationsApiOptions
@@ -88,7 +88,7 @@ interface SendInvitationEmailInput
 
 ### `SendInvitationEmailResult`
 
-`type`
+`type` — Represent the outcome of sending an invitation email with success status and optional error message
 
 ```ts
 type SendInvitationEmailResult
@@ -96,7 +96,7 @@ type SendInvitationEmailResult
 
 ### `SendInvitationEmailSeam`
 
-`interface`
+`interface` — Resolve sending an invitation email and return the result asynchronously
 
 ```ts
 interface SendInvitationEmailSeam
@@ -104,7 +104,7 @@ interface SendInvitationEmailSeam
 
 ### `WorkspaceInvitationView`
 
-`interface`
+`interface` — Represent a workspace invitation with details about inviter, permissions, status, and timestamps
 
 ```ts
 interface WorkspaceInvitationView

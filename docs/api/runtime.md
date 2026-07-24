@@ -8,7 +8,7 @@ Source: `src/runtime/index.ts`
 
 ### `AgentRuntime`
 
-`interface`
+`interface` — Resolve and stream tool execution loops with final results and intermediate events for agent runtime
 
 ```ts
 interface AgentRuntime
@@ -24,7 +24,7 @@ interface AgentRuntimeModelConfig
 
 ### `AgentTurnOptions`
 
-`interface`
+`interface` — Define options for configuring a single agent turn including context, prior messages, prompts, and event handlers
 
 ```ts
 interface AgentTurnOptions
@@ -56,7 +56,7 @@ interface AppToolLoopOptions
 
 ### `CatalogModel`
 
-`interface`
+`interface` — Define the structure and capabilities of a catalog item with optional pricing and feature flags
 
 ```ts
 interface CatalogModel
@@ -64,7 +64,7 @@ interface CatalogModel
 
 ### `CertifiedDelivery`
 
-`interface`
+`interface` — Resolve and manage certified profiles with refresh and composition capabilities
 
 ```ts
 interface CertifiedDelivery
@@ -72,7 +72,7 @@ interface CertifiedDelivery
 
 ### `CertifiedDeliveryConfig`
 
-`interface`
+`interface` — Define configuration options for delivering certified artifacts to a specified tenant target
 
 ```ts
 interface CertifiedDeliveryConfig
@@ -88,7 +88,7 @@ interface CertifiedDeliveryConfig
 
 ### `CreateAgentRuntimeOptions`
 
-`interface`
+`interface` — Define options for creating an agent runtime including model config and optional profile transformation
 
 ```ts
 interface CreateAgentRuntimeOptions
@@ -128,7 +128,7 @@ interface CreateAgentRuntimeOptions
 
 ### `CreateTangleRouterModelConfigOptions`
 
-`interface`
+`interface` — Define configuration options for creating a Tangle router model including API key and model details
 
 ```ts
 interface CreateTangleRouterModelConfigOptions
@@ -136,7 +136,7 @@ interface CreateTangleRouterModelConfigOptions
 
 ### `DEFAULT_TANGLE_BILLING_ENFORCEMENT_ENV_VAR`
 
-`const`
+`const` — Define the default environment variable name for Tangle billing enforcement
 
 ```ts
 "TANGLE_BILLING_ENFORCEMENT"
@@ -144,7 +144,7 @@ interface CreateTangleRouterModelConfigOptions
 
 ### `DEFAULT_TANGLE_ROUTER_BASE_URL`
 
-`const`
+`const` — Provide the default base URL for the Tangle router API endpoint
 
 ```ts
 "https://router.tangle.tools/v1"
@@ -176,7 +176,7 @@ interface CreateTangleRouterModelConfigOptions
 
 ### `isTangleExecutionKeyError`
 
-`function`
+`function` — Identify whether an error is a TangleExecutionKeyError based on its properties and type
 
 ```ts
 (error: unknown) => error is TangleExecutionKeyError
@@ -224,7 +224,7 @@ interface LoopToolCall
 
 ### `ModelCatalog`
 
-`interface`
+`interface` — Define a catalog containing models with a default ID and fetch timestamp
 
 ```ts
 interface ModelCatalog
@@ -240,7 +240,7 @@ interface ModelCatalog
 
 ### `OpenAICompatStreamTurnOptions`
 
-`interface`
+`interface` — Define options for configuring an OpenAI-compatible streaming chat turn including API details and tools
 
 ```ts
 interface OpenAICompatStreamTurnOptions
@@ -264,7 +264,7 @@ interface ResolvedAgentProfile
 
 ### `ResolvedTangleExecutionKey`
 
-`interface`
+`interface` — Define a resolved key combining an API key with its Tangle execution source
 
 ```ts
 interface ResolvedTangleExecutionKey
@@ -272,7 +272,7 @@ interface ResolvedTangleExecutionKey
 
 ### `ResolveModelOptions`
 
-`interface`
+`interface` — Resolve options for model configuration including environment variables and default router base URL
 
 ```ts
 interface ResolveModelOptions
@@ -288,7 +288,7 @@ interface ResolveModelOptions
 
 ### `ResolveTangleDevOrUserKeyOptions`
 
-`interface`
+`interface` — Resolve options for retrieving a Tangle developer or user API key based on environment and context
 
 ```ts
 interface ResolveTangleDevOrUserKeyOptions
@@ -296,7 +296,7 @@ interface ResolveTangleDevOrUserKeyOptions
 
 ### `resolveTangleExecutionEnvironment`
 
-`function`
+`function` — Resolve the current Tangle execution environment based on provided or process environment variables
 
 ```ts
 (env?: Record<string, string | undefined>) => TangleExecutionEnvironment
@@ -320,7 +320,7 @@ interface ResolveTangleDevOrUserKeyOptions
 
 ### `resolveUserTangleExecutionKeyForUser`
 
-`function`
+`function` — Resolve the Tangle execution key for a specified user using provided environment and API key options
 
 ```ts
 <UserId = string>(opts: ResolveUserTangleExecutionKeyForUserOptions<UserId>) => Promise<ResolvedTangleExecutionKey>
@@ -328,7 +328,7 @@ interface ResolveTangleDevOrUserKeyOptions
 
 ### `ResolveUserTangleExecutionKeyForUserOptions`
 
-`interface`
+`interface` — Resolve options for retrieving a user's Tangle execution key with environment and API key access parameters
 
 ```ts
 interface ResolveUserTangleExecutionKeyForUserOptions
@@ -336,7 +336,7 @@ interface ResolveUserTangleExecutionKeyForUserOptions
 
 ### `ResolveUserTangleExecutionKeyOptions`
 
-`interface`
+`interface` — Resolve options for retrieving user API keys within a specific Tangle execution environment
 
 ```ts
 interface ResolveUserTangleExecutionKeyOptions
@@ -424,7 +424,7 @@ type SurfacePermissionValue
 
 ### `SurfaceRegistry`
 
-`interface`
+`interface` — Resolve and build the overlay for a given surface kind within a turn context
 
 ```ts
 interface SurfaceRegistry
@@ -432,7 +432,7 @@ interface SurfaceRegistry
 
 ### `TangleBillingEnforcementOptions`
 
-`interface`
+`interface` — Define options for configuring billing enforcement environment variables and overrides
 
 ```ts
 interface TangleBillingEnforcementOptions
@@ -440,7 +440,7 @@ interface TangleBillingEnforcementOptions
 
 ### `TangleExecutionEnvironment`
 
-`type`
+`type` — Define the environment context for executing Tangle operations
 
 ```ts
 type TangleExecutionEnvironment
@@ -448,7 +448,7 @@ type TangleExecutionEnvironment
 
 ### `TangleExecutionKeyError`
 
-`class`
+`class` — Represent execution key errors with specific codes and HTTP status information
 
 ```ts
 class TangleExecutionKeyError
@@ -456,7 +456,7 @@ class TangleExecutionKeyError
 
 ### `TangleExecutionKeyErrorCode`
 
-`type`
+`type` — Define error codes for Tangle execution key issues related to API key and account connection
 
 ```ts
 type TangleExecutionKeyErrorCode
@@ -464,7 +464,7 @@ type TangleExecutionKeyErrorCode
 
 ### `tangleExecutionKeyHttpError`
 
-`function`
+`function` — Resolve and format TangleExecutionKey HTTP errors into a standardized error object or return null
 
 ```ts
 (error: unknown) => TangleExecutionKeyHttpError | null
@@ -472,7 +472,7 @@ type TangleExecutionKeyErrorCode
 
 ### `TangleExecutionKeyHttpError`
 
-`interface`
+`interface` — Represent HTTP error response containing status, error message, and specific error code
 
 ```ts
 interface TangleExecutionKeyHttpError
@@ -480,7 +480,7 @@ interface TangleExecutionKeyHttpError
 
 ### `TangleExecutionKeySource`
 
-`type`
+`type` — Resolve the source of the Tangle execution key as either local environment or user input
 
 ```ts
 type TangleExecutionKeySource
@@ -528,7 +528,7 @@ type ToolLoopStopReason
 
 ### `trimOrNull`
 
-`function`
+`function` — Resolve a string by trimming whitespace or returning null if empty or undefined
 
 ```ts
 (value: string | null | undefined) => string | null

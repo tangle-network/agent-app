@@ -33,28 +33,34 @@ function canonicalModelId(model: ModelInfo): string {
   return provider ? `${provider}/${model.id}` : model.id
 }
 
+/** Define possible origins for the chat model configuration values */
 export type ChatModelSource = 'request' | 'workspace' | 'env' | 'default'
 
+/** Resolve a chat model with its identifier and source information */
 export interface ResolvedChatModel {
   model: string
   source: ChatModelSource
 }
 
+/** Represent successful chat model validation with a true status and a validated string value */
 export interface ChatModelValidationSuccess {
   succeeded: true
   value: string
 }
 
+/** Describe a failed chat model validation result with an error message */
 export interface ChatModelValidationFailure {
   succeeded: false
   error: string
 }
 
+/** Resolve the outcome of validating a chat model as either success or failure */
 export type ChatModelValidationResult = ChatModelValidationSuccess | ChatModelValidationFailure
 
 /** The catalog-fetch boundary: maps a router base URL to the raw model list. */
 export type LoadModels = (routerBaseUrl: string) => Promise<ModelInfo[]>
 
+/** Resolve the effective chat model input by prioritizing request, workspace, environment, and default models */
 export interface ResolveChatModelInput {
   /** Per-request override (highest precedence). */
   requestModel?: string
@@ -79,6 +85,7 @@ export function resolveChatModel(input: ResolveChatModelInput): ResolvedChatMode
   return { model: input.defaultModel, source: 'default' }
 }
 
+/** Define input parameters for validating chat model IDs with optional allowlist and catalog access details */
 export interface ValidateChatModelIdInput {
   /** Ids accepted without a catalog round-trip (defaults + operator-trusted). */
   allowlist?: Iterable<string>
@@ -144,17 +151,20 @@ export async function validateChatModelId(
   return { succeeded: false, error: `Model is not available: ${cleaned}` }
 }
 
+/** Resolve and return a trimmed string model ID or undefined for invalid or empty input */
 export function cleanModelId(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
   const trimmed = value.trim()
   return trimmed.length > 0 ? trimmed : undefined
 }
 
+/** Validate if a model ID string conforms to length and character format requirements */
 export function isWellFormedModelId(modelId: string): boolean {
   if (modelId.length > 200) return false
   return /^[A-Za-z0-9._/@:-]+$/.test(modelId)
 }
 
+/** Resolve unique catalog IDs associated with a given model including its canonical form if applicable */
 export function catalogIdsForModel(model: ModelInfo): string[] {
   const ids = new Set<string>()
   if (typeof model.id === 'string' && model.id.trim()) ids.add(model.id.trim())

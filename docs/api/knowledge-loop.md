@@ -16,7 +16,7 @@ Source: `src/knowledge-loop/index.ts`
 
 ### `CreateKnowledgeLoopDeps`
 
-`interface`
+`interface` — Define dependencies required to create and run a knowledge processing loop
 
 ```ts
 interface CreateKnowledgeLoopDeps
@@ -48,7 +48,7 @@ interface KnowledgeDecider
 
 ### `KnowledgeDeciderInput`
 
-`interface`
+`interface` — Define the input parameters required to decide knowledge proposals within an agent-knowledge loop
 
 ```ts
 interface KnowledgeDeciderInput
@@ -56,7 +56,7 @@ interface KnowledgeDeciderInput
 
 ### `KnowledgeDecision`
 
-`interface`
+`interface` — Define a decision containing a candidate and the gate's verdict on that candidate
 
 ```ts
 interface KnowledgeDecision

@@ -80,7 +80,7 @@ interface KnowledgeLoopConfig
 
 ### `KnowledgeRequirementSpec`
 
-`interface`
+`interface` — Define the criteria and conditions required to satisfy a specific knowledge requirement
 
 ```ts
 interface KnowledgeRequirementSpec

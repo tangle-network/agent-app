@@ -8,7 +8,7 @@ Source: `src/design-canvas-react/engine.ts`
 
 ### `addElementCommand`
 
-`function`
+`function` — Create a command to add an element to a scene with optional positioning and grouping
 
 ```ts
 (input: AddElementInput) => SceneCommand
@@ -16,7 +16,7 @@ Source: `src/design-canvas-react/engine.ts`
 
 ### `AddElementInput`
 
-`interface`
+`interface` — Define input parameters for adding a scene element with optional index and parent group ID
 
 ```ts
 interface AddElementInput
@@ -24,7 +24,7 @@ interface AddElementInput
 
 ### `addPageCommand`
 
-`function`
+`function` — Create a command to add a page with optional settings and index in the scene
 
 ```ts
 (input: AddPageInput) => SceneCommand
@@ -32,7 +32,7 @@ interface AddElementInput
 
 ### `AddPageInput`
 
-`interface`
+`interface` — Define input parameters for adding a new page with optional settings and position index
 
 ```ts
 interface AddPageInput
@@ -40,7 +40,7 @@ interface AddPageInput
 
 ### `ApplySceneResult`
 
-`interface`
+`interface` — Resolve the result of applying a scene update including revision and optional normalized document
 
 ```ts
 interface ApplySceneResult
@@ -48,7 +48,7 @@ interface ApplySceneResult
 
 ### `bindSlotCommand`
 
-`function`
+`function` — Bind a slot to an element within a page and generate the corresponding scene command
 
 ```ts
 (input: BindSlotInput) => SceneCommand
@@ -56,7 +56,7 @@ interface ApplySceneResult
 
 ### `BindSlotInput`
 
-`interface`
+`interface` — Define input parameters for binding a slot within a scene document element
 
 ```ts
 interface BindSlotInput
@@ -96,7 +96,7 @@ interface BindSlotInput
 
 ### `createSceneCommandStack`
 
-`function`
+`function` — Create a command stack for scene editing with reapply capabilities based on the given document and page ID
 
 ```ts
 (document: SceneDocument, activePageId: string) => SceneCommandStackWithReapply
@@ -104,7 +104,7 @@ interface BindSlotInput
 
 ### `createSnapEngine`
 
-`function`
+`function` — Build a SnapEngine instance to manage snapping targets and behavior within an editor scene
 
 ```ts
 () => SnapEngine
@@ -112,7 +112,7 @@ interface BindSlotInput
 
 ### `createZoomPanMath`
 
-`function`
+`function` — Create zoom and pan math utilities enforcing valid zoom range constraints
 
 ```ts
 (config: ZoomPanConfig) => ZoomPanMath
@@ -128,7 +128,7 @@ readonly InsertTemplate[]
 
 ### `deleteElementCommand`
 
-`function`
+`function` — Resolve a command to delete an element from a specified page in the document
 
 ```ts
 (input: DeleteElementInput) => SceneCommand
@@ -136,7 +136,7 @@ readonly InsertTemplate[]
 
 ### `DeleteElementInput`
 
-`interface`
+`interface` — Define input parameters required to delete an element from a specific page in a document
 
 ```ts
 interface DeleteElementInput
@@ -144,7 +144,7 @@ interface DeleteElementInput
 
 ### `deletePageCommand`
 
-`function`
+`function` — Delete a page from a document ensuring it is not the last remaining page
 
 ```ts
 (input: DeletePageInput) => SceneCommand
@@ -152,7 +152,7 @@ interface DeleteElementInput
 
 ### `DeletePageInput`
 
-`interface`
+`interface` — Define input parameters required to delete a page from a scene document
 
 ```ts
 interface DeletePageInput
@@ -168,7 +168,7 @@ type DesignCanvasMode
 
 ### `DesignCanvasProps`
 
-`interface`
+`interface` — Define properties and callbacks for configuring and controlling the design canvas editor
 
 ```ts
 interface DesignCanvasProps
@@ -192,7 +192,7 @@ NudgeDelta
 
 ### `duplicatePageCommand`
 
-`function`
+`function` — Create a command to duplicate a page and prepare its deletion operation in the scene
 
 ```ts
 (input: DuplicatePageInput) => SceneCommand
@@ -200,7 +200,7 @@ NudgeDelta
 
 ### `DuplicatePageInput`
 
-`interface`
+`interface` — Define input parameters required to duplicate a page within a scene document
 
 ```ts
 interface DuplicatePageInput
@@ -208,7 +208,7 @@ interface DuplicatePageInput
 
 ### `EditorSceneState`
 
-`interface`
+`interface` — Define the state of the editor scene including document, view settings, and selection details
 
 ```ts
 interface EditorSceneState
@@ -216,7 +216,7 @@ interface EditorSceneState
 
 ### `ExportCropRect`
 
-`interface`
+`interface` — Define crop rectangle coordinates and dimensions for exporting content within page bounds
 
 ```ts
 interface ExportCropRect
@@ -256,7 +256,7 @@ interface ExportViewSnapshot
 
 ### `groupElementsCommand`
 
-`function`
+`function` — Create a command to group multiple elements into a single group within a scene
 
 ```ts
 (input: GroupElementsInput) => SceneCommand
@@ -264,7 +264,7 @@ interface ExportViewSnapshot
 
 ### `GroupElementsInput`
 
-`interface`
+`interface` — Define input parameters for grouping elements within a scene document on a specific page
 
 ```ts
 interface GroupElementsInput
@@ -328,7 +328,7 @@ interface InsertTemplate
 
 ### `MarqueeSelectOptions`
 
-`interface`
+`interface` — Define options to configure marquee selection behavior including containment requirements
 
 ```ts
 interface MarqueeSelectOptions
@@ -352,7 +352,7 @@ interface MarqueeSelectOptions
 
 ### `multiSetAttrsCommand`
 
-`function`
+`function` — Build a scene command to set multiple attributes on elements across pages
 
 ```ts
 (entries: MultiSetAttrsEntry[]) => SceneCommand
@@ -360,7 +360,7 @@ interface MarqueeSelectOptions
 
 ### `MultiSetAttrsEntry`
 
-`interface`
+`interface` — Define an entry linking page and element IDs with current and prior scene attribute patches
 
 ```ts
 interface MultiSetAttrsEntry
@@ -376,7 +376,7 @@ interface MultiSetAttrsEntry
 
 ### `NudgeDelta`
 
-`interface`
+`interface` — Represent horizontal and vertical displacement values for nudging elements
 
 ```ts
 interface NudgeDelta
@@ -384,7 +384,7 @@ interface NudgeDelta
 
 ### `reorderElementCommand`
 
-`function`
+`function` — Resolve a command to reorder an element within a scene by moving it to a specified index
 
 ```ts
 (input: ReorderElementInput) => SceneCommand
@@ -392,7 +392,7 @@ interface NudgeDelta
 
 ### `ReorderElementInput`
 
-`interface`
+`interface` — Define input parameters to reorder an element within a page
 
 ```ts
 interface ReorderElementInput
@@ -400,7 +400,7 @@ interface ReorderElementInput
 
 ### `reorderPageCommand`
 
-`function`
+`function` — Create a command to reorder a page to a specified index within a scene
 
 ```ts
 (input: ReorderPageInput) => SceneCommand
@@ -408,7 +408,7 @@ interface ReorderElementInput
 
 ### `ReorderPageInput`
 
-`interface`
+`interface` — Define input parameters to reorder a page by specifying its ID and target index
 
 ```ts
 interface ReorderPageInput
@@ -416,7 +416,7 @@ interface ReorderPageInput
 
 ### `ResolvedExportParams`
 
-`interface`
+`interface` — Define parameters required to resolve export settings including crop, pixel ratio, type, and quality
 
 ```ts
 interface ResolvedExportParams
@@ -448,7 +448,7 @@ interface ResolvedExportParams
 
 ### `SceneCommand`
 
-`interface`
+`interface` — Define a command with execution, undo, and operation methods for scene editing and persistence
 
 ```ts
 interface SceneCommand
@@ -456,7 +456,7 @@ interface SceneCommand
 
 ### `SceneCommandStack`
 
-`interface`
+`interface` — Manage and track scene commands with undo, redo, and state subscription capabilities
 
 ```ts
 interface SceneCommandStack
@@ -472,7 +472,7 @@ interface SceneCommandStackWithReapply
 
 ### `setAttrsCommand`
 
-`function`
+`function` — Create a command to set attributes on a scene element with undo capability
 
 ```ts
 (input: SetAttrsInput) => SceneCommand
@@ -480,7 +480,7 @@ interface SceneCommandStackWithReapply
 
 ### `SetAttrsInput`
 
-`interface`
+`interface` — Define input parameters for setting element attributes within a specific page context
 
 ```ts
 interface SetAttrsInput
@@ -488,7 +488,7 @@ interface SetAttrsInput
 
 ### `setDocumentTitleCommand`
 
-`function`
+`function` — Resolve a command to rename a document title with undo and redo operations
 
 ```ts
 (input: SetDocumentTitleInput) => SceneCommand
@@ -496,7 +496,7 @@ interface SetAttrsInput
 
 ### `SetDocumentTitleInput`
 
-`interface`
+`interface` — Define input parameters for setting the title of a scene document
 
 ```ts
 interface SetDocumentTitleInput
@@ -504,7 +504,7 @@ interface SetDocumentTitleInput
 
 ### `setPageGuidesCommand`
 
-`function`
+`function` — Create a command to update page guides with undo support
 
 ```ts
 (input: SetPageGuidesInput) => SceneCommand
@@ -512,7 +512,7 @@ interface SetDocumentTitleInput
 
 ### `SetPageGuidesInput`
 
-`interface`
+`interface` — Define input parameters for setting guides on a specific page within a document
 
 ```ts
 interface SetPageGuidesInput
@@ -520,7 +520,7 @@ interface SetPageGuidesInput
 
 ### `setPagePropsCommand`
 
-`function`
+`function` — Build a command to update page properties based on the provided input
 
 ```ts
 (input: SetPagePropsInput) => SceneCommand
@@ -528,7 +528,7 @@ interface SetPageGuidesInput
 
 ### `SetPagePropsInput`
 
-`interface`
+`interface` — Define input parameters for setting properties on a specific page within a scene document
 
 ```ts
 interface SetPagePropsInput
@@ -536,7 +536,7 @@ interface SetPagePropsInput
 
 ### `SnapEngine`
 
-`interface`
+`interface` — Resolve snapping targets and apply snapping logic to moving elements within the editor scene
 
 ```ts
 interface SnapEngine
@@ -544,7 +544,7 @@ interface SnapEngine
 
 ### `SnapResult`
 
-`interface`
+`interface` — Define the result of a snap operation including coordinates and active snap lines
 
 ```ts
 interface SnapResult
@@ -552,7 +552,7 @@ interface SnapResult
 
 ### `SnapTarget`
 
-`interface`
+`interface` — Define a target position and kind for snapping elements on a page
 
 ```ts
 interface SnapTarget
@@ -560,7 +560,7 @@ interface SnapTarget
 
 ### `SnapTargetKind`
 
-`type`
+`type` — Define snap target categories for aligning elements within a layout system
 
 ```ts
 type SnapTargetKind
@@ -568,7 +568,7 @@ type SnapTargetKind
 
 ### `SnapTargets`
 
-`interface`
+`interface` — Define vertical and horizontal collections of snap targets for alignment purposes
 
 ```ts
 interface SnapTargets
@@ -576,7 +576,7 @@ interface SnapTargets
 
 ### `ungroupElementCommand`
 
-`function`
+`function` — Resolve a command to ungroup a group element into its child elements within a scene
 
 ```ts
 (input: UngroupElementInput) => SceneCommand
@@ -584,7 +584,7 @@ interface SnapTargets
 
 ### `UngroupElementInput`
 
-`interface`
+`interface` — Define input parameters required to ungroup elements within a specific page and group
 
 ```ts
 interface UngroupElementInput
@@ -592,7 +592,7 @@ interface UngroupElementInput
 
 ### `ZoomPanConfig`
 
-`interface`
+`interface` — Define configuration options for minimum and maximum zoom levels in a zoom-pan interface
 
 ```ts
 interface ZoomPanConfig
@@ -600,7 +600,7 @@ interface ZoomPanConfig
 
 ### `ZoomPanMath`
 
-`interface`
+`interface` — Define methods and properties to calculate zoom and pan transformations between document and screen coordinates
 
 ```ts
 interface ZoomPanMath

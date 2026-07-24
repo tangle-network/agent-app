@@ -39,6 +39,7 @@ import type { ReadAttachmentFn } from './attachment-store'
 
 export type { PromptInputPart }
 
+/** Resolve the outcome of dispatching parts with success status and corresponding value or error message */
 export type DispatchPartsOutcome =
   | { succeeded: true; value: PromptInputPart[] }
   | { succeeded: false; error: string }
@@ -49,6 +50,7 @@ type SandboxMentionReadOutcome =
   | { succeeded: true; value: { size: number; base64?: string } }
   | { succeeded: false; error: string }
 
+/** Resolve sandbox mention details by reading from a specified path with optional byte reading */
 export type ReadSandboxMentionFn = (
   box: SandboxExecChannel,
   absolutePath: string,
@@ -95,6 +97,7 @@ function violatesUrlPathXor(part: PromptInputPart): boolean {
   return hasUrl === hasPath
 }
 
+/** Build input parameters for dispatching chat message parts including text, attachments, mentions, and history */
 export interface BuildDispatchPartsInput {
   text: string
   attachments: ChatAttachmentPart[]
@@ -142,6 +145,7 @@ function readResultToBase64(read: { base64?: string; bytes?: Uint8Array }): stri
   return undefined
 }
 
+/** Build dispatch parts from input by resolving mentions, paths, and applying size constraints asynchronously */
 export async function buildDispatchParts(input: BuildDispatchPartsInput): Promise<DispatchPartsOutcome> {
   const readMention = input.readSandboxMention ?? readSandboxMention
   const resolveMentionPath = input.resolveMentionPath ?? input.resolveAttachmentPath

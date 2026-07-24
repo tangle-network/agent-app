@@ -8,7 +8,7 @@ Source: `src/sequences/drizzle.ts`
 
 ### `createDrizzleSequenceStore`
 
-`function`
+`function` — Create a sequence store scoped to a specific sequence and workspace with database access and media resolution
 
 ```ts
 (options: CreateDrizzleSequenceStoreOptions) => SequenceStore
@@ -16,7 +16,7 @@ Source: `src/sequences/drizzle.ts`
 
 ### `CreateDrizzleSequenceStoreOptions`
 
-`interface`
+`interface` — Define options for creating a Drizzle sequence store including database, tables, scope, and media resolver
 
 ```ts
 interface CreateDrizzleSequenceStoreOptions
@@ -24,7 +24,7 @@ interface CreateDrizzleSequenceStoreOptions
 
 ### `createSequenceTables`
 
-`function`
+`function` — Build SQLite sequence tables with defined columns and relationships based on provided options
 
 ```ts
 (opts: CreateSequenceTablesOptions) => { sequences: SQLiteTableWithColumns<{ name: "sequence"; schema: undefined; colum…
@@ -32,7 +32,7 @@ interface CreateDrizzleSequenceStoreOptions
 
 ### `CreateSequenceTablesOptions`
 
-`interface`
+`interface` — Define options for creating sequence-related database tables including workspace and user tables
 
 ```ts
 interface CreateSequenceTablesOptions
@@ -40,7 +40,7 @@ interface CreateSequenceTablesOptions
 
 ### `SequenceClipRow`
 
-`type`
+`type` — Resolve the selected fields of sequence clips from the sequence tables data structure
 
 ```ts
 type SequenceClipRow
@@ -56,7 +56,7 @@ type SequenceDatabase
 
 ### `SequenceDecisionRow`
 
-`type`
+`type` — Resolve a sequence decision row from the sequenceDecisions table data
 
 ```ts
 type SequenceDecisionRow
@@ -64,7 +64,7 @@ type SequenceDecisionRow
 
 ### `SequenceExportRow`
 
-`type`
+`type` — Resolve a row type representing exported sequence data from sequenceExports table
 
 ```ts
 type SequenceExportRow
@@ -88,7 +88,7 @@ type SequenceParentTable
 
 ### `SequenceRow`
 
-`type`
+`type` — Resolve a sequence row by inferring the selected fields from the sequences table
 
 ```ts
 type SequenceRow
@@ -96,7 +96,7 @@ type SequenceRow
 
 ### `SequenceTables`
 
-`type`
+`type` — Resolve sequence tables by invoking the createSequenceTables factory function
 
 ```ts
 type SequenceTables
@@ -104,7 +104,7 @@ type SequenceTables
 
 ### `SequenceTrackRow`
 
-`type`
+`type` — Resolve the selected sequence track row from the sequenceTracks table
 
 ```ts
 type SequenceTrackRow

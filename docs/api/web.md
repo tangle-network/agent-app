@@ -40,7 +40,7 @@ Source: `src/web/index.ts`
 
 ### `CookieOptions`
 
-`interface`
+`interface` — Define options for configuring cookie attributes and behavior
 
 ```ts
 interface CookieOptions
@@ -80,7 +80,7 @@ interface KvLike
 
 ### `RateLimitResult`
 
-`interface`
+`interface` — Describe the outcome of a rate limit check including allowance, remaining count, and reset time
 
 ```ts
 interface RateLimitResult
@@ -96,7 +96,7 @@ interface RateLimitResult
 
 ### `RequestContext`
 
-`interface`
+`interface` — Define the context of a request including IP address, user agent, timestamp, and request ID
 
 ```ts
 interface RequestContext
@@ -112,7 +112,7 @@ interface RequestContext
 
 ### `SecurityHeaderOptions`
 
-`interface`
+`interface` — Define options for configuring security-related HTTP headers including disclaimers and retention labels
 
 ```ts
 interface SecurityHeaderOptions

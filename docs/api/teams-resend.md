@@ -16,7 +16,7 @@ Source: `src/teams/resend.ts`
 
 ### `ResendInvitationSenderOptions`
 
-`interface`
+`interface` — Define options for sending a resend invitation including sender address and optional API key
 
 ```ts
 interface ResendInvitationSenderOptions

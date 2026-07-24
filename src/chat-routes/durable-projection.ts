@@ -1,11 +1,13 @@
 import { getPartKey, mergePersistedPart, type StreamEvent } from '../stream/index'
 import type { ChatTurnRouteProducer } from './turn-routes'
 
+/** Resolve chat route events and materialize their durable state records */
 export interface ChatRouteDurableProjection {
   observe(event: unknown): void | Promise<void>
   materialize(): Array<Record<string, unknown>> | Promise<Array<Record<string, unknown>>>
 }
 
+/** Log chat route projection messages with optional metadata for durable processing */
 export type ChatRouteDurableProjectionLogger =
   (message: string, meta?: Record<string, unknown>) => void
 

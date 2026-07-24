@@ -11,12 +11,14 @@ export interface ToolHeaderNames {
   threadId: string
 }
 
+/** Provide default HTTP header names for user, workspace, and thread identification */
 export const DEFAULT_HEADER_NAMES: ToolHeaderNames = {
   userId: 'X-Agent-App-User-Id',
   workspaceId: 'X-Agent-App-Workspace-Id',
   threadId: 'X-Agent-App-Thread-Id',
 }
 
+/** Define options to verify bearer tokens and customize authentication header names */
 export interface AuthenticateOptions {
   /** Verify the bearer capability token belongs to `userId`. The product's
    *  HMAC/JWT impl — the seam that keeps token crypto out of this package. */
@@ -24,6 +26,7 @@ export interface AuthenticateOptions {
   headerNames?: ToolHeaderNames
 }
 
+/** Represent the result of tool authentication with success context or failure response */
 export type ToolAuthResult =
   | { ok: true; ctx: AppToolContext }
   | { ok: false; response: Response }

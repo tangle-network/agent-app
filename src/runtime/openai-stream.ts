@@ -96,6 +96,7 @@ function safeParse(s: string): Record<string, unknown> {
   }
 }
 
+/** Define options for configuring an OpenAI-compatible streaming chat turn including API details and tools */
 export interface OpenAICompatStreamTurnOptions {
   /** OpenAI-compat base URL (e.g. the Tangle Router `https://router.tangle.tools/v1`). */
   baseUrl: string

@@ -7,11 +7,13 @@
 
 import type { ZoomMath } from '../contracts'
 
+/** Define configuration settings for minimum and maximum zoom levels */
 export interface ZoomMathConfig {
   minZoom: number
   maxZoom: number
 }
 
+/** Create a ZoomMath object that validates config and calculates zoom ratio within bounds */
 export function createZoomMath(config: ZoomMathConfig): ZoomMath {
   const { minZoom, maxZoom } = config
   if (!Number.isFinite(minZoom) || minZoom <= 0) {
