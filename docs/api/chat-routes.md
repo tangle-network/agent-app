@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-120 exports.
+121 exports.
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
@@ -464,7 +464,7 @@ number
 
 ### `DetachedTurnFinal`
 
-`interface` — Authoritative final receipt for a turn whose live stream carried no usage (some harness paths only expose tokens via the completed-turn record, e.g.
+`interface` — Authoritative final receipt for a turn that finished server-side, or whose live stream carried no usage (some harness paths only expose tokens via the completed-turn record, e.g.
 
 ```ts
 interface DetachedTurnFinal
@@ -476,6 +476,14 @@ interface DetachedTurnFinal
 
 ```ts
 interface DetachedTurnOptions
+```
+
+### `DetachedTurnParts`
+
+`type` — The normalized structured message body (tool-call / file / plan / interaction parts) that `/chat-store` persists as the durable assistant row — the same shape `createSandboxChatProducer().assistantPa…
+
+```ts
+type DetachedTurnParts
 ```
 
 ### `DetachedTurnResult`
