@@ -30,6 +30,14 @@ interface BeforeInteractionAnswerArgs
 (from: ChatInteractionStatus, to: ChatInteractionStatus) => boolean
 ```
 
+### `ChatFreeTextField`
+
+`type` — A field the user types free text into, which may declare the longest answer its answer route will accept — so a card can stop the typing rather than let the route reject it.
+
+```ts
+type ChatFreeTextField
+```
+
 ### `ChatInteraction`
 
 `interface` — The client/persisted view of one ask.
@@ -60,14 +68,6 @@ type ChatInteractionStatus
 
 ```ts
 type ChatSelectField
-```
-
-### `ChatTextField`
-
-`type` — A free-text field that may declare the longest answer its answer route will accept, so a card can stop the typing rather than let the route reject it.
-
-```ts
-type ChatTextField
 ```
 
 ### `composerAnswerData`

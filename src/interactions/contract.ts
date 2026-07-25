@@ -61,8 +61,15 @@ export type ChatSelectField = Extract<InteractionField, { type: 'select' }> & {
 }
 
 /**
- * A free-text field that may declare the longest answer its answer route will
- * accept, so a card can stop the typing rather than let the route reject it.
+ * A field the user types free text into, which may declare the longest answer
+ * its answer route will accept — so a card can stop the typing rather than let
+ * the route reject it.
+ *
+ * Both `text` and `secret`, which is why this is not `ChatTextField`: unlike
+ * `ChatSelectField`, it does not name a single `type` literal. They render
+ * differently (a textarea vs a password input) and are grouped only by the one
+ * property that matters here — an answer whose length can run past what the
+ * route takes.
  *
  * Carried the same way as `allowCustom`: the schema may not define it, so it
  * rides on the wire/persisted type and survives because `parseInteractionRequest`
@@ -70,7 +77,7 @@ export type ChatSelectField = Extract<InteractionField, { type: 'select' }> & {
  * parsing one off the wire) sets it directly from whatever bound its own route
  * validates against.
  */
-export type ChatTextField = Extract<InteractionField, { type: 'text' | 'secret' }> & {
+export type ChatFreeTextField = Extract<InteractionField, { type: 'text' | 'secret' }> & {
   maxLength?: number
 }
 
@@ -78,7 +85,7 @@ export type ChatTextField = Extract<InteractionField, { type: 'text' | 'secret' 
 export type ChatInteractionField =
   | Exclude<InteractionField, { type: 'select' | 'text' | 'secret' }>
   | ChatSelectField
-  | ChatTextField
+  | ChatFreeTextField
 
 /** `InteractionRequest` whose select fields may carry `allowCustom`. */
 export type InteractionRequestWire = Omit<InteractionRequest, 'answerSpec'> & {

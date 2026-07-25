@@ -671,6 +671,12 @@
           "doc": "Union of the sidecar's legacy (path-based) and AI-SDK (url-based) file shapes; response-side every field besides `type` is optional."
         },
         {
+          "name": "ChatFreeTextField",
+          "kind": "type",
+          "signature": "type ChatFreeTextField",
+          "doc": "A field the user types free text into, which may declare the longest answer its answer route will accept — so a card can stop the typing rather than let the route reject it."
+        },
+        {
           "name": "ChatImagePart",
           "kind": "interface",
           "signature": "interface ChatImagePart",
@@ -789,12 +795,6 @@
           "kind": "interface",
           "signature": "interface ChatSubtaskPart",
           "doc": "Define a subtask part of a chat with prompt, description, agent, and optional identifier"
-        },
-        {
-          "name": "ChatTextField",
-          "kind": "type",
-          "signature": "type ChatTextField",
-          "doc": "A free-text field that may declare the longest answer its answer route will accept, so a card can stop the typing rather than let the route reject it."
         },
         {
           "name": "ChatTextPart",
@@ -10409,6 +10409,12 @@
           "doc": "Statuses only move forward (pending → terminal); a replayed/stale `pending` must never resurrect a resolved card."
         },
         {
+          "name": "ChatFreeTextField",
+          "kind": "type",
+          "signature": "type ChatFreeTextField",
+          "doc": "A field the user types free text into, which may declare the longest answer its answer route will accept — so a card can stop the typing rather than let the route reject it."
+        },
+        {
           "name": "ChatInteraction",
           "kind": "interface",
           "signature": "interface ChatInteraction",
@@ -10431,12 +10437,6 @@
           "kind": "type",
           "signature": "type ChatSelectField",
           "doc": "Extract select-type interaction fields and optionally allow custom values"
-        },
-        {
-          "name": "ChatTextField",
-          "kind": "type",
-          "signature": "type ChatTextField",
-          "doc": "A free-text field that may declare the longest answer its answer route will accept, so a card can stop the typing rather than let the route reject it."
         },
         {
           "name": "composerAnswerData",
@@ -18190,6 +18190,12 @@
           "doc": "Define properties for rendering the chat empty state with customizable text and starting doors"
         },
         {
+          "name": "ChatFreeTextField",
+          "kind": "type",
+          "signature": "type ChatFreeTextField",
+          "doc": "A field the user types free text into, which may declare the longest answer its answer route will accept — so a card can stop the typing rather than let the route reject it."
+        },
+        {
           "name": "ChatInteraction",
           "kind": "interface",
           "signature": "interface ChatInteraction",
@@ -18272,12 +18278,6 @@
           "kind": "interface",
           "signature": "interface ChatStreamToolResult",
           "doc": "Describe the result of a chat stream tool including its outcome and optional metadata fields"
-        },
-        {
-          "name": "ChatTextField",
-          "kind": "type",
-          "signature": "type ChatTextField",
-          "doc": "A free-text field that may declare the longest answer its answer route will accept, so a card can stop the typing rather than let the route reject it."
         },
         {
           "name": "ChatToolCallInfo",

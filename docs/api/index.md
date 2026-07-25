@@ -814,6 +814,14 @@ interface ChatAttachmentPart
 interface ChatFilePart
 ```
 
+### `ChatFreeTextField`
+
+`type` — A field the user types free text into, which may declare the longest answer its answer route will accept — so a card can stop the typing rather than let the route reject it.
+
+```ts
+type ChatFreeTextField
+```
+
 ### `ChatImagePart`
 
 `interface` — Define properties for an image part within a chat message including optional metadata fields
@@ -972,14 +980,6 @@ class ChatStoreInputError
 
 ```ts
 interface ChatSubtaskPart
-```
-
-### `ChatTextField`
-
-`type` — A free-text field that may declare the longest answer its answer route will accept, so a card can stop the typing rather than let the route reject it.
-
-```ts
-type ChatTextField
 ```
 
 ### `ChatTextPart`

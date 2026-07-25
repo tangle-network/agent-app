@@ -25,7 +25,7 @@ import type {
   ChatInteractionField,
   ChatInteractionStatus,
   ChatSelectField,
-  ChatTextField,
+  ChatFreeTextField,
 } from './chat-interactions'
 import { isTerminalInteractionStatus } from './chat-interactions'
 import {
@@ -206,15 +206,15 @@ function selectField(field: ChatInteractionField): ChatSelectField | null {
 }
 
 /** The free-text fields, which are the only ones that can carry a length cap. */
-function textField(field: ChatInteractionField): ChatTextField | null {
-  return field.type === 'text' || field.type === 'secret' ? (field as ChatTextField) : null
+function freeTextField(field: ChatInteractionField): ChatFreeTextField | null {
+  return field.type === 'text' || field.type === 'secret' ? (field as ChatFreeTextField) : null
 }
 
 /** The cap to stop typing at, or `undefined` for an uncapped field. A
  *  non-positive or fractional cap is treated as absent rather than clamping the
  *  field to zero characters — an unanswerable field is worse than an uncapped
  *  one, and the answer route still enforces the real bound. */
-function textFieldMaxLength(field: ChatTextField): number | undefined {
+function textFieldMaxLength(field: ChatFreeTextField): number | undefined {
   const max = field.maxLength
   return typeof max === 'number' && Number.isInteger(max) && max > 0 ? max : undefined
 }
@@ -414,7 +414,7 @@ export function InteractionQuestionCard({
         {interaction.fields.map((field) => {
           const value = values[field.name] ?? {}
           const select = selectField(field)
-          const freeText = textField(field)
+          const freeText = freeTextField(field)
           return (
             <fieldset key={field.name} className="space-y-2">
               <p className="text-sm font-medium leading-5 text-foreground">{field.label}</p>
