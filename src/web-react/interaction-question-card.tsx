@@ -191,7 +191,12 @@ export interface InteractionQuestionCardProps {
    *  infer. */
   timeoutNote?: ReactNode
   /** Renders `body` as markdown. Omitted, `body` renders as plain text — so a
-   *  host that passes authored markdown without this shows its syntax raw. */
+   *  host that passes authored markdown without this shows its syntax raw.
+   *
+   *  `interaction.body` is untrusted: it arrives off the wire, written by an
+   *  agent or whoever authored the ask. This card never injects HTML, but a
+   *  renderer that does is an XSS sink — so return React elements, and sanitize
+   *  (DOMPurify or equivalent) if you must produce HTML. */
   renderMarkdown?: (markdown: string) => ReactNode
   className?: string
 }
@@ -200,12 +205,17 @@ function selectField(field: ChatInteractionField): ChatSelectField | null {
   return field.type === 'select' ? (field as ChatSelectField) : null
 }
 
+/** The free-text fields, which are the only ones that can carry a length cap. */
+function textField(field: ChatInteractionField): ChatTextField | null {
+  return field.type === 'text' || field.type === 'secret' ? (field as ChatTextField) : null
+}
+
 /** The cap to stop typing at, or `undefined` for an uncapped field. A
  *  non-positive or fractional cap is treated as absent rather than clamping the
  *  field to zero characters — an unanswerable field is worse than an uncapped
  *  one, and the answer route still enforces the real bound. */
-function textFieldMaxLength(field: ChatInteractionField): number | undefined {
-  const max = (field as ChatTextField).maxLength
+function textFieldMaxLength(field: ChatTextField): number | undefined {
+  const max = field.maxLength
   return typeof max === 'number' && Number.isInteger(max) && max > 0 ? max : undefined
 }
 
@@ -260,6 +270,13 @@ export function InteractionQuestionCard({
   // alone, the new question would render with the previous answer already
   // filled in and its terminal chrome still showing — one click from submitting
   // an answer to a question the user never read.
+  //
+  // Keyed on `id` because `id` IS the ask's identity: a different id is a
+  // different question. Re-issuing the same id with different fields is
+  // therefore NOT a new ask and deliberately does not reset — an answer already
+  // typed against those fields survives. A host that changes what it is asking
+  // must change the id; what it may re-send under one id is the answer, which
+  // arrives as `answers` and resyncs through the effect below.
   //
   // During render, not in an effect: an effect would commit one frame of the
   // previous answer under the new question before clearing it. `submitting` and
@@ -390,6 +407,7 @@ export function InteractionQuestionCard({
         {interaction.fields.map((field) => {
           const value = values[field.name] ?? {}
           const select = selectField(field)
+          const freeText = textField(field)
           return (
             <fieldset key={field.name} className="space-y-2">
               <p className="text-sm font-medium leading-5 text-foreground">{field.label}</p>
@@ -450,7 +468,7 @@ export function InteractionQuestionCard({
                   aria-label={field.label}
                   onChange={(event) => setFieldValue(field.name, { text: event.target.value })}
                   placeholder={field.placeholder}
-                  maxLength={textFieldMaxLength(field)}
+                  maxLength={freeText ? textFieldMaxLength(freeText) : undefined}
                   className={FIELD_INPUT_CLASSES}
                 />
               ) : (
@@ -460,7 +478,7 @@ export function InteractionQuestionCard({
                   aria-label={field.label}
                   onChange={(event) => setFieldValue(field.name, { text: event.target.value })}
                   rows={3}
-                  maxLength={textFieldMaxLength(field)}
+                  maxLength={freeText ? textFieldMaxLength(freeText) : undefined}
                   placeholder={field.type === 'text' ? field.placeholder : undefined}
                   className={FIELD_INPUT_CLASSES}
                 />
