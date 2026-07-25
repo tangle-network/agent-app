@@ -15187,7 +15187,7 @@
           "name": "composeSkillsForHarness",
           "kind": "function",
           "signature": "(input: ComposeSkillsForHarnessInput) => ComposedSkills",
-          "doc": "Compose {@link ComposedSkills} for `harness`: `mounted` delivery when the platform names a cwd skill dir for it, `inline` delivery (the automatic fallback that keeps every skill available on every ha…"
+          "doc": "Compose {@link ComposedSkills} for `harness`."
         },
         {
           "name": "ComposeSkillsForHarnessInput",

@@ -19778,7 +19778,7 @@ interface ComposedSkills
 
 ### `composeSkillsForHarness`
 
-`function` — Compose {@link ComposedSkills} for `harness`: `mounted` delivery when the platform names a cwd skill dir for it, `inline` delivery (the automatic fallback that keeps every skill available on every ha…
+`function` — Compose {@link ComposedSkills} for `harness`.
 
 ```ts
 (input: ComposeSkillsForHarnessInput) => ComposedSkills

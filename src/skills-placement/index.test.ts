@@ -67,14 +67,63 @@ describe.skipIf(!available)('composeSkillsForHarness', () => {
     expect(result.promptSection).not.toContain('Strip the tells.')
   })
 
-  it('hermes -> inline: no refs, bodies rendered into the section', () => {
-    const result = mod!.composeSkillsForHarness({ skills, harness: 'hermes' })
+  it('hermes, default onNoSkillDir -> throws instead of silently inlining', () => {
+    expect(() => mod!.composeSkillsForHarness({ skills, harness: 'hermes' })).toThrow(
+      /no native skill-mount directory/,
+    )
+  })
+
+  it('amp, default onNoSkillDir -> throws instead of silently inlining', () => {
+    expect(() => mod!.composeSkillsForHarness({ skills, harness: 'amp' })).toThrow(
+      /no native skill-mount directory/,
+    )
+  })
+
+  it('amp, default onNoSkillDir -> throws AND the thrown message never contains a skill body', () => {
+    // Regression guard for the silent-inline bug: it must actually throw (not
+    // just fail to contain the body because it silently returned a prompt
+    // section as before), and the ERROR path itself must never leak skill
+    // bytes into anything a caller might log/display as if it were a normal
+    // composed prompt section.
+    expect(() => mod!.composeSkillsForHarness({ skills, harness: 'amp' })).toThrow()
+    let message = ''
+    try {
+      mod!.composeSkillsForHarness({ skills, harness: 'amp' })
+    } catch (err) {
+      message = (err as Error).message
+    }
+    expect(message).not.toBe('')
+    expect(message).not.toContain('Strip the tells.')
+  })
+
+  it('amp, default onNoSkillDir -> error names the harness, skill count, byte size, and mountable harnesses', () => {
+    expect(() => mod!.composeSkillsForHarness({ skills, harness: 'amp' })).toThrow(
+      /"amp".*1 skill\(s\).*\d+ bytes.*opencode/s,
+    )
+  })
+
+  it('amp, onNoSkillDir: "throw" (explicit) -> same as default', () => {
+    expect(() =>
+      mod!.composeSkillsForHarness({ skills, harness: 'amp', onNoSkillDir: 'throw' }),
+    ).toThrow(/no native skill-mount directory/)
+  })
+
+  it("amp, onNoSkillDir: 'inline' -> explicit opt-in still works: no refs, bodies rendered into the section", () => {
+    const result = mod!.composeSkillsForHarness({
+      skills,
+      harness: 'amp',
+      onNoSkillDir: 'inline',
+    })
     expect(result.refs).toEqual([])
     expect(result.promptSection).toContain('Strip the tells.')
   })
 
-  it('amp -> inline: no refs, bodies rendered into the section', () => {
-    const result = mod!.composeSkillsForHarness({ skills, harness: 'amp' })
+  it("hermes, onNoSkillDir: 'inline' -> explicit opt-in still works: no refs, bodies rendered into the section", () => {
+    const result = mod!.composeSkillsForHarness({
+      skills,
+      harness: 'hermes',
+      onNoSkillDir: 'inline',
+    })
     expect(result.refs).toEqual([])
     expect(result.promptSection).toContain('Strip the tells.')
   })
