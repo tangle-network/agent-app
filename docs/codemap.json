@@ -17896,7 +17896,7 @@
           "name": "appendSegmentEvent",
           "kind": "function",
           "signature": "(store: SegmentStore, executionId: string, incoming: TurnStreamEvent, maxEvents?: number) => TurnStreamEvent",
-          "doc": "Append a per-turn event to its execution's segment, assigning a monotonic `seq`."
+          "doc": "DEPRECATED (interactive turn-rebroadcast buffer) — append a per-turn event to its execution's segment, assigning a monotonic `seq`."
         },
         {
           "name": "broadcastThreadCreated",
@@ -17908,7 +17908,7 @@
           "name": "broadcastTurnStreamEvent",
           "kind": "function",
           "signature": "(namespace: TurnStreamNamespaceLike, input: { workspaceId: string; threadId: string; executionId: string; event: { type…",
-          "doc": "Fan a turn event out to the per-thread channel."
+          "doc": "DEPRECATED for sandbox-backed interactive turns (drive on the session-message lane + `SessionGatewayClient` instead) — fan a turn event out to the per-thread channel."
         },
         {
           "name": "broadcastWorkspaceActivity",
@@ -17944,7 +17944,7 @@
           "name": "createSegmentStore",
           "kind": "function",
           "signature": "() => SegmentStore",
-          "doc": "Create a SegmentStore with initialized segments and no active execution ID"
+          "doc": "DEPRECATED (interactive sandbox-turn rebroadcast; the SDK's session gateway replaces it) — create a SegmentStore with initialized segments and no active execution ID."
         },
         {
           "name": "createTurnLock",
@@ -17992,7 +17992,7 @@
           "name": "MAX_SEGMENT_EVENTS",
           "kind": "const",
           "signature": "2000",
-          "doc": "Per-turn replay window."
+          "doc": "DEPRECATED (interactive turn-rebroadcast buffer) — per-turn replay window."
         },
         {
           "name": "MemoryTurnStreamChannel",
@@ -18052,25 +18052,25 @@
           "name": "replayActiveSegment",
           "kind": "function",
           "signature": "(store: SegmentStore, afterSeq: number) => TurnStreamEvent[]",
-          "doc": "Events of the active, non-terminal turn with `seq > afterSeq` — what a (re)connecting client replays before going live."
+          "doc": "DEPRECATED (interactive turn-rebroadcast buffer; the SDK replays losslessly on both lanes) — events of the active, non-terminal turn with `seq > afterSeq`, i.e."
         },
         {
           "name": "scopeIndexChannelKey",
           "kind": "function",
           "signature": "(scopeId: string) => string",
-          "doc": "Generate a unique channel key string based on the provided scope identifier"
+          "doc": "Generate a unique channel key string based on the provided scope identifier."
         },
         {
           "name": "SegmentStore",
           "kind": "interface",
           "signature": "interface SegmentStore",
-          "doc": "Define a store managing segments and tracking the active execution identifier"
+          "doc": "DEPRECATED (interactive turn-rebroadcast buffer) — define a store managing segments and tracking the active execution identifier."
         },
         {
           "name": "threadChannelKey",
           "kind": "function",
           "signature": "(workspaceId: string, threadId: string) => string",
-          "doc": "Generate a unique string key combining workspace and thread identifiers"
+          "doc": "Generate a unique string key combining workspace and thread identifiers."
         },
         {
           "name": "TURN_LOCK_TTL_MS",
@@ -18154,13 +18154,13 @@
           "name": "TurnSegment",
           "kind": "interface",
           "signature": "interface TurnSegment",
-          "doc": "Represent a segment of a turn containing events, sequence limit, and terminal status"
+          "doc": "DEPRECATED (interactive turn-rebroadcast buffer) — represent a segment of a turn containing events, sequence limit, and terminal status."
         },
         {
           "name": "turnStorageChannelKey",
           "kind": "function",
           "signature": "(turnId: string) => string",
-          "doc": "Generate a storage channel key string for a given turn identifier"
+          "doc": "Generate a storage channel key string for a given turn identifier."
         },
         {
           "name": "TurnStreamDO",
@@ -18220,7 +18220,7 @@
           "name": "workspaceChannelKey",
           "kind": "function",
           "signature": "(workspaceId: string) => string",
-          "doc": "Generate a unique channel key based on the given workspace identifier"
+          "doc": "Generate a unique channel key based on the given workspace identifier."
         }
       ]
     },
