@@ -462,6 +462,63 @@ describe('incremental assistant persistence — crash-safe convergence', () => {
     expect(assistants[0]!.inputTokens).toBe(40)
   })
 
+  // The autonomous lane's completion-time settlement, isolated. The crash test
+  // above cannot see it: at `intervalMs: 0` over a turn whose tools all
+  // complete, the last draft happens to equal the final projection, so dropping
+  // the authoritative write would still leave a correct-looking row. This test
+  // removes that coincidence — DEFAULT cadence (only the first draft escapes
+  // the 2 s floor, so the last draft is stale) and a tool that never completes
+  // (only `finalizeAssistantParts` terminalizes it; `draftParts` deliberately
+  // leaves it `running`). Both differences are invisible unless the final write
+  // is authoritative over the draft.
+  it('autonomous lane: the FINAL write is authoritative over the last draft (stale cadence + dangling tool)', async () => {
+    const { store, threadId } = await freshStore()
+    let midRun: Row | undefined
+    async function* events(): AsyncGenerator<unknown> {
+      yield partUpdated({ type: 'text', id: 'txt1', text: 'Looking' }, 'Looking')
+      // The one draft the default cadence admits — proving the row is created
+      // by a DRAFT, so a lane that skipped the final write would leave this
+      // stale row behind rather than no row at all.
+      midRun = await waitUntil(
+        () => assistantRow(store, threadId),
+        (row) => Boolean(row && row.content.length > 0),
+        'the single draft row the default cadence admits',
+      )
+      yield partUpdated({ type: 'tool', id: 'call-9', tool: 'vault_search', state: { status: 'running', input: { query: 'lease' } } })
+      yield partUpdated({ type: 'text', id: 'txt1', text: 'Looking, then gave up.' }, ', then gave up.')
+      yield { type: 'result', data: { finalText: 'Looking, then gave up.' } }
+    }
+
+    const res = await runDetachedTurn({
+      store: createMemoryTurnEventStore(),
+      turnId: 'mission-step-9',
+      scopeId: threadId,
+      events: events(),
+      model: 'm',
+      // No `intervalMs`: the shipped 2 s default, so later drafts are throttled.
+      persist: { store, threadId },
+    })
+
+    expect(res.state).toBe('completed')
+    expect(midRun!.content).toBe('Looking')
+
+    const assistants = (await rows(store, threadId)).filter((row) => row.role === 'assistant')
+    expect(assistants).toHaveLength(1)
+    // Same row the draft started — patched, never appended beside.
+    expect(assistants[0]!.id).toBe(midRun!.id)
+    expect(res.messageId).toBe(midRun!.id)
+    // Authoritative text: the stale draft's 'Looking' did not survive.
+    expect(assistants[0]!.content).toBe('Looking, then gave up.')
+    // Authoritative parts: the dangling tool is terminalized, which only the
+    // completion-time projection does.
+    const tool = (assistants[0]!.parts ?? []).find((part) => part.type === 'tool') as
+      | { state?: { status?: string; metadata?: Record<string, unknown> } }
+      | undefined
+    expect(tool).toBeDefined()
+    expect(tool!.state?.status).toBe('error')
+    expect(tool!.state?.metadata?.terminalized).toBe(true)
+  })
+
   it('autonomous lane without `persist` is byte-unchanged: no row is written at all', async () => {
     const { store, threadId } = await freshStore()
     const res = await runDetachedTurn({
