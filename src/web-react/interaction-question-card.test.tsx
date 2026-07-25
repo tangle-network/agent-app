@@ -398,6 +398,22 @@ describe('InteractionQuestionCard host overrides', () => {
     expect(container.querySelector('textarea')!.maxLength).toBe(-1)
   })
 
+  it('announces a rejected submit rather than only showing it', async () => {
+    const submitAnswer = vi.fn(async (): Promise<InteractionSubmitResult> => ({
+      ok: false,
+      expired: false,
+      message: 'This decision was already answered.',
+    }))
+    mount(SELECT_INTERACTION, { submitAnswer })
+    fireEvent.click(screen.getByLabelText('Formal'))
+    fireEvent.click(submitButton())
+    await flush()
+
+    expect(screen.getByRole('alert').textContent).toContain('already answered')
+    // Still retryable — a rejected submit is not a terminal state.
+    expect(submitButton().disabled).toBe(false)
+  })
+
   it('starts over when the same card is handed the next ask', () => {
     const submitAnswer = okSubmitter()
     const { rerender } = render(

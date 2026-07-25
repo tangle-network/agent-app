@@ -470,7 +470,9 @@ export function InteractionQuestionCard({
         })}
       </div>
 
-      {error && <p className="mt-3 text-xs text-destructive">{error}</p>}
+      {/* Announced, not just shown: a submit that failed is the one thing on this
+          card that changes without the reader having moved focus. */}
+      {error && <p role="alert" className="mt-3 text-xs text-destructive">{error}</p>}
       {terminalNote && <p className="mt-3 text-xs text-muted-foreground">{terminalNote}</p>}
 
       {(showSubmitButton || showTimeoutNote) && (
