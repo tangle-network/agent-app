@@ -61,6 +61,10 @@ function mount(
     submitAnswer?: SubmitInteractionAnswer
     onResolved?: (id: string, status: string) => void
     onLateAnswer?: (message: string) => boolean | void | Promise<boolean | void>
+    kindLabel?: string
+    sourceNote?: string
+    timeoutNote?: React.ReactNode
+    renderMarkdown?: (markdown: string) => React.ReactNode
   } = {},
 ) {
   const submitAnswer = props.submitAnswer ?? okSubmitter()
@@ -71,6 +75,10 @@ function mount(
       submitAnswer={submitAnswer}
       onResolved={props.onResolved}
       onLateAnswer={props.onLateAnswer}
+      kindLabel={props.kindLabel}
+      sourceNote={props.sourceNote}
+      timeoutNote={props.timeoutNote}
+      renderMarkdown={props.renderMarkdown}
     />,
   )
   return { ...utils, submitAnswer }
@@ -315,5 +323,121 @@ describe('InteractionQuestionCard', () => {
     expect(radios.length).toBeGreaterThan(0)
     expect(radios.every((radio) => radio.disabled)).toBe(true)
     expect(submitButton().disabled).toBe(true)
+  })
+})
+
+describe('InteractionQuestionCard host overrides', () => {
+  it('names the agent as the asker by default', () => {
+    const { container } = mount(SELECT_INTERACTION)
+    expect(container.textContent).toContain('Question')
+    expect(container.textContent).toContain('The agent asked for input')
+  })
+
+  it('lets a non-agent host say who is actually asking', () => {
+    const { container } = mount(SELECT_INTERACTION, {
+      kindLabel: 'Decision',
+      sourceNote: 'This run is waiting on you',
+    })
+    expect(container.textContent).toContain('Decision')
+    expect(container.textContent).toContain('This run is waiting on you')
+    expect(container.textContent).not.toContain('The agent asked for input')
+  })
+
+  it('renders the body through the host renderer, and as plain text without one', () => {
+    const withBody = { ...SELECT_INTERACTION, body: '**ship it**' }
+    const plain = mount(withBody)
+    expect(plain.container.querySelector('strong')).toBeNull()
+    expect(plain.container.textContent).toContain('**ship it**')
+    plain.unmount()
+
+    const rendered = mount(withBody, {
+      renderMarkdown: (markdown) => <strong>{markdown.replaceAll('*', '')}</strong>,
+    })
+    expect(rendered.container.querySelector('strong')?.textContent).toBe('ship it')
+  })
+
+  it('shows the timeout note only while the ask is still open', () => {
+    const pending = mount(SELECT_INTERACTION, { timeoutNote: 'Answer within 5m, or “Formal” is chosen.' })
+    expect(pending.container.textContent).toContain('Answer within 5m, or “Formal” is chosen.')
+    pending.unmount()
+
+    // Once answered the consequence of silence is no longer true, and a card
+    // still counting down reads as though the answer never landed.
+    const answered = mount(
+      { ...SELECT_INTERACTION, status: 'answered', answers: { q0: ['Formal'] } },
+      { timeoutNote: 'Answer within 5m, or “Formal” is chosen.' },
+    )
+    expect(answered.container.textContent).not.toContain('Answer within 5m')
+  })
+
+  it('shows the timeout note to read-only viewers, who still need to know it will settle itself', () => {
+    const { container } = mount(SELECT_INTERACTION, {
+      canWrite: false,
+      timeoutNote: 'The run fails if nobody answers.',
+    })
+    expect(container.textContent).toContain('The run fails if nobody answers.')
+  })
+
+  it('caps a free-text answer at the length the answer route accepts', () => {
+    const capped = mount({
+      ...TEXT_INTERACTION,
+      fields: [{ ...TEXT_INTERACTION.fields[0], maxLength: 4096 } as ChatInteraction['fields'][number]],
+    })
+    expect(capped.container.querySelector('textarea')!.maxLength).toBe(4096)
+    capped.unmount()
+
+    // Uncapped stays uncapped: jsdom reports an absent maxLength as -1.
+    expect(mount(TEXT_INTERACTION).container.querySelector('textarea')!.maxLength).toBe(-1)
+  })
+
+  it('ignores a cap that would make the field unanswerable', () => {
+    const { container } = mount({
+      ...TEXT_INTERACTION,
+      fields: [{ ...TEXT_INTERACTION.fields[0], maxLength: 0 } as ChatInteraction['fields'][number]],
+    })
+    expect(container.querySelector('textarea')!.maxLength).toBe(-1)
+  })
+
+  it('starts over when the same card is handed the next ask', () => {
+    const submitAnswer = okSubmitter()
+    const { rerender } = render(
+      <InteractionQuestionCard interaction={SELECT_INTERACTION} canWrite submitAnswer={submitAnswer} />,
+    )
+    fireEvent.click(screen.getByLabelText('Formal'))
+    expect((screen.getByLabelText('Formal') as HTMLInputElement).checked).toBe(true)
+
+    // A different question arriving on the same instance must not inherit the
+    // previous answer — that is one click from resolving a question the reader
+    // never saw.
+    rerender(
+      <InteractionQuestionCard
+        interaction={{ ...SELECT_INTERACTION, id: 'int-next', title: 'Which region?' }}
+        canWrite
+        submitAnswer={submitAnswer}
+      />,
+    )
+    expect((screen.getByLabelText('Formal') as HTMLInputElement).checked).toBe(false)
+    expect(submitButton().disabled).toBe(true)
+  })
+
+  it('clears the previous ask’s resolved chrome when the next ask arrives', async () => {
+    const submitAnswer = okSubmitter()
+    const { container, rerender } = render(
+      <InteractionQuestionCard interaction={SELECT_INTERACTION} canWrite submitAnswer={submitAnswer} />,
+    )
+    fireEvent.click(screen.getByLabelText('Formal'))
+    fireEvent.click(submitButton())
+    await flush()
+    expect(container.textContent).toContain('Answered')
+
+    rerender(
+      <InteractionQuestionCard
+        interaction={{ ...SELECT_INTERACTION, id: 'int-next' }}
+        canWrite
+        submitAnswer={submitAnswer}
+      />,
+    )
+    expect(container.textContent).toContain('Waiting for your answer')
+    expect(container.textContent).not.toContain('Answered')
   })
 })

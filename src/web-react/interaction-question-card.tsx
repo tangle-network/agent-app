@@ -19,12 +19,13 @@
  * via `createInteractionAnswerSubmitter` (or any `SubmitInteractionAnswer`).
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   ChatInteraction,
   ChatInteractionField,
   ChatInteractionStatus,
   ChatSelectField,
+  ChatTextField,
 } from './chat-interactions'
 import { isTerminalInteractionStatus } from './chat-interactions'
 import {
@@ -174,11 +175,38 @@ export interface InteractionQuestionCardProps {
    *  turn. Return/resolve `false` when the send was rejected so the card stays
    *  retryable. Omit to hide the late-answer affordance entirely. */
   onLateAnswer?: (message: string) => boolean | void | Promise<boolean | void>
+  /** Overrides the kind badge ("Question"). */
+  kindLabel?: string
+  /** Overrides the header note ("The agent asked for input"). Set it whenever an
+   *  agent is not the one asking — a host that parks on a human at the graph
+   *  level is not an agent's mid-run question, and a card that claims otherwise
+   *  misreports why the work stopped. */
+  sourceNote?: string
+  /** What happens if nobody answers, rendered beside the submit action.
+   *
+   *  The caller owns both the clock and the copy: this card holds no timer, so a
+   *  deadline that counts down re-renders on the caller's cadence rather than
+   *  driving one of its own — and the consequence of silence ("the default is
+   *  taken", "the run fails") is the host's policy to state, not this card's to
+   *  infer. */
+  timeoutNote?: ReactNode
+  /** Renders `body` as markdown. Omitted, `body` renders as plain text — so a
+   *  host that passes authored markdown without this shows its syntax raw. */
+  renderMarkdown?: (markdown: string) => ReactNode
   className?: string
 }
 
 function selectField(field: ChatInteractionField): ChatSelectField | null {
   return field.type === 'select' ? (field as ChatSelectField) : null
+}
+
+/** The cap to stop typing at, or `undefined` for an uncapped field. A
+ *  non-positive or fractional cap is treated as absent rather than clamping the
+ *  field to zero characters — an unanswerable field is worse than an uncapped
+ *  one, and the answer route still enforces the real bound. */
+function textFieldMaxLength(field: ChatInteractionField): number | undefined {
+  const max = (field as ChatTextField).maxLength
+  return typeof max === 'number' && Number.isInteger(max) && max > 0 ? max : undefined
 }
 
 function valuesWithSelected(values: FieldValues, field: ChatSelectField, optionValue: string): FieldValues {
@@ -209,6 +237,10 @@ export function InteractionQuestionCard({
   submitAnswer,
   onResolved,
   onLateAnswer,
+  kindLabel,
+  sourceNote,
+  timeoutNote,
+  renderMarkdown,
   className,
 }: InteractionQuestionCardProps) {
   const [values, setValues] = useState<FieldValues>(() =>
@@ -220,6 +252,27 @@ export function InteractionQuestionCard({
   const [lateAnswerSent, setLateAnswerSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const submitInFlightRef = useRef(false)
+  const askIdRef = useRef(interaction.id)
+
+  // Every answer-bearing piece of state belongs to ONE ask, so being handed the
+  // NEXT one starts over. A host can resolve one question and be handed another
+  // on the same card instance (a run that re-parks, a queue that advances); left
+  // alone, the new question would render with the previous answer already
+  // filled in and its terminal chrome still showing — one click from submitting
+  // an answer to a question the user never read.
+  //
+  // During render, not in an effect: an effect would commit one frame of the
+  // previous answer under the new question before clearing it. `submitting` and
+  // `submitInFlightRef` are deliberately NOT reset — they are owned by the
+  // in-flight request's `finally`, and clearing them here would let a second
+  // submit start while the first is still outstanding.
+  if (askIdRef.current !== interaction.id) {
+    askIdRef.current = interaction.id
+    setValues(fieldValuesFromAnswers(interaction.fields, interaction.answers))
+    setLocalStatus(null)
+    setLateAnswerSent(false)
+    setError(null)
+  }
 
   useEffect(() => {
     if (!interaction.answers) return
@@ -301,6 +354,12 @@ export function InteractionQuestionCard({
     ? 'This question asked for a secret, so it cannot be sent as a new chat message. Ask the agent to request it again.'
     : TERMINAL_NOTES[status]
   const showSubmitButton = status === 'pending' || (canWrite && lateAnswerable && !lateAnswerSent)
+  // Only while the ask is still open. The note says what happens if nobody
+  // answers, which stops being true the moment somebody has — and a resolved
+  // card still offering a countdown reads as though the answer did not land.
+  // Shown to read-only viewers too: an ask about to settle itself is worth
+  // knowing whether or not you are the one who can answer it.
+  const showTimeoutNote = timeoutNote != null && status === 'pending'
   let submitLabel = 'Submit answer'
   if (lateAnswerable) {
     submitLabel = submitting ? 'Sending…' : 'Send as new message'
@@ -312,18 +371,20 @@ export function InteractionQuestionCard({
     <div className={`rounded-xl border border-border bg-card p-4 shadow-sm ${className ?? ''}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <InteractionBadge variant="outline">Question</InteractionBadge>
+          <InteractionBadge variant="outline">{kindLabel ?? 'Question'}</InteractionBadge>
           <InteractionBadge variant={answered ? 'default' : status === 'expired' || status === 'declined' ? 'destructive' : 'outline'}>
             {STATUS_LABELS[status]}
           </InteractionBadge>
         </div>
-        <span className="text-xs text-muted-foreground">The agent asked for input</span>
+        <span className="text-xs text-muted-foreground">{sourceNote ?? 'The agent asked for input'}</span>
       </div>
 
       {interaction.title.trim() && interaction.fields.every((field) => field.label !== interaction.title) && (
         <p className="mb-3 text-sm font-medium leading-5 text-foreground">{interaction.title}</p>
       )}
-      {interaction.body && <p className="mb-3 text-sm leading-5 text-muted-foreground">{interaction.body}</p>}
+      {interaction.body && (renderMarkdown
+        ? <div className="mb-3 text-sm leading-5 text-muted-foreground">{renderMarkdown(interaction.body)}</div>
+        : <p className="mb-3 text-sm leading-5 text-muted-foreground">{interaction.body}</p>)}
 
       <div className="space-y-4">
         {interaction.fields.map((field) => {
@@ -389,6 +450,7 @@ export function InteractionQuestionCard({
                   aria-label={field.label}
                   onChange={(event) => setFieldValue(field.name, { text: event.target.value })}
                   placeholder={field.placeholder}
+                  maxLength={textFieldMaxLength(field)}
                   className={FIELD_INPUT_CLASSES}
                 />
               ) : (
@@ -398,6 +460,7 @@ export function InteractionQuestionCard({
                   aria-label={field.label}
                   onChange={(event) => setFieldValue(field.name, { text: event.target.value })}
                   rows={3}
+                  maxLength={textFieldMaxLength(field)}
                   placeholder={field.type === 'text' ? field.placeholder : undefined}
                   className={FIELD_INPUT_CLASSES}
                 />
@@ -410,11 +473,16 @@ export function InteractionQuestionCard({
       {error && <p className="mt-3 text-xs text-destructive">{error}</p>}
       {terminalNote && <p className="mt-3 text-xs text-muted-foreground">{terminalNote}</p>}
 
-      {showSubmitButton && (
-        <div className="mt-4 flex items-center justify-end gap-2">
-          <InteractionActionButton onClick={() => void submit()} disabled={disabled || !answerData}>
-            {submitLabel}
-          </InteractionActionButton>
+      {(showSubmitButton || showTimeoutNote) && (
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+          {showTimeoutNote && (
+            <span className="mr-auto text-xs text-muted-foreground">{timeoutNote}</span>
+          )}
+          {showSubmitButton && (
+            <InteractionActionButton onClick={() => void submit()} disabled={disabled || !answerData}>
+              {submitLabel}
+            </InteractionActionButton>
+          )}
         </div>
       )}
       {answered && (

@@ -59,8 +59,26 @@ export function isSafeInteractionFieldKey(key: string): boolean {
 export type ChatSelectField = Extract<InteractionField, { type: 'select' }> & {
   allowCustom?: boolean
 }
+
+/**
+ * A free-text field that may declare the longest answer its answer route will
+ * accept, so a card can stop the typing rather than let the route reject it.
+ *
+ * Carried the same way as `allowCustom`: the schema may not define it, so it
+ * rides on the wire/persisted type and survives because `parseInteractionRequest`
+ * returns the raw payload. A product that SYNTHESISES an interaction (rather than
+ * parsing one off the wire) sets it directly from whatever bound its own route
+ * validates against.
+ */
+export type ChatTextField = Extract<InteractionField, { type: 'text' | 'secret' }> & {
+  maxLength?: number
+}
+
 /** Resolve a chat interaction field excluding select types or including chat select fields */
-export type ChatInteractionField = Exclude<InteractionField, { type: 'select' }> | ChatSelectField
+export type ChatInteractionField =
+  | Exclude<InteractionField, { type: 'select' | 'text' | 'secret' }>
+  | ChatSelectField
+  | ChatTextField
 
 /** `InteractionRequest` whose select fields may carry `allowCustom`. */
 export type InteractionRequestWire = Omit<InteractionRequest, 'answerSpec'> & {
