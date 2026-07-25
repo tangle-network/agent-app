@@ -383,7 +383,8 @@ describe('incremental assistant persistence — crash-safe convergence', () => {
   it('autonomous lane: runDetachedTurn owns the row, drafts it mid-run, and converges after a crash', async () => {
     const { store, threadId } = await freshStore()
     const turnStore = createMemoryTurnEventStore()
-    const persist = { store: store as never, threadId, intervalMs: 0 }
+    // `createChatStore(...)` satisfies the draft-store contract directly — no cast.
+    const persist = { store, threadId, intervalMs: 0 }
 
     // Attempt 1: the worker is killed mid-run — the call never returns, the
     // turn buffer is left `running`, the draft row is left partial.

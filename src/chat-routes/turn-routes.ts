@@ -555,7 +555,7 @@ export function createChatTurnRoutes<TContext = void>(
   // Incremental persistence is on whenever the store can patch a row. An
   // EXPLICIT opt-in against a store that cannot is a wiring bug, so it fails
   // here — at construction — instead of silently degrading every turn.
-  const draftStore = options.store as unknown as AssistantDraftStore
+  const draftStore: AssistantDraftStore = options.store
   if (options.incrementalPersistence && !storeSupportsDraftPersistence(draftStore)) {
     throw new Error(
       'incrementalPersistence requires a store with updateMessage() — `/chat-store`\'s createChatStore has it; a product store must implement it or omit the option',
@@ -923,6 +923,12 @@ export function createChatTurnRoutes<TContext = void>(
           })
         }
         const failed = runFailed || drainError !== undefined
+        // Settle any in-flight draft INSIDE the waitUntil-tracked drain. On the
+        // path where the producer throws, `persistAssistantMessage` never runs
+        // to close the writer, and an unawaited write would race the isolate's
+        // teardown — leaving a torn row instead of a clean partial one for a
+        // re-entered turn to adopt.
+        await draft?.close()
         try {
           await tap.done(failed ? 'error' : 'complete')
         } catch (err) {
