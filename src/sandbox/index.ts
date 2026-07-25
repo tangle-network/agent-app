@@ -266,6 +266,20 @@ export interface ProfileComposeOptions {
   extraFiles?: AgentProfileFileMount[]
   extraMcp?: Record<string, AgentProfileMcpServer>
   name?: string
+  /**
+   * The harness this profile is being composed for.
+   *
+   * Where a resource lands is harness-specific — skills resolve to
+   * `.opencode/skills/`, `.claude/skills/`, `.pi/skills/`, and so on
+   * (`skillDirForHarness`), and some harnesses take no cwd skills at all.
+   * Without this, an app composing a profile cannot place a harness-native
+   * resource and is pushed into hardcoding one harness's path, which then
+   * silently disagrees with the path its own prompt cites: the agent is told
+   * to read a directory nothing was written to and its skills are invisible.
+   * Prefer declaring `resources.skills` and letting the platform place them;
+   * use this when composing paths directly.
+   */
+  harness: Harness
 }
 
 /** Define runtime configuration methods for sandbox environments including credentials, metadata, and permissions */
@@ -1020,6 +1034,7 @@ async function materializeDeferredFilesForExistingBox(
   name: string,
   workspaceId: string,
   userId: string | undefined,
+  harness: Harness,
 ): Promise<Outcome<SandboxInstance>> {
   if (!shell.deferProfileFiles) return ok(box)
   const connectedIntegrationIds = await shell.connectedIntegrationIds(workspaceId)
@@ -1029,7 +1044,7 @@ async function materializeDeferredFilesForExistingBox(
     ...(userId ? { userId } : {}),
   }
   const files = await shell.files(buildCtx)
-  const fullProfile = shell.profile({ extraFiles: files })
+  const fullProfile = shell.profile({ extraFiles: files, harness })
   const { deferredFiles } = splitDeferredProfileFiles(fullProfile)
   if (deferredFiles.length === 0) return ok(box)
   // Skip the whole re-write when the corpus is UNCHANGED since the box was
@@ -1543,6 +1558,7 @@ export async function ensureWorkspaceSandbox(
           name,
           workspaceId,
           userId,
+          harness,
         )
         if (!written.succeeded) {
           throw deferredProfileWriteFailed('reused', name, written.error)
@@ -1614,6 +1630,7 @@ export async function ensureWorkspaceSandbox(
             name,
             workspaceId,
             userId,
+            harness,
           )
           if (!written.succeeded) {
             throw deferredProfileWriteFailed('resumed', name, written.error)
@@ -1652,7 +1669,7 @@ export async function ensureWorkspaceSandbox(
     shell.env(buildCtx),
     shell.files(buildCtx),
   ])
-  const fullProfile = shell.profile({ extraFiles: files })
+  const fullProfile = shell.profile({ extraFiles: files, harness })
   // When deferring, strip inline files from the create payload and write them
   // into the box after it reaches running. Keeps the provision body under the
   // orchestrator's 256 KiB cap and lands real files on disk.
@@ -1917,7 +1934,7 @@ export async function* streamSandboxPrompt(
   const appToolMcp = options?.appToolMcp ?? {}
   const extraMcp = mergeExtraMcp(appToolMcp, options?.baseProfileMcp ?? {}, options?.extraMcp)
 
-  const profile = shell.profile({ systemPrompt: options?.systemPrompt, extraMcp })
+  const profile = shell.profile({ systemPrompt: options?.systemPrompt, extraMcp, harness })
   const profileWithEffort = attachReasoningEffort(profile, harness, options?.effort)
 
   const stream = box.streamPrompt(prompt, {
@@ -2193,7 +2210,7 @@ export async function driveSandboxTurn(
   const appToolMcp = options.appToolMcp ?? {}
   const extraMcp = mergeExtraMcp(appToolMcp, options.baseProfileMcp ?? {}, options.extraMcp)
   const profile = attachReasoningEffort(
-    shell.profile({ systemPrompt: options.systemPrompt, extraMcp }),
+    shell.profile({ systemPrompt: options.systemPrompt, extraMcp, harness }),
     harness,
     options.effort,
   )
