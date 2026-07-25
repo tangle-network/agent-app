@@ -23,6 +23,8 @@ import { BrandMark } from './brand-mark'
 import { DurableChatCards, type DurableChatCardsProps } from './durable-chat-cards'
 import { attachmentPartsFromMessageParts, type ChatAttachmentPart } from './chat-attachments'
 import { MessageAttachments } from './message-attachments'
+import { WorkProductCard, workProductPartsFromMessageParts } from './work-product'
+import type { WorkProductPersistedPart } from '../work-product/types'
 
 export * from './chat-stream'
 export * from './chat-interactions'
@@ -43,6 +45,7 @@ export * from './use-composer-attachments'
 export * from './provider-logo'
 export * from './smooth-text'
 export * from './mission-activity'
+export * from './work-product'
 export * from './sandbox-terminal'
 export * from './seat-paywall'
 export {
@@ -274,6 +277,11 @@ export interface ChatMessagesProps {
    *  row next to the bubble — thumbnails for images, download chips for files.
    *  Absent → today's rendering, byte-identical (no attachment row). */
   resolveAttachmentUrl?: (part: ChatAttachmentPart) => string
+  /** Render persisted `type:'work_product'` anchor parts as `WorkProductCard`
+   *  rows under the message body — the chat card that keeps chat the driver
+   *  surface for review. `onOpen` opens the product's queue/detail surface.
+   *  Absent → today's rendering, byte-identical (no card row). */
+  workProductCards?: { onOpen?: (part: WorkProductPersistedPart) => void }
 }
 
 /** One starting "door" in the chat first-run state — a concrete, labeled action
@@ -959,6 +967,7 @@ function AssistantMessageImpl({
   renderExtras,
   durableCards,
   resolveAttachmentUrl,
+  workProductCards,
 }: {
   msg: ChatUiMessage
   streaming: boolean
@@ -971,6 +980,7 @@ function AssistantMessageImpl({
   renderExtras?: (message: ChatUiMessage) => ReactNode
   durableCards?: Omit<DurableChatCardsProps, 'parts' | 'renderMarkdown'>
   resolveAttachmentUrl?: (part: ChatAttachmentPart) => string
+  workProductCards?: { onOpen?: (part: WorkProductPersistedPart) => void }
 }) {
   // Smooth reveal: chunky network slabs (model bursts, flush windows, replay
   // polls) paint as a continuous typewriter. Reasoning often arrives as one
@@ -1085,6 +1095,15 @@ function AssistantMessageImpl({
           className="mt-3"
         />
       )}
+      {workProductCards &&
+        workProductPartsFromMessageParts(msg.parts).map((part) => (
+          <WorkProductCard
+            key={`${part.ref.id}:${part.ref.version}`}
+            part={part}
+            onOpen={workProductCards.onOpen}
+            className="mt-3"
+          />
+        ))}
       {renderExtras?.(msg)}
       {resolveAttachmentUrl && attachmentPartsFromMessageParts(msg.parts).length > 0 && (
         <div className="mt-2">
@@ -1189,6 +1208,7 @@ export function ChatMessages({
   emptyState,
   header,
   resolveAttachmentUrl,
+  workProductCards,
 }: ChatMessagesProps) {
   // Stabilize the fallback renderer's identity so it doesn't change every
   // render — otherwise the memoized `AssistantMessage` (and its per-frame body
@@ -1248,6 +1268,7 @@ export function ChatMessages({
             renderExtras={renderExtras}
             durableCards={durableCards}
             resolveAttachmentUrl={resolveAttachmentUrl}
+            workProductCards={workProductCards}
           />
         ),
       )}

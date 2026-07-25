@@ -13,6 +13,10 @@ export default defineConfig({
     // Unmount @testing-library React trees between tests (this repo doesn't run
     // with `globals: true`, so RTL's auto-cleanup hook isn't registered).
     setupFiles: ['./src/test-setup.ts'],
+    // sandbox-ui's workbench chunks import xterm.css; inlining sandbox-ui lets
+    // vite stub the CSS import instead of node rejecting the extension (the
+    // same fix every fleet app on sandbox-ui carries in ITS vitest config).
+    server: { deps: { inline: [/@tangle-network\/sandbox-ui/] } },
     // Run test FILES one at a time. Parallel forks each load the full module
     // graph (React, TipTap, drizzle, better-sqlite3, konva) and accumulate heap
     // across the files they own; serializing bounds peak RSS to a single file

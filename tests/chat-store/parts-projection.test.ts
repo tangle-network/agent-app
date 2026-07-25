@@ -20,6 +20,10 @@ describe('toChatMessageParts — the /stream → /chat-store typed boundary', ()
         submittedAt: '2026-07-21T00:00:00.000Z', status: 'pending',
       },
       { type: 'mention', mentionKind: 'file', path: 'docs/a.md', name: 'a.md' },
+      {
+        type: 'work_product', ref: { id: 'wp1', version: 1 },
+        kind: 'return_package', title: '2025 Return', status: 'ready',
+      },
     ]
     const typed: ChatMessagePart[] = toChatMessageParts(oneOfEach)
     expect(typed.map((part) => part.type)).toEqual(oneOfEach.map((part) => part.type))
@@ -32,6 +36,8 @@ describe('toChatMessageParts — the /stream → /chat-store typed boundary', ()
       { type: 'tool', id: 'c1' }, // no tool/state
       { type: 'notice', id: 'n1' }, // no noticeKind/text
       { type: 'mention', path: 'a.md', name: 'a.md' }, // no mentionKind
+      { type: 'work_product', ref: { id: 'wp1' }, kind: 'x', title: 'T', status: 'ready' }, // ref.version missing
+      { type: 'work_product', ref: { id: 'wp1', version: 1 }, kind: 'x', title: 'T', status: 'shipped' }, // bad status
       {
         type: 'plan', planId: 'p1', revision: 0, body: 'Plan',
         submittedAt: '2026-07-21T00:00:00.000Z', status: 'pending',

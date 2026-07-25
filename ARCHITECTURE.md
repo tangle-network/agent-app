@@ -18,6 +18,7 @@ navigable and is the seam a future package split would cut along.
 ```
   L3  React surfaces      web-react · design-canvas-react · sequences-react · studio-react
       (react + heavy libs) intakes-react · teams-react · vault · theme/styles/tailwind-preset
+                           work-product-react
         │  depends on ▼
   L2  Data / domain       design-canvas · sequences · intakes · teams      (drizzle peer)
         │  depends on ▼
@@ -27,7 +28,7 @@ navigable and is the seam a future package split would cut along.
   L0  Foundation          crypto · web · stream · redact · harness · missions · store
       (zero peers)         prompt · model-resolution · tangle · delegation · skills · knowledge
                            integrations · interactions · billing · eval-campaign · assets
-                           brand-extraction · studio
+                           brand-extraction · studio · work-product
 ```
 
 (`missions` sits at L0 — substrate-free, pure orchestration — but is consumed by
