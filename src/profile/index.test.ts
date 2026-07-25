@@ -314,20 +314,46 @@ describe('composeAgentProfile — system-prompt byte budget', () => {
     expect(() =>
       composeAgentProfile(BASE, {}, { systemPrompt: 'x'.repeat(200) }, { maxSystemPromptBytes: 100 }),
     ).toThrow(/over the 100-byte budget/)
-    // And a raised budget lets a known-big prompt through.
+    // A raised budget lets a known-big prompt through once its reason is stated.
     const out = composeAgentProfile(
       BASE,
       {},
       { systemPrompt: OVER_BUDGET_PROMPT },
-      { maxSystemPromptBytes: 100_000 },
+      { maxSystemPromptBytes: 100_000, overBudgetReason: 'irreducible per-turn doctrine' },
     )
     expect(out.prompt?.systemPrompt).toBe(OVER_BUDGET_PROMPT)
+  })
+
+  it('REDS when the cap is raised above the default with no overBudgetReason', () => {
+    // The failure that keeps recurring is reference material concatenated into
+    // the prompt, then the ceiling lifted to hide it. Raising the cap silently
+    // is the step this blocks, so it must fire even when the prompt still fits
+    // under the raised number.
+    expect(() =>
+      composeAgentProfile(BASE, {}, { systemPrompt: 'short' }, { maxSystemPromptBytes: 120_000 }),
+    ).toThrow(/exceeds the 40000-byte default without an overBudgetReason[\s\S]*resources\.files/)
+  })
+
+  it('REDS when warnOnly mutes the gate with no overBudgetReason', () => {
+    expect(() =>
+      composeAgentProfile(BASE, {}, { systemPrompt: OVER_BUDGET_PROMPT }, { warnOnly: true }),
+    ).toThrow(/warnOnly downgrades the over-budget throw[\s\S]*overBudgetReason/)
+  })
+
+  it('allows lowering the cap without a reason — only weakening it needs justifying', () => {
+    const out = composeAgentProfile(BASE, {}, { systemPrompt: 'short' }, { maxSystemPromptBytes: 1_000 })
+    expect(out.prompt?.systemPrompt).toBe('short')
   })
 
   it('warnOnly downgrades the throw to a console.warn that still yells', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     try {
-      const out = composeAgentProfile(BASE, {}, { systemPrompt: OVER_BUDGET_PROMPT }, { warnOnly: true })
+      const out = composeAgentProfile(
+        BASE,
+        {},
+        { systemPrompt: OVER_BUDGET_PROMPT },
+        { warnOnly: true, overBudgetReason: 'shipping while the corpus moves to mounts' },
+      )
       expect(out.prompt?.systemPrompt).toBe(OVER_BUDGET_PROMPT)
       expect(warn).toHaveBeenCalledTimes(1)
       expect(String(warn.mock.calls[0]?.[0])).toMatch(/over the 40000-byte budget/)
