@@ -283,6 +283,13 @@ export function InteractionQuestionCard({
   // `submitInFlightRef` are deliberately NOT reset — they are owned by the
   // in-flight request's `finally`, and clearing them here would let a second
   // submit start while the first is still outstanding.
+  //
+  // The visible cost: an id that changes WHILE a submit is outstanding leaves
+  // the new question reading "Submitting…" and disabled until that request
+  // settles — bounded by the 30s submit timeout. Preferred to the alternative,
+  // since the only way to free the button early is to drop the in-flight guard,
+  // and a second submit racing the first is a real bug where a stale label is
+  // only a confusing one.
   if (askIdRef.current !== interaction.id) {
     askIdRef.current = interaction.id
     setValues(fieldValuesFromAnswers(interaction.fields, interaction.answers))

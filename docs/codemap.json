@@ -791,6 +791,12 @@
           "doc": "Define a subtask part of a chat with prompt, description, agent, and optional identifier"
         },
         {
+          "name": "ChatTextField",
+          "kind": "type",
+          "signature": "type ChatTextField",
+          "doc": "A free-text field that may declare the longest answer its answer route will accept, so a card can stop the typing rather than let the route reject it."
+        },
+        {
           "name": "ChatTextPart",
           "kind": "interface",
           "signature": "interface ChatTextPart",
@@ -10427,6 +10433,12 @@
           "doc": "Extract select-type interaction fields and optionally allow custom values"
         },
         {
+          "name": "ChatTextField",
+          "kind": "type",
+          "signature": "type ChatTextField",
+          "doc": "A free-text field that may declare the longest answer its answer route will accept, so a card can stop the typing rather than let the route reject it."
+        },
+        {
           "name": "composerAnswerData",
           "kind": "function",
           "signature": "(field: ChatInteractionField, text: string) => Record<string, string | number | boolean | string[]>",
@@ -18262,6 +18274,12 @@
           "doc": "Describe the result of a chat stream tool including its outcome and optional metadata fields"
         },
         {
+          "name": "ChatTextField",
+          "kind": "type",
+          "signature": "type ChatTextField",
+          "doc": "A free-text field that may declare the longest answer its answer route will accept, so a card can stop the typing rather than let the route reject it."
+        },
+        {
           "name": "ChatToolCallInfo",
           "kind": "interface",
           "signature": "interface ChatToolCallInfo",
@@ -18774,7 +18792,7 @@
         {
           "name": "InteractionQuestionCard",
           "kind": "function",
-          "signature": "({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, className, }: InteractionQuestionCardProps) => Element",
+          "signature": "({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, sourceNote, timeoutNote, renderMarkdown, c…",
           "doc": null
         },
         {

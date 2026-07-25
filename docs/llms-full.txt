@@ -976,6 +976,14 @@ class ChatStoreInputError
 interface ChatSubtaskPart
 ```
 
+### `ChatTextField`
+
+`type` — A free-text field that may declare the longest answer its answer route will accept, so a card can stop the typing rather than let the route reject it.
+
+```ts
+type ChatTextField
+```
+
 ### `ChatTextPart`
 
 `interface` — `id` is the harness's per-segment identity; absent on legacy/router parts, which collapse to a single logical text stream.
@@ -13596,6 +13604,14 @@ type ChatInteractionStatus
 type ChatSelectField
 ```
 
+### `ChatTextField`
+
+`type` — A free-text field that may declare the longest answer its answer route will accept, so a card can stop the typing rather than let the route reject it.
+
+```ts
+type ChatTextField
+```
+
 ### `composerAnswerData`
 
 `function` — Shapes composer text into the respond payload for the routed field (select answers are string arrays on the wire; text answers are strings).
@@ -23716,6 +23732,14 @@ interface ChatStreamToolCall
 interface ChatStreamToolResult
 ```
 
+### `ChatTextField`
+
+`type` — A free-text field that may declare the longest answer its answer route will accept, so a card can stop the typing rather than let the route reject it.
+
+```ts
+type ChatTextField
+```
+
 ### `ChatToolCallInfo`
 
 `interface` — Describe the structure and state of a tool call within a chat interaction
@@ -24401,7 +24425,7 @@ interface InteractionPlanCardProps
 `function`
 
 ```ts
-({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, className, }: InteractionQuestionCardProps) => Element
+({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, sourceNote, timeoutNote, renderMarkdown, c…
 ```
 
 ### `InteractionQuestionCardProps`

@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-230 exports.
+231 exports.
 
 ### `activityTone`
 
@@ -348,6 +348,14 @@ interface ChatStreamToolCall
 
 ```ts
 interface ChatStreamToolResult
+```
+
+### `ChatTextField`
+
+`type` — A free-text field that may declare the longest answer its answer route will accept, so a card can stop the typing rather than let the route reject it.
+
+```ts
+type ChatTextField
 ```
 
 ### `ChatToolCallInfo`
@@ -1035,7 +1043,7 @@ interface InteractionPlanCardProps
 `function`
 
 ```ts
-({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, className, }: InteractionQuestionCardProps) => Element
+({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, sourceNote, timeoutNote, renderMarkdown, c…
 ```
 
 ### `InteractionQuestionCardProps`

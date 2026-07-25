@@ -4,7 +4,7 @@
 
 Source: `src/interactions/index.ts`
 
-58 exports.
+59 exports.
 
 ### `BeforeInteractionAnswerArgs`
 
@@ -60,6 +60,14 @@ type ChatInteractionStatus
 
 ```ts
 type ChatSelectField
+```
+
+### `ChatTextField`
+
+`type` — A free-text field that may declare the longest answer its answer route will accept, so a card can stop the typing rather than let the route reject it.
+
+```ts
+type ChatTextField
 ```
 
 ### `composerAnswerData`

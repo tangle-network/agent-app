@@ -4,7 +4,7 @@
 
 Source: `src/index.ts`
 
-767 exports.
+768 exports.
 
 ### `AddCitationArgs`
 
@@ -972,6 +972,14 @@ class ChatStoreInputError
 
 ```ts
 interface ChatSubtaskPart
+```
+
+### `ChatTextField`
+
+`type` — A free-text field that may declare the longest answer its answer route will accept, so a card can stop the typing rather than let the route reject it.
+
+```ts
+type ChatTextField
 ```
 
 ### `ChatTextPart`
