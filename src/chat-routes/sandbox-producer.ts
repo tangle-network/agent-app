@@ -31,6 +31,7 @@ import {
 import {
   asRecord,
   asString,
+  draftAssistantParts,
   finalizeAssistantParts,
   finalizePendingInteractionParts,
   getPartKey,
@@ -610,6 +611,12 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
       finalizeAssistantParts(partOrder, partMap, fullText),
       interactionOutcome,
     ),
+    // Mid-stream snapshot for incremental persistence: the same accumulators,
+    // WITHOUT the two completion-time settlements (`terminalizeDanglingTool*`
+    // and `finalizePendingInteractionParts`). A running tool and an unanswered
+    // ask are the correct live state; settling them early would persist
+    // phantom failures the final write then reverses.
+    draftParts: () => draftAssistantParts(partOrder, partMap, fullText),
     usage: () => usage,
     ...(options.model ? { model: options.model } : {}),
   }

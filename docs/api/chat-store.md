@@ -4,7 +4,7 @@
 
 Source: `src/chat-store/index.ts`
 
-59 exports.
+60 exports.
 
 ### `AppendMessageInput`
 
@@ -468,6 +468,14 @@ type StorableHarnessPartKind
 
 ```ts
 (parts: Record<string, unknown>[]) => ChatMessagePart[]
+```
+
+### `UpdateMessageInput`
+
+`interface` — Fields an existing message row may be patched with.
+
+```ts
+interface UpdateMessageInput
 ```
 
 ### `WorkspaceAccessCheck`

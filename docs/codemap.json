@@ -1475,6 +1475,12 @@
           "doc": "Summarize key statistics of a numerical distribution including count, min, percentiles, and max"
         },
         {
+          "name": "draftAssistantParts",
+          "kind": "function",
+          "signature": "(partOrder: string[], partMap: Map<string, JsonRecord>, finalText: string) => JsonRecord[]",
+          "doc": "The MID-STREAM twin of {@link finalizeAssistantParts}: the same assembled, collapsed projection MINUS the dangling-tool terminalizer."
+        },
+        {
           "name": "driveSandboxTurn",
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | PromptInputPart[], options: DriveSandboxTurnOptio…",
@@ -3433,7 +3439,7 @@
         {
           "name": "resolveChatTurn",
           "kind": "function",
-          "signature": "(input: { existingMessages: PersistedChatMessageForTurn[]; userContent: string; turnId?: string | undefined; }) => Reso…",
+          "signature": "(input: { existingMessages: PersistedChatMessageForTurn[]; userContent: string; turnId?: string | undefined; hasRunning…",
           "doc": "Resolve a chat turn by determining message reuse and constructing user message parts"
         },
         {
@@ -5699,6 +5705,42 @@
           "doc": "Throws `ChatTurnInputError` (413) when the parts' inline payload would blow the gateway cap."
         },
         {
+          "name": "AssistantDraftSnapshot",
+          "kind": "interface",
+          "signature": "interface AssistantDraftSnapshot",
+          "doc": "Live snapshot of the assistant body, taken from the producer's own accumulators."
+        },
+        {
+          "name": "AssistantDraftStore",
+          "kind": "interface",
+          "signature": "interface AssistantDraftStore",
+          "doc": "The store capability incremental persistence needs on top of `appendMessage`."
+        },
+        {
+          "name": "AssistantDraftWriter",
+          "kind": "interface",
+          "signature": "interface AssistantDraftWriter",
+          "doc": "Coalescing writer that keeps one durable assistant row in step with a streaming turn."
+        },
+        {
+          "name": "AssistantDraftWriterOptions",
+          "kind": "interface",
+          "signature": "interface AssistantDraftWriterOptions",
+          "doc": "Define the inputs required to construct an assistant draft writer"
+        },
+        {
+          "name": "assistantRowIdForTurn",
+          "kind": "function",
+          "signature": "(turnKey: string) => string",
+          "doc": "The default deterministic assistant-row id for a turn."
+        },
+        {
+          "name": "AssistantRowValues",
+          "kind": "interface",
+          "signature": "interface AssistantRowValues",
+          "doc": "Values written to the assistant row — the intersection of the append and patch shapes, so one snapshot serves both."
+        },
+        {
           "name": "ATTACHMENT_ACCEPT",
           "kind": "const",
           "signature": "\"image/*,.pdf,.txt,.md,.csv,.json,.yaml,.yml,.html\"",
@@ -5957,6 +5999,12 @@
           "doc": "Cross-check a filename's extension against its sniffed content."
         },
         {
+          "name": "createAssistantDraftWriter",
+          "kind": "function",
+          "signature": "(options: AssistantDraftWriterOptions) => AssistantDraftWriter",
+          "doc": "Build the coalescing draft writer for one turn."
+        },
+        {
           "name": "createAttachmentUploadRoute",
           "kind": "function",
           "signature": "(options: CreateAttachmentUploadRouteOptions) => (request: Request) => Promise<Response>",
@@ -6083,6 +6131,18 @@
           "doc": "Resolve the outcome of dispatching parts with success status and corresponding value or error message"
         },
         {
+          "name": "DraftPersistenceTuning",
+          "kind": "interface",
+          "signature": "interface DraftPersistenceTuning",
+          "doc": "Product-tunable cadence."
+        },
+        {
+          "name": "DraftStoredMessage",
+          "kind": "interface",
+          "signature": "interface DraftStoredMessage",
+          "doc": "Message row shape the writer reads back when re-entering a turn."
+        },
+        {
           "name": "FileIndexAuthorization",
           "kind": "type",
           "signature": "type FileIndexAuthorization",
@@ -6147,6 +6207,12 @@
           "kind": "const",
           "signature": "950000",
           "doc": "Define the maximum byte size allowed for inline parts in data processing"
+        },
+        {
+          "name": "isDraftContentEvent",
+          "kind": "function",
+          "signature": "(event: { type?: unknown; }) => boolean",
+          "doc": "True when this event should arm a draft write."
         },
         {
           "name": "MAX_ATTACHMENT_TOTAL_BYTES",
@@ -6429,6 +6495,12 @@
           "kind": "type",
           "signature": "type StaleTurnLockSessionProbeResult",
           "doc": "What the thing running the turn says about it."
+        },
+        {
+          "name": "storeSupportsDraftPersistence",
+          "kind": "function",
+          "signature": "(store: AssistantDraftStore) => boolean",
+          "doc": "True when a store can support incremental persistence at all."
         },
         {
           "name": "UPLOAD_INLINE_MAX_BYTES",
@@ -6833,6 +6905,12 @@
           "kind": "function",
           "signature": "(parts: Record<string, unknown>[]) => ChatMessagePart[]",
           "doc": "The typed projection at the `/stream` → `/chat-store` boundary."
+        },
+        {
+          "name": "UpdateMessageInput",
+          "kind": "interface",
+          "signature": "interface UpdateMessageInput",
+          "doc": "Fields an existing message row may be patched with."
         },
         {
           "name": "WorkspaceAccessCheck",
@@ -15365,6 +15443,12 @@
           "doc": "Minimal structural D1 contract (Cloudflare `D1Database` satisfies it)."
         },
         {
+          "name": "draftAssistantParts",
+          "kind": "function",
+          "signature": "(partOrder: string[], partMap: Map<string, JsonRecord>, finalText: string) => JsonRecord[]",
+          "doc": "The MID-STREAM twin of {@link finalizeAssistantParts}: the same assembled, collapsed projection MINUS the dangling-tool terminalizer."
+        },
+        {
           "name": "encodeEvent",
           "kind": "function",
           "signature": "(encoder: TextEncoder, event: StreamEvent) => Uint8Array<ArrayBufferLike>",
@@ -15475,7 +15559,7 @@
         {
           "name": "resolveChatTurn",
           "kind": "function",
-          "signature": "(input: { existingMessages: PersistedChatMessageForTurn[]; userContent: string; turnId?: string | undefined; }) => Reso…",
+          "signature": "(input: { existingMessages: PersistedChatMessageForTurn[]; userContent: string; turnId?: string | undefined; hasRunning…",
           "doc": "Resolve a chat turn by determining message reuse and constructing user message parts"
         },
         {

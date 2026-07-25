@@ -44,6 +44,14 @@ import { deriveExecutionId, handleChatTurn } from '@tangle-network/agent-runtime
 import type { ChatTurnIdentity, ChatTurnProducer } from '@tangle-network/agent-runtime'
 import { mentionInputToPart, toChatMessageParts, type ChatMessagePart } from '../chat-store/parts'
 import {
+  assistantRowIdForTurn,
+  createAssistantDraftWriter,
+  storeSupportsDraftPersistence,
+  type AssistantDraftStore,
+  type AssistantDraftWriter,
+  type DraftPersistenceTuning,
+} from './draft-persistence'
+import {
   createInteractionAnswerRoute,
   type InteractionAnswerRoute,
   type InteractionAnswerRouteOptions,
@@ -93,6 +101,10 @@ export interface ChatTurnMessageStore {
     parts?: ChatMessagePart[] | null
   }>>
   appendMessage(input: {
+    /** Caller-assigned row id. Honored by `/chat-store`'s `createChatStore`;
+     *  a product store free to ignore it (the writer then adopts whatever id
+     *  the insert returns). Set only by incremental persistence. */
+    id?: string
     threadId: string
     role: 'user' | 'assistant'
     content: string
@@ -105,6 +117,23 @@ export interface ChatTurnMessageStore {
     cacheWriteTokens?: number | null
     costUsd?: number | null
   }): Promise<unknown>
+  /** Patch an existing row. Its PRESENCE is what enables incremental assistant
+   *  persistence — a store without it keeps today's exact single-write-on-
+   *  completion behavior, which is what makes this additive. */
+  updateMessage?(id: string, patch: {
+    content?: string
+    parts?: ChatMessagePart[]
+    model?: string | null
+    inputTokens?: number | null
+    outputTokens?: number | null
+    reasoningTokens?: number | null
+    cacheReadTokens?: number | null
+    cacheWriteTokens?: number | null
+    costUsd?: number | null
+  }): Promise<unknown>
+  /** Remove a row. Used to retract a draft assistant row for a turn that ended
+   *  producing nothing, so the empty-turn case still leaves no row at all. */
+  deleteMessage?(id: string): Promise<unknown>
 }
 
 /** `ChatTurnProducer` plus the persisted projection the assembly reads after
@@ -112,6 +141,12 @@ export interface ChatTurnMessageStore {
  *  may omit the optional members (finalText persists as a single text part). */
 export interface ChatTurnRouteProducer extends ChatTurnProducer {
   assistantParts?(): Array<Record<string, unknown>>
+  /** MID-STREAM snapshot of the same projection, safe to call while the turn
+   *  is running: no dangling-tool terminalization, no pending-ask settlement
+   *  (see `/stream`'s `draftAssistantParts`). Read by incremental persistence.
+   *  A producer that omits it still drafts — the scalar text — but persists no
+   *  parts until the turn completes. */
+  draftParts?(): Array<Record<string, unknown>>
   usage?(): ChatTurnUsage
   model?: string
 }
@@ -297,6 +332,30 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
   /** Pre-persist transform of the final text (e.g. `/redact`'s `redactPII`).
    *  Live stream is never altered. */
   transformFinalText?(text: string): string | Promise<string>
+  /** Incremental persistence of the assistant row WHILE the turn streams
+   *  (`./draft-persistence`), so a viewer arriving mid-run is served from
+   *  durable storage instead of the streaming gateway's hot event buffer.
+   *
+   *  This is what lets the gateway keep that hot buffer SHORT at scale: its
+   *  Redis footprint is one sorted set per session refreshed on every push, so
+   *  memory grows LINEARLY with `ttl x concurrent sessions`. Stretching the
+   *  TTL to cover late viewers buys memory proportional to the increase and
+   *  still serves nothing past the new horizon. The buffer stays a reconnect
+   *  window; durable storage — kept at most one cadence interval stale by this
+   *  option — is the history tier.
+   *
+   *  Enabled by DEFAULT whenever `store.updateMessage` exists (every
+   *  `/chat-store` consumer); a store without it keeps today's exact
+   *  single-write behavior. Pass `false` to opt out, or an object to tune the
+   *  cadence. Wiring it against a store that cannot patch rows throws at route
+   *  construction rather than silently no-op'ing. */
+  incrementalPersistence?: false | DraftPersistenceTuning
+  /** Deterministic durable row id for this turn's assistant message. Default
+   *  `assistant:<executionId>` — already stable across retries because
+   *  `deriveExecutionId` is. Override only if the product's message ids have a
+   *  format constraint; it MUST stay deterministic per turn or a re-entered
+   *  turn will duplicate its row instead of converging. */
+  draftMessageId?(args: { identity: ChatTurnIdentity; executionId: string; threadId: string }): string
   /** Post-processing after a turn settles (billing, titles, audit). Fires with
    *  `failed:true` + `failureReason` when the turn carried a terminal error
    *  event (model 402 / rate-limit / server error) instead of a clean
@@ -493,6 +552,20 @@ export function createChatTurnRoutes<TContext = void>(
 ): ChatTurnRoutes {
   const log = options.log ?? ((message, meta) => console.error(message, meta ?? ''))
 
+  // Incremental persistence is on whenever the store can patch a row. An
+  // EXPLICIT opt-in against a store that cannot is a wiring bug, so it fails
+  // here — at construction — instead of silently degrading every turn.
+  const draftStore: AssistantDraftStore = options.store
+  if (options.incrementalPersistence && !storeSupportsDraftPersistence(draftStore)) {
+    throw new Error(
+      'incrementalPersistence requires a store with updateMessage() — `/chat-store`\'s createChatStore has it; a product store must implement it or omit the option',
+    )
+  }
+  const draftTuning: DraftPersistenceTuning | null =
+    options.incrementalPersistence === false || !storeSupportsDraftPersistence(draftStore)
+      ? null
+      : (options.incrementalPersistence ?? {})
+
   async function turn(request: Request, ctx?: { waitUntil?(p: Promise<unknown>): void }): Promise<Response> {
     const [rawBody, badBody] = await parseJsonObjectBody(request)
     if (badBody) return badBody
@@ -518,7 +591,23 @@ export function createChatTurnRoutes<TContext = void>(
       content: m.content,
       parts: (m.parts ?? null) as PersistedChatMessageForTurn['parts'],
     }))
-    const chatTurn = resolveChatTurn({ existingMessages, userContent: content, turnId })
+    // An assistant row already trailing the thread is either this turn's
+    // in-flight draft (retry — walk past it) or a settled answer (a genuine
+    // repeat — new turn). The turn buffer's running index is the discriminator;
+    // it is only consulted in the one case that can be ambiguous, so the common
+    // path costs nothing.
+    let hasRunningTurn = false
+    if (draftTuning && existingMessages.at(-1)?.role === 'assistant') {
+      try {
+        hasRunningTurn = ((await options.turnStore.listRunning?.(payload.threadId)) ?? []).length > 0
+      } catch (err) {
+        log('[chat-routes] listRunning probe failed; treating the thread as idle', {
+          threadId: payload.threadId,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+    const chatTurn = resolveChatTurn({ existingMessages, userContent: content, turnId, hasRunningTurn })
 
     const identity: ChatTurnIdentity = {
       tenantId,
@@ -583,6 +672,7 @@ export function createChatTurnRoutes<TContext = void>(
     // synchronously before the drain — the drain would otherwise be the only
     // path that runs the terminal hook.
     let producer: ChatTurnRouteProducer | undefined
+    let draft: AssistantDraftWriter | undefined
     let runFailed = false
     // Data of the event that marked the run failed — handed to `onTurnError`
     // when no drain throw supplies a richer cause.
@@ -664,6 +754,34 @@ export function createChatTurnRoutes<TContext = void>(
       const turnMarker = { type: 'turn', turnId: turnStreamId }
       await tap.onEvent(turnMarker)
 
+      // Durable projection: the turn buffer above serves LIVE reconnect; this
+      // keeps the persisted transcript at most one cadence interval behind, so
+      // a viewer arriving after the buffer's (deliberately short) hot window
+      // reads the in-flight answer from storage instead of an empty thread.
+      // Row identity is the turn's own `executionId`, so a re-entered turn
+      // patches the row a previous attempt started instead of duplicating it.
+      if (draftTuning) {
+        draft = createAssistantDraftWriter({
+          ...draftTuning,
+          store: draftStore,
+          threadId: payload.threadId,
+          messageId: options.draftMessageId
+            ? options.draftMessageId({ identity, executionId, threadId: payload.threadId })
+            : assistantRowIdForTurn(executionId),
+          snapshot: () => {
+            if (!producer) return null
+            return {
+              content: producer.finalText(),
+              ...(producer.draftParts ? { parts: producer.draftParts() } : {}),
+              ...(producer.usage ? { usage: producer.usage() } : {}),
+              ...(producer.model ? { model: producer.model } : {}),
+            }
+          },
+          ...(options.transformFinalText ? { transformText: options.transformFinalText } : {}),
+          log,
+        })
+      }
+
       turnStartedAtMs = Date.now()
       turnStarted = true
       if (options.lifecycle?.onTurnStart) {
@@ -706,6 +824,9 @@ export function createChatTurnRoutes<TContext = void>(
               lastFailureData = event.data
             }
             await tap.onEvent(event)
+            // Synchronous bookkeeping; the write it may start is fire-and-
+            // forget, so store latency never back-pressures the live stream.
+            draft?.notify(event)
             if (options.onEvent) await options.onEvent(event, context)
           },
           ...(options.transformFinalText ? { transformFinalText: options.transformFinalText } : {}),
@@ -728,11 +849,14 @@ export function createChatTurnRoutes<TContext = void>(
                   )
                 : rawParts
             const parts = projected ? toChatMessageParts(projected) : undefined
-            if (!finalText.trim() && (!parts || parts.length === 0)) return
+            if (!finalText.trim() && (!parts || parts.length === 0)) {
+              // Empty turn: today this leaves no assistant row at all, so a
+              // draft row started earlier is retracted, not left behind.
+              await draft?.discard()
+              return
+            }
             const usage = producer?.usage?.() ?? {}
-            await options.store.appendMessage({
-              threadId: payload.threadId,
-              role: 'assistant',
+            const values = {
               content: finalText,
               ...(parts && parts.length > 0 ? { parts } : {}),
               ...(producer?.model ? { model: producer.model } : {}),
@@ -742,6 +866,20 @@ export function createChatTurnRoutes<TContext = void>(
               ...(usage.cacheReadTokens !== undefined ? { cacheReadTokens: usage.cacheReadTokens } : {}),
               ...(usage.cacheWriteTokens !== undefined ? { cacheWriteTokens: usage.cacheWriteTokens } : {}),
               ...(usage.costUsd !== undefined ? { costUsd: usage.costUsd } : {}),
+            }
+            // ONE row per turn either way. With drafting, `finalize` settles
+            // any in-flight draft and then insert-or-patches the same
+            // deterministic id — so the row this turn ends with is identical to
+            // the one the single-write path produces. Without it, today's
+            // append is untouched.
+            if (draft) {
+              await draft.finalize(values)
+              return
+            }
+            await options.store.appendMessage({
+              threadId: payload.threadId,
+              role: 'assistant',
+              ...values,
             })
           },
           ...(options.onTurnComplete
@@ -785,6 +923,12 @@ export function createChatTurnRoutes<TContext = void>(
           })
         }
         const failed = runFailed || drainError !== undefined
+        // Settle any in-flight draft INSIDE the waitUntil-tracked drain. On the
+        // path where the producer throws, `persistAssistantMessage` never runs
+        // to close the writer, and an unawaited write would race the isolate's
+        // teardown — leaving a torn row instead of a clean partial one for a
+        // re-entered turn to adopt.
+        await draft?.close()
         try {
           await tap.done(failed ? 'error' : 'complete')
         } catch (err) {

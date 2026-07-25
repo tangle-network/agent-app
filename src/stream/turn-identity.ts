@@ -51,9 +51,29 @@ export function resolveChatTurn(input: {
   existingMessages: PersistedChatMessageForTurn[]
   userContent: string
   turnId?: string
+  /** True when the thread has a turn still RUNNING in the turn-event buffer
+   *  (`turnStore.listRunning(threadId)`).
+   *
+   *  Without incremental persistence the trailing row of a thread mid-turn is
+   *  always the user row, so the content fallback below could assume it. With
+   *  incremental persistence the assistant row lands seconds into the turn, so
+   *  a retry of that same turn finds an ASSISTANT row trailing and would
+   *  insert a duplicate user row.
+   *
+   *  This flag is the discriminator that keeps both cases right, and it needs
+   *  no new state: an assistant row trailing a turn that is still running is
+   *  that turn's in-flight draft (walk past it — this is a retry), whereas an
+   *  assistant row trailing a SETTLED turn is a completed answer (stop — the
+   *  user genuinely repeated a message and deserves a new turn). */
+  hasRunningTurn?: boolean
 }): ResolvedChatTurn {
   const { existingMessages, userContent, turnId } = input
-  const reusableIndex = findReusableUserMessageIndex(existingMessages, userContent, turnId)
+  const reusableIndex = findReusableUserMessageIndex(
+    existingMessages,
+    userContent,
+    turnId,
+    input.hasRunningTurn === true,
+  )
   if (reusableIndex >= 0) {
     return {
       turnIndex: countUserMessages(existingMessages.slice(0, reusableIndex)),
@@ -75,6 +95,7 @@ function findReusableUserMessageIndex(
   messages: PersistedChatMessageForTurn[],
   userContent: string,
   turnId: string | undefined,
+  hasRunningTurn: boolean,
 ): number {
   if (turnId) {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -83,10 +104,16 @@ function findReusableUserMessageIndex(
     }
   }
 
-  const latest = messages.at(-1)
-  if (latest?.role === 'user' && latest.content === userContent) {
-    return messages.length - 1
+  // Content fallback for a client that sends no turnId. Only the trailing rows
+  // of a turn still RUNNING are walked past (they are that turn's incrementally
+  // persisted assistant draft); a settled assistant row still ends the scan, so
+  // a user who genuinely repeats a message gets a new turn exactly as before.
+  let index = messages.length - 1
+  if (hasRunningTurn) {
+    while (index >= 0 && messages[index]?.role === 'assistant') index -= 1
   }
+  const latest = index >= 0 ? messages[index] : undefined
+  if (latest?.role === 'user' && latest.content === userContent) return index
 
   return -1
 }
