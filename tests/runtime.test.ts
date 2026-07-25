@@ -31,7 +31,7 @@ describe('runAppToolLoop', () => {
     expect(r.finalText).toBe('Here is my analysis.')
     expect(r.turns).toBe(1)
     expect(r.toolResults).toHaveLength(0)
-    expect(r.cappedOut).toBe(false)
+    expect(r.stopReason).toBe('completed')
   })
 
   it('executes a tool call, appends the result, and re-runs to the final answer', async () => {
@@ -172,7 +172,6 @@ describe('runAppToolLoop', () => {
       executeToolCall: async () => ({ ok: true, result: {} }),
       isExecutableTool: isExec,
     })
-    expect(r.cappedOut).toBe(true)
     expect(r.stopReason).toBe('backstop')
     expect(r.turns).toBe(4) // turns 0..3 ran, the 4th detected the backstop
     expect(r.toolResults.length).toBe(3)
@@ -189,7 +188,6 @@ describe('runAppToolLoop', () => {
       executeToolCall: async () => ({ ok: true, result: {} }),
       isExecutableTool: isExec,
     })
-    expect(r.cappedOut).toBe(true)
     expect(r.stopReason).toBe('stuck-loop')
     // Fires on the 3rd identical call — 2 tool results recorded before stop.
     expect(r.toolResults.length).toBe(2)

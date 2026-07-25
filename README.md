@@ -33,15 +33,15 @@ The engine packages you actually use are **peer dependencies** — install the o
 pnpm add @tangle-network/agent-eval @tangle-network/agent-integrations
 ```
 
-| Peer | Required by | Range |
+| Peer | Required by | Version |
 |---|---|---|
-| `@tangle-network/agent-eval` | `/eval`, `/eval-campaign`, `/profile`, `/knowledge` | `>=0.100.0` |
-| `@tangle-network/agent-runtime` | `/runtime`, `/chat-routes` | `>=0.79.3` |
+| `@tangle-network/agent-eval` | `/eval`, `/eval-campaign`, `/profile`, `/knowledge` | `0.128.0` |
+| `@tangle-network/agent-runtime` | `/runtime`, `/chat-routes` | `0.106.0` |
 | `@tangle-network/agent-integrations` | `/integrations` | `>=0.44.0` |
-| `@tangle-network/agent-interface` | `/interactions`, `/chat-store`, `/harness` | `>=0.15.0` |
+| `@tangle-network/agent-interface` | `/interactions`, `/chat-store`, `/harness` | `0.33.0` |
 | `@tangle-network/sandbox` | `/sandbox`, `/profile`, `/skills` | `>=0.9.7` |
-| `@tangle-network/agent-knowledge` | `/knowledge-loop` | `>=1.7.0` |
-| `@tangle-network/agent-profile-materialize` | `/skills-placement` | `>=0.6.0` |
+| `@tangle-network/agent-knowledge` | `/knowledge-loop` | `5.0.4` |
+| `@tangle-network/agent-profile-materialize` | `/skills-placement` | `0.8.0` |
 
 All of these except `agent-eval`, `agent-integrations`, and `agent-interface` are declared **optional** peers, so a product that never imports the subpath installs nothing. `driveSandboxTurn` (`/sandbox`) calls `box.driveTurn`, which the SDK added in **0.10.5** — above the declared floor, so pin `@tangle-network/sandbox >= 0.10.5` yourself if you use it.
 
@@ -123,7 +123,7 @@ Three decisions cover most of the surface.
 
 **1. How does the turn run?** Pick the transport by who's watching, not by feature.
 
-Each primitive is written `package → symbol`; three packages ship similarly-named turn functions, and AGENTS.md has the full [primitive table and the `runLoop` name-collision note](./AGENTS.md#turn-execution-primitives--which-one-when).
+Each primitive is written `package → symbol`; AGENTS.md has the full [turn execution table](./AGENTS.md#turn-execution-primitives--which-one-when).
 
 | Your turn | Use | Why |
 |---|---|---|

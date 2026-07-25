@@ -94,7 +94,7 @@ Every primitive below is written `package → symbol`, because three packages sh
 | --- | --- | --- |
 | **Interactive product turn** (chat, copilot) | sandbox → `box.streamPrompt()` held open for the turn (agent-app wraps it as `streamSandboxPrompt`, `/sandbox`); for the browser leg, sandbox → `box.mintScopedToken()` + `SessionGatewayClient` (`@tangle-network/sandbox/session-gateway`) so the tab attaches directly | A user is watching; worker lifetime ≈ turn length. The gateway replays buffered events on reconnect, so a dropped tab or worker restart loses nothing. |
 | **Autonomous product work** (missions, queues, crons, scheduled jobs) | sandbox → `box.driveTurn()` (agent-app wraps it as `driveSandboxTurn`, `/sandbox`) ticked from a durable driver (CF Workflows step, DO alarm, queue consumer). Drop to raw `box.dispatchPrompt({ detach: true })` + `box.findCompletedTurn(turnId, { sessionId })` / `box.session(id).status()` only when one pass is too coarse | No consumer exists and workers die in minutes. The platform executes the turn server-side; deterministic session/turn ids make crash re-dispatch a lookup, not a second agent run. Never hold an SSE stream open in a worker to learn that a session finished. |
-| **Eval agent** (agent-eval loops, self-improve, CI) | For a sandboxed harness: sandbox → `box.streamPrompt()`. For an in-process model turn: agent-runtime (root) → `runToolLoop` / `streamToolLoop` (same functions as agent-app `/runtime`'s `runAppToolLoop` / `streamAppToolLoop`). Only for a multi-round, multi-candidate search: agent-runtime → `runLoop` from the **`/loops`** subpath — a different kernel, not a turn loop | The harness IS the consumer and outlives the run; durability machinery adds nothing — reproducibility comes from scenarios and seeds, and a failed run is re-run, not resumed. |
+| **Eval agent** (agent-eval loops, self-improve, CI) | For a sandboxed harness: sandbox → `box.streamPrompt()`. For an in-process model turn: agent-runtime (root) → `runToolLoop` / `streamToolLoop` (same functions as agent-app `/runtime`'s `runAppToolLoop` / `streamAppToolLoop`). For a multi-round, multi-candidate search: agent-runtime → `runAgentRounds` from the **`/loops`** subpath | The harness IS the consumer and outlives the run; durability machinery adds nothing. Reproducibility comes from scenarios and seeds, and a failed run is re-run rather than resumed. |
 
 `agent-runtime` stays durability-free on purpose: it must run identically in a local eval process, CI, and a sandbox. Durable *session* execution is the sandbox platform's job; durable *orchestration* (sequencing, gates, budgets, schedules) is the product/shell layer above it.
 
@@ -119,19 +119,19 @@ Pick from this table before writing anything new; invariant 6 makes a *new* prim
 | `runAppToolLoop` / `streamAppToolLoop` | agent-app `/runtime` | **Aliases, not an implementation** — `src/runtime/loop.ts` re-exports agent-runtime's `runToolLoop` / `streamToolLoop` verbatim | Your product drives an OpenAI-compatible model turn itself (browser/edge copilot) and wants the app-side vocabulary. Identical at runtime to the row below. |
 | `runToolLoop` / `streamToolLoop` | `@tangle-network/agent-runtime` (**root** entry) | The real in-turn tool loop: one model turn → collect tool calls → dispatch → fold results back in OpenAI function-calling shape → re-run, bounded by `maxToolTurns` / `deadlineMs` / `maxCostUsd`. No rounds, no sandboxes | Same as above, importing the engine directly. Both spellings are fine; they are one function. |
 | `handleChatTurn(input)` | `@tangle-network/agent-runtime` (**root** entry) | The turn engine `createChatTurnRoutes` composes — agent-app contributes zero loop logic on this path | You need the engine turn without agent-app's route assembly. |
-| `runLoop(options)` | `@tangle-network/agent-runtime` **`/loops`** subpath | **Not a turn loop.** A multi-round, multi-candidate kernel: per round a driver plans N tasks, they run in N sandbox boxes at bounded concurrency, each output is parsed + validated, and results fold through `driver.decide`. Owns box lifecycle, lineage/fork, cost ledger, winner selection. Tagged `@experimental` | An eval or search harness explores candidates across rounds. Never for a chat turn. |
+| `runAgentRounds(options)` | `@tangle-network/agent-runtime` **`/loops`** subpath | A multi-round, multi-candidate runner: per round a driver plans N tasks, they run in N sandbox boxes at bounded concurrency, each output is parsed and validated, and results fold through `driver.decide`. Owns box lifecycle, lineage, cost accounting, and winner choice. Tagged `@experimental` | An eval or search process explores candidates across rounds. Never for a chat turn. |
 
-#### The `runLoop` name collision — read this before importing anything with "Loop" in it
+#### Turn loops and agent rounds
 
-Four different functions, and the names do not disambiguate them:
+Three public shapes cover different jobs:
 
-1. **`runLoop`** — `@tangle-network/agent-runtime/loops`. The multi-agent *round* kernel described above. It is **not** on the package root; the only `runLoop`-ish name on the root entry is `runLoopRunnerCli`.
-2. **`runToolLoop` / `streamToolLoop`** — `@tangle-network/agent-runtime` **root**. The *in-turn* tool loop. Different file, different subpath, different job from (1).
-3. **`runAppToolLoop` / `streamAppToolLoop`** — agent-app `/runtime`. A pure alias of (2); agent-app owns no loop code. The fleet is currently split — some products import the alias, others import (2) directly. Both resolve to the same function, so neither is a bug; do not "fix" one into the other opportunistically.
-4. **`routerToolLoop`** — a *third* tool loop, shipped on the **same `/loops` subpath as (1)**. So the collision exists inside one subpath, not just across packages.
+1. **`runAgentRounds`** from `@tangle-network/agent-runtime/loops` runs candidate work across rounds.
+2. **`runToolLoop` / `streamToolLoop`** from the agent-runtime root execute tool calls within one model turn.
+3. **`runAppToolLoop` / `streamAppToolLoop`** from agent-app `/runtime` are direct exports of the functions in item 2.
 
-Quick test when reading code or docs: a loop described with **rounds / candidates / a driver** is (1); a loop described with **tool calls folded back into one turn** is (2)/(3)/(4).
-If you are writing a chat turn, you want (2)/(3) — or better, no loop at all: let `createChatTurnRoutes` + `handleChatTurn` run the turn.
+Use `runAgentRounds` for rounds and candidates.
+Use a tool loop for tool calls within one turn.
+For an assembled chat route, let `createChatTurnRoutes` and `handleChatTurn` run the turn.
 
 The test for new code: *"Could the agent in the sandbox do this itself if we told it the intent?"* If yes, write the prompt, not the wrapper.
 
