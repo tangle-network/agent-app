@@ -357,6 +357,21 @@ describe('InteractionQuestionCard host overrides', () => {
     expect(rendered.container.querySelector('strong')?.textContent).toBe('ship it')
   })
 
+  it('renders the body through the host renderer and leaves labels as text', () => {
+    // `body` only. A field label doubles as the input's accessible name, so it
+    // has to stay a string — rendering it as nodes would break `aria-label` or
+    // silently disagree with what a screen reader announces.
+    const { container } = mount(
+      { ...TEXT_INTERACTION, title: '**Title**', body: '**Body**' },
+      { renderMarkdown: (markdown) => <em>{markdown.replaceAll('*', '')}</em> },
+    )
+    const rendered = Array.from(container.querySelectorAll('em')).map((el) => el.textContent)
+    expect(rendered).toEqual(['Body'])
+    expect(container.textContent).toContain('**Title**')
+    expect(container.querySelector('textarea')!.getAttribute('aria-label'))
+      .toBe(TEXT_INTERACTION.fields[0]?.label)
+  })
+
   it('shows the timeout note only while the ask is still open', () => {
     const pending = mount(SELECT_INTERACTION, { timeoutNote: 'Answer within 5m, or “Formal” is chosen.' })
     expect(pending.container.textContent).toContain('Answer within 5m, or “Formal” is chosen.')

@@ -193,6 +193,11 @@ export interface InteractionQuestionCardProps {
   /** Renders `body` as markdown. Omitted, `body` renders as plain text — so a
    *  host that passes authored markdown without this shows its syntax raw.
    *
+   *  `body` ONLY. `title` and every `field.label` stay plain strings: a label is
+   *  also the input's accessible name (`aria-label`), which has to be text, and
+   *  rendering one as nodes would either break that or silently disagree with
+   *  what a screen reader announces. Put prose in `body`.
+   *
    *  `interaction.body` is untrusted: it arrives off the wire, written by an
    *  agent or whoever authored the ask. This card never injects HTML, but a
    *  renderer that does is an XSS sink — so return React elements, and sanitize
