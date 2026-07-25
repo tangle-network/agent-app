@@ -692,7 +692,7 @@
           "name": "ChatInteractionField",
           "kind": "type",
           "signature": "type ChatInteractionField",
-          "doc": "Resolve a chat interaction field excluding select types or including chat select fields"
+          "doc": "An `InteractionField` widened where a card needs a flag the pinned schema may not define: `allowCustom` on a select, `maxLength` on a free-text field."
         },
         {
           "name": "ChatInteractionPart",
@@ -2204,7 +2204,7 @@
           "name": "InteractionRequestWire",
           "kind": "type",
           "signature": "type InteractionRequestWire",
-          "doc": "`InteractionRequest` whose select fields may carry `allowCustom`."
+          "doc": "`InteractionRequest` whose fields carry those widenings — a select that may grant `allowCustom`, a free-text field that may declare `maxLength`."
         },
         {
           "name": "InteractionRouteLogger",
@@ -10424,7 +10424,7 @@
           "name": "ChatInteractionField",
           "kind": "type",
           "signature": "type ChatInteractionField",
-          "doc": "Resolve a chat interaction field excluding select types or including chat select fields"
+          "doc": "An `InteractionField` widened where a card needs a flag the pinned schema may not define: `allowCustom` on a select, `maxLength` on a free-text field."
         },
         {
           "name": "ChatInteractionStatus",
@@ -10592,7 +10592,7 @@
           "name": "InteractionRequestWire",
           "kind": "type",
           "signature": "type InteractionRequestWire",
-          "doc": "`InteractionRequest` whose select fields may carry `allowCustom`."
+          "doc": "`InteractionRequest` whose fields carry those widenings — a select that may grant `allowCustom`, a free-text field that may declare `maxLength`."
         },
         {
           "name": "InteractionRouteLogger",
@@ -18205,7 +18205,7 @@
           "name": "ChatInteractionField",
           "kind": "type",
           "signature": "type ChatInteractionField",
-          "doc": "Resolve a chat interaction field excluding select types or including chat select fields"
+          "doc": "An `InteractionField` widened where a card needs a flag the pinned schema may not define: `allowCustom` on a select, `maxLength` on a free-text field."
         },
         {
           "name": "ChatInteractionRestoreMode",
@@ -18811,7 +18811,7 @@
           "name": "InteractionRequestWire",
           "kind": "type",
           "signature": "type InteractionRequestWire",
-          "doc": "`InteractionRequest` whose select fields may carry `allowCustom`."
+          "doc": "`InteractionRequest` whose fields carry those widenings — a select that may grant `allowCustom`, a free-text field that may declare `maxLength`."
         },
         {
           "name": "interactionStatusLabels",

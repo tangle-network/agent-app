@@ -81,13 +81,16 @@ export type ChatFreeTextField = Extract<InteractionField, { type: 'text' | 'secr
   maxLength?: number
 }
 
-/** Resolve a chat interaction field excluding select types or including chat select fields */
+/** An `InteractionField` widened where a card needs a flag the pinned schema may
+ *  not define: `allowCustom` on a select, `maxLength` on a free-text field. Every
+ *  other kind passes through unchanged. */
 export type ChatInteractionField =
   | Exclude<InteractionField, { type: 'select' | 'text' | 'secret' }>
   | ChatSelectField
   | ChatFreeTextField
 
-/** `InteractionRequest` whose select fields may carry `allowCustom`. */
+/** `InteractionRequest` whose fields carry those widenings — a select that may
+ *  grant `allowCustom`, a free-text field that may declare `maxLength`. */
 export type InteractionRequestWire = Omit<InteractionRequest, 'answerSpec'> & {
   answerSpec: { fields: ChatInteractionField[] }
 }

@@ -840,7 +840,7 @@ interface ChatInteraction
 
 ### `ChatInteractionField`
 
-`type` — Resolve a chat interaction field excluding select types or including chat select fields
+`type` — An `InteractionField` widened where a card needs a flag the pinned schema may not define: `allowCustom` on a select, `maxLength` on a free-text field.
 
 ```ts
 type ChatInteractionField
@@ -2856,7 +2856,7 @@ type InteractionRequest
 
 ### `InteractionRequestWire`
 
-`type` — `InteractionRequest` whose select fields may carry `allowCustom`.
+`type` — `InteractionRequest` whose fields carry those widenings — a select that may grant `allowCustom`, a free-text field that may declare `maxLength`.
 
 ```ts
 type InteractionRequestWire
