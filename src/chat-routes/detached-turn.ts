@@ -23,11 +23,21 @@
  * `AsyncIterable`.
  */
 
+import { toChatMessageParts } from '../chat-store/parts'
 import {
   coalesceDeltas,
   createBufferedTurnTap,
   type TurnEventStore,
 } from '../stream/index'
+import {
+  assistantRowIdForTurn,
+  createAssistantDraftWriter,
+  storeSupportsDraftPersistence,
+  type AssistantDraftStore,
+  type AssistantDraftWriter,
+  type AssistantRowValues,
+  type DraftPersistenceTuning,
+} from './draft-persistence'
 import {
   createSandboxChatProducer,
   type SandboxChatProducerOptions,
@@ -91,6 +101,35 @@ export interface DetachedTurnOptions {
    *  Unset, a re-stream over a `running` buffer is still attempted but logged
    *  as a possible-duplication hazard. */
   resetBuffer?: (turnId: string) => Promise<void>
+  /** Own the durable assistant row for this turn instead of returning the body
+   *  for the caller to insert — and keep it in step with the stream.
+   *
+   *  An autonomous run is exactly the case a late viewer hits: nobody is
+   *  watching when it starts, so by the time a browser opens the session the
+   *  streaming gateway's hot event buffer may already have expired it. Keeping
+   *  that buffer short is what makes it affordable at scale (its Redis
+   *  footprint is linear in `ttl x concurrent sessions`), so the durable row —
+   *  written incrementally here — is what serves the late viewer.
+   *
+   *  WIRING THIS TRANSFERS ROW OWNERSHIP: the returned {@link
+   *  DetachedTurnResult.messageId} names the row this call wrote (draft rows
+   *  during the stream, authoritative values at the end, retraction when the
+   *  turn produced nothing). The caller must NOT insert its own assistant row
+   *  for the turn. Omit the seam and nothing changes — the result is returned
+   *  and the caller persists it exactly as today.
+   *
+   *  Idempotency reuses the turn's own identity: the row id defaults to
+   *  `assistant:<turnId>`, so a durable driver re-invoking after a crash
+   *  patches the same row instead of duplicating parts. */
+  persist?: DraftPersistenceTuning & {
+    store: AssistantDraftStore
+    threadId: string
+    /** Deterministic row id. Default `assistant:<turnId>`. */
+    messageId?: string
+    /** Pre-persist text transform (`/redact`), applied to drafts AND the final
+     *  write — parity with the interactive lane's `transformFinalText`. */
+    transformText?: (text: string) => string | Promise<string>
+  }
   log?: (message: string, meta?: Record<string, unknown>) => void
 }
 
@@ -110,6 +149,10 @@ export interface DetachedTurnResult {
   /** True when a prior buffer meant this call returned a cached/finished result
    *  WITHOUT re-streaming (durable-driver retry after a crash). */
   cached: boolean
+  /** The durable assistant row this call wrote, when `persist` was wired.
+   *  `null` when the turn produced nothing and the row was retracted. Absent
+   *  when the caller owns persistence (today's behavior). */
+  messageId?: string | null
 }
 
 /** Terminal failure event types a producer may forward verbatim. */
@@ -151,6 +194,74 @@ function cachedResultFrom(final: DetachedTurnFinal | null): DetachedTurnResult {
 export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<DetachedTurnResult> {
   const { store, turnId, scopeId } = opts
 
+  // Hoisted so the draft writer's snapshot can read the producer's live
+  // accumulators; assigned once the idempotency branches decide to re-stream.
+  let producer: ReturnType<typeof createSandboxChatProducer> | undefined
+
+  // Durable row ownership (opt-in). Built before the idempotency branches so a
+  // cached/finished-server-side re-invoke still converges the row instead of
+  // leaving whatever partial state a crashed attempt wrote.
+  let draft: AssistantDraftWriter | undefined
+  if (opts.persist) {
+    const { store: persistStore, threadId, messageId, transformText, ...tuning } = opts.persist
+    if (!storeSupportsDraftPersistence(persistStore)) {
+      throw new Error(
+        'runDetachedTurn persist requires a store with updateMessage() — `/chat-store`\'s createChatStore has it',
+      )
+    }
+    draft = createAssistantDraftWriter({
+      ...tuning,
+      store: persistStore,
+      threadId,
+      messageId: messageId ?? assistantRowIdForTurn(turnId),
+      snapshot: () => (producer
+        ? {
+            content: producer.finalText?.() ?? '',
+            ...(producer.draftParts ? { parts: producer.draftParts() } : {}),
+            ...(producer.usage ? { usage: producer.usage() } : {}),
+            ...(opts.model ? { model: opts.model } : {}),
+          }
+        : null),
+      ...(transformText ? { transformText } : {}),
+      ...(opts.log ? { log: opts.log } : {}),
+    })
+  }
+
+  /** Settle the durable row with authoritative values (or retract it when the
+   *  turn produced nothing), and stamp the id onto the result. */
+  const settleRow = async (result: DetachedTurnResult): Promise<DetachedTurnResult> => {
+    if (!draft) return result
+    const transform = opts.persist?.transformText
+    const content = transform ? await transform(result.text) : result.text
+    const rawParts = transform
+      ? await Promise.all(
+          result.parts.map(async (part) =>
+            String((part as { type?: unknown }).type ?? '') === 'text'
+              ? { ...part, text: await transform(String((part as { text?: unknown }).text ?? '')) }
+              : part,
+          ),
+        )
+      : result.parts
+    const parts = toChatMessageParts(rawParts)
+    if (!content.trim() && parts.length === 0) {
+      await draft.discard()
+      return { ...result, messageId: null }
+    }
+    const values: AssistantRowValues = {
+      content,
+      ...(parts.length > 0 ? { parts } : {}),
+      ...(opts.model ? { model: opts.model } : {}),
+      ...(result.usage.inputTokens !== undefined ? { inputTokens: result.usage.inputTokens } : {}),
+      ...(result.usage.outputTokens !== undefined ? { outputTokens: result.usage.outputTokens } : {}),
+      ...(result.usage.reasoningTokens !== undefined ? { reasoningTokens: result.usage.reasoningTokens } : {}),
+      ...(result.usage.cacheReadTokens !== undefined ? { cacheReadTokens: result.usage.cacheReadTokens } : {}),
+      ...(result.usage.cacheWriteTokens !== undefined ? { cacheWriteTokens: result.usage.cacheWriteTokens } : {}),
+      ...(result.usage.costUsd !== undefined ? { costUsd: result.usage.costUsd } : {}),
+    }
+    await draft.finalize(values)
+    return { ...result, messageId: draft.rowId() ?? null }
+  }
+
   const completed = async (): Promise<DetachedTurnFinal | null> => {
     if (!opts.completedResult) return null
     try {
@@ -170,7 +281,7 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
     opts.log?.('[chat-routes] runDetachedTurn getStatus failed; treating as no prior', { turnId, err: String(err) })
   }
 
-  if (prior === 'complete') return cachedResultFrom(await completed())
+  if (prior === 'complete') return await settleRow(cachedResultFrom(await completed()))
 
   if (prior === 'running') {
     // A prior attempt marked the turn running and then this worker crashed. The
@@ -182,7 +293,7 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
       await store.setStatus(turnId, 'complete', scopeId).catch((err) => {
         opts.log?.('[chat-routes] runDetachedTurn failed to settle a completed running turn', { turnId, err: String(err) })
       })
-      return cachedResultFrom(final)
+      return await settleRow(cachedResultFrom(final))
     }
     // Genuine re-run: clear the partial buffer first, or the fresh tap's seq
     // (restarting at 0) interleaves with the orphaned rows.
@@ -205,7 +316,7 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
   // it) and is the browser's `/replay` resume handle.
   await tap.onEvent({ type: 'turn', turnId })
 
-  const producer = createSandboxChatProducer({
+  producer = createSandboxChatProducer({
     events: opts.events,
     model: opts.model,
     isRenderableInteraction: opts.isRenderableInteraction,
@@ -220,10 +331,17 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
       const type = (ev as { type?: unknown }).type
       if (typeof type === 'string' && TERMINAL_ERROR_TYPES.has(type)) runError = errorMessageOf(ev)
       await tap.onEvent(ev)
+      // Same coalesced cadence the interactive lane uses: the durable row
+      // tracks the run so a viewer arriving after the hot buffer's short window
+      // reads it from storage.
+      draft?.notify(ev as { type?: unknown })
     }
     await tap.done(runError ? 'error' : 'complete')
   } catch (err) {
     await tap.done('error').catch(() => {})
+    // Settle any in-flight draft before propagating so the partial row a
+    // re-invoke will adopt is a complete write, not a half-landed one.
+    await draft?.close().catch(() => {})
     throw err
   }
 
@@ -235,10 +353,10 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
     const final = await completed()
     if (final?.usage) usage = { ...usage, ...final.usage }
     if (!text && final?.text) {
-      return { state: 'completed', text: final.text, parts: final.parts ?? parts, usage, cached: false }
+      return await settleRow({ state: 'completed', text: final.text, parts: final.parts ?? parts, usage, cached: false })
     }
   }
 
-  if (runError) return { state: 'failed', text, parts, usage, error: runError, cached: false }
-  return { state: 'completed', text, parts, usage, cached: false }
+  if (runError) return await settleRow({ state: 'failed', text, parts, usage, error: runError, cached: false })
+  return await settleRow({ state: 'completed', text, parts, usage, cached: false })
 }

@@ -68,6 +68,12 @@ export interface CreateThreadInput {
 
 /** Define input parameters for appending a message to a chat thread with optional metadata */
 export interface AppendMessageInput {
+  /** Caller-assigned primary key. Omitted, the column default assigns a random
+   *  hex id (today's behavior). Incremental assistant persistence passes a
+   *  DETERMINISTIC id derived from the turn's own identity, so a re-entered
+   *  turn (crashed worker, durable-driver retry) finds and updates the row a
+   *  previous attempt started instead of inserting a second one. */
+  id?: string
   threadId: string
   role: 'user' | 'assistant' | 'system' | 'tool'
   content: string
@@ -81,6 +87,29 @@ export interface AppendMessageInput {
   cacheWriteTokens?: number | null
   costUsd?: number | null
   /** Opaque product-column values written verbatim in the SAME insert. */
+  extras?: Record<string, unknown>
+}
+
+/** Fields an existing message row may be patched with. Every field is
+ *  optional and only DEFINED fields are written, so a partial patch never
+ *  clears a column it does not mention. `threadId` and `role` are absent on
+ *  purpose: a message never moves thread or changes speaker.
+ *
+ *  Exists for incremental assistant persistence — the streaming turn writes
+ *  the row once and then patches it as content accumulates, so the durable
+ *  transcript is at most one cadence interval behind the live stream. */
+export interface UpdateMessageInput {
+  content?: string
+  parts?: ChatMessagePart[]
+  toolName?: string | null
+  model?: string | null
+  inputTokens?: number | null
+  outputTokens?: number | null
+  reasoningTokens?: number | null
+  cacheReadTokens?: number | null
+  cacheWriteTokens?: number | null
+  costUsd?: number | null
+  /** Opaque product-column values written verbatim in the SAME update. */
   extras?: Record<string, unknown>
 }
 
@@ -115,6 +144,14 @@ export interface ChatStore<TThread = ChatThreadRow, TMessage = ChatMessageRow> {
   /** Inserts the message and bumps the thread's `updatedAt` in one batch so
    *  workspace recency sorts stay truthful. */
   appendMessage(input: AppendMessageInput): Promise<TMessage>
+  /** Patches an existing message and bumps its thread's `updatedAt` in the
+   *  same batch. Resolves `null` when the id does not exist. Only defined
+   *  patch fields are written. */
+  updateMessage(id: string, patch: UpdateMessageInput): Promise<TMessage | null>
+  /** Removes one message. Resolves false when the id does not exist. Used by
+   *  incremental persistence to retract a draft row for a turn that ended
+   *  producing nothing, so an empty assistant row is never left behind. */
+  deleteMessage(id: string): Promise<boolean>
 }
 
 /** One driver round trip when `db.batch` exists; sequential awaits in the
@@ -265,6 +302,7 @@ export function createChatStore<TTables extends ChatTables>(
 
     async appendMessage(input) {
       const values = {
+        ...(input.id !== undefined ? { id: input.id } : {}),
         threadId: input.threadId,
         role: input.role,
         content: input.content,
@@ -286,6 +324,40 @@ export function createChatStore<TTables extends ChatTables>(
       const row = (insertResult as TMessage[] | undefined)?.[0]
       if (!row) throw new Error('message insert returned no row')
       return row
+    },
+
+    async updateMessage(id, patch) {
+      const values = {
+        ...(patch.content !== undefined ? { content: patch.content } : {}),
+        ...(patch.parts !== undefined ? { parts: patch.parts } : {}),
+        ...(patch.toolName !== undefined ? { toolName: patch.toolName } : {}),
+        ...(patch.model !== undefined ? { model: patch.model } : {}),
+        ...(patch.inputTokens !== undefined ? { inputTokens: patch.inputTokens } : {}),
+        ...(patch.outputTokens !== undefined ? { outputTokens: patch.outputTokens } : {}),
+        ...(patch.reasoningTokens !== undefined ? { reasoningTokens: patch.reasoningTokens } : {}),
+        ...(patch.cacheReadTokens !== undefined ? { cacheReadTokens: patch.cacheReadTokens } : {}),
+        ...(patch.cacheWriteTokens !== undefined ? { cacheWriteTokens: patch.cacheWriteTokens } : {}),
+        ...(patch.costUsd !== undefined ? { costUsd: patch.costUsd } : {}),
+        ...(patch.extras ?? {}),
+      }
+      if (Object.keys(values).length === 0) {
+        const [current] = await db.select().from(messages).where(eq(messages.id, id))
+        return (current as TMessage | undefined) ?? null
+      }
+      // The thread bump reads the row's own `thread_id` rather than trusting a
+      // caller-supplied one: a message never moves thread, so the subquery is
+      // the authoritative source and one fewer parameter to get wrong.
+      const [updateResult] = await runStatements(db, [
+        db.update(messages).set(values).where(eq(messages.id, id)).returning(),
+        db.update(threads).set({ updatedAt: new Date() })
+          .where(eq(threads.id, sql`(select ${messages.threadId} from ${messages} where ${messages.id} = ${id})`)),
+      ])
+      return (updateResult as TMessage[] | undefined)?.[0] ?? null
+    },
+
+    async deleteMessage(id) {
+      const deleted = await db.delete(messages).where(eq(messages.id, id)).returning()
+      return (deleted as unknown[]).length > 0
     },
   }
 }

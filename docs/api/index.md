@@ -4,7 +4,7 @@
 
 Source: `src/index.ts`
 
-766 exports.
+767 exports.
 
 ### `AddCitationArgs`
 
@@ -1884,6 +1884,14 @@ interface DispatchOptions
 
 ```ts
 interface DistributionSummary
+```
+
+### `draftAssistantParts`
+
+`function` — The MID-STREAM twin of {@link finalizeAssistantParts}: the same assembled, collapsed projection MINUS the dangling-tool terminalizer.
+
+```ts
+(partOrder: string[], partMap: Map<string, JsonRecord>, finalText: string) => JsonRecord[]
 ```
 
 ### `driveSandboxTurn`
@@ -4499,7 +4507,7 @@ interface RequestContext
 `function` — Resolve a chat turn by determining message reuse and constructing user message parts
 
 ```ts
-(input: { existingMessages: PersistedChatMessageForTurn[]; userContent: string; turnId?: string | undefined; }) => Reso…
+(input: { existingMessages: PersistedChatMessageForTurn[]; userContent: string; turnId?: string | undefined; hasRunning…
 ```
 
 ### `ResolvedAgentProfile`

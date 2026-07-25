@@ -4,7 +4,7 @@
 
 Source: `src/stream/index.ts`
 
-44 exports.
+45 exports.
 
 ### `asRecord`
 
@@ -116,6 +116,14 @@ interface BufferedTurnTap
 
 ```ts
 interface D1LikeForTurns
+```
+
+### `draftAssistantParts`
+
+`function` — The MID-STREAM twin of {@link finalizeAssistantParts}: the same assembled, collapsed projection MINUS the dangling-tool terminalizer.
+
+```ts
+(partOrder: string[], partMap: Map<string, JsonRecord>, finalText: string) => JsonRecord[]
 ```
 
 ### `encodeEvent`
@@ -267,7 +275,7 @@ interface ReplayTurnEventsOptions
 `function` — Resolve a chat turn by determining message reuse and constructing user message parts
 
 ```ts
-(input: { existingMessages: PersistedChatMessageForTurn[]; userContent: string; turnId?: string | undefined; }) => Reso…
+(input: { existingMessages: PersistedChatMessageForTurn[]; userContent: string; turnId?: string | undefined; hasRunning…
 ```
 
 ### `ResolvedChatTurn`

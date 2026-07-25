@@ -1888,6 +1888,14 @@ interface DispatchOptions
 interface DistributionSummary
 ```
 
+### `draftAssistantParts`
+
+`function` — The MID-STREAM twin of {@link finalizeAssistantParts}: the same assembled, collapsed projection MINUS the dangling-tool terminalizer.
+
+```ts
+(partOrder: string[], partMap: Map<string, JsonRecord>, finalText: string) => JsonRecord[]
+```
+
 ### `driveSandboxTurn`
 
 `function` — Resolve a sandbox turn by processing a message with given configuration and options
@@ -4501,7 +4509,7 @@ interface RequestContext
 `function` — Resolve a chat turn by determining message reuse and constructing user message parts
 
 ```ts
-(input: { existingMessages: PersistedChatMessageForTurn[]; userContent: string; turnId?: string | undefined; }) => Reso…
+(input: { existingMessages: PersistedChatMessageForTurn[]; userContent: string; turnId?: string | undefined; hasRunning…
 ```
 
 ### `ResolvedAgentProfile`
@@ -7456,6 +7464,54 @@ ReadonlySet<string>
 (parts: ChatTurnPartInput[], maxBytes?: number) => void
 ```
 
+### `AssistantDraftSnapshot`
+
+`interface` — Live snapshot of the assistant body, taken from the producer's own accumulators.
+
+```ts
+interface AssistantDraftSnapshot
+```
+
+### `AssistantDraftStore`
+
+`interface` — The store capability incremental persistence needs on top of `appendMessage`.
+
+```ts
+interface AssistantDraftStore
+```
+
+### `AssistantDraftWriter`
+
+`interface` — Coalescing writer that keeps one durable assistant row in step with a streaming turn.
+
+```ts
+interface AssistantDraftWriter
+```
+
+### `AssistantDraftWriterOptions`
+
+`interface` — Define the inputs required to construct an assistant draft writer
+
+```ts
+interface AssistantDraftWriterOptions
+```
+
+### `assistantRowIdForTurn`
+
+`function` — The default deterministic assistant-row id for a turn.
+
+```ts
+(turnKey: string) => string
+```
+
+### `AssistantRowValues`
+
+`interface` — Values written to the assistant row — the intersection of the append and patch shapes, so one snapshot serves both.
+
+```ts
+interface AssistantRowValues
+```
+
 ### `ATTACHMENT_ACCEPT`
 
 `const` — Accept list for the composer file picker + type validation, same grammar as the native `<input accept>` attribute.
@@ -7800,6 +7856,14 @@ interface ChatTurnUsage
 (fileName: string, sniff: SniffResult, allowed?: ReadonlySet<string>) => AttachmentTypeCheckResult
 ```
 
+### `createAssistantDraftWriter`
+
+`function` — Build the coalescing draft writer for one turn.
+
+```ts
+(options: AssistantDraftWriterOptions) => AssistantDraftWriter
+```
+
 ### `createAttachmentUploadRoute`
 
 `function` — Resolve an attachment upload route handler with customizable limits and validation options
@@ -7968,6 +8032,22 @@ number
 type DispatchPartsOutcome
 ```
 
+### `DraftPersistenceTuning`
+
+`interface` — Product-tunable cadence.
+
+```ts
+interface DraftPersistenceTuning
+```
+
+### `DraftStoredMessage`
+
+`interface` — Message row shape the writer reads back when re-entering a turn.
+
+```ts
+interface DraftStoredMessage
+```
+
 ### `FileIndexAuthorization`
 
 `type` — Define authorization details and parameters for indexing a file workspace with optional caching and ignore rules
@@ -8054,6 +8134,14 @@ type FilePartPromotionOutcome
 
 ```ts
 950000
+```
+
+### `isDraftContentEvent`
+
+`function` — True when this event should arm a draft write.
+
+```ts
+(event: { type?: unknown; }) => boolean
 ```
 
 ### `MAX_ATTACHMENT_TOTAL_BYTES`
@@ -8430,6 +8518,14 @@ type StaleTurnLockSandboxProbeResult
 
 ```ts
 type StaleTurnLockSessionProbeResult
+```
+
+### `storeSupportsDraftPersistence`
+
+`function` — True when a store can support incremental persistence at all.
+
+```ts
+(store: AssistantDraftStore) => boolean
 ```
 
 ### `UPLOAD_INLINE_MAX_BYTES`
@@ -8955,6 +9051,14 @@ type StorableHarnessPartKind
 
 ```ts
 (parts: Record<string, unknown>[]) => ChatMessagePart[]
+```
+
+### `UpdateMessageInput`
+
+`interface` — Fields an existing message row may be patched with.
+
+```ts
+interface UpdateMessageInput
 ```
 
 ### `WorkspaceAccessCheck`
@@ -20002,6 +20106,14 @@ interface BufferedTurnTap
 interface D1LikeForTurns
 ```
 
+### `draftAssistantParts`
+
+`function` — The MID-STREAM twin of {@link finalizeAssistantParts}: the same assembled, collapsed projection MINUS the dangling-tool terminalizer.
+
+```ts
+(partOrder: string[], partMap: Map<string, JsonRecord>, finalText: string) => JsonRecord[]
+```
+
 ### `encodeEvent`
 
 `function` — Encode a StreamEvent object into a Uint8Array using the provided TextEncoder
@@ -20151,7 +20263,7 @@ interface ReplayTurnEventsOptions
 `function` — Resolve a chat turn by determining message reuse and constructing user message parts
 
 ```ts
-(input: { existingMessages: PersistedChatMessageForTurn[]; userContent: string; turnId?: string | undefined; }) => Reso…
+(input: { existingMessages: PersistedChatMessageForTurn[]; userContent: string; turnId?: string | undefined; hasRunning…
 ```
 
 ### `ResolvedChatTurn`

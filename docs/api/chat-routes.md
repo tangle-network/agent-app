@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-131 exports.
+142 exports.
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
@@ -20,6 +20,54 @@ ReadonlySet<string>
 
 ```ts
 (parts: ChatTurnPartInput[], maxBytes?: number) => void
+```
+
+### `AssistantDraftSnapshot`
+
+`interface` — Live snapshot of the assistant body, taken from the producer's own accumulators.
+
+```ts
+interface AssistantDraftSnapshot
+```
+
+### `AssistantDraftStore`
+
+`interface` — The store capability incremental persistence needs on top of `appendMessage`.
+
+```ts
+interface AssistantDraftStore
+```
+
+### `AssistantDraftWriter`
+
+`interface` — Coalescing writer that keeps one durable assistant row in step with a streaming turn.
+
+```ts
+interface AssistantDraftWriter
+```
+
+### `AssistantDraftWriterOptions`
+
+`interface` — Define the inputs required to construct an assistant draft writer
+
+```ts
+interface AssistantDraftWriterOptions
+```
+
+### `assistantRowIdForTurn`
+
+`function` — The default deterministic assistant-row id for a turn.
+
+```ts
+(turnKey: string) => string
+```
+
+### `AssistantRowValues`
+
+`interface` — Values written to the assistant row — the intersection of the append and patch shapes, so one snapshot serves both.
+
+```ts
+interface AssistantRowValues
 ```
 
 ### `ATTACHMENT_ACCEPT`
@@ -366,6 +414,14 @@ interface ChatTurnUsage
 (fileName: string, sniff: SniffResult, allowed?: ReadonlySet<string>) => AttachmentTypeCheckResult
 ```
 
+### `createAssistantDraftWriter`
+
+`function` — Build the coalescing draft writer for one turn.
+
+```ts
+(options: AssistantDraftWriterOptions) => AssistantDraftWriter
+```
+
 ### `createAttachmentUploadRoute`
 
 `function` — Resolve an attachment upload route handler with customizable limits and validation options
@@ -534,6 +590,22 @@ number
 type DispatchPartsOutcome
 ```
 
+### `DraftPersistenceTuning`
+
+`interface` — Product-tunable cadence.
+
+```ts
+interface DraftPersistenceTuning
+```
+
+### `DraftStoredMessage`
+
+`interface` — Message row shape the writer reads back when re-entering a turn.
+
+```ts
+interface DraftStoredMessage
+```
+
 ### `FileIndexAuthorization`
 
 `type` — Define authorization details and parameters for indexing a file workspace with optional caching and ignore rules
@@ -620,6 +692,14 @@ type FilePartPromotionOutcome
 
 ```ts
 950000
+```
+
+### `isDraftContentEvent`
+
+`function` — True when this event should arm a draft write.
+
+```ts
+(event: { type?: unknown; }) => boolean
 ```
 
 ### `MAX_ATTACHMENT_TOTAL_BYTES`
@@ -996,6 +1076,14 @@ type StaleTurnLockSandboxProbeResult
 
 ```ts
 type StaleTurnLockSessionProbeResult
+```
+
+### `storeSupportsDraftPersistence`
+
+`function` — True when a store can support incremental persistence at all.
+
+```ts
+(store: AssistantDraftStore) => boolean
 ```
 
 ### `UPLOAD_INLINE_MAX_BYTES`

@@ -500,6 +500,30 @@ export function finalizeAssistantParts(
   ))
 }
 
+/** The MID-STREAM twin of {@link finalizeAssistantParts}: the same assembled,
+ *  collapsed projection MINUS the dangling-tool terminalizer.
+ *
+ *  Incremental persistence snapshots the assistant body while the turn is
+ *  still running, and mid-stream a tool part sitting at `state.status:
+ *  'running'` is the NORMAL in-flight state — not the abnormal end
+ *  {@link terminalizeDanglingToolPart} exists to settle. Running a live
+ *  snapshot through `finalizeAssistantParts` would persist every in-flight
+ *  tool call as a failure (`state.status:'error'`, `metadata.terminalized`),
+ *  so a reader of the durable row would see phantom tool errors that the final
+ *  write then silently un-does. Terminalization stays a completion-time
+ *  decision: the final write is the only writer allowed to settle a tool part.
+ *
+ *  Pending `interaction` parts are likewise left `pending` here (the caller
+ *  skips {@link finalizePendingInteractionParts}) — an ask is genuinely
+ *  unanswered until the turn settles. */
+export function draftAssistantParts(
+  partOrder: string[],
+  partMap: Map<string, JsonRecord>,
+  finalText: string,
+): JsonRecord[] {
+  return collapseRedundantTextParts(assembleAssistantParts(partOrder, partMap, finalText))
+}
+
 function partStatus(part: JsonRecord | undefined): string {
   const state = asRecord(part?.state)
   return String(state?.status ?? part?.status ?? '')
