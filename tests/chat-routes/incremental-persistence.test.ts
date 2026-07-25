@@ -271,6 +271,42 @@ describe('incremental assistant persistence — write cadence', () => {
     expect((await rows(store, threadId)).filter((row) => row.role === 'assistant')).toHaveLength(0)
   })
 
+  it('an errored turn still settles as FAILED and unbilled, with its partial answer kept as an error row', async () => {
+    const { store, threadId } = await freshStore()
+    const completions: Array<{ failed: boolean; failureReason?: string }> = []
+    async function* events(): AsyncGenerator<unknown> {
+      yield TURN_EVENTS[0]
+      await waitUntil(
+        () => assistantRow(store, threadId),
+        (row) => Boolean(row && row.content.length > 0),
+        'draft row before the failure',
+      )
+      // Terminal error EVENT (not a throw) — the 402 / rate-limit shape.
+      yield { type: 'error', data: { message: 'model quota exhausted' } }
+    }
+    const { routes, ctx, settle } = routesOver(
+      store as unknown as ChatTurnMessageStore,
+      () => createSandboxChatProducer({ events: events(), model: 'm' }),
+      {
+        incrementalPersistence: { intervalMs: 0 },
+        onTurnComplete: async (input: { failed: boolean; failureReason?: string }) => {
+          completions.push({ failed: input.failed, failureReason: input.failureReason })
+        },
+      },
+    )
+    await drain(await routes.turn(turnRequest(threadId, 'ask'), ctx))
+    await settle()
+
+    // Billing branches on this, and drafting must not have changed it.
+    expect(completions).toEqual([{ failed: true, failureReason: 'model quota exhausted' }])
+    // The partial answer is kept as ONE row carrying the visible error text —
+    // not a second row, and not an empty one.
+    const assistants = (await rows(store, threadId)).filter((row) => row.role === 'assistant')
+    expect(assistants).toHaveLength(1)
+    expect(assistants[0]!.content).toContain('Checking ')
+    expect(assistants[0]!.content).toContain('model quota exhausted')
+  })
+
   it('applies transformFinalText to DRAFT text and DRAFT text parts (the at-rest leak must not reopen mid-stream)', async () => {
     const { store, threadId } = await freshStore()
     // Sampled from INSIDE the stream — the final write re-redacts, so only a
