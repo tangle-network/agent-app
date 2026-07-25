@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
@@ -8,7 +9,7 @@ import {
   type InteractionSubmitResult,
   type SubmitInteractionAnswer,
 } from './interaction-card-support'
-import type { ChatInteraction } from './chat-interactions'
+import type { ChatFreeTextField, ChatInteraction } from './chat-interactions'
 
 afterEach(() => {
   cleanup()
@@ -61,6 +62,10 @@ function mount(
     submitAnswer?: SubmitInteractionAnswer
     onResolved?: (id: string, status: string) => void
     onLateAnswer?: (message: string) => boolean | void | Promise<boolean | void>
+    kindLabel?: string
+    sourceNote?: string
+    timeoutNote?: React.ReactNode
+    renderMarkdown?: (markdown: string) => React.ReactNode
   } = {},
 ) {
   const submitAnswer = props.submitAnswer ?? okSubmitter()
@@ -71,6 +76,10 @@ function mount(
       submitAnswer={submitAnswer}
       onResolved={props.onResolved}
       onLateAnswer={props.onLateAnswer}
+      kindLabel={props.kindLabel}
+      sourceNote={props.sourceNote}
+      timeoutNote={props.timeoutNote}
+      renderMarkdown={props.renderMarkdown}
     />,
   )
   return { ...utils, submitAnswer }
@@ -88,6 +97,27 @@ async function flush() {
   await act(async () => {
     await Promise.resolve()
   })
+}
+
+/** The card's only textarea, asserted present rather than assumed. */
+function textareaOf({ container }: { container: HTMLElement }): HTMLTextAreaElement {
+  const textarea = container.querySelector('textarea')
+  expect(textarea).not.toBeNull()
+  return textarea as HTMLTextAreaElement
+}
+
+/** A text ask carrying a length cap, built as a typed `ChatFreeTextField` rather
+ *  than cast — so a change to the field shape fails this file at compile time
+ *  instead of passing here and breaking the card. */
+function cappedTextarea(maxLength: number): HTMLTextAreaElement {
+  const field: ChatFreeTextField = {
+    type: 'text',
+    name: 'q0',
+    label: 'Describe your audience',
+    required: true,
+    maxLength,
+  }
+  return textareaOf(mount({ ...TEXT_INTERACTION, fields: [field] }))
 }
 
 describe('InteractionQuestionCard', () => {
@@ -315,5 +345,217 @@ describe('InteractionQuestionCard', () => {
     expect(radios.length).toBeGreaterThan(0)
     expect(radios.every((radio) => radio.disabled)).toBe(true)
     expect(submitButton().disabled).toBe(true)
+  })
+})
+
+describe('InteractionQuestionCard host overrides', () => {
+  it('names the agent as the asker by default', () => {
+    const { container } = mount(SELECT_INTERACTION)
+    expect(container.textContent).toContain('Question')
+    expect(container.textContent).toContain('The agent asked for input')
+  })
+
+  it('lets a non-agent host say who is actually asking', () => {
+    const { container } = mount(SELECT_INTERACTION, {
+      kindLabel: 'Decision',
+      sourceNote: 'This run is waiting on you',
+    })
+    expect(container.textContent).toContain('Decision')
+    expect(container.textContent).toContain('This run is waiting on you')
+    expect(container.textContent).not.toContain('The agent asked for input')
+  })
+
+  it('renders the body through the host renderer, and as plain text without one', () => {
+    const withBody = { ...SELECT_INTERACTION, body: '**ship it**' }
+    const plain = mount(withBody)
+    expect(plain.container.querySelector('strong')).toBeNull()
+    expect(plain.container.textContent).toContain('**ship it**')
+    plain.unmount()
+
+    const rendered = mount(withBody, {
+      renderMarkdown: (markdown) => <strong>{markdown.replaceAll('*', '')}</strong>,
+    })
+    expect(rendered.container.querySelector('strong')?.textContent).toBe('ship it')
+  })
+
+  it('renders the body through the host renderer and leaves labels as text', () => {
+    // `body` only. A field label doubles as the input's accessible name, so it
+    // has to stay a string — rendering it as nodes would break `aria-label` or
+    // silently disagree with what a screen reader announces.
+    const { container } = mount(
+      { ...TEXT_INTERACTION, title: '**Title**', body: '**Body**' },
+      { renderMarkdown: (markdown) => <em>{markdown.replaceAll('*', '')}</em> },
+    )
+    const rendered = Array.from(container.querySelectorAll('em')).map((el) => el.textContent)
+    expect(rendered).toEqual(['Body'])
+    expect(container.textContent).toContain('**Title**')
+    expect(container.querySelector('textarea')!.getAttribute('aria-label'))
+      .toBe(TEXT_INTERACTION.fields[0]?.label)
+  })
+
+  it('shows the timeout note only while the ask is still open', () => {
+    const pending = mount(SELECT_INTERACTION, { timeoutNote: 'Answer within 5m, or “Formal” is chosen.' })
+    expect(pending.container.textContent).toContain('Answer within 5m, or “Formal” is chosen.')
+    pending.unmount()
+
+    // Once answered the consequence of silence is no longer true, and a card
+    // still counting down reads as though the answer never landed.
+    const answered = mount(
+      { ...SELECT_INTERACTION, status: 'answered', answers: { q0: ['Formal'] } },
+      { timeoutNote: 'Answer within 5m, or “Formal” is chosen.' },
+    )
+    expect(answered.container.textContent).not.toContain('Answer within 5m')
+  })
+
+  it('shows the timeout note to read-only viewers, who still need to know it will settle itself', () => {
+    const { container } = mount(SELECT_INTERACTION, {
+      canWrite: false,
+      timeoutNote: 'The run fails if nobody answers.',
+    })
+    expect(container.textContent).toContain('The run fails if nobody answers.')
+  })
+
+  it('caps a free-text answer at the length the answer route accepts', () => {
+    expect(cappedTextarea(4096).maxLength).toBe(4096)
+    cleanup()
+    // Uncapped stays uncapped: jsdom reports an absent maxLength as -1.
+    expect(textareaOf(mount(TEXT_INTERACTION)).maxLength).toBe(-1)
+  })
+
+  it('ignores a cap that would make the field unanswerable', () => {
+    expect(cappedTextarea(0).maxLength).toBe(-1)
+    cleanup()
+    expect(cappedTextarea(12.5).maxLength).toBe(-1)
+  })
+
+  it('announces a rejected submit rather than only showing it', async () => {
+    const submitAnswer = vi.fn(async (): Promise<InteractionSubmitResult> => ({
+      ok: false,
+      expired: false,
+      message: 'This decision was already answered.',
+    }))
+    mount(SELECT_INTERACTION, { submitAnswer })
+    fireEvent.click(screen.getByLabelText('Formal'))
+    fireEvent.click(submitButton())
+    await flush()
+
+    expect(screen.getByRole('alert').textContent).toContain('already answered')
+    // Still retryable — a rejected submit is not a terminal state.
+    expect(submitButton().disabled).toBe(false)
+  })
+
+  it('does not wedge on a host submitter that never settles', async () => {
+    vi.useFakeTimers()
+    // NOT `createInteractionAnswerSubmitter` — that one aborts its own fetch.
+    // A product may pass any implementation, commonly one wrapping an untimed
+    // `fetch`. Without a deadline on the card, this leaves the in-flight guard
+    // set for the life of the instance: "Submitting…" forever, no answer ever
+    // sendable again.
+    const submitAnswer = vi.fn(() => new Promise<InteractionSubmitResult>(() => {}))
+    const { container } = mount(SELECT_INTERACTION, { submitAnswer })
+    fireEvent.click(screen.getByLabelText('Formal'))
+    fireEvent.click(submitButton())
+    await flush()
+    expect(submitButton().textContent).toContain('Submitting…')
+
+    await act(async () => {
+      vi.advanceTimersByTime(30_000)
+      await Promise.resolve()
+    })
+
+    expect(container.textContent).toContain('Could not reach the agent. Try again.')
+    expect(submitButton().disabled).toBe(false)
+
+    // And the guard really did clear — a retry reaches the submitter again.
+    vi.useRealTimers()
+    fireEvent.click(submitButton())
+    await flush()
+    expect(submitAnswer).toHaveBeenCalledTimes(2)
+  })
+
+  it('surfaces a throwing host submitter instead of dropping it', async () => {
+    // Without normalising, the rejection escapes the click handler as an
+    // unhandled rejection and the user is left with a card that silently did
+    // nothing.
+    const submitAnswer = vi.fn(async () => {
+      throw new Error('network is down')
+    }) as unknown as SubmitInteractionAnswer
+    const { container } = mount(SELECT_INTERACTION, { submitAnswer })
+    fireEvent.click(screen.getByLabelText('Formal'))
+    fireEvent.click(submitButton())
+    await flush()
+
+    expect(container.textContent).toContain('network is down')
+    expect(submitButton().disabled).toBe(false)
+  })
+
+  it('starts over when the same card is handed the next ask', () => {
+    const submitAnswer = okSubmitter()
+    const { rerender } = render(
+      <InteractionQuestionCard interaction={SELECT_INTERACTION} canWrite submitAnswer={submitAnswer} />,
+    )
+    fireEvent.click(screen.getByLabelText('Formal'))
+    expect((screen.getByLabelText('Formal') as HTMLInputElement).checked).toBe(true)
+
+    // A different question arriving on the same instance must not inherit the
+    // previous answer — that is one click from resolving a question the reader
+    // never saw.
+    rerender(
+      <InteractionQuestionCard
+        interaction={{ ...SELECT_INTERACTION, id: 'int-next', title: 'Which region?' }}
+        canWrite
+        submitAnswer={submitAnswer}
+      />,
+    )
+    expect((screen.getByLabelText('Formal') as HTMLInputElement).checked).toBe(false)
+    expect(submitButton().disabled).toBe(true)
+  })
+
+  it('survives StrictMode double-invocation without re-clearing a fresh answer', () => {
+    // The reset runs during render, so StrictMode renders it twice. The guard
+    // that stops the second pass re-clearing must be state, not a ref: a ref
+    // survives a render React abandons while the resets in the same pass do
+    // not, which would leave the guard claiming a reset that never committed.
+    const submitAnswer = okSubmitter()
+    const { rerender } = render(
+      <StrictMode>
+        <InteractionQuestionCard interaction={SELECT_INTERACTION} canWrite submitAnswer={submitAnswer} />
+      </StrictMode>,
+    )
+    rerender(
+      <StrictMode>
+        <InteractionQuestionCard
+          interaction={{ ...SELECT_INTERACTION, id: 'int-next' }}
+          canWrite
+          submitAnswer={submitAnswer}
+        />
+      </StrictMode>,
+    )
+    // Answering the NEW ask must stick — a guard that mis-tracked identity
+    // would clear this selection on the very next render.
+    fireEvent.click(screen.getByLabelText('Formal'))
+    expect((screen.getByLabelText('Formal') as HTMLInputElement).checked).toBe(true)
+    expect(submitButton().disabled).toBe(false)
+  })
+
+  it('clears the previous ask’s resolved chrome when the next ask arrives', async () => {
+    const submitAnswer = okSubmitter()
+    const { container, rerender } = render(
+      <InteractionQuestionCard interaction={SELECT_INTERACTION} canWrite submitAnswer={submitAnswer} />,
+    )
+    fireEvent.click(screen.getByLabelText('Formal'))
+    fireEvent.click(submitButton())
+    await flush()
+    expect(container.textContent).toContain('Answered')
+
+    rerender(
+      <InteractionQuestionCard
+        interaction={{ ...SELECT_INTERACTION, id: 'int-next' }}
+        canWrite
+        submitAnswer={submitAnswer}
+      />,
+    )
+    expect(container.textContent).toContain('Waiting for your answer')
+    expect(container.textContent).not.toContain('Answered')
   })
 })

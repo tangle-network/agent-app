@@ -4,7 +4,7 @@
 
 Source: `src/index.ts`
 
-767 exports.
+768 exports.
 
 ### `AddCitationArgs`
 
@@ -814,6 +814,14 @@ interface ChatAttachmentPart
 interface ChatFilePart
 ```
 
+### `ChatFreeTextField`
+
+`type` — A field the user types free text into, which may declare the longest answer its answer route will accept — so a card can stop the typing rather than let the route reject it.
+
+```ts
+type ChatFreeTextField
+```
+
 ### `ChatImagePart`
 
 `interface` — Define properties for an image part within a chat message including optional metadata fields
@@ -832,7 +840,7 @@ interface ChatInteraction
 
 ### `ChatInteractionField`
 
-`type` — Resolve a chat interaction field excluding select types or including chat select fields
+`type` — An `InteractionField` widened where a card needs a flag the pinned schema may not define: `allowCustom` on a select, `maxLength` on a free-text field.
 
 ```ts
 type ChatInteractionField
@@ -2848,7 +2856,7 @@ type InteractionRequest
 
 ### `InteractionRequestWire`
 
-`type` — `InteractionRequest` whose select fields may carry `allowCustom`.
+`type` — `InteractionRequest` whose fields carry those widenings — a select that may grant `allowCustom`, a free-text field that may declare `maxLength`.
 
 ```ts
 type InteractionRequestWire

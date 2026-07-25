@@ -211,6 +211,52 @@ export interface InteractionAnswerSubmitterOptions {
 }
 
 /**
+ * Runs a host-supplied submitter under the CARD's own deadline, and always
+ * resolves.
+ *
+ * `createInteractionAnswerSubmitter` aborts its own fetch, but a product may
+ * pass any `SubmitInteractionAnswer` — commonly one wrapping an untimed
+ * `fetch`. The deadline cannot live only in the submitter, because what gets
+ * stuck is the card: its in-flight guard is cleared by the awaited promise
+ * settling, so a submitter that never settles leaves that guard set for the
+ * life of the instance — "Submitting…" forever, and no answer can be sent
+ * again. A submitter with its own shorter timeout simply wins the race.
+ *
+ * Rejection is normalized too: a submitter that throws would otherwise escape
+ * the click handler as an unhandled rejection, leaving the user with a card
+ * that silently did nothing. It becomes a visible, retryable message instead.
+ */
+export function settleInteractionSubmit(
+  run: () => Promise<InteractionSubmitResult>,
+  timeoutMs: number = INTERACTION_SUBMIT_TIMEOUT_MS,
+): Promise<InteractionSubmitResult> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(
+      () => resolve({ ok: false, expired: false, message: INTERACTION_SUBMIT_TIMEOUT_MESSAGE }),
+      timeoutMs,
+    )
+    const settle = (result: InteractionSubmitResult) => {
+      clearTimeout(timer)
+      // A late result after the deadline resolves nothing — this promise is
+      // already settled — so the card keeps the timeout it already reported.
+      resolve(result)
+    }
+    // `Promise.resolve().then(run)` so a submitter that throws SYNCHRONOUSLY is
+    // caught here rather than at the call site, where it would bypass this
+    // whole guard.
+    Promise.resolve()
+      .then(run)
+      .then(settle, (err: unknown) =>
+        settle({
+          ok: false,
+          expired: false,
+          message: err instanceof Error ? err.message : 'Failed to submit the answer',
+        }),
+      )
+  })
+}
+
+/**
  * Builds the `SubmitInteractionAnswer` the cards consume: POSTs
  * `{ ...routingFields, id, outcome, data? }` with an abortable timeout and
  * normalizes the outcome. `expired` is the 410 path — the ask is gone

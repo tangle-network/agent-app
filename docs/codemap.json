@@ -671,6 +671,12 @@
           "doc": "Union of the sidecar's legacy (path-based) and AI-SDK (url-based) file shapes; response-side every field besides `type` is optional."
         },
         {
+          "name": "ChatFreeTextField",
+          "kind": "type",
+          "signature": "type ChatFreeTextField",
+          "doc": "A field the user types free text into, which may declare the longest answer its answer route will accept — so a card can stop the typing rather than let the route reject it."
+        },
+        {
           "name": "ChatImagePart",
           "kind": "interface",
           "signature": "interface ChatImagePart",
@@ -686,7 +692,7 @@
           "name": "ChatInteractionField",
           "kind": "type",
           "signature": "type ChatInteractionField",
-          "doc": "Resolve a chat interaction field excluding select types or including chat select fields"
+          "doc": "An `InteractionField` widened where a card needs a flag the pinned schema may not define: `allowCustom` on a select, `maxLength` on a free-text field."
         },
         {
           "name": "ChatInteractionPart",
@@ -2198,7 +2204,7 @@
           "name": "InteractionRequestWire",
           "kind": "type",
           "signature": "type InteractionRequestWire",
-          "doc": "`InteractionRequest` whose select fields may carry `allowCustom`."
+          "doc": "`InteractionRequest` whose fields carry those widenings — a select that may grant `allowCustom`, a free-text field that may declare `maxLength`."
         },
         {
           "name": "InteractionRouteLogger",
@@ -10403,6 +10409,12 @@
           "doc": "Statuses only move forward (pending → terminal); a replayed/stale `pending` must never resurrect a resolved card."
         },
         {
+          "name": "ChatFreeTextField",
+          "kind": "type",
+          "signature": "type ChatFreeTextField",
+          "doc": "A field the user types free text into, which may declare the longest answer its answer route will accept — so a card can stop the typing rather than let the route reject it."
+        },
+        {
           "name": "ChatInteraction",
           "kind": "interface",
           "signature": "interface ChatInteraction",
@@ -10412,7 +10424,7 @@
           "name": "ChatInteractionField",
           "kind": "type",
           "signature": "type ChatInteractionField",
-          "doc": "Resolve a chat interaction field excluding select types or including chat select fields"
+          "doc": "An `InteractionField` widened where a card needs a flag the pinned schema may not define: `allowCustom` on a select, `maxLength` on a free-text field."
         },
         {
           "name": "ChatInteractionStatus",
@@ -10580,7 +10592,7 @@
           "name": "InteractionRequestWire",
           "kind": "type",
           "signature": "type InteractionRequestWire",
-          "doc": "`InteractionRequest` whose select fields may carry `allowCustom`."
+          "doc": "`InteractionRequest` whose fields carry those widenings — a select that may grant `allowCustom`, a free-text field that may declare `maxLength`."
         },
         {
           "name": "InteractionRouteLogger",
@@ -18178,6 +18190,12 @@
           "doc": "Define properties for rendering the chat empty state with customizable text and starting doors"
         },
         {
+          "name": "ChatFreeTextField",
+          "kind": "type",
+          "signature": "type ChatFreeTextField",
+          "doc": "A field the user types free text into, which may declare the longest answer its answer route will accept — so a card can stop the typing rather than let the route reject it."
+        },
+        {
           "name": "ChatInteraction",
           "kind": "interface",
           "signature": "interface ChatInteraction",
@@ -18187,7 +18205,7 @@
           "name": "ChatInteractionField",
           "kind": "type",
           "signature": "type ChatInteractionField",
-          "doc": "Resolve a chat interaction field excluding select types or including chat select fields"
+          "doc": "An `InteractionField` widened where a card needs a flag the pinned schema may not define: `allowCustom` on a select, `maxLength` on a free-text field."
         },
         {
           "name": "ChatInteractionRestoreMode",
@@ -18774,7 +18792,7 @@
         {
           "name": "InteractionQuestionCard",
           "kind": "function",
-          "signature": "({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, className, }: InteractionQuestionCardProps) => Element",
+          "signature": "({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, sourceNote, timeoutNote, renderMarkdown, c…",
           "doc": null
         },
         {
@@ -18793,7 +18811,7 @@
           "name": "InteractionRequestWire",
           "kind": "type",
           "signature": "type InteractionRequestWire",
-          "doc": "`InteractionRequest` whose select fields may carry `allowCustom`."
+          "doc": "`InteractionRequest` whose fields carry those widenings — a select that may grant `allowCustom`, a free-text field that may declare `maxLength`."
         },
         {
           "name": "interactionStatusLabels",
@@ -19184,6 +19202,12 @@
           "kind": "function",
           "signature": "(content: string, parts: readonly ChatMentionPart[]) => { segments: MentionTextSegment[]; matched: Set<ChatMentionPart>…",
           "doc": "Split a message's text into plain-text and mention segments by matching `@<path>` runs against that message's own mention parts."
+        },
+        {
+          "name": "settleInteractionSubmit",
+          "kind": "function",
+          "signature": "(run: () => Promise<InteractionSubmitResult>, timeoutMs?: number) => Promise<InteractionSubmitResult>",
+          "doc": "Runs a host-supplied submitter under the CARD's own deadline, and always resolves."
         },
         {
           "name": "SmoothRevealOptions",
