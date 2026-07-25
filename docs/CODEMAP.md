@@ -38,7 +38,7 @@ _73 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./knowledge`](api/knowledge.md) | 6 | — |
 | [`./knowledge-loop`](api/knowledge-loop.md) | 11 | `config` |
 | [`./missions`](api/missions.md) | 65 | — |
-| [`./model-resolution`](api/model-resolution.md) | 14 | — |
+| [`./model-resolution`](api/model-resolution.md) | 23 | — |
 | [`./object-store`](api/object-store.md) | 15 | `crypto` |
 | [`./plans`](api/plans.md) | 12 | — |
 | [`./platform`](api/platform.md) | 65 | `billing`, `runtime`, `web` |
@@ -376,9 +376,9 @@ Source: `src/missions/index.ts` · 65 exports
 
 ## `./model-resolution`
 
-Source: `src/model-resolution/index.ts` · 14 exports
+Source: `src/model-resolution/index.ts` · 23 exports
 
-`catalogIdsForModel`, `ChatModelSource`, `ChatModelValidationFailure`, `ChatModelValidationResult`, `ChatModelValidationSuccess`, `cleanModelId`, `isWellFormedModelId`, `LoadModels`, `ModelInfo`, `resolveChatModel`, `ResolveChatModelInput`, `ResolvedChatModel`, `validateChatModelId`, `ValidateChatModelIdInput`
+`buildModelChain`, `catalogIdsForModel`, `ChatModelSource`, `ChatModelValidationFailure`, `ChatModelValidationResult`, `ChatModelValidationSuccess`, `cleanModelId`, `isUpstreamUnavailable`, `isWellFormedModelId`, `LoadModels`, `ModelFailoverAttempt`, `ModelFailoverExhaustedError`, `ModelFailoverResult`, `ModelInfo`, `resolveChatModel`, `ResolveChatModelInput`, `ResolvedChatModel`, `runWithModelFailover`, `RunWithModelFailoverInput`, `UPSTREAM_UNAVAILABLE_CODES`, `UPSTREAM_UNAVAILABLE_STATUSES`, `validateChatModelId`, `ValidateChatModelIdInput`
 
 [Full API →](api/model-resolution.md)
 
