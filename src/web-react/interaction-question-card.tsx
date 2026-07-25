@@ -262,7 +262,12 @@ export function InteractionQuestionCard({
   const [lateAnswerSent, setLateAnswerSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const submitInFlightRef = useRef(false)
-  const askIdRef = useRef(interaction.id)
+  // The ask this card's state currently belongs to. State, never a ref: it is
+  // compared and written during render, and a ref would not be transactional
+  // with the resets below. React may abandon a render — the discarded pass's
+  // `setValues` would be thrown away while a ref mutation survived it, leaving
+  // this guard claiming the reset had happened over the previous ask's answers.
+  const [askId, setAskId] = useState(interaction.id)
 
   // Every answer-bearing piece of state belongs to ONE ask, so being handed the
   // NEXT one starts over. A host can resolve one question and be handed another
@@ -278,8 +283,11 @@ export function InteractionQuestionCard({
   // must change the id; what it may re-send under one id is the answer, which
   // arrives as `answers` and resyncs through the effect below.
   //
-  // During render, not in an effect: an effect would commit one frame of the
-  // previous answer under the new question before clearing it. `submitting` and
+  // During render, not in an effect — React's documented "adjusting state when
+  // a prop changes" pattern: it re-runs this component immediately with the new
+  // state, before committing and before rendering children, so nothing escapes
+  // the render phase. An effect would instead commit one frame of the previous
+  // answer under the new question before clearing it. `submitting` and
   // `submitInFlightRef` are deliberately NOT reset — they are owned by the
   // in-flight request's `finally`, and clearing them here would let a second
   // submit start while the first is still outstanding.
@@ -290,8 +298,8 @@ export function InteractionQuestionCard({
   // since the only way to free the button early is to drop the in-flight guard,
   // and a second submit racing the first is a real bug where a stale label is
   // only a confusing one.
-  if (askIdRef.current !== interaction.id) {
-    askIdRef.current = interaction.id
+  if (askId !== interaction.id) {
+    setAskId(interaction.id)
     setValues(fieldValuesFromAnswers(interaction.fields, interaction.answers))
     setLocalStatus(null)
     setLateAnswerSent(false)

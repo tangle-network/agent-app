@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
@@ -434,6 +435,33 @@ describe('InteractionQuestionCard host overrides', () => {
     )
     expect((screen.getByLabelText('Formal') as HTMLInputElement).checked).toBe(false)
     expect(submitButton().disabled).toBe(true)
+  })
+
+  it('survives StrictMode double-invocation without re-clearing a fresh answer', () => {
+    // The reset runs during render, so StrictMode renders it twice. The guard
+    // that stops the second pass re-clearing must be state, not a ref: a ref
+    // survives a render React abandons while the resets in the same pass do
+    // not, which would leave the guard claiming a reset that never committed.
+    const submitAnswer = okSubmitter()
+    const { rerender } = render(
+      <StrictMode>
+        <InteractionQuestionCard interaction={SELECT_INTERACTION} canWrite submitAnswer={submitAnswer} />
+      </StrictMode>,
+    )
+    rerender(
+      <StrictMode>
+        <InteractionQuestionCard
+          interaction={{ ...SELECT_INTERACTION, id: 'int-next' }}
+          canWrite
+          submitAnswer={submitAnswer}
+        />
+      </StrictMode>,
+    )
+    // Answering the NEW ask must stick — a guard that mis-tracked identity
+    // would clear this selection on the very next render.
+    fireEvent.click(screen.getByLabelText('Formal'))
+    expect((screen.getByLabelText('Formal') as HTMLInputElement).checked).toBe(true)
+    expect(submitButton().disabled).toBe(false)
   })
 
   it('clears the previous ask’s resolved chrome when the next ask arrives', async () => {
