@@ -9,7 +9,7 @@ import {
   type InteractionSubmitResult,
   type SubmitInteractionAnswer,
 } from './interaction-card-support'
-import type { ChatInteraction } from './chat-interactions'
+import type { ChatFreeTextField, ChatInteraction } from './chat-interactions'
 
 afterEach(() => {
   cleanup()
@@ -97,6 +97,27 @@ async function flush() {
   await act(async () => {
     await Promise.resolve()
   })
+}
+
+/** The card's only textarea, asserted present rather than assumed. */
+function textareaOf({ container }: { container: HTMLElement }): HTMLTextAreaElement {
+  const textarea = container.querySelector('textarea')
+  expect(textarea).not.toBeNull()
+  return textarea as HTMLTextAreaElement
+}
+
+/** A text ask carrying a length cap, built as a typed `ChatFreeTextField` rather
+ *  than cast — so a change to the field shape fails this file at compile time
+ *  instead of passing here and breaking the card. */
+function cappedTextarea(maxLength: number): HTMLTextAreaElement {
+  const field: ChatFreeTextField = {
+    type: 'text',
+    name: 'q0',
+    label: 'Describe your audience',
+    required: true,
+    maxLength,
+  }
+  return textareaOf(mount({ ...TEXT_INTERACTION, fields: [field] }))
 }
 
 describe('InteractionQuestionCard', () => {
@@ -395,23 +416,16 @@ describe('InteractionQuestionCard host overrides', () => {
   })
 
   it('caps a free-text answer at the length the answer route accepts', () => {
-    const capped = mount({
-      ...TEXT_INTERACTION,
-      fields: [{ ...TEXT_INTERACTION.fields[0], maxLength: 4096 } as ChatInteraction['fields'][number]],
-    })
-    expect(capped.container.querySelector('textarea')!.maxLength).toBe(4096)
-    capped.unmount()
-
+    expect(cappedTextarea(4096).maxLength).toBe(4096)
+    cleanup()
     // Uncapped stays uncapped: jsdom reports an absent maxLength as -1.
-    expect(mount(TEXT_INTERACTION).container.querySelector('textarea')!.maxLength).toBe(-1)
+    expect(textareaOf(mount(TEXT_INTERACTION)).maxLength).toBe(-1)
   })
 
   it('ignores a cap that would make the field unanswerable', () => {
-    const { container } = mount({
-      ...TEXT_INTERACTION,
-      fields: [{ ...TEXT_INTERACTION.fields[0], maxLength: 0 } as ChatInteraction['fields'][number]],
-    })
-    expect(container.querySelector('textarea')!.maxLength).toBe(-1)
+    expect(cappedTextarea(0).maxLength).toBe(-1)
+    cleanup()
+    expect(cappedTextarea(12.5).maxLength).toBe(-1)
   })
 
   it('announces a rejected submit rather than only showing it', async () => {
