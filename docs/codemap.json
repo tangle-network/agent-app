@@ -60,7 +60,9 @@
         "turn-stream",
         "vault",
         "web",
-        "web-react"
+        "web-react",
+        "work-product",
+        "work-product-react"
       ],
       "error": null,
       "exports": [
@@ -99,6 +101,12 @@
           "kind": "interface",
           "signature": "interface AgentAppTheme",
           "doc": "Typed mirror of tokens.css for runtime/JS theming."
+        },
+        {
+          "name": "AgentCheckInput",
+          "kind": "interface",
+          "signature": "interface AgentCheckInput",
+          "doc": "Agent self-reported check input for `submit_work_product` (persisted with `source: 'agent'`; `platform`/`judge` sources are never model-suppliable)."
         },
         {
           "name": "AgentIdentityConfig",
@@ -599,6 +607,12 @@
           "doc": "Build an array of text parts with optional turn ID for user input"
         },
         {
+          "name": "buildWorkProductTools",
+          "kind": "function",
+          "signature": "(config: WorkProductToolConfig) => AppToolDefinition<Record<string, unknown>>[]",
+          "doc": "Build the three work-product tools for `customTools` registration on the MCP server / HTTP handler / runtime executor."
+        },
+        {
           "name": "BULK_DELETE_MAX_THREADS",
           "kind": "const",
           "signature": "200",
@@ -621,6 +635,12 @@
           "kind": "function",
           "signature": "(from: ChatPlanStatus, to: ChatPlanStatus) => boolean",
           "doc": "Plan status is monotonic: only a pending plan can settle."
+        },
+        {
+          "name": "canTransitionWorkProduct",
+          "kind": "function",
+          "signature": "(from: WorkProductStatus, to: WorkProductStatus) => boolean",
+          "doc": "Whether a legal edge exists from `from` to `to` in the review machine."
         },
         {
           "name": "CanvasRenderPalette",
@@ -825,6 +845,12 @@
           "kind": "interface",
           "signature": "interface ChatUsageTokens",
           "doc": "Per-step usage receipt as the harness reports it (sidecar `StepFinishPartSchema`)."
+        },
+        {
+          "name": "ChatWorkProductPart",
+          "kind": "type",
+          "signature": "type ChatWorkProductPart",
+          "doc": "Persisted work-product anchor card — byte-matches `workProductToPersistedPart` in `/work-product`'s contract."
         },
         {
           "name": "checkRateLimit",
@@ -1091,6 +1117,12 @@
           "doc": "In-memory {@link MissionStorePort} — the portable backend for tests and sandbox/eval shells."
         },
         {
+          "name": "createInMemoryWorkProductStore",
+          "kind": "function",
+          "signature": "() => InMemoryWorkProductStore",
+          "doc": "In-memory {@link WorkProductStorePort} — the portable backend for tests and reference assemblies."
+        },
+        {
           "name": "createInteractionAnswerRoute",
           "kind": "function",
           "signature": "(options: InteractionAnswerRouteOptions) => InteractionAnswerRoute",
@@ -1251,6 +1283,24 @@
           "kind": "function",
           "signature": "(opts?: { minRecall?: number | undefined; minContentLength?: number | undefined; }) => (requirement: CompletionRequirem…",
           "doc": "A deterministic `CorrectnessChecker` (agent-eval exports only `createLlmCorrectnessChecker`)."
+        },
+        {
+          "name": "CreateWorkProductInput",
+          "kind": "interface",
+          "signature": "interface CreateWorkProductInput",
+          "doc": "Define the input required to create a new draft work product row"
+        },
+        {
+          "name": "createWorkProductRoutes",
+          "kind": "function",
+          "signature": "(options: WorkProductRoutesOptions) => WorkProductRoutes",
+          "doc": "Create the work-product review endpoints over the store port and product seams"
+        },
+        {
+          "name": "createWorkProductService",
+          "kind": "function",
+          "signature": "(options: WorkProductServiceOptions) => WorkProductService",
+          "doc": "Create the guarded work-product service over a store port"
         },
         {
           "name": "createWorkspaceKeyManager",
@@ -1859,6 +1909,36 @@
           "doc": "Per-variable env gate: the kernel rejects any single `NAME=value` env entry over MAX_ARG_STRLEN (131072 bytes) with E2BIG, killing every exec inside the box."
         },
         {
+          "name": "EVIDENCE_COVERAGE_CHECK",
+          "kind": "const",
+          "signature": "\"evidence_coverage\"",
+          "doc": "The shell's one generic platform check: every material target has ≥1 evidence row."
+        },
+        {
+          "name": "EvidenceEntry",
+          "kind": "interface",
+          "signature": "interface EvidenceEntry",
+          "doc": "One lineage row: a source document location supporting one artifact claim"
+        },
+        {
+          "name": "EvidenceLocator",
+          "kind": "interface",
+          "signature": "interface EvidenceLocator",
+          "doc": "Point into a source document: page, free-form range, verbatim quote"
+        },
+        {
+          "name": "ExceptionEntry",
+          "kind": "interface",
+          "signature": "interface ExceptionEntry",
+          "doc": "One flagged problem with the work product, resolvable by agent or reviewer"
+        },
+        {
+          "name": "ExceptionSeverity",
+          "kind": "type",
+          "signature": "type ExceptionSeverity",
+          "doc": null
+        },
+        {
           "name": "ExpiringCapabilityTokenOptions",
           "kind": "interface",
           "signature": "interface ExpiringCapabilityTokenOptions",
@@ -1899,6 +1979,18 @@
           "kind": "function",
           "signature": "(parts: JsonRecord[], outcome: \"answered\" | \"expired\") => JsonRecord[]",
           "doc": "Settles still-pending interaction parts at persist time."
+        },
+        {
+          "name": "finalizeWorkProductProvenance",
+          "kind": "function",
+          "signature": "(store: WorkProductStorePort, input: FinalizeWorkProductProvenanceInput) => Promise<WorkProductRecord[]>",
+          "doc": "Back-fill `servingModels`/`costUsd` onto every record (and its history entries) stamped with `runId` — wire it into the chat route's existing `lifecycle.onTurnComplete` seam; no new hook."
+        },
+        {
+          "name": "FinalizeWorkProductProvenanceInput",
+          "kind": "interface",
+          "signature": "interface FinalizeWorkProductProvenanceInput",
+          "doc": "Completion receipt for one run, from the turn's usage/lifecycle seam."
         },
         {
           "name": "findCustomTool",
@@ -2099,6 +2191,12 @@
           "doc": "Define an in-memory mission store that tracks events and allows direct record writes"
         },
         {
+          "name": "InMemoryWorkProductStore",
+          "kind": "interface",
+          "signature": "interface InMemoryWorkProductStore",
+          "doc": "In-memory store surface with audit trail access and unguarded direct writes for tests"
+        },
+        {
           "name": "INTERACTION_CANCEL_EVENT",
           "kind": "const",
           "signature": "\"interaction.cancel\"",
@@ -2273,6 +2371,12 @@
           "doc": "Resolve whether a ChatMessagePart is specifically a ChatToolPart based on its type property"
         },
         {
+          "name": "isChatWorkProductPart",
+          "kind": "function",
+          "signature": "(part: ChatMessagePart) => part is WorkProductPersistedPart",
+          "doc": "Resolve whether a chat message part is a persisted work-product anchor"
+        },
+        {
           "name": "isHarness",
           "kind": "function",
           "signature": "(value: unknown) => value is \"opencode\" | \"claude-code\" | \"nanoclaw\" | \"kimi-code\" | \"codex\" | \"amp\" | \"factory-droids\"…",
@@ -2337,6 +2441,18 @@
           "kind": "function",
           "signature": "(event: unknown) => boolean",
           "doc": "Determine if an event is a terminal prompt event with type 'result' or 'done"
+        },
+        {
+          "name": "isWorkProductStatus",
+          "kind": "function",
+          "signature": "(value: unknown) => value is WorkProductStatus",
+          "doc": "Runtime guard for re-validating a status read off a JSON boundary."
+        },
+        {
+          "name": "isWorkProductTerminal",
+          "kind": "function",
+          "signature": "(status: WorkProductStatus) => boolean",
+          "doc": "Statuses a work product can never leave."
         },
         {
           "name": "JsonObject",
@@ -2517,6 +2633,12 @@
           "kind": "function",
           "signature": "(pathname: string) => SandboxTerminalWsMatch | null",
           "doc": "Parse a same-origin terminal-WS pathname into its parts, or `null` when the path is not a sandbox terminal WebSocket."
+        },
+        {
+          "name": "MAX_WORK_PRODUCT_BATCH",
+          "kind": "const",
+          "signature": "50",
+          "doc": "Max entries per `upsert_evidence`/`flag_exception` call — keeps each call a small batch the model can correct precisely on a named-index failure."
         },
         {
           "name": "MCP_PROTOCOL_VERSIONS",
@@ -2939,6 +3061,18 @@
           "doc": "HTTP status for a failed outcome — the handler's `ToolInputError.status` when present, else 400 for a validation reject."
         },
         {
+          "name": "parseAgentCheckInput",
+          "kind": "function",
+          "signature": "(raw: unknown, path?: string) => WorkProductParseResult<AgentCheckInput>",
+          "doc": "Validate one agent self-check ensuring identifiers, verdict flag, and optional detail are well formed"
+        },
+        {
+          "name": "parseArtifactInput",
+          "kind": "function",
+          "signature": "(raw: unknown, path?: string) => WorkProductParseResult<WorkProductArtifact>",
+          "doc": "Validate a raw artifact."
+        },
+        {
           "name": "parseAssetSpec",
           "kind": "function",
           "signature": "(raw: unknown) => AssetSpec<AssetFormat>",
@@ -2961,6 +3095,18 @@
           "kind": "interface",
           "signature": "interface ParsedMissionStep",
           "doc": "Define the structure representing a parsed mission step with id, kind, and intent fields"
+        },
+        {
+          "name": "parseEvidenceInput",
+          "kind": "function",
+          "signature": "(raw: unknown, path?: string) => WorkProductParseResult<EvidenceEntry>",
+          "doc": "Validate one raw evidence entry field-by-field."
+        },
+        {
+          "name": "parseExceptionInput",
+          "kind": "function",
+          "signature": "(raw: unknown, path?: string) => WorkProductParseResult<ExceptionEntry>",
+          "doc": "Validate one raw exception entry field-by-field."
         },
         {
           "name": "parseInteractionAnswers",
@@ -3023,6 +3169,12 @@
           "doc": "Resolve the result of parsing a plan submission into success with value or failure with error"
         },
         {
+          "name": "parseReviewQueueItem",
+          "kind": "function",
+          "signature": "(raw: unknown) => ReviewQueueItem | null",
+          "doc": "Re-validate one JSON-boundary row into a queue item; null for junk."
+        },
+        {
           "name": "parseSessionStreamEnvelope",
           "kind": "function",
           "signature": "(raw: unknown) => MissionStreamEvent | null",
@@ -3057,6 +3209,12 @@
           "kind": "function",
           "signature": "(part: Record<string, unknown>) => ChatPlan | null",
           "doc": "Resolve a persisted part object into a ChatPlan or return null if the type is not 'plan"
+        },
+        {
+          "name": "persistedPartToWorkProduct",
+          "kind": "function",
+          "signature": "(part: Record<string, unknown>) => WorkProductPersistedPart | null",
+          "doc": "Re-validate a stored/wire part into the typed anchor; null for junk."
         },
         {
           "name": "PLAN_SUBMITTED_EVENT",
@@ -3227,10 +3385,22 @@
           "doc": "Everything observable about what a run actually produced."
         },
         {
+          "name": "ProfileBacktestSummary",
+          "kind": "interface",
+          "signature": "interface ProfileBacktestSummary",
+          "doc": "The product-resolved backtest summary for one profile hash (from its own eval artifacts via agent-eval's `loadScorecard`) — the shell defines only this TYPE and the `ProvenanceStamp` slot that render…"
+        },
+        {
           "name": "ProfileComposeOptions",
           "kind": "interface",
           "signature": "interface ProfileComposeOptions",
           "doc": "Define options for composing a user profile including prompts, files, servers, and name"
+        },
+        {
+          "name": "projectReviewQueue",
+          "kind": "function",
+          "signature": "(inputs: ReviewQueueInputs) => ReviewQueueItem[]",
+          "doc": "Fold the existing sources into queue items, newest first."
         },
         {
           "name": "PromptInputPart",
@@ -3279,6 +3449,12 @@
           "kind": "interface",
           "signature": "interface PutObjectOptions",
           "doc": "Options for a single {@link ObjectStore.put}."
+        },
+        {
+          "name": "QualityCheck",
+          "kind": "interface",
+          "signature": "interface QualityCheck",
+          "doc": "One named quality verdict on the work product, tagged with who computed it"
         },
         {
           "name": "questionInteractionContentSignature",
@@ -3645,6 +3821,36 @@
           "kind": "function",
           "signature": "(candidate: KnowledgeCandidate, minConfidence: number) => KnowledgeGateVerdict",
           "doc": "The default gate — agent-knowledge's propose-don't-apply reviewer posture as a confidence threshold."
+        },
+        {
+          "name": "ReviewQueueInputs",
+          "kind": "interface",
+          "signature": "interface ReviewQueueInputs",
+          "doc": "Existing-source inputs the projection folds — no new stores"
+        },
+        {
+          "name": "ReviewQueueItem",
+          "kind": "interface",
+          "signature": "interface ReviewQueueItem",
+          "doc": "One row of the review queue projection for an engagement scope"
+        },
+        {
+          "name": "ReviewQueuePendingAsk",
+          "kind": "interface",
+          "signature": "interface ReviewQueuePendingAsk",
+          "doc": "A pending `/interactions` ask on a thread (from the existing list endpoint) — the missing_info source."
+        },
+        {
+          "name": "ReviewQueueState",
+          "kind": "type",
+          "signature": "type ReviewQueueState",
+          "doc": null
+        },
+        {
+          "name": "ReviewQueueThread",
+          "kind": "interface",
+          "signature": "interface ReviewQueueThread",
+          "doc": "An engagement-scoped chat thread — the intake candidate source."
         },
         {
           "name": "routerChatProbe",
@@ -4037,6 +4243,12 @@
           "doc": "Stamps accepted values onto matching persisted interaction parts without mutating the caller's transcript or answer maps."
         },
         {
+          "name": "stampProvenance",
+          "kind": "function",
+          "signature": "(base: WorkProductProvenanceBase, now?: () => number) => WorkProductProvenance",
+          "doc": "Stamp a full provenance from the dispatch-time base."
+        },
+        {
           "name": "statSandboxFileSize",
           "kind": "function",
           "signature": "(box: SandboxExecChannel, absolutePath: string, options?: SandboxExecOptions | undefined) => Promise<SandboxFileSizeOut…",
@@ -4161,6 +4373,12 @@
           "kind": "interface",
           "signature": "interface SubmitProposalResult",
           "doc": "Describe the result of submitting a proposal including deduplication and execution status"
+        },
+        {
+          "name": "SubmitWorkProductInput",
+          "kind": "interface",
+          "signature": "interface SubmitWorkProductInput",
+          "doc": "Payload for the draft→ready submit transition"
         },
         {
           "name": "summarize",
@@ -4427,6 +4645,12 @@
           "doc": "Resolve a string by trimming whitespace or returning null if empty or undefined"
         },
         {
+          "name": "TrustItem",
+          "kind": "interface",
+          "signature": "interface TrustItem",
+          "doc": "One item's raters: the per-judge verdicts {@link aggregateJudgeVerdicts } reduces, tagged with the item they scored so spread stays within-item."
+        },
+        {
           "name": "TURN_EVENTS_MIGRATION_SQL",
           "kind": "const",
           "signature": "\"\\nCREATE TABLE IF NOT EXISTS turn_events (\\n turnId TEXT NOT NULL,\\n seq INTEGER NOT NULL,\\n event TEXT NOT NULL,\\n PR…",
@@ -4451,6 +4675,12 @@
           "doc": "Resumable chat turns — the router-path answer to \"streams resume on disconnect\" (issue #27)."
         },
         {
+          "name": "unresolvedBlockingExceptions",
+          "kind": "function",
+          "signature": "(exceptions: readonly ExceptionEntry[]) => ExceptionEntry[]",
+          "doc": "Unresolved blocking exceptions are what park a work product in `blocked`."
+        },
+        {
           "name": "upsertDurableInteractionAsk",
           "kind": "function",
           "signature": "(store: DurablePlanStore, scope: DurableChatScope, request: InteractionRequestWire, options?: { eventId?: string | unde…",
@@ -4461,6 +4691,12 @@
           "kind": "function",
           "signature": "(body: Record<string, unknown>) => InteractionAnswerBodyValidation",
           "doc": "Validates the client POST body: `{ id, outcome, data?"
+        },
+        {
+          "name": "validateWorkProductVerdictBody",
+          "kind": "function",
+          "signature": "(body: Record<string, unknown>) => WorkProductVerdictBody",
+          "doc": "Validate the verdict POST body: `{ id, verdict, note?"
         },
         {
           "name": "VaultKv",
@@ -4575,6 +4811,156 @@
           "kind": "type",
           "signature": "type WithAgentActivity",
           "doc": "Step state extended with the activity lane a loader/seed route attaches."
+        },
+        {
+          "name": "WorkProductArtifact",
+          "kind": "interface",
+          "signature": "interface WorkProductArtifact",
+          "doc": "Define the reviewable artifact body with its kind, sources, and structured field map"
+        },
+        {
+          "name": "WorkProductAuditEvent",
+          "kind": "interface",
+          "signature": "interface WorkProductAuditEvent",
+          "doc": "One audit-trail row, appended after every committed state change."
+        },
+        {
+          "name": "WorkProductAuthorizeArgs",
+          "kind": "interface",
+          "signature": "interface WorkProductAuthorizeArgs",
+          "doc": "Auth seam arguments carrying the request, the endpoint intent, and the parsed verdict body"
+        },
+        {
+          "name": "WorkProductOutcome",
+          "kind": "type",
+          "signature": "type WorkProductOutcome",
+          "doc": "Discriminated outcome for guarded operations — `conflict` distinguishes a lost guarded race (retryable) from a logic rejection (illegal edge, missing row — deterministic, never retried)."
+        },
+        {
+          "name": "WorkProductParseResult",
+          "kind": "type",
+          "signature": "type WorkProductParseResult",
+          "doc": "Validation result whose failure names the exact field, so a tool layer can hand the model a correctable error it can act on."
+        },
+        {
+          "name": "WorkProductPatch",
+          "kind": "interface",
+          "signature": "interface WorkProductPatch",
+          "doc": "Fields a guarded write sets when the guard holds."
+        },
+        {
+          "name": "WorkProductPersistedPart",
+          "kind": "interface",
+          "signature": "interface WorkProductPersistedPart",
+          "doc": "The persisted `type:'work_product'` transcript anchor — the chat card that keeps chat the driver surface for review."
+        },
+        {
+          "name": "WorkProductProvenance",
+          "kind": "interface",
+          "signature": "interface WorkProductProvenance",
+          "doc": "The audit triple binding a work product to the exact configuration and run that produced it."
+        },
+        {
+          "name": "WorkProductProvenanceBase",
+          "kind": "type",
+          "signature": "type WorkProductProvenanceBase",
+          "doc": "The dispatch-time provenance closure's output: everything the route knows before the turn completes."
+        },
+        {
+          "name": "WorkProductRecord",
+          "kind": "interface",
+          "signature": "interface WorkProductRecord",
+          "doc": "Define the durable work product row accumulating artifact, lineage, exceptions, checks, and history"
+        },
+        {
+          "name": "WorkProductRef",
+          "kind": "interface",
+          "signature": "interface WorkProductRef",
+          "doc": "Stable pointer at one version of one work product."
+        },
+        {
+          "name": "WorkProductRouteAuthorization",
+          "kind": "type",
+          "signature": "type WorkProductRouteAuthorization",
+          "doc": "The product seam's verdict for one request: authenticated reviewer + workspace, or a product-authored short-circuit Response (401/403/429…)."
+        },
+        {
+          "name": "WorkProductRoutes",
+          "kind": "interface",
+          "signature": "interface WorkProductRoutes",
+          "doc": "Assembled review endpoints returning web-standard Responses"
+        },
+        {
+          "name": "WorkProductRoutesOptions",
+          "kind": "interface",
+          "signature": "interface WorkProductRoutesOptions",
+          "doc": "Configuration options assembling the review endpoints from the store and product seams"
+        },
+        {
+          "name": "WorkProductService",
+          "kind": "interface",
+          "signature": "interface WorkProductService",
+          "doc": "Guarded mutation surface over the work-product store"
+        },
+        {
+          "name": "WorkProductServiceOptions",
+          "kind": "interface",
+          "signature": "interface WorkProductServiceOptions",
+          "doc": "Configuration options for creating a work product service"
+        },
+        {
+          "name": "WorkProductStatus",
+          "kind": "type",
+          "signature": "type WorkProductStatus",
+          "doc": null
+        },
+        {
+          "name": "WorkProductStorePort",
+          "kind": "interface",
+          "signature": "interface WorkProductStorePort",
+          "doc": "Persistence seam — the product implements this over its own tables."
+        },
+        {
+          "name": "WorkProductToolConfig",
+          "kind": "interface",
+          "signature": "interface WorkProductToolConfig",
+          "doc": "Domain seams for the three work-product tools — every domain word is a parameter; the shell bakes none."
+        },
+        {
+          "name": "workProductToPersistedPart",
+          "kind": "function",
+          "signature": "(record: WorkProductRecord) => WorkProductPersistedPart",
+          "doc": "Project the transcript anchor part from a record."
+        },
+        {
+          "name": "workProductTrustInputs",
+          "kind": "function",
+          "signature": "<D extends string = string>(records: readonly WorkProductRecord[], verdictsFor: (record: WorkProductRecord) => readonly…",
+          "doc": "Trust-gate bridge: one `TrustItem` per work product whose production quality was scored by the product's eval-campaign ensemble."
+        },
+        {
+          "name": "WorkProductUpdateGuard",
+          "kind": "interface",
+          "signature": "interface WorkProductUpdateGuard",
+          "doc": "Fields a guarded write compares against the values the caller read."
+        },
+        {
+          "name": "WorkProductVerdictBody",
+          "kind": "type",
+          "signature": "type WorkProductVerdictBody",
+          "doc": "Reviewer verdict wire body for the POST endpoint."
+        },
+        {
+          "name": "WorkProductVerdictInput",
+          "kind": "interface",
+          "signature": "interface WorkProductVerdictInput",
+          "doc": "Reviewer verdict payload for the ready→approved / ready→changes_requested transition"
+        },
+        {
+          "name": "WorkProductVersionEntry",
+          "kind": "interface",
+          "signature": "interface WorkProductVersionEntry",
+          "doc": "Frozen milestone row for one version of the work product"
         },
         {
           "name": "WorkspaceKeyManager",
@@ -6560,7 +6946,8 @@
         "interactions",
         "plans",
         "stream",
-        "web-react"
+        "web-react",
+        "work-product"
       ],
       "error": null,
       "exports": [
@@ -6775,6 +7162,12 @@
           "doc": "Per-step usage receipt as the harness reports it (sidecar `StepFinishPartSchema`)."
         },
         {
+          "name": "ChatWorkProductPart",
+          "kind": "type",
+          "signature": "type ChatWorkProductPart",
+          "doc": "Persisted work-product anchor card — byte-matches `workProductToPersistedPart` in `/work-product`'s contract."
+        },
+        {
           "name": "createChatStore",
           "kind": "function",
           "signature": "<TTables extends ChatTables>(db: ChatDatabase, tables: TTables) => ChatStore<TTables[\"threads\"][\"$inferSelect\"], TTable…",
@@ -6851,6 +7244,12 @@
           "kind": "function",
           "signature": "(part: ChatMessagePart) => part is ChatToolPart",
           "doc": "Resolve whether a ChatMessagePart is specifically a ChatToolPart based on its type property"
+        },
+        {
+          "name": "isChatWorkProductPart",
+          "kind": "function",
+          "signature": "(part: ChatMessagePart) => part is WorkProductPersistedPart",
+          "doc": "Resolve whether a chat message part is a persisted work-product anchor"
         },
         {
           "name": "ListMessagesOptions",
@@ -18065,7 +18464,8 @@
         "missions",
         "plans",
         "runtime",
-        "trace"
+        "trace",
+        "work-product"
       ],
       "error": null,
       "exports": [
@@ -18610,6 +19010,30 @@
           "doc": null
         },
         {
+          "name": "EvidenceLineageTable",
+          "kind": "function",
+          "signature": "({ evidence, resolveSourceUrl, className }: EvidenceLineageTableProps) => Element",
+          "doc": "Target → claim → source lineage rows: the \"every material value traceable to source evidence\" surface."
+        },
+        {
+          "name": "EvidenceLineageTableProps",
+          "kind": "interface",
+          "signature": "interface EvidenceLineageTableProps",
+          "doc": "Properties for the evidence lineage table with source click-through"
+        },
+        {
+          "name": "ExceptionList",
+          "kind": "function",
+          "signature": "({ exceptions, className }: ExceptionListProps) => Element",
+          "doc": "Severity-badged exception rows with resolution state."
+        },
+        {
+          "name": "ExceptionListProps",
+          "kind": "interface",
+          "signature": "interface ExceptionListProps",
+          "doc": "Properties for the severity-badged exception list"
+        },
+        {
           "name": "fieldAcceptsFreeText",
           "kind": "function",
           "signature": "(field: ChatInteractionField) => boolean",
@@ -18982,6 +19406,12 @@
           "doc": "Fold a fetched page into the held rows: dedupe by `taskId` with the incoming row winning (a refresh re-fetches the head page, so newer snapshots of in-flight runs replace stale ones), newest `started…"
         },
         {
+          "name": "mergeReviewQueuePages",
+          "kind": "function",
+          "signature": "(existing: ReviewQueueItem[], incoming: ReviewQueueItem[]) => ReviewQueueItem[]",
+          "doc": "Merge a fetched page into held rows: dedupe by scopeKey, incoming wins, newest updatedAt first."
+        },
+        {
           "name": "MessageAttachments",
           "kind": "function",
           "signature": "({ parts, resolveFileUrl, justify, fetchFile }: MessageAttachmentsProps) => ReactNode",
@@ -19078,6 +19508,12 @@
           "doc": "Resolve interaction parsing outcome as success with value or failure with error message"
         },
         {
+          "name": "parseReviewQueueItem",
+          "kind": "function",
+          "signature": "(raw: unknown) => ReviewQueueItem | null",
+          "doc": "Re-validate one JSON-boundary row into a queue item; null for junk."
+        },
+        {
           "name": "pendingApprovalOf",
           "kind": "function",
           "signature": "(call: ChatToolCallInfo) => { proposalId: string; } | null",
@@ -19156,6 +19592,18 @@
           "doc": "Handle approval and rejection actions for proposals with asynchronous support"
         },
         {
+          "name": "ProvenanceStamp",
+          "kind": "function",
+          "signature": "({ provenance, backtest, className }: ProvenanceStampProps) => Element",
+          "doc": "The audit line a reviewer approves against: which configuration produced this document, what served it, and how that configuration measured on its backtest."
+        },
+        {
+          "name": "ProvenanceStampProps",
+          "kind": "interface",
+          "signature": "interface ProvenanceStampProps",
+          "doc": "Properties for the provenance stamp with the optional backtest slot"
+        },
+        {
           "name": "ProviderLogo",
           "kind": "function",
           "signature": "({ provider, size }: ProviderLogoProps) => ReactNode",
@@ -19166,6 +19614,18 @@
           "kind": "interface",
           "signature": "interface ProviderLogoProps",
           "doc": null
+        },
+        {
+          "name": "QualityCheckList",
+          "kind": "function",
+          "signature": "({ checks, className }: QualityCheckListProps) => Element",
+          "doc": "Pass/fail quality-check rows tagged with their source (agent self-report, platform gate, judge ensemble)."
+        },
+        {
+          "name": "QualityCheckListProps",
+          "kind": "interface",
+          "signature": "interface QualityCheckListProps",
+          "doc": "Properties for the pass/fail quality check list"
         },
         {
           "name": "questionInteractionContentSignature",
@@ -19214,6 +19674,42 @@
           "kind": "interface",
           "signature": "interface RestoreChatInteractionsOptions",
           "doc": "Define options to control how chat interactions are restored during the restore process"
+        },
+        {
+          "name": "ReviewQueueItem",
+          "kind": "interface",
+          "signature": "interface ReviewQueueItem",
+          "doc": "One row of the review queue projection for an engagement scope"
+        },
+        {
+          "name": "ReviewQueuePage",
+          "kind": "interface",
+          "signature": "interface ReviewQueuePage",
+          "doc": "One fetched page of queue items with an optional continuation cursor"
+        },
+        {
+          "name": "ReviewQueuePanel",
+          "kind": "function",
+          "signature": "({ fetchQueue, onSelect, title, emptyLabel, className, }: ReviewQueuePanelProps) => Element",
+          "doc": "The workspace review queue — cursor-paged, refreshable, selection via callback."
+        },
+        {
+          "name": "ReviewQueuePanelProps",
+          "kind": "interface",
+          "signature": "interface ReviewQueuePanelProps",
+          "doc": "Properties for the review queue panel over a fetch data port"
+        },
+        {
+          "name": "ReviewQueueState",
+          "kind": "type",
+          "signature": "type ReviewQueueState",
+          "doc": null
+        },
+        {
+          "name": "reviewQueueStateLabel",
+          "kind": "function",
+          "signature": "(state: ReviewQueueState) => string",
+          "doc": "Human label for a queue state."
         },
         {
           "name": "RunDrillIn",
@@ -19460,6 +19956,30 @@
           "kind": "interface",
           "signature": "interface WaterfallRow",
           "doc": null
+        },
+        {
+          "name": "WorkProductCard",
+          "kind": "function",
+          "signature": "({ part, onOpen, className }: WorkProductCardProps) => Element",
+          "doc": "The chat transcript anchor card for one work-product version — a compact, system-authored pointer, not a parallel review surface."
+        },
+        {
+          "name": "WorkProductCardProps",
+          "kind": "interface",
+          "signature": "interface WorkProductCardProps",
+          "doc": "Properties for the transcript anchor card rendered in chat"
+        },
+        {
+          "name": "workProductPartsFromMessageParts",
+          "kind": "function",
+          "signature": "(parts: readonly Record<string, unknown>[] | null | undefined) => WorkProductPersistedPart[]",
+          "doc": "Every persisted work-product anchor on one message, re-validated."
+        },
+        {
+          "name": "workProductStatusLabel",
+          "kind": "function",
+          "signature": "(status: WorkProductStatus) => string",
+          "doc": "Human label for a work-product status."
         }
       ]
     },
@@ -19475,7 +19995,8 @@
         "missions",
         "plans",
         "runtime",
-        "trace"
+        "trace",
+        "work-product"
       ],
       "error": null,
       "exports": [
@@ -19537,6 +20058,418 @@
           "name": "WorkspaceTerminalPanelProps",
           "kind": "interface",
           "signature": "interface WorkspaceTerminalPanelProps",
+          "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./work-product",
+      "source": "src/work-product/index.ts",
+      "dependsOn": [
+        "eval-campaign",
+        "tools"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "AgentCheckInput",
+          "kind": "interface",
+          "signature": "interface AgentCheckInput",
+          "doc": "Agent self-reported check input for `submit_work_product` (persisted with `source: 'agent'`; `platform`/`judge` sources are never model-suppliable)."
+        },
+        {
+          "name": "buildWorkProductTools",
+          "kind": "function",
+          "signature": "(config: WorkProductToolConfig) => AppToolDefinition<Record<string, unknown>>[]",
+          "doc": "Build the three work-product tools for `customTools` registration on the MCP server / HTTP handler / runtime executor."
+        },
+        {
+          "name": "canTransitionWorkProduct",
+          "kind": "function",
+          "signature": "(from: WorkProductStatus, to: WorkProductStatus) => boolean",
+          "doc": "Whether a legal edge exists from `from` to `to` in the review machine."
+        },
+        {
+          "name": "createInMemoryWorkProductStore",
+          "kind": "function",
+          "signature": "() => InMemoryWorkProductStore",
+          "doc": "In-memory {@link WorkProductStorePort} — the portable backend for tests and reference assemblies."
+        },
+        {
+          "name": "CreateWorkProductInput",
+          "kind": "interface",
+          "signature": "interface CreateWorkProductInput",
+          "doc": "Define the input required to create a new draft work product row"
+        },
+        {
+          "name": "createWorkProductRoutes",
+          "kind": "function",
+          "signature": "(options: WorkProductRoutesOptions) => WorkProductRoutes",
+          "doc": "Create the work-product review endpoints over the store port and product seams"
+        },
+        {
+          "name": "createWorkProductService",
+          "kind": "function",
+          "signature": "(options: WorkProductServiceOptions) => WorkProductService",
+          "doc": "Create the guarded work-product service over a store port"
+        },
+        {
+          "name": "EVIDENCE_COVERAGE_CHECK",
+          "kind": "const",
+          "signature": "\"evidence_coverage\"",
+          "doc": "The shell's one generic platform check: every material target has ≥1 evidence row."
+        },
+        {
+          "name": "EvidenceEntry",
+          "kind": "interface",
+          "signature": "interface EvidenceEntry",
+          "doc": "One lineage row: a source document location supporting one artifact claim"
+        },
+        {
+          "name": "EvidenceLocator",
+          "kind": "interface",
+          "signature": "interface EvidenceLocator",
+          "doc": "Point into a source document: page, free-form range, verbatim quote"
+        },
+        {
+          "name": "ExceptionEntry",
+          "kind": "interface",
+          "signature": "interface ExceptionEntry",
+          "doc": "One flagged problem with the work product, resolvable by agent or reviewer"
+        },
+        {
+          "name": "ExceptionSeverity",
+          "kind": "type",
+          "signature": "type ExceptionSeverity",
+          "doc": null
+        },
+        {
+          "name": "finalizeWorkProductProvenance",
+          "kind": "function",
+          "signature": "(store: WorkProductStorePort, input: FinalizeWorkProductProvenanceInput) => Promise<WorkProductRecord[]>",
+          "doc": "Back-fill `servingModels`/`costUsd` onto every record (and its history entries) stamped with `runId` — wire it into the chat route's existing `lifecycle.onTurnComplete` seam; no new hook."
+        },
+        {
+          "name": "FinalizeWorkProductProvenanceInput",
+          "kind": "interface",
+          "signature": "interface FinalizeWorkProductProvenanceInput",
+          "doc": "Completion receipt for one run, from the turn's usage/lifecycle seam."
+        },
+        {
+          "name": "InMemoryWorkProductStore",
+          "kind": "interface",
+          "signature": "interface InMemoryWorkProductStore",
+          "doc": "In-memory store surface with audit trail access and unguarded direct writes for tests"
+        },
+        {
+          "name": "isWorkProductStatus",
+          "kind": "function",
+          "signature": "(value: unknown) => value is WorkProductStatus",
+          "doc": "Runtime guard for re-validating a status read off a JSON boundary."
+        },
+        {
+          "name": "isWorkProductTerminal",
+          "kind": "function",
+          "signature": "(status: WorkProductStatus) => boolean",
+          "doc": "Statuses a work product can never leave."
+        },
+        {
+          "name": "MAX_WORK_PRODUCT_BATCH",
+          "kind": "const",
+          "signature": "50",
+          "doc": "Max entries per `upsert_evidence`/`flag_exception` call — keeps each call a small batch the model can correct precisely on a named-index failure."
+        },
+        {
+          "name": "parseAgentCheckInput",
+          "kind": "function",
+          "signature": "(raw: unknown, path?: string) => WorkProductParseResult<AgentCheckInput>",
+          "doc": "Validate one agent self-check ensuring identifiers, verdict flag, and optional detail are well formed"
+        },
+        {
+          "name": "parseArtifactInput",
+          "kind": "function",
+          "signature": "(raw: unknown, path?: string) => WorkProductParseResult<WorkProductArtifact>",
+          "doc": "Validate a raw artifact."
+        },
+        {
+          "name": "parseEvidenceInput",
+          "kind": "function",
+          "signature": "(raw: unknown, path?: string) => WorkProductParseResult<EvidenceEntry>",
+          "doc": "Validate one raw evidence entry field-by-field."
+        },
+        {
+          "name": "parseExceptionInput",
+          "kind": "function",
+          "signature": "(raw: unknown, path?: string) => WorkProductParseResult<ExceptionEntry>",
+          "doc": "Validate one raw exception entry field-by-field."
+        },
+        {
+          "name": "parseReviewQueueItem",
+          "kind": "function",
+          "signature": "(raw: unknown) => ReviewQueueItem | null",
+          "doc": "Re-validate one JSON-boundary row into a queue item; null for junk."
+        },
+        {
+          "name": "persistedPartToWorkProduct",
+          "kind": "function",
+          "signature": "(part: Record<string, unknown>) => WorkProductPersistedPart | null",
+          "doc": "Re-validate a stored/wire part into the typed anchor; null for junk."
+        },
+        {
+          "name": "ProfileBacktestSummary",
+          "kind": "interface",
+          "signature": "interface ProfileBacktestSummary",
+          "doc": "The product-resolved backtest summary for one profile hash (from its own eval artifacts via agent-eval's `loadScorecard`) — the shell defines only this TYPE and the `ProvenanceStamp` slot that render…"
+        },
+        {
+          "name": "projectReviewQueue",
+          "kind": "function",
+          "signature": "(inputs: ReviewQueueInputs) => ReviewQueueItem[]",
+          "doc": "Fold the existing sources into queue items, newest first."
+        },
+        {
+          "name": "QualityCheck",
+          "kind": "interface",
+          "signature": "interface QualityCheck",
+          "doc": "One named quality verdict on the work product, tagged with who computed it"
+        },
+        {
+          "name": "ReviewQueueInputs",
+          "kind": "interface",
+          "signature": "interface ReviewQueueInputs",
+          "doc": "Existing-source inputs the projection folds — no new stores"
+        },
+        {
+          "name": "ReviewQueueItem",
+          "kind": "interface",
+          "signature": "interface ReviewQueueItem",
+          "doc": "One row of the review queue projection for an engagement scope"
+        },
+        {
+          "name": "ReviewQueuePendingAsk",
+          "kind": "interface",
+          "signature": "interface ReviewQueuePendingAsk",
+          "doc": "A pending `/interactions` ask on a thread (from the existing list endpoint) — the missing_info source."
+        },
+        {
+          "name": "ReviewQueueState",
+          "kind": "type",
+          "signature": "type ReviewQueueState",
+          "doc": null
+        },
+        {
+          "name": "ReviewQueueThread",
+          "kind": "interface",
+          "signature": "interface ReviewQueueThread",
+          "doc": "An engagement-scoped chat thread — the intake candidate source."
+        },
+        {
+          "name": "stampProvenance",
+          "kind": "function",
+          "signature": "(base: WorkProductProvenanceBase, now?: () => number) => WorkProductProvenance",
+          "doc": "Stamp a full provenance from the dispatch-time base."
+        },
+        {
+          "name": "SubmitWorkProductInput",
+          "kind": "interface",
+          "signature": "interface SubmitWorkProductInput",
+          "doc": "Payload for the draft→ready submit transition"
+        },
+        {
+          "name": "TrustItem",
+          "kind": "interface",
+          "signature": "interface TrustItem",
+          "doc": "One item's raters: the per-judge verdicts {@link aggregateJudgeVerdicts } reduces, tagged with the item they scored so spread stays within-item."
+        },
+        {
+          "name": "unresolvedBlockingExceptions",
+          "kind": "function",
+          "signature": "(exceptions: readonly ExceptionEntry[]) => ExceptionEntry[]",
+          "doc": "Unresolved blocking exceptions are what park a work product in `blocked`."
+        },
+        {
+          "name": "validateWorkProductVerdictBody",
+          "kind": "function",
+          "signature": "(body: Record<string, unknown>) => WorkProductVerdictBody",
+          "doc": "Validate the verdict POST body: `{ id, verdict, note?"
+        },
+        {
+          "name": "WorkProductArtifact",
+          "kind": "interface",
+          "signature": "interface WorkProductArtifact",
+          "doc": "Define the reviewable artifact body with its kind, sources, and structured field map"
+        },
+        {
+          "name": "WorkProductAuditEvent",
+          "kind": "interface",
+          "signature": "interface WorkProductAuditEvent",
+          "doc": "One audit-trail row, appended after every committed state change."
+        },
+        {
+          "name": "WorkProductAuthorizeArgs",
+          "kind": "interface",
+          "signature": "interface WorkProductAuthorizeArgs",
+          "doc": "Auth seam arguments carrying the request, the endpoint intent, and the parsed verdict body"
+        },
+        {
+          "name": "WorkProductOutcome",
+          "kind": "type",
+          "signature": "type WorkProductOutcome",
+          "doc": "Discriminated outcome for guarded operations — `conflict` distinguishes a lost guarded race (retryable) from a logic rejection (illegal edge, missing row — deterministic, never retried)."
+        },
+        {
+          "name": "WorkProductParseResult",
+          "kind": "type",
+          "signature": "type WorkProductParseResult",
+          "doc": "Validation result whose failure names the exact field, so a tool layer can hand the model a correctable error it can act on."
+        },
+        {
+          "name": "WorkProductPatch",
+          "kind": "interface",
+          "signature": "interface WorkProductPatch",
+          "doc": "Fields a guarded write sets when the guard holds."
+        },
+        {
+          "name": "WorkProductPersistedPart",
+          "kind": "interface",
+          "signature": "interface WorkProductPersistedPart",
+          "doc": "The persisted `type:'work_product'` transcript anchor — the chat card that keeps chat the driver surface for review."
+        },
+        {
+          "name": "WorkProductProvenance",
+          "kind": "interface",
+          "signature": "interface WorkProductProvenance",
+          "doc": "The audit triple binding a work product to the exact configuration and run that produced it."
+        },
+        {
+          "name": "WorkProductProvenanceBase",
+          "kind": "type",
+          "signature": "type WorkProductProvenanceBase",
+          "doc": "The dispatch-time provenance closure's output: everything the route knows before the turn completes."
+        },
+        {
+          "name": "WorkProductRecord",
+          "kind": "interface",
+          "signature": "interface WorkProductRecord",
+          "doc": "Define the durable work product row accumulating artifact, lineage, exceptions, checks, and history"
+        },
+        {
+          "name": "WorkProductRef",
+          "kind": "interface",
+          "signature": "interface WorkProductRef",
+          "doc": "Stable pointer at one version of one work product."
+        },
+        {
+          "name": "WorkProductRouteAuthorization",
+          "kind": "type",
+          "signature": "type WorkProductRouteAuthorization",
+          "doc": "The product seam's verdict for one request: authenticated reviewer + workspace, or a product-authored short-circuit Response (401/403/429…)."
+        },
+        {
+          "name": "WorkProductRoutes",
+          "kind": "interface",
+          "signature": "interface WorkProductRoutes",
+          "doc": "Assembled review endpoints returning web-standard Responses"
+        },
+        {
+          "name": "WorkProductRoutesOptions",
+          "kind": "interface",
+          "signature": "interface WorkProductRoutesOptions",
+          "doc": "Configuration options assembling the review endpoints from the store and product seams"
+        },
+        {
+          "name": "WorkProductService",
+          "kind": "interface",
+          "signature": "interface WorkProductService",
+          "doc": "Guarded mutation surface over the work-product store"
+        },
+        {
+          "name": "WorkProductServiceOptions",
+          "kind": "interface",
+          "signature": "interface WorkProductServiceOptions",
+          "doc": "Configuration options for creating a work product service"
+        },
+        {
+          "name": "WorkProductStatus",
+          "kind": "type",
+          "signature": "type WorkProductStatus",
+          "doc": null
+        },
+        {
+          "name": "WorkProductStorePort",
+          "kind": "interface",
+          "signature": "interface WorkProductStorePort",
+          "doc": "Persistence seam — the product implements this over its own tables."
+        },
+        {
+          "name": "WorkProductToolConfig",
+          "kind": "interface",
+          "signature": "interface WorkProductToolConfig",
+          "doc": "Domain seams for the three work-product tools — every domain word is a parameter; the shell bakes none."
+        },
+        {
+          "name": "workProductToPersistedPart",
+          "kind": "function",
+          "signature": "(record: WorkProductRecord) => WorkProductPersistedPart",
+          "doc": "Project the transcript anchor part from a record."
+        },
+        {
+          "name": "workProductTrustInputs",
+          "kind": "function",
+          "signature": "<D extends string = string>(records: readonly WorkProductRecord[], verdictsFor: (record: WorkProductRecord) => readonly…",
+          "doc": "Trust-gate bridge: one `TrustItem` per work product whose production quality was scored by the product's eval-campaign ensemble."
+        },
+        {
+          "name": "WorkProductUpdateGuard",
+          "kind": "interface",
+          "signature": "interface WorkProductUpdateGuard",
+          "doc": "Fields a guarded write compares against the values the caller read."
+        },
+        {
+          "name": "WorkProductVerdictBody",
+          "kind": "type",
+          "signature": "type WorkProductVerdictBody",
+          "doc": "Reviewer verdict wire body for the POST endpoint."
+        },
+        {
+          "name": "WorkProductVerdictInput",
+          "kind": "interface",
+          "signature": "interface WorkProductVerdictInput",
+          "doc": "Reviewer verdict payload for the ready→approved / ready→changes_requested transition"
+        },
+        {
+          "name": "WorkProductVersionEntry",
+          "kind": "interface",
+          "signature": "interface WorkProductVersionEntry",
+          "doc": "Frozen milestone row for one version of the work product"
+        }
+      ]
+    },
+    {
+      "id": "./work-product-react",
+      "source": "src/work-product-react/index.tsx",
+      "dependsOn": [
+        "web-react",
+        "work-product"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "WorkProductPane",
+          "kind": "function",
+          "signature": "({ workProduct, defaultTab, currentContent, baselineContent, loadVersionBody, resolveSourceUrl, backtest, className, }:…",
+          "doc": "The tabbed review pane over one work product: Artifact | Diff | Lineage | Exceptions | Checks | History."
+        },
+        {
+          "name": "WorkProductPaneProps",
+          "kind": "interface",
+          "signature": "interface WorkProductPaneProps",
+          "doc": "Properties for the tabbed work-product review pane"
+        },
+        {
+          "name": "WorkProductPaneTab",
+          "kind": "type",
+          "signature": "type WorkProductPaneTab",
           "doc": null
         }
       ]

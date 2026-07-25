@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-232 exports.
+252 exports.
 
 ### `activityTone`
 
@@ -726,6 +726,38 @@ interface EffortLevel
 interface EffortPickerProps
 ```
 
+### `EvidenceLineageTable`
+
+`function` — Target → claim → source lineage rows: the "every material value traceable to source evidence" surface.
+
+```ts
+({ evidence, resolveSourceUrl, className }: EvidenceLineageTableProps) => Element
+```
+
+### `EvidenceLineageTableProps`
+
+`interface` — Properties for the evidence lineage table with source click-through
+
+```ts
+interface EvidenceLineageTableProps
+```
+
+### `ExceptionList`
+
+`function` — Severity-badged exception rows with resolution state.
+
+```ts
+({ exceptions, className }: ExceptionListProps) => Element
+```
+
+### `ExceptionListProps`
+
+`interface` — Properties for the severity-badged exception list
+
+```ts
+interface ExceptionListProps
+```
+
 ### `fieldAcceptsFreeText`
 
 `function` — Determine if a chat interaction field allows free text input
@@ -1222,6 +1254,14 @@ interface MentionTextSegment
 (existing: AgentActivityRecord[], incoming: AgentActivityRecord[]) => AgentActivityRecord[]
 ```
 
+### `mergeReviewQueuePages`
+
+`function` — Merge a fetched page into held rows: dedupe by scopeKey, incoming wins, newest updatedAt first.
+
+```ts
+(existing: ReviewQueueItem[], incoming: ReviewQueueItem[]) => ReviewQueueItem[]
+```
+
 ### `MessageAttachments`
 
 `function` — Renders a message's attachment parts as a row of image thumbnails and file chips.
@@ -1350,6 +1390,14 @@ type ParseInteractionAnswersResult
 type ParseInteractionResult
 ```
 
+### `parseReviewQueueItem`
+
+`function` — Re-validate one JSON-boundary row into a queue item; null for junk.
+
+```ts
+(raw: unknown) => ReviewQueueItem | null
+```
+
 ### `pendingApprovalOf`
 
 `function` — Extract `{proposalId, status}` from a tool outcome when it is a proposal awaiting human approval; null otherwise.
@@ -1454,6 +1502,22 @@ type ProducerWireEvent
 interface ProposalApprovalHandlers
 ```
 
+### `ProvenanceStamp`
+
+`function` — The audit line a reviewer approves against: which configuration produced this document, what served it, and how that configuration measured on its backtest.
+
+```ts
+({ provenance, backtest, className }: ProvenanceStampProps) => Element
+```
+
+### `ProvenanceStampProps`
+
+`interface` — Properties for the provenance stamp with the optional backtest slot
+
+```ts
+interface ProvenanceStampProps
+```
+
 ### `ProviderLogo`
 
 `function` — Real brand mark when we have one; tinted monogram otherwise.
@@ -1468,6 +1532,22 @@ interface ProposalApprovalHandlers
 
 ```ts
 interface ProviderLogoProps
+```
+
+### `QualityCheckList`
+
+`function` — Pass/fail quality-check rows tagged with their source (agent self-report, platform gate, judge ensemble).
+
+```ts
+({ checks, className }: QualityCheckListProps) => Element
+```
+
+### `QualityCheckListProps`
+
+`interface` — Properties for the pass/fail quality check list
+
+```ts
+interface QualityCheckListProps
 ```
 
 ### `questionInteractionContentSignature`
@@ -1532,6 +1612,54 @@ interface QuestionOptionListProps
 
 ```ts
 interface RestoreChatInteractionsOptions
+```
+
+### `ReviewQueueItem`
+
+`interface` — One row of the review queue projection for an engagement scope
+
+```ts
+interface ReviewQueueItem
+```
+
+### `ReviewQueuePage`
+
+`interface` — One fetched page of queue items with an optional continuation cursor
+
+```ts
+interface ReviewQueuePage
+```
+
+### `ReviewQueuePanel`
+
+`function` — The workspace review queue — cursor-paged, refreshable, selection via callback.
+
+```ts
+({ fetchQueue, onSelect, title, emptyLabel, className, }: ReviewQueuePanelProps) => Element
+```
+
+### `ReviewQueuePanelProps`
+
+`interface` — Properties for the review queue panel over a fetch data port
+
+```ts
+interface ReviewQueuePanelProps
+```
+
+### `ReviewQueueState`
+
+`type`
+
+```ts
+type ReviewQueueState
+```
+
+### `reviewQueueStateLabel`
+
+`function` — Human label for a queue state.
+
+```ts
+(state: ReviewQueueState) => string
 ```
 
 ### `RunDrillIn`
@@ -1860,4 +1988,36 @@ interface UseSandboxTerminalConnectionResult
 
 ```ts
 interface WaterfallRow
+```
+
+### `WorkProductCard`
+
+`function` — The chat transcript anchor card for one work-product version — a compact, system-authored pointer, not a parallel review surface.
+
+```ts
+({ part, onOpen, className }: WorkProductCardProps) => Element
+```
+
+### `WorkProductCardProps`
+
+`interface` — Properties for the transcript anchor card rendered in chat
+
+```ts
+interface WorkProductCardProps
+```
+
+### `workProductPartsFromMessageParts`
+
+`function` — Every persisted work-product anchor on one message, re-validated.
+
+```ts
+(parts: readonly Record<string, unknown>[] | null | undefined) => WorkProductPersistedPart[]
+```
+
+### `workProductStatusLabel`
+
+`function` — Human label for a work-product status.
+
+```ts
+(status: WorkProductStatus) => string
 ```

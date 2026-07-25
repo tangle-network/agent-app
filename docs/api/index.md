@@ -4,7 +4,7 @@
 
 Source: `src/index.ts`
 
-768 exports.
+832 exports.
 
 ### `AddCitationArgs`
 
@@ -52,6 +52,14 @@ interface AgentAppConfig
 
 ```ts
 interface AgentAppTheme
+```
+
+### `AgentCheckInput`
+
+`interface` — Agent self-reported check input for `submit_work_product` (persisted with `source: 'agent'`; `platform`/`judge` sources are never model-suppliable).
+
+```ts
+interface AgentCheckInput
 ```
 
 ### `AgentIdentityConfig`
@@ -718,6 +726,14 @@ interface BuildSandboxToolFileMountsOptions
 (text: string, turnId: string | undefined) => JsonRecord[]
 ```
 
+### `buildWorkProductTools`
+
+`function` — Build the three work-product tools for `customTools` registration on the MCP server / HTTP handler / runtime executor.
+
+```ts
+(config: WorkProductToolConfig) => AppToolDefinition<Record<string, unknown>>[]
+```
+
 ### `BULK_DELETE_MAX_THREADS`
 
 `const` — Bounds a single bulk-delete request's write set; product surfaces cap thread lists at far fewer, so a larger batch is a malformed or hostile request.
@@ -748,6 +764,14 @@ interface BuildSandboxToolFileMountsOptions
 
 ```ts
 (from: ChatPlanStatus, to: ChatPlanStatus) => boolean
+```
+
+### `canTransitionWorkProduct`
+
+`function` — Whether a legal edge exists from `from` to `to` in the review machine.
+
+```ts
+(from: WorkProductStatus, to: WorkProductStatus) => boolean
 ```
 
 ### `CanvasRenderPalette`
@@ -1020,6 +1044,14 @@ type ChatToolStatus
 
 ```ts
 interface ChatUsageTokens
+```
+
+### `ChatWorkProductPart`
+
+`type` — Persisted work-product anchor card — byte-matches `workProductToPersistedPart` in `/work-product`'s contract.
+
+```ts
+type ChatWorkProductPart
 ```
 
 ### `checkRateLimit`
@@ -1374,6 +1406,14 @@ type CreateDurableInteractionRoutePersistenceOptions
 () => InMemoryMissionStore
 ```
 
+### `createInMemoryWorkProductStore`
+
+`function` — In-memory {@link WorkProductStorePort} — the portable backend for tests and reference assemblies.
+
+```ts
+() => InMemoryWorkProductStore
+```
+
 ### `createInteractionAnswerRoute`
 
 `function` — Create an interaction answer route that handles listing and resolving interaction requests
@@ -1588,6 +1628,30 @@ interface CreateTangleRouterModelConfigOptions
 
 ```ts
 (opts?: { minRecall?: number | undefined; minContentLength?: number | undefined; }) => (requirement: CompletionRequirem…
+```
+
+### `CreateWorkProductInput`
+
+`interface` — Define the input required to create a new draft work product row
+
+```ts
+interface CreateWorkProductInput
+```
+
+### `createWorkProductRoutes`
+
+`function` — Create the work-product review endpoints over the store port and product seams
+
+```ts
+(options: WorkProductRoutesOptions) => WorkProductRoutes
+```
+
+### `createWorkProductService`
+
+`function` — Create the guarded work-product service over a store port
+
+```ts
+(options: WorkProductServiceOptions) => WorkProductService
 ```
 
 ### `createWorkspaceKeyManager`
@@ -2398,6 +2462,46 @@ interface EnsureWorkspaceSandboxOptions
 120000
 ```
 
+### `EVIDENCE_COVERAGE_CHECK`
+
+`const` — The shell's one generic platform check: every material target has ≥1 evidence row.
+
+```ts
+"evidence_coverage"
+```
+
+### `EvidenceEntry`
+
+`interface` — One lineage row: a source document location supporting one artifact claim
+
+```ts
+interface EvidenceEntry
+```
+
+### `EvidenceLocator`
+
+`interface` — Point into a source document: page, free-form range, verbatim quote
+
+```ts
+interface EvidenceLocator
+```
+
+### `ExceptionEntry`
+
+`interface` — One flagged problem with the work product, resolvable by agent or reviewer
+
+```ts
+interface ExceptionEntry
+```
+
+### `ExceptionSeverity`
+
+`type`
+
+```ts
+type ExceptionSeverity
+```
+
 ### `ExpiringCapabilityTokenOptions`
 
 `interface` — Define options for capability tokens that expire after a specified lifetime in milliseconds
@@ -2452,6 +2556,22 @@ interface ExpiringCapabilityTokenOptions
 
 ```ts
 (parts: JsonRecord[], outcome: "answered" | "expired") => JsonRecord[]
+```
+
+### `finalizeWorkProductProvenance`
+
+`function` — Back-fill `servingModels`/`costUsd` onto every record (and its history entries) stamped with `runId` — wire it into the chat route's existing `lifecycle.onTurnComplete` seam; no new hook.
+
+```ts
+(store: WorkProductStorePort, input: FinalizeWorkProductProvenanceInput) => Promise<WorkProductRecord[]>
+```
+
+### `FinalizeWorkProductProvenanceInput`
+
+`interface` — Completion receipt for one run, from the turn's usage/lifecycle seam.
+
+```ts
+interface FinalizeWorkProductProvenanceInput
 ```
 
 ### `findCustomTool`
@@ -2718,6 +2838,14 @@ typeof InMemoryDurableChatStateStore
 interface InMemoryMissionStore
 ```
 
+### `InMemoryWorkProductStore`
+
+`interface` — In-memory store surface with audit trail access and unguarded direct writes for tests
+
+```ts
+interface InMemoryWorkProductStore
+```
+
 ### `INTERACTION_CANCEL_EVENT`
 
 `const` — Sidecar → client: the ask was withdrawn; data = `{ id, reason?
@@ -2950,6 +3078,14 @@ type InteractionRouteLogger
 (part: ChatMessagePart) => part is ChatToolPart
 ```
 
+### `isChatWorkProductPart`
+
+`function` — Resolve whether a chat message part is a persisted work-product anchor
+
+```ts
+(part: ChatMessagePart) => part is WorkProductPersistedPart
+```
+
 ### `isHarness`
 
 `function` — Determine if a value is a recognized harness string identifier
@@ -3036,6 +3172,22 @@ type InteractionRouteLogger
 
 ```ts
 (event: unknown) => boolean
+```
+
+### `isWorkProductStatus`
+
+`function` — Runtime guard for re-validating a status read off a JSON boundary.
+
+```ts
+(value: unknown) => value is WorkProductStatus
+```
+
+### `isWorkProductTerminal`
+
+`function` — Statuses a work product can never leave.
+
+```ts
+(status: WorkProductStatus) => boolean
 ```
 
 ### `JsonObject`
@@ -3276,6 +3428,14 @@ interface LoopTraceEventLike
 
 ```ts
 (pathname: string) => SandboxTerminalWsMatch | null
+```
+
+### `MAX_WORK_PRODUCT_BATCH`
+
+`const` — Max entries per `upsert_evidence`/`flag_exception` call — keeps each call a small batch the model can correct precisely on a named-index failure.
+
+```ts
+50
 ```
 
 ### `MCP_PROTOCOL_VERSIONS`
@@ -3838,6 +3998,22 @@ type Outcome
 (outcome: { ok: false; code: string; message: string; status?: number | undefined; }) => number
 ```
 
+### `parseAgentCheckInput`
+
+`function` — Validate one agent self-check ensuring identifiers, verdict flag, and optional detail are well formed
+
+```ts
+(raw: unknown, path?: string) => WorkProductParseResult<AgentCheckInput>
+```
+
+### `parseArtifactInput`
+
+`function` — Validate a raw artifact.
+
+```ts
+(raw: unknown, path?: string) => WorkProductParseResult<WorkProductArtifact>
+```
+
 ### `parseAssetSpec`
 
 `function` — Validates an unknown value as an AssetSpec, including format-specific content validation.
@@ -3868,6 +4044,22 @@ interface ParsedMission
 
 ```ts
 interface ParsedMissionStep
+```
+
+### `parseEvidenceInput`
+
+`function` — Validate one raw evidence entry field-by-field.
+
+```ts
+(raw: unknown, path?: string) => WorkProductParseResult<EvidenceEntry>
+```
+
+### `parseExceptionInput`
+
+`function` — Validate one raw exception entry field-by-field.
+
+```ts
+(raw: unknown, path?: string) => WorkProductParseResult<ExceptionEntry>
 ```
 
 ### `parseInteractionAnswers`
@@ -3950,6 +4142,14 @@ interface ParseMissionBlocksOptions
 type ParsePlanSubmittedResult
 ```
 
+### `parseReviewQueueItem`
+
+`function` — Re-validate one JSON-boundary row into a queue item; null for junk.
+
+```ts
+(raw: unknown) => ReviewQueueItem | null
+```
+
 ### `parseSessionStreamEnvelope`
 
 `function` — Reconstruct the flat MissionStreamEvent from a broadcast envelope of shape `{ type, data: { ...missionFields } }` (transports may also stamp routing fields like workspaceId/threadId into `data`).
@@ -3996,6 +4196,14 @@ interface PersistedChatMessageForTurn
 
 ```ts
 (part: Record<string, unknown>) => ChatPlan | null
+```
+
+### `persistedPartToWorkProduct`
+
+`function` — Re-validate a stored/wire part into the typed anchor; null for junk.
+
+```ts
+(part: Record<string, unknown>) => WorkProductPersistedPart | null
 ```
 
 ### `PLAN_SUBMITTED_EVENT`
@@ -4222,12 +4430,28 @@ interface PresetToolHandlerOptions
 interface ProducedState
 ```
 
+### `ProfileBacktestSummary`
+
+`interface` — The product-resolved backtest summary for one profile hash (from its own eval artifacts via agent-eval's `loadScorecard`) — the shell defines only this TYPE and the `ProvenanceStamp` slot that render…
+
+```ts
+interface ProfileBacktestSummary
+```
+
 ### `ProfileComposeOptions`
 
 `interface` — Define options for composing a user profile including prompts, files, servers, and name
 
 ```ts
 interface ProfileComposeOptions
+```
+
+### `projectReviewQueue`
+
+`function` — Fold the existing sources into queue items, newest first.
+
+```ts
+(inputs: ReviewQueueInputs) => ReviewQueueItem[]
 ```
 
 ### `PromptInputPart`
@@ -4292,6 +4516,14 @@ interface PumpBufferedTurnOptions
 
 ```ts
 interface PutObjectOptions
+```
+
+### `QualityCheck`
+
+`interface` — One named quality verdict on the work product, tagged with who computed it
+
+```ts
+interface QualityCheck
 ```
 
 ### `questionInteractionContentSignature`
@@ -4780,6 +5012,46 @@ interface RevealSpanOptions
 
 ```ts
 (candidate: KnowledgeCandidate, minConfidence: number) => KnowledgeGateVerdict
+```
+
+### `ReviewQueueInputs`
+
+`interface` — Existing-source inputs the projection folds — no new stores
+
+```ts
+interface ReviewQueueInputs
+```
+
+### `ReviewQueueItem`
+
+`interface` — One row of the review queue projection for an engagement scope
+
+```ts
+interface ReviewQueueItem
+```
+
+### `ReviewQueuePendingAsk`
+
+`interface` — A pending `/interactions` ask on a thread (from the existing list endpoint) — the missing_info source.
+
+```ts
+interface ReviewQueuePendingAsk
+```
+
+### `ReviewQueueState`
+
+`type`
+
+```ts
+type ReviewQueueState
+```
+
+### `ReviewQueueThread`
+
+`interface` — An engagement-scoped chat thread — the intake candidate source.
+
+```ts
+interface ReviewQueueThread
 ```
 
 ### `routerChatProbe`
@@ -5302,6 +5574,14 @@ interface SignObjectUrlArgs
 (parts: Record<string, unknown>[], answersByInteractionId: Readonly<Record<string, InteractionAnswers>>) => Record<stri…
 ```
 
+### `stampProvenance`
+
+`function` — Stamp a full provenance from the dispatch-time base.
+
+```ts
+(base: WorkProductProvenanceBase, now?: () => number) => WorkProductProvenance
+```
+
 ### `statSandboxFileSize`
 
 `function` — Stats a sandbox file's byte length via `wc -c`.
@@ -5468,6 +5748,14 @@ interface SubmitProposalArgs
 
 ```ts
 interface SubmitProposalResult
+```
+
+### `SubmitWorkProductInput`
+
+`interface` — Payload for the draft→ready submit transition
+
+```ts
+interface SubmitWorkProductInput
 ```
 
 ### `summarize`
@@ -5822,6 +6110,14 @@ type ToolLoopStopReason
 (value: string | null | undefined) => string | null
 ```
 
+### `TrustItem`
+
+`interface` — One item's raters: the per-judge verdicts {@link aggregateJudgeVerdicts } reduces, tagged with the item they scored so spread stays within-item.
+
+```ts
+interface TrustItem
+```
+
 ### `TURN_EVENTS_MIGRATION_SQL`
 
 `const` — Schema for the D1 store — append to the product's migrations.
@@ -5854,6 +6150,14 @@ interface TurnEventStore
 type TurnStatus
 ```
 
+### `unresolvedBlockingExceptions`
+
+`function` — Unresolved blocking exceptions are what park a work product in `blocked`.
+
+```ts
+(exceptions: readonly ExceptionEntry[]) => ExceptionEntry[]
+```
+
 ### `upsertDurableInteractionAsk`
 
 `function` — Apply an ask event.
@@ -5868,6 +6172,14 @@ type TurnStatus
 
 ```ts
 (body: Record<string, unknown>) => InteractionAnswerBodyValidation
+```
+
+### `validateWorkProductVerdictBody`
+
+`function` — Validate the verdict POST body: `{ id, verdict, note?
+
+```ts
+(body: Record<string, unknown>) => WorkProductVerdictBody
 ```
 
 ### `VaultKv`
@@ -6020,6 +6332,206 @@ interface VideoTextAnimationScene
 
 ```ts
 type WithAgentActivity
+```
+
+### `WorkProductArtifact`
+
+`interface` — Define the reviewable artifact body with its kind, sources, and structured field map
+
+```ts
+interface WorkProductArtifact
+```
+
+### `WorkProductAuditEvent`
+
+`interface` — One audit-trail row, appended after every committed state change.
+
+```ts
+interface WorkProductAuditEvent
+```
+
+### `WorkProductAuthorizeArgs`
+
+`interface` — Auth seam arguments carrying the request, the endpoint intent, and the parsed verdict body
+
+```ts
+interface WorkProductAuthorizeArgs
+```
+
+### `WorkProductOutcome`
+
+`type` — Discriminated outcome for guarded operations — `conflict` distinguishes a lost guarded race (retryable) from a logic rejection (illegal edge, missing row — deterministic, never retried).
+
+```ts
+type WorkProductOutcome
+```
+
+### `WorkProductParseResult`
+
+`type` — Validation result whose failure names the exact field, so a tool layer can hand the model a correctable error it can act on.
+
+```ts
+type WorkProductParseResult
+```
+
+### `WorkProductPatch`
+
+`interface` — Fields a guarded write sets when the guard holds.
+
+```ts
+interface WorkProductPatch
+```
+
+### `WorkProductPersistedPart`
+
+`interface` — The persisted `type:'work_product'` transcript anchor — the chat card that keeps chat the driver surface for review.
+
+```ts
+interface WorkProductPersistedPart
+```
+
+### `WorkProductProvenance`
+
+`interface` — The audit triple binding a work product to the exact configuration and run that produced it.
+
+```ts
+interface WorkProductProvenance
+```
+
+### `WorkProductProvenanceBase`
+
+`type` — The dispatch-time provenance closure's output: everything the route knows before the turn completes.
+
+```ts
+type WorkProductProvenanceBase
+```
+
+### `WorkProductRecord`
+
+`interface` — Define the durable work product row accumulating artifact, lineage, exceptions, checks, and history
+
+```ts
+interface WorkProductRecord
+```
+
+### `WorkProductRef`
+
+`interface` — Stable pointer at one version of one work product.
+
+```ts
+interface WorkProductRef
+```
+
+### `WorkProductRouteAuthorization`
+
+`type` — The product seam's verdict for one request: authenticated reviewer + workspace, or a product-authored short-circuit Response (401/403/429…).
+
+```ts
+type WorkProductRouteAuthorization
+```
+
+### `WorkProductRoutes`
+
+`interface` — Assembled review endpoints returning web-standard Responses
+
+```ts
+interface WorkProductRoutes
+```
+
+### `WorkProductRoutesOptions`
+
+`interface` — Configuration options assembling the review endpoints from the store and product seams
+
+```ts
+interface WorkProductRoutesOptions
+```
+
+### `WorkProductService`
+
+`interface` — Guarded mutation surface over the work-product store
+
+```ts
+interface WorkProductService
+```
+
+### `WorkProductServiceOptions`
+
+`interface` — Configuration options for creating a work product service
+
+```ts
+interface WorkProductServiceOptions
+```
+
+### `WorkProductStatus`
+
+`type`
+
+```ts
+type WorkProductStatus
+```
+
+### `WorkProductStorePort`
+
+`interface` — Persistence seam — the product implements this over its own tables.
+
+```ts
+interface WorkProductStorePort
+```
+
+### `WorkProductToolConfig`
+
+`interface` — Domain seams for the three work-product tools — every domain word is a parameter; the shell bakes none.
+
+```ts
+interface WorkProductToolConfig
+```
+
+### `workProductToPersistedPart`
+
+`function` — Project the transcript anchor part from a record.
+
+```ts
+(record: WorkProductRecord) => WorkProductPersistedPart
+```
+
+### `workProductTrustInputs`
+
+`function` — Trust-gate bridge: one `TrustItem` per work product whose production quality was scored by the product's eval-campaign ensemble.
+
+```ts
+<D extends string = string>(records: readonly WorkProductRecord[], verdictsFor: (record: WorkProductRecord) => readonly…
+```
+
+### `WorkProductUpdateGuard`
+
+`interface` — Fields a guarded write compares against the values the caller read.
+
+```ts
+interface WorkProductUpdateGuard
+```
+
+### `WorkProductVerdictBody`
+
+`type` — Reviewer verdict wire body for the POST endpoint.
+
+```ts
+type WorkProductVerdictBody
+```
+
+### `WorkProductVerdictInput`
+
+`interface` — Reviewer verdict payload for the ready→approved / ready→changes_requested transition
+
+```ts
+interface WorkProductVerdictInput
+```
+
+### `WorkProductVersionEntry`
+
+`interface` — Frozen milestone row for one version of the work product
+
+```ts
+interface WorkProductVersionEntry
 ```
 
 ### `WorkspaceKeyManager`

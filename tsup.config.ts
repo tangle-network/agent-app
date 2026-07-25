@@ -38,6 +38,8 @@ export default defineConfig({
     'app-auth/index': 'src/app-auth/index.ts',
     'web/index': 'src/web/index.ts',
     'web-react/index': 'src/web-react/index.tsx',
+    'work-product/index': 'src/work-product/index.ts',
+    'work-product-react/index': 'src/work-product-react/index.tsx',
     'web-react/terminal': 'src/web-react/terminal.ts',
     'composer/index': 'src/composer/index.ts',
     'assistant/index': 'src/assistant/index.ts',
