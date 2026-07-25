@@ -19204,6 +19204,12 @@
           "doc": "Split a message's text into plain-text and mention segments by matching `@<path>` runs against that message's own mention parts."
         },
         {
+          "name": "settleInteractionSubmit",
+          "kind": "function",
+          "signature": "(run: () => Promise<InteractionSubmitResult>, timeoutMs?: number) => Promise<InteractionSubmitResult>",
+          "doc": "Runs a host-supplied submitter under the CARD's own deadline, and always resolves."
+        },
+        {
           "name": "SmoothRevealOptions",
           "kind": "interface",
           "signature": "interface SmoothRevealOptions",

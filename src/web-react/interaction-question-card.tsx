@@ -36,6 +36,7 @@ import {
   interactionTerminalNotes,
   isLateAnswerableStatus,
   lateAnswerMessage,
+  settleInteractionSubmit,
   type FieldValues,
   type SubmitInteractionAnswer,
 } from './interaction-card-support'
@@ -299,10 +300,11 @@ export function InteractionQuestionCard({
   //
   // The visible cost: an id that changes WHILE a submit is outstanding leaves
   // the new question reading "Submitting…" and disabled until that request
-  // settles — bounded by the 30s submit timeout. Preferred to the alternative,
-  // since the only way to free the button early is to drop the in-flight guard,
-  // and a second submit racing the first is a real bug where a stale label is
-  // only a confusing one.
+  // settles. Bounded, because `settleInteractionSubmit` holds the submitter to
+  // this card's own deadline rather than trusting it to have one. Preferred to
+  // the alternative, since the only way to free the button early is to drop the
+  // in-flight guard, and a second submit racing the first is a real bug where a
+  // stale label is only a confusing one.
   if (askId !== interaction.id) {
     setAskId(interaction.id)
     setValues(fieldValuesFromAnswers(interaction.fields, interaction.answers))
@@ -367,7 +369,9 @@ export function InteractionQuestionCard({
     setSubmitting(true)
     setError(null)
     try {
-      const result = await submitAnswer({ id: interaction.id, outcome: 'accepted', data: answerData })
+      const result = await settleInteractionSubmit(() =>
+        submitAnswer({ id: interaction.id, outcome: 'accepted', data: answerData }),
+      )
       if (result.ok) {
         setLocalStatus('answered')
         onResolved?.(interaction.id, 'answered', answerData)
@@ -516,7 +520,7 @@ export function InteractionQuestionCard({
       {(showSubmitButton || showTimeoutNote) && (
         <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
           {showTimeoutNote && (
-            <span className="mr-auto text-xs text-muted-foreground">{timeoutNote}</span>
+            <div className="mr-auto text-xs text-muted-foreground">{timeoutNote}</div>
           )}
           {showSubmitButton && (
             <InteractionActionButton onClick={() => void submit()} disabled={disabled || !answerData}>

@@ -430,6 +430,51 @@ describe('InteractionQuestionCard host overrides', () => {
     expect(submitButton().disabled).toBe(false)
   })
 
+  it('does not wedge on a host submitter that never settles', async () => {
+    vi.useFakeTimers()
+    // NOT `createInteractionAnswerSubmitter` — that one aborts its own fetch.
+    // A product may pass any implementation, commonly one wrapping an untimed
+    // `fetch`. Without a deadline on the card, this leaves the in-flight guard
+    // set for the life of the instance: "Submitting…" forever, no answer ever
+    // sendable again.
+    const submitAnswer = vi.fn(() => new Promise<InteractionSubmitResult>(() => {}))
+    const { container } = mount(SELECT_INTERACTION, { submitAnswer })
+    fireEvent.click(screen.getByLabelText('Formal'))
+    fireEvent.click(submitButton())
+    await flush()
+    expect(submitButton().textContent).toContain('Submitting…')
+
+    await act(async () => {
+      vi.advanceTimersByTime(30_000)
+      await Promise.resolve()
+    })
+
+    expect(container.textContent).toContain('Could not reach the agent. Try again.')
+    expect(submitButton().disabled).toBe(false)
+
+    // And the guard really did clear — a retry reaches the submitter again.
+    vi.useRealTimers()
+    fireEvent.click(submitButton())
+    await flush()
+    expect(submitAnswer).toHaveBeenCalledTimes(2)
+  })
+
+  it('surfaces a throwing host submitter instead of dropping it', async () => {
+    // Without normalising, the rejection escapes the click handler as an
+    // unhandled rejection and the user is left with a card that silently did
+    // nothing.
+    const submitAnswer = vi.fn(async () => {
+      throw new Error('network is down')
+    }) as unknown as SubmitInteractionAnswer
+    const { container } = mount(SELECT_INTERACTION, { submitAnswer })
+    fireEvent.click(screen.getByLabelText('Formal'))
+    fireEvent.click(submitButton())
+    await flush()
+
+    expect(container.textContent).toContain('network is down')
+    expect(submitButton().disabled).toBe(false)
+  })
+
   it('starts over when the same card is handed the next ask', () => {
     const submitAnswer = okSubmitter()
     const { rerender } = render(

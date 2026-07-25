@@ -24972,6 +24972,14 @@ interface SeatPaywallProps
 (content: string, parts: readonly ChatMentionPart[]) => { segments: MentionTextSegment[]; matched: Set<ChatMentionPart>…
 ```
 
+### `settleInteractionSubmit`
+
+`function` — Runs a host-supplied submitter under the CARD's own deadline, and always resolves.
+
+```ts
+(run: () => Promise<InteractionSubmitResult>, timeoutMs?: number) => Promise<InteractionSubmitResult>
+```
+
 ### `SmoothRevealOptions`
 
 `interface` — Define configuration options for controlling smooth text reveal animation rates

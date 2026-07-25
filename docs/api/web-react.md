@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-231 exports.
+232 exports.
 
 ### `activityTone`
 
@@ -1588,6 +1588,14 @@ interface SeatPaywallProps
 
 ```ts
 (content: string, parts: readonly ChatMentionPart[]) => { segments: MentionTextSegment[]; matched: Set<ChatMentionPart>…
+```
+
+### `settleInteractionSubmit`
+
+`function` — Runs a host-supplied submitter under the CARD's own deadline, and always resolves.
+
+```ts
+(run: () => Promise<InteractionSubmitResult>, timeoutMs?: number) => Promise<InteractionSubmitResult>
 ```
 
 ### `SmoothRevealOptions`
