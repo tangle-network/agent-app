@@ -11259,6 +11259,12 @@
       "error": null,
       "exports": [
         {
+          "name": "buildModelChain",
+          "kind": "function",
+          "signature": "(preferred: string, fallbacks: readonly string[]) => string[]",
+          "doc": "Build a failover chain: the preferred model first, then `fallbacks`, with duplicates removed so a model is never retried twice in one turn."
+        },
+        {
           "name": "catalogIdsForModel",
           "kind": "function",
           "signature": "(model: ModelInfo) => string[]",
@@ -11295,6 +11301,12 @@
           "doc": "Resolve and return a trimmed string model ID or undefined for invalid or empty input"
         },
         {
+          "name": "isUpstreamUnavailable",
+          "kind": "function",
+          "signature": "(signal: unknown) => boolean",
+          "doc": "True when `signal` — a thrown error OR a resolved result payload — indicates the model's upstream is unavailable and another model is worth trying."
+        },
+        {
           "name": "isWellFormedModelId",
           "kind": "function",
           "signature": "(modelId: string) => boolean",
@@ -11305,6 +11317,24 @@
           "kind": "type",
           "signature": "type LoadModels",
           "doc": "The catalog-fetch boundary: maps a router base URL to the raw model list."
+        },
+        {
+          "name": "ModelFailoverAttempt",
+          "kind": "interface",
+          "signature": "interface ModelFailoverAttempt",
+          "doc": "One model tried, and how it went."
+        },
+        {
+          "name": "ModelFailoverExhaustedError",
+          "kind": "class",
+          "signature": "class ModelFailoverExhaustedError",
+          "doc": "Every model in the chain failed; carries the trail for logging."
+        },
+        {
+          "name": "ModelFailoverResult",
+          "kind": "interface",
+          "signature": "interface ModelFailoverResult",
+          "doc": "The outcome of a failover run: the value plus the full attempt trail."
         },
         {
           "name": "ModelInfo",
@@ -11329,6 +11359,30 @@
           "kind": "interface",
           "signature": "interface ResolvedChatModel",
           "doc": "Resolve a chat model with its identifier and source information"
+        },
+        {
+          "name": "runWithModelFailover",
+          "kind": "function",
+          "signature": "<T>(input: RunWithModelFailoverInput<T>) => Promise<ModelFailoverResult<T>>",
+          "doc": "Run `run` against the first model in `models` that does not report an upstream outage, falling through the chain in order."
+        },
+        {
+          "name": "RunWithModelFailoverInput",
+          "kind": "interface",
+          "signature": "interface RunWithModelFailoverInput",
+          "doc": "Inputs to {@link runWithModelFailover}."
+        },
+        {
+          "name": "UPSTREAM_UNAVAILABLE_CODES",
+          "kind": "const",
+          "signature": "readonly string[]",
+          "doc": "Error codes that mean \"this model's upstream is unavailable — a different model may still work\"."
+        },
+        {
+          "name": "UPSTREAM_UNAVAILABLE_STATUSES",
+          "kind": "const",
+          "signature": "readonly number[]",
+          "doc": "HTTP statuses that indicate an upstream capacity/availability problem."
         },
         {
           "name": "validateChatModelId",
