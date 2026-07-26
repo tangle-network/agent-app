@@ -44,12 +44,12 @@ _75 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./platform`](api/platform.md) | 65 | `billing`, `runtime`, `web` |
 | [`./preflight`](api/preflight.md) | 12 | — |
 | [`./preset-cloudflare`](api/preset-cloudflare.md) | 16 | `billing`, `crypto`, `knowledge`, `tools`, `web` |
-| [`./profile`](api/profile.md) | 37 | `skills` |
+| [`./profile`](api/profile.md) | 44 | `skills` |
 | [`./prompt`](api/prompt.md) | 3 | — |
 | [`./redact`](api/redact.md) | 14 | — |
 | [`./run`](api/run.md) | 10 | `harness` |
 | [`./runtime`](api/runtime.md) | 66 | `tools` |
-| [`./sandbox`](api/sandbox.md) | 114 | `crypto`, `harness`, `runtime`, `tools` |
+| [`./sandbox`](api/sandbox.md) | 114 | `crypto`, `harness`, `profile`, `runtime`, `tools` |
 | [`./sequences`](api/sequences.md) | 113 | `tools`, `web` |
 | [`./sequences-react`](api/sequences-react.md) | 108 | `brand`, `sequences` |
 | [`./sequences/drizzle`](api/sequences-drizzle.md) | 13 | `tools`, `web` |
@@ -432,11 +432,11 @@ Depends on: `billing`, `crypto`, `knowledge`, `tools`, `web`
 
 ## `./profile`
 
-Source: `src/profile/index.ts` · 37 exports
+Source: `src/profile/index.ts` · 44 exports
 
 Depends on: `skills`
 
-`assertSkillDeliveryDisjoint`, `assertSystemPromptWithinBudget`, `composeAgentProfile`, `ComposedSkills`, `ComposeProfileBudget`, `composeShellResources`, `ComposeShellResourcesInput`, `composeSkills`, `CorpusEntry`, `CorpusLoadResult`, `corpusSkills`, `DEFAULT_MAX_SYSTEM_PROMPT_BYTES`, `EvolvableSectionInput`, `GlobModules`, `largestPromptSections`, `LoadCorpusOptions`, `loadMarkdownCorpus`, `makeEvolvableSection`, `mergeComposedSkills`, `parseCorpusSkills`, `ParsedSkill`, `parseSkillFrontmatter`, `profile`, `ProfileChannels`, `ProfileOverlay`, `registrySkills`, `renderInlineSkills`, `renderSkillIndex`, `SkillDeliveryMode`, `SkillEntry`, `skillEntryFromMarkdown`, `SkillFrontmatter`, `skillMountPath`, `skillRefs`, `stripComments`, `UserSkill`, `userSkillMounts`
+`assertSkillDeliveryDisjoint`, `assertSystemPromptWithinBudget`, `composeAgentProfile`, `ComposedSkills`, `ComposeProfileBudget`, `composeShellResources`, `ComposeShellResourcesInput`, `composeSkills`, `CorpusEntry`, `CorpusLoadResult`, `corpusSkills`, `DEFAULT_MAX_SYSTEM_PROMPT_BYTES`, `diffProfileFingerprints`, `EvolvableSectionInput`, `fingerprintAgentProfile`, `formatProfileDrift`, `GlobModules`, `largestPromptSections`, `LoadCorpusOptions`, `loadMarkdownCorpus`, `makeEvolvableSection`, `mergeComposedSkills`, `parseCorpusSkills`, `ParsedSkill`, `parseSkillFrontmatter`, `profile`, `ProfileChannels`, `ProfileDrift`, `ProfileDriftEntry`, `ProfileFingerprint`, `ProfileFingerprintContext`, `ProfileOverlay`, `registrySkills`, `renderInlineSkills`, `renderSkillIndex`, `SkillDeliveryMode`, `SkillEntry`, `skillEntryFromMarkdown`, `SkillFrontmatter`, `skillMountPath`, `skillRefs`, `stripComments`, `UserSkill`, `userSkillMounts`
 
 [Full API →](api/profile.md)
 
@@ -480,7 +480,7 @@ Depends on: `tools`
 
 Source: `src/sandbox/index.ts` · 114 exports
 
-Depends on: `crypto`, `harness`, `runtime`, `tools`
+Depends on: `crypto`, `harness`, `profile`, `runtime`, `tools`
 
 `AppToolDescriptor`, `assertEnvWithinLimits`, `assertProvisionPayloadWithinCap`, `attachReasoningEffort`, `AuthenticatedSandboxUser`, `bearerSubprotocolToken`, `bearerToken`, `buildAppToolMcpServers`, `BuildAppToolMcpServersOptions`, `buildSandboxRuntimeProxyHeaders`, `buildSandboxToolFileMounts`, `BuildSandboxToolFileMountsOptions`, `buildSandboxToolPathSetupScript`, `classifySeveredStream`, `createSandboxTerminalToken`, `createWorkspaceSandboxConnectionHandler`, `createWorkspaceSandboxManager`, `createWorkspaceSandboxRuntimeProxyHandler`, `createWorkspaceSandboxTerminalUpgradeHandler`, `DEFAULT_SANDBOX_RESOURCES`, `deferredCorpusHash`, `deleteSecret`, `detectInteractiveQuestion`, `driveSandboxTurn`, `DriveSandboxTurnOptions`, `encodeSandboxRuntimePath`, `ensureWorkspaceSandbox`, `EnsureWorkspaceSandboxOptions`, `ENV_TOTAL_MAX_BYTES`, `ENV_VALUE_MAX_BYTES`, `flattenHistory`, `getClient`, `isSandboxTerminalWsUpgrade`, `isTerminalPromptEvent`, `LivenessProbeConfig`, `matchSandboxTerminalWsPath`, `MemberSyncSeam`, `mergeExtraMcp`, `mergeHistoryIntoParts`, `mintSandboxScopedToken`, `mintTerminalProxyToken`, `Outcome`, `peekWorkspaceSandbox`, `PeekWorkspaceSandboxOutcome`, `ProfileComposeOptions`, `PromptInputPart`, `ProviderResolutionConfig`, `PROVISION_PAYLOAD_MAX_BYTES`, `ProvisionPayloadSections`, `ProvisionProfileSection`, `readSandboxBinaryBytes`, `readSecret`, `resetClientCache`, `ResolvedModel`, `resolveModel`, `resolveSandboxClientCredentials`, `ResolveSandboxClientCredentialsOptions`, `runSandboxPrompt`, `runSandboxToolPathSetup`, `SandboxApiCredentials`, `SandboxBuildContext`, `SandboxClientCredentials`, `SandboxCredentialEnvironment`, `SandboxExecChannel`, `SandboxExecOptions`, `SandboxFileBytesOutcome`, `SandboxFileSizeOutcome`, `SandboxPermissionLevel`, `SandboxResourceConfig`, `SandboxRestoreSpec`, `SandboxRuntimeAuthRefreshError`, `SandboxRuntimeConfig`, `SandboxRuntimeConnection`, `SandboxScope`, `SandboxStepTransition`, `SandboxTerminalTokenOptions`, `SandboxTerminalTokenResult`, `SandboxTerminalTokenSubject`, `SandboxTerminalWsMatch`, `sandboxToolBinDir`, `sandboxToolPath`, `SandboxToolPathOptions`, `sandboxToolRootDir`, `SandboxToolSpec`, `ScopedTokenResult`, `SecretStore`, `secretStoreFromClient`, `shellQuote`, `splitDeferredProfileFiles`, `statSandboxFileSize`, `StoppedSandboxResumeFailure`, `StoppedSandboxResumeRecovery`, `StorageConfig`, `storeSecret`, `streamSandboxPrompt`, `StreamSandboxPromptOptions`, `syncSandboxMemberAdd`, `syncSandboxMemberRemove`, `syncSandboxMemberRole`, `TerminalProxyIdentity`, `terminalTokenFromRequest`, `verifySandboxTerminalToken`, `verifyTerminalProxyToken`, `WorkspaceSandboxConnectionArgs`, `WorkspaceSandboxConnectionHandlerOptions`, `WorkspaceSandboxEnsureContext`, `WorkspaceSandboxInstanceLike`, `WorkspaceSandboxManager`, `WorkspaceSandboxManagerOptions`, `WorkspaceSandboxRuntimeProxyArgs`, `WorkspaceSandboxRuntimeProxyHandlerOptions`, `WorkspaceSandboxTerminalUpgradeHandlerOptions`, `WriteProfileFilesOptions`, `writeProfileFilesToBox`
 

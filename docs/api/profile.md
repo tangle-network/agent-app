@@ -4,7 +4,7 @@
 
 Source: `src/profile/index.ts`
 
-37 exports.
+44 exports.
 
 ### `assertSkillDeliveryDisjoint`
 
@@ -102,12 +102,36 @@ interface CorpusLoadResult
 40000
 ```
 
+### `diffProfileFingerprints`
+
+`function` — Channel-by-channel comparison of two fingerprints.
+
+```ts
+(a: ProfileFingerprint, b: ProfileFingerprint) => ProfileDrift
+```
+
 ### `EvolvableSectionInput`
 
 `interface` — Inputs to {@link makeEvolvableSection}.
 
 ```ts
 interface EvolvableSectionInput
+```
+
+### `fingerprintAgentProfile`
+
+`function` — Fingerprint a profile as the SDK would receive it.
+
+```ts
+(profile: AgentProfile, context?: ProfileFingerprintContext | undefined) => Promise<ProfileFingerprint>
+```
+
+### `formatProfileDrift`
+
+`function` — Human-readable drift report; exactly 'profiles identical' when equal.
+
+```ts
+(drift: ProfileDrift) => string
 ```
 
 ### `GlobModules`
@@ -196,6 +220,38 @@ namespace profile
 
 ```ts
 interface ProfileChannels
+```
+
+### `ProfileDrift`
+
+`interface`
+
+```ts
+interface ProfileDrift
+```
+
+### `ProfileDriftEntry`
+
+`interface` — One drifted channel between two fingerprints, rendered as comparable strings.
+
+```ts
+interface ProfileDriftEntry
+```
+
+### `ProfileFingerprint`
+
+`interface` — Channelled identity of one executed (or composed) profile.
+
+```ts
+interface ProfileFingerprint
+```
+
+### `ProfileFingerprintContext`
+
+`interface` — The dispatch context a profile cannot see but a turn's identity includes.
+
+```ts
+interface ProfileFingerprintContext
 ```
 
 ### `ProfileOverlay`

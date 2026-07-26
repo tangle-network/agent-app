@@ -12711,10 +12711,28 @@
           "doc": "Byte budget on the FINAL composed `prompt.systemPrompt`."
         },
         {
+          "name": "diffProfileFingerprints",
+          "kind": "function",
+          "signature": "(a: ProfileFingerprint, b: ProfileFingerprint) => ProfileDrift",
+          "doc": "Channel-by-channel comparison of two fingerprints."
+        },
+        {
           "name": "EvolvableSectionInput",
           "kind": "interface",
           "signature": "interface EvolvableSectionInput",
           "doc": "Inputs to {@link makeEvolvableSection}."
+        },
+        {
+          "name": "fingerprintAgentProfile",
+          "kind": "function",
+          "signature": "(profile: AgentProfile, context?: ProfileFingerprintContext | undefined) => Promise<ProfileFingerprint>",
+          "doc": "Fingerprint a profile as the SDK would receive it."
+        },
+        {
+          "name": "formatProfileDrift",
+          "kind": "function",
+          "signature": "(drift: ProfileDrift) => string",
+          "doc": "Human-readable drift report; exactly 'profiles identical' when equal."
         },
         {
           "name": "GlobModules",
@@ -12781,6 +12799,30 @@
           "kind": "interface",
           "signature": "interface ProfileChannels",
           "doc": "The file-mount channels layered onto `resources.files`."
+        },
+        {
+          "name": "ProfileDrift",
+          "kind": "interface",
+          "signature": "interface ProfileDrift",
+          "doc": null
+        },
+        {
+          "name": "ProfileDriftEntry",
+          "kind": "interface",
+          "signature": "interface ProfileDriftEntry",
+          "doc": "One drifted channel between two fingerprints, rendered as comparable strings."
+        },
+        {
+          "name": "ProfileFingerprint",
+          "kind": "interface",
+          "signature": "interface ProfileFingerprint",
+          "doc": "Channelled identity of one executed (or composed) profile."
+        },
+        {
+          "name": "ProfileFingerprintContext",
+          "kind": "interface",
+          "signature": "interface ProfileFingerprintContext",
+          "doc": "The dispatch context a profile cannot see but a turn's identity includes."
         },
         {
           "name": "ProfileOverlay",
@@ -13462,6 +13504,7 @@
       "dependsOn": [
         "crypto",
         "harness",
+        "profile",
         "runtime",
         "tools"
       ],

@@ -25,6 +25,7 @@ import {
   type TangleExecutionEnvironment,
 } from '../runtime/model'
 import { ok, fail, type Outcome } from './outcome'
+import { fingerprintAgentProfile, type ProfileFingerprint } from '../profile/fingerprint'
 
 export type { Outcome } from './outcome'
 export * from './binary-read'
@@ -1904,6 +1905,12 @@ export interface StreamSandboxPromptOptions {
   // streaming live (unlike the fire-and-forget `dispatchPrompt`/`driveTurn` path).
   // Omit for a run where closing the tab should stop burning tokens.
   detach?: boolean
+  // Observe the EXACT profile handed to the sandbox SDK for this turn — after
+  // the system-prompt override, the MCP merge, and reasoning-effort attachment
+  // — as a ProfileFingerprint. This is the seam an eval/backtest uses to PROVE
+  // it executed the shipped profile instead of re-deriving one and asserting
+  // nothing. Invoked once, before the first event is yielded.
+  onProfileResolved?: (fingerprint: ProfileFingerprint) => void
 }
 
 type StreamPromptOptions = Parameters<SandboxInstance['streamPrompt']>[1]
@@ -1936,6 +1943,14 @@ export async function* streamSandboxPrompt(
 
   const profile = shell.profile({ systemPrompt: options?.systemPrompt, extraMcp, harness })
   const profileWithEffort = attachReasoningEffort(profile, harness, options?.effort)
+
+  // Fingerprint is taken HERE — the one place the final profile exists — so an
+  // observer proves what was executed rather than re-deriving what should be.
+  if (options?.onProfileResolved) {
+    options.onProfileResolved(
+      await fingerprintAgentProfile(profileWithEffort, { model: model?.model, harness }),
+    )
+  }
 
   const stream = box.streamPrompt(prompt, {
     sessionId: options?.sessionId,

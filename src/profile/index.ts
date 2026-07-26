@@ -386,3 +386,14 @@ export type {
   SkillEntry,
   SkillFrontmatter,
 } from '../skills/index'
+export {
+  diffProfileFingerprints,
+  fingerprintAgentProfile,
+  formatProfileDrift,
+} from './fingerprint'
+export type {
+  ProfileDrift,
+  ProfileDriftEntry,
+  ProfileFingerprint,
+  ProfileFingerprintContext,
+} from './fingerprint'
