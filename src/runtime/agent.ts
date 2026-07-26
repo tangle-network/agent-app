@@ -62,12 +62,10 @@ export interface AgentRuntimeModelConfig {
   extraBody?: Record<string, unknown>
 }
 
-/** The agent's resolved profile surfaces for one turn — the things a delivered
- *  / certified `AgentProfile` can change. Profile-WIDE on purpose: certified
- *  delivery folds prompt-surface + skills into `systemPrompt` AND can add
- *  certified `tool` artifacts to `extraTools` (the model's advertised tools is
- *  rebuilt when these change). MCP servers / memory / RAG that materialize as
- *  files or servers deliver through the sandbox-provisioning seam, not here. */
+/** The agent's resolved in-process surfaces for one turn.
+ * Certified context may extend `systemPrompt` through agent-runtime's
+ * `createCertifiedContextSource`. It never changes executable tools.
+ * Files and servers are provisioned through the sandbox path instead. */
 export interface ResolvedAgentProfile {
   systemPrompt: string
   extraTools: unknown[]
@@ -78,12 +76,10 @@ export interface CreateAgentRuntimeOptions {
   /** The model endpoint the turns stream from. */
   model: AgentRuntimeModelConfig
   /**
-   * Optional transform applied to the resolved profile surfaces each turn —
-   * the seam for certified-artifact delivery (`createCertifiedDelivery`). It is
-   * profile-WIDE (not prompt-only): it returns the effective `systemPrompt` +
-   * advertised `extraTools`. Kept generic + injected so this substrate-free core
-   * never imports `@tangle-network/agent-runtime`. Fail-closed by contract: an
-   * impl that can't reach the plane returns the base surfaces unchanged.
+   * Optional transform applied to the in-process surfaces each turn.
+   * To add certified context, compose `systemPrompt` with
+   * `createCertifiedContextSource` from agent-runtime and pass `extraTools`
+   * through unchanged. This core stays runtime-independent.
    */
   composeProfile?: (base: ResolvedAgentProfile) => ResolvedAgentProfile | Promise<ResolvedAgentProfile>
   /** The product's proposal taxonomy — advertises `submit_proposal`'s `type`

@@ -800,22 +800,6 @@ interface CapabilityTokenOptions
 interface CatalogModel
 ```
 
-### `CertifiedDelivery`
-
-`interface` — Resolve and manage certified profiles with refresh and composition capabilities
-
-```ts
-interface CertifiedDelivery
-```
-
-### `CertifiedDeliveryConfig`
-
-`interface` — Define configuration options for delivering certified artifacts to a specified tenant target
-
-```ts
-interface CertifiedDeliveryConfig
-```
-
 ### `ChatAttachmentKind`
 
 `type` — The image/file split an attachment is rendered and persisted under — the same discriminant as {@link ChatMentionKind}, but a distinct name because an attachment carries content the product uploaded (…
@@ -1296,14 +1280,6 @@ interface CreateAgentRuntimeOptions
 (userId: string, opts: CapabilityTokenOptions) => Promise<string | undefined>
 ```
 
-### `createCertifiedDelivery`
-
-`function` — Build a certified-delivery transform for one agent target.
-
-```ts
-(config: CertifiedDeliveryConfig) => CertifiedDelivery
-```
-
 ### `createD1KnowledgeStateAccessor`
 
 `function` — The {@link KnowledgeStateAccessor} over the preset D1 schema — the seam that lets the declarative `satisfiedBy` rules resolve with ZERO consumer code: - `config(path)` reads the supplied workspace co…
@@ -1445,7 +1421,7 @@ interface CreateKnowledgeLoopDeps
 `function` — Production `CorrectnessChecker` — one LLM call per matched artifact, deterministic (temperature 0), structured JSON out.
 
 ```ts
-(tc: TCloud, opts?: LlmCorrectnessCheckerOpts | undefined) => CorrectnessChecker
+(chat: ChatClient, opts?: LlmCorrectnessCheckerOpts | undefined) => CorrectnessChecker
 ```
 
 ### `createMcpToolHandler`
@@ -4754,7 +4730,7 @@ interface RequestContext
 
 ### `ResolvedAgentProfile`
 
-`interface` — The agent's resolved profile surfaces for one turn — the things a delivered / certified `AgentProfile` can change.
+`interface` — The agent's resolved in-process surfaces for one turn.
 
 ```ts
 interface ResolvedAgentProfile
@@ -13092,7 +13068,7 @@ type CorrectnessChecker
 `function` — Production `CorrectnessChecker` — one LLM call per matched artifact, deterministic (temperature 0), structured JSON out.
 
 ```ts
-(tc: TCloud, opts?: LlmCorrectnessCheckerOpts | undefined) => CorrectnessChecker
+(chat: ChatClient, opts?: LlmCorrectnessCheckerOpts | undefined) => CorrectnessChecker
 ```
 
 ### `createTokenRecallChecker`
@@ -13196,9 +13172,25 @@ Source: `src/eval-campaign/index.ts`
 interface CampaignResult
 ```
 
+### `compareOptimizationMethods`
+
+`function` — Compare complete optimization methods on disjoint train, selection, and final test data.
+
+```ts
+<TScenario extends Scenario, TArtifact>(opts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Optim…
+```
+
+### `CompareOptimizationMethodsOptions`
+
+`interface`
+
+```ts
+interface CompareOptimizationMethodsOptions
+```
+
 ### `defaultProductionGate`
 
-`function`
+`function` — Opinionated production gate composing held-out significance, red-team, reward-hacking, and canary checks into a single `Gate.decide` decision.
 
 ```ts
 <TArtifact, TScenario extends Scenario>(options: DefaultProductionGateOptions) => Gate<TArtifact, TScenario>
@@ -13228,12 +13220,20 @@ interface EnsembleAggregate
 interface EnsembleJudgeConfig
 ```
 
-### `evolutionaryProposer`
+### `externalTextOptimizationMethod`
 
-`function`
+`function` — Adapt a third-party text optimizer without reimplementing its search.
 
 ```ts
-<TFindings = unknown>(opts: EvolutionaryProposerOptions<TFindings>) => SurfaceProposer<TFindings>
+<TScenario extends Scenario, TArtifact>(config: ExternalTextOptimizationMethodConfig<TScenario, TArtifact>) => Optimiza…
+```
+
+### `ExternalTextOptimizationMethodConfig`
+
+`interface` — Configuration for adapting another text optimizer.
+
+```ts
+interface ExternalTextOptimizationMethodConfig
 ```
 
 ### `Gate`
@@ -13244,12 +13244,20 @@ interface EnsembleJudgeConfig
 interface Gate
 ```
 
-### `gepaProposer`
+### `gepaOptimizationMethod`
 
-`function`
+`function` — Turn an optional GEPA installation into an `OptimizationMethod`.
 
 ```ts
-(opts: GepaProposerOptions) => SurfaceProposer<unknown>
+<TScenario extends Scenario, TArtifact>(config: GepaOptimizationMethodConfig<TScenario, TArtifact>) => OptimizationMeth…
+```
+
+### `GepaOptimizationMethodConfig`
+
+`interface`
+
+```ts
+interface GepaOptimizationMethodConfig
 ```
 
 ### `JudgeConfig`
@@ -13300,12 +13308,20 @@ interface LabeledScenarioStore
 type MutableSurface
 ```
 
-### `Mutator`
+### `OptimizationMethod`
 
-`interface` — Stateless surface mutation — given findings + current surface, return N candidate surfaces.
+`interface` — A complete optimization method, including candidate generation and selection.
 
 ```ts
-interface Mutator
+interface OptimizationMethod
+```
+
+### `OptimizationMethodResult`
+
+`interface`
+
+```ts
+interface OptimizationMethodResult
 ```
 
 ### `paretoSignificanceGate`
@@ -13318,7 +13334,7 @@ interface Mutator
 
 ### `runCampaign`
 
-`function`
+`function` — Core campaign orchestrator: fan scenarios through dispatch, score with judges, aggregate bootstrap CIs, and persist reproducible `CampaignResult` records.
 
 ```ts
 <TScenario extends Scenario, TArtifact>(opts: RunCampaignOptions<TScenario, TArtifact>) => Promise<CampaignResult<TArti…
@@ -13345,12 +13361,12 @@ interface Scenario
 `function` — One-shot self-improvement loop.
 
 ```ts
-<TScenario extends Scenario, TArtifact>(opts: SelfImproveOptions<TScenario, TArtifact>) => Promise<SelfImproveResult<TS…
+<TScenario extends Scenario$1, TArtifact>(opts: SelfImproveOptions<TScenario, TArtifact>) => Promise<SelfImproveResult<…
 ```
 
 ### `SelfImproveBudget`
 
-`interface` — # `selfImprove()` - the one-call improvement loop.
+`interface` — Run one complete improvement job.
 
 ```ts
 interface SelfImproveBudget
@@ -13370,6 +13386,22 @@ interface SelfImproveOptions
 
 ```ts
 interface SelfImproveResult
+```
+
+### `skillOptOptimizationMethod`
+
+`function` — Run Microsoft's SkillOpt trainer as a complete optimization method.
+
+```ts
+<TScenario extends Scenario, TArtifact>(config: SkillOptOptimizationMethodConfig<TScenario, TArtifact>) => Optimization…
+```
+
+### `SkillOptOptimizationMethodConfig`
+
+`interface`
+
+```ts
+interface SkillOptOptimizationMethodConfig
 ```
 
 ### `SurfaceProposer`
@@ -16986,22 +17018,6 @@ interface AppToolLoopOptions
 interface CatalogModel
 ```
 
-### `CertifiedDelivery`
-
-`interface` — Resolve and manage certified profiles with refresh and composition capabilities
-
-```ts
-interface CertifiedDelivery
-```
-
-### `CertifiedDeliveryConfig`
-
-`interface` — Define configuration options for delivering certified artifacts to a specified tenant target
-
-```ts
-interface CertifiedDeliveryConfig
-```
-
 ### `createAgentRuntime`
 
 `function` — Create an in-process agent runtime for one agent.
@@ -17016,14 +17032,6 @@ interface CertifiedDeliveryConfig
 
 ```ts
 interface CreateAgentRuntimeOptions
-```
-
-### `createCertifiedDelivery`
-
-`function` — Build a certified-delivery transform for one agent target.
-
-```ts
-(config: CertifiedDeliveryConfig) => CertifiedDelivery
 ```
 
 ### `createOpenAICompatStreamTurn`
@@ -17180,7 +17188,7 @@ interface OpenAIStreamChunk
 
 ### `ResolvedAgentProfile`
 
-`interface` — The agent's resolved profile surfaces for one turn — the things a delivered / certified `AgentProfile` can change.
+`interface` — The agent's resolved in-process surfaces for one turn.
 
 ```ts
 interface ResolvedAgentProfile

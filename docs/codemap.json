@@ -661,18 +661,6 @@
           "doc": "Define the structure and capabilities of a catalog item with optional pricing and feature flags"
         },
         {
-          "name": "CertifiedDelivery",
-          "kind": "interface",
-          "signature": "interface CertifiedDelivery",
-          "doc": "Resolve and manage certified profiles with refresh and composition capabilities"
-        },
-        {
-          "name": "CertifiedDeliveryConfig",
-          "kind": "interface",
-          "signature": "interface CertifiedDeliveryConfig",
-          "doc": "Define configuration options for delivering certified artifacts to a specified tenant target"
-        },
-        {
           "name": "ChatAttachmentKind",
           "kind": "type",
           "signature": "type ChatAttachmentKind",
@@ -1033,12 +1021,6 @@
           "doc": "Mint a capability token for `userId`, or `undefined` when no secret is configured (fail-closed — the caller omits the MCP server rather than fake it)."
         },
         {
-          "name": "createCertifiedDelivery",
-          "kind": "function",
-          "signature": "(config: CertifiedDeliveryConfig) => CertifiedDelivery",
-          "doc": "Build a certified-delivery transform for one agent target."
-        },
-        {
           "name": "createD1KnowledgeStateAccessor",
           "kind": "function",
           "signature": "(opts: PresetKnowledgeAccessorOptions) => KnowledgeStateAccessor",
@@ -1143,7 +1125,7 @@
         {
           "name": "createLlmCorrectnessChecker",
           "kind": "function",
-          "signature": "(tc: TCloud, opts?: LlmCorrectnessCheckerOpts | undefined) => CorrectnessChecker",
+          "signature": "(chat: ChatClient, opts?: LlmCorrectnessCheckerOpts | undefined) => CorrectnessChecker",
           "doc": "Production `CorrectnessChecker` — one LLM call per matched artifact, deterministic (temperature 0), structured JSON out."
         },
         {
@@ -3628,7 +3610,7 @@
           "name": "ResolvedAgentProfile",
           "kind": "interface",
           "signature": "interface ResolvedAgentProfile",
-          "doc": "The agent's resolved profile surfaces for one turn — the things a delivered / certified `AgentProfile` can change."
+          "doc": "The agent's resolved in-process surfaces for one turn."
         },
         {
           "name": "ResolvedChatTurn",
@@ -10008,7 +9990,7 @@
         {
           "name": "createLlmCorrectnessChecker",
           "kind": "function",
-          "signature": "(tc: TCloud, opts?: LlmCorrectnessCheckerOpts | undefined) => CorrectnessChecker",
+          "signature": "(chat: ChatClient, opts?: LlmCorrectnessCheckerOpts | undefined) => CorrectnessChecker",
           "doc": "Production `CorrectnessChecker` — one LLM call per matched artifact, deterministic (temperature 0), structured JSON out."
         },
         {
@@ -10092,10 +10074,22 @@
           "doc": null
         },
         {
+          "name": "compareOptimizationMethods",
+          "kind": "function",
+          "signature": "<TScenario extends Scenario, TArtifact>(opts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Optim…",
+          "doc": "Compare complete optimization methods on disjoint train, selection, and final test data."
+        },
+        {
+          "name": "CompareOptimizationMethodsOptions",
+          "kind": "interface",
+          "signature": "interface CompareOptimizationMethodsOptions",
+          "doc": null
+        },
+        {
           "name": "defaultProductionGate",
           "kind": "function",
           "signature": "<TArtifact, TScenario extends Scenario>(options: DefaultProductionGateOptions) => Gate<TArtifact, TScenario>",
-          "doc": null
+          "doc": "Opinionated production gate composing held-out significance, red-team, reward-hacking, and canary checks into a single `Gate.decide` decision."
         },
         {
           "name": "DispatchContext",
@@ -10116,10 +10110,16 @@
           "doc": "Config for {@link buildEnsembleJudge}."
         },
         {
-          "name": "evolutionaryProposer",
+          "name": "externalTextOptimizationMethod",
           "kind": "function",
-          "signature": "<TFindings = unknown>(opts: EvolutionaryProposerOptions<TFindings>) => SurfaceProposer<TFindings>",
-          "doc": null
+          "signature": "<TScenario extends Scenario, TArtifact>(config: ExternalTextOptimizationMethodConfig<TScenario, TArtifact>) => Optimiza…",
+          "doc": "Adapt a third-party text optimizer without reimplementing its search."
+        },
+        {
+          "name": "ExternalTextOptimizationMethodConfig",
+          "kind": "interface",
+          "signature": "interface ExternalTextOptimizationMethodConfig",
+          "doc": "Configuration for adapting another text optimizer."
         },
         {
           "name": "Gate",
@@ -10128,9 +10128,15 @@
           "doc": "Composable promotion gate."
         },
         {
-          "name": "gepaProposer",
+          "name": "gepaOptimizationMethod",
           "kind": "function",
-          "signature": "(opts: GepaProposerOptions) => SurfaceProposer<unknown>",
+          "signature": "<TScenario extends Scenario, TArtifact>(config: GepaOptimizationMethodConfig<TScenario, TArtifact>) => OptimizationMeth…",
+          "doc": "Turn an optional GEPA installation into an `OptimizationMethod`."
+        },
+        {
+          "name": "GepaOptimizationMethodConfig",
+          "kind": "interface",
+          "signature": "interface GepaOptimizationMethodConfig",
           "doc": null
         },
         {
@@ -10170,10 +10176,16 @@
           "doc": "The mutable surface a proposer changes."
         },
         {
-          "name": "Mutator",
+          "name": "OptimizationMethod",
           "kind": "interface",
-          "signature": "interface Mutator",
-          "doc": "Stateless surface mutation — given findings + current surface, return N candidate surfaces."
+          "signature": "interface OptimizationMethod",
+          "doc": "A complete optimization method, including candidate generation and selection."
+        },
+        {
+          "name": "OptimizationMethodResult",
+          "kind": "interface",
+          "signature": "interface OptimizationMethodResult",
+          "doc": null
         },
         {
           "name": "paretoSignificanceGate",
@@ -10185,7 +10197,7 @@
           "name": "runCampaign",
           "kind": "function",
           "signature": "<TScenario extends Scenario, TArtifact>(opts: RunCampaignOptions<TScenario, TArtifact>) => Promise<CampaignResult<TArti…",
-          "doc": null
+          "doc": "Core campaign orchestrator: fan scenarios through dispatch, score with judges, aggregate bootstrap CIs, and persist reproducible `CampaignResult` records."
         },
         {
           "name": "RunRecord",
@@ -10202,14 +10214,14 @@
         {
           "name": "selfImprove",
           "kind": "function",
-          "signature": "<TScenario extends Scenario, TArtifact>(opts: SelfImproveOptions<TScenario, TArtifact>) => Promise<SelfImproveResult<TS…",
+          "signature": "<TScenario extends Scenario$1, TArtifact>(opts: SelfImproveOptions<TScenario, TArtifact>) => Promise<SelfImproveResult<…",
           "doc": "One-shot self-improvement loop."
         },
         {
           "name": "SelfImproveBudget",
           "kind": "interface",
           "signature": "interface SelfImproveBudget",
-          "doc": "# `selfImprove()` - the one-call improvement loop."
+          "doc": "Run one complete improvement job."
         },
         {
           "name": "SelfImproveOptions",
@@ -10221,6 +10233,18 @@
           "name": "SelfImproveResult",
           "kind": "interface",
           "signature": "interface SelfImproveResult",
+          "doc": null
+        },
+        {
+          "name": "skillOptOptimizationMethod",
+          "kind": "function",
+          "signature": "<TScenario extends Scenario, TArtifact>(config: SkillOptOptimizationMethodConfig<TScenario, TArtifact>) => Optimization…",
+          "doc": "Run Microsoft's SkillOpt trainer as a complete optimization method."
+        },
+        {
+          "name": "SkillOptOptimizationMethodConfig",
+          "kind": "interface",
+          "signature": "interface SkillOptOptimizationMethodConfig",
           "doc": null
         },
         {
@@ -13052,18 +13076,6 @@
           "doc": "Define the structure and capabilities of a catalog item with optional pricing and feature flags"
         },
         {
-          "name": "CertifiedDelivery",
-          "kind": "interface",
-          "signature": "interface CertifiedDelivery",
-          "doc": "Resolve and manage certified profiles with refresh and composition capabilities"
-        },
-        {
-          "name": "CertifiedDeliveryConfig",
-          "kind": "interface",
-          "signature": "interface CertifiedDeliveryConfig",
-          "doc": "Define configuration options for delivering certified artifacts to a specified tenant target"
-        },
-        {
           "name": "createAgentRuntime",
           "kind": "function",
           "signature": "(opts: CreateAgentRuntimeOptions) => AgentRuntime",
@@ -13074,12 +13086,6 @@
           "kind": "interface",
           "signature": "interface CreateAgentRuntimeOptions",
           "doc": "Define options for creating an agent runtime including model config and optional profile transformation"
-        },
-        {
-          "name": "createCertifiedDelivery",
-          "kind": "function",
-          "signature": "(config: CertifiedDeliveryConfig) => CertifiedDelivery",
-          "doc": "Build a certified-delivery transform for one agent target."
         },
         {
           "name": "createOpenAICompatStreamTurn",
@@ -13199,7 +13205,7 @@
           "name": "ResolvedAgentProfile",
           "kind": "interface",
           "signature": "interface ResolvedAgentProfile",
-          "doc": "The agent's resolved profile surfaces for one turn — the things a delivered / certified `AgentProfile` can change."
+          "doc": "The agent's resolved in-process surfaces for one turn."
         },
         {
           "name": "ResolvedTangleExecutionKey",

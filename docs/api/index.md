@@ -4,7 +4,7 @@
 
 Source: `src/index.ts`
 
-832 exports.
+829 exports.
 
 ### `AddCitationArgs`
 
@@ -798,22 +798,6 @@ interface CapabilityTokenOptions
 interface CatalogModel
 ```
 
-### `CertifiedDelivery`
-
-`interface` — Resolve and manage certified profiles with refresh and composition capabilities
-
-```ts
-interface CertifiedDelivery
-```
-
-### `CertifiedDeliveryConfig`
-
-`interface` — Define configuration options for delivering certified artifacts to a specified tenant target
-
-```ts
-interface CertifiedDeliveryConfig
-```
-
 ### `ChatAttachmentKind`
 
 `type` — The image/file split an attachment is rendered and persisted under — the same discriminant as {@link ChatMentionKind}, but a distinct name because an attachment carries content the product uploaded (…
@@ -1294,14 +1278,6 @@ interface CreateAgentRuntimeOptions
 (userId: string, opts: CapabilityTokenOptions) => Promise<string | undefined>
 ```
 
-### `createCertifiedDelivery`
-
-`function` — Build a certified-delivery transform for one agent target.
-
-```ts
-(config: CertifiedDeliveryConfig) => CertifiedDelivery
-```
-
 ### `createD1KnowledgeStateAccessor`
 
 `function` — The {@link KnowledgeStateAccessor} over the preset D1 schema — the seam that lets the declarative `satisfiedBy` rules resolve with ZERO consumer code: - `config(path)` reads the supplied workspace co…
@@ -1443,7 +1419,7 @@ interface CreateKnowledgeLoopDeps
 `function` — Production `CorrectnessChecker` — one LLM call per matched artifact, deterministic (temperature 0), structured JSON out.
 
 ```ts
-(tc: TCloud, opts?: LlmCorrectnessCheckerOpts | undefined) => CorrectnessChecker
+(chat: ChatClient, opts?: LlmCorrectnessCheckerOpts | undefined) => CorrectnessChecker
 ```
 
 ### `createMcpToolHandler`
@@ -4752,7 +4728,7 @@ interface RequestContext
 
 ### `ResolvedAgentProfile`
 
-`interface` — The agent's resolved profile surfaces for one turn — the things a delivered / certified `AgentProfile` can change.
+`interface` — The agent's resolved in-process surfaces for one turn.
 
 ```ts
 interface ResolvedAgentProfile

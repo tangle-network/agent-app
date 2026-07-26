@@ -35,12 +35,12 @@ pnpm add @tangle-network/agent-eval @tangle-network/agent-integrations
 
 | Peer | Required by | Version |
 |---|---|---|
-| `@tangle-network/agent-eval` | `/eval`, `/eval-campaign`, `/profile`, `/knowledge` | `0.128.0` |
+| `@tangle-network/agent-eval` | `/eval`, `/eval-campaign`, `/profile`, `/knowledge` | `0.129.0` |
 | `@tangle-network/agent-runtime` | `/runtime`, `/chat-routes` | `0.106.0` |
 | `@tangle-network/agent-integrations` | `/integrations` | `>=0.44.0` |
-| `@tangle-network/agent-interface` | `/interactions`, `/chat-store`, `/harness` | `0.33.0` |
+| `@tangle-network/agent-interface` | `/interactions`, `/chat-store`, `/harness` | `0.34.0` |
 | `@tangle-network/sandbox` | `/sandbox`, `/profile`, `/skills` | `>=0.9.7` |
-| `@tangle-network/agent-knowledge` | `/knowledge-loop` | `5.0.4` |
+| `@tangle-network/agent-knowledge` | `/knowledge-loop` | `6.0.0` |
 | `@tangle-network/agent-profile-materialize` | `/skills-placement` | `0.8.0` |
 
 All of these except `agent-eval`, `agent-integrations`, and `agent-interface` are declared **optional** peers, so a product that never imports the subpath installs nothing. `driveSandboxTurn` (`/sandbox`) calls `box.driveTurn`, which the SDK added in **0.10.5** — above the declared floor, so pin `@tangle-network/sandbox >= 0.10.5` yourself if you use it.
@@ -105,6 +105,34 @@ const streamTurn = createOpenAICompatStreamTurn({ ...cfg, tools })
 
 The full three-transport walkthrough (Tangle Router, tcloud, Vercel AI SDK) is in [`examples/browser-copilot.md`](./examples/browser-copilot.md).
 
+Certified context comes directly from Runtime.
+Agent-app does not mirror its receive API:
+
+```ts
+import { createAgentRuntime } from '@tangle-network/agent-app/runtime'
+import { createCertifiedContextSource } from '@tangle-network/agent-runtime/intelligence'
+
+const certified = createCertifiedContextSource({
+  tenantId,
+  target: 'support-agent',
+})
+
+const runtime = createAgentRuntime({
+  model,
+  taxonomy,
+  handlers,
+  systemPrompt,
+  composeProfile: async (base) => ({
+    ...base,
+    systemPrompt: await certified.compose(base.systemPrompt),
+  }),
+})
+```
+
+Certified context is data only.
+`certified.compose(...)` adds inline prompt text; materialize file entries through the sandbox path.
+Certified context cannot add executable tools.
+
 Building the full **server chat vertical** instead — auth, thread/message tables, a streaming turn with buffered replay, uploads, and sidecar question answering — is the job of `createChatTurnRoutes` (`/chat-routes`) and the modules around it. The end-to-end assembly, including the durable plan/question workflow and the client composer, is in [`examples/chat-app.md`](./examples/chat-app.md).
 
 ## How it's organised
@@ -115,7 +143,7 @@ One rule decides where anything lives:
 > **Yes** → it belongs in an engine package (contribute it down).
 > **No** → it's app-shell, and it belongs here.
 
-Everything here is reached through a typed seam — `AppToolHandlers`, `AppToolTaxonomy`, `streamTurn`, `executeToolCall`, `verifyToken`, `KeyProvisioner` / `WorkspaceKeyStore` / `KeyCrypto`. The package never imports product code and never hard-codes a domain value (a proposal type, a premium, a disclaimer); each is a parameter. New capability arrives as a new subpath, never a breaking change to an existing one.
+Everything here is reached through a typed seam — `AppToolHandlers`, `AppToolTaxonomy`, `streamTurn`, `executeToolCall`, `verifyToken`, `KeyProvisioner` / `WorkspaceKeyStore` / `KeyCrypto`. The package never imports product code and never hard-codes a domain value (a proposal type, a premium, a disclaimer); each is a parameter. Replaced APIs are removed so the package has one current path for each job.
 
 ## Choosing a path
 

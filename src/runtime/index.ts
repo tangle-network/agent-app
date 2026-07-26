@@ -2,7 +2,6 @@ export * from './model-catalog'
 export * from './model'
 export * from './openai-stream'
 export * from './agent'
-export * from './certified-delivery'
 export * from './surface-profile'
 /**
  * The bounded agent tool-loop — the app-facing aliases of the substrate's

@@ -35,7 +35,7 @@ type CorrectnessChecker
 `function` — Production `CorrectnessChecker` — one LLM call per matched artifact, deterministic (temperature 0), structured JSON out.
 
 ```ts
-(tc: TCloud, opts?: LlmCorrectnessCheckerOpts | undefined) => CorrectnessChecker
+(chat: ChatClient, opts?: LlmCorrectnessCheckerOpts | undefined) => CorrectnessChecker
 ```
 
 ### `createTokenRecallChecker`
