@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-142 exports.
+150 exports.
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
@@ -342,6 +342,14 @@ type ChatTurnLockResult
 interface ChatTurnMessageStore
 ```
 
+### `ChatTurnModelFailover`
+
+`interface` — Which model served, and what it took to get there.
+
+```ts
+interface ChatTurnModelFailover
+```
+
 ### `ChatTurnPartInput`
 
 `type` — Resolve input as either a text part or a file part of a chat turn
@@ -412,6 +420,14 @@ interface ChatTurnUsage
 
 ```ts
 (fileName: string, sniff: SniffResult, allowed?: ReadonlySet<string>) => AttachmentTypeCheckResult
+```
+
+### `classifyTerminalFailure`
+
+`function` — Classify a terminal failure event.
+
+```ts
+(event: unknown) => TerminalFailure | null
 ```
 
 ### `createAssistantDraftWriter`
@@ -694,6 +710,14 @@ type FilePartPromotionOutcome
 950000
 ```
 
+### `isCommittingSandboxEvent`
+
+`function` — True when `event` puts content in front of the user (or in the persisted transcript), making a restart on another model unsafe.
+
+```ts
+(event: unknown) => boolean
+```
+
 ### `isDraftContentEvent`
 
 `function` — True when this event should arm a draft write.
@@ -748,6 +772,38 @@ number
 
 ```ts
 (path: string) => ChatMentionKind
+```
+
+### `ModelFailoverStreamHandle`
+
+`interface` — The failover-wrapped stream plus the attribution every consumer needs.
+
+```ts
+interface ModelFailoverStreamHandle
+```
+
+### `ModelFailoverStreamOptions`
+
+`interface` — Define inputs for streaming a turn across a model failover chain
+
+```ts
+interface ModelFailoverStreamOptions
+```
+
+### `ModelFallbackInfo`
+
+`interface` — Fired when a model is abandoned and the next one is about to be tried.
+
+```ts
+interface ModelFallbackInfo
+```
+
+### `OpenModelStream`
+
+`type` — Open the raw turn stream for one specific model.
+
+```ts
+type OpenModelStream
 ```
 
 ### `parseChatTurnParts`
@@ -1084,6 +1140,14 @@ type StaleTurnLockSessionProbeResult
 
 ```ts
 (store: AssistantDraftStore) => boolean
+```
+
+### `streamWithModelFailover`
+
+`function` — Wrap `open` in reactive model failover, streaming from the first model in `models` that reaches its commit point.
+
+```ts
+(options: ModelFailoverStreamOptions) => ModelFailoverStreamHandle
 ```
 
 ### `UPLOAD_INLINE_MAX_BYTES`
