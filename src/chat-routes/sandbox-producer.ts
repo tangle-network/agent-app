@@ -42,6 +42,13 @@ import {
   type JsonRecord,
   type StreamEvent,
 } from '../stream/index'
+import { buildModelChain, type ModelFailoverAttempt } from '../model-resolution/failover'
+import {
+  streamWithModelFailover,
+  type ModelFallbackInfo,
+  type ModelFailoverStreamHandle,
+  type OpenModelStream,
+} from './model-failover-stream'
 import type { ChatTurnRouteProducer, ChatTurnUsage } from './turn-routes'
 import type { ProducerWireEvent } from './wire'
 
@@ -65,10 +72,46 @@ export type FilePartPromotionOutcome =
 
 /** Define options for producing sandbox chat events with rendering and interaction controls */
 export interface SandboxChatProducerOptions {
-  /** The raw sandbox event stream (e.g. `streamSandboxPrompt(...)`). */
-  events: AsyncIterable<unknown>
-  /** Recorded on the persisted assistant message. */
+  /** The raw sandbox event stream (e.g. `streamSandboxPrompt(...)`).
+   *
+   *  An ALREADY-OPEN stream is bound to one model and cannot be reopened, so
+   *  this form can never fail over. Prefer {@link openEvents}; exactly one of
+   *  the two is required. */
+  events?: AsyncIterable<unknown>
+  /** Open the raw sandbox stream FOR A GIVEN MODEL — the failover-capable form
+   *  of {@link events}. The callback receives the model to run and returns the
+   *  same `AsyncIterable` `events` would have been (typically
+   *  `streamSandboxPrompt(shell, box, prompt, { ...opts, model })`).
+   *
+   *  Wiring this turns failover ON with no further flag: whenever the resolved
+   *  chain (`model` + {@link fallbackModels}) holds more than one entry, a model
+   *  whose upstream is dead is abandoned BEFORE its first client-visible byte
+   *  and the next one is tried. A one-entry chain opens exactly once — no extra
+   *  call, no added latency, byte-identical to today.
+   *
+   *  Requires {@link model}: failover has to know which model it is running. */
+  openEvents?: OpenModelStream
+  /** Recorded on the persisted assistant message. When failover moves the turn
+   *  to another model, the producer's `model` reports the model that ACTUALLY
+   *  served, not this preferred one — see {@link modelFailover}. */
   model?: string
+  /** Models to try, in order, when `model`'s upstream is dead. Product config,
+   *  never a shell default: agent-app cannot know which ids are live, and a
+   *  baked list would rot into exactly the stale-liveness bug this guards
+   *  against. Empty/omitted → one attempt, today's behavior.
+   *
+   *  Pick these deliberately. A same-family fallback is NOT automatically safe:
+   *  `gemini-2.5-flash` produced zero persisted deliverables in 2 of 3 measured
+   *  runs on a med-legal filing flow where `gemini-2.5-pro` succeeded. That is
+   *  why every fallback is surfaced (persisted `model`, a transcript notice, and
+   *  `modelFailover()`) instead of being applied silently. */
+  fallbackModels?: readonly string[]
+  /** Opt out of failover while still using {@link openEvents}. `false` collapses
+   *  the chain to `model` alone. */
+  modelFailover?: false
+  /** Fired when a model is abandoned mid-chain (telemetry/alerting). The user
+   *  already sees a transcript notice; this is for the operator. */
+  onModelFallback?: (info: ModelFallbackInfo) => void
   /** Which ask kinds the product renders a card for. Anything else is
    *  auto-declined (see `declineInteraction`) so the run never hangs in the
    *  broker waiting on a card no client will show. Default: question/plan.
@@ -246,6 +289,58 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
   const log = options.log ?? ((message, meta) => console.error(message, meta ?? ''))
   const renderable = options.isRenderableInteraction ?? isRenderableInteractionKind
 
+  // ── model failover ────────────────────────────────────────────────────────
+  // ON by default whenever the caller can reopen the stream (`openEvents`) and
+  // named more than one model. There is no `enabled` flag on purpose: the class
+  // of failure this fixes was a capability that shipped switched off, and a
+  // second opt-in on top of supplying the chain would reproduce it exactly.
+  if (options.openEvents && !options.model) {
+    throw new Error(
+      'createSandboxChatProducer: `openEvents` requires `model` — failover must know which model it is running',
+    )
+  }
+  if (!options.openEvents && !options.events) {
+    throw new Error('createSandboxChatProducer: pass `openEvents` (failover-capable) or `events`')
+  }
+  const chain = options.model
+    ? buildModelChain(options.model, options.modelFailover === false ? [] : (options.fallbackModels ?? []))
+    : []
+
+  /** Fallback notices waiting to be emitted. `onFallback` fires from inside the
+   *  first pull of the failover stream, where a generator cannot yield, so the
+   *  notice is queued and drained at the top of the next loop iteration —
+   *  landing immediately before the serving model's first event. */
+  const pendingModelNotices: Array<{ id: string; text: string }> = []
+  let modelNoticeCount = 0
+
+  let failover: ModelFailoverStreamHandle | undefined
+  let source: AsyncIterable<unknown>
+  if (options.openEvents) {
+    failover = streamWithModelFailover({
+      models: chain,
+      open: options.openEvents,
+      log,
+      onFallback: (info) => {
+        modelNoticeCount += 1
+        pendingModelNotices.push({
+          id: `model-fallback-${modelNoticeCount}`,
+          // Named models on both sides: a quality regression after a downgrade
+          // must be attributable to the model that actually answered.
+          text: `${info.from} was unavailable (${info.reason}) — answered with ${info.to} instead.`,
+        })
+        options.onModelFallback?.(info)
+      },
+    })
+    source = failover.events
+  } else {
+    source = options.events!
+  }
+
+  /** The model that ACTUALLY served this turn. Read lazily everywhere (the
+   *  `model` getter, the draft snapshot, the persisted row) so a fallback that
+   *  happens after the row was drafted still lands on the final write. */
+  const servingModel = (): string | undefined => failover?.servingModel() ?? options.model
+
   let fullText = ''
   const partOrder: string[] = []
   const partMap = new Map<string, JsonRecord>()
@@ -304,9 +399,24 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
     }
   }
 
+  /** Emit any queued fallback notices, persisting each so the downgrade is in
+   *  the durable transcript and not only in the live stream. Uses the existing
+   *  `warning` notice kind deliberately: every shipped client already renders
+   *  it, whereas a bespoke kind would be dropped by `dispatchChatStreamLine`'s
+   *  filter — an attribution nobody sees is not attribution. */
+  function* drainModelNotices(): Generator<ProducerWireEvent, void, unknown> {
+    while (pendingModelNotices.length > 0) {
+      const queued = pendingModelNotices.shift()!
+      const notice = noticePart('warning', queued.id, queued.text)
+      recordPersistedPart(notice, undefined, noticePartKey(notice.id))
+      yield { type: 'notice', id: notice.id, noticeKind: 'warning', text: queued.text }
+    }
+  }
+
   async function* stream(): AsyncGenerator<ProducerWireEvent, void, unknown> {
     try {
-      for await (const raw of options.events) {
+      for await (const raw of source) {
+        yield* drainModelNotices()
         const record = asRecord(raw)
         if (!record || typeof record.type !== 'string') continue
         // Fold bare tool_call/tool_result shapes into the canonical part event;
@@ -580,6 +690,9 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         // unknown types.
         yield toProducerWireEvent(record)
       }
+      // A model that fell over and then produced nothing never entered the loop
+      // body; the downgrade must still be recorded.
+      yield* drainModelNotices()
     } catch (streamErr) {
       const diagnostic = sandboxStreamFailureDiagnostic(streamErr)
       log('[chat-routes] sandbox stream failed', {
@@ -618,6 +731,18 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
     // phantom failures the final write then reverses.
     draftParts: () => draftAssistantParts(partOrder, partMap, fullText),
     usage: () => usage,
-    ...(options.model ? { model: options.model } : {}),
+    // A GETTER, not a captured value: `turn-routes` reads `producer.model` at
+    // draft-snapshot and persist time, both of which happen after the stream
+    // resolved which model serves. A plain property would freeze the PREFERRED
+    // model into the row and make a downgrade unattributable — the exact
+    // failure mode this work exists to prevent.
+    get model(): string | undefined {
+      return servingModel()
+    },
+    modelFailover: () => ({
+      model: servingModel(),
+      attempts: failover?.attempts() ?? [],
+      usedFallback: failover?.usedFallback() ?? false,
+    }),
   }
 }

@@ -24,6 +24,7 @@
  */
 
 import { toChatMessageParts } from '../chat-store/parts'
+import type { ModelFailoverAttempt } from '../model-resolution/failover'
 import {
   coalesceDeltas,
   createBufferedTurnTap,
@@ -71,9 +72,30 @@ export interface DetachedTurnOptions {
   scopeId: string
   /** The raw sandbox event stream for this turn (e.g. `streamSandboxPrompt`).
    *  Ownership of the box, prompt, tooling, and attachments stays with the
-   *  caller — this only projects the stream. */
-  events: AsyncIterable<unknown>
-  /** Recorded on the persisted assistant message + usage receipt. */
+   *  caller — this only projects the stream.
+   *
+   *  An already-open stream is bound to one model and cannot fail over. Prefer
+   *  {@link openEvents}; exactly one of the two is required. */
+  events?: AsyncIterable<unknown>
+  /** Open the raw sandbox stream FOR A GIVEN MODEL — the failover-capable form
+   *  of {@link events}. Wiring it turns failover on with no further flag
+   *  whenever {@link fallbackModels} is non-empty. Requires {@link model}.
+   *
+   *  An autonomous run is the case that most needs this: nobody is watching to
+   *  notice a dead upstream and retry by hand, so without failover the mission
+   *  step or queue job simply fails. Forwarded to the producer. */
+  openEvents?: SandboxChatProducerOptions['openEvents']
+  /** Models to try, in order, when `model`'s upstream is dead. Product config —
+   *  see the producer's note on why a same-family fallback is not automatically
+   *  safe and why every fallback is surfaced. */
+  fallbackModels?: SandboxChatProducerOptions['fallbackModels']
+  /** Opt out of failover while still using {@link openEvents}. */
+  modelFailover?: false
+  /** Fired when a model is abandoned mid-chain (telemetry/alerting). */
+  onModelFallback?: SandboxChatProducerOptions['onModelFallback']
+  /** The PREFERRED model. Recorded on the persisted assistant message + usage
+   *  receipt — unless failover moved the turn, in which case the model that
+   *  actually served is recorded instead and surfaced on the result. */
   model?: string
   /** Per-flush buffer coalescer. Default `coalesceDeltas`. */
   coalesce?: (events: unknown[]) => unknown[]
@@ -153,6 +175,15 @@ export interface DetachedTurnResult {
    *  `null` when the turn produced nothing and the row was retracted. Absent
    *  when the caller owns persistence (today's behavior). */
   messageId?: string | null
+  /** The model that SERVED the turn — the fallback's id when failover moved it.
+   *  A caller that bills or scores per model must read this, not the model it
+   *  requested. */
+  model?: string
+  /** True when the preferred model did not serve. Makes an autonomous
+   *  downgrade — which no human watched happen — attributable after the fact. */
+  usedModelFallback?: boolean
+  /** Every model tried, in order, with the reason each was abandoned. */
+  modelAttempts?: ModelFailoverAttempt[]
 }
 
 /** Terminal failure event types a producer may forward verbatim. */
@@ -198,6 +229,12 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
   // accumulators; assigned once the idempotency branches decide to re-stream.
   let producer: ReturnType<typeof createSandboxChatProducer> | undefined
 
+  /** The model that actually served. Read LAZILY (never captured up front): on
+   *  a cached/finished-server-side path no producer exists and the preferred
+   *  model is the best available answer, but on a live re-stream failover may
+   *  have moved the turn after the row was first drafted. */
+  const servingModel = (): string | undefined => producer?.model ?? opts.model
+
   // Durable row ownership (opt-in). Built before the idempotency branches so a
   // cached/finished-server-side re-invoke still converges the row instead of
   // leaving whatever partial state a crashed attempt wrote.
@@ -219,7 +256,7 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
             content: producer.finalText?.() ?? '',
             ...(producer.draftParts ? { parts: producer.draftParts() } : {}),
             ...(producer.usage ? { usage: producer.usage() } : {}),
-            ...(opts.model ? { model: opts.model } : {}),
+            ...(servingModel() ? { model: servingModel() } : {}),
           }
         : null),
       ...(transformText ? { transformText } : {}),
@@ -229,7 +266,16 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
 
   /** Settle the durable row with authoritative values (or retract it when the
    *  turn produced nothing), and stamp the id onto the result. */
-  const settleRow = async (result: DetachedTurnResult): Promise<DetachedTurnResult> => {
+  const settleRow = async (base: DetachedTurnResult): Promise<DetachedTurnResult> => {
+    // Every return path funnels through here, so stamping attribution once is
+    // what guarantees no result — cached, failed, or clean — can report a turn
+    // without naming the model that produced it.
+    const info = producer?.modelFailover?.()
+    const result: DetachedTurnResult = {
+      ...base,
+      ...(servingModel() ? { model: servingModel() } : {}),
+      ...(info ? { usedModelFallback: info.usedFallback, modelAttempts: info.attempts } : {}),
+    }
     if (!draft) return result
     const transform = opts.persist?.transformText
     const content = transform ? await transform(result.text) : result.text
@@ -250,7 +296,7 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
     const values: AssistantRowValues = {
       content,
       ...(parts.length > 0 ? { parts } : {}),
-      ...(opts.model ? { model: opts.model } : {}),
+      ...(result.model ? { model: result.model } : {}),
       ...(result.usage.inputTokens !== undefined ? { inputTokens: result.usage.inputTokens } : {}),
       ...(result.usage.outputTokens !== undefined ? { outputTokens: result.usage.outputTokens } : {}),
       ...(result.usage.reasoningTokens !== undefined ? { reasoningTokens: result.usage.reasoningTokens } : {}),
@@ -317,8 +363,11 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
   await tap.onEvent({ type: 'turn', turnId })
 
   producer = createSandboxChatProducer({
-    events: opts.events,
+    ...(opts.openEvents ? { openEvents: opts.openEvents } : { events: opts.events }),
     model: opts.model,
+    ...(opts.fallbackModels ? { fallbackModels: opts.fallbackModels } : {}),
+    ...(opts.modelFailover === false ? { modelFailover: false as const } : {}),
+    ...(opts.onModelFallback ? { onModelFallback: opts.onModelFallback } : {}),
     isRenderableInteraction: opts.isRenderableInteraction,
     declineInteraction: opts.declineInteraction,
     promoteFilePart: opts.promoteFilePart,

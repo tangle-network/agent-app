@@ -65,6 +65,7 @@ import {
   type PersistedChatMessageForTurn,
   type TurnEventStore,
 } from '../stream/index'
+import type { ModelFailoverAttempt } from '../model-resolution/failover'
 import { parseJsonObjectBody } from '../web/index'
 import {
   assertPromptPartsWithinCap,
@@ -148,7 +149,23 @@ export interface ChatTurnRouteProducer extends ChatTurnProducer {
    *  parts until the turn completes. */
   draftParts?(): Array<Record<string, unknown>>
   usage?(): ChatTurnUsage
+  /** The model that SERVED the turn. With failover wired this is the model that
+   *  actually answered, which is not necessarily the one the caller preferred —
+   *  read it after the stream drains, never before. */
   model?: string
+  /** Model-failover attribution, when the producer supports it. Reported onto
+   *  the usage/billing receipt so a downgrade is never silent. */
+  modelFailover?(): ChatTurnModelFailover
+}
+
+/** Which model served, and what it took to get there. */
+export interface ChatTurnModelFailover {
+  /** The model that served the turn. */
+  model?: string
+  /** Every model tried, in order, with the reason each was abandoned. */
+  attempts: ModelFailoverAttempt[]
+  /** True when the preferred model did not serve. */
+  usedFallback: boolean
 }
 
 /** Resolve authorization status and context for a chat turn including tenant and user identification */
@@ -265,6 +282,13 @@ export interface ChatTurnLifecycleComplete<TContext> extends ChatTurnLifecycleBa
   finalText: string
   usage: ChatTurnUsage
   durationMs: number
+  /** The model that SERVED the turn — the fallback's id when failover moved it.
+   *  `usage` is that model's, so telemetry that splits cost or quality by model
+   *  must key on this and not on the requested one. */
+  model?: string
+  /** Attribution for a downgrade: which models were tried and why each failed.
+   *  `undefined` when the producer reports no failover support. */
+  modelFailover?: ChatTurnModelFailover
 }
 /** Represent an error occurring during a chat turn lifecycle with context and duration information */
 export interface ChatTurnLifecycleError<TContext> extends ChatTurnLifecycleBase<TContext> {
@@ -369,6 +393,13 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
     context: TContext
     failed: boolean
     failureReason?: string
+    /** The model that SERVED this turn. With failover wired it may differ from
+     *  the requested one, so a product that bills or scores per model MUST read
+     *  it here rather than assuming the model it asked for. */
+    model?: string
+    /** Present when the producer supports failover: the full attempt trail, and
+     *  `usedFallback` — the flag that makes a silent downgrade impossible. */
+    modelFailover?: ChatTurnModelFailover
   }): Promise<void>
   /** Per-event side channel (product broadcast). The turn-buffer tap is
    *  already wired; this runs in addition. */
@@ -697,10 +728,13 @@ export function createChatTurnRoutes<TContext = void>(
             error: terminalError ?? lastFailureData ?? new Error('chat turn failed'),
           })
         } else {
+          const failoverInfo = producer?.modelFailover?.()
           await lifecycle.onTurnComplete?.({
             identity, executionId, turnStreamId, context, durationMs,
             finalText: producer?.finalText() ?? '',
             usage: producer?.usage?.() ?? {},
+            ...(producer?.model ? { model: producer.model } : {}),
+            ...(failoverInfo ? { modelFailover: failoverInfo } : {}),
           })
         }
       } catch (err) {
@@ -889,14 +923,20 @@ export function createChatTurnRoutes<TContext = void>(
                 // (not a throw) still lands here — so surface `runFailed` so the
                 // product skips billing an errored turn instead of marking it
                 // complete with empty text.
-                onTurnComplete: ({ identity: turnIdentity, finalText }: { identity: ChatTurnIdentity; finalText: string }) =>
-                  options.onTurnComplete!({
+                onTurnComplete: ({ identity: turnIdentity, finalText }: { identity: ChatTurnIdentity; finalText: string }) => {
+                  // Read AFTER the drain, so the model reported to billing is
+                  // the one that actually served — a fallback included.
+                  const failoverInfo = producer?.modelFailover?.()
+                  return options.onTurnComplete!({
                     identity: turnIdentity,
                     finalText,
                     context,
                     failed: runFailed,
                     ...(runFailed ? { failureReason: failureReasonOf(lastFailureData) } : {}),
-                  }),
+                    ...(producer?.model ? { model: producer.model } : {}),
+                    ...(failoverInfo ? { modelFailover: failoverInfo } : {}),
+                  })
+                },
               }
             : {}),
           ...(options.traceFlush ? { traceFlush: () => options.traceFlush!(context) } : {}),
