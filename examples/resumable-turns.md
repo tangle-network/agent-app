@@ -4,23 +4,39 @@ When a model answers, it streams out in pieces. If the user's tab drops — or a
 Worker restarts mid-turn — you don't want to lose the answer. This module buffers
 every event as it's produced so a reconnecting client can replay the tail.
 
-## ⚠️ First: are you on the sandbox? Then you almost certainly DON'T need this.
+## ⚠️ First: is a live browser watching an INTERACTIVE sandbox turn? Then you don't need this.
 
-**The `@tangle-network/sandbox` SDK already buffers + replays session streams.**
-`box.streamPrompt` / `box.dispatchPrompt` buffer events server-side; a
-reconnecting **worker** resumes by passing `lastEventId` (forwarded as the
-`Last-Event-ID` header), a **browser** attaches directly with
-`box.mintScopedToken()` + `SessionGatewayClient`
-(`@tangle-network/sandbox/session-gateway`, WebSocket, replay from
-`lastEventId`), and `box.findCompletedTurn(turnId, { sessionId })` is the
-idempotent completion check. Both gtm-agent and creative-agent already use this
-— **do not hand-roll the buffer below over a sandbox session.** See the
-`sandbox-sdk-integration` guidance.
+**The `@tangle-network/sandbox` SDK already buffers + replays session streams —
+but only the lane you drive the turn on.**
+A production A/B (4 arms, sandbox.tangle.tools, SDK 0.12.0) measured it:
 
-**This module is the resume story for the SANDBOX-FREE path only** — a browser or
-edge copilot streaming the Tangle Router (or any OpenAI-compatible endpoint)
-directly, where there is no sandbox session gateway to replay for you (the
-[`browser-copilot.md`](./browser-copilot.md) shape). That's the whole niche.
+| turn driver | endpoint | raw turn events | delivered to a gateway client |
+| --- | --- | --- | --- |
+| `box.streamPrompt()` × 3 session-id strategies | `POST /agents/run/stream` | 71 / 527 / 408 | **0 / 0 / 0** |
+| `box.session(id).sendMessage({ parts })` | `POST /agents/sessions/{id}/messages` | 297 | **297 / 297** |
+
+So:
+
+- **Interactive turn, browser attaching** — drive it on the message lane
+  (`box.createSession({ sessionId, backend })` once, then
+  `box.session(id).sendMessage({ parts })`) and let the tab connect with
+  `box.mintScopedToken({ scope: 'session', … })` + `SessionGatewayClient`
+  (`@tangle-network/sandbox/session-gateway`). **Do not hand-roll the buffer
+  below over that.**
+- **Worker holding the turn** — `box.streamPrompt()`, and resume with
+  `box.streamPrompt('', { executionId, lastEventId })`: it replays strictly
+  after the cursor and does not re-dispatch (measured over a SIGKILL: 0 lost,
+  0 duplicated, 0 out-of-order, ids 1..517 contiguous). Still no buffer needed.
+- **DETACHED / autonomous run a browser must tail** — you DO need this module.
+  `dispatchPrompt({ detach: true })` and `driveTurn` call `streamPrompt`
+  internally, so the run never reaches the gateway and no SDK primitive can
+  show it to a tab. Use `runDetachedTurn` (`/chat-routes`) over a
+  `TurnEventStore`.
+
+**This module has exactly two niches**: the SANDBOX-FREE path (a browser or
+edge copilot streaming the Tangle Router, or any OpenAI-compatible endpoint,
+directly — the [`browser-copilot.md`](./browser-copilot.md) shape), and any
+detached sandbox run that must be watchable live.
 
 ```
 POST /chat/stream          → buffer the turn + stream live    (pump OR tap)
@@ -34,9 +50,11 @@ It is pure mechanism behind a storage seam — no peers. Storage is a
 
 | You're running… | Use this? |
 | --- | --- |
-| **Sandbox-backed turn** (most products) | **No** — the SDK already buffers + replays: `box.streamPrompt` + `lastEventId` for a worker, `box.mintScopedToken()` + `SessionGatewayClient` for a browser. Use those. |
+| **Interactive sandbox turn, browser attaching** | **No** — drive it on the message lane (`box.session(id).sendMessage()`) and attach the tab with `box.mintScopedToken()` + `SessionGatewayClient`. The gateway delivered 297/297 frames on that lane. |
+| **Interactive sandbox turn, worker consumes it** | **No** — `box.streamPrompt()` + `box.streamPrompt('', { executionId, lastEventId })` resumes losslessly. (A gateway client sees nothing on this lane, so if a second viewer must watch, move the turn to the message lane rather than buffering it.) |
 | **Sandbox-free interactive turn** (browser/edge copilot on the Router directly) | **Yes** — there's no gateway; this is your resume mechanism. |
-| **Autonomous turn** (mission, queue, cron) | Prefer `box.driveTurn()` (agent-app's `driveSandboxTurn`) ticked from a durable driver, or raw `box.dispatchPrompt({ detach: true })` + poll. Buffer only if you also stream it to a watcher AND aren't sandbox-backed — and then use `runDetachedTurn` (`/chat-routes`), which does exactly that bridge. |
+| **Autonomous / detached turn a browser must tail** (mission, queue, cron, inbound email) | **Yes** — `dispatchPrompt({ detach: true })` and `driveTurn` run on the lane the gateway cannot see, so the buffer is the only live path. Use `runDetachedTurn` (`/chat-routes`), which does exactly that bridge. |
+| **Autonomous turn nobody watches** | **No** — `box.driveTurn()` (agent-app's `driveSandboxTurn`) ticked from a durable driver, or raw `dispatchPrompt({ detach: true })` + poll. Nothing to stream. |
 | **Eval / CI** (long-lived process) | **No** — the harness is the consumer and outlives the run; a failed run is re-run, not resumed. |
 
 ## Pick a transport — who owns the producer?

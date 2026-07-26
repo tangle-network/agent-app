@@ -34,6 +34,17 @@ export const config = {
      * var is unset. Any model your Tangle Router key can reach.
      */
     default: 'REPLACE_WITH_MODEL',
+    /**
+     * Models to try, in order, when the chosen model's upstream is DEAD
+     * (quota wall, 502, provider outage). Failover is reactive — zero cost
+     * until the preferred model actually fails — and every fallback is
+     * surfaced: the persisted row and billing receipt name the model that
+     * actually served, and the transcript gets a visible notice. Keep this
+     * list cross-provider (an outage usually takes a whole provider down)
+     * and review it with your default: a stale ladder degrades to today's
+     * behavior (the turn fails), never to a silent wrong-model answer.
+     */
+    fallbacks: ['gemini-2.5-flash-lite', 'gpt-5-mini'],
     /** Default reasoning effort for turns that don't specify one. */
     effort: 'auto',
   },
@@ -54,7 +65,7 @@ export const config = {
 } as const satisfies {
   name: string
   systemPrompt: string
-  model: { default: string; effort: 'auto' | 'low' | 'medium' | 'high' }
+  model: { default: string; fallbacks: readonly string[]; effort: 'auto' | 'low' | 'medium' | 'high' }
   harness: Harness
   interactions: { question?: boolean; permission?: boolean; plan?: boolean }
 }

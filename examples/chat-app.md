@@ -16,6 +16,7 @@ Who owns each hop:
 | Body parse, turn identity, routes | `/chat-routes` (`createChatTurnRoutes`) |
 | Turn engine (NDJSON protocol, hook order) | agent-runtime `handleChatTurn` |
 | Sandbox events → client vocabulary + persisted parts | `/chat-routes` (`createSandboxChatProducer`) |
+| Model failover on a dead upstream (attributed, pre-first-byte) | `/chat-routes` (`openEvents` + `fallbackModels` on the producer) |
 | Buffered replay after a drop | `/stream` turn buffer (wired by default) |
 | Upload → `PromptInputPart` descriptors | `/chat-routes` (`createUploadRoute`) |
 | Store-backed attachments (validate, dispatch, promote) | `/chat-routes` (`resolveChatAttachments`, `buildDispatchParts`, `promoteAgentFilePart`) |
@@ -83,13 +84,20 @@ export function buildChat(env: Env) {
       const planEnabled = body.enablePlans === true
       return createSandboxChatProducer({
         model: body.model,
+        // Reactive model failover, ON by default: a dead upstream (quota wall,
+        // 502, provider outage) moves the turn to the next model BEFORE any
+        // client-visible byte. Never silent — the persisted row + billing
+        // receipt name the model that served, and the transcript gets a notice.
+        fallbackModels: ['gemini-2.5-flash-lite', 'gpt-5-mini'],
         // No separate producer planMode option: close over the product's
         // per-turn policy and auto-decline plan asks no card will render.
         isRenderableInteraction: (kind) =>
           kind === 'question' || (kind === 'plan' && planEnabled),
-        events: streamSandboxPrompt(shell, box, prompt, {
-          sessionId: identity.sessionId, executionId,
-          model: body.model, effort: body.effort,
+        openEvents: ({ model, attempt }) => streamSandboxPrompt(shell, box, prompt, {
+          // A failover attempt is a NEW dispatch — its own execution identity.
+          sessionId: identity.sessionId,
+          executionId: attempt === 1 ? executionId : `${executionId}-f${attempt}`,
+          model, effort: body.effort,
           interactions: { question: true, plan: true },
         }),
       })

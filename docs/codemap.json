@@ -6059,6 +6059,7 @@
       "dependsOn": [
         "chat-store",
         "interactions",
+        "model-resolution",
         "plans",
         "sandbox",
         "stream",
@@ -6319,6 +6320,12 @@
           "doc": "What the route persists — a structural subset of `/chat-store`'s `ChatStore`, so `createChatStore(db, tables)` satisfies it directly and a product with its own persistence adapts without importing dr…"
         },
         {
+          "name": "ChatTurnModelFailover",
+          "kind": "interface",
+          "signature": "interface ChatTurnModelFailover",
+          "doc": "Which model served, and what it took to get there."
+        },
+        {
           "name": "ChatTurnPartInput",
           "kind": "type",
           "signature": "type ChatTurnPartInput",
@@ -6371,6 +6378,12 @@
           "kind": "function",
           "signature": "(fileName: string, sniff: SniffResult, allowed?: ReadonlySet<string>) => AttachmentTypeCheckResult",
           "doc": "Cross-check a filename's extension against its sniffed content."
+        },
+        {
+          "name": "classifyTerminalFailure",
+          "kind": "function",
+          "signature": "(event: unknown) => TerminalFailure | null",
+          "doc": "Classify a terminal failure event."
         },
         {
           "name": "createAssistantDraftWriter",
@@ -6583,6 +6596,12 @@
           "doc": "Define the maximum byte size allowed for inline parts in data processing"
         },
         {
+          "name": "isCommittingSandboxEvent",
+          "kind": "function",
+          "signature": "(event: unknown) => boolean",
+          "doc": "True when `event` puts content in front of the user (or in the persisted transcript), making a restart on another model unsafe."
+        },
+        {
           "name": "isDraftContentEvent",
           "kind": "function",
           "signature": "(event: { type?: unknown; }) => boolean",
@@ -6623,6 +6642,30 @@
           "kind": "function",
           "signature": "(path: string) => ChatMentionKind",
           "doc": "`image` when the path's extension is in the known image set (the same table {@link mediaTypeForMentionPath} reads), `file` otherwise."
+        },
+        {
+          "name": "ModelFailoverStreamHandle",
+          "kind": "interface",
+          "signature": "interface ModelFailoverStreamHandle",
+          "doc": "The failover-wrapped stream plus the attribution every consumer needs."
+        },
+        {
+          "name": "ModelFailoverStreamOptions",
+          "kind": "interface",
+          "signature": "interface ModelFailoverStreamOptions",
+          "doc": "Define inputs for streaming a turn across a model failover chain"
+        },
+        {
+          "name": "ModelFallbackInfo",
+          "kind": "interface",
+          "signature": "interface ModelFallbackInfo",
+          "doc": "Fired when a model is abandoned and the next one is about to be tried."
+        },
+        {
+          "name": "OpenModelStream",
+          "kind": "type",
+          "signature": "type OpenModelStream",
+          "doc": "Open the raw turn stream for one specific model."
         },
         {
           "name": "parseChatTurnParts",
@@ -6875,6 +6918,12 @@
           "kind": "function",
           "signature": "(store: AssistantDraftStore) => boolean",
           "doc": "True when a store can support incremental persistence at all."
+        },
+        {
+          "name": "streamWithModelFailover",
+          "kind": "function",
+          "signature": "(options: ModelFailoverStreamOptions) => ModelFailoverStreamHandle",
+          "doc": "Wrap `open` in reactive model failover, streaming from the first model in `models` that reaches its commit point."
         },
         {
           "name": "UPLOAD_INLINE_MAX_BYTES",
@@ -17902,7 +17951,7 @@
           "name": "appendSegmentEvent",
           "kind": "function",
           "signature": "(store: SegmentStore, executionId: string, incoming: TurnStreamEvent, maxEvents?: number) => TurnStreamEvent",
-          "doc": "Append a per-turn event to its execution's segment, assigning a monotonic `seq`."
+          "doc": "DEPRECATED (interactive turn-rebroadcast buffer) — append a per-turn event to its execution's segment, assigning a monotonic `seq`."
         },
         {
           "name": "broadcastThreadCreated",
@@ -17914,7 +17963,7 @@
           "name": "broadcastTurnStreamEvent",
           "kind": "function",
           "signature": "(namespace: TurnStreamNamespaceLike, input: { workspaceId: string; threadId: string; executionId: string; event: { type…",
-          "doc": "Fan a turn event out to the per-thread channel."
+          "doc": "DEPRECATED for sandbox-backed interactive turns (drive on the session-message lane + `SessionGatewayClient` instead) — fan a turn event out to the per-thread channel."
         },
         {
           "name": "broadcastWorkspaceActivity",
@@ -17950,7 +17999,7 @@
           "name": "createSegmentStore",
           "kind": "function",
           "signature": "() => SegmentStore",
-          "doc": "Create a SegmentStore with initialized segments and no active execution ID"
+          "doc": "DEPRECATED (interactive sandbox-turn rebroadcast; the SDK's session gateway replaces it) — create a SegmentStore with initialized segments and no active execution ID."
         },
         {
           "name": "createTurnLock",
@@ -17998,7 +18047,7 @@
           "name": "MAX_SEGMENT_EVENTS",
           "kind": "const",
           "signature": "2000",
-          "doc": "Per-turn replay window."
+          "doc": "DEPRECATED (interactive turn-rebroadcast buffer) — per-turn replay window."
         },
         {
           "name": "MemoryTurnStreamChannel",
@@ -18058,25 +18107,25 @@
           "name": "replayActiveSegment",
           "kind": "function",
           "signature": "(store: SegmentStore, afterSeq: number) => TurnStreamEvent[]",
-          "doc": "Events of the active, non-terminal turn with `seq > afterSeq` — what a (re)connecting client replays before going live."
+          "doc": "DEPRECATED (interactive turn-rebroadcast buffer; the SDK replays losslessly on both lanes) — events of the active, non-terminal turn with `seq > afterSeq`, i.e."
         },
         {
           "name": "scopeIndexChannelKey",
           "kind": "function",
           "signature": "(scopeId: string) => string",
-          "doc": "Generate a unique channel key string based on the provided scope identifier"
+          "doc": "Generate a unique channel key string based on the provided scope identifier."
         },
         {
           "name": "SegmentStore",
           "kind": "interface",
           "signature": "interface SegmentStore",
-          "doc": "Define a store managing segments and tracking the active execution identifier"
+          "doc": "DEPRECATED (interactive turn-rebroadcast buffer) — define a store managing segments and tracking the active execution identifier."
         },
         {
           "name": "threadChannelKey",
           "kind": "function",
           "signature": "(workspaceId: string, threadId: string) => string",
-          "doc": "Generate a unique string key combining workspace and thread identifiers"
+          "doc": "Generate a unique string key combining workspace and thread identifiers."
         },
         {
           "name": "TURN_LOCK_TTL_MS",
@@ -18160,13 +18209,13 @@
           "name": "TurnSegment",
           "kind": "interface",
           "signature": "interface TurnSegment",
-          "doc": "Represent a segment of a turn containing events, sequence limit, and terminal status"
+          "doc": "DEPRECATED (interactive turn-rebroadcast buffer) — represent a segment of a turn containing events, sequence limit, and terminal status."
         },
         {
           "name": "turnStorageChannelKey",
           "kind": "function",
           "signature": "(turnId: string) => string",
-          "doc": "Generate a storage channel key string for a given turn identifier"
+          "doc": "Generate a storage channel key string for a given turn identifier."
         },
         {
           "name": "TurnStreamDO",
@@ -18226,7 +18275,7 @@
           "name": "workspaceChannelKey",
           "kind": "function",
           "signature": "(workspaceId: string) => string",
-          "doc": "Generate a unique channel key based on the given workspace identifier"
+          "doc": "Generate a unique channel key based on the given workspace identifier."
         }
       ]
     },
