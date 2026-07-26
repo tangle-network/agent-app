@@ -3,17 +3,23 @@
  * core (`./core`). One class serves every channel family; the instance NAME
  * decides which endpoints a given instance ever sees:
  *
- * - **thread channel** (`${workspaceId}:${threadId}`) — the live chat turn:
- *   WebSocket fanout, per-turn segments with `sync`/`afterSeq` reconnect
- *   replay, and the thread-scope lock.
+ * - **thread channel** (`${workspaceId}:${threadId}`) — the thread-scope lock
+ *   (KEPT), plus the live turn rebroadcast: WebSocket fanout and per-turn
+ *   segments with `sync`/`afterSeq` reconnect replay. That rebroadcast is
+ *   `@deprecated` for sandbox-backed interactive turns — the sandbox session
+ *   gateway already does it, browser-direct, when the turn is driven on the
+ *   message lane (`./core`'s header has the production measurement).
  * - **workspace channel** (`${workspaceId}`) — coarse sidebar signals
  *   (`thread.activity` responding set, durable across eviction;
- *   `thread.created` recent list) and the workspace-scope lock.
+ *   `thread.created` recent list) and the workspace-scope lock. KEPT: the
+ *   gateway is per-session and read-only, so it carries neither.
  * - **turn storage** (`turn:${turnId}`) — the durable `TurnEventStore` rows +
  *   status for one buffered turn (replay survives DO eviction — this is what
- *   graduates the vertical's `turnStore` from no-op).
+ *   graduates the vertical's `turnStore` from no-op). KEPT and load-bearing:
+ *   a DETACHED run never reaches the gateway, so this is the only way a
+ *   browser tails autonomous work.
  * - **scope index** (`scope:${scopeId}`) — the running-turn index backing
- *   `TurnEventStore.listRunning` reconnect discovery.
+ *   `TurnEventStore.listRunning` reconnect discovery. KEPT.
  *
  * The class is a PLAIN class over a structural {@link TurnStreamDOState} —
  * no `cloudflare:workers` import, so this package stays substrate-free and
@@ -347,6 +353,11 @@ export class TurnStreamDO {
         this.recentCreated = this.recentCreated.slice(-MAX_RECENT_CREATED)
       }
     } else if (typeof data.executionId === 'string') {
+      // Deprecated lane: per-turn rebroadcast. A product on the sandbox
+      // message lane stops sending these and the tab reads the gateway
+      // instead; the lock's cooperative release and the stale-lock
+      // reconciler then own release (this terminal auto-release is a
+      // convenience, not the only path out of a wedge).
       outgoing = appendSegmentEvent(
         this.segments,
         data.executionId,

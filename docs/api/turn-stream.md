@@ -40,7 +40,7 @@ number
 
 ### `appendSegmentEvent`
 
-`function` — Append a per-turn event to its execution's segment, assigning a monotonic `seq`.
+`function` — DEPRECATED (interactive turn-rebroadcast buffer) — append a per-turn event to its execution's segment, assigning a monotonic `seq`.
 
 ```ts
 (store: SegmentStore, executionId: string, incoming: TurnStreamEvent, maxEvents?: number) => TurnStreamEvent
@@ -56,7 +56,7 @@ number
 
 ### `broadcastTurnStreamEvent`
 
-`function` — Fan a turn event out to the per-thread channel.
+`function` — DEPRECATED for sandbox-backed interactive turns (drive on the session-message lane + `SessionGatewayClient` instead) — fan a turn event out to the per-thread channel.
 
 ```ts
 (namespace: TurnStreamNamespaceLike, input: { workspaceId: string; threadId: string; executionId: string; event: { type…
@@ -104,7 +104,7 @@ interface CreateDurableTurnLockOptions
 
 ### `createSegmentStore`
 
-`function` — Create a SegmentStore with initialized segments and no active execution ID
+`function` — DEPRECATED (interactive sandbox-turn rebroadcast; the SDK's session gateway replaces it) — create a SegmentStore with initialized segments and no active execution ID.
 
 ```ts
 () => SegmentStore
@@ -168,7 +168,7 @@ interface DurableTurnLock
 
 ### `MAX_SEGMENT_EVENTS`
 
-`const` — Per-turn replay window.
+`const` — DEPRECATED (interactive turn-rebroadcast buffer) — per-turn replay window.
 
 ```ts
 2000
@@ -248,7 +248,7 @@ interface ReleaseInterruptedDurableTurnLockInput
 
 ### `replayActiveSegment`
 
-`function` — Events of the active, non-terminal turn with `seq > afterSeq` — what a (re)connecting client replays before going live.
+`function` — DEPRECATED (interactive turn-rebroadcast buffer; the SDK replays losslessly on both lanes) — events of the active, non-terminal turn with `seq > afterSeq`, i.e.
 
 ```ts
 (store: SegmentStore, afterSeq: number) => TurnStreamEvent[]
@@ -256,7 +256,7 @@ interface ReleaseInterruptedDurableTurnLockInput
 
 ### `scopeIndexChannelKey`
 
-`function` — Generate a unique channel key string based on the provided scope identifier
+`function` — Generate a unique channel key string based on the provided scope identifier.
 
 ```ts
 (scopeId: string) => string
@@ -264,7 +264,7 @@ interface ReleaseInterruptedDurableTurnLockInput
 
 ### `SegmentStore`
 
-`interface` — Define a store managing segments and tracking the active execution identifier
+`interface` — DEPRECATED (interactive turn-rebroadcast buffer) — define a store managing segments and tracking the active execution identifier.
 
 ```ts
 interface SegmentStore
@@ -272,7 +272,7 @@ interface SegmentStore
 
 ### `threadChannelKey`
 
-`function` — Generate a unique string key combining workspace and thread identifiers
+`function` — Generate a unique string key combining workspace and thread identifiers.
 
 ```ts
 (workspaceId: string, threadId: string) => string
@@ -384,7 +384,7 @@ type TurnLockSeamResult
 
 ### `TurnSegment`
 
-`interface` — Represent a segment of a turn containing events, sequence limit, and terminal status
+`interface` — DEPRECATED (interactive turn-rebroadcast buffer) — represent a segment of a turn containing events, sequence limit, and terminal status.
 
 ```ts
 interface TurnSegment
@@ -392,7 +392,7 @@ interface TurnSegment
 
 ### `turnStorageChannelKey`
 
-`function` — Generate a storage channel key string for a given turn identifier
+`function` — Generate a storage channel key string for a given turn identifier.
 
 ```ts
 (turnId: string) => string
@@ -472,7 +472,7 @@ type TurnStreamUpgradeAuthorization
 
 ### `workspaceChannelKey`
 
-`function` — Generate a unique channel key based on the given workspace identifier
+`function` — Generate a unique channel key based on the given workspace identifier.
 
 ```ts
 (workspaceId: string) => string
