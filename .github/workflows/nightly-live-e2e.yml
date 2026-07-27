@@ -93,7 +93,7 @@ jobs:
           step=$(grep -E '^  FAILED' live.log | head -1 | sed 's/^ *//')
           echo "::error title=Nightly live turn failed::model=${LIVE_MODEL} box=${box:-none-provisioned} target=${SANDBOX_API_URL} failing-step=${step:-see log}"
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: nightly-live-log
