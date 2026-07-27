@@ -46,6 +46,7 @@ import { mentionInputToPart, toChatMessageParts, type ChatMessagePart } from '..
 import {
   assistantRowIdForTurn,
   createAssistantDraftWriter,
+  rowIdOf,
   storeSupportsDraftPersistence,
   type AssistantDraftStore,
   type AssistantDraftWriter,
@@ -212,6 +213,20 @@ export interface ChatTurnProduceArgs<TContext> {
   /** The turn-buffer id announced to the client for replay. */
   turnStreamId: string
   priorMessages: PersistedChatMessageForTurn[]
+  /** The durable `role:'user'` row this turn is anchored to — the row the
+   *  factory just inserted, or the one retry-dedup REUSED. Products anchor
+   *  optimistic-bubble swaps, retry targeting, and stop-polling to it, and it
+   *  is the only way to name a REUSED row (which `priorMessages` excludes).
+   *
+   *  Three states, all meaningful:
+   *  - `undefined` — not resolved yet. `turnLock.acquire` is the one seam that
+   *    sees this: it runs before any side effect by contract, so the row does
+   *    not exist when it reads the args.
+   *  - `null` — resolved, no row: `authorize` returned `insertUserMessage:
+   *    false` on a turn with nothing to reuse, or the store's `appendMessage`
+   *    resolved without a usable id.
+   *  - a string — the row id, for `contextGate`, `beforeTurn`, and `produce`. */
+  userMessageId?: string | null
 }
 
 /** One event as it crosses the route: the producer's own vocabulary, or an
@@ -289,6 +304,11 @@ export interface ChatTurnLifecycleComplete<TContext> extends ChatTurnLifecycleBa
   /** Attribution for a downgrade: which models were tried and why each failed.
    *  `undefined` when the producer reports no failover support. */
   modelFailover?: ChatTurnModelFailover
+  /** The durable `role:'assistant'` row this turn wrote, or `null` when it
+   *  wrote none (an empty turn leaves no row — a draft started mid-stream is
+   *  retracted). The detached lane surfaces the same id as
+   *  `DetachedTurnResult.messageId`; one contract, two lanes. */
+  assistantMessageId: string | null
 }
 /** Represent an error occurring during a chat turn lifecycle with context and duration information */
 export interface ChatTurnLifecycleError<TContext> extends ChatTurnLifecycleBase<TContext> {
@@ -306,6 +326,32 @@ export interface ChatTurnLifecycle<TContext> {
   onTurnStart?(info: ChatTurnLifecycleStart<TContext>): void | Promise<void>
   onTurnComplete?(info: ChatTurnLifecycleComplete<TContext>): void | Promise<void>
   onTurnError?(info: ChatTurnLifecycleError<TContext>): void | Promise<void>
+}
+
+/** What a settled turn reports to `onTurnComplete` — the product's
+ *  post-processing seam (billing, titles, audit). */
+export interface ChatTurnCompleteInput<TContext> {
+  identity: ChatTurnIdentity
+  finalText: string
+  context: TContext
+  failed: boolean
+  failureReason?: string
+  /** The model that SERVED this turn. With failover wired it may differ from
+   *  the requested one, so a product that bills or scores per model MUST read
+   *  it here rather than assuming the model it asked for. */
+  model?: string
+  /** Present when the producer supports failover: the full attempt trail, and
+   *  `usedFallback` — the flag that makes a silent downgrade impossible. */
+  modelFailover?: ChatTurnModelFailover
+  /** The durable `role:'assistant'` row this turn wrote, or `null` when it
+   *  wrote none (an empty turn leaves no row).
+   *
+   *  Populated even when `failed` is true — a terminal error event still
+   *  persists whatever partial answer arrived, and that pairing is exactly
+   *  what lets a product render an error row against a REAL message instead of
+   *  hunting for the newest row in the thread. The detached lane surfaces the
+   *  same id as `DetachedTurnResult.messageId`. */
+  assistantMessageId: string | null
 }
 
 /** Define options to configure chat turn routes including authorization, storage, and event buffering */
@@ -387,20 +433,7 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
    *  than billing an empty turn and marking it done. A turn that THROWS never
    *  reaches this hook (the engine skips it on a producer throw). Errors are
    *  swallowed by the engine — they never fail a streamed turn. */
-  onTurnComplete?(input: {
-    identity: ChatTurnIdentity
-    finalText: string
-    context: TContext
-    failed: boolean
-    failureReason?: string
-    /** The model that SERVED this turn. With failover wired it may differ from
-     *  the requested one, so a product that bills or scores per model MUST read
-     *  it here rather than assuming the model it asked for. */
-    model?: string
-    /** Present when the producer supports failover: the full attempt trail, and
-     *  `usedFallback` — the flag that makes a silent downgrade impossible. */
-    modelFailover?: ChatTurnModelFailover
-  }): Promise<void>
+  onTurnComplete?(input: ChatTurnCompleteInput<TContext>): Promise<void>
   /** Per-event side channel (product broadcast). The turn-buffer tap is
    *  already wired; this runs in addition. */
   onEvent?(event: { type: string; data?: Record<string, unknown> }, context: TContext): void | Promise<void>
@@ -660,8 +693,11 @@ export function createChatTurnRoutes<TContext = void>(
           ? [{ type: 'text', text: content }, ...fileParts]
           : [...fileParts]
 
-    // The producer input every pre-turn seam reads (and `beforeTurn` may
-    // rewrite). Mutated in place before the producer's deferred first pull.
+    // The producer input every pre-turn seam reads. Replaced — never mutated
+    // in place — as later steps resolve more of it (`userMessageId` after the
+    // insert, `beforeTurn`'s patch after that), so a seam that captured the
+    // object never sees it change underneath. `produce` reads the last
+    // version because the engine defers its first pull.
     let produceArgs: ChatTurnProduceArgs<TContext> = {
       request,
       body: payload,
@@ -704,6 +740,12 @@ export function createChatTurnRoutes<TContext = void>(
     // path that runs the terminal hook.
     let producer: ChatTurnRouteProducer | undefined
     let draft: AssistantDraftWriter | undefined
+    // Set once persistence settles; `undefined` means it never ran.
+    let assistantMessageId: string | null | undefined
+    /** The assistant row this turn ended with. Falls back to the draft writer
+     *  so a turn whose producer THREW — skipping `persistAssistantMessage`
+     *  entirely — still names the partial row it left behind. */
+    const assistantRowId = (): string | null => assistantMessageId ?? draft?.rowId() ?? null
     let runFailed = false
     // Data of the event that marked the run failed — handed to `onTurnError`
     // when no drain throw supplies a richer cause.
@@ -733,6 +775,7 @@ export function createChatTurnRoutes<TContext = void>(
             identity, executionId, turnStreamId, context, durationMs,
             finalText: producer?.finalText() ?? '',
             usage: producer?.usage?.() ?? {},
+            assistantMessageId: assistantRowId(),
             ...(producer?.model ? { model: producer.model } : {}),
             ...(failoverInfo ? { modelFailover: failoverInfo } : {}),
           })
@@ -750,14 +793,24 @@ export function createChatTurnRoutes<TContext = void>(
       // dispatched/synthetic turn. AND-composition: it can only subtract, never
       // resurrect a turn the engine already deduped as a retry.
       const insertUserMessage = chatTurn.shouldInsertUserMessage && (auth.insertUserMessage ?? true)
+      // Name the row this turn is anchored to. Insert and reuse are mutually
+      // exclusive (`shouldInsertUserMessage` is false exactly when a reusable
+      // row was found), so one source or the other — never both, never a
+      // guess. Products used to re-derive this by decorating the store and
+      // falling back to the newest row, which mis-resolves under sub-second
+      // same-thread turns.
+      let userMessageId: string | null = chatTurn.reusedUserMessageId ?? null
       if (insertUserMessage) {
-        await options.store.appendMessage({
-          threadId: payload.threadId,
-          role: 'user',
-          content,
-          parts: userPartsWithFiles(chatTurn.userParts, fileParts, mentions),
-        })
+        userMessageId = rowIdOf(
+          await options.store.appendMessage({
+            threadId: payload.threadId,
+            role: 'user',
+            content,
+            parts: userPartsWithFiles(chatTurn.userParts, fileParts, mentions),
+          }),
+        )
       }
+      produceArgs = { ...produceArgs, userMessageId }
 
       // Domain-readiness gate: may short-circuit with the product's own
       // response before the producer runs. The user row above is kept (a real
@@ -887,6 +940,10 @@ export function createChatTurnRoutes<TContext = void>(
               // Empty turn: today this leaves no assistant row at all, so a
               // draft row started earlier is retracted, not left behind.
               await draft?.discard()
+              // Read the writer rather than assuming `null`: `discard` is a
+              // no-op on a store without `deleteMessage` (drafting needs only
+              // `updateMessage`), and there the draft row genuinely survives.
+              assistantMessageId = draft?.rowId() ?? null
               return
             }
             const usage = producer?.usage?.() ?? {}
@@ -908,13 +965,16 @@ export function createChatTurnRoutes<TContext = void>(
             // append is untouched.
             if (draft) {
               await draft.finalize(values)
+              assistantMessageId = draft.rowId() ?? null
               return
             }
-            await options.store.appendMessage({
-              threadId: payload.threadId,
-              role: 'assistant',
-              ...values,
-            })
+            assistantMessageId = rowIdOf(
+              await options.store.appendMessage({
+                threadId: payload.threadId,
+                role: 'assistant',
+                ...values,
+              }),
+            )
           },
           ...(options.onTurnComplete
             ? {
@@ -932,6 +992,7 @@ export function createChatTurnRoutes<TContext = void>(
                     finalText,
                     context,
                     failed: runFailed,
+                    assistantMessageId: assistantRowId(),
                     ...(runFailed ? { failureReason: failureReasonOf(lastFailureData) } : {}),
                     ...(producer?.model ? { model: producer.model } : {}),
                     ...(failoverInfo ? { modelFailover: failoverInfo } : {}),
