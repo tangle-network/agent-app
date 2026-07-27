@@ -93,8 +93,11 @@ jobs:
           step=$(grep -E '^  FAILED' live.log | head -1 | sed 's/^ *//')
           echo "::error title=Nightly live turn failed::model=${LIVE_MODEL} box=${box:-none-provisioned} target=${SANDBOX_API_URL} failing-step=${step:-see log}"
 
+      # Only when the turn actually ran. `if: always()` alone uploads nothing and
+      # warns "No files were found" whenever the credential check short-circuits
+      # — a spurious warning in the one workflow whose job is legible failure.
       - uses: actions/upload-artifact@v7
-        if: always()
+        if: always() && steps.live.outcome != 'skipped'
         with:
           name: nightly-live-log
           path: live.log
