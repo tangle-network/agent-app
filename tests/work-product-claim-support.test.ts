@@ -463,6 +463,48 @@ describe('submit_work_product re-checks claim support', () => {
   })
 })
 
+// ── locating a figure is value-wise too, or the gate becomes unsatisfiable ──
+
+describe('findSourceLine matches a numeric needle by VALUE, not as a substring', () => {
+  // A document where a small figure is also the TAIL of a larger one — the
+  // shape that made an honest citation unreachable. Substring search returns
+  // the WAGE line for "450.00" because it occurs there first, the claim-support
+  // gate then correctly refuses it, and the union of the two behaviours is a
+  // gate no honest answer can satisfy at occurrence 1. That is the exact
+  // failure this area exists to avoid, so locating has to be value-wise too.
+  const DOC = [
+    'Form W-2  Tax Year 2025',
+    'Box 1   Wages, tips, other compensation ......... 128,450.00',
+    'Box 14  Union dues .............................      450.00',
+  ].join('\n')
+
+  it('cites the line that carries the value, not the line that merely contains its digits', async () => {
+    const { findSourceLine } = await import('../src/work-product/quote')
+    const located = findSourceLine(DOC, '450.00')
+    expect(located.ok).toBe(true)
+    if (!located.ok) return
+    expect(located.quote).toBe('Box 14  Union dues .............................      450.00')
+    expect(located.occurrences).toBe(1)
+    expect(verifyClaimSupport(located.quote, '450.00').status).toBe('supported')
+  })
+
+  it('still finds the larger figure by its own value', async () => {
+    const { findSourceLine } = await import('../src/work-product/quote')
+    const located = findSourceLine(DOC, '128450.00')
+    expect(located.ok).toBe(true)
+    if (!located.ok) return
+    expect(located.quote).toBe('Box 1   Wages, tips, other compensation ......... 128,450.00')
+  })
+
+  it('a PHRASE needle still matches as text', async () => {
+    const { findSourceLine } = await import('../src/work-product/quote')
+    const located = findSourceLine(DOC, 'Union dues')
+    expect(located.ok).toBe(true)
+    if (!located.ok) return
+    expect(located.quote).toContain('Union dues')
+  })
+})
+
 // ── the invariant that makes this worth having ─────────────────────────────
 
 describe('anchoring by value cannot produce an unsupported citation', () => {
