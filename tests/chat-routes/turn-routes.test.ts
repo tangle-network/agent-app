@@ -155,19 +155,25 @@ describe('createChatTurnRoutes — turn', () => {
     expect(rows.find((row) => row.role === 'assistant')?.parts).toEqual([planToPersistedPart(plan)])
   })
 
-  it('does not double-insert the user row on a retried turnId', async () => {
-    const { routes, rows, ctx, pending } = makeRoutes()
+  it('does not double-insert the user row on a retried turnId, and names the REUSED row', async () => {
+    const produce = vi.fn((_args: ChatTurnProduceArgs<unknown>) => fakeProducer([{ type: 'text', text: 'ok' }], 'ok'))
+    const { routes, rows, ctx, pending } = makeRoutes({ produce })
     const body = { threadId: 't-1', content: 'same question', turnId: 'turn-abc' }
     await readLines((await routes.turn(turnRequest(body), ctx)).body!)
     await Promise.all(pending.splice(0))
     await readLines((await routes.turn(turnRequest(body), ctx)).body!)
     await Promise.all(pending.splice(0))
 
-    expect(rows.filter((r) => r.role === 'user')).toHaveLength(1)
+    const userRows = rows.filter((r) => r.role === 'user')
+    expect(userRows).toHaveLength(1)
+    // The retry inserts nothing, so its id can only come from the reuse path —
+    // and `priorMessages` deliberately excludes that row, so nothing else in
+    // the produce args could supply it.
+    expect(produce.mock.calls.map((call) => call[0]!.userMessageId)).toEqual([userRows[0]!.id, userRows[0]!.id])
   })
 
   it('authorize insertUserMessage:false suppresses the user-row insert but still runs the turn', async () => {
-    const produce = vi.fn(() => fakeProducer([{ type: 'text', text: 'ack' }], 'ack'))
+    const produce = vi.fn((_args: ChatTurnProduceArgs<unknown>) => fakeProducer([{ type: 'text', text: 'ack' }], 'ack'))
     const { routes, rows, ctx, pending } = makeRoutes({
       produce,
       authorize: async () => ({ ok: true, tenantId: 'ws-1', userId: 'user-1', context: undefined, insertUserMessage: false }),
@@ -178,6 +184,8 @@ describe('createChatTurnRoutes — turn', () => {
     expect(produce).toHaveBeenCalledTimes(1)
     expect(rows.filter((r) => r.role === 'user')).toHaveLength(0)
     expect(rows.filter((r) => r.role === 'assistant')).toHaveLength(1)
+    // Resolved, and there is genuinely no row — distinct from "not yet known".
+    expect(produce.mock.calls[0]![0]!.userMessageId).toBeNull()
   })
 
   it('authorize insertUserMessage:true cannot resurrect a deduped retry (AND-composition)', async () => {
@@ -407,10 +415,14 @@ describe('createChatTurnRoutes — product seams', () => {
 
   it('lifecycle: onTurnStart→onTurnComplete on success, onTurnStart→onTurnError on failure, always ordered', async () => {
     const events: string[] = []
+    const completed: Array<string | null> = []
     const lifecycle = {
       onTurnStart: () => { events.push('start') },
-      onTurnComplete: (info: { finalText: string; usage: { inputTokens?: number } }) =>
-        { events.push(`complete:${info.finalText}:${info.usage.inputTokens ?? 0}`) },
+      onTurnComplete: (info: { finalText: string; usage: { inputTokens?: number }; assistantMessageId: string | null }) =>
+        {
+          events.push(`complete:${info.finalText}:${info.usage.inputTokens ?? 0}`)
+          completed.push(info.assistantMessageId)
+        },
       onTurnError: () => { events.push('error') },
     }
 
@@ -421,6 +433,8 @@ describe('createChatTurnRoutes — product seams', () => {
     await readLines((await ok.routes.turn(turnRequest({ threadId: 't-1', content: 'q' }), ok.ctx)).body!)
     await Promise.all(ok.pending)
     expect(events).toEqual(['start', 'complete:yo:3'])
+    // The telemetry seam names the same row the persistence seam wrote.
+    expect(completed).toEqual([ok.rows.find((r) => r.role === 'assistant')!.id])
 
     events.length = 0
     const bad = makeRoutes({
@@ -507,11 +521,11 @@ describe('createChatTurnRoutes — product seams', () => {
   })
 
   it('onTurnComplete: reports failed:true + failureReason on a terminal error event (not a clean complete)', async () => {
-    const calls: Array<{ failed: boolean; failureReason?: string; finalText: string }> = []
-    const { routes, ctx, pending } = makeRoutes({
+    const calls: Array<{ failed: boolean; failureReason?: string; finalText: string; assistantMessageId: string | null }> = []
+    const { routes, rows, ctx, pending } = makeRoutes({
       produce: () => fakeProducer([{ type: 'error', data: { message: 'model 402 payment required' } }], ''),
-      onTurnComplete: async ({ failed, failureReason, finalText }) => {
-        calls.push({ failed, ...(failureReason ? { failureReason } : {}), finalText })
+      onTurnComplete: async ({ failed, failureReason, finalText, assistantMessageId }) => {
+        calls.push({ failed, ...(failureReason ? { failureReason } : {}), finalText, assistantMessageId })
       },
     })
     await readLines((await routes.turn(turnRequest({ threadId: 't-1', content: 'q' }), ctx)).body!)
@@ -520,10 +534,14 @@ describe('createChatTurnRoutes — product seams', () => {
     expect(calls).toHaveLength(1)
     expect(calls[0]!.failed).toBe(true)
     expect(calls[0]!.failureReason).toBe('model 402 payment required')
+    // This error carried no text at all, so no assistant row was written — the
+    // id reports that honestly instead of naming the user row.
+    expect(rows.filter((r) => r.role === 'assistant')).toHaveLength(0)
+    expect(calls[0]!.assistantMessageId).toBeNull()
   })
 
   it('persists partial content and reports failed:true when the producer catches a severed stream', async () => {
-    const calls: Array<{ failed: boolean; failureReason?: string; finalText: string }> = []
+    const calls: Array<{ failed: boolean; failureReason?: string; finalText: string; assistantMessageId: string | null }> = []
     const { routes, rows, ctx, pending } = makeRoutes({
       produce: () => createSandboxChatProducer({
         events: (async function* () {
@@ -535,8 +553,8 @@ describe('createChatTurnRoutes — product seams', () => {
         })(),
         log: () => {},
       }),
-      onTurnComplete: async ({ failed, failureReason, finalText }) => {
-        calls.push({ failed, ...(failureReason ? { failureReason } : {}), finalText })
+      onTurnComplete: async ({ failed, failureReason, finalText, assistantMessageId }) => {
+        calls.push({ failed, ...(failureReason ? { failureReason } : {}), finalText, assistantMessageId })
       },
     })
 
@@ -561,6 +579,9 @@ describe('createChatTurnRoutes — product seams', () => {
       failed: true,
       failureReason: expect.stringContaining('connection dropped'),
       finalText: expect.stringContaining('Partial answer'),
+      // failed:true AND a real row — the pairing a product needs to render an
+      // error against the message it actually wrote.
+      assistantMessageId: assistant!.id,
     })])
   })
 
@@ -585,6 +606,107 @@ describe('createChatTurnRoutes — product seams', () => {
     await Promise.all(pending)
     // Exactly the producer's own events — no engine lifecycle envelopes.
     expect(raw).toEqual(['text', 'text'])
+  })
+})
+
+describe('createChatTurnRoutes — persisted message ids', () => {
+  it('hands every post-insert seam the user row the factory just wrote', async () => {
+    const seen: Record<string, string | null | undefined> = {}
+    const produce = vi.fn((args: ChatTurnProduceArgs<unknown>) => {
+      seen.produce = args.userMessageId
+      return fakeProducer([{ type: 'text', text: 'ok' }], 'ok')
+    })
+    const { routes, rows, ctx, pending } = makeRoutes({
+      produce,
+      contextGate: (args) => { seen.contextGate = args.userMessageId; return { proceed: true as const } },
+      beforeTurn: (args) => { seen.beforeTurn = args.userMessageId },
+    })
+
+    await readLines((await routes.turn(turnRequest({ threadId: 't-1', content: 'hi' }), ctx)).body!)
+    await Promise.all(pending)
+
+    const userRow = rows.find((r) => r.role === 'user')!
+    expect(seen).toEqual({
+      contextGate: userRow.id,
+      beforeTurn: userRow.id,
+      produce: userRow.id,
+    })
+  })
+
+  it('turnLock.acquire sees no user id because it runs before the insert', async () => {
+    let seenAtAcquire: string | null | undefined = 'unset'
+    let rowsAtAcquire = -1
+    const { routes, rows, ctx, pending } = makeRoutes({
+      turnLock: {
+        acquire: (args) => {
+          seenAtAcquire = args.userMessageId
+          rowsAtAcquire = rows.length
+          return { acquired: true as const }
+        },
+        release: () => {},
+      },
+    })
+    await readLines((await routes.turn(turnRequest({ threadId: 't-1', content: 'hi' }), ctx)).body!)
+    await Promise.all(pending)
+
+    // `undefined` — not "resolved to nothing". The second assertion is what
+    // actually pins WHY: the lock is acquired before any side effect, so the
+    // row it would name does not exist yet.
+    expect(seenAtAcquire).toBeUndefined()
+    expect(rowsAtAcquire).toBe(0)
+  })
+
+  it('reports the assistant row to onTurnComplete', async () => {
+    const seen: Array<string | null> = []
+    const { routes, rows, ctx, pending } = makeRoutes({
+      onTurnComplete: async ({ assistantMessageId }) => { seen.push(assistantMessageId) },
+    })
+    await readLines((await routes.turn(turnRequest({ threadId: 't-1', content: 'q' }), ctx)).body!)
+    await Promise.all(pending)
+
+    const assistantRow = rows.find((r) => r.role === 'assistant')!
+    expect(seen).toEqual([assistantRow.id])
+    // The id names a row that is really there — the thing the "newest row in
+    // the thread" workaround was approximating.
+    expect(rows.filter((r) => r.id === seen[0])).toHaveLength(1)
+  })
+
+  it('reports null when an empty turn leaves no assistant row', async () => {
+    const seen: Array<string | null> = []
+    const { routes, rows, ctx, pending } = makeRoutes({
+      produce: () => fakeProducer([], ''),
+      onTurnComplete: async ({ assistantMessageId }) => { seen.push(assistantMessageId) },
+    })
+    await readLines((await routes.turn(turnRequest({ threadId: 't-1', content: 'q' }), ctx)).body!)
+    await Promise.all(pending)
+
+    expect(rows.filter((r) => r.role === 'assistant')).toHaveLength(0)
+    expect(seen).toEqual([null])
+  })
+
+  it('reports null for both ids when the store returns no row from appendMessage', async () => {
+    // `ChatTurnMessageStore.appendMessage` is typed `Promise<unknown>`, so a
+    // product adapter resolving `void` is legal. It must degrade to "no id",
+    // never to a fabricated one, and must not fail the turn.
+    const store: ChatTurnMessageStore = {
+      async listMessages() { return [] },
+      async appendMessage() { /* returns undefined */ },
+    }
+    const produce = vi.fn((_args: ChatTurnProduceArgs<unknown>) => fakeProducer([{ type: 'text', text: 'ok' }], 'ok'))
+    const seen: Array<string | null> = []
+    const { routes, ctx, pending } = makeRoutes({
+      store,
+      produce,
+      onTurnComplete: async ({ assistantMessageId }) => { seen.push(assistantMessageId) },
+    })
+
+    const res = await routes.turn(turnRequest({ threadId: 't-1', content: 'q' }), ctx)
+    expect(res.status).toBe(200)
+    await readLines(res.body!)
+    await Promise.all(pending)
+
+    expect(produce.mock.calls[0]![0]!.userMessageId).toBeNull()
+    expect(seen).toEqual([null])
   })
 })
 

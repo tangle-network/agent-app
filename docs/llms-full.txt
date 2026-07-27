@@ -8208,6 +8208,14 @@ type ChatTurnAuthorization
 interface ChatTurnAuthorizeArgs
 ```
 
+### `ChatTurnCompleteInput`
+
+`interface` — What a settled turn reports to `onTurnComplete` — the product's post-processing seam (billing, titles, audit).
+
+```ts
+interface ChatTurnCompleteInput
+```
+
 ### `ChatTurnFilePartInput`
 
 `interface` — A non-text prompt part the upload route hands back and the client echoes on send.
@@ -8982,6 +8990,14 @@ interface ResolveChatAttachmentsOptions
 
 ```ts
 type ResolveChatAttachmentsResult
+```
+
+### `rowIdOf`
+
+`function` — The row id an `appendMessage` actually returned, or `null` when the store returned nothing usable.
+
+```ts
+(inserted: unknown) => string | null
 ```
 
 ### `runDetachedTurn`

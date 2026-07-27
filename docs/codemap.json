@@ -6266,6 +6266,12 @@
           "doc": "Define arguments required to authorize a chat turn based on intent and request details"
         },
         {
+          "name": "ChatTurnCompleteInput",
+          "kind": "interface",
+          "signature": "interface ChatTurnCompleteInput",
+          "doc": "What a settled turn reports to `onTurnComplete` — the product's post-processing seam (billing, titles, audit)."
+        },
+        {
           "name": "ChatTurnFilePartInput",
           "kind": "interface",
           "signature": "interface ChatTurnFilePartInput",
@@ -6846,6 +6852,12 @@
           "kind": "type",
           "signature": "type ResolveChatAttachmentsResult",
           "doc": "Resolve the result of chat attachment processing with success status and corresponding data or error"
+        },
+        {
+          "name": "rowIdOf",
+          "kind": "function",
+          "signature": "(inserted: unknown) => string | null",
+          "doc": "The row id an `appendMessage` actually returned, or `null` when the store returned nothing usable."
         },
         {
           "name": "runDetachedTurn",

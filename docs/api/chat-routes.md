@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-150 exports.
+152 exports.
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
@@ -244,6 +244,14 @@ type ChatTurnAuthorization
 
 ```ts
 interface ChatTurnAuthorizeArgs
+```
+
+### `ChatTurnCompleteInput`
+
+`interface` — What a settled turn reports to `onTurnComplete` — the product's post-processing seam (billing, titles, audit).
+
+```ts
+interface ChatTurnCompleteInput
 ```
 
 ### `ChatTurnFilePartInput`
@@ -1020,6 +1028,14 @@ interface ResolveChatAttachmentsOptions
 
 ```ts
 type ResolveChatAttachmentsResult
+```
+
+### `rowIdOf`
+
+`function` — The row id an `appendMessage` actually returned, or `null` when the store returned nothing usable.
+
+```ts
+(inserted: unknown) => string | null
 ```
 
 ### `runDetachedTurn`

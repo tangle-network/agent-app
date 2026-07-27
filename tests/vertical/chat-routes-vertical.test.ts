@@ -39,6 +39,9 @@ async function* feed(events: Array<Record<string, unknown>>): AsyncGenerator<unk
 
 function factoryRoutes(app: MiniApp, turnStore = createMemoryTurnEventStore()) {
   const pending: Promise<unknown>[] = []
+  // The ids the product's seams are handed — the thing a product used to
+  // re-derive by decorating the store and guessing at the newest row.
+  const ids: { userMessageId?: string | null; assistantMessageId?: string | null } = {}
   const routes = createChatTurnRoutes({
     projectId: 'vertical-mini',
     authorize: async ({ request }) => {
@@ -49,11 +52,15 @@ function factoryRoutes(app: MiniApp, turnStore = createMemoryTurnEventStore()) {
     },
     store: app.store,
     turnStore,
-    produce: () => createSandboxChatProducer({ events: feed(RAW_TURN_EVENTS), model: MINI_APP_MODEL }),
+    produce: (args) => {
+      ids.userMessageId = args.userMessageId
+      return createSandboxChatProducer({ events: feed(RAW_TURN_EVENTS), model: MINI_APP_MODEL })
+    },
+    onTurnComplete: async ({ assistantMessageId }) => { ids.assistantMessageId = assistantMessageId },
     log: () => {},
   })
   const ctx = { waitUntil: (p: Promise<unknown>) => void pending.push(p) }
-  return { routes, ctx, settle: () => Promise.all(pending) }
+  return { routes, ctx, settle: () => Promise.all(pending), ids }
 }
 
 describe('vertical: createChatTurnRoutes replaces the hand-rolled chat route', () => {
@@ -64,7 +71,7 @@ describe('vertical: createChatTurnRoutes replaces the hand-rolled chat route', (
     app.grantMembership('factory@example.com', 'ws1')
     const thread = await app.store.createThread({ workspaceId: 'ws1', firstMessage: 'File my lease summary' })
 
-    const { routes, ctx, settle } = factoryRoutes(app)
+    const { routes, ctx, settle, ids } = factoryRoutes(app)
 
     const log: Array<[string, unknown]> = []
     let turnId: string | null = null
@@ -105,6 +112,11 @@ describe('vertical: createChatTurnRoutes replaces the hand-rolled chat route', (
     const messages = await app.store.listMessages(thread.id)
     expect(messages.map((m) => m.role)).toEqual(['user', 'assistant'])
     const assistant = messages[1]!
+
+    // Both ids the product was handed resolve to those exact rows — no store
+    // decoration, no "newest row in the thread" guess.
+    expect(ids.userMessageId).toBe(messages[0]!.id)
+    expect(ids.assistantMessageId).toBe(assistant.id)
     expect(assistant.content).toBe('Filed the lease summary.')
     expect(assistant.model).toBe(MINI_APP_MODEL)
     expect(assistant.inputTokens).toBe(40)
