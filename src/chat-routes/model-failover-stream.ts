@@ -255,6 +255,28 @@ function isEmptyTerminalReceipt(event: unknown): boolean {
   return text.trim().length === 0
 }
 
+/**
+ * Hard ceiling on same-model re-runs. A turn that comes back blank three times
+ * running is not a flake this can retry away, and each pass costs a full
+ * sandbox turn — so the budget is capped rather than trusted.
+ */
+export const MAX_EMPTY_TURN_RETRIES = 3
+
+/**
+ * Coerce the caller's budget to a finite, bounded, non-negative integer.
+ *
+ * `Math.trunc(NaN)` is `NaN` and `retry >= NaN` is false for every `retry`, so
+ * a naive clamp turns a bad config value into a loop that opens sandbox streams
+ * until the worker dies. `Infinity` has the same shape. Both resolve to `0` —
+ * an unusable budget disables the retry rather than running unbounded.
+ */
+function resolveEmptyTurnRetries(value: number | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0
+  const truncated = Math.trunc(value)
+  if (truncated <= 0) return 0
+  return Math.min(truncated, MAX_EMPTY_TURN_RETRIES)
+}
+
 /** Abandon a dead attempt's iterator. Never allowed to mask the outage. */
 async function closeIterator(iterator: AsyncIterator<unknown>, log?: ModelFailoverStreamOptions['log']): Promise<void> {
   try {
@@ -281,7 +303,7 @@ export function streamWithModelFailover(
   options: ModelFailoverStreamOptions,
 ): ModelFailoverStreamHandle {
   const committing = options.isCommitting ?? isCommittingSandboxEvent
-  const emptyTurnRetries = Math.max(0, Math.trunc(options.emptyTurnRetries ?? 0))
+  const emptyTurnRetries = resolveEmptyTurnRetries(options.emptyTurnRetries)
   let serving: string | undefined
   let trail: ModelFailoverAttempt[] = []
   let fellBack = false

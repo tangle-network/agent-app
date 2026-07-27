@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-154 exports.
+155 exports.
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
@@ -764,6 +764,14 @@ number
 
 ```ts
 number
+```
+
+### `MAX_EMPTY_TURN_RETRIES`
+
+`const` — Hard ceiling on same-model re-runs.
+
+```ts
+3
 ```
 
 ### `MAX_TEXT_ATTACHMENT_BYTES`

@@ -4,6 +4,7 @@ import {
   classifyTerminalFailure,
   createSandboxChatProducer,
   isCommittingSandboxEvent,
+  MAX_EMPTY_TURN_RETRIES,
   runDetachedTurn,
   streamWithModelFailover,
   type AssistantDraftStore,
@@ -271,6 +272,31 @@ describe('streamWithModelFailover — over the verbatim sequences', () => {
     expect(opened).toEqual(['model-a', 'model-a', 'model-a'])
     expect(handle.servingModel()).toBe('model-a')
     expect(events).toHaveLength(EMPTY_COMPLETED_SEQUENCE.length)
+  })
+
+  it.each([
+    ['NaN', Number.NaN, 1],
+    ['Infinity', Number.POSITIVE_INFINITY, 1],
+    ['-Infinity', Number.NEGATIVE_INFINITY, 1],
+    ['negative', -5, 1],
+    ['fractional 2.7 → 2', 2.7, 3],
+    ['above the ceiling', 99, 1 + MAX_EMPTY_TURN_RETRIES],
+  ])('bounds a %s budget instead of looping forever', async (_label, budget, expectedOpens) => {
+    // `Math.trunc(NaN)` is NaN and `retry >= NaN` is false for every retry, so
+    // an unguarded clamp opens sandbox streams until the worker dies.
+    const opened: string[] = []
+    const handle = streamWithModelFailover({
+      models: ['model-a'],
+      emptyTurnRetries: budget as number,
+      open: ({ model }) => {
+        opened.push(model)
+        if (opened.length > 50) throw new Error('unbounded retry loop')
+        return feed(EMPTY_COMPLETED_SEQUENCE)
+      },
+    })
+
+    await collect(handle.events)
+    expect(opened).toHaveLength(expectedOpens as number)
   })
 
   it('never re-runs a turn that produced text — a delivered answer is never produced twice', async () => {

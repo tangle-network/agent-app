@@ -6662,6 +6662,12 @@
           "doc": "Ceiling on a binary attachment's raw (pre-encoding) byte size."
         },
         {
+          "name": "MAX_EMPTY_TURN_RETRIES",
+          "kind": "const",
+          "signature": "3",
+          "doc": "Hard ceiling on same-model re-runs."
+        },
+        {
           "name": "MAX_TEXT_ATTACHMENT_BYTES",
           "kind": "const",
           "signature": "number",

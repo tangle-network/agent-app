@@ -8736,6 +8736,14 @@ number
 number
 ```
 
+### `MAX_EMPTY_TURN_RETRIES`
+
+`const` — Hard ceiling on same-model re-runs.
+
+```ts
+3
+```
+
 ### `MAX_TEXT_ATTACHMENT_BYTES`
 
 `const` — Ceiling on a text attachment's raw byte size.
