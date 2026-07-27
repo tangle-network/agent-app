@@ -1992,17 +1992,104 @@ export async function* streamSandboxPrompt(
   }
 }
 
-/** Resolve a sandbox prompt by streaming and aggregating message parts into a complete string */
-export async function runSandboxPrompt(
-  shell: SandboxRuntimeConfig,
-  box: SandboxInstance,
-  message: string | PromptInputPart[],
-  options?: StreamSandboxPromptOptions,
-): Promise<string> {
-  let fullText = ''
-  let firstTextSeen = false
+/**
+ * Stable identity for a streamed text part, so deltas of one part accumulate
+ * together and two concurrent parts never overwrite each other. Harnesses spell
+ * the id differently and some snapshot updates carry none at all.
+ *
+ * Deliberately NOT `/stream`'s `getPartKey`, despite the overlapping property
+ * lookup: that one resolves a key for any persisted part across every type and
+ * falls back to the CONSTANT `'current'`, which merges all id-less parts into a
+ * single lane. Here an id-less part must stay distinct — merging two of them
+ * would silently drop one candidate answer, the exact failure class this
+ * function was changed to fix. Sharing three lines of lookup would also couple
+ * `/sandbox` to `/stream`, which are independent subpaths today.
+ */
+function textPartId(part: Record<string, unknown> | undefined, fallback: string): string {
+  for (const key of ['id', 'partId', 'messagePartId']) {
+    const value = part?.[key]
+    if (typeof value === 'string' && value.trim()) return value
+  }
+  return fallback
+}
 
-  for await (const rawEvent of streamSandboxPrompt(shell, box, message, options)) {
+/**
+ * The prompt text a harness may replay back as an assistant text part before it
+ * answers. Both spellings are collected because `streamSandboxPrompt` dispatches
+ * the HISTORY-FOLDED prompt, not the raw message — an echo replays what was sent.
+ */
+function dispatchedPromptTexts(
+  message: string | PromptInputPart[],
+  history: StreamSandboxPromptOptions['history'],
+): string[] {
+  const raw =
+    typeof message === 'string'
+      ? message
+      : ((message.find((part) => part.type === 'text') as { text?: string } | undefined)?.text ?? '')
+  return [...new Set([raw, flattenHistory(raw, history)].map((text) => text.trim()))].filter(Boolean)
+}
+
+/**
+ * The last streamed text part that is not a replay of the prompt. Used only when
+ * the turn carried no `result` receipt.
+ *
+ * Two distinct decisions, and only the first is content-based. WHICH parts are
+ * eligible is decided by CONTENT — an echo is excluded because it matches the
+ * dispatched prompt, at whatever position it arrived. Choosing among the
+ * remaining eligible parts is then ordinal, last-wins, because a harness emits
+ * reasoning/preamble parts before the answer. That ordering assumption is safe
+ * in a way "skip the first part" was not: it can only pick the wrong part when a
+ * turn produced several genuine non-echo texts and the final one is not the
+ * answer, whereas the positional rule mis-fired on the single-answer case that
+ * is overwhelmingly the common one.
+ */
+function lastNonPromptTextPart(parts: Map<string, string>, promptTexts: string[]): string {
+  const values = Array.from(parts.values())
+    .map((value) => value.trim())
+    .filter((value) => value && !promptTexts.includes(value))
+  return values.at(-1) ?? ''
+}
+
+/**
+ * Aggregate a sandbox prompt event stream down to the turn's one final answer.
+ *
+ * Exported SEPARATELY from `runSandboxPrompt` because the aggregation is pure —
+ * `AsyncIterable<event> -> string` — while the streaming half is not: a product
+ * that mounts per-turn MCP servers or resolves its harness per workspace wraps
+ * `streamSandboxPrompt` in its own generator. Binding this logic to one stream
+ * function is exactly what pushed three products into forking the whole thing,
+ * bug and all. Take this over a local copy no matter whose generator you drive.
+ *
+ * Two rules earn their keep, and both were learned from the naive version:
+ *
+ * - Text accumulates PER PART ID, never into one running buffer, so two
+ *   concurrent text parts cannot overwrite each other.
+ * - A prompt echo is identified by CONTENT, never by arrival position. The
+ *   "skip whichever text part arrives first" shortcut is wrong on both sandbox
+ *   lanes: on the delta lane (`box.streamPrompt`, explicit deltas) the first
+ *   part is the answer's opening token, so the answer silently loses it; and
+ *   when the echo arrives AFTER the answer, the function returns the caller's
+ *   own prompt as the agent's reply. Both failures produce a plausible-looking
+ *   string, the worst shape for the unattended cron/judge turns this exists for.
+ *
+ * A blank-but-present `result.finalText` is ignored in favour of the streamed
+ * text rather than overwriting a real answer with whitespace.
+ *
+ * @param events raw sandbox turn events, in order
+ * @param message the prompt as handed to the stream, so an echo of it is dropped
+ * @param history folded into the dispatched prompt by `streamSandboxPrompt`;
+ *        pass whatever was passed there, since the echo replays the FOLDED text
+ */
+export async function collectSandboxPromptText(
+  events: AsyncIterable<unknown>,
+  message: string | PromptInputPart[],
+  history?: StreamSandboxPromptOptions['history'],
+): Promise<string> {
+  let finalText = ''
+  const textParts = new Map<string, string>()
+  let anonymousTextPart = 0
+
+  for await (const rawEvent of events) {
     const event = rawEvent as { type?: string; data?: Record<string, unknown> }
     if (!event.type) continue
 
@@ -2010,20 +2097,37 @@ export async function runSandboxPrompt(
       const part = event.data?.part as Record<string, unknown> | undefined
       const delta = typeof event.data?.delta === 'string' ? event.data.delta : null
       if (String(part?.type ?? '') === 'text') {
-        if (!firstTextSeen) {
-          firstTextSeen = true
-          continue
-        }
-        if (delta) fullText += delta
-        else if (typeof part?.text === 'string') fullText = part.text
+        const partId = textPartId(part, delta ? 'delta' : `text-${anonymousTextPart++}`)
+        if (delta) textParts.set(partId, `${textParts.get(partId) ?? ''}${delta}`)
+        else if (typeof part?.text === 'string') textParts.set(partId, part.text)
       }
     } else if (event.type === 'result') {
-      const finalText = typeof event.data?.finalText === 'string' ? event.data.finalText : null
-      if (finalText) fullText = finalText
+      const resultText = typeof event.data?.finalText === 'string' ? event.data.finalText : null
+      if (resultText?.trim()) finalText = resultText
     }
   }
 
-  return fullText
+  return finalText || lastNonPromptTextPart(textParts, dispatchedPromptTexts(message, history))
+}
+
+/**
+ * Resolve a sandbox prompt by streaming it and aggregating the turn down to one
+ * final string. The shell's profile / model / MCP resolution and severed-stream
+ * fail-loud come from `streamSandboxPrompt`; the aggregation is
+ * `collectSandboxPromptText`, which products driving their own generator should
+ * import directly.
+ */
+export async function runSandboxPrompt(
+  shell: SandboxRuntimeConfig,
+  box: SandboxInstance,
+  message: string | PromptInputPart[],
+  options?: StreamSandboxPromptOptions,
+): Promise<string> {
+  return collectSandboxPromptText(
+    streamSandboxPrompt(shell, box, message, options),
+    message,
+    options?.history,
+  )
 }
 
 // Mirrors the SDK's PermissionLevel union (not re-exported by

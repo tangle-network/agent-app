@@ -907,6 +907,12 @@
           "doc": "Collapses text-part artifacts of unstable upstream segment identity: the same text arriving under two keys (id-less delta stream, then an id-bearing snapshot) folds into two segments, and interleaved…"
         },
         {
+          "name": "collectSandboxPromptText",
+          "kind": "function",
+          "signature": "(events: AsyncIterable<unknown>, message: string | PromptInputPart[], history?: { role: \"user\" | \"assistant\"; content:…",
+          "doc": "Aggregate a sandbox prompt event stream down to the turn's one final answer."
+        },
+        {
           "name": "CompleteMissionInput",
           "kind": "interface",
           "signature": "interface CompleteMissionInput",
@@ -3886,7 +3892,7 @@
           "name": "runSandboxPrompt",
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | PromptInputPart[], options?: StreamSandboxPromptO…",
-          "doc": "Resolve a sandbox prompt by streaming and aggregating message parts into a complete string"
+          "doc": "Resolve a sandbox prompt by streaming it and aggregating the turn down to one final string."
         },
         {
           "name": "runSandboxToolPathSetup",
@@ -13619,6 +13625,12 @@
           "doc": "Resolve the severed stream event to a corresponding sandbox step transition or null"
         },
         {
+          "name": "collectSandboxPromptText",
+          "kind": "function",
+          "signature": "(events: AsyncIterable<unknown>, message: string | PromptInputPart[], history?: { role: \"user\" | \"assistant\"; content:…",
+          "doc": "Aggregate a sandbox prompt event stream down to the turn's one final answer."
+        },
+        {
           "name": "createSandboxTerminalToken",
           "kind": "function",
           "signature": "(subject: TerminalProxyIdentity, opts: SandboxTerminalTokenOptions) => Promise<SandboxTerminalTokenResult>",
@@ -13880,7 +13892,7 @@
           "name": "runSandboxPrompt",
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | PromptInputPart[], options?: StreamSandboxPromptO…",
-          "doc": "Resolve a sandbox prompt by streaming and aggregating message parts into a complete string"
+          "doc": "Resolve a sandbox prompt by streaming it and aggregating the turn down to one final string."
         },
         {
           "name": "runSandboxToolPathSetup",

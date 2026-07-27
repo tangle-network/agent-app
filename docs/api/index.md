@@ -4,7 +4,7 @@
 
 Source: `src/index.ts`
 
-833 exports.
+834 exports.
 
 ### `AddCitationArgs`
 
@@ -1124,6 +1124,14 @@ type ChatWorkProductPart
 
 ```ts
 (parts: JsonRecord[]) => JsonRecord[]
+```
+
+### `collectSandboxPromptText`
+
+`function` — Aggregate a sandbox prompt event stream down to the turn's one final answer.
+
+```ts
+(events: AsyncIterable<unknown>, message: string | PromptInputPart[], history?: { role: "user" | "assistant"; content:…
 ```
 
 ### `CompleteMissionInput`
@@ -5096,7 +5104,7 @@ interface RouterModel
 
 ### `runSandboxPrompt`
 
-`function` — Resolve a sandbox prompt by streaming and aggregating message parts into a complete string
+`function` — Resolve a sandbox prompt by streaming it and aggregating the turn down to one final string.
 
 ```ts
 (shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | PromptInputPart[], options?: StreamSandboxPromptO…

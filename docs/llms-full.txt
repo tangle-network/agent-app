@@ -1128,6 +1128,14 @@ type ChatWorkProductPart
 (parts: JsonRecord[]) => JsonRecord[]
 ```
 
+### `collectSandboxPromptText`
+
+`function` — Aggregate a sandbox prompt event stream down to the turn's one final answer.
+
+```ts
+(events: AsyncIterable<unknown>, message: string | PromptInputPart[], history?: { role: "user" | "assistant"; content:…
+```
+
 ### `CompleteMissionInput`
 
 `interface` — Define input parameters to complete a mission with status and optional summary
@@ -5098,7 +5106,7 @@ interface RouterModel
 
 ### `runSandboxPrompt`
 
-`function` — Resolve a sandbox prompt by streaming and aggregating message parts into a complete string
+`function` — Resolve a sandbox prompt by streaming it and aggregating the turn down to one final string.
 
 ```ts
 (shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | PromptInputPart[], options?: StreamSandboxPromptO…
@@ -17727,6 +17735,14 @@ interface BuildSandboxToolFileMountsOptions
 (event: unknown) => SandboxStepTransition | null
 ```
 
+### `collectSandboxPromptText`
+
+`function` — Aggregate a sandbox prompt event stream down to the turn's one final answer.
+
+```ts
+(events: AsyncIterable<unknown>, message: string | PromptInputPart[], history?: { role: "user" | "assistant"; content:…
+```
+
 ### `createSandboxTerminalToken`
 
 `function` — Generate a sandbox terminal token for a given subject with specified options
@@ -18073,7 +18089,7 @@ interface ResolveSandboxClientCredentialsOptions
 
 ### `runSandboxPrompt`
 
-`function` — Resolve a sandbox prompt by streaming and aggregating message parts into a complete string
+`function` — Resolve a sandbox prompt by streaming it and aggregating the turn down to one final string.
 
 ```ts
 (shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | PromptInputPart[], options?: StreamSandboxPromptO…
