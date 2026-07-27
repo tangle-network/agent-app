@@ -101,6 +101,25 @@ async function collect(source: AsyncGenerator<unknown>): Promise<Array<Record<st
   return out
 }
 
+/**
+ * Token totals of every `step-finish` receipt that survived to the consumer.
+ *
+ * A `step-finish` is never a top-level event type — it is nested at
+ * `data.part.type` inside a `message.part.updated`. Each receipt is billable,
+ * so the totals identify WHICH pass leaked: the blank pass bills 21,080 and
+ * the healthy pass 13,954.
+ */
+function stepFinishTokenTotals(events: Array<Record<string, unknown>>): number[] {
+  const totals: number[] = []
+  for (const event of events) {
+    if (event.type !== 'message.part.updated') continue
+    const part = (event.data as { part?: { type?: string; tokens?: { total?: number } } })?.part
+    if (part?.type !== 'step-finish') continue
+    totals.push(part.tokens?.total ?? -1)
+  }
+  return totals
+}
+
 describe('isCommittingSandboxEvent — the commit-point rule', () => {
   it('treats every pre-error event of the real dead-model sequence as non-committing', () => {
     // The terminal `error` and trailing `done` are classified elsewhere; the
@@ -252,9 +271,14 @@ describe('streamWithModelFailover — over the verbatim sequences', () => {
     expect(retries).toEqual([{ model: 'model-a', retry: 1 }])
     // The blank pass is discarded whole — including its `step-finish` token
     // receipt, which must never be billed.
+    // A `step-finish` is NEVER a top-level event type — in both fixtures it
+    // arrives nested as `data.part.type` inside `message.part.updated`, so a
+    // top-level filter would read 0 even with both receipts leaked. Assert on
+    // the nested shape and identify each receipt by its token total: the blank
+    // pass billed 21,080 and the healthy pass 13,954.
+    expect(stepFinishTokenTotals(events)).toEqual([13954])
     expect(events.some((e) => e.type === 'result' && (e.data as { finalText?: string })?.finalText === 'ok')).toBe(true)
     expect(events.filter((e) => e.type === 'result')).toHaveLength(1)
-    expect(events.filter((e) => e.type === 'step-finish')).toHaveLength(0)
   })
 
   it('gives up after the budget and commits the blank turn exactly as today', async () => {
@@ -476,6 +500,23 @@ describe('createSandboxChatProducer — failover wiring', () => {
     expect(() => createSandboxChatProducer({} as Parameters<typeof createSandboxChatProducer>[0])).toThrow(
       /`openEvents` \(failover-capable\) or `events`/,
     )
+  })
+
+  it('refuses a retry budget it cannot honour on a fixed `events` stream', () => {
+    // A fixed stream has nothing to re-open, so the budget would be a silent
+    // no-op: the product believes blank turns are retried and none are.
+    expect(() =>
+      createSandboxChatProducer({ model: 'gpt-5-mini', events: feed([]), emptyTurnRetries: 2 }),
+    ).toThrow(/`emptyTurnRetries` requires `openEvents`/)
+    // An unusable budget resolves to 0, which is honestly "no retries" on
+    // either form — it must NOT throw, or a NaN from `Number(env)` would take
+    // down a product that never asked for the feature.
+    expect(() =>
+      createSandboxChatProducer({ model: 'gpt-5-mini', events: feed([]), emptyTurnRetries: Number.NaN }),
+    ).not.toThrow()
+    expect(() =>
+      createSandboxChatProducer({ model: 'gpt-5-mini', events: feed([]), emptyTurnRetries: 0 }),
+    ).not.toThrow()
   })
 
   it('exhaustion (every model dead) ends the turn as a structured failure, with the fallback notice still recorded', async () => {
