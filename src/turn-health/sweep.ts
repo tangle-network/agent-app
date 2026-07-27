@@ -94,13 +94,53 @@ export interface SweepOptions {
    *  returns fluent prose and HTTP 200.
    *
    *  This is the fourth failure shape, and the only one no per-turn rule can
-   *  see. Measured on production: tax-agent has 129 assistant turns across 64
-   *  threads, all-time, with zero tool parts — while every other detector in
-   *  this module reports it healthy. */
+   *  see.
+   *
+   *  The verdict is drawn ONLY over turns whose parts were present and
+   *  readable. An earlier revision counted rows that stored no parts, and the
+   *  production example this comment used to cite was that bug rather than a
+   *  finding: tax-agent's 97 parts-less rows all predate its parts persistence
+   *  (they stop at 2026-07-17T02:20Z, the encrypted rows start 02:58Z), while
+   *  the same database's `turn_events` table holds 243 `tool_call` frames over
+   *  15 turns. The tool surface was never dead; the rows were empty. */
   expectsToolCalls?: boolean
   /** Turns needed before a dead tool surface is called. Default 10. */
   minTurnsForToolSurface?: number
+  /**
+   * Make an at-rest parts encoding readable, so this sweep can judge a product
+   * that does not store parts in the clear.
+   *
+   * Without it, a product that encrypts `parts` (tax-agent wraps the whole
+   * array in one `__encrypted_parts__` part) is permanently UNMEASURABLE by the
+   * tool-surface rule: every row is opaque, so the honest verdict is "cannot
+   * certify" forever. This seam is how such a product gets a real verdict
+   * instead of permanent blindness — the sweep stays domain-free and the
+   * product supplies the decoder.
+   *
+   * Return the decoded parts value (it is parsed exactly like a stored one).
+   * Returning `null`/`undefined` or THROWING leaves the row's stored value in
+   * place, so a decoder that fails reports the row as opaque. It must never
+   * report success as an empty array: that manufactures the exact absent-parts
+   * blindness this module now refuses to draw conclusions from.
+   */
+  decodeParts?: (raw: unknown, row: PersistedTurnRow) => Promise<unknown> | unknown
   now?: number
+}
+
+/** Apply the optional decoder, falling back to the stored value on any failure
+ *  so a broken decoder degrades to blindness (reported) rather than to a fake
+ *  empty parts array (silent). */
+async function decodeRowParts(
+  decode: SweepOptions['decodeParts'],
+  row: PersistedTurnRow,
+): Promise<unknown> {
+  if (!decode) return row.parts
+  try {
+    const decoded = await decode(row.parts, row)
+    return decoded ?? row.parts
+  } catch {
+    return row.parts
+  }
 }
 
 /** What the sweep found. Returned as well as alerted, so a cron can log it and
@@ -130,6 +170,13 @@ export interface SweepResult {
    *  {@link unreadableTurns} (a row can have readable text and opaque parts).
    *  No tool verdict is drawn over these. */
   opaquePartsTurns: number
+  /** Turns that persisted NO parts at all. Distinct from
+   *  {@link opaquePartsTurns}: nothing failed to parse, there was simply
+   *  nothing there. Also excluded from every tool verdict. */
+  noPartsTurns: number
+  /** Turns a tool verdict may actually be drawn from — parts present AND
+   *  interpretable. The denominator behind `dead_tool_surface`. */
+  toolReadableTurns: number
   alerts: TurnHealthAlert[]
 }
 
@@ -244,6 +291,10 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
   // (nothing judgeable at all).
   let toolReadableTurns = 0
   let opaquePartsTurns = 0
+  // Rows that persisted NO parts at all. Not opaque (nothing failed to parse)
+  // and not evidence either — counted separately so the coverage line can say
+  // which of the two blindnesses applies.
+  let noPartsTurns = 0
   const opaqueTypes = new Set<string>()
   const malformedSamples: TurnHealthReason[] = []
   const rejectedSamples: TurnHealthReason[] = []
@@ -251,12 +302,16 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
   for (const row of turns) {
     const verdict = classifyTurnOutcome({
       finalText: row.content,
-      parts: parseParts(row.parts),
+      parts: parseParts(await decodeRowParts(options.decodeParts, row)),
       outputTokens: row.outputTokens ?? null,
     })
     toolCalls += verdict.toolCalls
     if (verdict.toolCalls > 0) turnsWithToolCalls += 1
-    if (verdict.partsReadable) toolReadableTurns += 1
+    // A tool verdict needs evidence that was READ. `partsReadable` alone is
+    // satisfied vacuously by a row that persisted no parts, which is how a
+    // product with 243 real tool calls was paged as having a dead tool surface.
+    if (verdict.partsReadable && verdict.interpretedParts > 0) toolReadableTurns += 1
+    else if (verdict.partsReadable) noPartsTurns += 1
     else {
       opaquePartsTurns += 1
       for (const t of verdict.opaquePartTypes) opaqueTypes.add(t)
@@ -351,12 +406,56 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
         ...(opaquePartsTurns > 0
           ? [`${opaquePartsTurns} further turn(s) had unreadable parts and were not judged`]
           : []),
+        ...(noPartsTurns > 0
+          ? [`${noPartsTurns} further turn(s) persisted no parts at all and were not judged`]
+          : []),
       ],
       data: {
         turnsJudged: toolReadableTurns,
         toolCalls: 0,
         turnsWithToolCalls: 0,
-        turnsNotJudged: opaquePartsTurns,
+        turnsNotJudged: opaquePartsTurns + noPartsTurns,
+        opaquePartsTurns,
+        noPartsTurns,
+      },
+      at: now,
+    })
+  }
+
+  // A product that ASKED for a tool-surface verdict and did not get one must be
+  // told that, or the absence of a page reads as a pass. This is the honest
+  // form of the alert above: same question, and the answer is "I could not
+  // see", which is a real finding about the product's observability rather than
+  // a fabricated finding about its behaviour.
+  if (
+    options.expectsToolCalls &&
+    toolReadableTurns < minTurnsForToolSurface &&
+    opaquePartsTurns + noPartsTurns > 0
+  ) {
+    alerts.push({
+      product: options.product,
+      severity: 'warning',
+      key: `sweep:${options.product}:tool_surface_unmeasurable`,
+      title: `${options.product}: tool surface could not be certified — only ${toolReadableTurns} of ${turns.length} turns carried readable parts`,
+      details: [
+        ...(noPartsTurns > 0
+          ? [`${noPartsTurns} turn(s) persisted no parts at all — nothing to read a tool call from`]
+          : []),
+        ...(opaquePartsTurns > 0
+          ? [
+              `${opaquePartsTurns} turn(s) stored parts this sweep cannot interpret (${
+                [...opaqueTypes].join(', ') || 'unnamed'
+              }) — supply \`decodeParts\` to make them readable`,
+            ]
+          : []),
+        'this is NOT a dead tool surface finding; it is the absence of evidence either way',
+      ],
+      data: {
+        toolReadableTurns,
+        noPartsTurns,
+        opaquePartsTurns,
+        turnsSeen: turns.length,
+        opaqueTypes: [...opaqueTypes],
       },
       at: now,
     })
@@ -405,6 +504,8 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
     toolCalls,
     unreadableTurns,
     opaquePartsTurns,
+    noPartsTurns,
+    toolReadableTurns,
     alerts,
   }
 }
