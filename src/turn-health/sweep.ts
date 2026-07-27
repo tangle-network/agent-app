@@ -118,6 +118,23 @@ function parseParts(raw: unknown): unknown[] {
 const HOUR_MS = 3_600_000
 
 /**
+ * Assistant-row openers agent-app writes ITSELF when a sandbox turn fails.
+ *
+ * Kept byte-identical to the strings `createSandboxChatProducer` composes
+ * (`src/chat-routes/sandbox-producer.ts`). They are shell vocabulary, not
+ * product domain, so recognising them is this package's job — a product on
+ * the shared producer gets a correct sweep with no configuration.
+ *
+ * `tests/turn-health/turn-health.test.ts` pins these against the producer, so
+ * changing the producer's wording without changing this list fails CI rather
+ * than silently making dead threads look answered.
+ */
+export const SHELL_ERROR_REPLY_PREFIXES: readonly string[] = [
+  'The sandbox model stream stopped before a clean completion.',
+  'The sandbox agent returned an error before producing a visible answer.',
+]
+
+/**
  * Run one sweep and deliver whatever it finds.
  *
  * Errors from the sink are NOT swallowed here (unlike the live lane): a sweep
@@ -293,11 +310,18 @@ export function createD1TurnHealthSource(
      * marks a dead product healthy — the same failure-returning-success shape
      * this module exists to catch, recursing into the detector itself.
      *
-     * There is no domain-free way to recognise it: `output_tokens IS NULL`
+     * There is no schema-level way to recognise it: `output_tokens IS NULL`
      * looked promising until legal-agent showed 22 of 25 GENUINE replies with
-     * null usage. So the error prose is a PRODUCT parameter, per this
-     * package's rule that domain is never baked in. Prefixes are bound as
-     * query parameters, never interpolated.
+     * null usage — it would have reported a working product broken.
+     *
+     * Defaults to {@link SHELL_ERROR_REPLY_PREFIXES}, the openers agent-app
+     * ITSELF writes in `createSandboxChatProducer`. Those are not domain —
+     * this package composed them, so this package is what must recognise
+     * them, and every product on the shared producer is correct with no
+     * configuration. Pass your own list to ADD product-specific error prose;
+     * pass `[]` to disable the rule.
+     *
+     * Prefixes are bound as query parameters, never interpolated.
      */
     errorReplyPrefixes?: readonly string[]
   } = {},
@@ -307,7 +331,7 @@ export function createD1TurnHealthSource(
   // here so this can never become an injection point.
   const message = safeIdentifier(options.messageTable ?? 'message')
   const thread = safeIdentifier(options.threadTable ?? 'thread')
-  const errorPrefixes = [...(options.errorReplyPrefixes ?? [])]
+  const errorPrefixes = [...(options.errorReplyPrefixes ?? SHELL_ERROR_REPLY_PREFIXES)]
 
   return {
     async findUnansweredThreads({ minAgeMs, maxAgeMs, now }) {

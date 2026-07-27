@@ -4,7 +4,7 @@
 
 Source: `src/turn-health/index.ts`
 
-30 exports.
+31 exports.
 
 ### `AlertSink`
 
@@ -124,6 +124,14 @@ type FetchLike
 
 ```ts
 interface PersistedTurnRow
+```
+
+### `SHELL_ERROR_REPLY_PREFIXES`
+
+`const` — Assistant-row openers agent-app writes ITSELF when a sandbox turn fails.
+
+```ts
+readonly string[]
 ```
 
 ### `SweepOptions`

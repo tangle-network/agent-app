@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { describe, expect, it, vi } from 'vitest'
 import { classifyTurnOutcome } from '../../src/turn-health/classify.js'
 import { createTurnHealthLifecycle } from '../../src/turn-health/lifecycle.js'
@@ -9,6 +10,7 @@ import {
 } from '../../src/turn-health/sink.js'
 import {
   createD1TurnHealthSource,
+  SHELL_ERROR_REPLY_PREFIXES,
   sweepSilentFailures,
   type TurnHealthSource,
 } from '../../src/turn-health/sweep.js'
@@ -343,6 +345,39 @@ describe('createD1TurnHealthSource — an error row is not an answer', () => {
     }
   }
 
+  it('pins the shell error openers to the strings the producer actually writes', async () => {
+    // These are agent-app's OWN words, not product domain — the sandbox
+    // producer composes them. If someone rewords the producer without
+    // updating the list, dead threads start looking answered, so this fails
+    // CI instead.
+    const producer = await readFile(
+      new URL('../../src/chat-routes/sandbox-producer.ts', import.meta.url),
+      'utf8',
+    )
+    for (const prefix of SHELL_ERROR_REPLY_PREFIXES) {
+      expect(producer).toContain(prefix)
+    }
+  })
+
+  it('uses the shell openers by default, and honours an explicit empty list', async () => {
+    const withDefault = recordingDb()
+    await createD1TurnHealthSource(withDefault).findUnansweredThreads({
+      minAgeMs: 1,
+      maxAgeMs: 2,
+      now: 3,
+    })
+    // Default-correct: a product on the shared producer needs no config.
+    expect(withDefault.calls[0]!.params.slice(2)).toEqual([...SHELL_ERROR_REPLY_PREFIXES])
+
+    const disabled = recordingDb()
+    await createD1TurnHealthSource(disabled, { errorReplyPrefixes: [] }).findUnansweredThreads({
+      minAgeMs: 1,
+      maxAgeMs: 2,
+      now: 3,
+    })
+    expect(disabled.calls[0]!.sql).not.toContain('NOT LIKE')
+  })
+
   it('binds each error prefix as a parameter, never into the SQL text', async () => {
     // The row that fooled the first version of this detector, verbatim from
     // gtm production on 2026-07-27 — 246 chars of prose that answers nothing:
@@ -366,7 +401,7 @@ describe('createD1TurnHealthSource — an error row is not an answer', () => {
 
   it('emits no error clause when the product supplies none', async () => {
     const db = recordingDb()
-    const source = createD1TurnHealthSource(db)
+    const source = createD1TurnHealthSource(db, { errorReplyPrefixes: [] })
     await source.findUnansweredThreads({ minAgeMs: 60_000, maxAgeMs: 600_000, now: 1_800_000_000_000 })
     const call = db.calls[0]!
     expect(call.sql).not.toContain('NOT LIKE')

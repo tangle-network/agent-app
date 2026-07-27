@@ -16190,6 +16190,14 @@ type FetchLike
 interface PersistedTurnRow
 ```
 
+### `SHELL_ERROR_REPLY_PREFIXES`
+
+`const` — Assistant-row openers agent-app writes ITSELF when a sandbox turn fails.
+
+```ts
+readonly string[]
+```
+
 ### `SweepOptions`
 
 `interface`

@@ -12525,6 +12525,12 @@
           "doc": "A persisted assistant row, as the sweep needs to judge it."
         },
         {
+          "name": "SHELL_ERROR_REPLY_PREFIXES",
+          "kind": "const",
+          "signature": "readonly string[]",
+          "doc": "Assistant-row openers agent-app writes ITSELF when a sandbox turn fails."
+        },
+        {
           "name": "SweepOptions",
           "kind": "interface",
           "signature": "interface SweepOptions",
