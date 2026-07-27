@@ -5584,6 +5584,14 @@ interface SignObjectUrlArgs
 (base: WorkProductProvenanceBase, now?: () => number) => WorkProductProvenance
 ```
 
+### `stampReplaySeq`
+
+`function` — Serialize a replayed row for the wire, stamping the buffer ordinal ONTO the line so a reconnecting client can continue from `?fromSeq=<lastSeq>`.
+
+```ts
+(row: BufferedTurnEvent) => string
+```
+
 ### `statSandboxFileSize`
 
 `function` — Stats a sandbox file's byte length via `wc -c`.
@@ -21048,6 +21056,14 @@ interface ResolvedChatTurn
 
 ```ts
 (part: JsonRecord) => string
+```
+
+### `stampReplaySeq`
+
+`function` — Serialize a replayed row for the wire, stamping the buffer ordinal ONTO the line so a reconnecting client can continue from `?fromSeq=<lastSeq>`.
+
+```ts
+(row: BufferedTurnEvent) => string
 ```
 
 ### `StreamEvent`
