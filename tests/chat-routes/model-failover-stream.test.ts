@@ -8,6 +8,7 @@ import {
   runDetachedTurn,
   streamWithModelFailover,
   type AssistantDraftStore,
+  type EmptyTurnRetryInfo,
 } from '../../src/chat-routes/index'
 import { ModelFailoverExhaustedError } from '../../src/model-resolution/failover'
 import { createMemoryTurnEventStore } from '../../src/stream/index'
@@ -500,6 +501,43 @@ describe('createSandboxChatProducer — failover wiring', () => {
     expect(() => createSandboxChatProducer({} as Parameters<typeof createSandboxChatProducer>[0])).toThrow(
       /`openEvents` \(failover-capable\) or `events`/,
     )
+  })
+
+  it('re-runs a blank turn through the PRODUCER seam, billing only the pass that answered', async () => {
+    // `createChatTurnRoutes` and `runDetachedTurn` call the producer, not
+    // `streamWithModelFailover` directly, so the forwarding of
+    // `emptyTurnRetries`/`onEmptyTurnRetry` is what a product actually
+    // depends on. Exercised here end-to-end rather than one layer down.
+    const opened: string[] = []
+    const retries: EmptyTurnRetryInfo[] = []
+    const producer = createSandboxChatProducer({
+      model: 'model-a',
+      fallbackModels: ['model-b'],
+      emptyTurnRetries: 1,
+      onEmptyTurnRetry: (info) => retries.push(info),
+      openEvents: ({ model }) => {
+        opened.push(model)
+        return feed(opened.length === 1 ? EMPTY_COMPLETED_SEQUENCE : HEALTHY_MODEL_SEQUENCE)
+      },
+      log: () => {},
+    })
+
+    await collect(producer.stream as AsyncGenerator<unknown>)
+
+    // Same model twice — the chain is never walked, so `model-b` never runs
+    // and the answer stays attributable to the model the product chose.
+    expect(opened).toEqual(['model-a', 'model-a'])
+    expect(producer.model).toBe('model-a')
+    expect(producer.finalText()).toBe('ok')
+    expect(retries).toEqual([{ model: 'model-a', retry: 1, remaining: 0 }])
+    // Usage is the HEALTHY pass's receipt alone. The blank pass burned 13,011
+    // input tokens; billing them here would overcharge for a turn the
+    // customer never saw.
+    expect(producer.usage?.()).toMatchObject({ inputTokens: 1144, outputTokens: 10 })
+    // A same-model re-run is NOT a downgrade, so it must not emit the
+    // fallback notice that a real chain walk does.
+    expect(producer.modelFailover?.()).toMatchObject({ usedFallback: false })
+    expect(producer.assistantParts?.().some((part) => part.type === 'notice')).toBe(false)
   })
 
   it('refuses a retry budget it cannot honour on a fixed `events` stream', () => {
