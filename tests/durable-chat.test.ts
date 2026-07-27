@@ -108,7 +108,7 @@ describe('durable chat server contracts', () => {
     expect(response.status).toBe(200)
     expect(await json(response)).toMatchObject({
       plan: { status: 'approved' },
-      receipt: { turnId: 'plan:plan-1:approved', planId: 'plan-1', revision: 1 },
+      receipt: { turnId: 'plan:plan-1:revision:1:approved', planId: 'plan-1', revision: 1 },
     })
   })
 

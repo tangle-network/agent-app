@@ -132,7 +132,7 @@ function recoverReceipt(
   decision: 'approved' | 'rejected',
 ): DurableFollowUpReceipt {
   return stablePlanReceipt(scope, plan.planId, plan.revision, decision, {
-    followUp: { turnId: planFollowUpTurnId(plan.planId, decision), state: 'unknown' },
+    followUp: { turnId: planFollowUpTurnId(plan.planId, plan.revision, decision), state: 'unknown' },
   })
 }
 

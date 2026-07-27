@@ -3243,8 +3243,8 @@
         {
           "name": "planFollowUpTurnId",
           "kind": "function",
-          "signature": "(planId: string, outcome: \"approved\" | \"rejected\") => string",
-          "doc": "Generate a unique follow-up turn ID based on the plan ID and its outcome"
+          "signature": "(planId: string, revision: number, outcome: \"approved\" | \"rejected\") => string",
+          "doc": "Generate a unique follow-up turn ID for one decided plan revision"
         },
         {
           "name": "PlanLimit",
@@ -12039,8 +12039,8 @@
         {
           "name": "planFollowUpTurnId",
           "kind": "function",
-          "signature": "(planId: string, outcome: \"approved\" | \"rejected\") => string",
-          "doc": "Generate a unique follow-up turn ID based on the plan ID and its outcome"
+          "signature": "(planId: string, revision: number, outcome: \"approved\" | \"rejected\") => string",
+          "doc": "Generate a unique follow-up turn ID for one decided plan revision"
         },
         {
           "name": "planPartKey",

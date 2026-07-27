@@ -4242,10 +4242,10 @@ interface PersistedChatMessageForTurn
 
 ### `planFollowUpTurnId`
 
-`function` — Generate a unique follow-up turn ID based on the plan ID and its outcome
+`function` — Generate a unique follow-up turn ID for one decided plan revision
 
 ```ts
-(planId: string, outcome: "approved" | "rejected") => string
+(planId: string, revision: number, outcome: "approved" | "rejected") => string
 ```
 
 ### `PlanLimit`
@@ -15700,10 +15700,10 @@ type ParsePlanSubmittedResult
 
 ### `planFollowUpTurnId`
 
-`function` — Generate a unique follow-up turn ID based on the plan ID and its outcome
+`function` — Generate a unique follow-up turn ID for one decided plan revision
 
 ```ts
-(planId: string, outcome: "approved" | "rejected") => string
+(planId: string, revision: number, outcome: "approved" | "rejected") => string
 ```
 
 ### `planPartKey`

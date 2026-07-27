@@ -131,9 +131,13 @@ export function planRevisionKey(planId: string, revision: number): string {
   return `plan:${planId}:revision:${revision}`
 }
 
-/** Generate a unique follow-up turn ID based on the plan ID and its outcome */
-export function planFollowUpTurnId(planId: string, outcome: 'approved' | 'rejected'): string {
-  return `plan:${planId}:${outcome}`
+/** Generate a unique follow-up turn ID for one decided plan revision */
+export function planFollowUpTurnId(
+  planId: string,
+  revision: number,
+  outcome: 'approved' | 'rejected',
+): string {
+  return `${planRevisionKey(planId, revision)}:${outcome}`
 }
 
 /** Plan status is monotonic: only a pending plan can settle. */
