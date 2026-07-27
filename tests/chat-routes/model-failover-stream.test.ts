@@ -69,6 +69,27 @@ const HEALTHY_MODEL_SEQUENCE: Array<Record<string, unknown>> = [
   { type: 'done', data: { requestId: '11e5f96e-98d3-4a0e-aa1b-e076ced7a449', outcome: { type: 'completed' } }, id: '605' },
 ]
 
+/**
+ * The VERBATIM sequence a real box emitted for a turn that COMPLETED and
+ * produced nothing (sandbox.tangle.tools, gtm-agent production profile —
+ * 36,121 B prompt, 6 MCP servers, 6 subagents — 2026-07-27). No error, no
+ * throw, `outcome: { type: 'completed' }`, zero `token` events, `finalText: ''`.
+ * The customer's message is blank and every existing classifier says the turn
+ * succeeded. Measured on 28 turns that day, this shape accounted for every
+ * blank answer, and a same-model re-run recovered them.
+ */
+const EMPTY_COMPLETED_SEQUENCE: Array<Record<string, unknown>> = [
+  { type: 'start', data: { id: 'b450d3c1-32e9-4bc0-a0fa-a1ce6564ca37', identifier: 'default' }, id: '1' },
+  { type: 'execution.started', data: { executionId: 'b450d3c1-32e9-4bc0-a0fa-a1ce6564ca37', sessionId: 'abprobe-empty' }, id: '2' },
+  { type: 'status', data: { status: 'generating_response' }, id: '3' },
+  { type: 'session.updated', data: { sessionId: 'ses_05b98f800ffeI04ciTCHI5LNHG' }, id: '4' },
+  { type: 'message.part.updated', data: { part: { id: 'prt_step', messageID: 'msg_1', type: 'step-start' } }, id: '5' },
+  { type: 'message.part.updated', data: { part: { id: 'prt_fin', messageID: 'msg_1', reason: 'stop', type: 'step-finish', tokens: { total: 21080, input: 13011, output: 0 }, cost: 0 } }, id: '6' },
+  { type: 'status', data: { status: 'completed' }, id: '7' },
+  { type: 'result', data: { outcome: { type: 'completed' }, finalText: '', toolInvocations: [], tokenUsage: { inputTokens: 13997, outputTokens: 0 } }, id: '8' },
+  { type: 'done', data: { requestId: 'b450d3c1-32e9-4bc0-a0fa-a1ce6564ca37', outcome: { type: 'completed' } }, id: '9' },
+]
+
 async function* feed(events: Array<Record<string, unknown>>): AsyncGenerator<unknown> {
   for (const event of events) yield event
 }
@@ -189,6 +210,98 @@ describe('streamWithModelFailover — over the verbatim sequences', () => {
 
     await collect(handle.events)
     expect(opened).toEqual(['model-a'])
+  })
+
+  it('still does not retry an empty turn by DEFAULT — `emptyTurnRetries` is opt-in', async () => {
+    const opened: string[] = []
+    const handle = streamWithModelFailover({
+      models: ['model-a', 'model-b'],
+      open: ({ model }) => {
+        opened.push(model)
+        return feed(EMPTY_COMPLETED_SEQUENCE)
+      },
+    })
+
+    const events = await collect(handle.events)
+    expect(opened).toEqual(['model-a'])
+    expect(events).toHaveLength(EMPTY_COMPLETED_SEQUENCE.length)
+  })
+
+  it('re-runs the SAME model on a completed-but-blank turn, and never walks the chain for it', async () => {
+    const opened: string[] = []
+    const retries: Array<{ model: string; retry: number }> = []
+    const handle = streamWithModelFailover({
+      models: ['model-a', 'model-b'],
+      emptyTurnRetries: 2,
+      onEmptyTurnRetry: ({ model, retry }) => retries.push({ model, retry }),
+      open: ({ model }) => {
+        opened.push(model)
+        // Blank on the first pass, a real answer on the second — the measured
+        // production behavior.
+        return feed(opened.length === 1 ? EMPTY_COMPLETED_SEQUENCE : HEALTHY_MODEL_SEQUENCE)
+      },
+    })
+
+    const events = await collect(handle.events)
+    // The re-run is the SAME model: attribution is untouched, `model-b` is never
+    // reached, and `usedFallback` stays false so no downgrade notice is emitted.
+    expect(opened).toEqual(['model-a', 'model-a'])
+    expect(handle.servingModel()).toBe('model-a')
+    expect(handle.usedFallback()).toBe(false)
+    expect(retries).toEqual([{ model: 'model-a', retry: 1 }])
+    // The blank pass is discarded whole — including its `step-finish` token
+    // receipt, which must never be billed.
+    expect(events.some((e) => e.type === 'result' && (e.data as { finalText?: string })?.finalText === 'ok')).toBe(true)
+    expect(events.filter((e) => e.type === 'result')).toHaveLength(1)
+    expect(events.filter((e) => e.type === 'step-finish')).toHaveLength(0)
+  })
+
+  it('gives up after the budget and commits the blank turn exactly as today', async () => {
+    const opened: string[] = []
+    const handle = streamWithModelFailover({
+      models: ['model-a', 'model-b'],
+      emptyTurnRetries: 2,
+      open: ({ model }) => {
+        opened.push(model)
+        return feed(EMPTY_COMPLETED_SEQUENCE)
+      },
+    })
+
+    const events = await collect(handle.events)
+    expect(opened).toEqual(['model-a', 'model-a', 'model-a'])
+    expect(handle.servingModel()).toBe('model-a')
+    expect(events).toHaveLength(EMPTY_COMPLETED_SEQUENCE.length)
+  })
+
+  it('never re-runs a turn that produced text — a delivered answer is never produced twice', async () => {
+    const opened: string[] = []
+    const handle = streamWithModelFailover({
+      models: ['model-a'],
+      emptyTurnRetries: 3,
+      open: ({ model }) => {
+        opened.push(model)
+        return feed(HEALTHY_MODEL_SEQUENCE)
+      },
+    })
+
+    await collect(handle.events)
+    expect(opened).toEqual(['model-a'])
+  })
+
+  it('an OUTAGE still walks the chain even with an empty-turn budget set', async () => {
+    const opened: string[] = []
+    const handle = streamWithModelFailover({
+      models: ['model-a', 'model-b'],
+      emptyTurnRetries: 2,
+      open: ({ model }) => {
+        opened.push(model)
+        return feed(model === 'model-a' ? DEAD_MODEL_SEQUENCE : HEALTHY_MODEL_SEQUENCE)
+      },
+    })
+
+    await collect(handle.events)
+    expect(opened).toEqual(['model-a', 'model-b'])
+    expect(handle.usedFallback()).toBe(true)
   })
 
   it('re-throws a thrown non-outage error from the first model without opening the second', async () => {

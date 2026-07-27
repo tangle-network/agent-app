@@ -45,6 +45,7 @@ import {
 import { buildModelChain, type ModelFailoverAttempt } from '../model-resolution/failover'
 import {
   streamWithModelFailover,
+  type EmptyTurnRetryInfo,
   type ModelFallbackInfo,
   type ModelFailoverStreamHandle,
   type OpenModelStream,
@@ -112,6 +113,18 @@ export interface SandboxChatProducerOptions {
   /** Fired when a model is abandoned mid-chain (telemetry/alerting). The user
    *  already sees a transcript notice; this is for the operator. */
   onModelFallback?: (info: ModelFallbackInfo) => void
+  /** Re-run the SAME model this many times when a turn completes with no
+   *  assistant text at all. Default `0` (unchanged behavior). Requires
+   *  {@link openEvents} — there is nothing to re-open on a fixed stream.
+   *
+   *  Distinct from {@link fallbackModels} on purpose: this never changes which
+   *  model answers, so it carries none of the attribution risk a downgrade
+   *  does. Measured on production 2026-07-27 through gtm-agent's profile, a
+   *  completed-but-blank turn is a transient platform flake — 8 hard cases went
+   *  7/8 delivered to 8/8 with one re-run, costing 1 extra turn in 9. */
+  emptyTurnRetries?: number
+  /** Fired when a blank turn is discarded and the same model re-run. */
+  onEmptyTurnRetry?: (info: EmptyTurnRetryInfo) => void
   /** Which ask kinds the product renders a card for. Anything else is
    *  auto-declined (see `declineInteraction`) so the run never hangs in the
    *  broker waiting on a card no client will show. Default: question/plan.
@@ -320,6 +333,8 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
       models: chain,
       open: options.openEvents,
       log,
+      ...(options.emptyTurnRetries !== undefined ? { emptyTurnRetries: options.emptyTurnRetries } : {}),
+      ...(options.onEmptyTurnRetry ? { onEmptyTurnRetry: options.onEmptyTurnRetry } : {}),
       onFallback: (info) => {
         modelNoticeCount += 1
         pendingModelNotices.push({
