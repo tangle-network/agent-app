@@ -732,6 +732,44 @@ describe('mintSandboxScopedToken', () => {
     expect(r.succeeded).toBe(false)
     if (!r.succeeded) expect(r.error.message).toContain('403')
   })
+
+  it('forwards runtimeSessionId, which the gateway filters the event stream on', async () => {
+    // `scope: 'session'` mints the browser's read-only gateway JWT. The SDK
+    // needs the RUNTIME session id, which is not the same as the client-facing
+    // one when a product keys its channel by thread.
+    const mint = vi.fn().mockResolvedValue({
+      token: 'jwt',
+      expiresAt: new Date(1_700_000_000_000),
+      scope: 'session',
+    })
+    const box = { mintScopedToken: mint } as unknown as SandboxInstance
+    const r = await mintSandboxScopedToken(box, {
+      scope: 'session',
+      sessionId: 'thread-9',
+      runtimeSessionId: 'sess_runtime_abc',
+      ttlMinutes: 15,
+    })
+    expect(r.succeeded).toBe(true)
+    expect(mint).toHaveBeenCalledWith({
+      scope: 'session',
+      sessionId: 'thread-9',
+      runtimeSessionId: 'sess_runtime_abc',
+      ttlMinutes: 15,
+    })
+  })
+
+  it('omits runtimeSessionId entirely when the caller does not supply one', async () => {
+    // Byte-identical to the payload an SDK predating the field already sees.
+    const mint = vi.fn().mockResolvedValue({
+      token: 't',
+      expiresAt: new Date(1_700_000_000_000),
+      scope: 'session-runtime',
+    })
+    const box = { mintScopedToken: mint } as unknown as SandboxInstance
+    await mintSandboxScopedToken(box, { scope: 'session-runtime', sessionId: 's-1' })
+    expect(mint).toHaveBeenCalledWith({ scope: 'session-runtime', sessionId: 's-1' })
+    expect(Object.keys(mint.mock.calls[0]![0] as object)).not.toContain('runtimeSessionId')
+  })
 })
 
 describe('provision S-cost gates', () => {

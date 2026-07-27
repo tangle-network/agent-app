@@ -2153,19 +2153,43 @@ export interface ScopedTokenResult {
 
 /**
  * Mint a scoped token for an already-provisioned box (e.g. to hand a terminal
- * proxy a narrowed credential). Uses the SDK's native `box.mintScopedToken`,
- * which normalizes `expiresAt` to a Date — no hand-rolled wire call.
+ * proxy a narrowed credential, or a browser a read-only session-gateway JWT).
+ * Uses the SDK's native `box.mintScopedToken`, which normalizes `expiresAt` to
+ * a Date — no hand-rolled wire call.
+ *
+ * Never mint `scope: 'project'` for a viewer when the box is shared across
+ * threads: a project token exposes every other session on it.
  */
 export async function mintSandboxScopedToken(
   box: SandboxInstance,
-  options: { scope: ScopedTokenScope; sessionId?: string; ttlMinutes?: number },
+  options: {
+    scope: ScopedTokenScope
+    /** The client-facing session id (`scope: 'session'` / `'session-runtime'`). */
+    sessionId?: string
+    /**
+     * The RUNTIME (sidecar) session the gateway filters its event stream on.
+     * Required by the SDK for `scope: 'session'` from 0.12, and legitimately
+     * DIFFERENT from `sessionId` — a product commonly keys the browser-facing
+     * channel by thread so a viewer's subscription survives the underlying
+     * session being replaced mid-thread.
+     */
+    runtimeSessionId?: string
+    ttlMinutes?: number
+  },
 ): Promise<Outcome<ScopedTokenResult>> {
   try {
     const token = await box.mintScopedToken({
       scope: options.scope,
       ...(options.sessionId ? { sessionId: options.sessionId } : {}),
+      // Forwarded structurally rather than through the SDK's option type: that
+      // type only gained `runtimeSessionId` in 0.12, and this package's peer
+      // floor is >=0.9.7. Widening the floor would be a breaking change for
+      // consumers still on 0.9–0.11, and an SDK that predates the field simply
+      // never receives it — the object below is byte-identical to today's when
+      // the caller omits it.
+      ...(options.runtimeSessionId ? { runtimeSessionId: options.runtimeSessionId } : {}),
       ...(options.ttlMinutes ? { ttlMinutes: options.ttlMinutes } : {}),
-    })
+    } as Parameters<SandboxInstance['mintScopedToken']>[0])
     return ok({ token: token.token, expiresAt: token.expiresAt, scope: token.scope })
   } catch (err) {
     return fail(err)
