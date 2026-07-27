@@ -413,6 +413,38 @@ describe('createChatTurnRoutes — product seams', () => {
     expect(args.priorMessages).toEqual(rewrittenPrior)
   })
 
+  it('beforeTurn: a void return leaves the input untouched, and a context mutation reaches produce + onTurnComplete', async () => {
+    // The second shipped shape of this seam (legal's): resolve request-scoped
+    // state onto `context` and return NOTHING. The patch arm is not the only
+    // contract — a `void` return must not be read as "patch with undefined".
+    interface Ctx { resolved?: string }
+    const { store } = memoryMessageStore()
+    const produce = vi.fn((_args: ChatTurnProduceArgs<Ctx>) => fakeProducer([{ type: 'text', text: 'ok' }], 'ok'))
+    const completed: Array<string | undefined> = []
+    const pending: Promise<unknown>[] = []
+    const routes = createChatTurnRoutes<Ctx>({
+      projectId: 'test-app',
+      authorize: async () => ({ ok: true, tenantId: 'ws-1', userId: 'user-1', context: {} }),
+      store,
+      turnStore: createMemoryTurnEventStore(),
+      produce,
+      beforeTurn: (args) => { args.context.resolved = 'from-beforeTurn' },
+      onTurnComplete: async ({ context }) => { completed.push(context.resolved) },
+      log: () => {},
+    })
+
+    const ctx = { waitUntil: (p: Promise<unknown>) => void pending.push(p) }
+    await readLines((await routes.turn(turnRequest({ threadId: 't-1', content: 'original' }), ctx)).body!)
+    await Promise.all(pending)
+
+    const args = produce.mock.calls[0]![0]!
+    expect(args.prompt).toBe('original') // route-assembled value survives a void return
+    expect(args.priorMessages).toEqual([])
+    // Same object, threaded forward — this is what makes the mutation legal.
+    expect(args.context.resolved).toBe('from-beforeTurn')
+    expect(completed).toEqual(['from-beforeTurn'])
+  })
+
   it('lifecycle: onTurnStart→onTurnComplete on success, onTurnStart→onTurnError on failure, always ordered', async () => {
     const events: string[] = []
     const completed: Array<string | null> = []
@@ -460,6 +492,64 @@ describe('createChatTurnRoutes — product seams', () => {
     // The user row is still recorded (a real user turn); no assistant row.
     expect(rows.filter((r) => r.role === 'user')).toHaveLength(1)
     expect(rows.filter((r) => r.role === 'assistant')).toHaveLength(0)
+  })
+
+  it('contextGate: decides from the request body it is handed (a turn already answered is refused)', async () => {
+    // The second shipped shape (creative's): the verdict is keyed on the wire
+    // payload, not on ambient state — so the seam must receive the SAME parsed,
+    // validated body the route used, with no re-parse of the request.
+    const answered = new Set(['turn-a'])
+    const produce = vi.fn(() => fakeProducer([{ type: 'text', text: 'x' }], 'x'))
+    const seenBodies: Array<string | undefined> = []
+    const gate = {
+      produce,
+      contextGate: async (args: ChatTurnProduceArgs<unknown>) => {
+        seenBodies.push(args.body.turnId)
+        return answered.has(args.body.turnId ?? '')
+          ? { proceed: false as const, response: Response.json({ code: 'already_answered' }, { status: 409 }) }
+          : { proceed: true as const }
+      },
+    }
+
+    const refused = makeRoutes(gate)
+    const res = await refused.routes.turn(turnRequest({ threadId: 't-1', content: 'hi', turnId: 'turn-a' }), refused.ctx)
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({ code: 'already_answered' })
+    expect(produce).not.toHaveBeenCalled()
+    expect(refused.rows.filter((r) => r.role === 'assistant')).toHaveLength(0)
+
+    const allowed = makeRoutes(gate)
+    const ok = await allowed.routes.turn(turnRequest({ threadId: 't-2', content: 'hi', turnId: 'turn-b' }), allowed.ctx)
+    expect(ok.status).toBe(200)
+    await readLines(ok.body!)
+    await Promise.all(allowed.pending)
+    expect(produce).toHaveBeenCalledTimes(1)
+    expect(seenBodies).toEqual(['turn-a', 'turn-b'])
+  })
+
+  it('insertUserMessage:false: the post-insert seams see userMessageId null, not a stale row', async () => {
+    // The cross-seam half of the graduated `insertUserMessage` contract: a
+    // suppressed insert with nothing to reuse must surface as `null`, never as
+    // some other row in the thread.
+    const seen: Record<string, string | null | undefined> = {}
+    const produce = vi.fn((args: ChatTurnProduceArgs<unknown>) => {
+      seen.produce = args.userMessageId
+      return fakeProducer([{ type: 'text', text: 'ok' }], 'ok')
+    })
+    const { routes, rows, ctx, pending } = makeRoutes({
+      authorize: async () => ({ ok: true, tenantId: 'ws-1', userId: 'user-1', context: undefined, insertUserMessage: false }),
+      produce,
+      contextGate: (args) => { seen.contextGate = args.userMessageId; return { proceed: true as const } },
+      beforeTurn: (args) => { seen.beforeTurn = args.userMessageId },
+    })
+
+    await readLines((await routes.turn(turnRequest({ threadId: 't-1', content: 'approve' }), ctx)).body!)
+    await Promise.all(pending)
+
+    expect(seen).toEqual({ contextGate: null, beforeTurn: null, produce: null })
+    expect(rows.filter((r) => r.role === 'user')).toHaveLength(0)
+    // The turn itself still ran — suppression hides the bubble, not the answer.
+    expect(rows.filter((r) => r.role === 'assistant')).toHaveLength(1)
   })
 
   it('turnLock: acquires before the turn and releases in finally even when the turn throws', async () => {
@@ -606,6 +696,56 @@ describe('createChatTurnRoutes — product seams', () => {
     await Promise.all(pending)
     // Exactly the producer's own events — no engine lifecycle envelopes.
     expect(raw).toEqual(['text', 'text'])
+  })
+
+  it('onRawEvent: never sees an injected keepalive, even though the client does', async () => {
+    // The tap sits UPSTREAM of heartbeat injection, so a synthetic event cannot
+    // reach a product's trace and be mistaken for something the agent emitted.
+    let releaseGate!: () => void
+    const gate = new Promise<void>((r) => { releaseGate = r })
+    const raw: string[] = []
+    const { routes, ctx, pending } = makeRoutes({
+      produce: () => ({
+        stream: (async function* () {
+          await gate
+          yield { type: 'text', text: 'answer' }
+        })(),
+        finalText: () => 'answer',
+      }),
+      heartbeat: { intervalMs: 5, event: ({ tick }) => ({ type: 'keepalive', data: { tick } }) },
+      onRawEvent: (event) => { raw.push(event.type) },
+    })
+
+    const res = await routes.turn(turnRequest({ threadId: 't-1', content: 'hi' }), ctx)
+    const seen: Array<Record<string, unknown>> = []
+    await drainUntil(res.body!, seen, (s) => s.filter((l) => l.type === 'keepalive').length >= 2)
+    releaseGate()
+    await drainUntil(res.body!, seen, (s) => s.some((l) => l.type === 'text' && l.text === 'answer'))
+    await Promise.all(pending)
+
+    // The client got keepalives; the raw tap got only the producer's own event.
+    expect(seen.filter((l) => l.type === 'keepalive').length).toBeGreaterThanOrEqual(2)
+    expect(raw).toEqual(['text'])
+  })
+
+  it('onRawEvent: a throwing handler is swallowed — the stream and the turn still complete', async () => {
+    // Telemetry is an observer. A broken sink must not truncate the client's
+    // stream, drop an event, or fail the turn.
+    const completed: boolean[] = []
+    const { routes, rows, ctx, pending } = makeRoutes({
+      produce: () => fakeProducer([{ type: 'text', text: 'a' }, { type: 'text', text: 'b' }], 'ab'),
+      onRawEvent: () => { throw new Error('trace sink down') },
+      onTurnComplete: async ({ failed }) => { completed.push(failed) },
+    })
+
+    const res = await routes.turn(turnRequest({ threadId: 't-1', content: 'hi' }), ctx)
+    expect(res.status).toBe(200)
+    const lines = await readLines(res.body!)
+    await Promise.all(pending)
+
+    expect(lines.filter((l) => l.type === 'text').map((l) => l.text)).toEqual(['a', 'b'])
+    expect(completed).toEqual([false])
+    expect(rows.find((r) => r.role === 'assistant')!.content).toBe('ab')
   })
 })
 

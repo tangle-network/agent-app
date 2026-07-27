@@ -399,32 +399,30 @@ reload so a lost response cannot strand an already-dispatched execution.
 
 A complex product turn-orchestrator does more than stream: it holds a
 single-flight lock, keeps the client alive through long tool calls, gates on
-domain readiness, and books telemetry. `createChatTurnRoutes` exposes six
-optional seams for exactly that — **omit any one and the route behaves exactly
-as above.** They compose with `authorize` / `produce` / `store` / `interactions`.
+domain readiness, and books telemetry. `createChatTurnRoutes` exposes optional
+seams for exactly that — **omit any one and the route behaves exactly as
+above.** They compose with `authorize` / `produce` / `store` / `interactions`.
 
-**Stability** — two of the six are stable; the other four are `@experimental`:
+**Stability** — `turnLock`, `contextGate`, `beforeTurn`, `lifecycle`,
+`heartbeat` and `onRawEvent` are all **stable and safe to depend on**, as is the
+`authorize` result's `insertUserMessage` flag (used above for
+dispatched/synthetic follow-up turns). They graduated in #227, once each had two
+independent product consumers exercising it — the bar this package uses, because
+a single consumer's usage is indistinguishable from that consumer's assumptions.
 
-| Seam | Stability |
-| --- | --- |
-| `lifecycle` | **stable** — safe to depend on |
-| `heartbeat` | **stable** — safe to depend on |
-| `turnLock` | `@experimental` |
-| `contextGate` | `@experimental` |
-| `beforeTurn` | `@experimental` |
-| `onRawEvent` | `@experimental` |
-
-The `@experimental` seams are single-consumer today (proven by gtm, #200) and
-kept flat/top-level for back-compat; their shape may still change without a
-major bump. (The `authorize` result's `insertUserMessage` flag — used above for
-dispatched/synthetic follow-up turns — is `@experimental` for the same reason.)
+They stay flat/top-level rather than grouped under a `hooks` object: the
+grouping would break every shipped call for no mechanism gain, and this
+package's exports are additive-only. `onRawEvent` keeps its `(event, context)`
+signature for the same reason. Its event type is exported as `ChatRouteEvent`
+(also the return type of `heartbeat.event`) if you want a standalone handler
+rather than an inline literal.
 
 ```ts
 const routes = createChatTurnRoutes({
   projectId: 'acme-agent',
   authorize, store, turnStore, produce, // as above
 
-  // 1. [@experimental] Single-flight lock — acquired before any side effect,
+  // 1. Single-flight lock — acquired before any side effect,
   //    released once when the turn settles (drain finish), short-circuit, throw.
   turnLock: {
     acquire: async ({ identity, executionId }) => {
@@ -436,35 +434,37 @@ const routes = createChatTurnRoutes({
     release: (lockId) => releaseLock(lockId as string),
   },
 
-  // 2. [@experimental] Domain-readiness gate — short-circuit BEFORE the producer
+  // 2. Domain-readiness gate — short-circuit BEFORE the producer
   //    runs (the user row is already persisted; return the assistant side).
   contextGate: async ({ identity, prompt }) => {
     const ready = await computeContextSufficiency(identity.tenantId)
     return ready.ok ? { proceed: true } : { proceed: false, response: cannedAskForContext(ready.missing) }
   },
 
-  // 3. [@experimental] Observe + augment the assembled input before the producer runs.
+  // 3. Observe + augment the assembled input before the producer runs.
+  //    Return a patch, or return nothing and mutate `context` for `produce` to read.
   beforeTurn: async ({ prompt, priorMessages, identity }) => {
     const composed = await composeSystemPromptWithCertified(identity.tenantId)
     return { priorMessages: [systemMessage(composed), ...priorMessages] }
   },
 
-  // 4. [stable] Deterministic run telemetry — start, then exactly one of complete/error.
+  // 4. Deterministic run telemetry — start, then exactly one of complete/error.
   lifecycle: {
     onTurnStart: ({ identity, executionId }) => startRun(identity, executionId),
     onTurnComplete: ({ finalText, usage, durationMs }) => endRun({ pass: true, finalText, usage, durationMs }),
     onTurnError: ({ error, durationMs }) => endRun({ pass: false, error, durationMs }),
   },
 
-  // 5. [stable] Keepalive while the producer is quiet (provisioning, first-token
+  // 5. Keepalive while the producer is quiet (provisioning, first-token
   //    wait). Window resets on every real event; a chatty producer never fires one.
   heartbeat: {
     intervalMs: 5_000,
     event: ({ elapsedMs }) => ({ type: 'run-phase', data: { phase: 'working', heartbeat: true, elapsedMs } }),
   },
 
-  // 6. [@experimental] Raw producer events for telemetry, before the engine frames
-  //    them (distinct from `onEvent`, which sees the engine-framed stream incl. lifecycle).
+  // 6. Raw producer events for telemetry, before the engine frames them (distinct
+  //    from `onEvent`, which sees the engine-framed stream incl. lifecycle). Never
+  //    sees an injected keepalive; a throw here is swallowed, never fails the turn.
   onRawEvent: (event) => emitToTrace(event),
 })
 ```

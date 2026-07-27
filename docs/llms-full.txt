@@ -8192,6 +8192,14 @@ interface ChatRouteDurableProjection
 type ChatRouteDurableProjectionLogger
 ```
 
+### `ChatRouteEvent`
+
+`type` — One event as it crosses the route: the producer's own vocabulary, or an injected keepalive.
+
+```ts
+type ChatRouteEvent
+```
+
 ### `ChatTurnAuthorization`
 
 `type` — Resolve authorization status and context for a chat turn including tenant and user identification

@@ -6254,6 +6254,12 @@
           "doc": "Log chat route projection messages with optional metadata for durable processing"
         },
         {
+          "name": "ChatRouteEvent",
+          "kind": "type",
+          "signature": "type ChatRouteEvent",
+          "doc": "One event as it crosses the route: the producer's own vocabulary, or an injected keepalive."
+        },
+        {
           "name": "ChatTurnAuthorization",
           "kind": "type",
           "signature": "type ChatTurnAuthorization",
