@@ -177,6 +177,11 @@
       "import": "./dist/turn-stream/index.js",
       "default": "./dist/turn-stream/index.js"
     },
+    "./turn-health": {
+      "types": "./dist/turn-health/index.d.ts",
+      "import": "./dist/turn-health/index.js",
+      "default": "./dist/turn-health/index.js"
+    },
     "./integrations": {
       "types": "./dist/integrations/index.d.ts",
       "import": "./dist/integrations/index.js",

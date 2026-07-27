@@ -27,6 +27,7 @@
     "src/crypto/index.ts",
     "src/stream/index.ts",
     "src/turn-stream/index.ts",
+    "src/turn-health/index.ts",
     "src/integrations/index.ts",
     "src/interactions/index.ts",
     "src/plans/index.ts",
