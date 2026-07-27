@@ -45,7 +45,12 @@ export interface PersistedTurnRow {
 /** What the sweep needs from a store. A product on a non-standard schema
  *  implements these two reads; everything else is shared. */
 export interface TurnHealthSource {
-  findUnansweredThreads(input: { minAgeMs: number; now: number }): Promise<UnansweredThread[]>
+  findUnansweredThreads(input: {
+    minAgeMs: number
+    /** Ignore user messages older than this. See {@link SweepOptions.maxAgeMs}. */
+    maxAgeMs: number
+    now: number
+  }): Promise<UnansweredThread[]>
   listRecentAssistantTurns(input: { sinceMs: number; now: number; limit: number }): Promise<
     PersistedTurnRow[]
   >
@@ -58,6 +63,17 @@ export interface SweepOptions {
   /** A user message must go unanswered this long before it counts. Guards
    *  against alerting on a turn that is simply still streaming. Default 15 min. */
   minAgeMs?: number
+  /**
+   * A user message OLDER than this is abandoned, not unanswered — it stops
+   * counting. Default 7 days.
+   *
+   * Without this bound the sweep is worse than useless. gtm-agent's table
+   * holds 384 unanswered messages whose oldest is 1,676 h (70 days) old;
+   * paging hourly on a backlog nobody will ever reply to is exactly how an
+   * alert channel gets muted, and a muted channel is the state this module
+   * exists to escape. The alert has to mean "something broke recently".
+   */
+  maxAgeMs?: number
   /** How far back to judge settled turns. Default 24 h. */
   lookbackMs?: number
   /** Cap on rows judged per sweep. Default 500. */
@@ -111,13 +127,14 @@ const HOUR_MS = 3_600_000
 export async function sweepSilentFailures(options: SweepOptions): Promise<SweepResult> {
   const now = options.now ?? Date.now()
   const minAgeMs = options.minAgeMs ?? 15 * 60_000
+  const maxAgeMs = options.maxAgeMs ?? 7 * 24 * HOUR_MS
   const lookbackMs = options.lookbackMs ?? 24 * HOUR_MS
   const limit = options.limit ?? 500
   const emptyRateThreshold = options.emptyRateThreshold ?? 0.05
   const minTurnsForRate = options.minTurnsForRate ?? 10
 
   const [unanswered, turns] = await Promise.all([
-    options.source.findUnansweredThreads({ minAgeMs, now }),
+    options.source.findUnansweredThreads({ minAgeMs, maxAgeMs, now }),
     options.source.listRecentAssistantTurns({ sinceMs: now - lookbackMs, now, limit }),
   ])
 
@@ -266,8 +283,9 @@ export function createD1TurnHealthSource(
   const thread = safeIdentifier(options.threadTable ?? 'thread')
 
   return {
-    async findUnansweredThreads({ minAgeMs, now }) {
+    async findUnansweredThreads({ minAgeMs, maxAgeMs, now }) {
       const cutoffSeconds = Math.floor((now - minAgeMs) / 1000)
+      const floorSeconds = Math.floor((now - maxAgeMs) / 1000)
       const { results } = await db
         .prepare(
           `SELECT m.thread_id AS threadId,
@@ -276,6 +294,7 @@ export function createD1TurnHealthSource(
              FROM ${message} m
             WHERE m.role = 'user'
               AND m.created_at <= ?1
+              AND m.created_at >= ?2
               AND m.created_at > COALESCE(
                     (SELECT MAX(a.created_at)
                        FROM ${message} a
@@ -285,7 +304,7 @@ export function createD1TurnHealthSource(
             GROUP BY m.thread_id
             ORDER BY oldestCreatedAt ASC`,
         )
-        .bind(cutoffSeconds)
+        .bind(cutoffSeconds, floorSeconds)
         .all<{ threadId: string; pendingMessages: number; oldestCreatedAt: number }>()
 
       return results.map((row) => ({

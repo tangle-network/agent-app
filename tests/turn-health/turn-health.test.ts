@@ -154,6 +154,30 @@ describe('sweepSilentFailures — the outage no per-turn hook can see', () => {
     }
   }
 
+  it('passes the abandonment window down so an ancient backlog stops paging', async () => {
+    // gtm's table holds 384 unanswered messages whose oldest is 1,676h old.
+    // Paging hourly on a backlog nobody will ever answer is how a channel gets
+    // muted — and a muted channel is the state this module exists to escape.
+    let seen: { minAgeMs: number; maxAgeMs: number } | null = null
+    const sink = recordingSink()
+    await sweepSilentFailures({
+      product: 'gtm-agent',
+      source: {
+        async findUnansweredThreads(input) {
+          seen = { minAgeMs: input.minAgeMs, maxAgeMs: input.maxAgeMs }
+          return []
+        },
+        async listRecentAssistantTurns() {
+          return []
+        },
+      },
+      sink,
+      now: 1_800_000_000_000,
+    })
+    expect(seen).toEqual({ minAgeMs: 15 * 60_000, maxAgeMs: 7 * 24 * 3_600_000 })
+    expect(sink.alerts).toHaveLength(0)
+  })
+
   it('pages on threads accumulating unanswered user messages', async () => {
     const sink = recordingSink()
     const result = await sweepSilentFailures({
