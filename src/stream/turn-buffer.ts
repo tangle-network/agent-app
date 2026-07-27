@@ -290,6 +290,38 @@ export async function* replayTurnEvents(opts: ReplayTurnEventsOptions): AsyncGen
   }
 }
 
+/**
+ * Serialize a replayed row for the wire, stamping the buffer ordinal ONTO the
+ * line so a reconnecting client can continue from `?fromSeq=<lastSeq>`.
+ *
+ * The seq lives on the {@link BufferedTurnEvent} row wrapper, not inside the
+ * serialized event — `flush()` builds `{seq: ++seq, event: JSON.stringify(ev)}`.
+ * A route that enqueues `row.event` alone therefore emits lines with no seq at
+ * all, and every client cursor silently pins to 0: each reconnect refetches the
+ * whole turn and re-applies every delta onto already-rendered state. This
+ * restores the contract `web-react/chat-stream` already documents ("replayed
+ * lines carry an extra `seq` — transparently ignored").
+ *
+ * The `{seq: -1}` `turn_status` sentinel is passed through unstamped: it is a
+ * terminator, not a cursor position, and stamping it would move a client's
+ * cursor to -1.
+ *
+ * Fail-soft by construction — a line that is not a JSON object passes through
+ * verbatim. A stamping bug must degrade to today's behaviour, never break a
+ * replay.
+ */
+export function stampReplaySeq(row: BufferedTurnEvent): string {
+  if (row.seq <= 0) return row.event
+  const line = row.event
+  // Cheap splice instead of parse+stringify: these rows are already canonical
+  // JSON objects from `JSON.stringify`, and replay is a hot per-event path.
+  if (line.charCodeAt(0) !== 0x7b /* { */) return line
+  const rest = line.slice(1)
+  return rest.trimStart().startsWith('}')
+    ? `{"seq":${row.seq}${rest}`
+    : `{"seq":${row.seq},${rest}`
+}
+
 // ── D1 store ──────────────────────────────────────────────────────────────
 
 /** Minimal structural D1 contract (Cloudflare `D1Database` satisfies it). */
