@@ -117,7 +117,7 @@ describe('create-agent-app scaffolder', () => {
   it('substitutes the project name into package.json + agent.config.ts', () => {
     const pkg = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf8'))
     expect(pkg.name).toBe('demo-agent')
-    expect(pkg.dependencies['@tangle-network/agent-app']).toBeTruthy()
+    expect(pkg.dependencies['@tangle-network/agent-app']).toBe('^0.44.16')
     expect(pkg.scripts['knowledge:ingest']).toBe('node scripts/knowledge-ingest.mjs')
     const cfg = readFileSync(join(projectDir, 'agent.config.ts'), 'utf8')
     expect(cfg).toContain("name: 'demo-agent'")
@@ -128,12 +128,26 @@ describe('create-agent-app scaffolder', () => {
 
   it('template engine pins match agent-app peerDependencies (drift gate)', () => {
     const appPkg = JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8')) as {
+      devDependencies: Record<string, string>
       peerDependencies: Record<string, string>
       peerDependenciesMeta?: Record<string, { optional?: boolean }>
     }
     const gen = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf8')) as {
       peerDependencies: Record<string, string>
       devDependencies: Record<string, string>
+    }
+    for (const name of [
+      '@tangle-network/agent-eval',
+      '@tangle-network/agent-interface',
+      '@tangle-network/agent-knowledge',
+      '@tangle-network/agent-profile-materialize',
+      '@tangle-network/agent-runtime',
+      '@tangle-network/sandbox',
+      '@tangle-network/sandbox-ui',
+    ]) {
+      expect(appPkg.devDependencies[name], `${name} must build against its advertised peer`).toBe(
+        appPkg.peerDependencies[name],
+      )
     }
     // Every engine peer the template pins must be pinned to agent-app's own range.
     for (const [name, range] of Object.entries(gen.peerDependencies)) {

@@ -35,15 +35,16 @@ pnpm add @tangle-network/agent-eval @tangle-network/agent-integrations
 
 | Peer | Required by | Range |
 |---|---|---|
-| `@tangle-network/agent-eval` | `/eval`, `/eval-campaign`, `/profile`, `/knowledge` | `>=0.100.0` |
-| `@tangle-network/agent-runtime` | `/runtime`, `/chat-routes` | `>=0.79.3` |
+| `@tangle-network/agent-eval` | `/eval`, `/eval-campaign`, `/profile`, `/knowledge` | `0.133.0` |
+| `@tangle-network/agent-runtime` | `/runtime`, `/chat-routes` | `0.107.1` |
 | `@tangle-network/agent-integrations` | `/integrations` | `>=0.44.0` |
-| `@tangle-network/agent-interface` | `/interactions`, `/chat-store`, `/harness` | `>=0.15.0` |
-| `@tangle-network/sandbox` | `/sandbox`, `/profile`, `/skills` | `>=0.9.7` |
-| `@tangle-network/agent-knowledge` | `/knowledge-loop` | `>=1.7.0` |
-| `@tangle-network/agent-profile-materialize` | `/skills-placement` | `>=0.6.0` |
+| `@tangle-network/agent-interface` | `/interactions`, `/chat-store`, `/harness` | `0.36.0` |
+| `@tangle-network/sandbox` | `/sandbox` | `0.14.0` |
+| `@tangle-network/agent-knowledge` | `/knowledge-loop` | `6.1.2` |
+| `@tangle-network/agent-profile-materialize` | `/skills-placement` | `0.9.0` |
+| `@tangle-network/sandbox-ui` | `/brand`, `/studio-react`, `/work-product-react` | `0.90.0` |
 
-All of these except `agent-eval`, `agent-integrations`, and `agent-interface` are declared **optional** peers, so a product that never imports the subpath installs nothing. `driveSandboxTurn` (`/sandbox`) calls `box.driveTurn`, which the SDK added in **0.10.5** — above the declared floor, so pin `@tangle-network/sandbox >= 0.10.5` yourself if you use it.
+All of these except `agent-eval`, `agent-integrations`, and `agent-interface` are declared **optional** peers, so a product that never imports the subpath installs nothing.
 
 Modules that import no engine package (`/tools`, `/web`, `/crypto`, `/redact`, `/stream`, `/billing`, `/tangle` — the last two take their client as a structural contract) need no peers.
 

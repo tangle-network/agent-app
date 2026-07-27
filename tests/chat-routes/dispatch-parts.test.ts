@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   buildDispatchParts,
+  normalizeChatPromptForSandbox,
   type BuildDispatchPartsInput,
   type ReadSandboxMentionFn,
   type PromptInputPart,
@@ -46,6 +47,58 @@ function base(overrides: Partial<BuildDispatchPartsInput> = {}): BuildDispatchPa
 function isMediaPart(part: PromptInputPart): part is Extract<PromptInputPart, { type: 'image' | 'file' }> {
   return part.type === 'image' || part.type === 'file'
 }
+
+describe('normalizeChatPromptForSandbox', () => {
+  it('converts an absolute generic-file path to a canonical file URL', () => {
+    expect(
+      normalizeChatPromptForSandbox([
+        {
+          type: 'file',
+          filename: 'Q3 review — final.md',
+          mediaType: 'text/markdown',
+          path: '/workspace/uploads/Q3 review — final.md',
+        },
+      ]),
+    ).toEqual([
+      {
+        type: 'file',
+        filename: 'Q3 review — final.md',
+        mediaType: 'text/markdown',
+        url: 'file:///workspace/uploads/Q3%20review%20%E2%80%94%20final.md',
+      },
+    ])
+  })
+
+  it('preserves image paths and inline file URLs', () => {
+    expect(
+      normalizeChatPromptForSandbox([
+        { type: 'image', filename: 'chart.png', path: '/workspace/uploads/chart.png' },
+        { type: 'file', filename: 'notes.txt', url: 'data:text/plain;base64,bm90ZXM=' },
+      ]),
+    ).toEqual([
+      { type: 'image', filename: 'chart.png', path: '/workspace/uploads/chart.png' },
+      { type: 'file', filename: 'notes.txt', url: 'data:text/plain;base64,bm90ZXM=' },
+    ])
+  })
+
+  it('rejects ambiguous, relative, and content-only file parts', () => {
+    expect(() =>
+      normalizeChatPromptForSandbox([
+        { type: 'file', filename: 'both.txt', url: 'data:text/plain,hi', path: '/workspace/both.txt' },
+      ]),
+    ).toThrow('exactly one URL or path')
+    expect(() =>
+      normalizeChatPromptForSandbox([
+        { type: 'file', filename: 'relative.txt', path: 'uploads/relative.txt' },
+      ]),
+    ).toThrow('must be absolute')
+    expect(() =>
+      normalizeChatPromptForSandbox([
+        { type: 'file', filename: 'content.txt', content: 'inline text' },
+      ]),
+    ).toThrow('do not accept inline content')
+  })
+})
 
 describe('buildDispatchParts — parts[0] text', () => {
   it('is byte-identical to input.text', async () => {
@@ -105,7 +158,7 @@ describe('buildDispatchParts — path demotion', () => {
     expect('url' in (part as object)).toBe(false)
   })
 
-  it('demotes an oversize file to a path-only part (no mediaType/filename/url keys)', async () => {
+  it('demotes an oversize file to a file URL', async () => {
     const result = await buildDispatchParts(
       base({
         attachments: [attachment({ type: 'file', path: 'uploads/big.csv', name: 'big.csv', mediaType: 'text/csv' })],
@@ -114,7 +167,12 @@ describe('buildDispatchParts — path demotion', () => {
     )
     expect(result.succeeded).toBe(true)
     if (!result.succeeded) return
-    expect(result.value[1]).toEqual({ type: 'file', path: `${VAULT_DIR}/uploads/big.csv` })
+    expect(result.value[1]).toEqual({
+      type: 'file',
+      filename: 'big.csv',
+      mediaType: 'text/csv',
+      url: `file://${VAULT_DIR}/uploads/big.csv`,
+    })
   })
 
   it('forces demotion of an otherwise-inlinable image when systemPrompt consumes the budget', async () => {
@@ -144,7 +202,12 @@ describe('buildDispatchParts — path demotion', () => {
     expect(result.succeeded).toBe(true)
     if (!result.succeeded) return
     expect(result.value[1]).toEqual({ type: 'image', filename: 'pic.png', mediaType: 'image/png', path: `${VAULT_DIR}/uploads/pic.png` })
-    expect(result.value[2]).toEqual({ type: 'file', path: `${VAULT_DIR}/uploads/notes.txt` })
+    expect(result.value[2]).toEqual({
+      type: 'file',
+      filename: 'notes.txt',
+      mediaType: 'text/plain',
+      url: `file://${VAULT_DIR}/uploads/notes.txt`,
+    })
   })
 })
 
@@ -180,7 +243,12 @@ describe('buildDispatchParts — budget math', () => {
     const [, first, second] = result.value
     expect(first?.type).toBe('file')
     if (first?.type === 'file') expect(typeof first.url).toBe('string')
-    expect(second).toEqual({ type: 'file', path: `${VAULT_DIR}/uploads/two.bin` })
+    expect(second).toEqual({
+      type: 'file',
+      filename: 'two.bin',
+      mediaType: 'application/octet-stream',
+      url: `file://${VAULT_DIR}/uploads/two.bin`,
+    })
   })
 })
 
@@ -269,8 +337,11 @@ describe('buildDispatchParts — url/path exclusivity invariant', () => {
     if (!result.succeeded) return
     for (const part of result.value) {
       if (!isMediaPart(part)) continue
-      const hasUrl = typeof part.url === 'string' && part.url.startsWith('data:')
-      const hasPath = typeof part.path === 'string' && part.path.startsWith('/')
+      const hasUrl = typeof part.url === 'string' && (
+        part.url.startsWith('data:')
+        || part.url.startsWith('file://')
+      )
+      const hasPath = part.type === 'image' && typeof part.path === 'string' && part.path.startsWith('/')
       expect(hasUrl).not.toBe(hasPath)
       expect(hasUrl || hasPath).toBe(true)
     }
@@ -295,7 +366,7 @@ describe('buildDispatchParts — profile wire reserve', () => {
     if (!withProfile.succeeded) return
     const part = withProfile.value[1]
     expect(part).not.toHaveProperty('url')
-    if (part && isMediaPart(part)) expect(part.path).toBe(`${VAULT_DIR}/uploads/pic.png`)
+    if (part?.type === 'image') expect(part.path).toBe(`${VAULT_DIR}/uploads/pic.png`)
   })
 
   it('final size check includes the profile rider', async () => {
@@ -363,7 +434,7 @@ describe('buildDispatchParts — mentions', () => {
     expect(reader.mock.calls[0]![2]).toEqual({ readBytes: false })
   })
 
-  it('ships a non-image mention as a bare in-box path part (stat only, no bytes)', async () => {
+  it('ships a non-image mention as an in-box file URL (stat only, no bytes)', async () => {
     const reader = vi.fn(async (_box: SandboxExecChannel, _path: string, _options: { readBytes: boolean }) => ({
       succeeded: true as const,
       value: { size: 42 },
@@ -373,7 +444,11 @@ describe('buildDispatchParts — mentions', () => {
     )
     expect(result.succeeded).toBe(true)
     if (!result.succeeded) return
-    expect(result.value[1]).toEqual({ type: 'file', path: `${VAULT_DIR}/notes.md` })
+    expect(result.value[1]).toEqual({
+      type: 'file',
+      filename: 'notes.md',
+      url: `file://${VAULT_DIR}/notes.md`,
+    })
     expect(reader).toHaveBeenCalledTimes(1)
     expect(reader.mock.calls[0]![2]).toEqual({ readBytes: false })
   })
@@ -389,7 +464,11 @@ describe('buildDispatchParts — mentions', () => {
     )
     expect(result.succeeded).toBe(true)
     if (!result.succeeded) return
-    expect(result.value[1]).toEqual({ type: 'file', path: `${VAULT_DIR}/${path}` })
+    expect(result.value[1]).toEqual({
+      type: 'file',
+      filename: 'Q3 review — final.md',
+      url: `file://${VAULT_DIR}/research/competitors/Q3%20review%20%E2%80%94%20final.md`,
+    })
     expect(reader.mock.calls[0]![1]).toBe(`${VAULT_DIR}/${path}`)
   })
 
@@ -425,8 +504,11 @@ describe('buildDispatchParts — mentions', () => {
     if (!result.succeeded) return
     for (const part of result.value) {
       if (!isMediaPart(part)) continue
-      const hasUrl = typeof part.url === 'string' && part.url.startsWith('data:')
-      const hasPath = typeof part.path === 'string' && part.path.startsWith('/')
+      const hasUrl = typeof part.url === 'string' && (
+        part.url.startsWith('data:')
+        || part.url.startsWith('file://')
+      )
+      const hasPath = part.type === 'image' && typeof part.path === 'string' && part.path.startsWith('/')
       expect(hasUrl).not.toBe(hasPath)
       expect(hasUrl || hasPath).toBe(true)
     }

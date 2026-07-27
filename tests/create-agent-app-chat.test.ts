@@ -134,7 +134,7 @@ describe('create-agent-app --chat scaffolder', () => {
   it('substitutes tokens across package.json, agent.config.ts, wrangler.toml, and the dev page', () => {
     const pkg = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf8'))
     expect(pkg.name).toBe('demo-chat')
-    expect(pkg.dependencies['@tangle-network/agent-app']).toBeTruthy()
+    expect(pkg.dependencies['@tangle-network/agent-app']).toBe('^0.44.16')
     const cfg = readFileSync(join(projectDir, 'agent.config.ts'), 'utf8')
     expect(cfg).toContain("name: 'demo-chat'")
     for (const file of ['agent.config.ts', 'wrangler.toml', 'public/index.html', 'prompts/system.md']) {
@@ -155,8 +155,12 @@ describe('create-agent-app --chat scaffolder', () => {
       devDependencies: Record<string, string>
       peerDependencies?: Record<string, string>
     }
-    // Every @tangle-network engine the template declares (as a runtime dep or a
-    // peer pin) must be an agent-app peer, at or above agent-app's floor.
+    const exactStackPackages = new Set([
+      '@tangle-network/agent-eval',
+      '@tangle-network/agent-interface',
+      '@tangle-network/agent-runtime',
+      '@tangle-network/sandbox',
+    ])
     const declaredEngines: Record<string, string> = {
       ...gen.peerDependencies,
       ...gen.dependencies,
@@ -165,6 +169,10 @@ describe('create-agent-app --chat scaffolder', () => {
       if (!name.startsWith('@tangle-network/') || name === '@tangle-network/agent-app') continue
       const floor = appPkg.peerDependencies[name]
       expect(floor, `template declares ${name} but it is not an agent-app peer`).toBeTruthy()
+      if (exactStackPackages.has(name)) {
+        expect(range, `template pins ${name}@${range}; agent-app wants ${floor}`).toBe(floor)
+        continue
+      }
       expect(
         versionGte(minVersion(range), minVersion(floor as string)),
         `template pins ${name}@${range}, below agent-app's peer floor ${floor}`,

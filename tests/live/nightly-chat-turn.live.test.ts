@@ -23,7 +23,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { SandboxClient } from '@tangle-network/sandbox'
+import { Sandbox } from '@tangle-network/sandbox'
 
 import {
   createChatTurnRoutes,
@@ -126,11 +126,11 @@ describe.skipIf(!LIVE)('NIGHTLY LIVE E2E: one real sandbox chat turn', () => {
       runner.facts.startedAt = new Date().toISOString()
 
       const rawEvents: unknown[] = []
-      let box: Awaited<ReturnType<SandboxClient['create']>> | undefined
+      let box: Awaited<ReturnType<Sandbox['create']>> | undefined
 
       try {
         const client = await runner.step('connect sandbox client', () => {
-          return new SandboxClient({ apiKey: process.env.SANDBOX_API_KEY!, baseUrl: BASE_URL })
+          return new Sandbox({ apiKey: process.env.SANDBOX_API_KEY!, baseUrl: BASE_URL })
         })
 
         box = await runner.step('provision box (or reuse LIVE_BOX_ID)', async () => {

@@ -4,9 +4,10 @@
  * `/web-react` re-exports these types into browser bundles, so nothing here may
  * reach a Node builtin or an engine package.
  *
- * The part shape mirrors the sandbox SDK's `PromptInputPart` structurally
- * (text | image | file with filename/mediaType/url/path/content) — derived
- * here, not imported, so the client bundle never touches the SDK.
+ * The client part shape is intentionally broader than the sandbox SDK's current
+ * `PromptInputPart`: it carries uploads and local mentions until the server
+ * normalizes them into the SDK contract. It is derived here, not imported, so
+ * the client bundle never touches the SDK.
  */
 
 export interface ChatTurnTextPartInput {

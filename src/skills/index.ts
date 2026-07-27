@@ -32,20 +32,20 @@
  * (see `@tangle-network/agent-app/skills-placement`) and deliberately kept out
  * of this substrate-free module.
  *
- * Substrate-free over storage, exact over the SDK boundary: the only inbound
+ * Storage-independent and exact over the profile boundary: the only inbound
  * seam is the glob-result map the consumer passes in (its call site keeps the
  * literal `import.meta.glob` Vite must static-analyze); the only outbound seam
- * is `@tangle-network/sandbox`'s `AgentProfileFileMount[]`/`AgentProfileResourceRef[]`,
+ * is `@tangle-network/agent-interface`'s
+ * `AgentProfileFileMount[]`/`AgentProfileResourceRef[]`,
  * the exact shapes `resources.files`/`resources.skills` consume. Node builtins
  * are resolved lazily via `process.getBuiltinModule` so a static `node:*`
  * import never reaches the Vite SSR bundle.
  */
 
-import type { AgentProfileFileMount, AgentProfileResourceRef } from '@tangle-network/sandbox'
+import type { AgentProfileFileMount, AgentProfileResourceRef } from '@tangle-network/agent-interface'
 
-/** Construct the inline arm of the SDK's `AgentProfileResourceRef`. Inlined here
- *  so this leaf subpath stays type-only over `@tangle-network/sandbox` — it
- *  carries no runtime dependency on the SDK, just its file-mount type contract. */
+/** Construct the inline arm of `AgentProfileResourceRef`. Inlined here so this
+ *  leaf subpath stays type-only over `@tangle-network/agent-interface`. */
 function inlineResource(name: string, content: string): AgentProfileResourceRef {
   return { kind: 'inline', name, content }
 }

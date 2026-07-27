@@ -1648,6 +1648,12 @@
           "doc": "Fired when a model is abandoned and the next one is about to be tried."
         },
         {
+          "name": "normalizeChatPromptForSandbox",
+          "kind": "function",
+          "signature": "(prompt: string | readonly ChatTurnPartInput[]) => string | PromptInputPart[]",
+          "doc": "Convert the browser-safe chat attachment contract into the current sandbox prompt contract."
+        },
+        {
           "name": "OpenModelStream",
           "kind": "type",
           "signature": "type OpenModelStream",
@@ -4532,7 +4538,7 @@
         {
           "name": "createLlmCorrectnessChecker",
           "kind": "function",
-          "signature": "(tc: TCloud, opts?: LlmCorrectnessCheckerOpts | undefined) => CorrectnessChecker",
+          "signature": "(chat: ChatClient, opts?: LlmCorrectnessCheckerOpts | undefined) => CorrectnessChecker",
           "doc": "Production `CorrectnessChecker` — one LLM call per matched artifact, deterministic (temperature 0), structured JSON out."
         },
         {
@@ -4616,10 +4622,22 @@
           "doc": null
         },
         {
+          "name": "compareOptimizationMethods",
+          "kind": "function",
+          "signature": "<TScenario extends Scenario, TArtifact>(opts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Optim…",
+          "doc": "Compare complete optimization methods on disjoint train, selection, and final test data."
+        },
+        {
+          "name": "CompareOptimizationMethodsOptions",
+          "kind": "interface",
+          "signature": "interface CompareOptimizationMethodsOptions",
+          "doc": null
+        },
+        {
           "name": "defaultProductionGate",
           "kind": "function",
           "signature": "<TArtifact, TScenario extends Scenario>(options: DefaultProductionGateOptions) => Gate<TArtifact, TScenario>",
-          "doc": null
+          "doc": "Opinionated production gate composing held-out significance, red-team, reward-hacking, and canary checks into a single `Gate.decide` decision."
         },
         {
           "name": "DispatchContext",
@@ -4640,10 +4658,16 @@
           "doc": "Config for {@link buildEnsembleJudge}."
         },
         {
-          "name": "evolutionaryProposer",
+          "name": "externalTextOptimizationMethod",
           "kind": "function",
-          "signature": "<TFindings = unknown>(opts: EvolutionaryProposerOptions<TFindings>) => SurfaceProposer<TFindings>",
-          "doc": null
+          "signature": "<TScenario extends Scenario, TArtifact>(config: ExternalTextOptimizationMethodConfig<TScenario, TArtifact>) => Optimiza…",
+          "doc": "Adapt a third-party text optimizer without reimplementing its search."
+        },
+        {
+          "name": "ExternalTextOptimizationMethodConfig",
+          "kind": "interface",
+          "signature": "interface ExternalTextOptimizationMethodConfig",
+          "doc": "Configuration for adapting another text optimizer."
         },
         {
           "name": "Gate",
@@ -4652,9 +4676,15 @@
           "doc": "Composable promotion gate."
         },
         {
-          "name": "gepaProposer",
+          "name": "gepaOptimizationMethod",
           "kind": "function",
-          "signature": "(opts: GepaProposerOptions) => SurfaceProposer<unknown>",
+          "signature": "<TScenario extends Scenario, TArtifact>(config: GepaOptimizationMethodConfig<TScenario, TArtifact>) => OptimizationMeth…",
+          "doc": "Turn an optional GEPA installation into an `OptimizationMethod`."
+        },
+        {
+          "name": "GepaOptimizationMethodConfig",
+          "kind": "interface",
+          "signature": "interface GepaOptimizationMethodConfig",
           "doc": null
         },
         {
@@ -4694,10 +4724,16 @@
           "doc": "The mutable surface a proposer changes."
         },
         {
-          "name": "Mutator",
+          "name": "OptimizationMethod",
           "kind": "interface",
-          "signature": "interface Mutator",
-          "doc": "Stateless surface mutation — given findings + current surface, return N candidate surfaces."
+          "signature": "interface OptimizationMethod",
+          "doc": "A complete optimization method, including candidate generation and selection."
+        },
+        {
+          "name": "OptimizationMethodResult",
+          "kind": "interface",
+          "signature": "interface OptimizationMethodResult",
+          "doc": null
         },
         {
           "name": "paretoSignificanceGate",
@@ -4709,7 +4745,7 @@
           "name": "runCampaign",
           "kind": "function",
           "signature": "<TScenario extends Scenario, TArtifact>(opts: RunCampaignOptions<TScenario, TArtifact>) => Promise<CampaignResult<TArti…",
-          "doc": null
+          "doc": "Core campaign orchestrator: fan scenarios through dispatch, score with judges, aggregate bootstrap CIs, and persist reproducible `CampaignResult` records."
         },
         {
           "name": "RunRecord",
@@ -4733,7 +4769,7 @@
           "name": "SelfImproveBudget",
           "kind": "interface",
           "signature": "interface SelfImproveBudget",
-          "doc": "# `selfImprove()` - the one-call improvement loop."
+          "doc": null
         },
         {
           "name": "SelfImproveOptions",
@@ -4745,6 +4781,18 @@
           "name": "SelfImproveResult",
           "kind": "interface",
           "signature": "interface SelfImproveResult",
+          "doc": null
+        },
+        {
+          "name": "skillOptOptimizationMethod",
+          "kind": "function",
+          "signature": "<TScenario extends Scenario, TArtifact>(config: SkillOptOptimizationMethodConfig<TScenario, TArtifact>) => Optimization…",
+          "doc": "Run Microsoft's SkillOpt trainer as a complete optimization method."
+        },
+        {
+          "name": "SkillOptOptimizationMethodConfig",
+          "kind": "interface",
+          "signature": "interface SkillOptOptimizationMethodConfig",
           "doc": null
         },
         {
@@ -7731,7 +7779,7 @@
           "name": "LoopToolCall",
           "kind": "interface",
           "signature": "interface LoopToolCall",
-          "doc": "Bounded turn-level tool-dispatch loop."
+          "doc": null
         },
         {
           "name": "mergeSurfaceOverlay",
@@ -8182,7 +8230,7 @@
         {
           "name": "getClient",
           "kind": "function",
-          "signature": "(shell: SandboxRuntimeConfig) => SandboxClient",
+          "signature": "(shell: SandboxRuntimeConfig) => Sandbox",
           "doc": "Resolve a synchronous sandbox client from provided runtime configuration credentials"
         },
         {
@@ -8230,7 +8278,7 @@
         {
           "name": "mintSandboxScopedToken",
           "kind": "function",
-          "signature": "(box: SandboxInstance, options: { scope: ScopedTokenScope; sessionId?: string | undefined; ttlMinutes?: number | undefi…",
+          "signature": "(box: SandboxInstance, options: MintScopedTokenOptions) => Promise<Outcome<ScopedTokenResult>>",
           "doc": "Mint a scoped token for an already-provisioned box (e.g."
         },
         {

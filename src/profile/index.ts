@@ -15,10 +15,10 @@
  *                    exactly like the registry's free tier
  *
  * plus an optional MCP overlay (delegation + per-turn app-tool side channel), a
- * per-turn `systemPrompt` override, and a `name` override. The merge is the SDK
- * `mergeAgentProfiles`: `mcp` is last-wins per key (base -> overlay), `resources`
- * arrays are concatenated (base ++ overlay), `prompt` is shallow-merged so an
- * overlay carrying only `systemPrompt` overrides it while keeping base
+ * per-turn `systemPrompt` override, and a `name` override. The canonical
+ * `mergeAgentProfiles` contract makes `mcp` last-wins per key (base -> overlay),
+ * concatenates `resources` arrays (base ++ overlay), and shallow-merges `prompt`
+ * so an overlay carrying only `systemPrompt` overrides it while keeping base
  * instructions. The compose algebra is DATA — the product injects the base
  * profile, the channel mounts (built with the `skills` subpath primitives), the
  * delegation/app-tool MCP map, and the override strings; nothing here reaches
@@ -39,8 +39,8 @@ import type {
   AgentProfileFileMount,
   AgentProfileMcpServer,
   AgentProfileResourceRef,
-} from '@tangle-network/sandbox'
-import { mergeAgentProfiles } from '@tangle-network/sandbox'
+} from '@tangle-network/agent-interface'
+import { mergeAgentProfiles } from '@tangle-network/agent-interface'
 import { profile } from '@tangle-network/agent-eval'
 import {
   composeShellResources,
@@ -215,14 +215,16 @@ export function composeAgentProfile(
   return pruneEmptyResourceChannels(merged)
 }
 
-/** Drop empty resource channels the SDK merge normalizes in (`tools`/`skills`/
- *  `agents`/`commands`: `[]`), so the composed profile's wire payload carries
+/** Drop absent and empty resource channels the canonical merge normalizes in,
+ *  so the composed profile's wire payload carries
  *  only the channels that actually have content — one canonical shape every app
  *  emits, instead of a sidecar payload full of empty arrays. */
 function pruneEmptyResourceChannels(profile: AgentProfile): AgentProfile {
   if (!profile.resources) return profile
   const kept = Object.fromEntries(
-    Object.entries(profile.resources).filter(([, value]) => !(Array.isArray(value) && value.length === 0)),
+    Object.entries(profile.resources).filter(([, value]) =>
+      value !== undefined && !(Array.isArray(value) && value.length === 0),
+    ),
   ) as AgentProfile['resources']
   const out: AgentProfile = { ...profile, resources: kept }
   if (kept && Object.keys(kept).length === 0) delete out.resources

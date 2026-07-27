@@ -19,6 +19,7 @@
 import { config } from '../agent.config'
 import {
   createSandboxChatProducer,
+  normalizeChatPromptForSandbox,
   type ChatTurnProduceArgs,
   type ChatTurnRouteProducer,
   type SandboxUploadSink,
@@ -100,7 +101,7 @@ export function createSandboxProduce(env: AppEnv) {
       // Opt out with `modelFailover: false` (or empty `fallbacks`).
       fallbackModels: config.model.fallbacks,
       openEvents: ({ model: attemptModel, attempt }) =>
-        streamSandboxPrompt(shell, box, prompt, {
+        streamSandboxPrompt(shell, box, normalizeChatPromptForSandbox(prompt), {
           sessionId: identity.sessionId,
           // A failover attempt is a NEW dispatch, not a reconnect to the dead
           // one — it needs its own execution identity or the platform would

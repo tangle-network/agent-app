@@ -168,7 +168,7 @@ type LoopMessage
 
 ### `LoopToolCall`
 
-`interface` — Bounded turn-level tool-dispatch loop.
+`interface`
 
 ```ts
 interface LoopToolCall
