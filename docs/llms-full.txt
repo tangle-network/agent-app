@@ -19233,12 +19233,52 @@ interface AgentCheckInput
 (config: WorkProductToolConfig) => AppToolDefinition<Record<string, unknown>>[]
 ```
 
+### `canonicalizeValue`
+
+`function` — Reduce a numeric token to the form both sides are compared in: no currency, no grouping, no trailing zeros in the fraction, no leading zeros.
+
+```ts
+(token: string) => string | null
+```
+
 ### `canTransitionWorkProduct`
 
 `function` — Whether a legal edge exists from `from` to `to` in the review machine.
 
 ```ts
 (from: WorkProductStatus, to: WorkProductStatus) => boolean
+```
+
+### `CLAIM_SUPPORT_CHECK`
+
+`const` — Platform check: how many quoted evidence entries anchor to text that actually CARRIES the figure the entry claims.
+
+```ts
+"claim_support"
+```
+
+### `ClaimSupport`
+
+`type`
+
+```ts
+type ClaimSupport
+```
+
+### `claimSupportErrorDetail`
+
+`function` — The sentence a model can act on without re-reading the document: what it claimed, what the line it cited actually says, what figures that line does carry, and the two ways out — cite the value, or dr…
+
+```ts
+(failure: { status: "unsupported"; claimed: string[]; present: string[]; }, quote: string) => string
+```
+
+### `claimValues`
+
+`function` — The values a claim asserts, canonicalized — empty when the claim asserts no figure, which is the "nothing to check" case.
+
+```ts
+(claim: string) => string[]
 ```
 
 ### `createInMemoryWorkProductStore`
@@ -19599,6 +19639,22 @@ interface TrustItem
 
 ```ts
 (body: Record<string, unknown>) => WorkProductVerdictBody
+```
+
+### `valuesInText`
+
+`function` — Every distinct value appearing in `text`, canonicalized.
+
+```ts
+(text: string) => string[]
+```
+
+### `verifyClaimSupport`
+
+`function` — Does `quote` carry the figure `claim` asserts?
+
+```ts
+(quote: string, claim: string) => ClaimSupport
 ```
 
 ### `WorkProductArtifact`
