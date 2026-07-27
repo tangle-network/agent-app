@@ -169,9 +169,13 @@ describe('upsert_evidence — the quote gate', () => {
     expect(outcome.code).toBe('quote_not_found')
     expect(outcome.message).toContain('entries[0].locator.quote')
     expect(outcome.message).toContain('vault/w2.pdf')
-    // The error must teach the correction, not just deny.
-    expect(outcome.message).toContain('character-for-character')
-    expect(outcome.message).toContain('omit locator.quote')
+    // The error must teach the correction, not just deny — and the correction
+    // it teaches must be one the model can actually perform. "Retype it
+    // correctly" is the instruction that produced a 9-of-59 success rate, so
+    // the message points at the span form instead.
+    expect(outcome.message).toContain('locator.span')
+    expect(outcome.message).toContain('slices out of the document itself')
+    expect(outcome.message).toContain('COMPUTED')
     // Nothing persisted: a rejected batch leaves no half-written row.
     expect(await store.listByWorkspace('ws')).toEqual([])
   })
@@ -323,7 +327,7 @@ describe('submit_work_product — the persisted-quote re-check', () => {
     expect(check?.source).toBe('platform')
     expect(check?.passed).toBe(true)
     expect(check?.detail).toBe(
-      '1/1 quoted evidence entries verified against their source; 1 recorded without a quote',
+      '1/1 quoted evidence entries verified against their source (0 platform-sliced from a source span, 1 model-quoted and proved to occur); 1 recorded without a quote',
     )
   })
 

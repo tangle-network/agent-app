@@ -65,3 +65,66 @@ export function sourceContainsQuote(sourceText: string, quote: string): boolean 
   if (normalizedQuote.length === 0) return false
   return normalizeQuoteText(sourceText).includes(normalizedQuote)
 }
+
+// ── spans: the citation form that cannot be wrong ────────────────────────────
+
+/**
+ * Slice a citation out of the source text by character offset — the reason
+ * this module exists in its stronger form.
+ *
+ * Verification above is a REJECTION gate: the model retypes a quote and the
+ * shell refuses it when the characters do not occur. That gate is correct and
+ * it works, but a model that reproduces a line character-for-character only
+ * some of the time cannot USE it — every miss is a refusal, and the package
+ * ends up with no lineage at all rather than false lineage. A measured 9 of 59
+ * on the live tax surface is what "some of the time" meant in practice.
+ *
+ * A span inverts it. The model names two integers into text it just read; the
+ * PLATFORM produces the quote from the bytes it already holds. There is no
+ * retyping step to get wrong, so a fabricated quote is not rejected — it is
+ * unrepresentable. `sourceContainsQuote(text, sliceSourceSpan(text, span))` is
+ * true for every span this function returns, by construction.
+ *
+ * Offsets index the SAME string the product's document-reading tool pages
+ * with an offset, which is the same string its `readSourceText` seam returns.
+ * That is the one contract a product must keep; violate it and spans point at
+ * the wrong characters (still real characters of that document — never
+ * invented text, but the wrong line).
+ *
+ * Half-open `[start, end)`, matching `String.prototype.slice` and the
+ * `offset`/`offset + text.length` window a paged read already reports.
+ */
+export type SourceSpanFailure =
+  | { reason: 'not_integer'; field: 'start' | 'end' }
+  | { reason: 'negative'; field: 'start' | 'end' }
+  | { reason: 'inverted' }
+  | { reason: 'out_of_range'; totalChars: number }
+  | { reason: 'blank' }
+
+export type SourceSpanResult =
+  | { ok: true; quote: string }
+  | { ok: false; failure: SourceSpanFailure }
+
+/** Resolve `[start, end)` against `sourceText`. Every rejection is a caller
+ *  mistake the model can correct from the paged read it already has, so each
+ *  carries the discriminator a tool layer turns into a specific message. */
+export function sliceSourceSpan(
+  sourceText: string,
+  span: { start: number; end: number },
+): SourceSpanResult {
+  for (const field of ['start', 'end'] as const) {
+    const value = span[field]
+    if (!Number.isInteger(value)) return { ok: false, failure: { reason: 'not_integer', field } }
+    if (value < 0) return { ok: false, failure: { reason: 'negative', field } }
+  }
+  if (span.end <= span.start) return { ok: false, failure: { reason: 'inverted' } }
+  if (span.end > sourceText.length) {
+    return { ok: false, failure: { reason: 'out_of_range', totalChars: sourceText.length } }
+  }
+  const quote = sourceText.slice(span.start, span.end)
+  // A whitespace-only slice is a real slice of the document and would pass
+  // `sourceContainsQuote` on any text — the same vacuous pass an empty quote
+  // gets there, refused for the same reason: it is not a click target.
+  if (quote.trim().length === 0) return { ok: false, failure: { reason: 'blank' } }
+  return { ok: true, quote }
+}
