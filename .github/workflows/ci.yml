@@ -27,6 +27,14 @@ jobs:
       - run: pnpm run build
       # Dead-surface gate. Fails on an unused file, an unused internal export, or
       # an unused dependency — the accumulation this repo had to clean up by hand.
-      # It cannot see unused PUBLIC exports (an entry's exports are API by
-      # definition); those are a fleet-grep question, not a CI one.
+      # Two blind spots it CANNOT cover, both by construction:
+      #   * unused PUBLIC exports — an entry's exports are API by definition, so
+      #     this is a fleet-grep question, not a CI one;
+      #   * a dep pulled in only TRANSITIVELY by a peer's own import. The four
+      #     @xterm/* devDeps are the live example: nothing in src/ references
+      #     them, but sandbox-ui's terminal chunk does `import
+      #     "@xterm/xterm/css/xterm.css"`, and vitest inlines sandbox-ui, so
+      #     removing them breaks src/work-product-react/pane.test.tsx. They are
+      #     in knip's ignoreDependencies for exactly that reason — do not
+      #     "clean them up".
       - run: pnpm run knip

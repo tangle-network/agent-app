@@ -92,7 +92,11 @@
     "tsc"
   ],
   "ignoreDependencies": [
-    "@tangle-network/agent-profile-materialize"
+    "@tangle-network/agent-profile-materialize",
+    "@xterm/addon-fit",
+    "@xterm/addon-web-links",
+    "@xterm/addon-webgl",
+    "@xterm/xterm"
   ],
   "rules": {
     "duplicates": "off"
