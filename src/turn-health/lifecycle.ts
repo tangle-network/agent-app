@@ -23,6 +23,9 @@ export interface TurnHealthCompleteInfo {
   threadId?: string
   turnStreamId?: string
   executionId?: string
+  /** `/chat-routes` sets this when a `contextGate` short-circuited the turn and
+   *  the producer never ran. */
+  gated?: boolean
 }
 
 /** Structural mirror of the lifecycle error payload. */
@@ -53,6 +56,15 @@ export interface TurnHealthLifecycleOptions {
     kinds: string[]
     durationMs: number
   }): void
+  /** Page when a turn was answered by a gate instead of the model.
+   *
+   *  Default `false`, and the default is the honest one: gating is a legitimate
+   *  design and a product that gates its intake would otherwise page on every
+   *  healthy turn. Whether the rate is pathological is domain knowledge, so it
+   *  stays a product decision — the verdict is ALWAYS reported through
+   *  {@link TurnHealthLifecycleOptions.onVerdict} so a counter can watch the
+   *  rate even when nobody is paged. */
+  alertOnGatedTurn?: boolean
 }
 
 function errorText(error: unknown): string {
@@ -83,6 +95,7 @@ export function createTurnHealthLifecycle(
         finalText: info.finalText,
         outputTokens: info.usage?.outputTokens ?? null,
         durationMs: info.durationMs,
+        ...(info.gated ? { gated: true } : {}),
       })
       options.onVerdict?.({
         product: options.product,
@@ -91,6 +104,10 @@ export function createTurnHealthLifecycle(
         durationMs: info.durationMs,
       })
       if (verdict.healthy || verdict.severity === null) return
+      // Counted above, paged only on request — see `alertOnGatedTurn`.
+      if (!options.alertOnGatedTurn && verdict.reasons.every((r) => r.kind === 'answered_without_model')) {
+        return
+      }
       await sink.deliver(
         turnAlert({
           product: options.product,

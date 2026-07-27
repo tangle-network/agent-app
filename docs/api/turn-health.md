@@ -4,7 +4,7 @@
 
 Source: `src/turn-health/index.ts`
 
-31 exports.
+32 exports.
 
 ### `AlertSink`
 
@@ -70,6 +70,14 @@ interface AlertThrottleStore
 (sinks: readonly AlertSink[]) => AlertSink
 ```
 
+### `createSlackBotAlertSink`
+
+`function` — POST to Slack `chat.postMessage` with a bot token.
+
+```ts
+(options: { botToken: string; channel: string; fetchImpl?: FetchLike | undefined; }) => AlertSink
+```
+
 ### `createThrottledAlertSink`
 
 `function` — Collapse repeats of the same `key` inside `windowMs`.
@@ -128,7 +136,7 @@ interface PersistedTurnRow
 
 ### `SHELL_ERROR_REPLY_PREFIXES`
 
-`const` — Assistant-row openers agent-app writes ITSELF when a sandbox turn fails.
+`const`
 
 ```ts
 readonly string[]

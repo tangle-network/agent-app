@@ -109,6 +109,53 @@ export function createWebhookAlertSink(options: {
   }
 }
 
+/**
+ * POST to Slack `chat.postMessage` with a bot token.
+ *
+ * This is the transport the org actually has. A survey of the four product
+ * repos found NO ops alert path of any kind — no incoming webhook, no pager, no
+ * notifier — which is the mechanical reason a 17-day outage never reached a
+ * human. What does exist is a Slack bot token in the shared secrets store, and
+ * `@tangle-network/agent-integrations` already speaks this exact API, so this
+ * routes alerts through the channel the org runs rather than standing up a new
+ * one.
+ *
+ * Slack answers `200 OK` with `{"ok": false, "error": "..."}` for an invalid
+ * token or channel, so the body is checked and not just the status — a
+ * transport that reports success on a rejected post would make the alerter
+ * itself a silent failure.
+ */
+export function createSlackBotAlertSink(options: {
+  botToken: string
+  channel: string
+  fetchImpl?: FetchLike
+}): AlertSink {
+  const fetchImpl = options.fetchImpl ?? (globalThis.fetch as unknown as FetchLike)
+  return {
+    async deliver(alert) {
+      const icon = alert.severity === 'critical' ? ':rotating_light:' : ':warning:'
+      const lines = [
+        `${icon} *${alert.title}*`,
+        ...alert.details.map((d) => `• ${d}`),
+        `_${new Date(alert.at).toISOString()}_`,
+      ]
+      const response = await fetchImpl('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          Authorization: `Bearer ${options.botToken}`,
+        },
+        body: JSON.stringify({ channel: options.channel, text: lines.join('\n') }),
+      })
+      if (!response.ok) throw new Error(`slack chat.postMessage responded ${response.status}`)
+      const body = (await response.text?.()) ?? ''
+      if (body && !/"ok"\s*:\s*true/.test(body)) {
+        throw new Error(`slack rejected the alert: ${body.slice(0, 200)}`)
+      }
+    },
+  }
+}
+
 /** stderr sink. The zero-config fallback so a product that has not yet been
  *  given a webhook still emits something a log search can find. */
 export function createConsoleAlertSink(log: (message: string) => void = console.error): AlertSink {

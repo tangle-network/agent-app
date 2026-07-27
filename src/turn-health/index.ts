@@ -49,6 +49,7 @@ export {
   createGuardedAlertSink,
   createMemoryThrottleStore,
   createMultiAlertSink,
+  createSlackBotAlertSink,
   createThrottledAlertSink,
   createWebhookAlertSink,
   type FetchLike,

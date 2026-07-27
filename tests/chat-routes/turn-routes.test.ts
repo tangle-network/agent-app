@@ -543,6 +543,51 @@ describe('createChatTurnRoutes — product seams', () => {
     expect(rows.filter((r) => r.role === 'assistant')).toHaveLength(0)
   })
 
+  it('contextGate: a gated turn is REPORTED to telemetry, stamped so it is not read as a blank turn', async () => {
+    // Until this fired, the gate was the one answer path that produced no
+    // lifecycle event at all: the early return happens before `turnStarted`, so
+    // a product whose gate answered every turn looked IDLE rather than broken —
+    // indistinguishable from healthy on any dashboard. That is exactly how a
+    // tool surface goes quiet without anyone noticing.
+    const events: string[] = []
+    let completed: { finalText: string; gated?: true; assistantMessageId: string | null } | undefined
+    const { routes, ctx, rows } = makeRoutes({
+      produce: () => fakeProducer([{ type: 'text', text: 'should not run' }], 'x'),
+      contextGate: async () => ({ proceed: false, response: Response.json({ needContext: true }, { status: 409 }) }),
+      lifecycle: {
+        onTurnStart: () => { events.push('start') },
+        onTurnComplete: (info) => {
+          events.push('complete')
+          completed = { finalText: info.finalText, assistantMessageId: info.assistantMessageId, ...(info.gated ? { gated: true } : {}) }
+        },
+        onTurnError: () => { events.push('error') },
+      },
+    })
+
+    const res = await routes.turn(turnRequest({ threadId: 't-gated', content: 'hi' }), ctx)
+    expect(res.status).toBe(409)
+    expect(events).toEqual(['start', 'complete'])
+    // `gated` is what separates "the model was never asked" from "the model
+    // answered with nothing" — identical payloads, opposite meanings.
+    expect(completed?.gated).toBe(true)
+    expect(completed?.finalText).toBe('')
+    // No model ran and no assistant row was written, so nothing is billable.
+    expect(completed?.assistantMessageId).toBeNull()
+    expect(rows.filter((r) => r.role === 'assistant')).toHaveLength(0)
+  })
+
+  it('contextGate: the gated turn does NOT fire the billing/persistence onTurnComplete', async () => {
+    // Telemetry must see every turn; billing must see only real ones.
+    const onTurnComplete = vi.fn()
+    const { routes, ctx } = makeRoutes({
+      produce: () => fakeProducer([{ type: 'text', text: 'x' }], 'x'),
+      contextGate: async () => ({ proceed: false, response: Response.json({ gated: true }, { status: 409 }) }),
+      onTurnComplete,
+    })
+    await routes.turn(turnRequest({ threadId: 't-gated-2', content: 'hi' }), ctx)
+    expect(onTurnComplete).not.toHaveBeenCalled()
+  })
+
   it('contextGate: decides from the request body it is handed (a turn already answered is refused)', async () => {
     // The second shipped shape (creative's): the verdict is keyed on the wire
     // payload, not on ambient state — so the seam must receive the SAME parsed,

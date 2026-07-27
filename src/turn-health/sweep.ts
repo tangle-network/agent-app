@@ -84,6 +84,22 @@ export interface SweepOptions {
   emptyRateThreshold?: number
   /** Absolute floor: never page on a rate computed from fewer turns than this. */
   minTurnsForRate?: number
+  /** Declare that this product's deliverable comes from TOOL calls, which
+   *  switches on the dead-tool-surface detector.
+   *
+   *  Opt-in because only the product knows: a copilot that answers from context
+   *  is perfectly healthy with zero tool calls, while an agent whose entire job
+   *  is to file, draft, or submit something is broken the moment its tool
+   *  surface goes quiet — and broken INVISIBLY, because every turn still
+   *  returns fluent prose and HTTP 200.
+   *
+   *  This is the fourth failure shape, and the only one no per-turn rule can
+   *  see. Measured on production: tax-agent has 129 assistant turns across 64
+   *  threads, all-time, with zero tool parts — while every other detector in
+   *  this module reports it healthy. */
+  expectsToolCalls?: boolean
+  /** Turns needed before a dead tool surface is called. Default 10. */
+  minTurnsForToolSurface?: number
   now?: number
 }
 
@@ -99,6 +115,21 @@ export interface SweepResult {
   emptyCompletions: number
   malformedToolCalls: number
   toolCallsWithoutEffect: number
+  /** Tool calls the harness rejected while settling them as `completed`. */
+  rejectedToolCalls: number
+  /** Turns carrying at least one tool part. */
+  turnsWithToolCalls: number
+  /** Total tool parts across the window. */
+  toolCalls: number
+  /** Turns the classifier could not interpret at all (encrypted at rest, or a
+   *  part vocabulary this module does not know). These are EXCLUDED from
+   *  `turnsJudged`-based rates — a rate computed over rows nobody could read is
+   *  a fabricated number. */
+  unreadableTurns: number
+  /** Turns whose PARTS could not be interpreted. A superset of
+   *  {@link unreadableTurns} (a row can have readable text and opaque parts).
+   *  No tool verdict is drawn over these. */
+  opaquePartsTurns: number
   alerts: TurnHealthAlert[]
 }
 
@@ -129,6 +160,11 @@ const HOUR_MS = 3_600_000
  * changing the producer's wording without changing this list fails CI rather
  * than silently making dead threads look answered.
  */
+/** D1's maximum LIKE pattern length, including the trailing `%`. Measured, not
+ *  documented: 50 succeeds, 51 raises `SQLITE_ERROR: LIKE or GLOB pattern too
+ *  complex`. */
+export const D1_MAX_LIKE_PATTERN_LENGTH = 50
+
 export const SHELL_ERROR_REPLY_PREFIXES: readonly string[] = [
   'The sandbox model stream stopped before a clean completion.',
   'The sandbox agent returned an error before producing a visible answer.',
@@ -149,6 +185,11 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
   const limit = options.limit ?? 500
   const emptyRateThreshold = options.emptyRateThreshold ?? 0.05
   const minTurnsForRate = options.minTurnsForRate ?? 10
+  const minTurnsForToolSurface = options.minTurnsForToolSurface ?? 10
+  // Half the window opaque means the sweep is guessing. Fixed rather than
+  // configurable: a product must not be able to tune its own blindness report
+  // into silence.
+  const blindThreshold = 0.5
 
   const [unanswered, turns] = await Promise.all([
     options.source.findUnansweredThreads({ minAgeMs, maxAgeMs, now }),
@@ -193,8 +234,19 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
   let emptyCompletions = 0
   let malformedToolCalls = 0
   let toolCallsWithoutEffect = 0
+  let rejectedToolCalls = 0
   let unhealthyTurns = 0
+  let turnsWithToolCalls = 0
+  let toolCalls = 0
+  let unreadableTurns = 0
+  // Turns whose PARTS were interpretable — the only rows a tool verdict may be
+  // drawn from. Distinct from `unreadableTurns`, which is the harder blindness
+  // (nothing judgeable at all).
+  let toolReadableTurns = 0
+  let opaquePartsTurns = 0
+  const opaqueTypes = new Set<string>()
   const malformedSamples: TurnHealthReason[] = []
+  const rejectedSamples: TurnHealthReason[] = []
 
   for (const row of turns) {
     const verdict = classifyTurnOutcome({
@@ -202,6 +254,17 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
       parts: parseParts(row.parts),
       outputTokens: row.outputTokens ?? null,
     })
+    toolCalls += verdict.toolCalls
+    if (verdict.toolCalls > 0) turnsWithToolCalls += 1
+    if (verdict.partsReadable) toolReadableTurns += 1
+    else {
+      opaquePartsTurns += 1
+      for (const t of verdict.opaquePartTypes) opaqueTypes.add(t)
+    }
+    if (verdict.unreadable) {
+      unreadableTurns += 1
+      continue
+    }
     if (verdict.healthy) continue
     unhealthyTurns += 1
     for (const reason of verdict.reasons) {
@@ -211,8 +274,16 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
         if (malformedSamples.length < 3) malformedSamples.push(reason)
       }
       if (reason.kind === 'tool_call_no_effect') toolCallsWithoutEffect += 1
+      if (reason.kind === 'tool_call_rejected') {
+        rejectedToolCalls += 1
+        if (rejectedSamples.length < 3) rejectedSamples.push(reason)
+      }
     }
   }
+
+  // Turns this sweep could actually judge. Every rate below divides by THIS,
+  // never by the raw row count.
+  const readableTurns = turns.length - unreadableTurns
 
   // A malformed tool call is never acceptable at any rate — it means a
   // deliverable was requested and silently discarded. Page on the first one.
@@ -228,8 +299,22 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
     })
   }
 
-  if (turns.length >= minTurnsForRate) {
-    const rate = emptyCompletions / turns.length
+  // A rejected call means a deliverable was requested and thrown away while the
+  // turn reported success. Never acceptable at any rate.
+  if (rejectedToolCalls > 0) {
+    alerts.push({
+      product: options.product,
+      severity: 'critical',
+      key: `sweep:${options.product}:tool_call_rejected`,
+      title: `${options.product}: ${rejectedToolCalls} tool call(s) were REJECTED but settled as completed — deliverables silently dropped`,
+      details: rejectedSamples.map(describeReason),
+      data: { rejectedToolCalls, turnsJudged: readableTurns },
+      at: now,
+    })
+  }
+
+  if (readableTurns >= minTurnsForRate) {
+    const rate = emptyCompletions / readableTurns
     if (rate > emptyRateThreshold) {
       alerts.push({
         product: options.product,
@@ -237,13 +322,70 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
         key: `sweep:${options.product}:empty_completion_rate`,
         title: `${options.product}: ${(rate * 100).toFixed(1)}% of turns completed with no output`,
         details: [
-          `${emptyCompletions} of ${turns.length} settled turns delivered nothing`,
+          `${emptyCompletions} of ${readableTurns} readable settled turns delivered nothing`,
           `threshold ${(emptyRateThreshold * 100).toFixed(1)}%`,
         ],
-        data: { emptyCompletions, turnsJudged: turns.length, rate },
+        data: { emptyCompletions, turnsJudged: readableTurns, rate },
         at: now,
       })
     }
+  }
+
+  // ── the fourth shape: a tool surface that has gone quiet ───────────────
+  //
+  // Nothing errors, every turn answers fluently, and the product stops DOING
+  // anything. Only visible across a window, which is why it needs its own pass
+  // rather than a rule inside the per-turn classifier.
+  // Judged ONLY over turns whose parts could be interpreted, and the count of
+  // rows that could not is stated in the alert — a verdict that names its own
+  // coverage can be trusted; one that hides it cannot.
+  if (options.expectsToolCalls && toolReadableTurns >= minTurnsForToolSurface && toolCalls === 0) {
+    alerts.push({
+      product: options.product,
+      severity: 'critical',
+      key: `sweep:${options.product}:dead_tool_surface`,
+      title: `${options.product}: ZERO tool calls across ${toolReadableTurns} turns — the tool surface is dead`,
+      details: [
+        `${toolReadableTurns} assistant turns with readable parts in the lookback, none of which called a tool`,
+        'the product declares its deliverable comes from tool calls, so it has answered without doing anything',
+        ...(opaquePartsTurns > 0
+          ? [`${opaquePartsTurns} further turn(s) had unreadable parts and were not judged`]
+          : []),
+      ],
+      data: {
+        turnsJudged: toolReadableTurns,
+        toolCalls: 0,
+        turnsWithToolCalls: 0,
+        turnsNotJudged: opaquePartsTurns,
+      },
+      at: now,
+    })
+  }
+
+  // ── the detector reporting on ITSELF ───────────────────────────────────
+  //
+  // The one verdict this module must never give is "healthy" derived from rows
+  // it could not read. If most of the window was opaque, that fact is the
+  // alert — silence here would be the module committing the exact failure it
+  // was built to catch.
+  if (opaquePartsTurns > 0 && opaquePartsTurns >= turns.length * blindThreshold) {
+    alerts.push({
+      product: options.product,
+      severity: 'warning',
+      key: `sweep:${options.product}:detector_blind`,
+      title: `${options.product}: ${opaquePartsTurns} of ${turns.length} turns have unreadable parts — this sweep cannot certify them`,
+      details: [
+        `uninterpretable part types: ${[...opaqueTypes].join(', ') || '(none named)'}`,
+        'these rows are excluded from every verdict above; treat them as UNMEASURED, not healthy',
+      ],
+      data: {
+        opaquePartsTurns,
+        unreadableTurns,
+        turnsSeen: turns.length,
+        opaqueTypes: [...opaqueTypes],
+      },
+      at: now,
+    })
   }
 
   for (const alert of alerts) await options.sink.deliver(alert)
@@ -258,6 +400,11 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
     emptyCompletions,
     malformedToolCalls,
     toolCallsWithoutEffect,
+    rejectedToolCalls,
+    turnsWithToolCalls,
+    toolCalls,
+    unreadableTurns,
+    opaquePartsTurns,
     alerts,
   }
 }
@@ -331,7 +478,22 @@ export function createD1TurnHealthSource(
   // here so this can never become an injection point.
   const message = safeIdentifier(options.messageTable ?? 'message')
   const thread = safeIdentifier(options.threadTable ?? 'thread')
-  const errorPrefixes = [...(options.errorReplyPrefixes ?? SHELL_ERROR_REPLY_PREFIXES)]
+  // D1 rejects a LIKE pattern longer than 50 characters with
+  // `SQLITE_ERROR: LIKE or GLOB pattern too complex`, and the pattern is the
+  // prefix PLUS the trailing `%`. Measured against production D1 on
+  // 2026-07-27: a 49-char prefix (50-char pattern) succeeds, 50 fails.
+  //
+  // Both shipped defaults are longer than that (55 and 70 characters), so
+  // before this clamp `findUnansweredThreads` threw on every product database
+  // — the detector could not run at all against the only store the fleet uses.
+  //
+  // Truncating is safe in the one direction that matters: a shorter prefix
+  // matches MORE rows as non-answers, so a thread is reported unanswered
+  // rather than silently marked healthy. The first 49 characters of each
+  // default are still unambiguous.
+  const errorPrefixes = [...(options.errorReplyPrefixes ?? SHELL_ERROR_REPLY_PREFIXES)].map((p) =>
+    p.slice(0, D1_MAX_LIKE_PATTERN_LENGTH - 1),
+  )
 
   return {
     async findUnansweredThreads({ minAgeMs, maxAgeMs, now }) {

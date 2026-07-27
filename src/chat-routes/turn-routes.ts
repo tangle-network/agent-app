@@ -329,6 +329,14 @@ export interface ChatTurnLifecycleComplete<TContext> extends ChatTurnLifecycleBa
    *  retracted). The detached lane surfaces the same id as
    *  `DetachedTurnResult.messageId`; one contract, two lanes. */
   assistantMessageId: string | null
+  /** Set when `contextGate` answered this turn and the producer never ran.
+   *
+   *  Present so telemetry can tell "the model produced nothing" apart from "the
+   *  model was never asked" — they look identical here (`finalText: ''`,
+   *  empty `usage`) and mean opposite things. A gated turn writes no assistant
+   *  row, so `assistantMessageId` is `null`, and the billing/persistence
+   *  `onTurnComplete` is deliberately NOT fired for it. */
+  gated?: true
 }
 /** Represent an error occurring during a chat turn lifecycle with context and duration information */
 export interface ChatTurnLifecycleError<TContext> extends ChatTurnLifecycleBase<TContext> {
@@ -807,6 +815,8 @@ export function createChatTurnRoutes<TContext = void>(
     let turnStartedAtMs = 0
     let turnStarted = false
     let lifecycleSettled = false
+    // Set when `contextGate` answered the turn without running the producer.
+    let gatedTurn = false
 
     // Exactly one terminal lifecycle hook, after the turn settles (idempotent).
     // Failure is this route's own verdict (`runFailed` from error/failed
@@ -830,6 +840,7 @@ export function createChatTurnRoutes<TContext = void>(
             finalText: producer?.finalText() ?? '',
             usage: producer?.usage?.() ?? {},
             assistantMessageId: assistantRowId(),
+            ...(gatedTurn ? { gated: true } : {}),
             ...(producer?.model ? { model: producer.model } : {}),
             ...(failoverInfo ? { modelFailover: failoverInfo } : {}),
           })
@@ -873,6 +884,33 @@ export function createChatTurnRoutes<TContext = void>(
         const gate = await options.contextGate(produceArgs)
         if (!gate.proceed) {
           await releaseLock()
+          // A gated turn is still a TURN, and until now it was the one answer
+          // path that fired no lifecycle hook at all — `turnStarted` is set
+          // further down, so an early return here left telemetry with no record
+          // that anything happened. A product whose gate answers everything
+          // therefore looks IDLE rather than broken, which is indistinguishable
+          // from healthy on every dashboard.
+          //
+          // Only the LIFECYCLE hooks fire (telemetry, errors swallowed); the
+          // billing/persistence `onTurnComplete` deliberately does not, because
+          // no model ran and no assistant row was written. `gated` marks the
+          // completion so a consumer counts it without mistaking it for a model
+          // turn that produced nothing.
+          gatedTurn = true
+          turnStartedAtMs = Date.now()
+          if (options.lifecycle?.onTurnStart) {
+            try {
+              await options.lifecycle.onTurnStart({
+                identity, executionId, turnStreamId, context, startedAt: turnStartedAtMs,
+              })
+            } catch (err) {
+              log('[chat-routes] lifecycle.onTurnStart failed', {
+                turnId: turnStreamId,
+                error: err instanceof Error ? err.message : String(err),
+              })
+            }
+          }
+          await fireTerminalLifecycle(false, undefined)
           return gate.response
         }
       }

@@ -12495,6 +12495,12 @@
           "doc": "Fan out to several sinks."
         },
         {
+          "name": "createSlackBotAlertSink",
+          "kind": "function",
+          "signature": "(options: { botToken: string; channel: string; fetchImpl?: FetchLike | undefined; }) => AlertSink",
+          "doc": "POST to Slack `chat.postMessage` with a bot token."
+        },
+        {
           "name": "createThrottledAlertSink",
           "kind": "function",
           "signature": "(inner: AlertSink, options: { windowMs: number; store?: AlertThrottleStore | undefined; }) => AlertSink",
@@ -12540,7 +12546,7 @@
           "name": "SHELL_ERROR_REPLY_PREFIXES",
           "kind": "const",
           "signature": "readonly string[]",
-          "doc": "Assistant-row openers agent-app writes ITSELF when a sandbox turn fails."
+          "doc": null
         },
         {
           "name": "SweepOptions",

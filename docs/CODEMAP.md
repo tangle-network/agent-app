@@ -71,7 +71,7 @@ _74 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./theme/tailwind-preset`](api/theme-tailwind-preset.md) | 1 | — |
 | [`./tools`](api/tools.md) | 63 | `crypto`, `eval` |
 | [`./trace`](api/trace.md) | 20 | `missions` |
-| [`./turn-health`](api/turn-health.md) | 31 | — |
+| [`./turn-health`](api/turn-health.md) | 32 | — |
 | [`./turn-stream`](api/turn-stream.md) | 59 | `chat-routes`, `stream` |
 | [`./vault`](api/vault.md) | 17 | — |
 | [`./vault/lazy`](api/vault-lazy.md) | 2 | — |
@@ -669,9 +669,9 @@ Depends on: `missions`
 
 ## `./turn-health`
 
-Source: `src/turn-health/index.ts` · 31 exports
+Source: `src/turn-health/index.ts` · 32 exports
 
-`AlertSink`, `AlertThrottleStore`, `classifyTurnOutcome`, `createConsoleAlertSink`, `createD1TurnHealthSource`, `createGuardedAlertSink`, `createMemoryThrottleStore`, `createMultiAlertSink`, `createThrottledAlertSink`, `createTurnHealthLifecycle`, `createWebhookAlertSink`, `D1LikeForHealth`, `describeReason`, `FetchLike`, `PersistedTurnRow`, `SHELL_ERROR_REPLY_PREFIXES`, `SweepOptions`, `SweepResult`, `sweepSilentFailures`, `turnAlert`, `TurnHealthAlert`, `TurnHealthCompleteInfo`, `TurnHealthErrorInfo`, `TurnHealthLifecycle`, `TurnHealthLifecycleOptions`, `TurnHealthReason`, `TurnHealthSeverity`, `TurnHealthSource`, `TurnHealthVerdict`, `TurnOutcomeInput`, `UnansweredThread`
+`AlertSink`, `AlertThrottleStore`, `classifyTurnOutcome`, `createConsoleAlertSink`, `createD1TurnHealthSource`, `createGuardedAlertSink`, `createMemoryThrottleStore`, `createMultiAlertSink`, `createSlackBotAlertSink`, `createThrottledAlertSink`, `createTurnHealthLifecycle`, `createWebhookAlertSink`, `D1LikeForHealth`, `describeReason`, `FetchLike`, `PersistedTurnRow`, `SHELL_ERROR_REPLY_PREFIXES`, `SweepOptions`, `SweepResult`, `sweepSilentFailures`, `turnAlert`, `TurnHealthAlert`, `TurnHealthCompleteInfo`, `TurnHealthErrorInfo`, `TurnHealthLifecycle`, `TurnHealthLifecycleOptions`, `TurnHealthReason`, `TurnHealthSeverity`, `TurnHealthSource`, `TurnHealthVerdict`, `TurnOutcomeInput`, `UnansweredThread`
 
 [Full API →](api/turn-health.md)
 

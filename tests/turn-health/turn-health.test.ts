@@ -10,6 +10,7 @@ import {
 } from '../../src/turn-health/sink.js'
 import {
   createD1TurnHealthSource,
+  D1_MAX_LIKE_PATTERN_LENGTH,
   SHELL_ERROR_REPLY_PREFIXES,
   sweepSilentFailures,
   type TurnHealthSource,
@@ -367,7 +368,12 @@ describe('createD1TurnHealthSource — an error row is not an answer', () => {
       now: 3,
     })
     // Default-correct: a product on the shared producer needs no config.
-    expect(withDefault.calls[0]!.params.slice(2)).toEqual([...SHELL_ERROR_REPLY_PREFIXES])
+    // Each opener is clamped to what D1 will accept as a LIKE pattern — the
+    // full 55- and 70-character strings raise `SQLITE_ERROR: LIKE or GLOB
+    // pattern too complex` and made this query throw on every product database.
+    expect(withDefault.calls[0]!.params.slice(2)).toEqual(
+      SHELL_ERROR_REPLY_PREFIXES.map((prefix) => prefix.slice(0, D1_MAX_LIKE_PATTERN_LENGTH - 1)),
+    )
 
     const disabled = recordingDb()
     await createD1TurnHealthSource(disabled, { errorReplyPrefixes: [] }).findUnansweredThreads({
