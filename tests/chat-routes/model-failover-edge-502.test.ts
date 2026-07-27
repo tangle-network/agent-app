@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createSandboxChatProducer,
   streamWithModelFailover,
+  summarizeFailoverReason,
   type ChatTurnMessageStore,
 } from '../../src/chat-routes/index'
 import { isUpstreamUnavailable, readHttpStatusHint } from '../../src/model-resolution/failover'
@@ -242,6 +243,85 @@ describe('streamWithModelFailover rescues an edge 502', () => {
     expect(handle.servingModel()).toBe('gemini-2.5-flash-lite')
     // Nothing from the dead attempt leaks into the transcript.
     expect(events.some((e) => JSON.stringify(e).includes('error code: 502'))).toBe(false)
+  })
+})
+
+/**
+ * The SECOND body shape, captured from the live run at 2026-07-27 19:40 UTC
+ * (cf-ray `a21e1e1d0f86ad49-DEN`). Curl saw the 16-byte `text/plain` form
+ * above; Node's fetch negotiated Cloudflare's full HTML error PAGE for the very
+ * same failure. Both are 502s with zero `x-tangle-*` headers, and the
+ * classifier has to read both — but only one of them is fit to show a customer.
+ */
+const EDGE_502_HTML =
+  '<!DOCTYPE html>\n<!--[if lt IE 7]> <html class="no-js ie6 oldie" lang="en-US"> <![endif]-->\n' +
+  '<!--[if IE 7]>    <html class="no-js ie7 oldie" lang="en-US"> <![endif]-->\n' +
+  '<!--[if IE 8]>    <html class="no-js ie8 oldie" lang="en-US"> <![endif]-->'
+
+describe('summarizeFailoverReason — the notice a customer actually reads', () => {
+  it('never puts Cloudflare\'s HTML error page in the transcript', () => {
+    const raw = `OpenAI-compat stream failed (HTTP 502): ${EDGE_502_HTML}`
+    const shown = summarizeFailoverReason(raw)
+    // This is the defect the live proof surfaced: the notice read
+    // `gemini-2.5-pro was unavailable (OpenAI-compat stream failed (HTTP 502):
+    // <!DOCTYPE html>\n<!--[if lt IE 7]> <html class="no-js ie6 oldie"…`.
+    expect(shown).not.toContain('<!DOCTYPE')
+    expect(shown).not.toContain('<html')
+    expect(shown).not.toContain('ie6 oldie')
+    // The CAUSE survives — an unattributable downgrade is the thing this must
+    // never become.
+    expect(shown).toBe('HTTP 502')
+  })
+
+  it('keeps a real upstream message, and caps a runaway one', () => {
+    expect(summarizeFailoverReason('Inference temporarily unavailable. Our team has been notified.')).toBe(
+      'Inference temporarily unavailable. Our team has been notified.',
+    )
+    // The plain-text edge body is short and already meaningful — untouched.
+    expect(summarizeFailoverReason(`OpenAI-compat stream failed (HTTP 502): ${EDGE_502_BODY}`)).toBe(
+      'OpenAI-compat stream failed (HTTP 502): error code: 502',
+    )
+    const long = `upstream said ${'blah '.repeat(200)}`
+    const capped = summarizeFailoverReason(long)
+    expect(capped.length).toBeLessThanOrEqual(161)
+    expect(capped.endsWith('…')).toBe(true)
+    // An HTML page with no readable status still says something honest.
+    expect(summarizeFailoverReason('<html><body>gateway problem</body></html>')).toBe(
+      'upstream returned an error page',
+    )
+    expect(summarizeFailoverReason('   ')).toBe('upstream unavailable')
+  })
+
+  it('the PRODUCER notice is condensed while the attempt trail keeps the full text', async () => {
+    const opened: string[] = []
+    const produced = createSandboxChatProducer({
+      model: 'gemini-2.5-pro',
+      fallbackModels: ['gemini-2.5-flash-lite'],
+      openEvents: ({ model }) => {
+        opened.push(model)
+        if (model === 'gemini-2.5-pro') {
+          return (async function* (): AsyncGenerator<unknown> {
+            throw Object.assign(new Error(`OpenAI-compat stream failed (HTTP 502): ${EDGE_502_HTML}`), { status: 502 })
+          })()
+        }
+        return feed(HEALTHY_SEQUENCE)
+      },
+      log: () => {},
+    })
+
+    const wire: string[] = []
+    for await (const event of produced.stream) wire.push(JSON.stringify(event))
+    const notice = wire.find((line) => line.includes('was unavailable'))
+
+    expect(opened).toEqual(['gemini-2.5-pro', 'gemini-2.5-flash-lite'])
+    expect(notice).toBeTruthy()
+    // What the customer reads: both models named, the cause named, no markup.
+    expect(notice).toContain('gemini-2.5-pro was unavailable (HTTP 502)')
+    expect(notice).toContain('answered with gemini-2.5-flash-lite instead')
+    expect(notice).not.toContain('DOCTYPE')
+    // What the operator gets: the verbatim text, untouched.
+    const trail = produced.modelFailover?.()
+    expect(trail?.attempts[0]?.reason).toContain('<!DOCTYPE html>')
   })
 })
 

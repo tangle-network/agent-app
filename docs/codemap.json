@@ -1924,6 +1924,12 @@
           "doc": "Wrap `open` in reactive model failover, streaming from the first model in `models` that reaches its commit point."
         },
         {
+          "name": "summarizeFailoverReason",
+          "kind": "function",
+          "signature": "(reason: string) => string",
+          "doc": "Condense an abandoned attempt's raw failure text into something safe to show a customer in the transcript."
+        },
+        {
           "name": "UPLOAD_INLINE_MAX_BYTES",
           "kind": "const",
           "signature": "number",

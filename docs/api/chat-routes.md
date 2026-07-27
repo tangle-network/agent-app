@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-156 exports.
+157 exports.
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
@@ -1196,6 +1196,14 @@ type StaleTurnLockSessionProbeResult
 
 ```ts
 (options: ModelFailoverStreamOptions) => ModelFailoverStreamHandle
+```
+
+### `summarizeFailoverReason`
+
+`function` — Condense an abandoned attempt's raw failure text into something safe to show a customer in the transcript.
+
+```ts
+(reason: string) => string
 ```
 
 ### `UPLOAD_INLINE_MAX_BYTES`
