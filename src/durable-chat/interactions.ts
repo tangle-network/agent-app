@@ -17,7 +17,7 @@ import type {
   DurableInteractionProjection,
   DurableInteractionSettlement,
   DurableInteractionSettlementOptions,
-  DurablePlanStore,
+  DurableInteractionStore,
 } from './types'
 
 function nowIso(now?: () => string): string {
@@ -45,7 +45,7 @@ function safeAnswers(data: Record<string, InteractionAnswerValue> | undefined): 
 /** Apply an ask event. Event ids and semantic signatures make replays safe;
  * a prior cancel creates a tombstone and cannot be resurrected by a late ask. */
 export async function upsertDurableInteractionAsk(
-  store: DurablePlanStore,
+  store: DurableInteractionStore,
   scope: DurableChatScope,
   request: InteractionRequestWire,
   options: { eventId?: string; semanticKey?: string; now?: () => string } = {},
@@ -73,7 +73,7 @@ export async function upsertDurableInteractionAsk(
 /** Apply a cancel event. It is valid before the ask arrives and leaves a
  * terminal tombstone so a delayed ask cannot re-open the card. */
 export async function recordDurableInteractionCancel(
-  store: DurablePlanStore,
+  store: DurableInteractionStore,
   scope: DurableChatScope,
   interactionId: string,
   reason?: string,
@@ -101,7 +101,7 @@ export async function recordDurableInteractionCancel(
  * transition is intentionally separate from answer-intent acknowledgement so
  * callers can choose reconciled or best-effort delivery. */
 export async function recordDurableInteractionAnswer(
-  store: DurablePlanStore,
+  store: DurableInteractionStore,
   scope: DurableChatScope,
   interactionId: string,
   outcome: 'accepted' | 'declined',
@@ -122,7 +122,7 @@ export async function recordDurableInteractionAnswer(
 
 /** Define options for creating durable interaction settlement factories including store and optional reconcile authority */
 export interface DurableInteractionSettlementFactoryOptions extends DurableInteractionSettlementOptions {
-  store: DurablePlanStore
+  store: DurableInteractionStore
   /** Optional authority lookup used by `reconcile`; returning null leaves the
    * intent prepared for a later durable retry. */
   reconcileAuthority?: (args: {
@@ -145,7 +145,11 @@ export function createDurableInteractionSettlement(
         scope, interactionId, attemptKey: options.attemptKey,
         intentKey: intentKey(scope, interactionId, options.attemptKey),
         outcome, ...(parsed ? { data: parsed } : {}), state: 'prepared',
-        guarantee: options.guarantee ?? 'reconciled', createdAt: now(),
+        // Default to the guarantee that is always true. Stamping `reconciled`
+        // by default persisted a claim about a reconciliation that, without a
+        // `reconcileAuthority`, never ran — and that wrong value outlived the
+        // request in the database.
+        guarantee: options.guarantee ?? 'best-effort', createdAt: now(),
       }
       const result = await options.store.claimAnswerIntent(scope, record)
       if (result.status === 'conflict') throw new DurableChatConflictError(result.reason)
@@ -166,7 +170,7 @@ export function createDurableInteractionSettlement(
     async finalize(scope, key) {
       const existing = await options.store.getAnswerIntent(scope, key)
       if (!existing) throw new DurableChatConflictError('unknown answer intent')
-      await options.store.finalizeAnswerIntent(scope, key, options.guarantee ?? 'reconciled')
+      await options.store.finalizeAnswerIntent(scope, key, options.guarantee ?? 'best-effort')
       return (await options.store.getAnswerIntent(scope, key))!
     },
     async abort(scope, key, error) {
@@ -187,7 +191,7 @@ export function createDurableInteractionSettlement(
         ...(acknowledgement.status ? { status: acknowledgement.status } : {}),
         ...(acknowledgement.at ? { at: acknowledgement.at } : {}),
       })
-      await options.store.finalizeAnswerIntent(scope, key, options.guarantee ?? 'reconciled')
+      await options.store.finalizeAnswerIntent(scope, key, options.guarantee ?? 'best-effort')
       return (await options.store.getAnswerIntent(scope, key))!
     },
   }

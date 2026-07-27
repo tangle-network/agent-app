@@ -331,13 +331,21 @@ that renders attachments outside `ChatMessages`.
 
 ## Durable plan and question workflow
 
-Apps that need decisions and accepted answers to survive reloads bind one
-production `DurableChatStateStore` to the shared route/producer adapters. The
-store is product infrastructure (D1, Postgres, a Durable Object, or equivalent);
-agent-app owns the command/settlement protocol around it. The exported
-`InMemoryDurableChatStateStore` is intentionally only for tests and local demos.
+Apps that need decisions and accepted answers to survive reloads bind a durable
+store to the shared route/producer adapters. agent-app ships that store:
+`/durable-chat/drizzle` works against any SQLite drizzle driver (D1, libsql,
+better-sqlite3). The exported `InMemoryDurableChatStateStore` is for tests and
+local demos only — it has no cross-process locking and no crash recovery.
+
+Two ports, so you implement only the half you use: `DurablePlanStore` (plan
+decisions) and `DurableInteractionStore` (question answers). A product wiring
+plan cards but not question cards needs three tables, not seven.
+
+Apply `DURABLE_CHAT_MIGRATION_SQL` once (it is plain SQL — paste it into your
+migrations directory), then:
 
 ```ts
+import { drizzle } from 'drizzle-orm/d1'
 import {
   createSandboxChatProducer,
   withDurableChatProjection,
@@ -348,9 +356,19 @@ import {
   createDurableInteractionRoutePersistence,
   createDurablePlanRoutes,
 } from '@tangle-network/agent-app/durable-chat'
+import {
+  createDurableChatTables,
+  createDrizzleDurableChatStore,
+} from '@tangle-network/agent-app/durable-chat/drizzle'
 import { createInteractionAnswerRoute } from '@tangle-network/agent-app/interactions'
 
-const scope = createDurableChatScope(`${workspaceId}/${threadId}`) // only after auth
+const tables = createDurableChatTables()
+const durableStore = createDrizzleDurableChatStore({ db: drizzle(env.DB), tables })
+
+// The scope is derived from trusted credentials, never from the request body.
+const session = await auth.requireSession(request)
+const scope = createDurableChatScope(`${session.workspaceId}/${threadId}`)
+
 const producer = withDurableChatProjection(
   createSandboxChatProducer({ events }),
   createDurableChatEventProjection({ store: durableStore, scope }),
@@ -360,20 +378,43 @@ createInteractionAnswerRoute({
   resolveConnection,
   durable: createDurableInteractionRoutePersistence({
     store: durableStore,
-    guarantee: 'reconciled',
+    // `best-effort` is the honest default and still gives full crash recovery:
+    // a retry carrying the same attemptKey settles from the durable intent
+    // journal, because an intent only reaches `acknowledged` after the answer
+    // POST succeeded. `reconciled` is for products that own an authority able
+    // to confirm a specific payload committed, and structurally requires one.
+    guarantee: 'best-effort',
     scope: async () => scope,
-    reconcileAuthority: ({ intent }) => lookupAnswerAcknowledgement(intent),
   }),
 })
 
 const planRoutes = createDurablePlanRoutes({
   store: durableStore,
-  authority: sandboxPlanAuthority,
-  authorize: async ({ request }) => authorizePlanScope(request),
-  afterDecision: ({ receipt, effectKey }) =>
-    applyPlanModePolicyIdempotently(receipt, effectKey),
+  // Sandbox is the plan authority; `SandboxSession.plan()` is the source of truth.
+  authority: {
+    current: ({ planId }) => box.session(sessionId).plan(planId),
+    decide: ({ planId, revision, decision, feedback, idempotencyKey }) =>
+      box.session(sessionId).decidePlan({ planId, revision, decision, feedback, idempotencyKey }),
+  },
+  authorize: async ({ request }) => {
+    const authorized = await auth.requireSession(request)
+    return createDurableChatScope(`${authorized.workspaceId}/${threadId}`)
+  },
+  // The route claims `effectKey` before calling this, but the effect itself is
+  // outside the database — so it must be safe to run twice.
+  afterDecision: async ({ receipt, effectKey }) => {
+    const already = await env.KV.get(`effect:${effectKey}`)
+    if (already) return
+    await dispatchFollowUpTurn(receipt.turnId)
+    await env.KV.put(`effect:${effectKey}`, '1')
+  },
 })
 ```
+
+Concurrency is handled for you: claims are compare-and-set with a lease, so two
+workers cannot drive the same decision, and a worker that dies mid-decision has
+its claim taken over after `staleAfterMs` (default one hour) rather than wedging
+the plan forever.
 
 On the client, `ChatMessages` can render the canonical cards directly from
 persisted `message.parts`. `attachFollowUp` must be idempotent by the receipt id;

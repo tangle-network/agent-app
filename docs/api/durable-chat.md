@@ -4,14 +4,14 @@
 
 Source: `src/durable-chat/index.ts`
 
-60 exports.
+70 exports.
 
 ### `applyDurableInteractionAnswer`
 
 `function` — Resolve and record the outcome and answers of a durable interaction within the given store and scope
 
 ```ts
-(store: DurablePlanStore, scope: DurableChatScope, interactionId: string, outcome: "declined" | "accepted", answers?: R…
+(store: DurableInteractionStore, scope: DurableChatScope, interactionId: string, outcome: "declined" | "accepted", answ…
 ```
 
 ### `applyDurableInteractionAsk`
@@ -19,7 +19,7 @@ Source: `src/durable-chat/index.ts`
 `function` — Resolve and upsert a durable interaction ask in the store with optional event and timing parameters
 
 ```ts
-(store: DurablePlanStore, scope: DurableChatScope, request: InteractionRequestWire, options?: { eventId?: string | unde…
+(store: DurableInteractionStore, scope: DurableChatScope, request: InteractionRequestWire, options?: { eventId?: string…
 ```
 
 ### `applyDurableInteractionCancel`
@@ -27,7 +27,7 @@ Source: `src/durable-chat/index.ts`
 `function` — Resolve cancellation of a durable interaction with optional reason and event details
 
 ```ts
-(store: DurablePlanStore, scope: DurableChatScope, interactionId: string, reason?: string | undefined, options?: { even…
+(store: DurableInteractionStore, scope: DurableChatScope, interactionId: string, reason?: string | undefined, options?:…
 ```
 
 ### `createDurableChatEventProjection`
@@ -35,7 +35,7 @@ Source: `src/durable-chat/index.ts`
 `function` — Event projector usable with any `ChatTurnRouteProducer` through `withDurableChatProjection`.
 
 ```ts
-(options: { store: DurablePlanStore; scope: DurableChatScope; now?: (() => string) | undefined; }) => DurableChatEventP…
+(options: { store: DurableChatStore; scope: DurableChatScope; now?: (() => string) | undefined; }) => DurableChatEventP…
 ```
 
 ### `createDurableChatScope`
@@ -51,12 +51,12 @@ Source: `src/durable-chat/index.ts`
 `function` — Binds an authorized durable scope/store to interaction lifecycle events.
 
 ```ts
-(options: { store: DurablePlanStore; scope: DurableChatScope; now?: (() => string) | undefined; }) => DurableInteractio…
+(options: { store: DurableInteractionStore; scope: DurableChatScope; now?: (() => string) | undefined; }) => DurableInt…
 ```
 
 ### `createDurableInteractionRoutePersistence`
 
-`function` — Ready-to-use bridge from `/interactions` to the durable state port.
+`function` — Ready-to-use bridge from `/interactions` to the durable interaction port.
 
 ```ts
 (options: CreateDurableInteractionRoutePersistenceOptions) => DurableInteractionRoutePersistence<PreparedDurableInterac…
@@ -64,7 +64,7 @@ Source: `src/durable-chat/index.ts`
 
 ### `CreateDurableInteractionRoutePersistenceOptions`
 
-`type` — Define options for durable interaction route persistence with reconciliation guarantees and authority functions
+`type` — Options for durable interaction route persistence.
 
 ```ts
 type CreateDurableInteractionRoutePersistenceOptions
@@ -94,9 +94,25 @@ type CreateDurableInteractionRoutePersistenceOptions
 () => InMemoryDurableChatStateStore
 ```
 
+### `createSidecarAbsenceReconciler`
+
+`function` — Treat an ask that is no longer outstanding as settled.
+
+```ts
+(options?: SidecarAbsenceReconcilerOptions) => (args: SidecarAbsenceReconcilerArgs) => Promise<DurableInteractionAcknow…
+```
+
+### `DurableAnswerIntentClaim`
+
+`type` — Outcome of claiming an answer intent.
+
+```ts
+type DurableAnswerIntentClaim
+```
+
 ### `DurableAnswerIntentJournal`
 
-`type` — Provide durable methods to manage the lifecycle of answer intents in a plan store
+`type` — Provide durable methods to manage the lifecycle of answer intents in a store
 
 ```ts
 type DurableAnswerIntentJournal
@@ -182,12 +198,28 @@ type DurableChatScope
 type DurableChatStateStore
 ```
 
+### `DurableChatStore`
+
+`interface` — Both ports.
+
+```ts
+interface DurableChatStore
+```
+
 ### `DurableChatUnavailableError`
 
 `class` — Represent unavailable durable chat authority errors with status code 503
 
 ```ts
 class DurableChatUnavailableError
+```
+
+### `DurableClaimLease`
+
+`interface` — Ownership fields returned by a successful claim.
+
+```ts
+interface DurableClaimLease
 ```
 
 ### `DurableFollowUpReceipt`
@@ -208,7 +240,7 @@ interface DurableInteractionAcknowledgement
 
 ### `DurableInteractionGuarantee`
 
-`type` — Define interaction durability levels to specify reconciliation or best-effort guarantees
+`type` — How thoroughly an answer's delivery was confirmed before the intent was marked finalized.
 
 ```ts
 type DurableInteractionGuarantee
@@ -262,6 +294,14 @@ interface DurableInteractionSettlementFactoryOptions
 interface DurableInteractionSettlementOptions
 ```
 
+### `DurableInteractionStore`
+
+`interface` — Interaction-side durable port: ask projections (with semantic dedupe and duplicate-id aliases) and the answer-intent journal.
+
+```ts
+interface DurableInteractionStore
+```
+
 ### `DurablePlanAuthority`
 
 `interface` — Structural port to Sandbox (or another durable plan authority).
@@ -302,6 +342,14 @@ interface DurablePlanAuthorityResult
 type DurablePlanAuthorization
 ```
 
+### `DurablePlanCommandClaim`
+
+`type` — Outcome of claiming a plan decision command.
+
+```ts
+type DurablePlanCommandClaim
+```
+
 ### `DurablePlanCommandJournal`
 
 `type` — Pick essential methods to manage and record durable plan command operations
@@ -340,6 +388,22 @@ type DurablePlanCommandState
 
 ```ts
 type DurablePlanDecision
+```
+
+### `DurablePlanEffectClaim`
+
+`type` — Outcome of claiming an after-decision effect.
+
+```ts
+type DurablePlanEffectClaim
+```
+
+### `DurablePlanEffectJournal`
+
+`type` — Pick the methods that claim and settle one after-decision effect.
+
+```ts
+type DurablePlanEffectJournal
 ```
 
 ### `DurablePlanEffectRecord`
@@ -384,7 +448,7 @@ interface DurablePlanRoutes
 
 ### `DurablePlanStateStore`
 
-`type` — Represent durable storage for plan state management with persistence and reliability guarantees
+`type`
 
 ```ts
 type DurablePlanStateStore
@@ -392,7 +456,7 @@ type DurablePlanStateStore
 
 ### `DurablePlanStore`
 
-`interface` — Manage durable storage and retrieval of plan projections, commands, and effects within a scoped context
+`interface` — Plan-side durable port: revision projections, the decision-command journal, and the after-decision effect journal.
 
 ```ts
 interface DurablePlanStore
@@ -459,7 +523,7 @@ interface PreparedDurableInteractionAnswer
 `function` — Record an accepted/declined answer in the projection.
 
 ```ts
-(store: DurablePlanStore, scope: DurableChatScope, interactionId: string, outcome: "declined" | "accepted", answers?: R…
+(store: DurableInteractionStore, scope: DurableChatScope, interactionId: string, outcome: "declined" | "accepted", answ…
 ```
 
 ### `recordDurableInteractionCancel`
@@ -467,7 +531,23 @@ interface PreparedDurableInteractionAnswer
 `function` — Apply a cancel event.
 
 ```ts
-(store: DurablePlanStore, scope: DurableChatScope, interactionId: string, reason?: string | undefined, options?: { even…
+(store: DurableInteractionStore, scope: DurableChatScope, interactionId: string, reason?: string | undefined, options?:…
+```
+
+### `SidecarAbsenceReconcilerArgs`
+
+`interface` — The outstanding-ask snapshot a reconciler reasons about.
+
+```ts
+interface SidecarAbsenceReconcilerArgs
+```
+
+### `SidecarAbsenceReconcilerOptions`
+
+`interface` — Options for `createSidecarAbsenceReconciler`.
+
+```ts
+interface SidecarAbsenceReconcilerOptions
 ```
 
 ### `stablePlanReceipt`
@@ -483,5 +563,5 @@ interface PreparedDurableInteractionAnswer
 `function` — Apply an ask event.
 
 ```ts
-(store: DurablePlanStore, scope: DurableChatScope, request: InteractionRequestWire, options?: { eventId?: string | unde…
+(store: DurableInteractionStore, scope: DurableChatScope, request: InteractionRequestWire, options?: { eventId?: string…
 ```

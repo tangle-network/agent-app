@@ -8,7 +8,7 @@ import {
   type DurablePlanCommandKey,
   type DurablePlanEffectRecord,
   type DurablePlanProjection,
-  type DurablePlanStore,
+  type DurableChatStore,
 } from './types'
 import { DurableChatConflictError } from './errors'
 import { canTransitionPlanStatus } from '../plans/index'
@@ -19,7 +19,7 @@ import { canTransitionPlanStatus } from '../plans/index'
  * transaction, or crash recovery. Production adapters should implement the
  * same port with a database/Workflow primitive and CAS at every claim.
  */
-export class InMemoryDurableChatStateStore implements DurablePlanStore {
+export class InMemoryDurableChatStateStore implements DurableChatStore {
   private readonly plans = new Map<string, DurablePlanProjection>()
   private readonly currentPlans = new Map<string, string>()
   private readonly commands = new Map<string, DurablePlanCommandRecord>()
@@ -256,7 +256,7 @@ export class InMemoryDurableChatStateStore implements DurablePlanStore {
     intent.acknowledgement = acknowledgement
     intent.state = 'acknowledged'
   }
-  async finalizeAnswerIntent(scope: DurableChatScope, intentKey: string, guarantee: DurableAnswerIntentRecord['guarantee'] = 'reconciled'): Promise<void> {
+  async finalizeAnswerIntent(scope: DurableChatScope, intentKey: string, guarantee: DurableAnswerIntentRecord['guarantee'] = 'best-effort'): Promise<void> {
     const intent = this.answerIntents.get(this.intentKey(scope, intentKey))
     if (!intent) throw new DurableChatConflictError('cannot finalize unknown answer intent')
     if (intent.state === 'finalized') return

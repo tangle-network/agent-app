@@ -22,7 +22,8 @@ import type {
   DurableInteractionAcknowledgement,
   DurableInteractionGuarantee,
   DurableInteractionSettlement,
-  DurablePlanStore,
+  DurableChatStore,
+  DurableInteractionStore,
 } from './types'
 import {
   parsePlanSubmittedEvent,
@@ -39,7 +40,7 @@ export interface DurableInteractionProjectionAdapter {
 
 /** Binds an authorized durable scope/store to interaction lifecycle events. */
 export function createDurableInteractionProjectionAdapter(options: {
-  store: DurablePlanStore
+  store: DurableInteractionStore
   scope: DurableChatScope
   now?: () => string
 }): DurableInteractionProjectionAdapter {
@@ -101,7 +102,7 @@ function eventRecord(value: unknown): Record<string, unknown> | null {
  * `withDurableChatProjection`. It tracks this turn's identities so older
  * thread state is not copied into every assistant message. */
 export function createDurableChatEventProjection(options: {
-  store: DurablePlanStore
+  store: DurableChatStore
   scope: DurableChatScope
   now?: () => string
 }): DurableChatEventProjection {
@@ -162,14 +163,25 @@ export interface PreparedDurableInteractionAnswer {
 }
 
 interface DurableInteractionRoutePersistenceBase {
-  store: DurablePlanStore
+  store: DurableInteractionStore
   scope(args: DurableInteractionRouteArgs): DurableChatScope | Promise<DurableChatScope>
   now?: () => string
 }
 
-/** Define options for durable interaction route persistence with reconciliation guarantees and authority functions */
+/**
+ * Options for durable interaction route persistence.
+ *
+ * Prefer `'best-effort'`: it is the honest default and still gives full crash
+ * recovery through the intent journal. `'reconciled'` is for a product that owns
+ * an authority able to confirm a specific answer committed — it structurally
+ * requires that lookup, because the guarantee names evidence, not intent.
+ */
 export type CreateDurableInteractionRoutePersistenceOptions =
   | (DurableInteractionRoutePersistenceBase & {
+      /**
+       * Requires `reconcileAuthority`. The sidecar cannot currently satisfy this
+       * on its own — see `DurableInteractionGuarantee`.
+       */
       guarantee: 'reconciled'
       reconcileAuthority(args: {
         scope: DurableChatScope
@@ -186,13 +198,34 @@ export type CreateDurableInteractionRoutePersistenceOptions =
       }) => Promise<DurableInteractionAcknowledgement | null>
     })
 
-/** Ready-to-use bridge from `/interactions` to the durable state port. Only
- * the reconciled variant may claim crash-safe behavior; best-effort is
- * explicit in both its type and persisted intent. */
+/**
+ * Ready-to-use bridge from `/interactions` to the durable interaction port.
+ *
+ * **Crash recovery is automatic and does not depend on the guarantee level.**
+ * `reconcile` below resolves an ambiguous retry from the durable journal alone:
+ * an intent that a previous attempt left `acknowledged` is finished and reported
+ * settled, and one already `finalized` reports settled directly. Because the
+ * settlement only reaches those states after a successful answer POST, that is
+ * real proof of delivery — no upstream lookup, no product code, every adopter.
+ *
+ * `reconcileAuthority` covers only what local state cannot: an attempt that died
+ * between the successful POST and its acknowledgement, leaving the intent at
+ * `prepared`. See `DurableInteractionGuarantee` for why the sidecar cannot
+ * currently answer that, and `./reconcile` for the partial signal that exists.
+ */
 export function createDurableInteractionRoutePersistence(
   options: CreateDurableInteractionRoutePersistenceOptions,
 ): DurableInteractionRoutePersistence<PreparedDurableInteractionAnswer> {
   const guarantee: DurableInteractionGuarantee = options.guarantee
+  // The union type already forbids this, but the guard defends JavaScript
+  // callers and re-exports — a persisted `reconciled` with nothing reconciling
+  // is precisely the dishonest record this module is meant to stop producing.
+  if (guarantee === 'reconciled' && typeof options.reconcileAuthority !== 'function') {
+    throw new TypeError(
+      "durable interaction persistence: guarantee 'reconciled' requires a reconcileAuthority. " +
+      "Use 'best-effort' (crash recovery from the intent journal still applies), or supply an authority lookup.",
+    )
+  }
   return {
     guarantee,
     async prepare(args) {

@@ -155,6 +155,10 @@ export function createDurablePlanRoutes(options: DurablePlanRouteOptions): Durab
     receipt: DurableFollowUpReceipt,
   ): Promise<boolean> {
     const effectKey = planEffectKey(scope, plan.planId, plan.revision, receipt.decision)
+    // Held across the try/catch so a failure settles under the SAME lease the
+    // claim issued. A store that hands out leases will then reject this write if
+    // another worker took the claim over while `afterDecision` was running.
+    let lease: string | undefined
     try {
       const existing = await options.store.getPlanEffect(scope, effectKey)
       if (existing?.state === 'completed') return true
@@ -163,11 +167,12 @@ export function createDurablePlanRoutes(options: DurablePlanRouteOptions): Durab
         decision: receipt.decision, state: 'claimed', claimedAt: now(),
       })
       if (claim.status === 'existing' && claim.record.state === 'completed') return true
+      lease = claim.lease
       await options.afterDecision({ scope, plan, receipt, effectKey })
-      await options.store.completePlanEffect(scope, effectKey)
+      await options.store.completePlanEffect(scope, effectKey, lease)
       return true
     } catch (error) {
-      await options.store.failPlanEffect(scope, effectKey, error instanceof Error ? error.message : String(error)).catch(() => undefined)
+      await options.store.failPlanEffect(scope, effectKey, error instanceof Error ? error.message : String(error), lease).catch(() => undefined)
       logger.warn('[durable-chat] afterDecision failed:', error)
       return false
     }
@@ -336,9 +341,13 @@ export function createDurablePlanRoutes(options: DurablePlanRouteOptions): Durab
         return errorResponse(error, 'DURABLE_CHAT_UNAVAILABLE', 503, 'plan authority unavailable')
       }
     }
+    // The authority call can outlast a claim's lease. Settling under the lease we
+    // were granted means a worker that took this decision over in the meantime
+    // wins, instead of both of them writing over each other.
+    const commandLease = claimed.status === 'claimed' ? claimed.lease : undefined
     let projectionPending = false
     try {
-      await options.store.recordPlanAuthorityResult(scope, commandKey, authorityResult, authorityResult.receipt)
+      await options.store.recordPlanAuthorityResult(scope, commandKey, authorityResult, authorityResult.receipt, commandLease)
     } catch (error) {
       projectionPending = true
       // The authority has committed; the receipt remains safe to return and
@@ -347,7 +356,7 @@ export function createDurablePlanRoutes(options: DurablePlanRouteOptions): Durab
     }
     try {
       await options.store.putPlanProjection(scope, authorityResult.plan)
-      await options.store.finalizePlanCommand(scope, commandKey)
+      await options.store.finalizePlanCommand(scope, commandKey, commandLease)
     } catch (error) {
       projectionPending = true
       logger.warn('[durable-chat] failed to finalize plan projection:', error)

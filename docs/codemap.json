@@ -171,19 +171,19 @@
         {
           "name": "applyDurableInteractionAnswer",
           "kind": "function",
-          "signature": "(store: DurablePlanStore, scope: DurableChatScope, interactionId: string, outcome: \"declined\" | \"accepted\", answers?: R…",
+          "signature": "(store: DurableInteractionStore, scope: DurableChatScope, interactionId: string, outcome: \"declined\" | \"accepted\", answ…",
           "doc": "Resolve and record the outcome and answers of a durable interaction within the given store and scope"
         },
         {
           "name": "applyDurableInteractionAsk",
           "kind": "function",
-          "signature": "(store: DurablePlanStore, scope: DurableChatScope, request: InteractionRequestWire, options?: { eventId?: string | unde…",
+          "signature": "(store: DurableInteractionStore, scope: DurableChatScope, request: InteractionRequestWire, options?: { eventId?: string…",
           "doc": "Resolve and upsert a durable interaction ask in the store with optional event and timing parameters"
         },
         {
           "name": "applyDurableInteractionCancel",
           "kind": "function",
-          "signature": "(store: DurablePlanStore, scope: DurableChatScope, interactionId: string, reason?: string | undefined, options?: { even…",
+          "signature": "(store: DurableInteractionStore, scope: DurableChatScope, interactionId: string, reason?: string | undefined, options?:…",
           "doc": "Resolve cancellation of a durable interaction with optional reason and event details"
         },
         {
@@ -1053,7 +1053,7 @@
         {
           "name": "createDurableChatEventProjection",
           "kind": "function",
-          "signature": "(options: { store: DurablePlanStore; scope: DurableChatScope; now?: (() => string) | undefined; }) => DurableChatEventP…",
+          "signature": "(options: { store: DurableChatStore; scope: DurableChatScope; now?: (() => string) | undefined; }) => DurableChatEventP…",
           "doc": "Event projector usable with any `ChatTurnRouteProducer` through `withDurableChatProjection`."
         },
         {
@@ -1065,20 +1065,20 @@
         {
           "name": "createDurableInteractionProjectionAdapter",
           "kind": "function",
-          "signature": "(options: { store: DurablePlanStore; scope: DurableChatScope; now?: (() => string) | undefined; }) => DurableInteractio…",
+          "signature": "(options: { store: DurableInteractionStore; scope: DurableChatScope; now?: (() => string) | undefined; }) => DurableInt…",
           "doc": "Binds an authorized durable scope/store to interaction lifecycle events."
         },
         {
           "name": "createDurableInteractionRoutePersistence",
           "kind": "function",
           "signature": "(options: CreateDurableInteractionRoutePersistenceOptions) => DurableInteractionRoutePersistence<PreparedDurableInterac…",
-          "doc": "Ready-to-use bridge from `/interactions` to the durable state port."
+          "doc": "Ready-to-use bridge from `/interactions` to the durable interaction port."
         },
         {
           "name": "CreateDurableInteractionRoutePersistenceOptions",
           "kind": "type",
           "signature": "type CreateDurableInteractionRoutePersistenceOptions",
-          "doc": "Define options for durable interaction route persistence with reconciliation guarantees and authority functions"
+          "doc": "Options for durable interaction route persistence."
         },
         {
           "name": "createDurableInteractionSettlement",
@@ -1253,6 +1253,12 @@
           "kind": "function",
           "signature": "(subject: TerminalProxyIdentity, opts: SandboxTerminalTokenOptions) => Promise<SandboxTerminalTokenResult>",
           "doc": "Generate a sandbox terminal token for a given subject with specified options"
+        },
+        {
+          "name": "createSidecarAbsenceReconciler",
+          "kind": "function",
+          "signature": "(options?: SidecarAbsenceReconcilerOptions) => (args: SidecarAbsenceReconcilerArgs) => Promise<DurableInteractionAcknow…",
+          "doc": "Treat an ask that is no longer outstanding as settled."
         },
         {
           "name": "createSurfaceRegistry",
@@ -1561,10 +1567,16 @@
           "doc": "The shape of a `drizzle-orm/sqlite-core` module — the few builders the preset schema uses."
         },
         {
+          "name": "DurableAnswerIntentClaim",
+          "kind": "type",
+          "signature": "type DurableAnswerIntentClaim",
+          "doc": "Outcome of claiming an answer intent."
+        },
+        {
           "name": "DurableAnswerIntentJournal",
           "kind": "type",
           "signature": "type DurableAnswerIntentJournal",
-          "doc": "Provide durable methods to manage the lifecycle of answer intents in a plan store"
+          "doc": "Provide durable methods to manage the lifecycle of answer intents in a store"
         },
         {
           "name": "DurableAnswerIntentRecord",
@@ -1627,10 +1639,22 @@
           "doc": "Alias used by adapters that store all durable chat state in one port."
         },
         {
+          "name": "DurableChatStore",
+          "kind": "interface",
+          "signature": "interface DurableChatStore",
+          "doc": "Both ports."
+        },
+        {
           "name": "DurableChatUnavailableError",
           "kind": "class",
           "signature": "class DurableChatUnavailableError",
           "doc": "Represent unavailable durable chat authority errors with status code 503"
+        },
+        {
+          "name": "DurableClaimLease",
+          "kind": "interface",
+          "signature": "interface DurableClaimLease",
+          "doc": "Ownership fields returned by a successful claim."
         },
         {
           "name": "DurableFollowUpReceipt",
@@ -1648,7 +1672,7 @@
           "name": "DurableInteractionGuarantee",
           "kind": "type",
           "signature": "type DurableInteractionGuarantee",
-          "doc": "Define interaction durability levels to specify reconciliation or best-effort guarantees"
+          "doc": "How thoroughly an answer's delivery was confirmed before the intent was marked finalized."
         },
         {
           "name": "durableInteractionIntentKey",
@@ -1699,6 +1723,12 @@
           "doc": "Define options for durable interaction settlement including attempt key, guarantee, and timestamp provider"
         },
         {
+          "name": "DurableInteractionStore",
+          "kind": "interface",
+          "signature": "interface DurableInteractionStore",
+          "doc": "Interaction-side durable port: ask projections (with semantic dedupe and duplicate-id aliases) and the answer-intent journal."
+        },
+        {
           "name": "DurablePlanAuthority",
           "kind": "interface",
           "signature": "interface DurablePlanAuthority",
@@ -1729,6 +1759,12 @@
           "doc": "Resolve authorization status for durable plans using scopes, responses, or nullish values"
         },
         {
+          "name": "DurablePlanCommandClaim",
+          "kind": "type",
+          "signature": "type DurablePlanCommandClaim",
+          "doc": "Outcome of claiming a plan decision command."
+        },
+        {
           "name": "DurablePlanCommandJournal",
           "kind": "type",
           "signature": "type DurablePlanCommandJournal",
@@ -1757,6 +1793,18 @@
           "kind": "type",
           "signature": "type DurablePlanDecision",
           "doc": "Represent durable plan outcomes as either approved or rejected"
+        },
+        {
+          "name": "DurablePlanEffectClaim",
+          "kind": "type",
+          "signature": "type DurablePlanEffectClaim",
+          "doc": "Outcome of claiming an after-decision effect."
+        },
+        {
+          "name": "DurablePlanEffectJournal",
+          "kind": "type",
+          "signature": "type DurablePlanEffectJournal",
+          "doc": "Pick the methods that claim and settle one after-decision effect."
         },
         {
           "name": "DurablePlanEffectRecord",
@@ -1792,13 +1840,13 @@
           "name": "DurablePlanStateStore",
           "kind": "type",
           "signature": "type DurablePlanStateStore",
-          "doc": "Represent durable storage for plan state management with persistence and reliability guarantees"
+          "doc": null
         },
         {
           "name": "DurablePlanStore",
           "kind": "interface",
           "signature": "interface DurablePlanStore",
-          "doc": "Manage durable storage and retrieval of plan projections, commands, and effects within a scoped context"
+          "doc": "Plan-side durable port: revision projections, the decision-command journal, and the after-decision effect journal."
         },
         {
           "name": "EmailBodySection",
@@ -3513,13 +3561,13 @@
         {
           "name": "recordDurableInteractionAnswer",
           "kind": "function",
-          "signature": "(store: DurablePlanStore, scope: DurableChatScope, interactionId: string, outcome: \"declined\" | \"accepted\", answers?: R…",
+          "signature": "(store: DurableInteractionStore, scope: DurableChatScope, interactionId: string, outcome: \"declined\" | \"accepted\", answ…",
           "doc": "Record an accepted/declined answer in the projection."
         },
         {
           "name": "recordDurableInteractionCancel",
           "kind": "function",
-          "signature": "(store: DurablePlanStore, scope: DurableChatScope, interactionId: string, reason?: string | undefined, options?: { even…",
+          "signature": "(store: DurableInteractionStore, scope: DurableChatScope, interactionId: string, reason?: string | undefined, options?:…",
           "doc": "Apply a cancel event."
         },
         {
@@ -4183,6 +4231,18 @@
           "doc": "Wraps a value in single quotes for `sh`, closing and reopening the quote around each embedded quote (`'` → `'\"'\"'`)."
         },
         {
+          "name": "SidecarAbsenceReconcilerArgs",
+          "kind": "interface",
+          "signature": "interface SidecarAbsenceReconcilerArgs",
+          "doc": "The outstanding-ask snapshot a reconciler reasons about."
+        },
+        {
+          "name": "SidecarAbsenceReconcilerOptions",
+          "kind": "interface",
+          "signature": "interface SidecarAbsenceReconcilerOptions",
+          "doc": "Options for `createSidecarAbsenceReconciler`."
+        },
+        {
           "name": "SidecarInteractionsConnection",
           "kind": "interface",
           "signature": "interface SidecarInteractionsConnection",
@@ -4683,7 +4743,7 @@
         {
           "name": "upsertDurableInteractionAsk",
           "kind": "function",
-          "signature": "(store: DurablePlanStore, scope: DurableChatScope, request: InteractionRequestWire, options?: { eventId?: string | unde…",
+          "signature": "(store: DurableInteractionStore, scope: DurableChatScope, request: InteractionRequestWire, options?: { eventId?: string…",
           "doc": "Apply an ask event."
         },
         {
@@ -9669,25 +9729,25 @@
         {
           "name": "applyDurableInteractionAnswer",
           "kind": "function",
-          "signature": "(store: DurablePlanStore, scope: DurableChatScope, interactionId: string, outcome: \"declined\" | \"accepted\", answers?: R…",
+          "signature": "(store: DurableInteractionStore, scope: DurableChatScope, interactionId: string, outcome: \"declined\" | \"accepted\", answ…",
           "doc": "Resolve and record the outcome and answers of a durable interaction within the given store and scope"
         },
         {
           "name": "applyDurableInteractionAsk",
           "kind": "function",
-          "signature": "(store: DurablePlanStore, scope: DurableChatScope, request: InteractionRequestWire, options?: { eventId?: string | unde…",
+          "signature": "(store: DurableInteractionStore, scope: DurableChatScope, request: InteractionRequestWire, options?: { eventId?: string…",
           "doc": "Resolve and upsert a durable interaction ask in the store with optional event and timing parameters"
         },
         {
           "name": "applyDurableInteractionCancel",
           "kind": "function",
-          "signature": "(store: DurablePlanStore, scope: DurableChatScope, interactionId: string, reason?: string | undefined, options?: { even…",
+          "signature": "(store: DurableInteractionStore, scope: DurableChatScope, interactionId: string, reason?: string | undefined, options?:…",
           "doc": "Resolve cancellation of a durable interaction with optional reason and event details"
         },
         {
           "name": "createDurableChatEventProjection",
           "kind": "function",
-          "signature": "(options: { store: DurablePlanStore; scope: DurableChatScope; now?: (() => string) | undefined; }) => DurableChatEventP…",
+          "signature": "(options: { store: DurableChatStore; scope: DurableChatScope; now?: (() => string) | undefined; }) => DurableChatEventP…",
           "doc": "Event projector usable with any `ChatTurnRouteProducer` through `withDurableChatProjection`."
         },
         {
@@ -9699,20 +9759,20 @@
         {
           "name": "createDurableInteractionProjectionAdapter",
           "kind": "function",
-          "signature": "(options: { store: DurablePlanStore; scope: DurableChatScope; now?: (() => string) | undefined; }) => DurableInteractio…",
+          "signature": "(options: { store: DurableInteractionStore; scope: DurableChatScope; now?: (() => string) | undefined; }) => DurableInt…",
           "doc": "Binds an authorized durable scope/store to interaction lifecycle events."
         },
         {
           "name": "createDurableInteractionRoutePersistence",
           "kind": "function",
           "signature": "(options: CreateDurableInteractionRoutePersistenceOptions) => DurableInteractionRoutePersistence<PreparedDurableInterac…",
-          "doc": "Ready-to-use bridge from `/interactions` to the durable state port."
+          "doc": "Ready-to-use bridge from `/interactions` to the durable interaction port."
         },
         {
           "name": "CreateDurableInteractionRoutePersistenceOptions",
           "kind": "type",
           "signature": "type CreateDurableInteractionRoutePersistenceOptions",
-          "doc": "Define options for durable interaction route persistence with reconciliation guarantees and authority functions"
+          "doc": "Options for durable interaction route persistence."
         },
         {
           "name": "createDurableInteractionSettlement",
@@ -9733,10 +9793,22 @@
           "doc": "Create an in-memory durable chat state store for managing chat session data efficiently"
         },
         {
+          "name": "createSidecarAbsenceReconciler",
+          "kind": "function",
+          "signature": "(options?: SidecarAbsenceReconcilerOptions) => (args: SidecarAbsenceReconcilerArgs) => Promise<DurableInteractionAcknow…",
+          "doc": "Treat an ask that is no longer outstanding as settled."
+        },
+        {
+          "name": "DurableAnswerIntentClaim",
+          "kind": "type",
+          "signature": "type DurableAnswerIntentClaim",
+          "doc": "Outcome of claiming an answer intent."
+        },
+        {
           "name": "DurableAnswerIntentJournal",
           "kind": "type",
           "signature": "type DurableAnswerIntentJournal",
-          "doc": "Provide durable methods to manage the lifecycle of answer intents in a plan store"
+          "doc": "Provide durable methods to manage the lifecycle of answer intents in a store"
         },
         {
           "name": "DurableAnswerIntentRecord",
@@ -9799,10 +9871,22 @@
           "doc": "Alias used by adapters that store all durable chat state in one port."
         },
         {
+          "name": "DurableChatStore",
+          "kind": "interface",
+          "signature": "interface DurableChatStore",
+          "doc": "Both ports."
+        },
+        {
           "name": "DurableChatUnavailableError",
           "kind": "class",
           "signature": "class DurableChatUnavailableError",
           "doc": "Represent unavailable durable chat authority errors with status code 503"
+        },
+        {
+          "name": "DurableClaimLease",
+          "kind": "interface",
+          "signature": "interface DurableClaimLease",
+          "doc": "Ownership fields returned by a successful claim."
         },
         {
           "name": "DurableFollowUpReceipt",
@@ -9820,7 +9904,7 @@
           "name": "DurableInteractionGuarantee",
           "kind": "type",
           "signature": "type DurableInteractionGuarantee",
-          "doc": "Define interaction durability levels to specify reconciliation or best-effort guarantees"
+          "doc": "How thoroughly an answer's delivery was confirmed before the intent was marked finalized."
         },
         {
           "name": "durableInteractionIntentKey",
@@ -9859,6 +9943,12 @@
           "doc": "Define options for durable interaction settlement including attempt key, guarantee, and timestamp provider"
         },
         {
+          "name": "DurableInteractionStore",
+          "kind": "interface",
+          "signature": "interface DurableInteractionStore",
+          "doc": "Interaction-side durable port: ask projections (with semantic dedupe and duplicate-id aliases) and the answer-intent journal."
+        },
+        {
           "name": "DurablePlanAuthority",
           "kind": "interface",
           "signature": "interface DurablePlanAuthority",
@@ -9889,6 +9979,12 @@
           "doc": "Resolve authorization status for durable plans using scopes, responses, or nullish values"
         },
         {
+          "name": "DurablePlanCommandClaim",
+          "kind": "type",
+          "signature": "type DurablePlanCommandClaim",
+          "doc": "Outcome of claiming a plan decision command."
+        },
+        {
           "name": "DurablePlanCommandJournal",
           "kind": "type",
           "signature": "type DurablePlanCommandJournal",
@@ -9917,6 +10013,18 @@
           "kind": "type",
           "signature": "type DurablePlanDecision",
           "doc": "Represent durable plan outcomes as either approved or rejected"
+        },
+        {
+          "name": "DurablePlanEffectClaim",
+          "kind": "type",
+          "signature": "type DurablePlanEffectClaim",
+          "doc": "Outcome of claiming an after-decision effect."
+        },
+        {
+          "name": "DurablePlanEffectJournal",
+          "kind": "type",
+          "signature": "type DurablePlanEffectJournal",
+          "doc": "Pick the methods that claim and settle one after-decision effect."
         },
         {
           "name": "DurablePlanEffectRecord",
@@ -9952,13 +10060,13 @@
           "name": "DurablePlanStateStore",
           "kind": "type",
           "signature": "type DurablePlanStateStore",
-          "doc": "Represent durable storage for plan state management with persistence and reliability guarantees"
+          "doc": null
         },
         {
           "name": "DurablePlanStore",
           "kind": "interface",
           "signature": "interface DurablePlanStore",
-          "doc": "Manage durable storage and retrieval of plan projections, commands, and effects within a scoped context"
+          "doc": "Plan-side durable port: revision projections, the decision-command journal, and the after-decision effect journal."
         },
         {
           "name": "InMemoryDurableChatStateStore",
@@ -10005,14 +10113,26 @@
         {
           "name": "recordDurableInteractionAnswer",
           "kind": "function",
-          "signature": "(store: DurablePlanStore, scope: DurableChatScope, interactionId: string, outcome: \"declined\" | \"accepted\", answers?: R…",
+          "signature": "(store: DurableInteractionStore, scope: DurableChatScope, interactionId: string, outcome: \"declined\" | \"accepted\", answ…",
           "doc": "Record an accepted/declined answer in the projection."
         },
         {
           "name": "recordDurableInteractionCancel",
           "kind": "function",
-          "signature": "(store: DurablePlanStore, scope: DurableChatScope, interactionId: string, reason?: string | undefined, options?: { even…",
+          "signature": "(store: DurableInteractionStore, scope: DurableChatScope, interactionId: string, reason?: string | undefined, options?:…",
           "doc": "Apply a cancel event."
+        },
+        {
+          "name": "SidecarAbsenceReconcilerArgs",
+          "kind": "interface",
+          "signature": "interface SidecarAbsenceReconcilerArgs",
+          "doc": "The outstanding-ask snapshot a reconciler reasons about."
+        },
+        {
+          "name": "SidecarAbsenceReconcilerOptions",
+          "kind": "interface",
+          "signature": "interface SidecarAbsenceReconcilerOptions",
+          "doc": "Options for `createSidecarAbsenceReconciler`."
         },
         {
           "name": "stablePlanReceipt",
@@ -10023,8 +10143,139 @@
         {
           "name": "upsertDurableInteractionAsk",
           "kind": "function",
-          "signature": "(store: DurablePlanStore, scope: DurableChatScope, request: InteractionRequestWire, options?: { eventId?: string | unde…",
+          "signature": "(store: DurableInteractionStore, scope: DurableChatScope, request: InteractionRequestWire, options?: { eventId?: string…",
           "doc": "Apply an ask event."
+        }
+      ]
+    },
+    {
+      "id": "./durable-chat/drizzle",
+      "source": "src/durable-chat/drizzle.ts",
+      "dependsOn": [
+        "interactions",
+        "plans"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "createDrizzleDurableChatStore",
+          "kind": "function",
+          "signature": "(options: CreateDrizzleDurableChatStoreOptions) => DurableChatStore",
+          "doc": "Build the composed store: both ports over all seven tables."
+        },
+        {
+          "name": "CreateDrizzleDurableChatStoreOptions",
+          "kind": "interface",
+          "signature": "interface CreateDrizzleDurableChatStoreOptions",
+          "doc": "Options for the composed store."
+        },
+        {
+          "name": "createDrizzleInteractionStore",
+          "kind": "function",
+          "signature": "(options: CreateDrizzleInteractionStoreOptions) => DurableInteractionStore",
+          "doc": "Build the interaction-side store: ask projections and the answer-intent journal."
+        },
+        {
+          "name": "CreateDrizzleInteractionStoreOptions",
+          "kind": "interface",
+          "signature": "interface CreateDrizzleInteractionStoreOptions",
+          "doc": "Options for the interaction-only store."
+        },
+        {
+          "name": "createDrizzlePlanStore",
+          "kind": "function",
+          "signature": "(options: CreateDrizzlePlanStoreOptions) => DurablePlanStore",
+          "doc": "Build the plan-side store: projections, the command journal, the effect journal."
+        },
+        {
+          "name": "CreateDrizzlePlanStoreOptions",
+          "kind": "interface",
+          "signature": "interface CreateDrizzlePlanStoreOptions",
+          "doc": "Options for the plan-only store."
+        },
+        {
+          "name": "createDurableChatTables",
+          "kind": "function",
+          "signature": "() => DurableChatTables",
+          "doc": "All seven tables, for a product wiring both halves."
+        },
+        {
+          "name": "createDurableInteractionTables",
+          "kind": "function",
+          "signature": "() => DurableInteractionTables",
+          "doc": "The four tables an interaction-only adopter needs."
+        },
+        {
+          "name": "createDurablePlanTables",
+          "kind": "function",
+          "signature": "() => DurablePlanTables",
+          "doc": "The three tables a plan-only adopter needs."
+        },
+        {
+          "name": "DURABLE_CHAT_MIGRATION_SQL",
+          "kind": "const",
+          "signature": "\"\\nCREATE TABLE IF NOT EXISTS durable_plan_projection (\\n id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),\\n s…",
+          "doc": "The DDL these tables compile to, for products applying migrations by hand (D1, libsql)."
+        },
+        {
+          "name": "DurableAnswerIntentRow",
+          "kind": "type",
+          "signature": "type DurableAnswerIntentRow",
+          "doc": "A persisted answer intent."
+        },
+        {
+          "name": "DurableChatDatabase",
+          "kind": "type",
+          "signature": "type DurableChatDatabase",
+          "doc": "Any SQLite drizzle database — `any` erases driver-specific generics so better-sqlite3, D1 and libsql handles all fit."
+        },
+        {
+          "name": "DurableChatStoreOptions",
+          "kind": "interface",
+          "signature": "interface DurableChatStoreOptions",
+          "doc": "Shared construction options."
+        },
+        {
+          "name": "DurableChatTables",
+          "kind": "interface",
+          "signature": "interface DurableChatTables",
+          "doc": "Both halves."
+        },
+        {
+          "name": "DurableInteractionProjectionRow",
+          "kind": "type",
+          "signature": "type DurableInteractionProjectionRow",
+          "doc": "A persisted interaction ask projection."
+        },
+        {
+          "name": "DurableInteractionTables",
+          "kind": "interface",
+          "signature": "interface DurableInteractionTables",
+          "doc": "Interaction-side tables."
+        },
+        {
+          "name": "DurablePlanCommandRow",
+          "kind": "type",
+          "signature": "type DurablePlanCommandRow",
+          "doc": "A persisted plan decision command."
+        },
+        {
+          "name": "DurablePlanEffectRow",
+          "kind": "type",
+          "signature": "type DurablePlanEffectRow",
+          "doc": "A persisted after-decision effect claim."
+        },
+        {
+          "name": "DurablePlanProjectionRow",
+          "kind": "type",
+          "signature": "type DurablePlanProjectionRow",
+          "doc": "Row types, for products that query these tables directly."
+        },
+        {
+          "name": "DurablePlanTables",
+          "kind": "interface",
+          "signature": "interface DurablePlanTables",
+          "doc": "Plan-side tables."
         }
       ]
     },

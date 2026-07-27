@@ -124,51 +124,88 @@ export interface DurablePlanEffectRecord {
   error?: string
 }
 
-/** Manage durable storage and retrieval of plan projections, commands, and effects within a scoped context */
+/** Ownership fields returned by a successful claim. Both are OPTIONAL: a store
+ * with no lease concept (the in-memory reference) omits them, and a caller that
+ * ignores them keeps the pre-lease behavior exactly. A store that DOES issue
+ * leases expects the token back on the matching settle call, so a stalled
+ * predecessor that wakes up cannot settle behind the worker that took over. */
+export interface DurableClaimLease {
+  /** Opaque token proving this caller currently owns the claim. */
+  lease?: string
+  /** True when this claim took over a lease whose holder went stale. */
+  takenOver?: boolean
+}
+
+/** Outcome of claiming a plan decision command. */
+export type DurablePlanCommandClaim =
+  | ({ status: 'claimed'; record: DurablePlanCommandRecord } & DurableClaimLease)
+  | ({ status: 'existing'; record: DurablePlanCommandRecord } & DurableClaimLease)
+  | { status: 'conflict'; record?: DurablePlanCommandRecord; reason: string }
+
+/** Outcome of claiming an after-decision effect. */
+export type DurablePlanEffectClaim =
+  | ({ status: 'claimed'; record: DurablePlanEffectRecord } & DurableClaimLease)
+  | ({ status: 'existing'; record: DurablePlanEffectRecord } & DurableClaimLease)
+
+/** Outcome of claiming an answer intent. */
+export type DurableAnswerIntentClaim =
+  | ({ status: 'claimed'; record: DurableAnswerIntentRecord } & DurableClaimLease)
+  | ({ status: 'existing'; record: DurableAnswerIntentRecord } & DurableClaimLease)
+  | { status: 'conflict'; record?: DurableAnswerIntentRecord; reason: string }
+
+/** Plan-side durable port: revision projections, the decision-command journal,
+ * and the after-decision effect journal. A product that wants durable plans and
+ * no durable questions implements THIS and nothing else — `createDurablePlanRoutes`
+ * asks for no more than this. `lease` is optional on every settle method: omit
+ * it to settle unconditionally (what every pre-lease implementation does). */
 export interface DurablePlanStore {
   getPlanProjection(scope: DurableChatScope, planId: string, revision?: number): Promise<DurablePlanProjection | null>
   putPlanProjection(scope: DurableChatScope, projection: DurablePlanProjection): Promise<void>
   listPlanProjections?(scope: DurableChatScope, planId?: string): Promise<DurablePlanProjection[]>
   getPlanCommand(scope: DurableChatScope, commandKey: DurablePlanCommandKey): Promise<DurablePlanCommandRecord | null>
-  claimPlanCommand(scope: DurableChatScope, command: DurablePlanCommandRecord): Promise<
-    | { status: 'claimed'; record: DurablePlanCommandRecord }
-    | { status: 'existing'; record: DurablePlanCommandRecord }
-    | { status: 'conflict'; record?: DurablePlanCommandRecord; reason: string }
-  >
-  recordPlanAuthorityResult(scope: DurableChatScope, commandKey: DurablePlanCommandKey, result: DurablePlanAuthorityResult, receipt: DurableFollowUpReceipt): Promise<void>
-  finalizePlanCommand(scope: DurableChatScope, commandKey: DurablePlanCommandKey): Promise<void>
+  claimPlanCommand(scope: DurableChatScope, command: DurablePlanCommandRecord): Promise<DurablePlanCommandClaim>
+  recordPlanAuthorityResult(scope: DurableChatScope, commandKey: DurablePlanCommandKey, result: DurablePlanAuthorityResult, receipt: DurableFollowUpReceipt, lease?: string): Promise<void>
+  finalizePlanCommand(scope: DurableChatScope, commandKey: DurablePlanCommandKey, lease?: string): Promise<void>
   getPlanEffect(scope: DurableChatScope, effectKey: string): Promise<DurablePlanEffectRecord | null>
-  claimPlanEffect(scope: DurableChatScope, effect: DurablePlanEffectRecord): Promise<
-    | { status: 'claimed'; record: DurablePlanEffectRecord }
-    | { status: 'existing'; record: DurablePlanEffectRecord }
-  >
-  completePlanEffect(scope: DurableChatScope, effectKey: string): Promise<void>
-  failPlanEffect(scope: DurableChatScope, effectKey: string, error: string): Promise<void>
+  claimPlanEffect(scope: DurableChatScope, effect: DurablePlanEffectRecord): Promise<DurablePlanEffectClaim>
+  completePlanEffect(scope: DurableChatScope, effectKey: string, lease?: string): Promise<void>
+  failPlanEffect(scope: DurableChatScope, effectKey: string, error: string, lease?: string): Promise<void>
+}
 
+/** Interaction-side durable port: ask projections (with semantic dedupe and
+ * duplicate-id aliases) and the answer-intent journal. A product that wants
+ * durable questions and no durable plans implements THIS and nothing else. */
+export interface DurableInteractionStore {
   getInteractionProjection(scope: DurableChatScope, interactionId: string): Promise<DurableInteractionProjection | null>
   upsertInteractionProjection(scope: DurableChatScope, projection: DurableInteractionProjection): Promise<DurableInteractionProjection>
   listInteractionProjections?(scope: DurableChatScope): Promise<DurableInteractionProjection[]>
   getAnswerIntent(scope: DurableChatScope, intentKey: string): Promise<DurableAnswerIntentRecord | null>
-  claimAnswerIntent(scope: DurableChatScope, intent: DurableAnswerIntentRecord): Promise<
-    | { status: 'claimed'; record: DurableAnswerIntentRecord }
-    | { status: 'existing'; record: DurableAnswerIntentRecord }
-    | { status: 'conflict'; record?: DurableAnswerIntentRecord; reason: string }
-  >
-  acknowledgeAnswerIntent(scope: DurableChatScope, intentKey: string, acknowledgement: DurableInteractionAcknowledgement): Promise<void>
+  claimAnswerIntent(scope: DurableChatScope, intent: DurableAnswerIntentRecord): Promise<DurableAnswerIntentClaim>
+  acknowledgeAnswerIntent(scope: DurableChatScope, intentKey: string, acknowledgement: DurableInteractionAcknowledgement, lease?: string): Promise<void>
   /** Atomically settle the interaction projection (including semantic aliases)
    * from the acknowledged intent and mark the intent finalized. */
-  finalizeAnswerIntent(scope: DurableChatScope, intentKey: string, guarantee?: DurableInteractionGuarantee): Promise<void>
-  abortAnswerIntent(scope: DurableChatScope, intentKey: string, error: string): Promise<void>
+  finalizeAnswerIntent(scope: DurableChatScope, intentKey: string, guarantee?: DurableInteractionGuarantee, lease?: string): Promise<void>
+  abortAnswerIntent(scope: DurableChatScope, intentKey: string, error: string, lease?: string): Promise<void>
 }
 
+/** Both ports. What a product wiring plan cards AND question cards passes, what
+ * `createDurableChatEventProjection` needs, and what the reference in-memory
+ * store implements. */
+export interface DurableChatStore extends DurablePlanStore, DurableInteractionStore {}
+
 /** Alias used by adapters that store all durable chat state in one port. */
-export type DurableChatStateStore = DurablePlanStore
-/** Represent durable storage for plan state management with persistence and reliability guarantees */
+export type DurableChatStateStore = DurableChatStore
+/**
+ * @deprecated Ambiguous name. This resolves to the PLAN-side port only; use
+ * `DurablePlanStore` for that, or `DurableChatStore` for both halves.
+ */
 export type DurablePlanStateStore = DurablePlanStore
 /** Pick essential methods to manage and record durable plan command operations */
 export type DurablePlanCommandJournal = Pick<DurablePlanStore, 'getPlanCommand' | 'claimPlanCommand' | 'recordPlanAuthorityResult' | 'finalizePlanCommand'>
-/** Provide durable methods to manage the lifecycle of answer intents in a plan store */
-export type DurableAnswerIntentJournal = Pick<DurablePlanStore, 'getAnswerIntent' | 'claimAnswerIntent' | 'acknowledgeAnswerIntent' | 'finalizeAnswerIntent' | 'abortAnswerIntent'>
+/** Pick the methods that claim and settle one after-decision effect. */
+export type DurablePlanEffectJournal = Pick<DurablePlanStore, 'getPlanEffect' | 'claimPlanEffect' | 'completePlanEffect' | 'failPlanEffect'>
+/** Provide durable methods to manage the lifecycle of answer intents in a store */
+export type DurableAnswerIntentJournal = Pick<DurableInteractionStore, 'getAnswerIntent' | 'claimAnswerIntent' | 'acknowledgeAnswerIntent' | 'finalizeAnswerIntent' | 'abortAnswerIntent'>
 
 /** Define a durable chat interaction projection with idempotent event tracking and optional tombstone flag */
 export interface DurableInteractionProjection extends ChatInteraction {
@@ -207,7 +244,40 @@ export interface DurableInteractionAcknowledgement {
   at?: string
 }
 
-/** Define interaction durability levels to specify reconciliation or best-effort guarantees */
+/**
+ * How thoroughly an answer's delivery was confirmed before the intent was marked
+ * finalized. It is a record of what actually happened, not a request — the
+ * settlement stamps what it verified.
+ *
+ * - `best-effort` — the answer POST returned success and the intent was settled
+ *   on that basis. **The default**, because it is the only level that is always
+ *   true.
+ * - `reconciled` — an authority lookup independently confirmed the answer before
+ *   the intent settled. Requires a product-supplied `reconcileAuthority`; the
+ *   route persistence type will not let you select it without one.
+ *
+ * ## What every adopter already gets for free
+ *
+ * Crash recovery does NOT require `reconciled`. The answer-intent journal is
+ * itself durable evidence: an attempt that reached `acknowledged` or `finalized`
+ * proves the sidecar accepted that exact payload, because the settlement only
+ * writes those states after a successful POST. A retry carrying the same
+ * `attemptKey` therefore resolves from local state with no upstream call and no
+ * product code — see `createDurableInteractionRoutePersistence`.
+ *
+ * ## The gap that remains
+ *
+ * One window is not locally recoverable: the POST succeeded but the process died
+ * before the acknowledgement was written, leaving the intent at `prepared`. The
+ * sidecar (`/interactions`) exposes only "list the asks still outstanding" and
+ * "submit an answer" — there is no lookup that reports whether a SPECIFIC
+ * payload committed, so nothing can distinguish that case from a POST that never
+ * landed. Closing it needs an acknowledgement/history endpoint upstream.
+ *
+ * `createSidecarAbsenceReconciler` (`./reconcile`) narrows that window with the
+ * one signal that does exist, and documents precisely where it is evidence and
+ * where it is not.
+ */
 export type DurableInteractionGuarantee = 'reconciled' | 'best-effort'
 
 /** Define options for durable interaction settlement including attempt key, guarantee, and timestamp provider */

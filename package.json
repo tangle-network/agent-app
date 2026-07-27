@@ -202,6 +202,11 @@
       "import": "./dist/durable-chat/index.js",
       "default": "./dist/durable-chat/index.js"
     },
+    "./durable-chat/drizzle": {
+      "types": "./dist/durable-chat/drizzle.d.ts",
+      "import": "./dist/durable-chat/drizzle.js",
+      "default": "./dist/durable-chat/drizzle.js"
+    },
     "./missions": {
       "types": "./dist/missions/index.d.ts",
       "import": "./dist/missions/index.js",
