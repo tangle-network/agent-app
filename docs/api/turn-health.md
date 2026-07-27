@@ -4,7 +4,7 @@
 
 Source: `src/turn-health/index.ts`
 
-30 exports.
+31 exports.
 
 ### `AlertSink`
 
@@ -43,7 +43,7 @@ interface AlertThrottleStore
 `function` — The sweep source for products on the canonical `/chat-store` tables.
 
 ```ts
-(db: D1LikeForHealth, options?: { messageTable?: string | undefined; threadTable?: string | undefined; }) => TurnHealth…
+(db: D1LikeForHealth, options?: { messageTable?: string | undefined; threadTable?: string | undefined; errorReplyPrefix…
 ```
 
 ### `createGuardedAlertSink`
@@ -124,6 +124,14 @@ type FetchLike
 
 ```ts
 interface PersistedTurnRow
+```
+
+### `SHELL_ERROR_REPLY_PREFIXES`
+
+`const` — Assistant-row openers agent-app writes ITSELF when a sandbox turn fails.
+
+```ts
+readonly string[]
 ```
 
 ### `SweepOptions`

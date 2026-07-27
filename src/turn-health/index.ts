@@ -59,6 +59,7 @@ export {
 export {
   createD1TurnHealthSource,
   type D1LikeForHealth,
+  SHELL_ERROR_REPLY_PREFIXES,
   type PersistedTurnRow,
   sweepSilentFailures,
   type SweepOptions,

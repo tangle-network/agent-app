@@ -45,7 +45,12 @@ export interface PersistedTurnRow {
 /** What the sweep needs from a store. A product on a non-standard schema
  *  implements these two reads; everything else is shared. */
 export interface TurnHealthSource {
-  findUnansweredThreads(input: { minAgeMs: number; now: number }): Promise<UnansweredThread[]>
+  findUnansweredThreads(input: {
+    minAgeMs: number
+    /** Ignore user messages older than this. See {@link SweepOptions.maxAgeMs}. */
+    maxAgeMs: number
+    now: number
+  }): Promise<UnansweredThread[]>
   listRecentAssistantTurns(input: { sinceMs: number; now: number; limit: number }): Promise<
     PersistedTurnRow[]
   >
@@ -58,6 +63,17 @@ export interface SweepOptions {
   /** A user message must go unanswered this long before it counts. Guards
    *  against alerting on a turn that is simply still streaming. Default 15 min. */
   minAgeMs?: number
+  /**
+   * A user message OLDER than this is abandoned, not unanswered — it stops
+   * counting. Default 7 days.
+   *
+   * Without this bound the sweep is worse than useless. gtm-agent's table
+   * holds 384 unanswered messages whose oldest is 1,676 h (70 days) old;
+   * paging hourly on a backlog nobody will ever reply to is exactly how an
+   * alert channel gets muted, and a muted channel is the state this module
+   * exists to escape. The alert has to mean "something broke recently".
+   */
+  maxAgeMs?: number
   /** How far back to judge settled turns. Default 24 h. */
   lookbackMs?: number
   /** Cap on rows judged per sweep. Default 500. */
@@ -102,6 +118,23 @@ function parseParts(raw: unknown): unknown[] {
 const HOUR_MS = 3_600_000
 
 /**
+ * Assistant-row openers agent-app writes ITSELF when a sandbox turn fails.
+ *
+ * Kept byte-identical to the strings `createSandboxChatProducer` composes
+ * (`src/chat-routes/sandbox-producer.ts`). They are shell vocabulary, not
+ * product domain, so recognising them is this package's job — a product on
+ * the shared producer gets a correct sweep with no configuration.
+ *
+ * `tests/turn-health/turn-health.test.ts` pins these against the producer, so
+ * changing the producer's wording without changing this list fails CI rather
+ * than silently making dead threads look answered.
+ */
+export const SHELL_ERROR_REPLY_PREFIXES: readonly string[] = [
+  'The sandbox model stream stopped before a clean completion.',
+  'The sandbox agent returned an error before producing a visible answer.',
+]
+
+/**
  * Run one sweep and deliver whatever it finds.
  *
  * Errors from the sink are NOT swallowed here (unlike the live lane): a sweep
@@ -111,13 +144,14 @@ const HOUR_MS = 3_600_000
 export async function sweepSilentFailures(options: SweepOptions): Promise<SweepResult> {
   const now = options.now ?? Date.now()
   const minAgeMs = options.minAgeMs ?? 15 * 60_000
+  const maxAgeMs = options.maxAgeMs ?? 7 * 24 * HOUR_MS
   const lookbackMs = options.lookbackMs ?? 24 * HOUR_MS
   const limit = options.limit ?? 500
   const emptyRateThreshold = options.emptyRateThreshold ?? 0.05
   const minTurnsForRate = options.minTurnsForRate ?? 10
 
   const [unanswered, turns] = await Promise.all([
-    options.source.findUnansweredThreads({ minAgeMs, now }),
+    options.source.findUnansweredThreads({ minAgeMs, maxAgeMs, now }),
     options.source.listRecentAssistantTurns({ sinceMs: now - lookbackMs, now, limit }),
   ])
 
@@ -257,17 +291,57 @@ export interface D1LikeForHealth {
  */
 export function createD1TurnHealthSource(
   db: D1LikeForHealth,
-  options: { messageTable?: string; threadTable?: string } = {},
+  options: {
+    messageTable?: string
+    threadTable?: string
+    /**
+     * Content prefixes that mark an assistant row as an ERROR SURFACE rather
+     * than an answer. A row matching one of these stops counting as a reply,
+     * so the thread keeps reporting as unanswered.
+     *
+     * This exists because the obvious rule — "an assistant row with non-empty
+     * content is an answer" — is wrong in the exact case that matters. On
+     * 2026-07-27 gtm-agent's newest assistant row read:
+     *
+     *   "The sandbox model stream stopped before a clean completion.
+     *    Error: All 2 model(s) failed. gpt-5-mini: TANGLE_HUB_URL is required …"
+     *
+     * 246 characters of well-formed prose that answers nothing. Counting it
+     * marks a dead product healthy — the same failure-returning-success shape
+     * this module exists to catch, recursing into the detector itself.
+     *
+     * There is no schema-level way to recognise it: `output_tokens IS NULL`
+     * looked promising until legal-agent showed 22 of 25 GENUINE replies with
+     * null usage — it would have reported a working product broken.
+     *
+     * Defaults to {@link SHELL_ERROR_REPLY_PREFIXES}, the openers agent-app
+     * ITSELF writes in `createSandboxChatProducer`. Those are not domain —
+     * this package composed them, so this package is what must recognise
+     * them, and every product on the shared producer is correct with no
+     * configuration. Pass your own list to ADD product-specific error prose;
+     * pass `[]` to disable the rule.
+     *
+     * Prefixes are bound as query parameters, never interpolated.
+     */
+    errorReplyPrefixes?: readonly string[]
+  } = {},
 ): TurnHealthSource {
   // Table names are identifiers and cannot be bound as parameters. They come
   // from deploy-time product config, never from a request, and are validated
   // here so this can never become an injection point.
   const message = safeIdentifier(options.messageTable ?? 'message')
   const thread = safeIdentifier(options.threadTable ?? 'thread')
+  const errorPrefixes = [...(options.errorReplyPrefixes ?? SHELL_ERROR_REPLY_PREFIXES)]
 
   return {
-    async findUnansweredThreads({ minAgeMs, now }) {
+    async findUnansweredThreads({ minAgeMs, maxAgeMs, now }) {
       const cutoffSeconds = Math.floor((now - minAgeMs) / 1000)
+      const floorSeconds = Math.floor((now - maxAgeMs) / 1000)
+      // Each prefix becomes one bound `NOT LIKE ?||'%'` term. Parameters, not
+      // interpolation — a product-supplied string never reaches the SQL text.
+      const errorClause = errorPrefixes
+        .map((_, i) => ` AND a.content NOT LIKE ?${i + 3} || '%'`)
+        .join('')
       const { results } = await db
         .prepare(
           `SELECT m.thread_id AS threadId,
@@ -276,16 +350,17 @@ export function createD1TurnHealthSource(
              FROM ${message} m
             WHERE m.role = 'user'
               AND m.created_at <= ?1
+              AND m.created_at >= ?2
               AND m.created_at > COALESCE(
                     (SELECT MAX(a.created_at)
                        FROM ${message} a
                       WHERE a.thread_id = m.thread_id
                         AND a.role = 'assistant'
-                        AND length(trim(a.content)) > 0), 0)
+                        AND length(trim(a.content)) > 0${errorClause}), 0)
             GROUP BY m.thread_id
             ORDER BY oldestCreatedAt ASC`,
         )
-        .bind(cutoffSeconds)
+        .bind(cutoffSeconds, floorSeconds, ...errorPrefixes)
         .all<{ threadId: string; pendingMessages: number; oldestCreatedAt: number }>()
 
       return results.map((row) => ({
