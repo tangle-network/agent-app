@@ -108,6 +108,99 @@ export type SourceSpanResult =
 /** Resolve `[start, end)` against `sourceText`. Every rejection is a caller
  *  mistake the model can correct from the paged read it already has, so each
  *  carries the discriminator a tool layer turns into a specific message. */
+/**
+ * Locate the line containing `value` and return it as a span — the citation
+ * form for a model that cannot count characters.
+ *
+ * Measured on production (tax session 135b7cc3, gpt-4.1-mini): given the
+ * document text and told exactly which line to cite, the model produced
+ * offsets that landed on the WRONG line four times out of four, then missed
+ * again on a second attempt after being shown the text its offsets had
+ * selected. Character arithmetic is not something this model class does.
+ *
+ * What it DOES do reliably is read the value: all four `claim` fields in that
+ * same run were correct to the cent. So the model names the value it read and
+ * the PLATFORM finds it. Both failure modes close at once —
+ *
+ *  - the quote cannot be invented, because the platform slices it;
+ *  - the span cannot be mis-addressed, because the platform computed it from
+ *    a needle it PROVED occurs in the text.
+ *
+ * A needle that is not in the document is refused, which is the same fail-loud
+ * posture as a quote that does not occur — and correctly so: the model is
+ * asserting the document says something it does not.
+ *
+ * The cited span is the whole LINE, not the needle: "128,450.00" alone is not
+ * a click target a reviewer can judge, whereas the line it sits on says what
+ * the number IS. Number-only needles are common and deliberately supported.
+ */
+export type SourceFindFailure =
+  | { reason: 'blank_needle' }
+  | { reason: 'not_found' }
+  | { reason: 'occurrence_out_of_range'; found: number }
+
+export type SourceFindResult =
+  | { ok: true; span: { start: number; end: number }; quote: string; occurrences: number }
+  | { ok: false; failure: SourceFindFailure }
+
+/** Line bounds containing `index`, trimmed of the newline terminators. */
+function lineAround(text: string, index: number): { start: number; end: number } {
+  let start = text.lastIndexOf('\n', index)
+  start = start < 0 ? 0 : start + 1
+  let end = text.indexOf('\n', index)
+  if (end < 0) end = text.length
+  // A CRLF document leaves a trailing \r inside the line; drop it so the
+  // quote is the line a reader sees rather than the line plus a control char.
+  if (end > start && text[end - 1] === '\r') end -= 1
+  return { start, end }
+}
+
+export function findSourceLine(
+  sourceText: string,
+  needle: string,
+  occurrence = 1,
+): SourceFindResult {
+  const trimmed = needle.trim()
+  if (trimmed.length === 0) return { ok: false, failure: { reason: 'blank_needle' } }
+
+  // Exact hits first (free, and the common case). Fall back to the normalized
+  // text ONLY to locate a position — the returned quote is always sliced from
+  // the ORIGINAL string, so representation folding never leaks into a stored
+  // citation.
+  const positions: number[] = []
+  for (let at = sourceText.indexOf(trimmed); at >= 0; at = sourceText.indexOf(trimmed, at + 1)) {
+    positions.push(at)
+  }
+  if (positions.length === 0) {
+    // Second chance for a needle that differs only in representation: a model
+    // reading "128,450.00" off a PDF layer may report "128450.00". Scan lines
+    // and compare normalized forms — cheap, and it keeps the honest-but-
+    // differently-typed citation working without loosening the exact path.
+    const wanted = normalizeQuoteText(trimmed)
+    if (wanted.length > 0) {
+      let cursor = 0
+      while (cursor <= sourceText.length) {
+        const bound = lineAround(sourceText, cursor)
+        const line = sourceText.slice(bound.start, bound.end)
+        if (normalizeQuoteText(line).includes(wanted) || normalizeQuoteText(line.replace(/,/gu, '')).includes(wanted)) {
+          positions.push(bound.start)
+        }
+        if (bound.end >= sourceText.length) break
+        cursor = bound.end + 1
+      }
+    }
+  }
+  if (positions.length === 0) return { ok: false, failure: { reason: 'not_found' } }
+  if (occurrence < 1 || occurrence > positions.length) {
+    return { ok: false, failure: { reason: 'occurrence_out_of_range', found: positions.length } }
+  }
+
+  const bound = lineAround(sourceText, positions[occurrence - 1]!)
+  const quote = sourceText.slice(bound.start, bound.end)
+  if (quote.trim().length === 0) return { ok: false, failure: { reason: 'not_found' } }
+  return { ok: true, span: bound, quote, occurrences: positions.length }
+}
+
 export function sliceSourceSpan(
   sourceText: string,
   span: { start: number; end: number },

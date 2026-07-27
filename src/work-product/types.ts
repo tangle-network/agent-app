@@ -89,9 +89,19 @@ export interface EvidenceLocator {
    *  or platform-sliced from {@link EvidenceLocator.span} — read `quoteBasis`
    *  to tell which. */
   quote?: string
-  /** Character range the quote is sliced from. The preferred citation form:
-   *  two integers cannot be a fabricated quote. */
+  /** Character range the quote is sliced from. Correct when the offsets are
+   *  computed by a tool; see {@link EvidenceLocator.find} for the form a model
+   *  should use, because models do not count characters reliably. */
   span?: EvidenceSpan
+  /** The value or distinctive text to LOCATE in the source. The platform finds
+   *  the line containing it and derives both `span` and `quote` from that —
+   *  so the model neither retypes the quote nor computes an offset, and a
+   *  citation that lands on the wrong line becomes unrepresentable rather than
+   *  merely wrong. The preferred citation form for an agent. */
+  find?: string
+  /** Which occurrence of `find` to cite when the value appears more than once
+   *  (1-based, default 1). */
+  findOccurrence?: number
   /** Server-set provenance for `quote`; a model-supplied value is discarded. */
   quoteBasis?: QuoteBasis
 }
@@ -330,6 +340,19 @@ export function parseEvidenceInput(raw: unknown, path = 'entry'): WorkProductPar
   if (locatorRaw.quote !== undefined) {
     if (typeof locatorRaw.quote !== 'string') return fail(`${path}.locator.quote`, 'must be a string when present')
     locator.quote = locatorRaw.quote
+  }
+  if (locatorRaw.find !== undefined) {
+    if (typeof locatorRaw.find !== 'string' || locatorRaw.find.trim().length === 0) {
+      return fail(`${path}.locator.find`, 'must be a non-empty string — the value or text to locate in the source')
+    }
+    locator.find = locatorRaw.find
+  }
+  if (locatorRaw.findOccurrence !== undefined) {
+    const value = locatorRaw.findOccurrence
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
+      return fail(`${path}.locator.findOccurrence`, 'must be a positive integer (1 = the first occurrence)')
+    }
+    locator.findOccurrence = value
   }
   if (locatorRaw.span !== undefined) {
     const spanRaw = asRecord(locatorRaw.span)

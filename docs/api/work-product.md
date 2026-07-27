@@ -4,7 +4,7 @@
 
 Source: `src/work-product/index.ts`
 
-70 exports.
+73 exports.
 
 ### `AgentCheckInput`
 
@@ -124,6 +124,14 @@ type ExceptionSeverity
 
 ```ts
 interface FinalizeWorkProductProvenanceInput
+```
+
+### `findSourceLine`
+
+`function`
+
+```ts
+(sourceText: string, needle: string, occurrence?: number) => SourceFindResult
 ```
 
 ### `InMemoryWorkProductStore`
@@ -296,7 +304,7 @@ interface ReviewQueueThread
 
 ### `sliceSourceSpan`
 
-`function` — Resolve `[start, end)` against `sourceText`.
+`function`
 
 ```ts
 (sourceText: string, span: { start: number; end: number; }) => SourceSpanResult
@@ -308,6 +316,22 @@ interface ReviewQueueThread
 
 ```ts
 (sourceText: string, quote: string) => boolean
+```
+
+### `SourceFindFailure`
+
+`type` — Locate the line containing `value` and return it as a span — the citation form for a model that cannot count characters.
+
+```ts
+type SourceFindFailure
+```
+
+### `SourceFindResult`
+
+`type`
+
+```ts
+type SourceFindResult
 ```
 
 ### `SourceSpanFailure`

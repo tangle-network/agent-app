@@ -19,6 +19,7 @@ import { dispatchAppTool, type AppToolContext, type AppToolHandlers, type AppToo
 import {
   buildWorkProductTools,
   createInMemoryWorkProductStore,
+  findSourceLine,
   parseEvidenceInput,
   sliceSourceSpan,
   sourceContainsQuote,
@@ -419,7 +420,7 @@ describe('submit_work_product — what the recorded checks say', () => {
     expect(outcome.ok).toBe(false)
     expect((outcome as { code: string }).code).toBe('evidence_not_anchored')
     expect((outcome as { message: string }).message).toContain('line_25a')
-    expect((outcome as { message: string }).message).toContain('locator.span')
+    expect((outcome as { message: string }).message).toContain('locator.find')
     const record = await onlyRecord(store)
     expect(record.status).toBe('draft')
     const coverage = record.checks.find((check) => check.name === 'evidence_coverage')!
@@ -489,7 +490,7 @@ describe('the retyping bottleneck the span form removes', () => {
     }
   })
 
-  it('ToolInputError for a wrong quote points the model at spans, not at retyping harder', async () => {
+  it('ToolInputError for a wrong quote points the model at anchor-by-value, not at retyping harder', async () => {
     const { dispatch } = harness()
     const outcome = await dispatch('upsert_evidence', {
       scopeKey: SCOPE,
@@ -505,7 +506,7 @@ describe('the retyping bottleneck the span form removes', () => {
     })
     expect(outcome.ok).toBe(false)
     expect((outcome as { code: string }).code).toBe('quote_not_found')
-    expect((outcome as { message: string }).message).toContain('locator.span')
+    expect((outcome as { message: string }).message).toContain('locator.find')
   })
 })
 
@@ -513,5 +514,163 @@ describe('ToolInputError shape stays correctable', () => {
   it('every span rejection is a 400-class model-correctable error, not a 500', () => {
     const error = new ToolInputError('invalid_span', 'x')
     expect(error.status).toBe(400)
+  })
+})
+
+/**
+ * Anchor-by-value: the citation form for a model that cannot count.
+ *
+ * Not a hypothetical. On production tax session `135b7cc3` (gpt-4.1-mini),
+ * given the document text and told exactly which line to cite, the model
+ * produced spans that landed on the WRONG line 4 times out of 4 — then missed
+ * again on a second attempt after being shown the text its offsets had
+ * selected. Every quote was genuine document text (spans made fabrication
+ * impossible, as designed) and every one cited the employer/payer line
+ * instead of the value line.
+ *
+ * Its four `claim` values were correct to the cent. So the model names the
+ * value; the platform finds it.
+ */
+describe('findSourceLine — the platform locates the value', () => {
+  it('cites the whole line a value sits on, not the bare value', () => {
+    const found = findSourceLine(W2_TEXT, '128,450.00')
+    expect(found).toMatchObject({ ok: true, quote: W2_BOX1_LINE, occurrences: 1 })
+    expect(found.ok && W2_TEXT.slice(found.span.start, found.span.end)).toBe(W2_BOX1_LINE)
+  })
+
+  it('lands on the value line where a hand-computed offset landed on the wrong one', () => {
+    // 97-132 is the span the production model actually emitted for wages.
+    expect(sliceSourceSpan(W2_TEXT, { start: 97, end: 132 })).toMatchObject({ ok: true })
+    expect(W2_TEXT.slice(97, 132)).not.toContain('128,450.00')
+    const found = findSourceLine(W2_TEXT, '128,450.00')
+    expect(found.ok && found.quote).toContain('128,450.00')
+  })
+
+  it('refuses a value the document does not contain', () => {
+    expect(findSourceLine(W2_TEXT, '999,999.00')).toEqual({ ok: false, failure: { reason: 'not_found' } })
+    expect(findSourceLine(W2_TEXT, '   ')).toEqual({ ok: false, failure: { reason: 'blank_needle' } })
+  })
+
+  it('finds a value typed without its thousands separator', () => {
+    const found = findSourceLine(W2_TEXT, '128450.00')
+    expect(found.ok && found.quote).toBe(W2_BOX1_LINE)
+  })
+
+  it('counts repeats and honours findOccurrence', () => {
+    const text = 'alpha 42 one\nbeta 42 two\ngamma 42 three'
+    expect(findSourceLine(text, '42')).toMatchObject({ ok: true, quote: 'alpha 42 one', occurrences: 3 })
+    expect(findSourceLine(text, '42', 3)).toMatchObject({ ok: true, quote: 'gamma 42 three' })
+    expect(findSourceLine(text, '42', 4)).toEqual({
+      ok: false,
+      failure: { reason: 'occurrence_out_of_range', found: 3 },
+    })
+  })
+
+  it('never returns text that is not a verbatim slice of the source', () => {
+    for (const text of [W2_TEXT, ORGANIZER_TEXT, 'a\r\nb 7\r\nc']) {
+      for (const needle of ['7', '128,450.00', '2,150', 'Box', 'church', 'b']) {
+        const found = findSourceLine(text, needle)
+        if (!found.ok) continue
+        expect(text.slice(found.span.start, found.span.end)).toBe(found.quote)
+        expect(sourceContainsQuote(text, found.quote)).toBe(true)
+      }
+    }
+  })
+
+  it('strips the CR of a CRLF line so the quote is the line a reader sees', () => {
+    const found = findSourceLine('header\r\nBox 1 pay 500.00\r\nfooter', '500.00')
+    expect(found.ok && found.quote).toBe('Box 1 pay 500.00')
+  })
+})
+
+describe('upsert_evidence — anchor by value', () => {
+  it('locates the value, stores the line, and reports the derived span', async () => {
+    const { dispatch, store } = harness()
+    const outcome = await dispatch('upsert_evidence', {
+      scopeKey: SCOPE,
+      entries: [
+        {
+          id: 'ev_w2_box1',
+          sourceRef: 'vault/w2.pdf',
+          locator: { find: '128,450.00' },
+          target: 'line_1a',
+          claim: 'Wages 128450.00',
+        },
+      ],
+    })
+    expect(outcome.ok).toBe(true)
+    const record = await onlyRecord(store)
+    const entry = record.evidence[0]!
+    expect(entry.locator.quote).toBe(W2_BOX1_LINE)
+    expect(entry.locator.quoteBasis).toBe('span')
+    expect(W2_TEXT.slice(entry.locator.span!.start, entry.locator.span!.end)).toBe(W2_BOX1_LINE)
+  })
+
+  it('refuses a value the named document does not contain', async () => {
+    const { dispatch, store } = harness()
+    const outcome = await dispatch('upsert_evidence', {
+      scopeKey: SCOPE,
+      entries: [
+        {
+          id: 'ev_bad',
+          sourceRef: 'vault/w2.pdf',
+          locator: { find: '999,999.00' },
+          target: 'line_1a',
+          claim: 'Wages 999999',
+        },
+      ],
+    })
+    expect(outcome.ok).toBe(false)
+    expect((outcome as { code: string }).code).toBe('value_not_found')
+    expect((outcome as { message: string }).message).toContain('999,999.00')
+    expect(await store.listByWorkspace('ws')).toEqual([])
+  })
+
+  it('overrules a hand-computed span when a value is also given', async () => {
+    // The production shape exactly: a correct value and a span that misses.
+    const { dispatch, store } = harness()
+    const outcome = await dispatch('upsert_evidence', {
+      scopeKey: SCOPE,
+      entries: [
+        {
+          id: 'ev_w2_box1',
+          sourceRef: 'vault/w2.pdf',
+          locator: { find: '128,450.00', span: { start: 97, end: 132 } },
+          target: 'line_1a',
+          claim: 'Wages 128450.00',
+        },
+      ],
+    })
+    expect(outcome.ok).toBe(true)
+    const record = await onlyRecord(store)
+    expect(record.evidence[0]!.locator.quote).toBe(W2_BOX1_LINE)
+    expect(record.evidence[0]!.locator.quote).toContain('128,450.00')
+  })
+
+  it('counts as an anchored target under requireAnchoredEvidence', async () => {
+    const { dispatch } = harness({ requireAnchoredEvidence: true })
+    await dispatch('upsert_evidence', {
+      scopeKey: SCOPE,
+      entries: [
+        { id: 'e1', sourceRef: 'vault/w2.pdf', locator: { find: '128,450.00' }, target: 'line_1a', claim: '128450.00' },
+        { id: 'e2', sourceRef: 'vault/w2.pdf', locator: { find: '17,908.00' }, target: 'line_25a', claim: '17908.00' },
+      ],
+    })
+    const outcome = await dispatch('submit_work_product', {
+      scopeKey: SCOPE,
+      artifact: { kind: 'return_package', title: 'T', fields: { line_1a: 128450, line_25a: 17908 } },
+    })
+    expect(outcome.ok).toBe(true)
+  })
+
+  it('is fail-closed when the source has no readable text', async () => {
+    const { dispatch } = harness()
+    const outcome = await dispatch('upsert_evidence', {
+      scopeKey: SCOPE,
+      entries: [
+        { id: 'ev', sourceRef: 'vault/scan.png', locator: { find: '1' }, target: 'line_1a', claim: 'x' },
+      ],
+    })
+    expect(outcome).toMatchObject({ ok: false, code: 'unverifiable_quote' })
   })
 })
