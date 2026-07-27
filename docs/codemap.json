@@ -1504,6 +1504,12 @@
           "doc": "Message row shape the writer reads back when re-entering a turn."
         },
         {
+          "name": "EmptyTurnRetryInfo",
+          "kind": "interface",
+          "signature": "interface EmptyTurnRetryInfo",
+          "doc": "One same-model re-run of a turn that completed with no assistant text."
+        },
+        {
           "name": "FileIndexAuthorization",
           "kind": "type",
           "signature": "type FileIndexAuthorization",
@@ -1592,6 +1598,12 @@
           "kind": "const",
           "signature": "number",
           "doc": "Ceiling on a binary attachment's raw (pre-encoding) byte size."
+        },
+        {
+          "name": "MAX_EMPTY_TURN_RETRIES",
+          "kind": "const",
+          "signature": "3",
+          "doc": "Hard ceiling on same-model re-runs."
         },
         {
           "name": "MAX_TEXT_ATTACHMENT_BYTES",

@@ -30,9 +30,14 @@
  *   COMMITS rather than failing over — it surfaces to the user exactly as it
  *   does today. Those fail identically on every model; walking the chain would
  *   only multiply latency and spend to reach the same error.
- * - A clean stream that simply produced nothing is NOT retried. An empty answer
+ * - A clean stream that produced nothing NEVER walks the chain. An empty answer
  *   is not evidence of a dead upstream, and a silent re-roll on another model is
- *   precisely the unattributable downgrade this work exists to prevent.
+ *   precisely the unattributable downgrade this work exists to prevent. Opt-in
+ *   `emptyTurnRetries` re-runs the SAME model instead, which leaves attribution
+ *   untouched — measured on production 2026-07-27, an empty turn is a transient
+ *   platform flake that a same-model re-run recovers (8 hard cases: 7/8
+ *   delivered on the first pass, 8/8 with one re-run, at a cost of 1 extra turn
+ *   in 9). Default `0`, so the behavior is unchanged unless a product asks.
  * - A chain of length 1 costs nothing: one attempt, no extra call, no added
  *   latency, byte-identical to no failover at all.
  */
@@ -189,7 +194,33 @@ export interface ModelFailoverStreamOptions {
   /** Override the commit-point rule. Default {@link isCommittingSandboxEvent}. */
   isCommitting?: (event: unknown) => boolean
   onFallback?: (info: ModelFallbackInfo) => void
+  /**
+   * How many times to RE-RUN THE SAME MODEL when a turn completes having
+   * produced no assistant text at all. Default `0` — byte-identical to no
+   * retry.
+   *
+   * This is deliberately not a chain walk. Falling over to a different model
+   * on an empty answer is the unattributable downgrade this module refuses to
+   * do; re-running the SAME model changes nothing about attribution, because
+   * the model that serves is the model that was asked for.
+   *
+   * Bounded by the same commit rule as failover: only a turn whose ONLY
+   * committing event is a terminal receipt with no text is retried, so nothing
+   * that reached the user can ever be produced twice.
+   */
+  emptyTurnRetries?: number
+  /** Fired when an empty turn is discarded and the same model re-run. */
+  onEmptyTurnRetry?: (info: EmptyTurnRetryInfo) => void
   log?: (message: string, meta?: Record<string, unknown>) => void
+}
+
+/** One same-model re-run of a turn that completed with no assistant text. */
+export interface EmptyTurnRetryInfo {
+  model: string
+  /** 1 for the first re-run. */
+  retry: number
+  /** How many re-runs remain after this one. */
+  remaining: number
 }
 
 /** The failover-wrapped stream plus the attribution every consumer needs. */
@@ -201,6 +232,49 @@ export interface ModelFailoverStreamHandle {
   attempts(): ModelFailoverAttempt[]
   /** True when the preferred model did not serve — the attributability signal. */
   usedFallback(): boolean
+}
+
+/**
+ * True when `event` is a terminal receipt (`result` / `done`) carrying no
+ * assistant text.
+ *
+ * Measured on production `sandbox.tangle.tools` (2026-07-27, 28 turns through
+ * the gtm-agent profile): a turn can end `{ outcome: { type: 'completed' } }`
+ * with `finalText: ''` and zero token events — the platform reports success and
+ * the customer's message is blank. It is not an outage, nothing throws, and
+ * `isUpstreamUnavailable` correctly declines to classify it, so before this the
+ * blank answer committed and shipped.
+ */
+function isEmptyTerminalReceipt(event: unknown): boolean {
+  const record = asRecord(event)
+  if (!record) return false
+  const type = asString(record.type) ?? ''
+  if (type !== 'result' && type !== 'done') return false
+  const data = asRecord(record.data)
+  const text = asString(data?.finalText) ?? asString(data?.text) ?? ''
+  return text.trim().length === 0
+}
+
+/**
+ * Hard ceiling on same-model re-runs. A turn that comes back blank three times
+ * running is not a flake this can retry away, and each pass costs a full
+ * sandbox turn — so the budget is capped rather than trusted.
+ */
+export const MAX_EMPTY_TURN_RETRIES = 3
+
+/**
+ * Coerce the caller's budget to a finite, bounded, non-negative integer.
+ *
+ * `Math.trunc(NaN)` is `NaN` and `retry >= NaN` is false for every `retry`, so
+ * a naive clamp turns a bad config value into a loop that opens sandbox streams
+ * until the worker dies. `Infinity` has the same shape. Both resolve to `0` —
+ * an unusable budget disables the retry rather than running unbounded.
+ */
+function resolveEmptyTurnRetries(value: number | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0
+  const truncated = Math.trunc(value)
+  if (truncated <= 0) return 0
+  return Math.min(truncated, MAX_EMPTY_TURN_RETRIES)
 }
 
 /** Abandon a dead attempt's iterator. Never allowed to mask the outage. */
@@ -229,12 +303,21 @@ export function streamWithModelFailover(
   options: ModelFailoverStreamOptions,
 ): ModelFailoverStreamHandle {
   const committing = options.isCommitting ?? isCommittingSandboxEvent
+  const emptyTurnRetries = resolveEmptyTurnRetries(options.emptyTurnRetries)
   let serving: string | undefined
   let trail: ModelFailoverAttempt[] = []
   let fellBack = false
   let attemptIndex = 0
 
-  const probe = async (model: string): Promise<AttemptOutcome> => {
+  /**
+   * One open-and-drain pass. `empty` marks the pass as an EMPTY TURN — the
+   * only committing event was a terminal receipt with no assistant text, so
+   * nothing reached the user and the pass can be discarded without any risk of
+   * producing an answer twice. It still carries the outcome it would otherwise
+   * have returned, so exhausting the retry budget is byte-identical to no
+   * retry at all.
+   */
+  const drainOnce = async (model: string): Promise<{ outcome: AttemptOutcome; empty: boolean }> => {
     attemptIndex += 1
     const source = await options.open({ model, attempt: attemptIndex })
     const iterator = source[Symbol.asyncIterator]()
@@ -245,8 +328,9 @@ export function streamWithModelFailover(
       // it (outage → next model, anything else → re-thrown to the caller).
       const next = await iterator.next()
       if (next.done) {
-        // Clean end. Nothing to fail over to — an empty answer is not an outage.
-        return { committed: true, buffered, iterator: null }
+        // Clean end with nothing committing. Not an outage — but also not an
+        // answer, so it is re-runnable on the same model.
+        return { outcome: { committed: true, buffered, iterator: null }, empty: true }
       }
 
       const event = next.value
@@ -254,16 +338,37 @@ export function streamWithModelFailover(
       if (failure?.outage) {
         await closeIterator(iterator, options.log)
         return {
-          committed: false,
-          error: failure.reason,
-          ...(failure.code ? { errorCode: failure.code } : {}),
+          outcome: {
+            committed: false,
+            error: failure.reason,
+            ...(failure.code ? { errorCode: failure.code } : {}),
+          },
+          empty: false,
         }
       }
 
       buffered.push(event)
       // A terminal NON-outage failure surfaces exactly as it does today.
-      if (failure) return { committed: true, buffered, iterator }
-      if (committing(event)) return { committed: true, buffered, iterator }
+      if (failure) return { outcome: { committed: true, buffered, iterator }, empty: false }
+      if (committing(event)) {
+        return { outcome: { committed: true, buffered, iterator }, empty: isEmptyTerminalReceipt(event) }
+      }
+    }
+  }
+
+  const probe = async (model: string): Promise<AttemptOutcome> => {
+    for (let retry = 0; ; retry += 1) {
+      const pass = await drainOnce(model)
+      if (!pass.empty || retry >= emptyTurnRetries) return pass.outcome
+      // Discard the empty pass entirely — including its `step-finish` token
+      // receipt, which must not be billed — and re-run the same model.
+      const iterator = pass.outcome.committed ? pass.outcome.iterator : null
+      if (iterator) await closeIterator(iterator, options.log)
+      const info: EmptyTurnRetryInfo = { model, retry: retry + 1, remaining: emptyTurnRetries - retry - 1 }
+      options.log?.('[chat-routes] turn completed with no assistant text; re-running the same model', {
+        ...info,
+      })
+      options.onEmptyTurnRetry?.(info)
     }
   }
 

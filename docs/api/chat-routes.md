@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-153 exports.
+155 exports.
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
@@ -638,6 +638,14 @@ interface DraftPersistenceTuning
 interface DraftStoredMessage
 ```
 
+### `EmptyTurnRetryInfo`
+
+`interface` — One same-model re-run of a turn that completed with no assistant text.
+
+```ts
+interface EmptyTurnRetryInfo
+```
+
 ### `FileIndexAuthorization`
 
 `type` — Define authorization details and parameters for indexing a file workspace with optional caching and ignore rules
@@ -756,6 +764,14 @@ number
 
 ```ts
 number
+```
+
+### `MAX_EMPTY_TURN_RETRIES`
+
+`const` — Hard ceiling on same-model re-runs.
+
+```ts
+3
 ```
 
 ### `MAX_TEXT_ATTACHMENT_BYTES`
