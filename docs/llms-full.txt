@@ -2355,6 +2355,14 @@ interface ResolveChatAttachmentsOptions
 type ResolveChatAttachmentsResult
 ```
 
+### `resolveEmptyTurnRetries`
+
+`function` — Coerce the caller's budget to a finite, bounded, non-negative integer.
+
+```ts
+(value: number | undefined) => number
+```
+
 ### `rowIdOf`
 
 `function` — The row id an `appendMessage` actually returned, or `null` when the store returned nothing usable.

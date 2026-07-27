@@ -44,6 +44,7 @@ import {
 } from '../stream/index'
 import { buildModelChain, type ModelFailoverAttempt } from '../model-resolution/failover'
 import {
+  resolveEmptyTurnRetries,
   streamWithModelFailover,
   type EmptyTurnRetryInfo,
   type ModelFallbackInfo,
@@ -314,6 +315,15 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
   }
   if (!options.openEvents && !options.events) {
     throw new Error('createSandboxChatProducer: pass `openEvents` (failover-capable) or `events`')
+  }
+  // A fixed `events` stream cannot be re-opened, so the retry silently does
+  // nothing. A config that asks for recovery and receives none is the exact
+  // silent-no-op class this seam exists to remove — refuse it at construction
+  // rather than let a product believe blank turns are being retried.
+  if (!options.openEvents && resolveEmptyTurnRetries(options.emptyTurnRetries) > 0) {
+    throw new Error(
+      'createSandboxChatProducer: `emptyTurnRetries` requires `openEvents` — a fixed `events` stream cannot be re-opened',
+    )
   }
   const chain = options.model
     ? buildModelChain(options.model, options.modelFailover === false ? [] : (options.fallbackModels ?? []))

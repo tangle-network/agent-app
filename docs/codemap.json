@@ -1816,6 +1816,12 @@
           "doc": "Resolve the result of chat attachment processing with success status and corresponding data or error"
         },
         {
+          "name": "resolveEmptyTurnRetries",
+          "kind": "function",
+          "signature": "(value: number | undefined) => number",
+          "doc": "Coerce the caller's budget to a finite, bounded, non-negative integer."
+        },
+        {
           "name": "rowIdOf",
           "kind": "function",
           "signature": "(inserted: unknown) => string | null",
