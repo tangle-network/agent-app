@@ -217,6 +217,10 @@ function findErrorDetail(failure: SourceFindFailure, needle: string): string {
       return `${JSON.stringify(needle)} does not occur in that document. Read it again and cite a value it actually contains, or — if this figure is COMPUTED rather than read — omit the locator and state the computation in claim.`
     case 'occurrence_out_of_range':
       return `that value occurs ${failure.found} time(s) in the document; findOccurrence is out of range.`
+    case 'not_distinctive':
+      return failure.found === 0
+        ? `${JSON.stringify(failure.needle)} is too short to identify a place in the document — a digit or two matches somewhere in almost any text. Cite the labelled line instead (for example "Box 1   Wages, tips, other compensation ......... 128,450.00"). If the document does not state this value at all, omit the locator and say so in claim rather than pointing at an unrelated line.`
+        : `${JSON.stringify(failure.needle)} occurs ${failure.found} times, so it names no particular place. Cite a longer stretch of the supporting line, or pass findOccurrence to say which one you mean.`
   }
 }
 
