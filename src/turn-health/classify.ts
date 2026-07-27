@@ -149,7 +149,11 @@ export interface TurnHealthVerdict {
    *  reported so a WINDOW can be judged: a product whose deliverable is tool
    *  output and which produced zero tool calls across every turn in the
    *  lookback has a dead tool surface, and that is the shape no per-turn rule
-   *  can see. (Measured: tax-agent, 129 of 129 assistant rows all-time.) */
+   *  can see.
+   *
+   *  Only meaningful alongside {@link interpretedParts} > 0. Zero tool calls
+   *  read off a row that persisted NO parts is not an observation about the
+   *  tool surface — it is the absence of one. */
   toolCalls: number
   /** True when nothing about this turn could be judged — no interpretable part
    *  AND no visible text. Callers MUST exclude these from any healthy/unhealthy
@@ -173,6 +177,19 @@ export interface TurnHealthVerdict {
    *  {@link partsReadable}. Named in the alert so a reader can see EXACTLY what
    *  the detector was blind to instead of taking "unreadable" on faith. */
   opaquePartTypes: string[]
+  /** How many parts this module actually READ (text, artifact, tool, or a known
+   *  non-output kind).
+   *
+   *  The third blindness, and the one that shipped a false page. `partsReadable`
+   *  only says nothing was *uninterpretable*; a row that persisted NO parts at
+   *  all satisfies that vacuously. Production: 97 of tax-agent's 156 assistant
+   *  rows predate parts persistence entirely and store `[]`, and reading "zero
+   *  tool calls" off them raised a critical `dead_tool_surface` against a
+   *  product whose own `turn_events` table holds 243 `tool_call` frames.
+   *
+   *  So a tool verdict requires BOTH `partsReadable` AND this being > 0 —
+   *  evidence that was read, not merely evidence that failed to be unreadable. */
+  interpretedParts: number
 }
 
 /** Part kinds that count as something a user actually receives.
@@ -347,6 +364,7 @@ export function classifyTurnOutcome(input: TurnOutcomeInput): TurnHealthVerdict 
       unreadable: true,
       partsReadable: false,
       opaquePartTypes: uniqueOpaque,
+      interpretedParts,
     }
   }
 
@@ -377,6 +395,7 @@ export function classifyTurnOutcome(input: TurnOutcomeInput): TurnHealthVerdict 
     unreadable: false,
     partsReadable,
     opaquePartTypes: uniqueOpaque,
+    interpretedParts,
   }
 }
 
