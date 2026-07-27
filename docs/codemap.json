@@ -6566,6 +6566,12 @@
           "doc": "Message row shape the writer reads back when re-entering a turn."
         },
         {
+          "name": "EmptyTurnRetryInfo",
+          "kind": "interface",
+          "signature": "interface EmptyTurnRetryInfo",
+          "doc": "One same-model re-run of a turn that completed with no assistant text."
+        },
+        {
           "name": "FileIndexAuthorization",
           "kind": "type",
           "signature": "type FileIndexAuthorization",
