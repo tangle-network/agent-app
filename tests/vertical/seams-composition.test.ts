@@ -1,6 +1,7 @@
 /**
- * Composition scenario for the #200 turn-lifecycle seams the rest of the
- * vertical suite doesn't exercise: `turnLock` + `lifecycle` + `contextGate`
+ * Composition scenario for the turn-lifecycle seams the rest of the vertical
+ * suite doesn't exercise (introduced #200, graduated to stable in #227):
+ * `turnLock` + `lifecycle` + `contextGate`
  * wired together on the assembled `createChatTurnRoutes`, driven through the
  * same fake-producer harness (`createSandboxChatProducer` over scripted sidecar
  * events) the other vertical tests use.
@@ -81,7 +82,7 @@ function turnRequest(cookie: string, threadId: string, content: string): Request
   })
 }
 
-describe('vertical: turnLock + lifecycle + contextGate composition (#200 seams)', () => {
+describe('vertical: turnLock + lifecycle + contextGate composition (graduated seams)', () => {
   it('contextGate reject writes no assistant row and never runs the producer or lifecycle', async () => {
     const app = await createMiniApp()
     await app.createWorkspace('ws1')

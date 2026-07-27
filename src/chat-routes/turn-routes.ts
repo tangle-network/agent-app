@@ -20,24 +20,31 @@
  * no router import. Auth/access is one injected `authorize` seam, composable
  * with `/app-auth` guards but not coupled to them.
  *
- * Six optional product seams let a complex turn-orchestrator compose the
- * vertical instead of hand-rolling a generator — each omittable to the exact
- * behavior above: `turnLock` (single-flight acquire/release around the turn),
+ * Optional product seams let a complex turn-orchestrator compose the vertical
+ * instead of hand-rolling a generator — each omittable to the exact behavior
+ * above: `turnLock` (single-flight acquire/release around the turn),
  * `contextGate` (pre-producer domain-readiness short-circuit), `beforeTurn`
  * (observe + augment the producer input), `lifecycle` (deterministic
  * start/complete/error telemetry), `heartbeat` (keepalive during silent
- * producer waits), plus `onRawEvent` (the raw producer events, for telemetry).
- * `handleChatTurn` stays the engine — the seams only wrap its input, its
- * producer stream, and its settle.
+ * producer waits), and `onRawEvent` (the raw producer events, for telemetry) —
+ * plus the `authorize` result's `insertUserMessage` flag (suppress the user row
+ * for a product-dispatched turn). `handleChatTurn` stays the engine — the seams
+ * only wrap its input, its producer stream, and its settle.
  *
- * Seam stability: `lifecycle`, `heartbeat`, and `turnLock` are generic and
- * stable (`turnLock` graduated with `/turn-stream`'s shared DO adapter, #221).
- * `contextGate`, `beforeTurn`, and `onRawEvent` are `@experimental` — proven
- * by a single consumer (gtm's chat vertical, #200) and may change once a
- * second consumer exercises them. They stay FLAT top-level options (not
- * grouped under a `hooks` object): that grouping would break the shipped
- * consumer's call for no mechanism gain, and this package's exports are
- * additive-only.
+ * Seam stability: all of the above are STABLE and safe to depend on. They
+ * graduated in #227 against the bar this package holds itself to — a seam is
+ * provisional until two INDEPENDENT consumers exercise it, because one
+ * consumer's shape is indistinguishable from that consumer's assumptions.
+ * `turnLock` cleared it with `/turn-stream`'s shared DO adapter (#221);
+ * `contextGate`, `beforeTurn`, `onRawEvent` and `insertUserMessage` each
+ * cleared it with two product verticals reading them differently — and the
+ * review found no leaked assumptions to fix, only `ChatRouteEvent` to export.
+ *
+ * They stay FLAT top-level options (not grouped under a `hooks` object): that
+ * grouping would break every shipped consumer's call for no mechanism gain, and
+ * this package's exports are additive-only. For the same reason `onRawEvent`
+ * keeps its two-argument `(event, context)` signature rather than being
+ * normalized to the single-args shape the other seams take.
  */
 
 import { deriveExecutionId, handleChatTurn } from '@tangle-network/agent-runtime'
@@ -182,7 +189,14 @@ export type ChatTurnAuthorization<TContext> =
        *  never overrides — the engine's retry-dedup: `authorize` runs before
        *  turn identity is resolved, so it cannot tell a retry from a fresh turn;
        *  a turn already deduped stays deduped. Omit / `true` → today's behavior.
-       *  @experimental Single-consumer; shape may change. */
+       *
+       *  Settled shape (#227). The validated case in both consumers is the same:
+       *  a durable plan-approval follow-up re-entering an execution the decision
+       *  route already enqueued — a decision, not a typed message, so it must
+       *  not surface a user bubble. Suppressing the insert also propagates:
+       *  `ChatTurnProduceArgs.userMessageId` is `null` for the rest of the turn
+       *  when there is no row to reuse, so a seam anchoring to the user row must
+       *  handle that arm rather than assume a string. */
       insertUserMessage?: boolean
     }
   | { ok: false; response: Response }
@@ -230,8 +244,13 @@ export interface ChatTurnProduceArgs<TContext> {
 }
 
 /** One event as it crosses the route: the producer's own vocabulary, or an
- *  injected keepalive. Same shape the engine forwards verbatim. */
-type ChatRouteEvent = { type: string; data?: Record<string, unknown> }
+ *  injected keepalive. Same shape the engine forwards verbatim.
+ *
+ *  Public because it IS the vocabulary of two seams — `onRawEvent`'s parameter
+ *  and `heartbeat.event`'s return. Exported so a product can declare a
+ *  standalone handler (`function onRawEvent(e: ChatRouteEvent, ctx: T)`) rather
+ *  than depending on contextual typing from an inline object literal. */
+export type ChatRouteEvent = { type: string; data?: Record<string, unknown> }
 
 /** Best-effort human-readable cause from a terminal `error` /
  *  `session.run.failed` event's `data`. */
@@ -382,11 +401,34 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
   /** Pre-turn readiness gate that can short-circuit with a product `Response`
    *  before the producer runs (the user row is already persisted). Runs after
    *  `turnLock.acquire`, before `beforeTurn`. Omit → always proceed.
-   *  @experimental Single-consumer (gtm, #200); shape may change. */
+   *
+   *  Settled shape (#227). What a consumer may depend on:
+   *  - `args.userMessageId` is RESOLVED here — a string, or `null` when the
+   *    insert was suppressed with nothing to reuse. (`turnLock.acquire` is the
+   *    only seam that sees it `undefined`.)
+   *  - `{proceed:false}` releases the lock and returns the product's `Response`
+   *    verbatim: `beforeTurn` and `produce` never run, no assistant row is
+   *    written, and the user row already inserted is KEPT — a real user turn
+   *    whose assistant side is the gate's own response.
+   *  - Always returning `{proceed:true}` is supported, not a misuse: the seam
+   *    doubles as the one place that runs after the user row exists and before
+   *    the producer, which is where per-turn analytics and readiness
+   *    precomputation belong. A gate that never gates is a valid consumer. */
   contextGate?(args: ChatTurnProduceArgs<TContext>): ChatTurnGateResult | Promise<ChatTurnGateResult>
   /** Observe the assembled producer input and optionally augment it (rewrite
    *  the prompt / prior messages) before the producer runs. Omit → no change.
-   *  @experimental Single-consumer (gtm, #200); shape may change. */
+   *
+   *  Settled shape (#227). BOTH return arms are contract:
+   *  - a `ChatTurnInputPatch` shallow-merges over the route-assembled args, so
+   *    an omitted field keeps the route's value;
+   *  - `void` means "no patch" — and mutating `args.context` in place is the
+   *    supported way to thread request-scoped state forward to `produce` /
+   *    `lifecycle` / `onTurnComplete`, which all receive the same object.
+   *
+   *  A throw propagates (the turn fails with the lock released). It runs BEFORE
+   *  `lifecycle.onTurnStart`, so a throw here fires no terminal lifecycle hook —
+   *  the span never opened. Telemetry for a failure in this seam belongs in the
+   *  seam, not in `lifecycle`. */
   beforeTurn?(args: ChatTurnProduceArgs<TContext>): ChatTurnInputPatch | void | Promise<ChatTurnInputPatch | void>
   /** Deterministic run telemetry (start / complete / error) with identity and
    *  timing. Omit → no telemetry. */
@@ -397,7 +439,18 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
    *  before any heartbeat injection (the raw sidecar-producer events, for
    *  telemetry). Never alters the stream; errors are swallowed. Distinct from
    *  `onEvent`, which sees the engine-framed stream incl. lifecycle envelopes.
-   *  @experimental Single-consumer (gtm, #200); shape may change. */
+   *
+   *  Settled shape (#227). What a consumer may depend on:
+   *  - it sees EXACTLY the producer's own events — no engine lifecycle
+   *    envelopes, and no injected keepalives (`heartbeat` wraps the stream
+   *    downstream of this tap, so a synthetic event never reaches a trace);
+   *  - a throw is caught and logged, never surfaced: a broken telemetry sink
+   *    cannot fail a turn or truncate the client's stream;
+   *  - it is an OBSERVER — the return value is ignored, and the event object
+   *    continues downstream. Mutating it mutates the stream; don't.
+   *
+   *  Takes `(event, context)` rather than one args object, matching both
+   *  shipped consumers; see the module header on why it stays that way. */
   onRawEvent?(event: ChatRouteEvent, context: TContext): void | Promise<void>
   /** Pre-persist transform of the final text (e.g. `/redact`'s `redactPII`).
    *  Live stream is never altered. */

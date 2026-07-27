@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-152 exports.
+153 exports.
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
@@ -228,6 +228,14 @@ interface ChatRouteDurableProjection
 
 ```ts
 type ChatRouteDurableProjectionLogger
+```
+
+### `ChatRouteEvent`
+
+`type` — One event as it crosses the route: the producer's own vocabulary, or an injected keepalive.
+
+```ts
+type ChatRouteEvent
 ```
 
 ### `ChatTurnAuthorization`
