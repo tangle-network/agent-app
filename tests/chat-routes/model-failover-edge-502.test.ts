@@ -180,6 +180,20 @@ describe('the classifier vs a VERBATIM Cloudflare edge 502', () => {
     // 429 is a capacity signal, not a request bug — it stays an outage.
     expect(isUpstreamUnavailable(new Error('OpenAI-compat stream failed (HTTP 429)'))).toBe(true)
   })
+
+  it('a 404 for a MODEL still fails over — "not found" is model-scoped, not request-scoped', () => {
+    // The trap in "any 4xx is decisive": a model this endpoint cannot find may
+    // be perfectly available as the next entry in the chain, so 404 is
+    // deliberately NOT in the request-error set.
+    expect(isUpstreamUnavailable(new Error('OpenAI-compat stream failed (HTTP 404): Model not found'))).toBe(true)
+    // …while a genuine request error at 400/401/403/422 still surfaces.
+    for (const status of [400, 401, 403, 422]) {
+      expect(
+        isUpstreamUnavailable(new Error(`OpenAI-compat stream failed (HTTP ${status}): request rejected`)),
+        `HTTP ${status} must surface, not walk the chain`,
+      ).toBe(false)
+    }
+  })
 })
 
 describe('streamWithModelFailover rescues an edge 502', () => {

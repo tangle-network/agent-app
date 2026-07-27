@@ -44,6 +44,15 @@ export const UPSTREAM_UNAVAILABLE_CODES: readonly string[] = [
 export const UPSTREAM_UNAVAILABLE_STATUSES: readonly number[] = [429, 500, 502, 503, 504]
 
 /**
+ * Statuses that mean the REQUEST is wrong, so every model in the chain would
+ * fail on it identically. Listed explicitly rather than as "any 4xx" because
+ * 404 is NOT one of them: a model the endpoint cannot find is model-scoped, and
+ * the next model in the chain may well be there. 429 is absent for the same
+ * reason in reverse — it is a capacity signal and lives in the list above.
+ */
+const REQUEST_ERROR_STATUSES: readonly number[] = [400, 401, 403, 405, 413, 422]
+
+/**
  * Message fragments emitted by real upstreams during this class of outage.
  * Matched case-insensitively as a last resort, after code and status.
  */
@@ -165,12 +174,12 @@ export function isUpstreamUnavailable(signal: unknown): boolean {
   const hinted = readHttpStatusHint(message)
   if (hinted !== undefined) {
     if (UPSTREAM_UNAVAILABLE_STATUSES.includes(hinted)) return true
-    // An explicit client-error status is decisive the OTHER way. A 400 carrying
-    // a validation message must surface rather than walk the chain, even when
-    // its body happens to contain a word from the fragment list — the router's
-    // own `Function tools with reasoning_effort are not supported` 400 is a
-    // request-shaping bug that fails identically on every model.
-    if (hinted >= 400 && hinted < 500) return false
+    // An explicit REQUEST-error status is decisive the OTHER way. A 400
+    // carrying a validation message must surface rather than walk the chain,
+    // even when its body happens to contain a word from the fragment list —
+    // the router's own `Function tools with reasoning_effort are not supported`
+    // 400 is a request-shaping bug that fails identically on every model.
+    if (REQUEST_ERROR_STATUSES.includes(hinted)) return false
   }
 
   const lowered = message.toLowerCase()
