@@ -78,7 +78,7 @@ _74 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./web`](api/web.md) | 15 | — |
 | [`./web-react`](api/web-react.md) | 252 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `runtime`, `trace`, `work-product` |
 | [`./web-react/terminal`](api/web-react-terminal.md) | 10 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `runtime`, `trace`, `work-product` |
-| [`./work-product`](api/work-product.md) | 65 | `eval-campaign`, `tools` |
+| [`./work-product`](api/work-product.md) | 70 | `eval-campaign`, `tools` |
 | [`./work-product-react`](api/work-product-react.md) | 3 | `web-react`, `work-product` |
 
 ---
@@ -731,11 +731,11 @@ Depends on: `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `mi
 
 ## `./work-product`
 
-Source: `src/work-product/index.ts` · 65 exports
+Source: `src/work-product/index.ts` · 70 exports
 
 Depends on: `eval-campaign`, `tools`
 
-`AgentCheckInput`, `buildWorkProductTools`, `canTransitionWorkProduct`, `createInMemoryWorkProductStore`, `CreateWorkProductInput`, `createWorkProductRoutes`, `createWorkProductService`, `EVIDENCE_COVERAGE_CHECK`, `EvidenceEntry`, `EvidenceLocator`, `ExceptionEntry`, `ExceptionSeverity`, `finalizeWorkProductProvenance`, `FinalizeWorkProductProvenanceInput`, `InMemoryWorkProductStore`, `isWorkProductStatus`, `isWorkProductTerminal`, `MAX_WORK_PRODUCT_BATCH`, `normalizeQuoteText`, `parseAgentCheckInput`, `parseArtifactInput`, `parseEvidenceInput`, `parseExceptionInput`, `parseReviewQueueItem`, `persistedPartToWorkProduct`, `ProfileBacktestSummary`, `projectReviewQueue`, `QualityCheck`, `QUOTE_VERIFICATION_CHECK`, `ReviewQueueInputs`, `ReviewQueueItem`, `ReviewQueuePendingAsk`, `ReviewQueueState`, `ReviewQueueThread`, `sourceContainsQuote`, `stampProvenance`, `SubmitWorkProductInput`, `TrustItem`, `unresolvedBlockingExceptions`, `validateWorkProductVerdictBody`, `WorkProductArtifact`, `WorkProductAuditEvent`, `WorkProductAuthorizeArgs`, `WorkProductOutcome`, `WorkProductParseResult`, `WorkProductPatch`, `WorkProductPersistedPart`, `WorkProductProvenance`, `WorkProductProvenanceBase`, `WorkProductRecord`, `WorkProductRef`, `WorkProductRouteAuthorization`, `WorkProductRoutes`, `WorkProductRoutesOptions`, `WorkProductService`, `WorkProductServiceOptions`, `WorkProductStatus`, `WorkProductStorePort`, `WorkProductToolConfig`, `workProductToPersistedPart`, `workProductTrustInputs`, `WorkProductUpdateGuard`, `WorkProductVerdictBody`, `WorkProductVerdictInput`, `WorkProductVersionEntry`
+`AgentCheckInput`, `buildWorkProductTools`, `canTransitionWorkProduct`, `createInMemoryWorkProductStore`, `CreateWorkProductInput`, `createWorkProductRoutes`, `createWorkProductService`, `EVIDENCE_COVERAGE_CHECK`, `EvidenceEntry`, `EvidenceLocator`, `EvidenceSpan`, `ExceptionEntry`, `ExceptionSeverity`, `finalizeWorkProductProvenance`, `FinalizeWorkProductProvenanceInput`, `InMemoryWorkProductStore`, `isWorkProductStatus`, `isWorkProductTerminal`, `MAX_WORK_PRODUCT_BATCH`, `normalizeQuoteText`, `parseAgentCheckInput`, `parseArtifactInput`, `parseEvidenceInput`, `parseExceptionInput`, `parseReviewQueueItem`, `persistedPartToWorkProduct`, `ProfileBacktestSummary`, `projectReviewQueue`, `QualityCheck`, `QUOTE_VERIFICATION_CHECK`, `QuoteBasis`, `ReviewQueueInputs`, `ReviewQueueItem`, `ReviewQueuePendingAsk`, `ReviewQueueState`, `ReviewQueueThread`, `sliceSourceSpan`, `sourceContainsQuote`, `SourceSpanFailure`, `SourceSpanResult`, `stampProvenance`, `SubmitWorkProductInput`, `TrustItem`, `unresolvedBlockingExceptions`, `validateWorkProductVerdictBody`, `WorkProductArtifact`, `WorkProductAuditEvent`, `WorkProductAuthorizeArgs`, `WorkProductOutcome`, `WorkProductParseResult`, `WorkProductPatch`, `WorkProductPersistedPart`, `WorkProductProvenance`, `WorkProductProvenanceBase`, `WorkProductRecord`, `WorkProductRef`, `WorkProductRouteAuthorization`, `WorkProductRoutes`, `WorkProductRoutesOptions`, `WorkProductService`, `WorkProductServiceOptions`, `WorkProductStatus`, `WorkProductStorePort`, `WorkProductToolConfig`, `workProductToPersistedPart`, `workProductTrustInputs`, `WorkProductUpdateGuard`, `WorkProductVerdictBody`, `WorkProductVerdictInput`, `WorkProductVersionEntry`
 
 [Full API →](api/work-product.md)
 

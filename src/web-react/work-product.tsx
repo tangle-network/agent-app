@@ -345,8 +345,31 @@ export function EvidenceLineageTable({ evidence, resolveSourceUrl, className }: 
                 <td className="py-2 pr-3 text-[13px] leading-snug text-foreground">
                   {entry.claim}
                   {entry.locator.quote && (
-                    <span className="mt-0.5 block border-l-2 border-border pl-2 text-xs italic text-muted-foreground">
+                    // The basis is what a reviewer weighs, so it has to be
+                    // visible per row, not only in the aggregate check detail.
+                    // A platform-sliced quote came out of the document's own
+                    // bytes; a model-typed one was proved to occur but was
+                    // transcribed. Same text, different strength of evidence.
+                    <span
+                      className={`mt-0.5 block border-l-2 pl-2 text-xs italic ${
+                        entry.locator.quoteBasis === 'span'
+                          ? 'border-primary/60 text-foreground'
+                          : 'border-border text-muted-foreground'
+                      }`}
+                      title={
+                        entry.locator.quoteBasis === 'span'
+                          ? 'Sliced from the source document by the platform'
+                          : entry.locator.quoteBasis === 'model'
+                            ? 'Quoted by the agent, verified to occur in the source'
+                            : 'Unverified quote'
+                      }
+                    >
                       “{entry.locator.quote}”
+                      {entry.locator.quoteBasis && (
+                        <span className="ml-1.5 align-middle text-[10px] not-italic uppercase tracking-wide text-muted-foreground">
+                          {entry.locator.quoteBasis === 'span' ? 'from source' : 'verified'}
+                        </span>
+                      )}
                     </span>
                   )}
                 </td>

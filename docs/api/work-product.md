@@ -4,7 +4,7 @@
 
 Source: `src/work-product/index.ts`
 
-65 exports.
+70 exports.
 
 ### `AgentCheckInput`
 
@@ -80,10 +80,18 @@ interface EvidenceEntry
 
 ### `EvidenceLocator`
 
-`interface` — Point into a source document: page, free-form range, verbatim quote
+`interface` — Point into a source document: page, free-form range, span, verbatim quote
 
 ```ts
 interface EvidenceLocator
+```
+
+### `EvidenceSpan`
+
+`interface` — A half-open `[start, end)` character range into the source document's text.
+
+```ts
+interface EvidenceSpan
 ```
 
 ### `ExceptionEntry`
@@ -238,6 +246,14 @@ interface QualityCheck
 "quote_verification"
 ```
 
+### `QuoteBasis`
+
+`type` — How `locator.quote` got there.
+
+```ts
+type QuoteBasis
+```
+
 ### `ReviewQueueInputs`
 
 `interface` — Existing-source inputs the projection folds — no new stores
@@ -278,12 +294,36 @@ type ReviewQueueState
 interface ReviewQueueThread
 ```
 
+### `sliceSourceSpan`
+
+`function` — Resolve `[start, end)` against `sourceText`.
+
+```ts
+(sourceText: string, span: { start: number; end: number; }) => SourceSpanResult
+```
+
 ### `sourceContainsQuote`
 
 `function` — Does `quote` occur in `sourceText`?
 
 ```ts
 (sourceText: string, quote: string) => boolean
+```
+
+### `SourceSpanFailure`
+
+`type` — Slice a citation out of the source text by character offset — the reason this module exists in its stronger form.
+
+```ts
+type SourceSpanFailure
+```
+
+### `SourceSpanResult`
+
+`type`
+
+```ts
+type SourceSpanResult
 ```
 
 ### `stampProvenance`

@@ -63,13 +63,37 @@ export interface WorkProductArtifact {
 
 // ── evidence / lineage: source doc + locator → field/claim ───────────────────
 
-/** Point into a source document: page, free-form range, verbatim quote */
+/** A half-open `[start, end)` character range into the source document's text.
+ *  Offsets index exactly the string the product's `readSourceText` seam
+ *  returns for the same `sourceRef` — which is the string its document-reading
+ *  tool pages with an `offset`. The PLATFORM slices `locator.quote` out of it,
+ *  so a span citation cannot name text the document does not contain. */
+export interface EvidenceSpan {
+  start: number
+  end: number
+}
+
+/** How `locator.quote` got there. Server-set on every path — never read from
+ *  model args, because the whole value of the distinction is that a reviewer
+ *  can trust it:
+ *   - `span`  the platform sliced it out of the source bytes (unfalsifiable)
+ *   - `model` the model supplied the text and the platform PROVED it occurs */
+export type QuoteBasis = 'span' | 'model'
+
+/** Point into a source document: page, free-form range, span, verbatim quote */
 export interface EvidenceLocator {
   page?: number
   /** 'L120-L134' | 'B7' | '¶4' — free-form, non-empty when present. */
   range?: string
-  /** Verbatim supporting quote from the source. */
+  /** Verbatim supporting quote from the source. Model-supplied and verified,
+   *  or platform-sliced from {@link EvidenceLocator.span} — read `quoteBasis`
+   *  to tell which. */
   quote?: string
+  /** Character range the quote is sliced from. The preferred citation form:
+   *  two integers cannot be a fabricated quote. */
+  span?: EvidenceSpan
+  /** Server-set provenance for `quote`; a model-supplied value is discarded. */
+  quoteBasis?: QuoteBasis
 }
 
 /** One lineage row: a source document location supporting one artifact claim */
@@ -307,6 +331,24 @@ export function parseEvidenceInput(raw: unknown, path = 'entry'): WorkProductPar
     if (typeof locatorRaw.quote !== 'string') return fail(`${path}.locator.quote`, 'must be a string when present')
     locator.quote = locatorRaw.quote
   }
+  if (locatorRaw.span !== undefined) {
+    const spanRaw = asRecord(locatorRaw.span)
+    if (!spanRaw) return fail(`${path}.locator.span`, 'must be an object { start, end } when present')
+    for (const field of ['start', 'end'] as const) {
+      const value = spanRaw[field]
+      if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+        return fail(`${path}.locator.span.${field}`, 'must be a non-negative integer character offset')
+      }
+    }
+    if ((spanRaw.end as number) <= (spanRaw.start as number)) {
+      return fail(`${path}.locator.span`, `end (${String(spanRaw.end)}) must be greater than start (${String(spanRaw.start)}) — the range is half-open [start, end)`)
+    }
+    locator.span = { start: spanRaw.start as number, end: spanRaw.end as number }
+  }
+  // `quoteBasis` is server-set. A model-supplied value is DROPPED rather than
+  // rejected: it is not a correctable mistake the model should burn a turn on,
+  // and silently honouring it would let a model label an unverified quote
+  // 'span'. The tool layer stamps the real basis after resolution.
   const entry: EvidenceEntry = {
     id: (record.id as string).trim(),
     sourceRef: (record.sourceRef as string).trim(),
