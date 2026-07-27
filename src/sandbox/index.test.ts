@@ -41,6 +41,7 @@ import {
   buildAppToolMcpServers,
   streamSandboxPrompt,
   runSandboxPrompt,
+  collectSandboxPromptText,
   resolveModel,
   flattenHistory,
   mergeHistoryIntoParts,
@@ -649,6 +650,33 @@ describe('runSandboxPrompt text aggregation', () => {
       textSnapshot('p1', 'Hello world'),
     ])
     await expect(runSandboxPrompt(shell(), box, 'q')).resolves.toBe('Hello world')
+  })
+
+  it('is a thin wrapper over collectSandboxPromptText — same events, same answer', async () => {
+    // The aggregation is reusable on ANY generator; a product that wraps
+    // streamSandboxPrompt to mount per-turn MCP still gets the identical result
+    // without forking this logic. That fork is what shipped the bug three times.
+    const events = [
+      textSnapshot('echo', 'greet me'),
+      textDelta('p1', 'Hello'),
+      textDelta('p1', ' world'),
+    ]
+    async function* standalone() {
+      for (const e of events) yield e
+    }
+    await expect(collectSandboxPromptText(standalone(), 'greet me')).resolves.toBe(
+      await runSandboxPrompt(shell(), boxYielding(events), 'greet me'),
+    )
+  })
+
+  it('collectSandboxPromptText drops an echo of the folded prompt when given the history', async () => {
+    async function* standalone() {
+      yield textSnapshot('echo', 'Assistant: prior\n\nUser: greet me')
+      yield textDelta('p1', 'Hi')
+    }
+    await expect(
+      collectSandboxPromptText(standalone(), 'greet me', [{ role: 'assistant', content: 'prior' }]),
+    ).resolves.toBe('Hi')
   })
 })
 

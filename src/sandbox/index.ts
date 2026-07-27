@@ -2034,32 +2034,45 @@ function lastNonPromptTextPart(parts: Map<string, string>, promptTexts: string[]
 }
 
 /**
- * Resolve a sandbox prompt by streaming and aggregating message parts into one
- * final string.
+ * Aggregate a sandbox prompt event stream down to the turn's one final answer.
  *
- * Text is accumulated PER PART ID rather than into a single running buffer, and
- * a prompt echo is dropped by matching its content. The obvious alternative —
- * one buffer, skipping whichever text part arrives first — is wrong on both
- * sandbox lanes: on the delta lane (`box.streamPrompt`, explicit deltas) it
- * silently drops the answer's opening token, and when the echo arrives after
- * the answer it returns the caller's own prompt as the agent's reply. Both
- * failures are silent and produce a plausible-looking string, which is the
- * worst shape for the unattended cron/judge turns this function exists for.
+ * Exported SEPARATELY from `runSandboxPrompt` because the aggregation is pure —
+ * `AsyncIterable<event> -> string` — while the streaming half is not: a product
+ * that mounts per-turn MCP servers or resolves its harness per workspace wraps
+ * `streamSandboxPrompt` in its own generator. Binding this logic to one stream
+ * function is exactly what pushed three products into forking the whole thing,
+ * bug and all. Take this over a local copy no matter whose generator you drive.
  *
- * A blank-but-present `result.finalText` is likewise ignored in favour of the
- * streamed text rather than overwriting a real answer with whitespace.
+ * Two rules earn their keep, and both were learned from the naive version:
+ *
+ * - Text accumulates PER PART ID, never into one running buffer, so two
+ *   concurrent text parts cannot overwrite each other.
+ * - A prompt echo is identified by CONTENT, never by arrival position. The
+ *   "skip whichever text part arrives first" shortcut is wrong on both sandbox
+ *   lanes: on the delta lane (`box.streamPrompt`, explicit deltas) the first
+ *   part is the answer's opening token, so the answer silently loses it; and
+ *   when the echo arrives AFTER the answer, the function returns the caller's
+ *   own prompt as the agent's reply. Both failures produce a plausible-looking
+ *   string, the worst shape for the unattended cron/judge turns this exists for.
+ *
+ * A blank-but-present `result.finalText` is ignored in favour of the streamed
+ * text rather than overwriting a real answer with whitespace.
+ *
+ * @param events raw sandbox turn events, in order
+ * @param message the prompt as handed to the stream, so an echo of it is dropped
+ * @param history folded into the dispatched prompt by `streamSandboxPrompt`;
+ *        pass whatever was passed there, since the echo replays the FOLDED text
  */
-export async function runSandboxPrompt(
-  shell: SandboxRuntimeConfig,
-  box: SandboxInstance,
+export async function collectSandboxPromptText(
+  events: AsyncIterable<unknown>,
   message: string | PromptInputPart[],
-  options?: StreamSandboxPromptOptions,
+  history?: StreamSandboxPromptOptions['history'],
 ): Promise<string> {
   let finalText = ''
   const textParts = new Map<string, string>()
   let anonymousTextPart = 0
 
-  for await (const rawEvent of streamSandboxPrompt(shell, box, message, options)) {
+  for await (const rawEvent of events) {
     const event = rawEvent as { type?: string; data?: Record<string, unknown> }
     if (!event.type) continue
 
@@ -2077,7 +2090,27 @@ export async function runSandboxPrompt(
     }
   }
 
-  return finalText || lastNonPromptTextPart(textParts, dispatchedPromptTexts(message, options?.history))
+  return finalText || lastNonPromptTextPart(textParts, dispatchedPromptTexts(message, history))
+}
+
+/**
+ * Resolve a sandbox prompt by streaming it and aggregating the turn down to one
+ * final string. The shell's profile / model / MCP resolution and severed-stream
+ * fail-loud come from `streamSandboxPrompt`; the aggregation is
+ * `collectSandboxPromptText`, which products driving their own generator should
+ * import directly.
+ */
+export async function runSandboxPrompt(
+  shell: SandboxRuntimeConfig,
+  box: SandboxInstance,
+  message: string | PromptInputPart[],
+  options?: StreamSandboxPromptOptions,
+): Promise<string> {
+  return collectSandboxPromptText(
+    streamSandboxPrompt(shell, box, message, options),
+    message,
+    options?.history,
+  )
 }
 
 // Mirrors the SDK's PermissionLevel union (not re-exported by
