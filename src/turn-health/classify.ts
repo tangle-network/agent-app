@@ -364,6 +364,9 @@ export function classifyTurnOutcome(input: TurnOutcomeInput): TurnHealthVerdict 
       unreadable: true,
       partsReadable: false,
       opaquePartTypes: uniqueOpaque,
+      // Structurally 0 here — `unreadable` is only reached when
+      // `interpretedParts === 0`. Carried rather than hardcoded so the field
+      // has one source on every return path.
       interpretedParts,
     }
   }
