@@ -15,7 +15,7 @@ import { lazy, Suspense } from 'react'
 
 const LazyKnot = lazy(() => import('../../brand').then((m) => ({ default: m.TangleKnot })))
 
-export interface BrandKnotProps {
+interface BrandKnotProps {
   size?: number
   className?: string
 }

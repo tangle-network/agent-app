@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.43.76",
+  "version": "0.44.0",
   "packageManager": "pnpm@10.33.4",
   "description": "Application-shell framework for Tangle agent products: a bounded tool loop, the structured agent→app tool side channel, integration-hub client, per-workspace billing, and crypto — composed over the Tangle agent substrate through typed seams.",
   "keywords": [
@@ -26,22 +26,17 @@
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "files": [
     "dist",
     "bin",
     ".claude/skills"
   ],
   "bin": {
-    "agent-app-theme-check": "./dist/theme-contract/cli.js"
+    "agent-app-theme-check": "./dist/theme-contract/cli.js",
+    "agent-app-preflight": "./dist/preflight/cli.js"
   },
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
-    },
+    "./package.json": "./package.json",
     "./tools": {
       "types": "./dist/tools/index.d.ts",
       "import": "./dist/tools/index.js",
@@ -197,11 +192,6 @@
       "import": "./dist/plans/index.js",
       "default": "./dist/plans/index.js"
     },
-    "./durable-chat": {
-      "types": "./dist/durable-chat/index.d.ts",
-      "import": "./dist/durable-chat/index.js",
-      "default": "./dist/durable-chat/index.js"
-    },
     "./missions": {
       "types": "./dist/missions/index.d.ts",
       "import": "./dist/missions/index.js",
@@ -231,11 +221,6 @@
       "types": "./dist/work-product-react/index.d.ts",
       "import": "./dist/work-product-react/index.js",
       "default": "./dist/work-product-react/index.js"
-    },
-    "./composer": {
-      "types": "./dist/composer/index.d.ts",
-      "import": "./dist/composer/index.js",
-      "default": "./dist/composer/index.js"
     },
     "./assistant": {
       "types": "./dist/assistant/index.d.ts",

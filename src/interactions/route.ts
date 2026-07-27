@@ -153,8 +153,10 @@ export interface DurableInteractionRouteArgs extends BeforeInteractionAnswerArgs
 }
 
 /** Crash-recoverable persistence lifecycle for the answer route. The product
- * binds this structural port to `/durable-chat` (or an equivalent durable
- * store). Existing `beforeAnswer` behavior remains independent and unchanged. */
+ * binds this structural port to its OWN durable store — agent-app ships no
+ * implementation (the `/durable-chat` module that used to provide one was
+ * removed in 0.44.0 after nine repos produced zero imports of it). Existing
+ * `beforeAnswer` behavior remains independent and unchanged. */
 export interface DurableInteractionRoutePersistence<TPrepared = unknown> {
   guarantee: 'reconciled' | 'best-effort'
   prepare(args: DurableInteractionRouteArgs): TPrepared | Promise<TPrepared>

@@ -2,7 +2,6 @@ import { defineConfig } from 'tsup'
 
 export default defineConfig({
   entry: {
-    index: 'src/index.ts',
     'tools/index': 'src/tools/index.ts',
     'tangle/index': 'src/tangle/index.ts',
     'runtime/index': 'src/runtime/index.ts',
@@ -32,7 +31,6 @@ export default defineConfig({
     'integrations/index': 'src/integrations/index.ts',
     'interactions/index': 'src/interactions/index.ts',
     'plans/index': 'src/plans/index.ts',
-    'durable-chat/index': 'src/durable-chat/index.ts',
     'missions/index': 'src/missions/index.ts',
     'platform/index': 'src/platform/index.ts',
     'app-auth/index': 'src/app-auth/index.ts',
@@ -41,7 +39,6 @@ export default defineConfig({
     'work-product/index': 'src/work-product/index.ts',
     'work-product-react/index': 'src/work-product-react/index.tsx',
     'web-react/terminal': 'src/web-react/terminal.ts',
-    'composer/index': 'src/composer/index.ts',
     'assistant/index': 'src/assistant/index.ts',
     'brand/index': 'src/brand/index.tsx',
     'redact/index': 'src/redact/index.ts',
@@ -75,6 +72,7 @@ export default defineConfig({
     'theme/tailwind-preset': 'src/theme/tailwind-preset.ts',
     'theme-contract/index': 'src/theme-contract/index.ts',
     'theme-contract/cli': 'src/theme-contract/cli.ts',
+    'preflight/cli': 'src/preflight/cli.ts',
     'studio/index': 'src/studio/index.ts',
     'studio-react/index': 'src/studio-react/index.tsx',
   },

@@ -108,7 +108,8 @@ consumer of L0/L1 installs none of them): `konva`/`react-konva` → only
 
 Adding a module? Follow `CLAUDE.md` § "When you add a module": confirm it's
 shell not engine, domain-seam it, wire `tsup.config.ts` + `package.json`
-`exports` + the root barrel, place it in the lowest layer it can live in.
+`exports` + `knip.json` `entry`, place it in the lowest layer it can live in.
+There is no root barrel — `.` was removed in 0.44.0.
 
 ## If we ever split into packages
 

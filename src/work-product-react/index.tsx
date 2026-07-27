@@ -1,6 +1,6 @@
 /**
- * `./work-product-react` — the sandbox-ui-composed review pane, mirroring
- * `/composer`'s optional-peer rule: this is the ONLY work-product surface
+ * `./work-product-react` — the sandbox-ui-composed review pane. It follows the
+ * optional-peer rule: this is the ONLY work-product surface
  * that imports `@tangle-network/sandbox-ui` (its `workbench` primitives:
  * `PillTabs`, `CodeSurface`, `DiffView`, `FileBreadcrumb`,
  * `computeDiffStats`). `/web-react`'s queue/card/lineage components stay

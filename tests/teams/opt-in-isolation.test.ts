@@ -1,12 +1,14 @@
 /**
  * The whole point of the teams module: it is OPT-IN by construction. A consumer
- * that imports only `.` (the bare entry) must pull ZERO teams code and must NOT
- * require the optional `drizzle-orm` peer. These tests prove that three ways:
- *   1. The root barrel SOURCE re-exports nothing from `./teams*`.
- *   2. The built `.` artifact contains no teams symbols and no `drizzle-orm` import.
- *   3. The pure `./teams` leaf SOURCE imports no drizzle / react / env.
- * Tests 2-3 read built artifacts when present; they self-skip (not silently
- * pass) before a build, and the source-level guards (1, 3) always run.
+ * must reach for `@tangle-network/agent-app/teams` explicitly, and nothing they
+ * get by default may pull teams code or the optional `drizzle-orm` peer.
+ *
+ * Until 0.44.0 that guarantee was enforced against the root barrel (`.`), which
+ * had to be checked for `./teams` re-exports. The barrel is gone — `.` is no
+ * longer an entry point at all — so the guarantee is now unconditional and the
+ * test asserts the stronger fact: there is no bare entry to leak through.
+ * The remaining tests prove the pure `./teams` leaf SOURCE imports no
+ * drizzle / react / env, and that the drizzle subpath is the one real boundary.
  */
 
 import { describe, it, expect } from 'vitest'
@@ -15,11 +17,25 @@ import { resolve } from 'node:path'
 
 const root = resolve(__dirname, '../..')
 
-describe('opt-in by construction — root barrel source', () => {
-  it('src/index.ts re-exports nothing from teams', () => {
-    const source = readFileSync(resolve(root, 'src/index.ts'), 'utf8')
-    expect(source).not.toMatch(/['"]\.\/teams/)
-    expect(source).not.toMatch(/teams-react/)
+describe('opt-in by construction — there is no root barrel to leak through', () => {
+  it('src/index.ts does not exist', () => {
+    expect(existsSync(resolve(root, 'src/index.ts'))).toBe(false)
+  })
+
+  it('tsup builds no root entry', () => {
+    const config = readFileSync(resolve(root, 'tsup.config.ts'), 'utf8')
+    expect(config).not.toMatch(/^\s*index:\s*'src\/index\.ts'/m)
+  })
+
+  it('package.json exports no "." subpath', () => {
+    const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as {
+      exports: Record<string, unknown>
+      main?: string
+      types?: string
+    }
+    expect(Object.keys(pkg.exports)).not.toContain('.')
+    expect(pkg.main).toBeUndefined()
+    expect(pkg.types).toBeUndefined()
   })
 })
 
@@ -68,20 +84,10 @@ describe('drizzle isolation — DB code lives behind /teams/drizzle', () => {
 })
 
 const distIndex = resolve(root, 'dist/index.js')
-const builtDescribe = existsSync(distIndex) ? describe : describe.skip
 
-builtDescribe('built `.` artifact — the tax stays clean', () => {
-  it('dist/index.js pulls no teams chunk and no drizzle-orm import', () => {
-    const built = readFileSync(distIndex, 'utf8')
-    // No teams module symbols leaked into the bare entry.
-    expect(built).not.toMatch(/createTeamTables/)
-    expect(built).not.toMatch(/createMembersApi/)
-    expect(built).not.toMatch(/ensurePersonalOrganization/)
-    expect(built).not.toMatch(/MembersPanel/)
-    // No re-export edge into any teams chunk.
-    expect(built).not.toMatch(/from\s*['"]\.\/teams/)
-    // The bare entry must not force the optional drizzle peer.
-    expect(built).not.toMatch(/from\s*['"]drizzle-orm/)
+describe('built `.` artifact — it must not come back', () => {
+  it('the build emits no dist/index.js', () => {
+    expect(existsSync(distIndex)).toBe(false)
   })
 
   it('the pure ./teams chunk carries no drizzle-orm import', () => {

@@ -18,7 +18,7 @@
 
 const VERSION = "v1";
 
-export interface PersistedThread {
+interface PersistedThread {
   threadId: string | null;
   /** The user's last-selected model slug — a non-sensitive UI preference, so
    *  unlike the transcript it is safe to cache. null → use the server default. */

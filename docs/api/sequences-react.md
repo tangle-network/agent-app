@@ -83,7 +83,7 @@ interface BrandMarkProps
 `function` — Extension-based kind classification; 'unknown' defers to a HEAD content-type probe at draw time.
 
 ```ts
-(url: string) => "image" | "unknown" | "video"
+(url: string) => "unknown" | "image" | "video"
 ```
 
 ### `clipChipGeometry`

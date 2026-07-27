@@ -140,7 +140,7 @@ export function ellipseTopLeftFromCenter(
 // Marquee selection
 // ---------------------------------------------------------------------------
 
-export interface MarqueeRect {
+interface MarqueeRect {
   x: number
   y: number
   width: number
@@ -171,7 +171,7 @@ export function normalizeMarquee(
 // Inline text editor overlay positioning
 // ---------------------------------------------------------------------------
 
-export interface OverlayPositionInput {
+interface OverlayPositionInput {
   /** Element top-left in document coordinates. */
   elementX: number
   elementY: number
@@ -183,7 +183,7 @@ export interface OverlayPositionInput {
   panY: number
 }
 
-export interface OverlayPosition {
+interface OverlayPosition {
   /** CSS left/top for the overlay textarea relative to the canvas container. */
   left: number
   top: number

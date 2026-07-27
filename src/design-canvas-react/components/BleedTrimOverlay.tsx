@@ -9,7 +9,7 @@
 
 import type { PageBleed } from '../../design-canvas/model'
 
-export interface BleedTrimOverlayProps {
+interface BleedTrimOverlayProps {
   /** Page dimensions in screen pixels (already multiplied by zoom). */
   pageWidthPx: number
   pageHeightPx: number
