@@ -9204,6 +9204,14 @@ type VaultKv
 
 Source: `src/profile/index.ts` · depends on `skills`
 
+### `assertProfilePromptWithinBudget`
+
+`function` — Run {@link assertSystemPromptWithinBudget} over a profile-shaped object's `prompt.systemPrompt`.
+
+```ts
+(profile: { prompt?: { systemPrompt?: unknown; } | undefined; } | undefined, budget?: ComposeProfileBudget, origin?: st…
+```
+
 ### `assertSkillDeliveryDisjoint`
 
 `function` — Throw when the same skill id is delivered both `inline` and `mounted` — the agent would see it twice (once in the prompt body, once as a mounted file it's told to go read), doubling prompt bytes and…
@@ -9217,7 +9225,7 @@ Source: `src/profile/index.ts` · depends on `skills`
 `function` — Enforce {@link ComposeProfileBudget} on a composed system prompt: over budget throws (or warns with `warnOnly`) with the actual size and the top-3 largest sections.
 
 ```ts
-(systemPrompt: string, budget?: ComposeProfileBudget) => void
+(systemPrompt: string, budget?: ComposeProfileBudget, origin?: string) => void
 ```
 
 ### `composeAgentProfile`

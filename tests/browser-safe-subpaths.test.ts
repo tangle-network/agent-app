@@ -82,7 +82,73 @@ for (const [key, entry] of Object.entries(pkg.exports)) {
   BROWSER_SAFE_ENTRYPOINTS[subpath] = src
 }
 
-const FORBIDDEN = [/^node:/, /^@tangle-network\/agent-runtime/, /^child_process$/, /^fs$/, /^util$/]
+/** Every Node builtin, in BOTH spellings. The `node:` prefix is one regex; the
+ *  BARE spelling needs the full list, and the old three-name allowlist
+ *  (`child_process`/`fs`/`util`) let `import { join } from 'path'` and
+ *  `import { createHash } from 'crypto'` through a browser-safe graph with all
+ *  25 assertions green — measured, by injecting exactly that into
+ *  `runtime/model-catalog.ts` (reachable from `/catalog`). Those two are the
+ *  most common accidental server imports in this codebase, so the list is the
+ *  whole builtin set rather than a growing allowlist of names someone
+ *  remembered. */
+const NODE_BUILTINS = [
+  'assert',
+  'async_hooks',
+  'buffer',
+  'child_process',
+  'cluster',
+  'console',
+  'constants',
+  'crypto',
+  'dgram',
+  'diagnostics_channel',
+  'dns',
+  'domain',
+  'events',
+  'fs',
+  'fs/promises',
+  'http',
+  'http2',
+  'https',
+  'inspector',
+  'module',
+  'net',
+  'os',
+  'path',
+  'path/posix',
+  'path/win32',
+  'perf_hooks',
+  'process',
+  'punycode',
+  'querystring',
+  'readline',
+  'repl',
+  'stream',
+  'stream/consumers',
+  'stream/promises',
+  'stream/web',
+  'string_decoder',
+  'sys',
+  'timers',
+  'timers/promises',
+  'tls',
+  'trace_events',
+  'tty',
+  'url',
+  'util',
+  'util/types',
+  'v8',
+  'vm',
+  'wasi',
+  'worker_threads',
+  'zlib',
+]
+
+const FORBIDDEN = [
+  /^node:/,
+  /^@tangle-network\/agent-runtime/,
+  ...NODE_BUILTINS.map((name) => new RegExp(`^${name.replace('/', '\\/')}$`)),
+]
 
 /** Static + dynamic + side-effect import specifiers in a source file. */
 function importSpecs(src: string): string[] {

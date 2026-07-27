@@ -1,0 +1,101 @@
+name: Nightly live e2e
+
+# Everything else in CI runs against a fake. This runs against the platform.
+#
+# The regressions this repo actually shipped were all green in CI: a streaming
+# lane that delivered nothing certified by 2,416 passing tests, a model
+# substitution that ran 27+ hours unnoticed, six deploy gates failing silently
+# in one night. A suite can only catch what its fixtures already believe, so one
+# job has to ask production.
+#
+# It is scheduled, never a PR gate: it costs real money, needs real secrets, and
+# a shared-infrastructure outage must not block a merge. A red run means "go
+# look at the platform", not "your branch is broken".
+on:
+  schedule:
+    # 07:00 UTC — after nightly platform deploys, before EU working hours.
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+    inputs:
+      model:
+        description: 'Model to request for the live turn'
+        required: false
+        default: 'gpt-5-mini'
+      box_id:
+        description: 'Reuse an existing sandbox id instead of provisioning'
+        required: false
+        default: ''
+
+concurrency:
+  group: nightly-live-e2e
+  cancel-in-progress: false
+
+jobs:
+  live-turn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+      LIVE_SANDBOX: '1'
+      SANDBOX_API_KEY: ${{ secrets.SANDBOX_API_KEY }}
+      SANDBOX_API_URL: ${{ vars.SANDBOX_API_URL || 'https://sandbox.tangle.tools' }}
+      LIVE_MODEL: ${{ inputs.model || 'gpt-5-mini' }}
+      LIVE_BOX_ID: ${{ inputs.box_id }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # Fail with the missing secret NAMED. A live job that dies on an empty
+      # credential and prints only a stack trace is the opacity this workflow
+      # exists to remove.
+      - name: Check credentials are present
+        run: |
+          missing=""
+          [ -n "$SANDBOX_API_KEY" ] || missing="$missing SANDBOX_API_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error title=Nightly live e2e cannot run::Missing repository secret(s):$missing."
+            echo "Set them in Settings → Secrets and variables → Actions. Rotate from the sandbox console."
+            exit 1
+          fi
+          echo "credentials present; target=$SANDBOX_API_URL model=$LIVE_MODEL"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run one real sandbox chat turn end to end
+        id: live
+        run: |
+          set -o pipefail
+          pnpm vitest run tests/live/nightly-chat-turn.live.test.ts --reporter=default 2>&1 | tee live.log
+
+      # The test prints a `=== nightly live e2e ===` block naming the box, the
+      # requested model, every step with its duration, and the last raw events.
+      # Lift it into the job summary so the failure is legible without opening
+      # the log.
+      - name: Publish the run report
+        if: always()
+        run: |
+          {
+            echo '### Nightly live e2e'
+            echo
+            echo '```'
+            awk '/=== nightly live e2e ===/,0' live.log | head -80
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Explain a failure in the annotation
+        if: failure()
+        run: |
+          box=$(grep -oE 'boxId +[a-z0-9-]+' live.log | head -1 | awk '{print $2}')
+          step=$(grep -E '^  FAILED' live.log | head -1 | sed 's/^ *//')
+          echo "::error title=Nightly live turn failed::model=${LIVE_MODEL} box=${box:-none-provisioned} target=${SANDBOX_API_URL} failing-step=${step:-see log}"
+
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: nightly-live-log
+          path: live.log
+          retention-days: 30

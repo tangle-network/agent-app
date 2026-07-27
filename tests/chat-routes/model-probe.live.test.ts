@@ -1,4 +1,9 @@
 /**
+ * test-quality:probe-only — this file deliberately asserts nothing; it prints
+ * measured payloads for a human and for the failover tests to be written
+ * against. Declared for `tests/test-quality.test.ts`, which otherwise (rightly)
+ * treats an assertion-free test as a test that cannot fail.
+ *
  * LIVE PROBE (not an assertion): ask a real box to run a one-word turn on each
  * candidate model and print the VERBATIM terminal event, plus how
  * `isUpstreamUnavailable` classifies it.

@@ -400,6 +400,7 @@
     "dev": "tsup --watch",
     "prepare": "tsup",
     "test": "vitest run",
+    "test:gates": "vitest run src/sandbox/index.test.ts src/profile/index.test.ts tests/chat-stream.test.ts tests/browser-safe-subpaths.test.ts tests/test-quality.test.ts tests/knip-entries-fresh.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "docs:gen": "agent-docs",

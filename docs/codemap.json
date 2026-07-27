@@ -7128,6 +7128,12 @@
       "error": null,
       "exports": [
         {
+          "name": "assertProfilePromptWithinBudget",
+          "kind": "function",
+          "signature": "(profile: { prompt?: { systemPrompt?: unknown; } | undefined; } | undefined, budget?: ComposeProfileBudget, origin?: st…",
+          "doc": "Run {@link assertSystemPromptWithinBudget} over a profile-shaped object's `prompt.systemPrompt`."
+        },
+        {
           "name": "assertSkillDeliveryDisjoint",
           "kind": "function",
           "signature": "(inlineIds: Iterable<string>, mountedIds: Iterable<string>) => void",
@@ -7136,7 +7142,7 @@
         {
           "name": "assertSystemPromptWithinBudget",
           "kind": "function",
-          "signature": "(systemPrompt: string, budget?: ComposeProfileBudget) => void",
+          "signature": "(systemPrompt: string, budget?: ComposeProfileBudget, origin?: string) => void",
           "doc": "Enforce {@link ComposeProfileBudget} on a composed system prompt: over budget throws (or warns with `warnOnly`) with the actual size and the top-3 largest sections."
         },
         {

@@ -146,6 +146,31 @@ pnpm typecheck && pnpm test && pnpm build
 ```
 tsup (ESM + d.ts), vitest, tsc. Every change keeps tests green. **No `Co-Authored-By` / AI-attribution in commits** (repo-wide). Commit identity is the global git config (`Drew Stone <drewstone329@gmail.com>`) — never override it.
 
+### Prove a new test can fail — before you claim it passes
+
+A test that cannot fail is worse than no test: it reports safety it does not provide, and this repo has shipped that exact failure. 2,416 passing tests once certified a streaming lane that delivered nothing, because the fixtures encoded the same wrong assumption as the code.
+
+So the bar for a new or changed test is not "it is green". It is: **break the thing it guards, watch it go red, restore, watch it go green — and paste both outputs in the PR.** Concretely, from the PR that added the prompt-budget gate:
+
+```
+# 1. break it
+$ python3 - <<'PY'   # replace the three assertProfilePromptWithinBudget(...) calls with a no-op
+...
+$ npx vitest run src/sandbox/index.test.ts -t "provision S-cost gates"
+  Tests  5 failed | 9 passed (14)
+  → promise resolved "{ name: 'box-w1', …(8) }" instead of rejecting
+
+# 2. restore it
+$ npx vitest run src/sandbox/index.test.ts -t "provision S-cost gates"
+  PASS (14) FAIL (0)
+```
+
+If breaking the code does not turn the test red, the test is measuring something else — find out what before merging.
+
+`tests/test-quality.test.ts` enforces the floor of this rule in CI (a test body with no assertion, or an assertion that is true regardless of the code). It cannot check the part that matters most — a real assertion against a fixture that shares the code's wrong assumption passes it and still proves nothing. That part is on you.
+
+A test that deliberately asserts nothing (a print-only probe capturing real payloads) declares itself with `test-quality:probe-only` in the file, so "this asserts nothing" is on the record rather than an oversight.
+
 ## When you add a module
 1. Apply the rule above — confirm it's shell, not engine.
 2. Domain-seam it (typed config; no product import).

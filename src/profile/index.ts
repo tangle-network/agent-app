@@ -49,6 +49,18 @@ import {
   type ComposeShellResourcesInput,
   type SkillEntry,
 } from '../skills/index'
+import { assertSystemPromptWithinBudget, type ComposeProfileBudget } from './budget'
+
+/** The prompt byte budget lives in `./budget` (import-free) so `/sandbox` can
+ *  run the same gate without pulling agent-eval through this module. Re-exported
+ *  here so the published `/profile` surface is unchanged. */
+export {
+  assertProfilePromptWithinBudget,
+  assertSystemPromptWithinBudget,
+  DEFAULT_MAX_SYSTEM_PROMPT_BYTES,
+  largestPromptSections,
+  type ComposeProfileBudget,
+} from './budget'
 
 /** Re-expose the agent-eval section/render substrate so a product wires the
  *  evolvable surface through ONE subpath: `makeEvolvableSection` builds the
@@ -119,104 +131,6 @@ export interface ProfileOverlay {
   instructions?: string[]
   /** Profile `name` override. When unset, the base name is kept. */
   name?: string
-}
-
-/** Byte budget on the FINAL composed `prompt.systemPrompt`. Past this the
- *  model degrades sharply (a 122,659-byte prompt shipped once and the model
- *  returned empty answers), so the default gate throws well before that. */
-export const DEFAULT_MAX_SYSTEM_PROMPT_BYTES = 40_000
-
-/** Budget config for the composed system prompt. */
-export interface ComposeProfileBudget {
-  /** Byte cap on the composed `prompt.systemPrompt`.
-   *  Default {@link DEFAULT_MAX_SYSTEM_PROMPT_BYTES}. */
-  maxSystemPromptBytes?: number
-  /** Downgrade the over-budget throw to a `console.warn` — the escape hatch
-   *  for a product with a known-big prompt that must still ship (it yells on
-   *  every compose instead of blocking). */
-  warnOnly?: boolean
-  /** Required to raise {@link maxSystemPromptBytes} above
-   *  {@link DEFAULT_MAX_SYSTEM_PROMPT_BYTES} or to set {@link warnOnly}: a
-   *  written reason naming what stays inline and why it cannot be mounted.
-   *  Weakening the cap is a product decision that outlives the person making
-   *  it, and the usual cause is reference material concatenated into the prompt
-   *  that belongs in `resources.files`; demanding the sentence here keeps that
-   *  from happening by accident. */
-  overBudgetReason?: string
-}
-
-/** Reject a budget that weakens the cap without stating why. Runs before the
- *  size check so it fires on every compose, not only once a prompt has already
- *  grown past the raised ceiling. */
-function assertBudgetPolicy(budget: ComposeProfileBudget): void {
-  const raisedCap =
-    budget.maxSystemPromptBytes !== undefined &&
-    budget.maxSystemPromptBytes > DEFAULT_MAX_SYSTEM_PROMPT_BYTES
-  if (!raisedCap && !budget.warnOnly) return
-  if ((budget.overBudgetReason ?? '').trim() !== '') return
-  const weakened = raisedCap
-    ? `maxSystemPromptBytes ${budget.maxSystemPromptBytes} exceeds the ${DEFAULT_MAX_SYSTEM_PROMPT_BYTES}-byte default`
-    : 'warnOnly downgrades the over-budget throw to a warning'
-  throw new Error(
-    `${weakened} without an overBudgetReason. Oversized system prompts degrade toward empty answers, so the cap is not a formality. ` +
-      'Before raising it: rank the prompt with largestPromptSections() — reference material (playbooks, checklists, corpora) belongs in resources.files ' +
-      "via corpusSkills()/userSkillMounts() or composeSkills({ mode: 'mounted' }), which puts the bodies on disk in the sandbox and leaves a short index in the prompt. " +
-      'Only content the agent must obey without a tool call should stay inline. If the prompt is genuinely irreducible, set overBudgetReason to the sentence that says so.',
-  )
-}
-
-/** Largest markdown-heading-delimited sections of a prompt, by UTF-8 bytes.
- *  Cheap heuristic: split on `#`-heading lines; the preamble before the first
- *  heading reports as "(preamble)". */
-export function largestPromptSections(
-  prompt: string,
-  top = 3,
-): Array<{ title: string; bytes: number }> {
-  const encoder = new TextEncoder()
-  const sections: Array<{ title: string; bytes: number }> = []
-  let title = '(preamble)'
-  let start = 0
-  const flush = (end: number) => {
-    const body = prompt.slice(start, end)
-    if (body.trim()) sections.push({ title, bytes: encoder.encode(body).byteLength })
-  }
-  const headingRe = /^#{1,6}\s+(.+)$/gm
-  for (const match of prompt.matchAll(headingRe)) {
-    flush(match.index)
-    title = (match[1] ?? '').trim() || '(untitled section)'
-    start = match.index
-  }
-  flush(prompt.length)
-  return sections.sort((a, b) => b.bytes - a.bytes).slice(0, top)
-}
-
-/** Enforce {@link ComposeProfileBudget} on a composed system prompt: over
- *  budget throws (or warns with `warnOnly`) with the actual size and the
- *  top-3 largest sections. Exported so a product assembling its prompt
- *  outside {@link composeAgentProfile} (e.g. via the `/prompt` assembler) can
- *  run the same gate at its own final-composition point. */
-export function assertSystemPromptWithinBudget(
-  systemPrompt: string,
-  budget: ComposeProfileBudget = {},
-): void {
-  assertBudgetPolicy(budget)
-  const max = budget.maxSystemPromptBytes ?? DEFAULT_MAX_SYSTEM_PROMPT_BYTES
-  const bytes = new TextEncoder().encode(systemPrompt).byteLength
-  if (bytes <= max) return
-  const sections = largestPromptSections(systemPrompt)
-    .map((s) => `"${s.title}" (${s.bytes}B)`)
-    .join(', ')
-  const message =
-    `composed systemPrompt is ${bytes} bytes — over the ${max}-byte budget ` +
-    `(oversized prompts degrade to empty answers). ` +
-    (sections ? `Largest sections: ${sections}. ` : '') +
-    `Move reference material to resources.files (corpusSkills/userSkillMounts, or composeSkills({ mode: 'mounted' })) so the bodies land on disk in the sandbox ` +
-    `and the prompt keeps only an index; keep inline only what the agent must obey without a tool call. Raising maxSystemPromptBytes requires an overBudgetReason.`
-  if (budget.warnOnly) {
-    console.warn(`[profile] ${message}`)
-    return
-  }
-  throw new Error(message)
 }
 
 /** Project per-user skills onto SDK file mounts at the harness skill-discovery
