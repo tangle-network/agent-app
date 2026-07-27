@@ -21,6 +21,7 @@ import { defineAppTool, type AppToolDefinition } from '../tools/registry'
 import type { AppToolContext } from '../tools/types'
 import { createWorkProductService, type WorkProductOutcome, type WorkProductService } from './service'
 import { stampProvenance, type WorkProductProvenanceBase } from './provenance'
+import { sourceContainsQuote } from './quote'
 import {
   parseAgentCheckInput,
   parseArtifactInput,
@@ -39,9 +40,15 @@ import {
  *  small batch the model can correct precisely on a named-index failure. */
 export const MAX_WORK_PRODUCT_BATCH = 50
 
-/** The shell's one generic platform check: every material target has ≥1
- *  evidence row. Recorded as `QualityCheck{source:'platform'}`. */
+/** Platform check: every material target has ≥1 evidence row. Recorded as
+ *  `QualityCheck{source:'platform'}`. */
 export const EVIDENCE_COVERAGE_CHECK = 'evidence_coverage'
+
+/** Platform check: how many evidence entries carry a quote the shell PROVED
+ *  occurs in the source it names. Recorded when `readSourceText` is wired, so
+ *  a reviewer reads the strength of the lineage off the row itself rather than
+ *  trusting that a quote was checked. */
+export const QUOTE_VERIFICATION_CHECK = 'quote_verification'
 
 /** Domain seams for the three work-product tools — every domain word is a
  *  parameter; the shell bakes none. */
@@ -55,6 +62,20 @@ export interface WorkProductToolConfig {
    *  (vault stat / attachment lookup). A dangling ref is a `ToolInputError`
    *  naming the entry index — lineage can never point at nothing. */
   resolveSourceRef: (ref: string, ctx: AppToolContext) => Promise<boolean>
+  /** Fail-loud QUOTE verification: return the source document's TEXT for a
+   *  ref so the shell can prove each `locator.quote` occurs in it verbatim.
+   *  Wiring this turns the gate ON — a quote that does not occur is a
+   *  `ToolInputError` naming the entry index, so the model re-extracts from
+   *  the document instead of persisting invented lineage.
+   *
+   *  Return `null` ONLY when the ref genuinely has no extractable text (an
+   *  image scan, an opaque blob). The gate is fail-CLOSED on `null`: a quote
+   *  that cannot be checked is refused, because "unverifiable" and "verified"
+   *  must never look the same to a reviewer. Such an entry is still recordable
+   *  without `locator.quote` — `claim` carries the assertion.
+   *
+   *  Omit the seam entirely and no quote is checked. */
+  readSourceText?: (ref: string, ctx: AppToolContext) => Promise<string | null>
   /** The material targets the platform coverage check requires evidence for.
    *  Product-owned vocabulary; omit to skip the coverage gate. */
   materialTargets?: (artifact: WorkProductArtifact) => string[]
@@ -136,6 +157,77 @@ async function resolveDraft(
   })
 }
 
+/**
+ * Prove every supplied `locator.quote` occurs in the source it names, or
+ * throw the correctable error that sends the model back to the document.
+ *
+ * Source texts are read once per distinct `sourceRef` in the batch — a
+ * 50-entry batch citing three documents is three reads, not fifty.
+ *
+ * No-op when `readSourceText` is not wired: the product has not given the
+ * shell a way to see its documents, and inventing a weaker check here would
+ * report unverified lineage as verified.
+ */
+async function assertQuotesOccurInSources(
+  config: WorkProductToolConfig,
+  entries: readonly EvidenceEntry[],
+  ctx: AppToolContext,
+): Promise<void> {
+  const readSourceText = config.readSourceText
+  if (!readSourceText) return
+  const texts = new Map<string, string | null>()
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index]!
+    const quote = entry.locator.quote
+    if (quote === undefined || quote.trim().length === 0) continue
+    if (!texts.has(entry.sourceRef)) texts.set(entry.sourceRef, await readSourceText(entry.sourceRef, ctx))
+    const text = texts.get(entry.sourceRef)
+    if (text === null || text === undefined) {
+      throw new ToolInputError(
+        'unverifiable_quote',
+        `entries[${index}].locator.quote: "${entry.sourceRef}" has no readable text, so the quote cannot be verified. Record the entry without locator.quote and state the basis in claim.`,
+      )
+    }
+    if (!sourceContainsQuote(text, quote)) {
+      throw new ToolInputError(
+        'quote_not_found',
+        `entries[${index}].locator.quote: ${JSON.stringify(quote)} does not occur in "${entry.sourceRef}". Copy the supporting line character-for-character out of that document, or — if this value is COMPUTED rather than read — omit locator.quote and state the computation in claim.`,
+      )
+    }
+  }
+}
+
+/** Re-verify every persisted quote at submit time. The upsert gate stops new
+ *  fabrication; this stops a package whose evidence was written BEFORE the
+ *  gate existed (or under a since-corrected document) from reaching a
+ *  reviewer. Entries with no quote are neither verified nor failures — they
+ *  are lineage with no click target, counted separately so the recorded check
+ *  states how much of the package is quote-backed. */
+async function summarizeQuoteVerification(
+  config: WorkProductToolConfig,
+  evidence: readonly EvidenceEntry[],
+  ctx: AppToolContext,
+): Promise<{ verified: number; withoutQuote: number; failed: string[] } | undefined> {
+  const readSourceText = config.readSourceText
+  if (!readSourceText) return undefined
+  const texts = new Map<string, string | null>()
+  let verified = 0
+  let withoutQuote = 0
+  const failed: string[] = []
+  for (const entry of evidence) {
+    const quote = entry.locator.quote
+    if (quote === undefined || quote.trim().length === 0) {
+      withoutQuote += 1
+      continue
+    }
+    if (!texts.has(entry.sourceRef)) texts.set(entry.sourceRef, await readSourceText(entry.sourceRef, ctx))
+    const text = texts.get(entry.sourceRef)
+    if (typeof text === 'string' && sourceContainsQuote(text, quote)) verified += 1
+    else failed.push(entry.id)
+  }
+  return { verified, withoutQuote, failed }
+}
+
 /** Build the three work-product tools for `customTools` registration on the
  *  MCP server / HTTP handler / runtime executor. */
 export function buildWorkProductTools(config: WorkProductToolConfig): AppToolDefinition[] {
@@ -167,7 +259,11 @@ export function buildWorkProductTools(config: WorkProductToolConfig): AppToolDef
                 properties: {
                   page: { type: 'number' },
                   range: { type: 'string', description: "Free-form location: 'L120-L134' | 'B7' | '¶4'." },
-                  quote: { type: 'string', description: 'Verbatim supporting quote.' },
+                  quote: {
+                    type: 'string',
+                    description:
+                      'Verbatim supporting quote — copied character-for-character out of the source, not retyped, reformatted, or summarised. The platform checks it occurs in the document and REFUSES the entry if it does not. For a value you COMPUTED rather than read, omit this field and state the computation in claim.',
+                  },
                 },
               },
               target: { type: 'string', description: 'Artifact field/claim this evidence supports.' },
@@ -199,6 +295,11 @@ export function buildWorkProductTools(config: WorkProductToolConfig): AppToolDef
           )
         }
       }
+      // Fail-loud quote verification: a quote must occur in the document the
+      // entry names. Rejected BEFORE the draft is resolved, so a batch with a
+      // fabricated quote persists nothing — the model corrects and re-sends
+      // rather than leaving a half-written row behind.
+      await assertQuotesOccurInSources(config, entries, ctx)
       const draft = await resolveDraft(service, config, scopeKey, ctx)
       const record = await unwrap(() => service.upsertEvidence(draft.id, entries), 'evidence_rejected')
       return { workProductId: record.id, version: record.version, evidenceCount: record.evidence.length }
@@ -333,11 +434,37 @@ export function buildWorkProductTools(config: WorkProductToolConfig): AppToolDef
         )
       }
 
-      // The shell's ONE generic platform check: every material target has ≥1
-      // evidence row. A failing coverage check is BOTH recorded on the row
-      // (visible to the queue) and rejected fail-loud — a lineage-free package
-      // can never reach a reviewer.
+      // Platform check one: every persisted quote still occurs in the source
+      // it names. The upsert gate stops NEW fabrication; this stops a package
+      // whose evidence predates the gate from reaching a reviewer. Recorded on
+      // the row AND rejected fail-loud — the same discipline as coverage.
       const checks: QualityCheck[] = [...agentChecks]
+      const quotes = await summarizeQuoteVerification(config, draft.evidence, ctx)
+      if (quotes) {
+        const quoted = quotes.verified + quotes.failed.length
+        checks.unshift({
+          id: QUOTE_VERIFICATION_CHECK,
+          name: QUOTE_VERIFICATION_CHECK,
+          passed: quotes.failed.length === 0,
+          detail:
+            quotes.failed.length === 0
+              ? `${quotes.verified}/${quoted} quoted evidence entries verified against their source; ${quotes.withoutQuote} recorded without a quote`
+              : `Unverifiable quotes on: ${quotes.failed.join(', ')}`,
+          source: 'platform',
+        })
+        if (quotes.failed.length > 0) {
+          await unwrap(() => service.recordChecks(draft.id, checks), 'checks_rejected')
+          throw new ToolInputError(
+            'quote_verification_failed',
+            `Cannot submit: ${quotes.failed.length} evidence entr${quotes.failed.length === 1 ? 'y quotes' : 'ies quote'} text that does not occur in the source named (${quotes.failed.join(', ')}). Re-emit each with a quote copied character-for-character from that document, or without locator.quote if the value is computed.`,
+          )
+        }
+      }
+
+      // Platform check two: every material target has ≥1 evidence row. A
+      // failing coverage check is BOTH recorded on the row (visible to the
+      // queue) and rejected fail-loud — a lineage-free package can never reach
+      // a reviewer.
       if (config.materialTargets) {
         const targets = config.materialTargets(artifact)
         const covered = new Set(draft.evidence.map((entry) => entry.target))

@@ -10,6 +10,7 @@
 export * from './types'
 export * from './service'
 export * from './tools'
+export * from './quote'
 export * from './queue'
 export * from './route'
 export * from './provenance'

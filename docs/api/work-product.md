@@ -4,7 +4,7 @@
 
 Source: `src/work-product/index.ts`
 
-62 exports.
+65 exports.
 
 ### `AgentCheckInput`
 
@@ -64,7 +64,7 @@ interface CreateWorkProductInput
 
 ### `EVIDENCE_COVERAGE_CHECK`
 
-`const` — The shell's one generic platform check: every material target has ≥1 evidence row.
+`const` — Platform check: every material target has ≥1 evidence row.
 
 ```ts
 "evidence_coverage"
@@ -150,6 +150,14 @@ interface InMemoryWorkProductStore
 50
 ```
 
+### `normalizeQuoteText`
+
+`function` — Fold a string to the form both sides of a quote comparison are measured in.
+
+```ts
+(value: string) => string
+```
+
 ### `parseAgentCheckInput`
 
 `function` — Validate one agent self-check ensuring identifiers, verdict flag, and optional detail are well formed
@@ -222,6 +230,14 @@ interface ProfileBacktestSummary
 interface QualityCheck
 ```
 
+### `QUOTE_VERIFICATION_CHECK`
+
+`const` — Platform check: how many evidence entries carry a quote the shell PROVED occurs in the source it names.
+
+```ts
+"quote_verification"
+```
+
 ### `ReviewQueueInputs`
 
 `interface` — Existing-source inputs the projection folds — no new stores
@@ -260,6 +276,14 @@ type ReviewQueueState
 
 ```ts
 interface ReviewQueueThread
+```
+
+### `sourceContainsQuote`
+
+`function` — Does `quote` occur in `sourceText`?
+
+```ts
+(sourceText: string, quote: string) => boolean
 ```
 
 ### `stampProvenance`
