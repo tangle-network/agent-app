@@ -207,6 +207,26 @@ describe('create-agent-app --chat scaffolder', () => {
     }
   }, 120_000)
 
+  // Roadmap #188 Phase 2 listed the scaffold's budget checks as riding with
+  // #226. This is the theme half: the scaffolded app must not reference a
+  // design token nothing defines. That failure has no build error and no test
+  // failure — the component simply renders transparent, which is how an
+  // invisible popover ships. `checkThemeContract` is the same walk products run
+  // in their own CI via the `agent-app-theme-check` bin; running it here means
+  // a scaffold can never EMIT the defect in the first place.
+  it('the generated app references no undefined design token (invisible-UI class)', async () => {
+    const { checkThemeContract } = (await import('../src/theme-contract/index')) as typeof import('../src/theme-contract/index')
+    const srcDir = join(projectDir, 'src')
+    const result = checkThemeContract({ srcDirs: [srcDir] })
+    expect(
+      result.missing,
+      `the --chat scaffold emits references to design tokens that are not defined in tokens.css, ` +
+        `so those surfaces render transparent:\n  ${result.missing
+          .map((m) => `${m.varName} (${m.referencedIn})`)
+          .join('\n  ')}`,
+    ).toEqual([])
+  })
+
   it("the generated app's OWN e2e suite passes: fake producer → turn → stream → persisted parts → replay", () => {
     // This is the one-day-claim gate: the template ships a working end-to-end
     // test, and CI proves it stays working against the current shell. It also
