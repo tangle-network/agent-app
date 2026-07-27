@@ -2721,7 +2721,7 @@
         {
           "name": "mintSandboxScopedToken",
           "kind": "function",
-          "signature": "(box: SandboxInstance, options: { scope: ScopedTokenScope; sessionId?: string | undefined; ttlMinutes?: number | undefi…",
+          "signature": "(box: SandboxInstance, options: { scope: ScopedTokenScope; sessionId?: string | undefined; runtimeSessionId?: string |…",
           "doc": "Mint a scoped token for an already-provisioned box (e.g."
         },
         {
@@ -4247,6 +4247,12 @@
           "kind": "function",
           "signature": "(base: WorkProductProvenanceBase, now?: () => number) => WorkProductProvenance",
           "doc": "Stamp a full provenance from the dispatch-time base."
+        },
+        {
+          "name": "stampReplaySeq",
+          "kind": "function",
+          "signature": "(row: BufferedTurnEvent) => string",
+          "doc": "Serialize a replayed row for the wire, stamping the buffer ordinal ONTO the line so a reconnecting client can continue from `?fromSeq=<lastSeq>`."
         },
         {
           "name": "statSandboxFileSize",
@@ -13747,7 +13753,7 @@
         {
           "name": "mintSandboxScopedToken",
           "kind": "function",
-          "signature": "(box: SandboxInstance, options: { scope: ScopedTokenScope; sessionId?: string | undefined; ttlMinutes?: number | undefi…",
+          "signature": "(box: SandboxInstance, options: { scope: ScopedTokenScope; sessionId?: string | undefined; runtimeSessionId?: string |…",
           "doc": "Mint a scoped token for an already-provisioned box (e.g."
         },
         {
@@ -16136,6 +16142,12 @@
           "kind": "function",
           "signature": "(part: JsonRecord) => string",
           "doc": "Resolve the tool name from a JSON record using tool, name, or a default value"
+        },
+        {
+          "name": "stampReplaySeq",
+          "kind": "function",
+          "signature": "(row: BufferedTurnEvent) => string",
+          "doc": "Serialize a replayed row for the wire, stamping the buffer ordinal ONTO the line so a reconnecting client can continue from `?fromSeq=<lastSeq>`."
         },
         {
           "name": "StreamEvent",
@@ -18814,6 +18826,12 @@
           "doc": "Define callbacks to handle events and data during a chat streaming session"
         },
         {
+          "name": "chatStreamLaneListener",
+          "kind": "function",
+          "signature": "(cb: ChatStreamCallbacks) => (event: RecoveredTurnEvent) => void",
+          "doc": "Route recovered events back into the existing `ChatStreamCallbacks`."
+        },
+        {
           "name": "ChatStreamToolCall",
           "kind": "interface",
           "signature": "interface ChatStreamToolCall",
@@ -18952,6 +18970,18 @@
           "doc": null
         },
         {
+          "name": "DEFAULT_LIVE_SILENCE_TIMEOUT_MS",
+          "kind": "const",
+          "signature": "30000",
+          "doc": "A live lane whose silence is measured; 30s matches the proven default."
+        },
+        {
+          "name": "DEFAULT_LIVENESS_POLL_TICKS",
+          "kind": "const",
+          "signature": "20",
+          "doc": null
+        },
+        {
           "name": "DEFAULT_MENTION_EMPTY_TEXT",
           "kind": "const",
           "signature": "\"No matching files\"",
@@ -18962,6 +18992,24 @@
           "kind": "const",
           "signature": "20",
           "doc": "Max popover results per query — enough to show a useful spread of matches without pushing the fuzzy-filtered list past what a popover can usefully render in one screen."
+        },
+        {
+          "name": "DEFAULT_RECONNECT_DELAY_MS",
+          "kind": "const",
+          "signature": "250",
+          "doc": null
+        },
+        {
+          "name": "DEFAULT_SETTLE_POLL_INTERVAL_MS",
+          "kind": "const",
+          "signature": "250",
+          "doc": null
+        },
+        {
+          "name": "discoverRunningTurn",
+          "kind": "function",
+          "signature": "(listRunning: (signal: AbortSignal) => Promise<string[]>, signal: AbortSignal) => Promise<RunningTurnDiscovery>",
+          "doc": "Probe for a turn already running on this thread."
         },
         {
           "name": "DISPATCH_MAX_MEDIA_PARTS",
@@ -18992,6 +19040,12 @@
           "kind": "function",
           "signature": "(line: string, cb: ChatStreamCallbacks) => { turnId?: string | undefined; receivedContent: boolean; }",
           "doc": "Parse one NDJSON line into the callbacks."
+        },
+        {
+          "name": "drainNdjsonLines",
+          "kind": "function",
+          "signature": "(body: ReadableStream<Uint8Array<ArrayBufferLike>>, onLine: (line: string) => void) => Promise<void>",
+          "doc": "Drain an NDJSON body line by line, carrying the trailing partial across chunks and flushing it at EOF."
         },
         {
           "name": "DurableChatCard",
@@ -19190,6 +19244,30 @@
           "kind": "interface",
           "signature": "interface FlowWaterfallProps",
           "doc": null
+        },
+        {
+          "name": "followDurableTurn",
+          "kind": "function",
+          "signature": "(opts: Omit<FollowTurnOptions, \"attachLive\">) => Promise<FollowTurnResult>",
+          "doc": "Durable-lane recovery on its own — the whole helper for a product with no live lane (no sandbox session to attach to, or a detached run the session gateway provably never sees)."
+        },
+        {
+          "name": "followTurn",
+          "kind": "function",
+          "signature": "(opts: FollowTurnOptions) => Promise<FollowTurnResult>",
+          "doc": "Follow one turn to completion across both lanes, recovering from transport drops on the way."
+        },
+        {
+          "name": "FollowTurnOptions",
+          "kind": "interface",
+          "signature": "interface FollowTurnOptions",
+          "doc": "Configure the dual-lane follow for one turn."
+        },
+        {
+          "name": "FollowTurnResult",
+          "kind": "interface",
+          "signature": "interface FollowTurnResult",
+          "doc": "How a followed turn ended."
         },
         {
           "name": "formatActivityCost",
@@ -19450,6 +19528,24 @@
           "doc": "Renders the late answer as a self-contained chat message: the original question, its context, and the user's answer(s)."
         },
         {
+          "name": "LiveLaneAttachment",
+          "kind": "interface",
+          "signature": "interface LiveLaneAttachment",
+          "doc": "A live-lane connection the follower can tear down."
+        },
+        {
+          "name": "LiveLaneConnector",
+          "kind": "type",
+          "signature": "type LiveLaneConnector",
+          "doc": "Structural port for a live lane."
+        },
+        {
+          "name": "LiveLaneHandlers",
+          "kind": "interface",
+          "signature": "interface LiveLaneHandlers",
+          "doc": "Callbacks a `LiveLaneConnector` drives while it is attached."
+        },
+        {
           "name": "loadAttachmentFile",
           "kind": "function",
           "signature": "(url: string, fetchFile?: (url: string) => Promise<Response>) => Promise<AttachmentFileResult>",
@@ -19606,6 +19702,12 @@
           "doc": "Re-validate one JSON-boundary row into a queue item; null for junk."
         },
         {
+          "name": "parseRunningTurnResponse",
+          "kind": "function",
+          "signature": "(body: unknown) => string[]",
+          "doc": "`{running: string[]}` — the one discovery contract every app already shares."
+        },
+        {
           "name": "pendingApprovalOf",
           "kind": "function",
           "signature": "(call: ChatToolCallInfo) => { proposalId: string; } | null",
@@ -19744,6 +19846,12 @@
           "doc": "Ranks `files` against `query` (case-insensitive), capped to `limit`: name-prefix matches first, then name-substring, then path-substring."
         },
         {
+          "name": "RecoveredTurnEvent",
+          "kind": "interface",
+          "signature": "interface RecoveredTurnEvent",
+          "doc": "A normalized transport event."
+        },
+        {
           "name": "resolveChatInteraction",
           "kind": "function",
           "signature": "(list: ChatInteraction[], id: string, status: \"answered\" | \"declined\" | \"cancelled\" | \"expired\", answers?: InteractionA…",
@@ -19814,6 +19922,12 @@
           "kind": "interface",
           "signature": "interface RunDrillInProps",
           "doc": "Define properties required to run a drill and handle its closure event"
+        },
+        {
+          "name": "RunningTurnDiscovery",
+          "kind": "type",
+          "signature": "type RunningTurnDiscovery",
+          "doc": "The outcome of a page-load running-turn probe."
         },
         {
           "name": "SandboxTerminalConnection",
@@ -19916,6 +20030,30 @@
           "kind": "function",
           "signature": "(name: string, blob: Blob) => { ok: true; } | { ok: false; message: string; }",
           "doc": "Drives an anchor-click download from an already-resolved blob."
+        },
+        {
+          "name": "TurnDiscoveryState",
+          "kind": "type",
+          "signature": "type TurnDiscoveryState",
+          "doc": "Where the page-load probe got to."
+        },
+        {
+          "name": "TurnLane",
+          "kind": "type",
+          "signature": "type TurnLane",
+          "doc": "Which lane delivered an event."
+        },
+        {
+          "name": "TurnRecoveryTimings",
+          "kind": "type",
+          "signature": "type TurnRecoveryTimings",
+          "doc": "Timing knobs forwarded verbatim to `followTurn`."
+        },
+        {
+          "name": "TurnResetReason",
+          "kind": "type",
+          "signature": "type TurnResetReason",
+          "doc": "Why accumulated turn state must be discarded before more events arrive."
         },
         {
           "name": "upsertChatInteraction",
@@ -20038,6 +20176,24 @@
           "doc": "Whole seconds elapsed while `active`, ticking once a second."
         },
         {
+          "name": "useTurnRecovery",
+          "kind": "function",
+          "signature": "(options: UseTurnRecoveryOptions) => UseTurnRecoveryResult",
+          "doc": "Discover and re-attach to a turn already running in this scope"
+        },
+        {
+          "name": "UseTurnRecoveryOptions",
+          "kind": "interface",
+          "signature": "interface UseTurnRecoveryOptions",
+          "doc": "Configure page-load turn recovery for one chat scope."
+        },
+        {
+          "name": "UseTurnRecoveryResult",
+          "kind": "interface",
+          "signature": "interface UseTurnRecoveryResult",
+          "doc": "What the hook exposes to the chat surface."
+        },
+        {
           "name": "waterfallLayout",
           "kind": "function",
           "signature": "(trace: FlowTrace) => WaterfallRow[]",
@@ -20072,6 +20228,139 @@
           "kind": "function",
           "signature": "(status: WorkProductStatus) => string",
           "doc": "Human label for a work-product status."
+        }
+      ]
+    },
+    {
+      "id": "./web-react/session-gateway",
+      "source": "src/web-react/session-gateway.ts",
+      "dependsOn": [
+        "brand",
+        "chat-routes",
+        "chat-store",
+        "harness",
+        "interactions",
+        "missions",
+        "plans",
+        "runtime",
+        "trace",
+        "work-product"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "APPLIED_SEQ_CAP",
+          "kind": "const",
+          "signature": "100000",
+          "doc": "Memory floor on the applied-seq set — a cap, not a policy."
+        },
+        {
+          "name": "createSessionGatewayLane",
+          "kind": "function",
+          "signature": "(options: SessionGatewayLaneOptions) => LiveLaneConnector",
+          "doc": "Build the session-gateway `LiveLaneConnector`."
+        },
+        {
+          "name": "createSessionStreamGrantFetcher",
+          "kind": "function",
+          "signature": "(options: SessionStreamGrantFetcherOptions) => (signal: AbortSignal) => Promise<SessionStreamGrant | null>",
+          "doc": "Build a grant fetcher that NEVER throws: network failure, a non-2xx, an `available:false` body and a malformed payload all resolve `null`."
+        },
+        {
+          "name": "GATEWAY_TERMINAL_EVENT_TYPES",
+          "kind": "const",
+          "signature": "ReadonlySet<string>",
+          "doc": "Frames that mean this turn is over."
+        },
+        {
+          "name": "GATEWAY_TRANSPORT_NOTICE_TYPES",
+          "kind": "const",
+          "signature": "ReadonlySet<string>",
+          "doc": "Frames that prove the SOCKET is alive but say nothing about the TURN."
+        },
+        {
+          "name": "gatewayFrameToTurnEvent",
+          "kind": "function",
+          "signature": "(raw: unknown) => GatewayTurnEvent | null",
+          "doc": "Decode one gateway frame into `{type, data}`, or `null` if it carries nothing."
+        },
+        {
+          "name": "GatewayTurnEvent",
+          "kind": "interface",
+          "signature": "interface GatewayTurnEvent",
+          "doc": "A decoded gateway frame."
+        },
+        {
+          "name": "isGatewayTransportNotice",
+          "kind": "function",
+          "signature": "(type: string) => boolean",
+          "doc": "Report whether a decoded gateway event type is transport noise, not turn feedback"
+        },
+        {
+          "name": "isTerminalGatewayEvent",
+          "kind": "function",
+          "signature": "(type: string) => boolean",
+          "doc": "Report whether a decoded gateway event type terminates the turn"
+        },
+        {
+          "name": "parseSessionStreamGrant",
+          "kind": "function",
+          "signature": "(body: unknown) => SessionStreamGrant | null",
+          "doc": "Parse the grant endpoint body."
+        },
+        {
+          "name": "ReplayCursorStorage",
+          "kind": "interface",
+          "signature": "interface ReplayCursorStorage",
+          "doc": "Structurally the SDK's `ReplayStateStorage`; `window.localStorage` satisfies it."
+        },
+        {
+          "name": "SessionGatewayClientConfigLike",
+          "kind": "interface",
+          "signature": "interface SessionGatewayClientConfigLike",
+          "doc": "The subset of the SDK client's config this lane sets."
+        },
+        {
+          "name": "SessionGatewayClientFactory",
+          "kind": "type",
+          "signature": "type SessionGatewayClientFactory",
+          "doc": "Construct the gateway client."
+        },
+        {
+          "name": "SessionGatewayClientLike",
+          "kind": "interface",
+          "signature": "interface SessionGatewayClientLike",
+          "doc": "Structural mirror of the SDK's `SessionGatewayClient`."
+        },
+        {
+          "name": "SessionGatewayLaneOptions",
+          "kind": "interface",
+          "signature": "interface SessionGatewayLaneOptions",
+          "doc": "Configure the session-gateway live lane."
+        },
+        {
+          "name": "SessionGrantUnavailableReason",
+          "kind": "type",
+          "signature": "type SessionGrantUnavailableReason",
+          "doc": "Why a viewer cannot attach right now."
+        },
+        {
+          "name": "SessionStreamGrant",
+          "kind": "interface",
+          "signature": "interface SessionStreamGrant",
+          "doc": "A short-lived, read-only grant for one session's gateway stream."
+        },
+        {
+          "name": "SessionStreamGrantFetcherOptions",
+          "kind": "interface",
+          "signature": "interface SessionStreamGrantFetcherOptions",
+          "doc": "Fetch a grant from the product's mint endpoint."
+        },
+        {
+          "name": "SessionStreamGrantResponse",
+          "kind": "type",
+          "signature": "type SessionStreamGrantResponse",
+          "doc": "The grant endpoint's response body."
         }
       ]
     },

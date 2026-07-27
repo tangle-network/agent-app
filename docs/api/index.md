@@ -4,7 +4,7 @@
 
 Source: `src/index.ts`
 
-832 exports.
+833 exports.
 
 ### `AddCitationArgs`
 
@@ -3547,7 +3547,7 @@ interface MemberSyncSeam
 `function` — Mint a scoped token for an already-provisioned box (e.g.
 
 ```ts
-(box: SandboxInstance, options: { scope: ScopedTokenScope; sessionId?: string | undefined; ttlMinutes?: number | undefi…
+(box: SandboxInstance, options: { scope: ScopedTokenScope; sessionId?: string | undefined; runtimeSessionId?: string |…
 ```
 
 ### `mintTerminalProxyToken`
@@ -5580,6 +5580,14 @@ interface SignObjectUrlArgs
 
 ```ts
 (base: WorkProductProvenanceBase, now?: () => number) => WorkProductProvenance
+```
+
+### `stampReplaySeq`
+
+`function` — Serialize a replayed row for the wire, stamping the buffer ordinal ONTO the line so a reconnecting client can continue from `?fromSeq=<lastSeq>`.
+
+```ts
+(row: BufferedTurnEvent) => string
 ```
 
 ### `statSandboxFileSize`

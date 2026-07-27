@@ -4,7 +4,7 @@
 
 Source: `src/stream/index.ts`
 
-45 exports.
+46 exports.
 
 ### `asRecord`
 
@@ -300,6 +300,14 @@ interface ResolvedChatTurn
 
 ```ts
 (part: JsonRecord) => string
+```
+
+### `stampReplaySeq`
+
+`function` — Serialize a replayed row for the wire, stamping the buffer ordinal ONTO the line so a reconnecting client can continue from `?fromSeq=<lastSeq>`.
+
+```ts
+(row: BufferedTurnEvent) => string
 ```
 
 ### `StreamEvent`

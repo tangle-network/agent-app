@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-252 exports.
+276 exports.
 
 ### `activityTone`
 
@@ -342,6 +342,14 @@ type ChatSelectField
 interface ChatStreamCallbacks
 ```
 
+### `chatStreamLaneListener`
+
+`function` — Route recovered events back into the existing `ChatStreamCallbacks`.
+
+```ts
+(cb: ChatStreamCallbacks) => (event: RecoveredTurnEvent) => void
+```
+
 ### `ChatStreamToolCall`
 
 `interface` — Define the structure for a chat tool call including optional ID, name, and arguments object
@@ -526,6 +534,22 @@ interface ConsumeChatStreamResult
 readonly EffortLevel[]
 ```
 
+### `DEFAULT_LIVE_SILENCE_TIMEOUT_MS`
+
+`const` — A live lane whose silence is measured; 30s matches the proven default.
+
+```ts
+30000
+```
+
+### `DEFAULT_LIVENESS_POLL_TICKS`
+
+`const`
+
+```ts
+20
+```
+
 ### `DEFAULT_MENTION_EMPTY_TEXT`
 
 `const` — Popover empty-state copy for a `ready` index whose query matched nothing.
@@ -540,6 +564,30 @@ readonly EffortLevel[]
 
 ```ts
 20
+```
+
+### `DEFAULT_RECONNECT_DELAY_MS`
+
+`const`
+
+```ts
+250
+```
+
+### `DEFAULT_SETTLE_POLL_INTERVAL_MS`
+
+`const`
+
+```ts
+250
+```
+
+### `discoverRunningTurn`
+
+`function` — Probe for a turn already running on this thread.
+
+```ts
+(listRunning: (signal: AbortSignal) => Promise<string[]>, signal: AbortSignal) => Promise<RunningTurnDiscovery>
 ```
 
 ### `DISPATCH_MAX_MEDIA_PARTS`
@@ -580,6 +628,14 @@ number
 
 ```ts
 (line: string, cb: ChatStreamCallbacks) => { turnId?: string | undefined; receivedContent: boolean; }
+```
+
+### `drainNdjsonLines`
+
+`function` — Drain an NDJSON body line by line, carrying the trailing partial across chunks and flushing it at EOF.
+
+```ts
+(body: ReadableStream<Uint8Array<ArrayBufferLike>>, onLine: (line: string) => void) => Promise<void>
 ```
 
 ### `DurableChatCard`
@@ -844,6 +900,38 @@ interface FileMention
 
 ```ts
 interface FlowWaterfallProps
+```
+
+### `followDurableTurn`
+
+`function` — Durable-lane recovery on its own — the whole helper for a product with no live lane (no sandbox session to attach to, or a detached run the session gateway provably never sees).
+
+```ts
+(opts: Omit<FollowTurnOptions, "attachLive">) => Promise<FollowTurnResult>
+```
+
+### `followTurn`
+
+`function` — Follow one turn to completion across both lanes, recovering from transport drops on the way.
+
+```ts
+(opts: FollowTurnOptions) => Promise<FollowTurnResult>
+```
+
+### `FollowTurnOptions`
+
+`interface` — Configure the dual-lane follow for one turn.
+
+```ts
+interface FollowTurnOptions
+```
+
+### `FollowTurnResult`
+
+`interface` — How a followed turn ended.
+
+```ts
+interface FollowTurnResult
 ```
 
 ### `formatActivityCost`
@@ -1190,6 +1278,30 @@ type InteractionSubmitResult
 (interaction: ChatInteraction, data: Record<string, string | number | boolean | string[]>) => string
 ```
 
+### `LiveLaneAttachment`
+
+`interface` — A live-lane connection the follower can tear down.
+
+```ts
+interface LiveLaneAttachment
+```
+
+### `LiveLaneConnector`
+
+`type` — Structural port for a live lane.
+
+```ts
+type LiveLaneConnector
+```
+
+### `LiveLaneHandlers`
+
+`interface` — Callbacks a `LiveLaneConnector` drives while it is attached.
+
+```ts
+interface LiveLaneHandlers
+```
+
 ### `loadAttachmentFile`
 
 `function` — Fetches (and caches) the raw bytes behind one attachment url.
@@ -1398,6 +1510,14 @@ type ParseInteractionResult
 (raw: unknown) => ReviewQueueItem | null
 ```
 
+### `parseRunningTurnResponse`
+
+`function` — `{running: string[]}` — the one discovery contract every app already shares.
+
+```ts
+(body: unknown) => string[]
+```
+
 ### `pendingApprovalOf`
 
 `function` — Extract `{proposalId, status}` from a tool outcome when it is a proposal awaiting human approval; null otherwise.
@@ -1582,6 +1702,14 @@ interface QuestionOptionListProps
 (files: readonly FileMention[], query: string, limit: number) => FileMention[]
 ```
 
+### `RecoveredTurnEvent`
+
+`interface` — A normalized transport event.
+
+```ts
+interface RecoveredTurnEvent
+```
+
 ### `resolveChatInteraction`
 
 `function` — Marks one ask resolved locally (the card's `onResolved`).
@@ -1676,6 +1804,14 @@ type ReviewQueueState
 
 ```ts
 interface RunDrillInProps
+```
+
+### `RunningTurnDiscovery`
+
+`type` — The outcome of a page-load running-turn probe.
+
+```ts
+type RunningTurnDiscovery
 ```
 
 ### `SandboxTerminalConnection`
@@ -1812,6 +1948,38 @@ interface ToolRunStep
 
 ```ts
 (name: string, blob: Blob) => { ok: true; } | { ok: false; message: string; }
+```
+
+### `TurnDiscoveryState`
+
+`type` — Where the page-load probe got to.
+
+```ts
+type TurnDiscoveryState
+```
+
+### `TurnLane`
+
+`type` — Which lane delivered an event.
+
+```ts
+type TurnLane
+```
+
+### `TurnRecoveryTimings`
+
+`type` — Timing knobs forwarded verbatim to `followTurn`.
+
+```ts
+type TurnRecoveryTimings
+```
+
+### `TurnResetReason`
+
+`type` — Why accumulated turn state must be discarded before more events arrive.
+
+```ts
+type TurnResetReason
 ```
 
 ### `upsertChatInteraction`
@@ -1972,6 +2140,30 @@ interface UseSandboxTerminalConnectionResult
 
 ```ts
 (active: boolean) => number
+```
+
+### `useTurnRecovery`
+
+`function` — Discover and re-attach to a turn already running in this scope
+
+```ts
+(options: UseTurnRecoveryOptions) => UseTurnRecoveryResult
+```
+
+### `UseTurnRecoveryOptions`
+
+`interface` — Configure page-load turn recovery for one chat scope.
+
+```ts
+interface UseTurnRecoveryOptions
+```
+
+### `UseTurnRecoveryResult`
+
+`interface` — What the hook exposes to the chat surface.
+
+```ts
+interface UseTurnRecoveryResult
 ```
 
 ### `waterfallLayout`

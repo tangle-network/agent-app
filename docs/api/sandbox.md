@@ -323,7 +323,7 @@ interface MemberSyncSeam
 `function` — Mint a scoped token for an already-provisioned box (e.g.
 
 ```ts
-(box: SandboxInstance, options: { scope: ScopedTokenScope; sessionId?: string | undefined; ttlMinutes?: number | undefi…
+(box: SandboxInstance, options: { scope: ScopedTokenScope; sessionId?: string | undefined; runtimeSessionId?: string |…
 ```
 
 ### `mintTerminalProxyToken`
