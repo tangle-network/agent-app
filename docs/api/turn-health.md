@@ -43,7 +43,7 @@ interface AlertThrottleStore
 `function` — The sweep source for products on the canonical `/chat-store` tables.
 
 ```ts
-(db: D1LikeForHealth, options?: { messageTable?: string | undefined; threadTable?: string | undefined; }) => TurnHealth…
+(db: D1LikeForHealth, options?: { messageTable?: string | undefined; threadTable?: string | undefined; errorReplyPrefix…
 ```
 
 ### `createGuardedAlertSink`

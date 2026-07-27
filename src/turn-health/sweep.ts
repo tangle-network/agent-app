@@ -274,18 +274,50 @@ export interface D1LikeForHealth {
  */
 export function createD1TurnHealthSource(
   db: D1LikeForHealth,
-  options: { messageTable?: string; threadTable?: string } = {},
+  options: {
+    messageTable?: string
+    threadTable?: string
+    /**
+     * Content prefixes that mark an assistant row as an ERROR SURFACE rather
+     * than an answer. A row matching one of these stops counting as a reply,
+     * so the thread keeps reporting as unanswered.
+     *
+     * This exists because the obvious rule — "an assistant row with non-empty
+     * content is an answer" — is wrong in the exact case that matters. On
+     * 2026-07-27 gtm-agent's newest assistant row read:
+     *
+     *   "The sandbox model stream stopped before a clean completion.
+     *    Error: All 2 model(s) failed. gpt-5-mini: TANGLE_HUB_URL is required …"
+     *
+     * 246 characters of well-formed prose that answers nothing. Counting it
+     * marks a dead product healthy — the same failure-returning-success shape
+     * this module exists to catch, recursing into the detector itself.
+     *
+     * There is no domain-free way to recognise it: `output_tokens IS NULL`
+     * looked promising until legal-agent showed 22 of 25 GENUINE replies with
+     * null usage. So the error prose is a PRODUCT parameter, per this
+     * package's rule that domain is never baked in. Prefixes are bound as
+     * query parameters, never interpolated.
+     */
+    errorReplyPrefixes?: readonly string[]
+  } = {},
 ): TurnHealthSource {
   // Table names are identifiers and cannot be bound as parameters. They come
   // from deploy-time product config, never from a request, and are validated
   // here so this can never become an injection point.
   const message = safeIdentifier(options.messageTable ?? 'message')
   const thread = safeIdentifier(options.threadTable ?? 'thread')
+  const errorPrefixes = [...(options.errorReplyPrefixes ?? [])]
 
   return {
     async findUnansweredThreads({ minAgeMs, maxAgeMs, now }) {
       const cutoffSeconds = Math.floor((now - minAgeMs) / 1000)
       const floorSeconds = Math.floor((now - maxAgeMs) / 1000)
+      // Each prefix becomes one bound `NOT LIKE ?||'%'` term. Parameters, not
+      // interpolation — a product-supplied string never reaches the SQL text.
+      const errorClause = errorPrefixes
+        .map((_, i) => ` AND a.content NOT LIKE ?${i + 3} || '%'`)
+        .join('')
       const { results } = await db
         .prepare(
           `SELECT m.thread_id AS threadId,
@@ -300,11 +332,11 @@ export function createD1TurnHealthSource(
                        FROM ${message} a
                       WHERE a.thread_id = m.thread_id
                         AND a.role = 'assistant'
-                        AND length(trim(a.content)) > 0), 0)
+                        AND length(trim(a.content)) > 0${errorClause}), 0)
             GROUP BY m.thread_id
             ORDER BY oldestCreatedAt ASC`,
         )
-        .bind(cutoffSeconds, floorSeconds)
+        .bind(cutoffSeconds, floorSeconds, ...errorPrefixes)
         .all<{ threadId: string; pendingMessages: number; oldestCreatedAt: number }>()
 
       return results.map((row) => ({

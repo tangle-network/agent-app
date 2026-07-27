@@ -7,7 +7,11 @@ import {
   createWebhookAlertSink,
   type TurnHealthAlert,
 } from '../../src/turn-health/sink.js'
-import { sweepSilentFailures, type TurnHealthSource } from '../../src/turn-health/sweep.js'
+import {
+  createD1TurnHealthSource,
+  sweepSilentFailures,
+  type TurnHealthSource,
+} from '../../src/turn-health/sweep.js'
 
 /** Collects delivered alerts. */
 function recordingSink(): AlertSink & { alerts: TurnHealthAlert[] } {
@@ -319,6 +323,59 @@ describe('sweepSilentFailures — the outage no per-turn hook can see', () => {
       now: 1_800_000_000_000,
     })
     expect(sink.alerts.find((a) => a.key.endsWith('empty_completion_rate'))).toBeUndefined()
+  })
+})
+
+describe('createD1TurnHealthSource — an error row is not an answer', () => {
+  /** Records the SQL and the bound parameters. */
+  function recordingDb() {
+    const calls: Array<{ sql: string; params: unknown[] }> = []
+    return {
+      calls,
+      prepare(sql: string) {
+        return {
+          bind(...params: unknown[]) {
+            calls.push({ sql, params })
+            return { async all() { return { results: [] } } }
+          },
+        }
+      },
+    }
+  }
+
+  it('binds each error prefix as a parameter, never into the SQL text', async () => {
+    // The row that fooled the first version of this detector, verbatim from
+    // gtm production on 2026-07-27 — 246 chars of prose that answers nothing:
+    // "The sandbox model stream stopped before a clean completion. Error:
+    //  All 2 model(s) failed. gpt-5-mini: TANGLE_HUB_URL is required …"
+    const db = recordingDb()
+    const source = createD1TurnHealthSource(db, {
+      errorReplyPrefixes: ["The sandbox model stream stopped", "All 2 model(s) failed"],
+    })
+    await source.findUnansweredThreads({ minAgeMs: 60_000, maxAgeMs: 600_000, now: 1_800_000_000_000 })
+
+    const call = db.calls[0]!
+    // Two NOT LIKE terms, and the prose is in the PARAMS, not the SQL.
+    expect(call.sql.match(/NOT LIKE/g)).toHaveLength(2)
+    expect(call.sql).not.toContain('sandbox model stream stopped')
+    expect(call.params.slice(2)).toEqual([
+      'The sandbox model stream stopped',
+      'All 2 model(s) failed',
+    ])
+  })
+
+  it('emits no error clause when the product supplies none', async () => {
+    const db = recordingDb()
+    const source = createD1TurnHealthSource(db)
+    await source.findUnansweredThreads({ minAgeMs: 60_000, maxAgeMs: 600_000, now: 1_800_000_000_000 })
+    const call = db.calls[0]!
+    expect(call.sql).not.toContain('NOT LIKE')
+    expect(call.params).toHaveLength(2)
+  })
+
+  it('refuses an unsafe table identifier', () => {
+    expect(() => createD1TurnHealthSource(recordingDb(), { messageTable: 'message; DROP TABLE x' }))
+      .toThrow(/unsafe table identifier/)
   })
 })
 
