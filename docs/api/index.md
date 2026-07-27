@@ -5096,7 +5096,7 @@ interface RouterModel
 
 ### `runSandboxPrompt`
 
-`function` — Resolve a sandbox prompt by streaming and aggregating message parts into a complete string
+`function` — Resolve a sandbox prompt by streaming and aggregating message parts into one final string.
 
 ```ts
 (shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | PromptInputPart[], options?: StreamSandboxPromptO…

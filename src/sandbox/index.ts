@@ -1992,15 +1992,72 @@ export async function* streamSandboxPrompt(
   }
 }
 
-/** Resolve a sandbox prompt by streaming and aggregating message parts into a complete string */
+/**
+ * Stable identity for a streamed text part, so deltas of one part accumulate
+ * together and two concurrent parts never overwrite each other. Harnesses spell
+ * the id differently and some snapshot updates carry none at all.
+ */
+function textPartId(part: Record<string, unknown> | undefined, fallback: string): string {
+  for (const key of ['id', 'partId', 'messagePartId']) {
+    const value = part?.[key]
+    if (typeof value === 'string' && value.trim()) return value
+  }
+  return fallback
+}
+
+/**
+ * The prompt text a harness may replay back as an assistant text part before it
+ * answers. Both spellings are collected because `streamSandboxPrompt` dispatches
+ * the HISTORY-FOLDED prompt, not the raw message — an echo replays what was sent.
+ */
+function dispatchedPromptTexts(
+  message: string | PromptInputPart[],
+  history: StreamSandboxPromptOptions['history'],
+): string[] {
+  const raw =
+    typeof message === 'string'
+      ? message
+      : ((message.find((part) => part.type === 'text') as { text?: string } | undefined)?.text ?? '')
+  return [...new Set([raw, flattenHistory(raw, history)].map((text) => text.trim()))].filter(Boolean)
+}
+
+/**
+ * The last streamed text part that is not a replay of the prompt. Used only when
+ * the turn carried no `result` receipt: identifying the echo by CONTENT is what
+ * makes this correct on a lane that emits the echo late, or never.
+ */
+function lastNonPromptTextPart(parts: Map<string, string>, promptTexts: string[]): string {
+  const values = Array.from(parts.values())
+    .map((value) => value.trim())
+    .filter((value) => value && !promptTexts.includes(value))
+  return values.at(-1) ?? ''
+}
+
+/**
+ * Resolve a sandbox prompt by streaming and aggregating message parts into one
+ * final string.
+ *
+ * Text is accumulated PER PART ID rather than into a single running buffer, and
+ * a prompt echo is dropped by matching its content. The obvious alternative —
+ * one buffer, skipping whichever text part arrives first — is wrong on both
+ * sandbox lanes: on the delta lane (`box.streamPrompt`, explicit deltas) it
+ * silently drops the answer's opening token, and when the echo arrives after
+ * the answer it returns the caller's own prompt as the agent's reply. Both
+ * failures are silent and produce a plausible-looking string, which is the
+ * worst shape for the unattended cron/judge turns this function exists for.
+ *
+ * A blank-but-present `result.finalText` is likewise ignored in favour of the
+ * streamed text rather than overwriting a real answer with whitespace.
+ */
 export async function runSandboxPrompt(
   shell: SandboxRuntimeConfig,
   box: SandboxInstance,
   message: string | PromptInputPart[],
   options?: StreamSandboxPromptOptions,
 ): Promise<string> {
-  let fullText = ''
-  let firstTextSeen = false
+  let finalText = ''
+  const textParts = new Map<string, string>()
+  let anonymousTextPart = 0
 
   for await (const rawEvent of streamSandboxPrompt(shell, box, message, options)) {
     const event = rawEvent as { type?: string; data?: Record<string, unknown> }
@@ -2010,20 +2067,17 @@ export async function runSandboxPrompt(
       const part = event.data?.part as Record<string, unknown> | undefined
       const delta = typeof event.data?.delta === 'string' ? event.data.delta : null
       if (String(part?.type ?? '') === 'text') {
-        if (!firstTextSeen) {
-          firstTextSeen = true
-          continue
-        }
-        if (delta) fullText += delta
-        else if (typeof part?.text === 'string') fullText = part.text
+        const partId = textPartId(part, delta ? 'delta' : `text-${anonymousTextPart++}`)
+        if (delta) textParts.set(partId, `${textParts.get(partId) ?? ''}${delta}`)
+        else if (typeof part?.text === 'string') textParts.set(partId, part.text)
       }
     } else if (event.type === 'result') {
-      const finalText = typeof event.data?.finalText === 'string' ? event.data.finalText : null
-      if (finalText) fullText = finalText
+      const resultText = typeof event.data?.finalText === 'string' ? event.data.finalText : null
+      if (resultText?.trim()) finalText = resultText
     }
   }
 
-  return fullText
+  return finalText || lastNonPromptTextPart(textParts, dispatchedPromptTexts(message, options?.history))
 }
 
 // Mirrors the SDK's PermissionLevel union (not re-exported by

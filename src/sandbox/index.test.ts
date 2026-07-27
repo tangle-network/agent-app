@@ -40,6 +40,7 @@ import {
   peekWorkspaceSandbox,
   buildAppToolMcpServers,
   streamSandboxPrompt,
+  runSandboxPrompt,
   resolveModel,
   flattenHistory,
   mergeHistoryIntoParts,
@@ -532,6 +533,122 @@ describe('streamSandboxPrompt seam', () => {
       { type: 'image', url: 'https://img/1.png' },
       { type: 'text', text: 'Assistant: prior\n\nUser: describe this' },
     ])
+  })
+})
+
+describe('runSandboxPrompt text aggregation', () => {
+  const shell = () =>
+    shellFor(
+      { apiKey: 'k', baseUrl: 'https://s' },
+      {
+        provider: {
+          apiKey: 'router-key',
+          providerName: 'openai-compat',
+          defaultModel: 'gpt-x',
+          routerBaseUrl: 'https://router',
+        },
+        profile: () => PROFILE,
+      },
+    )
+
+  const boxYielding = (events: unknown[]) => {
+    async function* gen() {
+      for (const e of events) yield e
+    }
+    return fakeBox({ streamPrompt: vi.fn().mockReturnValue(gen()) })
+  }
+
+  const textDelta = (id: string, delta: string) => ({
+    type: 'message.part.updated',
+    data: { part: { id, type: 'text' }, delta },
+  })
+  const textSnapshot = (id: string, text: string) => ({
+    type: 'message.part.updated',
+    data: { part: { id, type: 'text', text } },
+  })
+
+  it('keeps every delta of a delta-streamed answer that carries no result receipt', async () => {
+    // The run/stream lane emits explicit deltas. Dropping the first one silently
+    // truncates the answer's opening token — a wrong-but-plausible string, the
+    // worst failure shape for an unattended cron/judge turn.
+    const box = boxYielding([
+      textDelta('p1', 'Hello'),
+      textDelta('p1', ' brave'),
+      textDelta('p1', ' world'),
+    ])
+    await expect(runSandboxPrompt(shell(), box, 'greet me')).resolves.toBe('Hello brave world')
+  })
+
+  it('drops a harness echo of the dispatched prompt without positional guessing', async () => {
+    // The echo is identified by CONTENT, not by "it arrived first": a lane that
+    // emits the answer before the echo, or emits no echo at all, must still be right.
+    const box = boxYielding([
+      textSnapshot('echo', 'greet me'),
+      textDelta('p1', 'Hello'),
+      textDelta('p1', ' world'),
+    ])
+    await expect(runSandboxPrompt(shell(), box, 'greet me')).resolves.toBe('Hello world')
+  })
+
+  it('drops an echo of the HISTORY-FOLDED prompt, which is what the harness actually received', async () => {
+    // streamSandboxPrompt dispatches flattenHistory(message, history); an echo
+    // replays that folded string, not the raw message.
+    const folded = 'Assistant: prior\n\nUser: greet me'
+    const box = boxYielding([textSnapshot('echo', folded), textDelta('p1', 'Hi there')])
+    await expect(
+      runSandboxPrompt(shell(), box, 'greet me', {
+        history: [{ role: 'assistant', content: 'prior' }],
+      }),
+    ).resolves.toBe('Hi there')
+  })
+
+  it('drops the echo even when it arrives AFTER the answer', async () => {
+    // Ordering is not a contract. A positional "skip the first text part" rule
+    // returns the prompt itself here.
+    const box = boxYielding([
+      textDelta('p1', 'Hello'),
+      textDelta('p1', ' world'),
+      textSnapshot('echo', 'greet me'),
+    ])
+    await expect(runSandboxPrompt(shell(), box, 'greet me')).resolves.toBe('Hello world')
+  })
+
+  it('does not let a later text part clobber an earlier one on the delta lane', async () => {
+    const box = boxYielding([
+      textDelta('p1', 'thinking out loud'),
+      textDelta('p2', 'the answer is 42'),
+    ])
+    await expect(runSandboxPrompt(shell(), box, 'q')).resolves.toBe('the answer is 42')
+  })
+
+  it('prefers the result receipt over accumulated parts', async () => {
+    const box = boxYielding([
+      textDelta('p1', 'partial'),
+      { type: 'result', data: { finalText: 'authoritative answer' } },
+    ])
+    await expect(runSandboxPrompt(shell(), box, 'q')).resolves.toBe('authoritative answer')
+  })
+
+  it('ignores a blank result receipt and falls back to the streamed text', async () => {
+    const box = boxYielding([
+      textDelta('p1', 'streamed answer'),
+      { type: 'result', data: { finalText: '   ' } },
+    ])
+    await expect(runSandboxPrompt(shell(), box, 'q')).resolves.toBe('streamed answer')
+  })
+
+  it('returns empty string when the turn produced only an echo', async () => {
+    const box = boxYielding([textSnapshot('echo', 'q')])
+    await expect(runSandboxPrompt(shell(), box, 'q')).resolves.toBe('')
+  })
+
+  it('accumulates the snapshot lane, where each update re-sends the whole part', async () => {
+    const box = boxYielding([
+      textSnapshot('p1', 'Hel'),
+      textSnapshot('p1', 'Hello wor'),
+      textSnapshot('p1', 'Hello world'),
+    ])
+    await expect(runSandboxPrompt(shell(), box, 'q')).resolves.toBe('Hello world')
   })
 })
 

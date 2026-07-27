@@ -3886,7 +3886,7 @@
           "name": "runSandboxPrompt",
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | PromptInputPart[], options?: StreamSandboxPromptO…",
-          "doc": "Resolve a sandbox prompt by streaming and aggregating message parts into a complete string"
+          "doc": "Resolve a sandbox prompt by streaming and aggregating message parts into one final string."
         },
         {
           "name": "runSandboxToolPathSetup",
@@ -13880,7 +13880,7 @@
           "name": "runSandboxPrompt",
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | PromptInputPart[], options?: StreamSandboxPromptO…",
-          "doc": "Resolve a sandbox prompt by streaming and aggregating message parts into a complete string"
+          "doc": "Resolve a sandbox prompt by streaming and aggregating message parts into one final string."
         },
         {
           "name": "runSandboxToolPathSetup",
