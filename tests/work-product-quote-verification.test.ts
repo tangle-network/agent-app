@@ -173,8 +173,8 @@ describe('upsert_evidence — the quote gate', () => {
     // it teaches must be one the model can actually perform. "Retype it
     // correctly" is the instruction that produced a 9-of-59 success rate, so
     // the message points at the span form instead.
-    expect(outcome.message).toContain('locator.span')
-    expect(outcome.message).toContain('slices out of the document itself')
+    expect(outcome.message).toContain('locator.find')
+    expect(outcome.message).toContain('locates it and writes the quote itself')
     expect(outcome.message).toContain('COMPUTED')
     // Nothing persisted: a rejected batch leaves no half-written row.
     expect(await store.listByWorkspace('ws')).toEqual([])

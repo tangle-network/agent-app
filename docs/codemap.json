@@ -14943,6 +14943,12 @@
           "doc": "Completion receipt for one run, from the turn's usage/lifecycle seam."
         },
         {
+          "name": "findSourceLine",
+          "kind": "function",
+          "signature": "(sourceText: string, needle: string, occurrence?: number) => SourceFindResult",
+          "doc": null
+        },
+        {
           "name": "InMemoryWorkProductStore",
           "kind": "interface",
           "signature": "interface InMemoryWorkProductStore",
@@ -15079,6 +15085,18 @@
           "kind": "function",
           "signature": "(sourceText: string, quote: string) => boolean",
           "doc": "Does `quote` occur in `sourceText`?"
+        },
+        {
+          "name": "SourceFindFailure",
+          "kind": "type",
+          "signature": "type SourceFindFailure",
+          "doc": "Locate the line containing `value` and return it as a span — the citation form for a model that cannot count characters."
+        },
+        {
+          "name": "SourceFindResult",
+          "kind": "type",
+          "signature": "type SourceFindResult",
+          "doc": null
         },
         {
           "name": "SourceSpanFailure",

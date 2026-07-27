@@ -21,7 +21,7 @@ import { defineAppTool, type AppToolDefinition } from '../tools/registry'
 import type { AppToolContext } from '../tools/types'
 import { createWorkProductService, type WorkProductOutcome, type WorkProductService } from './service'
 import { stampProvenance, type WorkProductProvenanceBase } from './provenance'
-import { sliceSourceSpan, sourceContainsQuote, type SourceSpanFailure } from './quote'
+import { findSourceLine, sliceSourceSpan, sourceContainsQuote, type SourceFindFailure, type SourceSpanFailure } from './quote'
 import {
   parseAgentCheckInput,
   parseArtifactInput,
@@ -189,6 +189,18 @@ function spanErrorDetail(failure: SourceSpanFailure): string {
   }
 }
 
+/** Turn a locate failure into a sentence naming what was searched for. */
+function findErrorDetail(failure: SourceFindFailure, needle: string): string {
+  switch (failure.reason) {
+    case 'blank_needle':
+      return 'the value to locate is empty.'
+    case 'not_found':
+      return `${JSON.stringify(needle)} does not occur in that document. Read it again and cite a value it actually contains, or — if this figure is COMPUTED rather than read — omit the locator and state the computation in claim.`
+    case 'occurrence_out_of_range':
+      return `that value occurs ${failure.found} time(s) in the document; findOccurrence is out of range.`
+  }
+}
+
 /**
  * Resolve every entry's quote against the document it names — the one place
  * lineage text is decided.
@@ -237,8 +249,40 @@ async function resolveEvidenceQuotes(
     // one — so this function only ever WRITES it, and only on a path that
     // established it. Every `continue` below therefore leaves the entry
     // unlabelled, which is the honest state for a quote nothing proved.
+    const find = entry.locator.find
     const span = entry.locator.span
     const quote = entry.locator.quote
+
+    if (find !== undefined) {
+      if (!readSourceText) {
+        throw new ToolInputError(
+          'span_unsupported',
+          `entries[${index}].locator.find: this deployment cannot read source text, so a value cannot be located. Record the entry without locator.find.`,
+          500,
+        )
+      }
+      const text = await readText(entry.sourceRef)
+      if (text === null) {
+        throw new ToolInputError(
+          'unverifiable_quote',
+          `entries[${index}].locator.find: "${entry.sourceRef}" has no readable text, so the value cannot be located. Record the entry without a locator and state the basis in claim.`,
+        )
+      }
+      const located = findSourceLine(text, find, entry.locator.findOccurrence ?? 1)
+      if (!located.ok) {
+        throw new ToolInputError(
+          'value_not_found',
+          `entries[${index}].locator.find into "${entry.sourceRef}": ${findErrorDetail(located.failure, find)}`,
+        )
+      }
+      // The platform owns BOTH halves now: it found the position and it cut
+      // the text. The model contributed a value it read, which is the one
+      // thing it does reliably.
+      entry.locator.span = located.span
+      entry.locator.quote = located.quote
+      entry.locator.quoteBasis = 'span'
+      continue
+    }
 
     if (span) {
       if (!readSourceText) {
@@ -279,7 +323,7 @@ async function resolveEvidenceQuotes(
     if (!sourceContainsQuote(text, quote)) {
       throw new ToolInputError(
         'quote_not_found',
-        `entries[${index}].locator.quote: ${JSON.stringify(quote)} does not occur in "${entry.sourceRef}". Cite locator.span {start, end} instead — the character range you read it at, which this platform slices out of the document itself so the text is right by construction. If the value is COMPUTED rather than read, omit both and state the computation in claim.`,
+        `entries[${index}].locator.quote: ${JSON.stringify(quote)} does not occur in "${entry.sourceRef}". Cite locator.find instead — the value as it appears in the document — and this platform locates it and writes the quote itself, so the text is right by construction. If the value is COMPUTED rather than read, omit both and state the computation in claim.`,
       )
     }
     entry.locator.quoteBasis = 'model'
@@ -350,7 +394,7 @@ export function buildWorkProductTools(config: WorkProductToolConfig): AppToolDef
   const upsertEvidence = defineAppTool({
     name: 'upsert_evidence',
     description:
-      'Record source→field lineage for the current work product, incrementally as you find it. Each entry links a source document (sourceRef + locator) to one artifact target and states the claim it supports. Cite by locator.span {start, end} — the character range you read the value at — and the platform slices the supporting quote out of the document for you. Re-emitting an entry id replaces that entry. Address the work product by scopeKey; the first call creates the draft.',
+      'Record source→field lineage for the current work product, incrementally as you find it. Each entry links a source document (sourceRef + locator) to one artifact target and states the claim it supports. Cite by locator.find — the value exactly as it appears in the document — and the platform locates it and writes the supporting quote for you. Re-emitting an entry id replaces that entry. Address the work product by scopeKey; the first call creates the draft.',
     parameters: {
       type: 'object',
       properties: {
@@ -369,10 +413,20 @@ export function buildWorkProductTools(config: WorkProductToolConfig): AppToolDef
                 properties: {
                   page: { type: 'number' },
                   range: { type: 'string', description: "Free-form location: 'L120-L134' | 'B7' | '¶4'." },
+                  find: {
+                    type: 'string',
+                    description:
+                      'PREFERRED — use this whenever the value was READ from a document. The value exactly as it appears in the source (for example "128,450.00"), or a short distinctive phrase from the supporting line. The platform LOCATES it, cites the whole line it sits on, and returns that line to you. You do not retype the quote and you do not compute character offsets — so the citation can neither be invented nor land on the wrong line. If the value is not in the document, the entry is refused.',
+                  },
+                  findOccurrence: {
+                    type: 'integer',
+                    minimum: 1,
+                    description: 'Which occurrence of `find` to cite when the value appears more than once. Defaults to the first.',
+                  },
                   span: {
                     type: 'object',
                     description:
-                      'PREFERRED. The character range you read the value at, as absolute offsets into the whole document: start is the first character, end is one past the last. If you read with an offset, add that offset to the position within the text you got back. The platform slices the quote out of the document itself and stores it, and returns it to you — you never retype source text, so the citation cannot be wrong. Use this whenever the value was READ from a document.',
+                      'Only when you have exact character offsets from a tool that computed them. Absolute offsets into the whole document: start is the first character, end is one past the last. Prefer `find` — offsets computed by hand land on the wrong line.',
                     properties: {
                       start: { type: 'integer', minimum: 0 },
                       end: { type: 'integer', minimum: 1 },
@@ -641,7 +695,7 @@ export function buildWorkProductTools(config: WorkProductToolConfig): AppToolDef
           await unwrap(() => service.recordChecks(draft.id, checks), 'checks_rejected')
           throw new ToolInputError(
             'evidence_not_anchored',
-            `Cannot submit: these material targets have an evidence row but no source anchor: ${unanchored.join(', ')}. Re-emit each with locator.span {start, end} — the character range in the document you read the value at. The platform slices the quote out of the document itself, so you never retype source text.`,
+            `Cannot submit: these material targets have an evidence row but no source anchor: ${unanchored.join(', ')}. Re-emit each with locator.find — the value exactly as it appears in the document. The platform locates it and writes the quote itself, so you never retype source text or count characters.`,
           )
         }
       }

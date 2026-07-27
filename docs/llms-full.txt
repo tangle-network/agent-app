@@ -19337,6 +19337,14 @@ type ExceptionSeverity
 interface FinalizeWorkProductProvenanceInput
 ```
 
+### `findSourceLine`
+
+`function`
+
+```ts
+(sourceText: string, needle: string, occurrence?: number) => SourceFindResult
+```
+
 ### `InMemoryWorkProductStore`
 
 `interface` — In-memory store surface with audit trail access and unguarded direct writes for tests
@@ -19519,6 +19527,22 @@ interface ReviewQueueThread
 
 ```ts
 (sourceText: string, quote: string) => boolean
+```
+
+### `SourceFindFailure`
+
+`type` — Locate the line containing `value` and return it as a span — the citation form for a model that cannot count characters.
+
+```ts
+type SourceFindFailure
+```
+
+### `SourceFindResult`
+
+`type`
+
+```ts
+type SourceFindResult
 ```
 
 ### `SourceSpanFailure`
