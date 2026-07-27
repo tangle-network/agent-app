@@ -557,10 +557,12 @@ describe('findSourceLine — the platform locates the value', () => {
   })
 
   it('counts repeats and honours findOccurrence', () => {
-    const text = 'alpha 42 one\nbeta 42 two\ngamma 42 three'
-    expect(findSourceLine(text, '42')).toMatchObject({ ok: true, quote: 'alpha 42 one', occurrences: 3 })
-    expect(findSourceLine(text, '42', 3)).toMatchObject({ ok: true, quote: 'gamma 42 three' })
-    expect(findSourceLine(text, '42', 4)).toEqual({
+    // A needle long enough to be a citation at all — see the
+    // needle-distinctiveness suite for why '42' no longer qualifies.
+    const text = 'alpha 42.50 one\nbeta 42.50 two\ngamma 42.50 three'
+    expect(findSourceLine(text, '42.50')).toMatchObject({ ok: true, quote: 'alpha 42.50 one', occurrences: 3 })
+    expect(findSourceLine(text, '42.50', 3)).toMatchObject({ ok: true, quote: 'gamma 42.50 three' })
+    expect(findSourceLine(text, '42.50', 4)).toEqual({
       ok: false,
       failure: { reason: 'occurrence_out_of_range', found: 3 },
     })
@@ -672,5 +674,97 @@ describe('upsert_evidence — anchor by value', () => {
       ],
     })
     expect(outcome).toMatchObject({ ok: false, code: 'unverifiable_quote' })
+  })
+})
+
+/**
+ * A needle must actually identify a place.
+ *
+ * Production work product `b9a37e44` (session e34d9f19, gpt-4.1-mini) reached
+ * `ready` with `quote_verification: 16/16 verified` and
+ * `evidence_coverage: 15/15 material targets evidenced (15 span-anchored)` —
+ * genuinely good on the seven lines the documents state. The other NINE were
+ * lines the 1099-DIV does not mention at all, cited with the value "0", and
+ * the platform faithfully located the "0" inside "Tax Year 2025" in the
+ * header. Every one re-sliced byte-exactly. Every one was worthless.
+ *
+ * That is the third turn of the same screw: verified-but-fabricated, then
+ * sliced-but-mis-addressed, now located-but-not-evidential. A citation has to
+ * point somewhere a reviewer can judge.
+ */
+describe('findSourceLine — a needle must identify a place', () => {
+  it('refuses the production needle: a bare "0" matching the year in a header', () => {
+    const HEADER = 'FORM 1099-DIV  Dividends and Distributions          Tax Year 2025'
+    const DIV = [HEADER, 'Box 1a  Total ordinary dividends ................   2,204.18'].join('\n')
+    // The old behaviour, stated so the regression is unmistakable: "0" is in
+    // the header, so a naive locate cites the header.
+    expect(HEADER).toContain('0')
+    expect(findSourceLine(DIV, '0')).toEqual({
+      ok: false,
+      failure: { reason: 'not_distinctive', needle: '0', found: 0 },
+    })
+  })
+
+  it('refuses any one- or two-character needle', () => {
+    for (const needle of ['0', '7', '.5', '1a']) {
+      expect(findSourceLine(W2_TEXT, needle), needle).toMatchObject({
+        ok: false,
+        failure: { reason: 'not_distinctive' },
+      })
+    }
+  })
+
+  it('still accepts a real value of three characters or more', () => {
+    expect(findSourceLine(W2_TEXT, '128,450.00')).toMatchObject({ ok: true, quote: W2_BOX1_LINE })
+    expect(findSourceLine(ORGANIZER_TEXT, '2,150')).toMatchObject({ ok: true })
+  })
+
+  it('refuses a needle that matches all over the document', () => {
+    const noisy = Array.from({ length: 12 }, (_, i) => `row ${i} value 100.00`).join('\n')
+    const result = findSourceLine(noisy, '100.00')
+    expect(result).toMatchObject({ ok: false, failure: { reason: 'not_distinctive', found: 12 } })
+  })
+
+  it('lets an explicit findOccurrence cite a genuinely repeated value', () => {
+    const noisy = Array.from({ length: 12 }, (_, i) => `row ${i} value 100.00`).join('\n')
+    expect(findSourceLine(noisy, '100.00', 3)).toMatchObject({ ok: true, quote: 'row 2 value 100.00' })
+  })
+})
+
+describe('upsert_evidence — a non-distinctive needle is refused, with the way out', () => {
+  it('refuses it and says what to do instead', async () => {
+    const { dispatch, store } = harness()
+    const outcome = await dispatch('upsert_evidence', {
+      scopeKey: SCOPE,
+      entries: [
+        { id: 'ev_zero', sourceRef: 'vault/w2.pdf', locator: { find: '0' }, target: 'line_4a', claim: '0' },
+      ],
+    })
+    expect(outcome.ok).toBe(false)
+    expect((outcome as { code: string }).code).toBe('value_not_found')
+    const message = (outcome as { message: string }).message
+    expect(message).toContain('too short')
+    // The way out must be stated, or this becomes another unsatisfiable gate.
+    expect(message).toContain('omit the locator')
+    expect(await store.listByWorkspace('ws')).toEqual([])
+  })
+
+  it('leaves the honest alternative available — a claim with no locator', async () => {
+    const { dispatch, store } = harness()
+    const outcome = await dispatch('upsert_evidence', {
+      scopeKey: SCOPE,
+      entries: [
+        {
+          id: 'ev_zero',
+          sourceRef: 'vault/w2.pdf',
+          locator: {},
+          target: 'line_4a',
+          claim: 'No IRA distributions — the W-2 and the organizer do not report any.',
+        },
+      ],
+    })
+    expect(outcome.ok).toBe(true)
+    const record = await onlyRecord(store)
+    expect(record.evidence[0]!.locator.quoteBasis).toBeUndefined()
   })
 })

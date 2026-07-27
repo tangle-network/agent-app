@@ -135,6 +135,20 @@ export type SourceFindFailure =
   | { reason: 'blank_needle' }
   | { reason: 'not_found' }
   | { reason: 'occurrence_out_of_range'; found: number }
+  | { reason: 'not_distinctive'; needle: string; found: number }
+
+/** A needle must be long enough to identify a place in the document. Two
+ *  characters is not a citation: measured on production work product
+ *  b9a37e44, nine evidence entries for lines the 1099-DIV does not state were
+ *  cited with the value "0", and the platform faithfully matched the "0"
+ *  inside "Tax Year 2025" in the header. Every one re-sliced byte-exactly and
+ *  every one was worthless as evidence. */
+const MIN_NEEDLE_LENGTH = 3
+
+/** Above this many hits the needle names no particular place, so citing the
+ *  first is arbitrary rather than evidential. `findOccurrence` remains the way
+ *  to cite a genuinely repeated value on purpose. */
+const MAX_AMBIGUOUS_MATCHES = 8
 
 export type SourceFindResult =
   | { ok: true; span: { start: number; end: number }; quote: string; occurrences: number }
@@ -159,6 +173,9 @@ export function findSourceLine(
 ): SourceFindResult {
   const trimmed = needle.trim()
   if (trimmed.length === 0) return { ok: false, failure: { reason: 'blank_needle' } }
+  if (trimmed.length < MIN_NEEDLE_LENGTH) {
+    return { ok: false, failure: { reason: 'not_distinctive', needle: trimmed, found: 0 } }
+  }
 
   // Exact hits first (free, and the common case). Fall back to the normalized
   // text ONLY to locate a position — the returned quote is always sliced from
@@ -188,6 +205,11 @@ export function findSourceLine(
     }
   }
   if (positions.length === 0) return { ok: false, failure: { reason: 'not_found' } }
+  // An explicit `findOccurrence` is the caller saying "yes, it repeats, I mean
+  // that one" — so ambiguity is only a failure when they did NOT say which.
+  if (occurrence === 1 && positions.length > MAX_AMBIGUOUS_MATCHES) {
+    return { ok: false, failure: { reason: 'not_distinctive', needle: trimmed, found: positions.length } }
+  }
   if (occurrence < 1 || occurrence > positions.length) {
     return { ok: false, failure: { reason: 'occurrence_out_of_range', found: positions.length } }
   }
