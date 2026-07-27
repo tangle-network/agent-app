@@ -115,6 +115,8 @@ export interface SweepResult {
   emptyCompletions: number
   malformedToolCalls: number
   toolCallsWithoutEffect: number
+  /** Tool calls the harness rejected while settling them as `completed`. */
+  rejectedToolCalls: number
   /** Turns carrying at least one tool part. */
   turnsWithToolCalls: number
   /** Total tool parts across the window. */
@@ -158,6 +160,11 @@ const HOUR_MS = 3_600_000
  * changing the producer's wording without changing this list fails CI rather
  * than silently making dead threads look answered.
  */
+/** D1's maximum LIKE pattern length, including the trailing `%`. Measured, not
+ *  documented: 50 succeeds, 51 raises `SQLITE_ERROR: LIKE or GLOB pattern too
+ *  complex`. */
+export const D1_MAX_LIKE_PATTERN_LENGTH = 50
+
 export const SHELL_ERROR_REPLY_PREFIXES: readonly string[] = [
   'The sandbox model stream stopped before a clean completion.',
   'The sandbox agent returned an error before producing a visible answer.',
@@ -227,6 +234,7 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
   let emptyCompletions = 0
   let malformedToolCalls = 0
   let toolCallsWithoutEffect = 0
+  let rejectedToolCalls = 0
   let unhealthyTurns = 0
   let turnsWithToolCalls = 0
   let toolCalls = 0
@@ -238,6 +246,7 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
   let opaquePartsTurns = 0
   const opaqueTypes = new Set<string>()
   const malformedSamples: TurnHealthReason[] = []
+  const rejectedSamples: TurnHealthReason[] = []
 
   for (const row of turns) {
     const verdict = classifyTurnOutcome({
@@ -265,6 +274,10 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
         if (malformedSamples.length < 3) malformedSamples.push(reason)
       }
       if (reason.kind === 'tool_call_no_effect') toolCallsWithoutEffect += 1
+      if (reason.kind === 'tool_call_rejected') {
+        rejectedToolCalls += 1
+        if (rejectedSamples.length < 3) rejectedSamples.push(reason)
+      }
     }
   }
 
@@ -282,6 +295,20 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
       title: `${options.product}: ${malformedToolCalls} tool call(s) had unparseable arguments — deliverables silently dropped`,
       details: malformedSamples.map(describeReason),
       data: { malformedToolCalls, turnsJudged: turns.length },
+      at: now,
+    })
+  }
+
+  // A rejected call means a deliverable was requested and thrown away while the
+  // turn reported success. Never acceptable at any rate.
+  if (rejectedToolCalls > 0) {
+    alerts.push({
+      product: options.product,
+      severity: 'critical',
+      key: `sweep:${options.product}:tool_call_rejected`,
+      title: `${options.product}: ${rejectedToolCalls} tool call(s) were REJECTED but settled as completed — deliverables silently dropped`,
+      details: rejectedSamples.map(describeReason),
+      data: { rejectedToolCalls, turnsJudged: readableTurns },
       at: now,
     })
   }
@@ -373,6 +400,7 @@ export async function sweepSilentFailures(options: SweepOptions): Promise<SweepR
     emptyCompletions,
     malformedToolCalls,
     toolCallsWithoutEffect,
+    rejectedToolCalls,
     turnsWithToolCalls,
     toolCalls,
     unreadableTurns,
@@ -450,7 +478,22 @@ export function createD1TurnHealthSource(
   // here so this can never become an injection point.
   const message = safeIdentifier(options.messageTable ?? 'message')
   const thread = safeIdentifier(options.threadTable ?? 'thread')
-  const errorPrefixes = [...(options.errorReplyPrefixes ?? SHELL_ERROR_REPLY_PREFIXES)]
+  // D1 rejects a LIKE pattern longer than 50 characters with
+  // `SQLITE_ERROR: LIKE or GLOB pattern too complex`, and the pattern is the
+  // prefix PLUS the trailing `%`. Measured against production D1 on
+  // 2026-07-27: a 49-char prefix (50-char pattern) succeeds, 50 fails.
+  //
+  // Both shipped defaults are longer than that (55 and 70 characters), so
+  // before this clamp `findUnansweredThreads` threw on every product database
+  // — the detector could not run at all against the only store the fleet uses.
+  //
+  // Truncating is safe in the one direction that matters: a shorter prefix
+  // matches MORE rows as non-answers, so a thread is reported unanswered
+  // rather than silently marked healthy. The first 49 characters of each
+  // default are still unambiguous.
+  const errorPrefixes = [...(options.errorReplyPrefixes ?? SHELL_ERROR_REPLY_PREFIXES)].map((p) =>
+    p.slice(0, D1_MAX_LIKE_PATTERN_LENGTH - 1),
+  )
 
   return {
     async findUnansweredThreads({ minAgeMs, maxAgeMs, now }) {

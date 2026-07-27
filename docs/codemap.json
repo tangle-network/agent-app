@@ -12540,7 +12540,7 @@
           "name": "SHELL_ERROR_REPLY_PREFIXES",
           "kind": "const",
           "signature": "readonly string[]",
-          "doc": "Assistant-row openers agent-app writes ITSELF when a sandbox turn fails."
+          "doc": null
         },
         {
           "name": "SweepOptions",

@@ -136,7 +136,7 @@ interface PersistedTurnRow
 
 ### `SHELL_ERROR_REPLY_PREFIXES`
 
-`const` — Assistant-row openers agent-app writes ITSELF when a sandbox turn fails.
+`const`
 
 ```ts
 readonly string[]

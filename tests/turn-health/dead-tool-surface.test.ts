@@ -228,3 +228,108 @@ describe('the detector reporting on its own blindness', () => {
     expect(rateAlert?.data?.turnsJudged).toBe(10)
   })
 })
+
+describe('a tool call the harness REJECTED but settled as completed', () => {
+  // Verbatim from legal-agent production (6 occurrences). Every other rule
+  // passes this turn: status is `completed`, the arguments parse, and the turn
+  // has text — so the product reported success six times while six deliverables
+  // were thrown away.
+  const rejectedPart = {
+    type: 'tool',
+    id: 'prt_f5f5ae9d9001YDEhA8gRbT9hH4',
+    tool: 'invalid',
+    callID: 'function-call-11321769816977219518',
+    state: {
+      status: 'completed',
+      input: {
+        tool: 'submit_proposal',
+        error:
+          "Model tried to call unavailable tool 'submit_proposal'. Available tools: invalid, question, bash, read, glob, grep, edit, write, task, webfetch, todowrite, skill.",
+      },
+      output:
+        "The arguments provided to the tool are invalid: Model tried to call unavailable tool 'submit_proposal'.",
+    },
+  }
+
+  it('flags it, and names the tool the model MEANT to call', () => {
+    const verdict = classifyTurnOutcome({
+      finalText: 'I have drafted the proposal for you.',
+      parts: [rejectedPart, { type: 'text', text: 'I have drafted the proposal for you.' }],
+    })
+    expect(verdict.healthy).toBe(false)
+    const rejected = verdict.reasons.find((r) => r.kind === 'tool_call_rejected')
+    expect(rejected).toBeDefined()
+    // `invalid` is the harness's placeholder; the useful name is in the payload.
+    expect(rejected && 'tool' in rejected && rejected.tool).toBe('submit_proposal')
+    // Critical even though prose was delivered: the customer got words where
+    // they should have got a filed deliverable.
+    expect(verdict.severity).toBe('critical')
+  })
+
+  it('is NOT caught by the malformed-argument or no-effect rules', () => {
+    const verdict = classifyTurnOutcome({ finalText: 'done', parts: [rejectedPart] })
+    const kinds = verdict.reasons.map((r) => r.kind)
+    expect(kinds).toContain('tool_call_rejected')
+    expect(kinds).not.toContain('malformed_tool_call')
+    expect(kinds).not.toContain('tool_call_no_effect')
+  })
+
+  it('pages on the FIRST rejected call, at any rate', async () => {
+    const sink = recordingSink()
+    const rows = [
+      ...Array.from({ length: 20 }, () => textTurn),
+      { content: 'I have drafted it.', parts: JSON.stringify([rejectedPart]) },
+    ]
+    const result = await sweepSilentFailures({ product: 'legal-agent', source: sourceOf(rows), sink })
+    expect(result.rejectedToolCalls).toBe(1)
+    const alert = sink.alerts.find((a) => a.key.endsWith(':tool_call_rejected'))
+    expect(alert?.severity).toBe('critical')
+    expect(alert?.details[0]).toContain('submit_proposal')
+  })
+
+  it('leaves a well-formed tool call alone', () => {
+    const verdict = classifyTurnOutcome({
+      finalText: 'Filed.',
+      parts: [{ type: 'tool', tool: 'submit_proposal', state: { status: 'completed', input: { title: 'A' } } }],
+    })
+    expect(verdict.healthy).toBe(true)
+  })
+})
+
+describe('the LIKE pattern D1 will actually accept', () => {
+  it('clamps every error prefix so the pattern fits D1s 50-character limit', async () => {
+    // Measured against production D1 on 2026-07-27: a 50-character LIKE pattern
+    // succeeds, 51 raises `SQLITE_ERROR: LIKE or GLOB pattern too complex`.
+    // Both shipped defaults are longer (55 and 70 chars), so before the clamp
+    // `findUnansweredThreads` threw on EVERY product database — the detector
+    // could not run at all against the only store the fleet uses.
+    const binds: unknown[][] = []
+    const db = {
+      prepare() {
+        return {
+          bind(...b: unknown[]) {
+            binds.push(b)
+            return { async all() { return { results: [] } } }
+          },
+        }
+      },
+    }
+    const { createD1TurnHealthSource, D1_MAX_LIKE_PATTERN_LENGTH } = await import(
+      '../../src/turn-health/sweep.js'
+    )
+    const source = createD1TurnHealthSource(db, {
+      errorReplyPrefixes: ['x'.repeat(200), 'The sandbox model stream stopped before a clean completion.'],
+    })
+    await source.findUnansweredThreads({ minAgeMs: 0, maxAgeMs: 1, now: 1_000_000 })
+
+    // The bound prefixes are everything after the two timestamps; the SQL
+    // appends `|| '%'`, so each must leave room for that one character.
+    const prefixes = binds[0]!.slice(2) as string[]
+    expect(prefixes).toHaveLength(2)
+    for (const p of prefixes) {
+      expect(p.length + 1).toBeLessThanOrEqual(D1_MAX_LIKE_PATTERN_LENGTH)
+    }
+    // Still specific enough to identify the shell's own error opener.
+    expect(prefixes[1]).toContain('The sandbox model stream stopped')
+  })
+})

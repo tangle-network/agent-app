@@ -67,6 +67,27 @@ export type TurnHealthReason =
    *  the moment nothing is watching, which is how 16 days of
    *  `TANGLE_HUB_URL is required` reached customers unnoticed. */
   | { kind: 'turn_failed'; reason: string }
+  /** A tool call the harness REJECTED, settled as `completed`.
+   *
+   *  Found live in legal-agent production, and missed by every other rule here:
+   *  the model called `submit_proposal`, the harness answered "Model tried to
+   *  call unavailable tool 'submit_proposal'", and the part persisted as
+   *  `{"tool":"invalid","state":{"status":"completed","input":{"error":"…"}}}`.
+   *
+   *  Status is `completed`, the arguments parse cleanly, and the turn has text —
+   *  so the blank-completion, malformed-argument and no-effect rules all pass it.
+   *  Six deliverables were requested and silently discarded while the product
+   *  reported success six times.
+   *
+   *  Detected structurally, on the presence of an `error` in the settled state
+   *  rather than on any harness's name for a rejected call — `invalid` is one
+   *  harness's convention and must not be baked into the shell. */
+  | {
+      kind: 'tool_call_rejected'
+      /** The tool the model was trying to reach, when the payload names it. */
+      tool: string
+      error: string
+    }
   /** The turn was answered without the model ever running — a pre-producer gate
    *  short-circuited and returned the product's own response.
    *
@@ -276,7 +297,23 @@ export function classifyTurnOutcome(input: TurnOutcomeInput): TurnHealthVerdict 
     // The #626 fingerprint: arguments surfaced as a raw string because they
     // failed to parse upstream. Checked before the status gate — a malformed
     // call can still be marked completed, which is precisely why it is silent.
+    // A rejected call settles as `completed` and carries its rejection in the
+    // state. Checked BEFORE the status gate for the same reason as the
+    // malformed case: the status is exactly what makes it silent.
     const toolInput = state?.input
+    const inputRecord = asRecord(toolInput)
+    const rejection =
+      nonEmptyString(inputRecord?.error) ?? nonEmptyString((state as Record<string, unknown>)?.error)
+    if (rejection) {
+      reasons.push({
+        kind: 'tool_call_rejected',
+        // The payload names the tool the model MEANT to call; the part's own
+        // `tool` is the harness's placeholder for a rejected call.
+        tool: nonEmptyString(inputRecord?.tool) ?? tool,
+        error: rejection.slice(0, 200),
+      })
+      continue
+    }
     if (typeof toolInput === 'string' && isUnparseableJson(toolInput)) {
       reasons.push({
         kind: 'malformed_tool_call',
@@ -348,7 +385,14 @@ export function classifyTurnOutcome(input: TurnOutcomeInput): TurnHealthVerdict 
  *  a human still received an answer. */
 function severityOf(reasons: TurnHealthReason[]): TurnHealthSeverity | null {
   if (reasons.length === 0) return null
-  const critical = reasons.some((r) => r.kind === 'empty_completion' || r.kind === 'turn_failed')
+  // A rejected tool call is critical even alongside readable prose: the
+  // customer got words where they should have got a filed deliverable.
+  const critical = reasons.some(
+    (r) =>
+      r.kind === 'empty_completion' ||
+      r.kind === 'turn_failed' ||
+      r.kind === 'tool_call_rejected',
+  )
   return critical ? 'critical' : 'warning'
 }
 
@@ -365,6 +409,8 @@ export function describeReason(reason: TurnHealthReason): string {
       return `tool \`${reason.tool}\` left no effect (status=${reason.status})`
     case 'turn_failed':
       return `turn failed: ${reason.reason}`
+    case 'tool_call_rejected':
+      return `tool \`${reason.tool}\` was REJECTED but settled as completed: ${reason.error}`
     case 'answered_without_model':
       return 'answered by a pre-producer gate — the model never ran'
     case 'unreadable_turn':
