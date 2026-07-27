@@ -14865,10 +14865,40 @@
           "doc": "Build the three work-product tools for `customTools` registration on the MCP server / HTTP handler / runtime executor."
         },
         {
+          "name": "canonicalizeValue",
+          "kind": "function",
+          "signature": "(token: string) => string | null",
+          "doc": "Reduce a numeric token to the form both sides are compared in: no currency, no grouping, no trailing zeros in the fraction, no leading zeros."
+        },
+        {
           "name": "canTransitionWorkProduct",
           "kind": "function",
           "signature": "(from: WorkProductStatus, to: WorkProductStatus) => boolean",
           "doc": "Whether a legal edge exists from `from` to `to` in the review machine."
+        },
+        {
+          "name": "CLAIM_SUPPORT_CHECK",
+          "kind": "const",
+          "signature": "\"claim_support\"",
+          "doc": "Platform check: how many quoted evidence entries anchor to text that actually CARRIES the figure the entry claims."
+        },
+        {
+          "name": "ClaimSupport",
+          "kind": "type",
+          "signature": "type ClaimSupport",
+          "doc": null
+        },
+        {
+          "name": "claimSupportErrorDetail",
+          "kind": "function",
+          "signature": "(failure: { status: \"unsupported\"; claimed: string[]; present: string[]; }, quote: string) => string",
+          "doc": "The sentence a model can act on without re-reading the document: what it claimed, what the line it cited actually says, what figures that line does carry, and the two ways out — cite the value, or dr…"
+        },
+        {
+          "name": "claimValues",
+          "kind": "function",
+          "signature": "(claim: string) => string[]",
+          "doc": "The values a claim asserts, canonicalized — empty when the claim asserts no figure, which is the \"nothing to check\" case."
         },
         {
           "name": "createInMemoryWorkProductStore",
@@ -15139,6 +15169,18 @@
           "kind": "function",
           "signature": "(body: Record<string, unknown>) => WorkProductVerdictBody",
           "doc": "Validate the verdict POST body: `{ id, verdict, note?"
+        },
+        {
+          "name": "valuesInText",
+          "kind": "function",
+          "signature": "(text: string) => string[]",
+          "doc": "Every distinct value appearing in `text`, canonicalized."
+        },
+        {
+          "name": "verifyClaimSupport",
+          "kind": "function",
+          "signature": "(quote: string, claim: string) => ClaimSupport",
+          "doc": "Does `quote` carry the figure `claim` asserts?"
         },
         {
           "name": "WorkProductArtifact",

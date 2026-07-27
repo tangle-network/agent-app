@@ -22,6 +22,7 @@ import type { AppToolContext } from '../tools/types'
 import { createWorkProductService, type WorkProductOutcome, type WorkProductService } from './service'
 import { stampProvenance, type WorkProductProvenanceBase } from './provenance'
 import { findSourceLine, sliceSourceSpan, sourceContainsQuote, type SourceFindFailure, type SourceSpanFailure } from './quote'
+import { claimSupportErrorDetail, verifyClaimSupport } from './claim-support'
 import {
   parseAgentCheckInput,
   parseArtifactInput,
@@ -49,6 +50,13 @@ export const EVIDENCE_COVERAGE_CHECK = 'evidence_coverage'
  *  a reviewer reads the strength of the lineage off the row itself rather than
  *  trusting that a quote was checked. */
 export const QUOTE_VERIFICATION_CHECK = 'quote_verification'
+
+/** Platform check: how many quoted evidence entries anchor to text that
+ *  actually CARRIES the figure the entry claims. Distinct from
+ *  `quote_verification`, which only proves the text came from the document —
+ *  production row `7256ef49` passed that one on all four entries while
+ *  supporting none of them. */
+export const CLAIM_SUPPORT_CHECK = 'claim_support'
 
 /** Domain seams for the three work-product tools — every domain word is a
  *  parameter; the shell bakes none. */
@@ -93,6 +101,17 @@ export interface WorkProductToolConfig {
    *  document-derived targets, and coverage stops being satisfiable by
    *  assertion. */
   requireAnchoredEvidence?: boolean
+  /** Verify that each anchored quote CARRIES the figure its entry claims.
+   *  ON by default — an anchor that does not support its claim is the one
+   *  failure mode every other gate here passes, and it reads to a reviewer as
+   *  the most authoritative citation on the row.
+   *
+   *  Only claims that assert a figure are checked, so a filing status, a name
+   *  or a date is unaffected; see `./claim-support` for exactly where the line
+   *  is drawn and why it is drawn to stay satisfiable. Set `false` only for a
+   *  product whose claims are figures the source states in a form no numeric
+   *  comparison can reach. */
+  verifyClaimSupport?: boolean
   /** Per-turn provenance closure the ROUTE supplies (profileHash + runId are
    *  known at dispatch; trusted, never read from model args). */
   provenance: (ctx: AppToolContext) => WorkProductProvenanceBase
@@ -330,6 +349,46 @@ async function resolveEvidenceQuotes(
   }
 }
 
+/**
+ * Refuse any entry whose anchored text does not carry the figure it claims.
+ *
+ * This runs AFTER `resolveEvidenceQuotes`, on the text the platform decided,
+ * and it is deliberately independent of how that text was anchored. `find`
+ * makes a mis-addressed citation unlikely — the platform locates the line — but
+ * `span` still accepts offsets a caller computed, and this is what "accepted
+ * only when they independently verify" means concretely: the slice has to
+ * contain the value.
+ *
+ * Row `7256ef49` is the case. Four span citations, every quote a real slice of
+ * the right document, every one ~200 characters above the figure it claimed.
+ * `resolveEvidenceQuotes` passed all four; nothing else here would have caught
+ * them; a reviewer would have read four authoritative-looking citations
+ * supporting nothing.
+ *
+ * Rejection is a `ToolInputError` so it folds back to the model mid-turn, the
+ * same posture a non-occurring quote already gets, and the message names both
+ * ways out — cite the value, or drop the locator because the figure was
+ * computed. An unsatisfiable gate does not stop a bad submit, it selects for
+ * one, so naming the second exit is load-bearing rather than politeness.
+ */
+function assertClaimsSupported(
+  config: WorkProductToolConfig,
+  entries: readonly EvidenceEntry[],
+): void {
+  if (config.verifyClaimSupport === false) return
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index]!
+    const quote = entry.locator.quote
+    if (quote === undefined) continue
+    const support = verifyClaimSupport(quote, entry.claim)
+    if (support.status !== 'unsupported') continue
+    throw new ToolInputError(
+      'claim_not_supported',
+      `entries[${index}].claim ${JSON.stringify(entry.claim)} is not supported by the text it cites in "${entry.sourceRef}": ${claimSupportErrorDetail(support, quote)}`,
+    )
+  }
+}
+
 /** Re-verify every persisted quote at submit time. The upsert gate stops new
  *  fabrication; this stops a package whose evidence was written BEFORE the
  *  gate existed (or under a since-corrected document) from reaching a
@@ -380,6 +439,35 @@ async function summarizeQuoteVerification(
     else failed.push(entry.id)
   }
   return { verified, spanAnchored, withoutQuote, failed }
+}
+
+/**
+ * Re-run claim support over every PERSISTED entry at submit time.
+ *
+ * Unlike `summarizeQuoteVerification` this needs no `readSourceText`: the
+ * question is whether the stored quote carries the stored claim, and both are
+ * on the row. So it runs for every product, including one that cannot read its
+ * sources back — and it is the check that catches a package whose evidence was
+ * written before this gate existed. Row `7256ef49` is exactly that package.
+ */
+function summarizeClaimSupport(evidence: readonly EvidenceEntry[]): {
+  supported: number
+  checkable: number
+  unsupported: string[]
+} {
+  let supported = 0
+  let checkable = 0
+  const unsupported: string[] = []
+  for (const entry of evidence) {
+    const quote = entry.locator.quote
+    if (quote === undefined) continue
+    const support = verifyClaimSupport(quote, entry.claim)
+    if (support.status === 'not_applicable') continue
+    checkable += 1
+    if (support.status === 'supported') supported += 1
+    else unsupported.push(entry.id)
+  }
+  return { supported, checkable, unsupported }
 }
 
 /** Build the three work-product tools for `customTools` registration on the
@@ -474,6 +562,10 @@ export function buildWorkProductTools(config: WorkProductToolConfig): AppToolDef
       // fabricated quote persists nothing — the model corrects and re-sends
       // rather than leaving a half-written row behind.
       await resolveEvidenceQuotes(config, entries, ctx)
+      // ...and the text that resolution produced must carry the figure the
+      // entry claims. Same batch, same fail-before-persist discipline: an
+      // entry citing the payer line for a wage figure never reaches the draft.
+      assertClaimsSupported(config, entries)
       const draft = await resolveDraft(service, config, scopeKey, ctx)
       const record = await unwrap(() => service.upsertEvidence(draft.id, entries), 'evidence_rejected')
       return {
@@ -649,7 +741,37 @@ export function buildWorkProductTools(config: WorkProductToolConfig): AppToolDef
         }
       }
 
-      // Platform check two: every material target has ≥1 evidence row. A
+      // Platform check two: every citation's text carries the figure it
+      // claims. Recorded AND rejected, like the other two — a citation that
+      // points at real text supporting nothing is the failure a reviewer is
+      // least able to catch by eye, because it looks exactly like a good one.
+      if (config.verifyClaimSupport !== false) {
+        const support = summarizeClaimSupport(draft.evidence)
+        checks.unshift({
+          id: CLAIM_SUPPORT_CHECK,
+          name: CLAIM_SUPPORT_CHECK,
+          passed: support.unsupported.length === 0,
+          detail:
+            support.unsupported.length > 0
+              ? `Cited text does not contain the claimed figure on: ${support.unsupported.join(', ')}`
+              : support.checkable === 0
+                ? // Honest about a vacuous pass: no entry paired a quote with a
+                  // figure, so nothing was checked. Reporting "0/0 verified"
+                  // would read to a reviewer as assurance that was never earned.
+                  'No citation pairs a quote with a claimed figure — nothing to check'
+                : `${support.supported}/${support.checkable} value-bearing citations anchor to text containing the claimed figure`,
+          source: 'platform',
+        })
+        if (support.unsupported.length > 0) {
+          await unwrap(() => service.recordChecks(draft.id, checks), 'checks_rejected')
+          throw new ToolInputError(
+            'claim_not_supported',
+            `Cannot submit: ${support.unsupported.length} evidence entr${support.unsupported.length === 1 ? 'y cites' : 'ies cite'} text that does not contain the figure claimed (${support.unsupported.join(', ')}). Re-emit each with locator.find set to the value exactly as it appears in the document, or without a locator if the figure was computed rather than read.`,
+          )
+        }
+      }
+
+      // Platform check three: every material target has ≥1 evidence row. A
       // failing coverage check is BOTH recorded on the row (visible to the
       // queue) and rejected fail-loud — a lineage-free package can never reach
       // a reviewer.

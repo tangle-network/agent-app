@@ -16,6 +16,8 @@
  * one differ by exactly the thing a fuzzy matcher forgives.
  */
 
+import { canonicalizeValue, valuesInText } from './claim-support'
+
 /** Whitespace folded to a single ASCII space: the Unicode space separators
  *  (`\p{Zs}`), the line/paragraph separators, and the zero-width characters a
  *  PDF text layer leaves behind (ZWSP / ZWNJ / ZWJ / BOM). */
@@ -160,30 +162,47 @@ export function findSourceLine(
   const trimmed = needle.trim()
   if (trimmed.length === 0) return { ok: false, failure: { reason: 'blank_needle' } }
 
-  // Exact hits first (free, and the common case). Fall back to the normalized
-  // text ONLY to locate a position — the returned quote is always sliced from
-  // the ORIGINAL string, so representation folding never leaks into a stored
-  // citation.
-  const positions: number[] = []
-  for (let at = sourceText.indexOf(trimmed); at >= 0; at = sourceText.indexOf(trimmed, at + 1)) {
-    positions.push(at)
+  /** Walk the document a line at a time. */
+  const eachLine = (visit: (bound: { start: number; end: number }, line: string) => void): void => {
+    let cursor = 0
+    while (cursor <= sourceText.length) {
+      const bound = lineAround(sourceText, cursor)
+      visit(bound, sourceText.slice(bound.start, bound.end))
+      if (bound.end >= sourceText.length) break
+      cursor = bound.end + 1
+    }
   }
-  if (positions.length === 0) {
-    // Second chance for a needle that differs only in representation: a model
-    // reading "128,450.00" off a PDF layer may report "128450.00". Scan lines
-    // and compare normalized forms — cheap, and it keeps the honest-but-
-    // differently-typed citation working without loosening the exact path.
-    const wanted = normalizeQuoteText(trimmed)
-    if (wanted.length > 0) {
-      let cursor = 0
-      while (cursor <= sourceText.length) {
-        const bound = lineAround(sourceText, cursor)
-        const line = sourceText.slice(bound.start, bound.end)
-        if (normalizeQuoteText(line).includes(wanted) || normalizeQuoteText(line.replace(/,/gu, '')).includes(wanted)) {
-          positions.push(bound.start)
-        }
-        if (bound.end >= sourceText.length) break
-        cursor = bound.end + 1
+
+  const positions: number[] = []
+
+  // A needle that IS a figure is matched BY VALUE, per line — never as a
+  // substring. Substring matching quietly answers the wrong question here: a
+  // model citing a genuine "450.00" line in a document that also carries
+  // "128,450.00" gets the WAGE line back, because "450.00" is a tail of it and
+  // occurs earlier. The citation then fails claim support and the honest
+  // anchor is unreachable at occurrence 1, which is the unsatisfiable-gate
+  // failure this whole area exists to avoid. Matching values also subsumes the
+  // representation cases the old second-chance pass handled — "128450.00"
+  // finds "128,450.00" because both canonicalize to the same number.
+  const wantedValue = canonicalizeValue(trimmed)
+  if (wantedValue !== null) {
+    eachLine((bound, line) => {
+      if (valuesInText(line).includes(wantedValue)) positions.push(bound.start)
+    })
+  } else {
+    // A PHRASE needle. Exact hits first (free, and the common case), then the
+    // normalized comparison ONLY to locate a position — the returned quote is
+    // always sliced from the ORIGINAL string, so representation folding never
+    // leaks into a stored citation.
+    for (let at = sourceText.indexOf(trimmed); at >= 0; at = sourceText.indexOf(trimmed, at + 1)) {
+      positions.push(at)
+    }
+    if (positions.length === 0) {
+      const wanted = normalizeQuoteText(trimmed)
+      if (wanted.length > 0) {
+        eachLine((bound, line) => {
+          if (normalizeQuoteText(line).includes(wanted)) positions.push(bound.start)
+        })
       }
     }
   }
