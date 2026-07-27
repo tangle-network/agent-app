@@ -16,7 +16,10 @@ function errorMessage(error: unknown): string {
 }
 
 /** Adds durable lifecycle projection to any producer lane without moving its
- * transport into agent-app. The projection is observed inline and its
+ * transport into agent-app. Purely STRUCTURAL: agent-app ships no implementer
+ * of {@link ChatRouteDurableProjection} and deliberately does not — the one it
+ * used to ship (`/durable-chat`) was removed in 0.44.0 with zero fleet imports.
+ * Pass any `{ observe, materialize }` object backed by your own store. The projection is observed inline and its
  * materialized parts replace same-key pending snapshots after the stream
  * drains. Projection persistence is best-effort for the live lane: a store
  * outage must not terminate an otherwise healthy sandbox stream. Failures are
