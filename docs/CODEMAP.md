@@ -42,7 +42,7 @@ _74 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./preflight`](api/preflight.md) | 12 | — |
 | [`./preflight/cli`](api/preflight-cli.md) | 2 | — |
 | [`./preset-cloudflare`](api/preset-cloudflare.md) | 16 | `billing`, `crypto`, `knowledge`, `tools`, `web` |
-| [`./profile`](api/profile.md) | 44 | `skills` |
+| [`./profile`](api/profile.md) | 45 | `skills` |
 | [`./prompt`](api/prompt.md) | 3 | — |
 | [`./redact`](api/redact.md) | 14 | — |
 | [`./run`](api/run.md) | 10 | `harness` |
@@ -411,11 +411,11 @@ Depends on: `billing`, `crypto`, `knowledge`, `tools`, `web`
 
 ## `./profile`
 
-Source: `src/profile/index.ts` · 44 exports
+Source: `src/profile/index.ts` · 45 exports
 
 Depends on: `skills`
 
-`assertSkillDeliveryDisjoint`, `assertSystemPromptWithinBudget`, `composeAgentProfile`, `ComposedSkills`, `ComposeProfileBudget`, `composeShellResources`, `ComposeShellResourcesInput`, `composeSkills`, `CorpusEntry`, `CorpusLoadResult`, `corpusSkills`, `DEFAULT_MAX_SYSTEM_PROMPT_BYTES`, `diffProfileFingerprints`, `EvolvableSectionInput`, `fingerprintAgentProfile`, `formatProfileDrift`, `GlobModules`, `largestPromptSections`, `LoadCorpusOptions`, `loadMarkdownCorpus`, `makeEvolvableSection`, `mergeComposedSkills`, `parseCorpusSkills`, `ParsedSkill`, `parseSkillFrontmatter`, `profile`, `ProfileChannels`, `ProfileDrift`, `ProfileDriftEntry`, `ProfileFingerprint`, `ProfileFingerprintContext`, `ProfileOverlay`, `registrySkills`, `renderInlineSkills`, `renderSkillIndex`, `SkillDeliveryMode`, `SkillEntry`, `skillEntryFromMarkdown`, `SkillFrontmatter`, `skillMountPath`, `skillRefs`, `stripComments`, `UserSkill`, `userSkillMounts`
+`assertProfilePromptWithinBudget`, `assertSkillDeliveryDisjoint`, `assertSystemPromptWithinBudget`, `composeAgentProfile`, `ComposedSkills`, `ComposeProfileBudget`, `composeShellResources`, `ComposeShellResourcesInput`, `composeSkills`, `CorpusEntry`, `CorpusLoadResult`, `corpusSkills`, `DEFAULT_MAX_SYSTEM_PROMPT_BYTES`, `diffProfileFingerprints`, `EvolvableSectionInput`, `fingerprintAgentProfile`, `formatProfileDrift`, `GlobModules`, `largestPromptSections`, `LoadCorpusOptions`, `loadMarkdownCorpus`, `makeEvolvableSection`, `mergeComposedSkills`, `parseCorpusSkills`, `ParsedSkill`, `parseSkillFrontmatter`, `profile`, `ProfileChannels`, `ProfileDrift`, `ProfileDriftEntry`, `ProfileFingerprint`, `ProfileFingerprintContext`, `ProfileOverlay`, `registrySkills`, `renderInlineSkills`, `renderSkillIndex`, `SkillDeliveryMode`, `SkillEntry`, `skillEntryFromMarkdown`, `SkillFrontmatter`, `skillMountPath`, `skillRefs`, `stripComments`, `UserSkill`, `userSkillMounts`
 
 [Full API →](api/profile.md)
 

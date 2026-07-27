@@ -26,6 +26,10 @@ import {
 } from '../runtime/model'
 import { ok, fail, type Outcome } from './outcome'
 import { fingerprintAgentProfile, type ProfileFingerprint } from '../profile/fingerprint'
+import {
+  assertProfilePromptWithinBudget,
+  type ComposeProfileBudget,
+} from '../profile/budget'
 
 export type { Outcome } from './outcome'
 export * from './binary-read'
@@ -342,6 +346,15 @@ export interface SandboxRuntimeConfig {
   // create AND resume/reuse paths (idempotent overwrite). Inline files are
   // STRIPPED from `resources.files` before create when this is set.
   deferProfileFiles?: boolean
+  // Byte budget on the system prompt of the profile this shell actually SENDS
+  // (provision + every turn). Defaults to the same 40 KB cap
+  // `composeAgentProfile` applies; set `warnOnly` + `overBudgetReason` to
+  // downgrade it. Wired here because the composer is opt-in: a product may
+  // hand-build its profile, or carry its real prompt only on the PER-TURN
+  // backend, and then the compose-time gate never runs on the bytes the model
+  // sees. An over-budget prompt degrades toward empty answers, which is
+  // indistinguishable from a broken stream — so it fails loud instead.
+  promptBudget?: ComposeProfileBudget
 }
 
 /** Define default resource limits and settings for sandbox environments */
@@ -1108,6 +1121,15 @@ type CreatePayload = Parameters<Sandbox['create']>[0]
 // failing at POST-time with actionable detail beats a platform 4xx (or a box
 // that boots and then E2BIGs on every exec).
 
+/** Appended to a prompt-budget throw from any of this module's three choke
+ *  points. A product that already raised the cap at compose time
+ *  (`composeAgentProfile(base, channels, overlay, { maxSystemPromptBytes })` —
+ *  gtm-agent uses 50_000) has to declare the SAME decision on the shell, or the
+ *  shell's default reads as a contradiction instead of a missing declaration. */
+const SHELL_PROMPT_BUDGET_HINT =
+  'If this prompt size is a decision you already made at compose time, mirror it on the shell as ' +
+  '`promptBudget: { maxSystemPromptBytes, overBudgetReason }` — the shell gate is the one that sees the profile actually sent.'
+
 /** Gate on the provision body: the platform orchestrator caps the create
  *  payload at 256 KiB; 240 KB leaves headroom for transport framing. An
  *  over-cap payload fails provisioning 100% of the time (a 282 KB payload
@@ -1727,10 +1749,19 @@ export async function ensureWorkspaceSandbox(
     },
   } as CreatePayload
 
-  // S-cost gates: an oversized env entry (E2BIG class) or an over-cap
-  // provision body can never produce a working sandbox — fail loud here,
-  // before the POST, with the offending section named.
+  // S-cost gates: an oversized env entry (E2BIG class), an over-cap provision
+  // body, or a system prompt past the degradation cliff — fail loud here,
+  // before the POST, with the offending section named. The prompt gate is
+  // separate from the payload gate on purpose: the 122,659-byte prompt that
+  // produced empty answers is a THIRD of the 240 KB payload cap, so the
+  // payload gate never sees it.
   assertEnvWithinLimits(env)
+  assertProfilePromptWithinBudget(
+    profile,
+    shell.promptBudget ?? {},
+    `provision profile systemPrompt for ${name}`,
+    SHELL_PROMPT_BUDGET_HINT,
+  )
   // `?? {}` only narrows the SDK parameter's `| undefined`; the literal above
   // is always defined. The structural sections type needs no cast.
   assertProvisionPayloadWithinCap(payload ?? {})
@@ -1943,6 +1974,15 @@ export async function* streamSandboxPrompt(
 
   const profile = shell.profile({ systemPrompt: options?.systemPrompt, extraMcp, harness })
   const profileWithEffort = attachReasoningEffort(profile, harness, options?.effort)
+  // The per-turn backend can carry a system prompt the create-time profile
+  // never had (creative-agent does exactly that), so the budget is re-checked
+  // on the profile this turn actually executes.
+  assertProfilePromptWithinBudget(
+    profileWithEffort,
+    shell.promptBudget ?? {},
+    'streamSandboxPrompt profile systemPrompt',
+    SHELL_PROMPT_BUDGET_HINT,
+  )
 
   // Fingerprint is taken HERE — the one place the final profile exists — so an
   // observer proves what was executed rather than re-deriving what should be.
@@ -2332,6 +2372,14 @@ export async function driveSandboxTurn(
     shell.profile({ systemPrompt: options.systemPrompt, extraMcp, harness }),
     harness,
     options.effort,
+  )
+  // Autonomous lane: nobody is watching, so an empty answer from an oversized
+  // prompt would be recorded as a completed turn with no output.
+  assertProfilePromptWithinBudget(
+    profile,
+    shell.promptBudget ?? {},
+    'driveSandboxTurn profile systemPrompt',
+    SHELL_PROMPT_BUDGET_HINT,
   )
   try {
     const drive = await box.driveTurn(prompt, {

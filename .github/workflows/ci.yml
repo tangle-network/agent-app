@@ -23,6 +23,19 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
+      # Incident-class gates, run FIRST and named. They are part of `pnpm test`
+      # too, so this step adds no coverage — it buys legibility and speed: a
+      # violation fails in seconds under a step called "gates", instead of
+      # surfacing as one red line inside a 3,300-test run. Each gate guards a
+      # class this repo actually shipped:
+      #   provision payload >240 KiB — no sandbox could ever be created
+      #   env entry >120 KB          — box boots, then E2BIGs on every exec
+      #   systemPrompt >40 KB        — model degrades to empty answers
+      #   unhandled onErrorEvent     — a failed turn renders as a silent blank
+      #   node import in a browser   — client bundle throws on module load
+      #   a test that cannot fail    — the meta-class behind all of the above
+      - name: Incident-class gates
+        run: pnpm run test:gates
       - run: pnpm run test
       - run: pnpm run build
       # Dead-surface gate. Fails on an unused file, an unused internal export, or

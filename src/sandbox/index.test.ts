@@ -963,6 +963,100 @@ describe('provision S-cost gates', () => {
     ).rejects.toThrow(/OPENCODE_CONFIG_CONTENT/)
     expect(createMock).not.toHaveBeenCalled()
   })
+
+  // The prompt budget is a SEPARATE gate from the payload cap, and this is the
+  // arithmetic that proves it has to be: the 122,659-byte prompt behind the
+  // empty-answer incident is half the 240,000-byte payload cap, so the payload
+  // gate is silent on it. `composeAgentProfile` is opt-in — tax-agent has zero
+  // call sites and creative-agent keeps its real prompt on the PER-TURN backend
+  // — so the shell has to run the gate itself.
+  const incidentPrompt = 'x'.repeat(122_659)
+  const bigPromptProfile = { name: 'big-prompt', prompt: { systemPrompt: incidentPrompt } } as AgentProfile
+
+  it('the payload gate alone does NOT catch the incident prompt — the size that produced empty answers is half the payload cap', () => {
+    expect(() =>
+      assertProvisionPayloadWithinCap({ env: {}, secrets: [], backend: { profile: bigPromptProfile } }),
+    ).not.toThrow()
+  })
+
+  it('ensureWorkspaceSandbox rejects an over-budget system prompt BEFORE the create POST', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox())
+    await expect(
+      ensureWorkspaceSandbox(
+        shellFor({ apiKey: 'k', baseUrl: 'https://s' }, { profile: () => bigPromptProfile }),
+        { workspaceId: 'w1', harness: 'opencode' },
+      ),
+    ).rejects.toThrow(/provision profile systemPrompt for box-w1 is 122659 bytes — over the 40000-byte budget/)
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('streamSandboxPrompt rejects an over-budget PER-TURN prompt before opening the stream', async () => {
+    const streamPrompt = vi.fn()
+    const box = fakeBox({ streamPrompt })
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, { profile: () => bigPromptProfile })
+    await expect(async () => {
+      for await (const _ of streamSandboxPrompt(shell, box, 'go', { sessionId: 's1' })) void _
+    }).rejects.toThrow(/streamSandboxPrompt profile systemPrompt is 122659 bytes/)
+    expect(streamPrompt).not.toHaveBeenCalled()
+  })
+
+  it('driveSandboxTurn rejects an over-budget prompt before dispatching the autonomous turn', async () => {
+    const driveTurn = vi.fn()
+    const box = fakeBox({ driveTurn })
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, { profile: () => bigPromptProfile })
+    await expect(driveSandboxTurn(shell, box, 'go', { sessionId: 's1' })).rejects.toThrow(
+      /driveSandboxTurn profile systemPrompt is 122659 bytes/,
+    )
+    expect(driveTurn).not.toHaveBeenCalled()
+  })
+
+  it('a product that must ship a big prompt opts out through the shell budget seam, with a written reason', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox())
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await ensureWorkspaceSandbox(
+      shellFor(
+        { apiKey: 'k', baseUrl: 'https://s' },
+        {
+          profile: () => bigPromptProfile,
+          promptBudget: { warnOnly: true, overBudgetReason: 'statutory text the agent must obey verbatim' },
+        },
+      ),
+      { workspaceId: 'w1', harness: 'opencode' },
+    )
+    expect(createMock).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0]?.[0]).toMatch(/over the 40000-byte budget/)
+    warn.mockRestore()
+  })
+
+  it('weakening the budget WITHOUT a written reason is itself rejected', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox())
+    await expect(
+      ensureWorkspaceSandbox(
+        shellFor(
+          { apiKey: 'k', baseUrl: 'https://s' },
+          { profile: () => bigPromptProfile, promptBudget: { warnOnly: true } },
+        ),
+        { workspaceId: 'w1', harness: 'opencode' },
+      ),
+    ).rejects.toThrow(/without an overBudgetReason/)
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('a normal profile passes every choke point untouched', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox())
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' })
+    await expect(
+      ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' }),
+    ).resolves.toBeDefined()
+    const box = fakeBox({ driveTurn: vi.fn().mockResolvedValue({ state: 'completed' }) })
+    await expect(driveSandboxTurn(shell, box, 'go', { sessionId: 's1' })).resolves.toMatchObject({
+      succeeded: true,
+    })
+  })
 })
 
 describe('ensureWorkspaceSandbox — new seams', () => {

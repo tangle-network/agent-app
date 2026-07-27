@@ -4,7 +4,15 @@
 
 Source: `src/profile/index.ts`
 
-44 exports.
+45 exports.
+
+### `assertProfilePromptWithinBudget`
+
+`function` — Run {@link assertSystemPromptWithinBudget} over a profile-shaped object's `prompt.systemPrompt`.
+
+```ts
+(profile: { prompt?: { systemPrompt?: unknown; } | undefined; } | undefined, budget?: ComposeProfileBudget, origin?: st…
+```
 
 ### `assertSkillDeliveryDisjoint`
 
@@ -19,7 +27,7 @@ Source: `src/profile/index.ts`
 `function` — Enforce {@link ComposeProfileBudget} on a composed system prompt: over budget throws (or warns with `warnOnly`) with the actual size and the top-3 largest sections.
 
 ```ts
-(systemPrompt: string, budget?: ComposeProfileBudget) => void
+(systemPrompt: string, budget?: ComposeProfileBudget, origin?: string) => void
 ```
 
 ### `composeAgentProfile`
