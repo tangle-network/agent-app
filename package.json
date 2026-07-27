@@ -222,6 +222,11 @@
       "import": "./dist/web-react/terminal.js",
       "default": "./dist/web-react/terminal.js"
     },
+    "./web-react/session-gateway": {
+      "types": "./dist/web-react/session-gateway.d.ts",
+      "import": "./dist/web-react/session-gateway.js",
+      "default": "./dist/web-react/session-gateway.js"
+    },
     "./work-product": {
       "types": "./dist/work-product/index.d.ts",
       "import": "./dist/work-product/index.js",

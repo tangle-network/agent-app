@@ -27,6 +27,7 @@
     "src/platform/index.ts",
     "src/web/index.ts",
     "src/web-react/index.tsx",
+    "src/web-react/session-gateway.ts",
     "src/redact/index.ts",
     "src/store/index.ts",
     "src/trace/index.ts",

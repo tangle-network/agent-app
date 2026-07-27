@@ -41,6 +41,7 @@ export default defineConfig({
     'work-product/index': 'src/work-product/index.ts',
     'work-product-react/index': 'src/work-product-react/index.tsx',
     'web-react/terminal': 'src/web-react/terminal.ts',
+    'web-react/session-gateway': 'src/web-react/session-gateway.ts',
     'composer/index': 'src/composer/index.ts',
     'assistant/index': 'src/assistant/index.ts',
     'brand/index': 'src/brand/index.tsx',
