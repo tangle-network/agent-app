@@ -8113,6 +8113,14 @@ interface ModelFailoverResult
 interface ModelInfo
 ```
 
+### `readHttpStatusHint`
+
+`function` — The HTTP status a message states in prose, or `undefined` when it states none.
+
+```ts
+(text: string) => number | undefined
+```
+
 ### `resolveChatModel`
 
 `function` — Resolve the chat-turn model by the one canonical precedence.
