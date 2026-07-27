@@ -14898,7 +14898,13 @@
           "name": "EvidenceLocator",
           "kind": "interface",
           "signature": "interface EvidenceLocator",
-          "doc": "Point into a source document: page, free-form range, verbatim quote"
+          "doc": "Point into a source document: page, free-form range, span, verbatim quote"
+        },
+        {
+          "name": "EvidenceSpan",
+          "kind": "interface",
+          "signature": "interface EvidenceSpan",
+          "doc": "A half-open `[start, end)` character range into the source document's text."
         },
         {
           "name": "ExceptionEntry",
@@ -15015,6 +15021,12 @@
           "doc": "Platform check: how many evidence entries carry a quote the shell PROVED occurs in the source it names."
         },
         {
+          "name": "QuoteBasis",
+          "kind": "type",
+          "signature": "type QuoteBasis",
+          "doc": "How `locator.quote` got there."
+        },
+        {
           "name": "ReviewQueueInputs",
           "kind": "interface",
           "signature": "interface ReviewQueueInputs",
@@ -15045,10 +15057,28 @@
           "doc": "An engagement-scoped chat thread — the intake candidate source."
         },
         {
+          "name": "sliceSourceSpan",
+          "kind": "function",
+          "signature": "(sourceText: string, span: { start: number; end: number; }) => SourceSpanResult",
+          "doc": "Resolve `[start, end)` against `sourceText`."
+        },
+        {
           "name": "sourceContainsQuote",
           "kind": "function",
           "signature": "(sourceText: string, quote: string) => boolean",
           "doc": "Does `quote` occur in `sourceText`?"
+        },
+        {
+          "name": "SourceSpanFailure",
+          "kind": "type",
+          "signature": "type SourceSpanFailure",
+          "doc": "Slice a citation out of the source text by character offset — the reason this module exists in its stronger form."
+        },
+        {
+          "name": "SourceSpanResult",
+          "kind": "type",
+          "signature": "type SourceSpanResult",
+          "doc": null
         },
         {
           "name": "stampProvenance",
