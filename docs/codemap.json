@@ -14680,7 +14680,7 @@
           "name": "EVIDENCE_COVERAGE_CHECK",
           "kind": "const",
           "signature": "\"evidence_coverage\"",
-          "doc": "The shell's one generic platform check: every material target has ≥1 evidence row."
+          "doc": "Platform check: every material target has ≥1 evidence row."
         },
         {
           "name": "EvidenceEntry",
@@ -14743,6 +14743,12 @@
           "doc": "Max entries per `upsert_evidence`/`flag_exception` call — keeps each call a small batch the model can correct precisely on a named-index failure."
         },
         {
+          "name": "normalizeQuoteText",
+          "kind": "function",
+          "signature": "(value: string) => string",
+          "doc": "Fold a string to the form both sides of a quote comparison are measured in."
+        },
+        {
           "name": "parseAgentCheckInput",
           "kind": "function",
           "signature": "(raw: unknown, path?: string) => WorkProductParseResult<AgentCheckInput>",
@@ -14797,6 +14803,12 @@
           "doc": "One named quality verdict on the work product, tagged with who computed it"
         },
         {
+          "name": "QUOTE_VERIFICATION_CHECK",
+          "kind": "const",
+          "signature": "\"quote_verification\"",
+          "doc": "Platform check: how many evidence entries carry a quote the shell PROVED occurs in the source it names."
+        },
+        {
           "name": "ReviewQueueInputs",
           "kind": "interface",
           "signature": "interface ReviewQueueInputs",
@@ -14825,6 +14837,12 @@
           "kind": "interface",
           "signature": "interface ReviewQueueThread",
           "doc": "An engagement-scoped chat thread — the intake candidate source."
+        },
+        {
+          "name": "sourceContainsQuote",
+          "kind": "function",
+          "signature": "(sourceText: string, quote: string) => boolean",
+          "doc": "Does `quote` occur in `sourceText`?"
         },
         {
           "name": "stampProvenance",
