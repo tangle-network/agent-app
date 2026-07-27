@@ -4,7 +4,7 @@
 
 Source: `src/model-resolution/index.ts`
 
-23 exports.
+24 exports.
 
 ### `buildModelChain`
 
@@ -116,6 +116,14 @@ interface ModelFailoverResult
 
 ```ts
 interface ModelInfo
+```
+
+### `readHttpStatusHint`
+
+`function` — The HTTP status a message states in prose, or `undefined` when it states none.
+
+```ts
+(text: string) => number | undefined
 ```
 
 ### `resolveChatModel`

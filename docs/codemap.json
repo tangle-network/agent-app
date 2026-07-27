@@ -6266,6 +6266,12 @@
           "doc": "The router /v1/models entry shape this module reads."
         },
         {
+          "name": "readHttpStatusHint",
+          "kind": "function",
+          "signature": "(text: string) => number | undefined",
+          "doc": "The HTTP status a message states in prose, or `undefined` when it states none."
+        },
+        {
           "name": "resolveChatModel",
           "kind": "function",
           "signature": "(input: ResolveChatModelInput) => ResolvedChatModel",

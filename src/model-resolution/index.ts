@@ -179,6 +179,7 @@ export function catalogIdsForModel(model: ModelInfo): string[] {
 // catalog but whose upstream is down. Catalog membership is not liveness.
 export {
   isUpstreamUnavailable,
+  readHttpStatusHint,
   runWithModelFailover,
   buildModelChain,
   ModelFailoverExhaustedError,
