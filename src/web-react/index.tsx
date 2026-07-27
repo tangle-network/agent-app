@@ -27,6 +27,8 @@ import { WorkProductCard, workProductPartsFromMessageParts } from './work-produc
 import type { WorkProductPersistedPart } from '../work-product/types'
 
 export * from './chat-stream'
+export * from './turn-recovery'
+export * from './use-turn-recovery'
 export * from './chat-interactions'
 export * from './chat-composer'
 export * from './interaction-card-support'
