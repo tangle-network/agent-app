@@ -14859,6 +14859,24 @@
           "doc": "Agent self-reported check input for `submit_work_product` (persisted with `source: 'agent'`; `platform`/`judge` sources are never model-suppliable)."
         },
         {
+          "name": "ARTIFACT_AGREEMENT_CHECK",
+          "kind": "const",
+          "signature": "\"artifact_agreement\"",
+          "doc": "Platform check: how many evidence claims agree with the artifact field they decorate."
+        },
+        {
+          "name": "ArtifactAgreement",
+          "kind": "type",
+          "signature": "type ArtifactAgreement",
+          "doc": null
+        },
+        {
+          "name": "artifactAgreementErrorDetail",
+          "kind": "function",
+          "signature": "(failure: { status: \"contradicts\"; claimed: string; expected: string; belongsTo: string; }, target: string) => string",
+          "doc": "The sentence a model can act on: both numbers, both lines, and the two ways out — move the citation, or correct the artifact."
+        },
+        {
           "name": "buildWorkProductTools",
           "kind": "function",
           "signature": "(config: WorkProductToolConfig) => AppToolDefinition<Record<string, unknown>>[]",
@@ -14899,6 +14917,12 @@
           "kind": "function",
           "signature": "(claim: string) => string[]",
           "doc": "The values a claim asserts, canonicalized — empty when the claim asserts no figure, which is the \"nothing to check\" case."
+        },
+        {
+          "name": "ConfusableTargetGroup",
+          "kind": "interface",
+          "signature": "interface ConfusableTargetGroup",
+          "doc": "One set of targets whose source lines are mistakable for each other, with the phrases that tell them apart."
         },
         {
           "name": "createInMemoryWorkProductStore",
@@ -14977,6 +15001,12 @@
           "kind": "function",
           "signature": "(sourceText: string, needle: string, occurrence?: number) => SourceFindResult",
           "doc": null
+        },
+        {
+          "name": "indexArtifactValues",
+          "kind": "function",
+          "signature": "(fields: Readonly<Record<string, unknown>> | undefined, normalizeTarget?: ((target: string) => string) | undefined) =>…",
+          "doc": "Canonical target → canonical value, for the artifact fields that state a figure."
         },
         {
           "name": "InMemoryWorkProductStore",
@@ -15153,6 +15183,24 @@
           "doc": "Payload for the draft→ready submit transition"
         },
         {
+          "name": "TARGET_CORRECTNESS_CHECK",
+          "kind": "const",
+          "signature": "\"target_correctness\"",
+          "doc": "Platform check: how many citations anchor to a line that belongs to the TARGET they are attached to, rather than to a sibling target's line."
+        },
+        {
+          "name": "targetLabelErrorDetail",
+          "kind": "function",
+          "signature": "(failure: { status: \"crossed\"; rival: string; rivalLabel: string; expected: readonly string[]; note?: string | undefine…",
+          "doc": "The sentence a model can act on: which line it actually cited, which target that line belongs to, and what its own target's line looks like."
+        },
+        {
+          "name": "TargetLabelVerdict",
+          "kind": "type",
+          "signature": "type TargetLabelVerdict",
+          "doc": null
+        },
+        {
           "name": "TrustItem",
           "kind": "interface",
           "signature": "interface TrustItem",
@@ -15177,10 +15225,22 @@
           "doc": "Every distinct value appearing in `text`, canonicalized."
         },
         {
+          "name": "verifyArtifactAgreement",
+          "kind": "function",
+          "signature": "(target: string, claim: string, fieldValues: ReadonlyMap<string, string>) => ArtifactAgreement",
+          "doc": null
+        },
+        {
           "name": "verifyClaimSupport",
           "kind": "function",
           "signature": "(quote: string, claim: string) => ClaimSupport",
           "doc": "Does `quote` carry the figure `claim` asserts?"
+        },
+        {
+          "name": "verifyTargetLabel",
+          "kind": "function",
+          "signature": "(quote: string, target: string, groups: readonly ConfusableTargetGroup[]) => TargetLabelVerdict",
+          "doc": null
         },
         {
           "name": "WorkProductArtifact",
