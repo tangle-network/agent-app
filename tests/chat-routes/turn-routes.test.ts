@@ -292,6 +292,55 @@ describe('createChatTurnRoutes — buffered replay', () => {
     expect(lines.at(-1)).toMatchObject({ type: 'turn_status', status: 'complete' })
   })
 
+  it('stamps the buffer seq on every replayed line so a client can continue', async () => {
+    // Without this the cursor pins to 0 forever: every reconnect refetches the
+    // whole turn and re-applies every delta onto already-rendered state.
+    const { routes, ctx, pending } = makeRoutes({
+      produce: () =>
+        fakeProducer(
+          Array.from({ length: 20 }, (_, i) => ({ type: 'text', text: `chunk${i} ` })),
+          Array.from({ length: 20 }, (_, i) => `chunk${i} `).join(''),
+        ),
+    })
+    const res = await routes.turn(turnRequest({ threadId: 't-seq', content: 'go' }), ctx)
+    const reader = res.body!.getReader()
+    const first = await reader.read()
+    const { turnId } = JSON.parse(
+      new TextDecoder().decode(first.value).split('\n')[0]!,
+    ) as { turnId: string }
+    await reader.cancel()
+    await Promise.all(pending)
+
+    const replayRes = await routes.replay(
+      new Request(`http://app.test/api/chat/replay/${turnId}?fromSeq=0`),
+      { turnId },
+    )
+    const lines = (await readLines(replayRes.body!)) as Array<Record<string, unknown>>
+
+    const sentinel = lines.at(-1)!
+    const events = lines.slice(0, -1)
+    expect(sentinel).toMatchObject({ type: 'turn_status', status: 'complete' })
+    // The sentinel is a terminator, not a cursor position — stamping it would
+    // move a client's cursor backwards.
+    expect(sentinel.seq).toBeUndefined()
+
+    const seqs = events.map((l) => l.seq)
+    expect(seqs.every((s) => typeof s === 'number' && (s as number) > 0)).toBe(true)
+    expect(seqs).toEqual([...(seqs as number[])].sort((a, b) => a - b))
+    // Stamping must not disturb the payload.
+    expect(events[0]).toMatchObject({ type: 'turn', turnId })
+
+    // The continuation contract: resuming past the last seq re-delivers nothing.
+    const lastSeq = seqs.at(-1) as number
+    const resumed = await routes.replay(
+      new Request(`http://app.test/api/chat/replay/${turnId}?fromSeq=${lastSeq}`),
+      { turnId },
+    )
+    const resumedLines = await readLines(resumed.body!)
+    expect(resumedLines).toHaveLength(1)
+    expect(resumedLines[0]).toMatchObject({ type: 'turn_status', status: 'complete' })
+  })
+
   it('authorizes replay through the same seam', async () => {
     const { routes } = makeRoutes({
       authorize: async (args) =>

@@ -70,6 +70,7 @@ import {
   normalizeClientTurnId,
   replayTurnEvents,
   resolveChatTurn,
+  stampReplaySeq,
   type PersistedChatMessageForTurn,
   type TurnEventStore,
 } from '../stream/index'
@@ -1148,7 +1149,10 @@ export function createChatTurnRoutes<TContext = void>(
           controller.close()
           return
         }
-        controller.enqueue(encoder.encode(`${value.event}\n`))
+        // Stamp the buffer ordinal so a reconnecting client resumes from
+        // `?fromSeq=<lastSeq>` instead of refetching the turn from 0 and
+        // re-applying every delta onto already-rendered state.
+        controller.enqueue(encoder.encode(`${stampReplaySeq(value)}\n`))
       },
       cancel() {
         void events.return(undefined)

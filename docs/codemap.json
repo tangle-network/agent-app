@@ -4249,6 +4249,12 @@
           "doc": "Stamp a full provenance from the dispatch-time base."
         },
         {
+          "name": "stampReplaySeq",
+          "kind": "function",
+          "signature": "(row: BufferedTurnEvent) => string",
+          "doc": "Serialize a replayed row for the wire, stamping the buffer ordinal ONTO the line so a reconnecting client can continue from `?fromSeq=<lastSeq>`."
+        },
+        {
           "name": "statSandboxFileSize",
           "kind": "function",
           "signature": "(box: SandboxExecChannel, absolutePath: string, options?: SandboxExecOptions | undefined) => Promise<SandboxFileSizeOut…",
@@ -16154,6 +16160,12 @@
           "kind": "function",
           "signature": "(part: JsonRecord) => string",
           "doc": "Resolve the tool name from a JSON record using tool, name, or a default value"
+        },
+        {
+          "name": "stampReplaySeq",
+          "kind": "function",
+          "signature": "(row: BufferedTurnEvent) => string",
+          "doc": "Serialize a replayed row for the wire, stamping the buffer ordinal ONTO the line so a reconnecting client can continue from `?fromSeq=<lastSeq>`."
         },
         {
           "name": "StreamEvent",
