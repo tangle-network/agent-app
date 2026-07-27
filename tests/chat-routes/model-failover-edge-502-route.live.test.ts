@@ -55,6 +55,24 @@
  * cannot serve and a non-reasoning one can, which is exactly the production
  * asymmetry, made reproducible on demand instead of waited for.
  *
+ * THE DEFAULT TRIGGER IS NOW FIXED UPSTREAM — EXPECT THIS TEST TO SAY SO. The
+ * router cause above was tangle-router #307 ("Gemini thinking headroom"):
+ * thinking is on by default from Gemini 2.5 up and the hidden thought tokens
+ * bill against the same output ceiling as the answer, so a modest `max_tokens`
+ * was consumed entirely by thinking and the response came back empty with
+ * `finish_reason: length`, which the router's fail-loud guard turned into a
+ * 5xx. It shipped to production 2026-07-27 20:01 UTC, and the identical
+ * ablation re-run at 20:02 returned 12/12 200 where it had returned 5/5 502 at
+ * 19:37.
+ *
+ * So on today's router this file FAILS with "no edge 5xx was observed, so this
+ * run proves nothing". That is the intended behavior, not a regression: a live
+ * test with nothing live to test must never report success. Point
+ * `LIVE_EDGE_502_MODEL` at whatever is currently 5xxing to run it for real. The
+ * permanent guard for this failure class is the non-live sibling
+ * (`model-failover-edge-502.test.ts`), which replays the verbatim capture and
+ * needs no outage at all.
+ *
  * The earlier readings this replaces are all consistent with it: "218/218 via
  * curl but ~5/8 via Node" was two clients sending different token budgets, and
  * "gemini-2.5-flash-lite never flaps" is because it is the control.
