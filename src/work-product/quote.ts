@@ -105,9 +105,6 @@ export type SourceSpanResult =
   | { ok: true; quote: string }
   | { ok: false; failure: SourceSpanFailure }
 
-/** Resolve `[start, end)` against `sourceText`. Every rejection is a caller
- *  mistake the model can correct from the paged read it already has, so each
- *  carries the discriminator a tool layer turns into a specific message. */
 /**
  * Locate the line containing `value` and return it as a span — the citation
  * form for a model that cannot count characters.
@@ -201,6 +198,9 @@ export function findSourceLine(
   return { ok: true, span: bound, quote, occurrences: positions.length }
 }
 
+/** Resolve `[start, end)` against `sourceText`. Every rejection is a caller
+ *  mistake the model can correct from the paged read it already has, so each
+ *  carries the discriminator a tool layer turns into a specific message. */
 export function sliceSourceSpan(
   sourceText: string,
   span: { start: number; end: number },

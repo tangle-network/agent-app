@@ -15078,7 +15078,7 @@
           "name": "sliceSourceSpan",
           "kind": "function",
           "signature": "(sourceText: string, span: { start: number; end: number; }) => SourceSpanResult",
-          "doc": null
+          "doc": "Resolve `[start, end)` against `sourceText`."
         },
         {
           "name": "sourceContainsQuote",

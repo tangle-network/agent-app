@@ -304,7 +304,7 @@ interface ReviewQueueThread
 
 ### `sliceSourceSpan`
 
-`function`
+`function` — Resolve `[start, end)` against `sourceText`.
 
 ```ts
 (sourceText: string, span: { start: number; end: number; }) => SourceSpanResult
