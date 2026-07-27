@@ -58,7 +58,62 @@ const UPSTREAM_UNAVAILABLE_MESSAGES: readonly string[] = [
   'rate limit',
   'overloaded',
   'temporarily unavailable',
+  // Model-SCOPED unavailability. A different model in the chain can still
+  // serve, so this belongs here and not with the client errors. Measured on a
+  // real box 2026-07-27: the sandbox now reports an unservable model as a
+  // terminal `error` whose data is `{"message":"Session error:
+  // {\"error\":{\"name\":\"UnknownError\",\"data\":{\"message\":\"Model not
+  // found: openai-compat/zai/glm-4.7.\"}}}"}` — no `code`, no numeric status,
+  // and none of the fragments above. The shipped live product-path proof went
+  // red on exactly this: `usedFallback:false`, `failed:true`, an error row to
+  // the customer where a fallback was available and would have answered.
+  'model not found',
+  'is not currently available',
 ]
+
+/**
+ * Textual forms an HTTP status arrives in when NO numeric field carries it.
+ *
+ * The case that forced this is the Cloudflare EDGE 502. Captured verbatim from
+ * `router.tangle.tools` on 2026-07-27 17:48:12 GMT (cf-ray
+ * `a21d793899f6cef3-DEN`): `HTTP/2 502`, `content-type: text/plain;
+ * charset=UTF-8`, a 16-byte body reading `error code: 502\n`, `server:
+ * cloudflare`, and **zero `x-tangle-*` headers** where a healthy 200 from the
+ * same endpoint carries nine of them. Zero means the origin never executed —
+ * so the router's own upstream failover, which lives inside the origin,
+ * structurally cannot fire. Only a client OUTSIDE the edge can rescue that
+ * turn, which is why this classifier has to recognize a failure shape that
+ * nobody upstream will ever label for it.
+ *
+ * Every pattern below matches a string a real producer emits:
+ * - `error code: 502` — Cloudflare's edge body (the capture above).
+ * - `(HTTP 502)` — `src/runtime/openai-stream.ts` wrapping a non-ok response.
+ * - `returned 502` — `src/runtime/model-catalog.ts`.
+ * - `failed with status 502` — `src/turn-stream/adapters.ts`.
+ * - `502 Bad Gateway` — an HTTP/1.1 status line. HTTP/2 carries no reason
+ *   phrase at all, which is precisely why matching the phrase alone (the
+ *   `'bad gateway'` fragment below) read the capture as a non-outage.
+ */
+const HTTP_STATUS_HINT_PATTERNS: readonly RegExp[] = [
+  /\berror\s+code:?\s*([1-5]\d{2})\b/i,
+  /\bhttp(?:\/[\d.]+)?[\s:]\s*([1-5]\d{2})\b/i,
+  /\bstatus(?:\s*code)?[\s:=]\s*([1-5]\d{2})\b/i,
+  /\b(?:returned|responded(?:\s+with)?)\s+([1-5]\d{2})\b/i,
+  /\b([1-5]\d{2})\s+(?:bad\s+gateway|service\s+unavailable|gateway\s+time-?out|internal\s+server\s+error|too\s+many\s+requests)\b/i,
+]
+
+/**
+ * The HTTP status a message states in prose, or `undefined` when it states
+ * none. Deliberately NOT "any three digits in the string" — an unanchored digit
+ * scan would read a token count or a duration as a status.
+ */
+export function readHttpStatusHint(text: string): number | undefined {
+  for (const pattern of HTTP_STATUS_HINT_PATTERNS) {
+    const match = pattern.exec(text)
+    if (match?.[1]) return Number(match[1])
+  }
+  return undefined
+}
 
 function readString(source: Record<string, unknown>, key: string): string | undefined {
   const value = source[key]
@@ -100,6 +155,24 @@ export function isUpstreamUnavailable(signal: unknown): boolean {
     readString(record, 'error') ??
     (nestedRecord ? readString(nestedRecord, 'message') : undefined)
   if (!message) return false
+
+  // A status carried as PROSE, checked before the fragment list because it is
+  // the stronger signal and it cuts BOTH ways. An edge 502 names no exception
+  // type and sets no numeric field, so without this the shipped classifier read
+  // `error code: 502` as a non-outage and handed the customer a Bad Gateway
+  // instead of trying the next model — the exact failure the router cannot
+  // rescue from inside its own origin.
+  const hinted = readHttpStatusHint(message)
+  if (hinted !== undefined) {
+    if (UPSTREAM_UNAVAILABLE_STATUSES.includes(hinted)) return true
+    // An explicit client-error status is decisive the OTHER way. A 400 carrying
+    // a validation message must surface rather than walk the chain, even when
+    // its body happens to contain a word from the fragment list — the router's
+    // own `Function tools with reasoning_effort are not supported` 400 is a
+    // request-shaping bug that fails identically on every model.
+    if (hinted >= 400 && hinted < 500) return false
+  }
+
   const lowered = message.toLowerCase()
   return UPSTREAM_UNAVAILABLE_MESSAGES.some((fragment) => lowered.includes(fragment))
 }

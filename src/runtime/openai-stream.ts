@@ -154,7 +154,16 @@ async function* streamChatCompletions(
   })
   if (!res.ok || !res.body) {
     const text = res.body ? await res.text().catch(() => '') : ''
-    throw new Error(`OpenAI-compat stream failed (HTTP ${res.status})${text ? `: ${text.slice(0, 200)}` : ''}`)
+    const error = new Error(`OpenAI-compat stream failed (HTTP ${res.status})${text ? `: ${text.slice(0, 200)}` : ''}`)
+    // Stamp the NUMERIC status. `isUpstreamUnavailable` (`/model-resolution`)
+    // reads a numeric field first and prose only as a backstop, and a
+    // Cloudflare EDGE 502 gives it nothing else to read: `content-type:
+    // text/plain`, a body of `error code: 502`, and none of the router's own
+    // `x-tangle-*` headers, because the origin never ran. Carrying the status
+    // as data keeps THIS path — the browser/edge copilot lane, which calls the
+    // router directly — out of the string-matching business entirely.
+    Object.assign(error, { status: res.status })
+    throw error
   }
   const reader = res.body.getReader()
   const decoder = new TextDecoder()

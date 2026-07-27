@@ -183,3 +183,37 @@ describe('UPSTREAM_UNAVAILABLE_CODES', () => {
     expect(UPSTREAM_UNAVAILABLE_CODES).toContain('provider_inference_unavailable')
   })
 })
+
+describe('model-SCOPED unavailability that carries no code and no status', () => {
+  /**
+   * VERBATIM terminal `error` event from a real box (sandbox.tangle.tools,
+   * 2026-07-27), for a model the session could not serve. Note what it does
+   * NOT have: no `code`, no numeric `status`, and no phrase from the outage
+   * fragment list as it shipped. The classifier returned false, the chain was
+   * never walked, and the customer got an error row while a healthy fallback
+   * sat unused — the same defect as the edge 502, different producer.
+   */
+  const SANDBOX_MODEL_NOT_FOUND = {
+    type: 'error',
+    data: {
+      message:
+        'Session error: {"sessionID":"ses_05b3f3e2dffeSb6Pih4JVjZkWl","error":{"name":"UnknownError","data":{"message":"Model not found: openai-compat/zai/glm-4.7."}}}',
+      requestId: '383d88db-a4e3-4551-9d3f-3e02f1bdab4c',
+    },
+    id: '51',
+  }
+
+  it('treats a model the upstream cannot find as worth trying another model for', () => {
+    // Model-scoped, not request-scoped: a DIFFERENT model in the chain can
+    // still serve, which is exactly when walking the chain is the right call.
+    expect(isUpstreamUnavailable(SANDBOX_MODEL_NOT_FOUND.data)).toBe(true)
+    expect(isUpstreamUnavailable({ message: 'Model "gpt-5.9" is not currently available..' })).toBe(true)
+  })
+
+  it('still refuses to walk the chain for a request bug that names no model', () => {
+    // The boundary this must not cross: a schema/validation failure fails
+    // identically on every model, so it surfaces.
+    expect(isUpstreamUnavailable({ message: 'Invalid request: messages must be an array' })).toBe(false)
+    expect(isUpstreamUnavailable({ message: "Unknown parameter: 'reasoning'." })).toBe(false)
+  })
+})
