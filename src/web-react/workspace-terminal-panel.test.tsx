@@ -40,6 +40,33 @@ describe('tabTerminalConnectionId', () => {
     const id = tabTerminalConnectionId('custom:key')
     expect(sessionStorage.getItem('custom:key')).toBe(id)
   })
+
+  it('keeps ids UNIQUE when sessionStorage is unavailable, instead of collapsing to one', () => {
+    // SSR / privacy mode. The sidecar keys one live connection per id, so a
+    // fallback that derives a deterministic id (e.g. from the sandbox id) hands
+    // every client the SAME id and their reconnects evict each other — the
+    // terminal sticks on "reconnecting" forever. The fallback must stay unique
+    // per call even though it can no longer be reload-stable.
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage')
+    Object.defineProperty(globalThis, 'sessionStorage', {
+      configurable: true,
+      get() {
+        throw new Error('sessionStorage is not available')
+      },
+    })
+    try {
+      const ids = new Set([
+        tabTerminalConnectionId('same:key'),
+        tabTerminalConnectionId('same:key'),
+        tabTerminalConnectionId('same:key'),
+      ])
+      expect(ids.size).toBe(3)
+      for (const id of ids) expect(id).toBeTruthy()
+    } finally {
+      if (descriptor) Object.defineProperty(globalThis, 'sessionStorage', descriptor)
+      else Reflect.deleteProperty(globalThis, 'sessionStorage')
+    }
+  })
 })
 
 describe('WorkspaceTerminalPanel', () => {
