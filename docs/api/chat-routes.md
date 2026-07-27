@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-155 exports.
+156 exports.
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
@@ -1052,6 +1052,14 @@ interface ResolveChatAttachmentsOptions
 
 ```ts
 type ResolveChatAttachmentsResult
+```
+
+### `resolveEmptyTurnRetries`
+
+`function` — Coerce the caller's budget to a finite, bounded, non-negative integer.
+
+```ts
+(value: number | undefined) => number
 ```
 
 ### `rowIdOf`

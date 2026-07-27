@@ -270,7 +270,7 @@ export const MAX_EMPTY_TURN_RETRIES = 3
  * until the worker dies. `Infinity` has the same shape. Both resolve to `0` —
  * an unusable budget disables the retry rather than running unbounded.
  */
-function resolveEmptyTurnRetries(value: number | undefined): number {
+export function resolveEmptyTurnRetries(value: number | undefined): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 0
   const truncated = Math.trunc(value)
   if (truncated <= 0) return 0
