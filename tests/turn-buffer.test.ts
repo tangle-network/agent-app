@@ -6,6 +6,7 @@ import {
   createBufferedTurnTap,
   replayTurnEvents,
   createMemoryTurnEventStore,
+  stampReplaySeq,
 } from '../src/stream/turn-buffer'
 
 function text(t: string) {
@@ -262,5 +263,57 @@ describe('createBufferedTurnTap', () => {
     const rows = await store.read('k4', 0)
     expect(rows).toHaveLength(1)
     expect(JSON.parse(rows[0]!.event).data.delta).toBe('Hello')
+  })
+})
+
+describe('stampReplaySeq', () => {
+  it('stamps the buffer ordinal onto a replayed line without disturbing it', () => {
+    const line = JSON.stringify({ kind: 'event', event: { type: 'text', text: 'hi' } })
+    const stamped = stampReplaySeq({ seq: 7, event: line })
+    const parsed = JSON.parse(stamped) as Record<string, unknown>
+    expect(parsed.seq).toBe(7)
+    expect(parsed.kind).toBe('event')
+    expect(parsed.event).toEqual({ type: 'text', text: 'hi' })
+  })
+
+  it('leaves the turn_status sentinel unstamped — it is a terminator, not a cursor', () => {
+    const line = JSON.stringify({ type: 'turn_status', status: 'complete' })
+    expect(stampReplaySeq({ seq: -1, event: line })).toBe(line)
+  })
+
+  it('handles an empty object payload', () => {
+    expect(JSON.parse(stampReplaySeq({ seq: 3, event: '{}' }))).toEqual({ seq: 3 })
+  })
+
+  it('passes a non-object line through verbatim rather than corrupting it', () => {
+    // Fail-soft: a stamping bug must degrade to today's behaviour, never break
+    // a replay.
+    expect(stampReplaySeq({ seq: 4, event: '"just a string"' })).toBe('"just a string"')
+    expect(stampReplaySeq({ seq: 4, event: 'not json' })).toBe('not json')
+  })
+
+  it('round-trips through the real tap + replay path with usable cursors', async () => {
+    const store = createMemoryTurnEventStore()
+    const tap = createBufferedTurnTap({ store, turnId: 'k-seq', flushIntervalMs: 0 })
+    await tap.onEvent(text('a '))
+    await tap.onEvent(text('b'))
+    await tap.done('complete')
+
+    const wire: Array<Record<string, unknown>> = []
+    for await (const row of replayTurnEvents({ store, turnId: 'k-seq' })) {
+      wire.push(JSON.parse(stampReplaySeq(row)) as Record<string, unknown>)
+    }
+    const events = wire.slice(0, -1)
+    expect(events.length).toBeGreaterThan(0)
+    expect(events.every((e) => typeof e.seq === 'number' && (e.seq as number) > 0)).toBe(true)
+    expect(wire.at(-1)).toEqual({ type: 'turn_status', status: 'complete' })
+
+    // Resuming past the last stamped seq yields only the sentinel.
+    const last = events.at(-1)!.seq as number
+    const resumed: unknown[] = []
+    for await (const row of replayTurnEvents({ store, turnId: 'k-seq', fromSeq: last })) {
+      resumed.push(JSON.parse(stampReplaySeq(row)))
+    }
+    expect(resumed).toEqual([{ type: 'turn_status', status: 'complete' }])
   })
 })
