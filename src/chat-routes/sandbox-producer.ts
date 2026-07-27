@@ -46,6 +46,7 @@ import { buildModelChain, type ModelFailoverAttempt } from '../model-resolution/
 import {
   resolveEmptyTurnRetries,
   streamWithModelFailover,
+  summarizeFailoverReason,
   type EmptyTurnRetryInfo,
   type ModelFallbackInfo,
   type ModelFailoverStreamHandle,
@@ -350,8 +351,12 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         pendingModelNotices.push({
           id: `model-fallback-${modelNoticeCount}`,
           // Named models on both sides: a quality regression after a downgrade
-          // must be attributable to the model that actually answered.
-          text: `${info.from} was unavailable (${info.reason}) — answered with ${info.to} instead.`,
+          // must be attributable to the model that actually answered. The
+          // REASON is condensed — a real edge 5xx arrives as Cloudflare's HTML
+          // error page, and the raw text put `<!DOCTYPE html><!--[if lt IE 7]>…`
+          // into the customer's transcript. The verbatim text is still on
+          // `modelFailover.attempts[].reason` for the operator.
+          text: `${info.from} was unavailable (${summarizeFailoverReason(info.reason)}) — answered with ${info.to} instead.`,
         })
         options.onModelFallback?.(info)
       },

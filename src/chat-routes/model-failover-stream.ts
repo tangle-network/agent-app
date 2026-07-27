@@ -44,6 +44,7 @@
 
 import {
   isUpstreamUnavailable,
+  readHttpStatusHint,
   runWithModelFailover,
   type ModelFailoverAttempt,
 } from '../model-resolution/failover'
@@ -115,6 +116,41 @@ export function isCommittingSandboxEvent(event: unknown): boolean {
   // Everything else — text/tool shapes the producer folds, asks, plans,
   // `result`/`done`, and any type this shell does not recognize — commits.
   return true
+}
+
+/**
+ * Condense an abandoned attempt's raw failure text into something safe to show
+ * a customer in the transcript.
+ *
+ * Measured on the live router 2026-07-27 19:40 UTC: an edge 5xx arrives as
+ * Cloudflare's full HTML error PAGE, so the verbatim reason began
+ * `<!DOCTYPE html>\n<!--[if lt IE 7]> <html class="no-js ie6 oldie"…` and the
+ * fallback notice pasted 200 bytes of that markup into the answer the customer
+ * reads. The cause is worth stating; the markup is not.
+ *
+ * Only the DISPLAY string is condensed. The full text stays on
+ * `modelFailover.attempts[].reason` for the operator, so nothing is lost —
+ * this narrows what the customer sees, never what telemetry records.
+ */
+export function summarizeFailoverReason(reason: string): string {
+  const collapsed = reason.replace(/\s+/g, ' ').trim()
+  if (!collapsed) return 'upstream unavailable'
+
+  // An HTML error page carries no message worth quoting — the status is the
+  // whole content. Detected on the ORIGINAL text, before collapsing, because
+  // that is the form the producer hands over.
+  if (/<!doctype html|<html[\s>]/i.test(collapsed)) {
+    const status = readHttpStatusHint(collapsed)
+    return status ? `HTTP ${status}` : 'upstream returned an error page'
+  }
+
+  // Anything else is a real message. Cap it so a verbose upstream cannot push
+  // the answer off the screen, and cut on a word boundary when one is near.
+  const LIMIT = 160
+  if (collapsed.length <= LIMIT) return collapsed
+  const clipped = collapsed.slice(0, LIMIT)
+  const lastSpace = clipped.lastIndexOf(' ')
+  return `${(lastSpace > LIMIT - 30 ? clipped.slice(0, lastSpace) : clipped).trimEnd()}…`
 }
 
 /** A terminal failure event, classified. `outage` decides failover vs surface. */

@@ -2499,6 +2499,14 @@ type StaleTurnLockSessionProbeResult
 (options: ModelFailoverStreamOptions) => ModelFailoverStreamHandle
 ```
 
+### `summarizeFailoverReason`
+
+`function` — Condense an abandoned attempt's raw failure text into something safe to show a customer in the transcript.
+
+```ts
+(reason: string) => string
+```
+
 ### `UPLOAD_INLINE_MAX_BYTES`
 
 `const` — 700 KiB: base64 inflates ~4/3, so an inline part stays comfortably under the ~1 MiB gateway body cap alongside the JSON envelope.
