@@ -83,16 +83,30 @@ const UPSTREAM_UNAVAILABLE_MESSAGES: readonly string[] = [
 /**
  * Textual forms an HTTP status arrives in when NO numeric field carries it.
  *
- * The case that forced this is the Cloudflare EDGE 502. Captured verbatim from
- * `router.tangle.tools` on 2026-07-27 17:48:12 GMT (cf-ray
+ * The case that forced this is the opaque Cloudflare 502. Captured verbatim
+ * from `router.tangle.tools` on 2026-07-27 17:48:12 GMT (cf-ray
  * `a21d793899f6cef3-DEN`): `HTTP/2 502`, `content-type: text/plain;
  * charset=UTF-8`, a 16-byte body reading `error code: 502\n`, `server:
  * cloudflare`, and **zero `x-tangle-*` headers** where a healthy 200 from the
- * same endpoint carries nine of them. Zero means the origin never executed —
- * so the router's own upstream failover, which lives inside the origin,
- * structurally cannot fire. Only a client OUTSIDE the edge can rescue that
- * turn, which is why this classifier has to recognize a failure shape that
- * nobody upstream will ever label for it.
+ * same endpoint carries nine of them.
+ *
+ * That capture was originally read as "zero headers means the origin never
+ * executed". It does not, and the correction matters more than the original
+ * guess did. Matching client-observed cf-rays against the origin's own access
+ * log (tangle-router #307) showed all 62 of those responses WERE produced by
+ * the router — `content-type: application/json`, an `X-Generation-Id`, and a
+ * routing trace showing the upstream had returned 200 — and Cloudflare
+ * replaced the body and every response header with its own error page, because
+ * an origin 502 reads to the edge as the origin having failed.
+ *
+ * The classifier's BEHAVIOR here was right for the wrong reason, and stays
+ * exactly as it is. What changes is why: the rescue is needed not because the
+ * origin is unreachable, but because a response the origin carefully
+ * structured arrives at the client as sixteen unlabelled bytes. The router now
+ * emits 503 instead of 502 on those paths so the body survives, but this
+ * pattern must remain — it is the client's only handle on any origin 5xx the
+ * edge decides to rewrite, including from a router that has not deployed the
+ * fix yet.
  *
  * Every pattern below matches a string a real producer emits:
  * - `error code: 502` — Cloudflare's edge body (the capture above).

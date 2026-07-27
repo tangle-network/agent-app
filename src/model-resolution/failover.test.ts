@@ -217,3 +217,77 @@ describe('model-SCOPED unavailability that carries no code and no status', () =>
     expect(isUpstreamUnavailable({ message: "Unknown parameter: 'reasoning'." })).toBe(false)
   })
 })
+
+/**
+ * The router's post-fix error shapes (tangle-router #307).
+ *
+ * The opaque `error code: 502` was never an edge outage: correlating
+ * client-observed cf-rays against the origin's access log showed all 62 of
+ * them were the router's own structured responses, with body and headers
+ * replaced by Cloudflare because an origin 502 reads to the edge as origin
+ * failure. The router now emits 503 on those paths so the body survives.
+ *
+ * That gives this classifier something it never had — a readable cause — and
+ * these cases pin that the readable form is classified the SAME way the
+ * opaque one was. A client that only understood the opaque shape would
+ * silently stop failing over the moment the router got better at explaining
+ * itself.
+ */
+describe('router failure shapes, before and after the edge-visibility fix', () => {
+  it('classifies the opaque edge body and the readable body identically', () => {
+    // What the client used to get: sixteen unlabelled bytes.
+    expect(isUpstreamUnavailable({ message: 'error code: 502' })).toBe(true)
+    // What it gets now: the same failure, explained.
+    expect(
+      isUpstreamUnavailable({
+        status: 503,
+        error: {
+          message:
+            'The model returned no content: it was truncated (finish_reason=length) before emitting a visible answer.',
+          type: 'server_error',
+          code: 'reasoning_budget_exhausted',
+          generationId: 'gen_01KYJBFSB323E9Y6CHKQH6VARV',
+        },
+      }),
+    ).toBe(true)
+  })
+
+  it('fails over on a router-rejected completion — another model can serve it', () => {
+    // The upstream returned 200 and the ROUTER refused the result. Retrying
+    // the same model reproduces it; a different model may not reason its whole
+    // budget away, so this belongs in the chain-walking bucket.
+    for (const code of ['reasoning_budget_exhausted', 'structured_output_validation_failed']) {
+      expect(isUpstreamUnavailable({ status: 503, error: { code, type: 'server_error' } })).toBe(true)
+    }
+  })
+
+  it('reads the remapped status out of prose when no numeric field carries it', () => {
+    expect(isUpstreamUnavailable({ message: 'router returned 503 for gemini-2.5-flash' })).toBe(true)
+  })
+
+  it('still refuses to walk the chain for the request-shaping 400s', () => {
+    // These fail identically on every model, so walking the chain burns the
+    // whole budget to arrive at the same error. This is the request-shaping
+    // class the router normalizes upstream (tangle-router #296).
+    expect(
+      isUpstreamUnavailable({
+        status: 400,
+        error: {
+          message:
+            "Function tools with reasoning_effort are not supported for gpt-5.5. Use /v1/responses or set reasoning_effort to 'none'.",
+          type: 'invalid_request_error',
+        },
+      }),
+    ).toBe(false)
+    expect(
+      isUpstreamUnavailable({ status: 400, error: { message: "Unknown parameter: 'reasoning'." } }),
+    ).toBe(false)
+  })
+
+  it('never reads a successful turn as an outage, whatever the prose says', () => {
+    // A completion whose TEXT discusses a 502 must not trigger failover.
+    expect(
+      isUpstreamUnavailable({ success: true, message: 'The server returned error code: 502 in my example' }),
+    ).toBe(false)
+  })
+})
