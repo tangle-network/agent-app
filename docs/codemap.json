@@ -12417,6 +12417,194 @@
       ]
     },
     {
+      "id": "./turn-health",
+      "source": "src/turn-health/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "AlertSink",
+          "kind": "interface",
+          "signature": "interface AlertSink",
+          "doc": "Deliver an alert."
+        },
+        {
+          "name": "AlertThrottleStore",
+          "kind": "interface",
+          "signature": "interface AlertThrottleStore",
+          "doc": "Records the last time a key was alerted on."
+        },
+        {
+          "name": "classifyTurnOutcome",
+          "kind": "function",
+          "signature": "(input: TurnOutcomeInput) => TurnHealthVerdict",
+          "doc": "Judge one settled turn."
+        },
+        {
+          "name": "createConsoleAlertSink",
+          "kind": "function",
+          "signature": "(log?: (message: string) => void) => AlertSink",
+          "doc": "stderr sink."
+        },
+        {
+          "name": "createD1TurnHealthSource",
+          "kind": "function",
+          "signature": "(db: D1LikeForHealth, options?: { messageTable?: string | undefined; threadTable?: string | undefined; }) => TurnHealth…",
+          "doc": "The sweep source for products on the canonical `/chat-store` tables."
+        },
+        {
+          "name": "createGuardedAlertSink",
+          "kind": "function",
+          "signature": "(inner: AlertSink, onError?: (error: unknown) => void) => AlertSink",
+          "doc": "Swallow transport errors so telemetry can never fail the turn it measures."
+        },
+        {
+          "name": "createMemoryThrottleStore",
+          "kind": "function",
+          "signature": "() => AlertThrottleStore",
+          "doc": "Process-local throttle store."
+        },
+        {
+          "name": "createMultiAlertSink",
+          "kind": "function",
+          "signature": "(sinks: readonly AlertSink[]) => AlertSink",
+          "doc": "Fan out to several sinks."
+        },
+        {
+          "name": "createThrottledAlertSink",
+          "kind": "function",
+          "signature": "(inner: AlertSink, options: { windowMs: number; store?: AlertThrottleStore | undefined; }) => AlertSink",
+          "doc": "Collapse repeats of the same `key` inside `windowMs`."
+        },
+        {
+          "name": "createTurnHealthLifecycle",
+          "kind": "function",
+          "signature": "(options: TurnHealthLifecycleOptions) => TurnHealthLifecycle",
+          "doc": "Build the lifecycle hooks that page on a turn which succeeded at nothing."
+        },
+        {
+          "name": "createWebhookAlertSink",
+          "kind": "function",
+          "signature": "(options: { webhookUrl: string; fetchImpl?: FetchLike | undefined; }) => AlertSink",
+          "doc": "POST to an incoming webhook in the Slack message format."
+        },
+        {
+          "name": "D1LikeForHealth",
+          "kind": "interface",
+          "signature": "interface D1LikeForHealth",
+          "doc": "Minimal structural D1 contract (Cloudflare's `D1Database` satisfies it)."
+        },
+        {
+          "name": "describeReason",
+          "kind": "function",
+          "signature": "(reason: TurnHealthReason) => string",
+          "doc": "One-line human summary of a reason, for an alert body."
+        },
+        {
+          "name": "FetchLike",
+          "kind": "type",
+          "signature": "type FetchLike",
+          "doc": "Minimal structural fetch, so this module has no lib-dom dependency and can be driven by a fake in tests."
+        },
+        {
+          "name": "PersistedTurnRow",
+          "kind": "interface",
+          "signature": "interface PersistedTurnRow",
+          "doc": "A persisted assistant row, as the sweep needs to judge it."
+        },
+        {
+          "name": "SweepOptions",
+          "kind": "interface",
+          "signature": "interface SweepOptions",
+          "doc": null
+        },
+        {
+          "name": "SweepResult",
+          "kind": "interface",
+          "signature": "interface SweepResult",
+          "doc": "What the sweep found."
+        },
+        {
+          "name": "sweepSilentFailures",
+          "kind": "function",
+          "signature": "(options: SweepOptions) => Promise<SweepResult>",
+          "doc": "Run one sweep and deliver whatever it finds."
+        },
+        {
+          "name": "turnAlert",
+          "kind": "function",
+          "signature": "(input: { product: string; severity: TurnHealthSeverity; reasons: TurnHealthReason[]; threadId?: string | undefined; tu…",
+          "doc": "Build the alert for a set of reasons found on one turn."
+        },
+        {
+          "name": "TurnHealthAlert",
+          "kind": "interface",
+          "signature": "interface TurnHealthAlert",
+          "doc": "One deliverable alert."
+        },
+        {
+          "name": "TurnHealthCompleteInfo",
+          "kind": "interface",
+          "signature": "interface TurnHealthCompleteInfo",
+          "doc": "Structural mirror of `/chat-routes`' `ChatTurnLifecycle` complete payload."
+        },
+        {
+          "name": "TurnHealthErrorInfo",
+          "kind": "interface",
+          "signature": "interface TurnHealthErrorInfo",
+          "doc": "Structural mirror of the lifecycle error payload."
+        },
+        {
+          "name": "TurnHealthLifecycle",
+          "kind": "interface",
+          "signature": "interface TurnHealthLifecycle",
+          "doc": "What {@link createTurnHealthLifecycle} returns — assignable to `createChatTurnRoutes`' `lifecycle` option."
+        },
+        {
+          "name": "TurnHealthLifecycleOptions",
+          "kind": "interface",
+          "signature": "interface TurnHealthLifecycleOptions",
+          "doc": null
+        },
+        {
+          "name": "TurnHealthReason",
+          "kind": "type",
+          "signature": "type TurnHealthReason",
+          "doc": "One specific way a turn returned success while failing."
+        },
+        {
+          "name": "TurnHealthSeverity",
+          "kind": "type",
+          "signature": "type TurnHealthSeverity",
+          "doc": "How loudly a reason should be routed."
+        },
+        {
+          "name": "TurnHealthSource",
+          "kind": "interface",
+          "signature": "interface TurnHealthSource",
+          "doc": "What the sweep needs from a store."
+        },
+        {
+          "name": "TurnHealthVerdict",
+          "kind": "interface",
+          "signature": "interface TurnHealthVerdict",
+          "doc": "The verdict for one turn."
+        },
+        {
+          "name": "TurnOutcomeInput",
+          "kind": "interface",
+          "signature": "interface TurnOutcomeInput",
+          "doc": "A settled turn, in the narrowest shape both call sites can supply."
+        },
+        {
+          "name": "UnansweredThread",
+          "kind": "interface",
+          "signature": "interface UnansweredThread",
+          "doc": "A thread that has taken user messages with no reply since."
+        }
+      ]
+    },
+    {
       "id": "./turn-stream",
       "source": "src/turn-stream/index.ts",
       "dependsOn": [

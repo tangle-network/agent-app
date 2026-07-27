@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_73 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_74 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -71,6 +71,7 @@ _73 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./theme/tailwind-preset`](api/theme-tailwind-preset.md) | 1 | — |
 | [`./tools`](api/tools.md) | 63 | `crypto`, `eval` |
 | [`./trace`](api/trace.md) | 20 | `missions` |
+| [`./turn-health`](api/turn-health.md) | 30 | — |
 | [`./turn-stream`](api/turn-stream.md) | 59 | `chat-routes`, `stream` |
 | [`./vault`](api/vault.md) | 17 | — |
 | [`./vault/lazy`](api/vault-lazy.md) | 2 | — |
@@ -665,6 +666,14 @@ Depends on: `missions`
 `buildFlowTrace`, `childSpanContext`, `composeMissionFlowTrace`, `createMissionTraceContext`, `delegationActivityToFlowSpans`, `DistributionSummary`, `FlowSpan`, `FlowTrace`, `LoopTraceEventLike`, `loopTraceEventsToFlowSpans`, `MissionFlowStep`, `MissionTraceContext`, `renderHistogram`, `renderWaterfall`, `stepActivityFlowTrace`, `StepSpanContext`, `summarize`, `TimedEvent`, `timedEventsFromLines`, `traceEnv`
 
 [Full API →](api/trace.md)
+
+## `./turn-health`
+
+Source: `src/turn-health/index.ts` · 30 exports
+
+`AlertSink`, `AlertThrottleStore`, `classifyTurnOutcome`, `createConsoleAlertSink`, `createD1TurnHealthSource`, `createGuardedAlertSink`, `createMemoryThrottleStore`, `createMultiAlertSink`, `createThrottledAlertSink`, `createTurnHealthLifecycle`, `createWebhookAlertSink`, `D1LikeForHealth`, `describeReason`, `FetchLike`, `PersistedTurnRow`, `SweepOptions`, `SweepResult`, `sweepSilentFailures`, `turnAlert`, `TurnHealthAlert`, `TurnHealthCompleteInfo`, `TurnHealthErrorInfo`, `TurnHealthLifecycle`, `TurnHealthLifecycleOptions`, `TurnHealthReason`, `TurnHealthSeverity`, `TurnHealthSource`, `TurnHealthVerdict`, `TurnOutcomeInput`, `UnansweredThread`
+
+[Full API →](api/turn-health.md)
 
 ## `./turn-stream`
 

@@ -28,6 +28,7 @@ export default defineConfig({
     'crypto/index': 'src/crypto/index.ts',
     'stream/index': 'src/stream/index.ts',
     'turn-stream/index': 'src/turn-stream/index.ts',
+    'turn-health/index': 'src/turn-health/index.ts',
     'integrations/index': 'src/integrations/index.ts',
     'interactions/index': 'src/interactions/index.ts',
     'plans/index': 'src/plans/index.ts',
