@@ -1996,6 +1996,14 @@ export async function* streamSandboxPrompt(
  * Stable identity for a streamed text part, so deltas of one part accumulate
  * together and two concurrent parts never overwrite each other. Harnesses spell
  * the id differently and some snapshot updates carry none at all.
+ *
+ * Deliberately NOT `/stream`'s `getPartKey`, despite the overlapping property
+ * lookup: that one resolves a key for any persisted part across every type and
+ * falls back to the CONSTANT `'current'`, which merges all id-less parts into a
+ * single lane. Here an id-less part must stay distinct — merging two of them
+ * would silently drop one candidate answer, the exact failure class this
+ * function was changed to fix. Sharing three lines of lookup would also couple
+ * `/sandbox` to `/stream`, which are independent subpaths today.
  */
 function textPartId(part: Record<string, unknown> | undefined, fallback: string): string {
   for (const key of ['id', 'partId', 'messagePartId']) {
@@ -2023,8 +2031,17 @@ function dispatchedPromptTexts(
 
 /**
  * The last streamed text part that is not a replay of the prompt. Used only when
- * the turn carried no `result` receipt: identifying the echo by CONTENT is what
- * makes this correct on a lane that emits the echo late, or never.
+ * the turn carried no `result` receipt.
+ *
+ * Two distinct decisions, and only the first is content-based. WHICH parts are
+ * eligible is decided by CONTENT — an echo is excluded because it matches the
+ * dispatched prompt, at whatever position it arrived. Choosing among the
+ * remaining eligible parts is then ordinal, last-wins, because a harness emits
+ * reasoning/preamble parts before the answer. That ordering assumption is safe
+ * in a way "skip the first part" was not: it can only pick the wrong part when a
+ * turn produced several genuine non-echo texts and the final one is not the
+ * answer, whereas the positional rule mis-fired on the single-answer case that
+ * is overwhelmingly the common one.
  */
 function lastNonPromptTextPart(parts: Map<string, string>, promptTexts: string[]): string {
   const values = Array.from(parts.values())
