@@ -1,10 +1,10 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": [
-    "src/index.ts",
     "src/tools/index.ts",
     "src/tangle/index.ts",
     "src/runtime/index.ts",
+    "src/catalog/index.ts",
     "src/eval/index.ts",
     "src/eval-campaign/index.ts",
     "src/knowledge/index.ts",
@@ -20,13 +20,26 @@
     "src/config/index.ts",
     "src/preset-cloudflare/index.ts",
     "src/billing/index.ts",
+    "src/preflight/index.ts",
+    "src/object-store/index.ts",
+    "src/chat-store/index.ts",
+    "src/chat-routes/index.ts",
     "src/crypto/index.ts",
     "src/stream/index.ts",
+    "src/turn-stream/index.ts",
     "src/integrations/index.ts",
+    "src/interactions/index.ts",
+    "src/plans/index.ts",
     "src/missions/index.ts",
     "src/platform/index.ts",
+    "src/app-auth/index.ts",
     "src/web/index.ts",
     "src/web-react/index.tsx",
+    "src/work-product/index.ts",
+    "src/work-product-react/index.tsx",
+    "src/web-react/terminal.ts",
+    "src/assistant/index.ts",
+    "src/brand/index.tsx",
     "src/redact/index.ts",
     "src/store/index.ts",
     "src/trace/index.ts",
@@ -40,20 +53,48 @@
     "src/design-canvas-react/index.ts",
     "src/design-canvas-react/engine.ts",
     "src/design-canvas-react/lazy.tsx",
+    "src/teams/index.ts",
+    "src/teams/drizzle.ts",
+    "src/teams/members-api.ts",
+    "src/teams/invitations-api.ts",
+    "src/teams/resend.ts",
+    "src/teams-react/index.ts",
+    "src/teams-react/lazy.tsx",
+    "src/intakes/index.ts",
+    "src/intakes/drizzle.ts",
+    "src/intakes/api.ts",
+    "src/intakes-react/index.ts",
+    "src/intakes-react/lazy.tsx",
+    "src/vault/index.ts",
+    "src/vault/lazy.tsx",
     "src/theme/index.ts",
     "src/theme/tailwind-preset.ts",
+    "src/theme-contract/index.ts",
+    "src/theme-contract/cli.ts",
+    "src/preflight/cli.ts",
+    "src/studio/index.ts",
+    "src/studio-react/index.tsx",
     "tests/**/*.test.{ts,tsx}",
     "src/**/*.test.{ts,tsx}"
   ],
-  "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "tests/**/*.{ts,tsx}"
+  ],
   "ignore": [
     ".worktrees/**",
     "create-agent-app/template/**",
     "create-agent-app/template-chat/**",
-    "playground/**"
+    "playground/**",
+    "tests/theme/fixtures/**"
   ],
-  "ignoreBinaries": ["tsc"],
+  "ignoreBinaries": [
+    "tsc"
+  ],
   "ignoreDependencies": [
     "@tangle-network/agent-profile-materialize"
-  ]
+  ],
+  "rules": {
+    "duplicates": "off"
+  }
 }

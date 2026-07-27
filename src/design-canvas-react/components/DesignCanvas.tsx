@@ -726,5 +726,3 @@ export function DesignCanvas({
     </div>
   )
 }
-
-export default DesignCanvas

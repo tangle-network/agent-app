@@ -68,7 +68,7 @@ function clampScale(value: number): number {
   return Math.min(Math.max(stepped, MIN_FONT_SCALE), MAX_FONT_SCALE);
 }
 
-export interface PanelWidth {
+interface PanelWidth {
   /** Current width in px. Apply as an inline `width` only on desktop. */
   width: number;
   /** Current max allowed width in px (viewport-derived; updates on resize).
@@ -143,7 +143,7 @@ export function usePanelWidth(): PanelWidth {
   return { width, maxWidth, setWidth, previewWidth, nudgeWidth };
 }
 
-export interface FontScale {
+interface FontScale {
   scale: number;
   increase: () => void;
   decrease: () => void;

@@ -4,31 +4,7 @@
 
 Source: `src/runtime/index.ts`
 
-66 exports.
-
-### `AgentRuntime`
-
-`interface` — Resolve and stream tool execution loops with final results and intermediate events for agent runtime
-
-```ts
-interface AgentRuntime
-```
-
-### `AgentRuntimeModelConfig`
-
-`interface` — OpenAI-compatible model endpoint (Tangle Router / tcloud / any compat provider).
-
-```ts
-interface AgentRuntimeModelConfig
-```
-
-### `AgentTurnOptions`
-
-`interface` — Define options for configuring a single agent turn including context, prior messages, prompts, and event handlers
-
-```ts
-interface AgentTurnOptions
-```
+61 exports.
 
 ### `AnySurfaceKind`
 
@@ -76,22 +52,6 @@ interface CertifiedDelivery
 
 ```ts
 interface CertifiedDeliveryConfig
-```
-
-### `createAgentRuntime`
-
-`function` — Create an in-process agent runtime for one agent.
-
-```ts
-(opts: CreateAgentRuntimeOptions) => AgentRuntime
-```
-
-### `CreateAgentRuntimeOptions`
-
-`interface` — Define options for creating an agent runtime including model config and optional profile transformation
-
-```ts
-interface CreateAgentRuntimeOptions
 ```
 
 ### `createCertifiedDelivery`

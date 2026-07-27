@@ -13,7 +13,7 @@
 import { lazy, Suspense } from 'react'
 import type { ComponentType } from 'react'
 
-export interface BrandMarkProps {
+interface BrandMarkProps {
   size?: number
   className?: string
 }

@@ -21,7 +21,7 @@ Who owns each hop:
 | Upload → `PromptInputPart` descriptors | `/chat-routes` (`createUploadRoute`) |
 | Store-backed attachments (validate, dispatch, promote) | `/chat-routes` (`resolveChatAttachments`, `buildDispatchParts`, `promoteAgentFilePart`) |
 | Ask answering (list/answer, 410 mapping, dedupe) | `/interactions` via `routes.interactions` |
-| Durable plan/question lifecycle | `/durable-chat` structural store + authority adapters |
+| Durable plan projection | `/plans` codec + `/chat-routes` `withDurableChatProjection` (structural) |
 | Composer, stream consumption, cards | `/web-react` |
 
 ## Schema (drizzle + one migration constant)
@@ -331,69 +331,25 @@ that renders attachments outside `ChatMessages`.
 
 ## Durable plan and question workflow
 
-Apps that need decisions and accepted answers to survive reloads bind one
-production `DurableChatStateStore` to the shared route/producer adapters. The
-store is product infrastructure (D1, Postgres, a Durable Object, or equivalent);
-agent-app owns the command/settlement protocol around it. The exported
-`InMemoryDurableChatStateStore` is intentionally only for tests and local demos.
+agent-app shipped a `/durable-chat` subpath here — an authorization-scoped
+command/settlement protocol (CAS plan decisions, stable follow-up receipts,
+answer intent/ack/finalize) over a product-supplied store. It was **removed in
+0.44.0**: it exported 60 symbols and, across nine consumer repos on their
+default branches, had exactly zero imports. Three apps that needed a plan
+decision hand-rolled a local one instead, which is the signal that the
+abstraction was not the one they wanted.
 
-```ts
-import {
-  createSandboxChatProducer,
-  withDurableChatProjection,
-} from '@tangle-network/agent-app/chat-routes'
-import {
-  createDurableChatEventProjection,
-  createDurableChatScope,
-  createDurableInteractionRoutePersistence,
-  createDurablePlanRoutes,
-} from '@tangle-network/agent-app/durable-chat'
-import { createInteractionAnswerRoute } from '@tangle-network/agent-app/interactions'
+What survives, and what to use:
 
-const scope = createDurableChatScope(`${workspaceId}/${threadId}`) // only after auth
-const producer = withDurableChatProjection(
-  createSandboxChatProducer({ events }),
-  createDurableChatEventProjection({ store: durableStore, scope }),
-)
-
-createInteractionAnswerRoute({
-  resolveConnection,
-  durable: createDurableInteractionRoutePersistence({
-    store: durableStore,
-    guarantee: 'reconciled',
-    scope: async () => scope,
-    reconcileAuthority: ({ intent }) => lookupAnswerAcknowledgement(intent),
-  }),
-})
-
-const planRoutes = createDurablePlanRoutes({
-  store: durableStore,
-  authority: sandboxPlanAuthority,
-  authorize: async ({ request }) => authorizePlanScope(request),
-  afterDecision: ({ receipt, effectKey }) =>
-    applyPlanModePolicyIdempotently(receipt, effectKey),
-})
-```
-
-On the client, `ChatMessages` can render the canonical cards directly from
-persisted `message.parts`. `attachFollowUp` must be idempotent by the receipt id;
-the shared controller deliberately invokes it again after an idempotent POST or
-reload so a lost response cannot strand an already-dispatched execution.
-
-```tsx
-<ChatMessages
-  messages={messages}
-  durableCards={{
-    canWrite,
-    submitInteraction: createDurableInteractionAnswerSubmitter({
-      url: '/api/chat/interactions',
-      attempts: createSessionInteractionAttemptStore(sessionStorage),
-    }),
-    decidePlan: (plan, decision, feedback) =>
-      planControllers.get(plan.planId)!.decide(decision, feedback),
-  }}
-/>
-```
+- The durable plan **authority** is the Sandbox SDK's — `SandboxSession.plan()`.
+  Read it there; do not re-implement a plan state machine.
+- `/plans` still owns the browser-safe projection (lifecycle event parsing, the
+  persisted `type:'plan'` codec, revision-aware transcript keys).
+- `/chat-routes` still exports `withDurableChatProjection`, which is fully
+  structural: hand it any `{ observe, materialize }` object and it folds your
+  materialized parts into the producer lane. Your own store, your own protocol.
+- `/interactions`' `createInteractionAnswerRoute` still takes a `durable` seam,
+  so answer persistence stays available without the removed module.
 
 ## Advanced hooks (optional)
 

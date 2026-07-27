@@ -9,7 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # tsup generates .d.ts for ~38 entries in a worker thread (the `prepare`
+      # tsup generates .d.ts for 73 entries in a worker thread (the `prepare`
       # script runs during install, and again in the build step); that worker
       # needed ~4.7GB and has grown with the subpath count (OOMed at 6144 after the #191/#192 merges); 8192 matches the documented local build requirement. The worker inherits
       # NODE_OPTIONS, so set the heap once at the job level.
@@ -25,3 +25,8 @@ jobs:
       - run: pnpm run typecheck
       - run: pnpm run test
       - run: pnpm run build
+      # Dead-surface gate. Fails on an unused file, an unused internal export, or
+      # an unused dependency — the accumulation this repo had to clean up by hand.
+      # It cannot see unused PUBLIC exports (an entry's exports are API by
+      # definition); those are a fleet-grep question, not a CI one.
+      - run: pnpm run knip

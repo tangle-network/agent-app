@@ -147,7 +147,7 @@ The **complete, always-current reference** — every published subpath, its expo
 
 **The server chat vertical** ([`examples/chat-app.md`](./examples/chat-app.md))
 - [`/chat-routes`](src/chat-routes) — `createChatTurnRoutes`: auth → store → streaming turn with buffered replay → uploads → sidecar question answering, assembled. Plus `runDetachedTurn` for autonomous turns a browser can still watch live.
-- [`/chat-store`](src/chat-store) · [`/interactions`](src/interactions) · [`/durable-chat`](src/durable-chat) · [`/plans`](src/plans) — persistence, human-in-the-loop asks, and the durable plan/question workflow around them.
+- [`/chat-store`](src/chat-store) · [`/interactions`](src/interactions) · [`/plans`](src/plans) — persistence, human-in-the-loop asks, and the durable plan projection.
 
 **On the sandbox**
 - [`/sandbox`](src/sandbox) — workspace provisioning + turn streaming.

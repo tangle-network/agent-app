@@ -50,7 +50,7 @@ const TOOL_STATUS: Record<string, ToolStatus> = {
   failed: "error",
 };
 
-export interface AdaptedTranscript {
+interface AdaptedTranscript {
   messages: ChatUiMessage[];
   /** The assistant message under which pending proposals should render, or null
    *  when there are none. */

@@ -11,7 +11,7 @@ import { Layer, Line } from 'react-konva'
 import type { SnapTarget, SnapTargetKind } from '../contracts'
 import { lightTheme, type CanvasRenderPalette } from '../../theme/theme'
 
-export interface SnapGuidesOverlayProps {
+interface SnapGuidesOverlayProps {
   /** Page dimensions in document px. */
   pageWidth: number
   pageHeight: number

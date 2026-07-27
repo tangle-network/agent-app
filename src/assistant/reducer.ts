@@ -65,7 +65,7 @@ export interface AssistantState {
   capped: boolean;
 }
 
-export type AssistantAction =
+type AssistantAction =
   | { type: "send"; messageId: string; assistantId: string; text: string }
   | { type: "stream"; event: AssistantStreamEvent }
   | { type: "stream_failed"; error: { code: string; message: string } }
