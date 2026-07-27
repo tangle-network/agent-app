@@ -269,7 +269,8 @@ describe('createSandboxChatProducer', () => {
         text: 'The agent requested permission approval — auto-declined by policy.',
       },
     ])
-    expect(declineInteraction).toHaveBeenCalledExactlyOnceWith('p-1')
+    expect(declineInteraction).toHaveBeenCalledTimes(1)
+    expect(declineInteraction).toHaveBeenCalledWith('p-1')
     expect(producer.assistantParts?.()).toEqual([
       expect.objectContaining({
         type: 'interaction',
@@ -335,7 +336,8 @@ describe('createSandboxChatProducer', () => {
       }),
       interaction('q-2', 'question'),
     ])
-    expect(declineInteraction).toHaveBeenCalledExactlyOnceWith('plan-1')
+    expect(declineInteraction).toHaveBeenCalledTimes(1)
+    expect(declineInteraction).toHaveBeenCalledWith('plan-1')
   })
 
   it('persists an explicit cancel outcome without inferring it from disappearance', async () => {

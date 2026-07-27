@@ -4,7 +4,7 @@
 
 Source: `src/turn-health/index.ts`
 
-31 exports.
+32 exports.
 
 ### `AlertSink`
 
@@ -68,6 +68,14 @@ interface AlertThrottleStore
 
 ```ts
 (sinks: readonly AlertSink[]) => AlertSink
+```
+
+### `createSlackBotAlertSink`
+
+`function` — POST to Slack `chat.postMessage` with a bot token.
+
+```ts
+(options: { botToken: string; channel: string; fetchImpl?: FetchLike | undefined; }) => AlertSink
 ```
 
 ### `createThrottledAlertSink`

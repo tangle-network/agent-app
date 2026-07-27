@@ -67,6 +67,29 @@ export type TurnHealthReason =
    *  the moment nothing is watching, which is how 16 days of
    *  `TANGLE_HUB_URL is required` reached customers unnoticed. */
   | { kind: 'turn_failed'; reason: string }
+  /** The turn was answered without the model ever running — a pre-producer gate
+   *  short-circuited and returned the product's own response.
+   *
+   *  Reported as a `warning`, never `critical`: gating an unready turn is a
+   *  legitimate design (an intake flow SHOULD answer before spending a model
+   *  call). What is pathological is the RATE, which only the caller's own
+   *  threshold can judge — so this variant exists to be COUNTED, and alerting
+   *  on it is opt-in. It is the per-turn evidence behind a dead tool surface:
+   *  a gate that answers every turn means the agent never runs at all. */
+  | { kind: 'answered_without_model' }
+  /** The detector could not read this turn.
+   *
+   *  Every part carried a type outside the vocabulary this classifier
+   *  understands — which is what field-level encryption at rest looks like from
+   *  the outside (tax-agent persists `{"type":"__encrypted_parts__"}`, its own
+   *  convention, and 32 of its 129 assistant rows are exactly that).
+   *
+   *  This exists because the alternative is the bug this whole module hunts.
+   *  An unreadable row has no text, no artifact and no tool part, so every
+   *  other rule here would happily conclude "nothing wrong" — a detector
+   *  reporting health from data it cannot see. Blindness is a finding, not a
+   *  pass, so it gets its own reason and its own counter. */
+  | { kind: 'unreadable_turn'; partTypes: string[] }
 
 /** A settled turn, in the narrowest shape both call sites can supply.
  *
@@ -86,6 +109,10 @@ export interface TurnOutcomeInput {
   failed?: boolean
   failureReason?: string | null
   durationMs?: number
+  /** Set when a pre-producer gate answered this turn and the model never ran.
+   *  Supplied by `/chat-routes`' lifecycle seam, which stamps `gated` on the
+   *  completion it now fires for a `contextGate` short-circuit. */
+  gated?: boolean
 }
 
 /** The verdict for one turn. `healthy` is exactly `reasons.length === 0`, kept
@@ -94,6 +121,37 @@ export interface TurnHealthVerdict {
   healthy: boolean
   severity: TurnHealthSeverity | null
   reasons: TurnHealthReason[]
+  /** How many tool parts this turn carried.
+   *
+   *  Zero is NOT a per-turn defect — plenty of good turns answer from context
+   *  without touching a tool, and paging on each one would be pure noise. It is
+   *  reported so a WINDOW can be judged: a product whose deliverable is tool
+   *  output and which produced zero tool calls across every turn in the
+   *  lookback has a dead tool surface, and that is the shape no per-turn rule
+   *  can see. (Measured: tax-agent, 129 of 129 assistant rows all-time.) */
+  toolCalls: number
+  /** True when nothing about this turn could be judged — no interpretable part
+   *  AND no visible text. Callers MUST exclude these from any healthy/unhealthy
+   *  ratio, because counting an unreadable turn as healthy is how a detector
+   *  reports green on data it never read. */
+  unreadable: boolean
+  /** False when this turn carried parts that could not be interpreted.
+   *
+   *  Separate from {@link unreadable} because the two blindnesses have
+   *  different consequences, and production has a row that is one but not the
+   *  other: tax-agent persists CIPHERTEXT as `content` alongside an encrypted
+   *  `parts` blob, so the turn plainly delivered something (there is text) while
+   *  its tool calls are completely invisible.
+   *
+   *  Any conclusion ABOUT TOOLS — above all the dead-tool-surface verdict — may
+   *  only be drawn over turns where this is true. Reading "no tool parts" off an
+   *  encrypted blob and declaring the tool surface dead would be the same
+   *  crime as declaring it healthy: a finding asserted from data never read. */
+  partsReadable: boolean
+  /** The part types that could not be interpreted. Empty when
+   *  {@link partsReadable}. Named in the alert so a reader can see EXACTLY what
+   *  the detector was blind to instead of taking "unreadable" on faith. */
+  opaquePartTypes: string[]
 }
 
 /** Part kinds that count as something a user actually receives.
@@ -103,6 +161,27 @@ export interface TurnHealthVerdict {
  *  disaster — counting a tool chip as output would suppress the very alert
  *  this module exists to raise. */
 const ARTIFACT_PART_KINDS = new Set(['file', 'image', 'work-product', 'plan', 'interaction'])
+
+/** Part types that carry no user-visible output but ARE understood.
+ *
+ *  The distinction matters: a turn made of nothing but `reasoning` parts
+ *  thought hard and said nothing, which is a real empty completion. A turn made
+ *  of types this module has never heard of is a turn it cannot read. Only the
+ *  second is blindness — so these are enumerated rather than lumped in with the
+ *  unknown.
+ *
+ *  Grounded in what the fleet actually persists, not guessed: a scan of every
+ *  assistant part in the gtm / legal / tax production tables returns exactly
+ *  `tool` (138), `text` (69), `reasoning` (26), `step-start` (3),
+ *  `step-finish` (3) and tax's opaque `__encrypted_parts__` (32). */
+const KNOWN_NON_OUTPUT_PART_KINDS = new Set([
+  'reasoning',
+  'step-start',
+  'step-finish',
+  'source',
+  'source-url',
+  'data',
+])
 
 const SAMPLE_CHARS = 120
 
@@ -158,21 +237,37 @@ export function classifyTurnOutcome(input: TurnOutcomeInput): TurnHealthVerdict 
 
   let hasVisibleText = nonEmptyString(input.finalText) !== null
   let artifactCount = 0
+  let toolCalls = 0
+  // Part types this module could not interpret. Tracked so blindness can be
+  // reported as blindness instead of silently reading as health.
+  const opaqueTypes: string[] = []
+  let interpretedParts = 0
 
   for (const raw of parts) {
     const part = asRecord(raw)
     if (!part) continue
     const type = typeof part.type === 'string' ? part.type : ''
 
-    if (type === 'text' && nonEmptyString(part.text) !== null) {
-      hasVisibleText = true
+    if (type === 'text') {
+      interpretedParts += 1
+      if (nonEmptyString(part.text) !== null) hasVisibleText = true
       continue
     }
     if (ARTIFACT_PART_KINDS.has(type)) {
+      interpretedParts += 1
       artifactCount += 1
       continue
     }
-    if (type !== 'tool') continue
+    if (KNOWN_NON_OUTPUT_PART_KINDS.has(type)) {
+      interpretedParts += 1
+      continue
+    }
+    if (type !== 'tool') {
+      opaqueTypes.push(type || '(missing type)')
+      continue
+    }
+    interpretedParts += 1
+    toolCalls += 1
 
     const tool = nonEmptyString(part.tool) ?? 'unknown'
     const state = asRecord(part.state)
@@ -197,10 +292,38 @@ export function classifyTurnOutcome(input: TurnOutcomeInput): TurnHealthVerdict 
     }
   }
 
-  // `outputTokens` is corroborating evidence, never the trigger: a turn can
-  // spend tokens on reasoning and still deliver nothing, and a turn with
-  // unknown usage can still be perfectly fine.
-  if (!input.failed && !hasVisibleText && artifactCount === 0) {
+  // A turn whose parts were ALL uninterpretable cannot be judged. Reported as
+  // blindness and returned early, because every rule below would otherwise read
+  // "no text, no artifact" off data that was simply encrypted and call it a
+  // blank completion — a false page that would train readers to ignore this
+  // module, which is the same ending as no detector at all.
+  const partsReadable = opaqueTypes.length === 0
+  const uniqueOpaque = [...new Set(opaqueTypes)]
+  const unreadable = opaqueTypes.length > 0 && interpretedParts === 0 && !hasVisibleText
+  if (unreadable) {
+    reasons.push({ kind: 'unreadable_turn', partTypes: uniqueOpaque })
+    return {
+      healthy: false,
+      severity: 'warning',
+      reasons,
+      toolCalls,
+      unreadable: true,
+      partsReadable: false,
+      opaquePartTypes: uniqueOpaque,
+    }
+  }
+
+  // A gate answered before the producer ran. Recorded rather than judged: see
+  // `answered_without_model`. It also SUPPRESSES the empty-completion rule
+  // below — the model producing no text is the expected outcome when the model
+  // never ran, and firing `empty_completion` here would page on every healthy
+  // intake turn.
+  if (input.gated) {
+    reasons.push({ kind: 'answered_without_model' })
+  } else if (!input.failed && !hasVisibleText && artifactCount === 0) {
+    // `outputTokens` is corroborating evidence, never the trigger: a turn can
+    // spend tokens on reasoning and still deliver nothing, and a turn with
+    // unknown usage can still be perfectly fine.
     reasons.push({
       kind: 'empty_completion',
       outputTokens: input.outputTokens ?? null,
@@ -213,6 +336,10 @@ export function classifyTurnOutcome(input: TurnOutcomeInput): TurnHealthVerdict 
     healthy: reasons.length === 0,
     severity: severityOf(reasons),
     reasons,
+    toolCalls,
+    unreadable: false,
+    partsReadable,
+    opaquePartTypes: uniqueOpaque,
   }
 }
 
@@ -238,5 +365,11 @@ export function describeReason(reason: TurnHealthReason): string {
       return `tool \`${reason.tool}\` left no effect (status=${reason.status})`
     case 'turn_failed':
       return `turn failed: ${reason.reason}`
+    case 'answered_without_model':
+      return 'answered by a pre-producer gate — the model never ran'
+    case 'unreadable_turn':
+      return `turn could not be read: every part had an uninterpretable type (${reason.partTypes.join(
+        ', ',
+      )})`
   }
 }
