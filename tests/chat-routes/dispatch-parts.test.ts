@@ -8,6 +8,7 @@ import {
 } from '../../src/chat-routes/dispatch-parts'
 import type { ReadAttachmentFn } from '../../src/chat-routes/attachment-store'
 import type { ChatAttachmentPart, ChatMentionPart } from '../../src/chat-store/parts'
+import type { ChatTurnPartInput } from '../../src/chat-routes/wire'
 import type { SandboxExecChannel } from '../../src/sandbox/binary-read'
 
 // Port of gtm's `dispatch-parts.test.ts`. gtm's vault-default-reader block (the
@@ -81,7 +82,7 @@ describe('normalizeChatPromptForSandbox', () => {
     ])
   })
 
-  it('rejects ambiguous, relative, and content-only file parts', () => {
+  it('rejects ambiguous, relative, unnamed, and obsolete parts', () => {
     expect(() =>
       normalizeChatPromptForSandbox([
         { type: 'file', filename: 'both.txt', url: 'data:text/plain,hi', path: '/workspace/both.txt' },
@@ -93,9 +94,21 @@ describe('normalizeChatPromptForSandbox', () => {
       ]),
     ).toThrow('must be absolute')
     expect(() =>
+      normalizeChatPromptForSandbox([{
+        type: 'image',
+        url: 'data:image/png;base64,AAAA',
+        path: '/workspace/both.png',
+      }]),
+    ).toThrow('exactly one URL or path')
+    expect(() =>
+      normalizeChatPromptForSandbox([
+        { type: 'file', url: 'data:text/plain,hi' },
+      ]),
+    ).toThrow('require a filename')
+    expect(() =>
       normalizeChatPromptForSandbox([
         { type: 'file', filename: 'content.txt', content: 'inline text' },
-      ]),
+      ] as unknown as ChatTurnPartInput[]),
     ).toThrow('do not accept inline content')
   })
 })

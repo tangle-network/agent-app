@@ -27,6 +27,7 @@ import {
   type SandboxExecChannel,
 } from '../sandbox/binary-read'
 import {
+  ChatTurnInputError,
   mediaTypeForMentionPath,
   base64WireLen,
   DISPATCH_REQUEST_MAX_BYTES,
@@ -95,8 +96,8 @@ function violatesUrlPathXor(part: PromptInputPart): boolean {
     part.url.startsWith('data:')
     || part.url.startsWith('file://')
   )
-  if (part.type === 'file') return !hasUrl
-  const hasPath = typeof part.path === 'string' && part.path.startsWith('/')
+  const hasPath = 'path' in part && typeof part.path === 'string' && part.path.startsWith('/')
+  if (part.type === 'file') return !hasUrl || hasPath
   return hasUrl === hasPath
 }
 
@@ -120,14 +121,17 @@ export function normalizeChatPromptForSandbox(
   if (typeof prompt === 'string') return prompt
   return prompt.map((part): PromptInputPart => {
     if (part.type === 'text') return part
-    if (part.content) {
-      throw new Error('Sandbox prompt parts do not accept inline content; provide a URL or path')
+    if ('content' in part) {
+      throw new ChatTurnInputError('Sandbox prompt parts do not accept inline content; provide a URL or path')
     }
 
-    const hasUrl = typeof part.url === 'string' && part.url.length > 0
-    const hasPath = typeof part.path === 'string' && part.path.length > 0
-    if (hasUrl === hasPath) {
-      throw new Error(`Sandbox ${part.type} parts require exactly one URL or path`)
+    const url = typeof part.url === 'string' && part.url.length > 0 ? part.url : undefined
+    const path = typeof part.path === 'string' && part.path.length > 0 ? part.path : undefined
+    if (Boolean(url) === Boolean(path)) {
+      throw new ChatTurnInputError(`Sandbox ${part.type} parts require exactly one URL or path`)
+    }
+    if (path && !path.startsWith('/')) {
+      throw new ChatTurnInputError(`Sandbox ${part.type} paths must be absolute: ${path}`)
     }
 
     if (part.type === 'image') {
@@ -135,23 +139,23 @@ export function normalizeChatPromptForSandbox(
         type: 'image',
         ...(part.filename ? { filename: part.filename } : {}),
         ...(part.mediaType ? { mediaType: part.mediaType } : {}),
-        ...(hasUrl ? { url: part.url } : { path: part.path }),
+        ...(url ? { url } : { path: path! }),
       }
     }
 
     const filename = part.filename?.trim()
     if (!filename) {
-      throw new Error('Sandbox file parts require a filename')
+      throw new ChatTurnInputError('Sandbox file parts require a filename')
     }
-    const url = hasUrl ? part.url! : sandboxFileUrl(part.path!)
-    if (!url) {
-      throw new Error(`Sandbox file paths must be absolute: ${part.path}`)
+    const fileUrl = url ?? sandboxFileUrl(path!)
+    if (!fileUrl) {
+      throw new ChatTurnInputError(`Sandbox file paths must be absolute: ${path}`)
     }
     return {
       type: 'file',
       filename,
       ...(part.mediaType ? { mediaType: part.mediaType } : {}),
-      url,
+      url: fileUrl,
     }
   })
 }
