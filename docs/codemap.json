@@ -8855,6 +8855,12 @@
           "doc": "Define a scope containing workspace and optional user identifiers for sandbox environments"
         },
         {
+          "name": "sandboxSidecarProxyUrl",
+          "kind": "function",
+          "signature": "(baseUrl: string, sandboxId: string) => string",
+          "doc": "Build the sandbox API's sidecar-proxy base for a box: `{baseUrl}/v1/sidecar-proxy/{sandboxId}`."
+        },
+        {
           "name": "SandboxStepTransition",
           "kind": "type",
           "signature": "type SandboxStepTransition",
@@ -8931,6 +8937,12 @@
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig) => SecretStore",
           "doc": "Resolve a SecretStore interface using the provided SandboxRuntimeConfig shell"
+        },
+        {
+          "name": "selectedBearerSubprotocol",
+          "kind": "function",
+          "signature": "(headers: Headers) => string | null",
+          "doc": "The exact `bearer.*` subprotocol string the browser offered, so it can be echoed verbatim on the 101."
         },
         {
           "name": "shellQuote",
@@ -9015,6 +9027,18 @@
           "kind": "function",
           "signature": "(headers: Headers) => string | null",
           "doc": "Resolve the terminal token from request headers using Authorization or Sec-WebSocket-Protocol fields"
+        },
+        {
+          "name": "TerminalUpgradeResponseLike",
+          "kind": "interface",
+          "signature": "interface TerminalUpgradeResponseLike",
+          "doc": "A response-like shape carrying just what the subprotocol echo decision reads."
+        },
+        {
+          "name": "terminalUpgradeSubprotocolEcho",
+          "kind": "function",
+          "signature": "(upstream: TerminalUpgradeResponseLike, browserProtocol: string | null) => { status: number; statusText: string; header…",
+          "doc": "Decide whether a terminal upgrade's 101 needs the browser's own subprotocol echoed back onto it, and return the headers to answer with."
         },
         {
           "name": "verifySandboxTerminalToken",

@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-134 exports.
+138 exports.
 
 ### `AppToolDescriptor`
 
@@ -758,6 +758,14 @@ interface SandboxRuntimeConnection
 interface SandboxScope
 ```
 
+### `sandboxSidecarProxyUrl`
+
+`function` — Build the sandbox API's sidecar-proxy base for a box: `{baseUrl}/v1/sidecar-proxy/{sandboxId}`.
+
+```ts
+(baseUrl: string, sandboxId: string) => string
+```
+
 ### `SandboxStepTransition`
 
 `type` — Define transitions marking the start or finish of a sandbox step with associated details
@@ -860,6 +868,14 @@ interface SecretStore
 
 ```ts
 (shell: SandboxRuntimeConfig) => SecretStore
+```
+
+### `selectedBearerSubprotocol`
+
+`function` — The exact `bearer.*` subprotocol string the browser offered, so it can be echoed verbatim on the 101.
+
+```ts
+(headers: Headers) => string | null
 ```
 
 ### `shellQuote`
@@ -972,6 +988,22 @@ interface TerminalProxyIdentity
 
 ```ts
 (headers: Headers) => string | null
+```
+
+### `TerminalUpgradeResponseLike`
+
+`interface` — A response-like shape carrying just what the subprotocol echo decision reads.
+
+```ts
+interface TerminalUpgradeResponseLike
+```
+
+### `terminalUpgradeSubprotocolEcho`
+
+`function` — Decide whether a terminal upgrade's 101 needs the browser's own subprotocol echoed back onto it, and return the headers to answer with.
+
+```ts
+(upstream: TerminalUpgradeResponseLike, browserProtocol: string | null) => { status: number; statusText: string; header…
 ```
 
 ### `verifySandboxTerminalToken`
