@@ -7264,6 +7264,18 @@
       "error": null,
       "exports": [
         {
+          "name": "CloudflareWorkflowBindingLike",
+          "kind": "interface",
+          "signature": "interface CloudflareWorkflowBindingLike",
+          "doc": "The structural binding implemented by Cloudflare's `Workflow<TParams>`."
+        },
+        {
+          "name": "CloudflareWorkflowInstanceLike",
+          "kind": "interface",
+          "signature": "interface CloudflareWorkflowInstanceLike",
+          "doc": "The structural part of a Cloudflare Workflow instance used to prove that a failed create call actually left an addressable durable instance behind."
+        },
+        {
           "name": "createD1KnowledgeStateAccessor",
           "kind": "function",
           "signature": "(opts: PresetKnowledgeAccessorOptions) => KnowledgeStateAccessor",
@@ -7322,6 +7334,18 @@
           "kind": "interface",
           "signature": "interface DrizzleSqliteCoreLike",
           "doc": "The shape of a `drizzle-orm/sqlite-core` module — the few builders the preset schema uses."
+        },
+        {
+          "name": "ensureCloudflareWorkflowInstance",
+          "kind": "function",
+          "signature": "<TParams, TStatus, TInstance extends CloudflareWorkflowInstanceLike<TStatus>>(binding: CloudflareWorkflowBindingLike<TP…",
+          "doc": "Create one durable Workflow instance, or prove an instance with the same id already exists before accepting a create error as an idempotent retry."
+        },
+        {
+          "name": "EnsureCloudflareWorkflowInstanceResult",
+          "kind": "interface",
+          "signature": "interface EnsureCloudflareWorkflowInstanceResult",
+          "doc": null
         },
         {
           "name": "PRESET_MIGRATION_SQL",
