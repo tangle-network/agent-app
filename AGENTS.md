@@ -124,16 +124,16 @@ Pick from this table before writing anything new; invariant 6 makes a *new* prim
 | `runAppToolLoop` / `streamAppToolLoop` | agent-app `/runtime` | **Aliases, not an implementation** — `src/runtime/loop.ts` re-exports agent-runtime's `runToolLoop` / `streamToolLoop` verbatim | Your product drives an OpenAI-compatible model turn itself (browser/edge copilot) and wants the app-side vocabulary. Identical at runtime to the row below. |
 | `runToolLoop` / `streamToolLoop` | `@tangle-network/agent-runtime` (**root** entry) | The real in-turn tool loop: one model turn → collect tool calls → dispatch → fold results back in OpenAI function-calling shape → re-run, bounded by `maxToolTurns` / `deadlineMs` / `maxCostUsd`. No rounds, no sandboxes | Same as above, importing the engine directly. Both spellings are fine; they are one function. |
 | `handleChatTurn(input)` | `@tangle-network/agent-runtime/durable` | The turn engine `createChatTurnRoutes` composes — agent-app contributes zero loop logic on this path | You need the engine turn without agent-app's route assembly. |
-| `runLoop(options)` | `@tangle-network/agent-runtime` **`/loops`** subpath | **Not a turn loop.** A multi-round, multi-candidate kernel: per round a driver plans N tasks, they run in N sandbox boxes at bounded concurrency, each output is parsed + validated, and results fold through `driver.decide`. Owns box lifecycle, lineage/fork, cost ledger, winner selection. Tagged `@experimental` | An eval or search harness explores candidates across rounds. Never for a chat turn. |
+| `runLoop(options)` | `@tangle-network/agent-runtime` **`/kernel`** subpath | **Not a turn loop.** A multi-round, multi-candidate kernel: per round a driver plans N tasks, they run in N sandbox boxes at bounded concurrency, each output is parsed + validated, and results fold through `driver.decide`. Owns box lifecycle, lineage/fork, cost ledger, winner selection. Tagged `@experimental` | An eval or search harness explores candidates across rounds. Never for a chat turn. |
 
 #### The `runLoop` name collision — read this before importing anything with "Loop" in it
 
 Four different functions, and the names do not disambiguate them:
 
-1. **`runLoop`** — `@tangle-network/agent-runtime/loops`. The multi-agent *round* kernel described above. It is **not** on the package root; the only `runLoop`-ish name on the root entry is `runLoopRunnerCli`.
+1. **`runLoop`** — `@tangle-network/agent-runtime/kernel`. The multi-agent *round* kernel described above. It is **not** on the package root; the only `runLoop`-ish name on the root entry is `runLoopRunnerCli`.
 2. **`runToolLoop` / `streamToolLoop`** — `@tangle-network/agent-runtime` **root**. The *in-turn* tool loop. Different file, different subpath, different job from (1).
 3. **`runAppToolLoop` / `streamAppToolLoop`** — agent-app `/runtime`. A pure alias of (2); agent-app owns no loop code. The fleet is currently split — some products import the alias, others import (2) directly. Both resolve to the same function, so neither is a bug; do not "fix" one into the other opportunistically.
-4. **`routerToolLoop`** — a *third* tool loop, shipped on the **same `/loops` subpath as (1)**. So the collision exists inside one subpath, not just across packages.
+4. **`routerToolLoop`** — a *third* tool loop, shipped on the **same `/kernel` subpath as (1)**. So the collision exists inside one subpath, not just across packages.
 
 Quick test when reading code or docs: a loop described with **rounds / candidates / a driver** is (1); a loop described with **tool calls folded back into one turn** is (2)/(3)/(4).
 If you are writing a chat turn, you want (2)/(3) — or better, no loop at all: let `createChatTurnRoutes` + `handleChatTurn` run the turn.
