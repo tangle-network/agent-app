@@ -87,7 +87,7 @@ tap consumes that push hook — no engine change, durability stays in the shell.
 
 ```ts
 import { createBufferedTurnTap, createD1TurnEventStore, coalesceChatStreamEvents } from '@tangle-network/agent-app/stream'
-import { handleChatTurn } from '@tangle-network/agent-runtime'
+import { handleChatTurn } from '@tangle-network/agent-runtime/durable'
 
 const tap = createBufferedTurnTap({
   store: createD1TurnEventStore(env.DB),
