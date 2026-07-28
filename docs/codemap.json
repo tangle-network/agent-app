@@ -1648,6 +1648,12 @@
           "doc": "Fired when a model is abandoned and the next one is about to be tried."
         },
         {
+          "name": "normalizeChatPromptForSandbox",
+          "kind": "function",
+          "signature": "(prompt: string | readonly ChatTurnPartInput[]) => string | PromptInputPart[]",
+          "doc": "Convert the browser-safe chat attachment contract into the current sandbox prompt contract."
+        },
+        {
           "name": "OpenModelStream",
           "kind": "type",
           "signature": "type OpenModelStream",
@@ -1980,6 +1986,7 @@
         "chat-routes",
         "interactions",
         "plans",
+        "store",
         "stream",
         "web-react",
         "work-product"
@@ -4562,7 +4569,7 @@
         {
           "name": "createLlmCorrectnessChecker",
           "kind": "function",
-          "signature": "(tc: TCloud, opts?: LlmCorrectnessCheckerOpts | undefined) => CorrectnessChecker",
+          "signature": "(chat: ChatClient, opts?: LlmCorrectnessCheckerOpts | undefined) => CorrectnessChecker",
           "doc": "Production `CorrectnessChecker` — one LLM call per matched artifact, deterministic (temperature 0), structured JSON out."
         },
         {
@@ -4664,10 +4671,22 @@
           "doc": null
         },
         {
+          "name": "compareOptimizationMethods",
+          "kind": "function",
+          "signature": "<TScenario extends Scenario, TArtifact>(opts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Optim…",
+          "doc": "Compare complete optimization methods on disjoint train, selection, and final test data."
+        },
+        {
+          "name": "CompareOptimizationMethodsOptions",
+          "kind": "interface",
+          "signature": "interface CompareOptimizationMethodsOptions",
+          "doc": null
+        },
+        {
           "name": "defaultProductionGate",
           "kind": "function",
           "signature": "<TArtifact, TScenario extends Scenario>(options: DefaultProductionGateOptions) => Gate<TArtifact, TScenario>",
-          "doc": null
+          "doc": "Opinionated production gate composing held-out significance, red-team, reward-hacking, and canary checks into a single `Gate.decide` decision."
         },
         {
           "name": "DispatchContext",
@@ -4688,10 +4707,16 @@
           "doc": "Config for {@link buildEnsembleJudge}."
         },
         {
-          "name": "evolutionaryProposer",
+          "name": "externalTextOptimizationMethod",
           "kind": "function",
-          "signature": "<TFindings = unknown>(opts: EvolutionaryProposerOptions<TFindings>) => SurfaceProposer<TFindings>",
-          "doc": null
+          "signature": "<TScenario extends Scenario, TArtifact>(config: ExternalTextOptimizationMethodConfig<TScenario, TArtifact>) => Optimiza…",
+          "doc": "Adapt a third-party text optimizer without reimplementing its search."
+        },
+        {
+          "name": "ExternalTextOptimizationMethodConfig",
+          "kind": "interface",
+          "signature": "interface ExternalTextOptimizationMethodConfig",
+          "doc": "Configuration for adapting another text optimizer."
         },
         {
           "name": "Gate",
@@ -4700,9 +4725,15 @@
           "doc": "Composable promotion gate."
         },
         {
-          "name": "gepaProposer",
+          "name": "gepaOptimizationMethod",
           "kind": "function",
-          "signature": "(opts: GepaProposerOptions) => SurfaceProposer<unknown>",
+          "signature": "<TScenario extends Scenario, TArtifact>(config: GepaOptimizationMethodConfig<TScenario, TArtifact>) => OptimizationMeth…",
+          "doc": "Turn an optional GEPA installation into an `OptimizationMethod`."
+        },
+        {
+          "name": "GepaOptimizationMethodConfig",
+          "kind": "interface",
+          "signature": "interface GepaOptimizationMethodConfig",
           "doc": null
         },
         {
@@ -4742,10 +4773,16 @@
           "doc": "The mutable surface a proposer changes."
         },
         {
-          "name": "Mutator",
+          "name": "OptimizationMethod",
           "kind": "interface",
-          "signature": "interface Mutator",
-          "doc": "Stateless surface mutation — given findings + current surface, return N candidate surfaces."
+          "signature": "interface OptimizationMethod",
+          "doc": "A complete optimization method, including candidate generation and selection."
+        },
+        {
+          "name": "OptimizationMethodResult",
+          "kind": "interface",
+          "signature": "interface OptimizationMethodResult",
+          "doc": null
         },
         {
           "name": "paretoSignificanceGate",
@@ -4757,7 +4794,7 @@
           "name": "runCampaign",
           "kind": "function",
           "signature": "<TScenario extends Scenario, TArtifact>(opts: RunCampaignOptions<TScenario, TArtifact>) => Promise<CampaignResult<TArti…",
-          "doc": null
+          "doc": "Core campaign orchestrator: fan scenarios through dispatch, score with judges, aggregate bootstrap CIs, and persist reproducible `CampaignResult` records."
         },
         {
           "name": "RunRecord",
@@ -4781,7 +4818,7 @@
           "name": "SelfImproveBudget",
           "kind": "interface",
           "signature": "interface SelfImproveBudget",
-          "doc": "# `selfImprove()` - the one-call improvement loop."
+          "doc": null
         },
         {
           "name": "SelfImproveOptions",
@@ -4793,6 +4830,18 @@
           "name": "SelfImproveResult",
           "kind": "interface",
           "signature": "interface SelfImproveResult",
+          "doc": null
+        },
+        {
+          "name": "skillOptOptimizationMethod",
+          "kind": "function",
+          "signature": "<TScenario extends Scenario, TArtifact>(config: SkillOptOptimizationMethodConfig<TScenario, TArtifact>) => Optimization…",
+          "doc": "Run Microsoft's SkillOpt trainer as a complete optimization method."
+        },
+        {
+          "name": "SkillOptOptimizationMethodConfig",
+          "kind": "interface",
+          "signature": "interface SkillOptOptimizationMethodConfig",
           "doc": null
         },
         {
@@ -4824,6 +4873,188 @@
           "kind": "function",
           "signature": "<D extends string>(items: readonly TrustItem<D>[], thresholds?: TrustThresholds) => TrustVerdict",
           "doc": "Decide whether an ensemble's per-item verdicts are trustworthy enough to believe a lift computed from them."
+        }
+      ]
+    },
+    {
+      "id": "./forms",
+      "source": "src/forms/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "assertFormBlankIntegrity",
+          "kind": "function",
+          "signature": "(blank: FormBlank) => Promise<void>",
+          "doc": "Prove the embedded bytes are the file the registry was derived from."
+        },
+        {
+          "name": "checkRegistryAgainstBlank",
+          "kind": "function",
+          "signature": "(args: { pdf: Uint8Array<ArrayBufferLike>; registry: FormRegistry; }) => Promise<RegistryCheckResult>",
+          "doc": "Check a registry against the blank it claims to describe."
+        },
+        {
+          "name": "decodeFormBlank",
+          "kind": "function",
+          "signature": "(blank: FormBlank) => Uint8Array<ArrayBufferLike>",
+          "doc": "Decode a blank once per isolate."
+        },
+        {
+          "name": "describeFormFill",
+          "kind": "function",
+          "signature": "(result: FillFormResult) => string",
+          "doc": "What to tell the agent after a fill."
+        },
+        {
+          "name": "FilledWidget",
+          "kind": "interface",
+          "signature": "interface FilledWidget",
+          "doc": "One widget the fill actually wrote."
+        },
+        {
+          "name": "FillFormOptions",
+          "kind": "interface",
+          "signature": "interface FillFormOptions",
+          "doc": null
+        },
+        {
+          "name": "FillFormResult",
+          "kind": "interface",
+          "signature": "interface FillFormResult",
+          "doc": null
+        },
+        {
+          "name": "fillPdfForm",
+          "kind": "function",
+          "signature": "(options: FillFormOptions) => Promise<FillFormResult>",
+          "doc": "Write a value map onto a blank, returning the bytes plus the exact widget-by-widget account of what was and was not placed."
+        },
+        {
+          "name": "formatFormCurrency",
+          "kind": "function",
+          "signature": "(value: number) => string",
+          "doc": "Format a figure the way a US agency form prints it: grouped thousands, two decimals, negatives in parentheses."
+        },
+        {
+          "name": "FormBlank",
+          "kind": "interface",
+          "signature": "interface FormBlank",
+          "doc": "A blank form's bytes, base64-encoded, with the provenance to check them."
+        },
+        {
+          "name": "FormLabelBasis",
+          "kind": "type",
+          "signature": "type FormLabelBasis",
+          "doc": "Where a slot's `label` came from, and therefore what it can prove."
+        },
+        {
+          "name": "FormRegistry",
+          "kind": "interface",
+          "signature": "interface FormRegistry",
+          "doc": "A form's complete slot table, pinned to the revision it was derived from."
+        },
+        {
+          "name": "FormSlot",
+          "kind": "interface",
+          "signature": "interface FormSlot",
+          "doc": "One semantic slot: what a caller supplies, and where the platform puts it."
+        },
+        {
+          "name": "FormSlotFormat",
+          "kind": "type",
+          "signature": "type FormSlotFormat",
+          "doc": "How a slot's text value is rendered into the box."
+        },
+        {
+          "name": "FormSlotKind",
+          "kind": "type",
+          "signature": "type FormSlotKind",
+          "doc": "What kind of widget a slot writes to."
+        },
+        {
+          "name": "LabelVerdict",
+          "kind": "type",
+          "signature": "type LabelVerdict",
+          "doc": "What the slot's `label` is worth, checked against the produced file."
+        },
+        {
+          "name": "parseFormAmount",
+          "kind": "function",
+          "signature": "(value: unknown) => number | undefined",
+          "doc": "A number, or a number written the way a form prints one (`$141,318.74`)."
+        },
+        {
+          "name": "parseFormBoolean",
+          "kind": "function",
+          "signature": "(value: unknown) => boolean | undefined",
+          "doc": "A checkbox takes a boolean and nothing else."
+        },
+        {
+          "name": "RegistryCheckResult",
+          "kind": "interface",
+          "signature": "interface RegistryCheckResult",
+          "doc": null
+        },
+        {
+          "name": "RegistryProblem",
+          "kind": "interface",
+          "signature": "interface RegistryProblem",
+          "doc": null
+        },
+        {
+          "name": "RegistryProblemCode",
+          "kind": "type",
+          "signature": "type RegistryProblemCode",
+          "doc": "Why a registry does not match the blank it claims to describe."
+        },
+        {
+          "name": "sha256Hex",
+          "kind": "function",
+          "signature": "(bytes: Uint8Array<ArrayBufferLike>) => Promise<string>",
+          "doc": "Lowercase-hex SHA-256 of a byte range."
+        },
+        {
+          "name": "SlotVerdict",
+          "kind": "type",
+          "signature": "type SlotVerdict",
+          "doc": null
+        },
+        {
+          "name": "SlotVerification",
+          "kind": "interface",
+          "signature": "interface SlotVerification",
+          "doc": null
+        },
+        {
+          "name": "UnfilledCode",
+          "kind": "type",
+          "signature": "type UnfilledCode",
+          "doc": "Why a supplied value did not reach the page."
+        },
+        {
+          "name": "UnfilledSlot",
+          "kind": "interface",
+          "signature": "interface UnfilledSlot",
+          "doc": null
+        },
+        {
+          "name": "verifyFilledForm",
+          "kind": "function",
+          "signature": "(args: { pdf: Uint8Array<ArrayBufferLike>; registry: FormRegistry; expected: Record<string, unknown>; }) => Promise<Ver…",
+          "doc": "Verify a filled form against the value map it was filled from."
+        },
+        {
+          "name": "VerifyFormResult",
+          "kind": "interface",
+          "signature": "interface VerifyFormResult",
+          "doc": null
+        },
+        {
+          "name": "widgetLabel",
+          "kind": "function",
+          "signature": "(form: PDFForm, field: string) => Promise<string | undefined>",
+          "doc": "The `/TU` accessibility text a widget carries, if any."
         }
       ]
     },
@@ -7082,6 +7313,18 @@
       "error": null,
       "exports": [
         {
+          "name": "CloudflareWorkflowBindingLike",
+          "kind": "interface",
+          "signature": "interface CloudflareWorkflowBindingLike",
+          "doc": "The structural binding implemented by Cloudflare's `Workflow<TParams>`."
+        },
+        {
+          "name": "CloudflareWorkflowInstanceLike",
+          "kind": "interface",
+          "signature": "interface CloudflareWorkflowInstanceLike",
+          "doc": "The structural part of a Cloudflare Workflow instance used to prove that a failed create call actually left an addressable durable instance behind."
+        },
+        {
           "name": "createD1KnowledgeStateAccessor",
           "kind": "function",
           "signature": "(opts: PresetKnowledgeAccessorOptions) => KnowledgeStateAccessor",
@@ -7140,6 +7383,18 @@
           "kind": "interface",
           "signature": "interface DrizzleSqliteCoreLike",
           "doc": "The shape of a `drizzle-orm/sqlite-core` module — the few builders the preset schema uses."
+        },
+        {
+          "name": "ensureCloudflareWorkflowInstance",
+          "kind": "function",
+          "signature": "<TParams, TStatus, TInstance extends CloudflareWorkflowInstanceLike<TStatus>>(binding: CloudflareWorkflowBindingLike<TP…",
+          "doc": "Create one durable Workflow instance, or prove an instance with the same id already exists before accepting a create error as an idempotent retry."
+        },
+        {
+          "name": "EnsureCloudflareWorkflowInstanceResult",
+          "kind": "interface",
+          "signature": "interface EnsureCloudflareWorkflowInstanceResult",
+          "doc": null
         },
         {
           "name": "PRESET_MIGRATION_SQL",
@@ -7779,7 +8034,7 @@
           "name": "LoopToolCall",
           "kind": "interface",
           "signature": "interface LoopToolCall",
-          "doc": "Bounded turn-level tool-dispatch loop."
+          "doc": null
         },
         {
           "name": "mergeSurfaceOverlay",
@@ -8230,7 +8485,7 @@
         {
           "name": "getClient",
           "kind": "function",
-          "signature": "(shell: SandboxRuntimeConfig) => SandboxClient",
+          "signature": "(shell: SandboxRuntimeConfig) => Sandbox",
           "doc": "Resolve a synchronous sandbox client from provided runtime configuration credentials"
         },
         {
@@ -8278,7 +8533,7 @@
         {
           "name": "mintSandboxScopedToken",
           "kind": "function",
-          "signature": "(box: SandboxInstance, options: { scope: ScopedTokenScope; sessionId?: string | undefined; ttlMinutes?: number | undefi…",
+          "signature": "(box: SandboxInstance, options: MintScopedTokenOptions) => Promise<Outcome<ScopedTokenResult>>",
           "doc": "Mint a scoped token for an already-provisioned box (e.g."
         },
         {
@@ -8286,6 +8541,30 @@
           "kind": "function",
           "signature": "(secret: string, identity: TerminalProxyIdentity, ttlMs?: number, now?: () => number) => Promise<Outcome<{ token: strin…",
           "doc": "Generate a signed token for TerminalProxyIdentity with an expiration based on TTL milliseconds"
+        },
+        {
+          "name": "ModelSelection",
+          "kind": "type",
+          "signature": "type ModelSelection",
+          "doc": "The three-state outcome of resolving a model: `{ succeeded: true, value: undefined }` means NOTHING was requested (the legitimate box-default configuration — not an error); `{ succeeded: true, value:…"
+        },
+        {
+          "name": "ModelSelectionError",
+          "kind": "type",
+          "signature": "type ModelSelectionError",
+          "doc": "Why a model failed to resolve into something transportable to the sandbox platform."
+        },
+        {
+          "name": "ModelSelectionFailure",
+          "kind": "type",
+          "signature": "type ModelSelectionFailure",
+          "doc": "A model id was named (by override, config, or default) but is not transportable to the sandbox platform."
+        },
+        {
+          "name": "ModelSelectionSource",
+          "kind": "type",
+          "signature": "type ModelSelectionSource",
+          "doc": "Which precedence slot supplied the failed/succeeded model id: `override` — the caller's per-turn `{ model }` argument."
         },
         {
           "name": "Outcome",
@@ -8354,6 +8633,12 @@
           "doc": "Resolve a secret value from the store by its name and return the outcome asynchronously"
         },
         {
+          "name": "requireTransportableModel",
+          "kind": "function",
+          "signature": "(selection: ModelSelection, context: string) => ResolvedModel | undefined",
+          "doc": "Shared fail-loud policy for the sandbox platform's three internal model callers (`ensureWorkspaceSandbox`'s `backendModelAtCreate`, `streamSandboxPrompt`, `driveSandboxTurn`): a `ModelSelection` in,…"
+        },
+        {
           "name": "resetClientCache",
           "kind": "function",
           "signature": "() => void",
@@ -8369,7 +8654,13 @@
           "name": "resolveModel",
           "kind": "function",
           "signature": "(config: ProviderResolutionConfig | undefined, override?: { model?: string | undefined; modelApiKey?: string | undefine…",
-          "doc": "Resolve and return the appropriate model configuration based on provider settings and optional overrides"
+          "doc": "Resolve and return the appropriate model configuration based on provider settings and optional overrides."
+        },
+        {
+          "name": "resolveModelSelection",
+          "kind": "function",
+          "signature": "(config: ProviderResolutionConfig | undefined, override?: { model?: string | undefined; modelApiKey?: string | undefine…",
+          "doc": "Resolve a provider + model configuration into a typed three-state outcome that separates \"nothing requested\" from \"something requested but untransportable\" — the distinction {@link resolveModel} coll…"
         },
         {
           "name": "resolveSandboxClientCredentials",
@@ -8444,10 +8735,28 @@
           "doc": "Resolve the outcome of a sandbox file size check with success status and value or error message"
         },
         {
+          "name": "SandboxModelResolutionError",
+          "kind": "class",
+          "signature": "class SandboxModelResolutionError",
+          "doc": "Thrown by {@link requireTransportableModel} when a model that was EXPLICITLY requested via a per-turn `{ model }` override cannot be transported to the sandbox platform."
+        },
+        {
           "name": "SandboxPermissionLevel",
           "kind": "type",
           "signature": "type SandboxPermissionLevel",
           "doc": "Define permission levels for sandbox access and control"
+        },
+        {
+          "name": "SandboxRecoveryFailedError",
+          "kind": "class",
+          "signature": "class SandboxRecoveryFailedError",
+          "doc": "Thrown when an unresponsive box could not be recovered by a state-preserving restart."
+        },
+        {
+          "name": "SandboxRecoveryPhase",
+          "kind": "type",
+          "signature": "type SandboxRecoveryPhase",
+          "doc": "Which step of the state-preserving stop→resume recovery failed."
         },
         {
           "name": "SandboxResourceConfig",
@@ -10434,6 +10743,18 @@
           "kind": "interface",
           "signature": "interface KVStore",
           "doc": "Define a key-value store interface for asynchronous data retrieval, storage, deletion, and listing"
+        },
+        {
+          "name": "runSqliteStatements",
+          "kind": "function",
+          "signature": "(db: SqliteBatchDatabase, statements: [unknown, ...unknown[]]) => Promise<unknown[]>",
+          "doc": "Execute related SQLite statements in one transactional driver batch when supported, or sequentially in the same order for portable local drivers."
+        },
+        {
+          "name": "SqliteBatchDatabase",
+          "kind": "interface",
+          "signature": "interface SqliteBatchDatabase",
+          "doc": "A database driver that can execute related SQLite statements as one batch."
         }
       ]
     },
@@ -12543,6 +12864,12 @@
           "doc": "Fan out to several sinks."
         },
         {
+          "name": "createSlackBotAlertSink",
+          "kind": "function",
+          "signature": "(options: { botToken: string; channel: string; fetchImpl?: FetchLike | undefined; }) => AlertSink",
+          "doc": "POST to Slack `chat.postMessage` with a bot token."
+        },
+        {
           "name": "createThrottledAlertSink",
           "kind": "function",
           "signature": "(inner: AlertSink, options: { windowMs: number; store?: AlertThrottleStore | undefined; }) => AlertSink",
@@ -12588,7 +12915,7 @@
           "name": "SHELL_ERROR_REPLY_PREFIXES",
           "kind": "const",
           "signature": "readonly string[]",
-          "doc": "Assistant-row openers agent-app writes ITSELF when a sandbox turn fails."
+          "doc": null
         },
         {
           "name": "SweepOptions",
@@ -14901,16 +15228,70 @@
           "doc": "Agent self-reported check input for `submit_work_product` (persisted with `source: 'agent'`; `platform`/`judge` sources are never model-suppliable)."
         },
         {
+          "name": "ARTIFACT_AGREEMENT_CHECK",
+          "kind": "const",
+          "signature": "\"artifact_agreement\"",
+          "doc": "Platform check: how many evidence claims agree with the artifact field they decorate."
+        },
+        {
+          "name": "ArtifactAgreement",
+          "kind": "type",
+          "signature": "type ArtifactAgreement",
+          "doc": null
+        },
+        {
+          "name": "artifactAgreementErrorDetail",
+          "kind": "function",
+          "signature": "(failure: { status: \"contradicts\"; claimed: string; expected: string; belongsTo: string; }, target: string) => string",
+          "doc": "The sentence a model can act on: both numbers, both lines, and the two ways out — move the citation, or correct the artifact."
+        },
+        {
           "name": "buildWorkProductTools",
           "kind": "function",
           "signature": "(config: WorkProductToolConfig) => AppToolDefinition<Record<string, unknown>>[]",
           "doc": "Build the three work-product tools for `customTools` registration on the MCP server / HTTP handler / runtime executor."
         },
         {
+          "name": "canonicalizeValue",
+          "kind": "function",
+          "signature": "(token: string) => string | null",
+          "doc": "Reduce a numeric token to the form both sides are compared in: no currency, no grouping, no trailing zeros in the fraction, no leading zeros."
+        },
+        {
           "name": "canTransitionWorkProduct",
           "kind": "function",
           "signature": "(from: WorkProductStatus, to: WorkProductStatus) => boolean",
           "doc": "Whether a legal edge exists from `from` to `to` in the review machine."
+        },
+        {
+          "name": "CLAIM_SUPPORT_CHECK",
+          "kind": "const",
+          "signature": "\"claim_support\"",
+          "doc": "Platform check: how many quoted evidence entries anchor to text that actually CARRIES the figure the entry claims."
+        },
+        {
+          "name": "ClaimSupport",
+          "kind": "type",
+          "signature": "type ClaimSupport",
+          "doc": null
+        },
+        {
+          "name": "claimSupportErrorDetail",
+          "kind": "function",
+          "signature": "(failure: { status: \"unsupported\"; claimed: string[]; present: string[]; }, quote: string) => string",
+          "doc": "The sentence a model can act on without re-reading the document: what it claimed, what the line it cited actually says, what figures that line does carry, and the two ways out — cite the value, or dr…"
+        },
+        {
+          "name": "claimValues",
+          "kind": "function",
+          "signature": "(claim: string) => string[]",
+          "doc": "The values a claim asserts, canonicalized — empty when the claim asserts no figure, which is the \"nothing to check\" case."
+        },
+        {
+          "name": "ConfusableTargetGroup",
+          "kind": "interface",
+          "signature": "interface ConfusableTargetGroup",
+          "doc": "One set of targets whose source lines are mistakable for each other, with the phrases that tell them apart."
         },
         {
           "name": "createInMemoryWorkProductStore",
@@ -14983,6 +15364,18 @@
           "kind": "interface",
           "signature": "interface FinalizeWorkProductProvenanceInput",
           "doc": "Completion receipt for one run, from the turn's usage/lifecycle seam."
+        },
+        {
+          "name": "findSourceLine",
+          "kind": "function",
+          "signature": "(sourceText: string, needle: string, occurrence?: number) => SourceFindResult",
+          "doc": null
+        },
+        {
+          "name": "indexArtifactValues",
+          "kind": "function",
+          "signature": "(fields: Readonly<Record<string, unknown>> | undefined, normalizeTarget?: ((target: string) => string) | undefined) =>…",
+          "doc": "Canonical target → canonical value, for the artifact fields that state a figure."
         },
         {
           "name": "InMemoryWorkProductStore",
@@ -15123,6 +15516,18 @@
           "doc": "Does `quote` occur in `sourceText`?"
         },
         {
+          "name": "SourceFindFailure",
+          "kind": "type",
+          "signature": "type SourceFindFailure",
+          "doc": "Locate the line containing `value` and return it as a span — the citation form for a model that cannot count characters."
+        },
+        {
+          "name": "SourceFindResult",
+          "kind": "type",
+          "signature": "type SourceFindResult",
+          "doc": null
+        },
+        {
           "name": "SourceSpanFailure",
           "kind": "type",
           "signature": "type SourceSpanFailure",
@@ -15147,6 +15552,24 @@
           "doc": "Payload for the draft→ready submit transition"
         },
         {
+          "name": "TARGET_CORRECTNESS_CHECK",
+          "kind": "const",
+          "signature": "\"target_correctness\"",
+          "doc": "Platform check: how many citations anchor to a line that belongs to the TARGET they are attached to, rather than to a sibling target's line."
+        },
+        {
+          "name": "targetLabelErrorDetail",
+          "kind": "function",
+          "signature": "(failure: { status: \"crossed\"; rival: string; rivalLabel: string; expected: readonly string[]; note?: string | undefine…",
+          "doc": "The sentence a model can act on: which line it actually cited, which target that line belongs to, and what its own target's line looks like."
+        },
+        {
+          "name": "TargetLabelVerdict",
+          "kind": "type",
+          "signature": "type TargetLabelVerdict",
+          "doc": null
+        },
+        {
           "name": "TrustItem",
           "kind": "interface",
           "signature": "interface TrustItem",
@@ -15163,6 +15586,30 @@
           "kind": "function",
           "signature": "(body: Record<string, unknown>) => WorkProductVerdictBody",
           "doc": "Validate the verdict POST body: `{ id, verdict, note?"
+        },
+        {
+          "name": "valuesInText",
+          "kind": "function",
+          "signature": "(text: string) => string[]",
+          "doc": "Every distinct value appearing in `text`, canonicalized."
+        },
+        {
+          "name": "verifyArtifactAgreement",
+          "kind": "function",
+          "signature": "(target: string, claim: string, fieldValues: ReadonlyMap<string, string>) => ArtifactAgreement",
+          "doc": null
+        },
+        {
+          "name": "verifyClaimSupport",
+          "kind": "function",
+          "signature": "(quote: string, claim: string) => ClaimSupport",
+          "doc": "Does `quote` carry the figure `claim` asserts?"
+        },
+        {
+          "name": "verifyTargetLabel",
+          "kind": "function",
+          "signature": "(quote: string, target: string, groups: readonly ConfusableTargetGroup[]) => TargetLabelVerdict",
+          "doc": null
         },
         {
           "name": "WorkProductArtifact",
