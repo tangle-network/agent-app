@@ -35,6 +35,26 @@ export interface DatabaseProviderOptions {
   notReadyMessage?: string
 }
 
+/** A database driver that can execute related SQLite statements as one batch.
+ * Cloudflare D1 and libsql expose this method; portable local drivers may not. */
+export interface SqliteBatchDatabase {
+  batch?: (statements: [unknown, ...unknown[]]) => Promise<unknown[]>
+}
+
+/** Execute related SQLite statements in one transactional driver batch when
+ * supported, or sequentially in the same order for portable local drivers. */
+export async function runSqliteStatements(
+  db: SqliteBatchDatabase,
+  statements: [unknown, ...unknown[]],
+): Promise<unknown[]> {
+  if (typeof db.batch === 'function') {
+    return await db.batch(statements)
+  }
+  const results: unknown[] = []
+  for (const statement of statements) results.push(await statement)
+  return results
+}
+
 /**
  * Create a swappable database provider. `DB` is the injected instance's type
  * (e.g. a drizzle `Database`); the proxy is typed as `DB` so callers keep full

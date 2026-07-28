@@ -18,6 +18,10 @@
 
 import { asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
+import {
+  runSqliteStatements,
+  type SqliteBatchDatabase,
+} from '../store'
 import { BULK_DELETE_MAX_THREADS, ChatStoreInputError, threadTitleFromMessage } from './core'
 import type { ChatMessagePart } from './parts'
 import type { ChatMessageRow, ChatTables, ChatThreadRow, NewChatMessageRow, NewChatThreadRow } from './schema'
@@ -25,9 +29,8 @@ import type { ChatMessageRow, ChatTables, ChatThreadRow, NewChatMessageRow, NewC
 /** Any SQLite drizzle database — `any` erases the driver-specific run-result
  *  and schema generics so better-sqlite3, D1, and libsql handles all fit.
  *  `batch` is structural: present on D1/libsql drizzle instances. */
-export type ChatDatabase = BaseSQLiteDatabase<'sync' | 'async', any, any> & {
-  batch?: (statements: [unknown, ...unknown[]]) => Promise<unknown[]>
-}
+export type ChatDatabase = BaseSQLiteDatabase<'sync' | 'async', any, any> &
+  SqliteBatchDatabase
 
 /** Product-injected access check. Throw to deny; the store never interprets
  *  users or roles itself. */
@@ -154,21 +157,6 @@ export interface ChatStore<TThread = ChatThreadRow, TMessage = ChatMessageRow> {
   deleteMessage(id: string): Promise<boolean>
 }
 
-/** One driver round trip when `db.batch` exists; sequential awaits in the
- *  given order otherwise. Statement order is the caller's integrity contract
- *  (children before parents). */
-async function runStatements(
-  db: ChatDatabase,
-  statements: [unknown, ...unknown[]],
-): Promise<unknown[]> {
-  if (typeof db.batch === 'function') {
-    return await db.batch(statements)
-  }
-  const results: unknown[] = []
-  for (const statement of statements) results.push(await statement)
-  return results
-}
-
 function clampLimit(limit: number | undefined, fallback: number, max: number): number {
   const value = Number.isFinite(limit) ? Math.trunc(limit as number) : fallback
   return Math.min(Math.max(value, 1), max)
@@ -251,7 +239,7 @@ export function createChatStore<TTables extends ChatTables>(
       if (options?.assertAccess) await options.assertAccess(existing.workspaceId)
       // Messages first so a partial failure never leaves orphaned rows behind
       // a deleted thread.
-      await runStatements(db, [
+      await runSqliteStatements(db, [
         db.delete(messages).where(eq(messages.threadId, threadId)),
         db.delete(threads).where(eq(threads.id, threadId)),
       ])
@@ -283,7 +271,7 @@ export function createChatStore<TTables extends ChatTables>(
       }
 
       const foundIds = rows.map((row) => row.id)
-      await runStatements(db, [
+      await runSqliteStatements(db, [
         db.delete(messages).where(inArray(messages.threadId, foundIds)),
         db.delete(threads).where(inArray(threads.id, foundIds)),
       ])
@@ -317,7 +305,7 @@ export function createChatStore<TTables extends ChatTables>(
         ...(input.costUsd !== undefined ? { costUsd: input.costUsd } : {}),
         ...(input.extras ?? {}),
       } as NewChatMessageRow
-      const [insertResult] = await runStatements(db, [
+      const [insertResult] = await runSqliteStatements(db, [
         db.insert(messages).values(values).returning(),
         db.update(threads).set({ updatedAt: new Date() }).where(eq(threads.id, input.threadId)),
       ])
@@ -347,7 +335,7 @@ export function createChatStore<TTables extends ChatTables>(
       // The thread bump reads the row's own `thread_id` rather than trusting a
       // caller-supplied one: a message never moves thread, so the subquery is
       // the authoritative source and one fewer parameter to get wrong.
-      const [updateResult] = await runStatements(db, [
+      const [updateResult] = await runSqliteStatements(db, [
         db.update(messages).set(values).where(eq(messages.id, id)).returning(),
         db.update(threads).set({ updatedAt: new Date() })
           .where(eq(threads.id, sql`(select ${messages.threadId} from ${messages} where ${messages.id} = ${id})`)),

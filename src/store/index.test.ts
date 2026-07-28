@@ -1,5 +1,38 @@
-import { describe, expect, it } from 'vitest'
-import { createDatabaseProvider, createInMemoryKV } from './index'
+import { describe, expect, it, vi } from 'vitest'
+import {
+  createDatabaseProvider,
+  createInMemoryKV,
+  runSqliteStatements,
+} from './index'
+
+describe('runSqliteStatements', () => {
+  it('uses one driver batch when the database supports it', async () => {
+    const statements = [{ id: 1 }, { id: 2 }] as [unknown, ...unknown[]]
+    const batch = vi.fn(async () => ['first', 'second'])
+
+    await expect(runSqliteStatements({ batch }, statements)).resolves.toEqual([
+      'first',
+      'second',
+    ])
+    expect(batch).toHaveBeenCalledOnce()
+    expect(batch).toHaveBeenCalledWith(statements)
+  })
+
+  it('awaits statements in order when a portable driver has no batch method', async () => {
+    const order: number[] = []
+    const statement = (value: number) => ({
+      then(resolve: (result: number) => void) {
+        order.push(value)
+        resolve(value)
+      },
+    })
+
+    await expect(
+      runSqliteStatements({}, [statement(1), statement(2)]),
+    ).resolves.toEqual([1, 2])
+    expect(order).toEqual([1, 2])
+  })
+})
 
 describe('createDatabaseProvider', () => {
   it('throws a custom message until a database is injected, then forwards', () => {

@@ -4,7 +4,7 @@
 
 Source: `src/store/index.ts`
 
-8 exports.
+10 exports.
 
 ### `createDatabaseProvider`
 
@@ -68,4 +68,20 @@ interface KVPutOptions
 
 ```ts
 interface KVStore
+```
+
+### `runSqliteStatements`
+
+`function` — Execute related SQLite statements in one transactional driver batch when supported, or sequentially in the same order for portable local drivers.
+
+```ts
+(db: SqliteBatchDatabase, statements: [unknown, ...unknown[]]) => Promise<unknown[]>
+```
+
+### `SqliteBatchDatabase`
+
+`interface` — A database driver that can execute related SQLite statements as one batch.
+
+```ts
+interface SqliteBatchDatabase
 ```
