@@ -474,57 +474,6 @@ function assertTargetsNotCrossed(config: WorkProductToolConfig, entries: readonl
   }
 }
 
-/**
- * Refuse any entry whose claim contradicts the artifact field it decorates.
- *
- * SUBMIT ONLY, and the "only" is load-bearing. The obvious placement is the
- * upsert, for the early feedback — and it makes the gate unsatisfiable on the
- * one path that needs it most. A `changes_requested` row keeps the artifact
- * the reviewer REJECTED, and an agent correcting a crossed package has exactly
- * one order available to it: fix the evidence, then submit the corrected
- * artifact, because the artifact is only settable at submit. Checking the
- * incoming citation against the stale artifact refuses precisely the correction
- * being asked for —
- *
- *     artifact (rejected): line_3a = 2204.18, line_3b = 1955.02
- *     agent re-emits:      line_3a <- 1955.02          <- the fix
- *     stale comparison:    "1955.02 is line_3b's value" -> refused, forever
- *
- * so the package can never be repaired. That is the same failure mode as a
- * coverage gate demanding lineage for a computed value, and it is refused for
- * the same reason: an unsatisfiable rule does not stop bad work, it selects for
- * invented work. At submit the artifact being compared is the one being
- * SUBMITTED, so both halves are current and either can be corrected freely
- * during the turn.
- *
- * Nothing is lost by waiting. Row `95105c8a` is caught at submit and could only
- * ever have been caught there — its crossed evidence was written turns before
- * there was an artifact to compare it to.
- *
- * Only a real contradiction is refused — the claim asserts a figure the same
- * artifact reports on another target. A component of an aggregate is not one
- * (row `a68b1943` evidences a 189,750.00 wage line with two W-2s of 128,450.00
- * and 61,300.00, and must keep doing so).
- */
-function assertEvidenceAgreesWithArtifact(
-  config: WorkProductToolConfig,
-  entries: readonly EvidenceEntry[],
-  artifact: WorkProductArtifact | null,
-): void {
-  if (config.verifyArtifactAgreement === false) return
-  const fieldValues = indexArtifactValues(artifact?.fields, config.normalizeTarget)
-  if (fieldValues.size === 0) return
-  for (let index = 0; index < entries.length; index += 1) {
-    const entry = entries[index]!
-    const agreement = verifyArtifactAgreement(entry.target, entry.claim, fieldValues)
-    if (agreement.status !== 'contradicts') continue
-    throw new ToolInputError(
-      'contradicts_artifact',
-      `entries[${index}].claim ${JSON.stringify(entry.claim)} contradicts this work product's own artifact: ${artifactAgreementErrorDetail(agreement, entry.target)}`,
-    )
-  }
-}
-
 /** Re-verify every persisted quote at submit time. The upsert gate stops new
  *  fabrication; this stops a package whose evidence was written BEFORE the
  *  gate existed (or under a since-corrected document) from reaching a
@@ -633,10 +582,36 @@ function summarizeTargetCorrectness(
   return { correct, checkable, crossed }
 }
 
-/** Re-run artifact agreement over every PERSISTED entry against the artifact
- *  being submitted. This is the pass that catches row `95105c8a`: the crossed
- *  entries were written turns before the artifact arrived, so the upsert-time
- *  comparison had nothing to compare them to. */
+/**
+ * Run artifact agreement over every PERSISTED entry against the artifact being
+ * submitted — the ONLY place it runs, and the "only" is load-bearing.
+ *
+ * The obvious second placement is the upsert, for the early feedback, and it
+ * makes the gate unsatisfiable on the one path that needs it most. A
+ * `changes_requested` row keeps the artifact the reviewer REJECTED, and an
+ * agent correcting a crossed package has exactly one order available to it:
+ * fix the evidence, then submit the corrected artifact, because the artifact
+ * is only settable at submit. Comparing the incoming citation to that stale
+ * artifact refuses precisely the correction being asked for —
+ *
+ *     artifact (rejected): line_3a = 2204.18, line_3b = 1955.02
+ *     agent re-emits:      line_3a <- 1955.02          <- the fix
+ *     stale comparison:    "1955.02 is line_3b's value" -> refused, forever
+ *
+ * so the package can never be repaired. Same failure mode as a coverage gate
+ * demanding lineage for a computed value, removed for the same reason: an
+ * unsatisfiable rule does not stop bad work, it selects for invented work.
+ * Here both halves are current and either can be corrected during the turn.
+ *
+ * Nothing is lost by waiting. Row `95105c8a` is caught here and could only ever
+ * have been caught here — its crossed evidence was written turns before there
+ * was an artifact to compare it to.
+ *
+ * Only a real CONTRADICTION is refused: the claim asserts a figure the same
+ * artifact reports on another target. A component of an aggregate is not one
+ * (row `a68b1943` evidences a 189,750.00 wage line with two W-2s of 128,450.00
+ * and 61,300.00, and must keep doing so).
+ */
 function summarizeArtifactAgreement(
   evidence: readonly EvidenceEntry[],
   fieldValues: ReadonlyMap<string, string>,
@@ -652,10 +627,10 @@ function summarizeArtifactAgreement(
     checkable += 1
     if (agreement.status === 'agrees') agreeing += 1
     else {
-      contradicting.push({
-        id: entry.id,
-        detail: `${entry.id} (${target} claims ${agreement.claimed}, which the artifact reports on ${agreement.belongsTo}; ${target} is ${agreement.expected})`,
-      })
+      // One home for the sentence: the same wording the per-entry refusal
+      // would have used, so a reviewer reading the recorded check and a model
+      // reading the error are told the same thing.
+      contradicting.push({ id: entry.id, detail: `${entry.id}: ${artifactAgreementErrorDetail(agreement, target)}` })
     }
   }
   return { agreeing, checkable, contradicting }
@@ -768,8 +743,8 @@ export function buildWorkProductTools(config: WorkProductToolConfig): AppToolDef
       // fabricated one, because it survives being clicked.
       assertTargetsNotCrossed(config, entries)
       // NOTE: artifact agreement is deliberately NOT checked here. See
-      // `assertEvidenceAgreesWithArtifact` — comparing an incoming citation to
-      // a STALE artifact deadlocks the one correction order an agent can take.
+      // `summarizeArtifactAgreement` — comparing an incoming citation to a
+      // STALE artifact deadlocks the one correction order an agent can take.
       const draft = await resolveDraft(service, config, scopeKey, ctx)
       const record = await unwrap(() => service.upsertEvidence(draft.id, entries), 'evidence_rejected')
       return {

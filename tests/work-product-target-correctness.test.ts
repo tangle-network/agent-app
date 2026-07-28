@@ -555,8 +555,8 @@ describe('submit_work_product', () => {
     expect(result.ok).toBe(false)
     expect((result as { code?: string }).code).toBe('contradicts_artifact')
     const message = (result as { message: string }).message
-    expect(message).toContain('f1040.line_3b claims 1955.02')
-    expect(message).toContain('the artifact reports on f1040.line_3a')
+    expect(message).toContain('the artifact reports 2204.18 on f1040.line_3b and 1955.02 on f1040.line_3a')
+    expect(message).toContain('it supports f1040.line_3a')
     const record = await onlyRecord(legacy.store)
     const check = record.checks.find((entry) => entry.name === 'artifact_agreement')
     expect(check?.passed).toBe(false)
