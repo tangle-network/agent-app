@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-124 exports.
+134 exports.
 
 ### `AppToolDescriptor`
 
@@ -124,6 +124,14 @@ interface BuildSandboxToolFileMountsOptions
 
 ```ts
 (events: AsyncIterable<unknown>, message: string | PromptInputPart[], history?: { role: "user" | "assistant"; content:…
+```
+
+### `createSandboxPrewarmer`
+
+`function`
+
+```ts
+(shell: SandboxRuntimeConfig, options: SandboxPrewarmerOptions) => SandboxPrewarmer
 ```
 
 ### `createSandboxTerminalToken`
@@ -398,6 +406,46 @@ type Outcome
 type PeekWorkspaceSandboxOutcome
 ```
 
+### `PrewarmClaimStore`
+
+`interface` — Cross-isolate claim.
+
+```ts
+interface PrewarmClaimStore
+```
+
+### `PrewarmDecision`
+
+`interface`
+
+```ts
+interface PrewarmDecision
+```
+
+### `PrewarmEvent`
+
+`type`
+
+```ts
+type PrewarmEvent
+```
+
+### `PrewarmOutcome`
+
+`type` — What `prewarm()` decided.
+
+```ts
+type PrewarmOutcome
+```
+
+### `PrewarmResult`
+
+`interface` — Terminal result of a warm this caller owns.
+
+```ts
+interface PrewarmResult
+```
+
 ### `ProfileComposeOptions`
 
 `interface` — Define options for composing a user profile including prompts, files, servers, and name
@@ -612,6 +660,38 @@ class SandboxModelResolutionError
 
 ```ts
 type SandboxPermissionLevel
+```
+
+### `SandboxPrewarmer`
+
+`interface`
+
+```ts
+interface SandboxPrewarmer
+```
+
+### `SandboxPrewarmerOptions`
+
+`interface`
+
+```ts
+interface SandboxPrewarmerOptions
+```
+
+### `SandboxPrewarmScope`
+
+`interface` — The workspace a warm targets.
+
+```ts
+interface SandboxPrewarmScope
+```
+
+### `SandboxReadiness`
+
+`type` — Readiness for the UI.
+
+```ts
+type SandboxReadiness
 ```
 
 ### `SandboxRecoveryFailedError`

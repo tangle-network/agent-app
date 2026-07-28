@@ -8381,6 +8381,12 @@
           "doc": "Aggregate a sandbox prompt event stream down to the turn's one final answer."
         },
         {
+          "name": "createSandboxPrewarmer",
+          "kind": "function",
+          "signature": "(shell: SandboxRuntimeConfig, options: SandboxPrewarmerOptions) => SandboxPrewarmer",
+          "doc": null
+        },
+        {
           "name": "createSandboxTerminalToken",
           "kind": "function",
           "signature": "(subject: TerminalProxyIdentity, opts: SandboxTerminalTokenOptions) => Promise<SandboxTerminalTokenResult>",
@@ -8585,6 +8591,36 @@
           "doc": "What a peek can find."
         },
         {
+          "name": "PrewarmClaimStore",
+          "kind": "interface",
+          "signature": "interface PrewarmClaimStore",
+          "doc": "Cross-isolate claim."
+        },
+        {
+          "name": "PrewarmDecision",
+          "kind": "interface",
+          "signature": "interface PrewarmDecision",
+          "doc": null
+        },
+        {
+          "name": "PrewarmEvent",
+          "kind": "type",
+          "signature": "type PrewarmEvent",
+          "doc": null
+        },
+        {
+          "name": "PrewarmOutcome",
+          "kind": "type",
+          "signature": "type PrewarmOutcome",
+          "doc": "What `prewarm()` decided."
+        },
+        {
+          "name": "PrewarmResult",
+          "kind": "interface",
+          "signature": "interface PrewarmResult",
+          "doc": "Terminal result of a warm this caller owns."
+        },
+        {
           "name": "ProfileComposeOptions",
           "kind": "interface",
           "signature": "interface ProfileComposeOptions",
@@ -8745,6 +8781,30 @@
           "kind": "type",
           "signature": "type SandboxPermissionLevel",
           "doc": "Define permission levels for sandbox access and control"
+        },
+        {
+          "name": "SandboxPrewarmer",
+          "kind": "interface",
+          "signature": "interface SandboxPrewarmer",
+          "doc": null
+        },
+        {
+          "name": "SandboxPrewarmerOptions",
+          "kind": "interface",
+          "signature": "interface SandboxPrewarmerOptions",
+          "doc": null
+        },
+        {
+          "name": "SandboxPrewarmScope",
+          "kind": "interface",
+          "signature": "interface SandboxPrewarmScope",
+          "doc": "The workspace a warm targets."
+        },
+        {
+          "name": "SandboxReadiness",
+          "kind": "type",
+          "signature": "type SandboxReadiness",
+          "doc": "Readiness for the UI."
         },
         {
           "name": "SandboxRecoveryFailedError",

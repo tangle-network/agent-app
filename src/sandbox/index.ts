@@ -2562,3 +2562,8 @@ function firstQuestionText(value: Record<string, unknown> | null): string {
 // + runtime-proxy handlers, and scoped terminal-token mint/verify.
 export * from './terminal-proxy-token'
 export * from './workspace-terminal'
+// Background box warming on project open: single-flight, non-blocking, and
+// explicit about spend. Imports `ensureWorkspaceSandbox`/`peekWorkspaceSandbox`
+// back out of this module; tsup inlines both files into the one
+// `sandbox/index` chunk, so the cycle exists only in source.
+export * from './prewarm'
