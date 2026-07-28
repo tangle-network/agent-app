@@ -444,7 +444,10 @@ export interface EnsureWorkspaceSandboxOptions {
   userId?: string
   harness: Harness
   // When set, both the running-reuse and stopped-resume short-circuits are
-  // skipped and any name-matched box is deleted before create.
+  // skipped and any name-matched box is deleted before create. This is the
+  // ONLY way a liveness-failed box is discarded: a failed probe triggers a
+  // state-preserving stop→resume recovery (or a SandboxRecoveryFailedError),
+  // never a delete — delete deprovisions the persistent workspace (#299).
   forceNew?: boolean
   // Real-time provisioning progress from the SDK's SSE stream, forwarded from
   // the `waitFor('running')` calls on the resume and cold-create paths. Callers
@@ -807,6 +810,41 @@ export class SandboxRuntimeAuthRefreshError extends Error {
   constructor(stage: ExistingBoxStage, name: string, detail: string, cause?: unknown) {
     super(`${stage} sandbox auth refresh failed for ${name}: ${detail}`, { cause })
     this.name = 'SandboxRuntimeAuthRefreshError'
+  }
+}
+
+/** Which step of the state-preserving stop→resume recovery failed. `stop` with a
+ *  driver-unsupported cause means the platform cannot restart this box (the
+ *  `tangle` driver exposes create/delete only); `probe` means the box restarted
+ *  but is still unresponsive. */
+export type SandboxRecoveryPhase = 'stop' | 'resume' | 'probe'
+
+/**
+ * Thrown when an unresponsive box could not be recovered by a state-preserving
+ * restart. Contract: this error is only ever thrown with the workspace intact —
+ * recovery never deletes. The caller decides what to do next (retry, surface to
+ * the user, or explicitly replace via `forceNew`).
+ */
+export class SandboxRecoveryFailedError extends Error {
+  readonly boxKey: string
+  readonly stage: ExistingBoxStage
+  readonly phase: SandboxRecoveryPhase
+  constructor(
+    stage: ExistingBoxStage,
+    boxKey: string,
+    phase: SandboxRecoveryPhase,
+    detail: string,
+    cause?: unknown,
+  ) {
+    super(
+      `${stage} sandbox ${boxKey} failed liveness recovery at ${phase}: ${detail}. ` +
+        `The workspace is preserved; pass forceNew to replace the box.`,
+      { cause },
+    )
+    this.name = 'SandboxRecoveryFailedError'
+    this.boxKey = boxKey
+    this.stage = stage
+    this.phase = phase
   }
 }
 
@@ -1320,8 +1358,9 @@ async function refreshRuntimeConnection(
     // Tolerate transient refresh/get failures (5xx, network blips) while the
     // orchestrator is still attaching the connection: swallow and retry. A box
     // that never surfaces a runtime URL is returned as-is so the caller's
-    // readiness gate (isReusableBox) drops and recreates it — rather than this
-    // poll throwing a hard provisioning failure on a recoverable hiccup.
+    // readiness gate (isReusableBox) sends it into state-preserving recovery
+    // (or fails loud) — rather than this poll throwing a hard provisioning
+    // failure on a recoverable hiccup.
     try {
       await current.refresh()
       if (sandboxRuntimeUrl(current)) return current
@@ -1452,10 +1491,11 @@ async function writeDeferredFilesWithRuntimeAuthRefresh(
 
 // Decide whether an existing (reused or resumed) box is safe to hand back.
 // `refreshRuntimeConnection` has already polled for the runtime URL, so a box
-// that still has none never became connectable and must be recreated rather
-// than silently reused — downstream exec/terminal traffic would fail against
-// it. A failed edge is likewise unusable. Only when the connection is present
-// do we spend an exec round-trip on the liveness probe.
+// that still has none never became connectable and must not be silently
+// reused — downstream exec/terminal traffic would fail against it. A failed
+// edge is likewise unusable. Only when the connection is present do we spend
+// an exec round-trip on the liveness probe. A box that fails this gate is
+// RECOVERED (stop→resume, workspace intact) or fails loud — never deleted.
 async function isReusableBox(
   box: SandboxInstance,
   harness: Harness,
@@ -1479,6 +1519,59 @@ async function resumeStoppedBox(
   } catch (err) {
     return fail(err)
   }
+}
+
+// State-preserving recovery for a box that failed the reuse gate: stop (keeps
+// the workspace — the platform's suspend path never scrubs storage), resume,
+// then re-probe. `box.delete()` is DEPROVISIONING — it wipes the persistent
+// workspace (sessions, uncommitted files, everything outside the product's own
+// DB) — so it must never be a recovery action (#299: a single slow exec or a
+// crashed harness process used to destroy a user's workspace). This restarts
+// the container, which also reboots a dead sidecar/harness process. Every
+// failure throws SandboxRecoveryFailedError with the workspace intact —
+// including on the `tangle` driver, where stop is unsupported and the throw
+// carries the platform's rejection as its cause.
+async function recoverUnresponsiveBox(
+  client: Sandbox,
+  box: SandboxInstance,
+  harness: Harness,
+  probe: LivenessProbeConfig | undefined,
+  stage: ExistingBoxStage,
+  name: string,
+  resumeTimeout: number,
+  onProgress?: (event: ProvisionEvent) => void,
+): Promise<SandboxInstance> {
+  try {
+    await box.stop()
+  } catch (err) {
+    throw new SandboxRecoveryFailedError(
+      stage,
+      name,
+      'stop',
+      'the platform could not stop the box for a state-preserving restart',
+      err,
+    )
+  }
+  const resumed = await resumeStoppedBox(box, resumeTimeout, onProgress)
+  if (!resumed.succeeded) {
+    throw new SandboxRecoveryFailedError(
+      stage,
+      name,
+      'resume',
+      'the box did not reach running after a state-preserving restart',
+      resumed.error,
+    )
+  }
+  const recovered = await refreshRuntimeConnection(client, resumed.value)
+  if (!(await isReusableBox(recovered, harness, probe))) {
+    throw new SandboxRecoveryFailedError(
+      stage,
+      name,
+      'probe',
+      'the box is still unresponsive after a state-preserving restart',
+    )
+  }
+  return recovered
 }
 
 /** Scope + the client and box key every workspace-scoped sandbox call needs.
@@ -1551,6 +1644,43 @@ export async function peekWorkspaceSandbox(
   return { status: 'running', box: match }
 }
 
+// The shared tail for handing back an existing (reused/resumed/recovered) box:
+// materialize deferred profile files, then run the product bootstrap. One
+// implementation so the reuse, resume, and recovery paths cannot drift.
+async function finalizeExistingBox(
+  shell: SandboxRuntimeConfig,
+  client: Sandbox,
+  box: SandboxInstance,
+  stage: ExistingBoxStage,
+  name: string,
+  workspaceId: string,
+  userId: string | undefined,
+  harness: Harness,
+  scope: SandboxScope,
+): Promise<SandboxInstance> {
+  const written = await materializeDeferredFilesForExistingBox(
+    shell,
+    client,
+    box,
+    stage,
+    name,
+    workspaceId,
+    userId,
+    harness,
+  )
+  if (!written.succeeded) {
+    throw deferredProfileWriteFailed(stage, name, written.error)
+  }
+  const finalBox = written.value
+  if (shell.bootstrap) {
+    const boot = await shell.bootstrap(finalBox, scope)
+    if (!boot.succeeded) {
+      throw new Error(`bootstrap failed on ${stage} box ${name}`, { cause: boot.error })
+    }
+  }
+  return finalBox
+}
+
 /** Resolve or create a workspace sandbox instance with optional reuse and progress tracking */
 export async function ensureWorkspaceSandbox(
   shell: SandboxRuntimeConfig,
@@ -1576,43 +1706,29 @@ export async function ensureWorkspaceSandbox(
     } else if (found.metadata?.harness === harness) {
       const ready = await refreshRuntimeConnection(client, found)
       if (await isReusableBox(ready, harness, shell.livenessProbe)) {
-        const written = await materializeDeferredFilesForExistingBox(
-          shell,
-          client,
-          ready,
-          'reused',
-          name,
-          workspaceId,
-          userId,
-          harness,
-        )
-        if (!written.succeeded) {
-          throw deferredProfileWriteFailed('reused', name, written.error)
-        }
-        const reusedBox = written.value
-        if (shell.bootstrap) {
-          const boot = await shell.bootstrap(reusedBox, scope)
-          if (!boot.succeeded) {
-            throw new Error(`bootstrap failed on reused box ${name}`, { cause: boot.error })
-          }
-        }
-        return reusedBox
+        return finalizeExistingBox(shell, client, ready, 'reused', name, workspaceId, userId, harness, scope)
       }
-      const dropped = await deleteBox(ready)
-      if (!dropped.succeeded) {
-        throw new Error(
-          `sandbox ${name} ` +
-            `(was ${String(found.metadata?.harness ?? 'unknown')}, want ${harness}, or unresponsive) ` +
-            `could not be deleted`,
-          { cause: dropped.error },
-        )
-      }
+      // Unresponsive (or never-connectable) box with the RIGHT harness: recover
+      // in place — stop→resume preserves the workspace — and fail loud if the
+      // box is still dead. Deleting here wiped user workspaces (#299); delete
+      // is reachable only via forceNew now.
+      const recovered = await recoverUnresponsiveBox(
+        client,
+        ready,
+        harness,
+        shell.livenessProbe,
+        'reused',
+        name,
+        resumeTimeout,
+        onProgress,
+      )
+      return finalizeExistingBox(shell, client, recovered, 'reused', name, workspaceId, userId, harness, scope)
     } else {
       const dropped = await deleteBox(found)
       if (!dropped.succeeded) {
         throw new Error(
           `sandbox ${name} ` +
-            `(was ${String(found.metadata?.harness ?? 'unknown')}, want ${harness}, or unresponsive) ` +
+            `(was ${String(found.metadata?.harness ?? 'unknown')}, want ${harness}) ` +
             `could not be deleted`,
           { cause: dropped.error },
         )
@@ -1648,37 +1764,22 @@ export async function ensureWorkspaceSandbox(
       } else {
         const box = await refreshRuntimeConnection(client, resumed.value)
         if (await isReusableBox(box, harness, shell.livenessProbe)) {
-          const written = await materializeDeferredFilesForExistingBox(
-            shell,
-            client,
-            box,
-            'resumed',
-            name,
-            workspaceId,
-            userId,
-            harness,
-          )
-          if (!written.succeeded) {
-            throw deferredProfileWriteFailed('resumed', name, written.error)
-          }
-          const resumedBox = written.value
-          if (shell.bootstrap) {
-            const boot = await shell.bootstrap(resumedBox, scope)
-            if (!boot.succeeded) {
-              throw new Error(`bootstrap failed on resumed box ${name}`, { cause: boot.error })
-            }
-          }
-          return resumedBox
+          return finalizeExistingBox(shell, client, box, 'resumed', name, workspaceId, userId, harness, scope)
         }
-        const dropped = await deleteBox(box)
-        if (!dropped.succeeded) {
-          throw new Error(
-            `resumed sandbox ${name} ` +
-              `(was ${String(box.metadata?.harness ?? 'unknown')}, want ${harness}, or unresponsive) ` +
-              `could not be deleted`,
-            { cause: dropped.error },
-          )
-        }
+        // The box resumed but is unresponsive: one full stop→resume cycle is
+        // the state-preserving recovery; still-dead fails loud. Never delete —
+        // that wipes the workspace (#299).
+        const recovered = await recoverUnresponsiveBox(
+          client,
+          box,
+          harness,
+          shell.livenessProbe,
+          'resumed',
+          name,
+          resumeTimeout,
+          onProgress,
+        )
+        return finalizeExistingBox(shell, client, recovered, 'resumed', name, workspaceId, userId, harness, scope)
       }
     }
   }

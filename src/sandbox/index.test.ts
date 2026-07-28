@@ -73,6 +73,7 @@ import {
   ENV_VALUE_MAX_BYTES,
   ENV_TOTAL_MAX_BYTES,
   SandboxRuntimeAuthRefreshError,
+  SandboxRecoveryFailedError,
   type SandboxRuntimeConfig,
   type SecretStore,
   type PromptInputPart,
@@ -120,6 +121,8 @@ function fakeBox(over: Partial<SandboxInstance> = {}): SandboxInstance {
     waitFor: vi.fn().mockResolvedValue(undefined),
     refresh: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
+    stop: vi.fn().mockResolvedValue(undefined),
+    resume: vi.fn().mockResolvedValue(undefined),
     streamPrompt: vi.fn(),
     permissions: {
       add: vi.fn().mockResolvedValue(undefined),
@@ -336,7 +339,7 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     expect(createMock.mock.calls[0]![0].webTerminalEnabled).toBe(true)
   })
 
-  it('recreates a reused box whose edge has failed instead of returning it', async () => {
+  it('recovers a reused box whose edge has failed instead of deleting it', async () => {
     const del = vi.fn().mockResolvedValue(undefined)
     const failed = fakeBox({
       name: 'box-w1',
@@ -344,25 +347,32 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
       connection: { runtimeUrl: 'https://rt', edgeStatus: 'failed' } as never,
       delete: del,
     })
+    // The state-preserving restart clears the edge failure.
+    failed.stop = vi.fn().mockImplementation(async () => {
+      ;(failed as { connection: unknown }).connection = { runtimeUrl: 'https://rt' }
+    }) as never
     // running-only: a status-blind mock would re-surface the box on the stopped
     // list and send Stage 2 down a resume() path the fake box can't service.
     listMock.mockImplementation(({ status }: { status: string }) =>
       status === 'running' ? Promise.resolve([failed]) : Promise.resolve([]),
     )
-    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
 
-    await ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
+    const box = await ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
 
-    expect(del).toHaveBeenCalledOnce()
-    expect(createMock).toHaveBeenCalledOnce()
+    expect(box).toBe(failed)
+    expect(failed.stop).toHaveBeenCalledOnce()
+    expect(failed.resume).toHaveBeenCalledOnce()
+    expect(del).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
   })
 
-  it('recreates a reused box that never surfaces a runtime connection (no silent reuse)', async () => {
+  it('fails loud (workspace intact) on a reused box that never surfaces a runtime connection', async () => {
     vi.useFakeTimers()
     try {
       const del = vi.fn().mockResolvedValue(undefined)
       // Matches harness but has no connection; refresh + get never populate one,
-      // so refreshRuntimeConnection exhausts its polling window.
+      // so refreshRuntimeConnection exhausts its polling window — before AND
+      // after the state-preserving restart.
       const stuck = fakeBox({
         name: 'box-w1',
         metadata: { harness: 'opencode' },
@@ -373,27 +383,35 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
         status === 'running' ? Promise.resolve([stuck]) : Promise.resolve([]),
       )
       getMock.mockResolvedValue(stuck)
-      createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
 
       const promise = ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
-      // Drive past the 30s readiness deadline so the poll loop gives up.
-      await vi.advanceTimersByTimeAsync(31_000)
-      await promise
+      const assertion = expect(promise).rejects.toMatchObject({
+        name: 'SandboxRecoveryFailedError',
+        phase: 'probe',
+        stage: 'reused',
+        boxKey: 'box-w1',
+      })
+      // Drive past BOTH 30s readiness windows (pre-recovery + post-restart).
+      await vi.advanceTimersByTimeAsync(62_000)
+      await assertion
 
-      expect(del).toHaveBeenCalledOnce()
-      expect(createMock).toHaveBeenCalledOnce()
+      expect(stuck.stop).toHaveBeenCalledOnce()
+      expect(stuck.resume).toHaveBeenCalledOnce()
+      expect(del).not.toHaveBeenCalled()
+      expect(createMock).not.toHaveBeenCalled()
     } finally {
       vi.useRealTimers()
     }
   })
 
-  it('recreates instead of hard-failing when refresh/get throw during the readiness poll', async () => {
+  it('fails loud instead of deleting when refresh/get keep throwing during the readiness poll', async () => {
     vi.useFakeTimers()
     try {
       const del = vi.fn().mockResolvedValue(undefined)
       // A harness-matched running box with no connection whose refresh + get
-      // keep throwing (transient 5xx / network blip). The poll must swallow and
-      // retry, then fall through to recreate — not surface a hard failure.
+      // keep throwing (transient 5xx / network blip). The poll swallows and
+      // retries; a box that never connects goes through recovery and then
+      // surfaces the typed error — the workspace is never deleted.
       const flaky = fakeBox({
         name: 'box-w1',
         metadata: { harness: 'opencode' },
@@ -405,17 +423,144 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
         status === 'running' ? Promise.resolve([flaky]) : Promise.resolve([]),
       )
       getMock.mockRejectedValue(new Error('transient 5xx'))
-      createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
 
       const promise = ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
-      await vi.advanceTimersByTimeAsync(31_000)
+      const assertion = expect(promise).rejects.toMatchObject({
+        name: 'SandboxRecoveryFailedError',
+        phase: 'probe',
+      })
+      await vi.advanceTimersByTimeAsync(62_000)
+      await assertion
 
-      await expect(promise).resolves.toBeDefined()
-      expect(del).toHaveBeenCalledOnce()
-      expect(createMock).toHaveBeenCalledOnce()
+      expect(del).not.toHaveBeenCalled()
+      expect(createMock).not.toHaveBeenCalled()
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('restarts (not deletes) a reused box whose liveness probe fails, and returns it once healthy', async () => {
+    let restarted = false
+    const del = vi.fn().mockResolvedValue(undefined)
+    const wedged = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      delete: del,
+      exec: vi.fn().mockImplementation(async (cmd: string) => {
+        if (!restarted) throw new Error('exec timed out')
+        return { stdout: cmd.startsWith('pgrep') ? '123' : 'alive' }
+      }),
+      stop: vi.fn().mockImplementation(async () => {
+        restarted = true
+      }),
+    } as Partial<SandboxInstance>)
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      status === 'running' ? Promise.resolve([wedged]) : Promise.resolve([]),
+    )
+    const probed = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
+      livenessProbe: { sidecarProcessPattern: () => 'sidecar' },
+    })
+
+    const box = await ensureWorkspaceSandbox(probed, { workspaceId: 'w1', harness: 'opencode' })
+
+    // The regression #299 pins: the same box (same workspace) comes back.
+    expect(box).toBe(wedged)
+    expect(wedged.stop).toHaveBeenCalledOnce()
+    expect(wedged.resume).toHaveBeenCalledOnce()
+    expect(del).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a typed error (no delete) when the box is still dead after recovery', async () => {
+    const del = vi.fn().mockResolvedValue(undefined)
+    const dead = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      delete: del,
+      exec: vi.fn().mockRejectedValue(new Error('exec timed out')),
+    } as Partial<SandboxInstance>)
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      status === 'running' ? Promise.resolve([dead]) : Promise.resolve([]),
+    )
+    const probed = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
+      livenessProbe: { sidecarProcessPattern: () => 'sidecar' },
+    })
+
+    const rejection = await ensureWorkspaceSandbox(probed, { workspaceId: 'w1', harness: 'opencode' })
+      .then(() => null, (err: unknown) => err)
+
+    expect(rejection).toBeInstanceOf(SandboxRecoveryFailedError)
+    expect(rejection).toMatchObject({ phase: 'probe', stage: 'reused', boxKey: 'box-w1' })
+    expect(del).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a typed stop-phase error when the driver cannot stop the box (tangle driver)', async () => {
+    const del = vi.fn().mockResolvedValue(undefined)
+    const unsupported = new Error("Suspend is not supported when ORCHESTRATOR_DRIVER is 'tangle'")
+    const dead = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      delete: del,
+      exec: vi.fn().mockRejectedValue(new Error('exec timed out')),
+      stop: vi.fn().mockRejectedValue(unsupported),
+    } as Partial<SandboxInstance>)
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      status === 'running' ? Promise.resolve([dead]) : Promise.resolve([]),
+    )
+    const probed = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
+      livenessProbe: { sidecarProcessPattern: () => 'sidecar' },
+    })
+
+    const rejection = await ensureWorkspaceSandbox(probed, { workspaceId: 'w1', harness: 'opencode' })
+      .then(() => null, (err: unknown) => err)
+
+    expect(rejection).toBeInstanceOf(SandboxRecoveryFailedError)
+    expect(rejection).toMatchObject({ phase: 'stop', cause: unsupported })
+    expect(dead.resume).not.toHaveBeenCalled()
+    expect(del).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('recovers (not deletes) a stopped box that resumes but fails the probe', async () => {
+    const del = vi.fn().mockResolvedValue(undefined)
+    const stopped = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      delete: del,
+      exec: vi.fn().mockRejectedValue(new Error('exec timed out')),
+    } as Partial<SandboxInstance>)
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      status === 'stopped' ? Promise.resolve([stopped]) : Promise.resolve([]),
+    )
+    const probed = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
+      livenessProbe: { sidecarProcessPattern: () => 'sidecar' },
+    })
+
+    const rejection = await ensureWorkspaceSandbox(probed, { workspaceId: 'w1', harness: 'opencode' })
+      .then(() => null, (err: unknown) => err)
+
+    expect(rejection).toBeInstanceOf(SandboxRecoveryFailedError)
+    expect(rejection).toMatchObject({ phase: 'probe', stage: 'resumed' })
+    // Stage-2 resume once, recovery stop→resume once more.
+    expect(stopped.stop).toHaveBeenCalledOnce()
+    expect(stopped.resume).toHaveBeenCalledTimes(2)
+    expect(del).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('forceNew still deletes the existing box and creates a replacement', async () => {
+    const del = vi.fn().mockResolvedValue(undefined)
+    const running = fakeBox({ name: 'box-w1', metadata: { harness: 'opencode' }, delete: del })
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      status === 'running' ? Promise.resolve([running]) : Promise.resolve([]),
+    )
+    createMock.mockResolvedValue(fakeBox())
+
+    await ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode', forceNew: true })
+
+    expect(del).toHaveBeenCalledOnce()
+    expect(createMock).toHaveBeenCalledOnce()
   })
 })
 
@@ -1092,24 +1237,34 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     expect(createMock).toHaveBeenCalledOnce()
   })
 
-  it('liveness probe deletes an unresponsive running box and recreates', async () => {
+  it('liveness probe restarts an unresponsive running box in place — never deletes (#299)', async () => {
+    let restarted = false
     const del = vi.fn().mockResolvedValue(undefined)
     const dead = fakeBox({
       name: 'box-w1',
       delete: del,
-      exec: vi.fn().mockResolvedValue({ stdout: '', exitCode: 1 }),
+      exec: vi.fn().mockImplementation(async (cmd: string) =>
+        restarted
+          ? { stdout: cmd.startsWith('pgrep') ? '123' : 'alive', exitCode: 0 }
+          : { stdout: '', exitCode: 1 },
+      ),
+      stop: vi.fn().mockImplementation(async () => {
+        restarted = true
+      }),
     })
     listMock.mockImplementation(({ status }: { status: string }) =>
       status === 'running' ? Promise.resolve([dead]) : Promise.resolve([]),
     )
-    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
     const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
       livenessProbe: { sidecarProcessPattern: () => 'opencode\\|claude' },
     })
-    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+    const box = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
     expect(dead.exec).toHaveBeenCalledWith('echo alive')
-    expect(del).toHaveBeenCalledOnce()
-    expect(createMock).toHaveBeenCalledOnce()
+    expect(dead.stop).toHaveBeenCalledOnce()
+    expect(dead.resume).toHaveBeenCalledOnce()
+    expect(box).toBe(dead)
+    expect(del).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
   })
 
   it('resumes a stopped box from snapshot instead of creating', async () => {
