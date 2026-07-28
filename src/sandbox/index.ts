@@ -2567,3 +2567,5 @@ export * from './workspace-terminal'
 // back out of this module; tsup inlines both files into the one
 // `sandbox/index` chunk, so the cycle exists only in source.
 export * from './prewarm'
+
+export * from './prewarm-claim-d1'
