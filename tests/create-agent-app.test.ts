@@ -126,7 +126,7 @@ describe('create-agent-app scaffolder', () => {
     expect(JSON.stringify(pkg)).not.toMatch(/__[A-Z_]+__/)
   })
 
-  it('template engine pins match agent-app peerDependencies (drift gate)', () => {
+  it('template engine pins satisfy agent-app peerDependencies (drift gate)', () => {
     const appPkg = JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8')) as {
       devDependencies: Record<string, string>
       peerDependencies: Record<string, string>
@@ -145,24 +145,36 @@ describe('create-agent-app scaffolder', () => {
       '@tangle-network/sandbox',
       '@tangle-network/sandbox-ui',
     ]) {
-      expect(appPkg.devDependencies[name], `${name} must build against its advertised peer`).toBe(
-        appPkg.peerDependencies[name],
-      )
+      // A peer range is a FLOOR, not a pin: agent-app declares the oldest
+      // engine it works against and the PRODUCT chooses the version. So this
+      // asks whether the version we build against MEETS that floor — asserting
+      // string equality is what turned every floor into an exact pin, and an
+      // exact OPTIONAL peer no consumer happens to match is not installed at
+      // all, which is a silent capability loss rather than a version warning.
+      expect(
+        versionGte(minVersion(appPkg.devDependencies[name] as string), minVersion(appPkg.peerDependencies[name] as string)),
+        `${name}: we build against ${appPkg.devDependencies[name]} but advertise the peer floor ${appPkg.peerDependencies[name]}`,
+      ).toBe(true)
     }
     // Every engine peer the template pins must be pinned to agent-app's own range.
     for (const [name, range] of Object.entries(gen.peerDependencies)) {
       if (!name.startsWith('@tangle-network/')) continue
       expect(appPkg.peerDependencies[name], `template pins ${name} but it is not an agent-app peer`).toBeTruthy()
-      expect(range, `template pins ${name}@${range}; agent-app wants ${appPkg.peerDependencies[name]}`).toBe(
-        appPkg.peerDependencies[name],
-      )
+      expect(
+        versionGte(minVersion(range), minVersion(appPkg.peerDependencies[name] as string)),
+        `template pins ${name}@${range}, below agent-app's peer floor ${appPkg.peerDependencies[name]}`,
+      ).toBe(true)
     }
     // Every REQUIRED engine peer of agent-app must be declared by the template —
     // an omission is exactly the class of bug that shipped (missing agent-runtime).
     for (const [name, range] of Object.entries(appPkg.peerDependencies)) {
       if (!name.startsWith('@tangle-network/')) continue
       if (appPkg.peerDependenciesMeta?.[name]?.optional) continue
-      expect(gen.peerDependencies[name], `agent-app requires peer ${name}@${range}; the template omits it`).toBe(range)
+      expect(gen.peerDependencies[name], `agent-app requires peer ${name}@${range}; the template omits it`).toBeTruthy()
+      expect(
+        versionGte(minVersion(gen.peerDependencies[name] as string), minVersion(range)),
+        `agent-app requires peer ${name}@${range}; the template pins ${gen.peerDependencies[name]}`,
+      ).toBe(true)
     }
     // Each pinned engine peer must come with a devDependency that installs a
     // version meeting the peer floor (otherwise `pnpm install` warns/underserves).
