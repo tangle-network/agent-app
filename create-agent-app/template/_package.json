@@ -15,16 +15,16 @@
     "@tangle-network/agent-app": "__AGENT_APP_VERSION__"
   },
   "peerDependencies": {
-    "@tangle-network/agent-eval": "0.133.0",
+    "@tangle-network/agent-eval": "0.133.2",
     "@tangle-network/agent-integrations": ">=0.44.0",
     "@tangle-network/agent-interface": "0.36.0",
-    "@tangle-network/agent-runtime": "0.107.2"
+    "@tangle-network/agent-runtime": "0.107.4"
   },
   "devDependencies": {
-    "@tangle-network/agent-eval": "0.133.0",
+    "@tangle-network/agent-eval": "0.133.2",
     "@tangle-network/agent-integrations": "^0.44.0",
     "@tangle-network/agent-interface": "0.36.0",
-    "@tangle-network/agent-runtime": "0.107.2",
+    "@tangle-network/agent-runtime": "0.107.4",
     "@types/node": "^25.6.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0",
