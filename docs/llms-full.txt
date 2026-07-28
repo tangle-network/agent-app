@@ -9388,6 +9388,22 @@ Source: `src/preflight/cli.ts`
 
 Source: `src/preset-cloudflare/index.ts` · depends on `billing`, `crypto`, `knowledge`, `tools`, `web`
 
+### `CloudflareWorkflowBindingLike`
+
+`interface` — The structural binding implemented by Cloudflare's `Workflow<TParams>`.
+
+```ts
+interface CloudflareWorkflowBindingLike
+```
+
+### `CloudflareWorkflowInstanceLike`
+
+`interface` — The structural part of a Cloudflare Workflow instance used to prove that a failed create call actually left an addressable durable instance behind.
+
+```ts
+interface CloudflareWorkflowInstanceLike
+```
+
 ### `createD1KnowledgeStateAccessor`
 
 `function` — The {@link KnowledgeStateAccessor} over the preset D1 schema — the seam that lets the declarative `satisfiedBy` rules resolve with ZERO consumer code: - `config(path)` reads the supplied workspace co…
@@ -9466,6 +9482,22 @@ interface DrizzleColumnLike
 
 ```ts
 interface DrizzleSqliteCoreLike
+```
+
+### `ensureCloudflareWorkflowInstance`
+
+`function` — Create one durable Workflow instance, or prove an instance with the same id already exists before accepting a create error as an idempotent retry.
+
+```ts
+<TParams, TStatus, TInstance extends CloudflareWorkflowInstanceLike<TStatus>>(binding: CloudflareWorkflowBindingLike<TP…
+```
+
+### `EnsureCloudflareWorkflowInstanceResult`
+
+`interface`
+
+```ts
+interface EnsureCloudflareWorkflowInstanceResult
 ```
 
 ### `PRESET_MIGRATION_SQL`

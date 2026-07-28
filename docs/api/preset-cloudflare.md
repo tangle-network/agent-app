@@ -4,7 +4,23 @@
 
 Source: `src/preset-cloudflare/index.ts`
 
-16 exports.
+20 exports.
+
+### `CloudflareWorkflowBindingLike`
+
+`interface` — The structural binding implemented by Cloudflare's `Workflow<TParams>`.
+
+```ts
+interface CloudflareWorkflowBindingLike
+```
+
+### `CloudflareWorkflowInstanceLike`
+
+`interface` — The structural part of a Cloudflare Workflow instance used to prove that a failed create call actually left an addressable durable instance behind.
+
+```ts
+interface CloudflareWorkflowInstanceLike
+```
 
 ### `createD1KnowledgeStateAccessor`
 
@@ -84,6 +100,22 @@ interface DrizzleColumnLike
 
 ```ts
 interface DrizzleSqliteCoreLike
+```
+
+### `ensureCloudflareWorkflowInstance`
+
+`function` — Create one durable Workflow instance, or prove an instance with the same id already exists before accepting a create error as an idempotent retry.
+
+```ts
+<TParams, TStatus, TInstance extends CloudflareWorkflowInstanceLike<TStatus>>(binding: CloudflareWorkflowBindingLike<TP…
+```
+
+### `EnsureCloudflareWorkflowInstanceResult`
+
+`interface`
+
+```ts
+interface EnsureCloudflareWorkflowInstanceResult
 ```
 
 ### `PRESET_MIGRATION_SQL`

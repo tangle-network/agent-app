@@ -50,6 +50,13 @@ import type {
 } from '../tools/index'
 import type { KvLike } from '../web/index'
 
+export {
+  ensureCloudflareWorkflowInstance,
+  type CloudflareWorkflowBindingLike,
+  type CloudflareWorkflowInstanceLike,
+  type EnsureCloudflareWorkflowInstanceResult,
+} from './workflow-instance'
+
 // ---------------------------------------------------------------------------
 // D1 structural seam
 //
