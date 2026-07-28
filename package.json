@@ -232,6 +232,11 @@
       "import": "./dist/work-product-react/index.js",
       "default": "./dist/work-product-react/index.js"
     },
+    "./chat-react": {
+      "types": "./dist/chat-react/index.d.ts",
+      "import": "./dist/chat-react/index.js",
+      "default": "./dist/chat-react/index.js"
+    },
     "./assistant": {
       "types": "./dist/assistant/index.d.ts",
       "import": "./dist/assistant/index.js",

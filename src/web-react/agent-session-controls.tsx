@@ -1,4 +1,16 @@
 /**
+ * @deprecated for chat composers — use `ComposerAgentControls` from
+ * `@tangle-network/agent-app/chat-react`, which adapts sandbox-ui's
+ * `AgentSessionControls`. That one is the canonical control: it carries the
+ * backend logos, the harness↔model compatibility table, the locked/fork
+ * trigger and three trigger layouts, and it is what every product in the fleet
+ * actually renders. This component predates it and no product imports it. It
+ * stays exported because removing a published symbol is a major; it is not a
+ * second supported implementation.
+ *
+ * Still correct for a surface that genuinely cannot take the sandbox-ui peer —
+ * it is dependency-free beyond React by design.
+ *
  * `AgentSessionControls` — the model + harness + reasoning-effort cluster a chat
  * composer docks. One component so every product's two composers (and every
  * product) share the same control surface and harness↔model coherence policy.
