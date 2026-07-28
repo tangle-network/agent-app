@@ -561,8 +561,9 @@ function validateTurnBody(body: Record<string, unknown>, maxInlinePartBytes: num
   // A mention is a turn's whole payload often enough to count: "@chart.png"
   // with no prose is a real ask, and the pointer block the mentions produce is
   // prompt content the model reads.
-  if (!content && fileParts.length === 0 && mentions.length === 0) {
-    throw new ChatTurnInputError('Missing content (send text, parts, mentions, or any combination)')
+  const hasAttachments = Array.isArray(body.attachments) && body.attachments.length > 0
+  if (!content && fileParts.length === 0 && mentions.length === 0 && !hasAttachments) {
+    throw new ChatTurnInputError('Missing content (send text, parts, mentions, attachments, or any combination)')
   }
   assertPromptPartsWithinCap(fileParts, maxInlinePartBytes)
   let turnId: string | undefined
