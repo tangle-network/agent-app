@@ -28,7 +28,7 @@ const TEMPLATES = {
 
 // The agent-app version range the generated project depends on. Kept as a single
 // constant so a release bump touches one line.
-const AGENT_APP_RANGE = '^0.44.16'
+const AGENT_APP_RANGE = '^0.44.17'
 
 // Template files renamed on materialization. A template cannot itself be named
 // `package.json` / `.gitignore` / `tsconfig.json` without confusing the

@@ -37,17 +37,17 @@ importers:
         specifier: 0.9.0
         version: 0.9.0
       '@tangle-network/agent-runtime':
-        specifier: 0.107.1
-        version: 0.107.1(@tangle-network/agent-eval@0.133.0)(@tangle-network/agent-interface@0.36.0)(@tangle-network/sandbox@0.14.0)
+        specifier: 0.107.2
+        version: 0.107.2(@tangle-network/agent-eval@0.133.0)(@tangle-network/agent-interface@0.36.0)(@tangle-network/sandbox@0.15.1)
       '@tangle-network/brand':
         specifier: 1.1.0
         version: 1.1.0(react@19.2.7)
       '@tangle-network/sandbox':
-        specifier: 0.14.0
-        version: 0.14.0
+        specifier: 0.15.1
+        version: 0.15.1
       '@tangle-network/sandbox-ui':
-        specifier: 0.90.0
-        version: 0.90.0(@floating-ui/dom@1.7.6)(@shikijs/themes@4.3.0)(@tangle-network/agent-interface@0.36.0)(@tangle-network/brand@1.1.0(react@19.2.7))(@tangle-network/ui@11.1.0(@tangle-network/brand@1.1.0(react@19.2.7))(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react-router@7.18.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))(@tiptap/pm@3.29.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(@xterm/addon-fit@0.11.0)(@xterm/addon-web-links@0.12.0)(@xterm/addon-webgl@0.19.0)(@xterm/xterm@6.0.0)(@xyflow/react@12.11.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+        specifier: 0.90.1
+        version: 0.90.1(@floating-ui/dom@1.7.6)(@shikijs/themes@4.3.0)(@tangle-network/agent-interface@0.36.0)(@tangle-network/brand@1.1.0(react@19.2.7))(@tangle-network/ui@11.1.0(@tangle-network/brand@1.1.0(react@19.2.7))(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react-router@7.18.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))(@tiptap/pm@3.29.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(@xterm/addon-fit@0.11.0)(@xterm/addon-web-links@0.12.0)(@xterm/addon-webgl@0.19.0)(@xterm/xterm@6.0.0)(@xyflow/react@12.11.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@tangle-network/ui':
         specifier: ^11.0.0
         version: 11.1.0(@tangle-network/brand@1.1.0(react@19.2.7))(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react-router@7.18.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
@@ -1625,14 +1625,14 @@ packages:
   '@tangle-network/agent-profile-materialize@0.9.0':
     resolution: {integrity: sha512-Y18RGqmNqczKKeC+uficJ80pzJwvh480zYZPHCQHVVJtaHLvUPriDGbZQL/JMN/myjWNKQ72L9RuFuRpWzI49w==}
 
-  '@tangle-network/agent-runtime@0.107.1':
-    resolution: {integrity: sha512-VeCogZJHRNpvXcToEUqB5ZeC9pcHVVh8584PcMFDTWxG4Nq+W3E12wmFUZf5oL68UrXre5pnU4n0jlDlqOeCjg==}
+  '@tangle-network/agent-runtime@0.107.2':
+    resolution: {integrity: sha512-RVCURkEKwJ50tp43QPROcr7u0hUlw2blHLmuTmF5QZkAKR9g/MH50toPXU3CUSulV57TpnxdyHiUmdGjxbL7ZQ==}
     engines: {node: '>=22.13.0'}
     hasBin: true
     peerDependencies:
       '@tangle-network/agent-eval': '>=0.133.0 <0.134.0'
       '@tangle-network/agent-interface': '>=0.36.0 <0.37.0'
-      '@tangle-network/sandbox': '>=0.14.0 <0.15.0'
+      '@tangle-network/sandbox': '>=0.15.0 <0.16.0'
       playwright: ^1.40.0
     peerDependenciesMeta:
       '@tangle-network/sandbox':
@@ -1648,12 +1648,12 @@ packages:
       react:
         optional: true
 
-  '@tangle-network/sandbox-ui@0.90.0':
-    resolution: {integrity: sha512-TwEO2zd2MHFwB/1+cnO7ZMgvE3jV110yXe3Eo5Xh3E1gKW7scJWN9Q+0NlWfe8PCv3oc7Z0nRLrwkzQmLT0Ejw==}
+  '@tangle-network/sandbox-ui@0.90.1':
+    resolution: {integrity: sha512-2TaY3wi+SXSBn0XQZQoteZM2MvGDqizOVQ4YjSEkgts3C5Txgtovlk5Xfb28HdJUOyYq8jcybNeZB5Fq1/qvJw==}
     peerDependencies:
       '@hocuspocus/provider': '>=2.15.0 <5.0.0'
       '@nanostores/react': '>=0.8.4 <2.0.0'
-      '@tangle-network/agent-interface': ^0.35.0
+      '@tangle-network/agent-interface': ^0.36.0
       '@tangle-network/brand': ^1.1.0
       '@tangle-network/ui': ^11.0.0
       '@tanstack/react-query': ^5.0.0
@@ -1691,8 +1691,8 @@ packages:
       yjs:
         optional: true
 
-  '@tangle-network/sandbox@0.14.0':
-    resolution: {integrity: sha512-8th91/Y/lzwRvpkOT17J2Eu8HezPqN+pk/4rYMSWOHQqgf0x2Rqg4O+yqPEARPIIUeI/m+7G+TDLhJPqsAYlVQ==}
+  '@tangle-network/sandbox@0.15.1':
+    resolution: {integrity: sha512-UKLS3LK9KVt7QXBRdr13qyqStVR6aermIE3NoHAy9Xo23htldhBo5tc+4tgjcgPgG08rj/C4J3a1FOJjLGTtvw==}
     peerDependencies:
       '@mastra/core': ^1.36.0
       '@modelcontextprotocol/sdk': ^1.29.0
@@ -5022,7 +5022,7 @@ snapshots:
     dependencies:
       '@tangle-network/agent-interface': 0.34.0
 
-  '@tangle-network/agent-runtime@0.107.1(@tangle-network/agent-eval@0.133.0)(@tangle-network/agent-interface@0.36.0)(@tangle-network/sandbox@0.14.0)':
+  '@tangle-network/agent-runtime@0.107.2(@tangle-network/agent-eval@0.133.0)(@tangle-network/agent-interface@0.36.0)(@tangle-network/sandbox@0.15.1)':
     dependencies:
       '@tangle-network/agent-eval': 0.133.0
       '@tangle-network/agent-interface': 0.36.0
@@ -5030,7 +5030,7 @@ snapshots:
       '@tangle-network/agent-profile-materialize': 0.9.0
       tar-stream: 3.2.0
     optionalDependencies:
-      '@tangle-network/sandbox': 0.14.0
+      '@tangle-network/sandbox': 0.15.1
     transitivePeerDependencies:
       - bare-abort-controller
       - bare-buffer
@@ -5040,7 +5040,7 @@ snapshots:
     optionalDependencies:
       react: 19.2.7
 
-  '@tangle-network/sandbox-ui@0.90.0(@floating-ui/dom@1.7.6)(@shikijs/themes@4.3.0)(@tangle-network/agent-interface@0.36.0)(@tangle-network/brand@1.1.0(react@19.2.7))(@tangle-network/ui@11.1.0(@tangle-network/brand@1.1.0(react@19.2.7))(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react-router@7.18.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))(@tiptap/pm@3.29.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(@xterm/addon-fit@0.11.0)(@xterm/addon-web-links@0.12.0)(@xterm/addon-webgl@0.19.0)(@xterm/xterm@6.0.0)(@xyflow/react@12.11.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+  '@tangle-network/sandbox-ui@0.90.1(@floating-ui/dom@1.7.6)(@shikijs/themes@4.3.0)(@tangle-network/agent-interface@0.36.0)(@tangle-network/brand@1.1.0(react@19.2.7))(@tangle-network/ui@11.1.0(@tangle-network/brand@1.1.0(react@19.2.7))(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react-router@7.18.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7))(@tiptap/pm@3.29.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(@xterm/addon-fit@0.11.0)(@xterm/addon-web-links@0.12.0)(@xterm/addon-webgl@0.19.0)(@xterm/xterm@6.0.0)(@xyflow/react@12.11.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:
       '@lobehub/icons-static-svg': 1.94.0
       '@pierre/diffs': 1.2.12(@shikijs/themes@4.3.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -5073,7 +5073,7 @@ snapshots:
       - '@types/react'
       - '@types/react-dom'
 
-  '@tangle-network/sandbox@0.14.0':
+  '@tangle-network/sandbox@0.15.1':
     dependencies:
       '@tangle-network/agent-core': 0.4.23
       '@tangle-network/agent-interface': 0.34.0

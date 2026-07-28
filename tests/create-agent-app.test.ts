@@ -117,7 +117,7 @@ describe('create-agent-app scaffolder', () => {
   it('substitutes the project name into package.json + agent.config.ts', () => {
     const pkg = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf8'))
     expect(pkg.name).toBe('demo-agent')
-    expect(pkg.dependencies['@tangle-network/agent-app']).toBe('^0.44.16')
+    expect(pkg.dependencies['@tangle-network/agent-app']).toBe('^0.44.17')
     expect(pkg.scripts['knowledge:ingest']).toBe('node scripts/knowledge-ingest.mjs')
     const cfg = readFileSync(join(projectDir, 'agent.config.ts'), 'utf8')
     expect(cfg).toContain("name: 'demo-agent'")
