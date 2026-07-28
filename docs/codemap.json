@@ -8656,6 +8656,18 @@
           "doc": "Define permission levels for sandbox access and control"
         },
         {
+          "name": "SandboxRecoveryFailedError",
+          "kind": "class",
+          "signature": "class SandboxRecoveryFailedError",
+          "doc": "Thrown when an unresponsive box could not be recovered by a state-preserving restart."
+        },
+        {
+          "name": "SandboxRecoveryPhase",
+          "kind": "type",
+          "signature": "type SandboxRecoveryPhase",
+          "doc": "Which step of the state-preserving stop→resume recovery failed."
+        },
+        {
           "name": "SandboxResourceConfig",
           "kind": "interface",
           "signature": "interface SandboxResourceConfig",

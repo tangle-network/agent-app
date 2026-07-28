@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-115 exports.
+117 exports.
 
 ### `AppToolDescriptor`
 
@@ -556,6 +556,22 @@ type SandboxFileSizeOutcome
 
 ```ts
 type SandboxPermissionLevel
+```
+
+### `SandboxRecoveryFailedError`
+
+`class` — Thrown when an unresponsive box could not be recovered by a state-preserving restart.
+
+```ts
+class SandboxRecoveryFailedError
+```
+
+### `SandboxRecoveryPhase`
+
+`type` — Which step of the state-preserving stop→resume recovery failed.
+
+```ts
+type SandboxRecoveryPhase
 ```
 
 ### `SandboxResourceConfig`

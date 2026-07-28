@@ -11194,6 +11194,22 @@ type SandboxFileSizeOutcome
 type SandboxPermissionLevel
 ```
 
+### `SandboxRecoveryFailedError`
+
+`class` — Thrown when an unresponsive box could not be recovered by a state-preserving restart.
+
+```ts
+class SandboxRecoveryFailedError
+```
+
+### `SandboxRecoveryPhase`
+
+`type` — Which step of the state-preserving stop→resume recovery failed.
+
+```ts
+type SandboxRecoveryPhase
+```
+
 ### `SandboxResourceConfig`
 
 `interface` — Define configuration parameters for sandbox resource allocation and lifecycle management
