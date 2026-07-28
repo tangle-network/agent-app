@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_75 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_76 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -13,6 +13,7 @@ _75 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./brand`](api/brand.md) | 5 | — |
 | [`./brand-extraction`](api/brand-extraction.md) | 19 | — |
 | [`./catalog`](api/catalog.md) | 6 | `runtime` |
+| [`./chat-react`](api/chat-react.md) | 10 | `chat-routes`, `web-react` |
 | [`./chat-routes`](api/chat-routes.md) | 158 | `chat-store`, `interactions`, `model-resolution`, `plans`, `sandbox`, `stream`, `web` |
 | [`./chat-store`](api/chat-store.md) | 62 | `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product` |
 | [`./config`](api/config.md) | 13 | `knowledge`, `runtime` |
@@ -145,6 +146,16 @@ Depends on: `runtime`
 `buildCatalog`, `CatalogModel`, `fetchModelCatalog`, `ModelCatalog`, `normalizeModelId`, `RouterModel`
 
 [Full API →](api/catalog.md)
+
+## `./chat-react`
+
+Source: `src/chat-react/index.tsx` · 10 exports
+
+Depends on: `chat-routes`, `web-react`
+
+`ComposerAgentControls`, `ComposerAgentControlsProps`, `ComposerEffortSelection`, `ComposerHarnessSelection`, `ComposerModelSelection`, `EntryComposer`, `EntryComposerProps`, `HarnessType`, `ReasoningEffort`, `ReasoningLevel`
+
+[Full API →](api/chat-react.md)
 
 ## `./chat-routes`
 

@@ -39,6 +39,7 @@ export default defineConfig({
     'web-react/index': 'src/web-react/index.tsx',
     'work-product/index': 'src/work-product/index.ts',
     'work-product-react/index': 'src/work-product-react/index.tsx',
+    'chat-react/index': 'src/chat-react/index.tsx',
     'web-react/terminal': 'src/web-react/terminal.ts',
     'assistant/index': 'src/assistant/index.ts',
     'brand/index': 'src/brand/index.tsx',
