@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-138 exports.
+143 exports.
 
 ### `AppToolDescriptor`
 
@@ -126,6 +126,14 @@ interface BuildSandboxToolFileMountsOptions
 (events: AsyncIterable<unknown>, message: string | PromptInputPart[], history?: { role: "user" | "assistant"; content:…
 ```
 
+### `createD1PrewarmClaimStore`
+
+`function` — A `PrewarmClaimStore` backed by one D1 table.
+
+```ts
+(db: PrewarmClaimD1Like, options?: D1PrewarmClaimStoreOptions) => { acquire(key: string, ttlSeconds: number): Promise<b…
+```
+
 ### `createSandboxPrewarmer`
 
 `function`
@@ -172,6 +180,22 @@ interface BuildSandboxToolFileMountsOptions
 
 ```ts
 (opts: WorkspaceSandboxTerminalUpgradeHandlerOptions) => (request: Request) => Promise<Response | null>
+```
+
+### `D1PrewarmClaimStoreOptions`
+
+`interface`
+
+```ts
+interface D1PrewarmClaimStoreOptions
+```
+
+### `DEFAULT_PREWARM_CLAIM_TABLE`
+
+`const`
+
+```ts
+"sandbox_prewarm_claims"
 ```
 
 ### `DEFAULT_SANDBOX_RESOURCES`
@@ -404,6 +428,22 @@ type Outcome
 
 ```ts
 type PeekWorkspaceSandboxOutcome
+```
+
+### `PREWARM_CLAIM_TABLE_DDL`
+
+`const` — Paste into a migration.
+
+```ts
+"CREATE TABLE IF NOT EXISTS sandbox_prewarm_claims (\n key TEXT PRIMARY KEY,\n expires_at INTEGER NOT NULL\n)"
+```
+
+### `PrewarmClaimD1Like`
+
+`interface` — The columns and statements this store uses, and nothing else.
+
+```ts
+interface PrewarmClaimD1Like
 ```
 
 ### `PrewarmClaimStore`

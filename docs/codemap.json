@@ -8452,6 +8452,12 @@
           "doc": "Aggregate a sandbox prompt event stream down to the turn's one final answer."
         },
         {
+          "name": "createD1PrewarmClaimStore",
+          "kind": "function",
+          "signature": "(db: PrewarmClaimD1Like, options?: D1PrewarmClaimStoreOptions) => { acquire(key: string, ttlSeconds: number): Promise<b…",
+          "doc": "A `PrewarmClaimStore` backed by one D1 table."
+        },
+        {
           "name": "createSandboxPrewarmer",
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig, options: SandboxPrewarmerOptions) => SandboxPrewarmer",
@@ -8486,6 +8492,18 @@
           "kind": "function",
           "signature": "(opts: WorkspaceSandboxTerminalUpgradeHandlerOptions) => (request: Request) => Promise<Response | null>",
           "doc": "Build a Worker-entry handler that proxies a sandbox terminal WebSocket upgrade to the sandbox API runtime proxy."
+        },
+        {
+          "name": "D1PrewarmClaimStoreOptions",
+          "kind": "interface",
+          "signature": "interface D1PrewarmClaimStoreOptions",
+          "doc": null
+        },
+        {
+          "name": "DEFAULT_PREWARM_CLAIM_TABLE",
+          "kind": "const",
+          "signature": "\"sandbox_prewarm_claims\"",
+          "doc": null
         },
         {
           "name": "DEFAULT_SANDBOX_RESOURCES",
@@ -8660,6 +8678,18 @@
           "kind": "type",
           "signature": "type PeekWorkspaceSandboxOutcome",
           "doc": "What a peek can find."
+        },
+        {
+          "name": "PREWARM_CLAIM_TABLE_DDL",
+          "kind": "const",
+          "signature": "\"CREATE TABLE IF NOT EXISTS sandbox_prewarm_claims (\\n key TEXT PRIMARY KEY,\\n expires_at INTEGER NOT NULL\\n)\"",
+          "doc": "Paste into a migration."
+        },
+        {
+          "name": "PrewarmClaimD1Like",
+          "kind": "interface",
+          "signature": "interface PrewarmClaimD1Like",
+          "doc": "The columns and statements this store uses, and nothing else."
         },
         {
           "name": "PrewarmClaimStore",
