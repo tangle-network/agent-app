@@ -4519,6 +4519,36 @@
       "error": null,
       "exports": [
         {
+          "name": "assertGateDiscriminates",
+          "kind": "function",
+          "signature": "<TInput>(name: string, gate: GateFn<TInput>, cases: readonly CalibrationCase<TInput>[]) => Promise<CalibrationReport>",
+          "doc": "`calibrateGate`, but throws instead of reporting."
+        },
+        {
+          "name": "calibrateGate",
+          "kind": "function",
+          "signature": "<TInput>(gate: GateFn<TInput>, cases: readonly CalibrationCase<TInput>[]) => Promise<CalibrationReport>",
+          "doc": "Run a gate against cases whose verdicts are known, and report whether it actually discriminates."
+        },
+        {
+          "name": "CalibrationCase",
+          "kind": "interface",
+          "signature": "interface CalibrationCase",
+          "doc": "A case whose verdict is known in advance, used to calibrate a gate."
+        },
+        {
+          "name": "CalibrationOutcome",
+          "kind": "interface",
+          "signature": "interface CalibrationOutcome",
+          "doc": null
+        },
+        {
+          "name": "CalibrationReport",
+          "kind": "interface",
+          "signature": "interface CalibrationReport",
+          "doc": null
+        },
+        {
           "name": "CompletionRequirement",
           "kind": "interface",
           "signature": "interface CompletionRequirement",
@@ -4553,6 +4583,24 @@
           "kind": "function",
           "signature": "(events: readonly RuntimeEventLike[]) => ProducedState",
           "doc": "Normalize a run's runtime event stream into `ProducedState`."
+        },
+        {
+          "name": "GateFn",
+          "kind": "type",
+          "signature": "type GateFn",
+          "doc": "A gate under calibration."
+        },
+        {
+          "name": "measureWithControl",
+          "kind": "function",
+          "signature": "<TValue>(opts: { readonly measure: () => TValue | Promise<TValue>; readonly control: () => TValue | Promise<TValue>; re…",
+          "doc": "Measure something, but only after proving the instrument can register a non-zero — because an absence is a claim about the measurement first."
+        },
+        {
+          "name": "ProbeReport",
+          "kind": "interface",
+          "signature": "interface ProbeReport",
+          "doc": null
         },
         {
           "name": "producedFromToolEvents",

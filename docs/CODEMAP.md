@@ -22,7 +22,7 @@ _75 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./design-canvas-react/engine`](api/design-canvas-react-engine.md) | 75 | `brand`, `design-canvas`, `theme` |
 | [`./design-canvas-react/lazy`](api/design-canvas-react-lazy.md) | 4 | `brand`, `design-canvas`, `theme` |
 | [`./design-canvas/drizzle`](api/design-canvas-drizzle.md) | 10 | `tools`, `web` |
-| [`./eval`](api/eval.md) | 13 | `tools` |
+| [`./eval`](api/eval.md) | 21 | `tools` |
 | [`./eval-campaign`](api/eval-campaign.md) | 37 | — |
 | [`./forms`](api/forms.md) | 29 | — |
 | [`./harness`](api/harness.md) | 13 | — |
@@ -238,11 +238,11 @@ Depends on: `tools`, `web`
 
 ## `./eval`
 
-Source: `src/eval/index.ts` · 13 exports
+Source: `src/eval/index.ts` · 21 exports
 
 Depends on: `tools`
 
-`CompletionRequirement`, `CompletionVerdict`, `CorrectnessChecker`, `createLlmCorrectnessChecker`, `createTokenRecallChecker`, `extractProducedState`, `producedFromToolEvents`, `ProducedState`, `RuntimeEventLike`, `SatisfiedBy`, `TaskGold`, `verifyCompletion`, `weightedComposite`
+`assertGateDiscriminates`, `calibrateGate`, `CalibrationCase`, `CalibrationOutcome`, `CalibrationReport`, `CompletionRequirement`, `CompletionVerdict`, `CorrectnessChecker`, `createLlmCorrectnessChecker`, `createTokenRecallChecker`, `extractProducedState`, `GateFn`, `measureWithControl`, `ProbeReport`, `producedFromToolEvents`, `ProducedState`, `RuntimeEventLike`, `SatisfiedBy`, `TaskGold`, `verifyCompletion`, `weightedComposite`
 
 [Full API →](api/eval.md)
 
