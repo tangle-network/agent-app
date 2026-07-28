@@ -629,6 +629,30 @@ describe('streamSandboxPrompt seam', () => {
     expect(opts.requireVisibleAssistantOutput).toBe(true)
   })
 
+  it('forwards execution replay and dispatch idempotency identities to box.streamPrompt', async () => {
+    async function* events() {
+      yield { type: 'result' }
+    }
+    const box = fakeBox({ streamPrompt: vi.fn().mockReturnValue(events()) })
+
+    for await (const _ of streamSandboxPrompt(shell(), box, 'retry me', {
+      sessionId: 'thread-1',
+      executionId: 'exec-1',
+      turnId: 'turn-1',
+      lastEventId: 'event-8',
+    })) {
+      void _
+    }
+
+    const [, opts] = (box.streamPrompt as ReturnType<typeof vi.fn>).mock.calls[0]!
+    expect(opts).toMatchObject({
+      sessionId: 'thread-1',
+      executionId: 'exec-1',
+      turnId: 'turn-1',
+      lastEventId: 'event-8',
+    })
+  })
+
   it('omits the model when provider resolution yields nothing', async () => {
     async function* events() {
       yield { type: 'result' }

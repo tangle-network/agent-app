@@ -14,7 +14,7 @@ _75 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./brand-extraction`](api/brand-extraction.md) | 19 | — |
 | [`./catalog`](api/catalog.md) | 6 | `runtime` |
 | [`./chat-routes`](api/chat-routes.md) | 158 | `chat-store`, `interactions`, `model-resolution`, `plans`, `sandbox`, `stream`, `web` |
-| [`./chat-store`](api/chat-store.md) | 62 | `chat-routes`, `interactions`, `plans`, `stream`, `web-react`, `work-product` |
+| [`./chat-store`](api/chat-store.md) | 62 | `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product` |
 | [`./config`](api/config.md) | 13 | `knowledge`, `runtime` |
 | [`./crypto`](api/crypto.md) | 10 | `billing` |
 | [`./design-canvas`](api/design-canvas.md) | 103 | `tools`, `web` |
@@ -54,7 +54,7 @@ _75 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./sequences/drizzle`](api/sequences-drizzle.md) | 13 | `tools`, `web` |
 | [`./skills`](api/skills.md) | 27 | — |
 | [`./skills-placement`](api/skills-placement.md) | 6 | `harness`, `skills` |
-| [`./store`](api/store.md) | 8 | — |
+| [`./store`](api/store.md) | 10 | — |
 | [`./stream`](api/stream.md) | 46 | `interactions`, `plans` |
 | [`./studio`](api/studio.md) | 37 | — |
 | [`./studio-react`](api/studio-react.md) | 30 | `studio` |
@@ -160,7 +160,7 @@ Depends on: `chat-store`, `interactions`, `model-resolution`, `plans`, `sandbox`
 
 Source: `src/chat-store/index.ts` · 62 exports
 
-Depends on: `chat-routes`, `interactions`, `plans`, `stream`, `web-react`, `work-product`
+Depends on: `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product`
 
 `AppendMessageInput`, `attachmentInputToPart`, `attachmentKindForMime`, `attachmentPartKey`, `attachmentPartsFromMessageParts`, `buildAttachmentPromptBlock`, `BULK_DELETE_MAX_THREADS`, `BulkDeleteThreadsInput`, `ChatAttachmentKind`, `ChatAttachmentPart`, `ChatDatabase`, `ChatFilePart`, `ChatImagePart`, `ChatInteractionPart`, `ChatMentionKind`, `ChatMentionPart`, `ChatMessagePart`, `ChatMessageRow`, `ChatNoticePart`, `ChatParentTable`, `ChatPartTime`, `ChatPlanPart`, `ChatReasoningPart`, `ChatStepFinishPart`, `ChatStepStartPart`, `ChatStore`, `ChatStoreInputError`, `ChatSubtaskPart`, `ChatTables`, `ChatTextPart`, `ChatThreadRow`, `ChatToolPart`, `ChatToolState`, `ChatToolStatus`, `ChatUsageTokens`, `ChatWorkProductPart`, `createChatStore`, `createChatTables`, `CreateChatTablesOptions`, `CreateThreadInput`, `DEFAULT_ATTACHMENT_PROMPT_HEADER`, `historyContentWithAttachments`, `isChatAttachmentPart`, `isChatInteractionPart`, `isChatMentionPart`, `isChatPlanPart`, `isChatStepFinishPart`, `isChatTextPart`, `isChatToolPart`, `isChatWorkProductPart`, `ListMessagesOptions`, `ListThreadsInput`, `ListThreadsResult`, `mentionInputToPart`, `mentionPartsFromMessageParts`, `NewChatMessageRow`, `NewChatThreadRow`, `StorableHarnessPartKind`, `threadTitleFromMessage`, `toChatMessageParts`, `UpdateMessageInput`, `WorkspaceAccessCheck`
 
@@ -524,9 +524,9 @@ Depends on: `harness`, `skills`
 
 ## `./store`
 
-Source: `src/store/index.ts` · 8 exports
+Source: `src/store/index.ts` · 10 exports
 
-`createDatabaseProvider`, `createInMemoryKV`, `DatabaseProvider`, `DatabaseProviderOptions`, `KVGetWithMetadataResult`, `KVListResult`, `KVPutOptions`, `KVStore`
+`createDatabaseProvider`, `createInMemoryKV`, `DatabaseProvider`, `DatabaseProviderOptions`, `KVGetWithMetadataResult`, `KVListResult`, `KVPutOptions`, `KVStore`, `runSqliteStatements`, `SqliteBatchDatabase`
 
 [Full API →](api/store.md)
 
