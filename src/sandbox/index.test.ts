@@ -74,6 +74,9 @@ import {
   ENV_TOTAL_MAX_BYTES,
   SandboxRuntimeAuthRefreshError,
   SandboxRecoveryFailedError,
+  resolveModelSelection,
+  requireTransportableModel,
+  SandboxModelResolutionError,
   type SandboxRuntimeConfig,
   type SecretStore,
   type PromptInputPart,
@@ -3072,5 +3075,275 @@ describe('peekWorkspaceSandbox', () => {
         workspaceId: 'w1',
       }),
     ).rejects.toThrow(/credentials are required/)
+  })
+})
+
+// #302 — resolveModel conflated model identity with credential resolution: a
+// credential miss destroyed an explicit model id (gtm-agent#665), and `??`
+// treated `''` as a present value. resolveModelSelection fixes both via a
+// typed three-state outcome; resolveModel stays a thin wrapper for back-compat.
+describe('resolveModelSelection', () => {
+  it('override with no derivable provider fails no_provider (and the legacy resolveModel wrapper still collapses to undefined — the gtm-agent#665 regression)', () => {
+    const args: [Parameters<typeof resolveModelSelection>[0], Parameters<typeof resolveModelSelection>[1]] = [
+      {},
+      { model: 'user-picked-model' },
+    ]
+    const selection = resolveModelSelection(...args)
+    expect(selection).toEqual({
+      succeeded: false,
+      error: 'no_provider',
+      model: 'user-picked-model',
+      source: 'override',
+    })
+    expect(resolveModel(...args)).toBeUndefined()
+  })
+
+  it('config-sourced no_api_key failure carries the resolved provider', () => {
+    const selection = resolveModelSelection({ providerName: 'openai-compat', modelName: 'm' })
+    expect(selection).toEqual({
+      succeeded: false,
+      error: 'no_api_key',
+      model: 'm',
+      provider: 'openai-compat',
+      source: 'config',
+    })
+  })
+
+  it('a stale provider.defaultModel with no key fails no_api_key with source:default', () => {
+    const selection = resolveModelSelection({ providerName: 'openai-compat', defaultModel: 'd' })
+    expect(selection).toEqual({
+      succeeded: false,
+      error: 'no_api_key',
+      model: 'd',
+      provider: 'openai-compat',
+      source: 'default',
+    })
+  })
+
+  it('nothing derivable resolves to succeeded:true, value:undefined — not an error', () => {
+    expect(resolveModelSelection({})).toEqual({ succeeded: true, value: undefined })
+  })
+
+  it('provider+key with no model name resolves to succeeded:true, value:undefined', () => {
+    expect(resolveModelSelection({ providerName: 'openai-compat', apiKey: 'k' })).toEqual({
+      succeeded: true,
+      value: undefined,
+    })
+  })
+
+  it('keyless success carries a value under allowKeylessModel', () => {
+    expect(
+      resolveModelSelection({ providerName: 'openai-compat', modelName: 'm', allowKeylessModel: true }),
+    ).toEqual({ succeeded: true, value: { model: 'm', provider: 'openai-compat' } })
+  })
+
+  it('keyless without an explicit providerName still fails no_provider (inference cannot fire keyless)', () => {
+    expect(resolveModelSelection({ modelName: 'm', allowKeylessModel: true })).toEqual({
+      succeeded: false,
+      error: 'no_provider',
+      model: 'm',
+      source: 'config',
+    })
+  })
+})
+
+describe('resolveModelSelection empty-string equivalence', () => {
+  // The `??` precedence chain used to treat '' as present, poisoning
+  // derivation. Every listed string field must behave as if omitted when ''.
+  const base: Record<string, unknown> = {
+    routerBaseUrl: 'https://router',
+    apiKey: 'router-key',
+    providerName: 'openai-compat',
+    modelName: 'gpt-x',
+    defaultModel: 'gpt-default',
+    openaiApiKey: 'oa-key',
+  }
+  const overrideBase = { model: 'override-model', modelApiKey: 'override-key' }
+
+  const configFields = [
+    'routerBaseUrl',
+    'apiKey',
+    'providerName',
+    'modelName',
+    'defaultModel',
+    'openaiApiKey',
+  ] as const
+
+  it.each(configFields)('config.%s: "" behaves identically to omitted', (field) => {
+    const withEmpty = { ...base, [field]: '' }
+    const omitted = { ...base }
+    delete omitted[field]
+    expect(resolveModelSelection(withEmpty, overrideBase)).toEqual(
+      resolveModelSelection(omitted, overrideBase),
+    )
+  })
+
+  it('override.model: "" behaves identically to omitted', () => {
+    const withEmpty = { model: '', modelApiKey: 'override-key' }
+    const omitted = { modelApiKey: 'override-key' }
+    expect(resolveModelSelection(base, withEmpty)).toEqual(resolveModelSelection(base, omitted))
+  })
+
+  it('override.modelApiKey: "" behaves identically to omitted', () => {
+    const withEmpty = { model: 'override-model', modelApiKey: '' }
+    const omitted = { model: 'override-model' }
+    expect(resolveModelSelection(base, withEmpty)).toEqual(resolveModelSelection(base, omitted))
+  })
+
+  // Pinned outcomes so the equivalence above isn't vacuous — each row asserts
+  // the ACTUAL derived value, not just "both sides match".
+  it('{apiKey:"", openaiApiKey:"sk", defaultModel:"gpt"} now resolves via the openai fallback (today\'s resolveModel returns undefined)', () => {
+    expect(resolveModelSelection({ apiKey: '', openaiApiKey: 'sk', defaultModel: 'gpt' })).toEqual({
+      succeeded: true,
+      value: { model: 'gpt', provider: 'openai', apiKey: 'sk' },
+    })
+  })
+
+  it('providerName:"" with apiKey+modelName still infers openai-compat from the key', () => {
+    expect(resolveModelSelection({ providerName: '', apiKey: 'k', modelName: 'm' })).toEqual({
+      succeeded: true,
+      value: { model: 'm', provider: 'openai-compat', apiKey: 'k' },
+    })
+  })
+
+  it('override.model:"" falls back to config.modelName', () => {
+    expect(
+      resolveModelSelection(
+        { providerName: 'openai-compat', apiKey: 'k', modelName: 'config-model' },
+        { model: '' },
+      ),
+    ).toEqual({ succeeded: true, value: { model: 'config-model', provider: 'openai-compat', apiKey: 'k' } })
+  })
+
+  it('override.modelApiKey:"" falls back to config.apiKey', () => {
+    expect(
+      resolveModelSelection(
+        { providerName: 'openai-compat', apiKey: 'config-key', modelName: 'm' },
+        { modelApiKey: '' },
+      ),
+    ).toEqual({ succeeded: true, value: { model: 'm', provider: 'openai-compat', apiKey: 'config-key' } })
+  })
+
+  it('trims whitespace around a model name', () => {
+    expect(
+      resolveModelSelection({ providerName: 'openai-compat', apiKey: 'k', modelName: '  m  ' }),
+    ).toEqual({ succeeded: true, value: { model: 'm', provider: 'openai-compat', apiKey: 'k' } })
+  })
+})
+
+describe('requireTransportableModel + SandboxModelResolutionError callers', () => {
+  it('streamSandboxPrompt rejects with SandboxModelResolutionError when an explicit options.model is untransportable, and never calls box.streamPrompt', async () => {
+    const streamPrompt = vi.fn()
+    const box = fakeBox({ streamPrompt })
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' })
+    let caught: unknown
+    try {
+      for await (const _ of streamSandboxPrompt(shell, box, 'go', { model: 'user-picked' })) void _
+    } catch (err) {
+      caught = err
+    }
+    expect(caught).toBeInstanceOf(SandboxModelResolutionError)
+    const err = caught as SandboxModelResolutionError
+    expect(err.code).toBe('no_provider')
+    expect(err.model).toBe('user-picked')
+    expect(err.source).toBe('override')
+    expect(streamPrompt).not.toHaveBeenCalled()
+  })
+
+  it('streamSandboxPrompt with no override and no provider config still streams, backend.model undefined', async () => {
+    async function* events() {
+      yield { type: 'result' }
+    }
+    const box = fakeBox({ streamPrompt: vi.fn().mockReturnValue(events()) })
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' })
+    for await (const _ of streamSandboxPrompt(shell, box, 'go')) void _
+    const [, opts] = (box.streamPrompt as ReturnType<typeof vi.fn>).mock.calls[0]!
+    expect(opts.backend.model).toBeUndefined()
+  })
+
+  it('driveSandboxTurn REJECTS (not a fail() Outcome) when an explicit model is untransportable, and never calls box.driveTurn', async () => {
+    const driveTurn = vi.fn()
+    const box = fakeBox({ driveTurn })
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' })
+    await expect(
+      driveSandboxTurn(shell, box, 'go', { sessionId: 's1', model: 'user-picked' }),
+    ).rejects.toBeInstanceOf(SandboxModelResolutionError)
+    expect(driveTurn).not.toHaveBeenCalled()
+  })
+
+  it('ensureWorkspaceSandbox keyless configured model keeps the pre-#302 create contract (tax-agent): creation succeeds, model not baked, drop is logged', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      listMock.mockResolvedValue([])
+      createMock.mockResolvedValue(
+        fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }),
+      )
+      const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+        backendModelAtCreate: true,
+        resumeStopped: false,
+        provider: { providerName: 'openai-compat', modelName: 'm' },
+      })
+      await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+      expect(createMock).toHaveBeenCalledOnce()
+      expect(createMock.mock.calls[0]![0].backend.model).toBeUndefined()
+      expect(errorSpy).toHaveBeenCalled()
+      const [message] = errorSpy.mock.calls[0]!
+      expect(String(message)).toContain('m')
+      expect(String(message)).toContain('allowKeylessModel')
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+
+  it('ensureWorkspaceSandbox + backendModelAtCreate with NO provider config creates normally, backend.model undefined', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      backendModelAtCreate: true,
+      resumeStopped: false,
+    })
+    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+    expect(createMock).toHaveBeenCalledOnce()
+    expect(createMock.mock.calls[0]![0].backend.model).toBeUndefined()
+  })
+
+  it('streamSandboxPrompt keyless configured model (tax-agent shape), no options.model: streams normally, backend.model undefined, drop logged', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      async function* events() {
+        yield { type: 'result' }
+      }
+      const box = fakeBox({ streamPrompt: vi.fn().mockReturnValue(events()) })
+      const shell = shellFor(
+        { apiKey: 'k', baseUrl: 'https://s' },
+        { provider: { providerName: 'openai-compat', modelName: 'm' } },
+      )
+      for await (const _ of streamSandboxPrompt(shell, box, 'go')) void _
+      const [, opts] = (box.streamPrompt as ReturnType<typeof vi.fn>).mock.calls[0]!
+      expect(opts.backend.model).toBeUndefined()
+      expect(errorSpy).toHaveBeenCalled()
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+
+  it('a source:default failure (stale provider.defaultModel, no key) is skipped silently: does not throw, backend.model undefined, logs via console.error', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      async function* events() {
+        yield { type: 'result' }
+      }
+      const box = fakeBox({ streamPrompt: vi.fn().mockReturnValue(events()) })
+      const shell = shellFor(
+        { apiKey: 'k', baseUrl: 'https://s' },
+        { provider: { providerName: 'openai-compat', defaultModel: 'd' } },
+      )
+      for await (const _ of streamSandboxPrompt(shell, box, 'go')) void _
+      const [, opts] = (box.streamPrompt as ReturnType<typeof vi.fn>).mock.calls[0]!
+      expect(opts.backend.model).toBeUndefined()
+      expect(errorSpy).toHaveBeenCalled()
+    } finally {
+      errorSpy.mockRestore()
+    }
   })
 })
