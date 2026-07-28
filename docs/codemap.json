@@ -4828,6 +4828,188 @@
       ]
     },
     {
+      "id": "./forms",
+      "source": "src/forms/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "assertFormBlankIntegrity",
+          "kind": "function",
+          "signature": "(blank: FormBlank) => Promise<void>",
+          "doc": "Prove the embedded bytes are the file the registry was derived from."
+        },
+        {
+          "name": "checkRegistryAgainstBlank",
+          "kind": "function",
+          "signature": "(args: { pdf: Uint8Array<ArrayBufferLike>; registry: FormRegistry; }) => Promise<RegistryCheckResult>",
+          "doc": "Check a registry against the blank it claims to describe."
+        },
+        {
+          "name": "decodeFormBlank",
+          "kind": "function",
+          "signature": "(blank: FormBlank) => Uint8Array<ArrayBufferLike>",
+          "doc": "Decode a blank once per isolate."
+        },
+        {
+          "name": "describeFormFill",
+          "kind": "function",
+          "signature": "(result: FillFormResult) => string",
+          "doc": "What to tell the agent after a fill."
+        },
+        {
+          "name": "FilledWidget",
+          "kind": "interface",
+          "signature": "interface FilledWidget",
+          "doc": "One widget the fill actually wrote."
+        },
+        {
+          "name": "FillFormOptions",
+          "kind": "interface",
+          "signature": "interface FillFormOptions",
+          "doc": null
+        },
+        {
+          "name": "FillFormResult",
+          "kind": "interface",
+          "signature": "interface FillFormResult",
+          "doc": null
+        },
+        {
+          "name": "fillPdfForm",
+          "kind": "function",
+          "signature": "(options: FillFormOptions) => Promise<FillFormResult>",
+          "doc": "Write a value map onto a blank, returning the bytes plus the exact widget-by-widget account of what was and was not placed."
+        },
+        {
+          "name": "formatFormCurrency",
+          "kind": "function",
+          "signature": "(value: number) => string",
+          "doc": "Format a figure the way a US agency form prints it: grouped thousands, two decimals, negatives in parentheses."
+        },
+        {
+          "name": "FormBlank",
+          "kind": "interface",
+          "signature": "interface FormBlank",
+          "doc": "A blank form's bytes, base64-encoded, with the provenance to check them."
+        },
+        {
+          "name": "FormLabelBasis",
+          "kind": "type",
+          "signature": "type FormLabelBasis",
+          "doc": "Where a slot's `label` came from, and therefore what it can prove."
+        },
+        {
+          "name": "FormRegistry",
+          "kind": "interface",
+          "signature": "interface FormRegistry",
+          "doc": "A form's complete slot table, pinned to the revision it was derived from."
+        },
+        {
+          "name": "FormSlot",
+          "kind": "interface",
+          "signature": "interface FormSlot",
+          "doc": "One semantic slot: what a caller supplies, and where the platform puts it."
+        },
+        {
+          "name": "FormSlotFormat",
+          "kind": "type",
+          "signature": "type FormSlotFormat",
+          "doc": "How a slot's text value is rendered into the box."
+        },
+        {
+          "name": "FormSlotKind",
+          "kind": "type",
+          "signature": "type FormSlotKind",
+          "doc": "What kind of widget a slot writes to."
+        },
+        {
+          "name": "LabelVerdict",
+          "kind": "type",
+          "signature": "type LabelVerdict",
+          "doc": "What the slot's `label` is worth, checked against the produced file."
+        },
+        {
+          "name": "parseFormAmount",
+          "kind": "function",
+          "signature": "(value: unknown) => number | undefined",
+          "doc": "A number, or a number written the way a form prints one (`$141,318.74`)."
+        },
+        {
+          "name": "parseFormBoolean",
+          "kind": "function",
+          "signature": "(value: unknown) => boolean | undefined",
+          "doc": "A checkbox takes a boolean and nothing else."
+        },
+        {
+          "name": "RegistryCheckResult",
+          "kind": "interface",
+          "signature": "interface RegistryCheckResult",
+          "doc": null
+        },
+        {
+          "name": "RegistryProblem",
+          "kind": "interface",
+          "signature": "interface RegistryProblem",
+          "doc": null
+        },
+        {
+          "name": "RegistryProblemCode",
+          "kind": "type",
+          "signature": "type RegistryProblemCode",
+          "doc": "Why a registry does not match the blank it claims to describe."
+        },
+        {
+          "name": "sha256Hex",
+          "kind": "function",
+          "signature": "(bytes: Uint8Array<ArrayBufferLike>) => Promise<string>",
+          "doc": "Lowercase-hex SHA-256 of a byte range."
+        },
+        {
+          "name": "SlotVerdict",
+          "kind": "type",
+          "signature": "type SlotVerdict",
+          "doc": null
+        },
+        {
+          "name": "SlotVerification",
+          "kind": "interface",
+          "signature": "interface SlotVerification",
+          "doc": null
+        },
+        {
+          "name": "UnfilledCode",
+          "kind": "type",
+          "signature": "type UnfilledCode",
+          "doc": "Why a supplied value did not reach the page."
+        },
+        {
+          "name": "UnfilledSlot",
+          "kind": "interface",
+          "signature": "interface UnfilledSlot",
+          "doc": null
+        },
+        {
+          "name": "verifyFilledForm",
+          "kind": "function",
+          "signature": "(args: { pdf: Uint8Array<ArrayBufferLike>; registry: FormRegistry; expected: Record<string, unknown>; }) => Promise<Ver…",
+          "doc": "Verify a filled form against the value map it was filled from."
+        },
+        {
+          "name": "VerifyFormResult",
+          "kind": "interface",
+          "signature": "interface VerifyFormResult",
+          "doc": null
+        },
+        {
+          "name": "widgetLabel",
+          "kind": "function",
+          "signature": "(form: PDFForm, field: string) => Promise<string | undefined>",
+          "doc": "The `/TU` accessibility text a widget carries, if any."
+        }
+      ]
+    },
+    {
       "id": "./harness",
       "source": "src/harness/index.ts",
       "dependsOn": [],

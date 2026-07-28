@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_74 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_75 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -13,7 +13,7 @@ _74 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./brand`](api/brand.md) | 5 | — |
 | [`./brand-extraction`](api/brand-extraction.md) | 19 | — |
 | [`./catalog`](api/catalog.md) | 6 | `runtime` |
-| [`./chat-routes`](api/chat-routes.md) | 158 | `chat-store`, `interactions`, `model-resolution`, `plans`, `sandbox`, `stream`, `web` |
+| [`./chat-routes`](api/chat-routes.md) | 157 | `chat-store`, `interactions`, `model-resolution`, `plans`, `sandbox`, `stream`, `web` |
 | [`./chat-store`](api/chat-store.md) | 62 | `chat-routes`, `interactions`, `plans`, `stream`, `web-react`, `work-product` |
 | [`./config`](api/config.md) | 13 | `knowledge`, `runtime` |
 | [`./crypto`](api/crypto.md) | 10 | `billing` |
@@ -23,7 +23,8 @@ _74 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./design-canvas-react/lazy`](api/design-canvas-react-lazy.md) | 4 | `brand`, `design-canvas`, `theme` |
 | [`./design-canvas/drizzle`](api/design-canvas-drizzle.md) | 10 | `tools`, `web` |
 | [`./eval`](api/eval.md) | 13 | `tools` |
-| [`./eval-campaign`](api/eval-campaign.md) | 37 | — |
+| [`./eval-campaign`](api/eval-campaign.md) | 30 | — |
+| [`./forms`](api/forms.md) | 29 | — |
 | [`./harness`](api/harness.md) | 13 | — |
 | [`./intakes`](api/intakes.md) | 29 | — |
 | [`./intakes-react`](api/intakes-react.md) | 3 | `intakes` |
@@ -147,11 +148,11 @@ Depends on: `runtime`
 
 ## `./chat-routes`
 
-Source: `src/chat-routes/index.ts` · 158 exports
+Source: `src/chat-routes/index.ts` · 157 exports
 
 Depends on: `chat-store`, `interactions`, `model-resolution`, `plans`, `sandbox`, `stream`, `web`
 
-`ALLOWED_ATTACHMENT_SNIFFED_MIMES`, `assertPromptPartsWithinCap`, `AssistantDraftSnapshot`, `AssistantDraftStore`, `AssistantDraftWriter`, `AssistantDraftWriterOptions`, `assistantRowIdForTurn`, `AssistantRowValues`, `ATTACHMENT_ACCEPT`, `ATTACHMENT_MAX_COUNT`, `AttachmentPathArgs`, `AttachmentPathCheck`, `AttachmentReadResult`, `attachmentSizeErrorMessage`, `attachmentTotalSizeErrorMessage`, `AttachmentTypeCheckResult`, `AttachmentUploadAuthorization`, `AttachmentWriteResult`, `base64WireLen`, `buildDispatchParts`, `BuildDispatchPartsInput`, `buildMentionPromptBlock`, `bytesToBase64`, `ChatAttachmentInput`, `ChatAttachmentKind`, `ChatMentionKind`, `ChatRouteDurableProjection`, `ChatRouteDurableProjectionLogger`, `ChatRouteEvent`, `ChatTurnAuthorization`, `ChatTurnAuthorizeArgs`, `ChatTurnCompleteInput`, `ChatTurnFilePartInput`, `ChatTurnGateResult`, `ChatTurnHeartbeat`, `ChatTurnInputError`, `ChatTurnInputPatch`, `ChatTurnLifecycle`, `ChatTurnLifecycleComplete`, `ChatTurnLifecycleError`, `ChatTurnLifecycleStart`, `ChatTurnLock`, `ChatTurnLockResult`, `ChatTurnMessageStore`, `ChatTurnModelFailover`, `ChatTurnPartInput`, `ChatTurnProduceArgs`, `chatTurnRequestInit`, `ChatTurnRequestPayload`, `ChatTurnRouteProducer`, `ChatTurnRoutes`, `ChatTurnTextPartInput`, `ChatTurnUsage`, `checkAttachmentType`, `classifyTerminalFailure`, `createAssistantDraftWriter`, `createAttachmentUploadRoute`, `CreateAttachmentUploadRouteOptions`, `createChatTurnRoutes`, `CreateChatTurnRoutesOptions`, `createSandboxChatProducer`, `createSandboxFileIndexRoute`, `CreateSandboxFileIndexRouteOptions`, `createUploadRoute`, `CreateUploadRouteOptions`, `DEFAULT_STALE_TURN_LOCK_GRACE_MS`, `DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS`, `defaultValidateAttachmentPath`, `DetachedTurnFinal`, `DetachedTurnOptions`, `DetachedTurnParts`, `DetachedTurnResult`, `DISPATCH_MAX_MEDIA_PARTS`, `DISPATCH_MAX_PARTS`, `DISPATCH_REQUEST_MAX_BYTES`, `DISPATCH_STRUCTURAL_RESERVE_BYTES`, `DispatchPartsOutcome`, `DraftPersistenceTuning`, `DraftStoredMessage`, `EmptyTurnRetryInfo`, `FileIndexAuthorization`, `FileIndexCache`, `FileIndexReadyResponse`, `FileIndexResponse`, `FileIndexWarmingResponse`, `FileMention`, `fileMentionsToParts`, `FileMentionsToPartsOptions`, `FilePartPromotionOutcome`, `formatBytes`, `INLINE_PARTS_MAX_BYTES`, `isCommittingSandboxEvent`, `isDraftContentEvent`, `MAX_ATTACHMENT_TOTAL_BYTES`, `MAX_BINARY_ATTACHMENT_BYTES`, `MAX_EMPTY_TURN_RETRIES`, `MAX_TEXT_ATTACHMENT_BYTES`, `mediaTypeForMentionPath`, `MENTION_MAX_COUNT`, `mentionKindForPath`, `ModelFailoverStreamHandle`, `ModelFailoverStreamOptions`, `ModelFallbackInfo`, `normalizeChatPromptForSandbox`, `OpenModelStream`, `parseChatTurnParts`, `parseFileMentions`, `ProducerErrorEvent`, `ProducerNoticeEvent`, `ProducerPassthroughEvent`, `ProducerPassthroughEventType`, `ProducerReasoningEvent`, `ProducerTextEvent`, `ProducerToolCallEvent`, `ProducerToolResultEvent`, `ProducerUsageEvent`, `ProducerWireEvent`, `PROMOTE_MAX_FILE_BYTES`, `promoteAgentFilePart`, `PromoteAgentFilePartOptions`, `PromoteFilePartResult`, `PromptInputPart`, `promptPartsByteSize`, `RawAgentFilePart`, `ReadAttachmentFn`, `ReadSandboxMentionFn`, `reconcileStaleTurnLock`, `ReconcileStaleTurnLockOptions`, `ReconcileStaleTurnLockResult`, `resolveChatAttachments`, `ResolveChatAttachmentsOptions`, `ResolveChatAttachmentsResult`, `resolveEmptyTurnRetries`, `rowIdOf`, `runDetachedTurn`, `SandboxChatProducerOptions`, `SandboxFileTreeSource`, `SandboxMentionPathCheck`, `SandboxTreeFile`, `SandboxTreeResult`, `SandboxUploadSink`, `sanitizeAttachmentFileName`, `sanitizeUploadFilename`, `sniffBinary`, `sniffMimeFromName`, `SniffResult`, `StaleTurnLockSandboxProbeResult`, `StaleTurnLockSessionProbeResult`, `storeSupportsDraftPersistence`, `streamWithModelFailover`, `summarizeFailoverReason`, `UPLOAD_INLINE_MAX_BYTES`, `UPLOAD_MAX_FILE_BYTES`, `UploadAuthorization`, `UploadedChatFile`, `validateSandboxMentionPath`, `withDurableChatProjection`, `WriteAttachmentFn`
+`ALLOWED_ATTACHMENT_SNIFFED_MIMES`, `assertPromptPartsWithinCap`, `AssistantDraftSnapshot`, `AssistantDraftStore`, `AssistantDraftWriter`, `AssistantDraftWriterOptions`, `assistantRowIdForTurn`, `AssistantRowValues`, `ATTACHMENT_ACCEPT`, `ATTACHMENT_MAX_COUNT`, `AttachmentPathArgs`, `AttachmentPathCheck`, `AttachmentReadResult`, `attachmentSizeErrorMessage`, `attachmentTotalSizeErrorMessage`, `AttachmentTypeCheckResult`, `AttachmentUploadAuthorization`, `AttachmentWriteResult`, `base64WireLen`, `buildDispatchParts`, `BuildDispatchPartsInput`, `buildMentionPromptBlock`, `bytesToBase64`, `ChatAttachmentInput`, `ChatAttachmentKind`, `ChatMentionKind`, `ChatRouteDurableProjection`, `ChatRouteDurableProjectionLogger`, `ChatRouteEvent`, `ChatTurnAuthorization`, `ChatTurnAuthorizeArgs`, `ChatTurnCompleteInput`, `ChatTurnFilePartInput`, `ChatTurnGateResult`, `ChatTurnHeartbeat`, `ChatTurnInputError`, `ChatTurnInputPatch`, `ChatTurnLifecycle`, `ChatTurnLifecycleComplete`, `ChatTurnLifecycleError`, `ChatTurnLifecycleStart`, `ChatTurnLock`, `ChatTurnLockResult`, `ChatTurnMessageStore`, `ChatTurnModelFailover`, `ChatTurnPartInput`, `ChatTurnProduceArgs`, `chatTurnRequestInit`, `ChatTurnRequestPayload`, `ChatTurnRouteProducer`, `ChatTurnRoutes`, `ChatTurnTextPartInput`, `ChatTurnUsage`, `checkAttachmentType`, `classifyTerminalFailure`, `createAssistantDraftWriter`, `createAttachmentUploadRoute`, `CreateAttachmentUploadRouteOptions`, `createChatTurnRoutes`, `CreateChatTurnRoutesOptions`, `createSandboxChatProducer`, `createSandboxFileIndexRoute`, `CreateSandboxFileIndexRouteOptions`, `createUploadRoute`, `CreateUploadRouteOptions`, `DEFAULT_STALE_TURN_LOCK_GRACE_MS`, `DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS`, `defaultValidateAttachmentPath`, `DetachedTurnFinal`, `DetachedTurnOptions`, `DetachedTurnParts`, `DetachedTurnResult`, `DISPATCH_MAX_MEDIA_PARTS`, `DISPATCH_MAX_PARTS`, `DISPATCH_REQUEST_MAX_BYTES`, `DISPATCH_STRUCTURAL_RESERVE_BYTES`, `DispatchPartsOutcome`, `DraftPersistenceTuning`, `DraftStoredMessage`, `EmptyTurnRetryInfo`, `FileIndexAuthorization`, `FileIndexCache`, `FileIndexReadyResponse`, `FileIndexResponse`, `FileIndexWarmingResponse`, `FileMention`, `fileMentionsToParts`, `FileMentionsToPartsOptions`, `FilePartPromotionOutcome`, `formatBytes`, `INLINE_PARTS_MAX_BYTES`, `isCommittingSandboxEvent`, `isDraftContentEvent`, `MAX_ATTACHMENT_TOTAL_BYTES`, `MAX_BINARY_ATTACHMENT_BYTES`, `MAX_EMPTY_TURN_RETRIES`, `MAX_TEXT_ATTACHMENT_BYTES`, `mediaTypeForMentionPath`, `MENTION_MAX_COUNT`, `mentionKindForPath`, `ModelFailoverStreamHandle`, `ModelFailoverStreamOptions`, `ModelFallbackInfo`, `OpenModelStream`, `parseChatTurnParts`, `parseFileMentions`, `ProducerErrorEvent`, `ProducerNoticeEvent`, `ProducerPassthroughEvent`, `ProducerPassthroughEventType`, `ProducerReasoningEvent`, `ProducerTextEvent`, `ProducerToolCallEvent`, `ProducerToolResultEvent`, `ProducerUsageEvent`, `ProducerWireEvent`, `PROMOTE_MAX_FILE_BYTES`, `promoteAgentFilePart`, `PromoteAgentFilePartOptions`, `PromoteFilePartResult`, `PromptInputPart`, `promptPartsByteSize`, `RawAgentFilePart`, `ReadAttachmentFn`, `ReadSandboxMentionFn`, `reconcileStaleTurnLock`, `ReconcileStaleTurnLockOptions`, `ReconcileStaleTurnLockResult`, `resolveChatAttachments`, `ResolveChatAttachmentsOptions`, `ResolveChatAttachmentsResult`, `resolveEmptyTurnRetries`, `rowIdOf`, `runDetachedTurn`, `SandboxChatProducerOptions`, `SandboxFileTreeSource`, `SandboxMentionPathCheck`, `SandboxTreeFile`, `SandboxTreeResult`, `SandboxUploadSink`, `sanitizeAttachmentFileName`, `sanitizeUploadFilename`, `sniffBinary`, `sniffMimeFromName`, `SniffResult`, `StaleTurnLockSandboxProbeResult`, `StaleTurnLockSessionProbeResult`, `storeSupportsDraftPersistence`, `streamWithModelFailover`, `summarizeFailoverReason`, `UPLOAD_INLINE_MAX_BYTES`, `UPLOAD_MAX_FILE_BYTES`, `UploadAuthorization`, `UploadedChatFile`, `validateSandboxMentionPath`, `withDurableChatProjection`, `WriteAttachmentFn`
 
 [Full API →](api/chat-routes.md)
 
@@ -247,11 +248,19 @@ Depends on: `tools`
 
 ## `./eval-campaign`
 
-Source: `src/eval-campaign/index.ts` · 37 exports
+Source: `src/eval-campaign/index.ts` · 30 exports
 
-`aggregateJudgeVerdicts`, `buildEnsembleJudge`, `CampaignResult`, `compareOptimizationMethods`, `CompareOptimizationMethodsOptions`, `defaultProductionGate`, `DispatchContext`, `EnsembleAggregate`, `EnsembleJudgeConfig`, `externalTextOptimizationMethod`, `ExternalTextOptimizationMethodConfig`, `Gate`, `gepaOptimizationMethod`, `GepaOptimizationMethodConfig`, `JudgeConfig`, `JudgeDimension`, `JudgeScore`, `JudgeVerdict`, `LabeledScenarioStore`, `MutableSurface`, `OptimizationMethod`, `OptimizationMethodResult`, `paretoSignificanceGate`, `runCampaign`, `RunRecord`, `Scenario`, `selfImprove`, `SelfImproveBudget`, `SelfImproveOptions`, `SelfImproveResult`, `skillOptOptimizationMethod`, `SkillOptOptimizationMethodConfig`, `SurfaceProposer`, `TrustItem`, `TrustThresholds`, `TrustVerdict`, `trustVerdicts`
+`aggregateJudgeVerdicts`, `buildEnsembleJudge`, `CampaignResult`, `defaultProductionGate`, `DispatchContext`, `EnsembleAggregate`, `EnsembleJudgeConfig`, `evolutionaryProposer`, `Gate`, `gepaProposer`, `JudgeConfig`, `JudgeDimension`, `JudgeScore`, `JudgeVerdict`, `LabeledScenarioStore`, `MutableSurface`, `Mutator`, `paretoSignificanceGate`, `runCampaign`, `RunRecord`, `Scenario`, `selfImprove`, `SelfImproveBudget`, `SelfImproveOptions`, `SelfImproveResult`, `SurfaceProposer`, `TrustItem`, `TrustThresholds`, `TrustVerdict`, `trustVerdicts`
 
 [Full API →](api/eval-campaign.md)
+
+## `./forms`
+
+Source: `src/forms/index.ts` · 29 exports
+
+`assertFormBlankIntegrity`, `checkRegistryAgainstBlank`, `decodeFormBlank`, `describeFormFill`, `FilledWidget`, `FillFormOptions`, `FillFormResult`, `fillPdfForm`, `formatFormCurrency`, `FormBlank`, `FormLabelBasis`, `FormRegistry`, `FormSlot`, `FormSlotFormat`, `FormSlotKind`, `LabelVerdict`, `parseFormAmount`, `parseFormBoolean`, `RegistryCheckResult`, `RegistryProblem`, `RegistryProblemCode`, `sha256Hex`, `SlotVerdict`, `SlotVerification`, `UnfilledCode`, `UnfilledSlot`, `verifyFilledForm`, `VerifyFormResult`, `widgetLabel`
+
+[Full API →](api/forms.md)
 
 ## `./harness`
 
