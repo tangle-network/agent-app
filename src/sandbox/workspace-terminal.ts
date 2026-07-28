@@ -255,6 +255,34 @@ export interface SandboxApiCredentials {
   apiKey: string
 }
 
+/**
+ * Build the sandbox API's sidecar-proxy base for a box:
+ * `{baseUrl}/v1/sidecar-proxy/{sandboxId}`.
+ *
+ * This is the ONLY upstream that serves the interactive terminal. Measured on
+ * production (`sandbox.tangle.tools`, one box, `ws` client, same credential in
+ * every arm):
+ *
+ * | upstream base                          | result                          |
+ * |----------------------------------------|---------------------------------|
+ * | `/v1/sidecar-proxy/{id}`               | 101 -> `ready` 2551ms -> shell  |
+ * | `/v1/sandboxes/{id}/runtime/`          | HTTP 500                        |
+ * | `connection.runtimeUrl` (the box host) | 101 then close 1000, 0 bytes    |
+ *
+ * The box's own `connection.runtimeUrl` (`https://sandbox-*.tangle.sh`) accepts
+ * the upgrade — its Caddy front end upgrades every path, including ones that do
+ * not exist — and then hangs up without a PTY. A 101 from that host therefore
+ * proves nothing; only a `ready` control frame does. Two products shipped a
+ * terminal against it and rendered a permanent spinner.
+ *
+ * Exported so no product writes the path literal a fourth time.
+ */
+export function sandboxSidecarProxyUrl(baseUrl: string, sandboxId: string): string {
+  if (!baseUrl) throw new Error('baseUrl is required')
+  if (!sandboxId) throw new Error('sandboxId is required')
+  return new URL(`/v1/sidecar-proxy/${encodeURIComponent(sandboxId)}`, baseUrl).toString().replace(/\/+$/, '')
+}
+
 /** Define a connection configuration for sandbox runtime including URL and optional server-side auth token */
 export interface SandboxRuntimeConnection {
   runtimeUrl: string
@@ -310,10 +338,7 @@ export function createWorkspaceSandboxRuntimeProxyHandler(opts: WorkspaceSandbox
     const credentials = directRuntimeConnection ? null : await opts.getSandboxApiCredentials({ request, userId: user.id, workspaceId, sandboxId })
     const upstreamUrl = directRuntimeConnection
       ? new URL(encodedRuntimePath, `${directRuntimeConnection.runtimeUrl.replace(/\/+$/, '')}/`)
-      : new URL(
-        `/v1/sandboxes/${encodeURIComponent(sandboxId)}/runtime/${encodedRuntimePath}`,
-        credentials!.baseUrl,
-      )
+      : new URL(encodedRuntimePath, `${sandboxSidecarProxyUrl(credentials!.baseUrl, sandboxId)}/`)
     upstreamUrl.search = requestUrl.search
 
     const headers = buildSandboxRuntimeProxyHeaders(
@@ -460,7 +485,7 @@ export function createWorkspaceSandboxTerminalUpgradeHandler(opts: WorkspaceSand
     const credentials = directRuntimeConnection ? null : await opts.getSandboxApiCredentials({ request, userId: user.id, workspaceId, sandboxId })
     const upstreamUrl = directRuntimeConnection
       ? new URL(subPath, `${directRuntimeConnection.runtimeUrl.replace(/\/+$/, '')}/`)
-      : new URL(`/v1/sandboxes/${encodeURIComponent(sandboxId)}/runtime/${subPath}`, credentials!.baseUrl)
+      : new URL(subPath, `${sandboxSidecarProxyUrl(credentials!.baseUrl, sandboxId)}/`)
     upstreamUrl.search = url.search
 
     // Forward the upgrade verbatim — keep the Upgrade/Connection + Sec-WebSocket-*
@@ -471,10 +496,78 @@ export function createWorkspaceSandboxTerminalUpgradeHandler(opts: WorkspaceSand
     const upstreamBearer = directRuntimeConnection?.authToken ?? credentials!.apiKey
     upstreamHeaders.set('Authorization', `Bearer ${upstreamBearer}`)
     upstreamHeaders.delete('host')
+    const browserProtocol = selectedBearerSubprotocol(request.headers.get('Sec-WebSocket-Protocol'))
     stripBearerSubprotocol(upstreamHeaders)
     const fetchImpl = opts.fetch ?? fetch
-    return fetchImpl(upstreamUrl.toString(), { method: request.method, headers: upstreamHeaders })
+    const upstream = await fetchImpl(upstreamUrl.toString(), { method: request.method, headers: upstreamHeaders })
+
+    const echo = terminalUpgradeSubprotocolEcho(upstream, browserProtocol)
+    if (!echo) return upstream
+    // Only reachable on a WebSocket-capable runtime: Cloudflare Workers is the
+    // one place a 101 Response can be constructed, and only while carrying the
+    // live socket. Dropping `webSocket` here would hand the browser a dead 101 —
+    // and on Node the construction throws outright, which is exactly the
+    // "status codes in the range 200 to 599" 500 the old upstream returned.
+    return new Response(null, {
+      status: echo.status,
+      statusText: echo.statusText,
+      headers: echo.headers,
+      webSocket: (upstream as Response & { webSocket?: WebSocket | null }).webSocket ?? null,
+    } as ResponseInit)
   }
+}
+
+/** A response-like shape carrying just what the subprotocol echo decision reads. */
+export interface TerminalUpgradeResponseLike {
+  status: number
+  statusText?: string
+  headers: Headers
+}
+
+/**
+ * Decide whether a terminal upgrade's 101 needs the browser's own subprotocol
+ * echoed back onto it, and return the headers to answer with. `null` means
+ * "pass the upstream response through untouched".
+ *
+ * Why this exists: the browser's terminal credential rides in a
+ * `bearer.<base64url>` WebSocket subprotocol, because a browser cannot set
+ * `Authorization` on a WS handshake. That subprotocol is a browser-to-Worker
+ * credential, so it is stripped before the upstream hop — and the upstream then
+ * answers the 101 selecting nothing. A browser MUST fail the connection when a
+ * 101 selects no subprotocol after it offered one (RFC 6455 s4.1), so the socket
+ * dies on open and the terminal renders a spinner forever.
+ *
+ * Kept as a pure function because a 101 `Response` cannot be constructed off
+ * Workers, so this is the only part of the decision a test can drive directly.
+ */
+export function terminalUpgradeSubprotocolEcho(
+  upstream: TerminalUpgradeResponseLike,
+  browserProtocol: string | null,
+): { status: number; statusText: string; headers: Headers } | null {
+  if (upstream.status !== 101 || !browserProtocol) return null
+  // The upstream's own selection is authoritative; overwriting it would tell the
+  // browser a protocol was agreed that the server never agreed to.
+  if (upstream.headers.has('Sec-WebSocket-Protocol')) return null
+  const headers = new Headers(upstream.headers)
+  headers.set('Sec-WebSocket-Protocol', browserProtocol)
+  return { status: upstream.status, statusText: upstream.statusText ?? '', headers }
+}
+
+/**
+ * The exact `bearer.*` subprotocol string the browser offered, so it can be
+ * echoed verbatim on the 101. Returns null when the browser offered none.
+ *
+ * Takes the raw `Sec-WebSocket-Protocol` value rather than the `Headers`, to
+ * match its siblings `bearerSubprotocolToken` and `stripBearerSubprotocol` —
+ * one shape for the whole family, and the caller reads the header once.
+ */
+export function selectedBearerSubprotocol(value: string | null): string | null {
+  if (!value) return null
+  for (const part of value.split(',')) {
+    const protocol = part.trim()
+    if (protocol.toLowerCase().startsWith(BEARER_SUBPROTOCOL_PREFIX)) return protocol
+  }
+  return null
 }
 
 const DEFAULT_RUNTIME_PROXY_HEADERS = ['accept', 'content-type', 'last-event-id', 'x-session-id']

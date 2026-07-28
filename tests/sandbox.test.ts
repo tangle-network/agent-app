@@ -11,6 +11,9 @@ import {
   encodeSandboxRuntimePath,
   isSandboxTerminalWsUpgrade,
   matchSandboxTerminalWsPath,
+  sandboxSidecarProxyUrl,
+  selectedBearerSubprotocol,
+  terminalUpgradeSubprotocolEcho,
   terminalTokenFromRequest,
   verifySandboxTerminalToken,
   type WorkspaceSandboxInstanceLike,
@@ -269,7 +272,7 @@ describe('workspace sandbox runtime proxy', () => {
     expect(res.headers.get('set-cookie')).toBeNull()
     expect(res.headers.get('x-runtime')).toBe('yes')
     const [upstream, init] = fetchMock.mock.calls[0] as [URL, RequestInit & { duplex?: 'half' }]
-    expect(String(upstream)).toBe('https://sandbox.test/v1/sandboxes/box-1/runtime/terminal/session%20a?cursor=1')
+    expect(String(upstream)).toBe('https://sandbox.test/v1/sidecar-proxy/box-1/terminal/session%20a?cursor=1')
     expect(init.headers).toBeInstanceOf(Headers)
     expect((init.headers as Headers).get('authorization')).toBe('Bearer sandbox-key')
   })
@@ -345,7 +348,7 @@ describe('workspace sandbox runtime proxy', () => {
     expect(res.status).toBe(200)
     expect(getSandboxApiCredentials).toHaveBeenCalledOnce()
     const [upstream, init] = fetchMock.mock.calls[0] as [URL, RequestInit & { duplex?: 'half' }]
-    expect(String(upstream)).toBe('https://sandbox.test/v1/sandboxes/box-1/runtime/terminals?cols=120')
+    expect(String(upstream)).toBe('https://sandbox.test/v1/sidecar-proxy/box-1/terminals?cols=120')
     expect((init.headers as Headers).get('authorization')).toBe('Bearer sandbox-key')
   })
 
@@ -434,7 +437,7 @@ describe('workspace sandbox terminal WebSocket upgrade', () => {
 
     expect(res?.status).toBe(200)
     const [upstream, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect(upstream).toBe('https://sandbox.test/v1/sandboxes/box-1/runtime/terminals/session/ws?cols=120')
+    expect(upstream).toBe('https://sandbox.test/v1/sidecar-proxy/box-1/terminals/session/ws?cols=120')
     expect((init.headers as Headers).get('authorization')).toBe('Bearer sandbox-key')
     expect((init.headers as Headers).get('sec-websocket-protocol')).toBe('terminal')
   })
@@ -488,5 +491,118 @@ describe('workspace sandbox terminal WebSocket upgrade', () => {
 
     expect(res?.status).toBe(403)
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The terminal upstream contract, pinned to a live measurement.
+//
+// Measured 2026-07-28 against production `sandbox.tangle.tools`, one box
+// (`sandbox-d168da28-21d`), the same `ws` client and the same credential in
+// every arm — only the upstream base differed:
+//
+//   /v1/sidecar-proxy/{id}          -> 101, `ready` @2551ms, shell prompt @3350ms
+//   /v1/sandboxes/{id}/runtime/     -> HTTP 500
+//   connection.runtimeUrl (box host)-> 101, then close 1000 with 0 bytes
+//
+// The box host's Caddy upgrades EVERY path (`/`, `/health`, and a route that
+// does not exist all returned 101 and held open), so a 101 from it proves
+// nothing. Only `/v1/sidecar-proxy/{id}` ever produced a PTY.
+// ---------------------------------------------------------------------------
+describe('terminal upstream base', () => {
+  it('builds the one base that produced a shell, and encodes the id', () => {
+    expect(sandboxSidecarProxyUrl('https://sandbox.test', 'box-1')).toBe('https://sandbox.test/v1/sidecar-proxy/box-1')
+    expect(sandboxSidecarProxyUrl('https://sandbox.test/', 'box 1')).toBe('https://sandbox.test/v1/sidecar-proxy/box%201')
+    // A base with a path is replaced, not appended to: the route is absolute.
+    expect(sandboxSidecarProxyUrl('https://sandbox.test/v1', 'box-1')).toBe('https://sandbox.test/v1/sidecar-proxy/box-1')
+  })
+
+  it('fails loud on a missing base or id rather than dialling a malformed host', () => {
+    expect(() => sandboxSidecarProxyUrl('', 'box-1')).toThrow(/baseUrl/)
+    expect(() => sandboxSidecarProxyUrl('https://sandbox.test', '')).toThrow(/sandboxId/)
+  })
+
+  it('never dials the /v1/sandboxes/{id}/runtime/ base that answered 500', async () => {
+    const token = await createSandboxTerminalToken(
+      { userId: 'user-1', workspaceId: 'workspace-1', sandboxId: 'box-1' },
+      { secret, expiresInMs: 60_000 },
+    )
+    const encoded = btoa(token.token).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    const dialled: string[] = []
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      dialled.push(String(input))
+      return new Response('upgraded', { status: 200 })
+    })
+    const upgrade = createWorkspaceSandboxTerminalUpgradeHandler({
+      requireUser: async () => ({ id: 'user-1' }),
+      requireWorkspaceAccess: async () => {},
+      getSandboxApiCredentials: async () => ({ baseUrl: 'https://sandbox.test', apiKey: 'sandbox-key' }),
+      tokenSecret: secret,
+      fetch: fetchMock as typeof fetch,
+    })
+    await upgrade(new Request('https://app.test/api/workspaces/workspace-1/sandbox/runtime/box-1/terminals/session/ws', {
+      headers: { Upgrade: 'websocket', 'Sec-WebSocket-Protocol': `bearer.${encoded}` },
+    }))
+
+    const proxy = createWorkspaceSandboxRuntimeProxyHandler({
+      requireUser: async () => ({ id: 'user-1' }),
+      requireWorkspaceAccess: async () => {},
+      getSandboxApiCredentials: async () => ({ baseUrl: 'https://sandbox.test', apiKey: 'sandbox-key' }),
+      tokenSecret: secret,
+      fetch: fetchMock as typeof fetch,
+    })
+    await proxy({
+      request: new Request('https://app.test/api/workspaces/workspace-1/sandbox/runtime/box-1/terminals', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token.token}` },
+      }),
+      params: { workspaceId: 'workspace-1', sandboxId: 'box-1', '*': 'terminals' },
+    })
+
+    expect(dialled).toHaveLength(2)
+    for (const url of dialled) {
+      expect(url).toContain('/v1/sidecar-proxy/box-1/')
+      expect(url).not.toContain('/runtime/')
+      expect(url).not.toContain('/v1/sandboxes/')
+    }
+  })
+})
+
+describe('terminal 101 subprotocol echo', () => {
+  const like = (status: number, headers: Record<string, string> = {}) => ({
+    status,
+    statusText: '',
+    headers: new Headers(headers),
+  })
+
+  it('picks the bearer offer out of a multi-protocol header', () => {
+    expect(selectedBearerSubprotocol('terminal, bearer.abc')).toBe('bearer.abc')
+    expect(selectedBearerSubprotocol('BEARER.abc')).toBe('BEARER.abc')
+    expect(selectedBearerSubprotocol('terminal')).toBeNull()
+    expect(selectedBearerSubprotocol(null)).toBeNull()
+  })
+
+  it('echoes the browser offer when the upstream 101 selected none', () => {
+    // Without this the browser fails the connection on a 101 that selected no
+    // subprotocol after it offered one, and the terminal spins forever.
+    const echo = terminalUpgradeSubprotocolEcho(like(101), 'bearer.abc')
+    expect(echo?.status).toBe(101)
+    expect(echo?.headers.get('Sec-WebSocket-Protocol')).toBe('bearer.abc')
+  })
+
+  it('preserves the rest of the upstream 101 headers', () => {
+    const echo = terminalUpgradeSubprotocolEcho(like(101, { upgrade: 'websocket', 'sec-websocket-accept': 'abc=' }), 'bearer.abc')
+    expect(echo?.headers.get('upgrade')).toBe('websocket')
+    expect(echo?.headers.get('sec-websocket-accept')).toBe('abc=')
+  })
+
+  it('leaves the upstream selection alone when it picked one', () => {
+    expect(terminalUpgradeSubprotocolEcho(like(101, { 'sec-websocket-protocol': 'tangle.terminal.v1' }), 'bearer.abc')).toBeNull()
+  })
+
+  it('does not touch a non-101 response, or one the browser sent no offer for', () => {
+    expect(terminalUpgradeSubprotocolEcho(like(500), 'bearer.abc')).toBeNull()
+    expect(terminalUpgradeSubprotocolEcho(like(403), 'bearer.abc')).toBeNull()
+    expect(terminalUpgradeSubprotocolEcho(like(101), null)).toBeNull()
   })
 })
