@@ -19289,6 +19289,30 @@ Source: `src/work-product/index.ts` · depends on `eval-campaign`, `tools`
 interface AgentCheckInput
 ```
 
+### `ARTIFACT_AGREEMENT_CHECK`
+
+`const` — Platform check: how many evidence claims agree with the artifact field they decorate.
+
+```ts
+"artifact_agreement"
+```
+
+### `ArtifactAgreement`
+
+`type`
+
+```ts
+type ArtifactAgreement
+```
+
+### `artifactAgreementErrorDetail`
+
+`function` — The sentence a model can act on: both numbers, both lines, and the two ways out — move the citation, or correct the artifact.
+
+```ts
+(failure: { status: "contradicts"; claimed: string; expected: string; belongsTo: string; }, target: string) => string
+```
+
 ### `buildWorkProductTools`
 
 `function` — Build the three work-product tools for `customTools` registration on the MCP server / HTTP handler / runtime executor.
@@ -19343,6 +19367,14 @@ type ClaimSupport
 
 ```ts
 (claim: string) => string[]
+```
+
+### `ConfusableTargetGroup`
+
+`interface` — One set of targets whose source lines are mistakable for each other, with the phrases that tell them apart.
+
+```ts
+interface ConfusableTargetGroup
 ```
 
 ### `createInMemoryWorkProductStore`
@@ -19447,6 +19479,14 @@ interface FinalizeWorkProductProvenanceInput
 
 ```ts
 (sourceText: string, needle: string, occurrence?: number) => SourceFindResult
+```
+
+### `indexArtifactValues`
+
+`function` — Canonical target → canonical value, for the artifact fields that state a figure.
+
+```ts
+(fields: Readonly<Record<string, unknown>> | undefined, normalizeTarget?: ((target: string) => string) | undefined) =>…
 ```
 
 ### `InMemoryWorkProductStore`
@@ -19681,6 +19721,30 @@ type SourceSpanResult
 interface SubmitWorkProductInput
 ```
 
+### `TARGET_CORRECTNESS_CHECK`
+
+`const` — Platform check: how many citations anchor to a line that belongs to the TARGET they are attached to, rather than to a sibling target's line.
+
+```ts
+"target_correctness"
+```
+
+### `targetLabelErrorDetail`
+
+`function` — The sentence a model can act on: which line it actually cited, which target that line belongs to, and what its own target's line looks like.
+
+```ts
+(failure: { status: "crossed"; rival: string; rivalLabel: string; expected: readonly string[]; note?: string | undefine…
+```
+
+### `TargetLabelVerdict`
+
+`type`
+
+```ts
+type TargetLabelVerdict
+```
+
 ### `TrustItem`
 
 `interface` — One item's raters: the per-judge verdicts {@link aggregateJudgeVerdicts } reduces, tagged with the item they scored so spread stays within-item.
@@ -19713,12 +19777,28 @@ interface TrustItem
 (text: string) => string[]
 ```
 
+### `verifyArtifactAgreement`
+
+`function`
+
+```ts
+(target: string, claim: string, fieldValues: ReadonlyMap<string, string>) => ArtifactAgreement
+```
+
 ### `verifyClaimSupport`
 
 `function` — Does `quote` carry the figure `claim` asserts?
 
 ```ts
 (quote: string, claim: string) => ClaimSupport
+```
+
+### `verifyTargetLabel`
+
+`function`
+
+```ts
+(quote: string, target: string, groups: readonly ConfusableTargetGroup[]) => TargetLabelVerdict
 ```
 
 ### `WorkProductArtifact`

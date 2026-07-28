@@ -13,6 +13,7 @@
  * never a silent clobber.
  */
 
+import { canonicalizeValue } from './claim-support'
 import {
   unresolvedBlockingExceptions,
   type EvidenceEntry,
@@ -105,8 +106,10 @@ export interface WorkProductService {
   /** Re-open a `changes_requested` row as the next draft: version bumps +1
    *  and the correction turn accumulates into the same scope row. */
   reopen(id: string): Promise<WorkProductOutcome<WorkProductRecord>>
-  /** Merge evidence entries by id (same id replaces — the agent can correct
-   *  itself mid-turn). Legal only while `draft`/`blocked`. */
+  /** Merge evidence entries by id AND by what they assert (target + source +
+   *  claim), so re-stating a fact already recorded replaces it under whatever
+   *  id this batch minted rather than appending a near-copy. Legal only while
+   *  `draft`/`blocked`. */
   upsertEvidence(id: string, entries: readonly EvidenceEntry[]): Promise<WorkProductOutcome<WorkProductRecord>>
   /** Merge exception entries by id, then reconcile the blocked flag: any
    *  unresolved blocking entry parks `draft`→`blocked`; resolving the last
@@ -158,6 +161,63 @@ function mergeById<T extends { id: string }>(existing: readonly T[], incoming: r
     } else {
       merged[at] = entry
     }
+  }
+  return merged
+}
+
+/**
+ * What makes two evidence rows THE SAME ROW, independent of the id the model
+ * happened to mint for them.
+ *
+ * Merging on the model-supplied id alone is idempotent only if the model
+ * re-uses ids, and it does not. Production row `95105c8a` carries 21 entries
+ * for 7 targets: the same seven facts emitted three times across a turn under
+ * `wages-line1a`, then `w2-wages`, then `wages` — every batch a fresh set of
+ * ids, so every batch appended instead of replacing. The tool contract says
+ * "re-emit an id to replace"; nothing made re-stating a fact you already
+ * recorded a replace, and re-stating facts is what an agent does when it
+ * revisits its work.
+ *
+ * So identity is what the row ASSERTS: this target, from this source, with
+ * this value. Re-emit any of the three under any id and it replaces.
+ *
+ * The claim is part of the key on purpose, and it is the part that keeps
+ * honest lineage alive: Form 1040 line 2b legitimately carries two rows from
+ * one 1099-INT (box 1 and box 3), and line 1a two rows from two W-2s. Keying
+ * on target+source alone would silently delete the second one — a merge rule
+ * that destroys evidence is worse than the duplication it fixes. A claim that
+ * IS a value keys on the canonical NUMBER, so `128450.00` and `128,450.00`
+ * are one fact; any other claim keys on its folded text, which is
+ * conservative: two different sentences stay two rows.
+ */
+function evidenceIdentity(entry: EvidenceEntry): string {
+  const whole = canonicalizeValue(entry.claim)
+  const claimKey = whole ?? entry.claim.normalize('NFKC').toLowerCase().replace(/\s+/gu, ' ').trim()
+  return `${entry.target} ${entry.sourceRef} ${claimKey}`
+}
+
+/**
+ * Upsert evidence by BOTH keys: the explicit id (the documented "re-emit to
+ * replace") and the assertion identity above. An incoming entry replaces every
+ * existing row it matches on either key, collapsing them to one at the position
+ * of the earliest — so a re-stated fact patches the row it duplicates instead of
+ * appending a near-copy, and a batch that re-states a fact twice lands once.
+ */
+function mergeEvidence(existing: readonly EvidenceEntry[], incoming: readonly EvidenceEntry[]): EvidenceEntry[] {
+  const merged = existing.slice()
+  for (const entry of incoming) {
+    const identity = evidenceIdentity(entry)
+    const hits: number[] = []
+    for (let index = 0; index < merged.length; index += 1) {
+      const candidate = merged[index]!
+      if (candidate.id === entry.id || evidenceIdentity(candidate) === identity) hits.push(index)
+    }
+    if (hits.length === 0) {
+      merged.push(entry)
+      continue
+    }
+    merged[hits[0]!] = entry
+    for (const index of hits.slice(1).reverse()) merged.splice(index, 1)
   }
   return merged
 }
@@ -302,7 +362,7 @@ export function createWorkProductService(options: WorkProductServiceOptions): Wo
     guardedMerge(
       id,
       ['draft', 'blocked'],
-      (record) => ({ evidence: mergeById(record.evidence, entries) }),
+      (record) => ({ evidence: mergeEvidence(record.evidence, entries) }),
       {
         step: 'wp.evidence',
         message: (record) => `Evidence upserted (${entries.length} entries, ${record.evidence.length} total)`,

@@ -22,7 +22,16 @@ import type { AppToolContext } from '../tools/types'
 import { createWorkProductService, type WorkProductOutcome, type WorkProductService } from './service'
 import { stampProvenance, type WorkProductProvenanceBase } from './provenance'
 import { findSourceLine, sliceSourceSpan, sourceContainsQuote, type SourceFindFailure, type SourceSpanFailure } from './quote'
-import { claimSupportErrorDetail, verifyClaimSupport } from './claim-support'
+import {
+  artifactAgreementErrorDetail,
+  claimSupportErrorDetail,
+  indexArtifactValues,
+  targetLabelErrorDetail,
+  verifyArtifactAgreement,
+  verifyClaimSupport,
+  verifyTargetLabel,
+  type ConfusableTargetGroup,
+} from './claim-support'
 import {
   parseAgentCheckInput,
   parseArtifactInput,
@@ -57,6 +66,19 @@ export const QUOTE_VERIFICATION_CHECK = 'quote_verification'
  *  production row `7256ef49` passed that one on all four entries while
  *  supporting none of them. */
 export const CLAIM_SUPPORT_CHECK = 'claim_support'
+
+/** Platform check: how many citations anchor to a line that belongs to the
+ *  TARGET they are attached to, rather than to a sibling target's line.
+ *  Recorded when the product declares `confusableTargets`; `claim_support`
+ *  passes a crossed pair by construction, because the figure really is on the
+ *  line — the wrong one. */
+export const TARGET_CORRECTNESS_CHECK = 'target_correctness'
+
+/** Platform check: how many evidence claims agree with the artifact field they
+ *  decorate. A package whose evidence reports one figure on a line and whose
+ *  artifact reports another contradicts itself; every other gate on this row
+ *  reads only one of the two halves. */
+export const ARTIFACT_AGREEMENT_CHECK = 'artifact_agreement'
 
 /** Domain seams for the three work-product tools — every domain word is a
  *  parameter; the shell bakes none. */
@@ -112,6 +134,33 @@ export interface WorkProductToolConfig {
    *  product whose claims are figures the source states in a form no numeric
    *  comparison can reach. */
   verifyClaimSupport?: boolean
+  /** Fold an evidence `target` (and every `materialTargets` name) to the
+   *  product's ONE canonical spelling.
+   *
+   *  Without it a target namespace forks and every check that joins evidence
+   *  to the artifact by name silently half-works. Measured on production row
+   *  `95105c8a`: the same seven form lines arrived as `line_3a` and
+   *  `f1040.line_3a` in one turn, so coverage, deduplication and artifact
+   *  agreement each saw two unrelated targets where the return has one line.
+   *
+   *  Pure and total — it runs on every ingested entry and on the coverage
+   *  target list, so a target it does not recognize must come back unchanged
+   *  rather than throw. */
+  normalizeTarget?: (target: string) => string
+  /** Targets whose SOURCE LINES are mistakable for each other, with the
+   *  phrases that tell them apart — the product's vocabulary, compared by the
+   *  shell. Omit and no target-correctness check runs.
+   *
+   *  Read negatively: an entry is refused only when the line it cites carries
+   *  a sibling target's label and none of its own, so an unusually-labelled
+   *  document never costs an honest citation. See `./claim-support` for why
+   *  the positive form ("the line must say X") is the wrong shape. */
+  confusableTargets?: readonly ConfusableTargetGroup[]
+  /** Refuse an evidence claim that asserts a figure the artifact reports on a
+   *  DIFFERENT target. ON by default and domain-free — it compares the package
+   *  to itself. Set `false` only for a product whose evidence claims are not
+   *  the artifact's own figures. */
+  verifyArtifactAgreement?: boolean
   /** Per-turn provenance closure the ROUTE supplies (profileHash + runId are
    *  known at dispatch; trusted, never read from model args). */
   provenance: (ctx: AppToolContext) => WorkProductProvenanceBase
@@ -393,6 +442,70 @@ function assertClaimsSupported(
   }
 }
 
+/**
+ * Refuse any entry whose cited line belongs to a sibling target.
+ *
+ * The fifth degree of freedom, and the one the four gates before it pass by
+ * construction: `quote_verification` proves the text is in the document,
+ * `claim_support` proves the text carries the claimed figure, and neither
+ * asks whether the figure belongs on THIS line. Row `95105c8a` shipped
+ * `evidence_coverage 6/6`, `claim_support 19/19`, `quote_verification 19/19`
+ * with `line_3a` (qualified dividends) pointing at the ordinary-dividends line
+ * and `line_3b` pointing at the qualified one.
+ *
+ * The product supplies which targets are confusable and what their lines say;
+ * the shell only compares. Refusal requires the document to positively name a
+ * sibling, so silence passes — see `./claim-support` for why that asymmetry is
+ * load-bearing rather than lenient.
+ */
+function assertTargetsNotCrossed(config: WorkProductToolConfig, entries: readonly EvidenceEntry[]): void {
+  const groups = config.confusableTargets
+  if (!groups || groups.length === 0) return
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index]!
+    const quote = entry.locator.quote
+    if (quote === undefined) continue
+    const verdict = verifyTargetLabel(quote, entry.target, groups)
+    if (verdict.status !== 'crossed') continue
+    throw new ToolInputError(
+      'target_crossed',
+      `entries[${index}] is attached to ${entry.target} but ${targetLabelErrorDetail(verdict, entry.target, quote)}`,
+    )
+  }
+}
+
+/**
+ * Refuse any entry whose claim contradicts the artifact field it decorates.
+ *
+ * Runs on every upsert against the draft's CURRENT artifact (usually absent —
+ * evidence streams in first) and again over the whole row at submit, which is
+ * where a package like `95105c8a` is actually caught: its artifact was right
+ * and its evidence crossed, and the two were never compared.
+ *
+ * Only a real contradiction is refused — the claim asserts a figure the same
+ * artifact reports on another target. A component of an aggregate is not one
+ * (row `a68b1943` evidences a 189,750.00 wage line with two W-2s of 128,450.00
+ * and 61,300.00, and must keep doing so).
+ */
+function assertEvidenceAgreesWithArtifact(
+  config: WorkProductToolConfig,
+  entries: readonly EvidenceEntry[],
+  artifact: WorkProductArtifact | null,
+): void {
+  if (config.verifyArtifactAgreement === false) return
+  const fieldValues = indexArtifactValues(artifact?.fields, config.normalizeTarget)
+  if (fieldValues.size === 0) return
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index]!
+    const agreement = verifyArtifactAgreement(entry.target, entry.claim, fieldValues)
+    if (agreement.status !== 'contradicts') continue
+    throw new ToolInputError(
+      'contradicts_artifact',
+      `entries[${index}].claim ${JSON.stringify(entry.claim)} contradicts this work product's own artifact: ${artifactAgreementErrorDetail(agreement, entry.target)}`,
+    )
+  }
+}
+
 /** Re-verify every persisted quote at submit time. The upsert gate stops new
  *  fabrication; this stops a package whose evidence was written BEFORE the
  *  gate existed (or under a since-corrected document) from reaching a
@@ -474,6 +587,61 @@ function summarizeClaimSupport(evidence: readonly EvidenceEntry[]): {
   return { supported, checkable, unsupported }
 }
 
+/**
+ * Re-run target correctness over every PERSISTED entry at submit time — the
+ * check that catches a package whose evidence was written before this gate
+ * existed. Like `summarizeClaimSupport` it reads only the row (the stored quote
+ * and the stored target), so it runs for every product.
+ */
+function summarizeTargetCorrectness(
+  evidence: readonly EvidenceEntry[],
+  groups: readonly ConfusableTargetGroup[],
+  targetOf: (entry: EvidenceEntry) => string,
+): { correct: number; checkable: number; crossed: { id: string; detail: string }[] } {
+  let correct = 0
+  let checkable = 0
+  const crossed: { id: string; detail: string }[] = []
+  for (const entry of evidence) {
+    const quote = entry.locator.quote
+    if (quote === undefined) continue
+    const target = targetOf(entry)
+    const verdict = verifyTargetLabel(quote, target, groups)
+    if (verdict.status === 'not_applicable') continue
+    checkable += 1
+    if (verdict.status === 'identified') correct += 1
+    else crossed.push({ id: entry.id, detail: `${entry.id} (${target} cites the ${verdict.rival} line)` })
+  }
+  return { correct, checkable, crossed }
+}
+
+/** Re-run artifact agreement over every PERSISTED entry against the artifact
+ *  being submitted. This is the pass that catches row `95105c8a`: the crossed
+ *  entries were written turns before the artifact arrived, so the upsert-time
+ *  comparison had nothing to compare them to. */
+function summarizeArtifactAgreement(
+  evidence: readonly EvidenceEntry[],
+  fieldValues: ReadonlyMap<string, string>,
+  targetOf: (entry: EvidenceEntry) => string,
+): { agreeing: number; checkable: number; contradicting: { id: string; detail: string }[] } {
+  let agreeing = 0
+  let checkable = 0
+  const contradicting: { id: string; detail: string }[] = []
+  for (const entry of evidence) {
+    const target = targetOf(entry)
+    const agreement = verifyArtifactAgreement(target, entry.claim, fieldValues)
+    if (agreement.status === 'not_applicable') continue
+    checkable += 1
+    if (agreement.status === 'agrees') agreeing += 1
+    else {
+      contradicting.push({
+        id: entry.id,
+        detail: `${entry.id} (${target} claims ${agreement.claimed}, which the artifact reports on ${agreement.belongsTo}; ${target} is ${agreement.expected})`,
+      })
+    }
+  }
+  return { agreeing, checkable, contradicting }
+}
+
 /** Build the three work-product tools for `customTools` registration on the
  *  MCP server / HTTP handler / runtime executor. */
 export function buildWorkProductTools(config: WorkProductToolConfig): AppToolDefinition[] {
@@ -549,6 +717,11 @@ export function buildWorkProductTools(config: WorkProductToolConfig): AppToolDef
       for (let index = 0; index < raw.length; index += 1) {
         const parsed = parseEvidenceInput(raw[index], `entries[${index}]`)
         if (!parsed.ok) throw new ToolInputError('invalid_evidence', `${parsed.field}: ${parsed.error}`)
+        // Fold to the product's canonical target spelling at INGEST, so the
+        // row never carries two names for one line. Every downstream check —
+        // coverage, deduplication, artifact agreement, the confusable-target
+        // groups — joins on this string.
+        if (config.normalizeTarget) parsed.value.target = config.normalizeTarget(parsed.value.target)
         entries.push(parsed.value)
       }
       // Fail-loud source resolution: lineage can never point at nothing.
@@ -570,7 +743,17 @@ export function buildWorkProductTools(config: WorkProductToolConfig): AppToolDef
       // entry claims. Same batch, same fail-before-persist discipline: an
       // entry citing the payer line for a wage figure never reaches the draft.
       assertClaimsSupported(config, entries)
+      // ...and that line must belong to the target it is attached to. A
+      // citation carrying the right figure on a sibling's line passes every
+      // gate above it and misleads a reviewer more effectively than a
+      // fabricated one, because it survives being clicked.
+      assertTargetsNotCrossed(config, entries)
       const draft = await resolveDraft(service, config, scopeKey, ctx)
+      // Nothing from this batch has been written yet, so a contradiction with
+      // an artifact the draft already carries still fails before persisting.
+      // On the usual path the artifact arrives last and this is a no-op; the
+      // submit-time pass is where a full row is compared.
+      assertEvidenceAgreesWithArtifact(config, entries, draft.artifact)
       const record = await unwrap(() => service.upsertEvidence(draft.id, entries), 'evidence_rejected')
       return {
         workProductId: record.id,
@@ -775,23 +958,90 @@ export function buildWorkProductTools(config: WorkProductToolConfig): AppToolDef
         }
       }
 
-      // Platform check three: every material target has ≥1 evidence row. A
+      // Legacy rows carry whatever target spelling was current when they were
+      // written, so every submit-time check folds on READ as well as ingest.
+      const targetOf = (entry: EvidenceEntry): string =>
+        config.normalizeTarget ? config.normalizeTarget(entry.target) : entry.target
+
+      // Platform check three: every citation's line belongs to the target it
+      // is attached to. Recorded AND rejected — a crossed citation is real
+      // text carrying the real figure, so it is invisible to every gate above.
+      if (config.confusableTargets && config.confusableTargets.length > 0) {
+        const crossing = summarizeTargetCorrectness(draft.evidence, config.confusableTargets, targetOf)
+        checks.unshift({
+          id: TARGET_CORRECTNESS_CHECK,
+          name: TARGET_CORRECTNESS_CHECK,
+          passed: crossing.crossed.length === 0,
+          detail:
+            crossing.crossed.length > 0
+              ? `Citations attached to the wrong target: ${crossing.crossed.map((item) => item.detail).join('; ')}`
+              : crossing.checkable === 0
+                ? 'No citation lands on a line this product can tell apart from a sibling target — nothing to check'
+                : `${crossing.correct}/${crossing.checkable} citations land on a line belonging to their own target`,
+          source: 'platform',
+        })
+        if (crossing.crossed.length > 0) {
+          await unwrap(() => service.recordChecks(draft.id, checks), 'checks_rejected')
+          throw new ToolInputError(
+            'target_crossed',
+            `Cannot submit: ${crossing.crossed.length} evidence entr${crossing.crossed.length === 1 ? 'y cites' : 'ies cite'} a line belonging to a different target — ${crossing.crossed.map((item) => item.detail).join('; ')}. Re-emit each against the target whose line it actually cites, or cite the line that belongs to the target it is attached to.`,
+          )
+        }
+      }
+
+      // Platform check four: the evidence and the artifact must agree about
+      // what each line holds. This is the pass that catches a package whose
+      // crossed evidence predates the artifact it decorates — every entry was
+      // recorded turns before there was an artifact to compare it to.
+      const artifactValues = indexArtifactValues(artifact.fields, config.normalizeTarget)
+      if (config.verifyArtifactAgreement !== false && artifactValues.size > 0) {
+        const agreement = summarizeArtifactAgreement(draft.evidence, artifactValues, targetOf)
+        checks.unshift({
+          id: ARTIFACT_AGREEMENT_CHECK,
+          name: ARTIFACT_AGREEMENT_CHECK,
+          passed: agreement.contradicting.length === 0,
+          detail:
+            agreement.contradicting.length > 0
+              ? `Evidence contradicts the artifact on: ${agreement.contradicting.map((item) => item.detail).join('; ')}`
+              : agreement.checkable === 0
+                ? 'No evidence claim states a figure the artifact also states — nothing to check'
+                : `${agreement.agreeing}/${agreement.checkable} evidence claims agree with the artifact field they support`,
+          source: 'platform',
+        })
+        if (agreement.contradicting.length > 0) {
+          await unwrap(() => service.recordChecks(draft.id, checks), 'checks_rejected')
+          throw new ToolInputError(
+            'contradicts_artifact',
+            `Cannot submit: ${agreement.contradicting.length} evidence entr${agreement.contradicting.length === 1 ? 'y contradicts' : 'ies contradict'} the artifact they support — ${agreement.contradicting.map((item) => item.detail).join('; ')}. Move each citation to the target it actually supports, or correct the artifact. The package cannot state both.`,
+          )
+        }
+      }
+
+      // Platform check five: every material target has ≥1 evidence row. A
       // failing coverage check is BOTH recorded on the row (visible to the
       // queue) and rejected fail-loud — a lineage-free package can never reach
       // a reviewer.
       if (config.materialTargets) {
-        const targets = config.materialTargets(artifact)
-        const covered = new Set(draft.evidence.map((entry) => entry.target))
+        // Both sides of the join fold to the canonical spelling: an artifact
+        // field written `line_3a` and an evidence row written `f1040.line_3a`
+        // are one line, and a coverage check that read them as two would
+        // report a miss on a target that IS evidenced.
+        const targets = [
+          ...new Set(
+            config.materialTargets(artifact).map((target) => (config.normalizeTarget ? config.normalizeTarget(target) : target)),
+          ),
+        ]
+        const covered = new Set(draft.evidence.map(targetOf))
         const missing = targets.filter((target) => !covered.has(target))
         // How each covered target is BACKED, not merely that a row exists.
         // A coverage count that cannot distinguish a platform-sliced citation
         // from a bare assertion is the number that let 13 invented quotes read
         // as "13/13 evidenced" on the row a reviewer then opened.
         const anchoredTargets = new Set(
-          draft.evidence.filter((entry) => entry.locator.quoteBasis !== undefined).map((entry) => entry.target),
+          draft.evidence.filter((entry) => entry.locator.quoteBasis !== undefined).map(targetOf),
         )
         const spanTargets = new Set(
-          draft.evidence.filter((entry) => entry.locator.quoteBasis === 'span').map((entry) => entry.target),
+          draft.evidence.filter((entry) => entry.locator.quoteBasis === 'span').map(targetOf),
         )
         const present = targets.filter((target) => covered.has(target))
         const unanchored = present.filter((target) => !anchoredTargets.has(target))
