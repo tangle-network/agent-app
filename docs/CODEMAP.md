@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_75 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_74 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -13,8 +13,8 @@ _75 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./brand`](api/brand.md) | 5 | — |
 | [`./brand-extraction`](api/brand-extraction.md) | 19 | — |
 | [`./catalog`](api/catalog.md) | 6 | `runtime` |
-| [`./chat-routes`](api/chat-routes.md) | 158 | `chat-store`, `interactions`, `model-resolution`, `plans`, `sandbox`, `stream`, `web` |
-| [`./chat-store`](api/chat-store.md) | 62 | `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product` |
+| [`./chat-routes`](api/chat-routes.md) | 157 | `chat-store`, `interactions`, `model-resolution`, `plans`, `sandbox`, `stream`, `web` |
+| [`./chat-store`](api/chat-store.md) | 62 | `chat-routes`, `interactions`, `plans`, `stream`, `web-react`, `work-product` |
 | [`./config`](api/config.md) | 13 | `knowledge`, `runtime` |
 | [`./crypto`](api/crypto.md) | 10 | `billing` |
 | [`./design-canvas`](api/design-canvas.md) | 103 | `tools`, `web` |
@@ -22,9 +22,8 @@ _75 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./design-canvas-react/engine`](api/design-canvas-react-engine.md) | 75 | `brand`, `design-canvas`, `theme` |
 | [`./design-canvas-react/lazy`](api/design-canvas-react-lazy.md) | 4 | `brand`, `design-canvas`, `theme` |
 | [`./design-canvas/drizzle`](api/design-canvas-drizzle.md) | 10 | `tools`, `web` |
-| [`./eval`](api/eval.md) | 13 | `tools` |
-| [`./eval-campaign`](api/eval-campaign.md) | 37 | — |
-| [`./forms`](api/forms.md) | 29 | — |
+| [`./eval`](api/eval.md) | 21 | `tools` |
+| [`./eval-campaign`](api/eval-campaign.md) | 30 | — |
 | [`./harness`](api/harness.md) | 13 | — |
 | [`./intakes`](api/intakes.md) | 29 | — |
 | [`./intakes-react`](api/intakes-react.md) | 3 | `intakes` |
@@ -42,19 +41,19 @@ _75 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./platform`](api/platform.md) | 65 | `billing`, `runtime`, `web` |
 | [`./preflight`](api/preflight.md) | 12 | — |
 | [`./preflight/cli`](api/preflight-cli.md) | 2 | — |
-| [`./preset-cloudflare`](api/preset-cloudflare.md) | 20 | `billing`, `crypto`, `knowledge`, `tools`, `web` |
+| [`./preset-cloudflare`](api/preset-cloudflare.md) | 16 | `billing`, `crypto`, `knowledge`, `tools`, `web` |
 | [`./profile`](api/profile.md) | 45 | `skills` |
 | [`./prompt`](api/prompt.md) | 3 | — |
 | [`./redact`](api/redact.md) | 14 | — |
 | [`./run`](api/run.md) | 10 | `harness` |
 | [`./runtime`](api/runtime.md) | 61 | `tools` |
-| [`./sandbox`](api/sandbox.md) | 124 | `crypto`, `harness`, `profile`, `runtime`, `tools` |
+| [`./sandbox`](api/sandbox.md) | 115 | `crypto`, `harness`, `profile`, `runtime`, `tools` |
 | [`./sequences`](api/sequences.md) | 113 | `tools`, `web` |
 | [`./sequences-react`](api/sequences-react.md) | 108 | `brand`, `sequences` |
 | [`./sequences/drizzle`](api/sequences-drizzle.md) | 13 | `tools`, `web` |
 | [`./skills`](api/skills.md) | 27 | — |
 | [`./skills-placement`](api/skills-placement.md) | 6 | `harness`, `skills` |
-| [`./store`](api/store.md) | 10 | — |
+| [`./store`](api/store.md) | 8 | — |
 | [`./stream`](api/stream.md) | 46 | `interactions`, `plans` |
 | [`./studio`](api/studio.md) | 37 | — |
 | [`./studio-react`](api/studio-react.md) | 30 | `studio` |
@@ -72,14 +71,14 @@ _75 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./theme/tailwind-preset`](api/theme-tailwind-preset.md) | 1 | — |
 | [`./tools`](api/tools.md) | 63 | `crypto`, `eval` |
 | [`./trace`](api/trace.md) | 20 | `missions` |
-| [`./turn-health`](api/turn-health.md) | 32 | — |
+| [`./turn-health`](api/turn-health.md) | 31 | — |
 | [`./turn-stream`](api/turn-stream.md) | 59 | `chat-routes`, `stream` |
 | [`./vault`](api/vault.md) | 17 | — |
 | [`./vault/lazy`](api/vault-lazy.md) | 2 | — |
 | [`./web`](api/web.md) | 15 | — |
 | [`./web-react`](api/web-react.md) | 252 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `runtime`, `trace`, `work-product` |
 | [`./web-react/terminal`](api/web-react-terminal.md) | 10 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `runtime`, `trace`, `work-product` |
-| [`./work-product`](api/work-product.md) | 90 | `eval-campaign`, `tools` |
+| [`./work-product`](api/work-product.md) | 70 | `eval-campaign`, `tools` |
 | [`./work-product-react`](api/work-product-react.md) | 3 | `web-react`, `work-product` |
 
 ---
@@ -148,11 +147,11 @@ Depends on: `runtime`
 
 ## `./chat-routes`
 
-Source: `src/chat-routes/index.ts` · 158 exports
+Source: `src/chat-routes/index.ts` · 157 exports
 
 Depends on: `chat-store`, `interactions`, `model-resolution`, `plans`, `sandbox`, `stream`, `web`
 
-`ALLOWED_ATTACHMENT_SNIFFED_MIMES`, `assertPromptPartsWithinCap`, `AssistantDraftSnapshot`, `AssistantDraftStore`, `AssistantDraftWriter`, `AssistantDraftWriterOptions`, `assistantRowIdForTurn`, `AssistantRowValues`, `ATTACHMENT_ACCEPT`, `ATTACHMENT_MAX_COUNT`, `AttachmentPathArgs`, `AttachmentPathCheck`, `AttachmentReadResult`, `attachmentSizeErrorMessage`, `attachmentTotalSizeErrorMessage`, `AttachmentTypeCheckResult`, `AttachmentUploadAuthorization`, `AttachmentWriteResult`, `base64WireLen`, `buildDispatchParts`, `BuildDispatchPartsInput`, `buildMentionPromptBlock`, `bytesToBase64`, `ChatAttachmentInput`, `ChatAttachmentKind`, `ChatMentionKind`, `ChatRouteDurableProjection`, `ChatRouteDurableProjectionLogger`, `ChatRouteEvent`, `ChatTurnAuthorization`, `ChatTurnAuthorizeArgs`, `ChatTurnCompleteInput`, `ChatTurnFilePartInput`, `ChatTurnGateResult`, `ChatTurnHeartbeat`, `ChatTurnInputError`, `ChatTurnInputPatch`, `ChatTurnLifecycle`, `ChatTurnLifecycleComplete`, `ChatTurnLifecycleError`, `ChatTurnLifecycleStart`, `ChatTurnLock`, `ChatTurnLockResult`, `ChatTurnMessageStore`, `ChatTurnModelFailover`, `ChatTurnPartInput`, `ChatTurnProduceArgs`, `chatTurnRequestInit`, `ChatTurnRequestPayload`, `ChatTurnRouteProducer`, `ChatTurnRoutes`, `ChatTurnTextPartInput`, `ChatTurnUsage`, `checkAttachmentType`, `classifyTerminalFailure`, `createAssistantDraftWriter`, `createAttachmentUploadRoute`, `CreateAttachmentUploadRouteOptions`, `createChatTurnRoutes`, `CreateChatTurnRoutesOptions`, `createSandboxChatProducer`, `createSandboxFileIndexRoute`, `CreateSandboxFileIndexRouteOptions`, `createUploadRoute`, `CreateUploadRouteOptions`, `DEFAULT_STALE_TURN_LOCK_GRACE_MS`, `DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS`, `defaultValidateAttachmentPath`, `DetachedTurnFinal`, `DetachedTurnOptions`, `DetachedTurnParts`, `DetachedTurnResult`, `DISPATCH_MAX_MEDIA_PARTS`, `DISPATCH_MAX_PARTS`, `DISPATCH_REQUEST_MAX_BYTES`, `DISPATCH_STRUCTURAL_RESERVE_BYTES`, `DispatchPartsOutcome`, `DraftPersistenceTuning`, `DraftStoredMessage`, `EmptyTurnRetryInfo`, `FileIndexAuthorization`, `FileIndexCache`, `FileIndexReadyResponse`, `FileIndexResponse`, `FileIndexWarmingResponse`, `FileMention`, `fileMentionsToParts`, `FileMentionsToPartsOptions`, `FilePartPromotionOutcome`, `formatBytes`, `INLINE_PARTS_MAX_BYTES`, `isCommittingSandboxEvent`, `isDraftContentEvent`, `MAX_ATTACHMENT_TOTAL_BYTES`, `MAX_BINARY_ATTACHMENT_BYTES`, `MAX_EMPTY_TURN_RETRIES`, `MAX_TEXT_ATTACHMENT_BYTES`, `mediaTypeForMentionPath`, `MENTION_MAX_COUNT`, `mentionKindForPath`, `ModelFailoverStreamHandle`, `ModelFailoverStreamOptions`, `ModelFallbackInfo`, `normalizeChatPromptForSandbox`, `OpenModelStream`, `parseChatTurnParts`, `parseFileMentions`, `ProducerErrorEvent`, `ProducerNoticeEvent`, `ProducerPassthroughEvent`, `ProducerPassthroughEventType`, `ProducerReasoningEvent`, `ProducerTextEvent`, `ProducerToolCallEvent`, `ProducerToolResultEvent`, `ProducerUsageEvent`, `ProducerWireEvent`, `PROMOTE_MAX_FILE_BYTES`, `promoteAgentFilePart`, `PromoteAgentFilePartOptions`, `PromoteFilePartResult`, `PromptInputPart`, `promptPartsByteSize`, `RawAgentFilePart`, `ReadAttachmentFn`, `ReadSandboxMentionFn`, `reconcileStaleTurnLock`, `ReconcileStaleTurnLockOptions`, `ReconcileStaleTurnLockResult`, `resolveChatAttachments`, `ResolveChatAttachmentsOptions`, `ResolveChatAttachmentsResult`, `resolveEmptyTurnRetries`, `rowIdOf`, `runDetachedTurn`, `SandboxChatProducerOptions`, `SandboxFileTreeSource`, `SandboxMentionPathCheck`, `SandboxTreeFile`, `SandboxTreeResult`, `SandboxUploadSink`, `sanitizeAttachmentFileName`, `sanitizeUploadFilename`, `sniffBinary`, `sniffMimeFromName`, `SniffResult`, `StaleTurnLockSandboxProbeResult`, `StaleTurnLockSessionProbeResult`, `storeSupportsDraftPersistence`, `streamWithModelFailover`, `summarizeFailoverReason`, `UPLOAD_INLINE_MAX_BYTES`, `UPLOAD_MAX_FILE_BYTES`, `UploadAuthorization`, `UploadedChatFile`, `validateSandboxMentionPath`, `withDurableChatProjection`, `WriteAttachmentFn`
+`ALLOWED_ATTACHMENT_SNIFFED_MIMES`, `assertPromptPartsWithinCap`, `AssistantDraftSnapshot`, `AssistantDraftStore`, `AssistantDraftWriter`, `AssistantDraftWriterOptions`, `assistantRowIdForTurn`, `AssistantRowValues`, `ATTACHMENT_ACCEPT`, `ATTACHMENT_MAX_COUNT`, `AttachmentPathArgs`, `AttachmentPathCheck`, `AttachmentReadResult`, `attachmentSizeErrorMessage`, `attachmentTotalSizeErrorMessage`, `AttachmentTypeCheckResult`, `AttachmentUploadAuthorization`, `AttachmentWriteResult`, `base64WireLen`, `buildDispatchParts`, `BuildDispatchPartsInput`, `buildMentionPromptBlock`, `bytesToBase64`, `ChatAttachmentInput`, `ChatAttachmentKind`, `ChatMentionKind`, `ChatRouteDurableProjection`, `ChatRouteDurableProjectionLogger`, `ChatRouteEvent`, `ChatTurnAuthorization`, `ChatTurnAuthorizeArgs`, `ChatTurnCompleteInput`, `ChatTurnFilePartInput`, `ChatTurnGateResult`, `ChatTurnHeartbeat`, `ChatTurnInputError`, `ChatTurnInputPatch`, `ChatTurnLifecycle`, `ChatTurnLifecycleComplete`, `ChatTurnLifecycleError`, `ChatTurnLifecycleStart`, `ChatTurnLock`, `ChatTurnLockResult`, `ChatTurnMessageStore`, `ChatTurnModelFailover`, `ChatTurnPartInput`, `ChatTurnProduceArgs`, `chatTurnRequestInit`, `ChatTurnRequestPayload`, `ChatTurnRouteProducer`, `ChatTurnRoutes`, `ChatTurnTextPartInput`, `ChatTurnUsage`, `checkAttachmentType`, `classifyTerminalFailure`, `createAssistantDraftWriter`, `createAttachmentUploadRoute`, `CreateAttachmentUploadRouteOptions`, `createChatTurnRoutes`, `CreateChatTurnRoutesOptions`, `createSandboxChatProducer`, `createSandboxFileIndexRoute`, `CreateSandboxFileIndexRouteOptions`, `createUploadRoute`, `CreateUploadRouteOptions`, `DEFAULT_STALE_TURN_LOCK_GRACE_MS`, `DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS`, `defaultValidateAttachmentPath`, `DetachedTurnFinal`, `DetachedTurnOptions`, `DetachedTurnParts`, `DetachedTurnResult`, `DISPATCH_MAX_MEDIA_PARTS`, `DISPATCH_MAX_PARTS`, `DISPATCH_REQUEST_MAX_BYTES`, `DISPATCH_STRUCTURAL_RESERVE_BYTES`, `DispatchPartsOutcome`, `DraftPersistenceTuning`, `DraftStoredMessage`, `EmptyTurnRetryInfo`, `FileIndexAuthorization`, `FileIndexCache`, `FileIndexReadyResponse`, `FileIndexResponse`, `FileIndexWarmingResponse`, `FileMention`, `fileMentionsToParts`, `FileMentionsToPartsOptions`, `FilePartPromotionOutcome`, `formatBytes`, `INLINE_PARTS_MAX_BYTES`, `isCommittingSandboxEvent`, `isDraftContentEvent`, `MAX_ATTACHMENT_TOTAL_BYTES`, `MAX_BINARY_ATTACHMENT_BYTES`, `MAX_EMPTY_TURN_RETRIES`, `MAX_TEXT_ATTACHMENT_BYTES`, `mediaTypeForMentionPath`, `MENTION_MAX_COUNT`, `mentionKindForPath`, `ModelFailoverStreamHandle`, `ModelFailoverStreamOptions`, `ModelFallbackInfo`, `OpenModelStream`, `parseChatTurnParts`, `parseFileMentions`, `ProducerErrorEvent`, `ProducerNoticeEvent`, `ProducerPassthroughEvent`, `ProducerPassthroughEventType`, `ProducerReasoningEvent`, `ProducerTextEvent`, `ProducerToolCallEvent`, `ProducerToolResultEvent`, `ProducerUsageEvent`, `ProducerWireEvent`, `PROMOTE_MAX_FILE_BYTES`, `promoteAgentFilePart`, `PromoteAgentFilePartOptions`, `PromoteFilePartResult`, `PromptInputPart`, `promptPartsByteSize`, `RawAgentFilePart`, `ReadAttachmentFn`, `ReadSandboxMentionFn`, `reconcileStaleTurnLock`, `ReconcileStaleTurnLockOptions`, `ReconcileStaleTurnLockResult`, `resolveChatAttachments`, `ResolveChatAttachmentsOptions`, `ResolveChatAttachmentsResult`, `resolveEmptyTurnRetries`, `rowIdOf`, `runDetachedTurn`, `SandboxChatProducerOptions`, `SandboxFileTreeSource`, `SandboxMentionPathCheck`, `SandboxTreeFile`, `SandboxTreeResult`, `SandboxUploadSink`, `sanitizeAttachmentFileName`, `sanitizeUploadFilename`, `sniffBinary`, `sniffMimeFromName`, `SniffResult`, `StaleTurnLockSandboxProbeResult`, `StaleTurnLockSessionProbeResult`, `storeSupportsDraftPersistence`, `streamWithModelFailover`, `summarizeFailoverReason`, `UPLOAD_INLINE_MAX_BYTES`, `UPLOAD_MAX_FILE_BYTES`, `UploadAuthorization`, `UploadedChatFile`, `validateSandboxMentionPath`, `withDurableChatProjection`, `WriteAttachmentFn`
 
 [Full API →](api/chat-routes.md)
 
@@ -160,7 +159,7 @@ Depends on: `chat-store`, `interactions`, `model-resolution`, `plans`, `sandbox`
 
 Source: `src/chat-store/index.ts` · 62 exports
 
-Depends on: `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product`
+Depends on: `chat-routes`, `interactions`, `plans`, `stream`, `web-react`, `work-product`
 
 `AppendMessageInput`, `attachmentInputToPart`, `attachmentKindForMime`, `attachmentPartKey`, `attachmentPartsFromMessageParts`, `buildAttachmentPromptBlock`, `BULK_DELETE_MAX_THREADS`, `BulkDeleteThreadsInput`, `ChatAttachmentKind`, `ChatAttachmentPart`, `ChatDatabase`, `ChatFilePart`, `ChatImagePart`, `ChatInteractionPart`, `ChatMentionKind`, `ChatMentionPart`, `ChatMessagePart`, `ChatMessageRow`, `ChatNoticePart`, `ChatParentTable`, `ChatPartTime`, `ChatPlanPart`, `ChatReasoningPart`, `ChatStepFinishPart`, `ChatStepStartPart`, `ChatStore`, `ChatStoreInputError`, `ChatSubtaskPart`, `ChatTables`, `ChatTextPart`, `ChatThreadRow`, `ChatToolPart`, `ChatToolState`, `ChatToolStatus`, `ChatUsageTokens`, `ChatWorkProductPart`, `createChatStore`, `createChatTables`, `CreateChatTablesOptions`, `CreateThreadInput`, `DEFAULT_ATTACHMENT_PROMPT_HEADER`, `historyContentWithAttachments`, `isChatAttachmentPart`, `isChatInteractionPart`, `isChatMentionPart`, `isChatPlanPart`, `isChatStepFinishPart`, `isChatTextPart`, `isChatToolPart`, `isChatWorkProductPart`, `ListMessagesOptions`, `ListThreadsInput`, `ListThreadsResult`, `mentionInputToPart`, `mentionPartsFromMessageParts`, `NewChatMessageRow`, `NewChatThreadRow`, `StorableHarnessPartKind`, `threadTitleFromMessage`, `toChatMessageParts`, `UpdateMessageInput`, `WorkspaceAccessCheck`
 
@@ -238,29 +237,21 @@ Depends on: `tools`, `web`
 
 ## `./eval`
 
-Source: `src/eval/index.ts` · 13 exports
+Source: `src/eval/index.ts` · 21 exports
 
 Depends on: `tools`
 
-`CompletionRequirement`, `CompletionVerdict`, `CorrectnessChecker`, `createLlmCorrectnessChecker`, `createTokenRecallChecker`, `extractProducedState`, `producedFromToolEvents`, `ProducedState`, `RuntimeEventLike`, `SatisfiedBy`, `TaskGold`, `verifyCompletion`, `weightedComposite`
+`assertGateDiscriminates`, `calibrateGate`, `CalibrationCase`, `CalibrationOutcome`, `CalibrationReport`, `CompletionRequirement`, `CompletionVerdict`, `CorrectnessChecker`, `createLlmCorrectnessChecker`, `createTokenRecallChecker`, `extractProducedState`, `GateFn`, `measureWithControl`, `ProbeReport`, `producedFromToolEvents`, `ProducedState`, `RuntimeEventLike`, `SatisfiedBy`, `TaskGold`, `verifyCompletion`, `weightedComposite`
 
 [Full API →](api/eval.md)
 
 ## `./eval-campaign`
 
-Source: `src/eval-campaign/index.ts` · 37 exports
+Source: `src/eval-campaign/index.ts` · 30 exports
 
-`aggregateJudgeVerdicts`, `buildEnsembleJudge`, `CampaignResult`, `compareOptimizationMethods`, `CompareOptimizationMethodsOptions`, `defaultProductionGate`, `DispatchContext`, `EnsembleAggregate`, `EnsembleJudgeConfig`, `externalTextOptimizationMethod`, `ExternalTextOptimizationMethodConfig`, `Gate`, `gepaOptimizationMethod`, `GepaOptimizationMethodConfig`, `JudgeConfig`, `JudgeDimension`, `JudgeScore`, `JudgeVerdict`, `LabeledScenarioStore`, `MutableSurface`, `OptimizationMethod`, `OptimizationMethodResult`, `paretoSignificanceGate`, `runCampaign`, `RunRecord`, `Scenario`, `selfImprove`, `SelfImproveBudget`, `SelfImproveOptions`, `SelfImproveResult`, `skillOptOptimizationMethod`, `SkillOptOptimizationMethodConfig`, `SurfaceProposer`, `TrustItem`, `TrustThresholds`, `TrustVerdict`, `trustVerdicts`
+`aggregateJudgeVerdicts`, `buildEnsembleJudge`, `CampaignResult`, `defaultProductionGate`, `DispatchContext`, `EnsembleAggregate`, `EnsembleJudgeConfig`, `evolutionaryProposer`, `Gate`, `gepaProposer`, `JudgeConfig`, `JudgeDimension`, `JudgeScore`, `JudgeVerdict`, `LabeledScenarioStore`, `MutableSurface`, `Mutator`, `paretoSignificanceGate`, `runCampaign`, `RunRecord`, `Scenario`, `selfImprove`, `SelfImproveBudget`, `SelfImproveOptions`, `SelfImproveResult`, `SurfaceProposer`, `TrustItem`, `TrustThresholds`, `TrustVerdict`, `trustVerdicts`
 
 [Full API →](api/eval-campaign.md)
-
-## `./forms`
-
-Source: `src/forms/index.ts` · 29 exports
-
-`assertFormBlankIntegrity`, `checkRegistryAgainstBlank`, `decodeFormBlank`, `describeFormFill`, `FilledWidget`, `FillFormOptions`, `FillFormResult`, `fillPdfForm`, `formatFormCurrency`, `FormBlank`, `FormLabelBasis`, `FormRegistry`, `FormSlot`, `FormSlotFormat`, `FormSlotKind`, `LabelVerdict`, `parseFormAmount`, `parseFormBoolean`, `RegistryCheckResult`, `RegistryProblem`, `RegistryProblemCode`, `sha256Hex`, `SlotVerdict`, `SlotVerification`, `UnfilledCode`, `UnfilledSlot`, `verifyFilledForm`, `VerifyFormResult`, `widgetLabel`
-
-[Full API →](api/forms.md)
 
 ## `./harness`
 
@@ -410,11 +401,11 @@ Source: `src/preflight/cli.ts` · 2 exports
 
 ## `./preset-cloudflare`
 
-Source: `src/preset-cloudflare/index.ts` · 20 exports
+Source: `src/preset-cloudflare/index.ts` · 16 exports
 
 Depends on: `billing`, `crypto`, `knowledge`, `tools`, `web`
 
-`CloudflareWorkflowBindingLike`, `CloudflareWorkflowInstanceLike`, `createD1KnowledgeStateAccessor`, `createPresetDrizzleSchema`, `createPresetFieldCrypto`, `createPresetToolHandlers`, `createPresetWorkspaceKeyManager`, `createPresetWorkspaceKeyStore`, `D1Like`, `D1PreparedLike`, `DrizzleColumnLike`, `DrizzleSqliteCoreLike`, `ensureCloudflareWorkflowInstance`, `EnsureCloudflareWorkflowInstanceResult`, `PRESET_MIGRATION_SQL`, `PRESET_TABLES`, `PresetBillingOptions`, `PresetKnowledgeAccessorOptions`, `PresetToolHandlerOptions`, `VaultKv`
+`createD1KnowledgeStateAccessor`, `createPresetDrizzleSchema`, `createPresetFieldCrypto`, `createPresetToolHandlers`, `createPresetWorkspaceKeyManager`, `createPresetWorkspaceKeyStore`, `D1Like`, `D1PreparedLike`, `DrizzleColumnLike`, `DrizzleSqliteCoreLike`, `PRESET_MIGRATION_SQL`, `PRESET_TABLES`, `PresetBillingOptions`, `PresetKnowledgeAccessorOptions`, `PresetToolHandlerOptions`, `VaultKv`
 
 [Full API →](api/preset-cloudflare.md)
 
@@ -466,11 +457,11 @@ Depends on: `tools`
 
 ## `./sandbox`
 
-Source: `src/sandbox/index.ts` · 124 exports
+Source: `src/sandbox/index.ts` · 115 exports
 
 Depends on: `crypto`, `harness`, `profile`, `runtime`, `tools`
 
-`AppToolDescriptor`, `assertEnvWithinLimits`, `assertProvisionPayloadWithinCap`, `attachReasoningEffort`, `AuthenticatedSandboxUser`, `bearerSubprotocolToken`, `bearerToken`, `buildAppToolMcpServers`, `BuildAppToolMcpServersOptions`, `buildSandboxRuntimeProxyHeaders`, `buildSandboxToolFileMounts`, `BuildSandboxToolFileMountsOptions`, `buildSandboxToolPathSetupScript`, `classifySeveredStream`, `collectSandboxPromptText`, `createSandboxTerminalToken`, `createWorkspaceSandboxConnectionHandler`, `createWorkspaceSandboxManager`, `createWorkspaceSandboxRuntimeProxyHandler`, `createWorkspaceSandboxTerminalUpgradeHandler`, `DEFAULT_SANDBOX_RESOURCES`, `deferredCorpusHash`, `deleteSecret`, `detectInteractiveQuestion`, `driveSandboxTurn`, `DriveSandboxTurnOptions`, `encodeSandboxRuntimePath`, `ensureWorkspaceSandbox`, `EnsureWorkspaceSandboxOptions`, `ENV_TOTAL_MAX_BYTES`, `ENV_VALUE_MAX_BYTES`, `flattenHistory`, `getClient`, `isSandboxTerminalWsUpgrade`, `isTerminalPromptEvent`, `LivenessProbeConfig`, `matchSandboxTerminalWsPath`, `MemberSyncSeam`, `mergeExtraMcp`, `mergeHistoryIntoParts`, `mintSandboxScopedToken`, `mintTerminalProxyToken`, `ModelSelection`, `ModelSelectionError`, `ModelSelectionFailure`, `ModelSelectionSource`, `Outcome`, `peekWorkspaceSandbox`, `PeekWorkspaceSandboxOutcome`, `ProfileComposeOptions`, `PromptInputPart`, `ProviderResolutionConfig`, `PROVISION_PAYLOAD_MAX_BYTES`, `ProvisionPayloadSections`, `ProvisionProfileSection`, `readSandboxBinaryBytes`, `readSecret`, `requireTransportableModel`, `resetClientCache`, `ResolvedModel`, `resolveModel`, `resolveModelSelection`, `resolveSandboxClientCredentials`, `ResolveSandboxClientCredentialsOptions`, `runSandboxPrompt`, `runSandboxToolPathSetup`, `SandboxApiCredentials`, `SandboxBuildContext`, `SandboxClientCredentials`, `SandboxCredentialEnvironment`, `SandboxExecChannel`, `SandboxExecOptions`, `SandboxFileBytesOutcome`, `SandboxFileSizeOutcome`, `SandboxModelResolutionError`, `SandboxPermissionLevel`, `SandboxRecoveryFailedError`, `SandboxRecoveryPhase`, `SandboxResourceConfig`, `SandboxRestoreSpec`, `SandboxRuntimeAuthRefreshError`, `SandboxRuntimeConfig`, `SandboxRuntimeConnection`, `SandboxScope`, `SandboxStepTransition`, `SandboxTerminalTokenOptions`, `SandboxTerminalTokenResult`, `SandboxTerminalTokenSubject`, `SandboxTerminalWsMatch`, `sandboxToolBinDir`, `sandboxToolPath`, `SandboxToolPathOptions`, `sandboxToolRootDir`, `SandboxToolSpec`, `ScopedTokenResult`, `SecretStore`, `secretStoreFromClient`, `shellQuote`, `splitDeferredProfileFiles`, `statSandboxFileSize`, `StoppedSandboxResumeFailure`, `StoppedSandboxResumeRecovery`, `StorageConfig`, `storeSecret`, `streamSandboxPrompt`, `StreamSandboxPromptOptions`, `syncSandboxMemberAdd`, `syncSandboxMemberRemove`, `syncSandboxMemberRole`, `TerminalProxyIdentity`, `terminalTokenFromRequest`, `verifySandboxTerminalToken`, `verifyTerminalProxyToken`, `WorkspaceSandboxConnectionArgs`, `WorkspaceSandboxConnectionHandlerOptions`, `WorkspaceSandboxEnsureContext`, `WorkspaceSandboxInstanceLike`, `WorkspaceSandboxManager`, `WorkspaceSandboxManagerOptions`, `WorkspaceSandboxRuntimeProxyArgs`, `WorkspaceSandboxRuntimeProxyHandlerOptions`, `WorkspaceSandboxTerminalUpgradeHandlerOptions`, `WriteProfileFilesOptions`, `writeProfileFilesToBox`
+`AppToolDescriptor`, `assertEnvWithinLimits`, `assertProvisionPayloadWithinCap`, `attachReasoningEffort`, `AuthenticatedSandboxUser`, `bearerSubprotocolToken`, `bearerToken`, `buildAppToolMcpServers`, `BuildAppToolMcpServersOptions`, `buildSandboxRuntimeProxyHeaders`, `buildSandboxToolFileMounts`, `BuildSandboxToolFileMountsOptions`, `buildSandboxToolPathSetupScript`, `classifySeveredStream`, `collectSandboxPromptText`, `createSandboxTerminalToken`, `createWorkspaceSandboxConnectionHandler`, `createWorkspaceSandboxManager`, `createWorkspaceSandboxRuntimeProxyHandler`, `createWorkspaceSandboxTerminalUpgradeHandler`, `DEFAULT_SANDBOX_RESOURCES`, `deferredCorpusHash`, `deleteSecret`, `detectInteractiveQuestion`, `driveSandboxTurn`, `DriveSandboxTurnOptions`, `encodeSandboxRuntimePath`, `ensureWorkspaceSandbox`, `EnsureWorkspaceSandboxOptions`, `ENV_TOTAL_MAX_BYTES`, `ENV_VALUE_MAX_BYTES`, `flattenHistory`, `getClient`, `isSandboxTerminalWsUpgrade`, `isTerminalPromptEvent`, `LivenessProbeConfig`, `matchSandboxTerminalWsPath`, `MemberSyncSeam`, `mergeExtraMcp`, `mergeHistoryIntoParts`, `mintSandboxScopedToken`, `mintTerminalProxyToken`, `Outcome`, `peekWorkspaceSandbox`, `PeekWorkspaceSandboxOutcome`, `ProfileComposeOptions`, `PromptInputPart`, `ProviderResolutionConfig`, `PROVISION_PAYLOAD_MAX_BYTES`, `ProvisionPayloadSections`, `ProvisionProfileSection`, `readSandboxBinaryBytes`, `readSecret`, `resetClientCache`, `ResolvedModel`, `resolveModel`, `resolveSandboxClientCredentials`, `ResolveSandboxClientCredentialsOptions`, `runSandboxPrompt`, `runSandboxToolPathSetup`, `SandboxApiCredentials`, `SandboxBuildContext`, `SandboxClientCredentials`, `SandboxCredentialEnvironment`, `SandboxExecChannel`, `SandboxExecOptions`, `SandboxFileBytesOutcome`, `SandboxFileSizeOutcome`, `SandboxPermissionLevel`, `SandboxResourceConfig`, `SandboxRestoreSpec`, `SandboxRuntimeAuthRefreshError`, `SandboxRuntimeConfig`, `SandboxRuntimeConnection`, `SandboxScope`, `SandboxStepTransition`, `SandboxTerminalTokenOptions`, `SandboxTerminalTokenResult`, `SandboxTerminalTokenSubject`, `SandboxTerminalWsMatch`, `sandboxToolBinDir`, `sandboxToolPath`, `SandboxToolPathOptions`, `sandboxToolRootDir`, `SandboxToolSpec`, `ScopedTokenResult`, `SecretStore`, `secretStoreFromClient`, `shellQuote`, `splitDeferredProfileFiles`, `statSandboxFileSize`, `StoppedSandboxResumeFailure`, `StoppedSandboxResumeRecovery`, `StorageConfig`, `storeSecret`, `streamSandboxPrompt`, `StreamSandboxPromptOptions`, `syncSandboxMemberAdd`, `syncSandboxMemberRemove`, `syncSandboxMemberRole`, `TerminalProxyIdentity`, `terminalTokenFromRequest`, `verifySandboxTerminalToken`, `verifyTerminalProxyToken`, `WorkspaceSandboxConnectionArgs`, `WorkspaceSandboxConnectionHandlerOptions`, `WorkspaceSandboxEnsureContext`, `WorkspaceSandboxInstanceLike`, `WorkspaceSandboxManager`, `WorkspaceSandboxManagerOptions`, `WorkspaceSandboxRuntimeProxyArgs`, `WorkspaceSandboxRuntimeProxyHandlerOptions`, `WorkspaceSandboxTerminalUpgradeHandlerOptions`, `WriteProfileFilesOptions`, `writeProfileFilesToBox`
 
 [Full API →](api/sandbox.md)
 
@@ -524,9 +515,9 @@ Depends on: `harness`, `skills`
 
 ## `./store`
 
-Source: `src/store/index.ts` · 10 exports
+Source: `src/store/index.ts` · 8 exports
 
-`createDatabaseProvider`, `createInMemoryKV`, `DatabaseProvider`, `DatabaseProviderOptions`, `KVGetWithMetadataResult`, `KVListResult`, `KVPutOptions`, `KVStore`, `runSqliteStatements`, `SqliteBatchDatabase`
+`createDatabaseProvider`, `createInMemoryKV`, `DatabaseProvider`, `DatabaseProviderOptions`, `KVGetWithMetadataResult`, `KVListResult`, `KVPutOptions`, `KVStore`
 
 [Full API →](api/store.md)
 
@@ -678,9 +669,9 @@ Depends on: `missions`
 
 ## `./turn-health`
 
-Source: `src/turn-health/index.ts` · 32 exports
+Source: `src/turn-health/index.ts` · 31 exports
 
-`AlertSink`, `AlertThrottleStore`, `classifyTurnOutcome`, `createConsoleAlertSink`, `createD1TurnHealthSource`, `createGuardedAlertSink`, `createMemoryThrottleStore`, `createMultiAlertSink`, `createSlackBotAlertSink`, `createThrottledAlertSink`, `createTurnHealthLifecycle`, `createWebhookAlertSink`, `D1LikeForHealth`, `describeReason`, `FetchLike`, `PersistedTurnRow`, `SHELL_ERROR_REPLY_PREFIXES`, `SweepOptions`, `SweepResult`, `sweepSilentFailures`, `turnAlert`, `TurnHealthAlert`, `TurnHealthCompleteInfo`, `TurnHealthErrorInfo`, `TurnHealthLifecycle`, `TurnHealthLifecycleOptions`, `TurnHealthReason`, `TurnHealthSeverity`, `TurnHealthSource`, `TurnHealthVerdict`, `TurnOutcomeInput`, `UnansweredThread`
+`AlertSink`, `AlertThrottleStore`, `classifyTurnOutcome`, `createConsoleAlertSink`, `createD1TurnHealthSource`, `createGuardedAlertSink`, `createMemoryThrottleStore`, `createMultiAlertSink`, `createThrottledAlertSink`, `createTurnHealthLifecycle`, `createWebhookAlertSink`, `D1LikeForHealth`, `describeReason`, `FetchLike`, `PersistedTurnRow`, `SHELL_ERROR_REPLY_PREFIXES`, `SweepOptions`, `SweepResult`, `sweepSilentFailures`, `turnAlert`, `TurnHealthAlert`, `TurnHealthCompleteInfo`, `TurnHealthErrorInfo`, `TurnHealthLifecycle`, `TurnHealthLifecycleOptions`, `TurnHealthReason`, `TurnHealthSeverity`, `TurnHealthSource`, `TurnHealthVerdict`, `TurnOutcomeInput`, `UnansweredThread`
 
 [Full API →](api/turn-health.md)
 
@@ -740,11 +731,11 @@ Depends on: `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `mi
 
 ## `./work-product`
 
-Source: `src/work-product/index.ts` · 90 exports
+Source: `src/work-product/index.ts` · 70 exports
 
 Depends on: `eval-campaign`, `tools`
 
-`AgentCheckInput`, `ARTIFACT_AGREEMENT_CHECK`, `ArtifactAgreement`, `artifactAgreementErrorDetail`, `buildWorkProductTools`, `canonicalizeValue`, `canTransitionWorkProduct`, `CLAIM_SUPPORT_CHECK`, `ClaimSupport`, `claimSupportErrorDetail`, `claimValues`, `ConfusableTargetGroup`, `createInMemoryWorkProductStore`, `CreateWorkProductInput`, `createWorkProductRoutes`, `createWorkProductService`, `EVIDENCE_COVERAGE_CHECK`, `EvidenceEntry`, `EvidenceLocator`, `EvidenceSpan`, `ExceptionEntry`, `ExceptionSeverity`, `finalizeWorkProductProvenance`, `FinalizeWorkProductProvenanceInput`, `findSourceLine`, `indexArtifactValues`, `InMemoryWorkProductStore`, `isWorkProductStatus`, `isWorkProductTerminal`, `MAX_WORK_PRODUCT_BATCH`, `normalizeQuoteText`, `parseAgentCheckInput`, `parseArtifactInput`, `parseEvidenceInput`, `parseExceptionInput`, `parseReviewQueueItem`, `persistedPartToWorkProduct`, `ProfileBacktestSummary`, `projectReviewQueue`, `QualityCheck`, `QUOTE_VERIFICATION_CHECK`, `QuoteBasis`, `ReviewQueueInputs`, `ReviewQueueItem`, `ReviewQueuePendingAsk`, `ReviewQueueState`, `ReviewQueueThread`, `sliceSourceSpan`, `sourceContainsQuote`, `SourceFindFailure`, `SourceFindResult`, `SourceSpanFailure`, `SourceSpanResult`, `stampProvenance`, `SubmitWorkProductInput`, `TARGET_CORRECTNESS_CHECK`, `targetLabelErrorDetail`, `TargetLabelVerdict`, `TrustItem`, `unresolvedBlockingExceptions`, `validateWorkProductVerdictBody`, `valuesInText`, `verifyArtifactAgreement`, `verifyClaimSupport`, `verifyTargetLabel`, `WorkProductArtifact`, `WorkProductAuditEvent`, `WorkProductAuthorizeArgs`, `WorkProductOutcome`, `WorkProductParseResult`, `WorkProductPatch`, `WorkProductPersistedPart`, `WorkProductProvenance`, `WorkProductProvenanceBase`, `WorkProductRecord`, `WorkProductRef`, `WorkProductRouteAuthorization`, `WorkProductRoutes`, `WorkProductRoutesOptions`, `WorkProductService`, `WorkProductServiceOptions`, `WorkProductStatus`, `WorkProductStorePort`, `WorkProductToolConfig`, `workProductToPersistedPart`, `workProductTrustInputs`, `WorkProductUpdateGuard`, `WorkProductVerdictBody`, `WorkProductVerdictInput`, `WorkProductVersionEntry`
+`AgentCheckInput`, `buildWorkProductTools`, `canTransitionWorkProduct`, `createInMemoryWorkProductStore`, `CreateWorkProductInput`, `createWorkProductRoutes`, `createWorkProductService`, `EVIDENCE_COVERAGE_CHECK`, `EvidenceEntry`, `EvidenceLocator`, `EvidenceSpan`, `ExceptionEntry`, `ExceptionSeverity`, `finalizeWorkProductProvenance`, `FinalizeWorkProductProvenanceInput`, `InMemoryWorkProductStore`, `isWorkProductStatus`, `isWorkProductTerminal`, `MAX_WORK_PRODUCT_BATCH`, `normalizeQuoteText`, `parseAgentCheckInput`, `parseArtifactInput`, `parseEvidenceInput`, `parseExceptionInput`, `parseReviewQueueItem`, `persistedPartToWorkProduct`, `ProfileBacktestSummary`, `projectReviewQueue`, `QualityCheck`, `QUOTE_VERIFICATION_CHECK`, `QuoteBasis`, `ReviewQueueInputs`, `ReviewQueueItem`, `ReviewQueuePendingAsk`, `ReviewQueueState`, `ReviewQueueThread`, `sliceSourceSpan`, `sourceContainsQuote`, `SourceSpanFailure`, `SourceSpanResult`, `stampProvenance`, `SubmitWorkProductInput`, `TrustItem`, `unresolvedBlockingExceptions`, `validateWorkProductVerdictBody`, `WorkProductArtifact`, `WorkProductAuditEvent`, `WorkProductAuthorizeArgs`, `WorkProductOutcome`, `WorkProductParseResult`, `WorkProductPatch`, `WorkProductPersistedPart`, `WorkProductProvenance`, `WorkProductProvenanceBase`, `WorkProductRecord`, `WorkProductRef`, `WorkProductRouteAuthorization`, `WorkProductRoutes`, `WorkProductRoutesOptions`, `WorkProductService`, `WorkProductServiceOptions`, `WorkProductStatus`, `WorkProductStorePort`, `WorkProductToolConfig`, `workProductToPersistedPart`, `workProductTrustInputs`, `WorkProductUpdateGuard`, `WorkProductVerdictBody`, `WorkProductVerdictInput`, `WorkProductVersionEntry`
 
 [Full API →](api/work-product.md)
 
