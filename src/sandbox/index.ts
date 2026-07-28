@@ -33,9 +33,35 @@ import {
   assertProfilePromptWithinBudget,
   type ComposeProfileBudget,
 } from '../profile/budget'
+import {
+  resolveModel,
+  resolveModelSelection,
+  requireTransportableModel,
+  SandboxModelResolutionError,
+  type ProviderResolutionConfig,
+  type ResolvedModel,
+  type ModelSelection,
+  type ModelSelectionFailure,
+  type ModelSelectionError,
+  type ModelSelectionSource,
+} from './model'
 
 export type { Outcome } from './outcome'
 export * from './binary-read'
+export {
+  resolveModel,
+  resolveModelSelection,
+  requireTransportableModel,
+  SandboxModelResolutionError,
+}
+export type {
+  ProviderResolutionConfig,
+  ResolvedModel,
+  ModelSelection,
+  ModelSelectionFailure,
+  ModelSelectionError,
+  ModelSelectionSource,
+}
 
 /** Define client credentials for accessing the sandbox environment with API key and base URL */
 export interface SandboxClientCredentials {
@@ -197,24 +223,6 @@ export interface SandboxResourceConfig {
   diskGB: number
   maxLifetimeSeconds: number
   idleTimeoutSeconds: number
-}
-
-/** Define configuration options for resolving a provider and its model with optional API keys and routing details */
-export interface ProviderResolutionConfig {
-  routerBaseUrl?: string
-  apiKey?: string
-  providerName?: string
-  modelName?: string
-  defaultModel?: string
-  openaiApiKey?: string
-  // Opt-in: a resolvable provider+model WITHOUT an api key still yields model
-  // metadata (model/provider/baseUrl, no apiKey) instead of undefined. Keyless
-  // metadata makes the sandbox platform mint its OWN per-user router key at
-  // create (its requiresRouterKey gate), so turns bill the box's billing owner
-  // instead of a product-baked shared key. Requires an explicit providerName —
-  // provider inference from key presence cannot fire keyless. Default false:
-  // a keyless config resolves to undefined exactly as before.
-  allowKeylessModel?: boolean
 }
 
 /** Define the context for building a sandbox including workspace, integrations, and optional user ID */
@@ -1809,7 +1817,9 @@ export async function ensureWorkspaceSandbox(
 
   // Bake the model at create when opted in. childKeyMint overrides the apiKey
   // per-workspace; a typed mint failure falls through to the parent key (logged).
-  let model = shell.backendModelAtCreate ? resolveModel(shell.provider) : undefined
+  let model = shell.backendModelAtCreate
+    ? requireTransportableModel(resolveModelSelection(shell.provider), `backendModelAtCreate for ${name}`)
+    : undefined
   if (model && shell.childKeyMint && model.provider === 'openai-compat') {
     const minted = await shell.childKeyMint(scope)
     if (minted.succeeded) model = { ...model, apiKey: minted.value }
@@ -1889,41 +1899,6 @@ export async function ensureWorkspaceSandbox(
     }
   }
   return box
-}
-
-/** Represent a fully configured model with optional API key and base URL for sandbox platform integration */
-export interface ResolvedModel {
-  model: string
-  provider: string
-  // Omitted only under `allowKeylessModel` — keyless metadata tells the
-  // sandbox platform to mint its own per-user router key for the box.
-  apiKey?: string
-  baseUrl?: string
-}
-
-/** Resolve and return the appropriate model configuration based on provider settings and optional overrides */
-export function resolveModel(
-  config: ProviderResolutionConfig | undefined,
-  override?: { model?: string; modelApiKey?: string },
-): ResolvedModel | undefined {
-  const c = config ?? {}
-  const explicitBaseUrl = c.routerBaseUrl
-  const explicitApiKey = override?.modelApiKey ?? c.apiKey
-  const provider =
-    c.providerName ?? (explicitApiKey ? 'openai-compat' : c.openaiApiKey ? 'openai' : undefined)
-  const modelName =
-    override?.model ??
-    c.modelName ??
-    (provider === 'openai' || provider === 'openai-compat' ? c.defaultModel : undefined)
-  const apiKey = explicitApiKey ?? (provider === 'openai' ? c.openaiApiKey : undefined)
-  if (!provider || !modelName) return undefined
-  if (!apiKey && !c.allowKeylessModel) return undefined
-  return {
-    model: modelName,
-    provider,
-    ...(apiKey ? { apiKey } : {}),
-    ...(explicitBaseUrl ? { baseUrl: explicitBaseUrl } : {}),
-  }
 }
 
 // The SDK's SandboxInstance.streamPrompt/.prompt accept `string | PromptInputPart[]`
@@ -2061,10 +2036,13 @@ export async function* streamSandboxPrompt(
   options?: StreamSandboxPromptOptions,
 ): AsyncGenerator<unknown> {
   const harness = options?.harness ?? 'opencode'
-  const model = resolveModel(shell.provider, {
-    model: options?.model,
-    modelApiKey: options?.modelApiKey,
-  })
+  const model = requireTransportableModel(
+    resolveModelSelection(shell.provider, {
+      model: options?.model,
+      modelApiKey: options?.modelApiKey,
+    }),
+    'streamSandboxPrompt',
+  )
 
   // Server-side enforcement of the harness↔model policy: a vendor-locked harness
   // (claude-code/codex/kimi-code) must not be sent a foreign-provider model, even
@@ -2458,10 +2436,17 @@ export async function driveSandboxTurn(
   options: DriveSandboxTurnOptions,
 ): Promise<Outcome<TurnDriveResult>> {
   const harness = options.harness ?? 'opencode'
-  const model = resolveModel(shell.provider, {
-    model: options.model,
-    modelApiKey: options.modelApiKey,
-  })
+  // Resolved (and, for an explicit override/config model, enforced-transportable)
+  // BEFORE the try below: a misconfigured model is a deterministic config error,
+  // not a retryable transport blip, so it throws here rather than returning
+  // `fail(...)` — a driver re-ticking this session would otherwise retry it forever.
+  const model = requireTransportableModel(
+    resolveModelSelection(shell.provider, {
+      model: options.model,
+      modelApiKey: options.modelApiKey,
+    }),
+    'driveSandboxTurn',
+  )
   if (model?.model) assertHarnessModelCompatible(harness, model.model)
   const prompt =
     typeof message === 'string'

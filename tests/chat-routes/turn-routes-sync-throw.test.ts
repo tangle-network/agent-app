@@ -6,9 +6,7 @@ import { describe, expect, it } from 'vitest'
 // `catch` settles it: `onTurnError` fires and the turn lock is released.
 import { vi } from 'vitest'
 vi.mock('@tangle-network/agent-runtime/durable', async (importOriginal) => {
-  const actual = await importOriginal<
-    typeof import('@tangle-network/agent-runtime/durable')
-  >()
+  const actual = await importOriginal<typeof import('@tangle-network/agent-runtime/durable')>()
   return {
     ...actual,
     handleChatTurn: () => {
