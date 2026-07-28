@@ -2010,6 +2010,9 @@ export function attachReasoningEffort(
 export interface StreamSandboxPromptOptions {
   sessionId?: string
   executionId?: string
+  /** Stable idempotency key for one logical dispatch. Reuse it with the same
+   * `sessionId` when a caller may retry the initial request. */
+  turnId?: string
   lastEventId?: string
   systemPrompt?: string
   model?: string
@@ -2099,6 +2102,7 @@ export async function* streamSandboxPrompt(
   const stream = box.streamPrompt(prompt, {
     sessionId: options?.sessionId,
     executionId: options?.executionId,
+    turnId: options?.turnId,
     lastEventId: options?.lastEventId,
     ...(options?.signal ? { signal: options.signal } : {}),
     ...(options?.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
@@ -2422,9 +2426,6 @@ export interface DriveSandboxTurnOptions extends StreamSandboxPromptOptions {
    * MUST reuse it so a crash + re-drive finds the in-flight session instead of
    * starting a second agent run. */
   sessionId: string
-  /** Turn idempotency key for the platform's completed-turn cache. Defaults to
-   * `sessionId` (correct for the one-turn-per-session shape detached drivers use). */
-  turnId?: string
   /** Wall-clock cap in ms from the session's start. A still-running session past
    * the cap is cancelled and reported `failed` — bounds an unattended run (e.g. a
    * turn that stalled on an interactive question nothing will answer). Omit for no cap. */
@@ -2440,8 +2441,8 @@ export interface DriveSandboxTurnOptions extends StreamSandboxPromptOptions {
 //
 // This is the durable path for cron / mission-step / queue callers: re-invoke on
 // your own schedule (Workflow step, DO alarm, queue tick) with the SAME
-// `sessionId`. Dispatch is idempotent on it, so a crash + re-drive is a lookup,
-// not a second agent run.
+// `sessionId` and `turnId`. Dispatch is idempotent on that pair, so a crash +
+// re-drive is a lookup, not a second agent run.
 //
 // The Outcome boundary separates a retryable transport failure from a settled
 // turn: `fail` means the drive call itself threw (network blip — retry the tick);

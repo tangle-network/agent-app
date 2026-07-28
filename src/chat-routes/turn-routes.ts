@@ -47,8 +47,12 @@
  * normalized to the single-args shape the other seams take.
  */
 
-import { deriveExecutionId, handleChatTurn } from '@tangle-network/agent-runtime'
-import type { ChatTurnIdentity, ChatTurnProducer } from '@tangle-network/agent-runtime'
+import {
+  deriveExecutionId,
+  handleChatTurn,
+  type ChatTurnIdentity,
+  type ChatTurnProducer,
+} from '@tangle-network/agent-runtime/durable'
 import { mentionInputToPart, toChatMessageParts, type ChatMessagePart } from '../chat-store/parts'
 import {
   assistantRowIdForTurn,

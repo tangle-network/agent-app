@@ -36,7 +36,7 @@ pnpm add @tangle-network/agent-eval @tangle-network/agent-integrations
 | Peer | Required by | Range |
 |---|---|---|
 | `@tangle-network/agent-eval` | `/eval`, `/eval-campaign`, `/profile`, `/knowledge` | `0.133.2` |
-| `@tangle-network/agent-runtime` | `/runtime`, `/chat-routes` | `0.107.4` |
+| `@tangle-network/agent-runtime` | `/runtime`, `/chat-routes` | `0.108.0` |
 | `@tangle-network/agent-integrations` | `/integrations` | `>=0.44.0` |
 | `@tangle-network/agent-interface` | `/interactions`, `/chat-store`, `/harness` | `0.36.0` |
 | `@tangle-network/sandbox` | `/sandbox` | `0.15.1` |
