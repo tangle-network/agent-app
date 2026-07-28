@@ -7126,6 +7126,18 @@
           "doc": "Per-product entitlement snapshot from the platform — the single read that tells a product whether to show its workspace or the seat paywall."
         },
         {
+          "name": "ProductSeatOffer",
+          "kind": "interface",
+          "signature": "interface ProductSeatOffer",
+          "doc": "Commercial terms returned by the platform's product catalog."
+        },
+        {
+          "name": "ProductSeatOfferPeriod",
+          "kind": "interface",
+          "signature": "interface ProductSeatOfferPeriod",
+          "doc": "Price and included shared-wallet credit for one seat billing period."
+        },
+        {
           "name": "readTangleTierState",
           "kind": "function",
           "signature": "(http: PlatformBillingHttp, userApiKey: string | null | undefined, policy?: Record<TanglePlanTier, TangleTierPolicy>) =…",
@@ -7171,7 +7183,7 @@
           "name": "seatCheckoutUrl",
           "kind": "function",
           "signature": "(baseUrl: string, productId: string) => string",
-          "doc": "Platform Stripe checkout URL for a product's $100/mo seat."
+          "doc": "Platform Stripe checkout URL for a product's catalog-backed seat."
         },
         {
           "name": "SeatStatus",
@@ -13798,6 +13810,7 @@
         "interactions",
         "missions",
         "plans",
+        "platform",
         "runtime",
         "trace",
         "work-product"
@@ -15073,7 +15086,7 @@
         {
           "name": "SeatPaywall",
           "kind": "function",
-          "signature": "({ product, onCheckout, priceUsd, includedUsageUsd, tagline, ctaLabel, benefits, footnote, }: SeatPaywallProps) => Reac…",
+          "signature": "({ product, onCheckout, priceUsd, includedUsageUsd, offer, tagline, ctaLabel, benefits, footnote, }: SeatPaywallProps)…",
           "doc": "Centered card paywall."
         },
         {
@@ -15329,6 +15342,7 @@
         "interactions",
         "missions",
         "plans",
+        "platform",
         "runtime",
         "trace",
         "work-product"

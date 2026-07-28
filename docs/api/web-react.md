@@ -1699,7 +1699,7 @@ interface SandboxTerminalConnectionResponse
 `function` — Centered card paywall.
 
 ```ts
-({ product, onCheckout, priceUsd, includedUsageUsd, tagline, ctaLabel, benefits, footnote, }: SeatPaywallProps) => Reac…
+({ product, onCheckout, priceUsd, includedUsageUsd, offer, tagline, ctaLabel, benefits, footnote, }: SeatPaywallProps)…
 ```
 
 ### `SeatPaywallProps`

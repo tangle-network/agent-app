@@ -125,6 +125,18 @@ describe('createPlatformBillingHttp.getProductEntitlement transport', () => {
             hasSeat: true,
             // platform also true, but a held seat must force onFreeTier false
             onFreeTier: true,
+            offer: {
+              currency: 'usd',
+              interval: 'month',
+              recurring: {
+                priceCents: 100_000,
+                includedCreditsCents: 10_000,
+              },
+              introductory: {
+                priceCents: 2_000,
+                includedCreditsCents: 1_000,
+              },
+            },
           },
         }),
         { status: 200, headers: { 'content-type': 'application/json' } },
@@ -141,6 +153,18 @@ describe('createPlatformBillingHttp.getProductEntitlement transport', () => {
     expect(ent.hasSeat).toBe(true)
     expect(ent.onFreeTier).toBe(false)
     expect(ent.lifetimeSpentUsd).toBe(3.2)
+    expect(ent.offer).toEqual({
+      currency: 'usd',
+      interval: 'month',
+      recurring: {
+        priceCents: 100_000,
+        includedCreditsCents: 10_000,
+      },
+      introductory: {
+        priceCents: 2_000,
+        includedCreditsCents: 1_000,
+      },
+    })
     expect(http.seatCheckoutUrl('gtm')).toBe(
       'https://id.tangle.tools/app/billing/seat/checkout?product=gtm',
     )

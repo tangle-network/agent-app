@@ -4,7 +4,7 @@
 
 Source: `src/platform/index.ts`
 
-65 exports.
+67 exports.
 
 ### `AdminGuardOptions`
 
@@ -334,6 +334,22 @@ interface PlatformUsageProductRow
 interface ProductEntitlement
 ```
 
+### `ProductSeatOffer`
+
+`interface` — Commercial terms returned by the platform's product catalog.
+
+```ts
+interface ProductSeatOffer
+```
+
+### `ProductSeatOfferPeriod`
+
+`interface` — Price and included shared-wallet credit for one seat billing period.
+
+```ts
+interface ProductSeatOfferPeriod
+```
+
 ### `readTangleTierState`
 
 `function` — Read subscription + balance and project them onto the tier policy.
@@ -392,7 +408,7 @@ interface SeatBillingFlagOptions
 
 ### `seatCheckoutUrl`
 
-`function` — Platform Stripe checkout URL for a product's $100/mo seat.
+`function` — Platform Stripe checkout URL for a product's catalog-backed seat.
 
 ```ts
 (baseUrl: string, productId: string) => string
