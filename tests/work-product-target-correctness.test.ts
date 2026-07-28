@@ -578,6 +578,67 @@ describe('submit_work_product', () => {
     expect(named.artifact_agreement?.detail).toContain('agree with the artifact field they support')
   })
 
+  it('lets an agent REPAIR a reopened row whose artifact is the crossed half', async () => {
+    // The satisfiability trap in this gate's own design, and why agreement is
+    // checked at submit and nowhere else. A `changes_requested` row keeps the
+    // artifact the reviewer REJECTED. An agent correcting a crossed package has
+    // exactly one order available — fix the evidence, then submit the corrected
+    // artifact, because the artifact is only settable at submit. Comparing the
+    // incoming citation to the STALE artifact refuses precisely that fix, and
+    // the package can never be repaired. Checking on upsert did exactly this.
+    const store = createInMemoryWorkProductStore()
+    let id = 0
+    const config: WorkProductToolConfig = {
+      store,
+      artifactKinds: ['return_package'],
+      exceptionKinds: ['missing_document'],
+      resolveSourceRef: async (ref) => ref in PROD_TEXTS,
+      readSourceText: async (ref) => PROD_TEXTS[ref] ?? null,
+      normalizeTarget,
+      provenance: () => ({ profileHash: 'hash-a', runId: 'run-1' }),
+      now: () => 1_000,
+      generateId: () => `wp-${++id}`,
+    }
+    const call = (tools: ReturnType<typeof buildWorkProductTools>, name: string, args: Record<string, unknown>) =>
+      dispatchAppTool(name, args, CTX, { handlers: NO_HANDLERS, taxonomy: NO_TAXONOMY, customTools: tools })
+
+    // A package written and submitted BEFORE this gate existed: the artifact
+    // has the dividend lines the wrong way round, and its evidence agrees.
+    const ungated = buildWorkProductTools({ ...config, verifyArtifactAgreement: false })
+    await call(ungated, 'upsert_evidence', {
+      scopeKey: SCOPE,
+      entries: [
+        { id: 'a', sourceRef: DIV_REF, locator: { find: '2,204.18' }, target: 'line_3b', claim: '2204.18' },
+        { id: 'b', sourceRef: DIV_REF, locator: { find: '1,955.02' }, target: 'line_3a', claim: '1955.02' },
+      ],
+    })
+    const submitted = await call(ungated, 'submit_work_product', {
+      scopeKey: SCOPE,
+      artifact: { kind: 'return_package', title: 'x', fields: { 'f1040.line_3a': 2204.18, 'f1040.line_3b': 1955.02 } },
+    })
+    expect(submitted.ok, JSON.stringify(submitted)).toBe(true)
+    const row = await onlyRecord(store)
+    await store.update(row.id, {}, { status: 'changes_requested' })
+
+    // Now, gated: the correction the reviewer asked for must be expressible.
+    const gated = buildWorkProductTools(config)
+    const fixed = await call(gated, 'upsert_evidence', {
+      scopeKey: SCOPE,
+      entries: [
+        { id: 'b', sourceRef: DIV_REF, locator: { find: '1,955.02' }, target: 'line_3a', claim: '1955.02' },
+        { id: 'a', sourceRef: DIV_REF, locator: { find: '2,204.18' }, target: 'line_3b', claim: '2204.18' },
+      ],
+    })
+    expect(fixed.ok, JSON.stringify(fixed)).toBe(true)
+
+    // ...and the corrected artifact then submits, with agreement passing.
+    const resubmitted = await call(gated, 'submit_work_product', {
+      scopeKey: SCOPE,
+      artifact: { kind: 'return_package', title: 'x', fields: { 'f1040.line_3a': 1955.02, 'f1040.line_3b': 2204.18 } },
+    })
+    expect(resubmitted.ok, JSON.stringify(resubmitted)).toBe(true)
+  })
+
   it('reports honestly when nothing was checkable, rather than a vacuous pass', async () => {
     const { dispatch, store } = harness()
     await dispatch('upsert_evidence', {

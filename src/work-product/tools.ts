@@ -477,10 +477,29 @@ function assertTargetsNotCrossed(config: WorkProductToolConfig, entries: readonl
 /**
  * Refuse any entry whose claim contradicts the artifact field it decorates.
  *
- * Runs on every upsert against the draft's CURRENT artifact (usually absent —
- * evidence streams in first) and again over the whole row at submit, which is
- * where a package like `95105c8a` is actually caught: its artifact was right
- * and its evidence crossed, and the two were never compared.
+ * SUBMIT ONLY, and the "only" is load-bearing. The obvious placement is the
+ * upsert, for the early feedback — and it makes the gate unsatisfiable on the
+ * one path that needs it most. A `changes_requested` row keeps the artifact
+ * the reviewer REJECTED, and an agent correcting a crossed package has exactly
+ * one order available to it: fix the evidence, then submit the corrected
+ * artifact, because the artifact is only settable at submit. Checking the
+ * incoming citation against the stale artifact refuses precisely the correction
+ * being asked for —
+ *
+ *     artifact (rejected): line_3a = 2204.18, line_3b = 1955.02
+ *     agent re-emits:      line_3a <- 1955.02          <- the fix
+ *     stale comparison:    "1955.02 is line_3b's value" -> refused, forever
+ *
+ * so the package can never be repaired. That is the same failure mode as a
+ * coverage gate demanding lineage for a computed value, and it is refused for
+ * the same reason: an unsatisfiable rule does not stop bad work, it selects for
+ * invented work. At submit the artifact being compared is the one being
+ * SUBMITTED, so both halves are current and either can be corrected freely
+ * during the turn.
+ *
+ * Nothing is lost by waiting. Row `95105c8a` is caught at submit and could only
+ * ever have been caught there — its crossed evidence was written turns before
+ * there was an artifact to compare it to.
  *
  * Only a real contradiction is refused — the claim asserts a figure the same
  * artifact reports on another target. A component of an aggregate is not one
@@ -748,12 +767,10 @@ export function buildWorkProductTools(config: WorkProductToolConfig): AppToolDef
       // gate above it and misleads a reviewer more effectively than a
       // fabricated one, because it survives being clicked.
       assertTargetsNotCrossed(config, entries)
+      // NOTE: artifact agreement is deliberately NOT checked here. See
+      // `assertEvidenceAgreesWithArtifact` — comparing an incoming citation to
+      // a STALE artifact deadlocks the one correction order an agent can take.
       const draft = await resolveDraft(service, config, scopeKey, ctx)
-      // Nothing from this batch has been written yet, so a contradiction with
-      // an artifact the draft already carries still fails before persisting.
-      // On the usual path the artifact arrives last and this is a no-op; the
-      // submit-time pass is where a full row is compared.
-      assertEvidenceAgreesWithArtifact(config, entries, draft.artifact)
       const record = await unwrap(() => service.upsertEvidence(draft.id, entries), 'evidence_rejected')
       return {
         workProductId: record.id,
