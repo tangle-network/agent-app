@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-158 exports.
+159 exports.
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
@@ -212,6 +212,14 @@ type ChatAttachmentKind
 
 ```ts
 type ChatMentionKind
+```
+
+### `ChatReasoningEffort`
+
+`type` — A chat turn's automatic sentinel plus the canonical agent reasoning levels.
+
+```ts
+type ChatReasoningEffort
 ```
 
 ### `ChatRouteDurableProjection`

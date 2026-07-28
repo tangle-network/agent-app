@@ -13,6 +13,7 @@ import type {
   AgentProfile,
   AgentProfileFileMount,
   AgentProfileMcpServer,
+  ReasoningEffort,
 } from '@tangle-network/agent-interface'
 import { createHash } from 'node:crypto'
 import {
@@ -1966,7 +1967,7 @@ export function mergeExtraMcp(
 export function attachReasoningEffort(
   profile: AgentProfile,
   harness: Harness,
-  effort: 'auto' | 'low' | 'medium' | 'high' | undefined,
+  effort: 'auto' | ReasoningEffort | undefined,
 ): AgentProfile {
   if (!effort || effort === 'auto') return profile
   return {
@@ -1994,7 +1995,7 @@ export interface StreamSandboxPromptOptions {
   modelApiKey?: string
   history?: Array<{ role: 'user' | 'assistant'; content: string }>
   harness?: Harness
-  effort?: 'auto' | 'low' | 'medium' | 'high'
+  effort?: 'auto' | ReasoningEffort
   appToolMcp?: Record<string, AgentProfileMcpServer>
   baseProfileMcp?: Record<string, AgentProfileMcpServer>
   extraMcp?: Record<string, AgentProfileMcpServer>
