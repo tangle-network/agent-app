@@ -123,15 +123,10 @@ describe('create-agent-app scaffolder', () => {
       peerDependencies: Record<string, string>
       devDependencies: Record<string, string>
     }
-    for (const name of [
-      '@tangle-network/agent-eval',
-      '@tangle-network/agent-interface',
-      '@tangle-network/agent-knowledge',
-      '@tangle-network/agent-profile-materialize',
-      '@tangle-network/agent-runtime',
-      '@tangle-network/sandbox',
-      '@tangle-network/sandbox-ui',
-    ]) {
+    for (const [name, peerRange] of Object.entries(appPkg.peerDependencies)) {
+      if (!name.startsWith('@tangle-network/')) continue
+      const devRange = appPkg.devDependencies[name]
+      expect(devRange, `${name}: peer is not installed for agent-app development`).toBeTruthy()
       // A peer range is a FLOOR, not a pin: agent-app declares the oldest
       // engine it works against and the PRODUCT chooses the version. So this
       // asks whether the version we build against MEETS that floor — asserting
@@ -139,8 +134,8 @@ describe('create-agent-app scaffolder', () => {
       // exact OPTIONAL peer no consumer happens to match is not installed at
       // all, which is a silent capability loss rather than a version warning.
       expect(
-        minimumVersionGte(appPkg.devDependencies[name] as string, appPkg.peerDependencies[name] as string),
-        `${name}: we build against ${appPkg.devDependencies[name]} but advertise the peer floor ${appPkg.peerDependencies[name]}`,
+        minimumVersionGte(devRange as string, peerRange),
+        `${name}: we build against ${devRange} but advertise the peer floor ${peerRange}`,
       ).toBe(true)
     }
     // Every engine peer the template pins must be pinned to agent-app's own range.

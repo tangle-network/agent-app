@@ -3,12 +3,12 @@
  * Phase 1). One factory composing the pieces every product re-wired by hand:
  *
  *   body parse/validate      → `/web` `parseJsonObjectBody` + `./wire`
- *   turn identity            → `/stream` `resolveChatTurn` + agent-runtime
+ *   turn identity            → `/stream` `resolveChatTurn` + agent-runtime `/durable`
  *                              `deriveExecutionId`
  *   producer                 → injected seam (sandbox lane via
  *                              `createSandboxChatProducer`; router lane is the
  *                              product's own `ChatTurnProducer`)
- *   turn engine              → agent-runtime `handleChatTurn` (verbatim)
+ *   turn engine              → agent-runtime `/durable` `handleChatTurn` (verbatim)
  *   durability               → `/stream` turn-buffer tap, wired BY DEFAULT
  *                              (tee + drain keeps the turn running after a
  *                              client drop; replay serves the buffered tail)
