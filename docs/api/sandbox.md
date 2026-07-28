@@ -875,7 +875,7 @@ interface SecretStore
 `function` — The exact `bearer.*` subprotocol string the browser offered, so it can be echoed verbatim on the 101.
 
 ```ts
-(headers: Headers) => string | null
+(value: string | null) => string | null
 ```
 
 ### `shellQuote`

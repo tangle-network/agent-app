@@ -576,10 +576,10 @@ describe('terminal 101 subprotocol echo', () => {
   })
 
   it('picks the bearer offer out of a multi-protocol header', () => {
-    expect(selectedBearerSubprotocol(new Headers({ 'sec-websocket-protocol': 'terminal, bearer.abc' }))).toBe('bearer.abc')
-    expect(selectedBearerSubprotocol(new Headers({ 'sec-websocket-protocol': 'BEARER.abc' }))).toBe('BEARER.abc')
-    expect(selectedBearerSubprotocol(new Headers({ 'sec-websocket-protocol': 'terminal' }))).toBeNull()
-    expect(selectedBearerSubprotocol(new Headers())).toBeNull()
+    expect(selectedBearerSubprotocol('terminal, bearer.abc')).toBe('bearer.abc')
+    expect(selectedBearerSubprotocol('BEARER.abc')).toBe('BEARER.abc')
+    expect(selectedBearerSubprotocol('terminal')).toBeNull()
+    expect(selectedBearerSubprotocol(null)).toBeNull()
   })
 
   it('echoes the browser offer when the upstream 101 selected none', () => {

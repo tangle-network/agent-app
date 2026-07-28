@@ -8941,7 +8941,7 @@
         {
           "name": "selectedBearerSubprotocol",
           "kind": "function",
-          "signature": "(headers: Headers) => string | null",
+          "signature": "(value: string | null) => string | null",
           "doc": "The exact `bearer.*` subprotocol string the browser offered, so it can be echoed verbatim on the 101."
         },
         {

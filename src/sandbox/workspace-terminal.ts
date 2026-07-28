@@ -496,7 +496,7 @@ export function createWorkspaceSandboxTerminalUpgradeHandler(opts: WorkspaceSand
     const upstreamBearer = directRuntimeConnection?.authToken ?? credentials!.apiKey
     upstreamHeaders.set('Authorization', `Bearer ${upstreamBearer}`)
     upstreamHeaders.delete('host')
-    const browserProtocol = selectedBearerSubprotocol(request.headers)
+    const browserProtocol = selectedBearerSubprotocol(request.headers.get('Sec-WebSocket-Protocol'))
     stripBearerSubprotocol(upstreamHeaders)
     const fetchImpl = opts.fetch ?? fetch
     const upstream = await fetchImpl(upstreamUrl.toString(), { method: request.method, headers: upstreamHeaders })
@@ -556,9 +556,12 @@ export function terminalUpgradeSubprotocolEcho(
 /**
  * The exact `bearer.*` subprotocol string the browser offered, so it can be
  * echoed verbatim on the 101. Returns null when the browser offered none.
+ *
+ * Takes the raw `Sec-WebSocket-Protocol` value rather than the `Headers`, to
+ * match its siblings `bearerSubprotocolToken` and `stripBearerSubprotocol` —
+ * one shape for the whole family, and the caller reads the header once.
  */
-export function selectedBearerSubprotocol(headers: Headers): string | null {
-  const value = headers.get('Sec-WebSocket-Protocol')
+export function selectedBearerSubprotocol(value: string | null): string | null {
   if (!value) return null
   for (const part of value.split(',')) {
     const protocol = part.trim()
