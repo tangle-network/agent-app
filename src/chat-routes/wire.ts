@@ -1,8 +1,10 @@
+import type { ReasoningEffort } from '@tangle-network/agent-interface'
+
 /**
  * Wire contract between the chat client (composer + `streamChatTurn`) and the
- * assembled server vertical (`createChatTurnRoutes`). Import-free on purpose:
- * `/web-react` re-exports these types into browser bundles, so nothing here may
- * reach a Node builtin or an engine package.
+ * assembled server vertical (`createChatTurnRoutes`). Runtime-import-free on
+ * purpose: `/web-react` re-exports these types into browser bundles, so nothing
+ * here may reach a Node builtin or an engine package.
  *
  * The client part shape permits an absolute file path until the server converts
  * it to the URL required by the sandbox SDK. It is derived here, not imported,
@@ -28,6 +30,9 @@ export interface ChatTurnFilePartInput {
 
 /** Resolve input as either a text part or a file part of a chat turn */
 export type ChatTurnPartInput = ChatTurnTextPartInput | ChatTurnFilePartInput
+
+/** A chat turn's automatic sentinel plus the canonical agent reasoning levels. */
+export type ChatReasoningEffort = 'auto' | ReasoningEffort
 
 // ── producer stream vocabulary ───────────────────────────────────────────────
 
@@ -172,7 +177,7 @@ export interface ChatTurnRequestPayload {
    *  uploads still sends store-backed files here. */
   attachments?: ChatAttachmentInput[]
   model?: string
-  effort?: 'auto' | 'low' | 'medium' | 'high'
+  effort?: ChatReasoningEffort
   harness?: string
   /** Client-generated idempotency key for the logical turn (retry-safe). */
   turnId?: string

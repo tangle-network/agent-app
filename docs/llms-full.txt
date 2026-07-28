@@ -1600,6 +1600,14 @@ type ChatAttachmentKind
 type ChatMentionKind
 ```
 
+### `ChatReasoningEffort`
+
+`type` — A chat turn's automatic sentinel plus the canonical agent reasoning levels.
+
+```ts
+type ChatReasoningEffort
+```
+
 ### `ChatRouteDurableProjection`
 
 `interface` — Resolve chat route events and materialize their durable state records

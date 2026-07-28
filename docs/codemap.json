@@ -1257,6 +1257,12 @@
           "doc": "The image/file split a mention is rendered and persisted under — the composer pill's icon, the dispatched part's `type`, and `ChatMentionPart.mentionKind` are all this one value."
         },
         {
+          "name": "ChatReasoningEffort",
+          "kind": "type",
+          "signature": "type ChatReasoningEffort",
+          "doc": "A chat turn's automatic sentinel plus the canonical agent reasoning levels."
+        },
+        {
           "name": "ChatRouteDurableProjection",
           "kind": "interface",
           "signature": "interface ChatRouteDurableProjection",

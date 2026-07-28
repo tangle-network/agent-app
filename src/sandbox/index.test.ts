@@ -918,6 +918,16 @@ describe('pure seam helpers', () => {
     expect(attachReasoningEffort(PROFILE, 'opencode', undefined)).toBe(PROFILE)
   })
 
+  it.each(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'ultracode'] as const)(
+    'attachReasoningEffort preserves the canonical %s level',
+    (effort) => {
+      expect(
+        attachReasoningEffort(PROFILE, 'opencode', effort).extensions?.opencode
+          ?.reasoningEffort,
+      ).toBe(effort)
+    },
+  )
+
   it('resolveModel precedence: explicit override beats env defaults', () => {
     const m = resolveModel(
       { apiKey: 'env-key', defaultModel: 'env-model', providerName: 'openai-compat' },
