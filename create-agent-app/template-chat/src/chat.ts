@@ -161,7 +161,6 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
       return {
         ok: true,
         sink: await resolveSink({ workspaceId: user.id, userId: user.id }),
-        uploadDir: '/workspace/uploads',
       }
     },
   })
