@@ -181,12 +181,18 @@ export function resolveModel(
 
 /**
  * Thrown by {@link requireTransportableModel} when a model that was
- * EXPLICITLY requested — via a per-turn override or a configured
- * `provider.modelName` — cannot be transported to the sandbox platform. The
- * message names the model, which precedence slot supplied it, what's
- * missing, and the fix, and states plainly that the requested model was NOT
- * sent to the box (the failure mode this error exists to make impossible to
- * miss — gtm-agent#665 silently substituted the box default instead).
+ * EXPLICITLY requested via a per-turn `{ model }` override cannot be
+ * transported to the sandbox platform. The message names the model, which
+ * precedence slot supplied it, what's missing, and the fix, and states
+ * plainly that the requested model was NOT sent to the box (the failure mode
+ * this error exists to make impossible to miss — gtm-agent#665 silently
+ * substituted the box default instead of a user-selected model).
+ *
+ * The error class itself carries no opinion about *when* it should be
+ * thrown — it is constructed from any {@link ModelSelectionFailure},
+ * regardless of `source`. A caller wanting a stricter policy (e.g. also
+ * fail-loud on an untransportable configured `provider.modelName`) can call
+ * {@link resolveModelSelection} directly and throw this itself.
  */
 export class SandboxModelResolutionError extends Error {
   readonly code: ModelSelectionError
@@ -223,30 +229,49 @@ export class SandboxModelResolutionError extends Error {
  * before this fix.
  *
  * The policy: success delegates straight through. A failure whose `source`
- * is `'override'` or `'config'` means a model was EXPLICITLY named this turn
- * (or explicitly configured) and could not be sent — that is exactly the
- * silent-substitution defect this fix closes, so it throws
- * {@link SandboxModelResolutionError} rather than letting the caller
- * silently fall back to the box's own default. A failure whose `source` is
- * `'default'` means only a stale `provider.defaultModel` board default
- * couldn't resolve — nobody asked for that model THIS turn, so the
- * historical silent-skip behavior is preserved: it's logged via
- * `console.error` and dropped, letting the box use its own default.
+ * is `'override'` means a PER-TURN model was explicitly selected THIS turn
+ * (a live, user-driven choice — passed as `{ model }`) and could not be
+ * sent; substituting the box default there is exactly the gtm-agent#665
+ * defect, so it throws {@link SandboxModelResolutionError} rather than
+ * silently falling back.
+ *
+ * A failure whose `source` is `'config'` or `'default'` means a
+ * *configured* `provider.modelName` / `provider.defaultModel` couldn't
+ * resolve — nobody made a choice this turn; the value came from board
+ * config that may simply describe "the platform supplies the credential."
+ * Shipped consumers rely on exactly that: tax-agent ships a shell with
+ * `provider: { providerName: 'openai-compat', modelName, routerBaseUrl }`
+ * and no `apiKey`/`allowKeylessModel`, with a contract test asserting
+ * `ensureWorkspaceSandbox` creation SUCCEEDS with the model silently
+ * dropped so the sandbox platform mints its own in-container credential
+ * (`apps/web/tests/sandbox-service-contract.test.ts`). A config-loud policy
+ * here would break every fresh tax sandbox provisioning and every tax turn.
+ * So both `'config'` and `'default'` keep the pre-#302 logged-skip
+ * behavior: `console.error` and drop, letting the box use its own default.
+ * A product wanting strict enforcement of a configured `provider.modelName`
+ * can call {@link resolveModelSelection} directly and apply its own policy.
  */
 export function requireTransportableModel(
   selection: ModelSelection,
   context: string,
 ): ResolvedModel | undefined {
   if (selection.succeeded) return selection.value
-  if (selection.source === 'default') {
-    const reason =
-      selection.error === 'no_api_key'
-        ? `provider "${selection.provider}" has no api key`
-        : 'no provider resolved'
+  if (selection.source === 'override') {
+    throw new SandboxModelResolutionError(selection, context)
+  }
+  const reason =
+    selection.error === 'no_api_key'
+      ? `provider "${selection.provider}" has no api key`
+      : 'no provider resolved'
+  if (selection.source === 'config') {
+    console.error(
+      `[sandbox] ${context}: dropping configured provider.modelName "${selection.model}" (${reason}); ` +
+        `the box will use its own default model — set allowKeylessModel:true to bake a keyless model, or configure an api key`,
+    )
+  } else {
     console.error(
       `[sandbox] ${context}: dropping provider.defaultModel "${selection.model}" (${reason}); using the box default`,
     )
-    return undefined
   }
-  throw new SandboxModelResolutionError(selection, context)
+  return undefined
 }

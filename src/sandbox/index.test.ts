@@ -3271,17 +3271,28 @@ describe('requireTransportableModel + SandboxModelResolutionError callers', () =
     expect(driveTurn).not.toHaveBeenCalled()
   })
 
-  it('ensureWorkspaceSandbox + backendModelAtCreate rejects on a keyless configured model with no allowKeylessModel, and never calls create', async () => {
-    listMock.mockResolvedValue([])
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-      backendModelAtCreate: true,
-      resumeStopped: false,
-      provider: { providerName: 'openai-compat', modelName: 'm' },
-    })
-    await expect(
-      ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' }),
-    ).rejects.toBeInstanceOf(SandboxModelResolutionError)
-    expect(createMock).not.toHaveBeenCalled()
+  it('ensureWorkspaceSandbox keyless configured model keeps the pre-#302 create contract (tax-agent): creation succeeds, model not baked, drop is logged', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      listMock.mockResolvedValue([])
+      createMock.mockResolvedValue(
+        fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }),
+      )
+      const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+        backendModelAtCreate: true,
+        resumeStopped: false,
+        provider: { providerName: 'openai-compat', modelName: 'm' },
+      })
+      await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+      expect(createMock).toHaveBeenCalledOnce()
+      expect(createMock.mock.calls[0]![0].backend.model).toBeUndefined()
+      expect(errorSpy).toHaveBeenCalled()
+      const [message] = errorSpy.mock.calls[0]!
+      expect(String(message)).toContain('m')
+      expect(String(message)).toContain('allowKeylessModel')
+    } finally {
+      errorSpy.mockRestore()
+    }
   })
 
   it('ensureWorkspaceSandbox + backendModelAtCreate with NO provider config creates normally, backend.model undefined', async () => {
@@ -3294,6 +3305,26 @@ describe('requireTransportableModel + SandboxModelResolutionError callers', () =
     await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
     expect(createMock).toHaveBeenCalledOnce()
     expect(createMock.mock.calls[0]![0].backend.model).toBeUndefined()
+  })
+
+  it('streamSandboxPrompt keyless configured model (tax-agent shape), no options.model: streams normally, backend.model undefined, drop logged', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      async function* events() {
+        yield { type: 'result' }
+      }
+      const box = fakeBox({ streamPrompt: vi.fn().mockReturnValue(events()) })
+      const shell = shellFor(
+        { apiKey: 'k', baseUrl: 'https://s' },
+        { provider: { providerName: 'openai-compat', modelName: 'm' } },
+      )
+      for await (const _ of streamSandboxPrompt(shell, box, 'go')) void _
+      const [, opts] = (box.streamPrompt as ReturnType<typeof vi.fn>).mock.calls[0]!
+      expect(opts.backend.model).toBeUndefined()
+      expect(errorSpy).toHaveBeenCalled()
+    } finally {
+      errorSpy.mockRestore()
+    }
   })
 
   it('a source:default failure (stale provider.defaultModel, no key) is skipped silently: does not throw, backend.model undefined, logs via console.error', async () => {

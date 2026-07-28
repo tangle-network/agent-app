@@ -11236,7 +11236,7 @@ type SandboxFileSizeOutcome
 
 ### `SandboxModelResolutionError`
 
-`class` — Thrown by {@link requireTransportableModel} when a model that was EXPLICITLY requested — via a per-turn override or a configured `provider.modelName` — cannot be transported to the sandbox platform.
+`class` — Thrown by {@link requireTransportableModel} when a model that was EXPLICITLY requested via a per-turn `{ model }` override cannot be transported to the sandbox platform.
 
 ```ts
 class SandboxModelResolutionError

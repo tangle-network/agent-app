@@ -8689,7 +8689,7 @@
           "name": "SandboxModelResolutionError",
           "kind": "class",
           "signature": "class SandboxModelResolutionError",
-          "doc": "Thrown by {@link requireTransportableModel} when a model that was EXPLICITLY requested — via a per-turn override or a configured `provider.modelName` — cannot be transported to the sandbox platform."
+          "doc": "Thrown by {@link requireTransportableModel} when a model that was EXPLICITLY requested via a per-turn `{ model }` override cannot be transported to the sandbox platform."
         },
         {
           "name": "SandboxPermissionLevel",
