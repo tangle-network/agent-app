@@ -9218,6 +9218,22 @@ interface PlatformUsageProductRow
 interface ProductEntitlement
 ```
 
+### `ProductSeatOffer`
+
+`interface` — Commercial terms returned by the platform's product catalog.
+
+```ts
+interface ProductSeatOffer
+```
+
+### `ProductSeatOfferPeriod`
+
+`interface` — Price and included shared-wallet credit for one seat billing period.
+
+```ts
+interface ProductSeatOfferPeriod
+```
+
 ### `readTangleTierState`
 
 `function` — Read subscription + balance and project them onto the tier policy.
@@ -9276,7 +9292,7 @@ interface SeatBillingFlagOptions
 
 ### `seatCheckoutUrl`
 
-`function` — Platform Stripe checkout URL for a product's $100/mo seat.
+`function` — Platform Stripe checkout URL for a product's catalog-backed seat.
 
 ```ts
 (baseUrl: string, productId: string) => string
@@ -17831,7 +17847,7 @@ interface SecurityHeaderOptions
 
 ## `./web-react`
 
-Source: `src/web-react/index.tsx` · depends on `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `runtime`, `trace`, `work-product`
+Source: `src/web-react/index.tsx` · depends on `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `trace`, `work-product`
 
 ### `activityTone`
 
@@ -19526,7 +19542,7 @@ interface SandboxTerminalConnectionResponse
 `function` — Centered card paywall.
 
 ```ts
-({ product, onCheckout, priceUsd, includedUsageUsd, tagline, ctaLabel, benefits, footnote, }: SeatPaywallProps) => Reac…
+({ product, onCheckout, priceUsd, includedUsageUsd, offer, tagline, ctaLabel, benefits, footnote, }: SeatPaywallProps)…
 ```
 
 ### `SeatPaywallProps`
@@ -19852,7 +19868,7 @@ interface WorkProductCardProps
 
 ## `./web-react/terminal`
 
-Source: `src/web-react/terminal.ts` · depends on `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `runtime`, `trace`, `work-product`
+Source: `src/web-react/terminal.ts` · depends on `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `trace`, `work-product`
 
 ### `SandboxTerminalConnection`
 

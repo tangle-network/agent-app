@@ -1,8 +1,6 @@
 /**
  * `SeatPaywall` — the shared "unlock this product" screen every agent app
- * shows when a user has no active seat and has spent past the free tier. One
- * component, adopted by all five products (gtm / creative / tax / legal /
- * insurance) in ~2 lines.
+ * shows when a user has no active seat and has spent past the free tier.
  *
  * Copy contract (design §6.8): the included monthly AI usage is framed as a
  * BENEFIT the buyer receives — never the ratio, never the word "margin", never
@@ -15,6 +13,7 @@
 
 import type { ReactNode } from 'react'
 
+import type { ProductSeatOffer } from '../platform/billing'
 import { usePending } from './controls'
 
 export interface SeatPaywallProps {
@@ -28,6 +27,9 @@ export interface SeatPaywallProps {
   priceUsd?: number
   /** Included monthly AI usage in whole dollars. Default 50. */
   includedUsageUsd?: number
+  /** Platform catalog terms. When present, these override the legacy dollar
+   * props and show any introductory period without product-local price copy. */
+  offer?: ProductSeatOffer
   /** Optional one-line value prop under the headline. */
   tagline?: string
   /** CTA label. Default "Unlock {product}". */
@@ -37,6 +39,15 @@ export interface SeatPaywallProps {
   benefits?: ReactNode[]
   /** Optional fine print under the CTA (e.g. "Cancel anytime."). Omitted by default. */
   footnote?: ReactNode
+}
+
+function usd(cents: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
+    maximumFractionDigits: cents % 100 === 0 ? 0 : 2,
+  }).format(cents / 100)
 }
 
 function CheckGlyph(): ReactNode {
@@ -77,12 +88,18 @@ export function SeatPaywall({
   onCheckout,
   priceUsd = 100,
   includedUsageUsd = 50,
+  offer,
   tagline,
   ctaLabel,
   benefits,
   footnote,
 }: SeatPaywallProps): ReactNode {
   const { pending, run } = usePending()
+  const recurringPrice = offer ? usd(offer.recurring.priceCents) : `$${priceUsd}`
+  const recurringUsage = offer
+    ? usd(offer.recurring.includedCreditsCents)
+    : `$${includedUsageUsd}`
+  const introductory = offer?.introductory ?? null
   return (
     <div className="flex min-h-[60vh] w-full items-center justify-center p-6">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-sm">
@@ -94,18 +111,37 @@ export function SeatPaywall({
         </h1>
         {tagline && <p className="mt-2 text-sm text-muted-foreground">{tagline}</p>}
 
-        <div className="mt-6 flex items-baseline gap-1.5">
-          <span className="text-3xl font-semibold text-foreground">${priceUsd}</span>
-          <span className="text-sm text-muted-foreground">/mo</span>
-        </div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Includes ${includedUsageUsd}/mo of AI usage
-        </p>
+        {introductory ? (
+          <>
+            <div className="mt-6 flex items-baseline gap-1.5">
+              <span className="text-3xl font-semibold text-foreground">
+                {usd(introductory.priceCents)}
+              </span>
+              <span className="text-sm text-muted-foreground">first month</span>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Includes {usd(introductory.includedCreditsCents)} of AI usage in your first month
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Then {recurringPrice}/mo · includes {recurringUsage}/mo of AI usage
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="mt-6 flex items-baseline gap-1.5">
+              <span className="text-3xl font-semibold text-foreground">{recurringPrice}</span>
+              <span className="text-sm text-muted-foreground">/mo</span>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Includes {recurringUsage}/mo of AI usage
+            </p>
+          </>
+        )}
 
         <ul className="mt-6 space-y-2.5">
           {(benefits ?? [
             `Full access to ${product}`,
-            `$${includedUsageUsd}/mo of AI usage included, every month`,
+            `${recurringUsage}/mo of AI usage included`,
           ]).map((benefit, i) => (
             <Benefit key={i}>{benefit}</Benefit>
           ))}

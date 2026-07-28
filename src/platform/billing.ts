@@ -77,13 +77,28 @@ export interface PlatformUsageProductRow {
  *  the platform persists. 'none' = the user has never held this seat. */
 export type SeatStatus = 'none' | 'active' | 'trialing' | 'past_due' | 'canceled'
 
+/** Price and included shared-wallet credit for one seat billing period. */
+export interface ProductSeatOfferPeriod {
+  priceCents: number
+  includedCreditsCents: number
+}
+
+/** Commercial terms returned by the platform's product catalog. Products use
+ * this exact object for display instead of duplicating prices in UI copy. */
+export interface ProductSeatOffer {
+  currency: 'usd'
+  interval: 'month'
+  recurring: ProductSeatOfferPeriod
+  introductory: ProductSeatOfferPeriod | null
+}
+
 /**
  * Per-product entitlement snapshot from the platform — the single read that
  * tells a product whether to show its workspace or the seat paywall. Shape
  * matches `GET /v1/billing/product-entitlement?product=<id>`.
  *
  * `hasSeat` and `onFreeTier` are computed platform-side from the raw seat row
- * + cumulative spend so the gate is identical across all five products:
+ * + cumulative spend so the access rule is identical across products:
  * - `hasSeat`     — an active/trialing seat whose period has not lapsed.
  * - `onFreeTier`  — no active seat AND cumulative spend below the free cap
  *                   ($2 / 200¢ lifetime). Keys off lifetime spend, not wallet
@@ -97,6 +112,45 @@ export interface ProductEntitlement {
   lifetimeSpentUsd: number
   hasSeat: boolean
   onFreeTier: boolean
+  /** Present when the platform exposes catalog-backed commercial terms. */
+  offer?: ProductSeatOffer
+}
+
+function productSeatOffer(value: unknown): ProductSeatOffer | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const candidate = value as Record<string, unknown>
+  if (candidate.currency !== 'usd' || candidate.interval !== 'month') return undefined
+
+  const period = (input: unknown, allowZeroPrice: boolean): ProductSeatOfferPeriod | undefined => {
+    if (!input || typeof input !== 'object') return undefined
+    const data = input as Record<string, unknown>
+    const priceCents = data.priceCents
+    const includedCreditsCents = data.includedCreditsCents
+    if (
+      typeof priceCents !== 'number' ||
+      !Number.isSafeInteger(priceCents) ||
+      (allowZeroPrice ? priceCents < 0 : priceCents <= 0) ||
+      typeof includedCreditsCents !== 'number' ||
+      !Number.isSafeInteger(includedCreditsCents) ||
+      includedCreditsCents < 0
+    ) {
+      return undefined
+    }
+    return { priceCents, includedCreditsCents }
+  }
+
+  const recurring = period(candidate.recurring, false)
+  const introductory =
+    candidate.introductory === null
+      ? null
+      : period(candidate.introductory, true)
+  if (!recurring || introductory === undefined) return undefined
+  return {
+    currency: 'usd',
+    interval: 'month',
+    recurring,
+    introductory,
+  }
 }
 
 /** Define methods to interact with platform billing endpoints using user or service authentication */
@@ -119,7 +173,7 @@ export interface PlatformBillingHttp {
   }): Promise<void>
   /** Absolute URL of the platform's billing-management surface. */
   billingUrl(): string
-  /** Absolute URL of the $100/mo seat checkout for `productId`. */
+  /** Absolute URL of the catalog-backed seat checkout for `productId`. */
   seatCheckoutUrl(productId: string): string
 }
 
@@ -200,10 +254,12 @@ export function createPlatformBillingHttp(opts: PlatformBillingHttpOptions): Pla
           lifetimeSpentUsd?: number | null
           hasSeat?: boolean | null
           onFreeTier?: boolean | null
+          offer?: unknown
         }
       }>(userApiKey, `/v1/billing/product-entitlement?product=${slug}`)
       const data = body.data ?? {}
       const hasSeat = data.hasSeat === true
+      const offer = productSeatOffer(data.offer)
       return {
         seatStatus: data.seatStatus ?? 'none',
         currentPeriodEnd: data.currentPeriodEnd ?? null,
@@ -211,6 +267,7 @@ export function createPlatformBillingHttp(opts: PlatformBillingHttpOptions): Pla
         hasSeat,
         // Free access only when there is no seat AND the platform says so.
         onFreeTier: !hasSeat && data.onFreeTier === true,
+        ...(offer ? { offer } : {}),
       }
     },
 
@@ -243,10 +300,10 @@ export function createPlatformBillingHttp(opts: PlatformBillingHttpOptions): Pla
 }
 
 /**
- * Platform Stripe checkout URL for a product's $100/mo seat. One shared price
- * carries `metadata.productId`; the platform distinguishes the product from
- * the `product` query param (not five distinct prices). Mirrors the
- * `billingUrl()` shape — a deterministic platform-rooted URL, no network call.
+ * Platform Stripe checkout URL for a product's catalog-backed seat. The
+ * platform resolves the product-specific price and introductory offer from the
+ * `product` query param. Mirrors the `billingUrl()` shape — a deterministic
+ * platform-rooted URL with no client-side pricing decisions.
  */
 export function seatCheckoutUrl(baseUrl: string, productId: string): string {
   const root = baseUrl.replace(/\/+$/, '')
@@ -383,7 +440,7 @@ function failOpenEntitlement(): ProductEntitlement {
 }
 
 /** Entitled = holds an active seat OR is still inside the free tier. The one
- *  predicate all five products gate on. */
+ *  predicate every product uses. */
 export function isProductEntitled(ent: ProductEntitlement): boolean {
   return ent.hasSeat || ent.onFreeTier
 }
