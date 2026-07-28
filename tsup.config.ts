@@ -73,6 +73,7 @@ export default defineConfig({
     'theme/tailwind-preset': 'src/theme/tailwind-preset.ts',
     'theme-contract/index': 'src/theme-contract/index.ts',
     'theme-contract/cli': 'src/theme-contract/cli.ts',
+    'forms/index': 'src/forms/index.ts',
     'preflight/cli': 'src/preflight/cli.ts',
     'studio/index': 'src/studio/index.ts',
     'studio-react/index': 'src/studio-react/index.tsx',
@@ -82,7 +83,7 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   target: 'es2022',
-  external: ['react', 'react/jsx-runtime', 'konva', 'react-konva', '@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog', '@tangle-network/agent-eval', '@tangle-network/agent-knowledge', '@tangle-network/agent-profile-materialize', '@tangle-network/agent-runtime', '@tangle-network/sandbox', 'drizzle-orm', 'drizzle-orm/*', '@huggingface/transformers', '@tangle-network/sandbox-ui', '@tangle-network/sandbox-ui/*', '@tangle-network/ui', '@tangle-network/ui/*', 'lucide-react', 'react-router', '@radix-ui/react-dialog', 'resend', 'better-auth', 'better-auth/*'],
+  external: ['react', 'react/jsx-runtime', 'konva', 'react-konva', '@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog', '@tangle-network/agent-eval', '@tangle-network/agent-knowledge', '@tangle-network/agent-profile-materialize', '@tangle-network/agent-runtime', '@tangle-network/sandbox', 'drizzle-orm', 'drizzle-orm/*', '@huggingface/transformers', '@tangle-network/sandbox-ui', '@tangle-network/sandbox-ui/*', '@tangle-network/ui', '@tangle-network/ui/*', 'lucide-react', 'react-router', '@radix-ui/react-dialog', 'resend', 'better-auth', 'better-auth/*', 'pdf-lib'],
   // tokens.css is shipped raw (the ./styles subpath); copy it next to the
   // built theme entries so `import '@tangle-network/agent-app/styles'` resolves.
   onSuccess: 'cp src/theme/tokens.css dist/theme/tokens.css && cp src/studio-react/studio.css dist/studio-react/studio.css',

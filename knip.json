@@ -21,6 +21,7 @@
     "src/preset-cloudflare/index.ts",
     "src/billing/index.ts",
     "src/preflight/index.ts",
+    "src/forms/index.ts",
     "src/object-store/index.ts",
     "src/chat-store/index.ts",
     "src/chat-routes/index.ts",

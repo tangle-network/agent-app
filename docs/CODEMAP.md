@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_74 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_75 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -24,6 +24,7 @@ _74 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./design-canvas/drizzle`](api/design-canvas-drizzle.md) | 10 | `tools`, `web` |
 | [`./eval`](api/eval.md) | 13 | `tools` |
 | [`./eval-campaign`](api/eval-campaign.md) | 37 | — |
+| [`./forms`](api/forms.md) | 29 | — |
 | [`./harness`](api/harness.md) | 13 | — |
 | [`./intakes`](api/intakes.md) | 29 | — |
 | [`./intakes-react`](api/intakes-react.md) | 3 | `intakes` |
@@ -252,6 +253,14 @@ Source: `src/eval-campaign/index.ts` · 37 exports
 `aggregateJudgeVerdicts`, `buildEnsembleJudge`, `CampaignResult`, `compareOptimizationMethods`, `CompareOptimizationMethodsOptions`, `defaultProductionGate`, `DispatchContext`, `EnsembleAggregate`, `EnsembleJudgeConfig`, `externalTextOptimizationMethod`, `ExternalTextOptimizationMethodConfig`, `Gate`, `gepaOptimizationMethod`, `GepaOptimizationMethodConfig`, `JudgeConfig`, `JudgeDimension`, `JudgeScore`, `JudgeVerdict`, `LabeledScenarioStore`, `MutableSurface`, `OptimizationMethod`, `OptimizationMethodResult`, `paretoSignificanceGate`, `runCampaign`, `RunRecord`, `Scenario`, `selfImprove`, `SelfImproveBudget`, `SelfImproveOptions`, `SelfImproveResult`, `skillOptOptimizationMethod`, `SkillOptOptimizationMethodConfig`, `SurfaceProposer`, `TrustItem`, `TrustThresholds`, `TrustVerdict`, `trustVerdicts`
 
 [Full API →](api/eval-campaign.md)
+
+## `./forms`
+
+Source: `src/forms/index.ts` · 29 exports
+
+`assertFormBlankIntegrity`, `checkRegistryAgainstBlank`, `decodeFormBlank`, `describeFormFill`, `FilledWidget`, `FillFormOptions`, `FillFormResult`, `fillPdfForm`, `formatFormCurrency`, `FormBlank`, `FormLabelBasis`, `FormRegistry`, `FormSlot`, `FormSlotFormat`, `FormSlotKind`, `LabelVerdict`, `parseFormAmount`, `parseFormBoolean`, `RegistryCheckResult`, `RegistryProblem`, `RegistryProblemCode`, `sha256Hex`, `SlotVerdict`, `SlotVerification`, `UnfilledCode`, `UnfilledSlot`, `verifyFilledForm`, `VerifyFormResult`, `widgetLabel`
+
+[Full API →](api/forms.md)
 
 ## `./harness`
 

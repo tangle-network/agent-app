@@ -2,7 +2,7 @@
   "name": "@tangle-network/agent-app",
   "version": "0.44.19",
   "packageManager": "pnpm@10.33.4",
-  "description": "Application-shell framework for Tangle agent products: a bounded tool loop, the structured agent→app tool side channel, integration-hub client, per-workspace billing, and crypto — composed over the Tangle agent substrate through typed seams.",
+  "description": "Application-shell framework for Tangle agent products: a bounded tool loop, the structured agent\u2192app tool side channel, integration-hub client, per-workspace billing, and crypto \u2014 composed over the Tangle agent substrate through typed seams.",
   "keywords": [
     "tangle",
     "ai-agent",
@@ -146,6 +146,11 @@
       "types": "./dist/preflight/index.d.ts",
       "import": "./dist/preflight/index.js",
       "default": "./dist/preflight/index.js"
+    },
+    "./forms": {
+      "types": "./dist/forms/index.d.ts",
+      "import": "./dist/forms/index.js",
+      "default": "./dist/forms/index.js"
     },
     "./object-store": {
       "types": "./dist/object-store/index.d.ts",
@@ -444,6 +449,7 @@
     "knip": "^5.46.0",
     "konva": "^10.3.0",
     "lucide-react": "^1.16.0",
+    "pdf-lib": "^1.17.1",
     "react": "^19.0.0",
     "react-dom": "^19.2.7",
     "react-konva": "^19.2.5",
@@ -473,7 +479,8 @@
     "react": ">=18",
     "react-konva": ">=18",
     "react-router": ">=7",
-    "resend": ">=6"
+    "resend": ">=6",
+    "pdf-lib": ">=1.17"
   },
   "peerDependenciesMeta": {
     "@huggingface/transformers": {
@@ -525,6 +532,9 @@
       "optional": true
     },
     "resend": {
+      "optional": true
+    },
+    "pdf-lib": {
       "optional": true
     }
   },
