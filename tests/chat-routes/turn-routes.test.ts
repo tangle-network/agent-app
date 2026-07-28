@@ -221,11 +221,28 @@ describe('createChatTurnRoutes — turn', () => {
     expect(args.executionId).toContain('test-app')
   })
 
-  it('rejects a body with neither content nor parts nor mentions, and a missing threadId', async () => {
+  it('accepts an attachment-only body and preserves attachments for downstream seams', async () => {
+    const produce = vi.fn((_args: ChatTurnProduceArgs<unknown>) => fakeProducer([{ type: 'text', text: 'ok' }], 'ok'))
+    const { routes, ctx, pending } = makeRoutes({ produce })
+    const attachments = [
+      { path: 'uploads/report.pdf', name: 'report.pdf', size: 42, mediaType: 'application/pdf', kind: 'file' },
+    ]
+    const res = await routes.turn(turnRequest({ threadId: 't-1', attachments }), ctx)
+    await readLines(res.body!)
+    await Promise.all(pending)
+
+    expect(res.status).toBe(200)
+    expect(produce).toHaveBeenCalledTimes(1)
+    expect(produce.mock.calls[0]![0]!.body.attachments).toEqual(attachments)
+  })
+
+  it('rejects a body with neither content nor parts nor mentions nor attachments, and a missing threadId', async () => {
     const { routes, ctx } = makeRoutes()
-    const empty = await routes.turn(turnRequest({ threadId: 't-1' }), ctx)
+    const empty = await routes.turn(turnRequest({ threadId: 't-1', attachments: [] }), ctx)
     expect(empty.status).toBe(400)
-    expect((await empty.json() as { error: string }).error).toContain('mentions')
+    expect((await empty.json() as { error: string }).error).toBe(
+      'Missing content (send text, parts, mentions, attachments, or any combination)',
+    )
     expect((await routes.turn(turnRequest({ content: 'x' }), ctx)).status).toBe(400)
   })
 
