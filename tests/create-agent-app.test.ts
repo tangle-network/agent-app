@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { cpSync, mkdtempSync, existsSync, mkdirSync, symlinkSync, readFileSync, realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { minimumVersionGte } from './test-utils/version-ranges'
 
 // Repo root — the real @tangle-network/agent-app package (its package.json `exports`
 // map every subpath the generated skeleton imports to a built `dist/*` artifact).
@@ -64,20 +65,6 @@ function linkDeps(projectDir: string) {
   link(join(nm, 'vitest'), join(REPO, 'node_modules', 'vitest'))
 }
 
-// "1.2.3" (after stripping a `^`/`>=` prefix) → comparable numeric tuple.
-function minVersion(range: string): number[] {
-  return range.replace(/^[~^>=\s]+/, '').split('.').map(Number)
-}
-
-function versionGte(a: number[], b: number[]): boolean {
-  for (let i = 0; i < Math.max(a.length, b.length); i++) {
-    const x = a[i] ?? 0
-    const y = b[i] ?? 0
-    if (x !== y) return x > y
-  }
-  return true
-}
-
 describe('create-agent-app scaffolder', () => {
   let projectDir: string
 
@@ -136,15 +123,10 @@ describe('create-agent-app scaffolder', () => {
       peerDependencies: Record<string, string>
       devDependencies: Record<string, string>
     }
-    for (const name of [
-      '@tangle-network/agent-eval',
-      '@tangle-network/agent-interface',
-      '@tangle-network/agent-knowledge',
-      '@tangle-network/agent-profile-materialize',
-      '@tangle-network/agent-runtime',
-      '@tangle-network/sandbox',
-      '@tangle-network/sandbox-ui',
-    ]) {
+    for (const [name, peerRange] of Object.entries(appPkg.peerDependencies)) {
+      if (!name.startsWith('@tangle-network/')) continue
+      const devRange = appPkg.devDependencies[name]
+      expect(devRange, `${name}: peer is not installed for agent-app development`).toBeTruthy()
       // A peer range is a FLOOR, not a pin: agent-app declares the oldest
       // engine it works against and the PRODUCT chooses the version. So this
       // asks whether the version we build against MEETS that floor — asserting
@@ -152,8 +134,8 @@ describe('create-agent-app scaffolder', () => {
       // exact OPTIONAL peer no consumer happens to match is not installed at
       // all, which is a silent capability loss rather than a version warning.
       expect(
-        versionGte(minVersion(appPkg.devDependencies[name] as string), minVersion(appPkg.peerDependencies[name] as string)),
-        `${name}: we build against ${appPkg.devDependencies[name]} but advertise the peer floor ${appPkg.peerDependencies[name]}`,
+        minimumVersionGte(devRange as string, peerRange),
+        `${name}: we build against ${devRange} but advertise the peer floor ${peerRange}`,
       ).toBe(true)
     }
     // Every engine peer the template pins must be pinned to agent-app's own range.
@@ -161,7 +143,7 @@ describe('create-agent-app scaffolder', () => {
       if (!name.startsWith('@tangle-network/')) continue
       expect(appPkg.peerDependencies[name], `template pins ${name} but it is not an agent-app peer`).toBeTruthy()
       expect(
-        versionGte(minVersion(range), minVersion(appPkg.peerDependencies[name] as string)),
+        minimumVersionGte(range, appPkg.peerDependencies[name] as string),
         `template pins ${name}@${range}, below agent-app's peer floor ${appPkg.peerDependencies[name]}`,
       ).toBe(true)
     }
@@ -172,7 +154,7 @@ describe('create-agent-app scaffolder', () => {
       if (appPkg.peerDependenciesMeta?.[name]?.optional) continue
       expect(gen.peerDependencies[name], `agent-app requires peer ${name}@${range}; the template omits it`).toBeTruthy()
       expect(
-        versionGte(minVersion(gen.peerDependencies[name] as string), minVersion(range)),
+        minimumVersionGte(gen.peerDependencies[name] as string, range),
         `agent-app requires peer ${name}@${range}; the template pins ${gen.peerDependencies[name]}`,
       ).toBe(true)
     }
@@ -182,7 +164,7 @@ describe('create-agent-app scaffolder', () => {
       const dev = gen.devDependencies[name]
       expect(dev, `${name} has a peer pin but no devDependency to install it`).toBeTruthy()
       expect(
-        versionGte(minVersion(dev as string), minVersion(peerRange)),
+        minimumVersionGte(dev as string, peerRange),
         `${name} devDependency ${dev} is below the peer floor ${peerRange}`,
       ).toBe(true)
     }
