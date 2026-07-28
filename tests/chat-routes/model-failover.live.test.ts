@@ -23,8 +23,8 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { SandboxClient } from '@tangle-network/sandbox'
-import type { AgentProfile } from '@tangle-network/sandbox'
+import type { AgentProfile } from '@tangle-network/agent-interface'
+import { Sandbox } from '@tangle-network/sandbox'
 
 import {
   createChatTurnRoutes,
@@ -76,7 +76,7 @@ function liveShell(): SandboxRuntimeConfig {
 const tables = createChatTables({ workspaceTable: workspacesTable })
 
 async function liveBox() {
-  const client = new SandboxClient({
+  const client = new Sandbox({
     apiKey: process.env.SANDBOX_API_KEY!,
     baseUrl: process.env.SANDBOX_API_URL ?? 'https://sandbox.tangle.tools',
   })

@@ -3,12 +3,10 @@
  * self-improvement loop, NOT a reimplementation.
  *
  * The loop ENGINE lives in `@tangle-network/agent-eval` (a peer dependency):
- * `selfImprove` already owns the whole cycle — train/holdout split, the GEPA
- * proposer, the held-out production gate, durable provenance + hosted ingest, and
- * every default. A product should NOT hand-roll `runImprovementLoop` +
- * `emitLoopProvenance` around it (that is the boilerplate this surface exists to
- * delete). It should call `selfImprove` with three things it actually owns:
- * scenarios, an `agent` dispatch, and a `judge`.
+ * `selfImprove` already owns execution, scoring, data separation, release
+ * decisions, durable provenance, and hosted ingest. Candidate search is always
+ * explicit: pass an official optimization `method`, or pass a caller-owned
+ * `SurfaceProposer`.
  *
  * This module adds the one piece `selfImprove` does not own and which every
  * multi-model product re-hand-rolls — the ensemble judge:
@@ -20,7 +18,7 @@
  *   fan-out, partial-failure handling, and composite are the scaffold's.
  *
  * Everything else is a curated re-export so a product has ONE eval import:
- * `selfImprove` + the gates + the proposers + the types. See
+ * `selfImprove` + release policies + optimization methods + their types. See
  * `.claude/skills/eval-campaign/SKILL.md` for the wiring contract.
  */
 
@@ -127,23 +125,30 @@ export type {
   RunRecord,
 } from '@tangle-network/agent-eval'
 export {
+  compareOptimizationMethods,
   defaultProductionGate,
-  evolutionaryProposer,
-  gepaProposer,
+  externalTextOptimizationMethod,
+  gepaOptimizationMethod,
   paretoSignificanceGate,
   runCampaign,
+  skillOptOptimizationMethod,
 } from '@tangle-network/agent-eval/campaign'
 export type {
   CampaignResult,
+  CompareOptimizationMethodsOptions,
   DispatchContext,
+  ExternalTextOptimizationMethodConfig,
   Gate,
+  GepaOptimizationMethodConfig,
   JudgeConfig,
   JudgeDimension,
   JudgeScore,
   LabeledScenarioStore,
   MutableSurface,
-  Mutator,
+  OptimizationMethod,
+  OptimizationMethodResult,
   Scenario,
+  SkillOptOptimizationMethodConfig,
   SurfaceProposer,
 } from '@tangle-network/agent-eval/campaign'
 export { selfImprove } from '@tangle-network/agent-eval/contract'

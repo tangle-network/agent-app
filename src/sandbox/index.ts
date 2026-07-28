@@ -1,9 +1,7 @@
 import {
   Sandbox,
-  type AgentProfile,
-  type AgentProfileFileMount,
-  type AgentProfileMcpServer,
   type ExecResult,
+  type MintScopedTokenOptions,
   type SandboxConnection,
   type SandboxInstance,
   type ScopedTokenScope,
@@ -11,6 +9,11 @@ import {
   type TurnDriveResult,
   type ProvisionEvent,
 } from '@tangle-network/sandbox'
+import type {
+  AgentProfile,
+  AgentProfileFileMount,
+  AgentProfileMcpServer,
+} from '@tangle-network/agent-interface'
 import { createHash } from 'node:crypto'
 import {
   buildAppToolMcpServer,
@@ -2302,14 +2305,10 @@ export interface ScopedTokenResult {
  */
 export async function mintSandboxScopedToken(
   box: SandboxInstance,
-  options: { scope: ScopedTokenScope; sessionId?: string; ttlMinutes?: number },
+  options: MintScopedTokenOptions,
 ): Promise<Outcome<ScopedTokenResult>> {
   try {
-    const token = await box.mintScopedToken({
-      scope: options.scope,
-      ...(options.sessionId ? { sessionId: options.sessionId } : {}),
-      ...(options.ttlMinutes ? { ttlMinutes: options.ttlMinutes } : {}),
-    })
+    const token = await box.mintScopedToken(options)
     return ok({ token: token.token, expiresAt: token.expiresAt, scope: token.scope })
   } catch (err) {
     return fail(err)

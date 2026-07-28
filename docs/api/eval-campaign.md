@@ -4,7 +4,7 @@
 
 Source: `src/eval-campaign/index.ts`
 
-30 exports.
+37 exports.
 
 ### `aggregateJudgeVerdicts`
 
@@ -30,9 +30,25 @@ Source: `src/eval-campaign/index.ts`
 interface CampaignResult
 ```
 
+### `compareOptimizationMethods`
+
+`function` — Compare complete optimization methods on disjoint train, selection, and final test data.
+
+```ts
+<TScenario extends Scenario, TArtifact>(opts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Optim…
+```
+
+### `CompareOptimizationMethodsOptions`
+
+`interface`
+
+```ts
+interface CompareOptimizationMethodsOptions
+```
+
 ### `defaultProductionGate`
 
-`function`
+`function` — Opinionated production gate composing held-out significance, red-team, reward-hacking, and canary checks into a single `Gate.decide` decision.
 
 ```ts
 <TArtifact, TScenario extends Scenario>(options: DefaultProductionGateOptions) => Gate<TArtifact, TScenario>
@@ -62,12 +78,20 @@ interface EnsembleAggregate
 interface EnsembleJudgeConfig
 ```
 
-### `evolutionaryProposer`
+### `externalTextOptimizationMethod`
 
-`function`
+`function` — Adapt a third-party text optimizer without reimplementing its search.
 
 ```ts
-<TFindings = unknown>(opts: EvolutionaryProposerOptions<TFindings>) => SurfaceProposer<TFindings>
+<TScenario extends Scenario, TArtifact>(config: ExternalTextOptimizationMethodConfig<TScenario, TArtifact>) => Optimiza…
+```
+
+### `ExternalTextOptimizationMethodConfig`
+
+`interface` — Configuration for adapting another text optimizer.
+
+```ts
+interface ExternalTextOptimizationMethodConfig
 ```
 
 ### `Gate`
@@ -78,12 +102,20 @@ interface EnsembleJudgeConfig
 interface Gate
 ```
 
-### `gepaProposer`
+### `gepaOptimizationMethod`
 
-`function`
+`function` — Turn an optional GEPA installation into an `OptimizationMethod`.
 
 ```ts
-(opts: GepaProposerOptions) => SurfaceProposer<unknown>
+<TScenario extends Scenario, TArtifact>(config: GepaOptimizationMethodConfig<TScenario, TArtifact>) => OptimizationMeth…
+```
+
+### `GepaOptimizationMethodConfig`
+
+`interface`
+
+```ts
+interface GepaOptimizationMethodConfig
 ```
 
 ### `JudgeConfig`
@@ -134,12 +166,20 @@ interface LabeledScenarioStore
 type MutableSurface
 ```
 
-### `Mutator`
+### `OptimizationMethod`
 
-`interface` — Stateless surface mutation — given findings + current surface, return N candidate surfaces.
+`interface` — A complete optimization method, including candidate generation and selection.
 
 ```ts
-interface Mutator
+interface OptimizationMethod
+```
+
+### `OptimizationMethodResult`
+
+`interface`
+
+```ts
+interface OptimizationMethodResult
 ```
 
 ### `paretoSignificanceGate`
@@ -152,7 +192,7 @@ interface Mutator
 
 ### `runCampaign`
 
-`function`
+`function` — Core campaign orchestrator: fan scenarios through dispatch, score with judges, aggregate bootstrap CIs, and persist reproducible `CampaignResult` records.
 
 ```ts
 <TScenario extends Scenario, TArtifact>(opts: RunCampaignOptions<TScenario, TArtifact>) => Promise<CampaignResult<TArti…
@@ -184,7 +224,7 @@ interface Scenario
 
 ### `SelfImproveBudget`
 
-`interface` — # `selfImprove()` - the one-call improvement loop.
+`interface`
 
 ```ts
 interface SelfImproveBudget
@@ -204,6 +244,22 @@ interface SelfImproveOptions
 
 ```ts
 interface SelfImproveResult
+```
+
+### `skillOptOptimizationMethod`
+
+`function` — Run Microsoft's SkillOpt trainer as a complete optimization method.
+
+```ts
+<TScenario extends Scenario, TArtifact>(config: SkillOptOptimizationMethodConfig<TScenario, TArtifact>) => Optimization…
+```
+
+### `SkillOptOptimizationMethodConfig`
+
+`interface`
+
+```ts
+interface SkillOptOptimizationMethodConfig
 ```
 
 ### `SurfaceProposer`

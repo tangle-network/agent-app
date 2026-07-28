@@ -3,7 +3,7 @@ import type {
   AgentProfile,
   AgentProfileFileMount,
   AgentProfileMcpServer,
-} from '@tangle-network/sandbox'
+} from '@tangle-network/agent-interface'
 import {
   assertSystemPromptWithinBudget,
   composeAgentProfile,
@@ -278,7 +278,7 @@ describe('makeEvolvableSection', () => {
 })
 
 describe('composeAgentProfile — canonical wire shape', () => {
-  it('prunes empty resource channels the SDK merge normalizes in', () => {
+  it('prunes empty resource channels the canonical merge normalizes in', () => {
     const out = composeAgentProfile(BASE, {})
     const res = (out.resources ?? {}) as Record<string, unknown>
     // No empty tools/skills/agents/commands arrays leak to the wire payload.

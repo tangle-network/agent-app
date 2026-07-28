@@ -1,35 +1,41 @@
 ---
 name: surface-evolution
-description: Optimize ONE evolvable surface (a prompt section / tool config) against a validated measurement, gate winners on held-out evidence plus a critical-dimension floor, and promote without offline/online drift. Use to run an Improve loop once eval-architect + measurement-validation pass.
+description: Optimize one production agent surface with Agent Eval methods, separate data, bounded spend, and measured promotion.
 ---
 
-# Surface Evolution — run the gated loop, promote without drift
+# Evolve One Surface
 
-You are a closed-loop controller for agent quality. **Sensor** = the eval (built by `eval-architect`, certified by `measurement-validation`). **Controller** = the proposer that proposes surface rewrites. **Actuator** = promotion (writing the surface to the live agent). **Safety interlock** = the gate. The interlock is the entire point: it prefers *under-promotion* to Goodhart. A loop that ships every apparent gain is worthless; a loop that ships only evidence-backed gains is the product.
+Optimize one surface that production loads exactly as measured.
+Keep security, approval, authorization, and compliance rules outside the editable surface.
 
-The engine exists in the substrate (`@tangle-network/agent-eval/contract` `selfImprove` / `runImprovementLoop`, `gepaProposer`, `defaultProductionGate`, `neutralizationGate`, `composeGate`) — re-exported via `@tangle-network/agent-app/eval-campaign`. **Do not rebuild it.** This skill is how you wire and run it safely.
+## Run
 
-## Invariant (non-negotiable)
+1. Identify the exact source file or data object that production loads.
+2. Establish training, method-selection, and final comparison cases with no overlap.
+3. Choose one search path:
+   - Use `gepaOptimizationMethod(...)` for official GEPA.
+   - Use `skillOptOptimizationMethod(...)` for official SkillOpt.
+   - Use `externalTextOptimizationMethod(...)` for another maintained optimizer.
+   - Use `SurfaceProposer` only when product or Runtime code owns candidate generation.
+4. Pass the chosen `method` or `proposer` to `selfImprove`.
+5. Set explicit dollars, concurrency, and repetitions.
+6. Guard critical dimensions in the release policy.
+7. Pass `neutralize` when added prompt size could create a decorative lift.
+8. Promote only the exact returned winner when `gateDecision` is `ship`.
 
-1. **Optimize exactly ONE surface that production renders identically.** The artifact you mutate offline must be the artifact the live agent loads — one source, rendered both places (e.g. an evolvable prompt section materialized from a single file into the live system prompt). If offline and online diverge, the lift is fictional the moment it ships.
-2. **Gate promotion on a held-out split AND a critical-dimension floor.** Never promote a net composite gain that regresses a guarded dimension (safety, hallucination, the regulated invariant). A +10 composite that loses 30 on hallucination is a regression, not a win. **AND gate on a footprint placebo.** A held-out lift proves the candidate beat baseline; it does NOT prove the lift came from the surface's CONTENT rather than the extra prompt/mount FOOTPRINT it added. Compose `neutralizationGate` (from `@tangle-network/agent-eval/campaign`, wired via `runImprovementLoop({ neutralize })`) AFTER the significance gate — `composeGate(heldOutGate({...}), neutralizationGate({...}))` — so a candidate whose content-blanked, footprint-matched twin reproduces more than `maxDecorativeFraction` (default 0.5) of the lift is HELD as decorative, no matter how large or significant its raw lift.
-3. **Budget is a hard ceiling and cost-aware** — skip cells beyond the ceiling, never abort. The user's spend maps to generations × candidates × reps: $0.20 buys one quick generation; $50 buys a wide search with tight CIs.
-4. **Never evolve a frozen surface.** The regulated invariants — human-in-the-loop, the compliance gate, auth/RBAC — are off-limits. Declare exactly what is evolvable; everything else the loop must not touch.
+## Required Checks
 
-> Worked result (this is the skill working): a GEPA run on the legal addendum proposed a "multi-jurisdictional divergence handling" section, diagnosed from the worst *training* personas. The gate guarded `hallucination_free` (no regression) and required held-out significance. When the held-out evidence came back incomplete, it **refused to ship** — exactly right. Trust > lift.
+- Prove the metric rejects a known-bad candidate before spending on search.
+- Prove each compared cell executed and reported usage.
+- Require paired final-case evidence.
+- Reject a winner that regresses any protected dimension.
+- After promotion, compare the live bytes with the selected surface.
+- Repeat the final comparison on fresh cases before claiming a durable gain.
 
-## Judgment (figure this out per product)
+Stop when added candidates no longer improve selection results within the budget.
+If failures require new tools, data, or execution behavior, change the architecture instead of continuing prompt search.
 
-- Which surface is safe to evolve (a guidance section, a tool description, a config knob) vs frozen (the invariants above)?
-- How to scope budget to the gap — one generation to confirm a hunch, many to search a wide space?
-- When has it converged or plateaued? If surface-tuning is exhausted and the gap is architectural, escalate — don't keep spending on a surface that's maxed.
+## Then consider
 
-## Self-test
-
-- **After a promotion, the live agent renders the exact winning surface** — diff the deployed artifact against the promoted one. They must be byte-identical.
-- **The held-out lift reproduces on a fresh run** — a one-shot gain is noise until it repeats.
-- **The gate's rejections are honest** — a held verdict carries a stated reason ("0 valid paired runs", "regressed guarded dimension"), never a silent pass and never a lift over partial data.
-
-## Evolves-by
-
-Production outcomes of shipped surfaces (did the held-out lift actually hold live?) feed back into the driver's mutation priors and the gate's thresholds. A surface that lifted offline but flatlined live tells you the held-out set wasn't representative — widen it. See `skill-evolution`.
+- Use `measurement-validation` when the metric or final-case split is not yet trustworthy.
+- Use `skill-evolution` when repeated runs expose a durable improvement to this operating procedure.

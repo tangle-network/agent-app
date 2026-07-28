@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-157 exports.
+158 exports.
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
@@ -828,6 +828,14 @@ interface ModelFailoverStreamOptions
 
 ```ts
 interface ModelFallbackInfo
+```
+
+### `normalizeChatPromptForSandbox`
+
+`function` — Convert the browser-safe chat attachment contract into the current sandbox prompt contract.
+
+```ts
+(prompt: string | readonly ChatTurnPartInput[]) => string | PromptInputPart[]
 ```
 
 ### `OpenModelStream`

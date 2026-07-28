@@ -5,9 +5,9 @@
  * blocks); each attachment or mention becomes one media part. An attachment
  * (read from the product store via the injected reader) draws the inline byte
  * budget first; a mention (read from the LIVE box) takes what is left. A file
- * inlines as a `data:` URI when it fits the remaining budget, otherwise demotes
- * to an in-box path part so the whole request stays under the proxy cap. Every
- * media part is deduped by its resolved absolute path. This module only
+ * inlines as a `data:` URI when it fits the remaining budget, otherwise uses
+ * the in-box file reference supported by the current sandbox prompt contract.
+ * Every media part is deduped by its resolved absolute path. This module only
  * produces the parts array; the caller decides when a turn dispatches parts
  * instead of a plain string.
  *
@@ -27,15 +27,18 @@ import {
   type SandboxExecChannel,
 } from '../sandbox/binary-read'
 import {
+  ChatTurnInputError,
   mediaTypeForMentionPath,
   base64WireLen,
   DISPATCH_REQUEST_MAX_BYTES,
   DISPATCH_STRUCTURAL_RESERVE_BYTES,
   DISPATCH_MAX_PARTS,
+  type ChatTurnPartInput,
 } from './wire'
 import type { ChatAttachmentPart, ChatMentionPart } from '../chat-store/parts'
 import { bytesToBase64 } from './upload'
 import type { ReadAttachmentFn } from './attachment-store'
+import { pathToFileURL } from 'node:url'
 
 export type { PromptInputPart }
 
@@ -85,16 +88,76 @@ async function readSandboxMention(
   return { succeeded: true, value: { size: stat.value, base64: bytesToBase64(read.value.bytes) } }
 }
 
-/** HARD INVARIANT: a media part (`image`/`file`) must carry exactly one of a
- *  non-empty `data:` URL or a non-empty absolute path — never both, never
- *  neither. The OpenCode adapter falls back to `part.url || part.path || ""`,
- *  so a part violating this silently degrades to an empty target instead of
- *  failing loud. */
+/** HARD INVARIANT: an image carries exactly one URL or absolute path, while a
+ *  file carries the URL required by the current sandbox prompt contract. */
 function violatesUrlPathXor(part: PromptInputPart): boolean {
   if (part.type === 'text') return false
-  const hasUrl = typeof part.url === 'string' && part.url.startsWith('data:')
-  const hasPath = typeof part.path === 'string' && part.path.startsWith('/')
+  const hasUrl = typeof part.url === 'string' && (
+    part.url.startsWith('data:')
+    || part.url.startsWith('file://')
+  )
+  const hasPath = 'path' in part && typeof part.path === 'string' && part.path.startsWith('/')
+  if (part.type === 'file') return !hasUrl || hasPath
   return hasUrl === hasPath
+}
+
+function sandboxFileUrl(absolutePath: string): string | undefined {
+  if (!absolutePath.startsWith('/')) return undefined
+  try {
+    return pathToFileURL(absolutePath).href
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Convert the browser-safe chat attachment contract into the current sandbox
+ * prompt contract. Images carry exactly one URL or path; generic files carry a
+ * filename and URL.
+ */
+export function normalizeChatPromptForSandbox(
+  prompt: string | readonly ChatTurnPartInput[],
+): string | PromptInputPart[] {
+  if (typeof prompt === 'string') return prompt
+  return prompt.map((part): PromptInputPart => {
+    if (part.type === 'text') return part
+    if ('content' in part) {
+      throw new ChatTurnInputError('Sandbox prompt parts do not accept inline content; provide a URL or path')
+    }
+
+    const url = typeof part.url === 'string' && part.url.length > 0 ? part.url : undefined
+    const path = typeof part.path === 'string' && part.path.length > 0 ? part.path : undefined
+    if (Boolean(url) === Boolean(path)) {
+      throw new ChatTurnInputError(`Sandbox ${part.type} parts require exactly one URL or path`)
+    }
+    if (path && !path.startsWith('/')) {
+      throw new ChatTurnInputError(`Sandbox ${part.type} paths must be absolute: ${path}`)
+    }
+
+    if (part.type === 'image') {
+      return {
+        type: 'image',
+        ...(part.filename ? { filename: part.filename } : {}),
+        ...(part.mediaType ? { mediaType: part.mediaType } : {}),
+        ...(url ? { url } : { path: path! }),
+      }
+    }
+
+    const filename = part.filename?.trim()
+    if (!filename) {
+      throw new ChatTurnInputError('Sandbox file parts require a filename')
+    }
+    const fileUrl = url ?? sandboxFileUrl(path!)
+    if (!fileUrl) {
+      throw new ChatTurnInputError(`Sandbox file paths must be absolute: ${path}`)
+    }
+    return {
+      type: 'file',
+      filename,
+      ...(part.mediaType ? { mediaType: part.mediaType } : {}),
+      url: fileUrl,
+    }
+  })
 }
 
 /** Build input parameters for dispatching chat message parts including text, attachments, mentions, and history */
@@ -112,7 +175,7 @@ export interface BuildDispatchPartsInput {
   /** The product's workspace/tenant key, passed to `readAttachment`. */
   scopeId: string
   /** Maps an attachment's store-relative path to the in-box absolute path a
-   *  path-based part references (same seam style as `fileMentionsToParts`'s
+   *  local media reference uses (same style as `fileMentionsToParts`'s
    *  `resolvePath`). */
   resolveAttachmentPath: (path: string) => string
   /** Maps a mention's workspace-relative path to its in-box absolute path.
@@ -122,7 +185,7 @@ export interface BuildDispatchPartsInput {
   /** The turn's already-ensured box — required when `mentions` is non-empty
    *  (mention bytes are read from the live box, not the store). */
   box?: SandboxExecChannel
-  /** Force every media part to a path reference, skipping all inlining. */
+  /** Force every media part to a local file reference, skipping all inlining. */
   forcePath?: boolean
   /** REQUIRED store reader for attachment content — no default (the product
    *  owns its store; see {@link ReadAttachmentFn}). */
@@ -163,8 +226,8 @@ export async function buildDispatchParts(input: BuildDispatchPartsInput): Promis
   const flattenedForSizing = flattenHistory(input.text, input.history)
   // May go negative when history/systemPrompt alone are large — every
   // attachment then fails the `runningInline + cost <= inlineBudget` check
-  // below and demotes to a path part, which is correct behavior (path parts
-  // don't draw on this budget), not a failure.
+  // below and uses a local file reference, which does not draw on this inline
+  // budget.
   const inlineBudget =
     requestMaxBytes
     - base64WireLen(byteLen(flattenedForSizing))
@@ -226,12 +289,8 @@ export async function buildDispatchParts(input: BuildDispatchPartsInput): Promis
       continue
     }
 
-    // File part. Sidecar's file-part zod union is tried [Legacy: {path
-    // required, content?} strips mediaType/filename] then [AISDK: {filename
-    // required, url required, mediaType?}] — so an inline file part must carry
-    // `filename` + `url` and no `path` key at all, while a path-based file part
-    // must carry only `path` (mediaType/filename would be stripped by the
-    // Legacy branch anyway).
+    // File parts use the current filename + URL contract. A file that is too
+    // large to inline keeps its existing in-box file through a file:// URL.
     const fileMediaType = mediaType ?? 'application/octet-stream'
     const inlinePart: PromptInputPart = {
       type: 'file',
@@ -244,7 +303,11 @@ export async function buildDispatchParts(input: BuildDispatchPartsInput): Promis
       parts.push(inlinePart)
       runningInline += cost
     } else {
-      parts.push({ type: 'file', path: absPath })
+      const url = sandboxFileUrl(absPath)
+      if (!url) {
+        return { succeeded: false, error: `resolved attachment path must be absolute: ${absPath}` }
+      }
+      parts.push({ type: 'file', filename: attachment.name, mediaType: fileMediaType, url })
     }
   }
 
@@ -275,7 +338,7 @@ export async function buildDispatchParts(input: BuildDispatchPartsInput): Promis
 
     // Only an image that projects within the remaining budget reads its bytes
     // to inline; every other mention (and a budget-exceeding image) ships
-    // path-only, so a large file is never base64'd just to be demoted.
+    // by local reference, so a large file is never base64'd unnecessarily.
     const projectedInlineCost = base64WireLen(stat.value.size)
       + byteLen(JSON.stringify({ type: 'image', filename: mention.name, mediaType: mediaType ?? '', url: '' }))
     if (isImage && mediaType && !forcePath && runningInline + projectedInlineCost <= inlineBudget) {
@@ -303,13 +366,15 @@ export async function buildDispatchParts(input: BuildDispatchPartsInput): Promis
       }
     }
 
-    // Path-only mention: an image keeps its `mediaType`, everything else is a
-    // bare `file` path (the sidecar's Legacy file-part branch strips extra keys).
-    parts.push(
-      isImage && mediaType
-        ? { type: 'image', filename: mention.name, mediaType, path: absPath }
-        : { type: 'file', path: absPath },
-    )
+    if (isImage && mediaType) {
+      parts.push({ type: 'image', filename: mention.name, mediaType, path: absPath })
+    } else {
+      const url = sandboxFileUrl(absPath)
+      if (!url) {
+        return { succeeded: false, error: `resolved mention path must be absolute: ${absPath}` }
+      }
+      parts.push({ type: 'file', filename: mention.name, url })
+    }
   }
 
   for (const part of parts) {

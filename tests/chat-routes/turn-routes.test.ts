@@ -229,6 +229,47 @@ describe('createChatTurnRoutes — turn', () => {
     expect((await routes.turn(turnRequest({ content: 'x' }), ctx)).status).toBe(400)
   })
 
+  it('rejects malformed file parts before persistence or producer execution', async () => {
+    const cases = [
+      {
+        part: { type: 'file', filename: 'inline.txt', content: 'legacy inline content' },
+        error: 'content is not supported',
+      },
+      {
+        part: {
+          type: 'file',
+          filename: 'both.txt',
+          url: 'data:text/plain,hi',
+          path: '/workspace/uploads/both.txt',
+        },
+        error: 'exactly one url or path',
+      },
+      {
+        part: { type: 'image', path: 'uploads/relative.png' },
+        error: 'path must be absolute',
+      },
+      {
+        part: { type: 'file', url: 'data:text/plain,hi' },
+        error: 'filename is required',
+      },
+    ]
+
+    for (const testCase of cases) {
+      const produce = vi.fn(() => fakeProducer([{ type: 'text', text: 'unexpected' }], 'unexpected'))
+      const { routes, rows, ctx } = makeRoutes({ produce })
+      const response = await routes.turn(turnRequest({
+        threadId: 't-1',
+        content: 'inspect this',
+        parts: [testCase.part],
+      }), ctx)
+
+      expect(response.status).toBe(400)
+      expect((await response.json() as { error: string }).error).toContain(testCase.error)
+      expect(rows).toEqual([])
+      expect(produce).not.toHaveBeenCalled()
+    }
+  })
+
   it('rejects inline parts over the byte budget with 413 (gateway-cap gate)', async () => {
     const { routes, ctx } = makeRoutes()
     const res = await routes.turn(
