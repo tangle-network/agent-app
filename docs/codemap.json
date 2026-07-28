@@ -8494,6 +8494,30 @@
           "doc": "Generate a signed token for TerminalProxyIdentity with an expiration based on TTL milliseconds"
         },
         {
+          "name": "ModelSelection",
+          "kind": "type",
+          "signature": "type ModelSelection",
+          "doc": "The three-state outcome of resolving a model: `{ succeeded: true, value: undefined }` means NOTHING was requested (the legitimate box-default configuration — not an error); `{ succeeded: true, value:…"
+        },
+        {
+          "name": "ModelSelectionError",
+          "kind": "type",
+          "signature": "type ModelSelectionError",
+          "doc": "Why a model failed to resolve into something transportable to the sandbox platform."
+        },
+        {
+          "name": "ModelSelectionFailure",
+          "kind": "type",
+          "signature": "type ModelSelectionFailure",
+          "doc": "A model id was named (by override, config, or default) but is not transportable to the sandbox platform."
+        },
+        {
+          "name": "ModelSelectionSource",
+          "kind": "type",
+          "signature": "type ModelSelectionSource",
+          "doc": "Which precedence slot supplied the failed/succeeded model id: `override` — the caller's per-turn `{ model }` argument."
+        },
+        {
           "name": "Outcome",
           "kind": "type",
           "signature": "type Outcome",
@@ -8560,6 +8584,12 @@
           "doc": "Resolve a secret value from the store by its name and return the outcome asynchronously"
         },
         {
+          "name": "requireTransportableModel",
+          "kind": "function",
+          "signature": "(selection: ModelSelection, context: string) => ResolvedModel | undefined",
+          "doc": "Shared fail-loud policy for the sandbox platform's three internal model callers (`ensureWorkspaceSandbox`'s `backendModelAtCreate`, `streamSandboxPrompt`, `driveSandboxTurn`): a `ModelSelection` in,…"
+        },
+        {
           "name": "resetClientCache",
           "kind": "function",
           "signature": "() => void",
@@ -8575,7 +8605,13 @@
           "name": "resolveModel",
           "kind": "function",
           "signature": "(config: ProviderResolutionConfig | undefined, override?: { model?: string | undefined; modelApiKey?: string | undefine…",
-          "doc": "Resolve and return the appropriate model configuration based on provider settings and optional overrides"
+          "doc": "Resolve and return the appropriate model configuration based on provider settings and optional overrides."
+        },
+        {
+          "name": "resolveModelSelection",
+          "kind": "function",
+          "signature": "(config: ProviderResolutionConfig | undefined, override?: { model?: string | undefined; modelApiKey?: string | undefine…",
+          "doc": "Resolve a provider + model configuration into a typed three-state outcome that separates \"nothing requested\" from \"something requested but untransportable\" — the distinction {@link resolveModel} coll…"
         },
         {
           "name": "resolveSandboxClientCredentials",
@@ -8648,6 +8684,12 @@
           "kind": "type",
           "signature": "type SandboxFileSizeOutcome",
           "doc": "Resolve the outcome of a sandbox file size check with success status and value or error message"
+        },
+        {
+          "name": "SandboxModelResolutionError",
+          "kind": "class",
+          "signature": "class SandboxModelResolutionError",
+          "doc": "Thrown by {@link requireTransportableModel} when a model that was EXPLICITLY requested — via a per-turn override or a configured `provider.modelName` — cannot be transported to the sandbox platform."
         },
         {
           "name": "SandboxPermissionLevel",

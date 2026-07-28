@@ -10978,6 +10978,38 @@ interface MemberSyncSeam
 (secret: string, identity: TerminalProxyIdentity, ttlMs?: number, now?: () => number) => Promise<Outcome<{ token: strin…
 ```
 
+### `ModelSelection`
+
+`type` — The three-state outcome of resolving a model: `{ succeeded: true, value: undefined }` means NOTHING was requested (the legitimate box-default configuration — not an error); `{ succeeded: true, value:…
+
+```ts
+type ModelSelection
+```
+
+### `ModelSelectionError`
+
+`type` — Why a model failed to resolve into something transportable to the sandbox platform.
+
+```ts
+type ModelSelectionError
+```
+
+### `ModelSelectionFailure`
+
+`type` — A model id was named (by override, config, or default) but is not transportable to the sandbox platform.
+
+```ts
+type ModelSelectionFailure
+```
+
+### `ModelSelectionSource`
+
+`type` — Which precedence slot supplied the failed/succeeded model id: `override` — the caller's per-turn `{ model }` argument.
+
+```ts
+type ModelSelectionSource
+```
+
 ### `Outcome`
 
 `type` — Represent success or failure of an operation with corresponding value or error information
@@ -11066,6 +11098,14 @@ interface ProvisionProfileSection
 (store: SecretStore, name: string) => Promise<Outcome<string>>
 ```
 
+### `requireTransportableModel`
+
+`function` — Shared fail-loud policy for the sandbox platform's three internal model callers (`ensureWorkspaceSandbox`'s `backendModelAtCreate`, `streamSandboxPrompt`, `driveSandboxTurn`): a `ModelSelection` in,…
+
+```ts
+(selection: ModelSelection, context: string) => ResolvedModel | undefined
+```
+
 ### `resetClientCache`
 
 `function` — Reset the client cache to clear stored data and force fresh retrieval
@@ -11084,7 +11124,15 @@ interface ResolvedModel
 
 ### `resolveModel`
 
-`function` — Resolve and return the appropriate model configuration based on provider settings and optional overrides
+`function` — Resolve and return the appropriate model configuration based on provider settings and optional overrides.
+
+```ts
+(config: ProviderResolutionConfig | undefined, override?: { model?: string | undefined; modelApiKey?: string | undefine…
+```
+
+### `resolveModelSelection`
+
+`function` — Resolve a provider + model configuration into a typed three-state outcome that separates "nothing requested" from "something requested but untransportable" — the distinction {@link resolveModel} coll…
 
 ```ts
 (config: ProviderResolutionConfig | undefined, override?: { model?: string | undefined; modelApiKey?: string | undefine…
@@ -11184,6 +11232,14 @@ type SandboxFileBytesOutcome
 
 ```ts
 type SandboxFileSizeOutcome
+```
+
+### `SandboxModelResolutionError`
+
+`class` — Thrown by {@link requireTransportableModel} when a model that was EXPLICITLY requested — via a per-turn override or a configured `provider.modelName` — cannot be transported to the sandbox platform.
+
+```ts
+class SandboxModelResolutionError
 ```
 
 ### `SandboxPermissionLevel`
