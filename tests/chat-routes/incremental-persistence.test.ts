@@ -417,6 +417,55 @@ describe('incremental assistant persistence — crash-safe convergence', () => {
     expect(all.filter((row) => row.role === 'assistant')).toHaveLength(2)
   })
 
+  it('an expired running lease cannot swallow a repeated message', async () => {
+    const { store, threadId } = await freshStore()
+    let now = 0
+    const shared = createMemoryTurnEventStore({
+      runningTurnLeaseMs: 100,
+      now: () => now,
+    })
+    await shared.setStatus('abandoned-turn', 'running', threadId)
+    now = 101
+
+    async function run() {
+      const { routes, ctx, settle } = routesOver(
+        store as unknown as ChatTurnMessageStore,
+        () => createSandboxChatProducer({ events: (async function* () { for (const e of TURN_EVENTS) yield e })(), model: 'm' }),
+        { incrementalPersistence: { intervalMs: 0 }, turnStore: shared },
+      )
+      await drain(await routes.turn(turnRequest(threadId, 'same question'), ctx))
+      await settle()
+    }
+    await run()
+    await run()
+
+    const all = await rows(store, threadId)
+    expect(all.filter((row) => row.role === 'user')).toHaveLength(2)
+    expect(all.filter((row) => row.role === 'assistant')).toHaveLength(2)
+  })
+
+  it('a new client turn id remains a new turn while an older lease is still live', async () => {
+    const { store, threadId } = await freshStore()
+    const shared = createMemoryTurnEventStore()
+    await shared.setStatus('abandoned-turn', 'running', threadId)
+
+    async function run(turnId: string) {
+      const { routes, ctx, settle } = routesOver(
+        store as unknown as ChatTurnMessageStore,
+        () => createSandboxChatProducer({ events: (async function* () { for (const e of TURN_EVENTS) yield e })(), model: 'm' }),
+        { incrementalPersistence: { intervalMs: 0 }, turnStore: shared },
+      )
+      await drain(await routes.turn(turnRequest(threadId, 'same question', { turnId }), ctx))
+      await settle()
+    }
+    await run('client-turn-1')
+    await run('client-turn-2')
+
+    const all = await rows(store, threadId)
+    expect(all.filter((row) => row.role === 'user')).toHaveLength(2)
+    expect(all.filter((row) => row.role === 'assistant')).toHaveLength(2)
+  })
+
   it('autonomous lane: runDetachedTurn owns the row, drafts it mid-run, and converges after a crash', async () => {
     const { store, threadId } = await freshStore()
     const turnStore = createMemoryTurnEventStore()

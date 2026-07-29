@@ -44,6 +44,8 @@
  * {@link TURN_STREAM_STORAGE_KEYS}.
  */
 
+import { DEFAULT_RUNNING_TURN_LEASE_MS } from '../stream/turn-buffer'
+
 import {
   ACTIVITY_TTL_MS,
   MAX_RECENT_CREATED,
@@ -144,6 +146,8 @@ export interface TurnStreamDOOptions {
   maxSegmentEvents?: number
   /** Override {@link ACTIVITY_TTL_MS}. */
   activityTtlMs?: number
+  /** How long an unrenewed running turn remains discoverable. */
+  runningTurnLeaseMs?: number
 }
 
 /** Manage per-turn segments and track active threads with durable event storage */
@@ -578,8 +582,12 @@ export class TurnStreamDO {
   private async handleScopeRunningList(): Promise<Response> {
     const index =
       (await this.state.storage.get<Record<string, ScopeTurnEntry>>(TURN_STREAM_STORAGE_KEYS.turnScope)) ?? {}
+    const cutoff = Date.now() - Math.max(
+      1,
+      this.options.runningTurnLeaseMs ?? DEFAULT_RUNNING_TURN_LEASE_MS,
+    )
     const running = Object.entries(index)
-      .filter(([, entry]) => entry.status === 'running')
+      .filter(([, entry]) => entry.status === 'running' && entry.updatedAt >= cutoff)
       .sort((a, b) => b[1].updatedAt - a[1].updatedAt)
       .map(([turnId]) => turnId)
     return jsonResponse({ running })

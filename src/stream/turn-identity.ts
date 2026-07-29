@@ -114,6 +114,11 @@ function findReusableUserMessageIndex(
       const message = messages[index]
       if (message?.role === 'user' && messageHasTurnId(message, turnId)) return index
     }
+    // A caller-supplied id is authoritative. A different id with identical
+    // text is a deliberate new turn, while a transport retry reuses the same
+    // id and takes the match above. Falling through to content dedup here lets
+    // an unrelated abandoned running row swallow an intentional repeat.
+    return -1
   }
 
   // Content fallback for a client that sends no turnId. Only the trailing rows
