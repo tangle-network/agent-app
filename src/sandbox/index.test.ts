@@ -88,10 +88,8 @@ import type {
   AgentProfileFileMount,
   AgentProfileMcpServer,
 } from '@tangle-network/agent-interface'
-import type {
-  EgressPolicy,
-  SandboxInstance,
-} from '@tangle-network/sandbox/core'
+import type { EgressPolicy } from '@tangle-network/sandbox'
+import type { SandboxInstance } from '@tangle-network/sandbox/core'
 
 const PROFILE: AgentProfile = { name: 'test' } as AgentProfile
 
