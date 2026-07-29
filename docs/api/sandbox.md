@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-143 exports.
+146 exports.
 
 ### `AppToolDescriptor`
 
@@ -654,6 +654,22 @@ interface SandboxClientCredentials
 type SandboxCredentialEnvironment
 ```
 
+### `SandboxEgressPolicyMismatchError`
+
+`class` — Thrown when an existing sandbox cannot be proven to have the requested outbound network policy.
+
+```ts
+class SandboxEgressPolicyMismatchError
+```
+
+### `SandboxEgressPolicySource`
+
+`type`
+
+```ts
+type SandboxEgressPolicySource
+```
+
 ### `SandboxExecChannel`
 
 `interface` — The `box.exec` surface these helpers use — structural, so a caller can pass the sandbox SDK's `SandboxInstance` directly or a narrower test double.
@@ -668,6 +684,14 @@ interface SandboxExecChannel
 
 ```ts
 interface SandboxExecOptions
+```
+
+### `SandboxExistingBoxStage`
+
+`type`
+
+```ts
+type SandboxExistingBoxStage
 ```
 
 ### `SandboxFileBytesOutcome`

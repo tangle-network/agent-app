@@ -1,21 +1,8 @@
 name: Publish
 
-# Two ways to release, both under this filename on purpose. Agent App's npm OIDC
-# publishing is bound to `publish.yml`, so all publishing must originate here:
-#
-#   • auto-release  — every merge to main: verify → bump patch → tag → publish.
-#   • tag path      — a human-pushed `v*` tag (or workflow_dispatch on a tag):
-#                     verify (with tag/version lock) → publish that exact version.
-#
-# The auto-release version-bump commit + tag are pushed with the default
-# GITHUB_TOKEN, which by design does NOT re-trigger workflows — so it never loops
-# (and a GITHUB_TOKEN tag push wouldn't fire the tag path either).
-
 on:
   push:
     branches: [main]
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 concurrency:
@@ -23,160 +10,231 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # ── auto-release on merge to main ─────────────────────────────────────────
-  auto-release:
+  package_release:
     if: >-
-      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-      !startsWith(github.event.head_commit.message, 'chore(release):') &&
-      !contains(github.event.head_commit.message, '[skip release]')
+      (github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+       !startsWith(github.event.head_commit.message, 'chore(release):') &&
+       !contains(github.event.head_commit.message, '[skip release]')) ||
+      startsWith(github.ref, 'refs/tags/v') ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # push the version-bump commit + tag
-      id-token: write # OIDC trusted publish + Sigstore provenance
-    env:
-      NODE_OPTIONS: --max-old-space-size=8192
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: pnpm
-          registry-url: https://registry.npmjs.org
-
-      - name: Install deps
-        run: pnpm install --frozen-lockfile
-
-      # Verify BEFORE bumping, so a red main never gets a version/tag.
-      - name: Typecheck
-        run: pnpm run typecheck
-      - name: Test
-        run: pnpm run test
-      - name: Build
-        run: pnpm run build
-
-      # Pinned (not @latest): npm 12.0.0 (2026-07-08) broke `--provenance` with
-      # "MODULE_NOT_FOUND: Cannot find module 'sigstore'". 11.18.0 is the last
-      # known-good release (>= 11.5.1 for OIDC). Revisit once a fixed 12.x ships.
-      - run: npm install -g npm@11.18.0
-
-      # --atomic: branch + tag land together or not at all. --follow-tags is
-      # per-ref — during a merge train the HEAD:main push gets rejected while
-      # the tag ref is still accepted, orphaning a vX.Y.Z tag that poisons
-      # every later release run ("fatal: tag already exists"). On a lost race,
-      # undo the local bump and retry on fresh main; the newer merge's queued
-      # run then no-ops via the already-published check.
-      - name: Bump patch, commit, tag, push (atomic)
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          for attempt in 1 2 3; do
-            git fetch origin main
-            git reset --hard origin/main
-            npm version patch --no-git-tag-version
-            V=$(node -p "require('./package.json').version")
-            npm version "$V" --prefix create-agent-app --no-git-tag-version
-            git add package.json create-agent-app/package.json
-            git commit -m "chore(release): $V [skip release]"
-            git tag "v$V"
-            if git push --atomic origin HEAD:main "refs/tags/v$V"; then
-              exit 0
-            fi
-            echo "release push lost the race (attempt $attempt); retrying on fresh main"
-            git tag -d "v$V"
-          done
-          echo "::error::release push lost the race 3 times — check for an orphaned tag"
-          exit 1
-
-      - name: Publish packages to npm (skip versions already published)
-        env:
-          CREATE_AGENT_APP_NPM_TOKEN: ${{ secrets.CREATE_AGENT_APP_NPM_TOKEN }}
-        run: .github/scripts/publish-packages.sh
-
-  # ── manual / human-pushed tag path ────────────────────────────────────────
-  verify:
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    env:
-      # tsup builds .d.ts for ~38 entry points in a worker thread (the `prepare`
-      # script fires during `pnpm install`, then again in the Build step). That
-      # worker needs ~4.7GB of heap; the default worker limit OOMs it with
-      # ERR_WORKER_OUT_OF_MEMORY on the hosted runner. The worker inherits
-      # NODE_OPTIONS, so a job-level heap covers install (prepare), test, and
-      # build in one place.
-      NODE_OPTIONS: --max-old-space-size=8192
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: pnpm
-          registry-url: https://registry.npmjs.org
-      - name: Install deps
-        run: pnpm install --frozen-lockfile
-      - name: Typecheck
-        run: pnpm run typecheck
-      - name: Test
-        run: pnpm run test
-      - name: Build
-        run: pnpm run build
-      - name: Verify tag/version lock
-        run: |
-          NPM_VERSION=$(node -p "require('./package.json').version")
-          CREATE_VERSION=$(node -p "require('./create-agent-app/package.json').version")
-          if [ "$CREATE_VERSION" != "$NPM_VERSION" ]; then
-            echo "::error::Package version mismatch: agent-app=$NPM_VERSION create-agent-app=$CREATE_VERSION."
-            exit 1
-          fi
-          if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
-            TAG_VERSION="${GITHUB_REF#refs/tags/v}"
-            if [ "$TAG_VERSION" != "$NPM_VERSION" ]; then
-              echo "::error::Tag/version mismatch: tag=$TAG_VERSION package=$NPM_VERSION."
-              exit 1
-            fi
-          fi
-          echo "Version locked: $NPM_VERSION"
-
-  publish-npm:
-    needs: verify
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    env:
-      # Same DTS-worker heap need: this job runs `pnpm install` (prepare → tsup)
-      # and `pnpm run build` before publishing.
-      NODE_OPTIONS: --max-old-space-size=8192
     permissions:
       contents: read
-      id-token: write
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    outputs:
+      mode: ${{ steps.release.outputs.mode }}
+      version: ${{ steps.release.outputs.version }}
+      base-sha: ${{ github.sha }}
+      publish-control-sha: ${{ steps.control.outputs.publish-sha }}
+      release-control-sha: ${{ steps.control.outputs.release-sha }}
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify release tag is on main
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          TAG_SHA=$(git rev-parse HEAD)
+          MAIN_SHA=$(git rev-parse refs/remotes/origin/main)
+          git merge-base --is-ancestor "$TAG_SHA" "$MAIN_SHA" || {
+            echo "::error::Tag $TAG_SHA is not on main at $MAIN_SHA."
+            exit 1
+          }
+      - name: Stage publish control before dependency install
+        id: control
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/publish-bundle"
+          cp .github/scripts/publish-packages.sh "$RUNNER_TEMP/publish-bundle/publish-packages.sh"
+          echo "publish-sha=$(sha256sum "$RUNNER_TEMP/publish-bundle/publish-packages.sh" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "release-sha=$(sha256sum .github/scripts/write-release.sh | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           cache: pnpm
-          registry-url: https://registry.npmjs.org
+      - name: Validate exact release commit
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          RELEASE_SHA=$(git rev-parse HEAD)
+          BASE_SHA=$(git rev-parse "$RELEASE_SHA^")
+          VERSION=${GITHUB_REF#refs/tags/v}
+          BASE_SHA="$BASE_SHA" VERSION="$VERSION" RELEASE_SHA="$RELEASE_SHA" \
+            bash .github/scripts/write-release.sh validate
+      - name: Check release contract
+        run: |
+          node .github/scripts/test-publish-workflow.mjs
+          bash .github/scripts/test-publish-packages.sh
+          bash .github/scripts/test-write-release.sh
       - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - run: pnpm run test
+
+      - name: Lock package version
+        id: release
+        run: |
+          set -euo pipefail
+          ROOT_VERSION=$(node -p "require('./package.json').version")
+          CREATE_VERSION=$(node -p "require('./create-agent-app/package.json').version")
+          if [[ "$ROOT_VERSION" != "$CREATE_VERSION" ]]; then
+            echo "::error::Package version mismatch: agent-app=$ROOT_VERSION create-agent-app=$CREATE_VERSION."
+            exit 1
+          fi
+
+          MODE='verify-only'
+          VERSION=$ROOT_VERSION
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            MODE='tag'
+            if [[ "${GITHUB_REF#refs/tags/v}" != "$VERSION" ]]; then
+              echo "::error::Tag/version mismatch: tag=${GITHUB_REF#refs/tags/v} package=$VERSION."
+              exit 1
+            fi
+          elif [[ "$GITHUB_EVENT_NAME" == 'push' && "$GITHUB_REF" == 'refs/heads/main' ]]; then
+            MODE='auto'
+            VERSION=$(ROOT_VERSION="$ROOT_VERSION" node -e '
+              const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(process.env.ROOT_VERSION)
+              if (!match) process.exit(1)
+              process.stdout.write(`${match[1]}.${match[2]}.${BigInt(match[3]) + 1n}`)
+            ')
+          fi
+
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
       - run: pnpm run build
 
-      # OIDC trusted publishing needs npm CLI >= 11.5.1; Node 22 ships npm 10.x,
-      # which sends the publish PUT UNAUTHENTICATED → registry 404. Upgrade first.
-      # We publish with `npm publish` (not `pnpm publish`): npm performs the OIDC
-      # id-token → registry-token exchange the trusted-publisher entry expects.
-      # Safe here because agent-app has no `workspace:` protocol deps to leak
-      # (peers are plain version ranges). The package ships only ./dist.
-      # Pinned (not @latest): npm 12.0.0 (2026-07-08) broke `--provenance`
-      # (sigstore MODULE_NOT_FOUND). 11.18.0 is the last known-good. Revisit on 12.x fix.
-      - run: npm install -g npm@11.18.0
-      - run: npm --version
-
-      # Idempotent: re-running a tag whose npm version is already published must
-      # not fail. Agent App uses npm OIDC; create-agent-app uses its repository
-      # secret because npm authorizes trusted publishers separately per package.
-      - name: Publish packages to npm (skip versions already published)
+      - name: Pack and inspect exact tarballs
+        if: steps.release.outputs.mode == 'tag'
         env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          BUNDLE="$RUNNER_TEMP/publish-bundle"
+          rm -f "$BUNDLE"/*.tgz "$BUNDLE/SHA256SUMS"
+
+          pack() {
+            local source=$1 output=$2 packed
+            packed=$(npm pack "$source" --ignore-scripts --pack-destination "$BUNDLE")
+            [[ -f "$BUNDLE/$packed" ]] || { echo "::error::npm pack did not create $packed."; exit 1; }
+            mv "$BUNDLE/$packed" "$BUNDLE/$output"
+          }
+          pack . agent-app.tgz
+          pack ./create-agent-app create-agent-app.tgz
+
+          EXPECTED_VERSION="$RELEASE_VERSION" \
+            bash "$BUNDLE/publish-packages.sh" validate \
+            "$BUNDLE/agent-app.tgz" "$BUNDLE/create-agent-app.tgz"
+          npm publish "$BUNDLE/agent-app.tgz" --dry-run --ignore-scripts --access public >/dev/null
+          npm publish "$BUNDLE/create-agent-app.tgz" --dry-run --ignore-scripts --access public >/dev/null
+          (
+            cd "$BUNDLE"
+            sha256sum agent-app.tgz create-agent-app.tgz publish-packages.sh > SHA256SUMS
+          )
+      - name: Upload release artifact
+        if: steps.release.outputs.mode == 'tag'
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: publish-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/publish-bundle/agent-app.tgz
+            ${{ runner.temp }}/publish-bundle/create-agent-app.tgz
+            ${{ runner.temp }}/publish-bundle/publish-packages.sh
+            ${{ runner.temp }}/publish-bundle/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  write_release:
+    needs: package_release
+    if: needs.package_release.outputs.mode == 'auto'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
+    steps:
+      - name: Commit version and dispatch tagged publication
+        env:
+          BASE_SHA: ${{ needs.package_release.outputs.base-sha }}
+          VERSION: ${{ needs.package_release.outputs.version }}
+          CONTROL_SHA: ${{ needs.package_release.outputs.release-control-sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          BARE="$RUNNER_TEMP/release.git"
+          git init --bare --quiet "$BARE"
+          export GIT_DIR="$BARE" GIT_INDEX_FILE="$RUNNER_TEMP/release.index"
+          git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
+          AUTH=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')
+          git config http.https://github.com/.extraheader "AUTHORIZATION: basic $AUTH"
+          unset AUTH
+          git fetch --no-tags origin "$BASE_SHA"
+          [[ $(git rev-parse FETCH_HEAD) == "$BASE_SHA" ]]
+          git show "$BASE_SHA:.github/scripts/write-release.sh" > "$RUNNER_TEMP/write-release.sh"
+          [[ $(sha256sum "$RUNNER_TEMP/write-release.sh" | cut -d' ' -f1) == "$CONTROL_SHA" ]]
+          chmod 700 "$RUNNER_TEMP/write-release.sh"
+          bash "$RUNNER_TEMP/write-release.sh"
+
+  publish_agent_app:
+    needs: package_release
+    if: needs.package_release.outputs.mode == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.package_release.outputs.artifact-id }}
+          path: ${{ runner.temp }}/publish-bundle
+          merge-multiple: true
+      - name: Publish exact Agent App tarball
+        env:
+          EXPECTED_VERSION: ${{ needs.package_release.outputs.version }}
+          CONTROL_SHA: ${{ needs.package_release.outputs.publish-control-sha }}
+          NPM_CONFIG_IGNORE_SCRIPTS: 'true'
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/publish-bundle"
+          sha256sum --check SHA256SUMS
+          [[ $(sha256sum publish-packages.sh | cut -d' ' -f1) == "$CONTROL_SHA" ]]
+          [[ $(npm --version) == '11.16.0' ]]
+          bash publish-packages.sh publish agent-app agent-app.tgz
+
+  publish_create_agent_app:
+    needs: package_release
+    if: needs.package_release.outputs.mode == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.package_release.outputs.artifact-id }}
+          path: ${{ runner.temp }}/publish-bundle
+          merge-multiple: true
+      - name: Publish exact create-agent-app tarball
+        env:
+          EXPECTED_VERSION: ${{ needs.package_release.outputs.version }}
+          CONTROL_SHA: ${{ needs.package_release.outputs.publish-control-sha }}
           CREATE_AGENT_APP_NPM_TOKEN: ${{ secrets.CREATE_AGENT_APP_NPM_TOKEN }}
-        run: .github/scripts/publish-packages.sh
+          NPM_CONFIG_IGNORE_SCRIPTS: 'true'
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/publish-bundle"
+          sha256sum --check SHA256SUMS
+          [[ $(sha256sum publish-packages.sh | cut -d' ' -f1) == "$CONTROL_SHA" ]]
+          [[ $(npm --version) == '11.16.0' ]]
+          bash publish-packages.sh publish create-agent-app create-agent-app.tgz
