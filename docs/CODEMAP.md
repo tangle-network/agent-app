@@ -78,7 +78,7 @@ _77 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./turn-stream`](api/turn-stream.md) | 59 | `chat-routes`, `stream` |
 | [`./vault`](api/vault.md) | 17 | — |
 | [`./vault/lazy`](api/vault-lazy.md) | 2 | — |
-| [`./web`](api/web.md) | 15 | — |
+| [`./web`](api/web.md) | 16 | — |
 | [`./web-react`](api/web-react.md) | 268 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./web-react/terminal`](api/web-react-terminal.md) | 10 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./work-product`](api/work-product.md) | 90 | `eval-campaign`, `tools` |
@@ -732,9 +732,9 @@ Source: `src/vault/lazy.tsx` · 2 exports
 
 ## `./web`
 
-Source: `src/web/index.ts` · 15 exports
+Source: `src/web/index.ts` · 16 exports
 
-`addSecurityHeaders`, `assertMediaUrl`, `checkRateLimit`, `clearCookieHeader`, `CookieOptions`, `extractRequestContext`, `JsonObject`, `KvLike`, `parseJsonObjectBody`, `RateLimitResult`, `readCookieValue`, `RequestContext`, `requireString`, `SecurityHeaderOptions`, `serializeCookie`
+`addSecurityHeaders`, `assertMediaUrl`, `checkRateLimit`, `clearCookieHeader`, `CookieOptions`, `extractRequestContext`, `JsonObject`, `KvLike`, `parseJsonObjectBody`, `RateLimitResult`, `readCookieValue`, `RequestContext`, `requireString`, `SecurityHeaderOptions`, `serializeCookie`, `STANDARD_SECURITY_HEADERS`
 
 [Full API →](api/web.md)
 

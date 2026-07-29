@@ -4,7 +4,7 @@
 
 Source: `src/web/index.ts`
 
-15 exports.
+16 exports.
 
 ### `addSecurityHeaders`
 
@@ -124,4 +124,12 @@ interface SecurityHeaderOptions
 
 ```ts
 (value: string, opts: CookieOptions) => string
+```
+
+### `STANDARD_SECURITY_HEADERS`
+
+`const` — Canonical generic response headers used by {@link addSecurityHeaders}.
+
+```ts
+Readonly<{ readonly 'Strict-Transport-Security': "max-age=31536000; includeSubDomains; preload"; readonly 'X-Content-Ty…
 ```

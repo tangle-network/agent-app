@@ -180,15 +180,25 @@ export interface SecurityHeaderOptions {
   extra?: Record<string, string>
 }
 
+/** Canonical generic response headers used by {@link addSecurityHeaders}.
+ * Exported so static-asset hosts can apply the same policy without copying
+ * values that silently drift from Worker/API responses. */
+export const STANDARD_SECURITY_HEADERS = Object.freeze({
+  'Strict-Transport-Security':
+    'max-age=31536000; includeSubDomains; preload',
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'SAMEORIGIN',
+  'Referrer-Policy': 'same-origin',
+  'X-XSS-Protection': '1; mode=block',
+} as const)
+
 /** Set standard security headers on a response (HSTS, nosniff, frame-options,
  *  referrer-policy, XSS) + optional product disclaimer/retention. The security
  *  set is generic; the disclaimer/retention are the product's. */
 export function addSecurityHeaders(response: Response, opts: SecurityHeaderOptions = {}): Response {
-  response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload')
-  response.headers.set('X-Content-Type-Options', 'nosniff')
-  response.headers.set('X-Frame-Options', 'SAMEORIGIN')
-  response.headers.set('Referrer-Policy', 'same-origin')
-  response.headers.set('X-XSS-Protection', '1; mode=block')
+  for (const [name, value] of Object.entries(STANDARD_SECURITY_HEADERS)) {
+    response.headers.set(name, value)
+  }
   if (opts.disclaimer) response.headers.set('X-AI-Disclaimer', opts.disclaimer)
   if (opts.retention) response.headers.set('X-Data-Retention', opts.retention)
   for (const [k, v] of Object.entries(opts.extra ?? {})) response.headers.set(k, v)
