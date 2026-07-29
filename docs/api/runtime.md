@@ -4,7 +4,7 @@
 
 Source: `src/runtime/index.ts`
 
-61 exports.
+62 exports.
 
 ### `AnySurfaceKind`
 
@@ -124,6 +124,14 @@ interface CreateTangleRouterModelConfigOptions
 
 ```ts
 (cfg: { baseUrl: string; apiKey: string; preferredDefault?: string | undefined; }) => Promise<ModelCatalog>
+```
+
+### `isChatCapableModel`
+
+`function` — Can this router entry serve a text chat turn?
+
+```ts
+(m: RouterModel) => boolean
 ```
 
 ### `isTangleBillingEnforcementDisabled`

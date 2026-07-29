@@ -2,6 +2,9 @@ import { useCallback, useMemo, useRef } from 'react'
 import { AgentSessionControls } from '@tangle-network/sandbox-ui/chat'
 import { canonicalModelId } from '@tangle-network/sandbox-ui/dashboard'
 import type { ModelInfo } from '@tangle-network/sandbox-ui/dashboard'
+// Browser-safe: model-catalog.ts imports nothing. Taken from the source module
+// rather than the `/catalog` subpath so this stays one build graph.
+import { isChatCapableModel, type RouterModel } from '../runtime/model-catalog'
 import type { HarnessType, ReasoningEffort, ReasoningLevel } from './types'
 
 /**
@@ -58,8 +61,10 @@ export interface ComposerAgentControlsProps {
   /**
    * Which surface the controls live on. `'chat'` (the default) drops the
    * shell-only `cli-base` backend — it has no conversational agent — and tells
-   * the shared control to use its chat-only default set. `'all'` keeps every
-   * backend for non-chat / scheduled surfaces.
+   * the shared control to use its chat-only default set. It also drops models
+   * that cannot serve a text turn (image / TTS / embedding / audio-in) from
+   * the model picker. `'all'` keeps every backend and every model for non-chat
+   * / scheduled surfaces.
    */
   context?: 'chat' | 'all'
   /**
@@ -101,6 +106,30 @@ function harnessesForContext(
 }
 
 /**
+ * The model-side twin of the harness trim above. Products hand the picker the
+ * router's raw `/v1/models`, which lists every routeable endpoint — image
+ * generators, TTS voices, embedding models, audio-in transcription. None of
+ * them can serve a chat turn, and on the live catalogue that is 35 of 504
+ * entries a user could pick and get a broken turn from.
+ *
+ * `context: 'all'` keeps the full list for non-chat surfaces.
+ *
+ * The selected model is never filtered out, whatever its modalities say: a
+ * product may deliberately pin something exotic, and a picker whose own value
+ * is missing from its list renders as blank.
+ */
+function modelsForContext(
+  models: ModelInfo[],
+  selectedId: string,
+  context: 'chat' | 'all',
+): ModelInfo[] {
+  if (context !== 'chat') return models
+  return models.filter(
+    (m) => m.id === selectedId || isChatCapableModel(m as unknown as RouterModel),
+  )
+}
+
+/**
  * The composer's agent-identity control: harness (agent backend), model, and
  * reasoning effort, over sandbox-ui's `AgentSessionControls`.
  *
@@ -122,7 +151,10 @@ function harnessesForContext(
  *    window of a harness change and disarmed on the next microtask, so it can
  *    never stay stuck — a later genuine pick is never swallowed, even when the
  *    harness change was a no-op.
- *  - CHAT-CONTEXT TRIM. `cli-base` never reaches a conversational surface.
+ *  - CHAT-CONTEXT TRIM. On a chat surface, `cli-base` never reaches the harness
+ *    picker and a non-chat model never reaches the model picker. Products feed
+ *    the picker the router's raw model list, where 35 of 504 entries (image,
+ *    TTS, embeddings, audio-in transcription) cannot serve a chat turn at all.
  *
  * Behavioral modes (a plan toggle) are NOT agent identity and do not belong
  * here — they dock on the other side of the composer via `controls`.
@@ -144,6 +176,11 @@ export function ComposerAgentControls({
     // so a provider-prefixed id still matches once models arrive.
     return model.value
   }, [model.value, model.models])
+
+  const offeredModels = useMemo(
+    () => modelsForContext(model.models, model.value, context),
+    [model.models, model.value, context],
+  )
 
   const harnessSwitching = useRef(false)
   const harnessOnChange = harness?.onChange
@@ -177,7 +214,7 @@ export function ComposerAgentControls({
       model={{
         value: canonicalSelected,
         onChange: onModelChange,
-        models: model.models,
+        models: offeredModels,
         loading: model.loading,
         disabled: model.disabled,
       }}

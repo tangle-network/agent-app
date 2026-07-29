@@ -1278,6 +1278,14 @@ interface CatalogModel
 (cfg: { baseUrl: string; apiKey: string; preferredDefault?: string | undefined; }) => Promise<ModelCatalog>
 ```
 
+### `isChatCapableModel`
+
+`function` — Can this router entry serve a text chat turn?
+
+```ts
+(m: RouterModel) => boolean
+```
+
 ### `ModelCatalog`
 
 `interface` — Define a catalog containing models with a default ID and fetch timestamp
@@ -1305,7 +1313,7 @@ interface RouterModel
 
 ## `./chat-react`
 
-Source: `src/chat-react/index.tsx` · depends on `chat-routes`, `web-react`
+Source: `src/chat-react/index.tsx` · depends on `chat-routes`, `runtime`, `web-react`
 
 ### `ComposerAgentControls`
 
@@ -10440,6 +10448,14 @@ interface CreateTangleRouterModelConfigOptions
 
 ```ts
 (cfg: { baseUrl: string; apiKey: string; preferredDefault?: string | undefined; }) => Promise<ModelCatalog>
+```
+
+### `isChatCapableModel`
+
+`function` — Can this router entry serve a text chat turn?
+
+```ts
+(m: RouterModel) => boolean
 ```
 
 ### `isTangleBillingEnforcementDisabled`

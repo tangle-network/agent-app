@@ -143,11 +143,30 @@ function providerRank(provider: string): number {
   return i === -1 ? PROVIDER_TIER.length : i
 }
 
-function isChatModel(m: RouterModel): boolean {
+/**
+ * Can this router entry serve a text chat turn?
+ *
+ * The router lists every routeable endpoint, which is not the same list a chat
+ * picker should show: measured against the live catalogue (504 entries), this
+ * rejects 35 — image generators, TTS voices, embedding models, and the
+ * audio-IN transcription endpoints (`whisper-1`, `gpt-4o-transcribe`, …) that
+ * emit text but cannot take a text prompt.
+ *
+ * A model whose metadata omits either modality list is KEPT. The router is the
+ * source of that metadata and it is occasionally sparse; dropping a usable
+ * model because a field is missing is the worse failure of the two.
+ *
+ * Exported because a picker needs the same answer `buildCatalog` uses — the
+ * fleet had this predicate copied into a product component, where its narrower
+ * spelling let the 10 transcription endpoints through.
+ */
+export function isChatCapableModel(m: RouterModel): boolean {
   const arch = m.architecture
   if (!arch?.input_modalities || !arch?.output_modalities) return true
   return arch.input_modalities.includes('text') && arch.output_modalities.includes('text')
 }
+
+const isChatModel = isChatCapableModel
 
 function isRouteable(m: RouterModel): boolean {
   return m.routeability?.routeable !== false && m.routeability?.status !== 'unavailable'
