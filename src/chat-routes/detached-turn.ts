@@ -37,6 +37,7 @@ import {
   type AssistantDraftStore,
   type AssistantDraftWriter,
   type AssistantRowValues,
+  type DraftStoredMessage,
   type DraftPersistenceTuning,
 } from './draft-persistence'
 import {
@@ -56,9 +57,10 @@ export type DetachedTurnParts = Array<Record<string, unknown>>
 export interface DetachedTurnFinal {
   text?: string
   usage?: ChatTurnUsage
-  /** The structured parts to persist when this receipt IS the result (the
-   *  cached / finished-server-side path). Omitted when the record only carries
-   *  a usage receipt. */
+  /** The structured parts to persist when this receipt is more complete than
+   *  the live stream (cached, finished server-side, or a fast stream that
+   *  delivered scalar text before its message-part events). Omitted when the
+   *  record only carries a usage receipt. */
   parts?: DetachedTurnParts
 }
 
@@ -113,8 +115,10 @@ export interface DetachedTurnOptions {
   /** Authoritative final receipt, consulted whenever a re-invoke finds a prior
    *  buffer: (a) an already-`complete` turn returns it as the cached result,
    *  (b) a `running` turn (crash mid-run) uses it to detect a run that finished
-   *  server-side, and (c) a clean run whose stream carried no usage/text falls
-   *  back to it. Typically `() => box.findCompletedTurn(turnId)`. */
+   *  server-side, and (c) a clean run whose stream carried no usage or only
+   *  scalar text falls back to it. For Sandbox runs, use
+   *  `readCompletedSandboxTurn` so the exact completed session message
+   *  restores tool/file parts as well as text. */
   completedResult?: () => Promise<DetachedTurnFinal | null | undefined>
   /** Clear the prior partial buffer for `turnId` before a genuine re-stream.
    *  A crash mid-run leaves buffered rows at seqs 1..N with status `running`;
@@ -207,11 +211,17 @@ function hasUsage(usage: ChatTurnUsage): boolean {
   return typeof usage.inputTokens === 'number' && usage.inputTokens > 0
 }
 
-function cachedResultFrom(final: DetachedTurnFinal | null): DetachedTurnResult {
+function cachedResultFrom(
+  final: DetachedTurnFinal | null,
+  persisted?: DraftStoredMessage,
+): DetachedTurnResult {
   return {
     state: 'completed',
-    text: final?.text ?? '',
-    parts: final?.parts ?? [],
+    text: final?.text ?? persisted?.content ?? '',
+    parts:
+      final?.parts ??
+      (persisted?.parts as DetachedTurnParts | null | undefined) ??
+      [],
     usage: final?.usage ?? {},
     cached: true,
   }
@@ -242,6 +252,15 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
    *  model is the best available answer, but on a live re-stream failover may
    *  have moved the turn after the row was first drafted. */
   const servingModel = (): string | undefined => producer?.model ?? opts.model
+
+  const persistedRow = async (): Promise<DraftStoredMessage | undefined> => {
+    if (!opts.persist) return undefined
+    return (await opts.persist.store.listMessages(opts.persist.threadId)).find(
+      (message) =>
+        message.id ===
+        (opts.persist?.messageId ?? assistantRowIdForTurn(turnId)),
+    )
+  }
 
   // Durable row ownership (opt-in). Built before the idempotency branches so a
   // cached/finished-server-side re-invoke still converges the row instead of
@@ -274,16 +293,15 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
 
   /** Settle the durable row with authoritative values (or retract it when the
    *  turn produced nothing), and stamp the id onto the result. */
-  const settleRow = async (base: DetachedTurnResult): Promise<DetachedTurnResult> => {
+  const settleRow = async (
+    base: DetachedTurnResult,
+    cachedPersisted?: DraftStoredMessage,
+  ): Promise<DetachedTurnResult> => {
     // A cached/reconciled return has no producer to replay the sidecar echo.
     // Preserve the attribution already written by the prior attempt instead
     // of replacing its served `model` with today's requested-model fallback.
-    const persisted = !producer && opts.persist
-      ? (await opts.persist.store.listMessages(opts.persist.threadId)).find(
-          (message) =>
-            message.id === (opts.persist?.messageId ?? assistantRowIdForTurn(turnId)),
-        )
-      : undefined
+    const persisted =
+      cachedPersisted ?? (!producer ? await persistedRow() : undefined)
     const info = producer?.modelFailover?.()
     const attribution = producer?.modelAttribution?.()
     const model = producer?.model ?? persisted?.model ?? opts.model
@@ -361,7 +379,13 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
     opts.log?.('[chat-routes] runDetachedTurn getStatus failed; treating as no prior', { turnId, err: String(err) })
   }
 
-  if (prior === 'complete') return await settleRow(cachedResultFrom(await completed()))
+  if (prior === 'complete') {
+    const persisted = await persistedRow()
+    return await settleRow(
+      cachedResultFrom(await completed(), persisted),
+      persisted,
+    )
+  }
 
   if (prior === 'running') {
     // A prior attempt marked the turn running and then this worker crashed. The
@@ -373,7 +397,8 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
       await store.setStatus(turnId, 'complete', scopeId).catch((err) => {
         opts.log?.('[chat-routes] runDetachedTurn failed to settle a completed running turn', { turnId, err: String(err) })
       })
-      return await settleRow(cachedResultFrom(final))
+      const persisted = await persistedRow()
+      return await settleRow(cachedResultFrom(final, persisted), persisted)
     }
     // Genuine re-run: clear the partial buffer first, or the fresh tap's seq
     // (restarting at 0) interleaves with the orphaned rows.
@@ -432,12 +457,22 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
   const parts = producer.assistantParts?.() ?? []
   let usage: ChatTurnUsage = producer.usage?.() ?? {}
 
-  if (!runError && !hasUsage(usage)) {
+  // A terminal result can supply scalar text even when the event subscriber
+  // missed every structured message part. Reconcile that text-only shape with
+  // the durable completion record before final persistence.
+  const onlyTextParts = parts.every((part) =>
+    String((part as { type?: unknown }).type ?? '') === 'text',
+  )
+  if (!runError && (!hasUsage(usage) || !text || onlyTextParts)) {
     const final = await completed()
     if (final?.usage) usage = { ...usage, ...final.usage }
-    if (!text && final?.text) {
-      return await settleRow({ state: 'completed', text: final.text, parts: final.parts ?? parts, usage, cached: false })
-    }
+    return await settleRow({
+      state: 'completed',
+      text: final?.text ?? text,
+      parts: final?.parts?.length ? final.parts : parts,
+      usage,
+      cached: false,
+    })
   }
 
   if (runError) return await settleRow({ state: 'failed', text, parts, usage, error: runError, cached: false })
