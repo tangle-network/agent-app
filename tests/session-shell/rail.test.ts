@@ -22,6 +22,8 @@ import {
   railCollapsedCookie,
   resolveSessionUnread,
   sessionLabel,
+  type SessionRailSubItem,
+  type SessionRowActions,
   type SessionSummary,
 } from '../../src/session-shell/index'
 
@@ -256,5 +258,56 @@ describe('rail collapse cookie', () => {
   it('omits `secure` for http so the rail state persists on localhost', () => {
     expect(railCollapsedCookie(true, { secure: false })).not.toContain('secure')
     expect(railCollapsedCookie(true, { secure: true })).toContain('; secure')
+  })
+})
+
+/**
+ * A product may support archiving a session but not renaming it (tax's PATCH
+ * takes `planMode` only). The rail builder used to require BOTH handlers, so
+ * such a product had two bad choices: pass a no-op rename — a menu item that
+ * silently does nothing — or pass no actions and lose archive entirely when its
+ * session panel was removed.
+ *
+ * `SessionHistoryPanel` has always rendered whichever handler it was given, so
+ * this makes the two halves of the shell agree rather than adding a new idea.
+ */
+describe('row actions the product actually has', () => {
+  function only(over: Partial<SessionRowActions<Icon>>): SessionRailSubItem<Icon> {
+    const [row] = buildSessionSubItems<Icon>({
+      sessions: [session('a')],
+      hrefForSession: href,
+      actions: { canEdit: true, ...over },
+    })
+    if (!row) throw new Error('expected one row')
+    return row
+  }
+
+  it('emits delete alone when the product has no rename', () => {
+    const deleted: string[] = []
+    const row = only({ onDelete: (s: SessionSummary) => deleted.push(s.id) })
+    expect(row.actions?.map((a) => a.id)).toEqual(['delete'])
+    row.actions?.[0]?.onSelect()
+    expect(deleted).toEqual(['a'])
+    // The one that is present must still be wired to the right handler.
+    expect(row.actions?.[0]?.destructive).toBe(true)
+  })
+
+  it('emits rename alone when the product has no delete', () => {
+    const renamed: string[] = []
+    const row = only({ onRename: (s: SessionSummary) => renamed.push(s.id) })
+    expect(row.actions?.map((a) => a.id)).toEqual(['rename'])
+    row.actions?.[0]?.onSelect()
+    expect(renamed).toEqual(['a'])
+  })
+
+  it('still emits both, in order, when the product has both', () => {
+    const row = only({ onRename: () => {}, onDelete: () => {} })
+    expect(row.actions?.map((a) => a.id)).toEqual(['rename', 'delete'])
+  })
+
+  // sandbox-ui renders the kebab trigger whenever `actions` is an array, so an
+  // empty array is a button that opens an empty menu.
+  it('emits undefined, not an empty array, when neither handler is supplied', () => {
+    expect(only({}).actions).toBeUndefined()
   })
 })

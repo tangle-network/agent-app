@@ -105,8 +105,17 @@ export interface SessionRowActions<TIcon = unknown> {
   deleteIcon?: TIcon
   renameLabel?: string
   deleteLabel?: string
-  onRename: (session: SessionSummary) => void
-  onDelete: (session: SessionSummary) => void
+  /**
+   * Omit when the product cannot rename a session — the row then offers delete
+   * only, instead of a menu item that does nothing.
+   *
+   * Independently optional, matching `SessionHistoryPanel`, which has always
+   * rendered whichever of the two it was given. The rail builder used to demand
+   * both, so a product with archive-but-no-rename (tax) could either fake a
+   * rename or ship no row actions at all.
+   */
+  onRename?: (session: SessionSummary) => void
+  onDelete?: (session: SessionSummary) => void
 }
 
 export const UNTITLED_SESSION_LABEL = 'Untitled chat'
@@ -140,6 +149,36 @@ export function buildSessionSubItems<TIcon = unknown>({
   prefetch = 'intent',
   overflow,
 }: BuildSessionSubItemsOptions<TIcon>): SessionRailSubItem<TIcon>[] {
+  /**
+   * Only the handlers the product actually supplied. An empty result becomes
+   * `undefined` rather than `[]`, because sandbox-ui renders the kebab trigger
+   * whenever `actions` is an array — an empty one is a button that opens an
+   * empty menu.
+   */
+  const rowActions = (session: SessionSummary): SessionRailAction<TIcon>[] | undefined => {
+    if (!actions?.canEdit) return undefined
+    const built: SessionRailAction<TIcon>[] = []
+    const { onRename, onDelete } = actions
+    if (onRename) {
+      built.push({
+        id: 'rename',
+        label: actions.renameLabel ?? 'Rename',
+        icon: actions.renameIcon,
+        onSelect: () => onRename(session),
+      })
+    }
+    if (onDelete) {
+      built.push({
+        id: 'delete',
+        label: actions.deleteLabel ?? 'Delete',
+        icon: actions.deleteIcon,
+        destructive: true,
+        onSelect: () => onDelete(session),
+      })
+    }
+    return built.length ? built : undefined
+  }
+
   const rows: SessionRailSubItem<TIcon>[] = sessions.map((session) => ({
     id: session.id,
     label: sessionLabel(session, untitledLabel),
@@ -147,23 +186,7 @@ export function buildSessionSubItems<TIcon = unknown>({
     prefetch,
     isLoading: respondingSessionIds?.has(session.id) ?? false,
     unread: Boolean(session.unread),
-    actions: actions?.canEdit
-      ? [
-          {
-            id: 'rename',
-            label: actions.renameLabel ?? 'Rename',
-            icon: actions.renameIcon,
-            onSelect: () => actions.onRename(session),
-          },
-          {
-            id: 'delete',
-            label: actions.deleteLabel ?? 'Delete',
-            icon: actions.deleteIcon,
-            destructive: true,
-            onSelect: () => actions.onDelete(session),
-          },
-        ]
-      : undefined,
+    actions: rowActions(session),
   }))
   if (!overflow) return rows
   return [
