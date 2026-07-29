@@ -444,6 +444,29 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     expect(update).not.toHaveBeenCalled()
   })
 
+  it('applies blocked mode when a reused sandbox currently allows egress', async () => {
+    const get = vi.fn().mockResolvedValue({
+      policy: { mode: 'open' },
+      source: 'sandbox',
+    })
+    const update = vi.fn().mockResolvedValue({
+      policy: { mode: 'blocked' },
+      source: 'sandbox',
+    })
+    const running = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      egress: { get, update },
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+
+    await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
+      egressPolicy: { mode: 'blocked' },
+    }), { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(update).toHaveBeenCalledWith({ mode: 'blocked' })
+  })
+
   it('identifies a reused sandbox egress read failure', async () => {
     const get = vi.fn().mockRejectedValue(new Error('control plane unavailable'))
     const running = fakeBox({
@@ -1471,6 +1494,43 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     const box = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
     expect(resume).toHaveBeenCalledOnce()
     expect(createMock).not.toHaveBeenCalled()
+    expect(box).toBe(stopped)
+  })
+
+  it('reconciles egress before returning a resumed box', async () => {
+    const get = vi.fn().mockResolvedValue({
+      policy: { mode: 'open' },
+      source: 'platform',
+    })
+    const update = vi.fn().mockResolvedValue({
+      policy: { mode: 'strict', allowDomains: ['relationships.example.com'] },
+      source: 'sandbox',
+    })
+    const stopped = fakeBox({
+      name: 'box-w1',
+      egress: { get, update },
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      Promise.resolve(status === 'stopped' ? [stopped] : []),
+    )
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      egressPolicy: {
+        mode: 'strict',
+        allowDomains: ['relationships.example.com'],
+      },
+    })
+
+    const box = await ensureWorkspaceSandbox(shell, {
+      workspaceId: 'w1',
+      harness: 'opencode',
+    })
+
+    expect(stopped.resume).toHaveBeenCalledOnce()
+    expect(get).toHaveBeenCalledOnce()
+    expect(update).toHaveBeenCalledWith({
+      mode: 'strict',
+      allowDomains: ['relationships.example.com'],
+    })
     expect(box).toBe(stopped)
   })
 

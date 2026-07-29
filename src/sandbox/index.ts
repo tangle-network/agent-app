@@ -322,7 +322,9 @@ export interface SandboxRuntimeConfig {
    * Product-declared outbound network policy. Applied when a sandbox is
    * created and reconciled before a reused or resumed sandbox is returned.
    * This keeps product tools and other required endpoints reachable without
-   * product-local lifecycle calls.
+   * product-local lifecycle calls. Adopting or changing the policy on an
+   * existing sandbox restarts its egress proxy once; matching explicit
+   * policies are left untouched.
    */
   egressPolicy?: EgressPolicy
 
