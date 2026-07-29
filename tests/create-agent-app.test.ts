@@ -10,6 +10,7 @@ import { minimumVersionGte } from './test-utils/version-ranges'
 const REPO = resolve(__dirname, '..')
 const CLI = join(REPO, 'create-agent-app', 'index.mjs')
 const DIST = join(REPO, 'dist')
+const APP_VERSION = JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8')).version as string
 
 // Link the generated project's @tangle-network/* deps to this repo's real packages
 // so `tsc` + `vitest` resolve the exact published types/artifacts offline (no
@@ -104,7 +105,7 @@ describe('create-agent-app scaffolder', () => {
   it('substitutes the project name into package.json + agent.config.ts', () => {
     const pkg = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf8'))
     expect(pkg.name).toBe('demo-agent')
-    expect(pkg.dependencies['@tangle-network/agent-app']).toBe('^0.44.18')
+    expect(pkg.dependencies['@tangle-network/agent-app']).toBe(`^${APP_VERSION}`)
     expect(pkg.scripts['knowledge:ingest']).toBe('node scripts/knowledge-ingest.mjs')
     const cfg = readFileSync(join(projectDir, 'agent.config.ts'), 'utf8')
     expect(cfg).toContain("name: 'demo-agent'")

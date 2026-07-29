@@ -75,8 +75,12 @@ jobs:
           for attempt in 1 2 3; do
             git fetch origin main
             git reset --hard origin/main
-            npm version patch -m "chore(release): %s [skip release]"
+            npm version patch --no-git-tag-version
             V=$(node -p "require('./package.json').version")
+            npm version "$V" --prefix create-agent-app --no-git-tag-version
+            git add package.json create-agent-app/package.json
+            git commit -m "chore(release): $V [skip release]"
+            git tag "v$V"
             if git push --atomic origin HEAD:main "refs/tags/v$V"; then
               exit 0
             fi
@@ -86,18 +90,20 @@ jobs:
           echo "::error::release push lost the race 3 times — check for an orphaned tag"
           exit 1
 
-      - name: Publish to npm (skip if already published)
+      - name: Publish packages to npm (skip versions already published)
         run: |
-          NAME=$(node -p "require('./package.json').name")
-          VERSION=$(node -p "require('./package.json').version")
-          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
-            echo "$NAME@$VERSION already on registry; skipping publish"
-          else
-            npm publish --provenance --access public || {
-              echo "::error::npm publish failed. Verify the trusted publisher entry exists at https://www.npmjs.com/package/@tangle-network/agent-app/access (workflow=publish.yml)."
-              exit 1
-            }
-          fi
+          for DIR in . create-agent-app; do
+            NAME=$(node -p "require('./$DIR/package.json').name")
+            VERSION=$(node -p "require('./$DIR/package.json').version")
+            if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+              echo "$NAME@$VERSION already on registry; skipping publish"
+            else
+              (cd "$DIR" && npm publish --provenance --access public) || {
+                echo "::error::npm publish failed for $NAME@$VERSION. Verify its trusted publisher entry uses workflow publish.yml."
+                exit 1
+              }
+            fi
+          done
 
   # ── manual / human-pushed tag path ────────────────────────────────────────
   verify:
@@ -130,6 +136,11 @@ jobs:
       - name: Verify tag/version lock
         run: |
           NPM_VERSION=$(node -p "require('./package.json').version")
+          CREATE_VERSION=$(node -p "require('./create-agent-app/package.json').version")
+          if [ "$CREATE_VERSION" != "$NPM_VERSION" ]; then
+            echo "::error::Package version mismatch: agent-app=$NPM_VERSION create-agent-app=$CREATE_VERSION."
+            exit 1
+          fi
           if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
             TAG_VERSION="${GITHUB_REF#refs/tags/v}"
             if [ "$TAG_VERSION" != "$NPM_VERSION" ]; then
@@ -176,15 +187,17 @@ jobs:
       # not fail. Auth is npm OIDC trusted publishing (no NPM_TOKEN) — the
       # id-token: write permission lets npm mint the short-lived OIDC token it
       # exchanges for publish rights + Sigstore provenance.
-      - name: Publish to npm (skip if already published)
+      - name: Publish packages to npm (skip versions already published)
         run: |
-          NAME=$(node -p "require('./package.json').name")
-          VERSION=$(node -p "require('./package.json').version")
-          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
-            echo "$NAME@$VERSION already on registry; skipping publish"
-          else
-            npm publish --provenance --access public || {
-              echo "::error::npm publish failed. Verify the trusted publisher entry exists at https://www.npmjs.com/package/@tangle-network/agent-app/access (workflow=publish.yml)."
-              exit 1
-            }
-          fi
+          for DIR in . create-agent-app; do
+            NAME=$(node -p "require('./$DIR/package.json').name")
+            VERSION=$(node -p "require('./$DIR/package.json').version")
+            if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+              echo "$NAME@$VERSION already on registry; skipping publish"
+            else
+              (cd "$DIR" && npm publish --provenance --access public) || {
+                echo "::error::npm publish failed for $NAME@$VERSION. Verify its trusted publisher entry uses workflow publish.yml."
+                exit 1
+              }
+            fi
+          done
