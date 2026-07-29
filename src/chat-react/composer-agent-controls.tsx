@@ -117,6 +117,13 @@ function harnessesForContext(
  * The selected model is never filtered out, whatever its modalities say: a
  * product may deliberately pin something exotic, and a picker whose own value
  * is missing from its list renders as blank.
+ *
+ * That escape hatch has to recognise BOTH spellings of the id. A product stores
+ * whatever `onChange` handed it, and `onChange` hands back the canonical
+ * provider-prefixed form — so a selection pinned before this trim existed is
+ * stored as `openai/gpt-image-1` while the catalog entry's own `id` is the bare
+ * `gpt-image-1`. Matching only the bare form drops exactly the model the guard
+ * exists to keep, and the picker renders unset, which reads as data loss.
  */
 function modelsForContext(
   models: ModelInfo[],
@@ -125,7 +132,10 @@ function modelsForContext(
 ): ModelInfo[] {
   if (context !== 'chat') return models
   return models.filter(
-    (m) => m.id === selectedId || isChatCapableModel(m as unknown as RouterModel),
+    (m) =>
+      m.id === selectedId ||
+      canonicalModelId(m) === selectedId ||
+      isChatCapableModel(m as unknown as RouterModel),
   )
 }
 
