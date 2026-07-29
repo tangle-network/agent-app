@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/create-agent-app",
-  "version": "0.44.44",
+  "version": "0.44.45",
   "description": "Scaffold a new Tangle agent product on @tangle-network/agent-app: the tool-loop skeleton (default) or, with --chat, the assembled multimodal chat vertical (auth, chat store, streaming turns with replay, uploads, agent asks) with its own end-to-end test — plus the agent-followable breadcrumb docs (AGENTS.md / CUSTOMIZE.md).",
   "keywords": [
     "tangle",
