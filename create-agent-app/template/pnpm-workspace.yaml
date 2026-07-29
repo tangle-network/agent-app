@@ -13,3 +13,7 @@ allowBuilds:
   '@ax-llm/ax': false
   esbuild: true
   workerd: true
+
+overrides:
+  # Rolldown 1.1.x installs @emnapi 1.x; wasm-runtime 1.2 requires 2.x.
+  '@napi-rs/wasm-runtime': 1.1.6
