@@ -15,7 +15,7 @@ _77 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./catalog`](api/catalog.md) | 7 | `runtime` |
 | [`./chat-react`](api/chat-react.md) | 10 | `chat-routes`, `runtime`, `web-react` |
 | [`./chat-routes`](api/chat-routes.md) | 163 | `chat-store`, `interactions`, `model-resolution`, `plans`, `sandbox`, `stream`, `web` |
-| [`./chat-store`](api/chat-store.md) | 62 | `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product` |
+| [`./chat-store`](api/chat-store.md) | 63 | `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product` |
 | [`./config`](api/config.md) | 13 | `knowledge`, `runtime` |
 | [`./crypto`](api/crypto.md) | 10 | `billing` |
 | [`./design-canvas`](api/design-canvas.md) | 103 | `tools`, `web` |
@@ -170,11 +170,11 @@ Depends on: `chat-store`, `interactions`, `model-resolution`, `plans`, `sandbox`
 
 ## `./chat-store`
 
-Source: `src/chat-store/index.ts` · 62 exports
+Source: `src/chat-store/index.ts` · 63 exports
 
 Depends on: `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product`
 
-`AppendMessageInput`, `attachmentInputToPart`, `attachmentKindForMime`, `attachmentPartKey`, `attachmentPartsFromMessageParts`, `buildAttachmentPromptBlock`, `BULK_DELETE_MAX_THREADS`, `BulkDeleteThreadsInput`, `ChatAttachmentKind`, `ChatAttachmentPart`, `ChatDatabase`, `ChatFilePart`, `ChatImagePart`, `ChatInteractionPart`, `ChatMentionKind`, `ChatMentionPart`, `ChatMessagePart`, `ChatMessageRow`, `ChatNoticePart`, `ChatParentTable`, `ChatPartTime`, `ChatPlanPart`, `ChatReasoningPart`, `ChatStepFinishPart`, `ChatStepStartPart`, `ChatStore`, `ChatStoreInputError`, `ChatSubtaskPart`, `ChatTables`, `ChatTextPart`, `ChatThreadRow`, `ChatToolPart`, `ChatToolState`, `ChatToolStatus`, `ChatUsageTokens`, `ChatWorkProductPart`, `createChatStore`, `createChatTables`, `CreateChatTablesOptions`, `CreateThreadInput`, `DEFAULT_ATTACHMENT_PROMPT_HEADER`, `historyContentWithAttachments`, `isChatAttachmentPart`, `isChatInteractionPart`, `isChatMentionPart`, `isChatPlanPart`, `isChatStepFinishPart`, `isChatTextPart`, `isChatToolPart`, `isChatWorkProductPart`, `ListMessagesOptions`, `ListThreadsInput`, `ListThreadsResult`, `mentionInputToPart`, `mentionPartsFromMessageParts`, `NewChatMessageRow`, `NewChatThreadRow`, `StorableHarnessPartKind`, `threadTitleFromMessage`, `toChatMessageParts`, `UpdateMessageInput`, `WorkspaceAccessCheck`
+`AppendMessageInput`, `attachmentInputToPart`, `attachmentKindForMime`, `attachmentPartKey`, `attachmentPartsFromMessageParts`, `buildAttachmentPromptBlock`, `BULK_DELETE_MAX_THREADS`, `BulkDeleteThreadsInput`, `ChatAttachmentKind`, `ChatAttachmentPart`, `ChatDatabase`, `ChatExtraIndexes`, `ChatFilePart`, `ChatImagePart`, `ChatInteractionPart`, `ChatMentionKind`, `ChatMentionPart`, `ChatMessagePart`, `ChatMessageRow`, `ChatNoticePart`, `ChatParentTable`, `ChatPartTime`, `ChatPlanPart`, `ChatReasoningPart`, `ChatStepFinishPart`, `ChatStepStartPart`, `ChatStore`, `ChatStoreInputError`, `ChatSubtaskPart`, `ChatTables`, `ChatTextPart`, `ChatThreadRow`, `ChatToolPart`, `ChatToolState`, `ChatToolStatus`, `ChatUsageTokens`, `ChatWorkProductPart`, `createChatStore`, `createChatTables`, `CreateChatTablesOptions`, `CreateThreadInput`, `DEFAULT_ATTACHMENT_PROMPT_HEADER`, `historyContentWithAttachments`, `isChatAttachmentPart`, `isChatInteractionPart`, `isChatMentionPart`, `isChatPlanPart`, `isChatStepFinishPart`, `isChatTextPart`, `isChatToolPart`, `isChatWorkProductPart`, `ListMessagesOptions`, `ListThreadsInput`, `ListThreadsResult`, `mentionInputToPart`, `mentionPartsFromMessageParts`, `NewChatMessageRow`, `NewChatThreadRow`, `StorableHarnessPartKind`, `threadTitleFromMessage`, `toChatMessageParts`, `UpdateMessageInput`, `WorkspaceAccessCheck`
 
 [Full API →](api/chat-store.md)
 

@@ -66,7 +66,29 @@ export interface CreateChatTablesOptions<
   /** Product columns merged into the message table — e.g. legal's
    *  `vault_files`. */
   messageExtraColumns?: TMessageExtras
+  /**
+   * Product indexes appended to the thread table's own, given the built
+   * columns (extras included) so a product can index what it added.
+   *
+   * Names are used VERBATIM — `tablePrefix` is not applied — because these
+   * have to byte-match indexes the product's migrations already created.
+   *
+   * Without this a product with one extra index cannot adopt the factory at
+   * all: it keeps a hand-rolled duplicate of the same physical table, and the
+   * two drift on the next factory change.
+   */
+  threadExtraIndexes?: ChatExtraIndexes
+  /** Product indexes appended to the message table's own. Same rules as
+   *  `threadExtraIndexes`. */
+  messageExtraIndexes?: ChatExtraIndexes
 }
+
+/**
+ * Builds product indexes from a table's columns. Returns drizzle's
+ * `index(...)`/`uniqueIndex(...)` results; the column map is passed through
+ * untyped because its shape depends on the product's own extras.
+ */
+export type ChatExtraIndexes = (columns: Record<string, AnySQLiteColumn>) => unknown[]
 
 const hexId = () => text('id').primaryKey().default(sql`(lower(hex(randomblob(16))))`)
 
@@ -82,6 +104,10 @@ export function createChatTables<
   const { workspaceTable, tablePrefix = '' } = options
   const threadExtras = options.threadExtraColumns ?? ({} as TThreadExtras)
   const messageExtras = options.messageExtraColumns ?? ({} as TMessageExtras)
+  const extraIndexes = (
+    build: ChatExtraIndexes | undefined,
+    table: Record<string, AnySQLiteColumn>,
+  ): unknown[] => build?.(table) ?? []
 
   const threads = sqliteTable(`${tablePrefix}thread`, {
     id: hexId(),
@@ -98,7 +124,8 @@ export function createChatTables<
     index(`idx_${tablePrefix}thread_workspace`).on(table.workspaceId),
     // Supports the store's list ordering (updatedAt desc within a workspace).
     index(`idx_${tablePrefix}thread_workspace_updated`).on(table.workspaceId, table.updatedAt),
-  ])
+    ...extraIndexes(options.threadExtraIndexes, table as unknown as Record<string, AnySQLiteColumn>),
+  ] as never)
 
   const messages = sqliteTable(`${tablePrefix}message`, {
     id: hexId(),
@@ -125,7 +152,8 @@ export function createChatTables<
   }, (table) => [
     index(`idx_${tablePrefix}message_thread`).on(table.threadId),
     index(`idx_${tablePrefix}message_thread_created`).on(table.threadId, table.createdAt),
-  ])
+    ...extraIndexes(options.messageExtraIndexes, table as unknown as Record<string, AnySQLiteColumn>),
+  ] as never)
 
   return { threads, messages }
 }
