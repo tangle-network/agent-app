@@ -27,6 +27,7 @@ import { minimumVersionGte } from './test-utils/version-ranges'
 const REPO = resolve(__dirname, '..')
 const CLI = join(REPO, 'create-agent-app', 'index.mjs')
 const DIST = join(REPO, 'dist')
+const APP_VERSION = JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8')).version as string
 
 function link(dest: string, src: string, required = true) {
   if (!existsSync(src)) {
@@ -121,7 +122,7 @@ describe('create-agent-app --chat scaffolder', () => {
   it('substitutes tokens across package.json, agent.config.ts, wrangler.toml, and the dev page', () => {
     const pkg = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf8'))
     expect(pkg.name).toBe('demo-chat')
-    expect(pkg.dependencies['@tangle-network/agent-app']).toBe('^0.44.18')
+    expect(pkg.dependencies['@tangle-network/agent-app']).toBe(`^${APP_VERSION}`)
     const cfg = readFileSync(join(projectDir, 'agent.config.ts'), 'utf8')
     expect(cfg).toContain("name: 'demo-chat'")
     for (const file of ['agent.config.ts', 'wrangler.toml', 'public/index.html', 'prompts/system.md']) {

@@ -26,9 +26,8 @@ const TEMPLATES = {
   chat: join(HERE, 'template-chat'),
 }
 
-// The agent-app version range the generated project depends on. Kept as a single
-// constant so a release bump touches one line.
-const AGENT_APP_RANGE = '^0.44.18'
+const { version: packageVersion } = JSON.parse(await readFile(join(HERE, 'package.json'), 'utf8'))
+const AGENT_APP_RANGE = `^${packageVersion}`
 
 // Template files renamed on materialization. A template cannot itself be named
 // `package.json` / `.gitignore` / `tsconfig.json` without confusing the
