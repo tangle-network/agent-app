@@ -1856,6 +1856,14 @@ interface ChatTurnUsage
 (event: unknown) => TerminalFailure | null
 ```
 
+### `CompletedSandboxTurnSource`
+
+`type` — The official Sandbox methods needed for completed-turn recovery.
+
+```ts
+type CompletedSandboxTurnSource
+```
+
 ### `createAssistantDraftWriter`
 
 `function` — Build the coalescing draft writer for one turn.
@@ -2414,6 +2422,22 @@ interface RawAgentFilePart
 
 ```ts
 type ReadAttachmentFn
+```
+
+### `readCompletedSandboxTurn`
+
+`function` — Read the exact completed turn.
+
+```ts
+(box: CompletedSandboxTurnSource, options: ReadCompletedSandboxTurnOptions) => Promise<DetachedTurnFinal | null>
+```
+
+### `ReadCompletedSandboxTurnOptions`
+
+`interface` — Options for resolving one exact detached turn.
+
+```ts
+interface ReadCompletedSandboxTurnOptions
 ```
 
 ### `ReadSandboxMentionFn`

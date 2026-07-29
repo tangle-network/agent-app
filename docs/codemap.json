@@ -1450,6 +1450,12 @@
           "doc": "Classify a terminal failure event."
         },
         {
+          "name": "CompletedSandboxTurnSource",
+          "kind": "type",
+          "signature": "type CompletedSandboxTurnSource",
+          "doc": "The official Sandbox methods needed for completed-turn recovery."
+        },
+        {
           "name": "createAssistantDraftWriter",
           "kind": "function",
           "signature": "(options: AssistantDraftWriterOptions) => AssistantDraftWriter",
@@ -1868,6 +1874,18 @@
           "kind": "type",
           "signature": "type ReadAttachmentFn",
           "doc": "Read one stored attachment for `scopeId` (the product's workspace/tenant key) at its store-relative `path`."
+        },
+        {
+          "name": "readCompletedSandboxTurn",
+          "kind": "function",
+          "signature": "(box: CompletedSandboxTurnSource, options: ReadCompletedSandboxTurnOptions) => Promise<DetachedTurnFinal | null>",
+          "doc": "Read the exact completed turn."
+        },
+        {
+          "name": "ReadCompletedSandboxTurnOptions",
+          "kind": "interface",
+          "signature": "interface ReadCompletedSandboxTurnOptions",
+          "doc": "Options for resolving one exact detached turn."
         },
         {
           "name": "ReadSandboxMentionFn",

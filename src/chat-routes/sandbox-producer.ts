@@ -57,6 +57,7 @@ import type {
   ChatTurnRouteProducer,
   ChatTurnUsage,
 } from './turn-routes'
+import { addStepFinishUsage } from './sandbox-turn-usage'
 import type { ProducerWireEvent } from './wire'
 
 /** Outcome of a `promoteFilePart` attempt. `key`, when given, becomes the
@@ -219,27 +220,6 @@ function parseEffectiveBackend(data: JsonRecord): Omit<
     ...(provider ? { servedProvider: provider } : {}),
     ...(source ? { servedSource: source } : {}),
   }
-}
-
-function usageFromStepFinish(part: JsonRecord, usage: ChatTurnUsage): void {
-  const tokens = asRecord(part.tokens)
-  if (tokens) {
-    const cache = asRecord(tokens.cache)
-    const add = (current: number | undefined, value: unknown): number | undefined => {
-      const n = Number(value)
-      if (!Number.isFinite(n)) return current
-      return (current ?? 0) + n
-    }
-    usage.inputTokens = add(usage.inputTokens, tokens.input)
-    usage.outputTokens = add(usage.outputTokens, tokens.output)
-    usage.reasoningTokens = add(usage.reasoningTokens, tokens.reasoning)
-    if (cache) {
-      usage.cacheReadTokens = add(usage.cacheReadTokens, cache.read)
-      usage.cacheWriteTokens = add(usage.cacheWriteTokens, cache.write)
-    }
-  }
-  const cost = Number(part.cost)
-  if (Number.isFinite(cost)) usage.costUsd = (usage.costUsd ?? 0) + cost
 }
 
 function toFiniteNumber(value: unknown): number | null {
@@ -554,7 +534,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
           }
 
           if (partType === 'step-finish') {
-            usageFromStepFinish(part, usage)
+            addStepFinishUsage(part, usage)
             // Persist the per-step receipt too (unique key per occurrence: the
             // parts have no id and two receipts must never merge into one).
             recordPersistedPart(part, undefined, `step-finish:#${stepCounter++}`)

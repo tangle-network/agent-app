@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-160 exports.
+163 exports.
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
@@ -460,6 +460,14 @@ interface ChatTurnUsage
 
 ```ts
 (event: unknown) => TerminalFailure | null
+```
+
+### `CompletedSandboxTurnSource`
+
+`type` — The official Sandbox methods needed for completed-turn recovery.
+
+```ts
+type CompletedSandboxTurnSource
 ```
 
 ### `createAssistantDraftWriter`
@@ -1020,6 +1028,22 @@ interface RawAgentFilePart
 
 ```ts
 type ReadAttachmentFn
+```
+
+### `readCompletedSandboxTurn`
+
+`function` — Read the exact completed turn.
+
+```ts
+(box: CompletedSandboxTurnSource, options: ReadCompletedSandboxTurnOptions) => Promise<DetachedTurnFinal | null>
+```
+
+### `ReadCompletedSandboxTurnOptions`
+
+`interface` — Options for resolving one exact detached turn.
+
+```ts
+interface ReadCompletedSandboxTurnOptions
 ```
 
 ### `ReadSandboxMentionFn`
