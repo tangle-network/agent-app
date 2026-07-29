@@ -11087,6 +11087,14 @@ interface D1PrewarmClaimStoreOptions
 SandboxResourceConfig
 ```
 
+### `DEFAULT_SIDECAR_PROCESS_PATTERN`
+
+`const` — Default ERE passed to `pgrep -f` when a liveness probe does not override the harness-process matcher.
+
+```ts
+"opencode|claude|codex"
+```
+
 ### `deferredCorpusHash`
 
 `function` — Stable content hash of the deferred file corpus (path + inline content).
