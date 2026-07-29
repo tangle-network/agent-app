@@ -110,6 +110,15 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
       - run: pnpm run build
 
+      - name: Configure exact artifact pack runtime
+        if: steps.release.outputs.mode == 'tag'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.0
+      - name: Verify artifact pack npm
+        if: steps.release.outputs.mode == 'tag'
+        run: "[[ $(npm --version) == '11.16.0' ]]"
+
       - name: Pack and inspect exact tarballs
         if: steps.release.outputs.mode == 'tag'
         env:

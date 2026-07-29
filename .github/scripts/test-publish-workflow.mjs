@@ -44,6 +44,13 @@ const job = (name) => {
   check(jobs.has(name), `missing ${name} job`)
   return jobs.get(name).join('\n')
 }
+const namedStep = (block, name) => {
+  const blockLines = block.split('\n')
+  const start = blockLines.findIndex((line) => line.trim() === `- name: ${name}`)
+  check(start >= 0, `missing ${name} step`)
+  const next = blockLines.findIndex((line, index) => index > start && /^      - /.test(line))
+  return blockLines.slice(start, next >= 0 ? next : undefined).join('\n')
+}
 
 const packageJob = job('package_release')
 const writeJob = job('write_release')
@@ -94,6 +101,11 @@ for (const command of ['pnpm install --frozen-lockfile', 'pnpm run typecheck', '
   check(packageJob.includes(command), `package job is missing ${command}`)
 }
 check(packageJob.indexOf('pnpm run build') < packageJob.indexOf('npm pack') && packageJob.indexOf('npm pack') < packageJob.indexOf('actions/upload-artifact@'), 'artifact is uploaded before build and pack complete')
+const artifactPackRuntimeStep = namedStep(packageJob, 'Configure exact artifact pack runtime')
+const artifactPackNpmStep = namedStep(packageJob, 'Verify artifact pack npm')
+check(artifactPackRuntimeStep.includes('node-version: 24.18.0'), 'artifact pack Node version is not exact')
+check(artifactPackNpmStep.includes("$(npm --version) == '11.16.0'"), 'artifact pack npm version is not checked')
+check(packageJob.indexOf('pnpm run build') < packageJob.indexOf('Configure exact artifact pack runtime') && packageJob.indexOf('Configure exact artifact pack runtime') < packageJob.indexOf('npm pack'), 'artifact pack runtime is configured outside the pack boundary')
 check(packageJob.includes('persist-credentials: false'), 'package checkout persists credentials')
 check(!packageJob.includes('npm version'), 'auto mode mutates package manifests before the tagged run')
 check(packageJob.includes('fetch-depth: 0'), 'release history is shallow')
@@ -113,7 +125,7 @@ check(packageJob.includes('git merge-base --is-ancestor "$TAG_SHA" "$MAIN_SHA"')
 check(packageJob.indexOf('Verify release tag is on main') < packageJob.indexOf('pnpm install'), 'invalid tags are rejected after dependency install')
 check(packageJob.includes('bash .github/scripts/write-release.sh validate'), 'tag release identity is not checked')
 check(packageJob.indexOf('bash .github/scripts/write-release.sh validate') < packageJob.indexOf('pnpm install'), 'tag release identity is checked after dependency install')
-check((packageJob.match(/if: steps\.release\.outputs\.mode == 'tag'/g) ?? []).length === 2, 'auto mode can create or upload publish artifacts')
+check((packageJob.match(/if: steps\.release\.outputs\.mode == 'tag'/g) ?? []).length === 4, 'tag-only artifact work can run in auto mode')
 
 check(writeJob.includes('contents: write') && writeJob.includes('actions: write') && !writeJob.includes('id-token: write'), 'write job permissions are wrong')
 check(writeJob.includes('needs: package_release'), 'write job does not wait for packaging')
