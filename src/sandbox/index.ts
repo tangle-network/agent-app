@@ -320,11 +320,9 @@ export interface SandboxRuntimeConfig {
 
   /**
    * Product-declared outbound network policy. Applied when a sandbox is
-   * created and reconciled before a reused or resumed sandbox is returned.
-   * This keeps product tools and other required endpoints reachable without
-   * product-local lifecycle calls. Adopting or changing the policy on an
-   * existing sandbox restarts its egress proxy once; matching explicit
-   * policies are left untouched.
+   * created. A reused or resumed sandbox is returned only when its explicit
+   * policy already matches; existing mismatches are rejected without updating
+   * or deleting the sandbox.
    */
   egressPolicy?: EgressPolicy
 
@@ -823,11 +821,49 @@ function deferredProfileWriteFailed(stage: 'new' | 'reused' | 'resumed', name: s
   return new Error(`deferred file write failed on ${stage} box ${name}: ${cause.message}`, { cause })
 }
 
-type ExistingBoxStage = 'reused' | 'resumed'
+export type SandboxExistingBoxStage = 'reused' | 'resumed'
+
+export type SandboxEgressPolicySource = Awaited<
+  ReturnType<SandboxInstance['egress']['get']>
+>['source']
+
+/**
+ * Thrown when an existing sandbox cannot be proven to have the requested
+ * outbound network policy. The sandbox is preserved and its policy is not
+ * changed. The caller explicitly decides whether to preserve, migrate, or
+ * replace the sandbox.
+ */
+export class SandboxEgressPolicyMismatchError extends Error {
+  readonly stage: SandboxExistingBoxStage
+  readonly boxName: string
+  readonly currentPolicy: EgressPolicy
+  readonly currentSource: SandboxEgressPolicySource
+  readonly desiredPolicy: EgressPolicy
+
+  constructor(
+    stage: SandboxExistingBoxStage,
+    boxName: string,
+    currentPolicy: EgressPolicy,
+    currentSource: SandboxEgressPolicySource,
+    desiredPolicy: EgressPolicy,
+  ) {
+    super(
+      `egress policy mismatch on ${stage} box ${boxName}: ` +
+        `current ${currentPolicy.mode} policy from ${currentSource} does not explicitly match ` +
+        `desired ${desiredPolicy.mode} policy; the existing box was preserved and egress was not updated.`,
+    )
+    this.name = 'SandboxEgressPolicyMismatchError'
+    this.stage = stage
+    this.boxName = boxName
+    this.currentPolicy = currentPolicy
+    this.currentSource = currentSource
+    this.desiredPolicy = desiredPolicy
+  }
+}
 
 /** Represent an error thrown when sandbox runtime authentication refresh fails for a specific stage and name */
 export class SandboxRuntimeAuthRefreshError extends Error {
-  constructor(stage: ExistingBoxStage, name: string, detail: string, cause?: unknown) {
+  constructor(stage: SandboxExistingBoxStage, name: string, detail: string, cause?: unknown) {
     super(`${stage} sandbox auth refresh failed for ${name}: ${detail}`, { cause })
     this.name = 'SandboxRuntimeAuthRefreshError'
   }
@@ -847,10 +883,10 @@ export type SandboxRecoveryPhase = 'stop' | 'resume' | 'probe'
  */
 export class SandboxRecoveryFailedError extends Error {
   readonly boxKey: string
-  readonly stage: ExistingBoxStage
+  readonly stage: SandboxExistingBoxStage
   readonly phase: SandboxRecoveryPhase
   constructor(
-    stage: ExistingBoxStage,
+    stage: SandboxExistingBoxStage,
     boxKey: string,
     phase: SandboxRecoveryPhase,
     detail: string,
@@ -1105,7 +1141,7 @@ async function materializeDeferredFilesForExistingBox(
   shell: SandboxRuntimeConfig,
   client: Sandbox,
   box: SandboxInstance,
-  stage: ExistingBoxStage,
+  stage: SandboxExistingBoxStage,
   name: string,
   workspaceId: string,
   userId: string | undefined,
@@ -1401,7 +1437,7 @@ async function refreshRuntimeConnection(
 async function bestEffortRefreshRuntimeExecAuth(
   client: Sandbox,
   box: SandboxInstance,
-  stage: ExistingBoxStage,
+  stage: SandboxExistingBoxStage,
   name: string,
 ): Promise<Outcome<SandboxInstance>> {
   let current = box
@@ -1445,7 +1481,7 @@ async function bestEffortRefreshRuntimeExecAuth(
 async function refreshRuntimeExecAuth(
   client: Sandbox,
   box: SandboxInstance,
-  stage: ExistingBoxStage,
+  stage: SandboxExistingBoxStage,
   name: string,
 ): Promise<Outcome<SandboxInstance>> {
   let current = box
@@ -1477,7 +1513,7 @@ async function writeDeferredFilesWithRuntimeAuthRefresh(
   client: Sandbox,
   box: SandboxInstance,
   files: AgentProfileFileMount[],
-  stage: ExistingBoxStage,
+  stage: SandboxExistingBoxStage,
   name: string,
 ): Promise<Outcome<SandboxInstance>> {
   let writeBox = box
@@ -1556,7 +1592,7 @@ async function recoverUnresponsiveBox(
   box: SandboxInstance,
   harness: Harness,
   probe: LivenessProbeConfig | undefined,
-  stage: ExistingBoxStage,
+  stage: SandboxExistingBoxStage,
   name: string,
   resumeTimeout: number,
   onProgress?: (event: ProvisionEvent) => void,
@@ -1671,14 +1707,14 @@ async function finalizeExistingBox(
   shell: SandboxRuntimeConfig,
   client: Sandbox,
   box: SandboxInstance,
-  stage: ExistingBoxStage,
+  stage: SandboxExistingBoxStage,
   name: string,
   workspaceId: string,
   userId: string | undefined,
   harness: Harness,
   scope: SandboxScope,
 ): Promise<SandboxInstance> {
-  await reconcileExistingBoxEgress(box, shell.egressPolicy, stage, name)
+  await assertExistingBoxEgress(box, shell.egressPolicy, stage, name)
   const written = await materializeDeferredFilesForExistingBox(
     shell,
     client,
@@ -1702,24 +1738,33 @@ async function finalizeExistingBox(
   return finalBox
 }
 
-function normalizedEgressPolicy(policy: EgressPolicy): string {
-  if (policy.mode !== 'strict') return policy.mode
-  const allowDomains = [...new Set(
-    (policy.allowDomains ?? [])
-      .map((domain) => domain.trim().toLowerCase())
-      .filter(Boolean),
-  )].sort()
-  return JSON.stringify({
-    mode: policy.mode,
-    allowDomains,
-    includeImplicitDomains: policy.includeImplicitDomains !== false,
-  })
+function canonicalizeJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalizeJson)
+  if (value === null || typeof value !== 'object') return value
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+      .map(([key, entry]) => [key, canonicalizeJson(entry)]),
+  )
 }
 
-async function reconcileExistingBoxEgress(
+function normalizedEgressPolicy(policy: EgressPolicy): string {
+  const normalized: Record<string, unknown> = { ...policy }
+  if (policy.mode === 'strict') {
+    normalized.allowDomains = [...new Set(
+      (policy.allowDomains ?? [])
+        .map((domain) => domain.trim().toLowerCase())
+        .filter(Boolean),
+    )].sort()
+    normalized.includeImplicitDomains = policy.includeImplicitDomains !== false
+  }
+  return JSON.stringify(canonicalizeJson(normalized))
+}
+
+async function assertExistingBoxEgress(
   box: SandboxInstance,
   desired: EgressPolicy | undefined,
-  stage: ExistingBoxStage,
+  stage: SandboxExistingBoxStage,
   name: string,
 ): Promise<void> {
   if (!desired) return
@@ -1733,19 +1778,15 @@ async function reconcileExistingBoxEgress(
     })
   }
   const matchingPolicy = normalizedEgressPolicy(current.policy) === normalizedEgressPolicy(desired)
-  // A platform-default `open` value is intentionally latched to the host's
-  // secure default. Re-apply it as an explicit sandbox policy so `open`
-  // actually means open; team and sandbox sources are already deliberate.
-  const effectiveSource = desired.mode !== 'open' || current.source !== 'platform'
-  if (matchingPolicy && effectiveSource) return
-  try {
-    await box.egress.update(desired)
-  } catch (cause) {
-    const error = cause instanceof Error ? cause : new Error(String(cause))
-    throw new Error(`egress policy update failed on ${stage} box ${name}: ${error.message}`, {
-      cause: error,
-    })
-  }
+  const explicitSource = current.source !== 'platform'
+  if (matchingPolicy && explicitSource) return
+  throw new SandboxEgressPolicyMismatchError(
+    stage,
+    name,
+    current.policy,
+    current.source,
+    desired,
+  )
 }
 
 /** Resolve or create a workspace sandbox instance with optional reuse and progress tracking */
