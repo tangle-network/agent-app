@@ -1676,7 +1676,7 @@ async function finalizeExistingBox(
   harness: Harness,
   scope: SandboxScope,
 ): Promise<SandboxInstance> {
-  await reconcileExistingBoxEgress(box, shell.egressPolicy)
+  await reconcileExistingBoxEgress(box, shell.egressPolicy, stage, name)
   const written = await materializeDeferredFilesForExistingBox(
     shell,
     client,
@@ -1717,16 +1717,33 @@ function normalizedEgressPolicy(policy: EgressPolicy): string {
 async function reconcileExistingBoxEgress(
   box: SandboxInstance,
   desired: EgressPolicy | undefined,
+  stage: ExistingBoxStage,
+  name: string,
 ): Promise<void> {
   if (!desired) return
-  const current = await box.egress.get()
+  let current: Awaited<ReturnType<SandboxInstance['egress']['get']>>
+  try {
+    current = await box.egress.get()
+  } catch (cause) {
+    const error = cause instanceof Error ? cause : new Error(String(cause))
+    throw new Error(`egress policy read failed on ${stage} box ${name}: ${error.message}`, {
+      cause: error,
+    })
+  }
   const matchingPolicy = normalizedEgressPolicy(current.policy) === normalizedEgressPolicy(desired)
   // A platform-default `open` value is intentionally latched to the host's
   // secure default. Re-apply it as an explicit sandbox policy so `open`
   // actually means open; team and sandbox sources are already deliberate.
   const effectiveSource = desired.mode !== 'open' || current.source !== 'platform'
   if (matchingPolicy && effectiveSource) return
-  await box.egress.update(desired)
+  try {
+    await box.egress.update(desired)
+  } catch (cause) {
+    const error = cause instanceof Error ? cause : new Error(String(cause))
+    throw new Error(`egress policy update failed on ${stage} box ${name}: ${error.message}`, {
+      cause: error,
+    })
+  }
 }
 
 /** Resolve or create a workspace sandbox instance with optional reuse and progress tracking */

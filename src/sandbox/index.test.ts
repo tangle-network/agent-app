@@ -444,6 +444,50 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     expect(update).not.toHaveBeenCalled()
   })
 
+  it('identifies a reused sandbox egress read failure', async () => {
+    const get = vi.fn().mockRejectedValue(new Error('control plane unavailable'))
+    const running = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      egress: { get, update: vi.fn() },
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
+      egressPolicy: { mode: 'strict', allowDomains: ['relationships.example.com'] },
+    })
+
+    await expect(ensureWorkspaceSandbox(shell, {
+      workspaceId: 'w1',
+      harness: 'opencode',
+    })).rejects.toThrow(
+      /egress policy read failed on reused box box-w1: control plane unavailable/,
+    )
+  })
+
+  it('identifies a reused sandbox egress update failure', async () => {
+    const get = vi.fn().mockResolvedValue({
+      policy: { mode: 'open' },
+      source: 'platform',
+    })
+    const update = vi.fn().mockRejectedValue(new Error('proxy restart failed'))
+    const running = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      egress: { get, update },
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
+      egressPolicy: { mode: 'strict', allowDomains: ['relationships.example.com'] },
+    })
+
+    await expect(ensureWorkspaceSandbox(shell, {
+      workspaceId: 'w1',
+      harness: 'opencode',
+    })).rejects.toThrow(
+      /egress policy update failed on reused box box-w1: proxy restart failed/,
+    )
+  })
+
   it('recovers a reused box whose edge has failed instead of deleting it', async () => {
     const del = vi.fn().mockResolvedValue(undefined)
     const failed = fakeBox({
