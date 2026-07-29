@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   acquireDurableTurnLock,
@@ -368,6 +368,23 @@ describe('TurnStreamDO turn-event storage (TurnEventStore contract)', () => {
     expect(await store.listRunning!(THREAD)).toEqual(['t-1'])
     // A scope with no history reports none.
     expect(await store.listRunning!('th-empty')).toEqual([])
+  })
+
+  it('listRunning expires an unrenewed running lease', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(0)
+    try {
+      const h = createMemoryTurnStreamHarness(
+        (state) => new TurnStreamDO(state, undefined, { runningTurnLeaseMs: 100 }),
+      )
+      const store = createDurableObjectTurnEventStore(h.namespace)
+      await store.setStatus('abandoned-turn', 'running', THREAD)
+      expect(await store.listRunning!(THREAD)).toEqual(['abandoned-turn'])
+
+      now.mockReturnValue(101)
+      expect(await store.listRunning!(THREAD)).toEqual([])
+    } finally {
+      now.mockRestore()
+    }
   })
 })
 

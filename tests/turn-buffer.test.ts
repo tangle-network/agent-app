@@ -1,13 +1,43 @@
-import { describe, it, expect } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
+import { describe, expect, it, vi } from 'vitest'
 import {
   coalesceDeltas,
   coalesceChatStreamEvents,
   pumpBufferedTurn,
   createBufferedTurnTap,
+  createD1TurnEventStore,
   replayTurnEvents,
   createMemoryTurnEventStore,
   stampReplaySeq,
+  TURN_EVENTS_MIGRATION_SQL,
+  type D1LikeForTurns,
+  type TurnEventStoreOptions,
 } from '../src/stream/turn-buffer'
+
+function d1TurnStore(options: TurnEventStoreOptions = {}) {
+  const sqlite = new DatabaseSync(':memory:')
+  type Prepared = ReturnType<D1LikeForTurns['prepare']>
+  type Bound = ReturnType<Prepared['bind']>
+  const prepared = (query: string, bound: unknown[] = []): Prepared & Bound => ({
+    bind(...values: unknown[]) {
+      return prepared(query, values)
+    },
+    async run() {
+      return sqlite.prepare(query).run(...(bound as never[]))
+    },
+    async all<T = Record<string, unknown>>() {
+      return { results: sqlite.prepare(query).all(...(bound as never[])) as T[] }
+    },
+    async first<T = Record<string, unknown>>() {
+      return (sqlite.prepare(query).get(...(bound as never[])) as T | undefined) ?? null
+    },
+  })
+  sqlite.exec(TURN_EVENTS_MIGRATION_SQL)
+  return {
+    store: createD1TurnEventStore({ prepare: (query) => prepared(query) }, options),
+    close: () => sqlite.close(),
+  }
+}
 
 function text(t: string) {
   return { kind: 'event', event: { type: 'text', text: t } }
@@ -107,6 +137,36 @@ describe('pumpBufferedTurn — pluggable coalesce + scope discovery', () => {
     expect(await store.listRunning!('thread-9')).toEqual(['b', 'a']) // newest first
     await store.setStatus('a', 'complete')
     expect(await store.listRunning!('thread-9')).toEqual(['b'])
+  })
+
+  it('expires an abandoned running lease without hiding a concurrent live turn', async () => {
+    let now = 0
+    const options = { runningTurnLeaseMs: 100, now: () => now }
+    const memory = createMemoryTurnEventStore(options)
+    const d1 = d1TurnStore(options)
+
+    try {
+      const results: Record<string, string[]> = {}
+      for (const [name, store] of [
+        ['memory', memory],
+        ['d1', d1.store],
+      ] as const) {
+        now = 0
+        await store.setStatus('older-live-turn', 'running', 'thread-9')
+        now = 10
+        await store.setStatus('later-turn', 'running', 'thread-9')
+        now = 20
+        await store.setStatus('later-turn', 'complete', 'thread-9')
+        results[name] = await store.listRunning!('thread-9')
+      }
+      expect(results).toEqual({ memory: ['older-live-turn'], d1: ['older-live-turn'] })
+
+      now = 101
+      expect(await memory.listRunning!('thread-9')).toEqual([])
+      expect(await d1.store.listRunning!('thread-9')).toEqual([])
+    } finally {
+      d1.close()
+    }
   })
 
   it('records the pump scopeId so a reloaded client can rediscover the turn', async () => {
@@ -243,6 +303,30 @@ describe('createBufferedTurnTap', () => {
     expect(await store.listRunning!('sess-A')).toEqual(['k2'])
     await tap.done('complete')
     expect(await store.listRunning!('sess-A')).toEqual([])
+  })
+
+  it('renews the running lease until the turn settles', async () => {
+    vi.useFakeTimers()
+    try {
+      const base = createMemoryTurnEventStore()
+      const setStatus = vi.fn(base.setStatus.bind(base))
+      const tap = createBufferedTurnTap({
+        store: { ...base, setStatus },
+        turnId: 'lease-turn',
+        scopeId: 'lease-thread',
+        runningTurnRenewIntervalMs: 50,
+      })
+
+      await tap.onEvent(text('working'))
+      await vi.advanceTimersByTimeAsync(50)
+      expect(setStatus.mock.calls.map((call) => call[1])).toEqual(['running', 'running'])
+
+      await tap.done('complete')
+      await vi.advanceTimersByTimeAsync(100)
+      expect(setStatus.mock.calls.map((call) => call[1])).toEqual(['running', 'running', 'complete'])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('done("error") flushes what was produced and marks error', async () => {

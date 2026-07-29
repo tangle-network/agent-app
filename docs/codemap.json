@@ -11270,13 +11270,13 @@
         {
           "name": "createD1TurnEventStore",
           "kind": "function",
-          "signature": "(db: D1LikeForTurns) => TurnEventStore",
+          "signature": "(db: D1LikeForTurns, options?: TurnEventStoreOptions) => TurnEventStore",
           "doc": "Resolve a TurnEventStore that appends and reads turn events using a D1-like database interface"
         },
         {
           "name": "createMemoryTurnEventStore",
           "kind": "function",
-          "signature": "() => TurnEventStore",
+          "signature": "(options?: TurnEventStoreOptions) => TurnEventStore",
           "doc": "In-memory store for tests and keyless local dev."
         },
         {
@@ -11284,6 +11284,18 @@
           "kind": "interface",
           "signature": "interface D1LikeForTurns",
           "doc": "Minimal structural D1 contract (Cloudflare `D1Database` satisfies it)."
+        },
+        {
+          "name": "DEFAULT_RUNNING_TURN_LEASE_MS",
+          "kind": "const",
+          "signature": "number",
+          "doc": "A running row is a renewable lease, not permanent truth."
+        },
+        {
+          "name": "DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS",
+          "kind": "const",
+          "signature": "30000",
+          "doc": "Keep a healthy turn's lease comfortably ahead of expiry without turning per-token streaming into status-write traffic."
         },
         {
           "name": "draftAssistantParts",
@@ -11470,6 +11482,12 @@
           "kind": "interface",
           "signature": "interface TurnEventStore",
           "doc": "Manage and query turn events and their lifecycle statuses within a scoped event store"
+        },
+        {
+          "name": "TurnEventStoreOptions",
+          "kind": "interface",
+          "signature": "interface TurnEventStoreOptions",
+          "doc": "Configure running-turn lease evaluation."
         },
         {
           "name": "TurnStatus",
