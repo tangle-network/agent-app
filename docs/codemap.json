@@ -819,31 +819,31 @@
           "name": "BrandHeader",
           "kind": "function",
           "signature": "({ title, children, className }: BrandHeaderProps) => Element",
-          "doc": "Shared app-shell header: icon-only Tangle knot + optional product title on the left, caller-supplied nav/actions on the right."
+          "doc": "Shared app-shell header with the canonical Tangle mark."
         },
         {
           "name": "BrandHeaderProps",
           "kind": "interface",
           "signature": "interface BrandHeaderProps",
-          "doc": "Define properties for a brand header including optional title, children, and CSS class name"
+          "doc": "Define properties for a brand header including optional title, children, and CSS class name."
         },
         {
           "name": "Logo",
           "kind": "function",
-          "signature": "({ variant, size, className, iconOnly }: LogoProps) => Element",
-          "doc": "Full Tangle lockup (knot + wordmark) or, with `iconOnly`, just the knot."
+          "signature": "({ variant, size, className, iconOnly, }: LogoProps) => Element",
+          "doc": "Render the canonical Tangle lockup through Agent App's existing API."
         },
         {
           "name": "LogoProps",
           "kind": "interface",
           "signature": "interface LogoProps",
-          "doc": "Define properties to customize the logo variant, size, style, and icon display options"
+          "doc": "Define properties to customize the logo variant, size, style, and icon display options."
         },
         {
           "name": "TangleKnot",
           "kind": "function",
-          "signature": "({ size, className }: { size?: number | undefined; className?: string | undefined; }) => Element",
-          "doc": "Icon-only Tangle knot, brand gradient, theme-independent."
+          "signature": "({ size, className, }: { size?: number | undefined; className?: string | undefined; }) => Element",
+          "doc": null
         }
       ]
     },
