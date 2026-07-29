@@ -35,8 +35,8 @@ git -C "$SEED" config core.hooksPath "$TMP/empty-hooks"
 git -C "$SEED" config user.name test
 git -C "$SEED" config user.email test@example.com
 mkdir -p "$SEED/create-agent-app"
-printf '{"name":"@tangle-network/agent-app","version":"1.2.3"}\n' > "$SEED/package.json"
-printf '{"name":"@tangle-network/create-agent-app","version":"1.2.3"}\n' > "$SEED/create-agent-app/package.json"
+printf '{"name":"@tangle-network/agent-app","version":"1.2.3","description":"app"}\n' > "$SEED/package.json"
+printf '{"name":"@tangle-network/create-agent-app","version":"1.2.3","description":"create"}\n' > "$SEED/create-agent-app/package.json"
 git -C "$SEED" add package.json create-agent-app/package.json
 git -C "$SEED" commit --quiet -m base
 git -C "$SEED" branch -M main
@@ -62,6 +62,51 @@ run_release() {
     GITHUB_TOKEN='test-token' \
     GITHUB_API_URL='https://api.example.test' \
     bash "$SCRIPT"
+}
+
+run_validate() {
+  local name=$1 version=$2 release_sha=$3 git_dir="$TMP/$1.git"
+  git init --bare --quiet "$git_dir"
+  git --git-dir="$git_dir" config core.hooksPath "$TMP/empty-hooks"
+  git --git-dir="$git_dir" remote add origin "$ORIGIN"
+  git --git-dir="$git_dir" fetch --quiet --no-tags origin +refs/heads/main:refs/remotes/origin/main
+  env \
+    RUNNER_TEMP="$TMP" \
+    GIT_DIR="$git_dir" \
+    BASE_SHA="$BASE" \
+    VERSION="$version" \
+    RELEASE_SHA="$release_sha" \
+    bash "$SCRIPT" validate
+}
+
+forge_release() {
+  local name=$1 mutation=$2 work="$TMP/forge-$1"
+  git clone --quiet --no-checkout "$ORIGIN" "$work"
+  git -C "$work" config core.hooksPath "$TMP/empty-hooks"
+  git -C "$work" config user.name test
+  git -C "$work" config user.email test@example.com
+  git -C "$work" checkout --quiet --detach "$BASE"
+  MUTATION="$mutation" node - "$work/package.json" "$work/create-agent-app/package.json" <<'NODE'
+const fs = require('node:fs')
+const [rootFile, createFile] = process.argv.slice(2)
+const root = JSON.parse(fs.readFileSync(rootFile, 'utf8'))
+const create = JSON.parse(fs.readFileSync(createFile, 'utf8'))
+root.version = '1.2.4'
+create.version = '1.2.4'
+if (process.env.MUTATION === 'extra') root.files = ['internal-release-data']
+if (process.env.MUTATION === 'remove') delete root.description
+if (process.env.MUTATION === 'modify') create.description = 'redirected package'
+fs.writeFileSync(rootFile, `${JSON.stringify(root, null, 2)}\n`)
+fs.writeFileSync(createFile, `${JSON.stringify(create, null, 2)}\n`)
+NODE
+  git -C "$work" add package.json create-agent-app/package.json
+  git -C "$work" commit --quiet -m 'chore(release): 1.2.4 [skip release]'
+  local forged
+  forged=$(git -C "$work" rev-parse HEAD)
+  git --git-dir="$ORIGIN" fetch --quiet "$work" "$forged"
+  git --git-dir="$ORIGIN" update-ref refs/heads/main "$forged"
+  git --git-dir="$ORIGIN" update-ref refs/tags/v1.2.4 "$forged"
+  printf '%s' "$forged"
 }
 
 fails() {
@@ -98,14 +143,28 @@ git -C "$ADVANCE" commit --quiet -m advanced
 git -C "$ADVANCE" push --quiet origin main
 run_release ancestor >/dev/null
 [[ $(wc -l < "$DISPATCH_LOG") -eq 3 ]]
+run_validate direct-valid 1.2.4 "$TAG" >/dev/null
 
 git -C "$SEED" tag v1.2.5 "$BASE"
 git -C "$SEED" push --quiet origin refs/tags/v1.2.5
 fails 'is not a one-parent release commit' run_release invalid 1.2.5
 [[ $(wc -l < "$DISPATCH_LOG") -eq 3 ]]
 
+FORGED_EXTRA=$(forge_release extra extra)
+fails 'does not exactly match' run_validate validate-extra 1.2.4 "$FORGED_EXTRA"
+fails 'does not exactly match' run_release release-extra 1.2.4
+[[ $(wc -l < "$DISPATCH_LOG") -eq 3 ]]
+
+FORGED_REMOVE=$(forge_release remove remove)
+fails 'does not exactly match' run_validate validate-remove 1.2.4 "$FORGED_REMOVE"
+[[ $(wc -l < "$DISPATCH_LOG") -eq 3 ]]
+
+FORGED_MODIFY=$(forge_release modify modify)
+fails 'does not exactly match' run_validate validate-modify 1.2.4 "$FORGED_MODIFY"
+[[ $(wc -l < "$DISPATCH_LOG") -eq 3 ]]
+
 run_release advanced-no-tag 1.2.6 > "$TMP/advanced.log"
 grep -Fq 'main advanced from tested commit' "$TMP/advanced.log"
 [[ $(wc -l < "$DISPATCH_LOG") -eq 3 ]]
 
-echo 'write release script: ok (5 cases)'
+echo 'write release script: ok (10 cases)'

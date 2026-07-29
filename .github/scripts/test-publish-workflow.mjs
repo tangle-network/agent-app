@@ -101,6 +101,8 @@ check(packageJob.includes('Verify release tag is on main'), 'tag publishing does
 check(packageJob.includes('+refs/heads/main:refs/remotes/origin/main'), 'tag check does not fetch main')
 check(packageJob.includes('git merge-base --is-ancestor "$TAG_SHA" "$MAIN_SHA"'), 'tag commit ancestry is not checked')
 check(packageJob.indexOf('Verify release tag is on main') < packageJob.indexOf('pnpm install'), 'invalid tags are rejected after dependency install')
+check(packageJob.includes('bash .github/scripts/write-release.sh validate'), 'tag release identity is not checked')
+check(packageJob.indexOf('bash .github/scripts/write-release.sh validate') < packageJob.indexOf('pnpm install'), 'tag release identity is checked after dependency install')
 check((packageJob.match(/if: steps\.release\.outputs\.mode == 'tag'/g) ?? []).length === 2, 'auto mode can create or upload publish artifacts')
 
 check(writeJob.includes('contents: write') && writeJob.includes('actions: write') && !writeJob.includes('id-token: write'), 'write job permissions are wrong')
@@ -115,6 +117,8 @@ for (const command of [
   'git merge-base --is-ancestor',
   'git diff --name-only',
   'git rev-list --parents',
+  'build_expected_release_tree',
+  'actual_tree',
   'actions/workflows/publish.yml/dispatches',
 ]) {
   check(releaseScript.includes(command), `release script is missing ${command}`)
