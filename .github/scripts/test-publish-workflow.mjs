@@ -10,6 +10,7 @@ const text = fs.readFileSync(path.join(root, '.github/workflows/publish.yml'), '
 const script = fs.readFileSync(path.join(root, '.github/scripts/publish-packages.sh'), 'utf8')
 const releaseScript = fs.readFileSync(path.join(root, '.github/scripts/write-release.sh'), 'utf8')
 const lines = text.split('\n')
+const triggerBlock = text.slice(0, text.indexOf('concurrency:'))
 const pins = {
   'actions/checkout': '3d3c42e5aac5ba805825da76410c181273ba90b1',
   'pnpm/action-setup': '0ebf47130e4866e96fce0953f49152a61190b271',
@@ -48,6 +49,7 @@ const agentPublishJob = job('publish_agent_app')
 const createPublishJob = job('publish_create_agent_app')
 check(jobs.size === 4, 'release workflow must contain exactly four jobs')
 check(/concurrency:\s*\n  group: release\s*\n  cancel-in-progress: false/.test(text), 'release concurrency changed')
+check(!/^\s+tags:/m.test(triggerBlock), 'tag pushes duplicate the explicit release dispatch')
 
 const actionRefs = [...text.matchAll(/uses:\s*([^@\s]+)@([^\s#]+)/g)].map((match) => ({ name: match[1], ref: match[2] }))
 check(actionRefs.every(({ ref }) => /^[0-9a-f]{40}$/.test(ref)), 'every action must use an exact commit SHA')
