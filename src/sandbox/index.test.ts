@@ -342,6 +342,108 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     expect(createMock.mock.calls[0]![0].webTerminalEnabled).toBe(true)
   })
 
+  it('declares the product egress policy on a newly created sandbox', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox())
+    const egressPolicy = {
+      mode: 'strict' as const,
+      allowDomains: ['relationships.example.com'],
+    }
+
+    await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
+      egressPolicy,
+    }), { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(createMock.mock.calls[0]![0].egressPolicy).toEqual(egressPolicy)
+  })
+
+  it('repairs a reused sandbox whose matching open policy is only the platform default', async () => {
+    const get = vi.fn().mockResolvedValue({
+      policy: { mode: 'open' },
+      source: 'platform',
+    })
+    const update = vi.fn().mockResolvedValue({
+      policy: { mode: 'open' },
+      source: 'sandbox',
+    })
+    const running = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      egress: { get, update },
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+
+    const box = await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
+      egressPolicy: { mode: 'open' },
+    }), { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(box).toBe(running)
+    expect(get).toHaveBeenCalledOnce()
+    expect(update).toHaveBeenCalledWith({ mode: 'open' })
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('applies a declared strict policy to a reused sandbox on the platform default', async () => {
+    const get = vi.fn().mockResolvedValue({
+      policy: { mode: 'open' },
+      source: 'platform',
+    })
+    const update = vi.fn().mockResolvedValue({
+      policy: {
+        mode: 'strict',
+        allowDomains: ['relationships.example.com'],
+      },
+      source: 'sandbox',
+    })
+    const running = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      egress: { get, update },
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+
+    await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
+      egressPolicy: {
+        mode: 'strict',
+        allowDomains: ['relationships.example.com'],
+      },
+    }), { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(get).toHaveBeenCalledOnce()
+    expect(update).toHaveBeenCalledWith({
+      mode: 'strict',
+      allowDomains: ['relationships.example.com'],
+    })
+  })
+
+  it('does not restart egress when a reused sandbox already has the declared policy', async () => {
+    const get = vi.fn().mockResolvedValue({
+      policy: {
+        mode: 'strict',
+        allowDomains: ['b.example.com', 'a.example.com'],
+        includeImplicitDomains: true,
+      },
+      source: 'sandbox',
+    })
+    const update = vi.fn()
+    const running = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      egress: { get, update },
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+
+    await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
+      egressPolicy: {
+        mode: 'strict',
+        allowDomains: ['a.example.com', 'b.example.com'],
+      },
+    }), { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(get).toHaveBeenCalledOnce()
+    expect(update).not.toHaveBeenCalled()
+  })
+
   it('recovers a reused box whose edge has failed instead of deleting it', async () => {
     const del = vi.fn().mockResolvedValue(undefined)
     const failed = fakeBox({
