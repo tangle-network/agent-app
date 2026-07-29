@@ -8879,6 +8879,18 @@
           "doc": "Sandbox credential policy reuses the canonical execution-environment union (development/test/staging/production) so env classification stays in one place (see resolveTangleExecutionEnvironment in run…"
         },
         {
+          "name": "SandboxEgressPolicyMismatchError",
+          "kind": "class",
+          "signature": "class SandboxEgressPolicyMismatchError",
+          "doc": "Thrown when an existing sandbox cannot be proven to have the requested outbound network policy."
+        },
+        {
+          "name": "SandboxEgressPolicySource",
+          "kind": "type",
+          "signature": "type SandboxEgressPolicySource",
+          "doc": null
+        },
+        {
           "name": "SandboxExecChannel",
           "kind": "interface",
           "signature": "interface SandboxExecChannel",
@@ -8889,6 +8901,12 @@
           "kind": "interface",
           "signature": "interface SandboxExecOptions",
           "doc": "Define options to execute code within a sandbox environment with optional session control"
+        },
+        {
+          "name": "SandboxExistingBoxStage",
+          "kind": "type",
+          "signature": "type SandboxExistingBoxStage",
+          "doc": null
         },
         {
           "name": "SandboxFileBytesOutcome",
