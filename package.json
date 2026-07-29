@@ -207,6 +207,11 @@
       "import": "./dist/missions/index.js",
       "default": "./dist/missions/index.js"
     },
+    "./session-shell": {
+      "types": "./dist/session-shell/index.d.ts",
+      "import": "./dist/session-shell/index.js",
+      "default": "./dist/session-shell/index.js"
+    },
     "./web": {
       "types": "./dist/web/index.d.ts",
       "import": "./dist/web/index.js",

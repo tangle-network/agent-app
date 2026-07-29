@@ -36,6 +36,7 @@ export default defineConfig({
     'platform/index': 'src/platform/index.ts',
     'app-auth/index': 'src/app-auth/index.ts',
     'web/index': 'src/web/index.ts',
+    'session-shell/index': 'src/session-shell/index.ts',
     'web-react/index': 'src/web-react/index.tsx',
     'work-product/index': 'src/work-product/index.ts',
     'work-product-react/index': 'src/work-product-react/index.tsx',
