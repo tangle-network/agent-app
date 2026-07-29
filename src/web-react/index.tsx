@@ -232,6 +232,9 @@ export interface ChatUiMessage extends ChatMessageMetrics {
 /** Define properties for rendering chat messages with optional models, markdown, extras, and durable cards */
 export interface ChatMessagesProps {
   messages: ChatUiMessage[]
+  /** Shared reading scale for both user and assistant prose. Defaults to 16px;
+   *  `large` uses 17px without enlarging labels, tool chrome, or metadata. */
+  messageSize?: 'default' | 'large'
   /** Catalogue models, for per-message cost from pricing. Pass [] to skip cost. */
   models?: CatalogModel[]
   /** Markdown renderer for assistant content; default renders pre-wrapped text. */
@@ -809,11 +812,13 @@ function SegmentText({
   streaming,
   showCaret,
   renderBody,
+  messageClassName,
 }: {
   content: string
   streaming: boolean
   showCaret: boolean
   renderBody: (content: string) => ReactNode
+  messageClassName: string
 }) {
   const text = useSmoothText(content, streaming)
   const body = useMemo(() => renderBody(text), [renderBody, text])
@@ -823,7 +828,7 @@ function SegmentText({
   // this stays rules-of-hooks safe.)
   if (!content.trim() && !showCaret) return null
   return (
-    <div className="text-base leading-[1.75]">
+    <div className={messageClassName}>
       {body}
       {/* Gate on showCaret (not the smoothed `text`, which is '' on the first
           frame) so the caret is steady from the start instead of flickering. */}
@@ -866,6 +871,7 @@ function SegmentedBody({
   approval,
   onToolCallClick,
   toolRenderers,
+  messageClassName,
 }: {
   segments: ChatMessageSegment[]
   msg: ChatUiMessage
@@ -874,6 +880,7 @@ function SegmentedBody({
   approval?: ProposalApprovalHandlers
   onToolCallClick?: (call: ChatToolCallInfo, message: ChatUiMessage) => void
   toolRenderers?: ToolDetailRenderers
+  messageClassName: string
 }) {
   const lastIndex = segments.length - 1
   const segmentToolIds = new Set(
@@ -928,6 +935,7 @@ function SegmentedBody({
             streaming={streaming && g.index === lastIndex}
             showCaret={streaming && g.index === lastIndex}
             renderBody={renderBody}
+            messageClassName={messageClassName}
           />
         ) : !streaming &&
           g.calls.length >= COLLAPSE_TOOL_RUN_AT &&
@@ -968,6 +976,7 @@ function AssistantMessageImpl({
   durableCards,
   resolveAttachmentUrl,
   workProductCards,
+  messageClassName,
 }: {
   msg: ChatUiMessage
   streaming: boolean
@@ -981,6 +990,7 @@ function AssistantMessageImpl({
   durableCards?: Omit<DurableChatCardsProps, 'parts' | 'renderMarkdown'>
   resolveAttachmentUrl?: (part: ChatAttachmentPart) => string
   workProductCards?: { onOpen?: (part: WorkProductPersistedPart) => void }
+  messageClassName: string
 }) {
   // Smooth reveal: chunky network slabs (model bursts, flush windows, replay
   // polls) paint as a continuous typewriter. Reasoning often arrives as one
@@ -1064,10 +1074,11 @@ function AssistantMessageImpl({
           approval={approval}
           onToolCallClick={onToolCallClick}
           toolRenderers={toolRenderers}
+          messageClassName={messageClassName}
         />
       ) : (
         <>
-          <div className="text-base leading-[1.75]">
+          <div className={messageClassName}>
             {body}
             {streaming && content && !msg.toolCalls?.length && <StreamingCaret />}
           </div>
@@ -1192,6 +1203,7 @@ function StreamErrorRow({ message, onRetry }: { message: string; onRetry?: () =>
  */
 export function ChatMessages({
   messages,
+  messageSize = 'default',
   models = [],
   renderMarkdown,
   renderExtras,
@@ -1210,6 +1222,10 @@ export function ChatMessages({
   resolveAttachmentUrl,
   workProductCards,
 }: ChatMessagesProps) {
+  const messageClassName =
+    messageSize === 'large'
+      ? 'agent-app-message-copy text-[17px] leading-[1.75]'
+      : 'agent-app-message-copy text-base leading-[1.75]'
   // Stabilize the fallback renderer's identity so it doesn't change every
   // render — otherwise the memoized `AssistantMessage` (and its per-frame body
   // memo) would invalidate on every parent render when no `renderMarkdown` is
@@ -1240,7 +1256,9 @@ export function ChatMessages({
               <p className="mb-1 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {userLabel}
               </p>
-              <div className="rounded-2xl rounded-tr-md bg-primary/10 px-4 py-2.5 text-base leading-relaxed">
+              <div
+                className={`rounded-2xl rounded-tr-md bg-primary/10 px-4 py-2.5 ${messageClassName}`}
+              >
                 <p className="whitespace-pre-wrap">{msg.content}</p>
               </div>
               {resolveAttachmentUrl && attachmentPartsFromMessageParts(msg.parts).length > 0 && (
@@ -1269,6 +1287,7 @@ export function ChatMessages({
             durableCards={durableCards}
             resolveAttachmentUrl={resolveAttachmentUrl}
             workProductCards={workProductCards}
+            messageClassName={messageClassName}
           />
         ),
       )}

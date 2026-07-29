@@ -14048,7 +14048,7 @@
         {
           "name": "ChatMessages",
           "kind": "function",
-          "signature": "({ messages, models, renderMarkdown, renderExtras, durableCards, userLabel, agentLabel, loading, approval, onToolCallCl…",
+          "signature": "({ messages, messageSize, models, renderMarkdown, renderExtras, durableCards, userLabel, agentLabel, loading, approval,…",
           "doc": "The message thread: one centered column; user messages are right-aligned bubbles with a User label; agent messages carry an Agent meta line with model id, tokens/sec, and cost, plus a collapsible thi…"
         },
         {

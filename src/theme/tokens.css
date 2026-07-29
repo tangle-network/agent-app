@@ -115,3 +115,10 @@
   background: var(--editor-selection-background);
   color: var(--editor-selection-foreground);
 }
+
+/* A product-supplied Markdown renderer may carry its own base text utility.
+ * Message size is a ChatMessages contract, so the rendered copy must inherit
+ * that choice while headings and inline code can still scale with em units. */
+.agent-app-message-copy > * {
+  font-size: inherit;
+}
