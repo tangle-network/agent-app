@@ -5,6 +5,8 @@ set -euo pipefail
 REGISTRY=${NPM_REGISTRY_URL:-https://registry.npmjs.org}
 ROOT_NAME='@tangle-network/agent-app'
 CREATE_NAME='@tangle-network/create-agent-app'
+REGISTRY_VERIFY_ATTEMPTS=${REGISTRY_VERIFY_ATTEMPTS:-12}
+REGISTRY_VERIFY_DELAY_SECONDS=${REGISTRY_VERIFY_DELAY_SECONDS:-5}
 
 die() {
   echo "::error::$*" >&2
@@ -12,6 +14,8 @@ die() {
 }
 
 [[ -n "${EXPECTED_VERSION:-}" ]] || die 'EXPECTED_VERSION is required.'
+[[ "$REGISTRY_VERIFY_ATTEMPTS" =~ ^[1-9][0-9]*$ ]] || die 'REGISTRY_VERIFY_ATTEMPTS must be a positive integer.'
+[[ "$REGISTRY_VERIFY_DELAY_SECONDS" =~ ^[0-9]+$ ]] || die 'REGISTRY_VERIFY_DELAY_SECONDS must be a non-negative integer.'
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
@@ -70,7 +74,7 @@ npm_command() {
 
 registry_integrity() {
   local name=$1 version=$2 key=$3 value
-  if value=$(npm_command '' view "$name@$version" dist.integrity --registry="$REGISTRY" 2> "$TMP/$key.stderr"); then
+  if value=$(npm_command '' view "$name@$version" dist.integrity --registry="$REGISTRY" --prefer-online 2> "$TMP/$key.stderr"); then
     [[ "$value" =~ ^sha512-[A-Za-z0-9+/]+={0,2}$ ]] || die "registry lookup failed for $name@$version: malformed integrity."
     printf '%s' "$value"
     return
@@ -78,6 +82,25 @@ registry_integrity() {
   if grep -Eq '(^|[^[:alnum:]_])E404([^[:alnum:]_]|$)' "$TMP/$key.stderr"; then return 44; fi
   cat "$TMP/$key.stderr" >&2
   die "registry lookup failed for $name@$version; refusing to publish after an unknown error."
+}
+
+wait_for_registry_integrity() {
+  local name=$1 version=$2 key=$3
+  local attempt value status
+
+  for ((attempt = 1; attempt <= REGISTRY_VERIFY_ATTEMPTS; attempt += 1)); do
+    if value=$(registry_integrity "$name" "$version" "$key"); then
+      printf '%s' "$value"
+      return
+    else
+      status=$?
+      [[ $status -eq 44 ]] || return "$status"
+    fi
+    if ((attempt < REGISTRY_VERIFY_ATTEMPTS)); then
+      sleep "$REGISTRY_VERIFY_DELAY_SECONDS"
+    fi
+  done
+  return 44
 }
 
 publish_one() {
@@ -105,7 +128,13 @@ publish_one() {
     fi
     die "npm publish failed for $name@$version."
   fi
-  remote_sri=$(registry_integrity "$name" "$version" "$key") || die "published $name@$version but registry verification failed."
+  if remote_sri=$(wait_for_registry_integrity "$name" "$version" "$key"); then
+    :
+  else
+    status=$?
+    [[ $status -eq 44 ]] || exit "$status"
+    die "published $name@$version but it was not visible after $REGISTRY_VERIFY_ATTEMPTS registry checks."
+  fi
   [[ "$remote_sri" == "$local_sri" ]] || die "published tarball mismatch for $name@$version."
   echo "$name@$version published and confirmed"
 }
