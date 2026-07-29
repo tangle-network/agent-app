@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-252 exports.
+268 exports.
 
 ### `activityTone`
 
@@ -758,6 +758,14 @@ interface EvidenceLineageTableProps
 interface ExceptionListProps
 ```
 
+### `FetchSessionPage`
+
+`type` — Data port — one page of sessions for the current view.
+
+```ts
+type FetchSessionPage
+```
+
 ### `fieldAcceptsFreeText`
 
 `function` — Determine if a chat interaction field allows free text input
@@ -868,6 +876,14 @@ interface FlowWaterfallProps
 
 ```ts
 (msg: ChatMessageMetrics, models: CatalogModel[]) => string | null
+```
+
+### `formatSessionTimestamp`
+
+`function` — Compact relative time.
+
+```ts
+(isoDate: string | null) => string
 ```
 
 ### `formatTokensPerSecond`
@@ -1188,6 +1204,22 @@ type InteractionSubmitResult
 
 ```ts
 (interaction: ChatInteraction, data: Record<string, string | number | boolean | string[]>) => string
+```
+
+### `LinkLikeComponent`
+
+`type`
+
+```ts
+type LinkLikeComponent
+```
+
+### `LinkLikeProps`
+
+`interface`
+
+```ts
+interface LinkLikeProps
 ```
 
 ### `loadAttachmentFile`
@@ -1718,6 +1750,62 @@ interface SeatPaywallProps
 (content: string, parts: readonly ChatMentionPart[]) => { segments: MentionTextSegment[]; matched: Set<ChatMentionPart>…
 ```
 
+### `SessionActionLabels`
+
+`interface`
+
+```ts
+interface SessionActionLabels
+```
+
+### `SessionActions`
+
+`interface`
+
+```ts
+interface SessionActions
+```
+
+### `SessionActionsOptions`
+
+`interface`
+
+```ts
+interface SessionActionsOptions
+```
+
+### `SessionHistoryPanel`
+
+`function` — The full session history: search, sort, cursor-paged rows with per-row actions, and the states in between (first-run empty, loading, no matches, error + retry).
+
+```ts
+({ history, hasAnySessions, query, onQueryChange, sort, onSortChange, hrefForSession, linkComponent: Link, respondingSe…
+```
+
+### `SessionHistoryPanelProps`
+
+`interface`
+
+```ts
+interface SessionHistoryPanelProps
+```
+
+### `SessionHistoryState`
+
+`interface`
+
+```ts
+interface SessionHistoryState
+```
+
+### `SessionPageQuery`
+
+`interface`
+
+```ts
+interface SessionPageQuery
+```
+
 ### `settleInteractionSubmit`
 
 `function` — Runs a host-supplied submitter under the CARD's own deadline, and always resolves.
@@ -1918,6 +2006,22 @@ interface UseFileMentionsOptions
 interface UseFileMentionsResult
 ```
 
+### `useInfiniteScroll`
+
+`function` — Fires `onLoadMore` when a sentinel element scrolls into view.
+
+```ts
+(onLoadMore: () => void, { enabled, root, rootMargin }: UseInfiniteScrollOptions) => (node: HTMLElement | null) => void
+```
+
+### `UseInfiniteScrollOptions`
+
+`interface`
+
+```ts
+interface UseInfiniteScrollOptions
+```
+
 ### `usePending`
 
 `function` — Guard an async action against double-submit.
@@ -1956,6 +2060,30 @@ interface UseSandboxTerminalConnectionOptions
 
 ```ts
 interface UseSandboxTerminalConnectionResult
+```
+
+### `useSessionActions`
+
+`function` — Rename + delete for one session, shared by the rail kebab and the history row menu so both drive the same dialogs and the same product mutations.
+
+```ts
+({ renameSession, deleteSession, onChanged, onDeletedCurrent, currentSessionId, notify, labels, }: SessionActionsOption…
+```
+
+### `useSessionHistory`
+
+`function` — Infinite-scroll data source for the history view.
+
+```ts
+({ fetchPage, q, sort, initialPage, defaultSort, }: UseSessionHistoryOptions) => SessionHistoryState
+```
+
+### `UseSessionHistoryOptions`
+
+`interface`
+
+```ts
+interface UseSessionHistoryOptions
 ```
 
 ### `useSmoothText`
