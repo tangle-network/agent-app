@@ -116,6 +116,15 @@ export interface SessionRowActions<TIcon = unknown> {
    */
   onRename?: (session: SessionSummary) => void
   onDelete?: (session: SessionSummary) => void
+  /**
+   * Row actions this shell has no opinion about — pin, categorise, duplicate,
+   * share. Evaluated per session so a label can read that row's state
+   * ("Pin" vs "Unpin"), and ordered between rename and delete so the
+   * destructive action stays last.
+   *
+   * `id` must not be `rename` or `delete`; those are the shell's own.
+   */
+  extraActions?: (session: SessionSummary) => SessionRailAction<TIcon>[]
 }
 
 export const UNTITLED_SESSION_LABEL = 'Untitled chat'
@@ -158,7 +167,7 @@ export function buildSessionSubItems<TIcon = unknown>({
   const rowActions = (session: SessionSummary): SessionRailAction<TIcon>[] | undefined => {
     if (!actions?.canEdit) return undefined
     const built: SessionRailAction<TIcon>[] = []
-    const { onRename, onDelete } = actions
+    const { onRename, onDelete, extraActions } = actions
     if (onRename) {
       built.push({
         id: 'rename',
@@ -167,6 +176,7 @@ export function buildSessionSubItems<TIcon = unknown>({
         onSelect: () => onRename(session),
       })
     }
+    if (extraActions) built.push(...extraActions(session))
     if (onDelete) {
       built.push({
         id: 'delete',

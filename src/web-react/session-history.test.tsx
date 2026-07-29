@@ -355,6 +355,35 @@ describe('SessionHistoryPanel', () => {
     expect(onRename).not.toHaveBeenCalled()
   })
 
+  it('names delete the way the product names it, matching the rail', () => {
+    renderPanel({ onDelete: vi.fn(), onRename: vi.fn(), deleteLabel: 'Archive', renameLabel: 'Retitle' })
+    fireEvent.click(screen.getAllByLabelText('Session actions')[0] as HTMLElement)
+    expect(screen.getByText('Archive')).toBeTruthy()
+    expect(screen.getByText('Retitle')).toBeTruthy()
+    expect(screen.queryByText('Delete')).toBeNull()
+  })
+
+  it('renders product row actions between rename and delete', () => {
+    const pinned: string[] = []
+    renderPanel({
+      onRename: vi.fn(),
+      onDelete: vi.fn(),
+      extraActions: (s) => [{ id: 'pin', label: 'Pin', onSelect: () => pinned.push(s.id) }],
+    })
+    fireEvent.click(screen.getAllByLabelText('Session actions')[0] as HTMLElement)
+    const labels = Array.from(
+      (screen.getByText('Pin').parentElement as HTMLElement).querySelectorAll('button'),
+    ).map((b) => b.textContent)
+    expect(labels).toEqual(['Rename', 'Pin', 'Delete'])
+    fireEvent.click(screen.getByText('Pin'))
+    expect(pinned).toEqual(['a'])
+  })
+
+  it('opens the menu for a product action even with no rename or delete', () => {
+    renderPanel({ extraActions: () => [{ id: 'pin', label: 'Pin', onSelect: () => {} }] })
+    expect(screen.getByLabelText('Session actions')).toBeTruthy()
+  })
+
   it('renders the new-session action only when the product supplies a route', () => {
     renderPanel()
     expect(screen.queryByText('New chat')).toBeNull()
