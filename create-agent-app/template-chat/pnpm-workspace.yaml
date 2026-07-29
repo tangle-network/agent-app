@@ -1,0 +1,16 @@
+packages:
+  - '.'
+
+autoInstallPeers: false
+
+minimumReleaseAge: 1440
+minimumReleaseAgeStrict: true
+minimumReleaseAgeIgnoreMissingTime: false
+minimumReleaseAgeExclude:
+  - '@tangle-network/*'
+
+allowBuilds:
+  '@ax-llm/ax': false
+  better-sqlite3: true
+  esbuild: true
+  workerd: true

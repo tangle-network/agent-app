@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AgentProfile } from '@tangle-network/agent-interface'
-import type { SandboxInstance } from '@tangle-network/sandbox'
+import type { SandboxInstance } from '@tangle-network/sandbox/core'
 import { fingerprintAgentProfile, type ProfileFingerprint } from '../profile/fingerprint'
 import { streamSandboxPrompt, type SandboxRuntimeConfig } from './index'
 
