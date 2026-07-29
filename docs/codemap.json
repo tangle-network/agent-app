@@ -996,6 +996,12 @@
           "doc": "Fetch the router model list and build the catalogue, with an in-isolate cache (TTL 5 min)."
         },
         {
+          "name": "isChatCapableModel",
+          "kind": "function",
+          "signature": "(m: RouterModel) => boolean",
+          "doc": "Can this router entry serve a text chat turn?"
+        },
+        {
           "name": "ModelCatalog",
           "kind": "interface",
           "signature": "interface ModelCatalog",
@@ -1020,6 +1026,7 @@
       "source": "src/chat-react/index.tsx",
       "dependsOn": [
         "chat-routes",
+        "runtime",
         "web-react"
       ],
       "error": null,
@@ -8088,6 +8095,12 @@
           "kind": "function",
           "signature": "(cfg: { baseUrl: string; apiKey: string; preferredDefault?: string | undefined; }) => Promise<ModelCatalog>",
           "doc": "Fetch the router model list and build the catalogue, with an in-isolate cache (TTL 5 min)."
+        },
+        {
+          "name": "isChatCapableModel",
+          "kind": "function",
+          "signature": "(m: RouterModel) => boolean",
+          "doc": "Can this router entry serve a text chat turn?"
         },
         {
           "name": "isTangleBillingEnforcementDisabled",

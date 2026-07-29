@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 
 import { ComposerAgentControls, EntryComposer } from './index'
 import type { ModelInfo } from '@tangle-network/sandbox-ui/dashboard'
@@ -179,6 +179,136 @@ describe('ComposerAgentControls', () => {
     // pick re-derives it from the NEW harness; honoring the snap both discards
     // that pick and persists it under the wrong harness's key.
     expect(onModelChange).not.toHaveBeenCalled()
+  })
+
+  /**
+   * Products hand the picker the router's raw `/v1/models`. Measured against
+   * the live catalogue on 2026-07-28 that is 504 entries, 35 of which cannot
+   * serve a chat turn — and every one of them was selectable. creative-agent
+   * had a private copy of this filter in a forked picker component; its
+   * narrower spelling let the 10 audio-in transcription endpoints through.
+   */
+  const MIXED_MODELS: ModelInfo[] = [
+    {
+      id: 'gpt-4.1-mini',
+      name: 'GPT-4.1 Mini',
+      provider: 'openai',
+      architecture: {
+        modality: 'text->text',
+        input_modalities: ['text'],
+        output_modalities: ['text'],
+      },
+    },
+    {
+      id: 'gpt-image-1',
+      name: 'GPT Image One',
+      provider: 'openai',
+      architecture: {
+        modality: 'image',
+        input_modalities: ['text'],
+        output_modalities: ['image'],
+      },
+    },
+    {
+      id: 'tts-1',
+      name: 'Speech One',
+      provider: 'openai',
+      architecture: {
+        modality: 'audio',
+        input_modalities: ['text'],
+        output_modalities: ['audio'],
+      },
+    },
+    {
+      // Emits text but cannot take a text prompt. This is the row creative's
+      // fork kept, because it only looked at output modalities.
+      id: 'whisper-1',
+      name: 'Whisper One',
+      provider: 'openai',
+      architecture: {
+        modality: 'audio',
+        input_modalities: ['audio'],
+        output_modalities: ['text'],
+      },
+    },
+    {
+      id: 'text-embedding-3-small',
+      name: 'Embedding Small',
+      provider: 'openai',
+      architecture: {
+        modality: 'embedding',
+        input_modalities: ['text'],
+        output_modalities: ['embeddings'],
+      },
+    },
+    {
+      // Sparse router metadata. Kept — dropping a usable model because a field
+      // is missing is the worse of the two failures.
+      id: 'sparse-meta',
+      name: 'Sparse Meta',
+      provider: 'openai',
+    },
+  ] as ModelInfo[]
+
+  /** Opens the model picker and returns the menu, so assertions are scoped to
+   *  the LIST rather than to the trigger, which also renders the current name. */
+  function openModelMenu(currentName: string): HTMLElement {
+    const trigger = screen
+      .getAllByRole('button')
+      .find((b) => (b.getAttribute('aria-label') ?? '').includes(currentName))
+    if (!trigger) throw new Error(`no model trigger labelled ${currentName}`)
+    openMenu(trigger)
+    return screen.getByRole('menu')
+  }
+
+  it('drops models that cannot serve a chat turn from a chat surface', () => {
+    render(
+      <ComposerAgentControls
+        layout="inline"
+        context="chat"
+        model={{ value: 'gpt-4.1-mini', onChange: () => {}, models: MIXED_MODELS }}
+      />,
+    )
+    const menu = openModelMenu('GPT-4.1 Mini')
+
+    // Positive control FIRST: if the menu never opened, every queryByText below
+    // passes vacuously. These two must be visible for the assertions to mean
+    // anything.
+    expect(within(menu).getByText('GPT-4.1 Mini')).toBeTruthy()
+    expect(within(menu).getByText('Sparse Meta')).toBeTruthy()
+
+    for (const name of ['GPT Image One', 'Speech One', 'Whisper One', 'Embedding Small']) {
+      expect(within(menu).queryByText(name)).toBeNull()
+    }
+  })
+
+  it('keeps every model on a non-chat surface', () => {
+    render(
+      <ComposerAgentControls
+        layout="inline"
+        context="all"
+        model={{ value: 'gpt-4.1-mini', onChange: () => {}, models: MIXED_MODELS }}
+      />,
+    )
+    const menu = openModelMenu('GPT-4.1 Mini')
+    // The trim is context-scoped, not a blanket ban — and this is the positive
+    // control proving the names above are absent because they were FILTERED,
+    // not because the menu renders no names at all.
+    expect(within(menu).getByText('GPT Image One')).toBeTruthy()
+    expect(within(menu).getByText('Whisper One')).toBeTruthy()
+  })
+
+  it('never hides the selected model, whatever its modalities claim', () => {
+    render(
+      <ComposerAgentControls
+        layout="inline"
+        context="chat"
+        model={{ value: 'gpt-image-1', onChange: () => {}, models: MIXED_MODELS }}
+      />,
+    )
+    // A product may deliberately pin something exotic. A picker whose own value
+    // is missing from its list renders as unset, which reads as data loss.
+    expect(document.body.textContent).toContain('GPT Image One')
   })
 
   it('keeps cli-base on a non-chat surface', () => {
