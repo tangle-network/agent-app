@@ -9569,6 +9569,14 @@ Source: `src/preflight/cli.ts`
 
 Source: `src/preset-cloudflare/index.ts` · depends on `billing`, `crypto`, `knowledge`, `tools`, `web`
 
+### `CloudflareHeadersRule`
+
+`interface` — One path rule in Cloudflare's static-asset `_headers` file.
+
+```ts
+interface CloudflareHeadersRule
+```
+
 ### `CloudflareWorkflowBindingLike`
 
 `interface` — The structural binding implemented by Cloudflare's `Workflow<TParams>`.
@@ -9719,6 +9727,14 @@ interface PresetKnowledgeAccessorOptions
 
 ```ts
 interface PresetToolHandlerOptions
+```
+
+### `renderCloudflareHeadersFile`
+
+`function` — Render native Cloudflare static-asset header rules.
+
+```ts
+(rules: readonly CloudflareHeadersRule[]) => string
 ```
 
 ### `VaultKv`

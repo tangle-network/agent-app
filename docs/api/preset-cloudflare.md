@@ -4,7 +4,15 @@
 
 Source: `src/preset-cloudflare/index.ts`
 
-20 exports.
+22 exports.
+
+### `CloudflareHeadersRule`
+
+`interface` — One path rule in Cloudflare's static-asset `_headers` file.
+
+```ts
+interface CloudflareHeadersRule
+```
 
 ### `CloudflareWorkflowBindingLike`
 
@@ -156,6 +164,14 @@ interface PresetKnowledgeAccessorOptions
 
 ```ts
 interface PresetToolHandlerOptions
+```
+
+### `renderCloudflareHeadersFile`
+
+`function` — Render native Cloudflare static-asset header rules.
+
+```ts
+(rules: readonly CloudflareHeadersRule[]) => string
 ```
 
 ### `VaultKv`
