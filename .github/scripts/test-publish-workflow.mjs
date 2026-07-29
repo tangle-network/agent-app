@@ -1,0 +1,125 @@
+#!/usr/bin/env node
+
+import fs from 'node:fs'
+import path from 'node:path'
+import process from 'node:process'
+import { fileURLToPath } from 'node:url'
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+const text = fs.readFileSync(path.join(root, '.github/workflows/publish.yml'), 'utf8')
+const script = fs.readFileSync(path.join(root, '.github/scripts/publish-packages.sh'), 'utf8')
+const lines = text.split('\n')
+const pins = {
+  'actions/checkout': '3d3c42e5aac5ba805825da76410c181273ba90b1',
+  'pnpm/action-setup': '0ebf47130e4866e96fce0953f49152a61190b271',
+  'actions/setup-node': '820762786026740c76f36085b0efc47a31fe5020',
+  'actions/upload-artifact': '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+  'actions/download-artifact': '3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c',
+}
+
+const fail = (message) => {
+  console.error(`publish workflow contract failed: ${message}`)
+  process.exit(1)
+}
+const check = (condition, message) => {
+  if (!condition) fail(message)
+}
+
+const jobs = new Map()
+let current
+for (const line of lines.slice(lines.indexOf('jobs:') + 1)) {
+  const match = /^  ([a-z0-9_]+):\s*$/.exec(line)
+  if (match) {
+    current = match[1]
+    jobs.set(current, [])
+  } else if (current) {
+    jobs.get(current).push(line)
+  }
+}
+const job = (name) => {
+  check(jobs.has(name), `missing ${name} job`)
+  return jobs.get(name).join('\n')
+}
+
+const packageJob = job('package_release')
+const writeJob = job('write_release')
+const agentPublishJob = job('publish_agent_app')
+const createPublishJob = job('publish_create_agent_app')
+check(jobs.size === 4, 'release workflow must contain exactly four jobs')
+check(/concurrency:\s*\n  group: release\s*\n  cancel-in-progress: false/.test(text), 'release concurrency changed')
+
+const actionRefs = [...text.matchAll(/uses:\s*([^@\s]+)@([^\s#]+)/g)].map((match) => ({ name: match[1], ref: match[2] }))
+check(actionRefs.every(({ ref }) => /^[0-9a-f]{40}$/.test(ref)), 'every action must use an exact commit SHA')
+for (const [name, pin] of Object.entries(pins)) {
+  const refs = actionRefs.filter((action) => action.name === name)
+  check(refs.length > 0 && refs.every(({ ref }) => ref === pin), `${name} does not use the required pin`)
+}
+
+for (let index = 0; index < lines.length; index += 1) {
+  if (!/^      - uses: actions\/checkout@/.test(lines[index])) continue
+  const step = []
+  for (let cursor = index; cursor < lines.length && (cursor === index || !/^      - /.test(lines[cursor])); cursor += 1) step.push(lines[cursor])
+  check(step.some((line) => line.trim() === 'persist-credentials: false'), 'checkout persists credentials')
+}
+
+const restricted = {
+  write_release: writeJob,
+  publish_agent_app: agentPublishJob,
+  publish_create_agent_app: createPublishJob,
+}
+const forbidden = [
+  'actions/checkout@',
+  'pnpm/action-setup@',
+  'pnpm install',
+  'npm install',
+  'npm pack',
+  'npm publish',
+  'npm version',
+  'pnpm run build',
+  'pnpm run typecheck',
+  'pnpm run test',
+]
+for (const [name, block] of Object.entries(restricted)) {
+  const commands = block.split('\n').filter((line) => !line.trim().startsWith('#')).join('\n')
+  for (const value of forbidden) check(!commands.includes(value), `${name} contains forbidden work: ${value}`)
+}
+
+check(packageJob.includes('contents: read') && !packageJob.includes('contents: write') && !packageJob.includes('id-token: write'), 'package job is not read-only')
+for (const command of ['pnpm install --frozen-lockfile', 'pnpm run typecheck', 'pnpm run test', 'pnpm run build', 'npm pack']) {
+  check(packageJob.includes(command), `package job is missing ${command}`)
+}
+check(packageJob.indexOf('pnpm run build') < packageJob.indexOf('npm pack') && packageJob.indexOf('npm pack') < packageJob.indexOf('actions/upload-artifact@'), 'artifact is uploaded before build and pack complete')
+check(packageJob.includes('persist-credentials: false'), 'package checkout persists credentials')
+check(packageJob.includes('control-sha:'), 'publish script is not anchored before dependency install')
+check(packageJob.indexOf('id: control') < packageJob.indexOf('pnpm install'), 'publish script is anchored after dependency install')
+check(packageJob.includes('actions/upload-artifact@'), 'tested tarballs are not uploaded')
+check(packageJob.includes('Verify tag is current main tip'), 'tag publishing does not check current main')
+check(packageJob.includes('+refs/heads/main:refs/remotes/origin/main'), 'tag check does not fetch main')
+check(packageJob.includes('[[ "$TAG_SHA" == "$MAIN_SHA" ]]'), 'tag commit is not compared with current main')
+check(packageJob.indexOf('Verify tag is current main tip') < packageJob.indexOf('pnpm install'), 'stale tags are rejected after dependency install')
+
+check(writeJob.includes('contents: write') && !writeJob.includes('id-token: write'), 'write job permissions are wrong')
+check(writeJob.includes('needs: package_release'), 'write job does not wait for packaging')
+check(!writeJob.includes('uses:'), 'write job invokes an action')
+check(writeJob.includes('git init --bare'), 'write job uses a checkout')
+check(writeJob.includes('push --atomic'), 'version commit and tag are not atomic')
+check(writeJob.includes('REMOTE_MAIN') && writeJob.includes('BASE_SHA'), 'write job is not tied to the tested commit')
+
+for (const [name, block] of [['publish_agent_app', agentPublishJob], ['publish_create_agent_app', createPublishJob]]) {
+  check(block.includes("needs.write_release.outputs.released == 'true'"), `${name} can publish an uncommitted auto release`)
+  check(block.includes('actions: read'), `${name} cannot download the artifact`)
+  check(block.includes('node-version: 24.18.0'), `${name} runtime is not exact`)
+  check(block.includes("$(npm --version) == '11.16.0'"), `${name} npm version is not checked`)
+  check(block.includes('artifact-ids: ${{ needs.package_release.outputs.artifact-id }}'), `${name} does not select the exact artifact`)
+  check(block.includes('sha256sum --check SHA256SUMS') && block.includes('CONTROL_SHA'), `${name} does not verify the artifact`)
+}
+check(agentPublishJob.includes('id-token: write') && !agentPublishJob.includes('contents: write'), 'Agent App publisher permissions are wrong')
+check(!agentPublishJob.includes('secrets.') && !agentPublishJob.includes('CREATE_AGENT_APP_NPM_TOKEN'), 'Agent App publisher receives a long-lived secret')
+check(agentPublishJob.includes('publish agent-app agent-app.tgz') && !agentPublishJob.includes('create-agent-app.tgz'), 'Agent App publisher is not limited to its tarball')
+check(!createPublishJob.includes('id-token: write') && !createPublishJob.includes('contents: write'), 'create-agent-app publisher permissions are wrong')
+check(createPublishJob.includes('CREATE_AGENT_APP_NPM_TOKEN: ${{ secrets.CREATE_AGENT_APP_NPM_TOKEN }}'), 'create-agent-app publisher lacks its token')
+check(createPublishJob.includes('publish create-agent-app create-agent-app.tgz') && !createPublishJob.includes('publish agent-app '), 'create-agent-app publisher is not limited to its tarball')
+check(script.includes('--ignore-scripts'), 'publish command allows lifecycle scripts')
+check(text.includes("startsWith(github.ref, 'refs/tags/v')") && text.includes("github.event_name == 'workflow_dispatch'"), 'manual tag publishing changed')
+
+console.log('publish workflow contract: ok')

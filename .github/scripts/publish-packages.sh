@@ -2,54 +2,144 @@
 
 set -euo pipefail
 
-ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-cd "$ROOT_DIR"
+REGISTRY=${NPM_REGISTRY_URL:-https://registry.npmjs.org}
+ROOT_NAME='@tangle-network/agent-app'
+CREATE_NAME='@tangle-network/create-agent-app'
 
-publish_from_dir() {
-  local dir=$1
-  local name=$2
-  local version=$3
-  local token=${4:-}
-
-  if [[ -n "$token" ]]; then
-    (cd "$dir" && NODE_AUTH_TOKEN="$token" npm publish --provenance --access public) || {
-      echo "::error::npm publish failed for $name@$version. Check its npm package credentials and trusted publisher settings."
-      return 1
-    }
-    return
-  fi
-
-  (cd "$dir" && npm publish --provenance --access public) || {
-    echo "::error::npm publish failed for $name@$version. Check its npm package credentials and trusted publisher settings."
-    return 1
-  }
+die() {
+  echo "::error::$*" >&2
+  exit 1
 }
 
-publish_package() {
-  local dir=$1
-  local name
-  local version
+[[ -n "${EXPECTED_VERSION:-}" ]] || die 'EXPECTED_VERSION is required.'
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
 
-  name=$(node -p "require('./${dir}/package.json').name")
-  version=$(node -p "require('./${dir}/package.json').version")
+tarball_version() {
+  local tarball=$1 expected_name=$2 key=$3
+  local listing="$TMP/$key.list" manifest="$TMP/$key.json"
 
-  if npm view "$name@$version" version >/dev/null 2>&1; then
+  [[ -f "$tarball" && ! -L "$tarball" ]] || die "malformed tarball for $expected_name: expected a regular file at $tarball."
+  tar -tzf "$tarball" > "$listing" 2>/dev/null || die "malformed tarball for $expected_name: unreadable gzip tar archive."
+  ! grep -Evq '^package(/|$)' "$listing" || die "malformed tarball for $expected_name: entry outside package/."
+  ! grep -Eq '(^|/)\.\.(/|$)' "$listing" || die "malformed tarball for $expected_name: unsafe archive path."
+  [[ $(grep -Fxc 'package/package.json' "$listing" || true) -eq 1 ]] || die "malformed tarball for $expected_name: expected one package/package.json."
+  [[ $(tar -tvzf "$tarball" package/package.json 2>/dev/null | head -c 1) == '-' ]] || die "malformed tarball for $expected_name: package.json is not a regular file."
+  tar -xOzf "$tarball" package/package.json > "$manifest" 2>/dev/null || die "malformed tarball for $expected_name: unreadable package.json."
+
+  node - "$manifest" "$expected_name" <<'NODE'
+const fs = require('node:fs')
+const [file, expectedName] = process.argv.slice(2)
+let manifest
+try {
+  manifest = JSON.parse(fs.readFileSync(file, 'utf8'))
+} catch {
+  console.error(`malformed tarball for ${expectedName}: invalid package.json.`)
+  process.exit(1)
+}
+if (manifest.name !== expectedName) {
+  console.error(`package name mismatch: expected ${expectedName}, found ${String(manifest.name)}.`)
+  process.exit(1)
+}
+if (manifest.private === true || typeof manifest.version !== 'string' || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(manifest.version)) {
+  console.error(`malformed tarball for ${expectedName}: invalid publish metadata.`)
+  process.exit(1)
+}
+process.stdout.write(manifest.version)
+NODE
+}
+
+integrity() {
+  node - "$1" <<'NODE'
+const crypto = require('node:crypto')
+const fs = require('node:fs')
+const hash = crypto.createHash('sha512').update(fs.readFileSync(process.argv[2])).digest('base64')
+process.stdout.write(`sha512-${hash}`)
+NODE
+}
+
+npm_command() {
+  local token=$1
+  shift
+  if [[ -n "$token" ]]; then
+    env -u CREATE_AGENT_APP_NPM_TOKEN NODE_AUTH_TOKEN="$token" npm "$@"
+  else
+    env -u CREATE_AGENT_APP_NPM_TOKEN -u NODE_AUTH_TOKEN npm "$@"
+  fi
+}
+
+registry_integrity() {
+  local name=$1 version=$2 key=$3 value
+  if value=$(npm_command '' view "$name@$version" dist.integrity --registry="$REGISTRY" 2> "$TMP/$key.stderr"); then
+    [[ "$value" =~ ^sha512-[A-Za-z0-9+/]+={0,2}$ ]] || die "registry lookup failed for $name@$version: malformed integrity."
+    printf '%s' "$value"
+    return
+  fi
+  if grep -Eq '(^|[^[:alnum:]_])E404([^[:alnum:]_]|$)' "$TMP/$key.stderr"; then return 44; fi
+  cat "$TMP/$key.stderr" >&2
+  die "registry lookup failed for $name@$version; refusing to publish after an unknown error."
+}
+
+publish_one() {
+  local tarball=$1 name=$2 version=$3 key=$4 token=$5
+  local local_sri remote_sri status
+  local args=(publish "$tarball")
+  [[ "$name" == "$ROOT_NAME" ]] && args+=(--provenance)
+  args+=(--access public --ignore-scripts --registry="$REGISTRY")
+  local_sri=$(integrity "$tarball")
+
+  if remote_sri=$(registry_integrity "$name" "$version" "$key"); then
+    [[ "$remote_sri" == "$local_sri" ]] || die "registry tarball mismatch for $name@$version."
     echo "$name@$version already on registry; skipping publish"
     return
+  else
+    status=$?
+    [[ $status -eq 44 ]] || exit "$status"
   fi
 
-  if [[ "$dir" == "create-agent-app" ]]; then
-    if [[ -z "${CREATE_AGENT_APP_NPM_TOKEN:-}" ]]; then
-      echo "::error::CREATE_AGENT_APP_NPM_TOKEN is required to publish $name@$version."
-      return 1
+  if [[ "$name" == "$CREATE_NAME" && -z "$token" ]]; then
+    die "CREATE_AGENT_APP_NPM_TOKEN is required to publish $name@$version."
+  fi
+  if ! npm_command "$token" "${args[@]}"; then
+    if remote_sri=$(registry_integrity "$name" "$version" "$key") && [[ "$remote_sri" == "$local_sri" ]]; then
+      echo "$name@$version exact tarball already published by a concurrent run"
+      return
     fi
-
-    publish_from_dir "$dir" "$name" "$version" "$CREATE_AGENT_APP_NPM_TOKEN"
-    return
+    die "npm publish failed for $name@$version."
   fi
-
-  publish_from_dir "$dir" "$name" "$version"
+  remote_sri=$(registry_integrity "$name" "$version" "$key") || die "published $name@$version but registry verification failed."
+  [[ "$remote_sri" == "$local_sri" ]] || die "published tarball mismatch for $name@$version."
+  echo "$name@$version published and confirmed"
 }
 
-publish_package .
-publish_package create-agent-app
+command=${1:-}
+shift || true
+case "$command" in
+  validate)
+    [[ $# -eq 2 ]] || die "usage: EXPECTED_VERSION=x.y.z $0 validate <agent-app.tgz> <create-agent-app.tgz>"
+    root_version=$(tarball_version "$1" "$ROOT_NAME" root)
+    create_version=$(tarball_version "$2" "$CREATE_NAME" create)
+    [[ "$root_version" == "$create_version" ]] || die "tarball version mismatch: $root_version != $create_version."
+    [[ "$root_version" == "$EXPECTED_VERSION" ]] || die "tarball version mismatch: expected $EXPECTED_VERSION, found $root_version."
+    echo "validated exact tarballs for version $root_version"
+    ;;
+  publish)
+    [[ $# -eq 2 ]] || die "usage: EXPECTED_VERSION=x.y.z $0 publish <agent-app|create-agent-app> <package.tgz>"
+    case "$1" in
+      agent-app)
+        [[ -z "${CREATE_AGENT_APP_NPM_TOKEN:-}" ]] || die 'CREATE_AGENT_APP_NPM_TOKEN must not be exposed to the agent-app publisher.'
+        name=$ROOT_NAME
+        token=''
+        ;;
+      create-agent-app)
+        name=$CREATE_NAME
+        token=${CREATE_AGENT_APP_NPM_TOKEN:-}
+        ;;
+      *) die "unknown package selector: $1" ;;
+    esac
+    version=$(tarball_version "$2" "$name" "$1")
+    [[ "$version" == "$EXPECTED_VERSION" ]] || die "tarball version mismatch: expected $EXPECTED_VERSION, found $version."
+    publish_one "$2" "$name" "$version" "$1" "$token"
+    ;;
+  *) die "usage: EXPECTED_VERSION=x.y.z $0 <validate|publish> ..." ;;
+esac
