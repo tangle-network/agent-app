@@ -29,7 +29,7 @@
     "@tangle-network/agent-integrations": ">=0.51.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260722.1",
+    "@cloudflare/workers-types": "5.20260722.1",
     "@tangle-network/agent-eval": "0.135.1",
     "@tangle-network/agent-integrations": "^0.51.0",
     "@types/better-sqlite3": "^7.6.13",
@@ -37,6 +37,6 @@
     "better-sqlite3": "^12.10.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0",
-    "wrangler": "^4.115.0"
+    "wrangler": "^4.114.0"
   }
 }

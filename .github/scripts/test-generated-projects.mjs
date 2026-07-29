@@ -159,6 +159,8 @@ function installAndRunScaffolder({
   run(installedCli, cliArgs, { cwd: runner, env, timeout: PACK_TIMEOUT_MS })
 
   const packagePath = join(project, 'package.json')
+  const workspacePath = join(project, 'pnpm-workspace.yaml')
+  const workspaceBeforeInstall = readFileSync(workspacePath, 'utf8')
   const generatedPackage = JSON.parse(readFileSync(packagePath, 'utf8'))
   const expectedRange = `^${packedVersion}`
   assertEqual(
@@ -179,6 +181,11 @@ function installAndRunScaffolder({
     'pnpm',
     ['exec', 'wrangler', 'deploy', '--dry-run', '--outdir', '.wrangler-dry-run'],
     { cwd: project, env },
+  )
+  assertEqual(
+    readFileSync(workspacePath, 'utf8'),
+    workspaceBeforeInstall,
+    `${variant} dependency policy after install`,
   )
 }
 
