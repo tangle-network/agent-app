@@ -96,7 +96,7 @@ reset
 run env CREATE_AGENT_APP_NPM_TOKEN=scaffold-token bash "$SCRIPT" publish create-agent-app "$CREATE_TGZ" >/dev/null
 [[ $(grep -c '^publish|' "$TMP/npm.log") -eq 1 ]]
 grep -Fq "publish|@tangle-network/create-agent-app@1.2.3|$CREATE_TGZ|scaffold-token||" "$TMP/npm.log"
-! grep '^publish|' "$TMP/npm.log" | grep -q -- '--provenance'
+grep '^publish|' "$TMP/npm.log" | grep -Fq -- '--provenance'
 grep '^publish|' "$TMP/npm.log" | grep -Fq -- '--ignore-scripts'
 grep '^view|' "$TMP/npm.log" | grep -Eq '\|\|$'
 
@@ -107,6 +107,18 @@ run bash "$SCRIPT" publish agent-app "$ROOT_TGZ" > "$TMP/rerun.log"
 run env CREATE_AGENT_APP_NPM_TOKEN=scaffold-token bash "$SCRIPT" publish create-agent-app "$CREATE_TGZ" >> "$TMP/rerun.log"
 no_publish
 [[ $(grep -c 'already on registry; skipping publish' "$TMP/rerun.log") -eq 2 ]]
+
+reset
+sri "$ROOT_TGZ" > "$TMP/state/root.integrity"
+run env CREATE_AGENT_APP_NPM_TOKEN=scaffold-token bash "$SCRIPT" publish create-agent-app "$CREATE_TGZ" >/dev/null
+[[ $(grep -c '^publish|' "$TMP/npm.log") -eq 1 ]]
+grep -Fq 'publish|@tangle-network/create-agent-app@1.2.3' "$TMP/npm.log"
+
+reset
+sri "$CREATE_TGZ" > "$TMP/state/create.integrity"
+run bash "$SCRIPT" publish agent-app "$ROOT_TGZ" >/dev/null
+[[ $(grep -c '^publish|' "$TMP/npm.log") -eq 1 ]]
+grep -Fq 'publish|@tangle-network/agent-app@1.2.3' "$TMP/npm.log"
 
 BAD_VERSION="$TMP/tarballs/create-1.2.4.tgz"
 make_tarball '@tangle-network/create-agent-app' 1.2.4 "$BAD_VERSION"
@@ -139,4 +151,4 @@ reset
 fails 'must not be exposed' run env CREATE_AGENT_APP_NPM_TOKEN=wrong-job bash "$SCRIPT" publish agent-app "$ROOT_TGZ"
 no_publish
 
-echo 'publish package script: ok (11 cases)'
+echo 'publish package script: ok (13 cases)'

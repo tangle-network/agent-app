@@ -83,9 +83,7 @@ registry_integrity() {
 publish_one() {
   local tarball=$1 name=$2 version=$3 key=$4 token=$5
   local local_sri remote_sri status
-  local args=(publish "$tarball")
-  [[ "$name" == "$ROOT_NAME" ]] && args+=(--provenance)
-  args+=(--access public --ignore-scripts --registry="$REGISTRY")
+  local args=(publish "$tarball" --provenance --access public --ignore-scripts --registry="$REGISTRY")
   local_sri=$(integrity "$tarball")
 
   if remote_sri=$(registry_integrity "$name" "$version" "$key"); then

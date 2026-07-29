@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const text = fs.readFileSync(path.join(root, '.github/workflows/publish.yml'), 'utf8')
 const script = fs.readFileSync(path.join(root, '.github/scripts/publish-packages.sh'), 'utf8')
+const releaseScript = fs.readFileSync(path.join(root, '.github/scripts/write-release.sh'), 'utf8')
 const lines = text.split('\n')
 const pins = {
   'actions/checkout': '3d3c42e5aac5ba805825da76410c181273ba90b1',
@@ -90,23 +91,38 @@ for (const command of ['pnpm install --frozen-lockfile', 'pnpm run typecheck', '
 }
 check(packageJob.indexOf('pnpm run build') < packageJob.indexOf('npm pack') && packageJob.indexOf('npm pack') < packageJob.indexOf('actions/upload-artifact@'), 'artifact is uploaded before build and pack complete')
 check(packageJob.includes('persist-credentials: false'), 'package checkout persists credentials')
-check(packageJob.includes('control-sha:'), 'publish script is not anchored before dependency install')
+check(!packageJob.includes('npm version'), 'auto mode mutates package manifests before the tagged run')
+check(packageJob.includes('fetch-depth: 0'), 'release history is shallow')
+check(packageJob.includes('publish-control-sha:') && packageJob.includes('release-control-sha:'), 'release scripts are not anchored before dependency install')
 check(packageJob.indexOf('id: control') < packageJob.indexOf('pnpm install'), 'publish script is anchored after dependency install')
+check(packageJob.includes('bash .github/scripts/test-write-release.sh'), 'release transition tests do not run')
 check(packageJob.includes('actions/upload-artifact@'), 'tested tarballs are not uploaded')
-check(packageJob.includes('Verify tag is current main tip'), 'tag publishing does not check current main')
+check(packageJob.includes('Verify release tag is on main'), 'tag publishing does not check main ancestry')
 check(packageJob.includes('+refs/heads/main:refs/remotes/origin/main'), 'tag check does not fetch main')
-check(packageJob.includes('[[ "$TAG_SHA" == "$MAIN_SHA" ]]'), 'tag commit is not compared with current main')
-check(packageJob.indexOf('Verify tag is current main tip') < packageJob.indexOf('pnpm install'), 'stale tags are rejected after dependency install')
+check(packageJob.includes('git merge-base --is-ancestor "$TAG_SHA" "$MAIN_SHA"'), 'tag commit ancestry is not checked')
+check(packageJob.indexOf('Verify release tag is on main') < packageJob.indexOf('pnpm install'), 'invalid tags are rejected after dependency install')
+check((packageJob.match(/if: steps\.release\.outputs\.mode == 'tag'/g) ?? []).length === 2, 'auto mode can create or upload publish artifacts')
 
-check(writeJob.includes('contents: write') && !writeJob.includes('id-token: write'), 'write job permissions are wrong')
+check(writeJob.includes('contents: write') && writeJob.includes('actions: write') && !writeJob.includes('id-token: write'), 'write job permissions are wrong')
 check(writeJob.includes('needs: package_release'), 'write job does not wait for packaging')
 check(!writeJob.includes('uses:'), 'write job invokes an action')
 check(writeJob.includes('git init --bare'), 'write job uses a checkout')
-check(writeJob.includes('push --atomic'), 'version commit and tag are not atomic')
-check(writeJob.includes('REMOTE_MAIN') && writeJob.includes('BASE_SHA'), 'write job is not tied to the tested commit')
+check(writeJob.includes('git show "$BASE_SHA:.github/scripts/write-release.sh"'), 'write job does not load the tested release script')
+check(writeJob.includes('CONTROL_SHA') && writeJob.includes('sha256sum'), 'write job does not authenticate the release script')
+check(writeJob.includes('bash "$RUNNER_TEMP/write-release.sh"'), 'write job does not execute the release script')
+for (const command of [
+  'git push --atomic',
+  'git merge-base --is-ancestor',
+  'git diff --name-only',
+  'git rev-list --parents',
+  'actions/workflows/publish.yml/dispatches',
+]) {
+  check(releaseScript.includes(command), `release script is missing ${command}`)
+}
 
 for (const [name, block] of [['publish_agent_app', agentPublishJob], ['publish_create_agent_app', createPublishJob]]) {
-  check(block.includes("needs.write_release.outputs.released == 'true'"), `${name} can publish an uncommitted auto release`)
+  check(block.includes("needs.package_release.outputs.mode == 'tag'"), `${name} can publish outside a tagged run`)
+  check(!block.includes('write_release'), `${name} depends on the pre-tag run`)
   check(block.includes('actions: read'), `${name} cannot download the artifact`)
   check(block.includes('node-version: 24.18.0'), `${name} runtime is not exact`)
   check(block.includes("$(npm --version) == '11.16.0'"), `${name} npm version is not checked`)
@@ -116,10 +132,10 @@ for (const [name, block] of [['publish_agent_app', agentPublishJob], ['publish_c
 check(agentPublishJob.includes('id-token: write') && !agentPublishJob.includes('contents: write'), 'Agent App publisher permissions are wrong')
 check(!agentPublishJob.includes('secrets.') && !agentPublishJob.includes('CREATE_AGENT_APP_NPM_TOKEN'), 'Agent App publisher receives a long-lived secret')
 check(agentPublishJob.includes('publish agent-app agent-app.tgz') && !agentPublishJob.includes('create-agent-app.tgz'), 'Agent App publisher is not limited to its tarball')
-check(!createPublishJob.includes('id-token: write') && !createPublishJob.includes('contents: write'), 'create-agent-app publisher permissions are wrong')
+check(createPublishJob.includes('id-token: write') && !createPublishJob.includes('contents: write'), 'create-agent-app publisher permissions are wrong')
 check(createPublishJob.includes('CREATE_AGENT_APP_NPM_TOKEN: ${{ secrets.CREATE_AGENT_APP_NPM_TOKEN }}'), 'create-agent-app publisher lacks its token')
 check(createPublishJob.includes('publish create-agent-app create-agent-app.tgz') && !createPublishJob.includes('publish agent-app '), 'create-agent-app publisher is not limited to its tarball')
-check(script.includes('--ignore-scripts'), 'publish command allows lifecycle scripts')
+check(script.includes('--provenance') && script.includes('--ignore-scripts'), 'publish command lacks provenance or allows lifecycle scripts')
 check(text.includes("startsWith(github.ref, 'refs/tags/v')") && text.includes("github.event_name == 'workflow_dispatch'"), 'manual tag publishing changed')
 
 console.log('publish workflow contract: ok')
