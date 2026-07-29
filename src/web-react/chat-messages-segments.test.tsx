@@ -20,6 +20,32 @@ function indexIn(container: HTMLElement, needle: string): number {
 }
 
 describe('ChatMessages segmented turns', () => {
+  it('applies the large reading size to user and assistant messages together', () => {
+    const messages: ChatUiMessage[] = [
+      { id: 'user-1', role: 'user', content: 'User question' },
+      { id: 'assistant-1', role: 'assistant', content: 'Assistant answer' },
+    ]
+    const { getByText } = render(
+      <ChatMessages
+        messages={messages}
+        messageSize="large"
+        renderMarkdown={(content) => (
+          <div className="text-sm">{content}</div>
+        )}
+      />,
+    )
+
+    expect(getByText('User question').parentElement?.className).toContain(
+      'text-[17px]',
+    )
+    expect(getByText('Assistant answer').parentElement?.className).toContain(
+      'text-[17px]',
+    )
+    expect(
+      getByText('Assistant answer').parentElement?.className,
+    ).toContain('agent-app-message-copy')
+  })
+
   it('renders text and tool segments in chronological order', () => {
     const message: ChatUiMessage = {
       id: 'm1',
