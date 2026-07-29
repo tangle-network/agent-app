@@ -10690,6 +10690,194 @@
       ]
     },
     {
+      "id": "./session-shell",
+      "source": "src/session-shell/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "activeSessionIdFromPath",
+          "kind": "function",
+          "signature": "({ pathname, base, segment, newSegment, }: ActiveSessionIdOptions) => string | null",
+          "doc": "The session id the current route has open, or `null` on the new-session composer / anywhere else."
+        },
+        {
+          "name": "ActiveSessionIdOptions",
+          "kind": "interface",
+          "signature": "interface ActiveSessionIdOptions",
+          "doc": null
+        },
+        {
+          "name": "buildSessionNavItem",
+          "kind": "function",
+          "signature": "<TIcon = unknown>({ id, label, icon, href, activeSessionId, emptyLabel, defaultOpen, ...subItemOptions }: BuildSessionN…",
+          "doc": "The rail's session entry: one expandable nav row whose sub-items are the recent sessions."
+        },
+        {
+          "name": "BuildSessionNavItemOptions",
+          "kind": "interface",
+          "signature": "interface BuildSessionNavItemOptions",
+          "doc": null
+        },
+        {
+          "name": "buildSessionSubItems",
+          "kind": "function",
+          "signature": "<TIcon = unknown>({ sessions, hrefForSession, respondingSessionIds, actions, untitledLabel, prefetch, overflow, }: Buil…",
+          "doc": "Session rows for the rail's expandable history item."
+        },
+        {
+          "name": "BuildSessionSubItemsOptions",
+          "kind": "interface",
+          "signature": "interface BuildSessionSubItemsOptions",
+          "doc": null
+        },
+        {
+          "name": "ComposedSidebarSessions",
+          "kind": "interface",
+          "signature": "interface ComposedSidebarSessions",
+          "doc": null
+        },
+        {
+          "name": "composeSidebarSessions",
+          "kind": "function",
+          "signature": "({ loaderSessions, optimisticSessions, limit, totalCount, liveUnreadIds, locallyReadIds, currentSessionId, }: ComposeSi…",
+          "doc": "The rail's session list: optimistic rows first, then the loader's, capped, with unread resolved per row."
+        },
+        {
+          "name": "ComposeSidebarSessionsOptions",
+          "kind": "interface",
+          "signature": "interface ComposeSidebarSessionsOptions",
+          "doc": null
+        },
+        {
+          "name": "DEFAULT_RAIL_COOKIE_NAME",
+          "kind": "const",
+          "signature": "\"agent-sidebar-rail-collapsed\"",
+          "doc": null
+        },
+        {
+          "name": "mergeSessionPages",
+          "kind": "function",
+          "signature": "(existing: SessionSummary[], incoming: SessionSummary[]) => SessionSummary[]",
+          "doc": "Append a fetched page to held rows, dropping ids already shown."
+        },
+        {
+          "name": "NavRouteDef",
+          "kind": "interface",
+          "signature": "interface NavRouteDef",
+          "doc": "One rail destination."
+        },
+        {
+          "name": "railCollapsedCookie",
+          "kind": "function",
+          "signature": "(collapsed: boolean, { name, maxAge, path, secure }?: RailCookieOptions) => string",
+          "doc": "The cookie string for a collapse state."
+        },
+        {
+          "name": "RailCookieOptions",
+          "kind": "interface",
+          "signature": "interface RailCookieOptions",
+          "doc": null
+        },
+        {
+          "name": "RailPrefetch",
+          "kind": "type",
+          "signature": "type RailPrefetch",
+          "doc": null
+        },
+        {
+          "name": "readRailCollapsedCookie",
+          "kind": "function",
+          "signature": "(cookieHeader: string | null | undefined, name?: string) => boolean",
+          "doc": "Read the persisted rail-collapse state from a request's `Cookie` header, so the server renders the rail in the state the user left it and the first client render does not re-flow."
+        },
+        {
+          "name": "resolveActiveNavId",
+          "kind": "function",
+          "signature": "({ pathname, base, routes, aliases, claimsNothing, }: ResolveActiveNavIdOptions) => string | undefined",
+          "doc": "The rail row to highlight for the current route."
+        },
+        {
+          "name": "ResolveActiveNavIdOptions",
+          "kind": "interface",
+          "signature": "interface ResolveActiveNavIdOptions",
+          "doc": null
+        },
+        {
+          "name": "resolveSessionUnread",
+          "kind": "function",
+          "signature": "({ sessionId, loaderUnread, liveUnreadIds, locallyReadIds, currentSessionId, }: ResolveSessionUnreadOptions) => boolean",
+          "doc": "Effective unread for one row."
+        },
+        {
+          "name": "ResolveSessionUnreadOptions",
+          "kind": "interface",
+          "signature": "interface ResolveSessionUnreadOptions",
+          "doc": null
+        },
+        {
+          "name": "sessionLabel",
+          "kind": "function",
+          "signature": "(session: SessionSummary, untitled?: string) => string",
+          "doc": "Display title for a session row — trims, and falls back rather than rendering an empty row the user cannot aim at."
+        },
+        {
+          "name": "SessionPage",
+          "kind": "interface",
+          "signature": "interface SessionPage",
+          "doc": "One fetched page of sessions with an optional continuation cursor."
+        },
+        {
+          "name": "SessionRailAction",
+          "kind": "interface",
+          "signature": "interface SessionRailAction",
+          "doc": "These mirror `@tangle-network/sandbox-ui/dashboard`'s `SidebarLayoutNavItem` / `RailExpandableSubItem` STRUCTURALLY rather than importing them, so this module stays free of the optional peer (invaria…"
+        },
+        {
+          "name": "SessionRailNavItem",
+          "kind": "interface",
+          "signature": "interface SessionRailNavItem",
+          "doc": null
+        },
+        {
+          "name": "SessionRailSubItem",
+          "kind": "interface",
+          "signature": "interface SessionRailSubItem",
+          "doc": null
+        },
+        {
+          "name": "SessionRowActions",
+          "kind": "interface",
+          "signature": "interface SessionRowActions",
+          "doc": "Per-row rename/delete wiring."
+        },
+        {
+          "name": "SessionSort",
+          "kind": "type",
+          "signature": "type SessionSort",
+          "doc": "Sort order for the history view."
+        },
+        {
+          "name": "SessionSummary",
+          "kind": "interface",
+          "signature": "interface SessionSummary",
+          "doc": "One session as the shell needs to see it."
+        },
+        {
+          "name": "UNTITLED_SESSION_LABEL",
+          "kind": "const",
+          "signature": "\"Untitled chat\"",
+          "doc": null
+        },
+        {
+          "name": "writeRailCollapsedCookie",
+          "kind": "function",
+          "signature": "(collapsed: boolean, options?: RailCookieOptions) => void",
+          "doc": "Persist the rail-collapse state from the browser."
+        }
+      ]
+    },
+    {
       "id": "./skills",
       "source": "src/skills/index.ts",
       "dependsOn": [],
@@ -13831,6 +14019,7 @@
         "plans",
         "platform",
         "runtime",
+        "session-shell",
         "trace",
         "work-product"
       ],
@@ -14401,6 +14590,12 @@
           "doc": "Properties for the severity-badged exception list"
         },
         {
+          "name": "FetchSessionPage",
+          "kind": "type",
+          "signature": "type FetchSessionPage",
+          "doc": "Data port — one page of sessions for the current view."
+        },
+        {
           "name": "fieldAcceptsFreeText",
           "kind": "function",
           "signature": "(field: ChatInteractionField) => boolean",
@@ -14483,6 +14678,12 @@
           "kind": "function",
           "signature": "(msg: ChatMessageMetrics, models: CatalogModel[]) => string | null",
           "doc": "\"$0.0042\" from token counts × catalogue per-token pricing; null when unknown."
+        },
+        {
+          "name": "formatSessionTimestamp",
+          "kind": "function",
+          "signature": "(isoDate: string | null) => string",
+          "doc": "Compact relative time."
         },
         {
           "name": "formatTokensPerSecond",
@@ -14723,6 +14924,18 @@
           "kind": "function",
           "signature": "(interaction: ChatInteraction, data: Record<string, string | number | boolean | string[]>) => string",
           "doc": "Renders the late answer as a self-contained chat message: the original question, its context, and the user's answer(s)."
+        },
+        {
+          "name": "LinkLikeComponent",
+          "kind": "type",
+          "signature": "type LinkLikeComponent",
+          "doc": null
+        },
+        {
+          "name": "LinkLikeProps",
+          "kind": "interface",
+          "signature": "interface LinkLikeProps",
+          "doc": null
         },
         {
           "name": "loadAttachmentFile",
@@ -15121,6 +15334,48 @@
           "doc": "Split a message's text into plain-text and mention segments by matching `@<path>` runs against that message's own mention parts."
         },
         {
+          "name": "SessionActionLabels",
+          "kind": "interface",
+          "signature": "interface SessionActionLabels",
+          "doc": null
+        },
+        {
+          "name": "SessionActions",
+          "kind": "interface",
+          "signature": "interface SessionActions",
+          "doc": null
+        },
+        {
+          "name": "SessionActionsOptions",
+          "kind": "interface",
+          "signature": "interface SessionActionsOptions",
+          "doc": null
+        },
+        {
+          "name": "SessionHistoryPanel",
+          "kind": "function",
+          "signature": "({ history, hasAnySessions, query, onQueryChange, sort, onSortChange, hrefForSession, linkComponent: Link, respondingSe…",
+          "doc": "The full session history: search, sort, cursor-paged rows with per-row actions, and the states in between (first-run empty, loading, no matches, error + retry)."
+        },
+        {
+          "name": "SessionHistoryPanelProps",
+          "kind": "interface",
+          "signature": "interface SessionHistoryPanelProps",
+          "doc": null
+        },
+        {
+          "name": "SessionHistoryState",
+          "kind": "interface",
+          "signature": "interface SessionHistoryState",
+          "doc": null
+        },
+        {
+          "name": "SessionPageQuery",
+          "kind": "interface",
+          "signature": "interface SessionPageQuery",
+          "doc": null
+        },
+        {
           "name": "settleInteractionSubmit",
           "kind": "function",
           "signature": "(run: () => Promise<InteractionSubmitResult>, timeoutMs?: number) => Promise<InteractionSubmitResult>",
@@ -15271,6 +15526,18 @@
           "doc": "Provide properties and methods to manage and refresh file mentions in a composer interface"
         },
         {
+          "name": "useInfiniteScroll",
+          "kind": "function",
+          "signature": "(onLoadMore: () => void, { enabled, root, rootMargin }: UseInfiniteScrollOptions) => (node: HTMLElement | null) => void",
+          "doc": "Fires `onLoadMore` when a sentinel element scrolls into view."
+        },
+        {
+          "name": "UseInfiniteScrollOptions",
+          "kind": "interface",
+          "signature": "interface UseInfiniteScrollOptions",
+          "doc": null
+        },
+        {
           "name": "usePending",
           "kind": "function",
           "signature": "() => { pending: boolean; run: (action: () => void | Promise<void>) => void; }",
@@ -15299,6 +15566,24 @@
           "kind": "interface",
           "signature": "interface UseSandboxTerminalConnectionResult",
           "doc": "Resolve sandbox terminal connection status and provide a method to initiate the connection"
+        },
+        {
+          "name": "useSessionActions",
+          "kind": "function",
+          "signature": "({ renameSession, deleteSession, onChanged, onDeletedCurrent, currentSessionId, notify, labels, }: SessionActionsOption…",
+          "doc": "Rename + delete for one session, shared by the rail kebab and the history row menu so both drive the same dialogs and the same product mutations."
+        },
+        {
+          "name": "useSessionHistory",
+          "kind": "function",
+          "signature": "({ fetchPage, q, sort, initialPage, defaultSort, }: UseSessionHistoryOptions) => SessionHistoryState",
+          "doc": "Infinite-scroll data source for the history view."
+        },
+        {
+          "name": "UseSessionHistoryOptions",
+          "kind": "interface",
+          "signature": "interface UseSessionHistoryOptions",
+          "doc": null
         },
         {
           "name": "useSmoothText",
@@ -15363,6 +15648,7 @@
         "plans",
         "platform",
         "runtime",
+        "session-shell",
         "trace",
         "work-product"
       ],

@@ -48,6 +48,7 @@ export * from './mission-activity'
 export * from './work-product'
 export * from './sandbox-terminal'
 export * from './seat-paywall'
+export * from './session-history'
 export {
   usePopover,
   usePending,
