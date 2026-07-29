@@ -4,7 +4,7 @@
 
 Source: `src/preflight/index.ts`
 
-12 exports.
+14 exports.
 
 ### `formatPreflightReport`
 
@@ -60,6 +60,22 @@ interface PreflightProbeVerdict
 
 ```ts
 interface PreflightReport
+```
+
+### `requiredValueProbe`
+
+`function` — Require a non-empty string without ever printing its value.
+
+```ts
+(config: RequiredValueProbeConfig) => PreflightProbe
+```
+
+### `RequiredValueProbeConfig`
+
+`interface` — Configuration for a required non-empty production value.
+
+```ts
+interface RequiredValueProbeConfig
 ```
 
 ### `routerChatProbe`

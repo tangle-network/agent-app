@@ -12,9 +12,10 @@
  * to rotate.
  *
  * A probe is `{ name, run, critical? }`; `run()` returns `{ ok, detail? }`.
- * The standard builders (`routerChatProbe`, `sandboxAuthProbe`, `httpHeadProbe`)
- * each take explicit config — they read nothing global — so the same probe runs
- * identically in a deploy step, a test, or a local check. `runPreflight` fans
+ * The standard builders (`requiredValueProbe`, `routerChatProbe`,
+ * `sandboxAuthProbe`, `httpHeadProbe`) each take explicit config — they read
+ * nothing global — so the same probe runs identically in a deploy step, a test,
+ * or a local check. `runPreflight` fans
  * the probes out, times each, and folds them into a pass/fail report: any
  * failed CRITICAL probe fails the whole run (probes are critical by default).
  *
@@ -178,6 +179,36 @@ function trimTrailingSlash(url: string): string {
 }
 
 // --- Standard probe builders --------------------------------------------------
+
+/** Configuration for a required non-empty production value. */
+export interface RequiredValueProbeConfig {
+  /** Human-readable value name, normally the environment variable name. */
+  name: string
+  /** Value supplied by the caller. It is checked but never included in output. */
+  value: string | null | undefined
+  /** Default `true`. */
+  critical?: boolean
+  /** Failure detail. Defaults to `NAME is unset`. */
+  missingDetail?: string
+}
+
+/**
+ * Require a non-empty string without ever printing its value.
+ *
+ * This covers local signing keys and other values that have no external
+ * endpoint to probe. Credentials with a live API should use a liveness probe
+ * instead, because presence alone cannot detect an expired key.
+ */
+export function requiredValueProbe(config: RequiredValueProbeConfig): PreflightProbe {
+  return {
+    name: `required:${config.name}`,
+    critical: config.critical,
+    run: async () => {
+      const ok = typeof config.value === 'string' && config.value.trim().length > 0
+      return { ok, detail: ok ? undefined : (config.missingDetail ?? `${config.name} is unset`) }
+    },
+  }
+}
 
 /** Define configuration options for probing an LLM router with authentication and model details */
 export interface RouterChatProbeConfig {

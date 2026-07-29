@@ -9535,6 +9535,22 @@ interface PreflightProbeVerdict
 interface PreflightReport
 ```
 
+### `requiredValueProbe`
+
+`function` — Require a non-empty string without ever printing its value.
+
+```ts
+(config: RequiredValueProbeConfig) => PreflightProbe
+```
+
+### `RequiredValueProbeConfig`
+
+`interface` — Configuration for a required non-empty production value.
+
+```ts
+interface RequiredValueProbeConfig
+```
+
 ### `routerChatProbe`
 
 `function` — Probe an OpenAI-compatible LLM router with one cheap `POST /chat/completions` (`max_tokens: 1`).

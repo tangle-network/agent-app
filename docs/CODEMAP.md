@@ -41,7 +41,7 @@ _77 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./object-store`](api/object-store.md) | 15 | `crypto` |
 | [`./plans`](api/plans.md) | 12 | — |
 | [`./platform`](api/platform.md) | 67 | `billing`, `runtime`, `web` |
-| [`./preflight`](api/preflight.md) | 12 | — |
+| [`./preflight`](api/preflight.md) | 14 | — |
 | [`./preflight/cli`](api/preflight-cli.md) | 2 | — |
 | [`./preset-cloudflare`](api/preset-cloudflare.md) | 22 | `billing`, `crypto`, `knowledge`, `tools`, `web` |
 | [`./profile`](api/profile.md) | 45 | `skills` |
@@ -406,9 +406,9 @@ Depends on: `billing`, `runtime`, `web`
 
 ## `./preflight`
 
-Source: `src/preflight/index.ts` · 12 exports
+Source: `src/preflight/index.ts` · 14 exports
 
-`formatPreflightReport`, `httpHeadProbe`, `HttpHeadProbeConfig`, `PreflightProbe`, `PreflightProbeResult`, `PreflightProbeVerdict`, `PreflightReport`, `routerChatProbe`, `RouterChatProbeConfig`, `runPreflight`, `sandboxAuthProbe`, `SandboxAuthProbeConfig`
+`formatPreflightReport`, `httpHeadProbe`, `HttpHeadProbeConfig`, `PreflightProbe`, `PreflightProbeResult`, `PreflightProbeVerdict`, `PreflightReport`, `requiredValueProbe`, `RequiredValueProbeConfig`, `routerChatProbe`, `RouterChatProbeConfig`, `runPreflight`, `sandboxAuthProbe`, `SandboxAuthProbeConfig`
 
 [Full API →](api/preflight.md)
 
