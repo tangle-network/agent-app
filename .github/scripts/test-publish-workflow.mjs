@@ -125,7 +125,17 @@ check(packageJob.includes('git merge-base --is-ancestor "$TAG_SHA" "$MAIN_SHA"')
 check(packageJob.indexOf('Verify release tag is on main') < packageJob.indexOf('pnpm install'), 'invalid tags are rejected after dependency install')
 check(packageJob.includes('bash .github/scripts/write-release.sh validate'), 'tag release identity is not checked')
 check(packageJob.indexOf('bash .github/scripts/write-release.sh validate') < packageJob.indexOf('pnpm install'), 'tag release identity is checked after dependency install')
-check((packageJob.match(/if: steps\.release\.outputs\.mode == 'tag'/g) ?? []).length === 4, 'tag-only artifact work can run in auto mode')
+for (const name of [
+  'Configure exact artifact pack runtime',
+  'Verify artifact pack npm',
+  'Pack and inspect exact tarballs',
+  'Upload release artifact',
+]) {
+  check(
+    namedStep(packageJob, name).includes("if: steps.release.outputs.mode == 'tag'"),
+    `${name} can run outside tagged releases`,
+  )
+}
 
 check(writeJob.includes('contents: write') && writeJob.includes('actions: write') && !writeJob.includes('id-token: write'), 'write job permissions are wrong')
 check(writeJob.includes('needs: package_release'), 'write job does not wait for packaging')

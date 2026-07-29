@@ -110,6 +110,7 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
       - run: pnpm run build
 
+      # Compile on supported Node 22; switch only packing to npm 11, which honors --ignore-scripts.
       - name: Configure exact artifact pack runtime
         if: steps.release.outputs.mode == 'tag'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
