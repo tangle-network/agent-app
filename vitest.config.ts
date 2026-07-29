@@ -25,8 +25,6 @@ export default defineConfig({
     // sequential wall-time cost is only a few seconds.
     pool: 'forks',
     fileParallelism: false,
-    poolOptions: {
-      forks: { execArgv: ['--max-old-space-size=4096'] },
-    },
+    execArgv: ['--max-old-space-size=4096'],
   },
 })
