@@ -101,6 +101,8 @@ check(packageJob.includes('publish-control-sha:') && packageJob.includes('releas
 check(packageJob.indexOf('id: control') < packageJob.indexOf('pnpm install'), 'publish script is anchored after dependency install')
 check(packageJob.includes('cp .github/scripts/read-npm-pack-filename.mjs'), 'npm pack parser is not staged before install')
 check(packageJob.indexOf('cp .github/scripts/read-npm-pack-filename.mjs') < packageJob.indexOf('pnpm install'), 'npm pack parser is staged after dependency install')
+check(packageJob.includes('pack-sha=$(sha256sum'), 'npm pack parser checksum is not captured before install')
+check(packageJob.includes('PACK_CONTROL_SHA:') && packageJob.includes('sha256sum "$BUNDLE/read-npm-pack-filename.mjs"'), 'npm pack parser checksum is not verified before use')
 check(packageJob.includes('npm pack "$source" --ignore-scripts --pack-destination "$BUNDLE" --json'), 'npm pack does not request structured output')
 check(packageJob.includes('node "$BUNDLE/read-npm-pack-filename.mjs"'), 'npm pack filename is not parsed by the staged parser')
 check(packageJob.includes('bash .github/scripts/test-write-release.sh'), 'release transition tests do not run')
