@@ -1,6 +1,7 @@
 import {
   Sandbox,
   type ExecResult,
+  type EgressPolicy,
   type MintScopedTokenOptions,
   type SandboxConnection,
   type SandboxInstance,
@@ -316,6 +317,16 @@ export interface SandboxRuntimeConfig {
   permissionRole?: (workspaceRole: string) => SandboxPermissionLevel
   resources?: SandboxResourceConfig
   provider?: ProviderResolutionConfig
+
+  /**
+   * Product-declared outbound network policy. Applied when a sandbox is
+   * created and reconciled before a reused or resumed sandbox is returned.
+   * This keeps product tools and other required endpoints reachable without
+   * product-local lifecycle calls. Adopting or changing the policy on an
+   * existing sandbox restarts its egress proxy once; matching explicit
+   * policies are left untouched.
+   */
+  egressPolicy?: EgressPolicy
 
   // BYOS3/R2 snapshot storage. Returns undefined => key omitted entirely
   // (fail-closed when creds absent). Product owns bucket/endpoint/credentials/prefix.
@@ -1667,6 +1678,7 @@ async function finalizeExistingBox(
   harness: Harness,
   scope: SandboxScope,
 ): Promise<SandboxInstance> {
+  await reconcileExistingBoxEgress(box, shell.egressPolicy, stage, name)
   const written = await materializeDeferredFilesForExistingBox(
     shell,
     client,
@@ -1688,6 +1700,52 @@ async function finalizeExistingBox(
     }
   }
   return finalBox
+}
+
+function normalizedEgressPolicy(policy: EgressPolicy): string {
+  if (policy.mode !== 'strict') return policy.mode
+  const allowDomains = [...new Set(
+    (policy.allowDomains ?? [])
+      .map((domain) => domain.trim().toLowerCase())
+      .filter(Boolean),
+  )].sort()
+  return JSON.stringify({
+    mode: policy.mode,
+    allowDomains,
+    includeImplicitDomains: policy.includeImplicitDomains !== false,
+  })
+}
+
+async function reconcileExistingBoxEgress(
+  box: SandboxInstance,
+  desired: EgressPolicy | undefined,
+  stage: ExistingBoxStage,
+  name: string,
+): Promise<void> {
+  if (!desired) return
+  let current: Awaited<ReturnType<SandboxInstance['egress']['get']>>
+  try {
+    current = await box.egress.get()
+  } catch (cause) {
+    const error = cause instanceof Error ? cause : new Error(String(cause))
+    throw new Error(`egress policy read failed on ${stage} box ${name}: ${error.message}`, {
+      cause: error,
+    })
+  }
+  const matchingPolicy = normalizedEgressPolicy(current.policy) === normalizedEgressPolicy(desired)
+  // A platform-default `open` value is intentionally latched to the host's
+  // secure default. Re-apply it as an explicit sandbox policy so `open`
+  // actually means open; team and sandbox sources are already deliberate.
+  const effectiveSource = desired.mode !== 'open' || current.source !== 'platform'
+  if (matchingPolicy && effectiveSource) return
+  try {
+    await box.egress.update(desired)
+  } catch (cause) {
+    const error = cause instanceof Error ? cause : new Error(String(cause))
+    throw new Error(`egress policy update failed on ${stage} box ${name}: ${error.message}`, {
+      cause: error,
+    })
+  }
 }
 
 /** Resolve or create a workspace sandbox instance with optional reuse and progress tracking */
@@ -1854,6 +1912,7 @@ export async function ensureWorkspaceSandbox(
     backend: { type: harness, profile, ...(model ? { model } : {}) },
     ...(storage ? { storage } : {}),
     ...(restore ? restore : {}),
+    ...(shell.egressPolicy ? { egressPolicy: shell.egressPolicy } : {}),
     ...(shell.webTerminalEnabled ? { webTerminalEnabled: true } : {}),
     maxLifetimeSeconds: resources.maxLifetimeSeconds,
     idleTimeoutSeconds: resources.idleTimeoutSeconds,
