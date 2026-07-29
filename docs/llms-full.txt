@@ -10554,6 +10554,14 @@ interface ModelCatalog
 (id: string) => string
 ```
 
+### `OpenAICompatServedModel`
+
+`interface` — Which model actually served one direct-router turn.
+
+```ts
+interface OpenAICompatServedModel
+```
+
 ### `OpenAICompatStreamTurnOptions`
 
 `interface` — Define options for configuring an OpenAI-compatible streaming chat turn including API details and tools

@@ -4,7 +4,7 @@
 
 Source: `src/runtime/index.ts`
 
-62 exports.
+63 exports.
 
 ### `AnySurfaceKind`
 
@@ -204,6 +204,14 @@ interface ModelCatalog
 
 ```ts
 (id: string) => string
+```
+
+### `OpenAICompatServedModel`
+
+`interface` — Which model actually served one direct-router turn.
+
+```ts
+interface OpenAICompatServedModel
 ```
 
 ### `OpenAICompatStreamTurnOptions`
