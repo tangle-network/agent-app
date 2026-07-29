@@ -15,7 +15,7 @@
  *
  * `LogoProps` mirrors sandbox-ui's signature so `Logo` is a drop-in.
  */
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 
 /** Define properties to customize the logo variant, size, style, and icon display options */
 export interface LogoProps {
@@ -37,32 +37,36 @@ const KNOT_PATH_B =
 const WORDMARK_PATH =
   'M244.353 87.6978V150.578H228.965V87.6978H244.353ZM209.018 94.5367V80.2889H264.3V94.5367H209.018ZM283.224 151.813C278.221 151.813 274.232 150.452 271.255 147.729C268.342 144.943 266.886 141.238 266.886 136.615C266.886 132.246 268.374 128.763 271.35 126.167C274.39 123.571 278.759 122.051 284.458 121.608L297.756 120.563V119.803C297.756 118.22 297.44 116.922 296.807 115.909C296.173 114.832 295.255 114.04 294.052 113.534C292.912 112.964 291.456 112.679 289.683 112.679C286.58 112.679 284.205 113.249 282.559 114.389C280.976 115.529 280.184 117.175 280.184 119.328H268.026C268.026 115.719 268.944 112.584 270.78 109.924C272.617 107.265 275.213 105.207 278.569 103.75C281.989 102.294 285.947 101.566 290.443 101.566C295.065 101.566 298.96 102.389 302.126 104.035C305.355 105.682 307.793 108.088 309.44 111.254C311.149 114.42 312.004 118.283 312.004 122.843V150.578H299.086L298.136 144.309C297.376 146.462 295.572 148.267 292.722 149.723C289.936 151.117 286.77 151.813 283.224 151.813ZM288.353 140.985C291.139 140.985 293.419 140.32 295.192 138.99C296.965 137.597 297.851 135.539 297.851 132.816V130.251L290.443 130.916C287.276 131.17 285.028 131.708 283.699 132.531C282.432 133.291 281.799 134.431 281.799 135.951C281.799 137.66 282.337 138.927 283.414 139.75C284.49 140.573 286.136 140.985 288.353 140.985ZM342.823 150.578H328.195V103.085H341.968L342.918 108.025C344.374 105.998 346.369 104.415 348.902 103.275C351.498 102.136 354.348 101.566 357.451 101.566C363.086 101.566 367.456 103.307 370.559 106.79C373.725 110.209 375.308 115.022 375.308 121.228V150.578H360.68V124.742C360.68 121.766 359.92 119.391 358.4 117.618C356.881 115.782 354.854 114.864 352.321 114.864C349.408 114.864 347.097 115.75 345.387 117.523C343.678 119.233 342.823 121.576 342.823 124.552V150.578ZM389.123 125.977C389.123 121.164 390.073 116.922 391.973 113.249C393.936 109.576 396.627 106.695 400.047 104.605C403.529 102.516 407.487 101.471 411.92 101.471C415.656 101.471 418.854 102.231 421.513 103.75C424.236 105.27 426.104 107.265 427.117 109.734L425.693 110.684L426.833 103.085H440.605V147.539C440.605 153.175 439.561 158.019 437.471 162.072C435.381 166.188 432.405 169.322 428.542 171.475C424.679 173.692 420.025 174.8 414.579 174.8C407.297 174.8 401.376 172.837 396.817 168.911C392.258 165.048 389.63 159.76 388.933 153.048H403.751C403.878 155.708 404.891 157.766 406.79 159.222C408.69 160.742 411.255 161.502 414.484 161.502C418.03 161.502 420.817 160.52 422.843 158.557C424.933 156.594 425.978 153.935 425.978 150.578V140.51L427.592 141.745C426.579 144.214 424.616 146.209 421.703 147.729C418.79 149.249 415.434 150.008 411.635 150.008C407.202 150.008 403.276 148.995 399.857 146.969C396.5 144.943 393.872 142.125 391.973 138.515C390.073 134.906 389.123 130.726 389.123 125.977ZM403.846 125.597C403.846 127.877 404.321 129.903 405.271 131.676C406.221 133.386 407.519 134.747 409.165 135.761C410.812 136.774 412.711 137.28 414.864 137.28C417.081 137.28 419.012 136.805 420.658 135.856C422.368 134.842 423.666 133.481 424.553 131.771C425.503 129.998 425.978 127.94 425.978 125.597C425.978 123.254 425.503 121.259 424.553 119.613C423.666 117.903 422.368 116.573 420.658 115.624C419.012 114.674 417.049 114.199 414.769 114.199C412.616 114.199 410.717 114.674 409.07 115.624C407.424 116.573 406.126 117.903 405.176 119.613C404.289 121.323 403.846 123.317 403.846 125.597ZM471.933 150.578H457.305V78.9591H471.933V150.578ZM510.643 151.813C505.893 151.813 501.651 150.737 497.915 148.584C494.242 146.431 491.329 143.486 489.176 139.75C487.086 135.951 486.041 131.613 486.041 126.737C486.041 121.798 487.055 117.46 489.081 113.724C491.171 109.924 494.052 106.948 497.725 104.795C501.397 102.642 505.608 101.566 510.358 101.566C515.36 101.566 519.666 102.611 523.276 104.7C526.885 106.727 529.671 109.639 531.635 113.439C533.598 117.175 534.579 121.639 534.579 126.832V130.536L493.735 130.726L493.925 121.703H520.046C520.046 119.17 519.191 117.175 517.482 115.719C515.772 114.199 513.429 113.439 510.453 113.439C507.983 113.439 505.957 113.914 504.374 114.864C502.854 115.814 501.714 117.302 500.954 119.328C500.194 121.291 499.814 123.824 499.814 126.927C499.814 131.36 500.701 134.652 502.474 136.805C504.31 138.895 507.128 139.94 510.928 139.94C513.714 139.94 516.025 139.465 517.862 138.515C519.698 137.565 520.869 136.236 521.376 134.526H534.769C533.946 139.782 531.35 143.993 526.98 147.159C522.611 150.262 517.165 151.813 510.643 151.813Z'
 
-/** Brand gradient + clip shared by the icon and the full lockup. Static ids are
- *  fine: every instance defines the identical gradient, so a duplicate id in the
- *  document resolves to an identical paint. */
-function KnotDefs() {
+interface KnotResourceIds {
+  gradientA: string
+  gradientB: string
+  clip: string
+}
+
+/** Brand gradient + clip shared by the icon and the full lockup. */
+function KnotDefs(ids: KnotResourceIds) {
   return (
     <defs>
-      <linearGradient id="tangleKnotA" x1="36.79" y1="58.78" x2="145.99" y2="183.59" gradientUnits="userSpaceOnUse">
+      <linearGradient id={ids.gradientA} x1="36.79" y1="58.78" x2="145.99" y2="183.59" gradientUnits="userSpaceOnUse">
         <stop stopColor="#8E59FF" />
         <stop offset="1" stopColor="#6888F9" />
       </linearGradient>
-      <linearGradient id="tangleKnotB" x1="36.78" y1="169.38" x2="145.99" y2="44.57" gradientUnits="userSpaceOnUse">
+      <linearGradient id={ids.gradientB} x1="36.78" y1="169.38" x2="145.99" y2="44.57" gradientUnits="userSpaceOnUse">
         <stop stopColor="#8E59FF" />
         <stop offset="1" stopColor="#6888F9" />
       </linearGradient>
-      <clipPath id="tangleKnotClip">
+      <clipPath id={ids.clip}>
         <rect width="126.648" height="144.74" fill="white" transform="translate(170.74 50.7545) rotate(90)" />
       </clipPath>
     </defs>
   )
 }
 
-function KnotPaths() {
+function KnotPaths(ids: KnotResourceIds) {
   return (
-    <g clipPath="url(#tangleKnotClip)">
-      <path d={KNOT_PATH_A} fill="url(#tangleKnotA)" />
-      <path opacity="0.8" d={KNOT_PATH_B} fill="url(#tangleKnotB)" />
+    <g clipPath={`url(#${ids.clip})`}>
+      <path d={KNOT_PATH_A} fill={`url(#${ids.gradientA})`} />
+      <path opacity="0.8" d={KNOT_PATH_B} fill={`url(#${ids.gradientB})`} />
     </g>
   )
 }
@@ -70,6 +74,13 @@ function KnotPaths() {
 /** Icon-only Tangle knot, brand gradient, theme-independent. `size` is the
  *  rendered square in px. */
 export function TangleKnot({ size = 24, className }: { size?: number; className?: string }) {
+  const instanceId = useId()
+  const ids = {
+    gradientA: `tangle-knot-a-${instanceId}`,
+    gradientB: `tangle-knot-b-${instanceId}`,
+    clip: `tangle-knot-clip-${instanceId}`,
+  }
+
   return (
     <svg
       width={size}
@@ -81,8 +92,8 @@ export function TangleKnot({ size = 24, className }: { size?: number; className?
       role="img"
       aria-label="Tangle"
     >
-      <KnotPaths />
-      <KnotDefs />
+      <KnotDefs {...ids} />
+      <KnotPaths {...ids} />
     </svg>
   )
 }
@@ -96,6 +107,12 @@ const LOCKUP_RATIO = 564 / 228
 export function Logo({ variant = 'sandbox', size = 'md', className, iconOnly = false }: LogoProps) {
   void variant
   const height = WORDMARK_HEIGHTS[size]
+  const instanceId = useId()
+  const ids = {
+    gradientA: `tangle-logo-a-${instanceId}`,
+    gradientB: `tangle-logo-b-${instanceId}`,
+    clip: `tangle-logo-clip-${instanceId}`,
+  }
   if (iconOnly) return <TangleKnot size={height} className={className} />
   return (
     <svg
@@ -108,9 +125,9 @@ export function Logo({ variant = 'sandbox', size = 'md', className, iconOnly = f
       role="img"
       aria-label="Tangle"
     >
-      <KnotPaths />
+      <KnotDefs {...ids} />
+      <KnotPaths {...ids} />
       <path d={WORDMARK_PATH} fill="currentColor" />
-      <KnotDefs />
     </svg>
   )
 }
