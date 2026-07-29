@@ -13872,7 +13872,7 @@ Source: `src/session-shell/index.ts`
 `function` — The session id the current route has open, or `null` on the new-session composer / anywhere else.
 
 ```ts
-({ pathname, base, segment, newSegment, }: ActiveSessionIdOptions) => string | null
+({ pathname, base, segment, newSegment, reserved, }: ActiveSessionIdOptions) => string | null
 ```
 
 ### `ActiveSessionIdOptions`

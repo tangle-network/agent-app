@@ -230,6 +230,11 @@ function stripTrailingSlashes(value: string): string {
   return value.replace(/\/+$/, '')
 }
 
+/** Bare segment name, so `reserved` accepts `'/settings'` or `'settings'`. */
+function stripSlashes(value: string): string {
+  return value.replace(/^\/+|\/+$/g, '')
+}
+
 /** Path with query + fragment removed and trailing slashes trimmed. A caller
  *  passing a full href instead of a pathname would otherwise match nothing. */
 function normalizePath(pathname: string): string {
@@ -250,10 +255,20 @@ export interface ActiveSessionIdOptions {
   pathname: string
   /** Workspace-scoped route base, e.g. `/app/ws_123`. */
   base: string
-  /** Route segment sessions live under. Default `chat` ⇒ `${base}/chat/:id`. */
+  /** Route segment sessions live under. Default `chat` ⇒ `${base}/chat/:id`.
+   *  Pass `''` when sessions sit DIRECTLY under the base (`/app/:sessionId`),
+   *  which is how one product routes them — then `reserved` is mandatory. */
   segment?: string
   /** Segment that means "composing a new session", not an id. Default `new`. */
   newSegment?: string
+  /**
+   * First segments that are OTHER routes, not session ids. Only meaningful
+   * with `segment: ''`, where `/app/settings` is otherwise indistinguishable
+   * from a session called `settings` — and resolving it as one would highlight
+   * and prefetch a session that does not exist. Pass the product's own nav
+   * paths; unknown-but-reserved is a routing bug, so this fails closed.
+   */
+  reserved?: readonly string[]
 }
 
 /**
@@ -272,13 +287,17 @@ export function activeSessionIdFromPath({
   base,
   segment = 'chat',
   newSegment = 'new',
+  reserved,
 }: ActiveSessionIdOptions): string | null {
   const path = normalizePath(pathname)
-  const prefix = `${stripTrailingSlashes(base)}/${segment}`
-  if (!isUnderPrefix(path, prefix) || path === stripTrailingSlashes(prefix)) return null
-  const rest = path.slice(prefix.length + 1)
-  const id = rest.split('/')[0] ?? ''
+  const root = stripTrailingSlashes(base)
+  const prefix = segment ? `${root}/${segment}` : root
+  if (!isUnderPrefix(path, prefix) || path === prefix) return null
+  const id = path.slice(prefix.length + 1).split('/')[0] ?? ''
   if (!id || id === newSegment) return null
+  // `/app/settings` under a segment-less route is a sibling page, not a
+  // session named "settings".
+  if (reserved?.some((name) => stripSlashes(name) === id)) return null
   return decodeURIComponent(id)
 }
 

@@ -10698,7 +10698,7 @@
         {
           "name": "activeSessionIdFromPath",
           "kind": "function",
-          "signature": "({ pathname, base, segment, newSegment, }: ActiveSessionIdOptions) => string | null",
+          "signature": "({ pathname, base, segment, newSegment, reserved, }: ActiveSessionIdOptions) => string | null",
           "doc": "The session id the current route has open, or `null` on the new-session composer / anywhere else."
         },
         {
