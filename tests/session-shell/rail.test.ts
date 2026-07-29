@@ -311,3 +311,68 @@ describe('row actions the product actually has', () => {
     expect(only({}).actions).toBeUndefined()
   })
 })
+
+/**
+ * Rename and delete are the only two acts the shell can name for every product.
+ * Pin, categorise, duplicate, share are real row actions that differ per
+ * product, so they arrive through a callback rather than as more fields.
+ */
+describe('product row actions beyond rename and delete', () => {
+  function rowWith(over: Partial<SessionRowActions<Icon>>): SessionRailSubItem<Icon> {
+    const [row] = buildSessionSubItems<Icon>({
+      sessions: [session('a')],
+      hrefForSession: href,
+      actions: { canEdit: true, ...over },
+    })
+    if (!row) throw new Error('expected one row')
+    return row
+  }
+
+  it('places them between rename and delete, keeping destructive last', () => {
+    const row = rowWith({
+      onRename: () => {},
+      onDelete: () => {},
+      extraActions: () => [
+        { id: 'pin', label: 'Pin', onSelect: () => {} },
+        { id: 'category', label: 'Set category', onSelect: () => {} },
+      ],
+    })
+    expect(row.actions?.map((a) => a.id)).toEqual(['rename', 'pin', 'category', 'delete'])
+  })
+
+  it('evaluates per session, so a label can read that row’s own state', () => {
+    const [pinned, unpinned] = buildSessionSubItems<Icon>({
+      sessions: [session('a', { isPinned: true }), session('b')],
+      hrefForSession: href,
+      actions: {
+        canEdit: true,
+        extraActions: (s) => [
+          { id: 'pin', label: s.isPinned ? 'Unpin' : 'Pin', onSelect: () => {} },
+        ],
+      },
+    })
+    expect(pinned?.actions?.[0]?.label).toBe('Unpin')
+    expect(unpinned?.actions?.[0]?.label).toBe('Pin')
+  })
+
+  it('carries the session into the handler', () => {
+    const pinned: string[] = []
+    const row = rowWith({
+      extraActions: (s) => [{ id: 'pin', label: 'Pin', onSelect: () => pinned.push(s.id) }],
+    })
+    row.actions?.[0]?.onSelect()
+    expect(pinned).toEqual(['a'])
+  })
+
+  it('is suppressed for a read-only viewer, like rename and delete', () => {
+    const [row] = buildSessionSubItems<Icon>({
+      sessions: [session('a')],
+      hrefForSession: href,
+      actions: {
+        canEdit: false,
+        extraActions: () => [{ id: 'pin', label: 'Pin', onSelect: () => {} }],
+      },
+    })
+    expect(row?.actions).toBeUndefined()
+  })
+})

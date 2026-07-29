@@ -26,6 +26,7 @@ import {
 
 import {
   type SessionPage,
+  type SessionRailAction,
   type SessionSort,
   type SessionSummary,
   mergeSessionPages,
@@ -582,6 +583,17 @@ export interface SessionHistoryPanelProps {
   respondingSessionIds?: ReadonlySet<string>
   onRename?: (session: SessionSummary) => void
   onDelete?: (session: SessionSummary) => void
+  /** Menu wording, so this surface and the rail name the same act the same way
+   *  — a product whose delete is really an archive says so in both places. */
+  renameLabel?: string
+  deleteLabel?: string
+  /**
+   * Row actions this shell has no opinion about — pin, categorise, share.
+   * Same seam and same ordering as the rail's `SessionRowActions.extraActions`:
+   * evaluated per session, placed between rename and delete. This menu is
+   * text-only, so `icon` is ignored here and honoured on the rail.
+   */
+  extraActions?: (session: SessionSummary) => SessionRailAction[]
   /** New-session destination for the header action. Omitted ⇒ no button. */
   newSessionHref?: string
   title?: string
@@ -673,6 +685,9 @@ export function SessionHistoryPanel({
   respondingSessionIds,
   onRename,
   onDelete,
+  renameLabel = 'Rename',
+  deleteLabel = 'Delete',
+  extraActions,
   newSessionHref,
   title = 'History',
   untitledLabel = UNTITLED_SESSION_LABEL,
@@ -766,6 +781,9 @@ export function SessionHistoryPanel({
                   timestamp={formatTimestamp(session.updatedAt)}
                   onRename={onRename}
                   onDelete={onDelete}
+                  renameLabel={renameLabel}
+                  deleteLabel={deleteLabel}
+                  extraActions={extraActions}
                 />
               ))}
 
@@ -816,6 +834,9 @@ function SessionRow({
   timestamp,
   onRename,
   onDelete,
+  renameLabel,
+  deleteLabel,
+  extraActions,
 }: {
   session: SessionSummary
   href: string
@@ -825,8 +846,13 @@ function SessionRow({
   timestamp: string
   onRename?: (session: SessionSummary) => void
   onDelete?: (session: SessionSummary) => void
+  renameLabel: string
+  deleteLabel: string
+  extraActions?: (session: SessionSummary) => SessionRailAction[]
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const extras = extraActions?.(session) ?? []
+  const hasMenu = Boolean(onRename) || Boolean(onDelete) || extras.length > 0
   // An unread dot next to a live responding indicator is two signals for one
   // state; the working indicator wins while the turn runs.
   const showUnread = Boolean(session.unread) && !responding
@@ -844,7 +870,7 @@ function SessionRow({
         </span>
       </Link>
       <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{timestamp}</span>
-      {(onRename || onDelete) && (
+      {hasMenu && (
         <div className="relative shrink-0">
           <button
             type="button"
@@ -871,9 +897,26 @@ function SessionRow({
                     }}
                     className="block w-full px-3 py-1.5 text-left text-xs text-foreground transition hover:bg-accent/30"
                   >
-                    Rename
+                    {renameLabel}
                   </button>
                 )}
+                {extras.map((action) => (
+                  <button
+                    key={action.id}
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      action.onSelect()
+                    }}
+                    className={`block w-full px-3 py-1.5 text-left text-xs transition ${
+                      action.destructive
+                        ? 'text-destructive hover:bg-destructive/10'
+                        : 'text-foreground hover:bg-accent/30'
+                    }`}
+                  >
+                    {action.label}
+                  </button>
+                ))}
                 {onDelete && (
                   <button
                     type="button"
@@ -883,7 +926,7 @@ function SessionRow({
                     }}
                     className="block w-full px-3 py-1.5 text-left text-xs text-destructive transition hover:bg-destructive/10"
                   >
-                    Delete
+                    {deleteLabel}
                   </button>
                 )}
               </div>
