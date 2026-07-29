@@ -109,6 +109,8 @@ jobs:
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
       - run: pnpm run build
+      - name: Test clean generated projects
+        run: pnpm run test:generated
 
       - name: Configure exact artifact pack runtime
         if: steps.release.outputs.mode == 'tag'

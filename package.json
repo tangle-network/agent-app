@@ -1,8 +1,8 @@
 {
   "name": "@tangle-network/agent-app",
   "version": "0.44.46",
-  "packageManager": "pnpm@10.33.4",
-  "description": "Application-shell framework for Tangle agent products: a bounded tool loop, the structured agent→app tool side channel, integration-hub client, per-workspace billing, and crypto — composed over the Tangle agent substrate through typed seams.",
+  "packageManager": "pnpm@11.17.0",
+  "description": "Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.",
   "keywords": [
     "tangle",
     "ai-agent",
@@ -420,6 +420,7 @@
     "dev": "tsup --watch",
     "prepare": "tsup",
     "test": "vitest run",
+    "test:generated": "node .github/scripts/test-generated-projects.mjs",
     "test:gates": "vitest run src/sandbox/index.test.ts src/profile/index.test.ts tests/chat-stream.test.ts tests/browser-safe-subpaths.test.ts tests/test-quality.test.ts tests/knip-entries-fresh.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
@@ -427,7 +428,7 @@
     "knip": "knip"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250620.0",
+    "@cloudflare/workers-types": "^5.20260722.1",
     "@radix-ui/react-dialog": "^1.1.15",
     "@tangle-network/agent-docs": "0.2.0",
     "@tangle-network/agent-eval": "0.135.1",
@@ -435,7 +436,7 @@
     "@tangle-network/agent-interface": "0.36.0",
     "@tangle-network/agent-knowledge": "6.1.10",
     "@tangle-network/agent-profile-materialize": "0.9.2",
-    "@tangle-network/agent-runtime": "0.109.0",
+    "@tangle-network/agent-runtime": "0.109.1",
     "@tangle-network/brand": "1.1.0",
     "@tangle-network/sandbox": "0.15.2",
     "@tangle-network/sandbox-ui": "0.91.5",
@@ -460,6 +461,7 @@
     "knip": "^5.46.0",
     "konva": "^10.3.0",
     "lucide-react": "^1.16.0",
+    "npm": "11.18.0",
     "pdf-lib": "^1.17.1",
     "react": "^19.0.0",
     "react-dom": "^19.2.7",
@@ -479,7 +481,7 @@
     "@tangle-network/agent-interface": ">=0.36.0",
     "@tangle-network/agent-knowledge": ">=6.1.10",
     "@tangle-network/agent-profile-materialize": ">=0.9.2",
-    "@tangle-network/agent-runtime": ">=0.109.0",
+    "@tangle-network/agent-runtime": ">=0.109.1",
     "@tangle-network/brand": ">=1.1.0",
     "@tangle-network/sandbox": ">=0.15.2",
     "@tangle-network/sandbox-ui": ">=0.91.5",
@@ -552,10 +554,5 @@
   },
   "dependencies": {
     "zod": "^4.4.3"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "better-sqlite3"
-    ]
   }
 }

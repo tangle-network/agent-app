@@ -38,6 +38,8 @@ jobs:
         run: pnpm run test:gates
       - run: pnpm run test
       - run: pnpm run build
+      - name: Test clean generated projects
+        run: pnpm run test:generated
       # Dead-surface gate. Fails on an unused file, an unused internal export, or
       # an unused dependency — the accumulation this repo had to clean up by hand.
       # Two blind spots it CANNOT cover, both by construction:

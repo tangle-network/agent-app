@@ -12,7 +12,7 @@ const listMock = vi.fn()
 const getMock = vi.fn()
 const sandboxCtor = vi.fn()
 
-vi.mock('@tangle-network/sandbox', () => ({
+vi.mock('@tangle-network/sandbox/core', () => ({
   Sandbox: class {
     list = listMock
     create = createMock
@@ -91,7 +91,7 @@ import type {
 import type {
   EgressPolicy,
   SandboxInstance,
-} from '@tangle-network/sandbox'
+} from '@tangle-network/sandbox/core'
 
 const PROFILE: AgentProfile = { name: 'test' } as AgentProfile
 

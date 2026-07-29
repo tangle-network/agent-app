@@ -76,7 +76,7 @@
  * minutes later, so a warm that dies must leave a trace a product can render.
  */
 
-import type { SandboxInstance } from '@tangle-network/sandbox'
+import type { SandboxInstance } from '@tangle-network/sandbox/core'
 import type { Harness } from '../harness/index'
 import {
   ensureWorkspaceSandbox,

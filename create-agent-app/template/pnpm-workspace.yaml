@@ -1,0 +1,9 @@
+packages:
+  - '.'
+
+autoInstallPeers: false
+
+allowBuilds:
+  '@ax-llm/ax': false
+  esbuild: true
+  workerd: true

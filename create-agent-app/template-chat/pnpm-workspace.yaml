@@ -1,0 +1,10 @@
+packages:
+  - '.'
+
+autoInstallPeers: false
+
+allowBuilds:
+  '@ax-llm/ax': false
+  better-sqlite3: true
+  esbuild: true
+  workerd: true

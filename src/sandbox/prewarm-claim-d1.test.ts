@@ -5,7 +5,7 @@ const listMock = vi.hoisted(() => vi.fn())
 const createMock = vi.hoisted(() => vi.fn())
 const getMock = vi.hoisted(() => vi.fn())
 
-vi.mock('@tangle-network/sandbox', () => ({
+vi.mock('@tangle-network/sandbox/core', () => ({
   Sandbox: class {
     list = listMock
     create = createMock

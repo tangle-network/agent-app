@@ -1,0 +1,14 @@
+packages:
+  - '.'
+
+autoInstallPeers: false
+
+minimumReleaseAgeExclude:
+  - '@cloudflare/workers-types'
+  - '@tangle-network/*'
+
+allowBuilds:
+  '@ax-llm/ax': false
+  better-sqlite3: true
+  canvas: true
+  esbuild: true

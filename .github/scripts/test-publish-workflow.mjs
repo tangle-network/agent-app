@@ -97,15 +97,27 @@ for (const [name, block] of Object.entries(restricted)) {
 }
 
 check(packageJob.includes('contents: read') && !packageJob.includes('contents: write') && !packageJob.includes('id-token: write'), 'package job is not read-only')
-for (const command of ['pnpm install --frozen-lockfile', 'pnpm run typecheck', 'pnpm run test', 'pnpm run build', 'npm pack']) {
+for (const command of [
+  'pnpm install --frozen-lockfile',
+  'pnpm run typecheck',
+  'pnpm run test',
+  'pnpm run build',
+  'pnpm run test:generated',
+  'npm pack',
+]) {
   check(packageJob.includes(command), `package job is missing ${command}`)
 }
-check(packageJob.indexOf('pnpm run build') < packageJob.indexOf('npm pack') && packageJob.indexOf('npm pack') < packageJob.indexOf('actions/upload-artifact@'), 'artifact is uploaded before build and pack complete')
 const artifactPackRuntimeStep = namedStep(packageJob, 'Configure exact artifact pack runtime')
 const artifactPackNpmStep = namedStep(packageJob, 'Verify artifact pack npm')
 check(artifactPackRuntimeStep.includes('node-version: 24.18.0'), 'artifact pack Node version is not exact')
 check(artifactPackNpmStep.includes("$(npm --version) == '11.16.0'"), 'artifact pack npm version is not checked')
 check(packageJob.indexOf('pnpm run build') < packageJob.indexOf('Configure exact artifact pack runtime') && packageJob.indexOf('Configure exact artifact pack runtime') < packageJob.indexOf('npm pack'), 'artifact pack runtime is configured outside the pack boundary')
+check(
+  packageJob.indexOf('pnpm run build') < packageJob.indexOf('pnpm run test:generated') &&
+    packageJob.indexOf('pnpm run test:generated') < packageJob.indexOf('npm pack') &&
+    packageJob.indexOf('npm pack') < packageJob.indexOf('actions/upload-artifact@'),
+  'artifact is uploaded before build, generated-project tests, and pack complete',
+)
 check(packageJob.includes('persist-credentials: false'), 'package checkout persists credentials')
 check(!packageJob.includes('npm version'), 'auto mode mutates package manifests before the tagged run')
 check(packageJob.includes('fetch-depth: 0'), 'release history is shallow')
