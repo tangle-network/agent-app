@@ -1,28 +1,33 @@
 /**
- * Lazy Tangle knot for the canvas surfaces.
- *
- * The brand mark lives in `../../brand`, which re-exports `TangleKnot` from the
- * `@tangle-network/sandbox-ui` barrel — a heavy, opt-in peer. Importing it
- * statically would drag that whole chain into the eagerly-evaluated canvas
- * module graph (Workspace / DesignCanvasEditor), which must stay importable in
- * environments that don't have the peer wired (SSR, tests). Pulling the mark
- * through a dynamic `import()` behind Suspense keeps the dependency lazy — the
- * same reason `lazy.tsx` defers the Konva editor chunk — so module-load stays
- * dependency-light and the mark resolves only when a surface actually renders it.
+ * Load the canonical Tangle knot only when a canvas surface renders it.
+ * `/brand` imports the optional `@tangle-network/brand` peer, so a failed load
+ * renders a fixed-size spacer instead of crashing the editor.
  */
 
 import { lazy, Suspense } from 'react'
-
-const LazyKnot = lazy(() => import('../../brand').then((m) => ({ default: m.TangleKnot })))
+import type { ComponentType } from 'react'
 
 interface BrandKnotProps {
   size?: number
   className?: string
 }
 
+function MarkSpacer({ size = 24, className }: BrandKnotProps) {
+  return <span aria-hidden style={{ display: 'inline-block', width: size, height: size }} className={className} />
+}
+
+const LazyKnot = lazy(async () => {
+  try {
+    const mod = await import('../../brand')
+    return { default: mod.TangleKnot as ComponentType<BrandKnotProps> }
+  } catch {
+    return { default: MarkSpacer as ComponentType<BrandKnotProps> }
+  }
+})
+
 export function BrandKnot({ size = 24, className }: BrandKnotProps) {
   return (
-    <Suspense fallback={<span aria-hidden style={{ display: 'inline-block', width: size, height: size }} className={className} />}>
+    <Suspense fallback={<MarkSpacer size={size} className={className} />}>
       <LazyKnot size={size} className={className} />
     </Suspense>
   )

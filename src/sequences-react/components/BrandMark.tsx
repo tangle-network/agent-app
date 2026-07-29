@@ -1,13 +1,7 @@
 /**
- * Lazy boundary around the Tangle knot from `../../brand`.
- *
- * `/brand` re-exports the mark from `@tangle-network/sandbox-ui`, an OPT-IN peer
- * (see brand/index.tsx). Static-importing it would pull the peer into every
- * module that renders the timeline — breaking substrate-free environments (and
- * products that haven't installed the peer) at module-eval time. Code-splitting
- * it (the repo's `lazy.tsx` convention) keeps the peer out of the editor's
- * static graph: the knot streams in only when an empty/phone state actually
- * renders, and its absence degrades to empty space rather than a crash.
+ * Load the canonical Tangle knot only when a sequence surface renders it.
+ * `/brand` imports the optional `@tangle-network/brand` peer, so a failed load
+ * renders a fixed-size spacer instead of crashing the editor.
  */
 
 import { lazy, Suspense } from 'react'
@@ -18,16 +12,11 @@ export interface BrandMarkProps {
   className?: string
 }
 
-/** Reserve the mark's footprint so its async arrival doesn't shift layout, and
- *  serve as the graceful fallback when the opt-in peer isn't installed. */
+/** Preserve the mark's footprint while its optional package loads or is absent. */
 function MarkSpacer({ size }: { size: number }) {
   return <span aria-hidden style={{ display: 'inline-block', width: size, height: size }} />
 }
 
-// The peer (`@tangle-network/sandbox-ui`, behind `/brand`) is optional. A
-// missing peer must degrade to reserved space, never crash the editor — so the
-// dynamic import resolves to the spacer on rejection instead of letting
-// Suspense throw the load error up through the timeline.
 const LazyKnot = lazy(async () => {
   try {
     const mod = await import('../../brand')
