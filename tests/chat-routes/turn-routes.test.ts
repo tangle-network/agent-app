@@ -21,6 +21,10 @@ interface StoredMessage {
   content: string
   parts?: ChatMessagePart[]
   model?: string | null
+  requestedModel?: string | null
+  servedModel?: string | null
+  servedProvider?: string | null
+  servedSource?: string | null
   inputTokens?: number | null
   outputTokens?: number | null
   costUsd?: number | null
@@ -134,6 +138,161 @@ describe('createChatTurnRoutes — turn', () => {
       costUsd: 0.01,
     })
     expect(rows[1]!.parts).toEqual([{ type: 'text', text: 'answer' }])
+  })
+
+  it('persists and reports requested-versus-served sandbox attribution', async () => {
+    const completions: Array<Record<string, unknown>> = []
+    const lifecycleCompletions: Array<Record<string, unknown>> = []
+    const { routes, rows, ctx, pending } = makeRoutes({
+      produce: () => createSandboxChatProducer({
+        model: 'openai/gpt-5',
+        events: (async function* () {
+          yield {
+            type: 'session.updated',
+            data: {
+              effectiveBackend: {
+                provider: 'openrouter',
+                model: 'anthropic/claude-sonnet-4',
+                source: 'profile',
+              },
+            },
+          }
+          yield {
+            type: 'message.part.updated',
+            data: { part: { type: 'text', id: 't1', text: 'answer' }, delta: 'answer' },
+          }
+          yield { type: 'result', data: { finalText: 'answer' } }
+        })(),
+      }),
+      onTurnComplete: async (input) => { completions.push(input as unknown as Record<string, unknown>) },
+      lifecycle: {
+        onTurnComplete: (input) => { lifecycleCompletions.push(input as unknown as Record<string, unknown>) },
+      },
+    })
+
+    await readLines((await routes.turn(turnRequest({ threadId: 't-1', content: 'question?' }), ctx)).body!)
+    await Promise.all(pending)
+
+    const attribution = {
+      model: 'anthropic/claude-sonnet-4',
+      requestedModel: 'openai/gpt-5',
+      servedModel: 'anthropic/claude-sonnet-4',
+      servedProvider: 'openrouter',
+      servedSource: 'profile',
+    }
+    expect(rows.find((row) => row.role === 'assistant')).toMatchObject(attribution)
+    expect(completions).toEqual([expect.objectContaining(attribution)])
+    expect(lifecycleCompletions).toEqual([expect.objectContaining(attribution)])
+  })
+
+  it('keeps the legacy model and omits served attribution when the sidecar sends no echo', async () => {
+    const completions: Array<Record<string, unknown>> = []
+    const lifecycleCompletions: Array<Record<string, unknown>> = []
+    const { routes, rows, ctx, pending } = makeRoutes({
+      produce: () => createSandboxChatProducer({
+        model: 'requested-model',
+        events: (async function* () {
+          yield {
+            type: 'message.part.updated',
+            data: { part: { type: 'text', id: 't1', text: 'answer' }, delta: 'answer' },
+          }
+          yield { type: 'result', data: { finalText: 'answer' } }
+        })(),
+      }),
+      onTurnComplete: async (input) => { completions.push(input as unknown as Record<string, unknown>) },
+      lifecycle: {
+        onTurnComplete: (input) => { lifecycleCompletions.push(input as unknown as Record<string, unknown>) },
+      },
+    })
+
+    await readLines((await routes.turn(turnRequest({ threadId: 't-1', content: 'question?' }), ctx)).body!)
+    await Promise.all(pending)
+
+    const assistant = rows.find((row) => row.role === 'assistant')!
+    expect(assistant).toMatchObject({
+      model: 'requested-model',
+      requestedModel: 'requested-model',
+    })
+    for (const value of [assistant, completions[0]!, lifecycleCompletions[0]!]) {
+      expect(value).not.toHaveProperty('servedModel')
+      expect(value).not.toHaveProperty('servedProvider')
+      expect(value).not.toHaveProperty('servedSource')
+    }
+  })
+
+  it('converges a drafted assistant row to the same model attribution as a single final write', async () => {
+    const run = async (draft: boolean): Promise<StoredMessage> => {
+      const rows: StoredMessage[] = []
+      let nextId = 1
+      const store: ChatTurnMessageStore = {
+        async listMessages(threadId) {
+          return rows.filter((row) => row.threadId === threadId)
+        },
+        async appendMessage(input) {
+          const row: StoredMessage = { id: input.id ?? `m${nextId++}`, ...input }
+          rows.push(row)
+          return row
+        },
+        ...(draft
+          ? {
+              async updateMessage(id: string, patch: Partial<StoredMessage>) {
+                const row = rows.find((candidate) => candidate.id === id)
+                if (row) Object.assign(row, patch)
+                return row ?? null
+              },
+            }
+          : {}),
+      }
+      const pending: Promise<unknown>[] = []
+      const routes = createChatTurnRoutes({
+        projectId: 'attribution-convergence',
+        authorize: async () => ({ ok: true, tenantId: 'ws-1', userId: 'user-1', context: undefined }),
+        store,
+        turnStore: createMemoryTurnEventStore(),
+        incrementalPersistence: draft ? { intervalMs: 1 } : false,
+        produce: () => createSandboxChatProducer({
+          model: 'requested-model',
+          events: (async function* () {
+            yield {
+              type: 'session.updated',
+              data: {
+                effectiveBackend: {
+                  provider: 'effective-provider',
+                  model: 'served-model',
+                  source: 'environment',
+                },
+              },
+            }
+            yield {
+              type: 'message.part.updated',
+              data: { part: { type: 'text', id: 't1', text: 'answer' }, delta: 'answer' },
+            }
+            yield { type: 'result', data: { finalText: 'answer' } }
+          })(),
+        }),
+        log: () => {},
+      })
+      const ctx = { waitUntil: (promise: Promise<unknown>) => void pending.push(promise) }
+      await readLines((await routes.turn(
+        turnRequest({ threadId: 't-1', content: 'question?', turnId: 'same-turn' }),
+        ctx,
+      )).body!)
+      await Promise.all(pending)
+      return rows.find((row) => row.role === 'assistant')!
+    }
+
+    const single = await run(false)
+    const drafted = await run(true)
+    const { id: _singleId, ...singleValues } = single
+    const { id: _draftedId, ...draftedValues } = drafted
+    expect(draftedValues).toEqual(singleValues)
+    expect(draftedValues).toMatchObject({
+      model: 'served-model',
+      requestedModel: 'requested-model',
+      servedModel: 'served-model',
+      servedProvider: 'effective-provider',
+      servedSource: 'environment',
+    })
   })
 
   it('persists a durable plan part returned by the producer', async () => {

@@ -108,6 +108,10 @@ export function createChatTables<
     parts: text('parts', { mode: 'json' }).$type<ChatMessagePart[]>().default([]),
     toolName: text('tool_name'),
     model: text('model'),
+    requestedModel: text('requested_model'),
+    servedModel: text('served_model'),
+    servedProvider: text('served_provider'),
+    servedSource: text('served_model_source'),
     // Usage receipt, flattened from the harness's `step-finish` shape
     // (`tokens {input, output, reasoning, cache{read, write}}` + `cost`).
     inputTokens: integer('input_tokens'),

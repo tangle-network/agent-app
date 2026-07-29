@@ -179,6 +179,14 @@ export interface DetachedTurnResult {
    *  A caller that bills or scores per model must read this, not the model it
    *  requested. */
   model?: string
+  /** The caller's explicit model request, before shell failover. */
+  requestedModel?: string
+  /** The effective model echoed by the downstream sandbox. */
+  servedModel?: string
+  /** The effective provider echoed by the downstream sandbox. */
+  servedProvider?: string
+  /** How the downstream sandbox selected the effective model. */
+  servedSource?: 'request' | 'environment' | 'profile'
   /** True when the preferred model did not serve. Makes an autonomous
    *  downgrade — which no human watched happen — attributable after the fact. */
   usedModelFallback?: boolean
@@ -267,13 +275,35 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
   /** Settle the durable row with authoritative values (or retract it when the
    *  turn produced nothing), and stamp the id onto the result. */
   const settleRow = async (base: DetachedTurnResult): Promise<DetachedTurnResult> => {
-    // Every return path funnels through here, so stamping attribution once is
-    // what guarantees no result — cached, failed, or clean — can report a turn
-    // without naming the model that produced it.
+    // A cached/reconciled return has no producer to replay the sidecar echo.
+    // Preserve the attribution already written by the prior attempt instead
+    // of replacing its served `model` with today's requested-model fallback.
+    const persisted = !producer && opts.persist
+      ? (await opts.persist.store.listMessages(opts.persist.threadId)).find(
+          (message) =>
+            message.id === (opts.persist?.messageId ?? assistantRowIdForTurn(turnId)),
+        )
+      : undefined
     const info = producer?.modelFailover?.()
+    const attribution = producer?.modelAttribution?.()
+    const model = producer?.model ?? persisted?.model ?? opts.model
+    const requestedModel = attribution?.requestedModel ?? persisted?.requestedModel ?? opts.model
+    const servedModel = attribution?.servedModel ?? persisted?.servedModel
+    const servedProvider = attribution?.servedProvider ?? persisted?.servedProvider
+    const servedSource = attribution?.servedSource ?? (
+      persisted?.servedSource === 'request' ||
+      persisted?.servedSource === 'environment' ||
+      persisted?.servedSource === 'profile'
+        ? persisted.servedSource
+        : undefined
+    )
     const result: DetachedTurnResult = {
       ...base,
-      ...(servingModel() ? { model: servingModel() } : {}),
+      ...(model ? { model } : {}),
+      ...(requestedModel ? { requestedModel } : {}),
+      ...(servedModel ? { servedModel } : {}),
+      ...(servedProvider ? { servedProvider } : {}),
+      ...(servedSource ? { servedSource } : {}),
       ...(info ? { usedModelFallback: info.usedFallback, modelAttempts: info.attempts } : {}),
     }
     if (!draft) return result
@@ -297,6 +327,10 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
       content,
       ...(parts.length > 0 ? { parts } : {}),
       ...(result.model ? { model: result.model } : {}),
+      ...(result.requestedModel ? { requestedModel: result.requestedModel } : {}),
+      ...(result.servedModel ? { servedModel: result.servedModel } : {}),
+      ...(result.servedProvider ? { servedProvider: result.servedProvider } : {}),
+      ...(result.servedSource ? { servedSource: result.servedSource } : {}),
       ...(result.usage.inputTokens !== undefined ? { inputTokens: result.usage.inputTokens } : {}),
       ...(result.usage.outputTokens !== undefined ? { outputTokens: result.usage.outputTokens } : {}),
       ...(result.usage.reasoningTokens !== undefined ? { reasoningTokens: result.usage.reasoningTokens } : {}),

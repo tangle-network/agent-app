@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-159 exports.
+160 exports.
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
@@ -364,6 +364,14 @@ type ChatTurnLockResult
 
 ```ts
 interface ChatTurnMessageStore
+```
+
+### `ChatTurnModelAttribution`
+
+`interface` — Requested and effective model attribution for one sandbox turn.
+
+```ts
+interface ChatTurnModelAttribution
 ```
 
 ### `ChatTurnModelFailover`

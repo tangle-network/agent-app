@@ -83,6 +83,10 @@ export interface AppendMessageInput {
   parts?: ChatMessagePart[]
   toolName?: string | null
   model?: string | null
+  requestedModel?: string | null
+  servedModel?: string | null
+  servedProvider?: string | null
+  servedSource?: string | null
   inputTokens?: number | null
   outputTokens?: number | null
   reasoningTokens?: number | null
@@ -106,6 +110,10 @@ export interface UpdateMessageInput {
   parts?: ChatMessagePart[]
   toolName?: string | null
   model?: string | null
+  requestedModel?: string | null
+  servedModel?: string | null
+  servedProvider?: string | null
+  servedSource?: string | null
   inputTokens?: number | null
   outputTokens?: number | null
   reasoningTokens?: number | null
@@ -297,6 +305,10 @@ export function createChatStore<TTables extends ChatTables>(
         ...(input.parts !== undefined ? { parts: input.parts } : {}),
         ...(input.toolName !== undefined ? { toolName: input.toolName } : {}),
         ...(input.model !== undefined ? { model: input.model } : {}),
+        ...(input.requestedModel !== undefined ? { requestedModel: input.requestedModel } : {}),
+        ...(input.servedModel !== undefined ? { servedModel: input.servedModel } : {}),
+        ...(input.servedProvider !== undefined ? { servedProvider: input.servedProvider } : {}),
+        ...(input.servedSource !== undefined ? { servedSource: input.servedSource } : {}),
         ...(input.inputTokens !== undefined ? { inputTokens: input.inputTokens } : {}),
         ...(input.outputTokens !== undefined ? { outputTokens: input.outputTokens } : {}),
         ...(input.reasoningTokens !== undefined ? { reasoningTokens: input.reasoningTokens } : {}),
@@ -320,6 +332,10 @@ export function createChatStore<TTables extends ChatTables>(
         ...(patch.parts !== undefined ? { parts: patch.parts } : {}),
         ...(patch.toolName !== undefined ? { toolName: patch.toolName } : {}),
         ...(patch.model !== undefined ? { model: patch.model } : {}),
+        ...(patch.requestedModel !== undefined ? { requestedModel: patch.requestedModel } : {}),
+        ...(patch.servedModel !== undefined ? { servedModel: patch.servedModel } : {}),
+        ...(patch.servedProvider !== undefined ? { servedProvider: patch.servedProvider } : {}),
+        ...(patch.servedSource !== undefined ? { servedSource: patch.servedSource } : {}),
         ...(patch.inputTokens !== undefined ? { inputTokens: patch.inputTokens } : {}),
         ...(patch.outputTokens !== undefined ? { outputTokens: patch.outputTokens } : {}),
         ...(patch.reasoningTokens !== undefined ? { reasoningTokens: patch.reasoningTokens } : {}),

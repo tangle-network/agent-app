@@ -47,6 +47,11 @@ export interface DraftStoredMessage {
   role: 'user' | 'assistant' | 'system' | 'tool'
   content: string
   parts?: ChatMessagePart[] | null
+  model?: string | null
+  requestedModel?: string | null
+  servedModel?: string | null
+  servedProvider?: string | null
+  servedSource?: string | null
 }
 
 /** Values written to the assistant row — the intersection of the append and
@@ -55,6 +60,10 @@ export interface AssistantRowValues {
   content: string
   parts?: ChatMessagePart[]
   model?: string | null
+  requestedModel?: string | null
+  servedModel?: string | null
+  servedProvider?: string | null
+  servedSource?: string | null
   inputTokens?: number | null
   outputTokens?: number | null
   reasoningTokens?: number | null

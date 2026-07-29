@@ -46,6 +46,20 @@ describe('createChatTables — table shapes', () => {
     })
   })
 
+  it('defines nullable requested and effective model attribution columns', () => {
+    const columns = getTableConfig(tables.messages).columns
+    for (const name of [
+      'requested_model',
+      'served_model',
+      'served_provider',
+      'served_model_source',
+    ]) {
+      const column = columns.find((candidate) => candidate.name === name)
+      expect(column).toBeDefined()
+      expect(column?.notNull).toBe(false)
+    }
+  })
+
   it('workspace_id stays a plain column when no workspace table is passed', () => {
     const detached = createChatTables()
     expect(fkFor(detached.threads, 'workspace_id')).toBeNull()
@@ -104,6 +118,10 @@ describe('createChatTables — defaults at runtime', () => {
     expect(message!.parts).toEqual([])
     expect(message!.toolName).toBeNull()
     expect(message!.model).toBeNull()
+    expect(message!.requestedModel).toBeNull()
+    expect(message!.servedModel).toBeNull()
+    expect(message!.servedProvider).toBeNull()
+    expect(message!.servedSource).toBeNull()
     expect(message!.inputTokens).toBeNull()
     expect(message!.costUsd).toBeNull()
   })
@@ -151,5 +169,32 @@ describe('ChatMessagePart — canonical coverage', () => {
       .values({ threadId: thread!.id, role: 'assistant', content: 'answer', parts })
       .returning()
     expect(message!.parts).toEqual(parts)
+  })
+
+  it('round-trips requested and effective model attribution', async () => {
+    const db = openDatabase([workspacesTable, tables.threads, tables.messages])
+    await db.insert(workspacesTable).values({ id: 'ws1', organizationId: 'org1', name: 'WS' })
+    const [thread] = await db.insert(tables.threads).values({ workspaceId: 'ws1', title: 'T' }).returning()
+
+    const [message] = await db.insert(tables.messages)
+      .values({
+        threadId: thread!.id,
+        role: 'assistant',
+        content: 'answer',
+        model: 'anthropic/claude-sonnet-4',
+        requestedModel: 'openai/gpt-5',
+        servedModel: 'anthropic/claude-sonnet-4',
+        servedProvider: 'openrouter',
+        servedSource: 'profile',
+      })
+      .returning()
+
+    expect(message).toMatchObject({
+      model: 'anthropic/claude-sonnet-4',
+      requestedModel: 'openai/gpt-5',
+      servedModel: 'anthropic/claude-sonnet-4',
+      servedProvider: 'openrouter',
+      servedSource: 'profile',
+    })
   })
 })
