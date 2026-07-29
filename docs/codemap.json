@@ -7369,6 +7369,18 @@
           "doc": "Aggregate of every probe verdict plus the overall pass/fail decision."
         },
         {
+          "name": "requiredValueProbe",
+          "kind": "function",
+          "signature": "(config: RequiredValueProbeConfig) => PreflightProbe",
+          "doc": "Require a non-empty string without ever printing its value."
+        },
+        {
+          "name": "RequiredValueProbeConfig",
+          "kind": "interface",
+          "signature": "interface RequiredValueProbeConfig",
+          "doc": "Configuration for a required non-empty production value."
+        },
+        {
           "name": "routerChatProbe",
           "kind": "function",
           "signature": "(config: RouterChatProbeConfig) => PreflightProbe",
