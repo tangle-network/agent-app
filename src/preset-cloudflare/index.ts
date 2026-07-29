@@ -57,6 +57,11 @@ export {
   type EnsureCloudflareWorkflowInstanceResult,
 } from './workflow-instance'
 
+export {
+  renderCloudflareHeadersFile,
+  type CloudflareHeadersRule,
+} from './headers'
+
 // ---------------------------------------------------------------------------
 // D1 structural seam
 //

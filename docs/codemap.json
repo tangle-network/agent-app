@@ -7409,6 +7409,12 @@
       "error": null,
       "exports": [
         {
+          "name": "CloudflareHeadersRule",
+          "kind": "interface",
+          "signature": "interface CloudflareHeadersRule",
+          "doc": "One path rule in Cloudflare's static-asset `_headers` file."
+        },
+        {
           "name": "CloudflareWorkflowBindingLike",
           "kind": "interface",
           "signature": "interface CloudflareWorkflowBindingLike",
@@ -7521,6 +7527,12 @@
           "kind": "interface",
           "signature": "interface PresetToolHandlerOptions",
           "doc": "Define configuration options for handling preset tools including database, vault, and optional utilities"
+        },
+        {
+          "name": "renderCloudflareHeadersFile",
+          "kind": "function",
+          "signature": "(rules: readonly CloudflareHeadersRule[]) => string",
+          "doc": "Render native Cloudflare static-asset header rules."
         },
         {
           "name": "VaultKv",
@@ -14021,6 +14033,12 @@
           "kind": "function",
           "signature": "(value: string, opts: CookieOptions) => string",
           "doc": "Serialize a Set-Cookie header value: `name=encodeURIComponent(value)` plus attributes in Path / HttpOnly / SameSite / Max-Age / Secure order."
+        },
+        {
+          "name": "STANDARD_SECURITY_HEADERS",
+          "kind": "const",
+          "signature": "Readonly<{ readonly 'Strict-Transport-Security': \"max-age=31536000; includeSubDomains; preload\"; readonly 'X-Content-Ty…",
+          "doc": "Canonical generic response headers used by {@link addSecurityHeaders}."
         }
       ]
     },

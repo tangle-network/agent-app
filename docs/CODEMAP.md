@@ -43,7 +43,7 @@ _77 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./platform`](api/platform.md) | 67 | `billing`, `runtime`, `web` |
 | [`./preflight`](api/preflight.md) | 12 | — |
 | [`./preflight/cli`](api/preflight-cli.md) | 2 | — |
-| [`./preset-cloudflare`](api/preset-cloudflare.md) | 20 | `billing`, `crypto`, `knowledge`, `tools`, `web` |
+| [`./preset-cloudflare`](api/preset-cloudflare.md) | 22 | `billing`, `crypto`, `knowledge`, `tools`, `web` |
 | [`./profile`](api/profile.md) | 45 | `skills` |
 | [`./prompt`](api/prompt.md) | 3 | — |
 | [`./redact`](api/redact.md) | 14 | — |
@@ -78,7 +78,7 @@ _77 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./turn-stream`](api/turn-stream.md) | 59 | `chat-routes`, `stream` |
 | [`./vault`](api/vault.md) | 17 | — |
 | [`./vault/lazy`](api/vault-lazy.md) | 2 | — |
-| [`./web`](api/web.md) | 15 | — |
+| [`./web`](api/web.md) | 16 | — |
 | [`./web-react`](api/web-react.md) | 268 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./web-react/terminal`](api/web-react-terminal.md) | 10 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./work-product`](api/work-product.md) | 90 | `eval-campaign`, `tools` |
@@ -422,11 +422,11 @@ Source: `src/preflight/cli.ts` · 2 exports
 
 ## `./preset-cloudflare`
 
-Source: `src/preset-cloudflare/index.ts` · 20 exports
+Source: `src/preset-cloudflare/index.ts` · 22 exports
 
 Depends on: `billing`, `crypto`, `knowledge`, `tools`, `web`
 
-`CloudflareWorkflowBindingLike`, `CloudflareWorkflowInstanceLike`, `createD1KnowledgeStateAccessor`, `createPresetDrizzleSchema`, `createPresetFieldCrypto`, `createPresetToolHandlers`, `createPresetWorkspaceKeyManager`, `createPresetWorkspaceKeyStore`, `D1Like`, `D1PreparedLike`, `DrizzleColumnLike`, `DrizzleSqliteCoreLike`, `ensureCloudflareWorkflowInstance`, `EnsureCloudflareWorkflowInstanceResult`, `PRESET_MIGRATION_SQL`, `PRESET_TABLES`, `PresetBillingOptions`, `PresetKnowledgeAccessorOptions`, `PresetToolHandlerOptions`, `VaultKv`
+`CloudflareHeadersRule`, `CloudflareWorkflowBindingLike`, `CloudflareWorkflowInstanceLike`, `createD1KnowledgeStateAccessor`, `createPresetDrizzleSchema`, `createPresetFieldCrypto`, `createPresetToolHandlers`, `createPresetWorkspaceKeyManager`, `createPresetWorkspaceKeyStore`, `D1Like`, `D1PreparedLike`, `DrizzleColumnLike`, `DrizzleSqliteCoreLike`, `ensureCloudflareWorkflowInstance`, `EnsureCloudflareWorkflowInstanceResult`, `PRESET_MIGRATION_SQL`, `PRESET_TABLES`, `PresetBillingOptions`, `PresetKnowledgeAccessorOptions`, `PresetToolHandlerOptions`, `renderCloudflareHeadersFile`, `VaultKv`
 
 [Full API →](api/preset-cloudflare.md)
 
@@ -732,9 +732,9 @@ Source: `src/vault/lazy.tsx` · 2 exports
 
 ## `./web`
 
-Source: `src/web/index.ts` · 15 exports
+Source: `src/web/index.ts` · 16 exports
 
-`addSecurityHeaders`, `assertMediaUrl`, `checkRateLimit`, `clearCookieHeader`, `CookieOptions`, `extractRequestContext`, `JsonObject`, `KvLike`, `parseJsonObjectBody`, `RateLimitResult`, `readCookieValue`, `RequestContext`, `requireString`, `SecurityHeaderOptions`, `serializeCookie`
+`addSecurityHeaders`, `assertMediaUrl`, `checkRateLimit`, `clearCookieHeader`, `CookieOptions`, `extractRequestContext`, `JsonObject`, `KvLike`, `parseJsonObjectBody`, `RateLimitResult`, `readCookieValue`, `RequestContext`, `requireString`, `SecurityHeaderOptions`, `serializeCookie`, `STANDARD_SECURITY_HEADERS`
 
 [Full API →](api/web.md)
 
