@@ -18,7 +18,7 @@
     "directory": "create-agent-app"
   },
   "bin": {
-    "create-agent-app": "./index.mjs"
+    "create-agent-app": "index.mjs"
   },
   "files": [
     "index.mjs",

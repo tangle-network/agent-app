@@ -1,6 +1,6 @@
 name: Publish
 
-# Two ways to release, both under THIS filename on purpose — npm OIDC trusted
+# Two ways to release, both under this filename on purpose. Agent App's npm OIDC
 # publishing is bound to `publish.yml`, so all publishing must originate here:
 #
 #   • auto-release  — every merge to main: verify → bump patch → tag → publish.
@@ -91,19 +91,9 @@ jobs:
           exit 1
 
       - name: Publish packages to npm (skip versions already published)
-        run: |
-          for DIR in . create-agent-app; do
-            NAME=$(node -p "require('./$DIR/package.json').name")
-            VERSION=$(node -p "require('./$DIR/package.json').version")
-            if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
-              echo "$NAME@$VERSION already on registry; skipping publish"
-            else
-              (cd "$DIR" && npm publish --provenance --access public) || {
-                echo "::error::npm publish failed for $NAME@$VERSION. Verify its trusted publisher entry uses workflow publish.yml."
-                exit 1
-              }
-            fi
-          done
+        env:
+          CREATE_AGENT_APP_NPM_TOKEN: ${{ secrets.CREATE_AGENT_APP_NPM_TOKEN }}
+        run: .github/scripts/publish-packages.sh
 
   # ── manual / human-pushed tag path ────────────────────────────────────────
   verify:
@@ -184,20 +174,9 @@ jobs:
       - run: npm --version
 
       # Idempotent: re-running a tag whose npm version is already published must
-      # not fail. Auth is npm OIDC trusted publishing (no NPM_TOKEN) — the
-      # id-token: write permission lets npm mint the short-lived OIDC token it
-      # exchanges for publish rights + Sigstore provenance.
+      # not fail. Agent App uses npm OIDC; create-agent-app uses its repository
+      # secret because npm authorizes trusted publishers separately per package.
       - name: Publish packages to npm (skip versions already published)
-        run: |
-          for DIR in . create-agent-app; do
-            NAME=$(node -p "require('./$DIR/package.json').name")
-            VERSION=$(node -p "require('./$DIR/package.json').version")
-            if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
-              echo "$NAME@$VERSION already on registry; skipping publish"
-            else
-              (cd "$DIR" && npm publish --provenance --access public) || {
-                echo "::error::npm publish failed for $NAME@$VERSION. Verify its trusted publisher entry uses workflow publish.yml."
-                exit 1
-              }
-            fi
-          done
+        env:
+          CREATE_AGENT_APP_NPM_TOKEN: ${{ secrets.CREATE_AGENT_APP_NPM_TOKEN }}
+        run: .github/scripts/publish-packages.sh
