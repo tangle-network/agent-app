@@ -8175,6 +8175,12 @@
           "doc": "Strip provider prefix, :free suffix, and trailing date stamps."
         },
         {
+          "name": "OpenAICompatServedModel",
+          "kind": "interface",
+          "signature": "interface OpenAICompatServedModel",
+          "doc": "Which model actually served one direct-router turn."
+        },
+        {
           "name": "OpenAICompatStreamTurnOptions",
           "kind": "interface",
           "signature": "interface OpenAICompatStreamTurnOptions",

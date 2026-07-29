@@ -49,6 +49,46 @@ await runCopilot(streamTurn)
 > (`createWorkspaceKeyManager().ensureKey`) server-side and hand the copilot that
 > short-lived key — the router enforces the cap at the key.
 
+### Record which model actually answered
+
+The router substitutes models on purpose: ask for `claude-sonnet-4-6` while
+Anthropic is quota-walled and you get a `200` answered by `openai/gpt-5`. Without
+`onServedModel`, the only model id you hold is the one you *asked* for — so
+per-model quality scoring credits the wrong model and cost uses the wrong price
+basis.
+
+```ts
+let served: OpenAICompatServedModel | undefined
+const streamTurn = createOpenAICompatStreamTurn({
+  ...cfg, tools,
+  onServedModel: (s) => { served = s },   // fires once per TURN; take the last
+})
+```
+
+Map it onto the shell's existing attribution contract — don't open a second
+channel. On a `ChatTurnRouteProducer` (`/chat-routes`):
+
+```ts
+modelAttribution: () => ({
+  requestedModel: served?.requestedModel,
+  servedModel: served?.servedModel,
+  echoReceived: served !== undefined,
+})
+```
+
+Leave that contract's `servedSource` unset: its union is sandbox
+profile-resolution vocabulary with no router analogue.
+
+Two things worth knowing:
+
+- **`substituted` is folded, not a raw compare.** The router reports the dated
+  upstream id (`gpt-5-2025-08-07`) in the response body for a request of
+  `openai/gpt-5` on *every* turn, substituted or not.
+- **In a browser, `source` tells you which signal survived.** `'router_header'`
+  is the router's own substitution flag; `'response_body'` is the backstop for
+  when CORS strips the header. Silence means neither was available — "learned
+  nothing", not "nothing was substituted".
+
 ## Transport B — tcloud SDK
 
 tcloud also speaks OpenAI-compat; point the same helper at its base URL:

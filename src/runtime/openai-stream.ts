@@ -15,9 +15,15 @@
  * or the Vercel AI SDK and pipe their stream through {@link toLoopEvents}.
  */
 import type { LoopEvent, LoopMessage, LoopToolCall } from './loop'
+import { normalizeModelId } from './model-catalog'
 
 /** Minimal OpenAI Chat Completions streaming chunk (structural — no `openai` dep). */
 export interface OpenAIStreamChunk {
+  /** The model that produced this chunk. The Tangle Router reports the DATED
+   *  upstream id here (`gpt-5-2025-08-07`) whether or not it substituted, so
+   *  this is a served-model source only after id folding — see
+   *  {@link OpenAICompatServedModel}. */
+  model?: string
   choices?: Array<{
     delta?: {
       content?: string | null
@@ -96,6 +102,63 @@ function safeParse(s: string): Record<string, unknown> {
   }
 }
 
+/**
+ * Which model actually served one direct-router turn.
+ *
+ * The router substitutes models on purpose — a quota-walled primary comes back
+ * `200` answered by a different model — and says so in response headers. This
+ * lane used to drop the whole `Response` after taking `.body`, so a turn
+ * requested as `claude-sonnet-4-6` and answered by `openai/gpt-5` was recorded
+ * by its caller as Claude: per-model quality scoring blamed the wrong model and
+ * cost used the wrong price basis.
+ *
+ * Map this onto the shell's existing attribution contract rather than inventing
+ * a second channel — `ChatTurnRouteProducer.modelAttribution()` (`/chat-routes`):
+ *
+ *     modelAttribution: () => ({ requestedModel, servedModel, echoReceived: true })
+ *
+ * Leave that contract's `servedSource` unset: its union is sandbox
+ * profile-resolution vocabulary with no router analogue.
+ */
+export interface OpenAICompatServedModel {
+  /** The model id this turn asked for (`OpenAICompatStreamTurnOptions.model`). */
+  requestedModel: string
+  /** The model the router/provider reports having actually served. */
+  servedModel: string
+  /** Where `servedModel` was read from. The header is the router's own
+   *  substitution signal; the body is the backstop that survives CORS. */
+  source: 'router_header' | 'response_body'
+  /** True when served differs from requested after id folding. Folded, not
+   *  compared raw: the body reports a dated id on EVERY turn, so `!==` would
+   *  claim a substitution every time. */
+  substituted: boolean
+  /** `x-tangle-failover` `trigger=` — why the router swapped. Absent when the
+   *  router did not inject the substitute (a caller-supplied fallback chain
+   *  sets the served-model header without the failover one). */
+  trigger?: string
+  /** `x-tangle-failover` `degraded=`. */
+  degraded?: boolean
+}
+
+/** Parse `from=…; to=…; trigger=…; degraded=…` down to the fields we report.
+ *  Absent/garbled segments are simply omitted — attribution is best-effort and
+ *  must never fail a turn that is otherwise streaming fine. */
+function parseFailoverHeader(raw: string | null): { trigger?: string; degraded?: boolean } {
+  if (!raw) return {}
+  const fields = new Map<string, string>()
+  for (const segment of raw.split(';')) {
+    const eq = segment.indexOf('=')
+    if (eq === -1) continue
+    fields.set(segment.slice(0, eq).trim().toLowerCase(), segment.slice(eq + 1).trim())
+  }
+  const trigger = fields.get('trigger')
+  const degraded = fields.get('degraded')
+  return {
+    ...(trigger ? { trigger } : {}),
+    ...(degraded != null ? { degraded: degraded === 'true' } : {}),
+  }
+}
+
 /** Define options for configuring an OpenAI-compatible streaming chat turn including API details and tools */
 export interface OpenAICompatStreamTurnOptions {
   /** OpenAI-compat base URL (e.g. the Tangle Router `https://router.tangle.tools/v1`). */
@@ -109,6 +172,16 @@ export interface OpenAICompatStreamTurnOptions {
   fetchImpl?: typeof fetch
   /** Extra body fields (e.g. `max_tokens`). */
   extraBody?: Record<string, unknown>
+  /**
+   * Called at most ONCE per turn, as soon as the serving model is
+   * determinable, with what actually answered. Never called when neither the
+   * header nor the body names a model — silence means "learned nothing", not
+   * "nothing was substituted".
+   *
+   * `streamTurn` runs once per TOOL turn, so a multi-turn `runAppToolLoop`
+   * fires this once per turn; take the last for row attribution.
+   */
+  onServedModel?: (served: OpenAICompatServedModel) => void
 }
 
 /**
@@ -135,7 +208,7 @@ export function createOpenAICompatStreamTurn(
         ...(opts.tools && opts.tools.length > 0 ? { tools: opts.tools } : {}),
         ...(opts.temperature != null ? { temperature: opts.temperature } : {}),
         ...opts.extraBody,
-      }),
+      }, opts.onServedModel ? { requestedModel: opts.model, report: opts.onServedModel } : undefined),
     )
 }
 
@@ -146,6 +219,7 @@ async function* streamChatCompletions(
   url: string,
   apiKey: string,
   body: Record<string, unknown>,
+  attribution?: { requestedModel: string; report: (served: OpenAICompatServedModel) => void },
 ): AsyncIterable<OpenAIStreamChunk> {
   const res = await doFetch(url, {
     method: 'POST',
@@ -165,6 +239,39 @@ async function* streamChatCompletions(
     Object.assign(error, { status: res.status })
     throw error
   }
+  // Served-model attribution, fired at most once, as early as it is knowable.
+  //
+  // The header comes first because it is the router's OWN substitution signal:
+  // `X-Tangle-Served-Model` is set only when the served model differs from the
+  // requested one, so its presence is authoritative and it arrives before the
+  // first byte of content. `X-Tangle-Failover` rides along only when the router
+  // itself picked the substitute (a caller-supplied fallback chain sets the
+  // former without the latter), which is why `trigger`/`degraded` are optional.
+  //
+  // The body is the backstop for when the header cannot reach us. In a BROWSER,
+  // headers are invisible to JS unless the server lists them in
+  // `Access-Control-Expose-Headers` — tangle-router#324 added both, but that
+  // only helps once it is DEPLOYED, and any other OpenAI-compat endpoint
+  // pointed at this client exposes nothing. The chunk `model` field is not
+  // subject to CORS, so it keeps the browser lane attributable regardless.
+  let reported = false
+  const report = (served: OpenAICompatServedModel): void => {
+    if (reported || !attribution) return
+    reported = true
+    attribution.report(served)
+  }
+  if (attribution) {
+    const servedHeader = res.headers.get('x-tangle-served-model')
+    if (servedHeader) {
+      report({
+        requestedModel: attribution.requestedModel,
+        servedModel: servedHeader,
+        source: 'router_header',
+        substituted: normalizeModelId(servedHeader) !== normalizeModelId(attribution.requestedModel),
+        ...parseFailoverHeader(res.headers.get('x-tangle-failover')),
+      })
+    }
+  }
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
@@ -179,11 +286,25 @@ async function* streamChatCompletions(
       if (!trimmed.startsWith('data:')) continue
       const data = trimmed.slice(5).trim()
       if (data === '[DONE]') return
+      let chunk: OpenAIStreamChunk
       try {
-        yield JSON.parse(data) as OpenAIStreamChunk
+        chunk = JSON.parse(data) as OpenAIStreamChunk
       } catch {
-        /* skip a partial/garbled SSE frame */
+        continue /* skip a partial/garbled SSE frame */
       }
+      // Body fallback: only when the header said nothing. Fold both ids before
+      // comparing — the router reports the dated upstream id (`gpt-5-2025-08-07`)
+      // for a request of `openai/gpt-5` even with NO substitution, so a raw
+      // `!==` would report a swap on literally every turn.
+      if (attribution && !reported && chunk.model) {
+        report({
+          requestedModel: attribution.requestedModel,
+          servedModel: chunk.model,
+          source: 'response_body',
+          substituted: normalizeModelId(chunk.model) !== normalizeModelId(attribution.requestedModel),
+        })
+      }
+      yield chunk
     }
   }
 }
