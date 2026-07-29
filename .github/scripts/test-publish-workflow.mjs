@@ -7,7 +7,16 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
-const text = fs.readFileSync(path.join(root, '.github/workflows/publish.yml'), 'utf8')
+const workflowDirectory = path.join(root, '.github/workflows')
+const workflows = fs.readdirSync(workflowDirectory)
+  .filter((file) => /\.ya?ml$/.test(file))
+  .sort()
+  .map((file) => ({ file, text: fs.readFileSync(path.join(workflowDirectory, file), 'utf8') }))
+const text = workflows.find(({ file }) => file === 'publish.yml')?.text
+if (!text) throw new Error('publish.yml is missing')
+const ciWorkflow = workflows.find(({ file }) => file === 'ci.yml')?.text
+const nightlyWorkflow = workflows.find(({ file }) => file === 'nightly-live-e2e.yml')?.text
+if (!ciWorkflow || !nightlyWorkflow) throw new Error('CI workflows are missing')
 const script = fs.readFileSync(path.join(root, '.github/scripts/publish-packages.sh'), 'utf8')
 const releaseScript = fs.readFileSync(path.join(root, '.github/scripts/write-release.sh'), 'utf8')
 const packFilenameScript = path.join(root, '.github/scripts/read-npm-pack-filename.mjs')
@@ -59,19 +68,29 @@ const createPublishJob = job('publish_create_agent_app')
 check(jobs.size === 4, 'release workflow must contain exactly four jobs')
 check(/concurrency:\s*\n  group: release\s*\n  cancel-in-progress: false/.test(text), 'release concurrency changed')
 check(!/^\s+tags:/m.test(triggerBlock), 'tag pushes duplicate the explicit release dispatch')
+check(ciWorkflow.includes('permissions:\n  contents: read'), 'CI permissions are not read-only')
+check(nightlyWorkflow.includes('permissions:\n  contents: read'), 'nightly permissions are not read-only')
+check(!/^      SANDBOX_API_KEY:/m.test(nightlyWorkflow), 'nightly secret is exposed to the full job')
+check((nightlyWorkflow.match(/SANDBOX_API_KEY: \$\{\{ secrets\.SANDBOX_API_KEY \}\}/g) ?? []).length === 2, 'nightly secret must be limited to its check and live test steps')
 
-const actionRefs = [...text.matchAll(/uses:\s*([^@\s]+)@([^\s#]+)/g)].map((match) => ({ name: match[1], ref: match[2] }))
+const actionRefs = workflows.flatMap(({ file, text: workflow }) =>
+  [...workflow.matchAll(/uses:\s*([^@\s]+)@([^\s#]+)/g)]
+    .map((match) => ({ file, name: match[1], ref: match[2] })),
+)
 check(actionRefs.every(({ ref }) => /^[0-9a-f]{40}$/.test(ref)), 'every action must use an exact commit SHA')
 for (const [name, pin] of Object.entries(pins)) {
   const refs = actionRefs.filter((action) => action.name === name)
   check(refs.length > 0 && refs.every(({ ref }) => ref === pin), `${name} does not use the required pin`)
 }
 
-for (let index = 0; index < lines.length; index += 1) {
-  if (!/^      - uses: actions\/checkout@/.test(lines[index])) continue
-  const step = []
-  for (let cursor = index; cursor < lines.length && (cursor === index || !/^      - /.test(lines[cursor])); cursor += 1) step.push(lines[cursor])
-  check(step.some((line) => line.trim() === 'persist-credentials: false'), 'checkout persists credentials')
+for (const { file, text: workflow } of workflows) {
+  const workflowLines = workflow.split('\n')
+  for (let index = 0; index < workflowLines.length; index += 1) {
+    if (!/^      - uses: actions\/checkout@/.test(workflowLines[index])) continue
+    const step = []
+    for (let cursor = index; cursor < workflowLines.length && (cursor === index || !/^      - /.test(workflowLines[cursor])); cursor += 1) step.push(workflowLines[cursor])
+    check(step.some((line) => line.trim() === 'persist-credentials: false'), `${file} checkout persists credentials`)
+  }
 }
 
 const restricted = {

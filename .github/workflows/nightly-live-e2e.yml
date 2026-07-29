@@ -30,6 +30,9 @@ concurrency:
   group: nightly-live-e2e
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   live-turn:
     runs-on: ubuntu-latest
@@ -37,14 +40,15 @@ jobs:
     env:
       NODE_OPTIONS: --max-old-space-size=8192
       LIVE_SANDBOX: '1'
-      SANDBOX_API_KEY: ${{ secrets.SANDBOX_API_KEY }}
       SANDBOX_API_URL: ${{ vars.SANDBOX_API_URL || 'https://sandbox.tangle.tools' }}
       LIVE_MODEL: ${{ inputs.model || 'gpt-5-mini' }}
       LIVE_BOX_ID: ${{ inputs.box_id }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           cache: pnpm
@@ -53,6 +57,8 @@ jobs:
       # credential and prints only a stack trace is the opacity this workflow
       # exists to remove.
       - name: Check credentials are present
+        env:
+          SANDBOX_API_KEY: ${{ secrets.SANDBOX_API_KEY }}
         run: |
           missing=""
           [ -n "$SANDBOX_API_KEY" ] || missing="$missing SANDBOX_API_KEY"
@@ -67,6 +73,8 @@ jobs:
 
       - name: Run one real sandbox chat turn end to end
         id: live
+        env:
+          SANDBOX_API_KEY: ${{ secrets.SANDBOX_API_KEY }}
         run: |
           set -o pipefail
           pnpm vitest run tests/live/nightly-chat-turn.live.test.ts --reporter=default 2>&1 | tee live.log
@@ -96,7 +104,7 @@ jobs:
       # Only when the turn actually ran. `if: always()` alone uploads nothing and
       # warns "No files were found" whenever the credential check short-circuits
       # — a spurious warning in the one workflow whose job is legible failure.
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always() && steps.live.outcome != 'skipped'
         with:
           name: nightly-live-log
