@@ -4,7 +4,7 @@
 
 Source: `src/chat-store/index.ts`
 
-62 exports.
+63 exports.
 
 ### `AppendMessageInput`
 
@@ -92,6 +92,14 @@ interface ChatAttachmentPart
 
 ```ts
 type ChatDatabase
+```
+
+### `ChatExtraIndexes`
+
+`type` — Builds product indexes from a table's columns.
+
+```ts
+type ChatExtraIndexes
 ```
 
 ### `ChatFilePart`

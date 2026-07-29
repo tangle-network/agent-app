@@ -2797,6 +2797,14 @@ interface ChatAttachmentPart
 type ChatDatabase
 ```
 
+### `ChatExtraIndexes`
+
+`type` — Builds product indexes from a table's columns.
+
+```ts
+type ChatExtraIndexes
+```
+
 ### `ChatFilePart`
 
 `interface` — Union of the sidecar's legacy (path-based) and AI-SDK (url-based) file shapes; response-side every field besides `type` is optional.

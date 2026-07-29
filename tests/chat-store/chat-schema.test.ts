@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { getTableName } from 'drizzle-orm'
-import { getTableConfig, text } from 'drizzle-orm/sqlite-core'
+import { getTableConfig, index, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import type { Part as HarnessWirePart } from '@tangle-network/agent-interface'
 import { createChatTables } from '../../src/chat-store/schema'
 import type { ChatMessagePart } from '../../src/chat-store/parts'
@@ -196,5 +196,65 @@ describe('ChatMessagePart — canonical coverage', () => {
       servedProvider: 'openrouter',
       servedSource: 'profile',
     })
+  })
+})
+
+/**
+ * A product with one extra index used to have no way to adopt the factory: it
+ * kept a hand-rolled duplicate of the same physical table, and the two drifted
+ * on the next factory change. gtm carried exactly that — two `message`
+ * declarations, one for reads and one for writes.
+ */
+describe('createChatTables — product indexes', () => {
+  const withIndexes = createChatTables({
+    workspaceTable: workspacesTable,
+    threadExtraColumns: { scopeKey: text('scope_key') },
+    messageExtraColumns: { turnId: text('turn_id') },
+    threadExtraIndexes: (c) => [index('idx_thread_scope').on(c.scopeKey!)],
+    messageExtraIndexes: (c) => [
+      uniqueIndex('uniq_message_thread_role_turn').on(c.threadId!, c.role!, c.turnId!),
+    ],
+  })
+
+  function indexNames(table: Parameters<typeof getTableConfig>[0]) {
+    return getTableConfig(table).indexes.map((i) => i.config.name).sort()
+  }
+
+  it('appends product indexes to the factory’s own, on both tables', () => {
+    expect(indexNames(withIndexes.threads)).toEqual([
+      'idx_thread_scope', 'idx_thread_workspace', 'idx_thread_workspace_updated',
+    ])
+    expect(indexNames(withIndexes.messages)).toEqual([
+      'idx_message_thread', 'idx_message_thread_created', 'uniq_message_thread_role_turn',
+    ])
+  })
+
+  it('can index a column the PRODUCT added, not just the factory’s own', () => {
+    const scope = getTableConfig(withIndexes.threads).indexes.find((i) => i.config.name === 'idx_thread_scope')
+    expect(scope?.config.columns.map((c) => (c as { name: string }).name)).toEqual(['scope_key'])
+  })
+
+  it('carries uniqueness, so a dedup index is actually unique', () => {
+    const uniq = getTableConfig(withIndexes.messages).indexes.find(
+      (i) => i.config.name === 'uniq_message_thread_role_turn',
+    )
+    expect(uniq?.config.unique).toBe(true)
+  })
+
+  it('does not prefix a product index name — it must match the product’s migration', () => {
+    const prefixedWithExtras = createChatTables({
+      tablePrefix: 'chat_',
+      threadExtraColumns: { scopeKey: text('scope_key') },
+      threadExtraIndexes: (c) => [index('idx_thread_scope').on(c.scopeKey!)],
+    })
+    expect(indexNames(prefixedWithExtras.threads)).toEqual([
+      'idx_chat_thread_workspace', 'idx_chat_thread_workspace_updated', 'idx_thread_scope',
+    ])
+  })
+
+  it('leaves a product that supplies none byte-unchanged', () => {
+    const plain = createChatTables({ workspaceTable: workspacesTable })
+    expect(indexNames(plain.threads)).toEqual(['idx_thread_workspace', 'idx_thread_workspace_updated'])
+    expect(indexNames(plain.messages)).toEqual(['idx_message_thread', 'idx_message_thread_created'])
   })
 })

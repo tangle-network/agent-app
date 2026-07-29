@@ -2168,6 +2168,12 @@
           "doc": "Any SQLite drizzle database — `any` erases the driver-specific run-result and schema generics so better-sqlite3, D1, and libsql handles all fit."
         },
         {
+          "name": "ChatExtraIndexes",
+          "kind": "type",
+          "signature": "type ChatExtraIndexes",
+          "doc": "Builds product indexes from a table's columns."
+        },
+        {
           "name": "ChatFilePart",
           "kind": "interface",
           "signature": "interface ChatFilePart",
