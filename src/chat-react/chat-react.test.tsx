@@ -311,6 +311,22 @@ describe('ComposerAgentControls', () => {
     expect(document.body.textContent).toContain('GPT Image One')
   })
 
+  it('recognises the selected model by its CANONICAL id too', () => {
+    render(
+      <ComposerAgentControls
+        layout="inline"
+        context="chat"
+        // What a product actually has on disk: `onChange` hands back the
+        // canonical provider-prefixed id, so a selection pinned before this
+        // trim existed is stored in that form while the catalog entry's own
+        // `id` stays bare. Matching only the bare form drops exactly the model
+        // the escape hatch above exists to keep.
+        model={{ value: 'openai/gpt-image-1', onChange: () => {}, models: MIXED_MODELS }}
+      />,
+    )
+    expect(document.body.textContent).toContain('GPT Image One')
+  })
+
   it('keeps cli-base on a non-chat surface', () => {
     render(
       <ComposerAgentControls
