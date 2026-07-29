@@ -3,12 +3,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
+import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const text = fs.readFileSync(path.join(root, '.github/workflows/publish.yml'), 'utf8')
 const script = fs.readFileSync(path.join(root, '.github/scripts/publish-packages.sh'), 'utf8')
 const releaseScript = fs.readFileSync(path.join(root, '.github/scripts/write-release.sh'), 'utf8')
+const packFilenameScript = path.join(root, '.github/scripts/read-npm-pack-filename.mjs')
 const lines = text.split('\n')
 const triggerBlock = text.slice(0, text.indexOf('concurrency:'))
 const pins = {
@@ -97,6 +99,10 @@ check(!packageJob.includes('npm version'), 'auto mode mutates package manifests 
 check(packageJob.includes('fetch-depth: 0'), 'release history is shallow')
 check(packageJob.includes('publish-control-sha:') && packageJob.includes('release-control-sha:'), 'release scripts are not anchored before dependency install')
 check(packageJob.indexOf('id: control') < packageJob.indexOf('pnpm install'), 'publish script is anchored after dependency install')
+check(packageJob.includes('cp .github/scripts/read-npm-pack-filename.mjs'), 'npm pack parser is not staged before install')
+check(packageJob.indexOf('cp .github/scripts/read-npm-pack-filename.mjs') < packageJob.indexOf('pnpm install'), 'npm pack parser is staged after dependency install')
+check(packageJob.includes('npm pack "$source" --ignore-scripts --pack-destination "$BUNDLE" --json'), 'npm pack does not request structured output')
+check(packageJob.includes('node "$BUNDLE/read-npm-pack-filename.mjs"'), 'npm pack filename is not parsed by the staged parser')
 check(packageJob.includes('bash .github/scripts/test-write-release.sh'), 'release transition tests do not run')
 check(packageJob.includes('actions/upload-artifact@'), 'tested tarballs are not uploaded')
 check(packageJob.includes('Verify release tag is on main'), 'tag publishing does not check main ancestry')
@@ -143,5 +149,18 @@ check(createPublishJob.includes('CREATE_AGENT_APP_NPM_TOKEN: ${{ secrets.CREATE_
 check(createPublishJob.includes('publish create-agent-app create-agent-app.tgz') && !createPublishJob.includes('publish agent-app '), 'create-agent-app publisher is not limited to its tarball')
 check(script.includes('--provenance') && script.includes('--ignore-scripts'), 'publish command lacks provenance or allows lifecycle scripts')
 check(text.includes("startsWith(github.ref, 'refs/tags/v')") && text.includes("github.event_name == 'workflow_dispatch'"), 'manual tag publishing changed')
+
+const parsePackFilename = (input) => spawnSync(process.execPath, [packFilenameScript], { input, encoding: 'utf8' })
+const validPack = parsePackFilename(JSON.stringify([{ filename: 'tangle-network-agent-app-0.44.44.tgz', files: Array.from({ length: 500 }, (_, index) => ({ path: `dist/${index}.js` })) }]))
+check(validPack.status === 0, `npm pack parser rejected valid JSON: ${validPack.stderr.trim()}`)
+check(validPack.stdout === 'tangle-network-agent-app-0.44.44.tgz', 'npm pack parser returned the wrong filename')
+for (const [name, input] of [
+  ['lifecycle output', 'build complete\n[{"filename":"package.tgz"}]'],
+  ['multiple results', '[{"filename":"one.tgz"},{"filename":"two.tgz"}]'],
+  ['path traversal', '[{"filename":"../package.tgz"}]'],
+  ['missing filename', '[{}]'],
+]) {
+  check(parsePackFilename(input).status !== 0, `npm pack parser accepted ${name}`)
+}
 
 console.log('publish workflow contract: ok')
