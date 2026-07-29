@@ -1378,6 +1378,12 @@
           "doc": "What the route persists — a structural subset of `/chat-store`'s `ChatStore`, so `createChatStore(db, tables)` satisfies it directly and a product with its own persistence adapts without importing dr…"
         },
         {
+          "name": "ChatTurnModelAttribution",
+          "kind": "interface",
+          "signature": "interface ChatTurnModelAttribution",
+          "doc": "Requested and effective model attribution for one sandbox turn."
+        },
+        {
           "name": "ChatTurnModelFailover",
           "kind": "interface",
           "signature": "interface ChatTurnModelFailover",

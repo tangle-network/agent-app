@@ -124,6 +124,10 @@ export interface ChatTurnMessageStore {
     content: string
     parts?: ChatMessagePart[]
     model?: string | null
+    requestedModel?: string | null
+    servedModel?: string | null
+    servedProvider?: string | null
+    servedSource?: string | null
     inputTokens?: number | null
     outputTokens?: number | null
     reasoningTokens?: number | null
@@ -138,6 +142,10 @@ export interface ChatTurnMessageStore {
     content?: string
     parts?: ChatMessagePart[]
     model?: string | null
+    requestedModel?: string | null
+    servedModel?: string | null
+    servedProvider?: string | null
+    servedSource?: string | null
     inputTokens?: number | null
     outputTokens?: number | null
     reasoningTokens?: number | null
@@ -169,6 +177,9 @@ export interface ChatTurnRouteProducer extends ChatTurnProducer {
   /** Model-failover attribution, when the producer supports it. Reported onto
    *  the usage/billing receipt so a downgrade is never silent. */
   modelFailover?(): ChatTurnModelFailover
+  /** Requested-versus-served attribution reported by the sandbox sidecar.
+   *  `echoReceived` distinguishes a missing echo from a partial echo. */
+  modelAttribution?(): ChatTurnModelAttribution
 }
 
 /** Which model served, and what it took to get there. */
@@ -179,6 +190,20 @@ export interface ChatTurnModelFailover {
   attempts: ModelFailoverAttempt[]
   /** True when the preferred model did not serve. */
   usedFallback: boolean
+}
+
+/** Requested and effective model attribution for one sandbox turn. */
+export interface ChatTurnModelAttribution {
+  /** The model explicitly requested by the caller, before shell failover. */
+  requestedModel?: string
+  /** The model the downstream sandbox reports actually served the turn. */
+  servedModel?: string
+  /** The provider that served the turn, when echoed by the sandbox. */
+  servedProvider?: string
+  /** How the sandbox selected the served model. */
+  servedSource?: 'request' | 'environment' | 'profile'
+  /** True when a structurally valid effective-backend echo was observed. */
+  echoReceived: boolean
 }
 
 /** Resolve authorization status and context for a chat turn including tenant and user identification */
@@ -325,6 +350,12 @@ export interface ChatTurnLifecycleComplete<TContext> extends ChatTurnLifecycleBa
    *  `usage` is that model's, so telemetry that splits cost or quality by model
    *  must key on this and not on the requested one. */
   model?: string
+  /** Requested-versus-served attribution. A difference is detectable from
+   *  this receipt and from the persisted assistant row independently. */
+  requestedModel?: string
+  servedModel?: string
+  servedProvider?: string
+  servedSource?: 'request' | 'environment' | 'profile'
   /** Attribution for a downgrade: which models were tried and why each failed.
    *  `undefined` when the producer reports no failover support. */
   modelFailover?: ChatTurnModelFailover
@@ -372,6 +403,12 @@ export interface ChatTurnCompleteInput<TContext> {
    *  the requested one, so a product that bills or scores per model MUST read
    *  it here rather than assuming the model it asked for. */
   model?: string
+  /** Requested-versus-served attribution. A difference is detectable from
+   *  this receipt and from the persisted assistant row independently. */
+  requestedModel?: string
+  servedModel?: string
+  servedProvider?: string
+  servedSource?: 'request' | 'environment' | 'profile'
   /** Present when the producer supports failover: the full attempt trail, and
    *  `usedFallback` — the flag that makes a silent downgrade impossible. */
   modelFailover?: ChatTurnModelFailover
@@ -840,6 +877,7 @@ export function createChatTurnRoutes<TContext = void>(
           })
         } else {
           const failoverInfo = producer?.modelFailover?.()
+          const attribution = producer?.modelAttribution?.()
           await lifecycle.onTurnComplete?.({
             identity, executionId, turnStreamId, context, durationMs,
             finalText: producer?.finalText() ?? '',
@@ -847,6 +885,10 @@ export function createChatTurnRoutes<TContext = void>(
             assistantMessageId: assistantRowId(),
             ...(gatedTurn ? { gated: true } : {}),
             ...(producer?.model ? { model: producer.model } : {}),
+            ...(attribution?.requestedModel ? { requestedModel: attribution.requestedModel } : {}),
+            ...(attribution?.servedModel ? { servedModel: attribution.servedModel } : {}),
+            ...(attribution?.servedProvider ? { servedProvider: attribution.servedProvider } : {}),
+            ...(attribution?.servedSource ? { servedSource: attribution.servedSource } : {}),
             ...(failoverInfo ? { modelFailover: failoverInfo } : {}),
           })
         }
@@ -1044,10 +1086,15 @@ export function createChatTurnRoutes<TContext = void>(
               return
             }
             const usage = producer?.usage?.() ?? {}
+            const attribution = producer?.modelAttribution?.()
             const values = {
               content: finalText,
               ...(parts && parts.length > 0 ? { parts } : {}),
               ...(producer?.model ? { model: producer.model } : {}),
+              ...(attribution?.requestedModel ? { requestedModel: attribution.requestedModel } : {}),
+              ...(attribution?.servedModel ? { servedModel: attribution.servedModel } : {}),
+              ...(attribution?.servedProvider ? { servedProvider: attribution.servedProvider } : {}),
+              ...(attribution?.servedSource ? { servedSource: attribution.servedSource } : {}),
               ...(usage.inputTokens !== undefined ? { inputTokens: usage.inputTokens } : {}),
               ...(usage.outputTokens !== undefined ? { outputTokens: usage.outputTokens } : {}),
               ...(usage.reasoningTokens !== undefined ? { reasoningTokens: usage.reasoningTokens } : {}),
@@ -1084,6 +1131,7 @@ export function createChatTurnRoutes<TContext = void>(
                   // Read AFTER the drain, so the model reported to billing is
                   // the one that actually served — a fallback included.
                   const failoverInfo = producer?.modelFailover?.()
+                  const attribution = producer?.modelAttribution?.()
                   return options.onTurnComplete!({
                     identity: turnIdentity,
                     finalText,
@@ -1092,6 +1140,10 @@ export function createChatTurnRoutes<TContext = void>(
                     assistantMessageId: assistantRowId(),
                     ...(runFailed ? { failureReason: failureReasonOf(lastFailureData) } : {}),
                     ...(producer?.model ? { model: producer.model } : {}),
+                    ...(attribution?.requestedModel ? { requestedModel: attribution.requestedModel } : {}),
+                    ...(attribution?.servedModel ? { servedModel: attribution.servedModel } : {}),
+                    ...(attribution?.servedProvider ? { servedProvider: attribution.servedProvider } : {}),
+                    ...(attribution?.servedSource ? { servedSource: attribution.servedSource } : {}),
                     ...(failoverInfo ? { modelFailover: failoverInfo } : {}),
                   })
                 },

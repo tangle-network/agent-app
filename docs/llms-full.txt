@@ -1760,6 +1760,14 @@ type ChatTurnLockResult
 interface ChatTurnMessageStore
 ```
 
+### `ChatTurnModelAttribution`
+
+`interface` — Requested and effective model attribution for one sandbox turn.
+
+```ts
+interface ChatTurnModelAttribution
+```
+
 ### `ChatTurnModelFailover`
 
 `interface` — Which model served, and what it took to get there.

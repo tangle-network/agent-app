@@ -29,6 +29,14 @@ function interaction(id: string, kind: string): Record<string, unknown> {
   }
 }
 
+function effectiveBackend(
+  provider: string,
+  model: string,
+  source: 'request' | 'environment' | 'profile',
+): Record<string, unknown> {
+  return { type: 'session.updated', data: { effectiveBackend: { provider, model, source } } }
+}
+
 async function drain(stream: AsyncGenerator<{ type: string }, void, unknown>) {
   const out: Array<Record<string, unknown>> = []
   for await (const event of stream) out.push(event as Record<string, unknown>)
@@ -60,6 +68,166 @@ describe('createSandboxChatProducer', () => {
       expect.objectContaining({ type: 'reasoning', text: 'thinking' }),
       expect.objectContaining({ type: 'text', text: 'Hello' }),
     ])
+  })
+
+  it('captures a matching effective backend without emitting a divergence notice', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([
+        effectiveBackend('openai', 'gpt-5', 'request'),
+        { type: 'result', data: { finalText: 'done' } },
+      ]),
+      model: 'gpt-5',
+    })
+
+    const events = await drain(producer.stream)
+
+    expect(producer.model).toBe('gpt-5')
+    expect(producer.modelAttribution?.()).toEqual({
+      requestedModel: 'gpt-5',
+      servedModel: 'gpt-5',
+      servedProvider: 'openai',
+      servedSource: 'request',
+      echoReceived: true,
+    })
+    expect(events.filter((event) => event.type === 'notice')).toEqual([])
+    expect(producer.assistantParts?.().filter((part) => part.type === 'notice')).toEqual([])
+  })
+
+  it('mirrors a substituted effective model and emits exactly one durable warning for an explicit request', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([
+        effectiveBackend('openrouter', 'anthropic/claude-sonnet-4', 'profile'),
+        effectiveBackend('openrouter', 'anthropic/claude-sonnet-4', 'profile'),
+        { type: 'result', data: { finalText: 'done' } },
+      ]),
+      model: 'openai/gpt-5',
+    })
+
+    const events = await drain(producer.stream)
+
+    expect(producer.model).toBe('anthropic/claude-sonnet-4')
+    expect(producer.modelAttribution?.()).toEqual({
+      requestedModel: 'openai/gpt-5',
+      servedModel: 'anthropic/claude-sonnet-4',
+      servedProvider: 'openrouter',
+      servedSource: 'profile',
+      echoReceived: true,
+    })
+    const notices = events.filter((event) => event.type === 'notice')
+    expect(notices).toEqual([
+      expect.objectContaining({
+        noticeKind: 'warning',
+        text: expect.stringContaining('Requested openai/gpt-5'),
+      }),
+    ])
+    expect(String(notices[0]?.text)).toContain('anthropic/claude-sonnet-4')
+    expect(producer.assistantParts?.().filter((part) => part.type === 'notice')).toEqual([
+      expect.objectContaining({
+        type: 'notice',
+        noticeKind: 'warning',
+        text: expect.stringContaining('anthropic/claude-sonnet-4'),
+      }),
+    ])
+  })
+
+  it('captures a profile-selected effective model without warning when no model was explicitly requested', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([
+        effectiveBackend('anthropic', 'claude-opus-4', 'profile'),
+        { type: 'result', data: { finalText: 'done' } },
+      ]),
+    })
+
+    const events = await drain(producer.stream)
+
+    expect(producer.model).toBe('claude-opus-4')
+    expect(producer.modelAttribution?.()).toEqual({
+      servedModel: 'claude-opus-4',
+      servedProvider: 'anthropic',
+      servedSource: 'profile',
+      echoReceived: true,
+    })
+    expect(events.filter((event) => event.type === 'notice')).toEqual([])
+    expect(producer.assistantParts?.().filter((part) => part.type === 'notice')).toEqual([])
+  })
+
+  it('keeps legacy model attribution unchanged when no effective backend echo arrives', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([{ type: 'result', data: { finalText: 'done' } }]),
+      model: 'anthropic/claude',
+    })
+
+    expect(await drain(producer.stream)).toEqual([])
+    expect(producer.model).toBe('anthropic/claude')
+    expect(producer.modelAttribution?.()).toEqual({
+      requestedModel: 'anthropic/claude',
+      echoReceived: false,
+    })
+  })
+
+  it('composes shell failover with downstream substitution while preserving both notices and the attempt trail', async () => {
+    const producer = createSandboxChatProducer({
+      model: 'dead-model',
+      fallbackModels: ['shell-fallback'],
+      openEvents: ({ model }) => model === 'dead-model'
+        ? feed([{
+            type: 'error',
+            data: {
+              code: 'provider_inference_unavailable',
+              message: 'provider inference is unavailable',
+            },
+          }])
+        : feed([
+            effectiveBackend('downstream', 'downstream-substitute', 'environment'),
+            partUpdated({ type: 'text', id: 't1', text: 'ok' }, 'ok'),
+            { type: 'result', data: { finalText: 'ok' } },
+          ]),
+      log: () => {},
+    })
+
+    const events = await drain(producer.stream)
+
+    expect(producer.model).toBe('downstream-substitute')
+    expect(producer.modelAttribution?.()).toEqual({
+      requestedModel: 'dead-model',
+      servedModel: 'downstream-substitute',
+      servedProvider: 'downstream',
+      servedSource: 'environment',
+      echoReceived: true,
+    })
+    expect(producer.modelFailover?.()).toMatchObject({
+      model: 'shell-fallback',
+      usedFallback: true,
+      attempts: [
+        expect.objectContaining({ model: 'dead-model', ok: false }),
+        { model: 'shell-fallback', ok: true },
+      ],
+    })
+    const notices = events.filter((event) => event.type === 'notice')
+    expect(notices).toHaveLength(2)
+    expect(notices.some((notice) => String(notice.text).includes('shell-fallback'))).toBe(true)
+    expect(notices.some((notice) => String(notice.text).includes('downstream-substitute'))).toBe(true)
+    expect(producer.assistantParts?.().filter((part) => part.type === 'notice')).toHaveLength(2)
+  })
+
+  it('ignores malformed effective-backend echoes', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([
+        { type: 'status', data: { effectiveBackend: 'gpt-5' } },
+        { type: 'status', data: { effectiveBackend: [] } },
+        { type: 'status', data: { effectiveBackend: { provider: 7, model: false, source: 'unknown' } } },
+        { type: 'result', data: { finalText: 'done' } },
+      ]),
+      model: 'legacy-model',
+    })
+
+    await drain(producer.stream)
+    expect(producer.model).toBe('legacy-model')
+    expect(producer.modelAttribution?.()).toEqual({
+      requestedModel: 'legacy-model',
+      echoReceived: false,
+    })
+    expect(producer.assistantParts?.().filter((part) => part.type === 'notice')).toEqual([])
   })
 
   it('announces a tool once and settles it once, with the persisted tool part tracking state', async () => {

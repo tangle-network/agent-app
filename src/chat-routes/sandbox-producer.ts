@@ -52,7 +52,11 @@ import {
   type ModelFailoverStreamHandle,
   type OpenModelStream,
 } from './model-failover-stream'
-import type { ChatTurnRouteProducer, ChatTurnUsage } from './turn-routes'
+import type {
+  ChatTurnModelAttribution,
+  ChatTurnRouteProducer,
+  ChatTurnUsage,
+} from './turn-routes'
 import type { ProducerWireEvent } from './wire'
 
 /** Outcome of a `promoteFilePart` attempt. `key`, when given, becomes the
@@ -194,6 +198,27 @@ function textDelta(tracker: TextTracker, key: string, part: JsonRecord, rawDelta
   // projection stays correct because finalText is authoritative at finalize.
   tracker.seen.set(key, snapshot)
   return snapshot
+}
+
+function parseEffectiveBackend(data: JsonRecord): Omit<
+  ChatTurnModelAttribution,
+  'requestedModel' | 'echoReceived'
+> | undefined {
+  const backend = asRecord(data.effectiveBackend)
+  if (!backend) return undefined
+  const provider = asString(backend.provider)
+  const model = asString(backend.model)
+  const rawSource = asString(backend.source)
+  const source =
+    rawSource === 'request' || rawSource === 'environment' || rawSource === 'profile'
+      ? rawSource
+      : undefined
+  if (!provider && !model && !source) return undefined
+  return {
+    ...(model ? { servedModel: model } : {}),
+    ...(provider ? { servedProvider: provider } : {}),
+    ...(source ? { servedSource: source } : {}),
+  }
 }
 
 function usageFromStepFinish(part: JsonRecord, usage: ChatTurnUsage): void {
@@ -370,6 +395,29 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
    *  `model` getter, the draft snapshot, the persisted row) so a fallback that
    *  happens after the row was drafted still lands on the final write. */
   const servingModel = (): string | undefined => failover?.servingModel() ?? options.model
+  let effectiveBackend: ReturnType<typeof parseEffectiveBackend>
+  let substitutionNoticeQueued = false
+  const servedModel = (): string | undefined => effectiveBackend?.servedModel ?? servingModel()
+
+  const captureEffectiveBackend = (data: JsonRecord | undefined): void => {
+    if (!data) return
+    const parsed = parseEffectiveBackend(data)
+    if (!parsed) return
+    effectiveBackend = parsed
+    const sentModel = servingModel()
+    if (
+      substitutionNoticeQueued ||
+      !options.model ||
+      !sentModel ||
+      !parsed.servedModel ||
+      parsed.servedModel === sentModel
+    ) return
+    substitutionNoticeQueued = true
+    pendingModelNotices.push({
+      id: 'model-substitution-1',
+      text: `Requested ${sentModel} — the sandbox answered with ${parsed.servedModel} instead.`,
+    })
+  }
 
   let fullText = ''
   const partOrder: string[] = []
@@ -446,8 +494,9 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
   async function* stream(): AsyncGenerator<ProducerWireEvent, void, unknown> {
     try {
       for await (const raw of source) {
-        yield* drainModelNotices()
         const record = asRecord(raw)
+        captureEffectiveBackend(asRecord(record?.data))
+        yield* drainModelNotices()
         if (!record || typeof record.type !== 'string') continue
         // Fold bare tool_call/tool_result shapes into the canonical part event;
         // everything else keeps its original record (verbatim forwarding must
@@ -767,12 +816,17 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
     // model into the row and make a downgrade unattributable — the exact
     // failure mode this work exists to prevent.
     get model(): string | undefined {
-      return servingModel()
+      return servedModel()
     },
     modelFailover: () => ({
       model: servingModel(),
       attempts: failover?.attempts() ?? [],
       usedFallback: failover?.usedFallback() ?? false,
+    }),
+    modelAttribution: () => ({
+      ...(options.model ? { requestedModel: options.model } : {}),
+      ...(effectiveBackend ?? {}),
+      echoReceived: effectiveBackend !== undefined,
     }),
   }
 }

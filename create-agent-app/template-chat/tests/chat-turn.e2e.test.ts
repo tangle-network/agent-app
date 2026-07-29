@@ -234,6 +234,10 @@ describe('e2e: fake sandbox producer → streamed turn → persisted transcript'
     const assistant = messages[1]!
     expect(assistant.content).toBe('Filed the summary.')
     expect(assistant.model).toBe(MODEL)
+    expect(assistant.requestedModel).toBe(MODEL)
+    expect(assistant.servedModel).toBeNull()
+    expect(assistant.servedProvider).toBeNull()
+    expect(assistant.servedSource).toBeNull()
     expect(assistant.inputTokens).toBe(40)
     expect(assistant.outputTokens).toBe(20)
     expect(assistant.reasoningTokens).toBe(5)

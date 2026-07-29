@@ -122,7 +122,11 @@ describe('createChatStore — messages', () => {
       role: 'assistant',
       content: 'answer',
       parts: [{ type: 'text', text: 'answer' }],
-      model: 'claude-fable-5',
+      model: 'anthropic/claude-sonnet-4',
+      requestedModel: 'openai/gpt-5',
+      servedModel: 'anthropic/claude-sonnet-4',
+      servedProvider: 'openrouter',
+      servedSource: 'profile',
       inputTokens: 10,
       outputTokens: 20,
       reasoningTokens: 3,
@@ -133,13 +137,31 @@ describe('createChatStore — messages', () => {
     expect(message.parts).toEqual([{ type: 'text', text: 'answer' }])
     expect(message).toMatchObject({
       role: 'assistant',
-      model: 'claude-fable-5',
+      model: 'anthropic/claude-sonnet-4',
+      requestedModel: 'openai/gpt-5',
+      servedModel: 'anthropic/claude-sonnet-4',
+      servedProvider: 'openrouter',
+      servedSource: 'profile',
       inputTokens: 10,
       outputTokens: 20,
       reasoningTokens: 3,
       cacheReadTokens: 5,
       cacheWriteTokens: 1,
       costUsd: 0.02,
+    })
+
+    const updated = await store.updateMessage(message.id, {
+      model: 'google/gemini-2.5-pro',
+      servedModel: 'google/gemini-2.5-pro',
+      servedProvider: 'google',
+      servedSource: 'environment',
+    })
+    expect(updated).toMatchObject({
+      requestedModel: 'openai/gpt-5',
+      model: 'google/gemini-2.5-pro',
+      servedModel: 'google/gemini-2.5-pro',
+      servedProvider: 'google',
+      servedSource: 'environment',
     })
 
     const bumped = await store.getThread(thread.id)
