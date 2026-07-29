@@ -7,7 +7,16 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
-const text = fs.readFileSync(path.join(root, '.github/workflows/publish.yml'), 'utf8')
+const workflowDirectory = path.join(root, '.github/workflows')
+const workflows = fs.readdirSync(workflowDirectory)
+  .filter((file) => /\.ya?ml$/.test(file))
+  .sort()
+  .map((file) => ({ file, text: fs.readFileSync(path.join(workflowDirectory, file), 'utf8') }))
+const text = workflows.find(({ file }) => file === 'publish.yml')?.text
+if (!text) throw new Error('publish.yml is missing')
+const ciWorkflow = workflows.find(({ file }) => file === 'ci.yml')?.text
+const nightlyWorkflow = workflows.find(({ file }) => file === 'nightly-live-e2e.yml')?.text
+if (!ciWorkflow || !nightlyWorkflow) throw new Error('CI workflows are missing')
 const script = fs.readFileSync(path.join(root, '.github/scripts/publish-packages.sh'), 'utf8')
 const releaseScript = fs.readFileSync(path.join(root, '.github/scripts/write-release.sh'), 'utf8')
 const packFilenameScript = path.join(root, '.github/scripts/read-npm-pack-filename.mjs')
@@ -59,19 +68,29 @@ const createPublishJob = job('publish_create_agent_app')
 check(jobs.size === 4, 'release workflow must contain exactly four jobs')
 check(/concurrency:\s*\n  group: release\s*\n  cancel-in-progress: false/.test(text), 'release concurrency changed')
 check(!/^\s+tags:/m.test(triggerBlock), 'tag pushes duplicate the explicit release dispatch')
+check(ciWorkflow.includes('permissions:\n  contents: read'), 'CI permissions are not read-only')
+check(nightlyWorkflow.includes('permissions:\n  contents: read'), 'nightly permissions are not read-only')
+check(!/^      SANDBOX_API_KEY:/m.test(nightlyWorkflow), 'nightly secret is exposed to the full job')
+check((nightlyWorkflow.match(/SANDBOX_API_KEY: \$\{\{ secrets\.SANDBOX_API_KEY \}\}/g) ?? []).length === 2, 'nightly secret must be limited to its check and live test steps')
 
-const actionRefs = [...text.matchAll(/uses:\s*([^@\s]+)@([^\s#]+)/g)].map((match) => ({ name: match[1], ref: match[2] }))
+const actionRefs = workflows.flatMap(({ file, text: workflow }) =>
+  [...workflow.matchAll(/uses:\s*([^@\s]+)@([^\s#]+)/g)]
+    .map((match) => ({ file, name: match[1], ref: match[2] })),
+)
 check(actionRefs.every(({ ref }) => /^[0-9a-f]{40}$/.test(ref)), 'every action must use an exact commit SHA')
 for (const [name, pin] of Object.entries(pins)) {
   const refs = actionRefs.filter((action) => action.name === name)
   check(refs.length > 0 && refs.every(({ ref }) => ref === pin), `${name} does not use the required pin`)
 }
 
-for (let index = 0; index < lines.length; index += 1) {
-  if (!/^      - uses: actions\/checkout@/.test(lines[index])) continue
-  const step = []
-  for (let cursor = index; cursor < lines.length && (cursor === index || !/^      - /.test(lines[cursor])); cursor += 1) step.push(lines[cursor])
-  check(step.some((line) => line.trim() === 'persist-credentials: false'), 'checkout persists credentials')
+for (const { file, text: workflow } of workflows) {
+  const workflowLines = workflow.split('\n')
+  for (let index = 0; index < workflowLines.length; index += 1) {
+    if (!/^      - uses: actions\/checkout@/.test(workflowLines[index])) continue
+    const step = []
+    for (let cursor = index; cursor < workflowLines.length && (cursor === index || !/^      - /.test(workflowLines[cursor])); cursor += 1) step.push(workflowLines[cursor])
+    check(step.some((line) => line.trim() === 'persist-credentials: false'), `${file} checkout persists credentials`)
+  }
 }
 
 const restricted = {
@@ -97,15 +116,27 @@ for (const [name, block] of Object.entries(restricted)) {
 }
 
 check(packageJob.includes('contents: read') && !packageJob.includes('contents: write') && !packageJob.includes('id-token: write'), 'package job is not read-only')
-for (const command of ['pnpm install --frozen-lockfile', 'pnpm run typecheck', 'pnpm run test', 'pnpm run build', 'npm pack']) {
+for (const command of [
+  'pnpm install --frozen-lockfile',
+  'pnpm run typecheck',
+  'pnpm run test',
+  'pnpm run build',
+  'pnpm run test:generated',
+  'npm pack',
+]) {
   check(packageJob.includes(command), `package job is missing ${command}`)
 }
-check(packageJob.indexOf('pnpm run build') < packageJob.indexOf('npm pack') && packageJob.indexOf('npm pack') < packageJob.indexOf('actions/upload-artifact@'), 'artifact is uploaded before build and pack complete')
 const artifactPackRuntimeStep = namedStep(packageJob, 'Configure exact artifact pack runtime')
 const artifactPackNpmStep = namedStep(packageJob, 'Verify artifact pack npm')
 check(artifactPackRuntimeStep.includes('node-version: 24.18.0'), 'artifact pack Node version is not exact')
 check(artifactPackNpmStep.includes("$(npm --version) == '11.16.0'"), 'artifact pack npm version is not checked')
 check(packageJob.indexOf('pnpm run build') < packageJob.indexOf('Configure exact artifact pack runtime') && packageJob.indexOf('Configure exact artifact pack runtime') < packageJob.indexOf('npm pack'), 'artifact pack runtime is configured outside the pack boundary')
+check(
+  packageJob.indexOf('pnpm run build') < packageJob.indexOf('pnpm run test:generated') &&
+    packageJob.indexOf('pnpm run test:generated') < packageJob.indexOf('npm pack') &&
+    packageJob.indexOf('npm pack') < packageJob.indexOf('actions/upload-artifact@'),
+  'artifact is uploaded before build, generated-project tests, and pack complete',
+)
 check(packageJob.includes('persist-credentials: false'), 'package checkout persists credentials')
 check(!packageJob.includes('npm version'), 'auto mode mutates package manifests before the tagged run')
 check(packageJob.includes('fetch-depth: 0'), 'release history is shallow')
@@ -125,7 +156,17 @@ check(packageJob.includes('git merge-base --is-ancestor "$TAG_SHA" "$MAIN_SHA"')
 check(packageJob.indexOf('Verify release tag is on main') < packageJob.indexOf('pnpm install'), 'invalid tags are rejected after dependency install')
 check(packageJob.includes('bash .github/scripts/write-release.sh validate'), 'tag release identity is not checked')
 check(packageJob.indexOf('bash .github/scripts/write-release.sh validate') < packageJob.indexOf('pnpm install'), 'tag release identity is checked after dependency install')
-check((packageJob.match(/if: steps\.release\.outputs\.mode == 'tag'/g) ?? []).length === 4, 'tag-only artifact work can run in auto mode')
+for (const name of [
+  'Configure exact artifact pack runtime',
+  'Verify artifact pack npm',
+  'Pack and inspect exact tarballs',
+  'Upload release artifact',
+]) {
+  check(
+    namedStep(packageJob, name).includes("if: steps.release.outputs.mode == 'tag'"),
+    `${name} can run outside tagged releases`,
+  )
+}
 
 check(writeJob.includes('contents: write') && writeJob.includes('actions: write') && !writeJob.includes('id-token: write'), 'write job permissions are wrong')
 check(writeJob.includes('needs: package_release'), 'write job does not wait for packaging')

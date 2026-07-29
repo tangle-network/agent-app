@@ -14,7 +14,7 @@ import type {
   UsageInfo,
 } from "./types";
 
-export type ChatStatus = "idle" | "streaming" | "awaiting_confirm";
+type ChatStatus = "idle" | "streaming" | "awaiting_confirm";
 
 /** Cap on in-memory messages. A session can survive route changes and drawer
  *  open/close for a long time, so the transcript is bounded to the most recent

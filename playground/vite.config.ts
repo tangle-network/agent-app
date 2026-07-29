@@ -1,17 +1,28 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { dirname, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 
 const require = createRequire(import.meta.url)
 // Resolve each peer to the PLAYGROUND's own copy. agent-app is linked via
 // `file:..` (a symlink), so Vite resolves react/react-konva imported from the
 // linked dist by walking up from the symlink TARGET — which lands on the parent
-// repo's own dev-dep copies (react@19 + react-konva@19). react-konva@19 then
-// throws "only compatible with React 19" against the playground's React 18, and
-// two React copies break hooks. Pinning absolute paths forces one consistent,
-// React-18 set across both the app and the linked package.
-const pkgDir = (id: string) => dirname(require.resolve(`${id}/package.json`))
+// repo's own dev-dep copies. Two React copies break hooks, even when their
+// versions match. Pinning absolute paths forces one set across both packages.
+function pkgDir(id: string): string {
+  let dir = dirname(require.resolve(id))
+  while (true) {
+    const manifest = join(dir, 'package.json')
+    if (existsSync(manifest)) {
+      const pkg = JSON.parse(readFileSync(manifest, 'utf8')) as { name?: string }
+      if (pkg.name === id) return dir
+    }
+    const parent = dirname(dir)
+    if (parent === dir) throw new Error(`Could not locate package root for ${id}`)
+    dir = parent
+  }
+}
 
 // Dev-only playground for agent-app's local (uncommitted) UI build. It consumes
 // the freshly-built dist via the `file:..` dependency, so the linked package's

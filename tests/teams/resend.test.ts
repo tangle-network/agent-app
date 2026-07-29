@@ -2,7 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // vitest hoists vi.mock above imports; factory-referenced vars must be `mock`-prefixed.
 const mockSend = vi.fn()
-vi.mock('resend', () => ({ Resend: vi.fn(() => ({ emails: { send: mockSend } })) }))
+vi.mock('resend', () => ({
+  Resend: vi.fn(function ResendMock() {
+    return { emails: { send: mockSend } }
+  }),
+}))
 
 import { Resend } from 'resend'
 import { createResendInvitationSender } from '../../src/teams/resend'
@@ -53,9 +57,11 @@ describe('createResendInvitationSender', () => {
   it('fails typed when the send throws', async () => {
     // A plain throwing `send` (not a vi.fn) for this case: vitest's mock
     // instrumentation otherwise surfaces the already-caught throw as a spurious
-    // failure. The seam still catches it and returns the typed outcome.
+    // failure. The adapter still catches it and returns the typed outcome.
     vi.mocked(Resend).mockImplementationOnce(
-      () => ({ emails: { send: () => { throw new Error('network down') } } }) as unknown as Resend,
+      function ResendMock() {
+        return { emails: { send: () => { throw new Error('network down') } } } as unknown as Resend
+      },
     )
     const send = createResendInvitationSender({ from: 'X <x@x.com>', apiKey: 'key' })
     expect(await send(input)).toEqual({ succeeded: false, error: 'network down' })

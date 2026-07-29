@@ -1,14 +1,16 @@
 import {
   Sandbox,
   type ExecResult,
-  type EgressPolicy,
-  type MintScopedTokenOptions,
-  type SandboxConnection,
-  type SandboxInstance,
-  type ScopedTokenScope,
-  type StorageConfig,
-  type TurnDriveResult,
-  type ProvisionEvent,
+} from '@tangle-network/sandbox/core'
+import type {
+  EgressPolicy,
+  MintScopedTokenOptions,
+  SandboxConnection,
+  SandboxInstance,
+  ScopedTokenScope,
+  StorageConfig,
+  TurnDriveResult,
+  ProvisionEvent,
 } from '@tangle-network/sandbox'
 import type {
   AgentProfile,

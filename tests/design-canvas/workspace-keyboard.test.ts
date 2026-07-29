@@ -66,7 +66,7 @@ function props(): DesignCanvasProps {
   }
 }
 
-let windowSpy: ReturnType<typeof vi.fn>
+let windowSpy: ReturnType<typeof vi.fn<(event: KeyboardEvent) => void>>
 
 // Konva's Stage sizes a backing <canvas> on mount and Workspace observes its
 // container via ResizeObserver — neither exists in jsdom. Polyfill both so the
@@ -100,7 +100,7 @@ function stubCanvasContext(): void {
 beforeEach(() => {
   ;(globalThis as { ResizeObserver?: unknown }).ResizeObserver = ResizeObserverStub
   stubCanvasContext()
-  windowSpy = vi.fn()
+  windowSpy = vi.fn<(event: KeyboardEvent) => void>()
   window.addEventListener('keydown', windowSpy)
 })
 
