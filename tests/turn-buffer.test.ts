@@ -329,6 +329,33 @@ describe('createBufferedTurnTap', () => {
     }
   })
 
+  it('renews from a later event when the runtime did not wake the scheduled timer', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(0)
+      const base = createMemoryTurnEventStore()
+      const setStatus = vi.fn(base.setStatus.bind(base))
+      const tap = createBufferedTurnTap({
+        store: { ...base, setStatus },
+        turnId: 'frozen-timer-turn',
+        scopeId: 'frozen-timer-thread',
+        runningTurnRenewIntervalMs: 50,
+      })
+
+      await tap.onEvent(text('started'))
+      vi.setSystemTime(50)
+      await tap.onEvent({ type: 'keepalive' })
+
+      expect(setStatus.mock.calls.map((call) => call[1])).toEqual([
+        'running',
+        'running',
+      ])
+      await tap.done('complete')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('done("error") flushes what was produced and marks error', async () => {
     const store = createMemoryTurnEventStore()
     const tap = createBufferedTurnTap({ store, turnId: 'k3', flushIntervalMs: 10_000 })

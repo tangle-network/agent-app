@@ -157,7 +157,9 @@ export interface BufferedTurnOptions {
    *  {@link TurnEventStore.listRunning} can find this turn after a reload. */
   scopeId?: string
   /** How often to renew the running-turn lease while a producer is alive.
-   *  Default {@link DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS}. */
+   *  The timer is backed up by event-driven renewal when a runtime freezes
+   *  unreferenced timers during remote I/O. Default
+   *  {@link DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS}. */
   runningTurnRenewIntervalMs?: number
 }
 
@@ -195,6 +197,11 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
   let settled = false
   let renewalTimer: ReturnType<typeof setTimeout> | undefined
   let renewal: Promise<void> = Promise.resolve()
+  let lastRenewedAt = 0
+  const runningTurnRenewIntervalMs = Math.max(
+    1,
+    opts.runningTurnRenewIntervalMs ?? DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS,
+  )
 
   function clearRenewalTimer(): void {
     if (renewalTimer !== undefined) clearTimeout(renewalTimer)
@@ -203,23 +210,29 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
 
   function scheduleRenewal(): void {
     if (settled || !opts.scopeId) return
-    const intervalMs = Math.max(
-      1,
-      opts.runningTurnRenewIntervalMs ?? DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS,
-    )
+    clearRenewalTimer()
+    const elapsedMs = Math.max(0, Date.now() - lastRenewedAt)
+    const delayMs = Math.max(1, runningTurnRenewIntervalMs - elapsedMs)
     renewalTimer = setTimeout(() => {
       renewalTimer = undefined
-      if (settled) return
-      renewal = opts.store
-        .setStatus(opts.turnId, 'running', opts.scopeId)
-        .catch(() => {})
-        .then(scheduleRenewal)
-    }, intervalMs)
+      void renewLease()
+    }, delayMs)
     // A deliberately abandoned tap in a Node test must not keep the process
     // alive until the production renewal interval elapses.
     if (typeof renewalTimer === 'object' && 'unref' in renewalTimer) {
       renewalTimer.unref()
     }
+  }
+
+  async function renewLease(): Promise<void> {
+    if (settled || !opts.scopeId) return
+    clearRenewalTimer()
+    lastRenewedAt = Date.now()
+    renewal = renewal
+      .then(() => opts.store.setStatus(opts.turnId, 'running', opts.scopeId))
+      .catch(() => {})
+    await renewal
+    scheduleRenewal()
   }
 
   async function flush(): Promise<void> {
@@ -235,12 +248,22 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
     if (started) return
     started = true
     await opts.store.setStatus(opts.turnId, 'running', opts.scopeId)
+    lastRenewedAt = Date.now()
     scheduleRenewal()
   }
 
   return {
     async onEvent(raw) {
       await ensureStarted()
+      // Cloudflare may freeze an unreferenced timer while a producer is
+      // awaiting remote I/O. A real event (including the route heartbeat)
+      // therefore also renews any lease whose interval has elapsed.
+      if (
+        opts.scopeId &&
+        Date.now() - lastRenewedAt >= runningTurnRenewIntervalMs
+      ) {
+        await renewLease()
+      }
       // Stamp ms-since-turn-start so any stored turn is replayable AND traceable
       // (see ../trace) from the same buffered rows.
       const ev = raw && typeof raw === 'object' ? { ...(raw as Record<string, unknown>), _t: Date.now() - startedAt } : raw
