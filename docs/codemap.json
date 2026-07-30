@@ -15781,18 +15781,6 @@
           "doc": "Stable-per-tab, unique-per-client terminal connection id."
         },
         {
-          "name": "TerminalStatusDisplay",
-          "kind": "interface",
-          "signature": "interface TerminalStatusDisplay",
-          "doc": null
-        },
-        {
-          "name": "TerminalStatusTone",
-          "kind": "type",
-          "signature": "type TerminalStatusTone",
-          "doc": null
-        },
-        {
           "name": "useSandboxTerminalConnection",
           "kind": "function",
           "signature": "(opts: UseSandboxTerminalConnectionOptions) => UseSandboxTerminalConnectionResult",
@@ -15809,18 +15797,6 @@
           "kind": "interface",
           "signature": "interface UseSandboxTerminalConnectionResult",
           "doc": "Resolve sandbox terminal connection status and provide a method to initiate the connection"
-        },
-        {
-          "name": "WorkspaceTerminalPanel",
-          "kind": "function",
-          "signature": "({ connection, connectionId, title, subtitle, isActive, onRetry, statusDisplay, headerExtra, className, }: WorkspaceTer…",
-          "doc": null
-        },
-        {
-          "name": "WorkspaceTerminalPanelProps",
-          "kind": "interface",
-          "signature": "interface WorkspaceTerminalPanelProps",
-          "doc": null
         }
       ]
     },

@@ -4,7 +4,7 @@
 
 Source: `src/web-react/terminal.ts`
 
-10 exports.
+6 exports.
 
 ### `SandboxTerminalConnection`
 
@@ -30,22 +30,6 @@ interface SandboxTerminalConnectionResponse
 (storageKey?: string) => string
 ```
 
-### `TerminalStatusDisplay`
-
-`interface`
-
-```ts
-interface TerminalStatusDisplay
-```
-
-### `TerminalStatusTone`
-
-`type`
-
-```ts
-type TerminalStatusTone
-```
-
 ### `useSandboxTerminalConnection`
 
 `function` — Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling
@@ -68,20 +52,4 @@ interface UseSandboxTerminalConnectionOptions
 
 ```ts
 interface UseSandboxTerminalConnectionResult
-```
-
-### `WorkspaceTerminalPanel`
-
-`function`
-
-```ts
-({ connection, connectionId, title, subtitle, isActive, onRetry, statusDisplay, headerExtra, className, }: WorkspaceTer…
-```
-
-### `WorkspaceTerminalPanelProps`
-
-`interface`
-
-```ts
-interface WorkspaceTerminalPanelProps
 ```
