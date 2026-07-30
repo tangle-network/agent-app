@@ -8558,7 +8558,7 @@
           "name": "createSandboxTerminalConnectionRoute",
           "kind": "function",
           "signature": "<TBox extends TerminalConnectionBoxLike, TUser>(opts: SandboxTerminalConnectionRouteOptions<TBox, TUser>) => (request:…",
-          "doc": "Build the browser-direct terminal connection route: `GET` handler that authenticates, resolves the sandbox, mints a scoped token, and returns exactly what the browser needs to connect `TerminalView`…"
+          "doc": "Build the browser-direct terminal connection route: `GET` handler that authenticates, resolves the sandbox, mints a scoped token pinned to `scope: 'session-runtime'` (the ONLY scope the platform gran…"
         },
         {
           "name": "createSandboxTerminalToken",
@@ -9093,12 +9093,6 @@
           "kind": "interface",
           "signature": "interface SandboxTerminalConnectionRouteOptions",
           "doc": "Configuration for {@link createSandboxTerminalConnectionRoute}."
-        },
-        {
-          "name": "SandboxTerminalConnectionScope",
-          "kind": "type",
-          "signature": "type SandboxTerminalConnectionScope",
-          "doc": "The `box.mintScopedToken` scope this route requests."
         },
         {
           "name": "SandboxTerminalTokenOptions",
@@ -15691,7 +15685,7 @@
           "name": "UseSandboxTerminalConnectionOptions",
           "kind": "interface",
           "signature": "interface UseSandboxTerminalConnectionOptions",
-          "doc": "Define options for configuring a sandbox terminal connection including workspace ID and connection parameters"
+          "doc": "Define options for configuring a sandbox terminal connection including workspace ID and connection parameters `connectionId`, when set, is passed to `createSandboxTerminalConnectionRoute` as the `con…"
         },
         {
           "name": "UseSandboxTerminalConnectionResult",
@@ -15814,7 +15808,7 @@
           "name": "UseSandboxTerminalConnectionOptions",
           "kind": "interface",
           "signature": "interface UseSandboxTerminalConnectionOptions",
-          "doc": "Define options for configuring a sandbox terminal connection including workspace ID and connection parameters"
+          "doc": "Define options for configuring a sandbox terminal connection including workspace ID and connection parameters `connectionId`, when set, is passed to `createSandboxTerminalConnectionRoute` as the `con…"
         },
         {
           "name": "UseSandboxTerminalConnectionResult",

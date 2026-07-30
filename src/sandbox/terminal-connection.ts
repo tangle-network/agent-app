@@ -10,34 +10,60 @@
  * `./terminal-proxy-token`, now `@deprecated` in favor of this one
  * (retirement tracked in #350; nothing removed, three apps still import it).
  *
- * This factory mirrors legal-agent's production route
- * (`src/routes/api.sandbox.connection.ts` + `src/lib/.server/user-sandbox.ts`)
- * byte-for-byte in status codes and response shape, generalized behind two
- * product seams (`requireUser`, `ensureSandbox`) so every app composes the
- * same mechanism instead of re-deriving it.
+ * VERIFIED PLATFORM CONTRACT (`@tangle-network/sandbox` 0.15.2 + the
+ * orchestrator/sidecar enforcement source, verified 2026-07-30):
+ *
+ * 1. Only a `scope: 'session-runtime'` token carries the `terminal`
+ *    capability (`cap: ["read", "workspace", "terminal"]`). `'project'` and
+ *    `'session'` mint SessionGateway READ tokens (HS256, `typ: "read"`, no
+ *    `cap` claim at all — a different token family the sidecar rejects
+ *    outright); `'read-only'` carries `cap: ["read"]` only. **No scope other
+ *    than `'session-runtime'` can ever open a terminal**, which is why this
+ *    route no longer takes `scope` as a parameter — it is pinned.
+ * 2. The orchestrator's terminal WS gate fails closed unless the token's
+ *    `sid` claim EQUALS the `<connectionId>` path segment of
+ *    `/terminals/<connectionId>/ws`
+ *    (`verifyScopedSidecarCapability(sidecar, token, "terminal", connectionId)`).
+ *    So `mintScopedToken({ scope: 'session-runtime', sessionId })` MUST be
+ *    called with `sessionId === connectionId` — the exact id `TerminalView`
+ *    will dial. That is why this route threads a `connectionId` end to end
+ *    instead of deriving its own session id.
+ * 3. The browser-safe terminal base is the mint result's `sidecarProxyUrl`
+ *    (`/v1/sidecar-proxy/{id}` on the Sandbox API) — **not**
+ *    `box.connection.runtimeUrl`. The SDK's own `_attachTerminal` is the
+ *    reference implementation:
+ *    `mintScopedToken({ scope: 'session-runtime', sessionId: connectionId })`
+ *    then dial `${scoped.sidecarProxyUrl}/terminals/${connectionId}/ws`.
+ *    Pointing `TerminalView` at `runtimeUrl` fails auth regardless of scope —
+ *    only the sidecar-proxy hop decodes the browser's
+ *    `bearer.<base64url>` WS subprotocol.
+ *
+ * HISTORICAL NOTE: an earlier shape of this route (and legal-agent's
+ * production route it was modeled on, `scope: 'project'` +
+ * `connection.runtimeUrl`) predates the platform's terminal-auth hardening —
+ * the terminal capability gate (2026-06-19), the scoped-token terminal WS
+ * path (2026-07-15), and the `sid`-binding fail-closed check
+ * (2026-07-17/18). That shape does not authenticate on the current platform
+ * and is not a valid spec for the token path anymore.
  *
  * SECURITY POSTURE: unlike the read-only session-gateway streaming token
  * (`box.mintScopedToken({scope:'session'})` paired with
  * `SessionGatewayClient`), the token this route mints grants **command
  * execution** in the sandbox once handed to `TerminalView`. Its safety rests
- * entirely on two load-bearing parameters this factory keeps caller-supplied
- * rather than baking in: a **short TTL** (default 15 minutes, the SDK's own
- * max) and a **narrow scope** — every scope is minted FROM the one box
- * `ensureSandbox` resolved for THIS user (even the default `'project'` scope
- * is that box's, never a fleet-wide credential), and the session scopes
- * narrow further to a single session. Widening either default without an
- * explicit reason is a security regression, not a convenience.
+ * on a **short TTL** (default 15 minutes, the SDK's own max — still a caller
+ * parameter) and, structurally, the narrowest scope the platform offers: one
+ * box (`ensureSandbox` resolved it for THIS user), one terminal connection
+ * (`session-runtime` bound to a single `sid`). Widening the TTL default
+ * without an explicit reason is a security regression, not a convenience.
  *
  * Wire contract: the browser passes the response's `sidecarUrl` as
- * `TerminalView`'s `apiUrl` and `token` as its token prop; sandbox-ui sends
- * the token as a `bearer.<base64url>` WebSocket subprotocol (browsers cannot
- * set `Authorization` on a WS handshake). `useSandboxTerminalConnection`
- * (`../web-react/sandbox-terminal`) is transport-agnostic and already resolves
- * `runtimeUrl ?? sidecarUrl` — this route returns `sidecarUrl` only, and the
- * hook's fallback picks it up with no hook change required.
- *
- * Default `scope: 'project'` + `ttlMinutes: 15` matches legal-agent's shipped
- * production route.
+ * `TerminalView`'s `apiUrl` prop, `token` as its token prop, and the
+ * response's echoed `connectionId` as `TerminalView`'s `connectionId` prop —
+ * the token's `sid` is bound to exactly that id, so any other value fails the
+ * WS upgrade. sandbox-ui sends the token as a `bearer.<base64url>` WebSocket
+ * subprotocol (browsers cannot set `Authorization` on a WS handshake).
+ * `useSandboxTerminalConnection` (`../web-react/sandbox-terminal`) carries
+ * `connectionId` through automatically.
  */
 
 /** The structural surface this route needs from an SDK sandbox box — no `@tangle-network/sandbox` class import (invariant 3). */
@@ -48,13 +74,9 @@ export interface TerminalConnectionBoxLike {
   mintScopedToken(opts: {
     scope: string
     sessionId?: string
-    runtimeSessionId?: string
     ttlMinutes?: number
-  }): Promise<{ token: string; expiresAt: Date }>
+  }): Promise<{ token: string; expiresAt: Date; sidecarProxyUrl: string }>
 }
-
-/** The `box.mintScopedToken` scope this route requests. See the SDK's `ScopedTokenScope`. */
-export type SandboxTerminalConnectionScope = 'project' | 'session' | 'session-runtime' | 'read-only'
 
 /** Configuration for {@link createSandboxTerminalConnectionRoute}. */
 export interface SandboxTerminalConnectionRouteOptions<TBox extends TerminalConnectionBoxLike, TUser> {
@@ -71,61 +93,64 @@ export interface SandboxTerminalConnectionRouteOptions<TBox extends TerminalConn
    * seam — the route only reacts to success/failure.
    */
   ensureSandbox(user: TUser, request: Request): Promise<TBox>
-  /** `box.mintScopedToken` scope. Default `'project'` (legal-agent production). */
-  scope?: SandboxTerminalConnectionScope
-  /** `box.mintScopedToken` TTL in minutes. Default `15` (legal-agent production; the SDK's own max). */
+  /** `box.mintScopedToken` TTL in minutes. Default `15` (the SDK's own max). */
   ttlMinutes?: number
   /**
-   * Required when `scope` is `'session'` or `'session-runtime'` — validated at
-   * FACTORY-CREATION time (fail loud on a deterministic config error rather
-   * than minting an overly broad token silently at request time). May be a
-   * literal or a `(user, box) => string` resolved per request; a callback
-   * that resolves to an empty value fails the request with a 500, never a
-   * silent fallback to a broader scope.
+   * Resolve the terminal connection id the minted token's `sid` is bound to
+   * — this MUST be the same id `TerminalView` dials
+   * (`tabTerminalConnectionId()`), because the orchestrator's terminal WS
+   * gate fails closed unless `sid === <connectionId>` in
+   * `/terminals/<connectionId>/ws`.
+   *
+   * `requested` is `new URL(request.url).searchParams.get('connectionId')`.
+   * The default resolver returns `requested` unchanged. A product may
+   * validate/namespace the id here (e.g. a per-user prefix in a shared box)
+   * — if it rewrites the id, the client MUST use the response's echoed
+   * `connectionId`, since the sid binding makes any other id fail the WS
+   * upgrade.
+   *
+   * A resolved falsy/empty value fails the request with a 400 before any
+   * sandbox work happens.
    */
-  sessionId?: string | ((user: TUser, box: TBox) => string)
-  /**
-   * Required when `scope` is `'session'` — same fail-loud contract as
-   * {@link SandboxTerminalConnectionRouteOptions.sessionId}.
-   */
-  runtimeSessionId?: string | ((user: TUser, box: TBox) => string)
+  resolveConnectionId?: (ctx: {
+    request: Request
+    user: TUser
+    box: TBox
+    requested: string | null
+  }) => string | null | undefined | Promise<string | null | undefined>
 }
 
-const DEFAULT_SCOPE: SandboxTerminalConnectionScope = 'project'
 const DEFAULT_TTL_MINUTES = 15
+const TERMINAL_SCOPE = 'session-runtime'
+
+function defaultResolveConnectionId(ctx: { requested: string | null }): string | null {
+  return ctx.requested
+}
 
 /**
  * Build the browser-direct terminal connection route: `GET` handler that
- * authenticates, resolves the sandbox, mints a scoped token, and returns
- * exactly what the browser needs to connect `TerminalView` directly to the
- * sidecar — no worker in the data path once the terminal is open.
+ * authenticates, resolves the sandbox, mints a scoped token pinned to
+ * `scope: 'session-runtime'` (the ONLY scope the platform grants the
+ * `terminal` capability to), and returns exactly what the browser needs to
+ * connect `TerminalView` directly to the sidecar — no worker in the data
+ * path once the terminal is open.
  *
- * Response shapes, matching legal-agent's production route exactly:
+ * Response shapes:
  * - `requireUser` returns a `Response` → that `Response`, verbatim.
  * - `ensureSandbox` throws → `500 {error}` (the thrown message surfaced).
- * - `box.connection?.runtimeUrl` missing → `503 {error, status: box.status}`.
+ * - `box.connection?.runtimeUrl` missing → `503 {error, status: box.status}`
+ *   — this is a READINESS gate only; the URL returned to the client on
+ *   success is always the mint's `sidecarProxyUrl`, never `runtimeUrl`.
+ * - resolved connection id is falsy/empty → `400 {error}`.
  * - `box.mintScopedToken` rejects → `503 {error}`.
- * - success → `200 {sidecarUrl, token, expiresAt, status, sandboxId}`.
- *
- * Throws IMMEDIATELY (at factory-creation time, not per-request) when a
- * session-shaped scope is configured without the session id(s) it requires —
- * a deterministic config error must never degrade into a silently broader
- * token at runtime.
+ * - success → `200 {sidecarUrl, token, expiresAt, status, sandboxId, connectionId}`.
+ *   `connectionId` is the id the token's `sid` is bound to — the client MUST
+ *   hand this (not its own) to `TerminalView`.
  */
 export function createSandboxTerminalConnectionRoute<TBox extends TerminalConnectionBoxLike, TUser>(
   opts: SandboxTerminalConnectionRouteOptions<TBox, TUser>,
 ): (request: Request) => Promise<Response> {
-  const scope = opts.scope ?? DEFAULT_SCOPE
-  if ((scope === 'session' || scope === 'session-runtime') && opts.sessionId === undefined) {
-    throw new Error(
-      `createSandboxTerminalConnectionRoute: scope '${scope}' requires a 'sessionId' option`,
-    )
-  }
-  if (scope === 'session' && opts.runtimeSessionId === undefined) {
-    throw new Error(
-      "createSandboxTerminalConnectionRoute: scope 'session' requires a 'runtimeSessionId' option",
-    )
-  }
+  const resolveConnectionId = opts.resolveConnectionId ?? defaultResolveConnectionId
 
   return async function handleSandboxTerminalConnection(request: Request): Promise<Response> {
     const user = await opts.requireUser(request)
@@ -152,29 +177,24 @@ export function createSandboxTerminalConnectionRoute<TBox extends TerminalConnec
       )
     }
 
-    let sessionId: string | undefined
-    if (opts.sessionId !== undefined) {
-      sessionId = typeof opts.sessionId === 'function' ? opts.sessionId(user, box) : opts.sessionId
-      if (!sessionId) {
-        return Response.json({ error: 'sessionId resolved to an empty value' }, { status: 500 })
-      }
+    const requested = new URL(request.url).searchParams.get('connectionId')
+    const connectionId = await resolveConnectionId({ request, user, box, requested })
+    if (!connectionId) {
+      return Response.json(
+        {
+          error:
+            "connectionId is required — pass the same id TerminalView dials (tabTerminalConnectionId()) as the 'connectionId' query parameter",
+        },
+        { status: 400 },
+      )
     }
 
-    let runtimeSessionId: string | undefined
-    if (opts.runtimeSessionId !== undefined) {
-      runtimeSessionId = typeof opts.runtimeSessionId === 'function' ? opts.runtimeSessionId(user, box) : opts.runtimeSessionId
-      if (!runtimeSessionId) {
-        return Response.json({ error: 'runtimeSessionId resolved to an empty value' }, { status: 500 })
-      }
-    }
-
-    let scoped: { token: string; expiresAt: Date }
+    let scoped: { token: string; expiresAt: Date; sidecarProxyUrl: string }
     try {
       scoped = await box.mintScopedToken({
-        scope,
+        scope: TERMINAL_SCOPE,
         ttlMinutes: opts.ttlMinutes ?? DEFAULT_TTL_MINUTES,
-        ...(sessionId !== undefined ? { sessionId } : {}),
-        ...(runtimeSessionId !== undefined ? { runtimeSessionId } : {}),
+        sessionId: connectionId,
       })
     } catch (err) {
       return Response.json(
@@ -184,11 +204,12 @@ export function createSandboxTerminalConnectionRoute<TBox extends TerminalConnec
     }
 
     return Response.json({
-      sidecarUrl: runtimeUrl,
+      sidecarUrl: scoped.sidecarProxyUrl,
       token: scoped.token,
       expiresAt: scoped.expiresAt.toISOString(),
       status: box.status,
       sandboxId: box.id,
+      connectionId,
     })
   }
 }

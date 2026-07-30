@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-151 exports.
+150 exports.
 
 ### `AppToolDescriptor`
 
@@ -144,7 +144,7 @@ interface BuildSandboxToolFileMountsOptions
 
 ### `createSandboxTerminalConnectionRoute`
 
-`function` — Build the browser-direct terminal connection route: `GET` handler that authenticates, resolves the sandbox, mints a scoped token, and returns exactly what the browser needs to connect `TerminalView`…
+`function` — Build the browser-direct terminal connection route: `GET` handler that authenticates, resolves the sandbox, mints a scoped token pinned to `scope: 'session-runtime'` (the ONLY scope the platform gran…
 
 ```ts
 <TBox extends TerminalConnectionBoxLike, TUser>(opts: SandboxTerminalConnectionRouteOptions<TBox, TUser>) => (request:…
@@ -860,14 +860,6 @@ type SandboxStepTransition
 
 ```ts
 interface SandboxTerminalConnectionRouteOptions
-```
-
-### `SandboxTerminalConnectionScope`
-
-`type` — The `box.mintScopedToken` scope this route requests.
-
-```ts
-type SandboxTerminalConnectionScope
 ```
 
 ### `SandboxTerminalTokenOptions`

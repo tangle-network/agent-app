@@ -40,7 +40,7 @@ interface SandboxTerminalConnectionResponse
 
 ### `UseSandboxTerminalConnectionOptions`
 
-`interface` — Define options for configuring a sandbox terminal connection including workspace ID and connection parameters
+`interface` — Define options for configuring a sandbox terminal connection including workspace ID and connection parameters `connectionId`, when set, is passed to `createSandboxTerminalConnectionRoute` as the `con…
 
 ```ts
 interface UseSandboxTerminalConnectionOptions

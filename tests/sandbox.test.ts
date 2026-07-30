@@ -610,13 +610,25 @@ describe('terminal 101 subprotocol echo', () => {
 })
 
 describe('createSandboxTerminalConnectionRoute', () => {
+  // `connection.runtimeUrl` is deliberately a DIFFERENT value from the mint's
+  // `sidecarProxyUrl` below so tests can assert the response returns the
+  // MINT result, never the readiness-signal runtimeUrl (#349 P1: the route
+  // used to return `runtimeUrl` directly, which fails auth on the current
+  // platform).
   const fakeBox = (overrides: Partial<TerminalConnectionBoxLike> = {}): TerminalConnectionBoxLike => ({
     id: 'box-1',
     status: 'running',
-    connection: { runtimeUrl: 'https://sidecar.example' },
-    mintScopedToken: vi.fn(async () => ({ token: 'tok', expiresAt: new Date('2026-01-01T00:15:00Z') })),
+    connection: { runtimeUrl: 'https://runtime.example/box-1' },
+    mintScopedToken: vi.fn(async () => ({
+      token: 'tok',
+      expiresAt: new Date('2026-01-01T00:15:00Z'),
+      sidecarProxyUrl: 'https://api.example/v1/sidecar-proxy/box-1',
+    })),
     ...overrides,
   })
+
+  const requestWithConnectionId = (connectionId = 'term-abc') =>
+    new Request(`https://app.test/api?connectionId=${encodeURIComponent(connectionId)}`)
 
   it('returns the requireUser Response verbatim (e.g. 401)', async () => {
     const unauthorized = Response.json({ error: 'Unauthorized' }, { status: 401 })
@@ -639,7 +651,7 @@ describe('createSandboxTerminalConnectionRoute', () => {
       },
     })
 
-    const res = await handler(new Request('https://app.test/api'))
+    const res = await handler(requestWithConnectionId())
     const data = await res.json() as Record<string, unknown>
 
     expect(res.status).toBe(500)
@@ -652,7 +664,7 @@ describe('createSandboxTerminalConnectionRoute', () => {
       ensureSandbox: async () => fakeBox({ status: 'starting', connection: undefined }),
     })
 
-    const res = await handler(new Request('https://app.test/api'))
+    const res = await handler(requestWithConnectionId())
     const data = await res.json() as Record<string, unknown>
 
     expect(res.status).toBe(503)
@@ -670,81 +682,90 @@ describe('createSandboxTerminalConnectionRoute', () => {
       }),
     })
 
-    const res = await handler(new Request('https://app.test/api'))
+    const res = await handler(requestWithConnectionId())
     const data = await res.json() as Record<string, unknown>
 
     expect(res.status).toBe(503)
     expect(data.error).toBe('mint exploded')
   })
 
-  it('returns 200 with sidecarUrl/token/expiresAt/status/sandboxId and mints with the default {scope, ttlMinutes}', async () => {
-    const box = fakeBox()
+  it('returns 400 when no connectionId query parameter is present and no custom resolver is configured', async () => {
     const handler = createSandboxTerminalConnectionRoute<TerminalConnectionBoxLike, { id: string }>({
       requireUser: async () => ({ id: 'user-1' }),
-      ensureSandbox: async () => box,
+      ensureSandbox: async () => fakeBox(),
     })
 
     const res = await handler(new Request('https://app.test/api'))
     const data = await res.json() as Record<string, unknown>
 
-    expect(res.status).toBe(200)
-    expect(data.sidecarUrl).toBe(box.connection!.runtimeUrl)
-    expect(data.expiresAt).toBe(new Date('2026-01-01T00:15:00Z').toISOString())
-    expect(data.status).toBe('running')
-    expect(data.sandboxId).toBe('box-1')
-    expect(box.mintScopedToken).toHaveBeenCalledWith({ scope: 'project', ttlMinutes: 15 })
+    expect(res.status).toBe(400)
+    expect(typeof data.error).toBe('string')
   })
 
-  it('reaches overrides (custom scope/ttl, sessionId callback receiving (user, box)) at the mint call', async () => {
+  it('returns 200 with sidecarUrl (the MINT result, never box.connection.runtimeUrl)/token/expiresAt/status/sandboxId/connectionId, and mints with {scope:"session-runtime", ttlMinutes:15, sessionId:<connectionId>}', async () => {
     const box = fakeBox()
-    const sessionIdCallback = vi.fn((user: { id: string }, resolvedBox: TerminalConnectionBoxLike) => `${user.id}:${resolvedBox.id}`)
     const handler = createSandboxTerminalConnectionRoute<TerminalConnectionBoxLike, { id: string }>({
       requireUser: async () => ({ id: 'user-1' }),
       ensureSandbox: async () => box,
-      scope: 'session-runtime',
-      ttlMinutes: 3,
-      sessionId: sessionIdCallback,
     })
 
-    const res = await handler(new Request('https://app.test/api'))
+    const res = await handler(requestWithConnectionId('term-abc'))
+    const data = await res.json() as Record<string, unknown>
 
     expect(res.status).toBe(200)
-    expect(sessionIdCallback).toHaveBeenCalledWith({ id: 'user-1' }, box)
-    expect(box.mintScopedToken).toHaveBeenCalledWith({ scope: 'session-runtime', ttlMinutes: 3, sessionId: 'user-1:box-1' })
+    expect(data.sidecarUrl).toBe('https://api.example/v1/sidecar-proxy/box-1')
+    expect(data.sidecarUrl).not.toBe(box.connection!.runtimeUrl)
+    expect(data.expiresAt).toBe(new Date('2026-01-01T00:15:00Z').toISOString())
+    expect(data.status).toBe('running')
+    expect(data.sandboxId).toBe('box-1')
+    expect(data.connectionId).toBe('term-abc')
+    expect(box.mintScopedToken).toHaveBeenCalledWith({ scope: 'session-runtime', ttlMinutes: 15, sessionId: 'term-abc' })
   })
 
-  it('throws immediately at factory-creation time for scope "session-runtime" without a sessionId option', () => {
-    expect(() =>
-      createSandboxTerminalConnectionRoute<TerminalConnectionBoxLike, { id: string }>({
-        requireUser: async () => ({ id: 'user-1' }),
-        ensureSandbox: async () => fakeBox(),
-        scope: 'session-runtime',
-      }),
-    ).toThrow()
+  it('reaches ttlMinutes override at the mint call', async () => {
+    const box = fakeBox()
+    const handler = createSandboxTerminalConnectionRoute<TerminalConnectionBoxLike, { id: string }>({
+      requireUser: async () => ({ id: 'user-1' }),
+      ensureSandbox: async () => box,
+      ttlMinutes: 3,
+    })
+
+    const res = await handler(requestWithConnectionId('term-abc'))
+
+    expect(res.status).toBe(200)
+    expect(box.mintScopedToken).toHaveBeenCalledWith({ scope: 'session-runtime', ttlMinutes: 3, sessionId: 'term-abc' })
   })
 
-  it('throws immediately at factory-creation time for scope "session" without a runtimeSessionId option', () => {
-    expect(() =>
-      createSandboxTerminalConnectionRoute<TerminalConnectionBoxLike, { id: string }>({
-        requireUser: async () => ({ id: 'user-1' }),
-        ensureSandbox: async () => fakeBox(),
-        scope: 'session',
-        sessionId: 'session-1',
-      }),
-    ).toThrow()
+  it('custom resolveConnectionId receives {request, user, box, requested} and its rewritten return value is both minted and echoed', async () => {
+    const box = fakeBox()
+    const resolveConnectionId = vi.fn(async (ctx: { requested: string | null }) => `user-1:${ctx.requested}`)
+    const handler = createSandboxTerminalConnectionRoute<TerminalConnectionBoxLike, { id: string }>({
+      requireUser: async () => ({ id: 'user-1' }),
+      ensureSandbox: async () => box,
+      resolveConnectionId,
+    })
+
+    const res = await handler(requestWithConnectionId('raw'))
+    const data = await res.json() as Record<string, unknown>
+
+    expect(res.status).toBe(200)
+    expect(resolveConnectionId).toHaveBeenCalledWith(
+      expect.objectContaining({ user: { id: 'user-1' }, box, requested: 'raw' }),
+    )
+    expect(data.connectionId).toBe('user-1:raw')
+    expect(box.mintScopedToken).toHaveBeenCalledWith({ scope: 'session-runtime', ttlMinutes: 15, sessionId: 'user-1:raw' })
   })
 
-  it('returns 500 at request time when a sessionId callback resolves to an empty value', async () => {
+  it('returns 400 at request time when a custom resolveConnectionId returns an empty string', async () => {
     const handler = createSandboxTerminalConnectionRoute<TerminalConnectionBoxLike, { id: string }>({
       requireUser: async () => ({ id: 'user-1' }),
       ensureSandbox: async () => fakeBox(),
-      scope: 'session-runtime',
-      sessionId: () => '',
+      resolveConnectionId: async () => '',
     })
 
-    const res = await handler(new Request('https://app.test/api'))
+    const res = await handler(requestWithConnectionId('raw'))
 
-    expect(res.status).toBe(500)
+    expect(res.status).toBe(400)
     const data = await res.json() as Record<string, unknown>
     expect(typeof data.error).toBe('string')
   })

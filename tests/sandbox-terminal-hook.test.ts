@@ -110,9 +110,10 @@ describe('useSandboxTerminalConnection', () => {
 // as its `fetcher`, proving the transport-agnostic contract end to end rather
 // than against a hand-written response fixture.
 describe('useSandboxTerminalConnection over createSandboxTerminalConnectionRoute', () => {
-  it('polls through a 503 provisioning response to the direct sidecar URL', async () => {
+  it('polls through a 503 provisioning response to the direct sidecar URL, threading connectionId end to end', async () => {
     vi.useFakeTimers()
     let calls = 0
+    const ensureSandboxCalls: unknown[] = []
     const handler = createSandboxTerminalConnectionRoute<TerminalConnectionBoxLike, { id: string }>({
       requireUser: async () => ({ id: 'user-1' }),
       ensureSandbox: async () => {
@@ -123,11 +124,15 @@ describe('useSandboxTerminalConnection over createSandboxTerminalConnectionRoute
         return {
           id: 'box-1',
           status: 'running',
-          connection: { runtimeUrl: 'https://sidecar.example/direct' },
-          mintScopedToken: vi.fn(async () => ({
-            token: 'tok-1',
-            expiresAt: new Date(Date.now() + 10 * 60_000),
-          })),
+          connection: { runtimeUrl: 'https://runtime.example/direct' },
+          mintScopedToken: vi.fn(async (mintOpts: unknown) => {
+            ensureSandboxCalls.push(mintOpts)
+            return {
+              token: 'tok-1',
+              expiresAt: new Date(Date.now() + 10 * 60_000),
+              sidecarProxyUrl: 'https://api.example/v1/sidecar-proxy/box-1',
+            }
+          }),
         }
       },
     })
@@ -141,6 +146,7 @@ describe('useSandboxTerminalConnection over createSandboxTerminalConnectionRoute
     try {
       const { result } = renderHook(() => useSandboxTerminalConnection({
         workspaceId: 'workspace-1',
+        connectionId: 'tab-term-1',
         fetcher,
         provisionPollIntervalMs: 10,
         provisionPollTimeoutMs: 1_000,
@@ -167,28 +173,38 @@ describe('useSandboxTerminalConnection over createSandboxTerminalConnectionRoute
       })
       expect(calls).toBe(3)
       expect(result.current.token).toBe('tok-1')
-      expect(result.current.runtimeUrl).toBe('https://sidecar.example/direct')
-      expect(result.current.sidecarUrl).toBe('https://sidecar.example/direct')
+      // The final state carries the MINT's sidecarProxyUrl, never the
+      // readiness-only runtimeUrl the fake box resolves to.
+      expect(result.current.runtimeUrl).toBe('https://api.example/v1/sidecar-proxy/box-1')
+      expect(result.current.sidecarUrl).toBe('https://api.example/v1/sidecar-proxy/box-1')
+      expect(result.current.connectionId).toBe('tab-term-1')
       expect(result.current.status).toBe('running')
+      expect(ensureSandboxCalls).toEqual([{ scope: 'session-runtime', ttlMinutes: 15, sessionId: 'tab-term-1' }])
     } finally {
       vi.useRealTimers()
     }
   })
 
-  it('re-invokes the factory and rotates the token before expiry', async () => {
+  it('re-invokes the factory and rotates the token before expiry, re-binding the same terminal connectionId every mint', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'))
 
+    const mintCallArgs: unknown[] = []
     const box: TerminalConnectionBoxLike = {
       id: 'box-1',
       status: 'running',
-      connection: { runtimeUrl: 'https://sidecar.example/direct' },
+      connection: { runtimeUrl: 'https://runtime.example/direct' },
       mintScopedToken: vi.fn(),
     }
     let mintCalls = 0
-    box.mintScopedToken = vi.fn(async () => {
+    box.mintScopedToken = vi.fn(async (mintOpts: unknown) => {
       mintCalls += 1
-      return { token: `tok-${mintCalls}`, expiresAt: new Date(Date.now() + 120) }
+      mintCallArgs.push(mintOpts)
+      return {
+        token: `tok-${mintCalls}`,
+        expiresAt: new Date(Date.now() + 120),
+        sidecarProxyUrl: 'https://api.example/v1/sidecar-proxy/box-1',
+      }
     })
     const handler = createSandboxTerminalConnectionRoute<TerminalConnectionBoxLike, { id: string }>({
       requireUser: async () => ({ id: 'user-1' }),
@@ -201,6 +217,7 @@ describe('useSandboxTerminalConnection over createSandboxTerminalConnectionRoute
     try {
       const { result } = renderHook(() => useSandboxTerminalConnection({
         workspaceId: 'workspace-1',
+        connectionId: 'tab-term-1',
         fetcher,
         tokenRefreshSkewMs: 100,
       }))
@@ -209,7 +226,7 @@ describe('useSandboxTerminalConnection over createSandboxTerminalConnectionRoute
         await Promise.resolve()
       })
       expect(result.current.token).toBe('tok-1')
-      expect(result.current.runtimeUrl).toBe('https://sidecar.example/direct')
+      expect(result.current.runtimeUrl).toBe('https://api.example/v1/sidecar-proxy/box-1')
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1_000)
@@ -217,7 +234,14 @@ describe('useSandboxTerminalConnection over createSandboxTerminalConnectionRoute
 
       expect(mintCalls).toBe(2)
       expect(result.current.token).toBe('tok-2')
-      expect(result.current.runtimeUrl).toBe('https://sidecar.example/direct')
+      expect(result.current.runtimeUrl).toBe('https://api.example/v1/sidecar-proxy/box-1')
+      expect(result.current.connectionId).toBe('tab-term-1')
+      // Refresh must re-bind the SAME terminal — every mint uses the one
+      // sessionId, never a fresh id per refresh.
+      expect(mintCallArgs).toEqual([
+        { scope: 'session-runtime', ttlMinutes: 15, sessionId: 'tab-term-1' },
+        { scope: 'session-runtime', ttlMinutes: 15, sessionId: 'tab-term-1' },
+      ])
     } finally {
       vi.useRealTimers()
     }
