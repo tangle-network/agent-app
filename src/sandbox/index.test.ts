@@ -52,8 +52,6 @@ import {
   readSecret,
   deleteSecret,
   mintSandboxScopedToken,
-  mintTerminalProxyToken,
-  verifyTerminalProxyToken,
   resolveSandboxClientCredentials,
   classifySeveredStream,
   detectInteractiveQuestion,
@@ -1958,27 +1956,6 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { env, resumeStopped: false })
     await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', userId: 'u9', harness: 'opencode' })
     expect(createMock.mock.calls[0]![0].env.BAD_CUSTOMER_ID).toBe('user:u9')
-  })
-})
-
-describe('terminal-proxy HMAC token', () => {
-  const secret = 'test-secret'
-  const id = { userId: 'u1', workspaceId: 'w1', sandboxId: 's1' }
-  it('round-trips mint -> verify', async () => {
-    const minted = await mintTerminalProxyToken(secret, id)
-    expect(minted.succeeded).toBe(true)
-    if (minted.succeeded) expect(await verifyTerminalProxyToken(secret, minted.value.token, id)).toBe(true)
-  })
-  it('rejects wrong identity, wrong secret, and expired token', async () => {
-    const minted = await mintTerminalProxyToken(secret, id)
-    if (!minted.succeeded) throw minted.error
-    expect(await verifyTerminalProxyToken(secret, minted.value.token, { ...id, sandboxId: 's2' })).toBe(false)
-    expect(await verifyTerminalProxyToken('other', minted.value.token, id)).toBe(false)
-    const expired = await mintTerminalProxyToken(secret, id, -1000)
-    if (expired.succeeded) expect(await verifyTerminalProxyToken(secret, expired.value.token, id)).toBe(false)
-  })
-  it('fails loud when secret absent', async () => {
-    expect((await mintTerminalProxyToken('', id)).succeeded).toBe(false)
   })
 })
 

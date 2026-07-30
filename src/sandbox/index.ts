@@ -2686,14 +2686,9 @@ function firstQuestionText(value: Record<string, unknown> | null): string {
     undefined
   return q ?? 'interactive question'
 }
-// Workspace sandbox terminal handlers: WebSocket upgrade proxy, connection
-// + runtime-proxy handlers, and scoped terminal-token mint/verify.
-// @deprecated (#350) — the same-origin proxy transport. Superseded by the
-// browser-direct scoped-token transport below.
-export * from './terminal-proxy-token'
-export * from './workspace-terminal'
-// Browser-direct scoped-token terminal connection route (#341/#349) — the
-// fleet-default transport superseding the proxy pair above.
+// Generic name-keyed workspace sandbox lifecycle manager.
+export * from './workspace-sandbox-manager'
+// Browser-direct scoped-token terminal connection route (#341/#349/#350).
 export * from './terminal-connection'
 // Background box warming on project open: single-flight, non-blocking, and
 // explicit about spend. Imports `ensureWorkspaceSandbox`/`peekWorkspaceSandbox`

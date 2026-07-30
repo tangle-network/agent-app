@@ -5,10 +5,9 @@
  * — the product's server authenticates the request and provisions/resolves
  * the sandbox exactly once, mints a short-lived SDK scoped token
  * (`box.mintScopedToken`), and hands the browser just enough to connect
- * `TerminalView` straight to the sidecar. No worker relays terminal bytes for
- * this shape — that is the proxy transport in `./workspace-terminal` +
- * `./terminal-proxy-token`, now `@deprecated` in favor of this one
- * (retirement tracked in #350; nothing removed, three apps still import it).
+ * `TerminalView` straight to the sidecar. No worker relays terminal bytes.
+ * The deprecated same-origin relay was removed in #350 after the fleet
+ * migrated, leaving this as the package's only terminal transport.
  *
  * VERIFIED PLATFORM CONTRACT (`@tangle-network/sandbox` 0.15.2 + the
  * orchestrator/sidecar enforcement source, verified 2026-07-30):
