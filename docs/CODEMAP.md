@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_77 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_78 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -78,6 +78,7 @@ _77 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./turn-stream`](api/turn-stream.md) | 59 | `chat-routes`, `stream` |
 | [`./vault`](api/vault.md) | 17 | — |
 | [`./vault/lazy`](api/vault-lazy.md) | 2 | — |
+| [`./vault/server`](api/vault-server.md) | 8 | — |
 | [`./web`](api/web.md) | 16 | — |
 | [`./web-react`](api/web-react.md) | 268 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./web-react/terminal`](api/web-react-terminal.md) | 6 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
@@ -729,6 +730,14 @@ Source: `src/vault/lazy.tsx` · 2 exports
 `VaultPaneLazy`, `VaultPaneProps`
 
 [Full API →](api/vault-lazy.md)
+
+## `./vault/server`
+
+Source: `src/vault/server.ts` · 8 exports
+
+`assessVaultDeletionBatch`, `compareIncarnationBaseline`, `FilesystemIncarnationLike`, `IncarnationComparison`, `VAULT_DELETION_REFUSAL_MIN_LIVE_FILES`, `VAULT_DELETION_REFUSAL_RATIO`, `VaultDeletionAssessment`, `VaultDeletionPolicy`
+
+[Full API →](api/vault-server.md)
 
 ## `./web`
 
