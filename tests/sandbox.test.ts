@@ -7,6 +7,7 @@ import {
   createWorkspaceSandboxConnectionHandler,
   createWorkspaceSandboxManager,
   createWorkspaceSandboxRuntimeProxyHandler,
+  createSandboxTerminalConnectionRoute,
   createWorkspaceSandboxTerminalUpgradeHandler,
   encodeSandboxRuntimePath,
   isSandboxTerminalWsUpgrade,
@@ -16,6 +17,7 @@ import {
   terminalUpgradeSubprotocolEcho,
   terminalTokenFromRequest,
   verifySandboxTerminalToken,
+  type TerminalConnectionBoxLike,
   type WorkspaceSandboxInstanceLike,
 } from '../src/sandbox/index'
 
@@ -604,5 +606,146 @@ describe('terminal 101 subprotocol echo', () => {
     expect(terminalUpgradeSubprotocolEcho(like(500), 'bearer.abc')).toBeNull()
     expect(terminalUpgradeSubprotocolEcho(like(403), 'bearer.abc')).toBeNull()
     expect(terminalUpgradeSubprotocolEcho(like(101), null)).toBeNull()
+  })
+})
+
+describe('createSandboxTerminalConnectionRoute', () => {
+  const fakeBox = (overrides: Partial<TerminalConnectionBoxLike> = {}): TerminalConnectionBoxLike => ({
+    id: 'box-1',
+    status: 'running',
+    connection: { runtimeUrl: 'https://sidecar.example' },
+    mintScopedToken: vi.fn(async () => ({ token: 'tok', expiresAt: new Date('2026-01-01T00:15:00Z') })),
+    ...overrides,
+  })
+
+  it('returns the requireUser Response verbatim (e.g. 401)', async () => {
+    const unauthorized = Response.json({ error: 'Unauthorized' }, { status: 401 })
+    const handler = createSandboxTerminalConnectionRoute<TerminalConnectionBoxLike, { id: string }>({
+      requireUser: async () => unauthorized,
+      ensureSandbox: async () => fakeBox(),
+    })
+
+    const res = await handler(new Request('https://app.test/api'))
+
+    expect(res).toBe(unauthorized)
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 500 with the thrown message when ensureSandbox throws', async () => {
+    const handler = createSandboxTerminalConnectionRoute<TerminalConnectionBoxLike, { id: string }>({
+      requireUser: async () => ({ id: 'user-1' }),
+      ensureSandbox: async () => {
+        throw new Error('provisioning exploded')
+      },
+    })
+
+    const res = await handler(new Request('https://app.test/api'))
+    const data = await res.json() as Record<string, unknown>
+
+    expect(res.status).toBe(500)
+    expect(data.error).toBe('provisioning exploded')
+  })
+
+  it('returns 503 {error, status} when connection.runtimeUrl is missing, relaying box.status exactly', async () => {
+    const handler = createSandboxTerminalConnectionRoute<TerminalConnectionBoxLike, { id: string }>({
+      requireUser: async () => ({ id: 'user-1' }),
+      ensureSandbox: async () => fakeBox({ status: 'starting', connection: undefined }),
+    })
+
+    const res = await handler(new Request('https://app.test/api'))
+    const data = await res.json() as Record<string, unknown>
+
+    expect(res.status).toBe(503)
+    expect(data.status).toBe('starting')
+    expect(typeof data.error).toBe('string')
+  })
+
+  it('returns 503 with the thrown message when mintScopedToken rejects', async () => {
+    const handler = createSandboxTerminalConnectionRoute<TerminalConnectionBoxLike, { id: string }>({
+      requireUser: async () => ({ id: 'user-1' }),
+      ensureSandbox: async () => fakeBox({
+        mintScopedToken: vi.fn(async () => {
+          throw new Error('mint exploded')
+        }),
+      }),
+    })
+
+    const res = await handler(new Request('https://app.test/api'))
+    const data = await res.json() as Record<string, unknown>
+
+    expect(res.status).toBe(503)
+    expect(data.error).toBe('mint exploded')
+  })
+
+  it('returns 200 with sidecarUrl/token/expiresAt/status/sandboxId and mints with the default {scope, ttlMinutes}', async () => {
+    const box = fakeBox()
+    const handler = createSandboxTerminalConnectionRoute<TerminalConnectionBoxLike, { id: string }>({
+      requireUser: async () => ({ id: 'user-1' }),
+      ensureSandbox: async () => box,
+    })
+
+    const res = await handler(new Request('https://app.test/api'))
+    const data = await res.json() as Record<string, unknown>
+
+    expect(res.status).toBe(200)
+    expect(data.sidecarUrl).toBe(box.connection!.runtimeUrl)
+    expect(data.expiresAt).toBe(new Date('2026-01-01T00:15:00Z').toISOString())
+    expect(data.status).toBe('running')
+    expect(data.sandboxId).toBe('box-1')
+    expect(box.mintScopedToken).toHaveBeenCalledWith({ scope: 'project', ttlMinutes: 15 })
+  })
+
+  it('reaches overrides (custom scope/ttl, sessionId callback receiving (user, box)) at the mint call', async () => {
+    const box = fakeBox()
+    const sessionIdCallback = vi.fn((user: { id: string }, resolvedBox: TerminalConnectionBoxLike) => `${user.id}:${resolvedBox.id}`)
+    const handler = createSandboxTerminalConnectionRoute<TerminalConnectionBoxLike, { id: string }>({
+      requireUser: async () => ({ id: 'user-1' }),
+      ensureSandbox: async () => box,
+      scope: 'session-runtime',
+      ttlMinutes: 3,
+      sessionId: sessionIdCallback,
+    })
+
+    const res = await handler(new Request('https://app.test/api'))
+
+    expect(res.status).toBe(200)
+    expect(sessionIdCallback).toHaveBeenCalledWith({ id: 'user-1' }, box)
+    expect(box.mintScopedToken).toHaveBeenCalledWith({ scope: 'session-runtime', ttlMinutes: 3, sessionId: 'user-1:box-1' })
+  })
+
+  it('throws immediately at factory-creation time for scope "session-runtime" without a sessionId option', () => {
+    expect(() =>
+      createSandboxTerminalConnectionRoute<TerminalConnectionBoxLike, { id: string }>({
+        requireUser: async () => ({ id: 'user-1' }),
+        ensureSandbox: async () => fakeBox(),
+        scope: 'session-runtime',
+      }),
+    ).toThrow()
+  })
+
+  it('throws immediately at factory-creation time for scope "session" without a runtimeSessionId option', () => {
+    expect(() =>
+      createSandboxTerminalConnectionRoute<TerminalConnectionBoxLike, { id: string }>({
+        requireUser: async () => ({ id: 'user-1' }),
+        ensureSandbox: async () => fakeBox(),
+        scope: 'session',
+        sessionId: 'session-1',
+      }),
+    ).toThrow()
+  })
+
+  it('returns 500 at request time when a sessionId callback resolves to an empty value', async () => {
+    const handler = createSandboxTerminalConnectionRoute<TerminalConnectionBoxLike, { id: string }>({
+      requireUser: async () => ({ id: 'user-1' }),
+      ensureSandbox: async () => fakeBox(),
+      scope: 'session-runtime',
+      sessionId: () => '',
+    })
+
+    const res = await handler(new Request('https://app.test/api'))
+
+    expect(res.status).toBe(500)
+    const data = await res.json() as Record<string, unknown>
+    expect(typeof data.error).toBe('string')
   })
 })

@@ -2688,8 +2688,13 @@ function firstQuestionText(value: Record<string, unknown> | null): string {
 }
 // Workspace sandbox terminal handlers: WebSocket upgrade proxy, connection
 // + runtime-proxy handlers, and scoped terminal-token mint/verify.
+// @deprecated (#350) — the same-origin proxy transport. Superseded by the
+// browser-direct scoped-token transport below.
 export * from './terminal-proxy-token'
 export * from './workspace-terminal'
+// Browser-direct scoped-token terminal connection route (#341/#349) — the
+// fleet-default transport superseding the proxy pair above.
+export * from './terminal-connection'
 // Background box warming on project open: single-flight, non-blocking, and
 // explicit about spend. Imports `ensureWorkspaceSandbox`/`peekWorkspaceSandbox`
 // back out of this module; tsup inlines both files into the one
