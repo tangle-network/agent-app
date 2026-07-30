@@ -14011,6 +14011,62 @@
       ]
     },
     {
+      "id": "./vault/server",
+      "source": "src/vault/server.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "assessVaultDeletionBatch",
+          "kind": "function",
+          "signature": "(input: { baselinePaths: readonly string[]; proposedDeletions: readonly string[]; manifestEmpty?: boolean | undefined;…",
+          "doc": "Decide whether a reconciliation pass's proposed deletions are safe to apply against the live baseline."
+        },
+        {
+          "name": "compareIncarnationBaseline",
+          "kind": "function",
+          "signature": "(baselineId: string | undefined, current: FilesystemIncarnationLike) => IncarnationComparison",
+          "doc": "Compare a recorded baseline filesystem-incarnation id against a sandbox's current incarnation fields."
+        },
+        {
+          "name": "FilesystemIncarnationLike",
+          "kind": "interface",
+          "signature": "interface FilesystemIncarnationLike",
+          "doc": "The subset of a sandbox's filesystem-incarnation identity this module needs."
+        },
+        {
+          "name": "IncarnationComparison",
+          "kind": "type",
+          "signature": "type IncarnationComparison",
+          "doc": "Result of comparing a recorded baseline incarnation id against the sandbox's current identity."
+        },
+        {
+          "name": "VAULT_DELETION_REFUSAL_MIN_LIVE_FILES",
+          "kind": "const",
+          "signature": "10",
+          "doc": "The blast-radius ratio gate only engages once the live baseline is at least this large, so a 2-file vault losing 1 file (50%) is not refused on ratio alone."
+        },
+        {
+          "name": "VAULT_DELETION_REFUSAL_RATIO",
+          "kind": "const",
+          "signature": "0.75",
+          "doc": "Refuse a deletion batch once it would remove at least this fraction of the live baseline (both this and `VAULT_DELETION_REFUSAL_MIN_LIVE_FILES` must hold — a tiny vault can lose all its files without…"
+        },
+        {
+          "name": "VaultDeletionAssessment",
+          "kind": "interface",
+          "signature": "interface VaultDeletionAssessment",
+          "doc": null
+        },
+        {
+          "name": "VaultDeletionPolicy",
+          "kind": "interface",
+          "signature": "interface VaultDeletionPolicy",
+          "doc": "Overrides for `assessVaultDeletionBatch`'s two thresholds."
+        }
+      ]
+    },
+    {
       "id": "./web",
       "source": "src/web/index.ts",
       "dependsOn": [],

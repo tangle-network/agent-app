@@ -393,6 +393,11 @@
       "import": "./dist/vault/lazy.js",
       "default": "./dist/vault/lazy.js"
     },
+    "./vault/server": {
+      "types": "./dist/vault/server.d.ts",
+      "import": "./dist/vault/server.js",
+      "default": "./dist/vault/server.js"
+    },
     "./brand": {
       "types": "./dist/brand/index.d.ts",
       "import": "./dist/brand/index.js",

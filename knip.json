@@ -71,6 +71,7 @@
     "src/intakes-react/lazy.tsx",
     "src/vault/index.ts",
     "src/vault/lazy.tsx",
+    "src/vault/server.ts",
     "src/theme/index.ts",
     "src/theme/tailwind-preset.ts",
     "src/theme-contract/index.ts",
