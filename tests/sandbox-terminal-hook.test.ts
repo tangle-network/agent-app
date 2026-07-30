@@ -4,6 +4,7 @@
 
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createSandboxTerminalConnectionRoute, type TerminalConnectionBoxLike } from '../src/sandbox/index'
 import { tabTerminalConnectionId, useSandboxTerminalConnection } from '../src/web-react/sandbox-terminal'
 
 describe('useSandboxTerminalConnection', () => {
@@ -99,6 +100,148 @@ describe('useSandboxTerminalConnection', () => {
       })
 
       expect(fetcher).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+// #341/#349 — the unmodified hook driven by the REAL browser-direct factory
+// as its `fetcher`, proving the transport-agnostic contract end to end rather
+// than against a hand-written response fixture.
+describe('useSandboxTerminalConnection over createSandboxTerminalConnectionRoute', () => {
+  it('polls through a 503 provisioning response to the direct sidecar URL, threading connectionId end to end', async () => {
+    vi.useFakeTimers()
+    let calls = 0
+    const ensureSandboxCalls: unknown[] = []
+    const handler = createSandboxTerminalConnectionRoute<TerminalConnectionBoxLike, { id: string }>({
+      requireUser: async () => ({ id: 'user-1' }),
+      ensureSandbox: async () => {
+        calls += 1
+        if (calls < 3) {
+          return { id: 'box-1', status: 'provisioning', connection: undefined, mintScopedToken: vi.fn() }
+        }
+        return {
+          id: 'box-1',
+          status: 'running',
+          connection: { runtimeUrl: 'https://runtime.example/direct' },
+          mintScopedToken: vi.fn(async (mintOpts: unknown) => {
+            ensureSandboxCalls.push(mintOpts)
+            return {
+              token: 'tok-1',
+              expiresAt: new Date(Date.now() + 10 * 60_000),
+              sidecarProxyUrl: 'https://api.example/v1/sidecar-proxy/box-1',
+            }
+          }),
+        }
+      },
+    })
+
+    // Bound to a stable `const` OUTSIDE the renderHook callback: an inline
+    // arrow created fresh on every render would give the hook's memoized
+    // `connect` a new dependency identity each render, re-triggering its
+    // mount effect and spinning forever.
+    const fetcher = (input: RequestInfo | URL) => handler(new Request(new URL(String(input), 'https://app.test')))
+
+    try {
+      const { result } = renderHook(() => useSandboxTerminalConnection({
+        workspaceId: 'workspace-1',
+        connectionId: 'tab-term-1',
+        fetcher,
+        provisionPollIntervalMs: 10,
+        provisionPollTimeoutMs: 1_000,
+      }))
+
+      // First mount fetch (calls=1) resolves to a 503 — deterministic under
+      // fake timers, unlike polling this with real timers + `waitFor`.
+      await act(async () => {
+        await Promise.resolve()
+      })
+      expect(result.current.status).toBe('provisioning')
+      expect(calls).toBe(1)
+
+      // Second poll (calls=2) — still provisioning.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10)
+      })
+      expect(result.current.status).toBe('provisioning')
+      expect(calls).toBe(2)
+
+      // Third poll (calls=3) — the box is ready.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10)
+      })
+      expect(calls).toBe(3)
+      expect(result.current.token).toBe('tok-1')
+      // The final state carries the MINT's sidecarProxyUrl, never the
+      // readiness-only runtimeUrl the fake box resolves to.
+      expect(result.current.runtimeUrl).toBe('https://api.example/v1/sidecar-proxy/box-1')
+      expect(result.current.sidecarUrl).toBe('https://api.example/v1/sidecar-proxy/box-1')
+      expect(result.current.connectionId).toBe('tab-term-1')
+      expect(result.current.status).toBe('running')
+      expect(ensureSandboxCalls).toEqual([{ scope: 'session-runtime', ttlMinutes: 15, sessionId: 'tab-term-1' }])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('re-invokes the factory and rotates the token before expiry, re-binding the same terminal connectionId every mint', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'))
+
+    const mintCallArgs: unknown[] = []
+    const box: TerminalConnectionBoxLike = {
+      id: 'box-1',
+      status: 'running',
+      connection: { runtimeUrl: 'https://runtime.example/direct' },
+      mintScopedToken: vi.fn(),
+    }
+    let mintCalls = 0
+    box.mintScopedToken = vi.fn(async (mintOpts: unknown) => {
+      mintCalls += 1
+      mintCallArgs.push(mintOpts)
+      return {
+        token: `tok-${mintCalls}`,
+        expiresAt: new Date(Date.now() + 120),
+        sidecarProxyUrl: 'https://api.example/v1/sidecar-proxy/box-1',
+      }
+    })
+    const handler = createSandboxTerminalConnectionRoute<TerminalConnectionBoxLike, { id: string }>({
+      requireUser: async () => ({ id: 'user-1' }),
+      ensureSandbox: async () => box,
+    })
+
+    // Same stable-reference requirement as the test above.
+    const fetcher = (input: RequestInfo | URL) => handler(new Request(new URL(String(input), 'https://app.test')))
+
+    try {
+      const { result } = renderHook(() => useSandboxTerminalConnection({
+        workspaceId: 'workspace-1',
+        connectionId: 'tab-term-1',
+        fetcher,
+        tokenRefreshSkewMs: 100,
+      }))
+
+      await act(async () => {
+        await Promise.resolve()
+      })
+      expect(result.current.token).toBe('tok-1')
+      expect(result.current.runtimeUrl).toBe('https://api.example/v1/sidecar-proxy/box-1')
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_000)
+      })
+
+      expect(mintCalls).toBe(2)
+      expect(result.current.token).toBe('tok-2')
+      expect(result.current.runtimeUrl).toBe('https://api.example/v1/sidecar-proxy/box-1')
+      expect(result.current.connectionId).toBe('tab-term-1')
+      // Refresh must re-bind the SAME terminal — every mint uses the one
+      // sessionId, never a fresh id per refresh.
+      expect(mintCallArgs).toEqual([
+        { scope: 'session-runtime', ttlMinutes: 15, sessionId: 'tab-term-1' },
+        { scope: 'session-runtime', ttlMinutes: 15, sessionId: 'tab-term-1' },
+      ])
     } finally {
       vi.useRealTimers()
     }

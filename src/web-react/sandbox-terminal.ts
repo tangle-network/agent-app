@@ -10,9 +10,25 @@ export interface SandboxTerminalConnection {
   error: string | null
   loading: boolean
   sandboxId?: string
+  connectionId?: string
 }
 
-/** Define the response structure for a sandbox terminal connection including URLs, token, status, and errors */
+/**
+ * Define the response structure for a sandbox terminal connection including URLs, token, status, and errors
+ *
+ * Transport-agnostic by construction (#341/#349): the browser-direct
+ * scoped-token route (`createSandboxTerminalConnectionRoute`,
+ * `src/sandbox/terminal-connection.ts`) returns `sidecarUrl` only — no
+ * `runtimeUrl` — while the (now `@deprecated`) same-origin proxy route
+ * returns both. `useSandboxTerminalConnection` below resolves
+ * `runtimeUrl ?? sidecarUrl` so either shape lands on the same connection
+ * state without a hook change.
+ *
+ * `connectionId` is the id the route's minted token's `sid` is bound to
+ * (echoed back from the `connectionId` the hook sent) — pass it straight
+ * through as `TerminalView`'s `connectionId` prop, since any other value
+ * fails the WS upgrade on the current platform.
+ */
 export interface SandboxTerminalConnectionResponse {
   runtimeUrl?: string
   sidecarUrl?: string
@@ -21,12 +37,24 @@ export interface SandboxTerminalConnectionResponse {
   status?: string
   error?: string
   sandboxId?: string
+  connectionId?: string
 }
 
-/** Define options for configuring a sandbox terminal connection including workspace ID and connection parameters */
+/**
+ * Define options for configuring a sandbox terminal connection including workspace ID and connection parameters
+ *
+ * `connectionId`, when set, is passed to
+ * `createSandboxTerminalConnectionRoute` as the `connectionId` query
+ * parameter — pass `tabTerminalConnectionId()` here so the route mints a
+ * token whose `sid` is bound to the same id `TerminalView` will dial. Give
+ * `TerminalView` the response's echoed `connectionId` (not this input
+ * value) alongside `sidecarUrl` as `apiUrl` and `token`, since a product's
+ * `resolveConnectionId` seam may rewrite it server-side.
+ */
 export interface UseSandboxTerminalConnectionOptions {
   workspaceId: string
   connectionUrl?: string | ((workspaceId: string) => string)
+  connectionId?: string
   fetcher?: typeof fetch
   provisionPollIntervalMs?: number
   provisionPollTimeoutMs?: number
@@ -52,7 +80,24 @@ const EMPTY_CONNECTION: SandboxTerminalConnection = {
   loading: false,
 }
 
-/** Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling */
+/**
+ * Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling
+ *
+ * Transport-agnostic (#341/#349): this hook does not care whether
+ * `connectionUrl` is backed by the fleet-default browser-direct
+ * scoped-token route (`createSandboxTerminalConnectionRoute`,
+ * `src/sandbox/terminal-connection.ts`, `sidecarUrl` only) or the
+ * `@deprecated` same-origin proxy route (`runtimeUrl` + `sidecarUrl`) — it
+ * resolves `runtimeUrl ?? sidecarUrl` either way.
+ *
+ * Pass `tabTerminalConnectionId()` as `opts.connectionId` — the hook forwards
+ * it as the `connectionId` query parameter the browser-direct route requires
+ * to mint a token whose `sid` is bound to that exact id (the orchestrator's
+ * terminal WS gate fails closed on any other value). Give `TerminalView` the
+ * RESULT's echoed `connectionId` (not the input value — a product's
+ * `resolveConnectionId` seam may rewrite it), the resolved `sidecarUrl`/
+ * `runtimeUrl` as `apiUrl`, and `token` as its token prop.
+ */
 export function useSandboxTerminalConnection(opts: UseSandboxTerminalConnectionOptions): UseSandboxTerminalConnectionResult {
   const [conn, setConn] = useState<SandboxTerminalConnection>(EMPTY_CONNECTION)
   const mountedRef = useRef(false)
@@ -63,9 +108,15 @@ export function useSandboxTerminalConnection(opts: UseSandboxTerminalConnectionO
   const refreshSkewMs = opts.tokenRefreshSkewMs ?? DEFAULT_TOKEN_REFRESH_SKEW_MS
 
   const connectionUrl = useCallback(() => {
-    if (typeof opts.connectionUrl === 'function') return opts.connectionUrl(opts.workspaceId)
-    return opts.connectionUrl ?? `/api/workspaces/${encodeURIComponent(opts.workspaceId)}/sandbox/connection`
-  }, [opts.connectionUrl, opts.workspaceId])
+    const base = typeof opts.connectionUrl === 'function'
+      ? opts.connectionUrl(opts.workspaceId)
+      : opts.connectionUrl ?? `/api/workspaces/${encodeURIComponent(opts.workspaceId)}/sandbox/connection`
+    if (!opts.connectionId) return base
+    // `base` may be relative (SSR-safe), so a plain `URL` parse isn't always
+    // possible — string-append with proper encoding covers both shapes.
+    const separator = base.includes('?') ? '&' : '?'
+    return `${base}${separator}connectionId=${encodeURIComponent(opts.connectionId)}`
+  }, [opts.connectionUrl, opts.workspaceId, opts.connectionId])
 
   const connect = useCallback(async () => {
     const generation = generationRef.current + 1
@@ -94,6 +145,7 @@ export function useSandboxTerminalConnection(opts: UseSandboxTerminalConnectionO
             error: null,
             loading: false,
             ...(data.sandboxId ? { sandboxId: data.sandboxId } : {}),
+            ...(data.connectionId ? { connectionId: data.connectionId } : {}),
           })
           return
         }

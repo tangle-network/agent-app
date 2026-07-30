@@ -8555,6 +8555,12 @@
           "doc": null
         },
         {
+          "name": "createSandboxTerminalConnectionRoute",
+          "kind": "function",
+          "signature": "<TBox extends TerminalConnectionBoxLike, TUser>(opts: SandboxTerminalConnectionRouteOptions<TBox, TUser>) => (request:…",
+          "doc": "Build the browser-direct terminal connection route: `GET` handler that authenticates, resolves the sandbox, mints a scoped token pinned to `scope: 'session-runtime'` (the ONLY scope the platform gran…"
+        },
+        {
           "name": "createSandboxTerminalToken",
           "kind": "function",
           "signature": "(subject: TerminalProxyIdentity, opts: SandboxTerminalTokenOptions) => Promise<SandboxTerminalTokenResult>",
@@ -9083,6 +9089,12 @@
           "doc": "Define transitions marking the start or finish of a sandbox step with associated details"
         },
         {
+          "name": "SandboxTerminalConnectionRouteOptions",
+          "kind": "interface",
+          "signature": "interface SandboxTerminalConnectionRouteOptions",
+          "doc": "Configuration for {@link createSandboxTerminalConnectionRoute}."
+        },
+        {
           "name": "SandboxTerminalTokenOptions",
           "kind": "interface",
           "signature": "interface SandboxTerminalTokenOptions",
@@ -9231,6 +9243,12 @@
           "kind": "function",
           "signature": "(box: SandboxInstance, seam: MemberSyncSeam, userId: string, role: string) => Promise<Outcome<void>>",
           "doc": "Synchronize a sandbox member's role by updating permissions based on the provided role mapping"
+        },
+        {
+          "name": "TerminalConnectionBoxLike",
+          "kind": "interface",
+          "signature": "interface TerminalConnectionBoxLike",
+          "doc": "The structural surface this route needs from an SDK sandbox box — no `@tangle-network/sandbox` class import (invariant 3)."
         },
         {
           "name": "TerminalProxyIdentity",
@@ -15477,7 +15495,7 @@
           "name": "SandboxTerminalConnectionResponse",
           "kind": "interface",
           "signature": "interface SandboxTerminalConnectionResponse",
-          "doc": "Define the response structure for a sandbox terminal connection including URLs, token, status, and errors"
+          "doc": "Define the response structure for a sandbox terminal connection including URLs, token, status, and errors Transport-agnostic by construction (#341/#349): the browser-direct scoped-token route (`creat…"
         },
         {
           "name": "SeatPaywall",
@@ -15717,13 +15735,13 @@
           "name": "useSandboxTerminalConnection",
           "kind": "function",
           "signature": "(opts: UseSandboxTerminalConnectionOptions) => UseSandboxTerminalConnectionResult",
-          "doc": "Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling"
+          "doc": "Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling Transport-agnostic (#341/#349): this hook does not care whether `connectionUrl` is backed by the fl…"
         },
         {
           "name": "UseSandboxTerminalConnectionOptions",
           "kind": "interface",
           "signature": "interface UseSandboxTerminalConnectionOptions",
-          "doc": "Define options for configuring a sandbox terminal connection including workspace ID and connection parameters"
+          "doc": "Define options for configuring a sandbox terminal connection including workspace ID and connection parameters `connectionId`, when set, is passed to `createSandboxTerminalConnectionRoute` as the `con…"
         },
         {
           "name": "UseSandboxTerminalConnectionResult",
@@ -15828,7 +15846,7 @@
           "name": "SandboxTerminalConnectionResponse",
           "kind": "interface",
           "signature": "interface SandboxTerminalConnectionResponse",
-          "doc": "Define the response structure for a sandbox terminal connection including URLs, token, status, and errors"
+          "doc": "Define the response structure for a sandbox terminal connection including URLs, token, status, and errors Transport-agnostic by construction (#341/#349): the browser-direct scoped-token route (`creat…"
         },
         {
           "name": "tabTerminalConnectionId",
@@ -15840,13 +15858,13 @@
           "name": "useSandboxTerminalConnection",
           "kind": "function",
           "signature": "(opts: UseSandboxTerminalConnectionOptions) => UseSandboxTerminalConnectionResult",
-          "doc": "Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling"
+          "doc": "Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling Transport-agnostic (#341/#349): this hook does not care whether `connectionUrl` is backed by the fl…"
         },
         {
           "name": "UseSandboxTerminalConnectionOptions",
           "kind": "interface",
           "signature": "interface UseSandboxTerminalConnectionOptions",
-          "doc": "Define options for configuring a sandbox terminal connection including workspace ID and connection parameters"
+          "doc": "Define options for configuring a sandbox terminal connection including workspace ID and connection parameters `connectionId`, when set, is passed to `createSandboxTerminalConnectionRoute` as the `con…"
         },
         {
           "name": "UseSandboxTerminalConnectionResult",

@@ -5,6 +5,30 @@ import {
   type TerminalProxyIdentity,
 } from './terminal-proxy-token'
 
+/**
+ * The same-origin PROXY terminal transport: connection handler -> HMAC proxy
+ * token -> runtime proxy -> WebSocket upgrade relay, with a worker in the
+ * data path for every terminal byte. Epic #343 / decision #341 moved the
+ * fleet default to the browser-direct scoped-token transport in
+ * `./terminal-connection.ts` — the product's server authenticates +
+ * provisions once, mints an SDK scoped token, and the browser connects
+ * `TerminalView` straight to the sidecar with no worker relay. Nothing here
+ * is removed (three apps still import this seam); retirement is tracked in
+ * #350 and removal is a major.
+ *
+ * KEPT / DEPRECATED split in this file:
+ *
+ * | export                                        | status                              |
+ * | ---------------------------------------------- | ----------------------------------- |
+ * | `createWorkspaceSandboxManager` + friends      | KEPT — generic box lifecycle, used by both transports |
+ * | `WorkspaceSandboxInstanceLike`                 | KEPT — same reason                  |
+ * | `createWorkspaceSandboxConnectionHandler`      | `@deprecated` — proxy connection route |
+ * | `createWorkspaceSandboxRuntimeProxyHandler`    | `@deprecated` — proxy runtime relay |
+ * | `createWorkspaceSandboxTerminalUpgradeHandler` | `@deprecated` — proxy WS upgrade relay |
+ * | `createSandboxTerminalToken` / `verifySandboxTerminalToken` | `@deprecated` — proxy HMAC token |
+ * | every other exported helper below              | `@deprecated` — exists only to serve the proxy relay |
+ */
+
 /** Define the shape of a workspace sandbox instance including its connection details and status */
 export interface WorkspaceSandboxInstanceLike {
   id: string
@@ -96,17 +120,41 @@ export function createWorkspaceSandboxManager<TClient, TBox extends WorkspaceSan
   }
 }
 
-/** Define options for generating a sandbox terminal token including secret and expiration settings */
+/**
+ * Define options for generating a sandbox terminal token including secret and expiration settings
+ *
+ * @deprecated Options for the same-origin proxy terminal transport's HMAC
+ * token, superseded by the browser-direct scoped-token transport — build the
+ * route with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export interface SandboxTerminalTokenOptions {
   secret?: string
   expiresInMs?: number
   now?: () => number
 }
 
-/** Resolve the identity type used for sandbox terminal token subjects */
+/**
+ * Resolve the identity type used for sandbox terminal token subjects
+ *
+ * @deprecated Identity alias for the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export type SandboxTerminalTokenSubject = TerminalProxyIdentity
 
-/** Provide token and expiration details for a sandbox terminal session */
+/**
+ * Provide token and expiration details for a sandbox terminal session
+ *
+ * @deprecated Result shape for the same-origin proxy terminal transport's
+ * HMAC token, superseded by the browser-direct scoped-token transport —
+ * build the route with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export interface SandboxTerminalTokenResult {
   token: string
   expiresAt: Date
@@ -121,7 +169,15 @@ const BEARER_SUBPROTOCOL_PREFIX = 'bearer.'
 // in-flight browser terminal sessions right after rollout.
 const LEGACY_TERMINAL_TOKEN_PREFIX = 'sbxt_'
 
-/** Generate a sandbox terminal token for a given subject with specified options */
+/**
+ * Generate a sandbox terminal token for a given subject with specified options
+ *
+ * @deprecated Mints a token for the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export async function createSandboxTerminalToken(
   subject: SandboxTerminalTokenSubject,
   opts: SandboxTerminalTokenOptions,
@@ -137,7 +193,15 @@ export async function createSandboxTerminalToken(
   return minted.value
 }
 
-/** Verify the validity of a sandbox terminal token against the expected identity and options */
+/**
+ * Verify the validity of a sandbox terminal token against the expected identity and options
+ *
+ * @deprecated Verifies a token for the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export async function verifySandboxTerminalToken(
   token: string,
   expected: SandboxTerminalTokenSubject,
@@ -152,12 +216,28 @@ export async function verifySandboxTerminalToken(
   return verifyTerminalProxyToken(secret ?? '', normalized, expected, now)
 }
 
-/** Represent an authenticated user within a sandbox environment with a unique identifier */
+/**
+ * Represent an authenticated user within a sandbox environment with a unique identifier
+ *
+ * @deprecated Exists only to serve the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export interface AuthenticatedSandboxUser {
   id: string
 }
 
-/** Define options to handle workspace sandbox connections with user authentication and access control */
+/**
+ * Define options to handle workspace sandbox connections with user authentication and access control
+ *
+ * @deprecated Options for the same-origin proxy terminal connection handler,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export interface WorkspaceSandboxConnectionHandlerOptions<TBox extends WorkspaceSandboxInstanceLike> {
   requireUser: (request: Request) => Promise<AuthenticatedSandboxUser>
   requireWorkspaceAccess: (args: { request: Request; userId: string; workspaceId: string }) => Promise<void>
@@ -168,7 +248,15 @@ export interface WorkspaceSandboxConnectionHandlerOptions<TBox extends Workspace
   exposeDirectSidecar?: boolean
 }
 
-/** Define arguments required to establish a workspace sandbox connection */
+/**
+ * Define arguments required to establish a workspace sandbox connection
+ *
+ * @deprecated Argument shape for the same-origin proxy terminal connection
+ * handler, superseded by the browser-direct scoped-token transport — build
+ * the route with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export interface WorkspaceSandboxConnectionArgs {
   request: Request
   params: {
@@ -176,7 +264,15 @@ export interface WorkspaceSandboxConnectionArgs {
   }
 }
 
-/** Create a handler to resolve workspace sandbox connections with user and access validation */
+/**
+ * Create a handler to resolve workspace sandbox connections with user and access validation
+ *
+ * @deprecated The same-origin proxy terminal transport is superseded by the
+ * browser-direct scoped-token transport — build the route with
+ * `createSandboxTerminalConnectionRoute` (`src/sandbox/terminal-connection.ts`)
+ * instead. Three apps still import this seam; retirement is tracked in #350
+ * and removal is a major.
+ */
 export function createWorkspaceSandboxConnectionHandler<TBox extends WorkspaceSandboxInstanceLike>(
   opts: WorkspaceSandboxConnectionHandlerOptions<TBox>,
 ) {
@@ -249,7 +345,15 @@ export function createWorkspaceSandboxConnectionHandler<TBox extends WorkspaceSa
   }
 }
 
-/** Define credentials required to access the sandbox API environment */
+/**
+ * Define credentials required to access the sandbox API environment
+ *
+ * @deprecated Exists only to serve the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export interface SandboxApiCredentials {
   baseUrl: string
   apiKey: string
@@ -276,6 +380,12 @@ export interface SandboxApiCredentials {
  * terminal against it and rendered a permanent spinner.
  *
  * Exported so no product writes the path literal a fourth time.
+ *
+ * @deprecated Exists only to serve the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
  */
 export function sandboxSidecarProxyUrl(baseUrl: string, sandboxId: string): string {
   if (!baseUrl) throw new Error('baseUrl is required')
@@ -283,14 +393,30 @@ export function sandboxSidecarProxyUrl(baseUrl: string, sandboxId: string): stri
   return new URL(`/v1/sidecar-proxy/${encodeURIComponent(sandboxId)}`, baseUrl).toString().replace(/\/+$/, '')
 }
 
-/** Define a connection configuration for sandbox runtime including URL and optional server-side auth token */
+/**
+ * Define a connection configuration for sandbox runtime including URL and optional server-side auth token
+ *
+ * @deprecated Exists only to serve the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export interface SandboxRuntimeConnection {
   runtimeUrl: string
   /** Server-side sidecar bearer. Must authorize terminal routes; never expose it to browser code. */
   authToken?: string
 }
 
-/** Define options for handling workspace sandbox runtime proxy including user, access, credentials, and connection retrieval */
+/**
+ * Define options for handling workspace sandbox runtime proxy including user, access, credentials, and connection retrieval
+ *
+ * @deprecated Options for the same-origin proxy terminal runtime relay,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export interface WorkspaceSandboxRuntimeProxyHandlerOptions {
   requireUser: (request: Request) => Promise<AuthenticatedSandboxUser>
   requireWorkspaceAccess: (args: { request: Request; userId: string; workspaceId: string; sandboxId: string }) => Promise<void>
@@ -301,7 +427,15 @@ export interface WorkspaceSandboxRuntimeProxyHandlerOptions {
   forwardHeaders?: string[]
 }
 
-/** Define arguments for proxying runtime requests within a workspace sandbox environment */
+/**
+ * Define arguments for proxying runtime requests within a workspace sandbox environment
+ *
+ * @deprecated Argument shape for the same-origin proxy terminal runtime
+ * relay, superseded by the browser-direct scoped-token transport — build the
+ * route with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export interface WorkspaceSandboxRuntimeProxyArgs {
   request: Request
   params: {
@@ -311,7 +445,15 @@ export interface WorkspaceSandboxRuntimeProxyArgs {
   }
 }
 
-/** Create a proxy handler to resolve sandbox runtime requests with user and workspace access validation */
+/**
+ * Create a proxy handler to resolve sandbox runtime requests with user and workspace access validation
+ *
+ * @deprecated The same-origin proxy terminal transport is superseded by the
+ * browser-direct scoped-token transport — build the route with
+ * `createSandboxTerminalConnectionRoute` (`src/sandbox/terminal-connection.ts`)
+ * instead. Three apps still import this seam; retirement is tracked in #350
+ * and removal is a major.
+ */
 export function createWorkspaceSandboxRuntimeProxyHandler(opts: WorkspaceSandboxRuntimeProxyHandlerOptions) {
   return async function handleWorkspaceSandboxRuntimeProxy({ request, params }: WorkspaceSandboxRuntimeProxyArgs): Promise<Response> {
     const user = await opts.requireUser(request)
@@ -392,7 +534,15 @@ export function createWorkspaceSandboxRuntimeProxyHandler(opts: WorkspaceSandbox
 const SANDBOX_TERMINAL_WS_PATHNAME =
   /^\/api\/workspaces\/([^/]+)\/sandbox\/runtime\/([^/]+)\/(terminals\/[^/]+\/ws)$/
 
-/** Define the structure for matching a sandbox terminal WebSocket with workspace and path details */
+/**
+ * Define the structure for matching a sandbox terminal WebSocket with workspace and path details
+ *
+ * @deprecated Exists only to serve the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export interface SandboxTerminalWsMatch {
   workspaceId: string
   sandboxId: string
@@ -406,6 +556,12 @@ export interface SandboxTerminalWsMatch {
  * (`/api/workspaces/:workspaceId/sandbox/runtime/:sandboxId`) with a canonical
  * `terminals/:id/ws` sub-path. `subPath` is left URL-encoded for re-use in the
  * upstream URL; the ids are decoded for auth checks.
+ *
+ * @deprecated Parses a path for the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
  */
 export function matchSandboxTerminalWsPath(pathname: string): SandboxTerminalWsMatch | null {
   const m = SANDBOX_TERMINAL_WS_PATHNAME.exec(pathname)
@@ -418,7 +574,15 @@ export function matchSandboxTerminalWsPath(pathname: string): SandboxTerminalWsM
   return { workspaceId: decodedWorkspaceId, sandboxId: decodedSandboxId, subPath }
 }
 
-/** True when `request` is a WebSocket upgrade for a sandbox terminal path. */
+/**
+ * True when `request` is a WebSocket upgrade for a sandbox terminal path.
+ *
+ * @deprecated Exists only to serve the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export function isSandboxTerminalWsUpgrade(request: Request): boolean {
   if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') return false
   try {
@@ -428,7 +592,15 @@ export function isSandboxTerminalWsUpgrade(request: Request): boolean {
   }
 }
 
-/** Define options to handle user authentication, workspace access, and sandbox API credential retrieval */
+/**
+ * Define options to handle user authentication, workspace access, and sandbox API credential retrieval
+ *
+ * @deprecated Options for the same-origin proxy terminal WS upgrade relay,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export interface WorkspaceSandboxTerminalUpgradeHandlerOptions {
   requireUser: (request: Request) => Promise<AuthenticatedSandboxUser>
   requireWorkspaceAccess: (args: { request: Request; userId: string; workspaceId: string; sandboxId: string }) => Promise<void>
@@ -448,6 +620,12 @@ export interface WorkspaceSandboxTerminalUpgradeHandlerOptions {
  * const handled = await handleSandboxTerminalUpgrade(request)
  * if (handled) return handled
  * ```
+ *
+ * @deprecated The same-origin proxy terminal transport is superseded by the
+ * browser-direct scoped-token transport — build the route with
+ * `createSandboxTerminalConnectionRoute` (`src/sandbox/terminal-connection.ts`)
+ * instead. Three apps still import this seam; retirement is tracked in #350
+ * and removal is a major.
  */
 export function createWorkspaceSandboxTerminalUpgradeHandler(opts: WorkspaceSandboxTerminalUpgradeHandlerOptions) {
   return async function handleWorkspaceSandboxTerminalUpgrade(request: Request): Promise<Response | null> {
@@ -517,7 +695,15 @@ export function createWorkspaceSandboxTerminalUpgradeHandler(opts: WorkspaceSand
   }
 }
 
-/** A response-like shape carrying just what the subprotocol echo decision reads. */
+/**
+ * A response-like shape carrying just what the subprotocol echo decision reads.
+ *
+ * @deprecated Exists only to serve the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export interface TerminalUpgradeResponseLike {
   status: number
   statusText?: string
@@ -539,6 +725,12 @@ export interface TerminalUpgradeResponseLike {
  *
  * Kept as a pure function because a 101 `Response` cannot be constructed off
  * Workers, so this is the only part of the decision a test can drive directly.
+ *
+ * @deprecated Exists only to serve the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
  */
 export function terminalUpgradeSubprotocolEcho(
   upstream: TerminalUpgradeResponseLike,
@@ -560,6 +752,12 @@ export function terminalUpgradeSubprotocolEcho(
  * Takes the raw `Sec-WebSocket-Protocol` value rather than the `Headers`, to
  * match its siblings `bearerSubprotocolToken` and `stripBearerSubprotocol` —
  * one shape for the whole family, and the caller reads the header once.
+ *
+ * @deprecated Exists only to serve the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
  */
 export function selectedBearerSubprotocol(value: string | null): string | null {
   if (!value) return null
@@ -572,7 +770,15 @@ export function selectedBearerSubprotocol(value: string | null): string | null {
 
 const DEFAULT_RUNTIME_PROXY_HEADERS = ['accept', 'content-type', 'last-event-id', 'x-session-id']
 
-/** Build proxy headers for sandbox runtime including authorization and forwarded headers */
+/**
+ * Build proxy headers for sandbox runtime including authorization and forwarded headers
+ *
+ * @deprecated Exists only to serve the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export function buildSandboxRuntimeProxyHeaders(source: Headers, sandboxApiKey: string, forwardHeaders = DEFAULT_RUNTIME_PROXY_HEADERS): Headers {
   const headers = new Headers()
   headers.set('Authorization', `Bearer ${sandboxApiKey}`)
@@ -583,14 +789,30 @@ export function buildSandboxRuntimeProxyHeaders(source: Headers, sandboxApiKey: 
   return headers
 }
 
-/** Encode a runtime path by URI-encoding each valid segment and returning null for invalid segments */
+/**
+ * Encode a runtime path by URI-encoding each valid segment and returning null for invalid segments
+ *
+ * @deprecated Exists only to serve the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export function encodeSandboxRuntimePath(runtimePath: string): string | null {
   const segments = runtimePath.split('/')
   if (segments.some((segment) => !segment || segment === '.' || segment === '..')) return null
   return segments.map((segment) => encodeURIComponent(segment)).join('/')
 }
 
-/** Extract the token from a bearer authorization string or return null if invalid or missing */
+/**
+ * Extract the token from a bearer authorization string or return null if invalid or missing
+ *
+ * @deprecated Exists only to serve the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export function bearerToken(value: string | null): string | null {
   if (!value) return null
   const trimmed = value.trim()
@@ -603,7 +825,15 @@ export function bearerToken(value: string | null): string | null {
   return trimmed
 }
 
-/** Resolve and decode a bearer token from a comma-separated subprotocol string or return null */
+/**
+ * Resolve and decode a bearer token from a comma-separated subprotocol string or return null
+ *
+ * @deprecated Exists only to serve the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export function bearerSubprotocolToken(value: string | null): string | null {
   if (!value) return null
   for (const part of value.split(',')) {
@@ -621,7 +851,15 @@ export function bearerSubprotocolToken(value: string | null): string | null {
   return null
 }
 
-/** Resolve the terminal token from request headers using Authorization or Sec-WebSocket-Protocol fields */
+/**
+ * Resolve the terminal token from request headers using Authorization or Sec-WebSocket-Protocol fields
+ *
+ * @deprecated Exists only to serve the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute`
+ * (`src/sandbox/terminal-connection.ts`) instead. Three apps still import
+ * this seam; retirement is tracked in #350 and removal is a major.
+ */
 export function terminalTokenFromRequest(headers: Headers): string | null {
   return bearerToken(headers.get('Authorization')) ?? bearerSubprotocolToken(headers.get('Sec-WebSocket-Protocol'))
 }

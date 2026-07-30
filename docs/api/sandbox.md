@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-147 exports.
+150 exports.
 
 ### `AppToolDescriptor`
 
@@ -140,6 +140,14 @@ interface BuildSandboxToolFileMountsOptions
 
 ```ts
 (shell: SandboxRuntimeConfig, options: SandboxPrewarmerOptions) => SandboxPrewarmer
+```
+
+### `createSandboxTerminalConnectionRoute`
+
+`function` — Build the browser-direct terminal connection route: `GET` handler that authenticates, resolves the sandbox, mints a scoped token pinned to `scope: 'session-runtime'` (the ONLY scope the platform gran…
+
+```ts
+<TBox extends TerminalConnectionBoxLike, TUser>(opts: SandboxTerminalConnectionRouteOptions<TBox, TUser>) => (request:…
 ```
 
 ### `createSandboxTerminalToken`
@@ -846,6 +854,14 @@ interface SandboxScope
 type SandboxStepTransition
 ```
 
+### `SandboxTerminalConnectionRouteOptions`
+
+`interface` — Configuration for {@link createSandboxTerminalConnectionRoute}.
+
+```ts
+interface SandboxTerminalConnectionRouteOptions
+```
+
 ### `SandboxTerminalTokenOptions`
 
 `interface` — Define options for generating a sandbox terminal token including secret and expiration settings
@@ -1044,6 +1060,14 @@ interface StreamSandboxPromptOptions
 
 ```ts
 (box: SandboxInstance, seam: MemberSyncSeam, userId: string, role: string) => Promise<Outcome<void>>
+```
+
+### `TerminalConnectionBoxLike`
+
+`interface` — The structural surface this route needs from an SDK sandbox box — no `@tangle-network/sandbox` class import (invariant 3).
+
+```ts
+interface TerminalConnectionBoxLike
 ```
 
 ### `TerminalProxyIdentity`

@@ -16,7 +16,7 @@ interface SandboxTerminalConnection
 
 ### `SandboxTerminalConnectionResponse`
 
-`interface` — Define the response structure for a sandbox terminal connection including URLs, token, status, and errors
+`interface` — Define the response structure for a sandbox terminal connection including URLs, token, status, and errors Transport-agnostic by construction (#341/#349): the browser-direct scoped-token route (`creat…
 
 ```ts
 interface SandboxTerminalConnectionResponse
@@ -32,7 +32,7 @@ interface SandboxTerminalConnectionResponse
 
 ### `useSandboxTerminalConnection`
 
-`function` — Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling
+`function` — Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling Transport-agnostic (#341/#349): this hook does not care whether `connectionUrl` is backed by the fl…
 
 ```ts
 (opts: UseSandboxTerminalConnectionOptions) => UseSandboxTerminalConnectionResult
@@ -40,7 +40,7 @@ interface SandboxTerminalConnectionResponse
 
 ### `UseSandboxTerminalConnectionOptions`
 
-`interface` — Define options for configuring a sandbox terminal connection including workspace ID and connection parameters
+`interface` — Define options for configuring a sandbox terminal connection including workspace ID and connection parameters `connectionId`, when set, is passed to `createSandboxTerminalConnectionRoute` as the `con…
 
 ```ts
 interface UseSandboxTerminalConnectionOptions
