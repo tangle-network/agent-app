@@ -183,6 +183,69 @@ describe('assessVaultDeletionBatch — other behaviors', () => {
   })
 })
 
+describe('assessVaultDeletionBatch — policy validation (fail-loud, never a disabled guard)', () => {
+  it('refusalRatio: NaN throws instead of silently disabling the guard', () => {
+    // The motivating scenario: NaN from a config parse failure makes
+    // `deletionRatio >= refusalRatio` always false, so a 15-of-20 batch
+    // (ratio 0.75, one survivor -> not all-files) would come back allowed.
+    const baseline = paths(20)
+    expect(() =>
+      assessVaultDeletionBatch({
+        baselinePaths: baseline,
+        proposedDeletions: baseline.slice(0, 15),
+        policy: { refusalRatio: Number.NaN },
+      }),
+    ).toThrow(RangeError)
+  })
+
+  it('refusalRatio: 0 throws instead of refusing a zero-deletion batch', () => {
+    // 0 >= 0 is true, so ratio 0 would spuriously refuse a batch that deletes
+    // nothing on any baseline at or above the floor.
+    expect(() =>
+      assessVaultDeletionBatch({
+        baselinePaths: paths(12),
+        proposedDeletions: [],
+        policy: { refusalRatio: 0 },
+      }),
+    ).toThrow(/refusalRatio must be a finite number in \(0, 1\]/)
+  })
+
+  it('refusalRatio above 1 throws (a ratio the guard can never reach)', () => {
+    expect(() =>
+      assessVaultDeletionBatch({ baselinePaths: paths(12), proposedDeletions: [], policy: { refusalRatio: 1.5 } }),
+    ).toThrow(RangeError)
+  })
+
+  it('non-finite or negative minLiveFiles throws', () => {
+    for (const minLiveFiles of [Number.NaN, Number.POSITIVE_INFINITY, -1]) {
+      expect(() =>
+        assessVaultDeletionBatch({ baselinePaths: paths(12), proposedDeletions: [], policy: { minLiveFiles } }),
+      ).toThrow(/minLiveFiles must be a finite number >= 0/)
+    }
+  })
+
+  it('refusalRatio exactly 1 is valid (refuse only a full wipe at the floor)', () => {
+    const baseline = paths(10)
+    const nineOfTen = assessVaultDeletionBatch({
+      baselinePaths: baseline,
+      proposedDeletions: baseline.slice(0, 9),
+      policy: { refusalRatio: 1 },
+    })
+    expect(nineOfTen.allowed).toBe(true)
+  })
+
+  it('minLiveFiles: 0 is valid (ratio armed at any baseline size)', () => {
+    const baseline = paths(3)
+    const result = assessVaultDeletionBatch({
+      baselinePaths: baseline,
+      proposedDeletions: baseline.slice(0, 2), // ratio 0.667
+      policy: { refusalRatio: 0.6, minLiveFiles: 0 },
+    })
+    expect(result.allowed).toBe(false)
+    expect(result.reason).toBe('ratio-exceeded')
+  })
+})
+
 function readyIncarnation(overrides: Partial<FilesystemIncarnationLike> = {}): FilesystemIncarnationLike {
   return {
     filesystemIncarnationId: 'inc-123',

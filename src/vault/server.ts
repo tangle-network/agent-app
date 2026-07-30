@@ -38,7 +38,12 @@ export const VAULT_DELETION_REFUSAL_RATIO = 0.75
 export const VAULT_DELETION_REFUSAL_MIN_LIVE_FILES = 10
 
 /** Overrides for `assessVaultDeletionBatch`'s two thresholds. Both default to
- *  the exported constants above. */
+ *  the exported constants above. Values are validated fail-loud:
+ *  `refusalRatio` must be finite and in (0, 1] — `NaN` (a config parse
+ *  failure) would make `deletionRatio >= refusalRatio` always false and silently
+ *  disable the guard, and `0` would refuse a zero-deletion batch; and
+ *  `minLiveFiles` must be finite and >= 0. Invalid values throw `RangeError`
+ *  instead of running with a guard that cannot fire (or cannot pass). */
 export interface VaultDeletionPolicy {
   refusalRatio?: number
   minLiveFiles?: number
@@ -84,6 +89,16 @@ export function assessVaultDeletionBatch(input: {
 }): VaultDeletionAssessment {
   const refusalRatio = input.policy?.refusalRatio ?? VAULT_DELETION_REFUSAL_RATIO
   const minLiveFiles = input.policy?.minLiveFiles ?? VAULT_DELETION_REFUSAL_MIN_LIVE_FILES
+  if (!Number.isFinite(refusalRatio) || refusalRatio <= 0 || refusalRatio > 1) {
+    throw new RangeError(
+      `vault deletion policy refusalRatio must be a finite number in (0, 1], got ${refusalRatio}`,
+    )
+  }
+  if (!Number.isFinite(minLiveFiles) || minLiveFiles < 0) {
+    throw new RangeError(
+      `vault deletion policy minLiveFiles must be a finite number >= 0, got ${minLiveFiles}`,
+    )
+  }
   const manifestEmpty = input.manifestEmpty ?? false
 
   const baselineLive = input.baselinePaths.length
@@ -96,7 +111,13 @@ export function assessVaultDeletionBatch(input: {
 
   const refusesEmptyManifest = manifestEmpty && baselineLive > 0
   const refusesAllFiles = wouldDelete > 0 && wouldDelete === baselineLive
-  const refusesBlastRadius = baselineLive >= minLiveFiles && deletionRatio >= refusalRatio
+  // `wouldDelete > 0` is unreachable-false under the validated policy domain
+  // (a positive refusalRatio can never be met by a 0 ratio) — it is here so
+  // the ratio branch stays safe on its own terms, independent of the
+  // validation above ever being relaxed.
+  const refusesBlastRadius = wouldDelete > 0
+    && baselineLive >= minLiveFiles
+    && deletionRatio >= refusalRatio
 
   const reason = refusesEmptyManifest
     ? ('empty-manifest' as const)
