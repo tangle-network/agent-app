@@ -10909,7 +10909,7 @@ type ToolLoopStopReason
 
 ## `./sandbox`
 
-Source: `src/sandbox/index.ts` · depends on `crypto`, `harness`, `profile`, `runtime`, `tools`
+Source: `src/sandbox/index.ts` · depends on `harness`, `profile`, `runtime`, `tools`
 
 ### `AppToolDescriptor`
 
@@ -10943,30 +10943,6 @@ interface AppToolDescriptor
 (profile: AgentProfile, harness: "opencode" | "claude-code" | "nanoclaw" | "kimi-code" | "codex" | "amp" | "factory-dro…
 ```
 
-### `AuthenticatedSandboxUser`
-
-`interface` — Represent an authenticated user within a sandbox environment with a unique identifier
-
-```ts
-interface AuthenticatedSandboxUser
-```
-
-### `bearerSubprotocolToken`
-
-`function` — Resolve and decode a bearer token from a comma-separated subprotocol string or return null
-
-```ts
-(value: string | null) => string | null
-```
-
-### `bearerToken`
-
-`function` — Extract the token from a bearer authorization string or return null if invalid or missing
-
-```ts
-(value: string | null) => string | null
-```
-
 ### `buildAppToolMcpServers`
 
 `function` — Build a mapping of MCP server profiles keyed by tool identifiers from provided options
@@ -10981,14 +10957,6 @@ interface AuthenticatedSandboxUser
 
 ```ts
 interface BuildAppToolMcpServersOptions
-```
-
-### `buildSandboxRuntimeProxyHeaders`
-
-`function` — Build proxy headers for sandbox runtime including authorization and forwarded headers
-
-```ts
-(source: Headers, sandboxApiKey: string, forwardHeaders?: string[]) => Headers
 ```
 
 ### `buildSandboxToolFileMounts`
@@ -11055,44 +11023,12 @@ interface BuildSandboxToolFileMountsOptions
 <TBox extends TerminalConnectionBoxLike, TUser>(opts: SandboxTerminalConnectionRouteOptions<TBox, TUser>) => (request:…
 ```
 
-### `createSandboxTerminalToken`
-
-`function` — Generate a sandbox terminal token for a given subject with specified options
-
-```ts
-(subject: TerminalProxyIdentity, opts: SandboxTerminalTokenOptions) => Promise<SandboxTerminalTokenResult>
-```
-
-### `createWorkspaceSandboxConnectionHandler`
-
-`function` — Create a handler to resolve workspace sandbox connections with user and access validation
-
-```ts
-<TBox extends WorkspaceSandboxInstanceLike>(opts: WorkspaceSandboxConnectionHandlerOptions<TBox>) => ({ request, params…
-```
-
 ### `createWorkspaceSandboxManager`
 
-`function` — Create a manager to handle workspace sandbox instances with client and options configuration
+`function` — Create a generic name-keyed sandbox lifecycle manager for products that drive their own SDK or box types.
 
 ```ts
 <TClient, TBox extends WorkspaceSandboxInstanceLike, TEnsureOptions = void>(opts: WorkspaceSandboxManagerOptions<TClien…
-```
-
-### `createWorkspaceSandboxRuntimeProxyHandler`
-
-`function` — Create a proxy handler to resolve sandbox runtime requests with user and workspace access validation
-
-```ts
-(opts: WorkspaceSandboxRuntimeProxyHandlerOptions) => ({ request, params }: WorkspaceSandboxRuntimeProxyArgs) => Promis…
-```
-
-### `createWorkspaceSandboxTerminalUpgradeHandler`
-
-`function` — Build a Worker-entry handler that proxies a sandbox terminal WebSocket upgrade to the sandbox API runtime proxy.
-
-```ts
-(opts: WorkspaceSandboxTerminalUpgradeHandlerOptions) => (request: Request) => Promise<Response | null>
 ```
 
 ### `D1PrewarmClaimStoreOptions`
@@ -11167,14 +11103,6 @@ SandboxResourceConfig
 interface DriveSandboxTurnOptions
 ```
 
-### `encodeSandboxRuntimePath`
-
-`function` — Encode a runtime path by URI-encoding each valid segment and returning null for invalid segments
-
-```ts
-(runtimePath: string) => string | null
-```
-
 ### `ensureWorkspaceSandbox`
 
 `function` — Resolve or create a workspace sandbox instance with optional reuse and progress tracking
@@ -11223,14 +11151,6 @@ interface EnsureWorkspaceSandboxOptions
 (shell: SandboxRuntimeConfig) => Sandbox
 ```
 
-### `isSandboxTerminalWsUpgrade`
-
-`function` — True when `request` is a WebSocket upgrade for a sandbox terminal path.
-
-```ts
-(request: Request) => boolean
-```
-
 ### `isTerminalPromptEvent`
 
 `function` — Determine if an event is a terminal prompt event with type 'result' or 'done
@@ -11245,14 +11165,6 @@ interface EnsureWorkspaceSandboxOptions
 
 ```ts
 interface LivenessProbeConfig
-```
-
-### `matchSandboxTerminalWsPath`
-
-`function` — Parse a same-origin terminal-WS pathname into its parts, or `null` when the path is not a sandbox terminal WebSocket.
-
-```ts
-(pathname: string) => SandboxTerminalWsMatch | null
 ```
 
 ### `MemberSyncSeam`
@@ -11285,14 +11197,6 @@ interface MemberSyncSeam
 
 ```ts
 (box: SandboxInstance, options: MintScopedTokenOptions) => Promise<Outcome<ScopedTokenResult>>
-```
-
-### `mintTerminalProxyToken`
-
-`function` — Generate a signed token for TerminalProxyIdentity with an expiration based on TTL milliseconds
-
-```ts
-(secret: string, identity: TerminalProxyIdentity, ttlMs?: number, now?: () => number) => Promise<Outcome<{ token: strin…
 ```
 
 ### `ModelSelection`
@@ -11543,14 +11447,6 @@ interface ResolveSandboxClientCredentialsOptions
 (box: SandboxInstance, options: SandboxToolPathOptions) => Promise<Outcome<void>>
 ```
 
-### `SandboxApiCredentials`
-
-`interface` — Define credentials required to access the sandbox API environment
-
-```ts
-interface SandboxApiCredentials
-```
-
 ### `SandboxBuildContext`
 
 `interface` — Define the context for building a sandbox including workspace, integrations, and optional user ID
@@ -11727,28 +11623,12 @@ class SandboxRuntimeAuthRefreshError
 interface SandboxRuntimeConfig
 ```
 
-### `SandboxRuntimeConnection`
-
-`interface` — Define a connection configuration for sandbox runtime including URL and optional server-side auth token
-
-```ts
-interface SandboxRuntimeConnection
-```
-
 ### `SandboxScope`
 
 `interface` — Define a scope containing workspace and optional user identifiers for sandbox environments
 
 ```ts
 interface SandboxScope
-```
-
-### `sandboxSidecarProxyUrl`
-
-`function` — Build the sandbox API's sidecar-proxy base for a box: `{baseUrl}/v1/sidecar-proxy/{sandboxId}`.
-
-```ts
-(baseUrl: string, sandboxId: string) => string
 ```
 
 ### `SandboxStepTransition`
@@ -11765,38 +11645,6 @@ type SandboxStepTransition
 
 ```ts
 interface SandboxTerminalConnectionRouteOptions
-```
-
-### `SandboxTerminalTokenOptions`
-
-`interface` — Define options for generating a sandbox terminal token including secret and expiration settings
-
-```ts
-interface SandboxTerminalTokenOptions
-```
-
-### `SandboxTerminalTokenResult`
-
-`interface` — Provide token and expiration details for a sandbox terminal session
-
-```ts
-interface SandboxTerminalTokenResult
-```
-
-### `SandboxTerminalTokenSubject`
-
-`type` — Resolve the identity type used for sandbox terminal token subjects
-
-```ts
-type SandboxTerminalTokenSubject
-```
-
-### `SandboxTerminalWsMatch`
-
-`interface` — Define the structure for matching a sandbox terminal WebSocket with workspace and path details
-
-```ts
-interface SandboxTerminalWsMatch
 ```
 
 ### `sandboxToolBinDir`
@@ -11861,14 +11709,6 @@ interface SecretStore
 
 ```ts
 (shell: SandboxRuntimeConfig) => SecretStore
-```
-
-### `selectedBearerSubprotocol`
-
-`function` — The exact `bearer.*` subprotocol string the browser offered, so it can be echoed verbatim on the 101.
-
-```ts
-(value: string | null) => string | null
 ```
 
 ### `shellQuote`
@@ -11975,73 +11815,9 @@ interface StreamSandboxPromptOptions
 interface TerminalConnectionBoxLike
 ```
 
-### `TerminalProxyIdentity`
-
-`interface` — Define identity details for a terminal proxy including user, workspace, and sandbox identifiers
-
-```ts
-interface TerminalProxyIdentity
-```
-
-### `terminalTokenFromRequest`
-
-`function` — Resolve the terminal token from request headers using Authorization or Sec-WebSocket-Protocol fields
-
-```ts
-(headers: Headers) => string | null
-```
-
-### `TerminalUpgradeResponseLike`
-
-`interface` — A response-like shape carrying just what the subprotocol echo decision reads.
-
-```ts
-interface TerminalUpgradeResponseLike
-```
-
-### `terminalUpgradeSubprotocolEcho`
-
-`function` — Decide whether a terminal upgrade's 101 needs the browser's own subprotocol echoed back onto it, and return the headers to answer with.
-
-```ts
-(upstream: TerminalUpgradeResponseLike, browserProtocol: string | null) => { status: number; statusText: string; header…
-```
-
-### `verifySandboxTerminalToken`
-
-`function` — Verify the validity of a sandbox terminal token against the expected identity and options
-
-```ts
-(token: string, expected: TerminalProxyIdentity, opts: SandboxTerminalTokenOptions) => Promise<boolean>
-```
-
-### `verifyTerminalProxyToken`
-
-`function` — Verify the authenticity and validity of a terminal proxy token against expected identity and timestamp
-
-```ts
-(secret: string, token: string, expected: TerminalProxyIdentity, now?: () => number) => Promise<boolean>
-```
-
-### `WorkspaceSandboxConnectionArgs`
-
-`interface` — Define arguments required to establish a workspace sandbox connection
-
-```ts
-interface WorkspaceSandboxConnectionArgs
-```
-
-### `WorkspaceSandboxConnectionHandlerOptions`
-
-`interface` — Define options to handle workspace sandbox connections with user authentication and access control
-
-```ts
-interface WorkspaceSandboxConnectionHandlerOptions
-```
-
 ### `WorkspaceSandboxEnsureContext`
 
-`interface` — Define the context containing workspace and user identifiers for sandbox environment operations
+`interface` — Define the context containing workspace and user identifiers for sandbox environment operations.
 
 ```ts
 interface WorkspaceSandboxEnsureContext
@@ -12049,7 +11825,7 @@ interface WorkspaceSandboxEnsureContext
 
 ### `WorkspaceSandboxInstanceLike`
 
-`interface` — Define the shape of a workspace sandbox instance including its connection details and status
+`interface` — Define the shape of a workspace sandbox instance including its connection details and status.
 
 ```ts
 interface WorkspaceSandboxInstanceLike
@@ -12057,7 +11833,7 @@ interface WorkspaceSandboxInstanceLike
 
 ### `WorkspaceSandboxManager`
 
-`interface` — Manage workspace sandboxes by ensuring their creation and retrieval for specified users
+`interface` — Manage workspace sandboxes by ensuring their creation and retrieval for specified users.
 
 ```ts
 interface WorkspaceSandboxManager
@@ -12065,34 +11841,10 @@ interface WorkspaceSandboxManager
 
 ### `WorkspaceSandboxManagerOptions`
 
-`interface` — Define configuration options for managing and interacting with workspace sandboxes
+`interface` — Define configuration options for managing workspace sandboxes.
 
 ```ts
 interface WorkspaceSandboxManagerOptions
-```
-
-### `WorkspaceSandboxRuntimeProxyArgs`
-
-`interface` — Define arguments for proxying runtime requests within a workspace sandbox environment
-
-```ts
-interface WorkspaceSandboxRuntimeProxyArgs
-```
-
-### `WorkspaceSandboxRuntimeProxyHandlerOptions`
-
-`interface` — Define options for handling workspace sandbox runtime proxy including user, access, credentials, and connection retrieval
-
-```ts
-interface WorkspaceSandboxRuntimeProxyHandlerOptions
-```
-
-### `WorkspaceSandboxTerminalUpgradeHandlerOptions`
-
-`interface` — Define options to handle user authentication, workspace access, and sandbox API credential retrieval
-
-```ts
-interface WorkspaceSandboxTerminalUpgradeHandlerOptions
 ```
 
 ### `WriteProfileFilesOptions`
@@ -20069,7 +19821,7 @@ interface SandboxTerminalConnection
 
 ### `SandboxTerminalConnectionResponse`
 
-`interface` — Define the response structure for a sandbox terminal connection including URLs, token, status, and errors Transport-agnostic by construction (#341/#349): the browser-direct scoped-token route (`creat…
+`interface` — Define the response structure for a sandbox terminal connection including URLs, token, status, and errors The browser-direct scoped-token route (`createSandboxTerminalConnectionRoute`, `src/sandbox/t…
 
 ```ts
 interface SandboxTerminalConnectionResponse
@@ -20389,7 +20141,7 @@ interface UseInfiniteScrollOptions
 
 ### `useSandboxTerminalConnection`
 
-`function` — Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling Transport-agnostic (#341/#349): this hook does not care whether `connectionUrl` is backed by the fl…
+`function` — Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling `connectionUrl` is backed by the browser-direct scoped-token route (`createSandboxTerminalConnectio…
 
 ```ts
 (opts: UseSandboxTerminalConnectionOptions) => UseSandboxTerminalConnectionResult
@@ -20514,7 +20266,7 @@ interface SandboxTerminalConnection
 
 ### `SandboxTerminalConnectionResponse`
 
-`interface` — Define the response structure for a sandbox terminal connection including URLs, token, status, and errors Transport-agnostic by construction (#341/#349): the browser-direct scoped-token route (`creat…
+`interface` — Define the response structure for a sandbox terminal connection including URLs, token, status, and errors The browser-direct scoped-token route (`createSandboxTerminalConnectionRoute`, `src/sandbox/t…
 
 ```ts
 interface SandboxTerminalConnectionResponse
@@ -20530,7 +20282,7 @@ interface SandboxTerminalConnectionResponse
 
 ### `useSandboxTerminalConnection`
 
-`function` — Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling Transport-agnostic (#341/#349): this hook does not care whether `connectionUrl` is backed by the fl…
+`function` — Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling `connectionUrl` is backed by the browser-direct scoped-token route (`createSandboxTerminalConnectio…
 
 ```ts
 (opts: UseSandboxTerminalConnectionOptions) => UseSandboxTerminalConnectionResult

@@ -8444,7 +8444,6 @@
       "id": "./sandbox",
       "source": "src/sandbox/index.ts",
       "dependsOn": [
-        "crypto",
         "harness",
         "profile",
         "runtime",
@@ -8477,24 +8476,6 @@
           "doc": "Attach a specified reasoning effort level to an agent profile for a given harness"
         },
         {
-          "name": "AuthenticatedSandboxUser",
-          "kind": "interface",
-          "signature": "interface AuthenticatedSandboxUser",
-          "doc": "Represent an authenticated user within a sandbox environment with a unique identifier"
-        },
-        {
-          "name": "bearerSubprotocolToken",
-          "kind": "function",
-          "signature": "(value: string | null) => string | null",
-          "doc": "Resolve and decode a bearer token from a comma-separated subprotocol string or return null"
-        },
-        {
-          "name": "bearerToken",
-          "kind": "function",
-          "signature": "(value: string | null) => string | null",
-          "doc": "Extract the token from a bearer authorization string or return null if invalid or missing"
-        },
-        {
           "name": "buildAppToolMcpServers",
           "kind": "function",
           "signature": "(options: BuildAppToolMcpServersOptions) => Record<string, AgentProfileMcpServer>",
@@ -8505,12 +8486,6 @@
           "kind": "interface",
           "signature": "interface BuildAppToolMcpServersOptions",
           "doc": "Define options for building MCP server configurations in the app tool environment"
-        },
-        {
-          "name": "buildSandboxRuntimeProxyHeaders",
-          "kind": "function",
-          "signature": "(source: Headers, sandboxApiKey: string, forwardHeaders?: string[]) => Headers",
-          "doc": "Build proxy headers for sandbox runtime including authorization and forwarded headers"
         },
         {
           "name": "buildSandboxToolFileMounts",
@@ -8561,34 +8536,10 @@
           "doc": "Build the browser-direct terminal connection route: `GET` handler that authenticates, resolves the sandbox, mints a scoped token pinned to `scope: 'session-runtime'` (the ONLY scope the platform gran…"
         },
         {
-          "name": "createSandboxTerminalToken",
-          "kind": "function",
-          "signature": "(subject: TerminalProxyIdentity, opts: SandboxTerminalTokenOptions) => Promise<SandboxTerminalTokenResult>",
-          "doc": "Generate a sandbox terminal token for a given subject with specified options"
-        },
-        {
-          "name": "createWorkspaceSandboxConnectionHandler",
-          "kind": "function",
-          "signature": "<TBox extends WorkspaceSandboxInstanceLike>(opts: WorkspaceSandboxConnectionHandlerOptions<TBox>) => ({ request, params…",
-          "doc": "Create a handler to resolve workspace sandbox connections with user and access validation"
-        },
-        {
           "name": "createWorkspaceSandboxManager",
           "kind": "function",
           "signature": "<TClient, TBox extends WorkspaceSandboxInstanceLike, TEnsureOptions = void>(opts: WorkspaceSandboxManagerOptions<TClien…",
-          "doc": "Create a manager to handle workspace sandbox instances with client and options configuration"
-        },
-        {
-          "name": "createWorkspaceSandboxRuntimeProxyHandler",
-          "kind": "function",
-          "signature": "(opts: WorkspaceSandboxRuntimeProxyHandlerOptions) => ({ request, params }: WorkspaceSandboxRuntimeProxyArgs) => Promis…",
-          "doc": "Create a proxy handler to resolve sandbox runtime requests with user and workspace access validation"
-        },
-        {
-          "name": "createWorkspaceSandboxTerminalUpgradeHandler",
-          "kind": "function",
-          "signature": "(opts: WorkspaceSandboxTerminalUpgradeHandlerOptions) => (request: Request) => Promise<Response | null>",
-          "doc": "Build a Worker-entry handler that proxies a sandbox terminal WebSocket upgrade to the sandbox API runtime proxy."
+          "doc": "Create a generic name-keyed sandbox lifecycle manager for products that drive their own SDK or box types."
         },
         {
           "name": "D1PrewarmClaimStoreOptions",
@@ -8645,12 +8596,6 @@
           "doc": "Define options to manage deterministic session resumption and turn idempotency in sandboxed drive turns"
         },
         {
-          "name": "encodeSandboxRuntimePath",
-          "kind": "function",
-          "signature": "(runtimePath: string) => string | null",
-          "doc": "Encode a runtime path by URI-encoding each valid segment and returning null for invalid segments"
-        },
-        {
           "name": "ensureWorkspaceSandbox",
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig, options: EnsureWorkspaceSandboxOptions) => Promise<SandboxInstance>",
@@ -8687,12 +8632,6 @@
           "doc": "Resolve a synchronous sandbox client from provided runtime configuration credentials"
         },
         {
-          "name": "isSandboxTerminalWsUpgrade",
-          "kind": "function",
-          "signature": "(request: Request) => boolean",
-          "doc": "True when `request` is a WebSocket upgrade for a sandbox terminal path."
-        },
-        {
           "name": "isTerminalPromptEvent",
           "kind": "function",
           "signature": "(event: unknown) => boolean",
@@ -8703,12 +8642,6 @@
           "kind": "interface",
           "signature": "interface LivenessProbeConfig",
           "doc": "Define configuration for liveness probes including sidecar process pattern and optional timeouts"
-        },
-        {
-          "name": "matchSandboxTerminalWsPath",
-          "kind": "function",
-          "signature": "(pathname: string) => SandboxTerminalWsMatch | null",
-          "doc": "Parse a same-origin terminal-WS pathname into its parts, or `null` when the path is not a sandbox terminal WebSocket."
         },
         {
           "name": "MemberSyncSeam",
@@ -8733,12 +8666,6 @@
           "kind": "function",
           "signature": "(box: SandboxInstance, options: MintScopedTokenOptions) => Promise<Outcome<ScopedTokenResult>>",
           "doc": "Mint a scoped token for an already-provisioned box (e.g."
-        },
-        {
-          "name": "mintTerminalProxyToken",
-          "kind": "function",
-          "signature": "(secret: string, identity: TerminalProxyIdentity, ttlMs?: number, now?: () => number) => Promise<Outcome<{ token: strin…",
-          "doc": "Generate a signed token for TerminalProxyIdentity with an expiration based on TTL milliseconds"
         },
         {
           "name": "ModelSelection",
@@ -8927,12 +8854,6 @@
           "doc": "Resolve the sandbox environment PATH setup by executing the configuration script with given options"
         },
         {
-          "name": "SandboxApiCredentials",
-          "kind": "interface",
-          "signature": "interface SandboxApiCredentials",
-          "doc": "Define credentials required to access the sandbox API environment"
-        },
-        {
           "name": "SandboxBuildContext",
           "kind": "interface",
           "signature": "interface SandboxBuildContext",
@@ -9065,22 +8986,10 @@
           "doc": "Define runtime configuration methods for sandbox environments including credentials, metadata, and permissions"
         },
         {
-          "name": "SandboxRuntimeConnection",
-          "kind": "interface",
-          "signature": "interface SandboxRuntimeConnection",
-          "doc": "Define a connection configuration for sandbox runtime including URL and optional server-side auth token"
-        },
-        {
           "name": "SandboxScope",
           "kind": "interface",
           "signature": "interface SandboxScope",
           "doc": "Define a scope containing workspace and optional user identifiers for sandbox environments"
-        },
-        {
-          "name": "sandboxSidecarProxyUrl",
-          "kind": "function",
-          "signature": "(baseUrl: string, sandboxId: string) => string",
-          "doc": "Build the sandbox API's sidecar-proxy base for a box: `{baseUrl}/v1/sidecar-proxy/{sandboxId}`."
         },
         {
           "name": "SandboxStepTransition",
@@ -9093,30 +9002,6 @@
           "kind": "interface",
           "signature": "interface SandboxTerminalConnectionRouteOptions",
           "doc": "Configuration for {@link createSandboxTerminalConnectionRoute}."
-        },
-        {
-          "name": "SandboxTerminalTokenOptions",
-          "kind": "interface",
-          "signature": "interface SandboxTerminalTokenOptions",
-          "doc": "Define options for generating a sandbox terminal token including secret and expiration settings"
-        },
-        {
-          "name": "SandboxTerminalTokenResult",
-          "kind": "interface",
-          "signature": "interface SandboxTerminalTokenResult",
-          "doc": "Provide token and expiration details for a sandbox terminal session"
-        },
-        {
-          "name": "SandboxTerminalTokenSubject",
-          "kind": "type",
-          "signature": "type SandboxTerminalTokenSubject",
-          "doc": "Resolve the identity type used for sandbox terminal token subjects"
-        },
-        {
-          "name": "SandboxTerminalWsMatch",
-          "kind": "interface",
-          "signature": "interface SandboxTerminalWsMatch",
-          "doc": "Define the structure for matching a sandbox terminal WebSocket with workspace and path details"
         },
         {
           "name": "sandboxToolBinDir",
@@ -9165,12 +9050,6 @@
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig) => SecretStore",
           "doc": "Resolve a SecretStore interface using the provided SandboxRuntimeConfig shell"
-        },
-        {
-          "name": "selectedBearerSubprotocol",
-          "kind": "function",
-          "signature": "(value: string | null) => string | null",
-          "doc": "The exact `bearer.*` subprotocol string the browser offered, so it can be echoed verbatim on the 101."
         },
         {
           "name": "shellQuote",
@@ -9251,94 +9130,28 @@
           "doc": "The structural surface this route needs from an SDK sandbox box — no `@tangle-network/sandbox` class import (invariant 3)."
         },
         {
-          "name": "TerminalProxyIdentity",
-          "kind": "interface",
-          "signature": "interface TerminalProxyIdentity",
-          "doc": "Define identity details for a terminal proxy including user, workspace, and sandbox identifiers"
-        },
-        {
-          "name": "terminalTokenFromRequest",
-          "kind": "function",
-          "signature": "(headers: Headers) => string | null",
-          "doc": "Resolve the terminal token from request headers using Authorization or Sec-WebSocket-Protocol fields"
-        },
-        {
-          "name": "TerminalUpgradeResponseLike",
-          "kind": "interface",
-          "signature": "interface TerminalUpgradeResponseLike",
-          "doc": "A response-like shape carrying just what the subprotocol echo decision reads."
-        },
-        {
-          "name": "terminalUpgradeSubprotocolEcho",
-          "kind": "function",
-          "signature": "(upstream: TerminalUpgradeResponseLike, browserProtocol: string | null) => { status: number; statusText: string; header…",
-          "doc": "Decide whether a terminal upgrade's 101 needs the browser's own subprotocol echoed back onto it, and return the headers to answer with."
-        },
-        {
-          "name": "verifySandboxTerminalToken",
-          "kind": "function",
-          "signature": "(token: string, expected: TerminalProxyIdentity, opts: SandboxTerminalTokenOptions) => Promise<boolean>",
-          "doc": "Verify the validity of a sandbox terminal token against the expected identity and options"
-        },
-        {
-          "name": "verifyTerminalProxyToken",
-          "kind": "function",
-          "signature": "(secret: string, token: string, expected: TerminalProxyIdentity, now?: () => number) => Promise<boolean>",
-          "doc": "Verify the authenticity and validity of a terminal proxy token against expected identity and timestamp"
-        },
-        {
-          "name": "WorkspaceSandboxConnectionArgs",
-          "kind": "interface",
-          "signature": "interface WorkspaceSandboxConnectionArgs",
-          "doc": "Define arguments required to establish a workspace sandbox connection"
-        },
-        {
-          "name": "WorkspaceSandboxConnectionHandlerOptions",
-          "kind": "interface",
-          "signature": "interface WorkspaceSandboxConnectionHandlerOptions",
-          "doc": "Define options to handle workspace sandbox connections with user authentication and access control"
-        },
-        {
           "name": "WorkspaceSandboxEnsureContext",
           "kind": "interface",
           "signature": "interface WorkspaceSandboxEnsureContext",
-          "doc": "Define the context containing workspace and user identifiers for sandbox environment operations"
+          "doc": "Define the context containing workspace and user identifiers for sandbox environment operations."
         },
         {
           "name": "WorkspaceSandboxInstanceLike",
           "kind": "interface",
           "signature": "interface WorkspaceSandboxInstanceLike",
-          "doc": "Define the shape of a workspace sandbox instance including its connection details and status"
+          "doc": "Define the shape of a workspace sandbox instance including its connection details and status."
         },
         {
           "name": "WorkspaceSandboxManager",
           "kind": "interface",
           "signature": "interface WorkspaceSandboxManager",
-          "doc": "Manage workspace sandboxes by ensuring their creation and retrieval for specified users"
+          "doc": "Manage workspace sandboxes by ensuring their creation and retrieval for specified users."
         },
         {
           "name": "WorkspaceSandboxManagerOptions",
           "kind": "interface",
           "signature": "interface WorkspaceSandboxManagerOptions",
-          "doc": "Define configuration options for managing and interacting with workspace sandboxes"
-        },
-        {
-          "name": "WorkspaceSandboxRuntimeProxyArgs",
-          "kind": "interface",
-          "signature": "interface WorkspaceSandboxRuntimeProxyArgs",
-          "doc": "Define arguments for proxying runtime requests within a workspace sandbox environment"
-        },
-        {
-          "name": "WorkspaceSandboxRuntimeProxyHandlerOptions",
-          "kind": "interface",
-          "signature": "interface WorkspaceSandboxRuntimeProxyHandlerOptions",
-          "doc": "Define options for handling workspace sandbox runtime proxy including user, access, credentials, and connection retrieval"
-        },
-        {
-          "name": "WorkspaceSandboxTerminalUpgradeHandlerOptions",
-          "kind": "interface",
-          "signature": "interface WorkspaceSandboxTerminalUpgradeHandlerOptions",
-          "doc": "Define options to handle user authentication, workspace access, and sandbox API credential retrieval"
+          "doc": "Define configuration options for managing workspace sandboxes."
         },
         {
           "name": "WriteProfileFilesOptions",
@@ -15495,7 +15308,7 @@
           "name": "SandboxTerminalConnectionResponse",
           "kind": "interface",
           "signature": "interface SandboxTerminalConnectionResponse",
-          "doc": "Define the response structure for a sandbox terminal connection including URLs, token, status, and errors Transport-agnostic by construction (#341/#349): the browser-direct scoped-token route (`creat…"
+          "doc": "Define the response structure for a sandbox terminal connection including URLs, token, status, and errors The browser-direct scoped-token route (`createSandboxTerminalConnectionRoute`, `src/sandbox/t…"
         },
         {
           "name": "SeatPaywall",
@@ -15735,7 +15548,7 @@
           "name": "useSandboxTerminalConnection",
           "kind": "function",
           "signature": "(opts: UseSandboxTerminalConnectionOptions) => UseSandboxTerminalConnectionResult",
-          "doc": "Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling Transport-agnostic (#341/#349): this hook does not care whether `connectionUrl` is backed by the fl…"
+          "doc": "Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling `connectionUrl` is backed by the browser-direct scoped-token route (`createSandboxTerminalConnectio…"
         },
         {
           "name": "UseSandboxTerminalConnectionOptions",
@@ -15846,7 +15659,7 @@
           "name": "SandboxTerminalConnectionResponse",
           "kind": "interface",
           "signature": "interface SandboxTerminalConnectionResponse",
-          "doc": "Define the response structure for a sandbox terminal connection including URLs, token, status, and errors Transport-agnostic by construction (#341/#349): the browser-direct scoped-token route (`creat…"
+          "doc": "Define the response structure for a sandbox terminal connection including URLs, token, status, and errors The browser-direct scoped-token route (`createSandboxTerminalConnectionRoute`, `src/sandbox/t…"
         },
         {
           "name": "tabTerminalConnectionId",
@@ -15858,7 +15671,7 @@
           "name": "useSandboxTerminalConnection",
           "kind": "function",
           "signature": "(opts: UseSandboxTerminalConnectionOptions) => UseSandboxTerminalConnectionResult",
-          "doc": "Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling Transport-agnostic (#341/#349): this hook does not care whether `connectionUrl` is backed by the fl…"
+          "doc": "Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling `connectionUrl` is backed by the browser-direct scoped-token route (`createSandboxTerminalConnectio…"
         },
         {
           "name": "UseSandboxTerminalConnectionOptions",

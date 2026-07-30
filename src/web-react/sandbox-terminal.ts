@@ -16,13 +16,10 @@ export interface SandboxTerminalConnection {
 /**
  * Define the response structure for a sandbox terminal connection including URLs, token, status, and errors
  *
- * Transport-agnostic by construction (#341/#349): the browser-direct
- * scoped-token route (`createSandboxTerminalConnectionRoute`,
- * `src/sandbox/terminal-connection.ts`) returns `sidecarUrl` only — no
- * `runtimeUrl` — while the (now `@deprecated`) same-origin proxy route
- * returns both. `useSandboxTerminalConnection` below resolves
- * `runtimeUrl ?? sidecarUrl` so either shape lands on the same connection
- * state without a hook change.
+ * The browser-direct scoped-token route (`createSandboxTerminalConnectionRoute`,
+ * `src/sandbox/terminal-connection.ts`) returns `sidecarUrl`. The hook also
+ * exposes that URL through the historical `runtimeUrl` state field so existing
+ * terminal panels do not need transport-specific branching.
  *
  * `connectionId` is the id the route's minted token's `sid` is bound to
  * (echoed back from the `connectionId` the hook sent) — pass it straight
@@ -83,12 +80,11 @@ const EMPTY_CONNECTION: SandboxTerminalConnection = {
 /**
  * Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling
  *
- * Transport-agnostic (#341/#349): this hook does not care whether
- * `connectionUrl` is backed by the fleet-default browser-direct
- * scoped-token route (`createSandboxTerminalConnectionRoute`,
- * `src/sandbox/terminal-connection.ts`, `sidecarUrl` only) or the
- * `@deprecated` same-origin proxy route (`runtimeUrl` + `sidecarUrl`) — it
- * resolves `runtimeUrl ?? sidecarUrl` either way.
+ * `connectionUrl` is backed by the browser-direct scoped-token route
+ * (`createSandboxTerminalConnectionRoute`,
+ * `src/sandbox/terminal-connection.ts`). The route returns `sidecarUrl`; the
+ * hook normalizes it into both URL fields for compatibility with existing
+ * terminal panels.
  *
  * Pass `tabTerminalConnectionId()` as `opts.connectionId` — the hook forwards
  * it as the `connectionId` query parameter the browser-direct route requires
