@@ -270,12 +270,20 @@ export interface StoppedSandboxResumeRecovery {
   restore?: SandboxRestoreSpec | null
 }
 
-// Reuse health gate + sidecar liveness. The exec+timeout-race is generic; the
-// sidecarProcessPattern is harness-specific (which process is the live sidecar),
-// so it is a closure. Absent => no liveness probe (reuse on metadata.harness match).
+/**
+ * Default ERE passed to `pgrep -f` when a liveness probe does not override the
+ * harness-process matcher. It covers the platform process names used by the
+ * fleet's shared OpenCode, Claude Code, and Codex terminal path; products with
+ * another harness can override it.
+ */
+export const DEFAULT_SIDECAR_PROCESS_PATTERN = 'opencode|claude|codex'
+
+// Reuse health gate + sidecar liveness. The exec+timeout-race is generic; a
+// product with a custom harness can override the default process matcher.
+// Absent livenessProbe => no probe (reuse on metadata.harness match).
 /** Define configuration for liveness probes including sidecar process pattern and optional timeouts */
 export interface LivenessProbeConfig {
-  sidecarProcessPattern: (harness: Harness) => string
+  sidecarProcessPattern?: (harness: Harness) => string
   execTimeoutMs?: number
   psTimeoutMs?: number
 }
@@ -1321,9 +1329,24 @@ export function assertEnvWithinLimits(env: Record<string, string>): void {
   }
 }
 
+function resolveSidecarProcessPattern(
+  probe: LivenessProbeConfig,
+  harness: Harness,
+): string {
+  const pattern =
+    probe.sidecarProcessPattern?.(harness) ?? DEFAULT_SIDECAR_PROCESS_PATTERN
+  if (pattern.includes('\\|')) {
+    throw new Error(
+      'Invalid livenessProbe.sidecarProcessPattern: pgrep -f uses extended regular expressions; ' +
+        'use a bare "|" for alternation, not "\\|".',
+    )
+  }
+  return pattern
+}
+
 // Generic exec+sidecar liveness probe. Absent probe => always alive (the prior
 // reuse-on-metadata-match behavior). With a probe: the container must answer an
-// `echo alive` exec within execTimeoutMs, and the sidecar process must be found
+// `echo alive` exec within execTimeoutMs, and the harness process must be found
 // by pgrep within psTimeoutMs (an inconclusive pgrep is treated as reusable).
 async function isBoxAlive(
   box: SandboxInstance,
@@ -1333,6 +1356,9 @@ async function isBoxAlive(
   if (!probe) return true
   const execTimeout = probe.execTimeoutMs ?? 5000
   const psTimeout = probe.psTimeoutMs ?? 3000
+  // Resolve and validate configuration before entering the operational catch:
+  // a bad ERE is a caller bug, not evidence that the box needs a restart.
+  const pattern = resolveSidecarProcessPattern(probe, harness)
   const race = <T>(p: Promise<T>, ms: number, label: string): Promise<T> =>
     Promise.race([
       p,
@@ -1341,7 +1367,6 @@ async function isBoxAlive(
   try {
     const alive = await race(box.exec('echo alive'), execTimeout, 'alive check timeout')
     if (!alive.stdout.includes('alive')) return false
-    const pattern = probe.sidecarProcessPattern(harness)
     try {
       const ps = await race(
         box.exec(`pgrep -f ${shellSingleQuote(pattern)} || echo no-sidecar`),

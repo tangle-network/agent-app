@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-146 exports.
+147 exports.
 
 ### `AppToolDescriptor`
 
@@ -204,6 +204,14 @@ interface D1PrewarmClaimStoreOptions
 
 ```ts
 SandboxResourceConfig
+```
+
+### `DEFAULT_SIDECAR_PROCESS_PATTERN`
+
+`const` — Default ERE passed to `pgrep -f` when a liveness probe does not override the harness-process matcher.
+
+```ts
+"opencode|claude|codex"
 ```
 
 ### `deferredCorpusHash`

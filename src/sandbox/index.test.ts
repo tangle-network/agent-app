@@ -72,6 +72,7 @@ import {
   PROVISION_PAYLOAD_MAX_BYTES,
   ENV_VALUE_MAX_BYTES,
   ENV_TOTAL_MAX_BYTES,
+  DEFAULT_SIDECAR_PROCESS_PATTERN,
   SandboxRuntimeAuthRefreshError,
   SandboxEgressPolicyMismatchError,
   SandboxRecoveryFailedError,
@@ -1481,6 +1482,59 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     expect(createMock).toHaveBeenCalledOnce()
   })
 
+  it('uses the default ERE to match a live harness process when no pattern is supplied (#342)', async () => {
+    const processTable = [
+      '/nix/profile/bin/opencode serve --hostname=127.0.0.1 --port=0',
+      '/usr/local/bin/claude --dangerously-skip-permissions',
+      '/opt/tangle/bin/codex app-server',
+      'node server.js',
+    ]
+    const exec = vi.fn().mockImplementation(async (cmd: string) => {
+      if (cmd === 'echo alive') return { stdout: 'alive', exitCode: 0 }
+      const match = cmd.match(/^pgrep -f '([^']+)' \|\| echo no-sidecar$/)
+      expect(match).not.toBeNull()
+      const pattern = match?.[1] ?? ''
+      const matched = processTable.some((line) => new RegExp(pattern).test(line))
+      return { stdout: matched ? '143\n' : 'no-sidecar\n', exitCode: 0 }
+    })
+    const running = fakeBox({ name: 'box-w1', exec })
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      status === 'running' ? Promise.resolve([running]) : Promise.resolve([]),
+    )
+
+    const box = await ensureWorkspaceSandbox(
+      shellFor({ apiKey: 'k', baseUrl: 'u' }, { livenessProbe: {} }),
+      { workspaceId: 'w1', harness: 'opencode' },
+    )
+
+    expect(DEFAULT_SIDECAR_PROCESS_PATTERN).toBe('opencode|claude|codex')
+    expect(exec).toHaveBeenCalledWith(
+      `pgrep -f '${DEFAULT_SIDECAR_PROCESS_PATTERN}' || echo no-sidecar`,
+    )
+    expect(box).toBe(running)
+    expect(running.stop).not.toHaveBeenCalled()
+    expect(running.resume).not.toHaveBeenCalled()
+  })
+
+  it('rejects a BRE-escaped alternation before probing or restarting the box (#342)', async () => {
+    const running = fakeBox({ name: 'box-w1', exec: vi.fn() })
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      status === 'running' ? Promise.resolve([running]) : Promise.resolve([]),
+    )
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      livenessProbe: { sidecarProcessPattern: () => 'opencode\\|claude' },
+    })
+
+    await expect(
+      ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' }),
+    ).rejects.toThrow(
+      'Invalid livenessProbe.sidecarProcessPattern: pgrep -f uses extended regular expressions',
+    )
+    expect(running.exec).not.toHaveBeenCalled()
+    expect(running.stop).not.toHaveBeenCalled()
+    expect(running.resume).not.toHaveBeenCalled()
+  })
+
   it('liveness probe restarts an unresponsive running box in place — never deletes (#299)', async () => {
     let restarted = false
     const del = vi.fn().mockResolvedValue(undefined)
@@ -1500,7 +1554,7 @@ describe('ensureWorkspaceSandbox — new seams', () => {
       status === 'running' ? Promise.resolve([dead]) : Promise.resolve([]),
     )
     const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-      livenessProbe: { sidecarProcessPattern: () => 'opencode\\|claude' },
+      livenessProbe: {},
     })
     const box = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
     expect(dead.exec).toHaveBeenCalledWith('echo alive')
