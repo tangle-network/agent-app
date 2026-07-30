@@ -11047,6 +11047,14 @@ interface BuildSandboxToolFileMountsOptions
 (shell: SandboxRuntimeConfig, options: SandboxPrewarmerOptions) => SandboxPrewarmer
 ```
 
+### `createSandboxTerminalConnectionRoute`
+
+`function` — Build the browser-direct terminal connection route: `GET` handler that authenticates, resolves the sandbox, mints a scoped token, and returns exactly what the browser needs to connect `TerminalView`…
+
+```ts
+<TBox extends TerminalConnectionBoxLike, TUser>(opts: SandboxTerminalConnectionRouteOptions<TBox, TUser>) => (request:…
+```
+
 ### `createSandboxTerminalToken`
 
 `function` — Generate a sandbox terminal token for a given subject with specified options
@@ -11751,6 +11759,22 @@ interface SandboxScope
 type SandboxStepTransition
 ```
 
+### `SandboxTerminalConnectionRouteOptions`
+
+`interface` — Configuration for {@link createSandboxTerminalConnectionRoute}.
+
+```ts
+interface SandboxTerminalConnectionRouteOptions
+```
+
+### `SandboxTerminalConnectionScope`
+
+`type` — The `box.mintScopedToken` scope this route requests.
+
+```ts
+type SandboxTerminalConnectionScope
+```
+
 ### `SandboxTerminalTokenOptions`
 
 `interface` — Define options for generating a sandbox terminal token including secret and expiration settings
@@ -11949,6 +11973,14 @@ interface StreamSandboxPromptOptions
 
 ```ts
 (box: SandboxInstance, seam: MemberSyncSeam, userId: string, role: string) => Promise<Outcome<void>>
+```
+
+### `TerminalConnectionBoxLike`
+
+`interface` — The structural surface this route needs from an SDK sandbox box — no `@tangle-network/sandbox` class import (invariant 3).
+
+```ts
+interface TerminalConnectionBoxLike
 ```
 
 ### `TerminalProxyIdentity`
@@ -19976,7 +20008,7 @@ interface SandboxTerminalConnection
 
 ### `SandboxTerminalConnectionResponse`
 
-`interface` — Define the response structure for a sandbox terminal connection including URLs, token, status, and errors
+`interface` — Define the response structure for a sandbox terminal connection including URLs, token, status, and errors Transport-agnostic by construction (#341/#349): the browser-direct scoped-token route (`creat…
 
 ```ts
 interface SandboxTerminalConnectionResponse
@@ -20296,7 +20328,7 @@ interface UseInfiniteScrollOptions
 
 ### `useSandboxTerminalConnection`
 
-`function` — Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling
+`function` — Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling Transport-agnostic (#341/#349): this hook does not care whether `connectionUrl` is backed by the fl…
 
 ```ts
 (opts: UseSandboxTerminalConnectionOptions) => UseSandboxTerminalConnectionResult
@@ -20421,7 +20453,7 @@ interface SandboxTerminalConnection
 
 ### `SandboxTerminalConnectionResponse`
 
-`interface` — Define the response structure for a sandbox terminal connection including URLs, token, status, and errors
+`interface` — Define the response structure for a sandbox terminal connection including URLs, token, status, and errors Transport-agnostic by construction (#341/#349): the browser-direct scoped-token route (`creat…
 
 ```ts
 interface SandboxTerminalConnectionResponse
@@ -20437,7 +20469,7 @@ interface SandboxTerminalConnectionResponse
 
 ### `useSandboxTerminalConnection`
 
-`function` — Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling
+`function` — Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling Transport-agnostic (#341/#349): this hook does not care whether `connectionUrl` is backed by the fl…
 
 ```ts
 (opts: UseSandboxTerminalConnectionOptions) => UseSandboxTerminalConnectionResult
