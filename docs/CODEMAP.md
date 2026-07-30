@@ -80,7 +80,7 @@ _77 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./vault/lazy`](api/vault-lazy.md) | 2 | — |
 | [`./web`](api/web.md) | 16 | — |
 | [`./web-react`](api/web-react.md) | 268 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
-| [`./web-react/terminal`](api/web-react-terminal.md) | 10 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
+| [`./web-react/terminal`](api/web-react-terminal.md) | 6 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./work-product`](api/work-product.md) | 90 | `eval-campaign`, `tools` |
 | [`./work-product-react`](api/work-product-react.md) | 3 | `web-react`, `work-product` |
 
@@ -750,11 +750,11 @@ Depends on: `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `mi
 
 ## `./web-react/terminal`
 
-Source: `src/web-react/terminal.ts` · 10 exports
+Source: `src/web-react/terminal.ts` · 6 exports
 
 Depends on: `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product`
 
-`SandboxTerminalConnection`, `SandboxTerminalConnectionResponse`, `tabTerminalConnectionId`, `TerminalStatusDisplay`, `TerminalStatusTone`, `useSandboxTerminalConnection`, `UseSandboxTerminalConnectionOptions`, `UseSandboxTerminalConnectionResult`, `WorkspaceTerminalPanel`, `WorkspaceTerminalPanelProps`
+`SandboxTerminalConnection`, `SandboxTerminalConnectionResponse`, `tabTerminalConnectionId`, `useSandboxTerminalConnection`, `UseSandboxTerminalConnectionOptions`, `UseSandboxTerminalConnectionResult`
 
 [Full API →](api/web-react-terminal.md)
 

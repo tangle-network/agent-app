@@ -3,8 +3,8 @@
  */
 
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
-import { useSandboxTerminalConnection } from '../src/web-react/sandbox-terminal'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { tabTerminalConnectionId, useSandboxTerminalConnection } from '../src/web-react/sandbox-terminal'
 
 describe('useSandboxTerminalConnection', () => {
   it('polls through provisioning responses and stores the ready terminal connection', async () => {
@@ -101,6 +101,52 @@ describe('useSandboxTerminalConnection', () => {
       expect(fetcher).toHaveBeenCalledTimes(1)
     } finally {
       vi.useRealTimers()
+    }
+  })
+})
+
+// Moved from the now-deleted `workspace-terminal-panel.test.tsx` (#340, the
+// shared terminal panel component removal) — these guard `tabTerminalConnectionId`
+// in `sandbox-terminal.ts`, which stays.
+describe('tabTerminalConnectionId', () => {
+  beforeEach(() => sessionStorage.clear())
+
+  it('is stable across calls in the same tab and persists in sessionStorage', () => {
+    const a = tabTerminalConnectionId()
+    const b = tabTerminalConnectionId()
+    expect(a).toBe(b)
+    expect(sessionStorage.getItem('agent-app:terminal-connection-id')).toBe(a)
+  })
+
+  it('honors a custom storage key', () => {
+    const id = tabTerminalConnectionId('custom:key')
+    expect(sessionStorage.getItem('custom:key')).toBe(id)
+  })
+
+  it('keeps ids UNIQUE when sessionStorage is unavailable, instead of collapsing to one', () => {
+    // SSR / privacy mode. The sidecar keys one live connection per id, so a
+    // fallback that derives a deterministic id (e.g. from the sandbox id) hands
+    // every client the SAME id and their reconnects evict each other — the
+    // terminal sticks on "reconnecting" forever. The fallback must stay unique
+    // per call even though it can no longer be reload-stable.
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage')
+    Object.defineProperty(globalThis, 'sessionStorage', {
+      configurable: true,
+      get() {
+        throw new Error('sessionStorage is not available')
+      },
+    })
+    try {
+      const ids = new Set([
+        tabTerminalConnectionId('same:key'),
+        tabTerminalConnectionId('same:key'),
+        tabTerminalConnectionId('same:key'),
+      ])
+      expect(ids.size).toBe(3)
+      for (const id of ids) expect(id).toBeTruthy()
+    } finally {
+      if (descriptor) Object.defineProperty(globalThis, 'sessionStorage', descriptor)
+      else Reflect.deleteProperty(globalThis, 'sessionStorage')
     }
   })
 })

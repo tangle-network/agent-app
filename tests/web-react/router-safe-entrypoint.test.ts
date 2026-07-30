@@ -17,10 +17,13 @@ describe('web-react Router entrypoint', () => {
     expect(composer).not.toContain('@tangle-network/sandbox-ui')
   })
 
-  it('keeps sandbox terminal UI on the explicit terminal subpath', () => {
+  it('keeps sandbox terminal connection mechanism on the explicit terminal subpath', () => {
+    // The shared panel component was removed (#340, zero importers org-wide)
+    // — the subpath now serves only the connection hook/id; panel chrome is a
+    // product concern (gtm/creative each keep their own local panel).
     const terminal = read('src/web-react/terminal.ts')
 
     expect(terminal).toContain("export * from './sandbox-terminal'")
-    expect(terminal).toContain("export * from './workspace-terminal-panel'")
+    expect(terminal).not.toContain('workspace-terminal-panel')
   })
 })

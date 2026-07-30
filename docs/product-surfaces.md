@@ -228,10 +228,19 @@ it a *timeline* must be the first thing you see.
   this without losing my place."* First impression: state exactly what one more
   seat buys, in one sentence, with the price — no tier wall.
 
-### Workspace terminal (`web-react/terminal` -> `WorkspaceTerminalPanel`)
+### Workspace terminal (`web-react/terminal`)
 - **Purpose / goal:** a live view into the sandbox session the agent is running
   in. Goal for the *power* user: *"see the raw truth when I need to debug."* Keep
   it opt-in and secondary — it's the inspection hatch, not the front door.
+- **Ownership boundary:** agent-app owns the connection *mechanism*
+  (`useSandboxTerminalConnection`, `tabTerminalConnectionId`) on the client and
+  the transport on `/sandbox` (connection/runtime-proxy/upgrade handlers, proxy
+  token mint/verify). Panel chrome — header, copy, status-tone mapping, empty
+  states — is product-owned; gtm-agent and creative-agent each keep a ~120-line
+  local panel over the shared hook by design, not as a gap. A shared panel
+  component shipped that chrome once and was removed after an org-wide
+  zero-importer audit (#340) — it mirrors the 0.44.0 root-barrel removal
+  precedent, so don't re-add it as a shared component.
 
 ---
 
