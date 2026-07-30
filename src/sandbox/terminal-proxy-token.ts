@@ -8,7 +8,15 @@ import { ok, fail, type Outcome } from './outcome'
 
 // Terminal-proxy HMAC token. Identity tuple is generic; the secret comes from a
 // closure (fail-loud if absent).
-/** Define identity details for a terminal proxy including user, workspace, and sandbox identifiers */
+/**
+ * Define identity details for a terminal proxy including user, workspace, and sandbox identifiers
+ *
+ * @deprecated Identity shape for the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute` (`src/sandbox/terminal-connection.ts`)
+ * instead. Three apps still import this seam; retirement is tracked in #350
+ * and removal is a major.
+ */
 export interface TerminalProxyIdentity {
   userId: string
   workspaceId: string
@@ -17,7 +25,15 @@ export interface TerminalProxyIdentity {
 
 const TERMINAL_PROXY_TOKEN_TTL_MS = 15 * 60 * 1000
 
-/** Generate a signed token for TerminalProxyIdentity with an expiration based on TTL milliseconds */
+/**
+ * Generate a signed token for TerminalProxyIdentity with an expiration based on TTL milliseconds
+ *
+ * @deprecated Mints a token for the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute` (`src/sandbox/terminal-connection.ts`)
+ * instead. Three apps still import this seam; retirement is tracked in #350
+ * and removal is a major.
+ */
 export async function mintTerminalProxyToken(
   secret: string,
   identity: TerminalProxyIdentity,
@@ -35,7 +51,15 @@ export async function mintTerminalProxyToken(
   return ok({ token: `${encoded}.${sig}`, expiresAt })
 }
 
-/** Verify the authenticity and validity of a terminal proxy token against expected identity and timestamp */
+/**
+ * Verify the authenticity and validity of a terminal proxy token against expected identity and timestamp
+ *
+ * @deprecated Verifies a token for the same-origin proxy terminal transport,
+ * superseded by the browser-direct scoped-token transport — build the route
+ * with `createSandboxTerminalConnectionRoute` (`src/sandbox/terminal-connection.ts`)
+ * instead. Three apps still import this seam; retirement is tracked in #350
+ * and removal is a major.
+ */
 export async function verifyTerminalProxyToken(
   secret: string,
   token: string,
