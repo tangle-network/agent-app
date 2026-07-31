@@ -205,6 +205,62 @@ function model(partial: Partial<CatalogModel> & Pick<CatalogModel, 'id' | 'name'
   return { supportsTools: true, supportsReasoning: false, featured: false, ...partial }
 }
 
+describe('ChatComposer layout', () => {
+  // The card is the bordered box the input lives in; `controls` being inside it
+  // versus outside is the whole distinction `controlsPlacement` draws, so the
+  // tests below ask that question of the real DOM rather than of a class list.
+  const card = () =>
+    screen.getByLabelText('Message input').closest('div.rounded-2xl') as HTMLElement
+
+  it('puts controls on the action row inside the card by default', () => {
+    render(<ChatComposer onSend={() => {}} controls={<button type="button">Model</button>} />)
+    expect(card()).toBeTruthy()
+    // Controls sit with Send, on the input's own row — not floating above it.
+    expect(card().contains(screen.getByText('Model'))).toBe(true)
+    expect(card().contains(screen.getByLabelText('Send'))).toBe(true)
+  })
+
+  it('keeps controls outside the card when placement is "above"', () => {
+    render(
+      <ChatComposer
+        onSend={() => {}}
+        controls={<button type="button">Model</button>}
+        controlsPlacement="above"
+      />,
+    )
+    expect(card().contains(screen.getByText('Model'))).toBe(false)
+    // Send stays on the action row either way — only `controls` moves.
+    expect(card().contains(screen.getByLabelText('Send'))).toBe(true)
+  })
+
+  it('starts the input at two lines', () => {
+    // `rows` is the floor: the autosize measures scrollHeight against
+    // `height: auto`, which a textarea resolves through this attribute, so it
+    // can never settle shorter than this.
+    render(<ChatComposer onSend={() => {}} />)
+    expect(screen.getByLabelText('Message input').getAttribute('rows')).toBe('2')
+  })
+
+  it('keeps the attach affordances on the action row beside the controls', () => {
+    render(
+      <ChatComposer
+        onSend={() => {}}
+        onAttach={() => {}}
+        controls={<button type="button">Model</button>}
+      />,
+    )
+    const attach = screen.getByLabelText('Attach files')
+    // Attach, the controls slot and Send share one row — the row is whatever
+    // element holds the attach button, so asserting the others live in it says
+    // "they are on the same line" without naming a class.
+    const actionRow = attach.parentElement as HTMLElement
+    expect(actionRow.contains(screen.getByText('Model'))).toBe(true)
+    expect(actionRow.contains(screen.getByLabelText('Send'))).toBe(true)
+    expect(card().contains(actionRow)).toBe(true)
+  })
+})
+
+
 describe('ModelPicker priorityGroup', () => {
   it('pins a labeled section above Recommended and does not duplicate the model below', () => {
     const models = [
