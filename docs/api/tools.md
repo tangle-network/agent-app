@@ -4,7 +4,7 @@
 
 Source: `src/tools/index.ts`
 
-63 exports.
+64 exports.
 
 ### `AddCitationArgs`
 
@@ -56,7 +56,7 @@ interface AppToolHandlers
 
 ### `AppToolMcpServer`
 
-`interface` — The portable MCP server entry the sandbox SDK accepts (transport + url + headers).
+`interface` — The portable MCP server entry the sandbox SDK accepts (transport + url + tagged headers).
 
 ```ts
 interface AppToolMcpServer
@@ -152,7 +152,7 @@ interface BuildAppToolsOptions
 
 ### `BuildHttpMcpServerOptions`
 
-`interface` — Define configuration options for building an HTTP MCP server including path, baseUrl, token, context, and description
+`interface` — Define configuration options for building an HTTP MCP server including path, baseUrl, token env key, context, and description
 
 ```ts
 interface BuildHttpMcpServerOptions
@@ -492,6 +492,14 @@ interface ToolHeaderNames
 
 ```ts
 class ToolInputError
+```
+
+### `unresolvableSurfaceCredential`
+
+`function` — Refuse to mount a surface whose credential is scoped narrower than the box.
+
+```ts
+(surface: string) => never
 ```
 
 ### `verifyCapabilityToken`

@@ -677,12 +677,15 @@ describe('buildDesignCanvasMcpServerEntry', () => {
     const entry = buildDesignCanvasMcpServerEntry({
       baseUrl: 'https://app.test/',
       path: '/api/canvas/doc-1/mcp',
-      token: 'cap_abc',
+      tokenEnvKey: 'CANVAS_CAPABILITY_TOKEN',
     })
     expect(entry).toEqual({
       transport: 'http',
       url: 'https://app.test/api/canvas/doc-1/mcp',
-      headers: { Authorization: 'Bearer cap_abc', 'Content-Type': 'application/json' },
+      headers: {
+        Authorization: { kind: 'secret-ref', key: 'CANVAS_CAPABILITY_TOKEN', format: 'bearer' },
+        'Content-Type': { kind: 'public', value: 'application/json' },
+      },
       enabled: true,
       metadata: { description: DEFAULT_DESIGN_CANVAS_MCP_DESCRIPTION },
     })
@@ -692,23 +695,43 @@ describe('buildDesignCanvasMcpServerEntry', () => {
     const entry = buildDesignCanvasMcpServerEntry({
       baseUrl: 'https://app.test',
       path: '/api/canvas/doc-1/mcp',
-      token: 'cap_abc',
+      tokenEnvKey: 'CANVAS_CAPABILITY_TOKEN',
       description: 'Brand asset editor',
       ctx: { userId: 'user-1', workspaceId: 'ws-1', threadId: null },
     })
-    expect(entry.headers.Authorization).toBe('Bearer cap_abc')
-    expect(entry.headers['X-Agent-App-User-Id']).toBe('user-1')
-    expect(entry.headers['X-Agent-App-Workspace-Id']).toBe('ws-1')
+    expect(entry.headers.Authorization).toEqual({
+      kind: 'secret-ref',
+      key: 'CANVAS_CAPABILITY_TOKEN',
+      format: 'bearer',
+    })
+    expect(entry.headers['X-Agent-App-User-Id']).toEqual({ kind: 'public', value: 'user-1' })
+    expect(entry.headers['X-Agent-App-Workspace-Id']).toEqual({ kind: 'public', value: 'ws-1' })
     expect(entry.metadata.description).toBe('Brand asset editor')
   })
 
-  it('fails closed on a missing token and a relative path', () => {
+  it('fails closed on a missing token env key and a relative path', () => {
     expect(() =>
-      buildDesignCanvasMcpServerEntry({ baseUrl: 'https://app.test', path: '/mcp', token: '  ' }),
-    ).toThrow(/capability token/)
+      buildDesignCanvasMcpServerEntry({ baseUrl: 'https://app.test', path: '/mcp', tokenEnvKey: '  ' }),
+    ).toThrow(/capability token env key/)
     expect(() =>
-      buildDesignCanvasMcpServerEntry({ baseUrl: 'https://app.test', path: 'mcp', token: 'cap_abc' }),
+      buildDesignCanvasMcpServerEntry({
+        baseUrl: 'https://app.test',
+        path: 'mcp',
+        tokenEnvKey: 'CANVAS_CAPABILITY_TOKEN',
+      }),
     ).toThrow(/must start with/)
+  })
+
+  // A token VALUE passed where a box-env NAME belongs would validate against
+  // the profile schema and fail much later as an opaque missing-secret error.
+  it('rejects a token value passed as the env key', () => {
+    expect(() =>
+      buildDesignCanvasMcpServerEntry({
+        baseUrl: 'https://app.test',
+        path: '/mcp',
+        tokenEnvKey: 'cap_abc.9f2e',
+      }),
+    ).toThrow(/environment-variable NAME/)
   })
 })
 

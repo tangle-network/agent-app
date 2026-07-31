@@ -42,6 +42,7 @@ export {
   buildHttpMcpServer,
   buildAppToolMcpServer,
   buildScopedMcpServerEntry,
+  unresolvableSurfaceCredential,
   DEFAULT_APP_TOOL_PATHS,
   type AppToolMcpServer,
   type BuildHttpMcpServerOptions,

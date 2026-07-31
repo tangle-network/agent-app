@@ -1083,7 +1083,7 @@
           "name": "ReasoningEffort",
           "kind": "type",
           "signature": "type ReasoningEffort",
-          "doc": "Portable reasoning/thinking effort."
+          "doc": null
         },
         {
           "name": "ReasoningLevel",
@@ -12676,7 +12676,7 @@
           "name": "AppToolMcpServer",
           "kind": "interface",
           "signature": "interface AppToolMcpServer",
-          "doc": "The portable MCP server entry the sandbox SDK accepts (transport + url + headers)."
+          "doc": "The portable MCP server entry the sandbox SDK accepts (transport + url + tagged headers)."
         },
         {
           "name": "AppToolName",
@@ -12748,7 +12748,7 @@
           "name": "BuildHttpMcpServerOptions",
           "kind": "interface",
           "signature": "interface BuildHttpMcpServerOptions",
-          "doc": "Define configuration options for building an HTTP MCP server including path, baseUrl, token, context, and description"
+          "doc": "Define configuration options for building an HTTP MCP server including path, baseUrl, token env key, context, and description"
         },
         {
           "name": "BuildMcpServerOptions",
@@ -13001,6 +13001,12 @@
           "kind": "class",
           "signature": "class ToolInputError",
           "doc": "A correctable bad-input error a tool handler throws; the HTTP layer maps it to a 4xx with the code, the runtime layer to a failed tool_result."
+        },
+        {
+          "name": "unresolvableSurfaceCredential",
+          "kind": "function",
+          "signature": "(surface: string) => never",
+          "doc": "Refuse to mount a surface whose credential is scoped narrower than the box."
         },
         {
           "name": "verifyCapabilityToken",

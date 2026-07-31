@@ -320,6 +320,26 @@ export interface SandboxRuntimeConfig {
   name: (workspaceId: string) => string
   metadata: (harness: Harness) => Record<string, unknown>
   connectedIntegrationIds: (workspaceId: string) => Promise<string[]>
+  /**
+   * Raw box environment written once at sandbox CREATION — deliberately plain
+   * strings, and the one place a credential value legitimately lives.
+   *
+   * This is the private side of the tagged-config contract, not profile
+   * material: an `AgentProfileMcpServer` may only carry a `secret-ref` naming a
+   * key, and the sandbox resolves that key against THIS map (or against the
+   * platform secret store fed by {@link SandboxRuntimeConfig.secrets}). So a
+   * `tokenEnvKey` passed to `buildAppToolMcpServers` must name a variable this
+   * seam places, or the reference resolves to nothing.
+   *
+   * It is NOT widened to tagged values: the sandbox SDK's create payload types
+   * `env` as `Record<string, string>`, and {@link assertEnvWithinLimits}
+   * measures those bytes against the kernel's per-entry `MAX_ARG_STRLEN`.
+   * Tagging it would make the box env reference itself.
+   *
+   * Values are workspace-wide and fixed for the box's lifetime, so a per-user
+   * or per-resource credential cannot be placed here — see
+   * `unresolvableSurfaceCredential` in `../tools/mcp`.
+   */
   env: (ctx: SandboxBuildContext) => Promise<Record<string, string>>
   files: (ctx: SandboxBuildContext) => Promise<AgentProfileFileMount[]>
   secrets: (workspaceId: string) => Promise<string[]>
@@ -443,7 +463,17 @@ export interface AppToolDescriptor {
 export interface BuildAppToolMcpServersOptions {
   tools: AppToolDescriptor[]
   baseUrl: string
-  token: string
+  /**
+   * NAME of the box-environment variable holding the capability token — never
+   * the token itself. Every emitted `Authorization` header is a `secret-ref` to
+   * this key, which the sandbox resolves privately; see
+   * `BuildHttpMcpServerOptions.tokenEnvKey` in `../tools/mcp`.
+   *
+   * The key must name a variable the box carries — placed by
+   * {@link SandboxRuntimeConfig.env} at creation, or injected from the platform
+   * secret store via {@link SandboxRuntimeConfig.secrets}.
+   */
+  tokenEnvKey: string
   ctx: AppToolContext
   headerNames?: ToolHeaderNames
 }
@@ -454,14 +484,17 @@ export function buildAppToolMcpServers(
 ): Record<string, AgentProfileMcpServer> {
   const entries: Record<string, AgentProfileMcpServer> = {}
   for (const { tool, key, description } of options.tools) {
+    // No cast: since the tagged-config contract (agent-interface 0.38.0) the
+    // builder's own return type IS an AgentProfileMcpServer. The cast that used
+    // to sit here is what let the pre-0.38.0 plain-string shape ship.
     entries[key] = buildAppToolMcpServer({
       tool,
       baseUrl: options.baseUrl,
-      token: options.token,
+      tokenEnvKey: options.tokenEnvKey,
       ctx: options.ctx,
       description,
       headerNames: options.headerNames,
-    }) as AgentProfileMcpServer
+    })
   }
   return entries
 }

@@ -16,12 +16,21 @@
  * the client request and are pure ROUTING data — never trusted content, never
  * identity. Identity comes from the closure (see above). The registered
  * `build()` runs server-side only: it validates the routing ids against the
- * product's access control, then mints its own URLs and capability tokens from
- * server configuration (`buildHttpMcpServer` + `createCapabilityToken` in
- * ../tools). A client can therefore never inject an arbitrary MCP url, header,
- * or token into the agent profile: the overlay's `mcp` values are typed as
- * {@link SurfaceMcpServer} (= the server-built `AppToolMcpServer` entry shape),
- * and only build() constructs them.
+ * product's access control, then mints its own URLs from server configuration
+ * (`buildHttpMcpServer` in ../tools). A client can therefore never inject an
+ * arbitrary MCP url, header, or credential into the agent profile: the
+ * overlay's `mcp` values are typed as {@link SurfaceMcpServer} (= the
+ * server-built `AppToolMcpServer` entry shape), and only build() constructs
+ * them.
+ *
+ * The credential itself never appears in the overlay. Since the tagged-config
+ * contract (`agent-interface` 0.38.0) the `Authorization` header is a
+ * `secret-ref` naming a box-environment variable, which the sandbox resolves
+ * privately; `build()` supplies that key NAME from server configuration and the
+ * product writes the value into `SandboxRuntimeConfig.env` at box creation. The
+ * value must be deterministic for the box's lifetime (an HMAC over the
+ * workspace id, e.g. `createCapabilityToken` in ../tools), because a freshly
+ * random per-request mint would never match what the box already carries.
  */
 
 import type { AppToolMcpServer } from '../tools/mcp'
