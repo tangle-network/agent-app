@@ -11,7 +11,7 @@ Source: `src/harness/index.ts`
 `function` — Fail-loud server guard: throw when a harness is asked to run a model it can't.
 
 ```ts
-(harness: "opencode" | "claude-code" | "nanoclaw" | "kimi-code" | "codex" | "amp" | "factory-droids" | "pi" | "hermes"…
+(harness: Harness, modelId: string) => void
 ```
 
 ### `coerceHarness`
@@ -19,7 +19,7 @@ Source: `src/harness/index.ts`
 `function` — Coerce an arbitrary value to a known harness, falling back (default `opencode`).
 
 ```ts
-(value: unknown, fallback?: "opencode" | "claude-code" | "nanoclaw" | "kimi-code" | "codex" | "amp" | "factory-droids"…
+(value: unknown, fallback?: Harness) => Harness
 ```
 
 ### `DEFAULT_HARNESS`
@@ -27,12 +27,12 @@ Source: `src/harness/index.ts`
 `const` — Define the default harness to use for code execution and testing environments
 
 ```ts
-"opencode" | "claude-code" | "nanoclaw" | "kimi-code" | "codex" | "amp" | "factory-droids" | "pi" | "hermes" | "forge"…
+Harness
 ```
 
 ### `Harness`
 
-`type` — Resolve a valid harness identifier from the predefined KNOWN_HARNESSES array
+`type` — A coding-agent backend this shell can dispatch a session onto.
 
 ```ts
 type Harness
@@ -43,7 +43,7 @@ type Harness
 `function` — Determine if a value is a recognized harness string identifier
 
 ```ts
-(value: unknown) => value is "opencode" | "claude-code" | "nanoclaw" | "kimi-code" | "codex" | "amp" | "factory-droids"…
+(value: unknown) => value is Harness
 ```
 
 ### `isModelCompatibleWithHarness`
@@ -51,15 +51,15 @@ type Harness
 `function` — Provider-less ids (sentinels like "default", or a session's own config) are compatible everywhere — every harness honors its own configuration.
 
 ```ts
-(harness: "opencode" | "claude-code" | "nanoclaw" | "kimi-code" | "codex" | "amp" | "factory-droids" | "pi" | "hermes"…
+(harness: Harness, modelId: string) => boolean
 ```
 
 ### `KNOWN_HARNESSES`
 
-`const` — The known coding-agent backends.
+`const` — The known coding-agent backends: the canonical harness set minus what has no provider adapter, plus adapters the canonical set has yet to adopt.
 
 ```ts
-readonly ["opencode", "claude-code", "nanoclaw", "kimi-code", "codex", "amp", "factory-droids", "pi", "hermes", "forge"…
+readonly Harness[]
 ```
 
 ### `modelProvider`
@@ -99,7 +99,7 @@ interface ResolveSessionHarnessInput
 `function` — Keep the harness when it can run `modelId`; else the model's native harness (anthropic → claude-code, openai → codex, moonshot → kimi-code), falling back to opencode.
 
 ```ts
-(harness: "opencode" | "claude-code" | "nanoclaw" | "kimi-code" | "codex" | "amp" | "factory-droids" | "pi" | "hermes"…
+(harness: Harness, modelId: string) => Harness
 ```
 
 ### `snapModelToHarness`
@@ -107,5 +107,5 @@ interface ResolveSessionHarnessInput
 `function` — Keep `modelId` when the harness can run it; else the harness's best compatible catalog id (preferred patterns in order, highest version).
 
 ```ts
-(harness: "opencode" | "claude-code" | "nanoclaw" | "kimi-code" | "codex" | "amp" | "factory-droids" | "pi" | "hermes"…
+(harness: Harness, modelId: string, canonicalIds: readonly string[]) => string
 ```

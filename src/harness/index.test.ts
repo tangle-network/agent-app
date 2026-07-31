@@ -1,3 +1,4 @@
+import { harnessTypeSchema } from '@tangle-network/agent-interface'
 import { describe, expect, it } from 'vitest'
 import {
   coerceHarness,
@@ -30,6 +31,28 @@ describe('harness taxonomy + coercion', () => {
 
   it('DEFAULT_HARNESS is a member of the list', () => {
     expect(KNOWN_HARNESSES).toContain(DEFAULT_HARNESS)
+  })
+
+  it('derives from the canonical harness enum, dropping only what has no backend', () => {
+    const canonical = new Set<string>(harnessTypeSchema.options)
+    const known = new Set<string>(KNOWN_HARNESSES)
+
+    // `gemini` is the one deliberate drop: the platform ships no gemini backend, and
+    // KNOWN_HARNESSES is dispatched as `backend.type`.
+    expect([...canonical].filter((h) => !known.has(h))).toEqual(['gemini'])
+    expect(isHarness('gemini')).toBe(false)
+
+    // Every canonical harness that is not dropped must be offered, so a harness added
+    // upstream reaches this shell without an edit here.
+    for (const harness of harnessTypeSchema.options) {
+      if (harness === 'gemini') continue
+      expect(isHarness(harness), `${harness} should be a known harness`).toBe(true)
+    }
+  })
+
+  it('carries the backends the canonical enum has yet to adopt', () => {
+    expect(isHarness('forge')).toBe(true)
+    expect(isHarness('cursor')).toBe(true)
   })
 })
 
@@ -88,6 +111,20 @@ describe('harness ↔ model compatibility (server-enforced)', () => {
     expect(snapHarnessToModel('claude-code', 'openai/gpt-5')).toBe('codex')
     expect(snapHarnessToModel('codex', 'anthropic/claude-sonnet-4-6')).toBe('claude-code')
     expect(snapHarnessToModel('claude-code', 'anthropic/claude-opus-4-6')).toBe('claude-code')
+  })
+
+  it('treats backends outside the canonical enum as router-backed, never snapping them', () => {
+    // forge/cursor are multi-provider CLIs with no vendor lock. They are answered here rather
+    // than cast into HarnessType, so the behavior holds without the canonical enum listing them.
+    for (const harness of ['forge', 'cursor'] as const) {
+      expect(isModelCompatibleWithHarness(harness, 'openai/gpt-5')).toBe(true)
+      expect(isModelCompatibleWithHarness(harness, 'anthropic/claude-sonnet-4-6')).toBe(true)
+      expect(snapModelToHarness(harness, 'anthropic/claude-sonnet-4-6', CATALOG)).toBe(
+        'anthropic/claude-sonnet-4-6',
+      )
+      expect(snapHarnessToModel(harness, 'openai/gpt-5')).toBe(harness)
+      expect(() => assertHarnessModelCompatible(harness, 'openai/gpt-5')).not.toThrow()
+    }
   })
 
   it('assertHarnessModelCompatible throws on a forbidden pair, passes a valid one', () => {
