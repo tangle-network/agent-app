@@ -260,7 +260,6 @@ describe('ChatComposer layout', () => {
   })
 })
 
-
 describe('ModelPicker priorityGroup', () => {
   it('pins a labeled section above Recommended and does not duplicate the model below', () => {
     const models = [

@@ -136,13 +136,13 @@ export interface ChatComposerProps {
    *  `<AgentSessionControls/>`). */
   controls?: ReactNode
   /**
-   * Where {@link controls} sit. `footer` (default) puts them on the card's own
+   * Where {@link controls} sit. `inline` (default) puts them on the card's own
    * action row, beside attach and Send — the model a turn will use reads as
    * part of the input rather than as a separate widget floating above it.
    * `above` keeps them outside the card, for a host that wants the input to be
    * nothing but the input.
    */
-  controlsPlacement?: 'above' | 'footer'
+  controlsPlacement?: 'above' | 'inline'
 
   /** Attachments are opt-in: pass `onAttach` to show the attach button, accept
    *  drag-and-drop onto the input, and render `pendingFiles` chips. */
@@ -176,7 +176,7 @@ export function ChatComposer({
   seed,
   onSeedApplied,
   controls,
-  controlsPlacement = 'footer',
+  controlsPlacement = 'inline',
   onAttach,
   onAttachFolder,
   pendingFiles = [],
@@ -350,7 +350,7 @@ export function ChatComposer({
 
   const folderChips = pendingFiles.filter((f) => f.kind === 'folder')
   const fileChips = pendingFiles.filter((f) => f.kind !== 'folder')
-  const showFooter = controls != null && controlsPlacement === 'footer'
+  const showInline = controls != null && controlsPlacement === 'inline'
   const showAbove = controls != null && controlsPlacement === 'above'
 
   return (
@@ -420,13 +420,15 @@ export function ChatComposer({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          // Two lines before it grows. `rows` is the floor rather than a
-          // `min-height`: the autosize below measures `scrollHeight` against
-          // `height: auto`, which a textarea resolves through `rows` — so the
-          // measurement can never come back shorter than this.
+          // Two lines before it grows. `rows` is what actually holds the floor:
+          // the autosize measures `scrollHeight` against `height: auto`, which a
+          // textarea resolves through `rows`, so the measurement cannot come back
+          // shorter. The paired `min-h-[56px]` is the same two lines expressed in
+          // CSS (2 x 24px `leading-6` + 8px `py-1`, border-box) so the floor also
+          // holds if that inline height is ever set from somewhere else.
           rows={2}
           aria-label="Message input"
-          className="max-h-[168px] w-full resize-none bg-transparent px-1.5 py-1 text-[15px] leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
+          className="max-h-[168px] min-h-[56px] w-full resize-none bg-transparent px-1.5 py-1 text-[15px] leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
         />
 
         <div className="flex items-end gap-2">
@@ -473,7 +475,7 @@ export function ChatComposer({
               long picker set can never push Send off the edge or grow the card a
               second line. Rendered even when empty so Send stays right-aligned. */}
           <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {showFooter && controls}
+            {showInline && controls}
           </div>
 
           {isStreaming ? (
