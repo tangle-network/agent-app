@@ -586,9 +586,11 @@ export function AssistantPanel({
           </div>
         )}
 
-      {/* Composer: the model picker sits directly above the input, so the model
-          the next turn will use reads as part of the composer. */}
-      <div className="border-border border-t p-2">
+      {/* Composer: the model picker sits on the input's own action row, so the
+          model the next turn will use reads as part of the composer. The band
+          is padded rather than flush — at `p-2` the card sat all but against
+          the dock's edges, which is what made the input look cramped. */}
+      <div className="border-border border-t p-3">
         {/* Running indicator: while a turn streams, the composer's Send becomes a
             Stop button — on its own an easy-to-miss signal. This animated row makes
             "the assistant is working" unmistakable regardless of the transcript

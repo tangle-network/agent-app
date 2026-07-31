@@ -133,8 +133,15 @@ export interface ChatComposerProps {
   onSeedApplied?: () => void
 
   /** Inline controls (e.g. `<ModelPicker/>` + `<EffortPicker/>` or
-   *  `<AgentSessionControls/>`). Rendered in a row above the input by default. */
+   *  `<AgentSessionControls/>`). */
   controls?: ReactNode
+  /**
+   * Where {@link controls} sit. `footer` (default) puts them on the card's own
+   * action row, beside attach and Send — the model a turn will use reads as
+   * part of the input rather than as a separate widget floating above it.
+   * `above` keeps them outside the card, for a host that wants the input to be
+   * nothing but the input.
+   */
   controlsPlacement?: 'above' | 'footer'
 
   /** Attachments are opt-in: pass `onAttach` to show the attach button, accept
@@ -169,7 +176,7 @@ export function ChatComposer({
   seed,
   onSeedApplied,
   controls,
-  controlsPlacement = 'above',
+  controlsPlacement = 'footer',
   onAttach,
   onAttachFolder,
   pendingFiles = [],
@@ -400,46 +407,12 @@ export function ChatComposer({
         </div>
       )}
 
-      <div className="flex items-end gap-2 rounded-2xl border border-border bg-card px-2.5 py-2 transition focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15">
-        {onAttach && (
-          <>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={disabled}
-              aria-label="Attach files"
-              title="Attach files"
-              className="mb-0.5 shrink-0 rounded-lg p-2 text-muted-foreground transition hover:bg-accent/40 hover:text-foreground disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <PaperclipGlyph className="h-4 w-4" />
-            </button>
-            <input ref={fileInputRef} type="file" multiple className="hidden" accept={accept} onChange={handleFileChange} />
-          </>
-        )}
-        {onAttachFolder && (
-          <>
-            <button
-              type="button"
-              onClick={() => folderInputRef.current?.click()}
-              disabled={disabled}
-              aria-label="Attach folder"
-              title="Attach folder"
-              className="mb-0.5 shrink-0 rounded-lg p-2 text-muted-foreground transition hover:bg-accent/40 hover:text-foreground disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <FolderGlyph className="h-4 w-4" />
-            </button>
-            {/* webkitdirectory is non-standard but widely supported for folder picks. */}
-            <input
-              ref={folderInputRef}
-              type="file"
-              multiple
-              className="hidden"
-              onChange={handleFolderChange}
-              {...({ webkitdirectory: '' } as Record<string, string>)}
-            />
-          </>
-        )}
-
+      {/* Two rows inside one card: the message gets the full width, and every
+          affordance that acts on it — attach, the controls slot, send — sits on
+          its own row beneath. A single row would make the textarea share its
+          line with the buttons, which is what squeezed the input and pushed the
+          controls out of the card in the first place. */}
+      <div className="flex flex-col gap-1.5 rounded-2xl border border-border bg-card px-3 py-2.5 transition focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15">
         <textarea
           ref={textareaRef}
           value={text}
@@ -447,35 +420,85 @@ export function ChatComposer({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          rows={1}
+          // Two lines before it grows. `rows` is the floor rather than a
+          // `min-height`: the autosize below measures `scrollHeight` against
+          // `height: auto`, which a textarea resolves through `rows` — so the
+          // measurement can never come back shorter than this.
+          rows={2}
           aria-label="Message input"
-          className="max-h-[168px] min-h-[40px] flex-1 resize-none bg-transparent px-1.5 py-2 text-[15px] leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
+          className="max-h-[168px] w-full resize-none bg-transparent px-1.5 py-1 text-[15px] leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
         />
 
-        {showFooter && <div className="mb-0.5 flex shrink-0 items-center gap-1.5">{controls}</div>}
+        <div className="flex items-end gap-2">
+          {onAttach && (
+            <>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={disabled}
+                aria-label="Attach files"
+                title="Attach files"
+                className="shrink-0 rounded-lg p-2 text-muted-foreground transition hover:bg-accent/40 hover:text-foreground disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <PaperclipGlyph className="h-4 w-4" />
+              </button>
+              <input ref={fileInputRef} type="file" multiple className="hidden" accept={accept} onChange={handleFileChange} />
+            </>
+          )}
+          {onAttachFolder && (
+            <>
+              <button
+                type="button"
+                onClick={() => folderInputRef.current?.click()}
+                disabled={disabled}
+                aria-label="Attach folder"
+                title="Attach folder"
+                className="shrink-0 rounded-lg p-2 text-muted-foreground transition hover:bg-accent/40 hover:text-foreground disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <FolderGlyph className="h-4 w-4" />
+              </button>
+              {/* webkitdirectory is non-standard but widely supported for folder picks. */}
+              <input
+                ref={folderInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={handleFolderChange}
+                {...({ webkitdirectory: '' } as Record<string, string>)}
+              />
+            </>
+          )}
 
-        {isStreaming ? (
-          <button
-            type="button"
-            onClick={onCancel}
-            aria-label="Stop response"
-            className="mb-0.5 inline-flex shrink-0 items-center gap-1.5 rounded-full bg-destructive/15 px-3.5 py-2 text-sm font-medium text-destructive transition hover:bg-destructive/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
-          >
-            <StopGlyph className="h-3.5 w-3.5" />
-            <span>Stop</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={send}
-            disabled={!canSend}
-            aria-label={sendLabel}
-            className="mb-0.5 inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card"
-          >
-            <SendGlyph className="h-3.5 w-3.5" />
-            <span>{sendLabel}</span>
-          </button>
-        )}
+          {/* The controls take the row's slack and scroll rather than wrap, so a
+              long picker set can never push Send off the edge or grow the card a
+              second line. Rendered even when empty so Send stays right-aligned. */}
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {showFooter && controls}
+          </div>
+
+          {isStreaming ? (
+            <button
+              type="button"
+              onClick={onCancel}
+              aria-label="Stop response"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-destructive/15 px-3.5 py-2 text-sm font-medium text-destructive transition hover:bg-destructive/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
+            >
+              <StopGlyph className="h-3.5 w-3.5" />
+              <span>Stop</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={send}
+              disabled={!canSend}
+              aria-label={sendLabel}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card"
+            >
+              <SendGlyph className="h-3.5 w-3.5" />
+              <span>{sendLabel}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {focusShortcut && (
