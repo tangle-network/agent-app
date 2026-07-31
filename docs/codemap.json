@@ -5181,44 +5181,44 @@
         {
           "name": "assertHarnessModelCompatible",
           "kind": "function",
-          "signature": "(harness: \"opencode\" | \"claude-code\" | \"nanoclaw\" | \"kimi-code\" | \"codex\" | \"amp\" | \"factory-droids\" | \"pi\" | \"hermes\"…",
+          "signature": "(harness: Harness, modelId: string) => void",
           "doc": "Fail-loud server guard: throw when a harness is asked to run a model it can't."
         },
         {
           "name": "coerceHarness",
           "kind": "function",
-          "signature": "(value: unknown, fallback?: \"opencode\" | \"claude-code\" | \"nanoclaw\" | \"kimi-code\" | \"codex\" | \"amp\" | \"factory-droids\"…",
+          "signature": "(value: unknown, fallback?: Harness) => Harness",
           "doc": "Coerce an arbitrary value to a known harness, falling back (default `opencode`)."
         },
         {
           "name": "DEFAULT_HARNESS",
           "kind": "const",
-          "signature": "\"opencode\" | \"claude-code\" | \"nanoclaw\" | \"kimi-code\" | \"codex\" | \"amp\" | \"factory-droids\" | \"pi\" | \"hermes\" | \"forge\"…",
+          "signature": "Harness",
           "doc": "Define the default harness to use for code execution and testing environments"
         },
         {
           "name": "Harness",
           "kind": "type",
           "signature": "type Harness",
-          "doc": "Resolve a valid harness identifier from the predefined KNOWN_HARNESSES array"
+          "doc": "A coding-agent backend this shell can dispatch a session onto."
         },
         {
           "name": "isHarness",
           "kind": "function",
-          "signature": "(value: unknown) => value is \"opencode\" | \"claude-code\" | \"nanoclaw\" | \"kimi-code\" | \"codex\" | \"amp\" | \"factory-droids\"…",
+          "signature": "(value: unknown) => value is Harness",
           "doc": "Determine if a value is a recognized harness string identifier"
         },
         {
           "name": "isModelCompatibleWithHarness",
           "kind": "function",
-          "signature": "(harness: \"opencode\" | \"claude-code\" | \"nanoclaw\" | \"kimi-code\" | \"codex\" | \"amp\" | \"factory-droids\" | \"pi\" | \"hermes\"…",
+          "signature": "(harness: Harness, modelId: string) => boolean",
           "doc": "Provider-less ids (sentinels like \"default\", or a session's own config) are compatible everywhere — every harness honors its own configuration."
         },
         {
           "name": "KNOWN_HARNESSES",
           "kind": "const",
-          "signature": "readonly [\"opencode\", \"claude-code\", \"nanoclaw\", \"kimi-code\", \"codex\", \"amp\", \"factory-droids\", \"pi\", \"hermes\", \"forge\"…",
-          "doc": "The known coding-agent backends."
+          "signature": "readonly Harness[]",
+          "doc": "The known coding-agent backends: the canonical harness set minus what has no provider adapter, plus adapters the canonical set has yet to adopt."
         },
         {
           "name": "modelProvider",
@@ -5247,13 +5247,13 @@
         {
           "name": "snapHarnessToModel",
           "kind": "function",
-          "signature": "(harness: \"opencode\" | \"claude-code\" | \"nanoclaw\" | \"kimi-code\" | \"codex\" | \"amp\" | \"factory-droids\" | \"pi\" | \"hermes\"…",
+          "signature": "(harness: Harness, modelId: string) => Harness",
           "doc": "Keep the harness when it can run `modelId`; else the model's native harness (anthropic → claude-code, openai → codex, moonshot → kimi-code), falling back to opencode."
         },
         {
           "name": "snapModelToHarness",
           "kind": "function",
-          "signature": "(harness: \"opencode\" | \"claude-code\" | \"nanoclaw\" | \"kimi-code\" | \"codex\" | \"amp\" | \"factory-droids\" | \"pi\" | \"hermes\"…",
+          "signature": "(harness: Harness, modelId: string, canonicalIds: readonly string[]) => string",
           "doc": "Keep `modelId` when the harness can run it; else the harness's best compatible catalog id (preferred patterns in order, highest version)."
         }
       ]
@@ -8005,7 +8005,7 @@
         {
           "name": "isKnownSandboxHarness",
           "kind": "function",
-          "signature": "(harness: ProfileHarness) => harness is \"opencode\" | \"claude-code\" | \"nanoclaw\" | \"kimi-code\" | \"codex\" | \"amp\" | \"fact…",
+          "signature": "(harness: ProfileHarness) => harness is Harness",
           "doc": "True when `harness` names a sandbox backend the SDK knows about."
         },
         {
@@ -8472,7 +8472,7 @@
         {
           "name": "attachReasoningEffort",
           "kind": "function",
-          "signature": "(profile: AgentProfile, harness: \"opencode\" | \"claude-code\" | \"nanoclaw\" | \"kimi-code\" | \"codex\" | \"amp\" | \"factory-dro…",
+          "signature": "(profile: AgentProfile, harness: Harness, effort: \"auto\" | \"none\" | \"minimal\" | \"low\" | \"medium\" | \"high\" | \"xhigh\" | \"…",
           "doc": "Attach a specified reasoning effort level to an agent profile for a given harness"
         },
         {
@@ -10992,7 +10992,7 @@
         {
           "name": "resolveSkillDir",
           "kind": "function",
-          "signature": "(harness: \"opencode\" | \"claude-code\" | \"nanoclaw\" | \"kimi-code\" | \"codex\" | \"amp\" | \"factory-droids\" | \"pi\" | \"hermes\"…",
+          "signature": "(harness: Harness) => string | null",
           "doc": "Resolve the cwd-relative skill dir `resources.skills` refs materialize into on `harness` — via the platform's `skillDirForHarness`."
         },
         {
@@ -11004,7 +11004,7 @@
         {
           "name": "unsupportedSkillHarnesses",
           "kind": "function",
-          "signature": "(harnesses: Iterable<\"opencode\" | \"claude-code\" | \"nanoclaw\" | \"kimi-code\" | \"codex\" | \"amp\" | \"factory-droids\" | \"pi\"…",
+          "signature": "(harnesses: Iterable<Harness>) => Harness[]",
           "doc": "Filter `harnesses` down to those with no mounted skill dir (deduped, first-seen order preserved) — the set that must fall back to `inline` delivery, or that a caller should warn about before offering…"
         }
       ]

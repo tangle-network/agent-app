@@ -35,7 +35,7 @@ interface AppToolDescriptor
 `function` — Attach a specified reasoning effort level to an agent profile for a given harness
 
 ```ts
-(profile: AgentProfile, harness: "opencode" | "claude-code" | "nanoclaw" | "kimi-code" | "codex" | "amp" | "factory-dro…
+(profile: AgentProfile, harness: Harness, effort: "auto" | "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "…
 ```
 
 ### `buildAppToolMcpServers`
