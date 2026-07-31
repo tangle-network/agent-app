@@ -209,8 +209,7 @@ describe('ChatComposer layout', () => {
   // The card is the bordered box the input lives in; `controls` being inside it
   // versus outside is the whole distinction `controlsPlacement` draws, so the
   // tests below ask that question of the real DOM rather than of a class list.
-  const card = () =>
-    screen.getByLabelText('Message input').closest('div.rounded-2xl') as HTMLElement
+  const card = () => screen.getByTestId('composer-card')
 
   it('puts controls on the action row inside the card by default', () => {
     render(<ChatComposer onSend={() => {}} controls={<button type="button">Model</button>} />)
@@ -231,6 +230,24 @@ describe('ChatComposer layout', () => {
     expect(card().contains(screen.getByText('Model'))).toBe(false)
     // Send stays on the action row either way — only `controls` moves.
     expect(card().contains(screen.getByLabelText('Send'))).toBe(true)
+  })
+
+  it('never drops the controls, whatever placement value it is handed', () => {
+    // `above` is matched exactly and everything else falls to inline, so a
+    // retired value or a typo still renders them. Vanishing controls is the one
+    // failure a reader cannot recover from.
+    for (const placement of ['footer', 'nonsense'] as unknown as ('above' | 'inline')[]) {
+      const { unmount } = render(
+        <ChatComposer
+          onSend={() => {}}
+          controls={<button type="button">Model</button>}
+          controlsPlacement={placement}
+        />,
+      )
+      expect(screen.getByText('Model')).toBeTruthy()
+      expect(screen.getByTestId('composer-card').contains(screen.getByText('Model'))).toBe(true)
+      unmount()
+    }
   })
 
   it('starts the input at two lines', () => {

@@ -350,8 +350,13 @@ export function ChatComposer({
 
   const folderChips = pendingFiles.filter((f) => f.kind === 'folder')
   const fileChips = pendingFiles.filter((f) => f.kind !== 'folder')
-  const showInline = controls != null && controlsPlacement === 'inline'
+  // `above` is the only placement that takes controls OUT of the card, so it is
+  // the only one matched exactly; everything else falls to inline. That keeps a
+  // retired value (this prop used to accept `footer` for the same placement) or a
+  // typo rendering the controls somewhere rather than nowhere — dropping them
+  // silently is the one outcome with no recovery for the reader.
   const showAbove = controls != null && controlsPlacement === 'above'
+  const showInline = controls != null && !showAbove
 
   return (
     <div
@@ -412,7 +417,10 @@ export function ChatComposer({
           its own row beneath. A single row would make the textarea share its
           line with the buttons, which is what squeezed the input and pushed the
           controls out of the card in the first place. */}
-      <div className="flex flex-col gap-1.5 rounded-2xl border border-border bg-card px-3 py-2.5 transition focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15">
+      <div
+        data-testid="composer-card"
+        className="flex flex-col gap-1.5 rounded-2xl border border-border bg-card px-3 py-2.5 transition focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15"
+      >
         <textarea
           ref={textareaRef}
           value={text}
@@ -423,9 +431,13 @@ export function ChatComposer({
           // Two lines before it grows. `rows` is what actually holds the floor:
           // the autosize measures `scrollHeight` against `height: auto`, which a
           // textarea resolves through `rows`, so the measurement cannot come back
-          // shorter. The paired `min-h-[56px]` is the same two lines expressed in
-          // CSS (2 x 24px `leading-6` + 8px `py-1`, border-box) so the floor also
-          // holds if that inline height is ever set from somewhere else.
+          // shorter. The paired `min-h-[56px]` is those same two lines in CSS
+          // (2 x 24px `leading-6` + 8px `py-1`, and `box-sizing: border-box` puts
+          // the padding inside the 56). It sits exactly AT the natural height on
+          // purpose: a floor is meant to be inert until something tries to go
+          // under it, which here means an inline height arriving from anywhere
+          // but the autosize. Setting it higher would buy no protection and cost
+          // permanent dead space under the caret.
           rows={2}
           aria-label="Message input"
           className="max-h-[168px] min-h-[56px] w-full resize-none bg-transparent px-1.5 py-1 text-[15px] leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
