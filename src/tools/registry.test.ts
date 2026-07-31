@@ -112,18 +112,22 @@ describe('buildAppToolMcpServer — custom tools', () => {
     const server = buildAppToolMcpServer({
       tool: setConfig,
       baseUrl: 'https://app.example.com/',
-      token: 'tok',
+      tokenEnvKey: 'APP_CAPABILITY_TOKEN',
       ctx,
       description: 'd',
     })
     expect(server.url).toBe('https://app.example.com/api/tools/set-config')
-    expect(server.headers.Authorization).toBe('Bearer tok')
+    expect(server.headers.Authorization).toEqual({
+      kind: 'secret-ref',
+      key: 'APP_CAPABILITY_TOKEN',
+      format: 'bearer',
+    })
   })
   it('throws when a custom tool has no path', () => {
     const noPath = defineAppTool({ name: 'no_path', description: 'd', parameters: {}, execute: () => null })
-    expect(() => buildAppToolMcpServer({ tool: noPath, baseUrl: 'https://x', token: 't', ctx, description: 'd' })).toThrow(
-      /no route path/,
-    )
+    expect(() =>
+      buildAppToolMcpServer({ tool: noPath, baseUrl: 'https://x', tokenEnvKey: 'T', ctx, description: 'd' }),
+    ).toThrow(/no route path/)
   })
 })
 

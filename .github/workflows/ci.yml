@@ -14,9 +14,16 @@ jobs:
     env:
       # tsup generates .d.ts for 73 entries in a worker thread (the `prepare`
       # script runs during install, and again in the build step); that worker
-      # needed ~4.7GB and has grown with the subpath count (OOMed at 6144 after the #191/#192 merges); 8192 matches the documented local build requirement. The worker inherits
+      # needed ~4.7GB and has grown with the subpath count (OOMed at 6144 after the #191/#192 merges). The worker inherits
       # NODE_OPTIONS, so set the heap once at the job level.
-      NODE_OPTIONS: --max-old-space-size=8192
+      #
+      # Raised 8192 -> 12288 when `AppToolMcpServer.headers` became
+      # `Record<string, AgentProfileConfigValue>`: that type reaches five entry
+      # points (tools, runtime, sandbox, design-canvas, sequences), so rollup-dts
+      # inlines agent-interface's schema graph into each. Measured on this repo:
+      # 8192 ERR_WORKER_OUT_OF_MEMORY, 10240 green at 9.4 GB peak RSS / 38 s.
+      # 12288 keeps headroom on a 16 GB ubuntu-latest runner.
+      NODE_OPTIONS: --max-old-space-size=12288
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

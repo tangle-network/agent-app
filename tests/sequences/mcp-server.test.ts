@@ -668,12 +668,15 @@ describe('buildSequencesMcpServerEntry', () => {
     const entry = buildSequencesMcpServerEntry({
       baseUrl: 'https://app.test/',
       path: '/api/sequences/seq-1/mcp',
-      token: 'cap_abc',
+      tokenEnvKey: 'SEQUENCES_CAPABILITY_TOKEN',
     })
     expect(entry).toEqual({
       transport: 'http',
       url: 'https://app.test/api/sequences/seq-1/mcp',
-      headers: { Authorization: 'Bearer cap_abc', 'Content-Type': 'application/json' },
+      headers: {
+        Authorization: { kind: 'secret-ref', key: 'SEQUENCES_CAPABILITY_TOKEN', format: 'bearer' },
+        'Content-Type': { kind: 'public', value: 'application/json' },
+      },
       enabled: true,
       metadata: { description: DEFAULT_SEQUENCES_MCP_DESCRIPTION },
     })
@@ -683,22 +686,30 @@ describe('buildSequencesMcpServerEntry', () => {
     const entry = buildSequencesMcpServerEntry({
       baseUrl: 'https://app.test',
       path: '/api/sequences/seq-1/mcp',
-      token: 'cap_abc',
+      tokenEnvKey: 'SEQUENCES_CAPABILITY_TOKEN',
       description: 'Edit the launch teaser timeline',
       ctx: { userId: 'user-1', workspaceId: 'ws-1', threadId: null },
     })
-    expect(entry.headers.Authorization).toBe('Bearer cap_abc')
-    expect(entry.headers['X-Agent-App-User-Id']).toBe('user-1')
-    expect(entry.headers['X-Agent-App-Workspace-Id']).toBe('ws-1')
+    expect(entry.headers.Authorization).toEqual({
+      kind: 'secret-ref',
+      key: 'SEQUENCES_CAPABILITY_TOKEN',
+      format: 'bearer',
+    })
+    expect(entry.headers['X-Agent-App-User-Id']).toEqual({ kind: 'public', value: 'user-1' })
+    expect(entry.headers['X-Agent-App-Workspace-Id']).toEqual({ kind: 'public', value: 'ws-1' })
     expect(entry.metadata.description).toBe('Edit the launch teaser timeline')
   })
 
-  it('fails closed on a missing token and a relative path', () => {
+  it('fails closed on a missing token env key and a relative path', () => {
     expect(() =>
-      buildSequencesMcpServerEntry({ baseUrl: 'https://app.test', path: '/mcp', token: '  ' }),
-    ).toThrow(/capability token/)
+      buildSequencesMcpServerEntry({ baseUrl: 'https://app.test', path: '/mcp', tokenEnvKey: '  ' }),
+    ).toThrow(/capability token env key/)
     expect(() =>
-      buildSequencesMcpServerEntry({ baseUrl: 'https://app.test', path: 'mcp', token: 'cap_abc' }),
+      buildSequencesMcpServerEntry({
+        baseUrl: 'https://app.test',
+        path: 'mcp',
+        tokenEnvKey: 'SEQUENCES_CAPABILITY_TOKEN',
+      }),
     ).toThrow(/must start with/)
   })
 })

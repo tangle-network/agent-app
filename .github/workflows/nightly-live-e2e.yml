@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      NODE_OPTIONS: --max-old-space-size=8192
+      NODE_OPTIONS: --max-old-space-size=12288
       LIVE_SANDBOX: '1'
       SANDBOX_API_URL: ${{ vars.SANDBOX_API_URL || 'https://sandbox.tangle.tools' }}
       LIVE_MODEL: ${{ inputs.model || 'gpt-5-mini' }}

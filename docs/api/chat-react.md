@@ -72,7 +72,7 @@ type HarnessType
 
 ### `ReasoningEffort`
 
-`type` — Portable reasoning/thinking effort.
+`type`
 
 ```ts
 type ReasoningEffort

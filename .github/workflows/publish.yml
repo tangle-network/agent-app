@@ -21,7 +21,7 @@ jobs:
     permissions:
       contents: read
     env:
-      NODE_OPTIONS: --max-old-space-size=8192
+      NODE_OPTIONS: --max-old-space-size=12288
     outputs:
       mode: ${{ steps.release.outputs.mode }}
       version: ${{ steps.release.outputs.version }}

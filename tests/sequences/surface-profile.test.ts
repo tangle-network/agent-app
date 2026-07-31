@@ -14,29 +14,35 @@ function server(url = 'https://app.example.com/api/tools/x'): AppToolMcpServer {
   return {
     transport: 'http',
     url,
-    headers: { Authorization: 'Bearer cap_x', 'Content-Type': 'application/json' },
+    headers: {
+      Authorization: { kind: 'secret-ref', key: 'APP_CAPABILITY_TOKEN', format: 'bearer' },
+      'Content-Type': { kind: 'public', value: 'application/json' },
+    },
     enabled: true,
     metadata: { description: 'test server' },
   }
 }
 
+/** Box-env variable the product writes the workspace capability token into at
+ *  sandbox creation. The profile REFERENCES this name; the value never enters
+ *  profile material. */
+const CAPABILITY_TOKEN_ENV = 'SEQUENCES_CAPABILITY_TOKEN'
+
 /** The worked example, in the per-request shape the module doc prescribes:
  *  the request handler builds the registry closing over server-trusted state
- *  (the capability secret and the AUTHENTICATED user/workspace) — the client
+ *  (the box-env key name and the AUTHENTICATED user/workspace) — the client
  *  ctx carries ONLY routing data (which sequence is open), never identity. */
-function sequencesRegistryFor(server: { secret: string; userId: string; workspaceId: string }) {
+function sequencesRegistryFor(server: { tokenEnvKey: string; userId: string; workspaceId: string }) {
   return createSurfaceRegistry([
     defineSurfaceKind<{ sequenceId: string }>({
       kind: 'sequences',
       build: async (ctx) => {
-        const token = await createCapabilityToken(server.userId, { secret: server.secret })
-        if (!token) throw new Error('capability secret unconfigured — refusing to mount the sequence MCP server')
         return {
           mcp: {
             sequence_edit: buildHttpMcpServer({
               path: '/api/tools/sequence-edit',
               baseUrl: 'https://app.example.com',
-              token,
+              tokenEnvKey: server.tokenEnvKey,
               ctx: { userId: server.userId, workspaceId: server.workspaceId, threadId: null },
               description: 'Apply timeline operations to the active sequence.',
             }),
@@ -51,22 +57,41 @@ function sequencesRegistryFor(server: { secret: string; userId: string; workspac
 
 describe('surface registry', () => {
   it('resolves a registered kind: identity from the request closure, routing from ctx', async () => {
-    const registry = sequencesRegistryFor({ secret: SECRET, userId: 'user-1', workspaceId: 'ws-1' })
+    const registry = sequencesRegistryFor({
+      tokenEnvKey: CAPABILITY_TOKEN_ENV,
+      userId: 'user-1',
+      workspaceId: 'ws-1',
+    })
     const overlay = await registry.resolve('sequences', { sequenceId: 'seq-1' })
 
     const entry = overlay.mcp!.sequence_edit!
     expect(entry.url).toBe('https://app.example.com/api/tools/sequence-edit')
-    // The Authorization header carries a real minted capability token bound to
-    // the acting user — not anything the client request could have supplied.
-    const expected = await createCapabilityToken('user-1', { secret: SECRET })
-    expect(entry.headers.Authorization).toBe(`Bearer ${expected}`)
-    expect(entry.headers['X-Agent-App-User-Id']).toBe('user-1')
-    expect(entry.headers['X-Agent-App-Workspace-Id']).toBe('ws-1')
+    // The Authorization header REFERENCES the box-env key the server closure
+    // named — not anything the client request could have supplied, and not the
+    // token value, which never enters profile material at all.
+    expect(entry.headers.Authorization).toEqual({
+      kind: 'secret-ref',
+      key: CAPABILITY_TOKEN_ENV,
+      format: 'bearer',
+    })
+    expect(entry.headers['X-Agent-App-User-Id']).toEqual({ kind: 'public', value: 'user-1' })
+    expect(entry.headers['X-Agent-App-Workspace-Id']).toEqual({ kind: 'public', value: 'ws-1' })
     expect(overlay.promptAddendum).toContain('seq-1')
   })
 
+  // What makes the reference resolvable: the value the product writes into
+  // SandboxRuntimeConfig.env at box creation is byte-identical to the one any
+  // later turn would mint, because the mint is a deterministic HMAC. A random
+  // per-request token would satisfy the schema and resolve to the WRONG value.
+  it('the referenced box-env value is deterministic across turns', async () => {
+    const first = await createCapabilityToken('ws-1', { secret: SECRET })
+    const second = await createCapabilityToken('ws-1', { secret: SECRET })
+    expect(first).toBeDefined()
+    expect(second).toBe(first)
+  })
+
   it('throws on an unknown kind and names the registered kinds', async () => {
-    const registry = sequencesRegistryFor({ secret: SECRET, userId: 'user-1', workspaceId: 'ws-1' })
+    const registry = sequencesRegistryFor({ tokenEnvKey: CAPABILITY_TOKEN_ENV, userId: 'user-1', workspaceId: 'ws-1' })
     await expect(registry.resolve('briefs', {})).rejects.toThrow(
       /unknown surface kind 'briefs' — registered kinds: sequences/,
     )

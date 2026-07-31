@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { agentProfileSchema } from '@tangle-network/agent-interface'
 
 const execFileAsync = promisify(execFile)
 
@@ -781,12 +782,25 @@ describe('buildAppToolMcpServers', () => {
         { tool: 'add_citation', key: 'app-cite', description: 'd2' },
       ],
       baseUrl: 'https://app',
-      token: 'tok',
+      tokenEnvKey: 'APP_CAPABILITY_TOKEN',
       ctx: { userId: 'w1', workspaceId: 'w1', threadId: null },
     })
     expect(Object.keys(entries).sort()).toEqual(['app-cite', 'app-propose'])
     expect(entries['app-propose']!.transport).toBe('http')
     expect(entries['app-propose']!.url).toContain('https://app')
+  })
+
+  // The cast this function used to carry (`as AgentProfileMcpServer`) is what
+  // let the pre-0.38.0 plain-string shape ship. Validating the returned map
+  // against the REAL schema is the check that cast defeated.
+  it('returns entries the real agentProfileSchema accepts', () => {
+    const entries = buildAppToolMcpServers({
+      tools: [{ tool: 'submit_proposal', key: 'app-propose', description: 'd1' }],
+      baseUrl: 'https://app.example.com',
+      tokenEnvKey: 'APP_CAPABILITY_TOKEN',
+      ctx: { userId: 'u1', workspaceId: 'w1', threadId: 't1' },
+    })
+    expect(agentProfileSchema.safeParse({ mcp: entries }).success).toBe(true)
   })
 })
 

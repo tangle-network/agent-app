@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { agentProfileSchema } from '@tangle-network/agent-interface'
 import {
   ToolInputError,
   buildAppToolOpenAITools,
@@ -264,19 +265,21 @@ describe('handleAppToolRequest', () => {
 describe('buildAppToolMcpServer', () => {
   it('builds an http MCP entry with server-set identity headers; omits thread when null', () => {
     const withThread = buildAppToolMcpServer({
-      tool: 'submit_proposal', baseUrl: 'https://app.example/', token: 'tok:u1',
+      tool: 'submit_proposal', baseUrl: 'https://app.example/', tokenEnvKey: 'APP_CAPABILITY_TOKEN',
       ctx: { userId: 'u1', workspaceId: 'ws1', threadId: 't1' }, description: 'd',
     })
     expect(withThread.transport).toBe('http')
     expect((withThread as { type?: string }).type).toBeUndefined()
     expect(withThread.url).toBe('https://app.example/api/tools/propose')
-    expect(withThread.headers['X-Agent-App-User-Id']).toBe('u1')
-    expect(withThread.headers['X-Agent-App-Workspace-Id']).toBe('ws1')
-    expect(withThread.headers['X-Agent-App-Thread-Id']).toBe('t1')
-    expect(withThread.headers.Authorization).toBe('Bearer tok:u1')
+    expect(withThread.headers['X-Agent-App-User-Id']).toEqual({ kind: 'public', value: 'u1' })
+    expect(withThread.headers['X-Agent-App-Workspace-Id']).toEqual({ kind: 'public', value: 'ws1' })
+    expect(withThread.headers['X-Agent-App-Thread-Id']).toEqual({ kind: 'public', value: 't1' })
+    expect(withThread.headers.Authorization).toEqual({
+      kind: 'secret-ref', key: 'APP_CAPABILITY_TOKEN', format: 'bearer',
+    })
 
     const noThread = buildAppToolMcpServer({
-      tool: 'render_ui', baseUrl: 'https://app.example', token: 't',
+      tool: 'render_ui', baseUrl: 'https://app.example', tokenEnvKey: 'APP_CAPABILITY_TOKEN',
       ctx: { userId: 'u1', workspaceId: 'ws1', threadId: null }, description: 'd',
     })
     expect(noThread.url).toBe('https://app.example/api/tools/render-ui')
@@ -285,24 +288,101 @@ describe('buildAppToolMcpServer', () => {
 
   it('buildHttpMcpServer omits workspace/thread headers when empty (user-scoped bridge like integration_invoke)', () => {
     const s = buildHttpMcpServer({
-      path: '/api/tools/integration-invoke', baseUrl: 'https://app.example/', token: 'tok',
+      path: '/api/tools/integration-invoke', baseUrl: 'https://app.example/', tokenEnvKey: 'HUB_CAPABILITY_TOKEN',
       ctx: { userId: 'u1', workspaceId: '', threadId: null }, description: 'hub bridge',
       headerNames: { userId: 'X-Product-User-Id', workspaceId: 'X-Product-Workspace-Id', threadId: 'X-Product-Thread-Id' },
     })
     expect(s.url).toBe('https://app.example/api/tools/integration-invoke')
-    expect(s.headers['X-Product-User-Id']).toBe('u1')
+    expect(s.headers['X-Product-User-Id']).toEqual({ kind: 'public', value: 'u1' })
     expect(s.headers['X-Product-Workspace-Id']).toBeUndefined()
     expect(s.headers['X-Product-Thread-Id']).toBeUndefined()
   })
 
   it('honors custom header names + paths', () => {
     const s = buildAppToolMcpServer({
-      tool: 'submit_proposal', baseUrl: 'https://x', token: 't',
+      tool: 'submit_proposal', baseUrl: 'https://x', tokenEnvKey: 'APP_CAPABILITY_TOKEN',
       ctx: { userId: 'u', workspaceId: 'w', threadId: null }, description: 'd',
       headerNames: { userId: 'X-Product-User-Id', workspaceId: 'X-Product-Workspace-Id', threadId: 'X-Product-Thread-Id' },
       paths: { submit_proposal: '/api/tools/propose' },
     })
-    expect(s.headers['X-Product-User-Id']).toBe('u')
+    expect(s.headers['X-Product-User-Id']).toEqual({ kind: 'public', value: 'u' })
     expect(s.url).toBe('https://x/api/tools/propose')
+  })
+})
+
+/**
+ * Calibration for the tagging change: these run the REAL `agentProfileSchema`
+ * from the resolved `@tangle-network/agent-interface`, so they cannot pass
+ * vacuously. The first pair pins BOTH directions of the 0.38.0 contract — the
+ * shape this package used to emit is rejected, the shape it emits now is
+ * accepted — which is what makes the acceptance assertion meaningful.
+ */
+describe('emitted MCP servers against the real AgentProfile contract', () => {
+  const ctx = { userId: 'u1', workspaceId: 'ws1', threadId: 't1' }
+
+  it('rejects the pre-0.38.0 plain-string shape this package used to emit', () => {
+    const legacy = {
+      transport: 'http',
+      url: 'https://app.example.com/api/tools/propose',
+      headers: {
+        Authorization: 'Bearer cap_abc',
+        'X-Agent-App-User-Id': 'u1',
+        'Content-Type': 'application/json',
+      },
+      enabled: true,
+      metadata: { description: 'd' },
+    }
+    expect(agentProfileSchema.safeParse({ mcp: { app_propose: legacy } }).success).toBe(false)
+  })
+
+  it('accepts what buildAppToolMcpServer emits now', () => {
+    const server = buildAppToolMcpServer({
+      tool: 'submit_proposal',
+      baseUrl: 'https://app.example.com',
+      tokenEnvKey: 'APP_CAPABILITY_TOKEN',
+      ctx,
+      description: 'd',
+    })
+    const parsed = agentProfileSchema.safeParse({ mcp: { app_propose: server } })
+    expect(parsed.success).toBe(true)
+  })
+
+  // The contract refuses to let a secret hide as public material, so there is
+  // no "wrap the token as public" escape hatch for a credential-named header.
+  it('refuses a credential-bearing custom header name carrying a public value', () => {
+    expect(() =>
+      buildHttpMcpServer({
+        path: '/api/tools/propose',
+        baseUrl: 'https://app.example.com',
+        tokenEnvKey: 'APP_CAPABILITY_TOKEN',
+        ctx,
+        description: 'd',
+        headerNames: { userId: 'X-Product-Token', workspaceId: 'X-Product-Ws', threadId: 'X-Product-Thread' },
+      }),
+    ).toThrow(/credential-bearing config names require a secret-ref/)
+  })
+
+  it('refuses a relative base URL the sandbox could never dial', () => {
+    expect(() =>
+      buildHttpMcpServer({
+        path: '/api/tools/propose',
+        baseUrl: '/relative',
+        tokenEnvKey: 'APP_CAPABILITY_TOKEN',
+        ctx,
+        description: 'd',
+      }),
+    ).toThrow(/absolute HTTP\(S\) URL/)
+  })
+
+  it('refuses a token value passed where the box-env key name belongs', () => {
+    expect(() =>
+      buildHttpMcpServer({
+        path: '/api/tools/propose',
+        baseUrl: 'https://app.example.com',
+        tokenEnvKey: 'cap_9f2e.abc',
+        ctx,
+        description: 'd',
+      }),
+    ).toThrow(/environment-variable NAME/)
   })
 })

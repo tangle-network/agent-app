@@ -72,7 +72,7 @@ _78 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./theme-contract`](api/theme-contract.md) | 4 | — |
 | [`./theme-contract/cli`](api/theme-contract-cli.md) | 0 | — |
 | [`./theme/tailwind-preset`](api/theme-tailwind-preset.md) | 1 | — |
-| [`./tools`](api/tools.md) | 63 | `crypto`, `eval` |
+| [`./tools`](api/tools.md) | 64 | `crypto`, `eval` |
 | [`./trace`](api/trace.md) | 20 | `missions` |
 | [`./turn-health`](api/turn-health.md) | 32 | — |
 | [`./turn-stream`](api/turn-stream.md) | 59 | `chat-routes`, `stream` |
@@ -679,11 +679,11 @@ Source: `src/theme/tailwind-preset.ts` · 1 exports
 
 ## `./tools`
 
-Source: `src/tools/index.ts` · 63 exports
+Source: `src/tools/index.ts` · 64 exports
 
 Depends on: `crypto`, `eval`
 
-`AddCitationArgs`, `AddCitationResult`, `APP_TOOL_NAMES`, `AppToolContext`, `AppToolDefinition`, `AppToolHandlers`, `AppToolMcpServer`, `AppToolName`, `AppToolOutcome`, `AppToolProducedEvent`, `AppToolRuntimeExecutor`, `AppToolTaxonomy`, `AuthenticateOptions`, `authenticateToolRequest`, `buildAppToolMcpServer`, `buildAppToolOpenAITools`, `BuildAppToolsOptions`, `buildHttpMcpServer`, `BuildHttpMcpServerOptions`, `BuildMcpServerOptions`, `buildScopedMcpServerEntry`, `CapabilityTokenOptions`, `createAppToolRuntimeExecutor`, `createCapabilityToken`, `createExpiringCapabilityToken`, `createMcpToolHandler`, `CreateMcpToolHandlerOptions`, `customToolToOpenAI`, `DEFAULT_APP_TOOL_PATHS`, `DEFAULT_HEADER_NAMES`, `defineAppTool`, `dispatchAppTool`, `DispatchOptions`, `ExpiringCapabilityTokenOptions`, `findCustomTool`, `handleAppToolRequest`, `HandleToolRequestOptions`, `isAppToolName`, `MCP_PROTOCOL_VERSIONS`, `McpProtocolVersion`, `McpServerInfo`, `McpToolDefinition`, `OpenAIFunctionTool`, `outcomeStatus`, `readToolArgs`, `RenderUiArgs`, `RenderUiResult`, `ResolvedToolCapabilities`, `resolveToolCapabilities`, `ResolveToolCapabilitiesOptions`, `restrictTaxonomy`, `RuntimeExecutorOptions`, `ScheduleFollowupArgs`, `ScheduleFollowupResult`, `ScopedMcpServerEntryOptions`, `SubmitProposalArgs`, `SubmitProposalResult`, `ToolAuthResult`, `ToolCapability`, `ToolHeaderNames`, `ToolInputError`, `verifyCapabilityToken`, `verifyExpiringCapabilityToken`
+`AddCitationArgs`, `AddCitationResult`, `APP_TOOL_NAMES`, `AppToolContext`, `AppToolDefinition`, `AppToolHandlers`, `AppToolMcpServer`, `AppToolName`, `AppToolOutcome`, `AppToolProducedEvent`, `AppToolRuntimeExecutor`, `AppToolTaxonomy`, `AuthenticateOptions`, `authenticateToolRequest`, `buildAppToolMcpServer`, `buildAppToolOpenAITools`, `BuildAppToolsOptions`, `buildHttpMcpServer`, `BuildHttpMcpServerOptions`, `BuildMcpServerOptions`, `buildScopedMcpServerEntry`, `CapabilityTokenOptions`, `createAppToolRuntimeExecutor`, `createCapabilityToken`, `createExpiringCapabilityToken`, `createMcpToolHandler`, `CreateMcpToolHandlerOptions`, `customToolToOpenAI`, `DEFAULT_APP_TOOL_PATHS`, `DEFAULT_HEADER_NAMES`, `defineAppTool`, `dispatchAppTool`, `DispatchOptions`, `ExpiringCapabilityTokenOptions`, `findCustomTool`, `handleAppToolRequest`, `HandleToolRequestOptions`, `isAppToolName`, `MCP_PROTOCOL_VERSIONS`, `McpProtocolVersion`, `McpServerInfo`, `McpToolDefinition`, `OpenAIFunctionTool`, `outcomeStatus`, `readToolArgs`, `RenderUiArgs`, `RenderUiResult`, `ResolvedToolCapabilities`, `resolveToolCapabilities`, `ResolveToolCapabilitiesOptions`, `restrictTaxonomy`, `RuntimeExecutorOptions`, `ScheduleFollowupArgs`, `ScheduleFollowupResult`, `ScopedMcpServerEntryOptions`, `SubmitProposalArgs`, `SubmitProposalResult`, `ToolAuthResult`, `ToolCapability`, `ToolHeaderNames`, `ToolInputError`, `unresolvableSurfaceCredential`, `verifyCapabilityToken`, `verifyExpiringCapabilityToken`
 
 [Full API →](api/tools.md)
 
