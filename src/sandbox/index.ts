@@ -918,6 +918,24 @@ export class SandboxEgressPolicyMismatchError extends Error {
   }
 }
 
+import {
+  isSandboxHostCapacityFailure,
+  serializeSandboxProvisioningError,
+} from './diagnostics'
+
+export {
+  EGRESS_PROXY_RECOVERY_REQUIRED,
+  serializeSandboxProvisioningError,
+  formatSandboxProvisioningSupportDetails,
+  formatSandboxProvisioningUserMessage,
+  isSandboxAuthFailure,
+  isSandboxApiBearerAuthFailure,
+  isSandboxApiSandboxMissingFailure,
+  isSandboxHostCapacityFailure,
+  type SafeSandboxErrorCause,
+  type SafeSandboxErrorDiagnostics,
+} from './diagnostics'
+
 /** Represent an error thrown when sandbox runtime authentication refresh fails for a specific stage and name */
 export class SandboxRuntimeAuthRefreshError extends Error {
   constructor(stage: SandboxExistingBoxStage, name: string, detail: string, cause?: unknown) {
@@ -1879,9 +1897,24 @@ export async function ensureWorkspaceSandbox(
     // the same way surfaces the error instead of looping.
     if (!shell.replaceUnbringableBox) throw err
     if (options.forceNew) throw err
-    if (!(err instanceof SandboxRecoveryFailedError)) throw err
+    if (!isUnbringableBoxError(err)) throw err
     return await provisionWorkspaceSandbox(shell, { ...options, forceNew: true })
   }
+}
+
+/**
+ * True when the platform cannot bring this box up where it lives.
+ *
+ * Two shapes reach here. `SandboxRecoveryFailedError` is the substrate's own
+ * verdict after it tried a state-preserving restart and failed. A host-capacity
+ * rejection is the same verdict one layer earlier: a box is pinned to a host,
+ * and a full host rejects every resume for every box on it until something else
+ * there goes away. Neither is transient, and neither is fixed by trying again
+ * at the same key.
+ */
+function isUnbringableBoxError(error: unknown): boolean {
+  if (error instanceof SandboxRecoveryFailedError) return true
+  return isSandboxHostCapacityFailure(serializeSandboxProvisioningError(error))
 }
 
 async function provisionWorkspaceSandbox(
