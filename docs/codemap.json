@@ -8596,6 +8596,12 @@
           "doc": "Define options to manage deterministic session resumption and turn idempotency in sandboxed drive turns"
         },
         {
+          "name": "EGRESS_PROXY_RECOVERY_REQUIRED",
+          "kind": "const",
+          "signature": "\"EGRESS_PROXY_RECOVERY_REQUIRED\"",
+          "doc": "Error code an app raises when a stopped box's egress proxy must be rebuilt before the box can be reused."
+        },
+        {
           "name": "ensureWorkspaceSandbox",
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig, options: EnsureWorkspaceSandboxOptions) => Promise<SandboxInstance>",
@@ -8626,10 +8632,46 @@
           "doc": "Build a single string combining conversation history and the current user message"
         },
         {
+          "name": "formatSandboxProvisioningSupportDetails",
+          "kind": "function",
+          "signature": "(diagnostics: SafeSandboxErrorDiagnostics) => string",
+          "doc": null
+        },
+        {
+          "name": "formatSandboxProvisioningUserMessage",
+          "kind": "function",
+          "signature": "(diagnostics: SafeSandboxErrorDiagnostics) => string",
+          "doc": null
+        },
+        {
           "name": "getClient",
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig) => Sandbox",
           "doc": "Resolve a synchronous sandbox client from provided runtime configuration credentials"
+        },
+        {
+          "name": "isSandboxApiBearerAuthFailure",
+          "kind": "function",
+          "signature": "(diagnostics: SafeSandboxErrorDiagnostics) => boolean",
+          "doc": null
+        },
+        {
+          "name": "isSandboxApiSandboxMissingFailure",
+          "kind": "function",
+          "signature": "(diagnostics: SafeSandboxErrorDiagnostics) => boolean",
+          "doc": "True when the sandbox API answered 404 for a specific sandbox resource — the box behind a persisted sandbox id no longer exists."
+        },
+        {
+          "name": "isSandboxAuthFailure",
+          "kind": "function",
+          "signature": "(diagnostics: SafeSandboxErrorDiagnostics) => boolean",
+          "doc": null
+        },
+        {
+          "name": "isSandboxHostCapacityFailure",
+          "kind": "function",
+          "signature": "(diagnostics: SafeSandboxErrorDiagnostics) => boolean",
+          "doc": "True when a resume failed because the host the box is pinned to cannot seat it — the host's slot budget is exhausted, not the box's fault and not something waiting fixes."
         },
         {
           "name": "isTerminalPromptEvent",
@@ -8854,6 +8896,18 @@
           "doc": "Resolve the sandbox environment PATH setup by executing the configuration script with given options"
         },
         {
+          "name": "SafeSandboxErrorCause",
+          "kind": "interface",
+          "signature": "interface SafeSandboxErrorCause",
+          "doc": null
+        },
+        {
+          "name": "SafeSandboxErrorDiagnostics",
+          "kind": "interface",
+          "signature": "interface SafeSandboxErrorDiagnostics",
+          "doc": null
+        },
+        {
           "name": "SandboxBuildContext",
           "kind": "interface",
           "signature": "interface SandboxBuildContext",
@@ -9050,6 +9104,12 @@
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig) => SecretStore",
           "doc": "Resolve a SecretStore interface using the provided SandboxRuntimeConfig shell"
+        },
+        {
+          "name": "serializeSandboxProvisioningError",
+          "kind": "function",
+          "signature": "(error: unknown, options?: { maxDepth?: number | undefined; }) => SafeSandboxErrorDiagnostics",
+          "doc": null
         },
         {
           "name": "shellQuote",
