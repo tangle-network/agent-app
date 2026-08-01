@@ -8,8 +8,8 @@ import { makeModels } from '../fixtures'
 
 /**
  * Visual audit for ChatComposer: the shared message input across its states —
- * model pill above the box, empty vs typed, streaming (Stop), the attach +
- * pending-file surface, and the footer-placement variant. Token-only styling, so
+ * model pill on the input's own action row, empty vs typed, streaming (Stop),
+ * the attach + pending-file surface, and the opt-out `above` placement. Token-only styling, so
  * this is also the proof it themes from the shared tokens (light + dark) without
  * any private --chat-* variables.
  */
@@ -39,7 +39,7 @@ export function ComposerRoute() {
   return (
     <div className="h-full w-full overflow-y-auto bg-background">
       <div className="mx-auto max-w-xl space-y-7 px-6 py-10">
-        <Demo title="Default — model pill above, empty">
+        <Demo title="Default — model pill on the action row, empty">
           <ChatComposer
             onSend={() => {}}
             placeholder="Message the assistant…"
@@ -78,12 +78,12 @@ export function ComposerRoute() {
           />
         </Demo>
 
-        <Demo title="Footer placement — model pill inline (no focus hint)">
+        <Demo title="Above placement — model pill outside the card (no focus hint)">
           <ChatComposer
             onSend={() => {}}
             placeholder="Message the assistant…"
             controls={pill}
-            controlsPlacement="footer"
+            controlsPlacement="above"
             focusShortcut={false}
           />
         </Demo>
