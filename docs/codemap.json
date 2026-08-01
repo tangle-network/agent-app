@@ -13102,6 +13102,12 @@
           "doc": "Build the `AgentProfileMcpServer`-shaped entry for a scoped, per-resource MCP channel."
         },
         {
+          "name": "CapabilitySubject",
+          "kind": "type",
+          "signature": "type CapabilitySubject",
+          "doc": "Which identity the bearer is bound to."
+        },
+        {
           "name": "CapabilityTokenOptions",
           "kind": "interface",
           "signature": "interface CapabilityTokenOptions",
