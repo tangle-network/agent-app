@@ -40,7 +40,12 @@
 
 import { sql } from 'drizzle-orm'
 import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
-import type { AnySQLiteColumn, AnySQLiteTable, SQLiteColumnBuilderBase } from 'drizzle-orm/sqlite-core'
+import type {
+  AnySQLiteColumn,
+  AnySQLiteTable,
+  SQLiteColumnBuilderBase,
+  SQLiteTableExtraConfigValue,
+} from 'drizzle-orm/sqlite-core'
 import type { ChatMessagePart } from './parts'
 
 /** A product table referenced by FK — only the `id` column is touched. */
@@ -84,11 +89,18 @@ export interface CreateChatTablesOptions<
 }
 
 /**
- * Builds product indexes from a table's columns. Returns drizzle's
- * `index(...)`/`uniqueIndex(...)` results; the column map is passed through
- * untyped because its shape depends on the product's own extras.
+ * Builds product indexes from a table's columns.
+ *
+ * The column map is passed untyped because its shape depends on the product's
+ * own extras; the RETURN is drizzle's own extra-config type, so the spread
+ * below stays inside the union `sqliteTable` expects and the built table keeps
+ * its inferred column types. Returning `unknown[]` here would force a cast on
+ * the config array, which widens every column to the cross-dialect union and
+ * breaks `db.select()` at every call site.
  */
-export type ChatExtraIndexes = (columns: Record<string, AnySQLiteColumn>) => unknown[]
+export type ChatExtraIndexes = (
+  columns: Record<string, AnySQLiteColumn>,
+) => SQLiteTableExtraConfigValue[]
 
 const hexId = () => text('id').primaryKey().default(sql`(lower(hex(randomblob(16))))`)
 
@@ -107,7 +119,7 @@ export function createChatTables<
   const extraIndexes = (
     build: ChatExtraIndexes | undefined,
     table: Record<string, AnySQLiteColumn>,
-  ): unknown[] => build?.(table) ?? []
+  ): SQLiteTableExtraConfigValue[] => build?.(table) ?? []
 
   const threads = sqliteTable(`${tablePrefix}thread`, {
     id: hexId(),
@@ -125,7 +137,7 @@ export function createChatTables<
     // Supports the store's list ordering (updatedAt desc within a workspace).
     index(`idx_${tablePrefix}thread_workspace_updated`).on(table.workspaceId, table.updatedAt),
     ...extraIndexes(options.threadExtraIndexes, table as unknown as Record<string, AnySQLiteColumn>),
-  ] as never)
+  ])
 
   const messages = sqliteTable(`${tablePrefix}message`, {
     id: hexId(),
@@ -153,7 +165,7 @@ export function createChatTables<
     index(`idx_${tablePrefix}message_thread`).on(table.threadId),
     index(`idx_${tablePrefix}message_thread_created`).on(table.threadId, table.createdAt),
     ...extraIndexes(options.messageExtraIndexes, table as unknown as Record<string, AnySQLiteColumn>),
-  ] as never)
+  ])
 
   return { threads, messages }
 }
