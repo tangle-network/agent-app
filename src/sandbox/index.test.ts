@@ -1675,6 +1675,77 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     expect(createMock).not.toHaveBeenCalled()
   })
 
+  it('leaves an unbringable box alone by default, because replacing it is a delete', async () => {
+    const stopped = fakeBox({
+      name: 'box-w1',
+      stop: vi.fn().mockRejectedValue(new Error('driver does not support stop')),
+      resume: vi.fn().mockResolvedValue(undefined),
+    })
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      Promise.resolve(status === 'running' ? [stopped] : []),
+    )
+
+    await expect(
+      ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+        livenessProbe: { sidecarProcessPattern: () => 'nothing-matches' },
+      }), { workspaceId: 'w1', harness: 'opencode' }),
+    ).rejects.toMatchObject({ name: 'SandboxRecoveryFailedError' })
+
+    expect(stopped.delete).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('replaces an unbringable box once when the shell says the box is rebuildable', async () => {
+    const stopped = fakeBox({
+      name: 'box-w1',
+      stop: vi.fn().mockRejectedValue(new Error('driver does not support stop')),
+      resume: vi.fn().mockResolvedValue(undefined),
+    })
+    let call = 0
+    listMock.mockImplementation(({ status }: { status: string }) => {
+      call += 1
+      // First provisioning attempt finds the dead box; the forceNew retry
+      // deletes it, so the second attempt finds nothing and creates.
+      return Promise.resolve(status === 'running' && call <= 2 ? [stopped] : [])
+    })
+    const created = fakeBox({ name: 'box-w1' })
+    createMock.mockResolvedValue(created)
+
+    const box = await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      replaceUnbringableBox: true,
+      livenessProbe: { sidecarProcessPattern: () => 'nothing-matches' },
+    }), { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(stopped.delete).toHaveBeenCalledOnce()
+    expect(createMock).toHaveBeenCalledOnce()
+    expect(box).toBe(created)
+  })
+
+  it('does not replace a second time — the retry runs with forceNew, so it cannot recurse', async () => {
+    const dead = fakeBox({
+      name: 'box-w1',
+      stop: vi.fn().mockRejectedValue(new Error('driver does not support stop')),
+      resume: vi.fn().mockResolvedValue(undefined),
+    })
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      Promise.resolve(status === 'running' ? [dead] : []),
+    )
+    // The one replacement attempt fails outright. Its error must surface as-is:
+    // swallowing it to try again is how a bounded retry becomes a loop.
+    const createFailure = new Error('no capacity anywhere in the fleet')
+    createMock.mockRejectedValue(createFailure)
+
+    await expect(
+      ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+        replaceUnbringableBox: true,
+        livenessProbe: { sidecarProcessPattern: () => 'nothing-matches' },
+      }), { workspaceId: 'w1', harness: 'opencode' }),
+    ).rejects.toBe(createFailure)
+
+    expect(dead.delete).toHaveBeenCalledOnce()
+    expect(createMock).toHaveBeenCalledOnce()
+  })
+
   it('preserves a generic stopped-box resume error instead of creating', async () => {
     const error = new Error('resume unavailable')
     const stopped = fakeBox({

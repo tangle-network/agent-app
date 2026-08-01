@@ -375,6 +375,20 @@ export interface SandboxRuntimeConfig {
   webTerminalEnabled?: boolean
   // default true: try stopped-resume before create.
   resumeStopped?: boolean
+  // Opt in to replacing a box the platform cannot bring up.
+  //
+  // Default false, and the default is the conservative one on purpose: a
+  // replacement is a delete, and delete DEPROVISIONS the persistent workspace
+  // (#299). An app whose durable state lives in the box's filesystem must not
+  // set this — losing the box loses the user's work.
+  //
+  // Set it when the box is a CACHE of state held elsewhere (a vault, a DB, an
+  // object store) and can be rebuilt. Then a box that cannot be started is
+  // abandoned and re-created once, instead of leaving the workspace unable to
+  // run for as long as the box stays unbringable — which, without this, is
+  // forever: the box key is derived from the workspace, so every later attempt
+  // resumes the same dead box and fails identically.
+  replaceUnbringableBox?: boolean
   // Product-owned retention/recovery policy after a stopped box fails to resume.
   // Return ok(null) to preserve the original resume error. A replacement key is
   // required before this shell creates a new box, so it cannot resolve the
@@ -1851,6 +1865,26 @@ async function assertExistingBoxEgress(
 
 /** Resolve or create a workspace sandbox instance with optional reuse and progress tracking */
 export async function ensureWorkspaceSandbox(
+  shell: SandboxRuntimeConfig,
+  options: EnsureWorkspaceSandboxOptions,
+): Promise<SandboxInstance> {
+  try {
+    return await provisionWorkspaceSandbox(shell, options)
+  } catch (err) {
+    // A box the platform cannot bring up is not a transient failure: the box
+    // key is derived from the workspace, so every later call resumes the same
+    // dead box and fails the same way. Left alone the workspace never runs
+    // again. Replacing it is a delete, so it happens only where the shell has
+    // declared the box rebuildable — and only once, so a replacement that dies
+    // the same way surfaces the error instead of looping.
+    if (!shell.replaceUnbringableBox) throw err
+    if (options.forceNew) throw err
+    if (!(err instanceof SandboxRecoveryFailedError)) throw err
+    return await provisionWorkspaceSandbox(shell, { ...options, forceNew: true })
+  }
+}
+
+async function provisionWorkspaceSandbox(
   shell: SandboxRuntimeConfig,
   options: EnsureWorkspaceSandboxOptions,
 ): Promise<SandboxInstance> {
