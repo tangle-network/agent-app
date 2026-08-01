@@ -83,8 +83,15 @@ export interface CheckPeerFloorsOptions {
  * tree is exports-map-independent and mirrors Node's own resolution order, so
  * the version reported is the version that would actually load.
  *
- * Returns null only when no directory for the package exists anywhere up the
- * tree, which is the genuine not-installed case.
+ * The walk STOPS at the repository root — a directory containing `.git` — and
+ * never climbs past it. Node itself would keep going, but a `node_modules`
+ * above a checkout belongs to something else entirely, and letting it answer
+ * silently changes the verdict: a stray `/tmp/node_modules` shadowing one
+ * package produced a confident FAIL for a repo that was above every floor. A
+ * check that reports the wrong tree is worse than no check.
+ *
+ * Returns null only when no directory for the package exists inside the repo,
+ * which is the genuine not-installed case.
  */
 function readInstalledManifest(
   name: string,
@@ -100,6 +107,8 @@ function readInstalledManifest(
         peerDependencies?: Record<string, string>
       }
     }
+    // Repo boundary: stop here rather than inheriting an unrelated tree.
+    if (existsSync(join(dir, '.git'))) return null
     const parent = dirname(dir)
     if (parent === dir) return null
     dir = parent

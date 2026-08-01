@@ -1,4 +1,5 @@
-import { readFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -118,5 +119,51 @@ describe('this package audits itself', () => {
     const report = checkPeerFloors({ appDir: root, shellManifest: own })
     const below = report.rows.filter((row) => row.verdict === 'below-floor')
     expect(below.map((row) => `${row.name} ${row.installed} vs ${row.range}`)).toEqual([])
+  })
+})
+
+describe('the walk stops at the repository boundary', () => {
+  // A `node_modules` ABOVE a checkout belongs to something else. Node would
+  // happily resolve through it; this must not, because inheriting one silently
+  // changes the verdict. Measured: a stray /tmp/node_modules shadowing a single
+  // package produced a confident FAIL for a repo that was above every floor.
+  it('does not inherit a package from outside the repo', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'peer-floor-boundary-'))
+    try {
+      // An ancestor tree holding an OLD version of the peer.
+      await mkdir(join(root, MODULES, '@tangle-network', 'agent-interface'), { recursive: true })
+      await writeFile(
+        join(root, MODULES, '@tangle-network', 'agent-interface', 'package.json'),
+        JSON.stringify({ name: '@tangle-network/agent-interface', version: '0.36.0' }),
+      )
+
+      // The repo sits inside it, declares the peer, and has its own agent-app
+      // but no copy of agent-interface.
+      const repo = join(root, 'app')
+      await mkdir(join(repo, MODULES, '@tangle-network', 'agent-app'), { recursive: true })
+      await writeFile(join(repo, '.git'), 'gitdir: elsewhere')
+      await writeFile(
+        join(repo, 'package.json'),
+        JSON.stringify({ name: 'app', dependencies: { '@tangle-network/agent-interface': '0.40.0' } }),
+      )
+      await writeFile(
+        join(repo, MODULES, '@tangle-network', 'agent-app', 'package.json'),
+        JSON.stringify({
+          name: '@tangle-network/agent-app',
+          version: '0.45.11',
+          peerDependencies: { '@tangle-network/agent-interface': '>=0.38.0 <0.41.0' },
+        }),
+      )
+
+      const report = checkPeerFloors({ appDir: repo, modulesDir: MODULES })
+      const row = report.rows.find((r) => r.name === '@tangle-network/agent-interface')
+
+      // NOT 'below-floor' from the ancestor's 0.36.0 — the version is simply
+      // not readable inside the repo, which is its own (also failing) verdict.
+      expect(row?.installed).toBeNull()
+      expect(row?.verdict).toBe('absent-but-declared')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })

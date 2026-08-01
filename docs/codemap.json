@@ -8659,6 +8659,12 @@
           "doc": null
         },
         {
+          "name": "DEFAULT_PROVISION_TIMEOUT_MS",
+          "kind": "const",
+          "signature": "120000",
+          "doc": "Default wait for a box to reach `running`."
+        },
+        {
           "name": "DEFAULT_SANDBOX_RESOURCES",
           "kind": "const",
           "signature": "SandboxResourceConfig",
