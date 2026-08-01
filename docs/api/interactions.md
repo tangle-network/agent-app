@@ -4,7 +4,15 @@
 
 Source: `src/interactions/index.ts`
 
-59 exports.
+64 exports.
+
+### `abortSession`
+
+`function` — Cancel a running session.
+
+```ts
+(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<SidecarAbortResult>>
+```
 
 ### `BeforeInteractionAnswerArgs`
 
@@ -132,6 +140,14 @@ interface DurableInteractionRoutePersistence
 
 ```ts
 (field: ChatInteractionField) => boolean
+```
+
+### `getSessionState`
+
+`function` — The session's current lifecycle, for reconnect and resume decisions.
+
+```ts
+(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<SidecarSessionState>>
 ```
 
 ### `INTERACTION_CANCEL_EVENT`
@@ -318,6 +334,14 @@ type InteractionRouteLogger
 (status: ChatInteractionStatus) => boolean
 ```
 
+### `isTerminalSidecarState`
+
+`function` — Whether a session has finished and will not produce more events.
+
+```ts
+(state: { state?: string | undefined; activeExecutionId?: string | null | undefined; reconnectable?: boolean | undefine…
+```
+
 ### `listSessionInteractions`
 
 `function` — Outstanding (unanswered) interactions for the session — the sidecar's registry is authoritative, so this is the reconnect/reload source of truth.
@@ -438,6 +462,14 @@ interface ResolveInteractionConnectionArgs
 (connection: SidecarInteractionsConnection, response: { id: string; outcome: "declined" | "cancelled" | "accepted"; dat…
 ```
 
+### `SidecarAbortResult`
+
+`interface`
+
+```ts
+interface SidecarAbortResult
+```
+
 ### `SidecarInteractionsConnection`
 
 `interface` — Where and how to reach one session's interaction registry.
@@ -460,6 +492,14 @@ interface SidecarInteractionsError
 
 ```ts
 type SidecarInteractionsResult
+```
+
+### `SidecarSessionState`
+
+`interface` — A sandbox session's lifecycle as the sidecar reports it.
+
+```ts
+interface SidecarSessionState
 ```
 
 ### `stampInteractionAnswers`

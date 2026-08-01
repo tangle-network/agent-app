@@ -33,7 +33,7 @@ _78 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./intakes/api`](api/intakes-api.md) | 3 | — |
 | [`./intakes/drizzle`](api/intakes-drizzle.md) | 18 | — |
 | [`./integrations`](api/integrations.md) | 10 | — |
-| [`./interactions`](api/interactions.md) | 59 | — |
+| [`./interactions`](api/interactions.md) | 64 | — |
 | [`./knowledge`](api/knowledge.md) | 6 | — |
 | [`./knowledge-loop`](api/knowledge-loop.md) | 11 | `config` |
 | [`./missions`](api/missions.md) | 65 | — |
@@ -337,9 +337,9 @@ Source: `src/integrations/index.ts` · 10 exports
 
 ## `./interactions`
 
-Source: `src/interactions/index.ts` · 59 exports
+Source: `src/interactions/index.ts` · 64 exports
 
-`BeforeInteractionAnswerArgs`, `cancelStatusFor`, `canTransitionInteractionStatus`, `ChatFreeTextField`, `ChatInteraction`, `ChatInteractionField`, `ChatInteractionStatus`, `ChatSelectField`, `composerAnswerData`, `composerAnswerDeliveries`, `ComposerAnswerDelivery`, `createInteractionAnswerRoute`, `dedupeQuestionInteractionsByContent`, `DurableInteractionRouteArgs`, `DurableInteractionRoutePersistence`, `fieldAcceptsFreeText`, `INTERACTION_CANCEL_EVENT`, `INTERACTION_EVENT`, `INTERACTION_RESOLVED_EVENT`, `InteractionAnswerBodyValidation`, `InteractionAnswerRoute`, `InteractionAnswerRouteOptions`, `InteractionAnswers`, `InteractionAnswerValue`, `InteractionCancelData`, `InteractionClientOutcome`, `InteractionConnectionResolution`, `InteractionData`, `interactionFromWireRequest`, `InteractionOutcome`, `interactionPartKey`, `InteractionPersistedPart`, `InteractionRequest`, `InteractionRequestWire`, `InteractionRouteLogger`, `interactionToPersistedPart`, `isRenderableInteractionKind`, `isSafeInteractionFieldKey`, `isTerminalInteractionStatus`, `listSessionInteractions`, `mapInteractionRespondFailure`, `NoticeKind`, `noticePart`, `noticePartKey`, `NoticePersistedPart`, `parseInteractionAnswers`, `ParseInteractionAnswersResult`, `parseInteractionCancel`, `parseInteractionRequest`, `ParseInteractionResult`, `persistedPartToInteraction`, `questionInteractionContentSignature`, `ResolveInteractionConnectionArgs`, `respondToSessionInteraction`, `SidecarInteractionsConnection`, `SidecarInteractionsError`, `SidecarInteractionsResult`, `stampInteractionAnswers`, `validateInteractionAnswerBody`
+`abortSession`, `BeforeInteractionAnswerArgs`, `cancelStatusFor`, `canTransitionInteractionStatus`, `ChatFreeTextField`, `ChatInteraction`, `ChatInteractionField`, `ChatInteractionStatus`, `ChatSelectField`, `composerAnswerData`, `composerAnswerDeliveries`, `ComposerAnswerDelivery`, `createInteractionAnswerRoute`, `dedupeQuestionInteractionsByContent`, `DurableInteractionRouteArgs`, `DurableInteractionRoutePersistence`, `fieldAcceptsFreeText`, `getSessionState`, `INTERACTION_CANCEL_EVENT`, `INTERACTION_EVENT`, `INTERACTION_RESOLVED_EVENT`, `InteractionAnswerBodyValidation`, `InteractionAnswerRoute`, `InteractionAnswerRouteOptions`, `InteractionAnswers`, `InteractionAnswerValue`, `InteractionCancelData`, `InteractionClientOutcome`, `InteractionConnectionResolution`, `InteractionData`, `interactionFromWireRequest`, `InteractionOutcome`, `interactionPartKey`, `InteractionPersistedPart`, `InteractionRequest`, `InteractionRequestWire`, `InteractionRouteLogger`, `interactionToPersistedPart`, `isRenderableInteractionKind`, `isSafeInteractionFieldKey`, `isTerminalInteractionStatus`, `isTerminalSidecarState`, `listSessionInteractions`, `mapInteractionRespondFailure`, `NoticeKind`, `noticePart`, `noticePartKey`, `NoticePersistedPart`, `parseInteractionAnswers`, `ParseInteractionAnswersResult`, `parseInteractionCancel`, `parseInteractionRequest`, `ParseInteractionResult`, `persistedPartToInteraction`, `questionInteractionContentSignature`, `ResolveInteractionConnectionArgs`, `respondToSessionInteraction`, `SidecarAbortResult`, `SidecarInteractionsConnection`, `SidecarInteractionsError`, `SidecarInteractionsResult`, `SidecarSessionState`, `stampInteractionAnswers`, `validateInteractionAnswerBody`
 
 [Full API →](api/interactions.md)
 

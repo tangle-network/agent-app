@@ -5707,6 +5707,12 @@
       "error": null,
       "exports": [
         {
+          "name": "abortSession",
+          "kind": "function",
+          "signature": "(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<SidecarAbortResult>>",
+          "doc": "Cancel a running session."
+        },
+        {
           "name": "BeforeInteractionAnswerArgs",
           "kind": "interface",
           "signature": "interface BeforeInteractionAnswerArgs",
@@ -5801,6 +5807,12 @@
           "kind": "function",
           "signature": "(field: ChatInteractionField) => boolean",
           "doc": "Determine if a chat interaction field allows free text input"
+        },
+        {
+          "name": "getSessionState",
+          "kind": "function",
+          "signature": "(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<SidecarSessionState>>",
+          "doc": "The session's current lifecycle, for reconnect and resume decisions."
         },
         {
           "name": "INTERACTION_CANCEL_EVENT",
@@ -5941,6 +5953,12 @@
           "doc": "Resolve if the interaction status is a terminal state excluding pending"
         },
         {
+          "name": "isTerminalSidecarState",
+          "kind": "function",
+          "signature": "(state: { state?: string | undefined; activeExecutionId?: string | null | undefined; reconnectable?: boolean | undefine…",
+          "doc": "Whether a session has finished and will not produce more events."
+        },
+        {
           "name": "listSessionInteractions",
           "kind": "function",
           "signature": "(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<InteractionRequestWire[]>>",
@@ -6031,6 +6049,12 @@
           "doc": "Resolves one interaction."
         },
         {
+          "name": "SidecarAbortResult",
+          "kind": "interface",
+          "signature": "interface SidecarAbortResult",
+          "doc": null
+        },
+        {
           "name": "SidecarInteractionsConnection",
           "kind": "interface",
           "signature": "interface SidecarInteractionsConnection",
@@ -6047,6 +6071,12 @@
           "kind": "type",
           "signature": "type SidecarInteractionsResult",
           "doc": "Represent the outcome of sidecar interactions with success or error details"
+        },
+        {
+          "name": "SidecarSessionState",
+          "kind": "interface",
+          "signature": "interface SidecarSessionState",
+          "doc": "A sandbox session's lifecycle as the sidecar reports it."
         },
         {
           "name": "stampInteractionAnswers",
