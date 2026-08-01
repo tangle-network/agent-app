@@ -4,6 +4,7 @@ import {
   formatSandboxProvisioningSupportDetails,
   isSandboxApiBearerAuthFailure,
   isSandboxApiSandboxMissingFailure,
+  isSandboxBoxConfigFailure,
   isSandboxAuthFailure,
   isSandboxHostCapacityFailure,
   serializeSandboxProvisioningError,
@@ -672,5 +673,63 @@ describe('unbringable sandbox detection', () => {
       .map((cause) => typeof cause.endpoint === 'string' ? /\/v1\/sandboxes\/([^/?#]+)/.exec(cause.endpoint)?.[1] : undefined)
       .find(Boolean)
     expect(id).toBe('sandbox-01626d7a7d6b')
+  })
+})
+
+/**
+ * The third way a box dies permanently, captured live from gtm production after
+ * the first two were fixed. The platform cannot rebuild the box's proxy because
+ * the egress policy it was created with is no longer recorded — and policy is
+ * applied at creation, so no retry against that box can ever succeed.
+ */
+function egressPolicyMissingResumeError(): Error {
+  return Object.assign(
+    new Error(
+      'Failed to resume project: Model-key refresh for sandbox-784ae3a20d71 has no recorded '
+      + 'egress policy — cannot rebuild the proxy config; re-apply the sandbox egress policy and retry',
+    ),
+    {
+      name: 'ServerError',
+      code: 'SERVER_ERROR',
+      status: 500,
+      endpoint: '/v1/sandboxes/sandbox-784ae3a20d71/resume',
+      origin: 'sandbox-api',
+    },
+  )
+}
+
+describe('sandbox box-config failures', () => {
+  it('recognises a resume that failed because the box has no recorded egress policy', () => {
+    const diagnostics = serializeSandboxProvisioningError(egressPolicyMissingResumeError())
+    expect(isSandboxBoxConfigFailure(diagnostics)).toBe(true)
+  })
+
+  it('is distinct from a host-capacity failure, so each stays legible', () => {
+    const diagnostics = serializeSandboxProvisioningError(egressPolicyMissingResumeError())
+    expect(isSandboxHostCapacityFailure(diagnostics)).toBe(false)
+  })
+
+  // A bare 500 from the sandbox API is transient far more often than not.
+  // Treating one as unbringable deletes a healthy box, so the match is narrow.
+  it('does not fire on an ordinary sandbox-api 500', () => {
+    const diagnostics = serializeSandboxProvisioningError(new Error('resume failed', {
+      cause: Object.assign(new Error('Failed to resume project: fetch failed'), {
+        code: 'SERVER_ERROR',
+        status: 500,
+        endpoint: '/v1/sandboxes/sandbox-1/resume',
+        origin: 'sandbox-api',
+      }),
+    }))
+    expect(isSandboxBoxConfigFailure(diagnostics)).toBe(false)
+  })
+
+  it('does not fire on the same wording from anywhere but the sandbox API', () => {
+    const diagnostics = serializeSandboxProvisioningError(new Error('vault sync failed', {
+      cause: Object.assign(new Error('has no recorded egress policy'), {
+        status: 500,
+        origin: 'vault',
+      }),
+    }))
+    expect(isSandboxBoxConfigFailure(diagnostics)).toBe(false)
   })
 })

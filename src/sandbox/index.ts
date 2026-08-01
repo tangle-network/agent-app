@@ -919,6 +919,7 @@ export class SandboxEgressPolicyMismatchError extends Error {
 }
 
 import {
+  isSandboxBoxConfigFailure,
   isSandboxHostCapacityFailure,
   serializeSandboxProvisioningError,
 } from './diagnostics'
@@ -1915,7 +1916,8 @@ export async function ensureWorkspaceSandbox(
  */
 function isUnbringableBoxError(error: unknown): boolean {
   if (error instanceof SandboxRecoveryFailedError) return true
-  return isSandboxHostCapacityFailure(serializeSandboxProvisioningError(error))
+  const diagnostics = serializeSandboxProvisioningError(error)
+  return isSandboxHostCapacityFailure(diagnostics) || isSandboxBoxConfigFailure(diagnostics)
 }
 
 async function provisionWorkspaceSandbox(
