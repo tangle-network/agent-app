@@ -11103,6 +11103,14 @@ SandboxResourceConfig
 interface DriveSandboxTurnOptions
 ```
 
+### `EGRESS_PROXY_RECOVERY_REQUIRED`
+
+`const` — Error code an app raises when a stopped box's egress proxy must be rebuilt before the box can be reused.
+
+```ts
+"EGRESS_PROXY_RECOVERY_REQUIRED"
+```
+
 ### `ensureWorkspaceSandbox`
 
 `function` — Resolve or create a workspace sandbox instance with optional reuse and progress tracking
@@ -11143,12 +11151,60 @@ interface EnsureWorkspaceSandboxOptions
 (message: string, history?: { role: "user" | "assistant"; content: string; }[] | undefined) => string
 ```
 
+### `formatSandboxProvisioningSupportDetails`
+
+`function`
+
+```ts
+(diagnostics: SafeSandboxErrorDiagnostics) => string
+```
+
+### `formatSandboxProvisioningUserMessage`
+
+`function`
+
+```ts
+(diagnostics: SafeSandboxErrorDiagnostics) => string
+```
+
 ### `getClient`
 
 `function` — Resolve a synchronous sandbox client from provided runtime configuration credentials
 
 ```ts
 (shell: SandboxRuntimeConfig) => Sandbox
+```
+
+### `isSandboxApiBearerAuthFailure`
+
+`function`
+
+```ts
+(diagnostics: SafeSandboxErrorDiagnostics) => boolean
+```
+
+### `isSandboxApiSandboxMissingFailure`
+
+`function` — True when the sandbox API answered 404 for a specific sandbox resource — the box behind a persisted sandbox id no longer exists.
+
+```ts
+(diagnostics: SafeSandboxErrorDiagnostics) => boolean
+```
+
+### `isSandboxAuthFailure`
+
+`function`
+
+```ts
+(diagnostics: SafeSandboxErrorDiagnostics) => boolean
+```
+
+### `isSandboxHostCapacityFailure`
+
+`function` — True when a resume failed because the host the box is pinned to cannot seat it — the host's slot budget is exhausted, not the box's fault and not something waiting fixes.
+
+```ts
+(diagnostics: SafeSandboxErrorDiagnostics) => boolean
 ```
 
 ### `isTerminalPromptEvent`
@@ -11447,6 +11503,22 @@ interface ResolveSandboxClientCredentialsOptions
 (box: SandboxInstance, options: SandboxToolPathOptions) => Promise<Outcome<void>>
 ```
 
+### `SafeSandboxErrorCause`
+
+`interface`
+
+```ts
+interface SafeSandboxErrorCause
+```
+
+### `SafeSandboxErrorDiagnostics`
+
+`interface`
+
+```ts
+interface SafeSandboxErrorDiagnostics
+```
+
 ### `SandboxBuildContext`
 
 `interface` — Define the context for building a sandbox including workspace, integrations, and optional user ID
@@ -11709,6 +11781,14 @@ interface SecretStore
 
 ```ts
 (shell: SandboxRuntimeConfig) => SecretStore
+```
+
+### `serializeSandboxProvisioningError`
+
+`function`
+
+```ts
+(error: unknown, options?: { maxDepth?: number | undefined; }) => SafeSandboxErrorDiagnostics
 ```
 
 ### `shellQuote`
