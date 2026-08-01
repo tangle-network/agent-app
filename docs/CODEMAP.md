@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_78 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_80 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -39,6 +39,8 @@ _78 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./missions`](api/missions.md) | 65 | — |
 | [`./model-resolution`](api/model-resolution.md) | 24 | — |
 | [`./object-store`](api/object-store.md) | 15 | `crypto` |
+| [`./peer-floors/check`](api/peer-floors-check.md) | 8 | — |
+| [`./peer-floors/cli`](api/peer-floors-cli.md) | 0 | — |
 | [`./plans`](api/plans.md) | 12 | — |
 | [`./platform`](api/platform.md) | 67 | `billing`, `runtime`, `web` |
 | [`./preflight`](api/preflight.md) | 14 | — |
@@ -386,6 +388,20 @@ Depends on: `crypto`
 `assertSafeKeySegment`, `createProxiedArtifactRoute`, `createR2ObjectStore`, `ObjectBody`, `objectKey`, `ObjectKeyParts`, `ObjectStore`, `PutObjectOptions`, `R2LikeBucket`, `R2LikeObjectBody`, `R2LikeObjectHead`, `signObjectUrl`, `SignObjectUrlArgs`, `verifyObjectUrl`, `VerifyObjectUrlResult`
 
 [Full API →](api/object-store.md)
+
+## `./peer-floors/check`
+
+Source: `src/peer-floors/check.ts` · 8 exports
+
+`checkPeerFloors`, `CheckPeerFloorsOptions`, `describePeerFloorViolation`, `formatPeerFloorReport`, `PeerFloorReport`, `PeerFloorRow`, `PeerFloorVerdict`, `satisfiesRange`
+
+[Full API →](api/peer-floors-check.md)
+
+## `./peer-floors/cli`
+
+Source: `src/peer-floors/cli.ts` · 0 exports
+
+_No public exports._
 
 ## `./plans`
 

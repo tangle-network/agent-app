@@ -6863,6 +6863,69 @@
       ]
     },
     {
+      "id": "./peer-floors/check",
+      "source": "src/peer-floors/check.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "checkPeerFloors",
+          "kind": "function",
+          "signature": "(options: CheckPeerFloorsOptions) => PeerFloorReport",
+          "doc": "Audit one app directory against the shell's declared peer floors."
+        },
+        {
+          "name": "CheckPeerFloorsOptions",
+          "kind": "interface",
+          "signature": "interface CheckPeerFloorsOptions",
+          "doc": null
+        },
+        {
+          "name": "describePeerFloorViolation",
+          "kind": "function",
+          "signature": "(row: PeerFloorRow, shellVersion: string, shell?: string) => string",
+          "doc": "The failure message for one violating row."
+        },
+        {
+          "name": "formatPeerFloorReport",
+          "kind": "function",
+          "signature": "(report: PeerFloorReport, shell?: string) => string",
+          "doc": null
+        },
+        {
+          "name": "PeerFloorReport",
+          "kind": "interface",
+          "signature": "interface PeerFloorReport",
+          "doc": null
+        },
+        {
+          "name": "PeerFloorRow",
+          "kind": "interface",
+          "signature": "interface PeerFloorRow",
+          "doc": null
+        },
+        {
+          "name": "PeerFloorVerdict",
+          "kind": "type",
+          "signature": "type PeerFloorVerdict",
+          "doc": "Installed, and inside the declared range."
+        },
+        {
+          "name": "satisfiesRange",
+          "kind": "function",
+          "signature": "(version: string, range: string) => boolean",
+          "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./peer-floors/cli",
+      "source": "src/peer-floors/cli.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": []
+    },
+    {
       "id": "./plans",
       "source": "src/plans/index.ts",
       "dependsOn": [],
