@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { getTableName } from 'drizzle-orm'
 import { getTableConfig, index, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
 import type { Part as HarnessWirePart } from '@tangle-network/agent-interface'
 import { createChatTables } from '../../src/chat-store/schema'
 import type { ChatMessagePart } from '../../src/chat-store/parts'
@@ -256,5 +257,69 @@ describe('createChatTables — product indexes', () => {
     const plain = createChatTables({ workspaceTable: workspacesTable })
     expect(indexNames(plain.threads)).toEqual(['idx_thread_workspace', 'idx_thread_workspace_updated'])
     expect(indexNames(plain.messages)).toEqual(['idx_message_thread', 'idx_message_thread_created'])
+  })
+})
+
+/**
+ * A table built WITH product indexes still behaves like one built without.
+ *
+ * Worth stating plainly: these assertions did NOT catch the regression that
+ * prompted them. Typing the callback `unknown[]` forced a cast on the whole
+ * extra-config array, and the resulting column widening
+ * (`PgColumn | MySqlColumn | …`) is invisible inside this package — it appears
+ * only through the emitted `.d.ts`, in a consumer whose own `db` meets the
+ * table. gtm's typecheck is what failed, with five errors on one `db.select`.
+ *
+ * They stay because what they pin is real and cheap: the seam does not change
+ * insert/select behaviour or the column types this package can see. The guard
+ * for the emitted-type shape is a consumer's typecheck, which is where the
+ * defect surfaced and where it is caught again.
+ */
+describe('createChatTables — the seam preserves table inference', () => {
+  const t = createChatTables({
+    workspaceTable: workspacesTable,
+    threadExtraColumns: { scopeKey: text('scope_key') },
+    messageExtraColumns: { turnId: text('turn_id') },
+    threadExtraIndexes: (c) => [index('idx_thread_scope').on(c.scopeKey!)],
+    messageExtraIndexes: (c) => [
+      uniqueIndex('uniq_message_thread_role_turn').on(c.threadId!, c.role!, c.turnId!),
+    ],
+  })
+
+  it('still supports a projected select over core AND extra columns', async () => {
+    const db = openDatabase([workspacesTable, t.threads, t.messages])
+    await db.insert(workspacesTable).values({ id: 'ws1', organizationId: 'org1', name: 'WS' })
+    const [thread] = await db
+      .insert(t.threads)
+      .values({ workspaceId: 'ws1', title: 'T', scopeKey: 'deal-1' })
+      .returning()
+    await db
+      .insert(t.messages)
+      .values({ threadId: thread!.id, role: 'user', content: 'hi', turnId: 'turn-1' })
+
+    // Projected select — the exact shape that broke when the columns widened.
+    const rows = await db
+      .select({ id: t.messages.id, role: t.messages.role, turnId: t.messages.turnId })
+      .from(t.messages)
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ role: 'user', turnId: 'turn-1' })
+    // `role` keeps its enum type, not `unknown` — a widened column loses this.
+    const role: 'user' | 'assistant' | 'system' | 'tool' = rows[0]!.role
+    expect(role).toBe('user')
+    // And the product's extra column keeps `string | null`, not `unknown`.
+    const turnId: string | null = rows[0]!.turnId
+    expect(turnId).toBe('turn-1')
+  })
+
+  /** Column types this package CAN see stay SQLite-shaped. */
+  it('keeps SQLite column types on both tables', () => {
+    const threadWorkspaceId: SQLiteColumn = t.threads.workspaceId
+    const threadScopeKey: SQLiteColumn = t.threads.scopeKey
+    const messageRole: SQLiteColumn = t.messages.role
+    const messageTurnId: SQLiteColumn = t.messages.turnId
+    for (const column of [threadWorkspaceId, threadScopeKey, messageRole, messageTurnId]) {
+      expect(column.name).toBeTruthy()
+    }
   })
 })
