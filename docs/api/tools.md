@@ -4,7 +4,7 @@
 
 Source: `src/tools/index.ts`
 
-64 exports.
+65 exports.
 
 ### `AddCitationArgs`
 
@@ -172,6 +172,14 @@ interface BuildMcpServerOptions
 
 ```ts
 (opts: ScopedMcpServerEntryOptions & { label: string; defaultDescription: string; }) => AppToolMcpServer
+```
+
+### `CapabilitySubject`
+
+`type` — Which identity the bearer is bound to.
+
+```ts
+type CapabilitySubject
 ```
 
 ### `CapabilityTokenOptions`

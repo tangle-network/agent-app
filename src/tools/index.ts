@@ -13,6 +13,7 @@ export {
   DEFAULT_HEADER_NAMES,
   type ToolHeaderNames,
   type AuthenticateOptions,
+  type CapabilitySubject,
   type ToolAuthResult,
 } from './auth'
 export {

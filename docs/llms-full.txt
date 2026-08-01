@@ -16942,6 +16942,14 @@ interface BuildMcpServerOptions
 (opts: ScopedMcpServerEntryOptions & { label: string; defaultDescription: string; }) => AppToolMcpServer
 ```
 
+### `CapabilitySubject`
+
+`type` — Which identity the bearer is bound to.
+
+```ts
+type CapabilitySubject
+```
+
 ### `CapabilityTokenOptions`
 
 `interface` — Define options for creating and verifying capability tokens including secret and prefix
