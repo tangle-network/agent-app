@@ -923,8 +923,9 @@ import {
   serializeSandboxProvisioningError,
 } from './diagnostics'
 
+export * from './recovery'
+
 export {
-  EGRESS_PROXY_RECOVERY_REQUIRED,
   serializeSandboxProvisioningError,
   formatSandboxProvisioningSupportDetails,
   formatSandboxProvisioningUserMessage,

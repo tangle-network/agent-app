@@ -14,10 +14,7 @@
  * does not fire on capacity wording from any origin but the sandbox API. A
  * classifier that over-matches turns a transient failure into a box deletion.
  */
-/** Error code an app raises when a stopped box's egress proxy must be rebuilt
- *  before the box can be reused. Declared here so the classifier below stands
- *  alone; apps that model this failure re-export the same literal. */
-export const EGRESS_PROXY_RECOVERY_REQUIRED = 'EGRESS_PROXY_RECOVERY_REQUIRED'
+import { EGRESS_PROXY_RECOVERY_REQUIRED } from './recovery'
 
 const SAFE_ERROR_FIELDS = [
   'code',
