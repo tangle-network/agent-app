@@ -33,7 +33,8 @@
   ],
   "bin": {
     "agent-app-theme-check": "./dist/theme-contract/cli.js",
-    "agent-app-preflight": "./dist/preflight/cli.js"
+    "agent-app-preflight": "./dist/preflight/cli.js",
+    "agent-app-peer-check": "./dist/peer-floors/cli.js"
   },
   "exports": {
     "./package.json": "./package.json",
@@ -418,7 +419,12 @@
       "import": "./dist/theme-contract/index.js",
       "default": "./dist/theme-contract/index.js"
     },
-    "./styles": "./dist/theme/tokens.css"
+    "./styles": "./dist/theme/tokens.css",
+    "./peer-floors": {
+      "types": "./dist/peer-floors/check.d.ts",
+      "import": "./dist/peer-floors/check.js",
+      "default": "./dist/peer-floors/check.js"
+    }
   },
   "scripts": {
     "build": "tsup",

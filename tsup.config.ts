@@ -16,6 +16,8 @@ export default defineConfig({
     'prompt/index': 'src/prompt/index.ts',
     'model-resolution/index': 'src/model-resolution/index.ts',
     'sandbox/index': 'src/sandbox/index.ts',
+    'peer-floors/check': 'src/peer-floors/check.ts',
+    'peer-floors/cli': 'src/peer-floors/cli.ts',
     'run/index': 'src/run/index.ts',
     'harness/index': 'src/harness/index.ts',
     'config/index': 'src/config/index.ts',
