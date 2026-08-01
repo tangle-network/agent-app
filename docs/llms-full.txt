@@ -11178,6 +11178,14 @@ interface D1PrewarmClaimStoreOptions
 "sandbox_prewarm_claims"
 ```
 
+### `DEFAULT_PROVISION_TIMEOUT_MS`
+
+`const` — Default wait for a box to reach `running`.
+
+```ts
+120000
+```
+
 ### `DEFAULT_SANDBOX_RESOURCES`
 
 `const` — Define default resource limits and settings for sandbox environments

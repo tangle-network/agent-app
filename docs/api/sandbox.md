@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-160 exports.
+161 exports.
 
 ### `AppToolDescriptor`
 
@@ -156,6 +156,14 @@ interface D1PrewarmClaimStoreOptions
 
 ```ts
 "sandbox_prewarm_claims"
+```
+
+### `DEFAULT_PROVISION_TIMEOUT_MS`
+
+`const` — Default wait for a box to reach `running`.
+
+```ts
+120000
 ```
 
 ### `DEFAULT_SANDBOX_RESOURCES`

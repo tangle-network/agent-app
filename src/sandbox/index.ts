@@ -375,6 +375,16 @@ export interface SandboxRuntimeConfig {
   webTerminalEnabled?: boolean
   // default true: try stopped-resume before create.
   resumeStopped?: boolean
+  /**
+   * How long to wait for a box to reach `running`, in ms. Default 120_000.
+   *
+   * Raise it when a cold create legitimately takes longer than that — a large
+   * vault restore, a heavy image, a loaded fleet. The failure it prevents is
+   * ugly: every attempt burns the full wait, times out, and the NEXT attempt
+   * starts the same slow create from scratch, so a workspace whose provision
+   * takes 130s never succeeds no matter how many times a user retries.
+   */
+  provisionTimeoutMs?: number
   // Opt in to replacing a box the platform cannot bring up.
   //
   // Default false, and the default is the conservative one on purpose: a
@@ -1315,6 +1325,10 @@ export const PROVISION_PAYLOAD_MAX_BYTES = 240_000
  *  the box. 120 KB leaves headroom for the name and framing. */
 export const ENV_VALUE_MAX_BYTES = 120_000
 
+/** Default wait for a box to reach `running`. Overridable per shell via
+ *  {@link SandboxRuntimeConfig.provisionTimeoutMs}. */
+export const DEFAULT_PROVISION_TIMEOUT_MS = 120_000
+
 /** Total env gate: the whole environment block shares the payload budget with
  *  the profile; past 200 KB the provision body cannot stay under the cap. */
 export const ENV_TOTAL_MAX_BYTES = 200_000
@@ -1930,7 +1944,7 @@ async function provisionWorkspaceSandbox(
   let name = resolved.name
   let recoveryRestore: SandboxRestoreSpec | null | undefined
   const resources = shell.resources ?? DEFAULT_SANDBOX_RESOURCES
-  const resumeTimeout = 120_000
+  const resumeTimeout = shell.provisionTimeoutMs ?? DEFAULT_PROVISION_TIMEOUT_MS
 
   // Stage 1 — running-box reuse (skipped on forceNew).
   const existing = await listRunning(client, name)
@@ -2113,7 +2127,10 @@ async function provisionWorkspaceSandbox(
 
   let box = await client.create(payload)
 
-  await box.waitFor('running', { timeoutMs: 120_000, ...(onProgress ? { onProgress } : {}) })
+  await box.waitFor('running', {
+    timeoutMs: shell.provisionTimeoutMs ?? DEFAULT_PROVISION_TIMEOUT_MS,
+    ...(onProgress ? { onProgress } : {}),
+  })
   box = await refreshRuntimeConnection(client, box)
 
   if (deferredFiles.length > 0) {
