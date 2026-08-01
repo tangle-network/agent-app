@@ -8470,6 +8470,12 @@
           "doc": "Throw when the serialized provision payload exceeds {@link PROVISION_PAYLOAD_MAX_BYTES}."
         },
         {
+          "name": "assessWorkspaceSandboxSnapshot",
+          "kind": "function",
+          "signature": "(snapshot: WorkspaceSandboxSnapshot | undefined, sandboxId: string, now?: number) => WorkspaceSandboxSnapshotAssessment",
+          "doc": "Judge a snapshot against the box being replaced."
+        },
+        {
           "name": "attachReasoningEffort",
           "kind": "function",
           "signature": "(profile: AgentProfile, harness: Harness, effort: \"auto\" | \"none\" | \"minimal\" | \"low\" | \"medium\" | \"high\" | \"xhigh\" | \"…",
@@ -8542,6 +8548,12 @@
           "doc": "Create a generic name-keyed sandbox lifecycle manager for products that drive their own SDK or box types."
         },
         {
+          "name": "createWorkspaceSandboxRecoveryManager",
+          "kind": "function",
+          "signature": "(store: WorkspaceSandboxRecoveryStore) => WorkspaceSandboxRecoveryManager",
+          "doc": "Bind the recovery bookkeeping to an app's storage."
+        },
+        {
           "name": "D1PrewarmClaimStoreOptions",
           "kind": "interface",
           "signature": "interface D1PrewarmClaimStoreOptions",
@@ -8596,10 +8608,16 @@
           "doc": "Define options to manage deterministic session resumption and turn idempotency in sandboxed drive turns"
         },
         {
+          "name": "EGRESS_PROXY_RECOVERY_PHASE",
+          "kind": "const",
+          "signature": "\"egress_proxy_recovery\"",
+          "doc": null
+        },
+        {
           "name": "EGRESS_PROXY_RECOVERY_REQUIRED",
           "kind": "const",
           "signature": "\"EGRESS_PROXY_RECOVERY_REQUIRED\"",
-          "doc": "Error code an app raises when a stopped box's egress proxy must be rebuilt before the box can be reused."
+          "doc": "The box exists and still holds unsnapshotted state, so discarding it is an owner's decision, not the runtime's."
         },
         {
           "name": "ensureWorkspaceSandbox",
@@ -8650,6 +8668,12 @@
           "doc": "Resolve a synchronous sandbox client from provided runtime configuration credentials"
         },
         {
+          "name": "isEgressProxyRecoveryRequiredError",
+          "kind": "function",
+          "signature": "(error: unknown) => boolean",
+          "doc": null
+        },
+        {
           "name": "isSandboxApiBearerAuthFailure",
           "kind": "function",
           "signature": "(diagnostics: SafeSandboxErrorDiagnostics) => boolean",
@@ -8678,6 +8702,30 @@
           "kind": "function",
           "signature": "(event: unknown) => boolean",
           "doc": "Determine if an event is a terminal prompt event with type 'result' or 'done"
+        },
+        {
+          "name": "isWorkspaceSandboxRecoveryAction",
+          "kind": "function",
+          "signature": "(value: unknown) => value is \"confirmation_required\" | \"deletion_declined\" | \"replacement_authorized\" | \"snapshot_repla…",
+          "doc": null
+        },
+        {
+          "name": "isWorkspaceSandboxRecoveryCode",
+          "kind": "function",
+          "signature": "(value: unknown) => value is \"EGRESS_PROXY_RECOVERY_REQUIRED\" | \"WORKSPACE_SANDBOX_MISSING\" | \"WORKSPACE_SANDBOX_HOST_E…",
+          "doc": null
+        },
+        {
+          "name": "isWorkspaceSandboxRecoveryState",
+          "kind": "function",
+          "signature": "(value: unknown) => value is WorkspaceSandboxRecoveryState",
+          "doc": null
+        },
+        {
+          "name": "isWorkspaceSandboxSnapshotRestoreError",
+          "kind": "function",
+          "signature": "(error: unknown) => boolean",
+          "doc": null
         },
         {
           "name": "LivenessProbeConfig",
@@ -8750,6 +8798,12 @@
           "kind": "type",
           "signature": "type PeekWorkspaceSandboxOutcome",
           "doc": "What a peek can find."
+        },
+        {
+          "name": "preferredWorkspaceSandboxRecoveryBoxKey",
+          "kind": "function",
+          "signature": "(recovery: WorkspaceSandboxRecoveryState | undefined) => string | undefined",
+          "doc": "The box key the next provisioning attempt should use, or undefined to keep using the workspace's own key."
         },
         {
           "name": "PREWARM_CLAIM_TABLE_DDL",
@@ -9118,6 +9172,12 @@
           "doc": "Wraps a value in single quotes for `sh`, closing and reopening the quote around each embedded quote (`'` → `'\"'\"'`)."
         },
         {
+          "name": "shouldRestoreWorkspaceSandboxRecovery",
+          "kind": "function",
+          "signature": "(recovery: WorkspaceSandboxRecoveryState | undefined) => boolean",
+          "doc": "Whether the replacement should be restored from the old box's snapshot."
+        },
+        {
           "name": "splitDeferredProfileFiles",
           "kind": "function",
           "signature": "(profile: AgentProfile) => { leanProfile: AgentProfile; deferredFiles: AgentProfileFileMount[]; }",
@@ -9190,6 +9250,42 @@
           "doc": "The structural surface this route needs from an SDK sandbox box — no `@tangle-network/sandbox` class import (invariant 3)."
         },
         {
+          "name": "WORKSPACE_SANDBOX_HOST_EXHAUSTED",
+          "kind": "const",
+          "signature": "\"WORKSPACE_SANDBOX_HOST_EXHAUSTED\"",
+          "doc": "The box exists but its host has no free slot, so it can never be resumed where it is."
+        },
+        {
+          "name": "WORKSPACE_SANDBOX_MISSING",
+          "kind": "const",
+          "signature": "\"WORKSPACE_SANDBOX_MISSING\"",
+          "doc": "The platform no longer has the box."
+        },
+        {
+          "name": "WORKSPACE_SANDBOX_RECOVERY_ACTIONS",
+          "kind": "const",
+          "signature": "readonly (\"confirmation_required\" | \"deletion_declined\" | \"replacement_authorized\" | \"snapshot_replacement_authorized\"…",
+          "doc": "Every declared action, for exhaustiveness tests in apps and here."
+        },
+        {
+          "name": "WORKSPACE_SANDBOX_RECOVERY_CODES",
+          "kind": "const",
+          "signature": "readonly (\"EGRESS_PROXY_RECOVERY_REQUIRED\" | \"WORKSPACE_SANDBOX_MISSING\" | \"WORKSPACE_SANDBOX_HOST_EXHAUSTED\" | \"WORKSP…",
+          "doc": "Every declared cause."
+        },
+        {
+          "name": "WORKSPACE_SANDBOX_SNAPSHOT_MAX_AGE_MS",
+          "kind": "const",
+          "signature": "number",
+          "doc": null
+        },
+        {
+          "name": "WORKSPACE_SANDBOX_UNRECOVERABLE",
+          "kind": "const",
+          "signature": "\"WORKSPACE_SANDBOX_UNRECOVERABLE\"",
+          "doc": "The platform ran its own recovery, failed, and asked for a replacement."
+        },
+        {
           "name": "WorkspaceSandboxEnsureContext",
           "kind": "interface",
           "signature": "interface WorkspaceSandboxEnsureContext",
@@ -9212,6 +9308,96 @@
           "kind": "interface",
           "signature": "interface WorkspaceSandboxManagerOptions",
           "doc": "Define configuration options for managing workspace sandboxes."
+        },
+        {
+          "name": "WorkspaceSandboxRecoveryAction",
+          "kind": "type",
+          "signature": "type WorkspaceSandboxRecoveryAction",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceSandboxRecoveryCode",
+          "kind": "type",
+          "signature": "type WorkspaceSandboxRecoveryCode",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceSandboxRecoveryDecision",
+          "kind": "type",
+          "signature": "type WorkspaceSandboxRecoveryDecision",
+          "doc": null
+        },
+        {
+          "name": "workspaceSandboxRecoveryDiagnostic",
+          "kind": "function",
+          "signature": "(recovery: WorkspaceSandboxRecoveryState) => Record<string, string | undefined>",
+          "doc": "Flat key/value shape for a log line — no nesting, no secrets."
+        },
+        {
+          "name": "workspaceSandboxRecoveryFromError",
+          "kind": "function",
+          "signature": "(error: unknown) => WorkspaceSandboxRecoveryState | undefined",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceSandboxRecoveryManager",
+          "kind": "interface",
+          "signature": "interface WorkspaceSandboxRecoveryManager",
+          "doc": null
+        },
+        {
+          "name": "workspaceSandboxRecoveryMessage",
+          "kind": "function",
+          "signature": "(recovery: WorkspaceSandboxRecoveryState) => string",
+          "doc": "What to tell the person waiting."
+        },
+        {
+          "name": "workspaceSandboxRecoveryRecommendedActions",
+          "kind": "function",
+          "signature": "(recovery: WorkspaceSandboxRecoveryState) => string[]",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceSandboxRecoveryRequiredError",
+          "kind": "class",
+          "signature": "class WorkspaceSandboxRecoveryRequiredError",
+          "doc": "Raised when chat cannot continue until an owner decides about the box."
+        },
+        {
+          "name": "WorkspaceSandboxRecoveryState",
+          "kind": "interface",
+          "signature": "interface WorkspaceSandboxRecoveryState",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceSandboxRecoveryStore",
+          "kind": "interface",
+          "signature": "interface WorkspaceSandboxRecoveryStore",
+          "doc": "Where an app keeps recovery state."
+        },
+        {
+          "name": "WorkspaceSandboxSnapshot",
+          "kind": "interface",
+          "signature": "interface WorkspaceSandboxSnapshot",
+          "doc": "A snapshot the app took of a box, addressed by the box it came from."
+        },
+        {
+          "name": "WorkspaceSandboxSnapshotAssessment",
+          "kind": "interface",
+          "signature": "interface WorkspaceSandboxSnapshotAssessment",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceSandboxSnapshotAvailability",
+          "kind": "type",
+          "signature": "type WorkspaceSandboxSnapshotAvailability",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceSandboxSnapshotFreshness",
+          "kind": "type",
+          "signature": "type WorkspaceSandboxSnapshotFreshness",
+          "doc": null
         },
         {
           "name": "WriteProfileFilesOptions",

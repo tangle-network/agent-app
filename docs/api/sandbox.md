@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-129 exports.
+160 exports.
 
 ### `AppToolDescriptor`
 
@@ -28,6 +28,14 @@ interface AppToolDescriptor
 
 ```ts
 (payload: ProvisionPayloadSections) => void
+```
+
+### `assessWorkspaceSandboxSnapshot`
+
+`function` — Judge a snapshot against the box being replaced.
+
+```ts
+(snapshot: WorkspaceSandboxSnapshot | undefined, sandboxId: string, now?: number) => WorkspaceSandboxSnapshotAssessment
 ```
 
 ### `attachReasoningEffort`
@@ -126,6 +134,14 @@ interface BuildSandboxToolFileMountsOptions
 <TClient, TBox extends WorkspaceSandboxInstanceLike, TEnsureOptions = void>(opts: WorkspaceSandboxManagerOptions<TClien…
 ```
 
+### `createWorkspaceSandboxRecoveryManager`
+
+`function` — Bind the recovery bookkeeping to an app's storage.
+
+```ts
+(store: WorkspaceSandboxRecoveryStore) => WorkspaceSandboxRecoveryManager
+```
+
 ### `D1PrewarmClaimStoreOptions`
 
 `interface`
@@ -198,9 +214,17 @@ SandboxResourceConfig
 interface DriveSandboxTurnOptions
 ```
 
+### `EGRESS_PROXY_RECOVERY_PHASE`
+
+`const`
+
+```ts
+"egress_proxy_recovery"
+```
+
 ### `EGRESS_PROXY_RECOVERY_REQUIRED`
 
-`const` — Error code an app raises when a stopped box's egress proxy must be rebuilt before the box can be reused.
+`const` — The box exists and still holds unsnapshotted state, so discarding it is an owner's decision, not the runtime's.
 
 ```ts
 "EGRESS_PROXY_RECOVERY_REQUIRED"
@@ -270,6 +294,14 @@ interface EnsureWorkspaceSandboxOptions
 (shell: SandboxRuntimeConfig) => Sandbox
 ```
 
+### `isEgressProxyRecoveryRequiredError`
+
+`function`
+
+```ts
+(error: unknown) => boolean
+```
+
 ### `isSandboxApiBearerAuthFailure`
 
 `function`
@@ -308,6 +340,38 @@ interface EnsureWorkspaceSandboxOptions
 
 ```ts
 (event: unknown) => boolean
+```
+
+### `isWorkspaceSandboxRecoveryAction`
+
+`function`
+
+```ts
+(value: unknown) => value is "confirmation_required" | "deletion_declined" | "replacement_authorized" | "snapshot_repla…
+```
+
+### `isWorkspaceSandboxRecoveryCode`
+
+`function`
+
+```ts
+(value: unknown) => value is "EGRESS_PROXY_RECOVERY_REQUIRED" | "WORKSPACE_SANDBOX_MISSING" | "WORKSPACE_SANDBOX_HOST_E…
+```
+
+### `isWorkspaceSandboxRecoveryState`
+
+`function`
+
+```ts
+(value: unknown) => value is WorkspaceSandboxRecoveryState
+```
+
+### `isWorkspaceSandboxSnapshotRestoreError`
+
+`function`
+
+```ts
+(error: unknown) => boolean
 ```
 
 ### `LivenessProbeConfig`
@@ -404,6 +468,14 @@ type Outcome
 
 ```ts
 type PeekWorkspaceSandboxOutcome
+```
+
+### `preferredWorkspaceSandboxRecoveryBoxKey`
+
+`function` — The box key the next provisioning attempt should use, or undefined to keep using the workspace's own key.
+
+```ts
+(recovery: WorkspaceSandboxRecoveryState | undefined) => string | undefined
 ```
 
 ### `PREWARM_CLAIM_TABLE_DDL`
@@ -894,6 +966,14 @@ interface SecretStore
 (value: string) => string
 ```
 
+### `shouldRestoreWorkspaceSandboxRecovery`
+
+`function` — Whether the replacement should be restored from the old box's snapshot.
+
+```ts
+(recovery: WorkspaceSandboxRecoveryState | undefined) => boolean
+```
+
 ### `splitDeferredProfileFiles`
 
 `function` — Split profile files into inline deferred files and a lean profile without them
@@ -990,6 +1070,54 @@ interface StreamSandboxPromptOptions
 interface TerminalConnectionBoxLike
 ```
 
+### `WORKSPACE_SANDBOX_HOST_EXHAUSTED`
+
+`const` — The box exists but its host has no free slot, so it can never be resumed where it is.
+
+```ts
+"WORKSPACE_SANDBOX_HOST_EXHAUSTED"
+```
+
+### `WORKSPACE_SANDBOX_MISSING`
+
+`const` — The platform no longer has the box.
+
+```ts
+"WORKSPACE_SANDBOX_MISSING"
+```
+
+### `WORKSPACE_SANDBOX_RECOVERY_ACTIONS`
+
+`const` — Every declared action, for exhaustiveness tests in apps and here.
+
+```ts
+readonly ("confirmation_required" | "deletion_declined" | "replacement_authorized" | "snapshot_replacement_authorized"…
+```
+
+### `WORKSPACE_SANDBOX_RECOVERY_CODES`
+
+`const` — Every declared cause.
+
+```ts
+readonly ("EGRESS_PROXY_RECOVERY_REQUIRED" | "WORKSPACE_SANDBOX_MISSING" | "WORKSPACE_SANDBOX_HOST_EXHAUSTED" | "WORKSP…
+```
+
+### `WORKSPACE_SANDBOX_SNAPSHOT_MAX_AGE_MS`
+
+`const`
+
+```ts
+number
+```
+
+### `WORKSPACE_SANDBOX_UNRECOVERABLE`
+
+`const` — The platform ran its own recovery, failed, and asked for a replacement.
+
+```ts
+"WORKSPACE_SANDBOX_UNRECOVERABLE"
+```
+
 ### `WorkspaceSandboxEnsureContext`
 
 `interface` — Define the context containing workspace and user identifiers for sandbox environment operations.
@@ -1020,6 +1148,126 @@ interface WorkspaceSandboxManager
 
 ```ts
 interface WorkspaceSandboxManagerOptions
+```
+
+### `WorkspaceSandboxRecoveryAction`
+
+`type`
+
+```ts
+type WorkspaceSandboxRecoveryAction
+```
+
+### `WorkspaceSandboxRecoveryCode`
+
+`type`
+
+```ts
+type WorkspaceSandboxRecoveryCode
+```
+
+### `WorkspaceSandboxRecoveryDecision`
+
+`type`
+
+```ts
+type WorkspaceSandboxRecoveryDecision
+```
+
+### `workspaceSandboxRecoveryDiagnostic`
+
+`function` — Flat key/value shape for a log line — no nesting, no secrets.
+
+```ts
+(recovery: WorkspaceSandboxRecoveryState) => Record<string, string | undefined>
+```
+
+### `workspaceSandboxRecoveryFromError`
+
+`function`
+
+```ts
+(error: unknown) => WorkspaceSandboxRecoveryState | undefined
+```
+
+### `WorkspaceSandboxRecoveryManager`
+
+`interface`
+
+```ts
+interface WorkspaceSandboxRecoveryManager
+```
+
+### `workspaceSandboxRecoveryMessage`
+
+`function` — What to tell the person waiting.
+
+```ts
+(recovery: WorkspaceSandboxRecoveryState) => string
+```
+
+### `workspaceSandboxRecoveryRecommendedActions`
+
+`function`
+
+```ts
+(recovery: WorkspaceSandboxRecoveryState) => string[]
+```
+
+### `WorkspaceSandboxRecoveryRequiredError`
+
+`class` — Raised when chat cannot continue until an owner decides about the box.
+
+```ts
+class WorkspaceSandboxRecoveryRequiredError
+```
+
+### `WorkspaceSandboxRecoveryState`
+
+`interface`
+
+```ts
+interface WorkspaceSandboxRecoveryState
+```
+
+### `WorkspaceSandboxRecoveryStore`
+
+`interface` — Where an app keeps recovery state.
+
+```ts
+interface WorkspaceSandboxRecoveryStore
+```
+
+### `WorkspaceSandboxSnapshot`
+
+`interface` — A snapshot the app took of a box, addressed by the box it came from.
+
+```ts
+interface WorkspaceSandboxSnapshot
+```
+
+### `WorkspaceSandboxSnapshotAssessment`
+
+`interface`
+
+```ts
+interface WorkspaceSandboxSnapshotAssessment
+```
+
+### `WorkspaceSandboxSnapshotAvailability`
+
+`type`
+
+```ts
+type WorkspaceSandboxSnapshotAvailability
+```
+
+### `WorkspaceSandboxSnapshotFreshness`
+
+`type`
+
+```ts
+type WorkspaceSandboxSnapshotFreshness
 ```
 
 ### `WriteProfileFilesOptions`
