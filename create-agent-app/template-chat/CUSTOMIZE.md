@@ -30,6 +30,9 @@ Discovery: **Which model answers by default, at what effort, on which harness?**
       `claude-code` must pair with their own provider's models).
 - [ ] Define the selectable profile catalog for the UI and map each selected
       profile id to the real runtime `AgentProfile` before session creation.
+      Keep that browser catalog to stable display metadata and capability labels;
+      resolve prompts, tools, permissions, connections, resources, and backend
+      policy server-side. Put profile authoring in settings, not the composer.
 - [ ] Leave per-turn overrides alone — the client can send `model`/`effort`
       per request and `MODEL_NAME` overrides without a redeploy.
 

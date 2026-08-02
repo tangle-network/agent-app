@@ -94,6 +94,11 @@ index exists.
 Missing capability data hides that control instead of rendering a dead one.
 The profile selection is a display catalog; the product resolves its id to the
 runtime `AgentProfile` before session creation.
+Keep the browser catalog to stable display metadata and capability labels; do not
+treat client-supplied prompt, tool, permission, connection, or backend fields as
+authority.
+Advanced profile authoring belongs in a product settings surface, not the
+composer row.
 
 Products keep their navigation taxonomy, route URLs, session storage, domain
 context, and transcript cards.

@@ -93,11 +93,16 @@ Omit an unavailable capability and its control stays hidden; do not pass a
 placeholder URL, empty catalog, or inert callback just to make the row look
 complete.
 
-The profile picker consumes a small display catalog (`id`, `name`, description,
-and capability labels), not the full runtime `AgentProfile`.
-The product resolves the selected id to the actual prompt, tools, resources,
-permissions, and backend configuration before creating or continuing a
-session.
+The profile picker consumes a safe display catalog: a stable `id`, `name`,
+description, capability labels, and `builtin` status.
+It is not the full runtime `AgentProfile`, and the browser's catalog is never
+authority for prompts, tools, permissions, connections, or backend access.
+The product resolves the selected id server-side to the actual prompt, model
+hints, backend preference, tools, permissions, MCP/integration grants,
+resources/skills, subagents, modes, hooks, and confidentiality policy before
+creating or continuing a session.
+Profile authoring belongs in a settings/profile surface; the composer only
+chooses the active profile for this turn.
 
 ```tsx
 import {
@@ -112,7 +117,7 @@ import {
     harness: data.harness,
     model: data.model,
     effort: data.effort,
-    layout: 'combined',
+    layout: 'responsive',
   }}
   planMode={data.planMode as ComposerPlanModeSelection | undefined}
   uploadUrl={data.uploadUrl}

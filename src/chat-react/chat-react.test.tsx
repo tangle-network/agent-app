@@ -99,11 +99,11 @@ describe('EntryComposer', () => {
         }}
       />,
     )
-    // The combined trigger summarises the selection, so the model name is the
-    // observable proof the control row mounted at all.
+    // The responsive control renders a desktop inline row and a compact
+    // narrow-screen menu, so the model name proves the row mounted at all.
     expect(screen.getByText('What do you want to work on?')).toBeTruthy()
-    // `Session controls` is the combined trigger's accessible name — the
-    // structural proof the row mounted, independent of catalog contents.
+    // The narrow-screen branch owns the accessible Session controls trigger;
+    // CSS decides which branch is visible in a real viewport.
     expect(screen.getByLabelText('Session controls')).toBeTruthy()
     expect(document.body.textContent).toContain('4.1 Mini')
   })
