@@ -10,10 +10,15 @@ of creating a product-local sidebar.
 - the capped rail session list;
 - optimistic sessions and unread state;
 - active navigation resolution; and
-- product-owned rename, delete, pin, or category actions.
+- the product's existing rename, delete, pin, or category actions.
 
 The product still owns its navigation taxonomy, route URLs, session queries,
 authentication, and domain content.
+
+The fixed rail is hidden below `lg` so it cannot cover a mobile composer.
+Products that need mobile navigation should add their compact header or menu
+around the shared content; that surface needs the product's brand and route
+context.
 
 ```tsx
 import { CirclePlus, FolderOpen, History } from 'lucide-react'

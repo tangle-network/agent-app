@@ -92,6 +92,8 @@ context, and transcript cards.
 The standard rail is hidden below `lg` so the fixed desktop rail cannot cover a
 mobile composer; products with a deliberate mobile rail can override
 `hideBelow`.
+When the rail is hidden, products that need mobile navigation supply the small
+product-branded header or menu around the shared content.
 
 Workflow-first and queue-first products may omit the session configuration when
 the standard chat rail would obscure their primary work.
