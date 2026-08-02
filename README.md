@@ -42,7 +42,7 @@ pnpm add @tangle-network/agent-eval @tangle-network/agent-integrations
 | `@tangle-network/sandbox` | `/sandbox` | `>=0.15.2` |
 | `@tangle-network/agent-knowledge` | `/knowledge-loop` | `>=6.1.11` |
 | `@tangle-network/agent-profile-materialize` | `/skills-placement` | `>=0.9.2` |
-| `@tangle-network/sandbox-ui` | `/brand`, `/studio-react`, `/work-product-react` | `>=0.91.5` |
+| `@tangle-network/sandbox-ui` | `/brand`, `/studio-react`, `/work-product-react`, `/workspace-react` | `>=0.91.5` |
 
 All of these except `agent-eval`, `agent-integrations`, and `agent-interface` are declared **optional** peers, so a product that never imports the subpath installs nothing.
 
@@ -155,7 +155,9 @@ The **complete, always-current reference** — every published subpath, its expo
 - [`/missions`](src/missions) — durable multi-step orchestration: sequencing, budgets, approval gates, schedules.
 
 **React surfaces**
-- [`/web-react`](src/web-react) — router-safe chat + observability components (never imports sandbox-only UI); [`/composer`](src/composer) when the chat owns a full sandbox profile.
+- [`/workspace-react`](src/workspace-react) — the default chat-first outer workspace composition: shared sidebar, session rail, and active-route wiring.
+- [`/web-react`](src/web-react) — router-safe chat, history, and observability components (never imports sandbox-only UI).
+- [`/chat-react`](src/chat-react) — the sandbox-ui-backed new-session composer and shared profile, backend, model, thinking, plan-mode, attachment, and mention controls.
 
 **Utilities (zero-dependency)**
 - [`/web`](src/web) · [`/stream`](src/stream) · [`/crypto`](src/crypto) · [`/redact`](src/redact) — request boundary, SSE normalization, field crypto, PII redaction.

@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_80 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_81 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -13,7 +13,7 @@ _80 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./brand`](api/brand.md) | 5 | — |
 | [`./brand-extraction`](api/brand-extraction.md) | 19 | — |
 | [`./catalog`](api/catalog.md) | 7 | `runtime` |
-| [`./chat-react`](api/chat-react.md) | 10 | `chat-routes`, `runtime`, `web-react` |
+| [`./chat-react`](api/chat-react.md) | 18 | `chat-routes`, `runtime`, `web-react` |
 | [`./chat-routes`](api/chat-routes.md) | 163 | `chat-store`, `interactions`, `model-resolution`, `plans`, `sandbox`, `stream`, `web` |
 | [`./chat-store`](api/chat-store.md) | 63 | `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product` |
 | [`./config`](api/config.md) | 13 | `knowledge`, `runtime` |
@@ -86,6 +86,7 @@ _80 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./web-react/terminal`](api/web-react-terminal.md) | 6 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./work-product`](api/work-product.md) | 90 | `eval-campaign`, `tools` |
 | [`./work-product-react`](api/work-product-react.md) | 3 | `web-react`, `work-product` |
+| [`./workspace-react`](api/workspace-react.md) | 4 | `session-shell` |
 
 ---
 
@@ -153,11 +154,11 @@ Depends on: `runtime`
 
 ## `./chat-react`
 
-Source: `src/chat-react/index.tsx` · 10 exports
+Source: `src/chat-react/index.tsx` · 18 exports
 
 Depends on: `chat-routes`, `runtime`, `web-react`
 
-`ComposerAgentControls`, `ComposerAgentControlsProps`, `ComposerEffortSelection`, `ComposerHarnessSelection`, `ComposerModelSelection`, `EntryComposer`, `EntryComposerProps`, `HarnessType`, `ReasoningEffort`, `ReasoningLevel`
+`AgentProfileCapability`, `AgentProfileDraft`, `AgentProfileOption`, `ComposerAgentControls`, `ComposerAgentControlsProps`, `ComposerEffortSelection`, `ComposerHarnessSelection`, `ComposerModeControls`, `ComposerModeControlsProps`, `ComposerModelSelection`, `ComposerPlanModeSelection`, `ComposerProfileSelection`, `EntryComposer`, `EntryComposerProps`, `HarnessType`, `ModelInfo`, `ReasoningEffort`, `ReasoningLevel`
 
 [Full API →](api/chat-react.md)
 
@@ -802,3 +803,13 @@ Depends on: `web-react`, `work-product`
 `WorkProductPane`, `WorkProductPaneProps`, `WorkProductPaneTab`
 
 [Full API →](api/work-product-react.md)
+
+## `./workspace-react`
+
+Source: `src/workspace-react/index.tsx` · 4 exports
+
+Depends on: `session-shell`
+
+`AgentWorkspaceActiveRoute`, `AgentWorkspaceLayout`, `AgentWorkspaceLayoutProps`, `AgentWorkspaceSessionConfig`
+
+[Full API →](api/workspace-react.md)

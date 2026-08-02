@@ -19,7 +19,14 @@ npm run dev      # http://localhost:4321
 Routes: **`/canvas`** (DesignCanvasEditor — toolbar, layers, rulers, pages),
 **`/timeline`** (sequences TimelineEditor — clips + captions, transport), **`/chat`**
 (web-react chat shell — messages, tool-call + proposal cards, stream-error + Retry,
-Model/Effort pickers).
+Model/Effort pickers), **`/workspace`** (the default `AgentWorkspaceLayout` +
+`EntryComposer` composition with the shared profile, backend, model, thinking,
+and plan controls).
+
+The workspace demo intentionally omits file uploads and `@` mentions because it
+has no real upload endpoint or file index.
+Product apps should pass `uploadUrl` and `mentions` only after wiring those
+backends.
 
 Toggle light/dark with the header button or `?theme=dark` on any route — this
 exercises the `tokens.css` + Tailwind-preset theme contract (`./styles`,
@@ -29,7 +36,7 @@ exercises the `tokens.css` + Tailwind-preset theme contract (`./styles`,
 
 ```bash
 npm run dev            # in one shell
-node scripts/a11y-axe.mjs   # axe-core over /canvas /timeline /chat × light/dark
+node scripts/a11y-axe.mjs   # axe-core over /canvas /timeline /chat /workspace × light/dark
 ```
 
 Returns real WCAG violations (exact contrast ratios, missing labels/roles) with

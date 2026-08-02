@@ -1032,10 +1032,28 @@
       "error": null,
       "exports": [
         {
+          "name": "AgentProfileCapability",
+          "kind": "interface",
+          "signature": "interface AgentProfileCapability",
+          "doc": "A selectable tool group offered by the create/edit form."
+        },
+        {
+          "name": "AgentProfileDraft",
+          "kind": "interface",
+          "signature": "interface AgentProfileDraft",
+          "doc": "The editable shape the create/edit form emits."
+        },
+        {
+          "name": "AgentProfileOption",
+          "kind": "interface",
+          "signature": "interface AgentProfileOption",
+          "doc": "An agent profile: a named bundle of toolset + persona layered over the same model and session."
+        },
+        {
           "name": "ComposerAgentControls",
           "kind": "function",
-          "signature": "({ model, harness, effort, className, context, layout, menuPlacement, filterModelsToHarness, }: ComposerAgentControlsPr…",
-          "doc": "The composer's agent-identity control: harness (agent backend), model, and reasoning effort, over sandbox-ui's `AgentSessionControls`."
+          "signature": "({ model, harness, profile, effort, className, context, layout, menuPlacement, filterModelsToHarness, }: ComposerAgentC…",
+          "doc": "The composer's agent-identity control: profile, backend, model, and reasoning effort, over sandbox-ui's `AgentSessionControls`."
         },
         {
           "name": "ComposerAgentControlsProps",
@@ -1056,15 +1074,39 @@
           "doc": null
         },
         {
+          "name": "ComposerModeControls",
+          "kind": "function",
+          "signature": "({ planMode }: ComposerModeControlsProps) => Element | null",
+          "doc": "The shared plan-mode toggle for the left side of an agent composer."
+        },
+        {
+          "name": "ComposerModeControlsProps",
+          "kind": "interface",
+          "signature": "interface ComposerModeControlsProps",
+          "doc": null
+        },
+        {
           "name": "ComposerModelSelection",
           "kind": "interface",
           "signature": "interface ComposerModelSelection",
           "doc": "The model half of the composer's agent identity."
         },
         {
+          "name": "ComposerPlanModeSelection",
+          "kind": "interface",
+          "signature": "interface ComposerPlanModeSelection",
+          "doc": null
+        },
+        {
+          "name": "ComposerProfileSelection",
+          "kind": "type",
+          "signature": "type ComposerProfileSelection",
+          "doc": "A selectable named bundle of persona and tool groups."
+        },
+        {
           "name": "EntryComposer",
           "kind": "function",
-          "signature": "({ heading, subheading, placeholder, initialValue, sendLabel, disabled, agent, modes, uploadUrl, accept, onAttachmentEr…",
+          "signature": "({ heading, subheading, placeholder, initialValue, sendLabel, disabled, agent, modes, planMode, uploadUrl, accept, onAt…",
           "doc": "`EntryComposer` — the centered \"what do you want to work on?\" surface a product shows before a conversation exists (a new thread, an empty session, a workspace overview)."
         },
         {
@@ -1078,6 +1120,12 @@
           "kind": "type",
           "signature": "type HarnessType",
           "doc": "The execution runner for an agent — WHICH runtime materializes and runs an `AgentProfile`."
+        },
+        {
+          "name": "ModelInfo",
+          "kind": "interface",
+          "signature": "interface ModelInfo",
+          "doc": "Wire-format model entry as returned by `/v1/models` on the Tangle Router (and most OpenAI-compatible gateways)."
         },
         {
           "name": "ReasoningEffort",
@@ -16621,6 +16669,40 @@
           "kind": "type",
           "signature": "type WorkProductPaneTab",
           "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./workspace-react",
+      "source": "src/workspace-react/index.tsx",
+      "dependsOn": [
+        "session-shell"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "AgentWorkspaceActiveRoute",
+          "kind": "interface",
+          "signature": "interface AgentWorkspaceActiveRoute",
+          "doc": "Route data for the shared active-nav resolver."
+        },
+        {
+          "name": "AgentWorkspaceLayout",
+          "kind": "function",
+          "signature": "({ children, navItems, sessions, activeRoute, activeId, ...sidebarProps }: AgentWorkspaceLayoutProps) => Element",
+          "doc": "The default agent workspace composition."
+        },
+        {
+          "name": "AgentWorkspaceLayoutProps",
+          "kind": "interface",
+          "signature": "interface AgentWorkspaceLayoutProps",
+          "doc": null
+        },
+        {
+          "name": "AgentWorkspaceSessionConfig",
+          "kind": "interface",
+          "signature": "interface AgentWorkspaceSessionConfig",
+          "doc": "The session data and product-owned URLs needed by the default workspace."
         }
       ]
     }

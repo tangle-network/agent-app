@@ -7,5 +7,17 @@
  * `ReasoningLevel` is sandbox-ui's `auto | ReasoningEffort` union.
  */
 export type { HarnessType } from '@tangle-network/sandbox-ui/dashboard'
-export type { ReasoningLevel } from '@tangle-network/sandbox-ui/chat'
+export type { ModelInfo } from '@tangle-network/sandbox-ui/dashboard'
+export type {
+  AgentProfileCapability,
+  AgentProfileDraft,
+  AgentProfileOption,
+  ReasoningLevel,
+} from '@tangle-network/sandbox-ui/chat'
 export type { ReasoningEffort } from '@tangle-network/agent-interface'
+
+export interface ComposerPlanModeSelection {
+  enabled: boolean
+  setEnabled: (next: boolean) => void
+  saving?: boolean
+}

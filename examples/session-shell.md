@@ -2,7 +2,14 @@
 
 The shell around the chat surface: past sessions in the rail, an entry point for a new one, and a paged history view behind it.
 
+For a standard chat-first workspace, use
+`AgentWorkspaceLayout` from `@tangle-network/agent-app/workspace-react`.
+The complete starting pattern is in [default-workspace.md](./default-workspace.md).
+
 This lives here because four products each built it by hand and drifted. The rule for adopting it is the point of the whole exercise: **install the package and pass your data in.** Copying these snippets into a fourth `workspace-sidebar.tsx` recreates exactly the problem this replaced.
+
+The lower-level APIs below are for products that need a custom outer layout or a
+nonstandard panel arrangement.
 
 Two entries, split on what a route **loader** can import:
 
@@ -17,7 +24,9 @@ Your nav taxonomy (Vault / Board / Studio, or Entities / Planning / Signatures) 
 
 ## 1. The layout: sessions in the rail
 
-`SidebarLayout` stays yours (it belongs to `@tangle-network/sandbox-ui`). The shell builds the one nav row that holds sessions, and you concatenate it with your own rows.
+`AgentWorkspaceLayout` uses `SidebarLayout` from `@tangle-network/sandbox-ui` and
+builds the one nav row that holds sessions.
+The product supplies its own rows through `navItems`.
 
 ```tsx
 import { History, CirclePlus, FolderOpen, Pencil, Trash2 } from 'lucide-react'

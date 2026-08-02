@@ -243,6 +243,11 @@
       "import": "./dist/chat-react/index.js",
       "default": "./dist/chat-react/index.js"
     },
+    "./workspace-react": {
+      "types": "./dist/workspace-react/index.d.ts",
+      "import": "./dist/workspace-react/index.js",
+      "default": "./dist/workspace-react/index.js"
+    },
     "./assistant": {
       "types": "./dist/assistant/index.d.ts",
       "import": "./dist/assistant/index.js",
