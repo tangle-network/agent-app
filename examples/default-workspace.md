@@ -3,6 +3,9 @@
 Chat-first products should start with the shared workspace composition instead
 of creating a product-local sidebar.
 
+The browser reference is [desktop](../docs/assets/default-workspace/desktop.png)
+and [mobile](../docs/assets/default-workspace/mobile.png).
+
 `AgentWorkspaceLayout` owns the repeated visual and session behavior:
 
 - the standard `SidebarLayout` from `sandbox-ui`;
