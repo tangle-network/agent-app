@@ -16623,6 +16623,40 @@
           "doc": null
         }
       ]
+    },
+    {
+      "id": "./workspace-react",
+      "source": "src/workspace-react/index.tsx",
+      "dependsOn": [
+        "session-shell"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "AgentWorkspaceActiveRoute",
+          "kind": "interface",
+          "signature": "interface AgentWorkspaceActiveRoute",
+          "doc": "Route data for the shared active-nav resolver."
+        },
+        {
+          "name": "AgentWorkspaceLayout",
+          "kind": "function",
+          "signature": "({ children, navItems, sessions, activeRoute, activeId, ...sidebarProps }: AgentWorkspaceLayoutProps) => Element",
+          "doc": "The default agent workspace composition."
+        },
+        {
+          "name": "AgentWorkspaceLayoutProps",
+          "kind": "interface",
+          "signature": "interface AgentWorkspaceLayoutProps",
+          "doc": null
+        },
+        {
+          "name": "AgentWorkspaceSessionConfig",
+          "kind": "interface",
+          "signature": "interface AgentWorkspaceSessionConfig",
+          "doc": "The session data and product-owned URLs needed by the default workspace."
+        }
+      ]
     }
   ]
 }

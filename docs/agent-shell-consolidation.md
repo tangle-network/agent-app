@@ -8,6 +8,14 @@ Staff architecture doc. Status: proposal. Owner: agent-app maintainers. Consumer
 
 **One sentence:** Every product re-hand-rolls the same ~3,000 lines of agent-shell plumbing (sandbox provisioning, skill mount, profile assembly, model resolution, prompt assembly); we lift that plumbing into `@tangle-network/agent-app` once, and each product collapses to a single `defineAgentProfile({...})` data object plus a thin runtime-config — because the domain seam the shell consumes is **already** the sandbox SDK's `AgentProfile` type, not a new invented shape.
 
+For the browser surface, the same rule now applies to the chat-first workspace:
+use `@tangle-network/agent-app/workspace-react` for the outer layout and session
+rail, `@tangle-network/agent-app/chat-react` for the new-session composer, and
+`@tangle-network/agent-app/web-react` for the full history view.
+Products keep their navigation taxonomy, routes, storage, and domain content.
+Workflow-first and queue-first products may omit the session rail when it would
+conflict with the product's primary job.
+
 **The duplication, measured (from the maps):**
 
 | Concern | gtm | creative | tax | legal | insurance | Status across fleet |

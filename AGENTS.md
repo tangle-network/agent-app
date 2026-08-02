@@ -78,6 +78,26 @@ That second row is why autonomous and detached runs were invisible to a browser.
 | `/peer-floors` | node-only peer-floor audit consumers run in THEIR CI (`checkPeerFloors` + the `agent-app-peer-check` bin): compares the floors the INSTALLED shell declares against the versions actually resolved ON DISK, and fails on `below-floor` or on a declared package whose version could not be read (an unchecked floor is reported as a failure, never as a pass it did not earn). This is its own gate because the failure it catches is invisible to every other one — `pnpm` only WARNS on an unmet peer that is also a direct dependency and says NOTHING for an unmet OPTIONAL peer, which is how most of the substrate is declared here, so a product sits below a floor with a clean install, clean typecheck, green suite and successful deploy and fails only on a live wire call (sandbox 0.15.1's `{command}`→`{executable,args}` spawn body) or at MODULE LOAD with types still resolving (agent-interface 0.38's tagged MCP config: `does not provide an export named defineAgentProfilePublicConfig`, 0 tsc errors, dozens of test FILES dead at import). Range matching is hand-rolled rather than taking a `semver` dependency — this package ships zero runtime deps and forcing one on every consumer is the worse trade — and models the rule that matters: a caret on a 0.x version is MINOR-LOCKED, so `^0.36.0` can never reach `0.38.0` and reinstalling cannot fix a 0.x violation; the pin must change, in every place it appears including `pnpm.overrides`. Calibrated against COMMITTED fixture trees whose module dir is `fixture_modules`, not `node_modules` — the latter is gitignored everywhere, so a fixture using it could not be committed and a calibration proof that is not committed is a proof that stops running. `shellManifest` lets a package audit itself, since a package has no copy of itself in its own `node_modules` | — (pure `fs`; no peer, no runtime dep) |
 | `/theme-contract` | node-only token-completeness checker consumers run in CI over THEIR OWN source (`checkThemeContract` + the `agent-app-theme-check` bin): a full `var(--…)` reference scan plus a check of the known-dangerous preset utilities (`surface-container*`/`card`/`popover`) against the shipped `tokens.css` + any extra app CSS — catches the invisible-popover/transparent-dropdown class. Split from `/theme` (which stays browser-clean) because it reads `fs`. Single source of truth for the token walk in `tokens-contract.test.ts`. | — (pure `fs` mechanism; no peer) |
 
+## Default chat-first workspace
+
+New conversational products use `@tangle-network/agent-app/workspace-react` for
+the outer workspace and expandable session rail.
+
+They pair it with `EntryComposer` from `/chat-react` for the new-session route
+and `SessionHistoryPanel` from `/web-react` for the full history route.
+
+Products keep their navigation taxonomy, route URLs, session storage, domain
+context, and transcript cards.
+
+The standard rail is hidden below `lg` so the fixed desktop rail cannot cover a
+mobile composer; products with a deliberate mobile rail can override
+`hideBelow`.
+
+Workflow-first and queue-first products may omit the session configuration when
+the standard chat rail would obscure their primary work.
+
+The canonical composition is [examples/default-workspace.md](./examples/default-workspace.md).
+
 ## Agent-native principles (products on the sandbox)
 
 The sandbox runs full agent harnesses — skills, tools, sub-agents, MCP, bash, python — invoked through prompts. Products built on agent-app coordinate UI, durability, approvals, and billing **around** the agent. They never do the agent's work for it, and agent-app must never make it easy to.

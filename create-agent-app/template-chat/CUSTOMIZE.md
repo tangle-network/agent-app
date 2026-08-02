@@ -63,6 +63,14 @@ Discovery: **What does the real surface look like?**
       `streamChatTurn` (start + resume against `/api/chat/replay/:turnId`),
       `useChatInteractions` + `InteractionQuestionCard`/`InteractionPlanCard`
       for the ask channel this server already exposes.
+- [ ] For a chat-first product, use `AgentWorkspaceLayout` from
+      `@tangle-network/agent-app/workspace-react` for the outer layout and
+      session rail, `EntryComposer` from
+      `@tangle-network/agent-app/chat-react` for the new-session route, and
+      `SessionHistoryPanel` from `@tangle-network/agent-app/web-react` for the
+      full history route.
+      Keep navigation taxonomy, session URLs, domain context, and transcript
+      cards in the product.
 - [ ] Keep the wire contract: `chatTurnRequestInit` from web-react serializes
       exactly what `createChatTurnRoutes` parses.
 

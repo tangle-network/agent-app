@@ -9,7 +9,7 @@ import { chromium } from 'playwright'
 import AxeBuilder from '@axe-core/playwright'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:4321'
-const ROUTES = ['/canvas', '/timeline', '/chat']
+const ROUTES = ['/canvas', '/timeline', '/chat', '/workspace']
 const THEMES = [
   { q: '', label: 'light' },
   { q: '?theme=dark', label: 'dark' },
@@ -46,7 +46,7 @@ for (const route of ROUTES) {
 }
 
 console.log(`\n──────── SUMMARY ────────`)
-console.log(`TOTAL violations across 3 routes × 2 themes: ${total}`)
+console.log(`TOTAL violations across ${ROUTES.length} routes × 2 themes: ${total}`)
 for (const [rule, n] of [...byRule.entries()].sort((a, b) => b[1] - a[1])) {
   console.log(`  ${rule}: ${n} node(s)`)
 }
