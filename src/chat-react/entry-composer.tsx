@@ -7,6 +7,8 @@ import {
   ComposerAgentControls,
   type ComposerAgentControlsProps,
 } from './composer-agent-controls'
+import { ComposerModeControls } from './composer-mode-controls'
+import type { ComposerPlanModeSelection } from './types'
 
 export interface EntryComposerProps {
   /** The one line above the input. Domain copy — always a product parameter. */
@@ -18,17 +20,23 @@ export interface EntryComposerProps {
   sendLabel?: string
   disabled?: boolean
   /**
-   * Agent identity (harness/model/effort). Pass it and the control row renders;
+   * Agent identity (profile/backend/model/effort). Pass it and the control row renders;
    * omit it and the composer ships without one. Omitting is a real choice for a
    * surface with nothing to choose — it should never be an oversight, which is
    * why this is one prop rather than a free-form slot a caller can forget.
    */
   agent?: ComposerAgentControlsProps
   /**
-   * Behavioral modes docked on the LEFT (a plan-approval toggle). A mode is an
+   * Product-specific behavioral controls docked on the LEFT. A mode is an
    * on/off switch, not a value picker, so it sits apart from agent identity.
+   * For the standard plan-approval control, prefer `planMode`.
    */
   modes?: ReactNode
+  /**
+   * Standard plan-approval mode. Pass only when the selected backend supports
+   * it; omitted means the control is not rendered.
+   */
+  planMode?: ComposerPlanModeSelection
   /**
    * Upload endpoint for staged attachments. Omit and the attach affordance is
    * hidden — a composer with no place to put a file must not offer one.
@@ -95,6 +103,7 @@ export function EntryComposer({
   disabled,
   agent,
   modes,
+  planMode,
   uploadUrl,
   accept = ATTACHMENT_ACCEPT,
   onAttachmentError,
@@ -181,7 +190,7 @@ export function EntryComposer({
                 }
               : undefined
           }
-          controls={modes}
+          controls={modes ?? <ComposerModeControls planMode={planMode} />}
           trailing={
             agent ? <ComposerAgentControls menuPlacement="down" {...agent} /> : undefined
           }

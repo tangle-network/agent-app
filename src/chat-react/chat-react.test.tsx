@@ -2,8 +2,9 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 
-import { ComposerAgentControls, EntryComposer } from './index'
+import { ComposerAgentControls, ComposerModeControls, EntryComposer } from './index'
 import type { ModelInfo } from '@tangle-network/sandbox-ui/dashboard'
+import type { AgentProfileOption } from '@tangle-network/sandbox-ui/chat'
 
 /**
  * These tests guard the exact defects that made three products diverge:
@@ -17,6 +18,8 @@ import type { ModelInfo } from '@tangle-network/sandbox-ui/dashboard'
  *  4. the harness snap leaking a model the user never picked,
  *  5. `cli-base` — a shell-only backend with no conversational agent —
  *     reaching a chat composer.
+ *  6. the named agent profile disappearing even though sandbox-ui already
+ *     provides the picker.
  *
  * Each was proven able to fail by breaking the code it guards; see the PR.
  */
@@ -34,6 +37,21 @@ const MODELS: ModelInfo[] = [
     provider: 'anthropic',
     contextWindow: 1_000_000,
   } as ModelInfo,
+]
+
+const PROFILES: AgentProfileOption[] = [
+  {
+    id: 'assistant',
+    name: 'Assistant',
+    description: 'General-purpose agent',
+    builtin: true,
+  },
+  {
+    id: 'reviewer',
+    name: 'Reviewer',
+    description: 'Checks work against the brief',
+    builtin: true,
+  },
 ]
 
 // The backend picker is a Radix Select, which drives its open state from
@@ -54,6 +72,20 @@ function openMenu(trigger: HTMLElement) {
 afterEach(cleanup)
 
 describe('EntryComposer', () => {
+  it('renders the shared plan toggle only when the product supplies plan state', () => {
+    const setEnabled = vi.fn()
+    const { rerender } = render(
+      <ComposerModeControls planMode={{ enabled: false, setEnabled }} />,
+    )
+    const plan = screen.getByRole('button', { name: 'Plan' })
+    expect(plan.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(plan)
+    expect(setEnabled).toHaveBeenCalledWith(true)
+
+    rerender(<ComposerModeControls />)
+    expect(screen.queryByRole('button', { name: 'Plan' })).toBeNull()
+  })
+
   it('renders the agent control row when the product supplies selections', () => {
     render(
       <EntryComposer
@@ -62,6 +94,7 @@ describe('EntryComposer', () => {
         agent={{
           model: { value: 'gpt-4.1-mini', onChange: () => {}, models: MODELS },
           harness: { value: 'opencode', onChange: () => {} },
+          profile: { value: 'assistant', onChange: () => {}, profiles: PROFILES },
           effort: { value: 'auto', onChange: () => {} },
         }}
       />,
@@ -123,6 +156,23 @@ describe('EntryComposer', () => {
 })
 
 describe('ComposerAgentControls', () => {
+  it('passes the named agent profile through to the shared picker', () => {
+    const onProfileChange = vi.fn()
+    render(
+      <ComposerAgentControls
+        layout="inline"
+        model={{ value: 'gpt-4.1-mini', onChange: () => {}, models: MODELS }}
+        profile={{ value: 'assistant', onChange: onProfileChange, profiles: PROFILES }}
+      />,
+    )
+
+    const profile = screen.getByLabelText('Agent profile')
+    expect(profile).toBeTruthy()
+    fireEvent.click(profile)
+    fireEvent.click(screen.getByText('Reviewer'))
+    expect(onProfileChange).toHaveBeenCalledWith('reviewer')
+  })
+
   it('shows the model a BARE stored id names, by canonicalising it for the picker', () => {
     render(
       <ComposerAgentControls

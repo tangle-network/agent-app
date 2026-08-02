@@ -1,5 +1,8 @@
 import { useCallback, useMemo, useRef } from 'react'
-import { AgentSessionControls } from '@tangle-network/sandbox-ui/chat'
+import {
+  AgentSessionControls,
+  type AgentSessionProfileControl,
+} from '@tangle-network/sandbox-ui/chat'
 import { canonicalModelId } from '@tangle-network/sandbox-ui/dashboard'
 import type { ModelInfo } from '@tangle-network/sandbox-ui/dashboard'
 // Browser-safe: model-catalog.ts imports nothing. Taken from the source module
@@ -51,11 +54,20 @@ export interface ComposerEffortSelection {
   disabled?: boolean
 }
 
+/**
+ * A selectable named bundle of persona and tool groups. The product resolves
+ * the selected id to the runtime AgentProfile before creating or continuing a
+ * session; the composer only needs the display catalog and persistence hooks.
+ */
+export type ComposerProfileSelection = AgentSessionProfileControl
+
 export interface ComposerAgentControlsProps {
   model: ComposerModelSelection
   /** Omit on a router-backed composer: a direct model call has no CLI backend,
    *  so the picker would be inert. Model + effort still render. */
   harness?: ComposerHarnessSelection
+  /** Universal named agent profile: persona + tool groups, independent of backend. */
+  profile?: ComposerProfileSelection
   effort?: ComposerEffortSelection
   className?: string
   /**
@@ -68,12 +80,15 @@ export interface ComposerAgentControlsProps {
    */
   context?: 'chat' | 'all'
   /**
-   * Trigger layout. `'combined'` (the default) collapses the pickers behind one
+   * Trigger layout. `'responsive'` (the default) lays the pickers out in a
+   * row on wider screens and uses a compact gear on narrow screens. `'combined'`
+   * collapses the pickers behind one
    * labeled trigger reading the current selection (`harness · model · effort`).
    * `'gear'` uses an anonymous gear icon instead of the label; `'inline'` lays
-   * the pickers out in a row.
+   * the pickers out in a row. `'responsive'` uses the labeled trigger on wider
+   * screens and the compact gear on narrow screens so Send stays reachable.
    */
-  layout?: 'inline' | 'gear' | 'combined'
+  layout?: 'inline' | 'gear' | 'combined' | 'responsive'
   /**
    * Where the pickers open. `'down'` pins them downward for a composer floating
    * in open space (the centered entry surface) so a tall menu can't flip up over
@@ -140,7 +155,7 @@ function modelsForContext(
 }
 
 /**
- * The composer's agent-identity control: harness (agent backend), model, and
+ * The composer's agent-identity control: profile, backend, model, and
  * reasoning effort, over sandbox-ui's `AgentSessionControls`.
  *
  * This is an ADAPTER, not a second implementation. sandbox-ui owns the control
@@ -172,10 +187,11 @@ function modelsForContext(
 export function ComposerAgentControls({
   model,
   harness,
+  profile,
   effort,
   className,
   context = 'chat',
-  layout = 'combined',
+  layout = 'responsive',
   menuPlacement,
   filterModelsToHarness = true,
 }: ComposerAgentControlsProps) {
@@ -214,43 +230,61 @@ export function ComposerAgentControls({
     [modelOnChange],
   )
 
+  const sharedProps = {
+    context,
+    menuPlacement,
+    filterModelsToHarness,
+    model: {
+      value: canonicalSelected,
+      onChange: onModelChange,
+      models: offeredModels,
+      loading: model.loading,
+      disabled: model.disabled,
+    },
+    harness: harness
+      ? {
+          value: harness.value,
+          onChange: onHarnessChange,
+          available: harnessesForContext(harness.available, context),
+          disabled: harness.disabled,
+          locked: harness.locked,
+          lockReason: harness.lockReason,
+          onNewChat: harness.onNewChat,
+        }
+      : undefined,
+    profile,
+    reasoning: effort
+      ? {
+          value: effort.value,
+          onChange: effort.onChange,
+          available: effort.available,
+          disabled: effort.disabled,
+        }
+      : undefined,
+  }
+
+  if (layout === 'responsive') {
+    return (
+      <>
+        <AgentSessionControls
+          {...sharedProps}
+          className={className ? `hidden sm:flex ${className}` : 'hidden sm:flex'}
+          layout="inline"
+        />
+        <AgentSessionControls
+          {...sharedProps}
+          className={className ? `flex sm:hidden ${className}` : 'flex sm:hidden'}
+          layout="gear"
+        />
+      </>
+    )
+  }
+
   return (
     <AgentSessionControls
       className={className}
-      context={context}
+      {...sharedProps}
       layout={layout}
-      menuPlacement={menuPlacement}
-      filterModelsToHarness={filterModelsToHarness}
-      model={{
-        value: canonicalSelected,
-        onChange: onModelChange,
-        models: offeredModels,
-        loading: model.loading,
-        disabled: model.disabled,
-      }}
-      harness={
-        harness
-          ? {
-              value: harness.value,
-              onChange: onHarnessChange,
-              available: harnessesForContext(harness.available, context),
-              disabled: harness.disabled,
-              locked: harness.locked,
-              lockReason: harness.lockReason,
-              onNewChat: harness.onNewChat,
-            }
-          : undefined
-      }
-      reasoning={
-        effort
-          ? {
-              value: effort.value,
-              onChange: effort.onChange,
-              available: effort.available,
-              disabled: effort.disabled,
-            }
-          : undefined
-      }
     />
   )
 }

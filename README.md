@@ -157,7 +157,7 @@ The **complete, always-current reference** — every published subpath, its expo
 **React surfaces**
 - [`/workspace-react`](src/workspace-react) — the default chat-first outer workspace composition: shared sidebar, session rail, and active-route wiring.
 - [`/web-react`](src/web-react) — router-safe chat, history, and observability components (never imports sandbox-only UI).
-- [`/chat-react`](src/chat-react) — the sandbox-ui-backed new-session composer and shared agent controls.
+- [`/chat-react`](src/chat-react) — the sandbox-ui-backed new-session composer and shared profile, backend, model, thinking, plan-mode, attachment, and mention controls.
 
 **Utilities (zero-dependency)**
 - [`/web`](src/web) · [`/stream`](src/stream) · [`/crypto`](src/crypto) · [`/redact`](src/redact) — request boundary, SSE normalization, field crypto, PII redaction.

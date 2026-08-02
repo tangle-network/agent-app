@@ -4,14 +4,38 @@
 
 Source: `src/chat-react/index.tsx`
 
-10 exports.
+18 exports.
+
+### `AgentProfileCapability`
+
+`interface` — A selectable tool group offered by the create/edit form.
+
+```ts
+interface AgentProfileCapability
+```
+
+### `AgentProfileDraft`
+
+`interface` — The editable shape the create/edit form emits.
+
+```ts
+interface AgentProfileDraft
+```
+
+### `AgentProfileOption`
+
+`interface` — An agent profile: a named bundle of toolset + persona layered over the same model and session.
+
+```ts
+interface AgentProfileOption
+```
 
 ### `ComposerAgentControls`
 
-`function` — The composer's agent-identity control: harness (agent backend), model, and reasoning effort, over sandbox-ui's `AgentSessionControls`.
+`function` — The composer's agent-identity control: profile, backend, model, and reasoning effort, over sandbox-ui's `AgentSessionControls`.
 
 ```ts
-({ model, harness, effort, className, context, layout, menuPlacement, filterModelsToHarness, }: ComposerAgentControlsPr…
+({ model, harness, profile, effort, className, context, layout, menuPlacement, filterModelsToHarness, }: ComposerAgentC…
 ```
 
 ### `ComposerAgentControlsProps`
@@ -38,6 +62,22 @@ interface ComposerEffortSelection
 interface ComposerHarnessSelection
 ```
 
+### `ComposerModeControls`
+
+`function` — The shared plan-mode toggle for the left side of an agent composer.
+
+```ts
+({ planMode }: ComposerModeControlsProps) => Element | null
+```
+
+### `ComposerModeControlsProps`
+
+`interface`
+
+```ts
+interface ComposerModeControlsProps
+```
+
 ### `ComposerModelSelection`
 
 `interface` — The model half of the composer's agent identity.
@@ -46,12 +86,28 @@ interface ComposerHarnessSelection
 interface ComposerModelSelection
 ```
 
+### `ComposerPlanModeSelection`
+
+`interface`
+
+```ts
+interface ComposerPlanModeSelection
+```
+
+### `ComposerProfileSelection`
+
+`type` — A selectable named bundle of persona and tool groups.
+
+```ts
+type ComposerProfileSelection
+```
+
 ### `EntryComposer`
 
 `function` — `EntryComposer` — the centered "what do you want to work on?" surface a product shows before a conversation exists (a new thread, an empty session, a workspace overview).
 
 ```ts
-({ heading, subheading, placeholder, initialValue, sendLabel, disabled, agent, modes, uploadUrl, accept, onAttachmentEr…
+({ heading, subheading, placeholder, initialValue, sendLabel, disabled, agent, modes, planMode, uploadUrl, accept, onAt…
 ```
 
 ### `EntryComposerProps`
@@ -68,6 +124,14 @@ interface EntryComposerProps
 
 ```ts
 type HarnessType
+```
+
+### `ModelInfo`
+
+`interface` — Wire-format model entry as returned by `/v1/models` on the Tangle Router (and most OpenAI-compatible gateways).
+
+```ts
+interface ModelInfo
 ```
 
 ### `ReasoningEffort`

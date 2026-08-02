@@ -26,11 +26,25 @@
 export {
   ComposerAgentControls,
   type ComposerAgentControlsProps,
+  type ComposerProfileSelection,
   type ComposerModelSelection,
   type ComposerHarnessSelection,
   type ComposerEffortSelection,
 } from './composer-agent-controls'
 
 export { EntryComposer, type EntryComposerProps } from './entry-composer'
+export {
+  ComposerModeControls,
+  type ComposerModeControlsProps,
+} from './composer-mode-controls'
 
-export type { HarnessType, ReasoningEffort, ReasoningLevel } from './types'
+export type {
+  AgentProfileCapability,
+  AgentProfileDraft,
+  AgentProfileOption,
+  ComposerPlanModeSelection,
+  HarnessType,
+  ModelInfo,
+  ReasoningEffort,
+  ReasoningLevel,
+} from './types'

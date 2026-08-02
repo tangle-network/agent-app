@@ -28,6 +28,8 @@ Discovery: **Which model answers by default, at what effort, on which harness?**
 - [ ] Set `model.default` to a model your Tangle Router key can reach.
 - [ ] Pick `harness` (`opencode` default; vendor-locked harnesses like
       `claude-code` must pair with their own provider's models).
+- [ ] Define the selectable profile catalog for the UI and map each selected
+      profile id to the real runtime `AgentProfile` before session creation.
 - [ ] Leave per-turn overrides alone — the client can send `model`/`effort`
       per request and `MODEL_NAME` overrides without a redeploy.
 
@@ -69,6 +71,10 @@ Discovery: **What does the real surface look like?**
       `@tangle-network/agent-app/chat-react` for the new-session route, and
       `SessionHistoryPanel` from `@tangle-network/agent-app/web-react` for the
       full history route.
+      Pass `agent.profile`, `agent.harness`, `agent.model`, and `agent.effort`
+      from real product state so the shared control row does not disappear.
+      Pass `planMode`, `uploadUrl`, and `mentions` only when the corresponding
+      backend behavior, upload route, and file index are real.
       Keep navigation taxonomy, session URLs, domain context, and transcript
       cards in the product.
 - [ ] Keep the wire contract: `chatTurnRequestInit` from web-react serializes

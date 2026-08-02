@@ -73,6 +73,55 @@ Pair the layout with `EntryComposer` from
 `SessionHistoryPanel` from `@tangle-network/agent-app/web-react` on the full
 history route.
 
+## Composer capability contract
+
+`EntryComposer` is capability-driven: a control appears only when the product
+passes the real data and callback that makes it work.
+
+| Product capability | `EntryComposer` input |
+| --- | --- |
+| Named agent profile / persona / tool groups | `agent.profile` |
+| Selectable agent backend | `agent.harness` |
+| Selectable model catalog | `agent.model` |
+| Thinking effort | `agent.effort` |
+| Plan-approval mode | `planMode`, only when the selected backend supports it |
+| File upload | `uploadUrl`, only when the endpoint accepts the shared attachment contract |
+| `@` file mentions | `mentions`, only when a real file index exists |
+| Product-specific behavior | `modes` |
+
+Omit an unavailable capability and its control stays hidden; do not pass a
+placeholder URL, empty catalog, or inert callback just to make the row look
+complete.
+
+The profile picker consumes a small display catalog (`id`, `name`, description,
+and capability labels), not the full runtime `AgentProfile`.
+The product resolves the selected id to the actual prompt, tools, resources,
+permissions, and backend configuration before creating or continuing a
+session.
+
+```tsx
+import {
+  EntryComposer,
+  type ComposerPlanModeSelection,
+} from '@tangle-network/agent-app/chat-react'
+
+<EntryComposer
+  heading="What do you want to work on?"
+  agent={{
+    profile: data.profile,
+    harness: data.harness,
+    model: data.model,
+    effort: data.effort,
+    layout: 'combined',
+  }}
+  planMode={data.planMode as ComposerPlanModeSelection | undefined}
+  uploadUrl={data.uploadUrl}
+  mentions={data.mentions}
+  modes={data.modes}
+  onSubmit={send}
+/>
+```
+
 Use `ChatMessages` and the shared `AgentComposer` for an existing session,
 keeping domain cards and context in the product.
 

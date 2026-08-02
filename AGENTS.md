@@ -86,6 +86,15 @@ the outer workspace and expandable session rail.
 They pair it with `EntryComposer` from `/chat-react` for the new-session route
 and `SessionHistoryPanel` from `/web-react` for the full history route.
 
+`EntryComposer` is the capability-driven default: pass the real profile,
+backend, model, and thinking selections through `agent`; pass `planMode` only
+when the selected backend supports plan approval; pass `uploadUrl` only when a
+real attachment endpoint exists; and pass `mentions` only when a real file
+index exists.
+Missing capability data hides that control instead of rendering a dead one.
+The profile selection is a display catalog; the product resolves its id to the
+runtime `AgentProfile` before session creation.
+
 Products keep their navigation taxonomy, route URLs, session storage, domain
 context, and transcript cards.
 
