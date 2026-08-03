@@ -583,6 +583,8 @@ export interface SessionHistoryPanelProps {
   respondingSessionIds?: ReadonlySet<string>
   onRename?: (session: SessionSummary) => void
   onDelete?: (session: SessionSummary) => void
+  /** Product-owned mutation for selected rows or a workspace-wide age range. */
+  onBulkAction?: (action: SessionBulkAction) => Promise<void>
   /** Menu wording, so this surface and the rail name the same act the same way
    *  — a product whose delete is really an archive says so in both places. */
   renameLabel?: string
@@ -608,6 +610,11 @@ export interface SessionHistoryPanelProps {
   contentWidth?: 'reading' | 'full'
   className?: string
 }
+
+export type SessionBulkAction =
+  | { kind: 'selected'; ids: string[] }
+  | { kind: 'older-than'; days: number }
+  | { kind: 'newer-than'; days: number }
 
 export interface LinkLikeProps {
   to: string
@@ -685,6 +692,7 @@ export function SessionHistoryPanel({
   respondingSessionIds,
   onRename,
   onDelete,
+  onBulkAction,
   renameLabel = 'Rename',
   deleteLabel = 'Delete',
   extraActions,
@@ -705,7 +713,67 @@ export function SessionHistoryPanel({
   })
   const searchTerm = query.trim()
   const isSearching = searchTerm.length > 0
-  const column = contentWidth === 'full' ? 'w-full' : 'mx-auto w-full max-w-3xl' 
+  const column = contentWidth === 'full' ? 'w-full' : 'mx-auto w-full max-w-4xl'
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [ageDays, setAgeDays] = useState('30')
+  const [bulkTarget, setBulkTarget] = useState<{
+    action: SessionBulkAction
+    title: string
+    body: string
+  } | null>(null)
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkError, setBulkError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setSelectedIds(new Set())
+  }, [searchTerm, sort])
+
+  useEffect(() => {
+    const visible = new Set(history.items.map((item) => item.id))
+    setSelectedIds((current) => {
+      const next = new Set([...current].filter((id) => visible.has(id)))
+      return next.size === current.size ? current : next
+    })
+  }, [history.items])
+
+  const selectedCount = selectedIds.size
+  const allVisibleSelected = history.items.length > 0 && history.items.every((item) => selectedIds.has(item.id))
+  const parsedAgeDays = Number(ageDays)
+  const validAgeDays = Number.isInteger(parsedAgeDays) && parsedAgeDays >= 1 && parsedAgeDays <= 36_500
+
+  const openBulkAction = useCallback((action: SessionBulkAction) => {
+    const verb = deleteLabel.toLowerCase()
+    if (action.kind === 'selected') {
+      setBulkTarget({
+        action,
+        title: `${deleteLabel} selected sessions?`,
+        body: `${verb === 'delete' ? 'This permanently removes' : `This ${verb}s`} ${action.ids.length} selected session${action.ids.length === 1 ? '' : 's'} and its messages.`,
+      })
+      return
+    }
+    const range = action.kind === 'older-than' ? `older than ${action.days} days` : `from the last ${action.days} days`
+    setBulkTarget({
+      action,
+      title: `${deleteLabel} sessions ${range}?`,
+      body: 'This applies to every matching session in this workspace, including sessions not currently loaded in this list.',
+    })
+  }, [deleteLabel])
+
+  const confirmBulkAction = useCallback(async () => {
+    if (!bulkTarget || !onBulkAction) return
+    setBulkBusy(true)
+    setBulkError(null)
+    try {
+      await onBulkAction(bulkTarget.action)
+      setBulkTarget(null)
+      setSelectedIds(new Set())
+      history.reload()
+    } catch (error) {
+      setBulkError(error instanceof Error ? error.message : `Could not ${deleteLabel.toLowerCase()} sessions`)
+    } finally {
+      setBulkBusy(false)
+    }
+  }, [bulkTarget, deleteLabel, history, onBulkAction])
 
   return (
     <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${className ?? ''}`}>
@@ -747,6 +815,72 @@ export function SessionHistoryPanel({
                 <option value="oldest">Oldest</option>
               </select>
             </div>
+            {onBulkAction && (
+              <div className={`flex flex-col gap-2 border-t border-border/60 px-3 py-3 ${column}`}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIds(new Set(history.items.map((item) => item.id)))}
+                    disabled={allVisibleSelected || history.items.length === 0}
+                    className="h-8 rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition hover:bg-accent/30 disabled:opacity-50"
+                  >
+                    Select all
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIds(new Set())}
+                    disabled={selectedCount === 0}
+                    className="h-8 rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition hover:bg-accent/30 disabled:opacity-50"
+                  >
+                    Deselect all
+                  </button>
+                  <span className="text-xs text-muted-foreground" aria-live="polite">
+                    {selectedCount} selected
+                  </span>
+                  {selectedCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => openBulkAction({ kind: 'selected', ids: [...selectedIds] })}
+                      className="h-8 rounded-md bg-destructive px-2.5 text-xs font-medium text-destructive-foreground transition hover:opacity-90"
+                    >
+                      {deleteLabel} selected
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label htmlFor="agent-app-session-age" className="text-xs text-muted-foreground">
+                    Session age
+                  </label>
+                  <input
+                    id="agent-app-session-age"
+                    type="number"
+                    min={1}
+                    max={36_500}
+                    value={ageDays}
+                    onChange={(event) => setAgeDays(event.target.value)}
+                    aria-invalid={ageDays.length > 0 && !validAgeDays}
+                    className="h-8 w-20 rounded-md border border-border bg-card px-2 text-xs tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                  <span className="text-xs text-muted-foreground">days</span>
+                  <button
+                    type="button"
+                    onClick={() => openBulkAction({ kind: 'older-than', days: parsedAgeDays })}
+                    disabled={!validAgeDays}
+                    className="h-8 rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition hover:bg-accent/30 disabled:opacity-50"
+                  >
+                    {deleteLabel} older
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openBulkAction({ kind: 'newer-than', days: parsedAgeDays })}
+                    disabled={!validAgeDays}
+                    className="h-8 rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition hover:bg-accent/30 disabled:opacity-50"
+                  >
+                    {deleteLabel} recent
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -766,7 +900,7 @@ export function SessionHistoryPanel({
                 No sessions match “{searchTerm}”.
               </p>
             ) : (
-              <SkeletonRows />
+              <p className="py-16 text-center text-sm text-muted-foreground">No sessions remain.</p>
             )
           ) : (
             <div className="flex flex-col gap-0.5">
@@ -781,6 +915,16 @@ export function SessionHistoryPanel({
                   timestamp={formatTimestamp(session.updatedAt)}
                   onRename={onRename}
                   onDelete={onDelete}
+                  selectable={Boolean(onBulkAction)}
+                  selected={selectedIds.has(session.id)}
+                  onSelectedChange={(selected) => {
+                    setSelectedIds((current) => {
+                      const next = new Set(current)
+                      if (selected) next.add(session.id)
+                      else next.delete(session.id)
+                      return next
+                    })
+                  }}
                   renameLabel={renameLabel}
                   deleteLabel={deleteLabel}
                   extraActions={extraActions}
@@ -800,6 +944,38 @@ export function SessionHistoryPanel({
           )}
         </div>
       </div>
+      {bulkTarget && (
+        <SessionDialog
+          title={bulkTarget.title}
+          onClose={() => {
+            if (!bulkBusy) {
+              setBulkTarget(null)
+              setBulkError(null)
+            }
+          }}
+          busy={bulkBusy}
+          error={bulkError}
+          footer={
+            <>
+              <DialogButton
+                onClick={() => {
+                  setBulkTarget(null)
+                  setBulkError(null)
+                }}
+                disabled={bulkBusy}
+                variant="ghost"
+              >
+                Cancel
+              </DialogButton>
+              <DialogButton onClick={() => void confirmBulkAction()} disabled={bulkBusy} variant="destructive">
+                {bulkBusy ? 'Working…' : deleteLabel}
+              </DialogButton>
+            </>
+          }
+        >
+          <p className="text-sm text-muted-foreground">{bulkTarget.body}</p>
+        </SessionDialog>
+      )}
     </div>
   )
 }
@@ -837,6 +1013,9 @@ function SessionRow({
   renameLabel,
   deleteLabel,
   extraActions,
+  selectable,
+  selected,
+  onSelectedChange,
 }: {
   session: SessionSummary
   href: string
@@ -849,6 +1028,9 @@ function SessionRow({
   renameLabel: string
   deleteLabel: string
   extraActions?: (session: SessionSummary) => SessionRailAction[]
+  selectable: boolean
+  selected: boolean
+  onSelectedChange: (selected: boolean) => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const extras = extraActions?.(session) ?? []
@@ -859,6 +1041,15 @@ function SessionRow({
 
   return (
     <div className="group relative flex items-center gap-2 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/20">
+      {selectable && (
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={(event) => onSelectedChange(event.target.checked)}
+          aria-label={`Select ${sessionLabel(session, untitledLabel)}`}
+          className="h-4 w-4 shrink-0 rounded border-border accent-primary"
+        />
+      )}
       <Link to={href} className="flex min-w-0 flex-1 items-center gap-3">
         {showUnread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />}
         <MessageIcon className="h-4 w-4 shrink-0 text-muted-foreground" />

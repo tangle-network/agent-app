@@ -16,7 +16,7 @@
  * sequential awaits in the same order.
  */
 
-import { asc, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, lt, sql, type SQL } from 'drizzle-orm'
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
 import {
   runSqliteStatements,
@@ -133,7 +133,26 @@ export interface ListMessagesOptions {
 /** Define input for bulk deleting threads with access checks per workspace */
 export interface BulkDeleteThreadsInput {
   ids: string[]
+  /** Optional single-workspace fence for products whose route already resolved
+   *  one active workspace. Omitted preserves the multi-workspace legal route. */
+  workspaceId?: string
   /** Called once per distinct workspace the ids touch, before ANY delete. */
+  assertAccess: WorkspaceAccessCheck
+}
+
+/** Delete threads selected by their last activity time within one workspace.
+ *
+ * Products can add a lifecycle predicate such as `status = 'active'` through
+ * `where`; the store still owns workspace scope, access ordering, and message
+ * cleanup for every consumer. */
+export interface BulkDeleteThreadsByUpdatedAtInput {
+  workspaceId: string
+  /** Exclusive upper bound: rows older than this instant. */
+  updatedBefore?: Date
+  /** Inclusive lower bound: rows updated at or after this instant. */
+  updatedAfter?: Date
+  where?: SQL
+  /** Called before any delete for the requested workspace. */
   assertAccess: WorkspaceAccessCheck
 }
 
@@ -149,6 +168,7 @@ export interface ChatStore<TThread = ChatThreadRow, TMessage = ChatMessageRow> {
    *  the delete — single-thread callers usually check access themselves. */
   deleteThread(threadId: string, options?: { assertAccess?: WorkspaceAccessCheck }): Promise<boolean>
   bulkDeleteThreads(input: BulkDeleteThreadsInput): Promise<{ deleted: number }>
+  bulkDeleteThreadsByUpdatedAt(input: BulkDeleteThreadsByUpdatedAtInput): Promise<{ deleted: number }>
   /** Ordered oldest-first: `created_at`, then rowid (insertion order within a
    *  same-second burst — a user+assistant pair lands in one epoch second). */
   listMessages(threadId: string, options?: ListMessagesOptions): Promise<TMessage[]>
@@ -255,7 +275,7 @@ export function createChatStore<TTables extends ChatTables>(
     },
 
     async bulkDeleteThreads(input) {
-      const { ids, assertAccess } = input
+      const { ids, workspaceId, assertAccess } = input
       if (typeof assertAccess !== 'function') throw new ChatStoreInputError('Missing assertAccess')
       if (!Array.isArray(ids) || ids.length === 0 || !ids.every((id) => typeof id === 'string' && id.length > 0)) {
         throw new ChatStoreInputError('Missing ids')
@@ -263,10 +283,16 @@ export function createChatStore<TTables extends ChatTables>(
       if (ids.length > BULK_DELETE_MAX_THREADS) {
         throw new ChatStoreInputError(`Too many ids (max ${BULK_DELETE_MAX_THREADS})`)
       }
+      if (workspaceId !== undefined && !workspaceId.trim()) {
+        throw new ChatStoreInputError('Invalid workspaceId')
+      }
 
+      const scope = workspaceId
+        ? and(inArray(threads.id, ids), eq(threads.workspaceId, workspaceId))
+        : inArray(threads.id, ids)
       const rows = await db.select({ id: threads.id, workspaceId: threads.workspaceId })
         .from(threads)
-        .where(inArray(threads.id, ids))
+        .where(scope)
       if (rows.length === 0) return { deleted: 0 }
 
       // Access is verified once per workspace the ids touch. Fail-closed: one
@@ -284,6 +310,41 @@ export function createChatStore<TTables extends ChatTables>(
         db.delete(threads).where(inArray(threads.id, foundIds)),
       ])
       return { deleted: foundIds.length }
+    },
+
+    async bulkDeleteThreadsByUpdatedAt(input) {
+      const { workspaceId, updatedBefore, updatedAfter, where, assertAccess } = input
+      if (typeof assertAccess !== 'function') throw new ChatStoreInputError('Missing assertAccess')
+      if (!workspaceId.trim()) throw new ChatStoreInputError('Missing workspaceId')
+      if (updatedBefore === undefined && updatedAfter === undefined) {
+        throw new ChatStoreInputError('Missing updatedAt boundary')
+      }
+      for (const boundary of [updatedBefore, updatedAfter]) {
+        if (boundary !== undefined && Number.isNaN(boundary.getTime())) {
+          throw new ChatStoreInputError('Invalid updatedAt boundary')
+        }
+      }
+
+      const conditions = [eq(threads.workspaceId, workspaceId)]
+      if (updatedBefore) conditions.push(lt(threads.updatedAt, updatedBefore))
+      if (updatedAfter) conditions.push(gte(threads.updatedAt, updatedAfter))
+      if (where) conditions.push(where)
+      const scope = and(...conditions)
+      const [countRow] = await db.select({ total: sql<number>`count(*)` })
+        .from(threads)
+        .where(scope)
+      const deleted = Number(countRow?.total ?? 0)
+      if (deleted === 0) return { deleted: 0 }
+
+      await assertAccess(workspaceId)
+      // Keep the age path unbounded without constructing a giant host-parameter
+      // list; the subquery lets SQLite/D1 stream the matching thread ids.
+      const matchingThreads = db.select({ id: threads.id }).from(threads).where(scope)
+      await runSqliteStatements(db, [
+        db.delete(messages).where(inArray(messages.threadId, matchingThreads)),
+        db.delete(threads).where(scope),
+      ])
+      return { deleted }
     },
 
     async listMessages(threadId, options) {

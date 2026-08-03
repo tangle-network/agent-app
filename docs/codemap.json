@@ -2192,6 +2192,12 @@
           "doc": "Bounds a single bulk-delete request's write set; product surfaces cap thread lists at far fewer, so a larger batch is a malformed or hostile request."
         },
         {
+          "name": "BulkDeleteThreadsByUpdatedAtInput",
+          "kind": "interface",
+          "signature": "interface BulkDeleteThreadsByUpdatedAtInput",
+          "doc": "Delete threads selected by their last activity time within one workspace."
+        },
+        {
           "name": "BulkDeleteThreadsInput",
           "kind": "interface",
           "signature": "interface BulkDeleteThreadsInput",
@@ -15749,6 +15755,12 @@
           "name": "SessionActionsOptions",
           "kind": "interface",
           "signature": "interface SessionActionsOptions",
+          "doc": null
+        },
+        {
+          "name": "SessionBulkAction",
+          "kind": "type",
+          "signature": "type SessionBulkAction",
           "doc": null
         },
         {

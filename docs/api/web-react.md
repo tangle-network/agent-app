@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-268 exports.
+269 exports.
 
 ### `activityTone`
 
@@ -1772,6 +1772,14 @@ interface SessionActions
 
 ```ts
 interface SessionActionsOptions
+```
+
+### `SessionBulkAction`
+
+`type`
+
+```ts
+type SessionBulkAction
 ```
 
 ### `SessionHistoryPanel`
