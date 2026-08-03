@@ -277,12 +277,12 @@ describe('ChatComposer layout', () => {
   })
 
   it('puts no overflow box between a control and the composer root, at either placement', () => {
-    // A control owns its popover: ModelPicker and EffortPicker anchor a
-    // ~400px-tall list absolutely to their own trigger. An `overflow` box
-    // anywhere above them clips that list to the action row's height, so it
-    // renders and is never visible, and the scroll offset the popover's width
-    // introduces drags the trigger out of the box's left edge. jsdom has no
-    // layout, so the class list is the only place that box is observable.
+    // Asserts exactly one thing: no ancestor from the control up to the
+    // composer root carries an overflow utility. That box is what would trap
+    // the popover a control anchors to itself (ModelPicker, EffortPicker) —
+    // the controls slot in chat-composer.tsx carries what it costs. jsdom has
+    // no layout, so the class list is the only place the box itself is
+    // observable; what it does to a rendered popover is not measurable here.
     for (const placement of ['inline', 'above'] as const) {
       const { container, unmount } = render(
         <ChatComposer
