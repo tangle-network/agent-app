@@ -30,8 +30,8 @@ import {
 } from '@tangle-network/agent-interface'
 
 /**
- * Canonical harnesses that are NOT sandbox backends. `KNOWN_HARNESSES` is dispatched as
- * `backend.type`, so a harness the platform ships no provider adapter for must stay out —
+ * Canonical harnesses that are NOT sandbox backends. Each value in `KNOWN_HARNESSES` is dispatched
+ * as `backend.type`, so a harness the platform ships no provider adapter for must stay out —
  * offering it would resolve a session onto a runner that cannot start.
  */
 const NON_BACKEND_HARNESSES = ['gemini'] as const satisfies readonly HarnessType[]
