@@ -131,7 +131,7 @@ type AttachmentFileResult
 `function` — All required fields answered → the respond payload; else null (not submittable yet).
 
 ```ts
-(fields: ChatInteractionField[], values: FieldValues) => Record<string, string | number | boolean | string[]> | null
+(fields: ({ type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…
 ```
 
 ### `buildMentionPromptBlock`
@@ -256,7 +256,7 @@ interface ChatInteraction
 
 ### `ChatInteractionField`
 
-`type` — An `InteractionField` widened where a card needs a flag the pinned schema may not define: `allowCustom` on a select, `maxLength` on a free-text field.
+`type` — The shared field contract under the UI-facing name used by this package.
 
 ```ts
 type ChatInteractionField
@@ -411,7 +411,7 @@ interface ChatUiMessage
 `function` — Shapes composer text into the respond payload for the routed field (select answers are string arrays on the wire; text answers are strings).
 
 ```ts
-(field: ChatInteractionField, text: string) => Record<string, string | number | boolean | string[]>
+(field: { type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…
 ```
 
 ### `composerAnswerDeliveries`
@@ -771,7 +771,7 @@ type FetchSessionPage
 `function` — Determine if a chat interaction field allows free text input
 
 ```ts
-(field: ChatInteractionField) => boolean
+(field: { type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…
 ```
 
 ### `fieldAnswer`
@@ -779,7 +779,7 @@ type FetchSessionPage
 `function` — The submitted value for one field, or null when it has no answer yet.
 
 ```ts
-(field: ChatInteractionField, values: FieldValues) => string | number | boolean | string[] | null
+(field: { type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…
 ```
 
 ### `FieldValues`
@@ -795,7 +795,7 @@ type FieldValues
 `function` — Converts acknowledged, persisted answers back into the local field state consumed by the shared cards.
 
 ```ts
-(fields: ChatInteractionField[], answers: InteractionAnswers | undefined) => FieldValues
+(fields: ({ type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…
 ```
 
 ### `FileIndexReadyResponse`
@@ -899,7 +899,7 @@ interface FlowWaterfallProps
 `function` — Secrets must never leave the sidecar answer channel for the visible chat transcript, so a secret-bearing ask cannot be late-answered.
 
 ```ts
-(fields: ChatInteractionField[]) => boolean
+(fields: ({ type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…
 ```
 
 ### `hydrateChatInteractions`
@@ -1043,7 +1043,7 @@ type InteractionData
 `function` — Reads a wire request into the client's pending `ChatInteraction`.
 
 ```ts
-(request: InteractionRequestWire) => ChatInteraction
+(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: "text"; name: string; label: string…
 ```
 
 ### `InteractionOutcome`
@@ -1112,7 +1112,7 @@ type InteractionRequest
 
 ### `InteractionRequestWire`
 
-`type` — `InteractionRequest` whose fields carry those widenings — a select that may grant `allowCustom`, a free-text field that may declare `maxLength`.
+`type` — The shared request contract under the wire-facing name used by this package.
 
 ```ts
 type InteractionRequestWire
@@ -1155,7 +1155,7 @@ type InteractionSubmitResult
 `function` — Builds the persisted/streamed `interaction` part from a wire request.
 
 ```ts
-(request: InteractionRequestWire, status: ChatInteractionStatus, cancelReason?: string | undefined, answers?: Interacti…
+(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: "text"; name: string; label: string…
 ```
 
 ### `isChatAttachmentPart`
@@ -1408,7 +1408,7 @@ type ParseInteractionAnswersResult
 
 ### `parseInteractionRequest`
 
-`function` — Parses an `interaction` event's data (`{ request }`).
+`function` — Parses an `interaction` event's data (`{ request }`) with the shared schema.
 
 ```ts
 (data: Record<string, unknown> | undefined) => ParseInteractionResult
@@ -1635,7 +1635,7 @@ interface QuestionOptionListProps
 `function` — Reload restore from the answer route's GET list.
 
 ```ts
-(list: ChatInteraction[], outstanding: InteractionRequestWire[], options?: RestoreChatInteractionsOptions) => ChatInter…
+(list: ChatInteraction[], outstanding: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: "text"…
 ```
 
 ### `RestoreChatInteractionsOptions`

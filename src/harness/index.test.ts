@@ -50,7 +50,9 @@ describe('harness taxonomy + coercion', () => {
     }
   })
 
-  it('carries the backends the canonical enum has yet to adopt', () => {
+  it('includes forge and cursor from the canonical enum', () => {
+    expect(harnessTypeSchema.options).toContain('forge')
+    expect(harnessTypeSchema.options).toContain('cursor')
     expect(isHarness('forge')).toBe(true)
     expect(isHarness('cursor')).toBe(true)
   })
@@ -113,9 +115,7 @@ describe('harness ↔ model compatibility (server-enforced)', () => {
     expect(snapHarnessToModel('claude-code', 'anthropic/claude-opus-4-6')).toBe('claude-code')
   })
 
-  it('treats backends outside the canonical enum as router-backed, never snapping them', () => {
-    // forge/cursor are multi-provider CLIs with no vendor lock. They are answered here rather
-    // than cast into HarnessType, so the behavior holds without the canonical enum listing them.
+  it('uses Interface compatibility for canonical multi-provider backends', () => {
     for (const harness of ['forge', 'cursor'] as const) {
       expect(isModelCompatibleWithHarness(harness, 'openai/gpt-5')).toBe(true)
       expect(isModelCompatibleWithHarness(harness, 'anthropic/claude-sonnet-4-6')).toBe(true)

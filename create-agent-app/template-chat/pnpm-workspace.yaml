@@ -12,6 +12,7 @@ minimumReleaseAgeExclude:
 allowBuilds:
   '@ax-llm/ax': false
   better-sqlite3: true
+  cpu-features: false
   esbuild: true
+  ssh2: false
   workerd: true
-

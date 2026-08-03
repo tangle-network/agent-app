@@ -34,14 +34,13 @@ describe('satisfiesRange', () => {
   })
 
   it('handles the compound range agent-app actually declares', () => {
-    expect(satisfiesRange('0.40.0', '>=0.38.0 <0.41.0')).toBe(true)
-    expect(satisfiesRange('0.38.0', '>=0.38.0 <0.41.0')).toBe(true)
-    expect(satisfiesRange('0.36.0', '>=0.38.0 <0.41.0')).toBe(false)
-    expect(satisfiesRange('0.41.0', '>=0.38.0 <0.41.0')).toBe(false)
+    expect(satisfiesRange('0.42.1', '>=0.42.1 <0.44.0')).toBe(true)
+    expect(satisfiesRange('0.43.0', '>=0.42.1 <0.44.0')).toBe(true)
+    expect(satisfiesRange('0.44.0', '>=0.42.1 <0.44.0')).toBe(false)
   })
 
   it('accepts a prerelease of a satisfying version — a floor is about the wire contract', () => {
-    expect(satisfiesRange('0.40.0-rc.1', '>=0.38.0 <0.41.0')).toBe(true)
+    expect(satisfiesRange('0.43.0-rc.1', '>=0.42.1 <0.44.0')).toBe(true)
   })
 
   it('handles alternation and wildcards', () => {
@@ -107,6 +106,20 @@ describe('checkPeerFloors', () => {
 })
 
 describe('this package audits itself', () => {
+  it('declares support for the current Interface line without claiming the next one', async () => {
+    const root = join(here, '..', '..')
+    const own = JSON.parse(
+      await readFile(join(root, 'package.json'), 'utf8'),
+    ) as { peerDependencies?: Record<string, string> }
+    const range = own.peerDependencies?.['@tangle-network/agent-interface']
+
+    expect(range).toBeDefined()
+    expect(satisfiesRange('0.42.0', range!)).toBe(false)
+    expect(satisfiesRange('0.42.1', range!)).toBe(true)
+    expect(satisfiesRange('0.43.0', range!)).toBe(true)
+    expect(satisfiesRange('0.44.0', range!)).toBe(false)
+  })
+
   // The floors this shell PUBLISHES must be satisfiable by the tree it is
   // developed against, or the contract shipped to consumers is one its own
   // author never ran. Self-audit needs the manifest passed in: a package has no

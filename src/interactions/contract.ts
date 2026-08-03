@@ -47,18 +47,11 @@ export function isSafeInteractionFieldKey(key: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Field types
-//
-// `allowCustom` (a select that also accepts a write-in value) is defined by
-// newer agent-interface schemas; older pinned schemas strip unknown keys on
-// parse. The wire/persisted field types below carry the flag so a card can gate
-// its write-in input, and `parseInteractionRequest` returns the RAW payload
-// (schema-validated, not schema-parsed) so the flag survives.
+// Field types — aliases of the shared Interface contract. The app owns how the
+// fields render, not a second wire shape.
 
 /** Extract select-type interaction fields and optionally allow custom values */
-export type ChatSelectField = Extract<InteractionField, { type: 'select' }> & {
-  allowCustom?: boolean
-}
+export type ChatSelectField = Extract<InteractionField, { type: 'select' }>
 
 /**
  * A field the user types free text into, which may declare the longest answer
@@ -71,29 +64,16 @@ export type ChatSelectField = Extract<InteractionField, { type: 'select' }> & {
  * property that matters here — an answer whose length can run past what the
  * route takes.
  *
- * Carried the same way as `allowCustom`: the schema may not define it, so it
- * rides on the wire/persisted type and survives because `parseInteractionRequest`
- * returns the raw payload. A product that SYNTHESISES an interaction (rather than
- * parsing one off the wire) sets it directly from whatever bound its own route
- * validates against.
+ * The request author chooses this value; omission means the shared contract
+ * imposes no length limit.
  */
-export type ChatFreeTextField = Extract<InteractionField, { type: 'text' | 'secret' }> & {
-  maxLength?: number
-}
+export type ChatFreeTextField = Extract<InteractionField, { type: 'text' | 'secret' }>
 
-/** An `InteractionField` widened where a card needs a flag the pinned schema may
- *  not define: `allowCustom` on a select, `maxLength` on a free-text field. Every
- *  other kind passes through unchanged. */
-export type ChatInteractionField =
-  | Exclude<InteractionField, { type: 'select' | 'text' | 'secret' }>
-  | ChatSelectField
-  | ChatFreeTextField
+/** The shared field contract under the UI-facing name used by this package. */
+export type ChatInteractionField = InteractionField
 
-/** `InteractionRequest` whose fields carry those widenings — a select that may
- *  grant `allowCustom`, a free-text field that may declare `maxLength`. */
-export type InteractionRequestWire = Omit<InteractionRequest, 'answerSpec'> & {
-  answerSpec: { fields: ChatInteractionField[] }
-}
+/** The shared request contract under the wire-facing name used by this package. */
+export type InteractionRequestWire = InteractionRequest
 
 // ---------------------------------------------------------------------------
 // Interaction lifecycle
@@ -213,9 +193,7 @@ export type ParseInteractionResult =
   | { succeeded: true; value: InteractionRequestWire }
   | { succeeded: false; error: string }
 
-/** Parses an `interaction` event's data (`{ request }`). Validates the shape
- *  with the agent-interface schema but returns the raw request so a field a
- *  pinned schema predates (`allowCustom`) survives. */
+/** Parses an `interaction` event's data (`{ request }`) with the shared schema. */
 export function parseInteractionRequest(data: Record<string, unknown> | undefined): ParseInteractionResult {
   const request = data?.request
   if (!request || typeof request !== 'object') {
@@ -225,7 +203,7 @@ export function parseInteractionRequest(data: Record<string, unknown> | undefine
   if (!validation.success) {
     return { succeeded: false, error: `malformed interaction request: ${validation.error.message}` }
   }
-  return { succeeded: true, value: request as InteractionRequestWire }
+  return { succeeded: true, value: validation.data }
 }
 
 /** Describe data required to cancel an interaction including its identifier and optional reason */

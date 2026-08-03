@@ -5266,7 +5266,7 @@
           "name": "KNOWN_HARNESSES",
           "kind": "const",
           "signature": "readonly Harness[]",
-          "doc": "The known coding-agent backends: the canonical harness set minus what has no provider adapter, plus adapters the canonical set has yet to adopt."
+          "doc": "The known coding-agent backends: the canonical harness set minus what has no provider adapter, Derived from `harnessTypeSchema.options` so a harness added upstream reaches this shell without an edit…"
         },
         {
           "name": "modelProvider",
@@ -5794,7 +5794,7 @@
           "name": "ChatInteractionField",
           "kind": "type",
           "signature": "type ChatInteractionField",
-          "doc": "An `InteractionField` widened where a card needs a flag the pinned schema may not define: `allowCustom` on a select, `maxLength` on a free-text field."
+          "doc": "The shared field contract under the UI-facing name used by this package."
         },
         {
           "name": "ChatInteractionStatus",
@@ -5811,7 +5811,7 @@
         {
           "name": "composerAnswerData",
           "kind": "function",
-          "signature": "(field: ChatInteractionField, text: string) => Record<string, string | number | boolean | string[]>",
+          "signature": "(field: { type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…",
           "doc": "Shapes composer text into the respond payload for the routed field (select answers are string arrays on the wire; text answers are strings)."
         },
         {
@@ -5853,7 +5853,7 @@
         {
           "name": "fieldAcceptsFreeText",
           "kind": "function",
-          "signature": "(field: ChatInteractionField) => boolean",
+          "signature": "(field: { type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…",
           "doc": "Determine if a chat interaction field allows free text input"
         },
         {
@@ -5937,7 +5937,7 @@
         {
           "name": "interactionFromWireRequest",
           "kind": "function",
-          "signature": "(request: InteractionRequestWire) => ChatInteraction",
+          "signature": "(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: \"text\"; name: string; label: string…",
           "doc": "Reads a wire request into the client's pending `ChatInteraction`."
         },
         {
@@ -5968,7 +5968,7 @@
           "name": "InteractionRequestWire",
           "kind": "type",
           "signature": "type InteractionRequestWire",
-          "doc": "`InteractionRequest` whose fields carry those widenings — a select that may grant `allowCustom`, a free-text field that may declare `maxLength`."
+          "doc": "The shared request contract under the wire-facing name used by this package."
         },
         {
           "name": "InteractionRouteLogger",
@@ -5979,7 +5979,7 @@
         {
           "name": "interactionToPersistedPart",
           "kind": "function",
-          "signature": "(request: InteractionRequestWire, status: ChatInteractionStatus, cancelReason?: string | undefined, answers?: Interacti…",
+          "signature": "(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: \"text\"; name: string; label: string…",
           "doc": "Builds the persisted/streamed `interaction` part from a wire request."
         },
         {
@@ -6009,7 +6009,7 @@
         {
           "name": "listSessionInteractions",
           "kind": "function",
-          "signature": "(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<InteractionRequestWire[]>>",
+          "signature": "(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<{ id: string; kind: string; title: str…",
           "doc": "Outstanding (unanswered) interactions for the session — the sidecar's registry is authoritative, so this is the reconnect/reload source of truth."
         },
         {
@@ -6064,7 +6064,7 @@
           "name": "parseInteractionRequest",
           "kind": "function",
           "signature": "(data: Record<string, unknown> | undefined) => ParseInteractionResult",
-          "doc": "Parses an `interaction` event's data (`{ request }`)."
+          "doc": "Parses an `interaction` event's data (`{ request }`) with the shared schema."
         },
         {
           "name": "ParseInteractionResult",
@@ -14518,7 +14518,7 @@
         {
           "name": "buildAnswerData",
           "kind": "function",
-          "signature": "(fields: ChatInteractionField[], values: FieldValues) => Record<string, string | number | boolean | string[]> | null",
+          "signature": "(fields: ({ type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…",
           "doc": "All required fields answered → the respond payload; else null (not submittable yet)."
         },
         {
@@ -14615,7 +14615,7 @@
           "name": "ChatInteractionField",
           "kind": "type",
           "signature": "type ChatInteractionField",
-          "doc": "An `InteractionField` widened where a card needs a flag the pinned schema may not define: `allowCustom` on a select, `maxLength` on a free-text field."
+          "doc": "The shared field contract under the UI-facing name used by this package."
         },
         {
           "name": "ChatInteractionRestoreMode",
@@ -14728,7 +14728,7 @@
         {
           "name": "composerAnswerData",
           "kind": "function",
-          "signature": "(field: ChatInteractionField, text: string) => Record<string, string | number | boolean | string[]>",
+          "signature": "(field: { type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…",
           "doc": "Shapes composer text into the respond payload for the routed field (select answers are string arrays on the wire; text answers are strings)."
         },
         {
@@ -14998,13 +14998,13 @@
         {
           "name": "fieldAcceptsFreeText",
           "kind": "function",
-          "signature": "(field: ChatInteractionField) => boolean",
+          "signature": "(field: { type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…",
           "doc": "Determine if a chat interaction field allows free text input"
         },
         {
           "name": "fieldAnswer",
           "kind": "function",
-          "signature": "(field: ChatInteractionField, values: FieldValues) => string | number | boolean | string[] | null",
+          "signature": "(field: { type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…",
           "doc": "The submitted value for one field, or null when it has no answer yet."
         },
         {
@@ -15016,7 +15016,7 @@
         {
           "name": "fieldValuesFromAnswers",
           "kind": "function",
-          "signature": "(fields: ChatInteractionField[], answers: InteractionAnswers | undefined) => FieldValues",
+          "signature": "(fields: ({ type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…",
           "doc": "Converts acknowledged, persisted answers back into the local field state consumed by the shared cards."
         },
         {
@@ -15094,7 +15094,7 @@
         {
           "name": "hasSecretField",
           "kind": "function",
-          "signature": "(fields: ChatInteractionField[]) => boolean",
+          "signature": "(fields: ({ type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…",
           "doc": "Secrets must never leave the sidecar answer channel for the visible chat transcript, so a secret-bearing ask cannot be late-answered."
         },
         {
@@ -15202,7 +15202,7 @@
         {
           "name": "interactionFromWireRequest",
           "kind": "function",
-          "signature": "(request: InteractionRequestWire) => ChatInteraction",
+          "signature": "(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: \"text\"; name: string; label: string…",
           "doc": "Reads a wire request into the client's pending `ChatInteraction`."
         },
         {
@@ -15257,7 +15257,7 @@
           "name": "InteractionRequestWire",
           "kind": "type",
           "signature": "type InteractionRequestWire",
-          "doc": "`InteractionRequest` whose fields carry those widenings — a select that may grant `allowCustom`, a free-text field that may declare `maxLength`."
+          "doc": "The shared request contract under the wire-facing name used by this package."
         },
         {
           "name": "interactionStatusLabels",
@@ -15286,7 +15286,7 @@
         {
           "name": "interactionToPersistedPart",
           "kind": "function",
-          "signature": "(request: InteractionRequestWire, status: ChatInteractionStatus, cancelReason?: string | undefined, answers?: Interacti…",
+          "signature": "(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: \"text\"; name: string; label: string…",
           "doc": "Builds the persisted/streamed `interaction` part from a wire request."
         },
         {
@@ -15479,7 +15479,7 @@
           "name": "parseInteractionRequest",
           "kind": "function",
           "signature": "(data: Record<string, unknown> | undefined) => ParseInteractionResult",
-          "doc": "Parses an `interaction` event's data (`{ request }`)."
+          "doc": "Parses an `interaction` event's data (`{ request }`) with the shared schema."
         },
         {
           "name": "ParseInteractionResult",
@@ -15646,7 +15646,7 @@
         {
           "name": "restoreChatInteractions",
           "kind": "function",
-          "signature": "(list: ChatInteraction[], outstanding: InteractionRequestWire[], options?: RestoreChatInteractionsOptions) => ChatInter…",
+          "signature": "(list: ChatInteraction[], outstanding: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: \"text\"…",
           "doc": "Reload restore from the answer route's GET list."
         },
         {

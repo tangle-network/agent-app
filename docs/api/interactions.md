@@ -56,7 +56,7 @@ interface ChatInteraction
 
 ### `ChatInteractionField`
 
-`type` — An `InteractionField` widened where a card needs a flag the pinned schema may not define: `allowCustom` on a select, `maxLength` on a free-text field.
+`type` — The shared field contract under the UI-facing name used by this package.
 
 ```ts
 type ChatInteractionField
@@ -83,7 +83,7 @@ type ChatSelectField
 `function` — Shapes composer text into the respond payload for the routed field (select answers are string arrays on the wire; text answers are strings).
 
 ```ts
-(field: ChatInteractionField, text: string) => Record<string, string | number | boolean | string[]>
+(field: { type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…
 ```
 
 ### `composerAnswerDeliveries`
@@ -139,7 +139,7 @@ interface DurableInteractionRoutePersistence
 `function` — Determine if a chat interaction field allows free text input
 
 ```ts
-(field: ChatInteractionField) => boolean
+(field: { type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…
 ```
 
 ### `getSessionState`
@@ -251,7 +251,7 @@ type InteractionData
 `function` — Reads a wire request into the client's pending `ChatInteraction`.
 
 ```ts
-(request: InteractionRequestWire) => ChatInteraction
+(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: "text"; name: string; label: string…
 ```
 
 ### `InteractionOutcome`
@@ -288,7 +288,7 @@ type InteractionRequest
 
 ### `InteractionRequestWire`
 
-`type` — `InteractionRequest` whose fields carry those widenings — a select that may grant `allowCustom`, a free-text field that may declare `maxLength`.
+`type` — The shared request contract under the wire-facing name used by this package.
 
 ```ts
 type InteractionRequestWire
@@ -307,7 +307,7 @@ type InteractionRouteLogger
 `function` — Builds the persisted/streamed `interaction` part from a wire request.
 
 ```ts
-(request: InteractionRequestWire, status: ChatInteractionStatus, cancelReason?: string | undefined, answers?: Interacti…
+(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: "text"; name: string; label: string…
 ```
 
 ### `isRenderableInteractionKind`
@@ -347,7 +347,7 @@ type InteractionRouteLogger
 `function` — Outstanding (unanswered) interactions for the session — the sidecar's registry is authoritative, so this is the reconnect/reload source of truth.
 
 ```ts
-(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<InteractionRequestWire[]>>
+(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<{ id: string; kind: string; title: str…
 ```
 
 ### `mapInteractionRespondFailure`
@@ -416,7 +416,7 @@ type ParseInteractionAnswersResult
 
 ### `parseInteractionRequest`
 
-`function` — Parses an `interaction` event's data (`{ request }`).
+`function` — Parses an `interaction` event's data (`{ request }`) with the shared schema.
 
 ```ts
 (data: Record<string, unknown> | undefined) => ParseInteractionResult

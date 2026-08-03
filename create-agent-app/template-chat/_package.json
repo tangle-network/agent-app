@@ -18,20 +18,20 @@
   },
   "dependencies": {
     "@tangle-network/agent-app": "__AGENT_APP_VERSION__",
-    "@tangle-network/agent-interface": "0.40.0",
-    "@tangle-network/agent-runtime": "0.114.0",
-    "@tangle-network/sandbox": "0.15.2",
+    "@tangle-network/agent-interface": "0.43.0",
+    "@tangle-network/agent-runtime": "0.123.0",
+    "@tangle-network/sandbox": "0.17.2",
     "better-auth": "^1.6.16",
     "drizzle-orm": "^0.45.2"
   },
   "peerDependencies": {
-    "@tangle-network/agent-eval": "0.139.2",
+    "@tangle-network/agent-eval": "0.142.2",
     "@tangle-network/agent-integrations": ">=0.52.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260730.1",
-    "@tangle-network/agent-eval": "0.139.2",
-    "@tangle-network/agent-integrations": "^0.52.0",
+    "@tangle-network/agent-eval": "0.142.2",
+    "@tangle-network/agent-integrations": "0.53.37",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.20.1",
     "better-sqlite3": "^12.10.0",
