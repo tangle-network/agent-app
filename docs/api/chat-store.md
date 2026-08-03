@@ -4,7 +4,7 @@
 
 Source: `src/chat-store/index.ts`
 
-63 exports.
+64 exports.
 
 ### `AppendMessageInput`
 
@@ -60,6 +60,14 @@ interface AppendMessageInput
 
 ```ts
 200
+```
+
+### `BulkDeleteThreadsByUpdatedAtInput`
+
+`interface` — Delete threads selected by their last activity time within one workspace.
+
+```ts
+interface BulkDeleteThreadsByUpdatedAtInput
 ```
 
 ### `BulkDeleteThreadsInput`

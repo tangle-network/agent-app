@@ -2829,6 +2829,14 @@ interface AppendMessageInput
 200
 ```
 
+### `BulkDeleteThreadsByUpdatedAtInput`
+
+`interface` — Delete threads selected by their last activity time within one workspace.
+
+```ts
+interface BulkDeleteThreadsByUpdatedAtInput
+```
+
 ### `BulkDeleteThreadsInput`
 
 `interface` — Define input for bulk deleting threads with access checks per workspace
@@ -20404,6 +20412,14 @@ interface SessionActions
 
 ```ts
 interface SessionActionsOptions
+```
+
+### `SessionBulkAction`
+
+`type`
+
+```ts
+type SessionBulkAction
 ```
 
 ### `SessionHistoryPanel`

@@ -407,6 +407,33 @@ describe('SessionHistoryPanel', () => {
     expect(onQueryChange).toHaveBeenCalledWith('acme')
     expect(onSortChange).toHaveBeenCalledWith('oldest')
   })
+
+  it('selects visible rows and confirms the shared bulk action', async () => {
+    const onBulkAction = vi.fn(async () => {})
+    const reload = vi.fn()
+    renderPanel({
+      history: panelState({ items: [session('a'), session('b')], reload }),
+      onBulkAction,
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select all' }))
+    expect(screen.getByText('2 selected')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete selected' }))
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /^Delete$/ }))
+
+    await waitFor(() => expect(onBulkAction).toHaveBeenCalledWith({ kind: 'selected', ids: ['a', 'b'] }))
+    expect(reload).toHaveBeenCalled()
+  })
+
+  it('sends the age filter direction and day count to the product mutation', async () => {
+    const onBulkAction = vi.fn(async () => {})
+    renderPanel({ onBulkAction })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete older' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Delete$/ }))
+    await waitFor(() => expect(onBulkAction).toHaveBeenCalledWith({ kind: 'older-than', days: 30 }))
+  })
 })
 
 describe('formatSessionTimestamp', () => {
