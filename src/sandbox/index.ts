@@ -2276,6 +2276,71 @@ export interface StreamSandboxPromptOptions {
 
 type StreamPromptOptions = Parameters<SandboxInstance['streamPrompt']>[1]
 
+/**
+ * The small event shape consumed by agent-gateway's streaming adapters.
+ *
+ * Sandbox providers can add fields to their event payloads over time. This
+ * adapter deliberately copies only the fields the gateway understands so
+ * consumers do not each have to maintain a provider-to-gateway cast.
+ */
+export interface SandboxStreamEvent {
+  type?: string
+  data?: {
+    part?: { type?: string; text?: string }
+    delta?: string
+    finalText?: string
+    inputRequired?: { prompt?: string }
+  }
+}
+
+/** Normalize raw sandbox events for shared agent-gateway consumers. */
+export function adaptSandboxStream(
+  events: AsyncIterable<unknown>,
+): AsyncGenerator<SandboxStreamEvent> {
+  return (async function* () {
+    for await (const rawEvent of events) {
+      if (!rawEvent || typeof rawEvent !== 'object' || Array.isArray(rawEvent)) continue
+
+      const event = rawEvent as Record<string, unknown>
+      const rawData = event.data
+      const dataRecord =
+        rawData && typeof rawData === 'object' && !Array.isArray(rawData)
+          ? (rawData as Record<string, unknown>)
+          : null
+      const data: NonNullable<SandboxStreamEvent['data']> = {}
+
+      const rawPart = dataRecord?.part
+      if (rawPart && typeof rawPart === 'object' && !Array.isArray(rawPart)) {
+        const part = rawPart as Record<string, unknown>
+        const normalizedPart: NonNullable<
+          NonNullable<SandboxStreamEvent['data']>['part']
+        > = {}
+        if (typeof part.type === 'string') normalizedPart.type = part.type
+        if (typeof part.text === 'string') normalizedPart.text = part.text
+        if (Object.keys(normalizedPart).length > 0) data.part = normalizedPart
+      }
+
+      if (typeof dataRecord?.delta === 'string') data.delta = dataRecord.delta
+      if (typeof dataRecord?.finalText === 'string') data.finalText = dataRecord.finalText
+
+      const rawInputRequired = dataRecord?.inputRequired
+      if (
+        rawInputRequired &&
+        typeof rawInputRequired === 'object' &&
+        !Array.isArray(rawInputRequired)
+      ) {
+        const prompt = (rawInputRequired as Record<string, unknown>).prompt
+        data.inputRequired = typeof prompt === 'string' ? { prompt } : {}
+      }
+
+      yield {
+        ...(typeof event.type === 'string' ? { type: event.type } : {}),
+        ...(Object.keys(data).length > 0 ? { data } : {}),
+      }
+    }
+  })()
+}
+
 /** Resolve and stream AI-generated responses from a sandboxed environment based on input messages and options */
 export async function* streamSandboxPrompt(
   shell: SandboxRuntimeConfig,

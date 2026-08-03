@@ -8599,6 +8599,12 @@
       "error": null,
       "exports": [
         {
+          "name": "adaptSandboxStream",
+          "kind": "function",
+          "signature": "(events: AsyncIterable<unknown>) => AsyncGenerator<SandboxStreamEvent, any, any>",
+          "doc": "Normalize raw sandbox events for shared agent-gateway consumers."
+        },
+        {
           "name": "AppToolDescriptor",
           "kind": "interface",
           "signature": "interface AppToolDescriptor",
@@ -9257,6 +9263,12 @@
           "kind": "type",
           "signature": "type SandboxStepTransition",
           "doc": "Define transitions marking the start or finish of a sandbox step with associated details"
+        },
+        {
+          "name": "SandboxStreamEvent",
+          "kind": "interface",
+          "signature": "interface SandboxStreamEvent",
+          "doc": "The small event shape consumed by agent-gateway's streaming adapters."
         },
         {
           "name": "SandboxTerminalConnectionRouteOptions",

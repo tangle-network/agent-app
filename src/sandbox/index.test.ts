@@ -40,6 +40,8 @@ import {
   ensureWorkspaceSandbox,
   peekWorkspaceSandbox,
   buildAppToolMcpServers,
+  adaptSandboxStream,
+  type SandboxStreamEvent,
   streamSandboxPrompt,
   runSandboxPrompt,
   collectSandboxPromptText,
@@ -818,6 +820,38 @@ describe('streamSandboxPrompt seam', () => {
         profile: () => PROFILE,
       },
     )
+
+  it('adapts raw sandbox events to the gateway event shape', async () => {
+    async function* rawEvents(): AsyncGenerator<unknown> {
+      yield {
+        type: 'message.part.updated',
+        data: {
+          part: { type: 'text', text: 'hello', ignored: true },
+          delta: 'he',
+          ignored: true,
+        },
+        ignored: true,
+      }
+      yield { type: 'result', data: { finalText: 'hello', ignored: true } }
+      yield {
+        type: 'input-required',
+        data: { inputRequired: { prompt: 'Need more', ignored: true } },
+      }
+      yield null
+    }
+
+    const out: SandboxStreamEvent[] = []
+    for await (const event of adaptSandboxStream(rawEvents())) out.push(event)
+
+    expect(out).toEqual([
+      {
+        type: 'message.part.updated',
+        data: { part: { type: 'text', text: 'hello' }, delta: 'he' },
+      },
+      { type: 'result', data: { finalText: 'hello' } },
+      { type: 'input-required', data: { inputRequired: { prompt: 'Need more' } } },
+    ])
+  })
 
   it('flattens history, resolves the model, attaches effort, and forwards to box.streamPrompt', async () => {
     async function* events() {

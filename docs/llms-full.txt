@@ -11098,6 +11098,14 @@ type ToolLoopStopReason
 
 Source: `src/sandbox/index.ts` · depends on `harness`, `profile`, `runtime`, `tools`
 
+### `adaptSandboxStream`
+
+`function` — Normalize raw sandbox events for shared agent-gateway consumers.
+
+```ts
+(events: AsyncIterable<unknown>) => AsyncGenerator<SandboxStreamEvent, any, any>
+```
+
 ### `AppToolDescriptor`
 
 `interface` — Describe an application tool with its name, unique key, and description
@@ -11976,6 +11984,14 @@ interface SandboxScope
 
 ```ts
 type SandboxStepTransition
+```
+
+### `SandboxStreamEvent`
+
+`interface` — The small event shape consumed by agent-gateway's streaming adapters.
+
+```ts
+interface SandboxStreamEvent
 ```
 
 ### `SandboxTerminalConnectionRouteOptions`
