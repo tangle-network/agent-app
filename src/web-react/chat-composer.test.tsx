@@ -275,6 +275,35 @@ describe('ChatComposer layout', () => {
     expect(actionRow.contains(screen.getByLabelText('Send'))).toBe(true)
     expect(card().contains(actionRow)).toBe(true)
   })
+
+  it('puts no overflow box between a control and the composer root, at either placement', () => {
+    // A control owns its popover: ModelPicker and EffortPicker anchor a
+    // ~400px-tall list absolutely to their own trigger. An `overflow` box
+    // anywhere above them clips that list to the action row's height, so it
+    // renders and is never visible, and the scroll offset the popover's width
+    // introduces drags the trigger out of the box's left edge. jsdom has no
+    // layout, so the class list is the only place that box is observable.
+    for (const placement of ['inline', 'above'] as const) {
+      const { container, unmount } = render(
+        <ChatComposer
+          onSend={() => {}}
+          controls={<button type="button">Model</button>}
+          controlsPlacement={placement}
+        />,
+      )
+      const root = container.firstElementChild as HTMLElement
+      let el: HTMLElement | null = screen.getByText('Model').parentElement
+      let checked = 0
+      for (; el && root.contains(el); el = el.parentElement) {
+        expect(el.className).not.toMatch(/overflow(-[xy])?-(auto|scroll|hidden|clip)/)
+        checked++
+      }
+      // The walk has to actually reach the root, or it proves nothing.
+      expect(checked).toBeGreaterThan(0)
+      expect(el).toBe(root.parentElement)
+      unmount()
+    }
+  })
 })
 
 describe('ModelPicker priorityGroup', () => {
