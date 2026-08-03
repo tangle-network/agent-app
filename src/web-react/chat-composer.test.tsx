@@ -304,6 +304,25 @@ describe('ChatComposer layout', () => {
       unmount()
     }
   })
+
+  it('keeps Send out of the controls slot, so a wrapping picker set cannot displace it', () => {
+    // What holds Send on the right is the row's structure, not a scroll box:
+    // controls reflow only INSIDE the slot, Send is the slot's sibling rather
+    // than its content, Send never shrinks, and the slot both takes the row's
+    // slack and may shrink under its own content instead of shoving Send off
+    // the edge. A picker set that outgrows the row therefore costs a second
+    // line, never Send's place on the first.
+    render(<ChatComposer onSend={() => {}} controls={<button type="button">Model</button>} />)
+    const send = screen.getByLabelText('Send')
+    const slot = screen.getByText('Model').parentElement as HTMLElement
+
+    expect(slot.contains(send)).toBe(false)
+    expect(send.parentElement).toBe(slot.parentElement)
+    expect(send.className).toContain('shrink-0')
+    expect(slot.className).toContain('flex-wrap')
+    expect(slot.className).toContain('flex-1')
+    expect(slot.className).toContain('min-w-0')
+  })
 })
 
 describe('ModelPicker priorityGroup', () => {
