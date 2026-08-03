@@ -4,7 +4,15 @@
 
 Source: `src/sandbox/index.ts`
 
-161 exports.
+163 exports.
+
+### `adaptSandboxStream`
+
+`function` — Normalize raw sandbox events for shared agent-gateway consumers.
+
+```ts
+(events: AsyncIterable<unknown>) => AsyncGenerator<SandboxStreamEvent, any, any>
+```
 
 ### `AppToolDescriptor`
 
@@ -884,6 +892,14 @@ interface SandboxScope
 
 ```ts
 type SandboxStepTransition
+```
+
+### `SandboxStreamEvent`
+
+`interface` — The small event shape consumed by agent-gateway's streaming adapters.
+
+```ts
+interface SandboxStreamEvent
 ```
 
 ### `SandboxTerminalConnectionRouteOptions`
