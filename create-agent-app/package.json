@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/create-agent-app",
-  "version": "0.45.17",
+  "version": "0.45.18",
   "description": "Create a tested Tangle agent application with either a tool loop or a complete chat interface.",
   "keywords": [
     "tangle",
