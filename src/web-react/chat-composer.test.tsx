@@ -275,6 +275,54 @@ describe('ChatComposer layout', () => {
     expect(actionRow.contains(screen.getByLabelText('Send'))).toBe(true)
     expect(card().contains(actionRow)).toBe(true)
   })
+
+  it('puts no overflow box between a control and the composer root, at either placement', () => {
+    // Asserts exactly one thing: no ancestor from the control up to the
+    // composer root carries an overflow utility. That box is what would trap
+    // the popover a control anchors to itself (ModelPicker, EffortPicker) —
+    // the controls slot in chat-composer.tsx carries what it costs. jsdom has
+    // no layout, so the class list is the only place the box itself is
+    // observable; what it does to a rendered popover is not measurable here.
+    for (const placement of ['inline', 'above'] as const) {
+      const { container, unmount } = render(
+        <ChatComposer
+          onSend={() => {}}
+          controls={<button type="button">Model</button>}
+          controlsPlacement={placement}
+        />,
+      )
+      const root = container.firstElementChild as HTMLElement
+      let el: HTMLElement | null = screen.getByText('Model').parentElement
+      let checked = 0
+      for (; el && root.contains(el); el = el.parentElement) {
+        expect(el.className).not.toMatch(/overflow(-[xy])?-(auto|scroll|hidden|clip)/)
+        checked++
+      }
+      // The walk has to actually reach the root, or it proves nothing.
+      expect(checked).toBeGreaterThan(0)
+      expect(el).toBe(root.parentElement)
+      unmount()
+    }
+  })
+
+  it('keeps Send out of the controls slot, so a wrapping picker set cannot displace it', () => {
+    // What holds Send on the right is the row's structure, not a scroll box:
+    // controls reflow only INSIDE the slot, Send is the slot's sibling rather
+    // than its content, Send never shrinks, and the slot both takes the row's
+    // slack and may shrink under its own content instead of shoving Send off
+    // the edge. A picker set that outgrows the row therefore costs a second
+    // line, never Send's place on the first.
+    render(<ChatComposer onSend={() => {}} controls={<button type="button">Model</button>} />)
+    const send = screen.getByLabelText('Send')
+    const slot = screen.getByText('Model').parentElement as HTMLElement
+
+    expect(slot.contains(send)).toBe(false)
+    expect(send.parentElement).toBe(slot.parentElement)
+    expect(send.className).toContain('shrink-0')
+    expect(slot.className).toContain('flex-wrap')
+    expect(slot.className).toContain('flex-1')
+    expect(slot.className).toContain('min-w-0')
+  })
 })
 
 describe('ModelPicker priorityGroup', () => {

@@ -483,10 +483,15 @@ export function ChatComposer({
             </>
           )}
 
-          {/* The controls take the row's slack and scroll rather than wrap, so a
-              long picker set can never push Send off the edge or grow the card a
-              second line. Rendered even when empty so Send stays right-aligned. */}
-          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {/* The controls take the row's slack and wrap onto a second line when
+              a long picker set outgrows it. This slot must never establish an
+              overflow box: a control owns its popover (ModelPicker, EffortPicker)
+              and anchors it absolutely to itself, so a scroll/clip box here traps
+              a 400px-tall list inside a ~34px row — the list renders and is never
+              visible — and the scroll offset that comes with it cuts the trigger's
+              own left edge. Growing a second line is the cost of controls that
+              stay operable. Rendered even when empty so Send stays right-aligned. */}
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
             {showInline && controls}
           </div>
 

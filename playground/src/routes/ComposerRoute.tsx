@@ -87,6 +87,21 @@ export function ComposerRoute() {
             focusShortcut={false}
           />
         </Demo>
+
+        {/* The assistant dock is the narrowest consumer of this composer: a
+            448px drawer, so the card renders at 424 and the controls slot at
+            ~309 — narrower than the model popover itself. Open the picker here,
+            not just in the roomy demos above: this is the width where a control
+            and the popover it owns compete for the row. */}
+        <Demo title="Dock width (448px drawer) — open the picker">
+          <div className="w-[424px]">
+            <ChatComposer
+              onSend={() => {}}
+              placeholder="Message the assistant…"
+              controls={pill}
+            />
+          </div>
+        </Demo>
       </div>
     </div>
   )
