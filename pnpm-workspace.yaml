@@ -13,7 +13,9 @@ allowBuilds:
   '@ax-llm/ax': false
   better-sqlite3: true
   canvas: true
+  cpu-features: false
   esbuild: true
+  ssh2: false
 
 overrides:
   esbuild: 0.28.1

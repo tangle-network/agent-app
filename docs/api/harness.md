@@ -56,7 +56,7 @@ type Harness
 
 ### `KNOWN_HARNESSES`
 
-`const` — The known coding-agent backends: the canonical harness set minus what has no provider adapter, plus adapters the canonical set has yet to adopt.
+`const` — The known coding-agent backends: the canonical harness set minus what has no provider adapter, Derived from `harnessTypeSchema.options` so a harness added upstream reaches this shell without an edit…
 
 ```ts
 readonly Harness[]
