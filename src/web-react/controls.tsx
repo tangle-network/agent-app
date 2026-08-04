@@ -82,10 +82,17 @@ export function usePopover(open: boolean, setOpen: (open: boolean) => void) {
   }
 }
 
-/** Tailwind utilities applied to every popover option so keyboard focus is
- *  visible (the prior buttons had no focus ring). */
-export const POPOVER_OPTION_FOCUS =
-  'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card'
+/**
+ * Focus treatment for a row inside a popover panel.
+ *
+ * The ring itself now comes from the `:focus-visible` floor in tokens.css, so
+ * this no longer restates a width or a colour. What it still has to say is
+ * WHERE the ring is drawn: a popover option is a full-width row inside a panel
+ * that clips its own corners (`overflow-hidden rounded-xl`), and an outward
+ * ring on the first or last row is clipped away by that panel. Pulling the
+ * offset negative draws the same ring just inside the row instead.
+ */
+export const POPOVER_OPTION_FOCUS = 'focus-visible:[outline-offset:-2px]'
 
 /**
  * Guard an async action against double-submit. `run` ignores re-entrant calls
@@ -260,7 +267,7 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
         type="button"
         {...triggerProps}
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30"
       >
         {selected ? (renderProviderBadge ? renderProviderBadge(selected.provider) : <ProviderLogo provider={selected.provider} size={16} />) : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}
         <span className="max-w-[160px] truncate">{selected?.name ?? value}</span>
@@ -278,7 +285,7 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search models..."
-                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground"
               />
             </div>
           </div>
@@ -376,7 +383,7 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
         {...triggerProps}
         onClick={() => setOpen(!open)}
         title={label ? `${label} — how hard the agent reasons before answering` : 'Reasoning effort'}
-        className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+        className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30"
       >
         <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />
         <span>

@@ -44,12 +44,18 @@ describe('popover keyboard model (EffortPicker)', () => {
     expect(screen.queryByRole('menu')).toBeNull()
   })
 
-  it('options expose selected state and a focus-visible ring', () => {
+  it('options expose selected state and a focus ring the panel cannot clip', () => {
     render(createElement(EffortPicker, { value: 'high', onChange: vi.fn() }))
     fireEvent.click(screen.getByRole('button', { name: /Extended/ }))
     const selected = screen.getByRole('menuitemradio', { name: 'Extended' })
     expect(selected.getAttribute('aria-checked')).toBe('true')
-    expect(selected.className).toContain('focus-visible:ring-2')
+    // The ring's width and colour come from the `:focus-visible` floor in
+    // tokens.css. The one thing an option row still has to say is WHERE it is
+    // drawn: these rows sit inside a panel that clips its own corners, so an
+    // outward ring on the first or last row is cut off. The negative offset is
+    // that override — and it must not be a suppression.
+    expect(selected.className).toContain('focus-visible:[outline-offset:-2px]')
+    expect(selected.className).not.toMatch(/(?:^|\s)(?:[a-z-]+:)?outline-none(?=\s|$)/)
     expect(screen.getByRole('menuitemradio', { name: 'Quick' }).getAttribute('aria-checked')).toBe('false')
   })
 

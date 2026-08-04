@@ -86,7 +86,7 @@ export function InteractionActionButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${variantClasses}`}
+      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${variantClasses}`}
     >
       {children}
     </button>
@@ -94,7 +94,7 @@ export function InteractionActionButton({
 }
 
 const FIELD_INPUT_CLASSES =
-  'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary disabled:opacity-50'
+  'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary disabled:opacity-50'
 
 // ── option rows ─────────────────────────────────────────────────────────────
 

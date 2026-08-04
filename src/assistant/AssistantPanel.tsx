@@ -432,7 +432,7 @@ export function AssistantPanel({
               onClick={toggleHistory}
               aria-label="Chat history"
               aria-pressed={view === "history"}
-              className={`rounded-md p-1.5 transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              className={`rounded-md p-1.5 transition-colors hover:bg-muted hover:text-foreground ${
                 view === "history"
                   ? "bg-muted text-foreground"
                   : "text-muted-foreground"
@@ -448,7 +448,7 @@ export function AssistantPanel({
               }}
               aria-label="New chat"
               title="New chat"
-              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <MessageSquarePlus className="h-4 w-4" />
             </button>
@@ -456,7 +456,7 @@ export function AssistantPanel({
               type="button"
               onClick={onClose}
               aria-label="Close assistant"
-              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <X className="h-4 w-4" />
             </button>
@@ -482,6 +482,8 @@ export function AssistantPanel({
           <AssistantHistory
             threads={threads.threads}
             loaded={threads.loaded}
+            error={threads.error}
+            onRetry={threads.refresh}
             activeThreadId={state.threadId}
             activeBusy={state.status !== "idle"}
             canRemove={threads.canRemove}
@@ -579,7 +581,7 @@ export function AssistantPanel({
                 // instruction, not a new magic string the backend must decode.)
                 chat.send("continue");
               }}
-              className="shrink-0 rounded-lg bg-primary px-3 py-1.5 font-semibold text-primary-foreground text-xs transition hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="shrink-0 rounded-lg bg-primary px-3 py-1.5 font-semibold text-primary-foreground text-xs transition hover:bg-primary/90"
             >
               Continue
             </button>

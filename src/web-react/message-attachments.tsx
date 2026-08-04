@@ -179,7 +179,11 @@ function AttachmentThumbnail({ part, resolveFileUrl, fetchFile }: AttachmentPart
   }, [objectUrl])
 
   if (!result) {
-    return <span className="inline-block h-16 w-16 shrink-0 animate-pulse rounded-md bg-muted" aria-hidden />
+    // The shimmer stays hidden and UNROLED. Giving each placeholder a role
+    // would put a dozen of them in the accessibility tree of one transcript
+    // message and, worse, make a not-yet-loaded attachment answer to the same
+    // role as a loaded one — the announcement belongs to the group instead.
+    return <span aria-hidden="true" className="inline-block h-16 w-16 shrink-0 animate-pulse rounded-md bg-muted" />
   }
   if (!result.ok || !objectUrl) {
     return <AttachmentThumbnailError name={part.name} />
@@ -190,7 +194,7 @@ function AttachmentThumbnail({ part, resolveFileUrl, fetchFile }: AttachmentPart
       type="button"
       onClick={handleClick}
       aria-label={`Open ${part.name}`}
-      className="h-16 w-16 shrink-0 overflow-hidden rounded-md border border-border focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className="h-16 w-16 shrink-0 overflow-hidden rounded-md border border-border"
     >
       <img src={objectUrl} alt={part.name} className="h-16 w-16 object-cover" />
     </button>

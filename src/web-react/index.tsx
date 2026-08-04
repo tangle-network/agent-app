@@ -338,7 +338,7 @@ export function ChatEmptyState({
               key={i}
               type="button"
               onClick={door.onSelect}
-              className="group flex min-h-[44px] flex-col items-start rounded-xl border border-border bg-card px-4 py-3 text-left transition hover:border-primary/40 hover:bg-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="group flex min-h-[44px] flex-col items-start rounded-xl border border-border bg-card px-4 py-3 text-left transition hover:border-primary/40 hover:bg-accent/30"
             >
               <span className="text-sm font-semibold text-foreground">{door.label}</span>
               {door.description && (
@@ -621,7 +621,7 @@ function ProposalCard({
           <ToolGlyph name={call.name} className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-warning-foreground">Needs your approval</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-warning-strong">Needs your approval</p>
           <p className="mt-0.5 text-[15px] font-semibold leading-snug text-foreground">{friendlyToolTitle(call)}</p>
           {summary && <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{summary}</p>}
           {meta.length > 0 && (
@@ -642,7 +642,7 @@ function ProposalCard({
               type="button"
               disabled={deciding}
               onClick={() => decide(() => approval.onApprove(pending.proposalId, call.id))}
-              className="inline-flex min-h-[40px] flex-1 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:min-w-[160px]"
+              className="inline-flex min-h-[40px] flex-1 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:min-w-[160px]"
             >
               Approve &amp; run
             </button>
@@ -650,7 +650,7 @@ function ProposalCard({
               type="button"
               disabled={deciding}
               onClick={() => decide(() => approval.onReject(pending.proposalId, call.id))}
-              className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-border bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-accent/30 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-border bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-accent/30 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
             >
               Reject
             </button>
@@ -662,7 +662,7 @@ function ProposalCard({
           type="button"
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
-          className="ml-auto inline-flex items-center gap-1 rounded text-[12px] font-medium text-muted-foreground transition hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="ml-auto inline-flex items-center gap-1 rounded text-[12px] font-medium text-muted-foreground transition hover:text-foreground"
         >
           {expanded ? 'Hide details' : 'View details'}
           <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? 'rotate-180' : ''}`} />
@@ -747,7 +747,7 @@ function ToolCallCard({
           type="button"
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
-          className="flex min-w-0 flex-1 items-center gap-2 rounded text-left focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex min-w-0 flex-1 items-center gap-2 rounded text-left"
         >
           <span
             className={`h-2 w-2 shrink-0 rounded-full ${
@@ -771,7 +771,7 @@ function ToolCallCard({
           onClick={() => setExpanded((v) => !v)}
           aria-label={expanded ? 'Collapse details' : 'Expand details'}
           aria-expanded={expanded}
-          className="shrink-0 rounded p-0.5 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="shrink-0 rounded p-0.5"
         >
           <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </button>

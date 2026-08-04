@@ -11,6 +11,13 @@
  * no longer matches the current props — so a swap never shows the prior scope's
  * threads for even one frame. In flight, a late result is dropped if either the
  * user or the client changed, and the request is aborted on the swap.
+ *
+ * A FAILED load is reported, not swallowed. `fetchThreads` answers a non-ok
+ * response, an unusable body or a thrown request with `null`; that used to end
+ * as `loaded: true` over an empty list, which renders identically to a user who
+ * has never chatted. `error` carries the reason so the history view can offer
+ * the retry instead — the `web-react/async` rule (a failed fetch cannot render
+ * as empty data) applied to this hook's own transport.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -23,6 +30,10 @@ export interface AssistantThreads {
   loading: boolean;
   /** True once a fetch has settled at least once (drives empty-vs-loading copy). */
   loaded: boolean;
+  /** Why the last load failed, or null. Non-null means the list on hand is stale
+   *  or empty because the request FAILED — never because there is nothing to
+   *  show. Cleared by the next successful load. */
+  error: string | null;
   /** Load (or reload) the thread list. Must be called to populate `threads` —
    *  the hook never fetches on mount (the panel calls this when history opens). */
   refresh: () => void;
@@ -35,10 +46,14 @@ export interface AssistantThreads {
   canRemove: boolean;
 }
 
+const THREADS_LOAD_FAILED =
+  "Couldn't load your conversations. Check your connection and try again.";
+
 interface ThreadsState {
   threads: AssistantThreadSummary[];
   loading: boolean;
   loaded: boolean;
+  error: string | null;
   /** The (user, client) the data belongs to; the hook masks to empty unless both
    *  match the current props, so a swap can't show the prior scope's list. */
   ownerUserId: string | null;
@@ -62,6 +77,7 @@ export function useAssistantThreads(userId: string | null): AssistantThreads {
     threads: [],
     loading: false,
     loaded: false,
+    error: null,
     ownerUserId: userId,
     ownerClient: client,
   }));
@@ -72,10 +88,12 @@ export function useAssistantThreads(userId: string | null): AssistantThreads {
     const requestedUserId = userRef.current;
     const requestedClient = clientRef.current;
     if (!requestedUserId) {
+      // No signed-in user is a resolved empty list, not a failure.
       setState({
         threads: [],
         loading: false,
         loaded: true,
+        error: null,
         ownerUserId: requestedUserId,
         ownerClient: requestedClient,
       });
@@ -88,6 +106,8 @@ export function useAssistantThreads(userId: string | null): AssistantThreads {
     setState((s) => ({
       ...s,
       loading: true,
+      // A retry starts clean; a still-failing load sets it again on settle.
+      error: null,
       ownerUserId: requestedUserId,
       ownerClient: requestedClient,
     }));
@@ -100,23 +120,31 @@ export function useAssistantThreads(userId: string | null): AssistantThreads {
       .then((result) => {
         if (!isCurrent()) return;
         setState((s) => ({
-          // null = transient failure: keep the prior list, just drop the spinner.
-          // Drop any in-flight/finished deletions so a stale fetch can't resurrect
-          // a row we already removed.
+          // null = the request failed: keep the prior list (it is the best data
+          // on hand) and REPORT it, so an empty list is never mistaken for a
+          // user with no conversations. Drop any in-flight/finished deletions so
+          // a stale fetch can't resurrect a row we already removed.
           threads: (result ?? s.threads).filter(
             (t) => !pendingDeletesRef.current.has(t.id),
           ),
           loading: false,
           loaded: true,
+          error: result === null ? THREADS_LOAD_FAILED : null,
           ownerUserId: requestedUserId,
           ownerClient: requestedClient,
         }));
       })
       .catch(() => {
         // fetchThreads returns null rather than rejecting; this guards a future
-        // change (or a throw in a state setter) from wedging the spinner.
+        // change (or a throw in a state setter) from wedging the spinner — and a
+        // throw is a failed load like any other.
         if (isCurrent()) {
-          setState((s) => ({ ...s, loading: false, loaded: true }));
+          setState((s) => ({
+            ...s,
+            loading: false,
+            loaded: true,
+            error: THREADS_LOAD_FAILED,
+          }));
         }
       });
   }, []);
@@ -186,6 +214,8 @@ export function useAssistantThreads(userId: string | null): AssistantThreads {
     threads: stale ? [] : state.threads,
     loading: stale ? false : state.loading,
     loaded: stale ? false : state.loaded,
+    // A prior scope's failure is not this scope's — masked with the rest.
+    error: stale ? null : state.error,
     refresh,
     remove,
     canRemove: typeof client.deleteThread === "function",

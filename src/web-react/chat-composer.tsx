@@ -5,6 +5,18 @@
  * Stop/Send toggle, a slot for inline controls (model picker, reasoning
  * effort), and a Cmd/Ctrl+L focus shortcut.
  *
+ * A REJECTED send never destroys the draft. The input clears optimistically —
+ * the composer stays editable while a turn streams precisely so the next
+ * message can be typed against a live answer, and holding the sent text in the
+ * box until the server confirms would put the clear on a collision course with
+ * that typing. So the clear happens immediately and the draft is held until the
+ * send is known to have landed: a handler that throws, rejects, or returns
+ * `{ ok: false }` puts the exact bytes back with the caret where it was, names
+ * the reason, and reports `onSendFailed` so the host can restore the
+ * attachments it consumed. If the user has already typed a replacement, the
+ * unsent text is shown in the notice with its own Retry instead of overwriting
+ * what they typed — neither draft is ever destroyed.
+ *
  * Styling contract matches the rest of `web-react`: Tailwind over the shared
  * design tokens (`bg-card`, `border-border`, `text-foreground`, `bg-primary`, …)
  * and inline-SVG glyphs. It defines NO `--chat-*` / `--brand-*` custom
@@ -102,15 +114,89 @@ export interface ComposerFile {
   part?: ComposerFilePart
 }
 
+/** A send the host refused. `error` is shown verbatim in the composer's notice;
+ *  omit it for the generic copy. */
+export interface ComposerSendRejected {
+  ok: false
+  error?: string
+}
+
+/**
+ * What a send handler reports back. `void` — what every handler returned before
+ * this existed — reads as accepted, so wiring stays unchanged; a thrown error, a
+ * rejected promise, or `{ ok: false }` is the rejection that restores the draft.
+ * A handler that resolves only when the whole turn finishes still reports
+ * correctly: the input already cleared on dispatch, so the answer only decides
+ * whether the draft comes back.
+ */
+export type ComposerSendOutcome = void | { ok: true } | ComposerSendRejected
+export type ComposerSendResult = ComposerSendOutcome | Promise<ComposerSendOutcome>
+
+/**
+ * A send handler, typed as a UNION with the legacy `=> void` signature rather
+ * than as `(…) => ComposerSendResult` alone.
+ *
+ * TypeScript's return-type-`void` rule accepts a function returning ANYTHING
+ * where a `=> void` is expected, and that rule fires only when the target's
+ * return type is exactly `void` — not when it is a union that contains `void`.
+ * So narrowing this prop to `ComposerSendResult` would reject handler shapes
+ * that compiled against the shipped `onSend?: (message: string) => void`:
+ * `onSend={(m) => rows.push(m)}` (returns `number`) and
+ * `onSend={(m) => append({ role: 'user', content: m })}` (an ai-sdk append
+ * returns `Promise<string | null | undefined>`) both stop compiling, on a
+ * package whose pinned consumers must never need a source edit to take a minor.
+ *
+ * The union keeps both: a legacy handler lands on the first member, and a
+ * handler that reports an outcome lands on the second. A call through it
+ * resolves to `void | ComposerSendResult`, which IS `ComposerSendResult`, so
+ * the composer reads the outcome exactly as before.
+ */
+export type ComposerSendHandler =
+  | ((message: string) => void)
+  | ((message: string) => ComposerSendResult)
+
+/** @see ComposerSendHandler — the parts-aware arity, same union for the same reason. */
+export type ComposerSendPartsHandler =
+  | ((message: string, parts: ComposerFilePart[]) => void)
+  | ((message: string, parts: ComposerFilePart[]) => ComposerSendResult)
+
+/** The rejected send, handed to `onSendFailed` so the host can undo whatever it
+ *  cleared optimistically — most importantly the staged attachments, which the
+ *  composer does not own (`pendingFiles` is a prop). */
+export interface ComposerSendFailure {
+  /** The reason as the composer renders it. */
+  message: string
+  /** The user's exact draft, untrimmed. */
+  text: string
+  /** The parts the rejected send carried. */
+  parts: ComposerFilePart[]
+  /** Whatever the handler threw / rejected with, or the `{ ok: false }` value. */
+  error: unknown
+  /** True when the draft was put back in the textarea (the box was empty).
+   *  False means the user had typed a replacement, so the unsent text is held in
+   *  the notice instead. */
+  restored: boolean
+}
+
 export interface ChatComposerProps {
   /** Send the trimmed, non-empty message. Attached files travel separately via
    *  `onAttach` + `pendingFiles` (the host consumes and clears them on send).
-   *  Optional when `onSendParts` is wired. */
-  onSend?: (message: string) => void
+   *  Optional when `onSendParts` is wired.
+   *
+   *  Report a refused send by throwing, rejecting, or returning `{ ok: false }`
+   *  — the composer restores the draft rather than losing it. */
+  onSend?: ComposerSendHandler
   /** Parts-aware send: receives the trimmed message plus the `part`
    *  descriptors of every `ready` pending file. Takes precedence over
-   *  `onSend`; enables file-only sends (empty text, ≥1 ready part). */
-  onSendParts?: (message: string, parts: ComposerFilePart[]) => void
+   *  `onSend`; enables file-only sends (empty text, ≥1 ready part).
+   *
+   *  Same rejection contract as `onSend`. */
+  onSendParts?: ComposerSendPartsHandler
+  /** Notified when a send is rejected, after the composer has restored what it
+   *  owns. The host uses it to put back the `pendingFiles` it consumed. */
+  onSendFailed?: (failure: ComposerSendFailure) => void
+  /** Notice copy when the handler names no reason of its own. */
+  sendFailureMessage?: string
   /** Stop the in-flight turn; shown in place of Send while `isStreaming`. */
   onCancel?: () => void
   isStreaming?: boolean
@@ -163,9 +249,46 @@ export interface ChatComposerProps {
 
 const MAX_HEIGHT = 168
 
+const DEFAULT_SEND_FAILURE = "Message not sent. Your draft is still here — try again."
+
+/** A rejection the handler reported by value rather than by throwing. */
+function isRejectedOutcome(outcome: ComposerSendOutcome): outcome is ComposerSendRejected {
+  return typeof outcome === 'object' && outcome !== null && outcome.ok === false
+}
+
+function isPromise(value: ComposerSendResult): value is Promise<ComposerSendOutcome> {
+  return typeof (value as Promise<ComposerSendOutcome> | undefined)?.then === 'function'
+}
+
+/** The reason to show. A rejection's own `error` string wins; then an Error's
+ *  message; else the caller's copy — never an empty notice. */
+function sendFailureText(error: unknown, fallback: string): string {
+  if (typeof error === 'object' && error !== null && 'ok' in error) {
+    const named = (error as ComposerSendRejected).error
+    if (typeof named === 'string' && named.trim() !== '') return named
+    return fallback
+  }
+  if (typeof error === 'string' && error.trim() !== '') return error
+  if (error instanceof Error && error.message.trim() !== '') return error.message
+  return fallback
+}
+
+interface FailedSend {
+  message: string
+  /** The user's exact draft, untrimmed — what a restore puts back. */
+  text: string
+  /** The trimmed form the handler was called with, so Retry sends the same
+   *  bytes the rejected attempt did. */
+  trimmed: string
+  parts: ComposerFilePart[]
+  restored: boolean
+}
+
 export function ChatComposer({
   onSend,
   onSendParts,
+  onSendFailed,
+  sendFailureMessage = DEFAULT_SEND_FAILURE,
   onCancel,
   isStreaming = false,
   disabled = false,
@@ -191,6 +314,10 @@ export function ChatComposer({
   const isControlled = value !== undefined
   const [internal, setInternal] = useState(initialValue ?? '')
   const text = isControlled ? value : internal
+  // A send outcome arrives after the render that dispatched it, so the restore
+  // decision must read the LIVE draft, not the one captured in that closure.
+  const textRef = useRef(text)
+  textRef.current = text
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -257,6 +384,22 @@ export function ChatComposer({
     el.setSelectionRange(text.length, text.length)
   }, [text])
 
+  // A restored draft gets the caret back where the user left it — same
+  // post-render rule as the seed above, but to the recorded offsets rather than
+  // to the end, so a failed send returns the user to the word they were on.
+  const restoreCaretRef = useRef<{ text: string; start: number; end: number } | null>(null)
+  useEffect(() => {
+    const pending = restoreCaretRef.current
+    if (!pending || pending.text !== text) return
+    restoreCaretRef.current = null
+    const el = textareaRef.current
+    if (!el) return
+    el.focus()
+    const start = Math.min(pending.start, text.length)
+    const end = Math.min(pending.end, text.length)
+    el.setSelectionRange(start, end)
+  }, [text])
+
   // Cmd/Ctrl+L focuses the composer from anywhere — the shortcut the hint
   // advertises. Scoped to when the shortcut is enabled and not disabled.
   useEffect(() => {
@@ -279,20 +422,89 @@ export function ChatComposer({
   const hasSendable = text.trim().length > 0 || readyFileCount > 0
   const canSend = hasSendable && !isStreaming && !disabled
 
+  const [failedSend, setFailedSend] = useState<FailedSend | null>(null)
+
+  // The draft comes back only when the box is still empty. If the user typed a
+  // replacement while the send was in flight, overwriting it would trade one
+  // lost message for another — the unsent text is held in the notice instead,
+  // where Retry can send it without touching what they typed.
+  const failSend = useCallback(
+    (error: unknown, draft: string, trimmed: string, parts: ComposerFilePart[], caret: { start: number; end: number }) => {
+      const message = sendFailureText(error, sendFailureMessage)
+      const restored = textRef.current === ''
+      if (restored) {
+        const el = textareaRef.current
+        setText(draft)
+        if (el && el.value === draft) {
+          // A handler that rejected SYNCHRONOUSLY did so inside the same event
+          // as the clear, so React collapses clear+restore into no state change
+          // at all — no re-render is coming and the effect below will never
+          // fire. Place the caret now rather than stranding the pending ref.
+          el.focus()
+          el.setSelectionRange(Math.min(caret.start, draft.length), Math.min(caret.end, draft.length))
+        } else {
+          restoreCaretRef.current = { text: draft, start: caret.start, end: caret.end }
+        }
+      }
+      setFailedSend({ message, text: draft, trimmed, parts, restored })
+      onSendFailed?.({ message, text: draft, parts, error, restored })
+    },
+    [onSendFailed, sendFailureMessage, setText],
+  )
+
+  // Hand the message to the host and watch the outcome. The input has already
+  // been cleared by the caller — this only decides whether it comes back.
+  const dispatchSend = useCallback(
+    (draft: string, trimmed: string, parts: ComposerFilePart[], caret: { start: number; end: number }) => {
+      let outcome: ComposerSendResult
+      try {
+        outcome = onSendParts ? onSendParts(trimmed, parts) : onSend?.(trimmed)
+      } catch (error) {
+        failSend(error, draft, trimmed, parts, caret)
+        return
+      }
+      if (isPromise(outcome)) {
+        void outcome.then(
+          (settled) => {
+            if (isRejectedOutcome(settled)) failSend(settled, draft, trimmed, parts, caret)
+          },
+          (error: unknown) => failSend(error, draft, trimmed, parts, caret),
+        )
+        return
+      }
+      if (isRejectedOutcome(outcome)) failSend(outcome, draft, trimmed, parts, caret)
+    },
+    [onSend, onSendParts, failSend],
+  )
+
   const send = useCallback(() => {
     const trimmed = text.trim()
     if (isStreaming || disabled) return
     const readyFiles = pendingFiles.filter((f) => f.status === 'ready')
     if (!trimmed && readyFiles.length === 0) return
-    if (onSendParts) {
-      const parts = readyFiles.filter((f) => f.part).map((f) => f.part as ComposerFilePart)
-      onSendParts(trimmed, parts)
-      setText('')
-      return
-    }
-    onSend?.(trimmed)
+    // Only a parts-aware send carries parts; `onSend`'s files travel through the
+    // host's own `pendingFiles`, so its failure payload names none.
+    const parts = onSendParts
+      ? readyFiles.filter((f) => f.part).map((f) => f.part as ComposerFilePart)
+      : []
+    const el = textareaRef.current
+    const caret = { start: el?.selectionStart ?? text.length, end: el?.selectionEnd ?? text.length }
+    setFailedSend(null)
     setText('')
-  }, [text, isStreaming, disabled, onSend, onSendParts, pendingFiles, setText])
+    textRef.current = ''
+    dispatchSend(text, trimmed, parts, caret)
+  }, [text, isStreaming, disabled, onSendParts, pendingFiles, setText, dispatchSend])
+
+  // Re-send the message the notice is holding. Reached only when the draft was
+  // NOT restored (the restored path leaves the text in the box, where Send is
+  // the affordance), so it never competes with the primary control.
+  const retryFailedSend = useCallback(() => {
+    const failure = failedSend
+    if (!failure || isStreaming || disabled) return
+    setFailedSend(null)
+    const caret = { start: failure.text.length, end: failure.text.length }
+    dispatchSend(failure.text, failure.trimmed, failure.parts, caret)
+  }, [failedSend, isStreaming, disabled, dispatchSend])
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // Respect IME composition — Enter commits the candidate, it doesn't send.
@@ -379,6 +591,48 @@ export function ChatComposer({
       )}
 
       {showAbove && <div className="mb-1.5 flex flex-wrap items-center gap-1.5 px-1">{controls}</div>}
+
+      {failedSend && (
+        <div
+          role="alert"
+          data-testid="composer-send-error"
+          className="mb-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+        >
+          <div className="flex items-start gap-2">
+            <span className="min-w-0 flex-1">{failedSend.message}</span>
+            <button
+              type="button"
+              aria-label="Dismiss send error"
+              onClick={() => setFailedSend(null)}
+              className="shrink-0 font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
+            >
+              Dismiss
+            </button>
+          </div>
+          {/* The draft is only held here when it could NOT go back in the box —
+              the user typed a replacement. Showing the bytes is what makes the
+              message recoverable by hand even if Retry keeps failing. */}
+          {!failedSend.restored && (
+            <div className="mt-1.5">
+              <p
+                data-testid="composer-unsent-draft"
+                className="max-h-20 overflow-y-auto whitespace-pre-wrap rounded-lg border border-destructive/30 bg-card px-2 py-1 text-foreground"
+              >
+                {failedSend.text}
+              </p>
+              <button
+                type="button"
+                aria-label="Retry sending the unsent message"
+                onClick={retryFailedSend}
+                disabled={isStreaming || disabled}
+                className="mt-1.5 font-medium underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {pendingFiles.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-1.5">

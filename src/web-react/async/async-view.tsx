@@ -96,8 +96,28 @@ export function AsyncView<T>({
     }
   }
 
+  // The busy signal lives on the WRAPPER, not inside the loading block, for the
+  // same reason every `??` above exists: `renderLoading` is an escape hatch, and
+  // a caller filling it with their own spinner would otherwise take the
+  // announcement with them — a screen reader would hear nothing for exactly the
+  // products that styled their wait state. The wrapper wraps every non-`ready`
+  // branch, so it cannot be opted out of.
+  //
+  // `aria-busy` is emitted in BOTH states rather than only while loading: a
+  // region that gains the attribute at the moment it goes busy, and drops it on
+  // arrival, gives assistive tech no transition to report. The `error` branch
+  // keeps its own `role="alert"` and takes no live region here, because nesting
+  // one inside another is what produces a doubled announcement.
+  const busy = state.status === 'loading' || state.status === 'idle'
+  const failed = state.status === 'error'
   return (
-    <div data-async-state={state.status} className={className}>
+    <div
+      data-async-state={state.status}
+      className={className}
+      role={failed ? undefined : 'status'}
+      aria-live={failed ? undefined : 'polite'}
+      aria-busy={busy}
+    >
       {branch()}
     </div>
   )
@@ -105,9 +125,16 @@ export function AsyncView<T>({
 
 function LoadingBlock({ label }: { label: string }): ReactElement {
   return (
-    <div role="status" aria-live="polite" aria-busy="true" className={BLOCK_CLASS}>
+    <div className={BLOCK_CLASS}>
+      {/* The ring is the brand colour, not `border-border`. A divider token is
+          tuned to be barely there, which is the opposite of what a busy
+          indicator needs: measured on this block it painted 1.10:1 in light and
+          1.20:1 in dark against its own panel — below the 3:1 a meaningful
+          graphic needs, and this spinner is the only signal that a fetch is in
+          flight. `border-primary` is also what the composer's send spinner
+          already uses, so this stops being the one that reads differently. */}
       <span
-        className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-transparent"
+        className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"
         aria-hidden="true"
       />
       <span className="text-sm text-muted-foreground">{label}</span>
@@ -180,14 +207,14 @@ export function MutationStatus<T>({ state, labels, className }: MutationStatusPr
   if (state.status === 'idle') return null
   if (state.status === 'pending') {
     return (
-      <span role="status" aria-live="polite" className={className ?? 'text-xs text-muted-foreground'}>
+      <span role="status" aria-live="polite" aria-busy={true} className={className ?? 'text-xs text-muted-foreground'}>
         {labels?.pending ?? 'Saving…'}
       </span>
     )
   }
   if (state.status === 'succeeded') {
     return (
-      <span role="status" aria-live="polite" className={className ?? 'text-xs text-muted-foreground'}>
+      <span role="status" aria-live="polite" aria-busy={false} className={className ?? 'text-xs text-muted-foreground'}>
         {labels?.succeeded ?? 'Saved'}
       </span>
     )

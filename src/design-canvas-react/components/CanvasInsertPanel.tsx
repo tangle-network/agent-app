@@ -277,7 +277,12 @@ export function CanvasInsertPanel({
             key={id}
             type="button"
             onClick={() => setTab(id)}
-            className={`flex flex-1 items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-medium transition-colors ${
+            // These tabs sit flush against the top and side edges of a panel
+            // that clips its overflow, so the floor's outward ring is cut off on
+            // three sides and reads as a stray underline. The negative offset
+            // draws the same ring inside the tab; width and colour still come
+            // from the tokens.
+            className={`flex flex-1 items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-medium transition-colors focus-visible:[outline-offset:-2px] ${
               tab === id
                 ? 'border-b-2 border-[var(--brand-primary)] text-[var(--text-primary)]'
                 : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'

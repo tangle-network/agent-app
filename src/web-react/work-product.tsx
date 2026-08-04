@@ -255,7 +255,14 @@ export function ReviewQueuePanel({
       {!error && items.length === 0 && !loading && (
         <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">{emptyLabel}</p>
       )}
-      <ul className="space-y-1.5">
+      {/* The queue renders neither rows nor the empty copy while `loading`, so
+          the announcement is the only thing a screen reader has during the wait.
+          Kept mounted with changing text: an inserted live region that already
+          carries its message is not reliably announced. */}
+      <span role="status" aria-live="polite" aria-busy={loading} className="sr-only">
+        {loading ? 'Loading review queue…' : ''}
+      </span>
+      <ul className="space-y-1.5" aria-busy={loading}>
         {items.map((item) => (
           <li key={item.scopeKey}>
             <button

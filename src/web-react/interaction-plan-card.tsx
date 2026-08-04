@@ -205,7 +205,7 @@ export function InteractionPlanCard({
           <button
             type="button"
             onClick={() => setExpanded((prev) => !prev)}
-            className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground transition hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground transition hover:text-foreground"
           >
             <ChevronDownGlyph className={`h-3 w-3 transition-transform ${expanded ? 'rotate-180' : ''}`} />
             {expanded ? 'Collapse plan' : 'Show full plan'}
@@ -227,7 +227,7 @@ export function InteractionPlanCard({
                     setValues((prev) => ({ ...prev, [field.name]: { ...prev[field.name], text: event.target.value } }))}
                   rows={2}
                   placeholder={field.type === 'text' ? field.placeholder ?? 'Optional feedback for the agent' : undefined}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary disabled:opacity-50"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary disabled:opacity-50"
                 />
               ) : (
                 <input
@@ -237,7 +237,7 @@ export function InteractionPlanCard({
                   aria-label={field.label}
                   onChange={(event) =>
                     setValues((prev) => ({ ...prev, [field.name]: { ...prev[field.name], text: event.target.value } }))}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary disabled:opacity-50"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary disabled:opacity-50"
                 />
               )}
             </fieldset>

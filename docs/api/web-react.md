@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-343 exports.
+349 exports.
 
 ### `activityTone`
 
@@ -203,7 +203,7 @@ interface ChatAttachmentPart
 `function`
 
 ```ts
-({ onSend, onSendParts, onCancel, isStreaming, disabled, placeholder, value, onValueChange, initialValue, seed, onSeedA…
+({ onSend, onSendParts, onSendFailed, sendFailureMessage, onCancel, isStreaming, disabled, placeholder, value, onValueC…
 ```
 
 ### `ChatComposerProps`
@@ -452,6 +452,54 @@ interface ComposerFilePart
 
 ```ts
 interface ComposerMentionProp
+```
+
+### `ComposerSendFailure`
+
+`interface` — The rejected send, handed to `onSendFailed` so the host can undo whatever it cleared optimistically — most importantly the staged attachments, which the composer does not own (`pendingFiles` is a pro…
+
+```ts
+interface ComposerSendFailure
+```
+
+### `ComposerSendHandler`
+
+`type` — A send handler, typed as a UNION with the legacy `=> void` signature rather than as `(…) => ComposerSendResult` alone.
+
+```ts
+type ComposerSendHandler
+```
+
+### `ComposerSendOutcome`
+
+`type` — What a send handler reports back.
+
+```ts
+type ComposerSendOutcome
+```
+
+### `ComposerSendPartsHandler`
+
+`type`
+
+```ts
+type ComposerSendPartsHandler
+```
+
+### `ComposerSendRejected`
+
+`interface` — A send the host refused.
+
+```ts
+interface ComposerSendRejected
+```
+
+### `ComposerSendResult`
+
+`type`
+
+```ts
+type ComposerSendResult
 ```
 
 ### `consumeChatStream`

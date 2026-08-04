@@ -149,7 +149,7 @@ export function PagesStrip({
               aria-label={`Page ${index + 1}: ${page.name}${isActive ? ' (active)' : ''}`}
               aria-pressed={isActive}
               onClick={() => onSelectPage(page.id)}
-              className="flex cursor-pointer flex-col items-center gap-1 rounded focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+              className="flex cursor-pointer flex-col items-center gap-1 rounded"
             >
             {/* Thumbnail or placeholder */}
             <div
@@ -214,7 +214,7 @@ export function PagesStrip({
           type="button"
           aria-label="Add page"
           onClick={onAddPage}
-          className="flex h-[72px] w-[80px] shrink-0 flex-col items-center justify-center gap-1 rounded border border-dashed border-[var(--border-default)] text-[var(--text-muted)] transition hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+          className="flex h-[72px] w-[80px] shrink-0 flex-col items-center justify-center gap-1 rounded border border-dashed border-[var(--border-default)] text-[var(--text-muted)] transition hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]"
         >
           <PlusGlyph className="h-4 w-4" />
           <span className="text-[10px]">Add page</span>
