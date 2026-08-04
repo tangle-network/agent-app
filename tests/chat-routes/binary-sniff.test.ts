@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { sniffBinary } from '../../src/chat-routes/binary-sniff'
+import {
+  OOXML_PRESENTATION_MACRO_ENABLED_MIME,
+  OOXML_PRESENTATION_MIME,
+  OOXML_SPREADSHEET_MACRO_ENABLED_MIME,
+  OOXML_SPREADSHEET_MIME,
+  OOXML_WORD_MACRO_ENABLED_MIME,
+  OOXML_WORD_MIME,
+  sniffBinary,
+} from '../../src/chat-routes/binary-sniff'
+import {
+  buildZip,
+  docxBytes,
+  opcPackageWithoutOfficeMainPart,
+  plainZipBytes,
+  pptxBytes,
+  realWorldOoxmlBytes,
+  xlsxBytes,
+  zipNamedLikeAnOfficePackage,
+  zipWithUnparseableStoredContentTypes,
+  zipWithWordPartsButNoContentTypes,
+} from './ooxml-fixtures'
 
 // Port of gtm-agent's `tests/binary-sniff.test.ts` — byte-identical fixtures,
 // same magic-byte families plus the fatal-UTF-8/SVG-text-is-binary edge cases.
@@ -66,8 +86,140 @@ describe('sniffBinary', () => {
     expect(sniffBinary(ascii('%PDF-1.7'))).toEqual({ binary: true, mime: 'application/pdf' })
   })
 
-  it('detects ZIP (and by extension OOXML docx/xlsx/pptx, which are just zip archives)', () => {
+  it('reports a bare zip signature with no central directory as application/zip', () => {
     expect(sniffBinary(bytes([0x50, 0x4b, 0x03, 0x04, 0, 0]))).toEqual({ binary: true, mime: 'application/zip' })
+  })
+
+  describe('OOXML packages (every one is a PKZIP container, so the zip signature decides nothing)', () => {
+    it('identifies a Word package written by a real toolchain (pandoc)', () => {
+      expect(sniffBinary(realWorldOoxmlBytes('real-word.docx'))).toEqual({ binary: true, mime: OOXML_WORD_MIME })
+    })
+
+    it('identifies an Excel package written by a real toolchain (LibreOffice Calc)', () => {
+      expect(sniffBinary(realWorldOoxmlBytes('real-excel.xlsx'))).toEqual({ binary: true, mime: OOXML_SPREADSHEET_MIME })
+    })
+
+    it('identifies a PowerPoint package written by a real toolchain (pandoc)', () => {
+      expect(sniffBinary(realWorldOoxmlBytes('real-powerpoint.pptx'))).toEqual({ binary: true, mime: OOXML_PRESENTATION_MIME })
+    })
+
+    it('identifies a Word package whose content-types part is deflated, from its part names', () => {
+      expect(sniffBinary(docxBytes())).toEqual({ binary: true, mime: OOXML_WORD_MIME })
+    })
+
+    it('identifies a Word package whose content-types part is stored, from its declared content types', () => {
+      expect(sniffBinary(docxBytes({ storedContentTypes: true }))).toEqual({ binary: true, mime: OOXML_WORD_MIME })
+    })
+
+    it('identifies Excel and PowerPoint packages', () => {
+      expect(sniffBinary(xlsxBytes())).toEqual({ binary: true, mime: OOXML_SPREADSHEET_MIME })
+      expect(sniffBinary(pptxBytes())).toEqual({ binary: true, mime: OOXML_PRESENTATION_MIME })
+    })
+
+    it('reports a macro-enabled package under its own mime, never the plain document one', () => {
+      expect(sniffBinary(docxBytes({ macroEnabled: true }))).toEqual({ binary: true, mime: OOXML_WORD_MACRO_ENABLED_MIME })
+      expect(sniffBinary(xlsxBytes({ macroEnabled: true }))).toEqual({ binary: true, mime: OOXML_SPREADSHEET_MACRO_ENABLED_MIME })
+      expect(sniffBinary(pptxBytes({ macroEnabled: true }))).toEqual({ binary: true, mime: OOXML_PRESENTATION_MACRO_ENABLED_MIME })
+    })
+
+    it('reports a macro-enabled package from its declared content types when they are readable', () => {
+      expect(sniffBinary(docxBytes({ macroEnabled: true, storedContentTypes: true }))).toEqual({
+        binary: true,
+        mime: OOXML_WORD_MACRO_ENABLED_MIME,
+      })
+    })
+
+    it('reports the macro-enabled mime for a VBA project a readable declaration calls a plain document', () => {
+      // The package DECLARES the plain main-part type and ships
+      // `word/vbaProject.bin`. A reader that returns on the declaration before
+      // scanning for the part admits this under the plain mime, which the
+      // default allow-list accepts — the invariant this module states.
+      for (const stored of [true, false]) {
+        expect(sniffBinary(docxBytes({ vbaPartWithPlainDeclaration: true, storedContentTypes: stored }))).toEqual({
+          binary: true,
+          mime: OOXML_WORD_MACRO_ENABLED_MIME,
+        })
+        expect(sniffBinary(xlsxBytes({ vbaPartWithPlainDeclaration: true, storedContentTypes: stored }))).toEqual({
+          binary: true,
+          mime: OOXML_SPREADSHEET_MACRO_ENABLED_MIME,
+        })
+        expect(sniffBinary(pptxBytes({ vbaPartWithPlainDeclaration: true, storedContentTypes: stored }))).toEqual({
+          binary: true,
+          mime: OOXML_PRESENTATION_MACRO_ENABLED_MIME,
+        })
+      }
+    })
+
+    it('is not steered off the macro-enabled reading by a decoy plain-document Override', () => {
+      // The content-types part is matched as one string, so a second Override
+      // declaring the plain main-part type is indistinguishable from the real
+      // one. The macro-enabled reading has to win regardless of which order
+      // the types are compared in.
+      const decoyed = docxBytes({
+        macroEnabled: true,
+        storedContentTypes: true,
+        extraContentTypeOverrides: [
+          ['/word/decoy.xml', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'],
+        ],
+      })
+      expect(sniffBinary(decoyed)).toEqual({ binary: true, mime: OOXML_WORD_MACRO_ENABLED_MIME })
+    })
+
+    it('identifies a Word package whose main part was renamed by a repair or a converter', () => {
+      // `word/document2.xml` is what a repaired Word file carries; the package
+      // is still a Word document and must not be refused over a part name.
+      const renamed = docxBytes({ mainPartSuffix: '2' })
+      expect(sniffBinary(renamed)).toEqual({ binary: true, mime: OOXML_WORD_MIME })
+    })
+
+    it('keeps an ordinary archive as application/zip', () => {
+      expect(sniffBinary(plainZipBytes())).toEqual({ binary: true, mime: 'application/zip' })
+    })
+
+    it('keeps an archive carrying Word parts but no OPC content-types part as application/zip', () => {
+      expect(sniffBinary(zipWithWordPartsButNoContentTypes())).toEqual({ binary: true, mime: 'application/zip' })
+    })
+
+    it('keeps an OPC package that is not a Word/Excel/PowerPoint document as application/zip', () => {
+      expect(sniffBinary(opcPackageWithoutOfficeMainPart())).toEqual({ binary: true, mime: 'application/zip' })
+    })
+
+    it('keeps an archive that only borrowed the Office entry NAMES as application/zip', () => {
+      // Two zero-cost named entries plus an arbitrary payload. The OPC
+      // package-relationships part is the structural evidence this craft does
+      // not carry.
+      expect(sniffBinary(zipNamedLikeAnOfficePackage())).toEqual({ binary: true, mime: 'application/zip' })
+      expect(sniffBinary(docxBytes({ omitPackageRelationships: true }))).toEqual({
+        binary: true,
+        mime: 'application/zip',
+      })
+    })
+
+    it('keeps a package whose readable content-types part is not one as application/zip', () => {
+      // When the part is stored its text is evidence, and this text says the
+      // archive is not what its entry names claim.
+      expect(sniffBinary(zipWithUnparseableStoredContentTypes())).toEqual({ binary: true, mime: 'application/zip' })
+    })
+
+    it('keeps an archive that merely NAMES an Office part inside a text entry as application/zip', () => {
+      // Entry CONTENT can say anything; only the package's own index counts.
+      const decoy = buildZip([{ name: 'readme.txt', content: 'contains [Content_Types].xml and word/document.xml' }])
+      expect(sniffBinary(decoy)).toEqual({ binary: true, mime: 'application/zip' })
+    })
+
+    it('keeps a truncated package as application/zip (no central directory, nothing to trust)', () => {
+      const full = docxBytes()
+      expect(sniffBinary(full.subarray(0, full.length - 8))).toEqual({ binary: true, mime: 'application/zip' })
+    })
+
+    it('keeps a package whose central-directory offset points out of bounds as application/zip', () => {
+      const corrupt = docxBytes()
+      // Last 22 bytes are the end-of-central-directory record; bytes 16-19 of
+      // it are the directory offset.
+      const end = corrupt.length - 22
+      corrupt.set([0xf0, 0xff, 0xff, 0x0f], end + 16)
+      expect(sniffBinary(corrupt)).toEqual({ binary: true, mime: 'application/zip' })
+    })
   })
 
   it('detects gzip', () => {

@@ -40,6 +40,13 @@ const BROWSER_NONREACT = new Set([
   'web',
   'harness',
   'plans',
+  // The record leaf is the review-queue vocabulary + the pure fold; a client
+  // renders proposed entries from it. Its drizzle sibling is a separate subpath.
+  'record',
+  // The openui leaf is the message-segment parser + the form/action contract; a
+  // chat body imports the parser directly. Its route factory is web-standard
+  // `Request`/`Response` only, so the whole subpath stays client-safe.
+  'openui',
 ])
 
 /** Browser-intended when a client bundle imports it: the whole `*-react` family

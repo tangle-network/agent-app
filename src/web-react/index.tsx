@@ -50,6 +50,7 @@ export * from './provenance'
 export * from './sandbox-terminal'
 export * from './seat-paywall'
 export * from './session-history'
+export * from './record-grid'
 export {
   usePopover,
   usePending,

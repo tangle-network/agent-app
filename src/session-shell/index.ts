@@ -15,6 +15,10 @@
  * rather than the shell knowing any URL.
  */
 
+import { isUnderPrefix, normalizePath, stripSlashes, stripTrailingSlashes } from './path'
+
+export * from './nav-guard'
+
 /** One session as the shell needs to see it. Products map their own row
  *  (thread / session / matter) onto this before handing it over. */
 export interface SessionSummary {
@@ -258,31 +262,6 @@ export function buildSessionNavItem<TIcon = unknown>({
 // ---------------------------------------------------------------------------
 // Routing / selection
 // ---------------------------------------------------------------------------
-
-function stripTrailingSlashes(value: string): string {
-  return value.replace(/\/+$/, '')
-}
-
-/** Bare segment name, so `reserved` accepts `'/settings'` or `'settings'`. */
-function stripSlashes(value: string): string {
-  return value.replace(/^\/+|\/+$/g, '')
-}
-
-/** Path with query + fragment removed and trailing slashes trimmed. A caller
- *  passing a full href instead of a pathname would otherwise match nothing. */
-function normalizePath(pathname: string): string {
-  const withoutHash = pathname.split('#')[0] ?? ''
-  const withoutQuery = withoutHash.split('?')[0] ?? ''
-  return stripTrailingSlashes(withoutQuery)
-}
-
-/** True when `path` is `prefix` or a segment-aligned descendant of it, so
- *  `/vault` never claims `/vault-archive`. */
-function isUnderPrefix(path: string, prefix: string): boolean {
-  const p = stripTrailingSlashes(prefix)
-  if (p === '') return true
-  return path === p || path.startsWith(`${p}/`)
-}
 
 export interface ActiveSessionIdOptions {
   pathname: string

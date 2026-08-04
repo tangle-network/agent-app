@@ -74,7 +74,11 @@ export interface CreateAttachmentUploadRouteOptions {
   /** Attachment kinds this route accepts. Default `['image', 'file']`. */
   allowedKinds?: ChatAttachmentKind[]
   /** Sniffed-mime allowlist fed to `checkAttachmentType`. Default
-   *  {@link ALLOWED_ATTACHMENT_SNIFFED_MIMES}. */
+   *  {@link ALLOWED_ATTACHMENT_SNIFFED_MIMES}. Narrow it to accept less than
+   *  the default (`new Set(['application/pdf'])`), or widen it to accept a
+   *  format the default refuses — macro-enabled Office packages are the
+   *  shipped case:
+   *  `new Set([...ALLOWED_ATTACHMENT_SNIFFED_MIMES, ...MACRO_ENABLED_OOXML_SNIFFED_MIMES])`. */
   allowedSniffedMimes?: ReadonlySet<string>
   /** Sanitized-name → store path. Default identity (the sanitized name IS
    *  the path); gtm passes `vaultFolderForFileName`, a tenant product a
