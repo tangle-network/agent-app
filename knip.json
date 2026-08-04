@@ -31,6 +31,8 @@
     "src/integrations/index.ts",
     "src/interactions/index.ts",
     "src/knowledge-loop/index.ts",
+    "src/legibility/cli.ts",
+    "src/legibility/index.ts",
     "src/knowledge/index.ts",
     "src/missions/index.ts",
     "src/model-resolution/index.ts",

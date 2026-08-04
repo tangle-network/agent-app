@@ -6267,6 +6267,219 @@
       ]
     },
     {
+      "id": "./legibility",
+      "source": "src/legibility/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "BannedTerm",
+          "kind": "interface",
+          "signature": "interface BannedTerm",
+          "doc": "A banned term plus the sentence that replaces it."
+        },
+        {
+          "name": "buildScannedFile",
+          "kind": "function",
+          "signature": "(path: string, text: string) => ScannedFile",
+          "doc": "Lex an in-memory source — the shape every check test uses."
+        },
+        {
+          "name": "checkLegibility",
+          "kind": "function",
+          "signature": "(config: LegibilityConfig) => LegibilityReport",
+          "doc": "Run the gate over a product's source."
+        },
+        {
+          "name": "COPY_CALLS",
+          "kind": "const",
+          "signature": "readonly string[]",
+          "doc": "Calls whose first string argument reaches the reader."
+        },
+        {
+          "name": "COPY_KEYS",
+          "kind": "const",
+          "signature": "readonly string[]",
+          "doc": "Attributes and object keys whose string value is copy."
+        },
+        {
+          "name": "DEFAULT_BANNED_TERMS",
+          "kind": "const",
+          "signature": "readonly BannedTerm[]",
+          "doc": "The default list."
+        },
+        {
+          "name": "EmptyStateOptions",
+          "kind": "interface",
+          "signature": "interface EmptyStateOptions",
+          "doc": null
+        },
+        {
+          "name": "formatLegibilityReport",
+          "kind": "function",
+          "signature": "(report: LegibilityReport, options?: FormatOptions) => string",
+          "doc": null
+        },
+        {
+          "name": "FormatOptions",
+          "kind": "interface",
+          "signature": "interface FormatOptions",
+          "doc": null
+        },
+        {
+          "name": "JsxAttribute",
+          "kind": "interface",
+          "signature": "interface JsxAttribute",
+          "doc": "One attribute on a JSX element."
+        },
+        {
+          "name": "JsxElement",
+          "kind": "interface",
+          "signature": "interface JsxElement",
+          "doc": "One JSX element, with the span every subtree question needs."
+        },
+        {
+          "name": "LEGIBILITY_CHECKS",
+          "kind": "const",
+          "signature": "readonly LegibilityCheckId[]",
+          "doc": null
+        },
+        {
+          "name": "LegibilityCheckId",
+          "kind": "type",
+          "signature": "type LegibilityCheckId",
+          "doc": "The checks this gate runs."
+        },
+        {
+          "name": "LegibilityConfig",
+          "kind": "interface",
+          "signature": "interface LegibilityConfig",
+          "doc": "What a product writes in `legibility.config.mjs`."
+        },
+        {
+          "name": "LegibilityFinding",
+          "kind": "interface",
+          "signature": "interface LegibilityFinding",
+          "doc": "One defect, at one place, with the fix named."
+        },
+        {
+          "name": "LegibilityReport",
+          "kind": "interface",
+          "signature": "interface LegibilityReport",
+          "doc": null
+        },
+        {
+          "name": "legibilityReportToJson",
+          "kind": "function",
+          "signature": "(report: LegibilityReport) => string",
+          "doc": "The machine-readable form, for a product that posts findings somewhere."
+        },
+        {
+          "name": "LegibilitySuppression",
+          "kind": "interface",
+          "signature": "interface LegibilitySuppression",
+          "doc": "A suppression that was honoured, with the reason its author wrote."
+        },
+        {
+          "name": "parseRouteConfig",
+          "kind": "function",
+          "signature": "(file: ScannedFile) => RouteEntry[]",
+          "doc": "Parse a `@react-router/dev/routes` config into composed route paths."
+        },
+        {
+          "name": "ReachabilityOptions",
+          "kind": "interface",
+          "signature": "interface ReachabilityOptions",
+          "doc": null
+        },
+        {
+          "name": "READERLESS_PATHS",
+          "kind": "const",
+          "signature": "readonly string[]",
+          "doc": "Paths whose modules cannot render."
+        },
+        {
+          "name": "RouteEntry",
+          "kind": "interface",
+          "signature": "interface RouteEntry",
+          "doc": "One route as declared, with its composed path."
+        },
+        {
+          "name": "scanFile",
+          "kind": "function",
+          "signature": "(path: string) => ScannedFile | null",
+          "doc": "Read and lex one file."
+        },
+        {
+          "name": "ScannedFile",
+          "kind": "interface",
+          "signature": "interface ScannedFile",
+          "doc": "One file, lexed once, with its line index ready."
+        },
+        {
+          "name": "ScannedSource",
+          "kind": "interface",
+          "signature": "interface ScannedSource",
+          "doc": "Everything one pass over a file produces."
+        },
+        {
+          "name": "scanSource",
+          "kind": "function",
+          "signature": "(text: string) => ScannedSource",
+          "doc": "Lex one TS/TSX source."
+        },
+        {
+          "name": "scanSources",
+          "kind": "function",
+          "signature": "(srcDirs: readonly string[], ignore?: readonly string[]) => ScannedFile[]",
+          "doc": "Lex every scannable file under `srcDirs`."
+        },
+        {
+          "name": "SegmentKind",
+          "kind": "type",
+          "signature": "type SegmentKind",
+          "doc": "What a stretch of source is, once the lexer has decided."
+        },
+        {
+          "name": "SilentFailureOptions",
+          "kind": "interface",
+          "signature": "interface SilentFailureOptions",
+          "doc": null
+        },
+        {
+          "name": "SourceSegment",
+          "kind": "interface",
+          "signature": "interface SourceSegment",
+          "doc": "One classified stretch of source."
+        },
+        {
+          "name": "staticSegments",
+          "kind": "function",
+          "signature": "(path: string) => string[]",
+          "doc": "The comparable segments of a path: statics only, params and holes dropped."
+        },
+        {
+          "name": "SuccessOptions",
+          "kind": "interface",
+          "signature": "interface SuccessOptions",
+          "doc": null
+        },
+        {
+          "name": "VocabularyOptions",
+          "kind": "interface",
+          "signature": "interface VocabularyOptions",
+          "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./legibility/cli",
+      "source": "src/legibility/cli.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": []
+    },
+    {
       "id": "./missions",
       "source": "src/missions/index.ts",
       "dependsOn": [],
@@ -14864,6 +15077,24 @@
           "doc": "Max popover results per query — enough to show a useful spread of matches without pushing the fuzzy-filtered list past what a popover can usefully render in one screen."
         },
         {
+          "name": "DEFAULT_PROVENANCE_CONFIDENCE_POLICY",
+          "kind": "const",
+          "signature": "ProvenanceConfidencePolicy",
+          "doc": "The starting policy."
+        },
+        {
+          "name": "describeProvenance",
+          "kind": "function",
+          "signature": "(record: ProvenanceRecord) => string",
+          "doc": "One plain sentence naming where the value came from — the panel's first line and part of what a screen reader announces."
+        },
+        {
+          "name": "describeProvenanceSourceStatus",
+          "kind": "function",
+          "signature": "(source: ProvenanceSource) => string | null",
+          "doc": "The sentence for a source that is not `ready`, or `null` when it is."
+        },
+        {
           "name": "DISPATCH_MAX_MEDIA_PARTS",
           "kind": "const",
           "signature": "24",
@@ -15380,6 +15611,12 @@
           "doc": "Fetches (and caches) the raw bytes behind one attachment url."
         },
         {
+          "name": "loadingProvenanceSources",
+          "kind": "function",
+          "signature": "(record: ProvenanceRecord) => ProvenanceSource[]",
+          "doc": "The sources still resolving — rendered as their own state, never as an absence."
+        },
+        {
           "name": "mediaTypeForMentionPath",
           "kind": "function",
           "signature": "(path: string) => string | undefined",
@@ -15608,6 +15845,90 @@
           "doc": "Handle approval and rejection actions for proposals with asynchronous support"
         },
         {
+          "name": "PROVENANCE_BASES",
+          "kind": "const",
+          "signature": "readonly ProvenanceBasis[]",
+          "doc": "Every basis, in the order a legend should list them."
+        },
+        {
+          "name": "ProvenanceBasis",
+          "kind": "type",
+          "signature": "type ProvenanceBasis",
+          "doc": "How a value came to exist."
+        },
+        {
+          "name": "provenanceBasisMeta",
+          "kind": "function",
+          "signature": "(basis: ProvenanceBasis) => ProvenanceBasisMeta",
+          "doc": "Words for one basis."
+        },
+        {
+          "name": "ProvenanceBasisMeta",
+          "kind": "interface",
+          "signature": "interface ProvenanceBasisMeta",
+          "doc": "The words one basis is rendered and announced with."
+        },
+        {
+          "name": "ProvenanceConfidencePolicy",
+          "kind": "interface",
+          "signature": "interface ProvenanceConfidencePolicy",
+          "doc": "Where a product draws its confidence lines."
+        },
+        {
+          "name": "ProvenanceGap",
+          "kind": "interface",
+          "signature": "interface ProvenanceGap",
+          "doc": "One stated gap."
+        },
+        {
+          "name": "ProvenanceGapKind",
+          "kind": "type",
+          "signature": "type ProvenanceGapKind",
+          "doc": "Something missing that the reader has to be TOLD about, because the value renders either way and a bare number reads as a fact."
+        },
+        {
+          "name": "provenanceGaps",
+          "kind": "function",
+          "signature": "(record: ProvenanceRecord) => ProvenanceGap[]",
+          "doc": "What this record cannot show, at its own level."
+        },
+        {
+          "name": "ProvenanceLegend",
+          "kind": "function",
+          "signature": "({ bases, className }: ProvenanceLegendProps) => Element | null",
+          "doc": "The marker key for a surface that renders several bases at once — a review pane, a grid, a return."
+        },
+        {
+          "name": "ProvenanceLegendProps",
+          "kind": "interface",
+          "signature": "interface ProvenanceLegendProps",
+          "doc": "Properties for the basis legend."
+        },
+        {
+          "name": "provenanceNextMove",
+          "kind": "function",
+          "signature": "(record: ProvenanceRecord, standing: ProvenanceStanding, policy?: ProvenanceConfidencePolicy) => string",
+          "doc": "The move THIS value's reader can actually make."
+        },
+        {
+          "name": "ProvenanceRecord",
+          "kind": "interface",
+          "signature": "interface ProvenanceRecord",
+          "doc": "A value, where it came from, and — when it was computed — the provenanced values it came from."
+        },
+        {
+          "name": "ProvenanceSource",
+          "kind": "interface",
+          "signature": "interface ProvenanceSource",
+          "doc": "One thing a value came from."
+        },
+        {
+          "name": "ProvenanceSourceStatus",
+          "kind": "type",
+          "signature": "type ProvenanceSourceStatus",
+          "doc": "Whether a source could be resolved."
+        },
+        {
           "name": "ProvenanceStamp",
           "kind": "function",
           "signature": "({ provenance, backtest, className }: ProvenanceStampProps) => Element",
@@ -15618,6 +15939,42 @@
           "kind": "interface",
           "signature": "interface ProvenanceStampProps",
           "doc": "Properties for the provenance stamp with the optional backtest slot"
+        },
+        {
+          "name": "ProvenanceStanding",
+          "kind": "type",
+          "signature": "type ProvenanceStanding",
+          "doc": "What the reader should DO about a value — the only form confidence takes on screen."
+        },
+        {
+          "name": "provenanceStandingMeta",
+          "kind": "function",
+          "signature": "(standing: ProvenanceStanding) => ProvenanceStandingMeta",
+          "doc": "Words for one standing."
+        },
+        {
+          "name": "ProvenanceStandingMeta",
+          "kind": "interface",
+          "signature": "interface ProvenanceStandingMeta",
+          "doc": "The words one standing is rendered and announced with."
+        },
+        {
+          "name": "provenanceTriggerLabel",
+          "kind": "function",
+          "signature": "(record: ProvenanceRecord, standing: ProvenanceStanding) => string",
+          "doc": "The accessible name of the disclosure control: the value, how it came to exist, and — unless there is nothing to do — the next move."
+        },
+        {
+          "name": "ProvenanceValue",
+          "kind": "function",
+          "signature": "({ record, onOpenSource, onRetrySource, confidencePolicy, maxDepth, defaultOpen, missingValueLabel, className, }: Prove…",
+          "doc": "A value, its origin marker, and the disclosure that shows where it came from."
+        },
+        {
+          "name": "ProvenanceValueProps",
+          "kind": "interface",
+          "signature": "interface ProvenanceValueProps",
+          "doc": "Properties for one provenanced value and its disclosure."
         },
         {
           "name": "ProviderLogo",
@@ -15674,6 +16031,12 @@
           "doc": "Marks one ask resolved locally (the card's `onResolved`)."
         },
         {
+          "name": "resolveProvenanceStanding",
+          "kind": "function",
+          "signature": "(record: ProvenanceRecord, policy?: ProvenanceConfidencePolicy) => ProvenanceStanding",
+          "doc": "This record's own standing, ignoring its inputs."
+        },
+        {
           "name": "responseErrorMessage",
           "kind": "function",
           "signature": "(res: Response) => Promise<{ code?: string | undefined; message: string; }>",
@@ -15726,6 +16089,12 @@
           "kind": "function",
           "signature": "(state: ReviewQueueState) => string",
           "doc": "Human label for a queue state."
+        },
+        {
+          "name": "rollUpProvenanceStanding",
+          "kind": "function",
+          "signature": "(record: ProvenanceRecord, policy?: ProvenanceConfidencePolicy, seen?: Set<ProvenanceRecord>) => ProvenanceStanding",
+          "doc": "The standing a reader should see: this record's own, weakened by every value it was computed from, however deep."
         },
         {
           "name": "RunDrillIn",
@@ -15834,6 +16203,12 @@
           "kind": "function",
           "signature": "(parts: Record<string, unknown>[], answersByInteractionId: Readonly<Record<string, InteractionAnswers>>) => Record<stri…",
           "doc": "Stamps accepted values onto matching persisted interaction parts without mutating the caller's transcript or answer maps."
+        },
+        {
+          "name": "standingFromConfidence",
+          "kind": "function",
+          "signature": "(confidence: number, policy?: ProvenanceConfidencePolicy) => ProvenanceStanding",
+          "doc": "The standing a bare confidence maps to under a policy."
         },
         {
           "name": "StreamChatOptions",
@@ -16050,6 +16425,12 @@
           "kind": "interface",
           "signature": "interface WaterfallRow",
           "doc": null
+        },
+        {
+          "name": "weakerProvenanceStanding",
+          "kind": "function",
+          "signature": "(a: ProvenanceStanding, b: ProvenanceStanding) => ProvenanceStanding",
+          "doc": "The weaker of two standings — `confirm` beats `check` beats `settled`."
         },
         {
           "name": "WorkProductCard",
