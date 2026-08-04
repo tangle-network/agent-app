@@ -883,7 +883,13 @@ export function WorkspaceView({
 
   return (
     <div
-      className={`design-canvas-workspace relative overflow-hidden bg-[var(--canvas-backdrop,#1a1a1a)] outline-none ${className ?? ''}`}
+      // The canvas is `tabIndex={0}`, so Tab lands here and the keyboard
+      // shortcuts below only work once it has focus — it must show that it does.
+      // The floor's ring is kept but pulled INSIDE the border box: this element
+      // is full-bleed inside its pane, so an outward ring is clipped by the
+      // ancestor that scrolls it. Only the offset is overridden; width and color
+      // still come from the tokens.
+      className={`design-canvas-workspace relative overflow-hidden bg-[var(--canvas-backdrop,#1a1a1a)] focus-visible:[outline-offset:-2px] ${className ?? ''}`}
       ref={containerRef}
       tabIndex={0}
       onWheel={handleWheel}

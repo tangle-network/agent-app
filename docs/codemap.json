@@ -15745,7 +15745,7 @@
         {
           "name": "ChatComposer",
           "kind": "function",
-          "signature": "({ onSend, onSendParts, onCancel, isStreaming, disabled, placeholder, value, onValueChange, initialValue, seed, onSeedA…",
+          "signature": "({ onSend, onSendParts, onSendFailed, sendFailureMessage, onCancel, isStreaming, disabled, placeholder, value, onValueC…",
           "doc": null
         },
         {
@@ -15933,6 +15933,42 @@
           "kind": "interface",
           "signature": "interface ComposerMentionProp",
           "doc": "Mirrors sandbox-ui#184's `AgentComposerProps['mention']` shape — plug the hook's `mention` return value straight into that prop."
+        },
+        {
+          "name": "ComposerSendFailure",
+          "kind": "interface",
+          "signature": "interface ComposerSendFailure",
+          "doc": "The rejected send, handed to `onSendFailed` so the host can undo whatever it cleared optimistically — most importantly the staged attachments, which the composer does not own (`pendingFiles` is a pro…"
+        },
+        {
+          "name": "ComposerSendHandler",
+          "kind": "type",
+          "signature": "type ComposerSendHandler",
+          "doc": "A send handler, typed as a UNION with the legacy `=> void` signature rather than as `(…) => ComposerSendResult` alone."
+        },
+        {
+          "name": "ComposerSendOutcome",
+          "kind": "type",
+          "signature": "type ComposerSendOutcome",
+          "doc": "What a send handler reports back."
+        },
+        {
+          "name": "ComposerSendPartsHandler",
+          "kind": "type",
+          "signature": "type ComposerSendPartsHandler",
+          "doc": null
+        },
+        {
+          "name": "ComposerSendRejected",
+          "kind": "interface",
+          "signature": "interface ComposerSendRejected",
+          "doc": "A send the host refused."
+        },
+        {
+          "name": "ComposerSendResult",
+          "kind": "type",
+          "signature": "type ComposerSendResult",
+          "doc": null
         },
         {
           "name": "consumeChatStream",

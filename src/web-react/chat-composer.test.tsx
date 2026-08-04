@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 import { ChatComposer } from './chat-composer'
 import { ModelPicker } from './controls'
@@ -440,5 +440,142 @@ describe('ChatComposer seed', () => {
     expect(onSeedApplied).toHaveBeenCalledOnce()
     expect(document.activeElement).toBe(input)
     expect(input.selectionStart).toBe(input.value.length)
+  })
+
+  // A rejected send used to destroy the message: setText('') ran unconditionally
+  // on dispatch and nothing ever put the bytes back. Each case below is a real
+  // rejection shape a host reports.
+  describe('a rejected send never loses the draft', () => {
+    it('restores the exact text, the caret, and names the reason when the handler throws', () => {
+      const onSend = vi.fn(() => {
+        throw new Error('You are offline.')
+      })
+      render(<ChatComposer onSend={onSend} />)
+      const input = screen.getByLabelText('Message input') as HTMLTextAreaElement
+
+      type(input, 'the long answer I typed')
+      input.setSelectionRange(4, 8)
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      expect(onSend).toHaveBeenCalledExactlyOnceWith('the long answer I typed')
+      expect(input.value).toBe('the long answer I typed')
+      expect(input.selectionStart).toBe(4)
+      expect(input.selectionEnd).toBe(8)
+      expect(document.activeElement).toBe(input)
+      expect(screen.getByRole('alert').textContent).toContain('You are offline.')
+    })
+
+    it('restores after a rejected promise (the 402/500 that resolves late)', async () => {
+      const onSend = vi.fn(() => Promise.reject(new Error('Seat limit reached.')))
+      render(<ChatComposer onSend={onSend} />)
+      const input = screen.getByLabelText('Message input') as HTMLTextAreaElement
+
+      type(input, 'draft that must survive')
+      fireEvent.keyDown(input, { key: 'Enter' })
+      // Cleared optimistically — the box is empty while the send is in flight.
+      expect(input.value).toBe('')
+
+      await screen.findByRole('alert')
+      expect(input.value).toBe('draft that must survive')
+      expect(screen.getByRole('alert').textContent).toContain('Seat limit reached.')
+    })
+
+    it('restores on a returned { ok: false } and shows its message', async () => {
+      const onSend = vi.fn(() => Promise.resolve({ ok: false as const, error: 'Validation failed.' }))
+      render(<ChatComposer onSend={onSend} />)
+      const input = screen.getByLabelText('Message input') as HTMLTextAreaElement
+
+      type(input, 'rejected by validation')
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      await screen.findByRole('alert')
+      expect(input.value).toBe('rejected by validation')
+      expect(screen.getByRole('alert').textContent).toContain('Validation failed.')
+    })
+
+    it('keeps the input cleared and shows no notice when the send is accepted', async () => {
+      const onSend = vi.fn(() => Promise.resolve())
+      render(<ChatComposer onSend={onSend} />)
+      const input = screen.getByLabelText('Message input') as HTMLTextAreaElement
+
+      type(input, 'accepted')
+      fireEvent.keyDown(input, { key: 'Enter' })
+      await Promise.resolve()
+
+      expect(input.value).toBe('')
+      expect(screen.queryByRole('alert')).toBeNull()
+    })
+
+    it('holds the unsent text in the notice instead of clobbering a replacement draft', async () => {
+      let reject: (error: Error) => void = () => {}
+      const onSend = vi.fn(() => new Promise<void>((_, r) => { reject = r }))
+      render(<ChatComposer onSend={onSend} />)
+      const input = screen.getByLabelText('Message input') as HTMLTextAreaElement
+
+      type(input, 'first message')
+      fireEvent.keyDown(input, { key: 'Enter' })
+      // The user starts the next message while the first is still in flight.
+      type(input, 'second message')
+      await act(async () => {
+        reject(new Error('Server error.'))
+        await Promise.resolve()
+      })
+
+      // Neither draft is destroyed: the typed one stays in the box, the unsent
+      // one is readable in the notice.
+      expect(input.value).toBe('second message')
+      expect(screen.getByTestId('composer-unsent-draft').textContent).toBe('first message')
+
+      // Retry re-sends the UNSENT bytes without touching what is being typed.
+      onSend.mockImplementation(() => Promise.resolve())
+      fireEvent.click(screen.getByLabelText('Retry sending the unsent message'))
+      expect(onSend).toHaveBeenLastCalledWith('first message')
+      expect(input.value).toBe('second message')
+    })
+
+    it('reports the failure so the host can restore the attachments it consumed', async () => {
+      const onSendFailed = vi.fn()
+      const part = { type: 'file' as const, filename: 'brief.pdf', url: 'data:,x' }
+      const onSendParts = vi.fn(() => Promise.reject(new Error('Upload gone.')))
+      render(
+        <ChatComposer
+          onSendParts={onSendParts}
+          onSendFailed={onSendFailed}
+          onAttach={vi.fn()}
+          pendingFiles={[{ id: 'f1', name: 'brief.pdf', kind: 'file', status: 'ready', part }]}
+        />,
+      )
+      const input = screen.getByLabelText('Message input') as HTMLTextAreaElement
+
+      type(input, 'see attached')
+      fireEvent.keyDown(input, { key: 'Enter' })
+      await screen.findByRole('alert')
+
+      expect(onSendFailed).toHaveBeenCalledExactlyOnceWith({
+        message: 'Upload gone.',
+        text: 'see attached',
+        parts: [part],
+        error: expect.any(Error),
+        restored: true,
+      })
+      expect(input.value).toBe('see attached')
+    })
+
+    it('clears a previous notice when the next send is dispatched', async () => {
+      const onSend = vi.fn((): Promise<void> => Promise.reject(new Error('Nope.')))
+      render(<ChatComposer onSend={onSend} />)
+      const input = screen.getByLabelText('Message input') as HTMLTextAreaElement
+
+      type(input, 'one')
+      fireEvent.keyDown(input, { key: 'Enter' })
+      await screen.findByRole('alert')
+
+      onSend.mockImplementation(() => Promise.resolve())
+      fireEvent.keyDown(input, { key: 'Enter' })
+      await act(async () => { await Promise.resolve() })
+
+      expect(screen.queryByRole('alert')).toBeNull()
+      expect(input.value).toBe('')
+    })
   })
 })

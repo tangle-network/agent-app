@@ -5,10 +5,20 @@
  * inside an already-narrow side panel, a full-height list is far easier to scan
  * and navigate. Selection, deletion, and refresh are owned by the host panel;
  * this component is presentational and holds only its own search query.
+ *
+ * The four states the list can be in are rendered through `web-react/async`'s
+ * `AsyncView` rather than a local ternary, because the ternary is what shipped
+ * the defect: with no `error` branch, a failed thread fetch fell through to
+ * "No past conversations yet." and told a user with a full history that they had
+ * none, with no retry. `AsyncView` cannot render `error` as `empty` — they are
+ * different variants — so the branch cannot go missing again. The load itself
+ * stays in `useAssistantThreads` (whose owner-masking and pending-delete rules
+ * are transport-specific); this component consumes its outcome.
  */
 
 import { Search, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { AsyncView, type AsyncResourceState } from "../web-react/async";
 import { timeAgo } from "./time-ago";
 import type { AssistantThreadSummary } from "./client";
 
@@ -16,6 +26,14 @@ export interface AssistantHistoryProps {
   threads: AssistantThreadSummary[];
   /** True once a fetch has settled at least once (drives empty-vs-loading copy). */
   loaded: boolean;
+  /** Why the load failed, from `useAssistantThreads`. Non-null renders the error
+   *  branch with a retry instead of an empty list. REQUIRED: a caller that never
+   *  has to answer "did the load fail?" is the caller that renders a failure as
+   *  an empty list. */
+  error: string | null;
+  /** Re-runs the load — `useAssistantThreads().refresh`. Required so the error
+   *  branch's button can never be inert. */
+  onRetry: () => void;
   /** The thread the live conversation is on, highlighted in the list. */
   activeThreadId: string | null;
   /** Whether the active thread is mid-turn — its delete is disabled (the stream
@@ -41,6 +59,8 @@ function parsedTime(iso: string): number | null {
 export function AssistantHistory({
   threads,
   loaded,
+  error,
+  onRetry,
   activeThreadId,
   activeBusy,
   canRemove,
@@ -82,6 +102,17 @@ export function AssistantHistory({
     [sorted, trimmed],
   );
 
+  // The load's outcome as the shared contract's variants. `error` wins over
+  // everything: a failed fetch leaves whatever list was last known, and
+  // rendering that as the answer is the confusion this branch exists to end.
+  const state: AsyncResourceState<AssistantThreadSummary[]> = error
+    ? { status: "error", message: error, error, retry: onRetry }
+    : !loaded
+      ? { status: "loading", retry: onRetry }
+      : visible.length === 0
+        ? { status: "empty", value: visible, retry: onRetry }
+        : { status: "ready", value: visible, retry: onRetry };
+
   return (
     <div className="flex h-full flex-col">
       <div className="border-border border-b p-2">
@@ -93,74 +124,81 @@ export function AssistantHistory({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search conversations"
             aria-label="Search conversations"
-            className="w-full rounded-md border border-border bg-surface-container-high py-1.5 pr-2 pl-8 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="w-full rounded-md border border-border bg-surface-container-high py-1.5 pr-2 pl-8 text-foreground text-sm placeholder:text-muted-foreground"
           />
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {visible.length === 0 ? (
-          <p className="px-3 py-6 text-center text-muted-foreground text-xs">
-            {!loaded
-              ? "Loading…"
-              : trimmed
-                ? "No conversations match your search."
-                : "No past conversations yet."}
-          </p>
-        ) : (
-          <ul className="py-1">
-            {visible.map((t) => {
-              const active = t.id === activeThreadId;
-              const ms = parsedTime(t.updatedAt);
-              const busyActive = active && activeBusy;
-              const title = t.title ?? "Untitled conversation";
-              return (
-                <li
-                  key={t.id}
-                  className={`group flex items-center transition-colors hover:bg-muted/60 ${
-                    active ? "bg-primary/10" : ""
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => onSelect(t.id)}
-                    className="flex min-w-0 flex-1 flex-col gap-0.5 px-3 py-2 text-left"
+        <AsyncView
+          state={state}
+          loadingLabel="Loading…"
+          empty={{
+            title: trimmed
+              ? "No conversations match your search."
+              : "No past conversations yet.",
+            description: trimmed
+              ? undefined
+              : "Your chats with the assistant will appear here.",
+          }}
+        >
+          {(rows) => (
+            <ul className="py-1">
+              {rows.map((t) => {
+                const active = t.id === activeThreadId;
+                const ms = parsedTime(t.updatedAt);
+                const busyActive = active && activeBusy;
+                const title = t.title ?? "Untitled conversation";
+                return (
+                  <li
+                    key={t.id}
+                    className={`group flex items-center transition-colors hover:bg-muted/60 ${
+                      active ? "bg-primary/10" : ""
+                    }`}
                   >
-                    <span
-                      className={`truncate text-sm ${
-                        active ? "font-medium text-foreground" : "text-foreground"
-                      }`}
-                    >
-                      {title}
-                    </span>
-                    {ms != null && (
-                      <span className="text-[11px] text-muted-foreground">
-                        {timeAgo(ms)}
-                      </span>
-                    )}
-                  </button>
-                  {canRemove && (
                     <button
                       type="button"
-                      onClick={() => onDelete(t.id)}
-                      disabled={busyActive}
-                      aria-label={`Delete conversation: ${title}`}
-                      title={
-                        busyActive
-                          ? "Can't delete while this conversation is active"
-                          : "Delete conversation"
-                      }
-                      // Always visible on touch devices (no hover to reveal it).
-                      className="shrink-0 p-2 text-muted-foreground opacity-0 transition [@media(hover:none)]:opacity-100 hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
+                      onClick={() => onSelect(t.id)}
+                      className="flex min-w-0 flex-1 flex-col gap-0.5 px-3 py-2 text-left"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <span
+                        className={`truncate text-sm ${
+                          active
+                            ? "font-medium text-foreground"
+                            : "text-foreground"
+                        }`}
+                      >
+                        {title}
+                      </span>
+                      {ms != null && (
+                        <span className="text-[11px] text-muted-foreground">
+                          {timeAgo(ms)}
+                        </span>
+                      )}
                     </button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                    {canRemove && (
+                      <button
+                        type="button"
+                        onClick={() => onDelete(t.id)}
+                        disabled={busyActive}
+                        aria-label={`Delete conversation: ${title}`}
+                        title={
+                          busyActive
+                            ? "Can't delete while this conversation is active"
+                            : "Delete conversation"
+                        }
+                        // Always visible on touch devices (no hover to reveal it).
+                        className="shrink-0 p-2 text-muted-foreground opacity-0 transition [@media(hover:none)]:opacity-100 hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </AsyncView>
       </div>
     </div>
   );

@@ -14,6 +14,8 @@ function renderHistory(over: Partial<AssistantHistoryProps> = {}) {
   const props: AssistantHistoryProps = {
     threads: [],
     loaded: true,
+    error: null,
+    onRetry: vi.fn(),
     activeThreadId: null,
     activeBusy: false,
     canRemove: true,
@@ -116,6 +118,41 @@ describe("AssistantHistory", () => {
     });
     expect(screen.getByText("Untitled conversation")).toBeTruthy();
     expect(screen.queryByText("Alpha")).toBeNull();
+  });
+
+  // A failed thread fetch used to land on the first-run copy: the component had
+  // loading / no-match / empty branches and no error branch at all, so a user
+  // with a full history was told they had none, with nothing to click.
+  it("renders the failure and a retry instead of the empty state", () => {
+    const onRetry = vi.fn();
+    renderHistory({
+      threads: [],
+      loaded: true,
+      error: "Couldn't load your conversations.",
+      onRetry,
+    });
+
+    expect(screen.getByRole("alert").textContent).toContain(
+      "Couldn't load your conversations.",
+    );
+    expect(screen.queryByText(/No past conversations/i)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it("shows the failure even when a stale list survived the failed load", () => {
+    renderHistory({
+      threads: [t({ id: "t1", title: "Kept from the last good load" })],
+      loaded: true,
+      error: "Network unreachable.",
+    });
+
+    // The stale rows are not passed off as the current answer.
+    expect(screen.getByRole("alert").textContent).toContain(
+      "Network unreachable.",
+    );
+    expect(screen.queryByText("Kept from the last good load")).toBeNull();
   });
 
   it("names each delete button by its conversation for assistive tech", () => {

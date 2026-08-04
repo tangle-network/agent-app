@@ -447,7 +447,7 @@ export function useSessionActions({
                 void submitRename()
               }
             }}
-            className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground"
           />
         </SessionDialog>
       )}
@@ -651,16 +651,25 @@ export function formatSessionTimestamp(isoDate: string | null): string {
 }
 
 function SkeletonRows() {
+  // The shimmer rows stay hidden from assistive tech — they say nothing a
+  // reader can use — but the wait itself has to be announced, or the panel is
+  // silent from the first paint until the rows arrive. The live region is a
+  // sibling so the rows' own flex layout is untouched.
   return (
-    <div className="flex flex-col gap-0.5" aria-hidden>
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-3 px-3 py-2.5">
-          <div className="h-4 w-4 animate-pulse rounded bg-muted" />
-          <div className="h-4 w-1/2 animate-pulse rounded bg-muted" />
-          <div className="ml-auto h-3 w-12 animate-pulse rounded bg-muted" />
-        </div>
-      ))}
-    </div>
+    <>
+      <span role="status" aria-live="polite" aria-busy={true} className="sr-only">
+        Loading sessions…
+      </span>
+      <div className="flex flex-col gap-0.5" aria-hidden>
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 px-3 py-2.5">
+            <div className="h-4 w-4 animate-pulse rounded bg-muted" />
+            <div className="h-4 w-1/2 animate-pulse rounded bg-muted" />
+            <div className="ml-auto h-3 w-12 animate-pulse rounded bg-muted" />
+          </div>
+        ))}
+      </div>
+    </>
   )
 }
 
@@ -803,13 +812,13 @@ export function SessionHistoryPanel({
                 onChange={(e) => onQueryChange(e.target.value)}
                 placeholder="Search your sessions…"
                 aria-label="Search sessions"
-                className="h-9 min-w-0 appearance-none rounded-md border border-border bg-card px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring sm:flex-1 [&::-webkit-search-cancel-button]:appearance-none"
+                className="h-9 min-w-0 appearance-none rounded-md border border-border bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground sm:flex-1 [&::-webkit-search-cancel-button]:appearance-none"
               />
               <select
                 value={sort}
                 onChange={(e) => onSortChange(e.target.value as SessionSort)}
                 aria-label="Sort sessions"
-                className="h-9 shrink-0 appearance-none rounded-md border border-border bg-card px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-[132px]"
+                className="h-9 shrink-0 appearance-none rounded-md border border-border bg-card px-2 text-sm text-foreground sm:w-[132px]"
               >
                 <option value="newest">Newest</option>
                 <option value="oldest">Oldest</option>
@@ -859,7 +868,7 @@ export function SessionHistoryPanel({
                     value={ageDays}
                     onChange={(event) => setAgeDays(event.target.value)}
                     aria-invalid={ageDays.length > 0 && !validAgeDays}
-                    className="h-8 w-20 rounded-md border border-border bg-card px-2 text-xs tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="h-8 w-20 rounded-md border border-border bg-card px-2 text-xs tabular-nums text-foreground"
                   />
                   <span className="text-xs text-muted-foreground">days</span>
                   <button
@@ -936,7 +945,9 @@ export function SessionHistoryPanel({
               ) : history.hasMore ? (
                 <div ref={sentinelRef} className="flex items-center justify-center py-6">
                   {history.isLoadingMore && (
-                    <span className="text-xs text-muted-foreground">Loading…</span>
+                    <span role="status" aria-live="polite" aria-busy={true} className="text-xs text-muted-foreground">
+                      Loading…
+                    </span>
                   )}
                 </div>
               ) : null}

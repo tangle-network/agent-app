@@ -85,7 +85,7 @@ function GearGlyph({ className }: { className?: string }) {
 
 /** Tailwind utilities for keyboard-visible focus on popover options + triggers. */
 const FOCUS_RING =
-  'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background'
+  ''
 
 /** Pill-styled harness picker — inline, no sandbox-ui dependency. */
 function HarnessPicker({

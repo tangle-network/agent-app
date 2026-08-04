@@ -136,7 +136,7 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
                     if (event.key === 'Escape') setRenamingId(null)
                     event.stopPropagation()
                   }}
-                  className="min-w-0 flex-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
+                  className="min-w-0 flex-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0 text-[13px] text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
                 />
               ) : (
                 // Selection is a real button (sibling of the eye/lock buttons) so
@@ -149,7 +149,7 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
                     if (canWrite) startRename(element)
                   }}
                   title={element.name}
-                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 bg-transparent text-left focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 bg-transparent text-left"
                 >
                   <KindIcon kind={element.kind} className="h-3.5 w-3.5 shrink-0 opacity-60" />
                   {element.slot ? <SlotGlyph className="h-3 w-3 shrink-0 text-[var(--brand-primary)]" /> : null}
@@ -168,7 +168,7 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
                 }}
                 disabled={!canWrite}
                 className={[
-                  'shrink-0 rounded p-0.5 transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]',
+                  'shrink-0 rounded p-0.5 transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100',
                   element.visible ? 'opacity-0' : 'opacity-100',
                 ].join(' ')}
               >
@@ -188,7 +188,7 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
                 }}
                 disabled={!canWrite}
                 className={[
-                  'shrink-0 rounded p-0.5 transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]',
+                  'shrink-0 rounded p-0.5 transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100',
                   element.locked ? 'opacity-100' : 'opacity-0',
                 ].join(' ')}
               >

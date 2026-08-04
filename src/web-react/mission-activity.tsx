@@ -163,7 +163,7 @@ function TraceIdCopy({ traceId }: { traceId: string }) {
       onClick={copy}
       title="Copy trace id"
       aria-label="Copy trace id"
-      className="inline-flex min-w-0 items-center gap-1.5 rounded text-left font-mono text-muted-foreground transition hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card"
+      className="inline-flex min-w-0 items-center gap-1.5 rounded text-left font-mono text-muted-foreground transition hover:text-foreground"
     >
       <span className="truncate">{traceId}</span>
       <CopyGlyph className="h-3 w-3 shrink-0" />
@@ -434,7 +434,16 @@ export function AgentActivityPanel({ fetchActivity, renderMissionRef, title = 'A
       </div>
       {error && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">{error}</p>}
       {!error && rows.length === 0 && !loading && <p className="px-1 text-sm text-muted-foreground">{emptyLabel}</p>}
-      <div className="space-y-1.5">
+      {/* While `loading` the list is empty AND the empty copy is suppressed, so
+          without this the panel is silent to a screen reader from first paint
+          until rows land. The region stays MOUNTED and its text changes, because
+          a live region that is inserted already carrying its message is not
+          reliably announced — and emptying it on arrival is what reports the
+          wait ending. */}
+      <span role="status" aria-live="polite" aria-busy={loading} className="sr-only">
+        {loading ? 'Loading activity…' : ''}
+      </span>
+      <div className="space-y-1.5" aria-busy={loading}>
         {rows.map((record) => (
           <ActivityRow key={record.taskId} record={record} renderMissionRef={renderMissionRef} />
         ))}

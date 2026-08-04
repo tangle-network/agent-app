@@ -25,7 +25,7 @@ export interface TimelineEmptyStateProps {
 }
 
 const DOOR_BUTTON =
-  'flex min-h-[44px] items-center gap-2 rounded-md border border-[var(--border-default)] bg-[var(--bg-input)] px-3.5 py-2 text-xs font-medium text-[var(--text-secondary)] transition hover:border-[var(--brand-primary)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+  'flex min-h-[44px] items-center gap-2 rounded-md border border-[var(--border-default)] bg-[var(--bg-input)] px-3.5 py-2 text-xs font-medium text-[var(--text-secondary)] transition hover:border-[var(--brand-primary)] hover:text-[var(--text-primary)]'
 
 export function TimelineEmptyState(props: TimelineEmptyStateProps) {
   const labels = { ...DEFAULT_TIMELINE_LABELS, ...props.labels }
@@ -60,7 +60,7 @@ export function TimelineEmptyState(props: TimelineEmptyStateProps) {
               onClick={onClick}
               className={
                 primary
-                  ? 'flex min-h-[44px] items-center gap-2 rounded-md bg-[var(--brand-primary)] px-3.5 py-2 text-xs font-semibold text-[hsl(var(--primary-foreground))] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                  ? 'flex min-h-[44px] items-center gap-2 rounded-md bg-[var(--brand-primary)] px-3.5 py-2 text-xs font-semibold text-[hsl(var(--primary-foreground))] transition hover:opacity-90'
                   : DOOR_BUTTON
               }
             >

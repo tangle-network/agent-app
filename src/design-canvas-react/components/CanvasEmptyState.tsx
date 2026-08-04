@@ -114,7 +114,7 @@ export function CanvasEmptyState({
               key={key}
               type="button"
               onClick={onClick}
-              className="group flex min-h-[44px] flex-col items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[hsl(var(--card))] px-3 py-4 text-center transition-colors hover:border-[var(--brand-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--bg-input)]"
+              className="group flex min-h-[44px] flex-col items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[hsl(var(--card))] px-3 py-4 text-center transition-colors hover:border-[var(--brand-primary)]"
             >
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] transition-colors group-hover:bg-[var(--brand-primary)]/15">
                 <Icon className="h-4 w-4" />

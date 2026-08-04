@@ -11,7 +11,7 @@ import { forwardRef } from 'react'
 import type { ButtonHTMLAttributes } from 'react'
 
 const BTN_BASE =
-  'items-center justify-center rounded border border-[var(--border-default)] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--bg-input)] disabled:cursor-default disabled:opacity-40'
+  'items-center justify-center rounded border border-[var(--border-default)] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:cursor-default disabled:opacity-40'
 
 const BTN_ACTIVE_EXTRA =
   ' border-[var(--brand-primary)] text-[var(--brand-primary)] hover:text-[var(--brand-primary)]'

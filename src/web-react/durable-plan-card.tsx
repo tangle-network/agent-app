@@ -74,7 +74,7 @@ export function DurablePlanCard({
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="mt-1 text-xs text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="mt-1 text-xs text-muted-foreground hover:text-foreground"
         >
           {expanded ? 'Collapse plan' : 'Show full plan'}
         </button>
@@ -91,7 +91,7 @@ export function DurablePlanCard({
             onChange={(event) => setFeedback(event.target.value)}
             rows={2}
             placeholder="Describe what you want changed in the plan"
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary disabled:opacity-50"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary disabled:opacity-50"
           />
         </div>
       )}

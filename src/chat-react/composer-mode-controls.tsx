@@ -26,7 +26,10 @@ export function ComposerModeControls({ planMode }: ComposerModeControlsProps) {
       onClick={() => planMode.setEnabled(!planMode.enabled)}
       title="Plan mode: the agent proposes a plan you approve before it executes"
       className={cn(
-        'inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-xs transition-colors',
+        // Inset ring: this chip sits in a composer row that clips its overflow,
+        // so an outward ring loses three of its four sides. Only the offset is
+        // overridden — width and colour stay with the tokens.
+        'inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-xs transition-colors focus-visible:[outline-offset:-2px]',
         planMode.enabled
           ? 'border-primary/50 bg-primary/10 text-primary'
           : 'border-border bg-transparent text-muted-foreground hover:text-foreground',

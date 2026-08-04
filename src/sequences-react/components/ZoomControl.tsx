@@ -25,7 +25,7 @@ function zoomPercent(zoom: number, fitZoom: number | undefined): number {
 }
 
 const ZOOM_STEP_BUTTON =
-  'flex h-7 w-7 items-center justify-center rounded border border-[var(--border-default)] text-sm leading-none text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+  'flex h-7 w-7 items-center justify-center rounded border border-[var(--border-default)] text-sm leading-none text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]'
 
 export function ZoomControl({ zoomMath, zoom, onZoomChange, fitZoom }: ZoomControlProps) {
   const sliderMin = zoomMath.zoomToSlider(zoomMath.minZoom)

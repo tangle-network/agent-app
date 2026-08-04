@@ -460,9 +460,12 @@ export function TimelineClipChip(props: TimelineClipChipProps) {
       tabIndex={tabbable ? 0 : -1}
       onKeyDown={handleKeyDown}
       title={clip.label}
-      className={`group absolute bottom-1 top-1 overflow-hidden rounded border text-left select-none outline-none ${KIND_TONES[track.kind]} ${
+      // No `outline-none` here: the chip's `ring-2` is its SELECTED state, not
+      // its focused state, so suppressing the floor would leave an unselected
+      // chip with nothing at all under keyboard focus.
+      className={`group absolute bottom-1 top-1 overflow-hidden rounded border text-left select-none ${KIND_TONES[track.kind]} ${
         selected ? 'ring-2 ring-[var(--brand-primary)]' : 'hover:ring-1 hover:ring-[var(--text-muted)]'
-      } focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--bg-input)] ${clip.disabled ? 'opacity-40' : ''} ${dragging ? 'z-30 shadow-lg shadow-black/30' : ''} ${
+      } ${clip.disabled ? 'opacity-40' : ''} ${dragging ? 'z-30 shadow-lg shadow-black/30' : ''} ${
         interactive ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
       }`}
       style={{
@@ -510,7 +513,7 @@ export function TimelineClipChip(props: TimelineClipChipProps) {
             event.stopPropagation()
           }}
           onBlur={commitText}
-          className="agent-app-edit-selection absolute inset-0 z-10 w-full bg-black/80 px-1.5 text-[11px] text-[var(--text-primary)] outline-none ring-1 ring-[var(--brand-primary)]"
+          className="agent-app-edit-selection absolute inset-0 z-10 w-full bg-black/80 px-1.5 text-[11px] text-[var(--text-primary)] ring-1 ring-[var(--brand-primary)]"
           aria-label="Caption text"
         />
       ) : null}
