@@ -4,7 +4,7 @@
 
 Source: `src/session-shell/index.ts`
 
-30 exports.
+48 exports.
 
 ### `activeSessionIdFromPath`
 
@@ -20,6 +20,14 @@ Source: `src/session-shell/index.ts`
 
 ```ts
 interface ActiveSessionIdOptions
+```
+
+### `assertNavHrefsRegistered`
+
+`function` — Fail unless every nav href resolves to a registered route.
+
+```ts
+(items: readonly NavHrefItem[], routes: NavRouteTable, options?: NavHrefCheckOptions) => void
 ```
 
 ### `buildSessionNavItem`
@@ -54,6 +62,14 @@ interface BuildSessionNavItemOptions
 interface BuildSessionSubItemsOptions
 ```
 
+### `checkNavHrefs`
+
+`function` — Check every nav href against the product's route table.
+
+```ts
+(items: readonly NavHrefItem[], routes: NavRouteTable, options?: NavHrefCheckOptions) => NavHrefReport
+```
+
 ### `ComposedSidebarSessions`
 
 `interface`
@@ -86,6 +102,14 @@ interface ComposeSidebarSessionsOptions
 "agent-sidebar-rail-collapsed"
 ```
 
+### `flattenRouteTable`
+
+`function` — Every path pattern the table registers, rooted and de-duplicated.
+
+```ts
+(table: NavRouteTable) => string[]
+```
+
 ### `mergeSessionPages`
 
 `function` — Append a fetched page to held rows, dropping ids already shown.
@@ -94,12 +118,84 @@ interface ComposeSidebarSessionsOptions
 (existing: SessionSummary[], incoming: SessionSummary[]) => SessionSummary[]
 ```
 
+### `NavDestination`
+
+`interface` — One rail destination as the product declares it, before a base is applied.
+
+```ts
+interface NavDestination
+```
+
+### `NavHrefCheckOptions`
+
+`interface`
+
+```ts
+interface NavHrefCheckOptions
+```
+
+### `NavHrefItem`
+
+`interface` — A nav row as the guard needs to see it.
+
+```ts
+interface NavHrefItem
+```
+
+### `NavHrefProblem`
+
+`interface`
+
+```ts
+interface NavHrefProblem
+```
+
+### `NavHrefProblemReason`
+
+`type`
+
+```ts
+type NavHrefProblemReason
+```
+
+### `NavHrefReport`
+
+`interface`
+
+```ts
+interface NavHrefReport
+```
+
 ### `NavRouteDef`
 
 `interface` — One rail destination.
 
 ```ts
 interface NavRouteDef
+```
+
+### `NavRouteTable`
+
+`type` — A route table entry is either a bare pattern string or a router config node.
+
+```ts
+type NavRouteTable
+```
+
+### `NavScope`
+
+`type` — The bases a product routes rail rows under.
+
+```ts
+type NavScope
+```
+
+### `NavScopeBases`
+
+`type` — A base path per scope.
+
+```ts
+type NavScopeBases
 ```
 
 ### `railCollapsedCookie`
@@ -134,6 +230,14 @@ type RailPrefetch
 (cookieHeader: string | null | undefined, name?: string) => boolean
 ```
 
+### `RegisteredRoute`
+
+`interface` — One entry of a registered route table.
+
+```ts
+interface RegisteredRoute
+```
+
 ### `resolveActiveNavId`
 
 `function` — The rail row to highlight for the current route.
@@ -148,6 +252,46 @@ type RailPrefetch
 
 ```ts
 interface ResolveActiveNavIdOptions
+```
+
+### `ResolvedNavDestination`
+
+`interface` — A destination with its base applied.
+
+```ts
+interface ResolvedNavDestination
+```
+
+### `resolveNavDestinations`
+
+`function` — Apply the bases to every destination, preserving declaration order.
+
+```ts
+<TScope extends string>(destinations: readonly NavDestination<TScope>[], bases: Readonly<Record<TScope, string>>) => Re…
+```
+
+### `resolveNavHref`
+
+`function` — Apply a destination's scope base to its path.
+
+```ts
+<TScope extends string>(destination: NavDestination<TScope>, bases: Readonly<Record<TScope, string>>) => string
+```
+
+### `resolveScopedActiveNavId`
+
+`function` — The rail row to highlight, across scopes.
+
+```ts
+<TScope extends string>({ pathname, destinations, bases, aliases, claimsNothing, }: ResolveScopedActiveNavIdOptions<TSc…
+```
+
+### `ResolveScopedActiveNavIdOptions`
+
+`interface`
+
+```ts
+interface ResolveScopedActiveNavIdOptions
 ```
 
 ### `resolveSessionUnread`

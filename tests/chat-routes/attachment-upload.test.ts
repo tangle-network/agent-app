@@ -2,7 +2,7 @@
  * Tests for `createAttachmentUploadRoute`.
  *
  * Classification is content-based (`sniffBinary`), not extension-based: a
- * lying extension (PNG named .txt, or a real .docx which is just a zip) must
+ * lying extension (PNG named .txt, an ordinary archive named .docx) must
  * still be detected and routed to the raw-bytes writer with the sniffed
  * mime. Size guards enforce the raw per-kind limit and the aggregate
  * per-batch limit against the AUTHORITATIVE (decoded) byte length, not the
@@ -19,9 +19,21 @@ import {
   createAttachmentUploadRoute,
   type AttachmentUploadAuthorization,
 } from '../../src/chat-routes/attachment-upload'
-import { MAX_ATTACHMENT_TOTAL_BYTES, MAX_BINARY_ATTACHMENT_BYTES } from '../../src/chat-routes/attachment-validation'
+import {
+  ALLOWED_ATTACHMENT_SNIFFED_MIMES,
+  MACRO_ENABLED_OOXML_SNIFFED_MIMES,
+  MAX_ATTACHMENT_TOTAL_BYTES,
+  MAX_BINARY_ATTACHMENT_BYTES,
+} from '../../src/chat-routes/attachment-validation'
+import {
+  OOXML_PRESENTATION_MIME,
+  OOXML_SPREADSHEET_MIME,
+  OOXML_WORD_MACRO_ENABLED_MIME,
+  OOXML_WORD_MIME,
+} from '../../src/chat-routes/binary-sniff'
 import type { AttachmentWriteResult, WriteAttachmentFn } from '../../src/chat-routes/attachment-store'
 import type { ChatAttachmentInput, ChatAttachmentKind } from '../../src/chat-routes/wire'
+import { docxBytes, plainZipBytes, realWorldOoxmlBytes } from './ooxml-fixtures'
 
 const SCOPE = 'ws-1'
 
@@ -172,16 +184,111 @@ describe('createAttachmentUploadRoute', () => {
     expect(writes).toHaveLength(0)
   })
 
-  it('rejects docx-shaped (zip magic) bytes as an unsupported attachment type (415)', async () => {
+  it('rejects a bare zip signature named .docx as a mismatch (400), writing nothing', async () => {
     const { write, writes } = recordingWriteAttachment()
     const route = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
-    const file = fileOf(zipBytes(), 'report.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    const file = fileOf(zipBytes(), 'report.docx', OOXML_WORD_MIME)
     const res = await route(uploadRequest([file]))
 
-    expect(res.status).toBe(415)
+    expect(res.status).toBe(400)
     const body = await json(res)
-    expect(body.error?.code).toBe('attachment_type_not_allowed')
+    expect(body.error?.code).toBe('attachment_type_mismatch')
+    expect(body.error?.message).toContain('application/zip')
     expect(writes).toHaveLength(0)
+  })
+
+  describe('Office documents', () => {
+    it('accepts a Word package written by a real toolchain, writing the bytes verbatim under the sniffed mime', async () => {
+      const { write, writes } = recordingWriteAttachment()
+      const route = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
+      const bytes = realWorldOoxmlBytes('real-word.docx')
+      // The browser reports nothing useful for an Office file on many
+      // platforms, so the empty type is the realistic case, not a convenience.
+      const res = await route(uploadRequest([fileOf(bytes, 'Master Services Agreement.docx', '')]))
+
+      expect(res.status).toBe(200)
+      const body = await res.json() as { files: ChatAttachmentInput[] }
+      expect(body.files).toEqual([{
+        path: 'Master-Services-Agreement.docx',
+        name: 'Master-Services-Agreement.docx',
+        size: bytes.length,
+        mediaType: OOXML_WORD_MIME,
+        kind: 'file',
+      }])
+      expect(Array.from(writes[0]!.content as Uint8Array)).toEqual(Array.from(bytes))
+      expect(writes[0]!.opts.originalName).toBe('Master Services Agreement.docx')
+    })
+
+    it('accepts Excel and PowerPoint packages written by a real toolchain', async () => {
+      const { write } = recordingWriteAttachment()
+      const route = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
+      const res = await route(uploadRequest([
+        fileOf(realWorldOoxmlBytes('real-excel.xlsx'), 'workpapers.xlsx', ''),
+        fileOf(realWorldOoxmlBytes('real-powerpoint.pptx'), 'deck.pptx', ''),
+      ]))
+
+      expect(res.status).toBe(200)
+      const body = await res.json() as { files: ChatAttachmentInput[] }
+      expect(body.files.map((f) => f.mediaType)).toEqual([OOXML_SPREADSHEET_MIME, OOXML_PRESENTATION_MIME])
+      expect(body.files.every((f) => f.kind === 'file')).toBe(true)
+    })
+
+    it('rejects an ordinary archive with 415, writing nothing', async () => {
+      const { write, writes } = recordingWriteAttachment()
+      const route = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
+      const res = await route(uploadRequest([fileOf(plainZipBytes(), 'archive.zip', 'application/zip')]))
+
+      expect(res.status).toBe(415)
+      const body = await json(res)
+      expect(body.error?.code).toBe('attachment_type_not_allowed')
+      expect(writes).toHaveLength(0)
+    })
+
+    it('rejects an ordinary archive renamed .docx with 400, writing nothing', async () => {
+      const { write, writes } = recordingWriteAttachment()
+      const route = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
+      const res = await route(uploadRequest([fileOf(plainZipBytes(), 'contract.docx', OOXML_WORD_MIME)]))
+
+      expect(res.status).toBe(400)
+      const body = await json(res)
+      expect(body.error?.code).toBe('attachment_type_mismatch')
+      expect(writes).toHaveLength(0)
+    })
+
+    it('rejects a macro-enabled package by default and accepts it when the route widens allowedSniffedMimes', async () => {
+      const bytes = docxBytes({ macroEnabled: true })
+      const { write, writes } = recordingWriteAttachment()
+      const strict = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
+      const strictRes = await strict(uploadRequest([fileOf(bytes, 'macro.docm', '')]))
+      expect(strictRes.status).toBe(415)
+      expect((await json(strictRes)).error?.code).toBe('attachment_type_not_allowed')
+      expect(writes).toHaveLength(0)
+
+      const widened = createAttachmentUploadRoute({
+        authorize: okAuthorize(),
+        writeAttachment: write,
+        allowedSniffedMimes: new Set([...ALLOWED_ATTACHMENT_SNIFFED_MIMES, ...MACRO_ENABLED_OOXML_SNIFFED_MIMES]),
+      })
+      const res = await widened(uploadRequest([fileOf(bytes, 'macro.docm', '')]))
+      expect(res.status).toBe(200)
+      const body = await res.json() as { files: ChatAttachmentInput[] }
+      expect(body.files[0]).toMatchObject({ mediaType: OOXML_WORD_MACRO_ENABLED_MIME, kind: 'file' })
+    })
+
+    it('still rejects a Word package when the route narrows allowedSniffedMimes to PDF only', async () => {
+      const { write, writes } = recordingWriteAttachment()
+      const route = createAttachmentUploadRoute({
+        authorize: okAuthorize(),
+        writeAttachment: write,
+        allowedSniffedMimes: new Set(['application/pdf']),
+      })
+      const res = await route(uploadRequest([fileOf(realWorldOoxmlBytes('real-word.docx'), 'contract.docx', '')]))
+
+      expect(res.status).toBe(415)
+      const body = await json(res)
+      expect(body.error?.code).toBe('attachment_type_not_allowed')
+      expect(writes).toHaveLength(0)
+    })
   })
 
   it('rejects ID3/mp3-magic bytes as a disallowed attachment type (415)', async () => {

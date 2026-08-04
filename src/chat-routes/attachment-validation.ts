@@ -16,6 +16,14 @@
  */
 
 import { formatBytes } from './wire'
+import {
+  OOXML_PRESENTATION_MACRO_ENABLED_MIME,
+  OOXML_PRESENTATION_MIME,
+  OOXML_SPREADSHEET_MACRO_ENABLED_MIME,
+  OOXML_SPREADSHEET_MIME,
+  OOXML_WORD_MACRO_ENABLED_MIME,
+  OOXML_WORD_MIME,
+} from './binary-sniff'
 import type { SniffResult } from './binary-sniff'
 
 /** Ceiling on a binary attachment's raw (pre-encoding) byte size. */
@@ -37,14 +45,42 @@ export const MAX_ATTACHMENT_TOTAL_BYTES = 25 * 1024 * 1024
  * Accept list for the composer file picker + type validation, same grammar as
  * the native `<input accept>` attribute. Images plus the text/doc types a
  * product's store actually reads.
+ *
+ * Every extension here is one the default {@link ALLOWED_ATTACHMENT_SNIFFED_MIMES}
+ * actually admits — a picker that offers a format the gate then rejects is a
+ * defect, so `tests/chat-routes/attachment-validation.test.ts` walks this
+ * string and proves each entry uploads.
  */
 export const ATTACHMENT_ACCEPT =
-  'image/*,.pdf,.txt,.md,.csv,.json,.yaml,.yml,.html'
+  'image/*,.pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,.json,.yaml,.yml,.html'
+
+/** The Office (OOXML) package mimes the default allow-list admits — the
+ *  formats professionals actually send: Word contracts, Excel workpapers,
+ *  PowerPoint decks. Admitting the format is a gate decision only; whether a
+ *  product can EXTRACT text from one is that product's concern. */
+export const OOXML_SNIFFED_MIMES: ReadonlySet<string> = new Set([
+  OOXML_WORD_MIME,
+  OOXML_SPREADSHEET_MIME,
+  OOXML_PRESENTATION_MIME,
+])
+
+/** Macro-enabled Office package mimes (`.docm`/`.xlsm`/`.pptm`), reported by
+ *  `sniffBinary` but deliberately NOT in the default allow-list: a package
+ *  carrying a VBA project is a different risk decision than a plain document,
+ *  and it is the product's to make. Opt in by widening the allow-list at the
+ *  route's `allowedSniffedMimes` seam:
+ *  `new Set([...ALLOWED_ATTACHMENT_SNIFFED_MIMES, ...MACRO_ENABLED_OOXML_SNIFFED_MIMES])`. */
+export const MACRO_ENABLED_OOXML_SNIFFED_MIMES: ReadonlySet<string> = new Set([
+  OOXML_WORD_MACRO_ENABLED_MIME,
+  OOXML_SPREADSHEET_MACRO_ENABLED_MIME,
+  OOXML_PRESENTATION_MACRO_ENABLED_MIME,
+])
 
 /** Sniffed-mime counterpart of `ATTACHMENT_ACCEPT`: the binary formats
- *  `sniffBinary` can identify from magic bytes among the accepted types.
+ *  `sniffBinary` can identify from content among the accepted types.
  *  Values must match `sniffBinary`'s output strings verbatim, or every
- *  upload of that format fails the type gate. */
+ *  upload of that format fails the type gate — locked by the round-trip test
+ *  that sniffs real bytes of every mime listed here. */
 export const ALLOWED_ATTACHMENT_SNIFFED_MIMES: ReadonlySet<string> = new Set([
   'image/png',
   'image/jpeg',
@@ -58,6 +94,7 @@ export const ALLOWED_ATTACHMENT_SNIFFED_MIMES: ReadonlySet<string> = new Set([
   'image/heic',
   'image/heif',
   'application/pdf',
+  ...OOXML_SNIFFED_MIMES,
 ])
 
 /** Extensions whose magic-byte family is unambiguous, mapped to the mime
@@ -70,7 +107,16 @@ export const ALLOWED_ATTACHMENT_SNIFFED_MIMES: ReadonlySet<string> = new Set([
  *  mapping in that family isn't one-to-one (a legitimate `.heic` can carry a
  *  `mif1` brand), so an extension-implies-mime entry would reject genuine
  *  files. They still ride the allowlist gate below, which is what catches an
- *  mp4 renamed `.avif` (its content sniffs `video/mp4`, not an allowed mime). */
+ *  mp4 renamed `.avif` (its content sniffs `video/mp4`, not an allowed mime).
+ *  The Office extensions ARE here: a `.zip` renamed `.docx` sniffs
+ *  `application/zip` (its container carries neither of the two OPC parts an
+ *  Office package must have), so the entry turns a generic 415 into a mismatch
+ *  that names what the file actually is. Sniffing answers what format the
+ *  bytes CLAIM to be, not whether they are a readable document — see
+ *  `sniffOoxml`'s note on what a reader with no inflater can and cannot prove.
+ *  The macro-enabled extensions are listed for the same reason
+ *  even though the default allow-list refuses them — a product that widens
+ *  the allow-list gets the renamed-file check with it. */
 const EXTENSION_IMPLIES_SNIFFED_MIME: Readonly<Record<string, string>> = {
   png: 'image/png',
   jpg: 'image/jpeg',
@@ -83,6 +129,12 @@ const EXTENSION_IMPLIES_SNIFFED_MIME: Readonly<Record<string, string>> = {
   webp: 'image/webp',
   svg: 'image/svg+xml',
   pdf: 'application/pdf',
+  docx: OOXML_WORD_MIME,
+  xlsx: OOXML_SPREADSHEET_MIME,
+  pptx: OOXML_PRESENTATION_MIME,
+  docm: OOXML_WORD_MACRO_ENABLED_MIME,
+  xlsm: OOXML_SPREADSHEET_MACRO_ENABLED_MIME,
+  pptm: OOXML_PRESENTATION_MACRO_ENABLED_MIME,
 }
 
 /** Represent the result of checking an attachment's type with success or specific failure details */
