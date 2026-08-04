@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { authenticateToolRequest, DEFAULT_HEADER_NAMES } from './auth'
+import { authenticateToolRequest, DEFAULT_HEADER_NAMES, readToolArgs } from './auth'
 
 const H = DEFAULT_HEADER_NAMES
 
@@ -153,5 +153,21 @@ describe('authenticateToolRequest — capability subject', () => {
 
     expect(result.ok).toBe(true)
     expect(verifyToken).toHaveBeenCalledWith('workspace-a', 'tok')
+  })
+})
+
+describe('readToolArgs', () => {
+  it('reads arguments from the Streamable HTTP MCP envelope', async () => {
+    const request = new Request('https://app.example.com/api/tools/propose', {
+      method: 'POST',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'submit_proposal', arguments: { title: 'Review' } },
+      }),
+    })
+
+    await expect(readToolArgs(request)).resolves.toEqual({ title: 'Review' })
   })
 })

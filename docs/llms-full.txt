@@ -11162,6 +11162,14 @@ interface AppToolDescriptor
 interface BuildAppToolMcpServersOptions
 ```
 
+### `buildProductEgressPolicy`
+
+`function` — Build the standard outbound policy for a product sandbox.
+
+```ts
+(publicOrigin: string | URL, extraDomains?: readonly string[]) => EgressPolicy
+```
+
 ### `buildSandboxToolFileMounts`
 
 `function` — Build file mounts for sandbox tools based on provided options and tool configurations
@@ -17206,6 +17214,14 @@ type McpProtocolVersion
 interface McpServerInfo
 ```
 
+### `McpToolCallContent`
+
+`interface`
+
+```ts
+interface McpToolCallContent
+```
+
 ### `McpToolDefinition`
 
 `interface` — One tool entry in the registry the handler owns.
@@ -17232,7 +17248,7 @@ interface OpenAIFunctionTool
 
 ### `readToolArgs`
 
-`function` — Read a tool's argument object from the request body, tolerant of MCP host aliases (`args` / `arguments`) or a bare body.
+`function` — Read a tool's argument object from the request body, tolerant of direct aliases (`args` / `arguments`), Streamable HTTP MCP (`params.arguments`), or a bare body.
 
 ```ts
 <T>(request: Request) => Promise<T | null>

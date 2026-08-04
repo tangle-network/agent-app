@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-163 exports.
+164 exports.
 
 ### `adaptSandboxStream`
 
@@ -68,6 +68,14 @@ interface AppToolDescriptor
 
 ```ts
 interface BuildAppToolMcpServersOptions
+```
+
+### `buildProductEgressPolicy`
+
+`function` — Build the standard outbound policy for a product sandbox.
+
+```ts
+(publicOrigin: string | URL, extraDomains?: readonly string[]) => EgressPolicy
 ```
 
 ### `buildSandboxToolFileMounts`

@@ -65,6 +65,7 @@ import {
   buildSandboxToolFileMounts,
   buildSandboxToolPathSetupScript,
   runSandboxToolPathSetup,
+  buildProductEgressPolicy,
   splitDeferredProfileFiles,
   deferredCorpusHash,
   writeProfileFilesToBox,
@@ -1109,6 +1110,30 @@ describe('runSandboxPrompt text aggregation', () => {
 })
 
 describe('pure seam helpers', () => {
+  it('builds the standard strict product egress policy from a public origin', () => {
+    expect(buildProductEgressPolicy('https://Legal.Tangle.Tools/app', [
+      'www.irs.gov',
+      'WWW.IRS.GOV.',
+    ])).toEqual({
+      mode: 'strict',
+      allowDomains: ['legal.tangle.tools', 'www.irs.gov'],
+      includeImplicitDomains: true,
+    })
+  })
+
+  it.each([
+    'ftp://legal.tangle.tools',
+    'not a URL',
+  ])('rejects a non-web product origin: %s', (origin) => {
+    expect(() => buildProductEgressPolicy(origin)).toThrow(/http or https|Invalid URL/)
+  })
+
+  it('rejects malformed extra domains instead of widening the policy', () => {
+    expect(() => buildProductEgressPolicy('https://legal.tangle.tools', [
+      'https://evil.example',
+    ])).toThrow('hostname or wildcard')
+  })
+
   it('flattenHistory returns the bare message when no history', () => {
     expect(flattenHistory('x')).toBe('x')
   })

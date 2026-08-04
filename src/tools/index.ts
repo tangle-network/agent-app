@@ -55,6 +55,7 @@ export {
   MCP_PROTOCOL_VERSIONS,
   type McpProtocolVersion,
   type McpServerInfo,
+  type McpToolCallContent,
   type McpToolDefinition,
   type CreateMcpToolHandlerOptions,
 } from './mcp-rpc'

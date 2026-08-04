@@ -236,6 +236,39 @@ export interface SandboxBuildContext {
   userId?: string
 }
 
+/**
+ * Build the standard outbound policy for a product sandbox.
+ *
+ * Product code supplies its public origin and only the extra product-specific
+ * destinations. Package registries and other shared runtime destinations are
+ * added by the platform's implicit allowlist.
+ */
+export function buildProductEgressPolicy(
+  publicOrigin: string | URL,
+  extraDomains: readonly string[] = [],
+): EgressPolicy {
+  const origin = typeof publicOrigin === 'string' ? new URL(publicOrigin) : publicOrigin
+  if (origin.protocol !== 'http:' && origin.protocol !== 'https:') {
+    throw new Error(`Product egress origin must use http or https: ${origin.protocol}`)
+  }
+  if (!origin.hostname) throw new Error('Product egress origin must include a hostname')
+
+  const domains = new Set<string>([origin.hostname.toLowerCase()])
+  for (const value of extraDomains) {
+    const domain = value.trim().toLowerCase().replace(/\.$/, '')
+    if (!domain || domain.includes('://') || domain.includes('/') || domain.includes(':')) {
+      throw new Error(`Product egress domain must be a hostname or wildcard: ${value}`)
+    }
+    domains.add(domain)
+  }
+
+  return {
+    mode: 'strict',
+    allowDomains: [...domains],
+    includeImplicitDomains: true,
+  }
+}
+
 // SDK-typed snapshot storage config (re-exported for product seam closures).
 export type { StorageConfig }
 
