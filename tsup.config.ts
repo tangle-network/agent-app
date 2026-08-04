@@ -86,6 +86,8 @@ export default defineConfig({
     'theme/tailwind-preset': 'src/theme/tailwind-preset.ts',
     'theme-contract/index': 'src/theme-contract/index.ts',
     'theme-contract/cli': 'src/theme-contract/cli.ts',
+    'legibility/index': 'src/legibility/index.ts',
+    'legibility/cli': 'src/legibility/cli.ts',
     'forms/index': 'src/forms/index.ts',
     'preflight/cli': 'src/preflight/cli.ts',
     'studio/index': 'src/studio/index.ts',

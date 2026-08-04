@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-321 exports.
+349 exports.
 
 ### `activityTone`
 
@@ -588,6 +588,30 @@ readonly EffortLevel[]
 
 ```ts
 20
+```
+
+### `DEFAULT_PROVENANCE_CONFIDENCE_POLICY`
+
+`const` — The starting policy.
+
+```ts
+ProvenanceConfidencePolicy
+```
+
+### `describeProvenance`
+
+`function` — One plain sentence naming where the value came from — the panel's first line and part of what a screen reader announces.
+
+```ts
+(record: ProvenanceRecord) => string
+```
+
+### `describeProvenanceSourceStatus`
+
+`function` — The sentence for a source that is not `ready`, or `null` when it is.
+
+```ts
+(source: ProvenanceSource) => string | null
 ```
 
 ### `DISPATCH_MAX_MEDIA_PARTS`
@@ -1302,6 +1326,14 @@ interface LinkLikeProps
 (url: string, fetchFile?: (url: string) => Promise<Response>) => Promise<AttachmentFileResult>
 ```
 
+### `loadingProvenanceSources`
+
+`function` — The sources still resolving — rendered as their own state, never as an absence.
+
+```ts
+(record: ProvenanceRecord) => ProvenanceSource[]
+```
+
 ### `mediaTypeForMentionPath`
 
 `function` — The `image/*` mime for a mention path by extension, or `undefined` for anything not in the known image set (dispatched as `type: 'file'`).
@@ -1622,6 +1654,118 @@ type ProducerWireEvent
 interface ProposalApprovalHandlers
 ```
 
+### `PROVENANCE_BASES`
+
+`const` — Every basis, in the order a legend should list them.
+
+```ts
+readonly ProvenanceBasis[]
+```
+
+### `ProvenanceBasis`
+
+`type` — How a value came to exist.
+
+```ts
+type ProvenanceBasis
+```
+
+### `provenanceBasisMeta`
+
+`function` — Words for one basis.
+
+```ts
+(basis: ProvenanceBasis) => ProvenanceBasisMeta
+```
+
+### `ProvenanceBasisMeta`
+
+`interface` — The words one basis is rendered and announced with.
+
+```ts
+interface ProvenanceBasisMeta
+```
+
+### `ProvenanceConfidencePolicy`
+
+`interface` — Where a product draws its confidence lines.
+
+```ts
+interface ProvenanceConfidencePolicy
+```
+
+### `ProvenanceGap`
+
+`interface` — One stated gap.
+
+```ts
+interface ProvenanceGap
+```
+
+### `ProvenanceGapKind`
+
+`type` — Something missing that the reader has to be TOLD about, because the value renders either way and a bare number reads as a fact.
+
+```ts
+type ProvenanceGapKind
+```
+
+### `provenanceGaps`
+
+`function` — What this record cannot show, at its own level.
+
+```ts
+(record: ProvenanceRecord) => ProvenanceGap[]
+```
+
+### `ProvenanceLegend`
+
+`function` — The marker key for a surface that renders several bases at once — a review pane, a grid, a return.
+
+```ts
+({ bases, className }: ProvenanceLegendProps) => Element | null
+```
+
+### `ProvenanceLegendProps`
+
+`interface` — Properties for the basis legend.
+
+```ts
+interface ProvenanceLegendProps
+```
+
+### `provenanceNextMove`
+
+`function` — The move THIS value's reader can actually make.
+
+```ts
+(record: ProvenanceRecord, standing: ProvenanceStanding, policy?: ProvenanceConfidencePolicy) => string
+```
+
+### `ProvenanceRecord`
+
+`interface` — A value, where it came from, and — when it was computed — the provenanced values it came from.
+
+```ts
+interface ProvenanceRecord
+```
+
+### `ProvenanceSource`
+
+`interface` — One thing a value came from.
+
+```ts
+interface ProvenanceSource
+```
+
+### `ProvenanceSourceStatus`
+
+`type` — Whether a source could be resolved.
+
+```ts
+type ProvenanceSourceStatus
+```
+
 ### `ProvenanceStamp`
 
 `function` — The audit line a reviewer approves against: which configuration produced this document, what served it, and how that configuration measured on its backtest.
@@ -1636,6 +1780,54 @@ interface ProposalApprovalHandlers
 
 ```ts
 interface ProvenanceStampProps
+```
+
+### `ProvenanceStanding`
+
+`type` — What the reader should DO about a value — the only form confidence takes on screen.
+
+```ts
+type ProvenanceStanding
+```
+
+### `provenanceStandingMeta`
+
+`function` — Words for one standing.
+
+```ts
+(standing: ProvenanceStanding) => ProvenanceStandingMeta
+```
+
+### `ProvenanceStandingMeta`
+
+`interface` — The words one standing is rendered and announced with.
+
+```ts
+interface ProvenanceStandingMeta
+```
+
+### `provenanceTriggerLabel`
+
+`function` — The accessible name of the disclosure control: the value, how it came to exist, and — unless there is nothing to do — the next move.
+
+```ts
+(record: ProvenanceRecord, standing: ProvenanceStanding) => string
+```
+
+### `ProvenanceValue`
+
+`function` — A value, its origin marker, and the disclosure that shows where it came from.
+
+```ts
+({ record, onOpenSource, onRetrySource, confidencePolicy, maxDepth, defaultOpen, missingValueLabel, className, }: Prove…
+```
+
+### `ProvenanceValueProps`
+
+`interface` — Properties for one provenanced value and its disclosure.
+
+```ts
+interface ProvenanceValueProps
 ```
 
 ### `ProviderLogo`
@@ -1950,6 +2142,14 @@ type RecordGridWriteOutcome
 (list: ChatInteraction[], id: string, status: "answered" | "declined" | "cancelled" | "expired", answers?: InteractionA…
 ```
 
+### `resolveProvenanceStanding`
+
+`function` — This record's own standing, ignoring its inputs.
+
+```ts
+(record: ProvenanceRecord, policy?: ProvenanceConfidencePolicy) => ProvenanceStanding
+```
+
 ### `responseErrorMessage`
 
 `function` — Extracts the most specific error message a route returned.
@@ -2020,6 +2220,14 @@ type ReviewQueueState
 
 ```ts
 (state: ReviewQueueState) => string
+```
+
+### `rollUpProvenanceStanding`
+
+`function` — The standing a reader should see: this record's own, weakened by every value it was computed from, however deep.
+
+```ts
+(record: ProvenanceRecord, policy?: ProvenanceConfidencePolicy, seen?: Set<ProvenanceRecord>) => ProvenanceStanding
 ```
 
 ### `RunDrillIn`
@@ -2172,6 +2380,14 @@ interface SmoothRevealOptions
 
 ```ts
 (parts: Record<string, unknown>[], answersByInteractionId: Readonly<Record<string, InteractionAnswers>>) => Record<stri…
+```
+
+### `standingFromConfidence`
+
+`function` — The standing a bare confidence maps to under a policy.
+
+```ts
+(confidence: number, policy?: ProvenanceConfidencePolicy) => ProvenanceStanding
 ```
 
 ### `StreamChatOptions`
@@ -2484,6 +2700,14 @@ interface UseSessionHistoryOptions
 
 ```ts
 interface WaterfallRow
+```
+
+### `weakerProvenanceStanding`
+
+`function` — The weaker of two standings — `confirm` beats `check` beats `settled`.
+
+```ts
+(a: ProvenanceStanding, b: ProvenanceStanding) => ProvenanceStanding
 ```
 
 ### `withoutRecordGridCreated`
