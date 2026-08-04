@@ -65,6 +65,7 @@ import {
   buildSandboxToolFileMounts,
   buildSandboxToolPathSetupScript,
   runSandboxToolPathSetup,
+  buildProductEgressPolicy,
   splitDeferredProfileFiles,
   deferredCorpusHash,
   writeProfileFilesToBox,
@@ -499,6 +500,31 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     })
 
     expect(update).not.toHaveBeenCalled()
+    expect(running.delete).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('migrates an existing policy only when the shell explicitly enables it', async () => {
+    const desiredPolicy = { mode: 'strict' as const, allowDomains: ['relationships.example.com'] }
+    const get = vi.fn()
+      .mockResolvedValueOnce({ policy: { mode: 'open' }, source: 'platform' })
+      .mockResolvedValueOnce({ policy: desiredPolicy, source: 'sandbox' })
+    const update = vi.fn().mockResolvedValue({ policy: desiredPolicy, source: 'sandbox' })
+    const running = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      egress: { get, update },
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+
+    const box = await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
+      egressPolicy: desiredPolicy,
+      migrateEgressPolicy: true,
+    }), { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(box).toBe(running)
+    expect(update).toHaveBeenCalledWith(desiredPolicy)
+    expect(get).toHaveBeenCalledTimes(2)
     expect(running.delete).not.toHaveBeenCalled()
     expect(createMock).not.toHaveBeenCalled()
   })
@@ -1109,6 +1135,28 @@ describe('runSandboxPrompt text aggregation', () => {
 })
 
 describe('pure seam helpers', () => {
+  it('builds the standard strict product egress policy from a public origin', () => {
+    expect(buildProductEgressPolicy('https://Legal.Tangle.Tools/app', [
+      'www.irs.gov',
+      'WWW.IRS.GOV.',
+    ])).toEqual({
+      mode: 'strict',
+      allowDomains: ['legal.tangle.tools', 'models.dev', 'www.irs.gov'],
+      includeImplicitDomains: false,
+    })
+  })
+
+  it.each([
+    'ftp://legal.tangle.tools',
+    'not a URL',
+  ])('rejects a non-web product origin: %s', (origin) => {
+    expect(() => buildProductEgressPolicy(origin)).toThrow(/http or https|Invalid URL/)
+  })
+
+  it.each(['https://evil.example', '*', 'bar.*.com', 'foo..com'])('rejects malformed extra domains instead of widening the policy: %s', (domain) => {
+    expect(() => buildProductEgressPolicy('https://legal.tangle.tools', [domain])).toThrow('hostname or wildcard')
+  })
+
   it('flattenHistory returns the bare message when no history', () => {
     expect(flattenHistory('x')).toBe('x')
   })

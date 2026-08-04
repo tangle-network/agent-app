@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-163 exports.
+165 exports.
 
 ### `adaptSandboxStream`
 
@@ -68,6 +68,14 @@ interface AppToolDescriptor
 
 ```ts
 interface BuildAppToolMcpServersOptions
+```
+
+### `buildProductEgressPolicy`
+
+`function`
+
+```ts
+(publicOrigin: string | URL, extraDomains?: readonly string[]) => EgressPolicy
 ```
 
 ### `buildSandboxToolFileMounts`
@@ -596,6 +604,14 @@ interface ProvisionPayloadSections
 
 ```ts
 interface ProvisionProfileSection
+```
+
+### `PYPI_EGRESS_DOMAINS`
+
+`const` — Hosts required when a product installs its pinned Python tooling at boot.
+
+```ts
+readonly ["pypi.org", "files.pythonhosted.org", "pypi.python.org"]
 ```
 
 ### `readSandboxBinaryBytes`

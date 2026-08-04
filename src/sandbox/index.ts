@@ -236,6 +236,62 @@ export interface SandboxBuildContext {
   userId?: string
 }
 
+/**
+ * Build the standard outbound policy for a product sandbox.
+ *
+ * Product code supplies its public origin and only the extra product-specific
+ * destinations. The model capability registry is named explicitly because a
+ * strict product sandbox must not inherit the platform's broad developer list.
+ */
+function isWellFormedDomainPattern(pattern: string): boolean {
+  if (!pattern || pattern.startsWith('.') || pattern.includes('..')) return false
+  const labels = pattern.split('.')
+  if (labels.some((label) => label.length === 0)) return false
+
+  for (let index = 1; index < labels.length; index += 1) {
+    if (labels[index]!.includes('*')) return false
+  }
+
+  const head = labels[0]!
+  if (head === '*' || head === '**') return labels.length >= 2
+  return !head.includes('*')
+}
+
+/** Hosts required when a product installs its pinned Python tooling at boot. */
+export const PYPI_EGRESS_DOMAINS = ['pypi.org', 'files.pythonhosted.org', 'pypi.python.org'] as const
+
+export function buildProductEgressPolicy(
+  publicOrigin: string | URL,
+  extraDomains: readonly string[] = [],
+): EgressPolicy {
+  const origin = typeof publicOrigin === 'string' ? new URL(publicOrigin) : publicOrigin
+  if (origin.protocol !== 'http:' && origin.protocol !== 'https:') {
+    throw new Error(`Product egress origin must use http or https: ${origin.protocol}`)
+  }
+  if (!origin.hostname) throw new Error('Product egress origin must include a hostname')
+
+  const domains = new Set<string>([origin.hostname.toLowerCase(), 'models.dev'])
+  for (const value of extraDomains) {
+    const domain = value.trim().toLowerCase().replace(/\.$/, '')
+    if (
+      !domain
+      || domain.includes('://')
+      || domain.includes('/')
+      || domain.includes(':')
+      || !isWellFormedDomainPattern(domain)
+    ) {
+      throw new Error(`Product egress domain must be a hostname or wildcard: ${value}`)
+    }
+    domains.add(domain)
+  }
+
+  return {
+    mode: 'strict',
+    allowDomains: [...domains],
+    includeImplicitDomains: false,
+  }
+}
+
 // SDK-typed snapshot storage config (re-exported for product seam closures).
 export type { StorageConfig }
 
@@ -352,9 +408,16 @@ export interface SandboxRuntimeConfig {
    * Product-declared outbound network policy. Applied when a sandbox is
    * created. A reused or resumed sandbox is returned only when its explicit
    * policy already matches; existing mismatches are rejected without updating
-   * or deleting the sandbox.
+   * or deleting the sandbox unless migration is explicitly enabled below.
    */
   egressPolicy?: EgressPolicy
+  /**
+   * Update an existing box to {@link egressPolicy} before reuse when its
+   * recorded policy is absent or different. This is an explicit fleet
+   * migration switch: the updated policy is read back and must match before
+   * the box is returned. It never deletes the box.
+   */
+  migrateEgressPolicy?: boolean
 
   // BYOS3/R2 snapshot storage. Returns undefined => key omitted entirely
   // (fail-closed when creds absent). Product owns bucket/endpoint/credentials/prefix.
@@ -1822,7 +1885,7 @@ async function finalizeExistingBox(
   harness: Harness,
   scope: SandboxScope,
 ): Promise<SandboxInstance> {
-  await assertExistingBoxEgress(box, shell.egressPolicy, stage, name)
+  await assertExistingBoxEgress(box, shell.egressPolicy, shell.migrateEgressPolicy, stage, name)
   const written = await materializeDeferredFilesForExistingBox(
     shell,
     client,
@@ -1872,6 +1935,7 @@ function normalizedEgressPolicy(policy: EgressPolicy): string {
 async function assertExistingBoxEgress(
   box: SandboxInstance,
   desired: EgressPolicy | undefined,
+  migrate: boolean | undefined,
   stage: SandboxExistingBoxStage,
   name: string,
 ): Promise<void> {
@@ -1888,6 +1952,22 @@ async function assertExistingBoxEgress(
   const matchingPolicy = normalizedEgressPolicy(current.policy) === normalizedEgressPolicy(desired)
   const explicitSource = current.source !== 'platform'
   if (matchingPolicy && explicitSource) return
+
+  if (migrate) {
+    try {
+      await box.egress.update(desired)
+      const migrated = await box.egress.get()
+      const migratedPolicy = normalizedEgressPolicy(migrated.policy) === normalizedEgressPolicy(desired)
+      if (migratedPolicy && migrated.source !== 'platform') return
+      current = migrated
+    } catch (cause) {
+      const error = cause instanceof Error ? cause : new Error(String(cause))
+      throw new Error(`egress policy migration failed on ${stage} box ${name}: ${error.message}`, {
+        cause: error,
+      })
+    }
+  }
+
   throw new SandboxEgressPolicyMismatchError(
     stage,
     name,
