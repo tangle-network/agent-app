@@ -257,6 +257,9 @@ function isWellFormedDomainPattern(pattern: string): boolean {
   return !head.includes('*')
 }
 
+/** Hosts required when a product installs its pinned Python tooling at boot. */
+export const PYPI_EGRESS_DOMAINS = ['pypi.org', 'files.pythonhosted.org', 'pypi.python.org'] as const
+
 export function buildProductEgressPolicy(
   publicOrigin: string | URL,
   extraDomains: readonly string[] = [],
@@ -405,9 +408,16 @@ export interface SandboxRuntimeConfig {
    * Product-declared outbound network policy. Applied when a sandbox is
    * created. A reused or resumed sandbox is returned only when its explicit
    * policy already matches; existing mismatches are rejected without updating
-   * or deleting the sandbox.
+   * or deleting the sandbox unless migration is explicitly enabled below.
    */
   egressPolicy?: EgressPolicy
+  /**
+   * Update an existing box to {@link egressPolicy} before reuse when its
+   * recorded policy is absent or different. This is an explicit fleet
+   * migration switch: the updated policy is read back and must match before
+   * the box is returned. It never deletes the box.
+   */
+  migrateEgressPolicy?: boolean
 
   // BYOS3/R2 snapshot storage. Returns undefined => key omitted entirely
   // (fail-closed when creds absent). Product owns bucket/endpoint/credentials/prefix.
@@ -1875,7 +1885,7 @@ async function finalizeExistingBox(
   harness: Harness,
   scope: SandboxScope,
 ): Promise<SandboxInstance> {
-  await assertExistingBoxEgress(box, shell.egressPolicy, stage, name)
+  await assertExistingBoxEgress(box, shell.egressPolicy, shell.migrateEgressPolicy, stage, name)
   const written = await materializeDeferredFilesForExistingBox(
     shell,
     client,
@@ -1925,6 +1935,7 @@ function normalizedEgressPolicy(policy: EgressPolicy): string {
 async function assertExistingBoxEgress(
   box: SandboxInstance,
   desired: EgressPolicy | undefined,
+  migrate: boolean | undefined,
   stage: SandboxExistingBoxStage,
   name: string,
 ): Promise<void> {
@@ -1941,6 +1952,22 @@ async function assertExistingBoxEgress(
   const matchingPolicy = normalizedEgressPolicy(current.policy) === normalizedEgressPolicy(desired)
   const explicitSource = current.source !== 'platform'
   if (matchingPolicy && explicitSource) return
+
+  if (migrate) {
+    try {
+      await box.egress.update(desired)
+      const migrated = await box.egress.get()
+      const migratedPolicy = normalizedEgressPolicy(migrated.policy) === normalizedEgressPolicy(desired)
+      if (migratedPolicy && migrated.source !== 'platform') return
+      current = migrated
+    } catch (cause) {
+      const error = cause instanceof Error ? cause : new Error(String(cause))
+      throw new Error(`egress policy migration failed on ${stage} box ${name}: ${error.message}`, {
+        cause: error,
+      })
+    }
+  }
+
   throw new SandboxEgressPolicyMismatchError(
     stage,
     name,
