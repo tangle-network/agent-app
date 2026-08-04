@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-297 exports.
+343 exports.
 
 ### `activityTone`
 
@@ -75,7 +75,7 @@ interface AgentSessionControlsProps
 `const` — Accept list for the composer file picker + type validation, same grammar as the native `<input accept>` attribute.
 
 ```ts
-"image/*,.pdf,.txt,.md,.csv,.json,.yaml,.yml,.html"
+"image/*,.pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,.json,.yaml,.yml,.html"
 ```
 
 ### `AttachmentFileResult`
@@ -750,6 +750,14 @@ interface EffortLevel
 interface EffortPickerProps
 ```
 
+### `EMPTY_RECORD_GRID_OVERLAY`
+
+`const` — An overlay holding nothing.
+
+```ts
+RecordGridOverlay
+```
+
 ### `EvidenceLineageTable`
 
 `function` — Target → claim → source lineage rows: the "every material value traceable to source evidence" surface.
@@ -900,6 +908,14 @@ interface FlowWaterfallProps
 
 ```ts
 (msg: ChatMessageMetrics, models: CatalogModel[]) => string | null
+```
+
+### `formatRecordGridValue`
+
+`function` — Display text for a cell.
+
+```ts
+(column: RecordGridColumn, value: RecordGridValue, locale?: string | undefined) => string
 ```
 
 ### `formatSessionTimestamp`
@@ -1198,6 +1214,14 @@ type InteractionSubmitResult
 (status: ChatInteractionStatus) => boolean
 ```
 
+### `isRecordGridCellApplicable`
+
+`function` — True when the column's dependency (if any) is satisfied by the row's other values.
+
+```ts
+(column: RecordGridColumn, values: Readonly<Record<string, RecordGridValue>>) => boolean
+```
+
 ### `isRenderableInteractionKind`
 
 `function` — Resolve if the given interaction kind is renderable within the application context
@@ -1454,6 +1478,14 @@ type ParseInteractionAnswersResult
 type ParseInteractionResult
 ```
 
+### `parseRecordGridInput`
+
+`function` — Turn what an editor control produced into a typed value.
+
+```ts
+(column: RecordGridColumn, raw: string) => RecordGridCellOutcome
+```
+
 ### `parseReviewQueueItem`
 
 `function` — Re-validate one JSON-boundary row into a queue item; null for junk.
@@ -1556,6 +1588,14 @@ interface ProducerUsageEvent
 
 ```ts
 type ProducerWireEvent
+```
+
+### `projectRecordGridRows`
+
+`function` — The rows to render: caller rows minus local deletes, with local cell edits applied, then locally-created rows.
+
+```ts
+(rows: readonly RecordGridRow[], overlay: RecordGridOverlay) => RecordGridRow[]
 ```
 
 ### `ProposalApprovalHandlers`
@@ -1758,6 +1798,14 @@ interface ProvenanceValueProps
 interface ProviderLogoProps
 ```
 
+### `pruneRecordGridOverlay`
+
+`function` — Drop the overlay entries the caller's own rows have caught up with: a cell whose value now matches, a created row now present, a removed row now gone.
+
+```ts
+(rows: readonly RecordGridRow[], overlay: RecordGridOverlay) => RecordGridOverlay
+```
+
 ### `QualityCheckList`
 
 `function` — Pass/fail quality-check rows tagged with their source (agent self-report, platform gate, judge ensemble).
@@ -1804,6 +1852,238 @@ interface QuestionOptionListProps
 
 ```ts
 (files: readonly FileMention[], query: string, limit: number) => FileMention[]
+```
+
+### `readRecordGridCell`
+
+`function` — Parse editor text and validate it in one step — what a committing cell editor calls.
+
+```ts
+(column: RecordGridColumn, raw: string) => RecordGridCellOutcome
+```
+
+### `RecordGrid`
+
+`function` — The shared editable record table.
+
+```ts
+({ columns, rows, caption, state, error, onRetry, empty, onCreate, onUpdate, onDelete, newRowDefaults, addLabel, locale…
+```
+
+### `RecordGridBooleanColumn`
+
+`interface` — A checkbox.
+
+```ts
+interface RecordGridBooleanColumn
+```
+
+### `RecordGridCellChange`
+
+`interface` — One committed cell edit, handed to `onUpdate`.
+
+```ts
+interface RecordGridCellChange
+```
+
+### `RecordGridCellOutcome`
+
+`type` — Typed outcome for one cell.
+
+```ts
+type RecordGridCellOutcome
+```
+
+### `RecordGridCellSource`
+
+`interface` — Where one cell's value came from.
+
+```ts
+interface RecordGridCellSource
+```
+
+### `RecordGridColumn`
+
+`type` — Every column shape the grid renders.
+
+```ts
+type RecordGridColumn
+```
+
+### `RecordGridColumnBase`
+
+`interface` — Fields every column kind carries.
+
+```ts
+interface RecordGridColumnBase
+```
+
+### `RecordGridCreateOutcome`
+
+`type` — Outcome of a create.
+
+```ts
+type RecordGridCreateOutcome
+```
+
+### `RecordGridCurrencyColumn`
+
+`interface` — A money amount.
+
+```ts
+interface RecordGridCurrencyColumn
+```
+
+### `RecordGridDateColumn`
+
+`interface` — A calendar date held as `YYYY-MM-DD`; no time, no zone.
+
+```ts
+interface RecordGridDateColumn
+```
+
+### `RecordGridDependency`
+
+`interface` — A cell is only editable, rendered, and validated when the column it depends on holds `equals`.
+
+```ts
+interface RecordGridDependency
+```
+
+### `recordGridEditorText`
+
+`function` — The text an editor control starts with — the raw value, never the formatted one, so committing an untouched cell is a no-op.
+
+```ts
+(column: RecordGridColumn, value: RecordGridValue) => string
+```
+
+### `RecordGridEmptyState`
+
+`interface` — The empty state's content.
+
+```ts
+interface RecordGridEmptyState
+```
+
+### `recordGridFail`
+
+`function` — Build a cell failure outcome carrying the message shown next to the cell.
+
+```ts
+(error: string) => RecordGridCellOutcome
+```
+
+### `RecordGridNumberColumn`
+
+`interface` — A plain number.
+
+```ts
+interface RecordGridNumberColumn
+```
+
+### `recordGridOk`
+
+`function` — Build a cell success outcome.
+
+```ts
+(value: RecordGridValue) => RecordGridCellOutcome
+```
+
+### `RecordGridOverlay`
+
+`interface` — Edits the grid has applied locally but the caller's `rows` prop has not yet caught up with.
+
+```ts
+interface RecordGridOverlay
+```
+
+### `RecordGridProps`
+
+`interface` — Properties for the editable, provenance-aware record grid.
+
+```ts
+interface RecordGridProps
+```
+
+### `RecordGridRow`
+
+`interface` — One row: an id, a flat value bag keyed by column id, and optional per-cell provenance.
+
+```ts
+interface RecordGridRow
+```
+
+### `recordGridRowLabel`
+
+`function` — Accessible name for a row's own controls.
+
+```ts
+(columns: readonly RecordGridColumn[], row: RecordGridRow) => string
+```
+
+### `RecordGridRowOutcome`
+
+`type` — Typed outcome for a whole row of inputs (the add form).
+
+```ts
+type RecordGridRowOutcome
+```
+
+### `RecordGridSelectColumn`
+
+`interface` — One of a closed set of values.
+
+```ts
+interface RecordGridSelectColumn
+```
+
+### `RecordGridSelectOption`
+
+`interface` — One option of a `select` column.
+
+```ts
+interface RecordGridSelectOption
+```
+
+### `RecordGridSourceBasis`
+
+`type` — How a value came to sit in a cell.
+
+```ts
+type RecordGridSourceBasis
+```
+
+### `RecordGridState`
+
+`type` — Which of the three data states the caller is in.
+
+```ts
+type RecordGridState
+```
+
+### `RecordGridTextColumn`
+
+`interface` — Free text, optionally length- or pattern-constrained.
+
+```ts
+interface RecordGridTextColumn
+```
+
+### `RecordGridValue`
+
+`type` — The value one cell can hold.
+
+```ts
+type RecordGridValue
+```
+
+### `RecordGridWriteOutcome`
+
+`type` — Outcome of an update or a delete.
+
+```ts
+type RecordGridWriteOutcome
 ```
 
 ### `resolveChatInteraction`
@@ -1916,6 +2196,14 @@ type ReviewQueueState
 
 ```ts
 interface RunDrillInProps
+```
+
+### `sameRecordGridValue`
+
+`function` — Value equality across the grid's value union, treating `undefined` as `null` so an absent key and an explicit null never read as a change.
+
+```ts
+(a: RecordGridValue | undefined, b: RecordGridValue | undefined) => boolean
 ```
 
 ### `SandboxTerminalConnection`
@@ -2076,6 +2364,14 @@ interface StreamChatOptions
 
 ```ts
 type SubmitInteractionAnswer
+```
+
+### `sumRecordGridColumn`
+
+`function` — Sum a numeric column over the rows that hold a number.
+
+```ts
+(rows: readonly RecordGridRow[], columnId: string) => number
 ```
 
 ### `tabTerminalConnectionId`
@@ -2326,6 +2622,22 @@ interface UseSessionHistoryOptions
 (active: boolean) => number
 ```
 
+### `validateRecordGridCell`
+
+`function` — Check one already-typed value against its column.
+
+```ts
+(column: RecordGridColumn, value: RecordGridValue) => RecordGridCellOutcome
+```
+
+### `validateRecordGridRow`
+
+`function` — Validate a whole value bag against the columns.
+
+```ts
+(columns: readonly RecordGridColumn[], values: Readonly<Record<string, RecordGridValue>>) => RecordGridRowOutcome
+```
+
 ### `waterfallLayout`
 
 `function` — Project a FlowTrace into proportional bar geometry for {@link FlowWaterfall}.
@@ -2348,6 +2660,62 @@ interface WaterfallRow
 
 ```ts
 (a: ProvenanceStanding, b: ProvenanceStanding) => ProvenanceStanding
+```
+
+### `withoutRecordGridCreated`
+
+`function` — Take back an optimistic create — the rollback path.
+
+```ts
+(overlay: RecordGridOverlay, rowId: string) => RecordGridOverlay
+```
+
+### `withoutRecordGridRemoved`
+
+`function` — Take back an optimistic delete — the rollback path.
+
+```ts
+(overlay: RecordGridOverlay, rowId: string) => RecordGridOverlay
+```
+
+### `withoutRecordGridUpdate`
+
+`function` — Take back one optimistic cell edit — the rollback path.
+
+```ts
+(overlay: RecordGridOverlay, rowId: string, columnId: string) => RecordGridOverlay
+```
+
+### `withRecordGridCreated`
+
+`function` — Record an optimistic create.
+
+```ts
+(overlay: RecordGridOverlay, row: RecordGridRow) => RecordGridOverlay
+```
+
+### `withRecordGridRemoved`
+
+`function` — Record an optimistic delete.
+
+```ts
+(overlay: RecordGridOverlay, rowId: string) => RecordGridOverlay
+```
+
+### `withRecordGridServerRow`
+
+`function` — Adopt a row the writer returned as canonical: for a locally-created row it replaces the draft; for an existing row it replaces the optimistic cells.
+
+```ts
+(overlay: RecordGridOverlay, draftId: string, row: RecordGridRow) => RecordGridOverlay
+```
+
+### `withRecordGridUpdate`
+
+`function` — Record one optimistic cell edit.
+
+```ts
+(overlay: RecordGridOverlay, rowId: string, columnId: string, value: RecordGridValue) => RecordGridOverlay
 ```
 
 ### `WorkProductCard`

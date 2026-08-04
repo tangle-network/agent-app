@@ -1159,7 +1159,7 @@
           "name": "ALLOWED_ATTACHMENT_SNIFFED_MIMES",
           "kind": "const",
           "signature": "ReadonlySet<string>",
-          "doc": "Sniffed-mime counterpart of `ATTACHMENT_ACCEPT`: the binary formats `sniffBinary` can identify from magic bytes among the accepted types."
+          "doc": "Sniffed-mime counterpart of `ATTACHMENT_ACCEPT`: the binary formats `sniffBinary` can identify from content among the accepted types."
         },
         {
           "name": "assertPromptPartsWithinCap",
@@ -1206,7 +1206,7 @@
         {
           "name": "ATTACHMENT_ACCEPT",
           "kind": "const",
-          "signature": "\"image/*,.pdf,.txt,.md,.csv,.json,.yaml,.yml,.html\"",
+          "signature": "\"image/*,.pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,.json,.yaml,.yml,.html\"",
           "doc": "Accept list for the composer file picker + type validation, same grammar as the native `<input accept>` attribute."
         },
         {
@@ -1732,6 +1732,12 @@
           "doc": "True when this event should arm a draft write."
         },
         {
+          "name": "MACRO_ENABLED_OOXML_SNIFFED_MIMES",
+          "kind": "const",
+          "signature": "ReadonlySet<string>",
+          "doc": "Macro-enabled Office package mimes (`.docm`/`.xlsm`/`.pptm`), reported by `sniffBinary` but deliberately NOT in the default allow-list: a package carrying a VBA project is a different risk decision t…"
+        },
+        {
           "name": "MAX_ATTACHMENT_TOTAL_BYTES",
           "kind": "const",
           "signature": "number",
@@ -1796,6 +1802,48 @@
           "kind": "function",
           "signature": "(prompt: string | readonly ChatTurnPartInput[]) => string | PromptInputPart[]",
           "doc": "Convert the browser-safe chat attachment contract into the current sandbox prompt contract."
+        },
+        {
+          "name": "OOXML_PRESENTATION_MACRO_ENABLED_MIME",
+          "kind": "const",
+          "signature": "\"application/vnd.ms-powerpoint.presentation.macroEnabled.12\"",
+          "doc": "Sniffed mime for a macro-enabled PowerPoint package (`.pptm`)."
+        },
+        {
+          "name": "OOXML_PRESENTATION_MIME",
+          "kind": "const",
+          "signature": "\"application/vnd.openxmlformats-officedocument.presentationml.presentation\"",
+          "doc": "Sniffed mime for a PowerPoint OOXML package (`.pptx`)."
+        },
+        {
+          "name": "OOXML_SNIFFED_MIMES",
+          "kind": "const",
+          "signature": "ReadonlySet<string>",
+          "doc": "The Office (OOXML) package mimes the default allow-list admits — the formats professionals actually send: Word contracts, Excel workpapers, PowerPoint decks."
+        },
+        {
+          "name": "OOXML_SPREADSHEET_MACRO_ENABLED_MIME",
+          "kind": "const",
+          "signature": "\"application/vnd.ms-excel.sheet.macroEnabled.12\"",
+          "doc": "Sniffed mime for a macro-enabled Excel package (`.xlsm`)."
+        },
+        {
+          "name": "OOXML_SPREADSHEET_MIME",
+          "kind": "const",
+          "signature": "\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\"",
+          "doc": "Sniffed mime for an Excel OOXML package (`.xlsx`)."
+        },
+        {
+          "name": "OOXML_WORD_MACRO_ENABLED_MIME",
+          "kind": "const",
+          "signature": "\"application/vnd.ms-word.document.macroEnabled.12\"",
+          "doc": "Sniffed mime for a macro-enabled Word package (`.docm`)."
+        },
+        {
+          "name": "OOXML_WORD_MIME",
+          "kind": "const",
+          "signature": "\"application/vnd.openxmlformats-officedocument.wordprocessingml.document\"",
+          "doc": "Sniffed mime for a Word OOXML package (`.docx`)."
         },
         {
           "name": "OpenModelStream",
@@ -4679,6 +4727,268 @@
       ]
     },
     {
+      "id": "./documents",
+      "source": "src/documents/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "classifyPdfDocument",
+          "kind": "function",
+          "signature": "(bytes: Uint8Array<ArrayBufferLike>, pdf: PdfEngine) => DocumentOutcome<PdfClassification>",
+          "doc": "Classify a PDF: whether it has a text layer, and which pages do not."
+        },
+        {
+          "name": "createDocumentExtractor",
+          "kind": "function",
+          "signature": "(config?: DocumentExtractorConfig) => DocumentExtractor",
+          "doc": "Bind an engine and limits once, at worker start, so call sites read `documents.extract(bytes, { mediaType })` and never re-wire the wasm."
+        },
+        {
+          "name": "decodeXmlEntities",
+          "kind": "function",
+          "signature": "(input: string) => string",
+          "doc": "Resolve XML character/entity references."
+        },
+        {
+          "name": "DEFAULT_MAX_DOCUMENT_BYTES",
+          "kind": "const",
+          "signature": "number",
+          "doc": "25 MB — the cap both predecessor implementations converged on, and roughly the point where a Worker's memory budget stops tolerating a full decode."
+        },
+        {
+          "name": "DEFAULT_MAX_ZIP_ENTRY_BYTES",
+          "kind": "const",
+          "signature": "number",
+          "doc": "Ceiling on what ONE entry may expand to."
+        },
+        {
+          "name": "DOCM_MEDIA_TYPE",
+          "kind": "const",
+          "signature": "\"application/vnd.ms-word.document.macroEnabled.12\"",
+          "doc": "Macro-enabled WordprocessingML (`.docm`)."
+        },
+        {
+          "name": "DocumentExtractionError",
+          "kind": "interface",
+          "signature": "interface DocumentExtractionError",
+          "doc": null
+        },
+        {
+          "name": "DocumentExtractionErrorCode",
+          "kind": "type",
+          "signature": "type DocumentExtractionErrorCode",
+          "doc": "Why extraction stopped."
+        },
+        {
+          "name": "DocumentExtractionStage",
+          "kind": "type",
+          "signature": "type DocumentExtractionStage",
+          "doc": "Where extraction stopped."
+        },
+        {
+          "name": "DocumentExtractor",
+          "kind": "interface",
+          "signature": "interface DocumentExtractor",
+          "doc": null
+        },
+        {
+          "name": "DocumentExtractorConfig",
+          "kind": "interface",
+          "signature": "interface DocumentExtractorConfig",
+          "doc": null
+        },
+        {
+          "name": "DocumentFormat",
+          "kind": "type",
+          "signature": "type DocumentFormat",
+          "doc": "What kind of extraction a media type routes to."
+        },
+        {
+          "name": "DocumentOutcome",
+          "kind": "type",
+          "signature": "type DocumentOutcome",
+          "doc": null
+        },
+        {
+          "name": "DOCX_MEDIA_TYPE",
+          "kind": "const",
+          "signature": "\"application/vnd.openxmlformats-officedocument.wordprocessingml.document\"",
+          "doc": "OOXML WordprocessingML — the `.docx` a word processor writes."
+        },
+        {
+          "name": "DocxExtractionDetail",
+          "kind": "interface",
+          "signature": "interface DocxExtractionDetail",
+          "doc": null
+        },
+        {
+          "name": "DocxText",
+          "kind": "interface",
+          "signature": "interface DocxText",
+          "doc": null
+        },
+        {
+          "name": "extractDocument",
+          "kind": "function",
+          "signature": "(input: ArrayBuffer | Uint8Array<ArrayBufferLike>, options?: ExtractDocumentOptions) => Promise<DocumentOutcome<Extract…",
+          "doc": "Extract a document's text."
+        },
+        {
+          "name": "ExtractDocumentOptions",
+          "kind": "interface",
+          "signature": "interface ExtractDocumentOptions",
+          "doc": null
+        },
+        {
+          "name": "extractDocxText",
+          "kind": "function",
+          "signature": "(bytes: Uint8Array<ArrayBufferLike>, mediaType: string, zip?: ReadZipEntryOptions) => Promise<DocumentOutcome<{ text: s…",
+          "doc": "Extract the readable text of a `.docx` / `.docm` package."
+        },
+        {
+          "name": "ExtractedDocument",
+          "kind": "interface",
+          "signature": "interface ExtractedDocument",
+          "doc": null
+        },
+        {
+          "name": "normalizeMediaType",
+          "kind": "function",
+          "signature": "(mediaType: string) => string",
+          "doc": "Strip parameters and case from a media type: `Text/Plain; charset=utf-8` → `text/plain`."
+        },
+        {
+          "name": "PDF_MEDIA_TYPE",
+          "kind": "const",
+          "signature": "\"application/pdf\"",
+          "doc": null
+        },
+        {
+          "name": "PdfClassification",
+          "kind": "interface",
+          "signature": "interface PdfClassification",
+          "doc": null
+        },
+        {
+          "name": "PdfContentKind",
+          "kind": "type",
+          "signature": "type PdfContentKind",
+          "doc": "PDF content kinds, normalized away from the engine's own vocabulary."
+        },
+        {
+          "name": "PdfEngine",
+          "kind": "interface",
+          "signature": "interface PdfEngine",
+          "doc": "The seam that keeps `@firecrawl/pdf-inspector-wasm` out of this module."
+        },
+        {
+          "name": "PdfExtractionDetail",
+          "kind": "interface",
+          "signature": "interface PdfExtractionDetail",
+          "doc": null
+        },
+        {
+          "name": "PdfPageClassification",
+          "kind": "interface",
+          "signature": "interface PdfPageClassification",
+          "doc": null
+        },
+        {
+          "name": "PdfTextFormat",
+          "kind": "type",
+          "signature": "type PdfTextFormat",
+          "doc": "Plain text preserves the source's line breaks; markdown carries structure (headings, page markers) but reflows lines into paragraphs."
+        },
+        {
+          "name": "readZipDirectory",
+          "kind": "function",
+          "signature": "(bytes: Uint8Array<ArrayBufferLike>) => ZipOutcome<ZipEntry[]>",
+          "doc": "Read every central-directory entry."
+        },
+        {
+          "name": "readZipEntry",
+          "kind": "function",
+          "signature": "(bytes: Uint8Array<ArrayBufferLike>, entry: ZipEntry, options?: ReadZipEntryOptions) => Promise<ZipOutcome<Uint8Array<A…",
+          "doc": "Inflate one entry's bytes."
+        },
+        {
+          "name": "ReadZipEntryOptions",
+          "kind": "interface",
+          "signature": "interface ReadZipEntryOptions",
+          "doc": "Options for {@link readZipEntry}."
+        },
+        {
+          "name": "ResolvedMediaType",
+          "kind": "interface",
+          "signature": "interface ResolvedMediaType",
+          "doc": null
+        },
+        {
+          "name": "resolveMediaType",
+          "kind": "function",
+          "signature": "(input: ResolveMediaTypeInput) => DocumentOutcome<ResolvedMediaType>",
+          "doc": "Decide which extractor handles these bytes."
+        },
+        {
+          "name": "ResolveMediaTypeInput",
+          "kind": "interface",
+          "signature": "interface ResolveMediaTypeInput",
+          "doc": null
+        },
+        {
+          "name": "wordprocessingXmlToText",
+          "kind": "function",
+          "signature": "(xml: string) => DocxText",
+          "doc": "Walk WordprocessingML and emit its readable text."
+        },
+        {
+          "name": "ZipEntry",
+          "kind": "interface",
+          "signature": "interface ZipEntry",
+          "doc": null
+        },
+        {
+          "name": "ZipOutcome",
+          "kind": "type",
+          "signature": "type ZipOutcome",
+          "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./documents/pdf-inspector",
+      "source": "src/documents/pdf-inspector.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "createPdfInspectorEngine",
+          "kind": "function",
+          "signature": "(wasm: PdfInspectorWasm) => PdfEngine",
+          "doc": "Build the wasm-backed engine."
+        },
+        {
+          "name": "initPdfInspector",
+          "kind": "function",
+          "signature": "(wasm: PdfInspectorWasm) => DocumentOutcome<{ version: string; }>",
+          "doc": "Instantiate the engine for this isolate."
+        },
+        {
+          "name": "isPdfInspectorReady",
+          "kind": "function",
+          "signature": "() => boolean",
+          "doc": "Whether the engine has been instantiated in this isolate."
+        },
+        {
+          "name": "PdfInspectorWasm",
+          "kind": "type",
+          "signature": "type PdfInspectorWasm",
+          "doc": "The compiled wasm, or a thunk that produces it on first use."
+        }
+      ]
+    },
+    {
       "id": "./eval",
       "source": "src/eval/index.ts",
       "dependsOn": [
@@ -7130,6 +7440,282 @@
       ]
     },
     {
+      "id": "./openui",
+      "source": "src/openui/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "createOpenUIActionRoute",
+          "kind": "function",
+          "signature": "<TContext, TNode extends OpenUINode = OpenUINode>(options: OpenUIActionRouteOptions<TContext, TNode>) => OpenUIActionRo…",
+          "doc": "Build the action endpoint for agent-authored pages."
+        },
+        {
+          "name": "describeOpenUIAction",
+          "kind": "function",
+          "signature": "(submission: OpenUIActionSubmission) => string",
+          "doc": "One plain line recording what the user did, for the product to carry into the NEXT turn's context."
+        },
+        {
+          "name": "hasOpenUISegment",
+          "kind": "function",
+          "signature": "(content: string) => boolean",
+          "doc": "Whether a message carries any agent-authored page at all."
+        },
+        {
+          "name": "isOpenUIFieldKind",
+          "kind": "function",
+          "signature": "(kind: string) => kind is OpenUIFieldKind",
+          "doc": "Whether a string names an input kind this contract knows."
+        },
+        {
+          "name": "isSafeOpenUIActionId",
+          "kind": "function",
+          "signature": "(id: string) => boolean",
+          "doc": "Ids the host accepts on the wire: identifier-safe, same rule as field ids."
+        },
+        {
+          "name": "isSafeOpenUIFieldId",
+          "kind": "function",
+          "signature": "(id: string) => boolean",
+          "doc": "Field ids the host will accept: identifier-safe, and never a key that would reach `Object.prototype`."
+        },
+        {
+          "name": "OPENUI_INPUT_KINDS",
+          "kind": "const",
+          "signature": "readonly OpenUIFieldKind[]",
+          "doc": "The input kinds this guide teaches, in the order it lists them."
+        },
+        {
+          "name": "OPENUI_INTERACTIVE_AUTHORING_GUIDE",
+          "kind": "const",
+          "signature": "string",
+          "doc": "The interactive vocabulary, written for a model."
+        },
+        {
+          "name": "OpenUIActionBodyErrorCode",
+          "kind": "type",
+          "signature": "type OpenUIActionBodyErrorCode",
+          "doc": "Why a submission body was refused before any handler ran."
+        },
+        {
+          "name": "OpenUIActionBodyValidation",
+          "kind": "type",
+          "signature": "type OpenUIActionBodyValidation",
+          "doc": "Parsed submission, or the reason the body was refused."
+        },
+        {
+          "name": "OpenUIActionHandler",
+          "kind": "type",
+          "signature": "type OpenUIActionHandler",
+          "doc": "One product action, keyed in {@link OpenUIActionRouteOptions.actions} by the `action.id` the agent authored on the page."
+        },
+        {
+          "name": "OpenUIActionHandlerArgs",
+          "kind": "interface",
+          "signature": "interface OpenUIActionHandlerArgs",
+          "doc": "What a handler is given: the caller's request, the parsed submission, and whatever the product's authorizer resolved."
+        },
+        {
+          "name": "OpenUIActionLogger",
+          "kind": "type",
+          "signature": "type OpenUIActionLogger",
+          "doc": "Logging surface the route uses; `console` by default."
+        },
+        {
+          "name": "OpenUIActionResolution",
+          "kind": "type",
+          "signature": "type OpenUIActionResolution",
+          "doc": "The product's verdict on who is calling."
+        },
+        {
+          "name": "OpenUIActionResult",
+          "kind": "type",
+          "signature": "type OpenUIActionResult",
+          "doc": "What a handler returns."
+        },
+        {
+          "name": "OpenUIActionRoute",
+          "kind": "interface",
+          "signature": "interface OpenUIActionRoute",
+          "doc": "The endpoint a product mounts."
+        },
+        {
+          "name": "OpenUIActionRouteOptions",
+          "kind": "interface",
+          "signature": "interface OpenUIActionRouteOptions",
+          "doc": "How the route is wired."
+        },
+        {
+          "name": "OpenUIActionSubmission",
+          "kind": "interface",
+          "signature": "interface OpenUIActionSubmission",
+          "doc": "What the browser POSTs when an action fires."
+        },
+        {
+          "name": "OpenUIArtifact",
+          "kind": "interface",
+          "signature": "interface OpenUIArtifact",
+          "doc": "A page read back out of the vault, and its title when one was stored."
+        },
+        {
+          "name": "OpenUIArtifactError",
+          "kind": "interface",
+          "signature": "interface OpenUIArtifactError",
+          "doc": "Why a stored page could not be read."
+        },
+        {
+          "name": "OpenUIArtifactResult",
+          "kind": "type",
+          "signature": "type OpenUIArtifactResult",
+          "doc": "Reading a stored page either produces nodes or says why it did not."
+        },
+        {
+          "name": "OpenUIFieldIssue",
+          "kind": "interface",
+          "signature": "interface OpenUIFieldIssue",
+          "doc": "One rejected field, named so a card can mark exactly that input."
+        },
+        {
+          "name": "OpenUIFieldIssueCode",
+          "kind": "type",
+          "signature": "type OpenUIFieldIssueCode",
+          "doc": "Why one field's value was rejected."
+        },
+        {
+          "name": "OpenUIFieldKind",
+          "kind": "type",
+          "signature": "type OpenUIFieldKind",
+          "doc": "The input kinds a form field can be."
+        },
+        {
+          "name": "OpenUIFieldSpec",
+          "kind": "interface",
+          "signature": "interface OpenUIFieldSpec",
+          "doc": "One field, reduced to what a value check needs."
+        },
+        {
+          "name": "OpenUIFormSpec",
+          "kind": "interface",
+          "signature": "interface OpenUIFormSpec",
+          "doc": "A form the host can check a submission against."
+        },
+        {
+          "name": "OpenUIFormValidation",
+          "kind": "type",
+          "signature": "type OpenUIFormValidation",
+          "doc": "The outcome of checking a submission against a form."
+        },
+        {
+          "name": "OpenUIFormValues",
+          "kind": "type",
+          "signature": "type OpenUIFormValues",
+          "doc": "Submitted field values, keyed by field id."
+        },
+        {
+          "name": "OpenUINode",
+          "kind": "interface",
+          "signature": "interface OpenUINode",
+          "doc": "The narrowest thing a host can assert about a parsed node: it names a type."
+        },
+        {
+          "name": "OpenUISegment",
+          "kind": "type",
+          "signature": "type OpenUISegment",
+          "doc": "One piece of an assistant message: prose, or a page to render."
+        },
+        {
+          "name": "OpenUIValue",
+          "kind": "type",
+          "signature": "type OpenUIValue",
+          "doc": "A value one OpenUI field can hold."
+        },
+        {
+          "name": "parseOpenUIArtifact",
+          "kind": "function",
+          "signature": "<TNode extends OpenUINode = OpenUINode>(content: string) => OpenUIArtifactResult<TNode>",
+          "doc": "Read a `render_ui` artifact back out of the vault."
+        },
+        {
+          "name": "parseOpenUISegments",
+          "kind": "function",
+          "signature": "<TNode extends OpenUINode = OpenUINode>(content: string) => OpenUISegment<TNode>[]",
+          "doc": "Split message content into markdown and OpenUI segments, in source order."
+        },
+        {
+          "name": "validateOpenUIActionBody",
+          "kind": "function",
+          "signature": "(body: Record<string, unknown>) => OpenUIActionBodyValidation",
+          "doc": "Validate a raw JSON body into a submission."
+        },
+        {
+          "name": "validateOpenUIFormValues",
+          "kind": "function",
+          "signature": "(spec: OpenUIFormSpec, values: OpenUIFormValues) => OpenUIFormValidation",
+          "doc": "Check submitted values against the form the agent authored."
+        }
+      ]
+    },
+    {
+      "id": "./openui-react",
+      "source": "src/openui-react/index.tsx",
+      "dependsOn": [
+        "openui"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "OPENUI_RESERVED_BODY_KEYS",
+          "kind": "const",
+          "signature": "readonly string[]",
+          "doc": "The body keys the hook owns; a product's extra `body` fields cannot shadow them."
+        },
+        {
+          "name": "OpenUIActionContext",
+          "kind": "interface",
+          "signature": "interface OpenUIActionContext",
+          "doc": "Where on the page an action fired, and what the form held at that moment."
+        },
+        {
+          "name": "OpenUIActionFailure",
+          "kind": "interface",
+          "signature": "interface OpenUIActionFailure",
+          "doc": "A refused action, as the route sends it."
+        },
+        {
+          "name": "OpenUIActionOutcome",
+          "kind": "type",
+          "signature": "type OpenUIActionOutcome",
+          "doc": "The boundary outcome: the reply, or the reason there is none."
+        },
+        {
+          "name": "OpenUIActionResponse",
+          "kind": "interface",
+          "signature": "interface OpenUIActionResponse",
+          "doc": "A successful action reply, as the route sends it."
+        },
+        {
+          "name": "OpenUIActionsController",
+          "kind": "interface",
+          "signature": "interface OpenUIActionsController",
+          "doc": "What the hook returns."
+        },
+        {
+          "name": "useOpenUIActions",
+          "kind": "function",
+          "signature": "<TNode extends OpenUINode = OpenUINode>(options: UseOpenUIActionsOptions<TNode>) => OpenUIActionsController<TNode>",
+          "doc": "Make an agent-authored page interactive."
+        },
+        {
+          "name": "UseOpenUIActionsOptions",
+          "kind": "interface",
+          "signature": "interface UseOpenUIActionsOptions",
+          "doc": "How the hook talks to the product route."
+        }
+      ]
+    },
+    {
       "id": "./peer-floors/check",
       "source": "src/peer-floors/check.ts",
       "dependsOn": [],
@@ -8247,6 +8833,352 @@
           "kind": "interface",
           "signature": "interface AssembleSystemPromptInput",
           "doc": "Inputs to {@link assembleSystemPrompt}."
+        }
+      ]
+    },
+    {
+      "id": "./record",
+      "source": "src/record/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "canonicalRecordJson",
+          "kind": "function",
+          "signature": "(value: unknown) => string",
+          "doc": "Deterministic JSON with object keys sorted at every depth."
+        },
+        {
+          "name": "DecodedRecordEntry",
+          "kind": "interface",
+          "signature": "interface DecodedRecordEntry",
+          "doc": "A resolved entry with its value already parsed, handed to the rules."
+        },
+        {
+          "name": "defaultRecordMaterialDifference",
+          "kind": "function",
+          "signature": "RecordMaterialDifference",
+          "doc": "The default rule, and the one all three hand-rolled stores converged on: two assertions materially differ when they come from DIFFERENT source kinds and encode to different canonical JSON."
+        },
+        {
+          "name": "defaultRecordPeriodScope",
+          "kind": "function",
+          "signature": "RecordPeriodScopeResolver",
+          "doc": "The scope assumed for every path when a consumer supplies no resolver."
+        },
+        {
+          "name": "detectRecordConflict",
+          "kind": "function",
+          "signature": "(policy: RecordWritePolicy, head: { sourceKind: string; valueJson: string; affirmedEmpty: boolean; } | undefined, incom…",
+          "doc": "True when the incoming write disagrees with the live head under the policy's rule (or the default)."
+        },
+        {
+          "name": "FoldableRecordEntry",
+          "kind": "interface",
+          "signature": "interface FoldableRecordEntry",
+          "doc": "The slice of a stored row the fold reads."
+        },
+        {
+          "name": "foldRecordEntries",
+          "kind": "function",
+          "signature": "<T>(entries: readonly FoldableRecordEntry[], options: FoldRecordEntriesOptions<T>) => RecordOutcome<RecordFoldResult<T>>",
+          "doc": "Resolve entries against the requested period, then fold them in `seq` order."
+        },
+        {
+          "name": "FoldRecordEntriesOptions",
+          "kind": "interface",
+          "signature": "interface FoldRecordEntriesOptions",
+          "doc": "Options for one fold."
+        },
+        {
+          "name": "RECORD_KEY_SENTINEL",
+          "kind": "const",
+          "signature": "\"\"",
+          "doc": "Sentinel for an unused key column."
+        },
+        {
+          "name": "RECORD_PERIOD_SENTINEL",
+          "kind": "const",
+          "signature": "0",
+          "doc": "Sentinel period for a record with no time dimension."
+        },
+        {
+          "name": "RECORD_REVIEW_STATES",
+          "kind": "const",
+          "signature": "readonly RecordReviewState[]",
+          "doc": "Every review state, for iteration and validation."
+        },
+        {
+          "name": "RecordEntryKey",
+          "kind": "interface",
+          "signature": "interface RecordEntryKey",
+          "doc": "The columns that identify which assertion an entry supersedes."
+        },
+        {
+          "name": "recordEntryVisibleInPeriod",
+          "kind": "function",
+          "signature": "(scope: RecordPeriodScope, entryPeriod: number, requestedPeriod: number) => boolean",
+          "doc": "True when an entry at `entryPeriod` is a candidate at `requestedPeriod` under `scope`."
+        },
+        {
+          "name": "RecordErrorCode",
+          "kind": "type",
+          "signature": "type RecordErrorCode",
+          "doc": "Error classes a caller maps to a status code or a retry decision."
+        },
+        {
+          "name": "recordFail",
+          "kind": "function",
+          "signature": "(code: RecordErrorCode, error: string) => RecordOutcome<never>",
+          "doc": "Build a failure outcome carrying its error class."
+        },
+        {
+          "name": "RecordFoldResult",
+          "kind": "interface",
+          "signature": "interface RecordFoldResult",
+          "doc": "What a fold produced."
+        },
+        {
+          "name": "RecordFoldRules",
+          "kind": "interface",
+          "signature": "interface RecordFoldRules",
+          "doc": "The consumer's grouping rules."
+        },
+        {
+          "name": "RecordKeyCanonicalizer",
+          "kind": "type",
+          "signature": "type RecordKeyCanonicalizer",
+          "doc": "Canonicalize a key column before it enters the fold key (upper-casing a region code, trimming an identifier)."
+        },
+        {
+          "name": "recordKeyString",
+          "kind": "function",
+          "signature": "(key: RecordEntryKey) => string",
+          "doc": "Join an entry key into one comparable string, for grouping in memory."
+        },
+        {
+          "name": "RecordMaterialDifference",
+          "kind": "type",
+          "signature": "type RecordMaterialDifference",
+          "doc": "How a live accepted head at the same key is compared against an incoming write."
+        },
+        {
+          "name": "recordOk",
+          "kind": "function",
+          "signature": "<T>(value: T) => RecordOutcome<T>",
+          "doc": "Build a success outcome."
+        },
+        {
+          "name": "RecordOutcome",
+          "kind": "type",
+          "signature": "type RecordOutcome",
+          "doc": "Typed outcome for every record operation."
+        },
+        {
+          "name": "RecordParseResult",
+          "kind": "type",
+          "signature": "type RecordParseResult",
+          "doc": "The result shape a `safeParse`-style validator returns."
+        },
+        {
+          "name": "RecordPeriodScope",
+          "kind": "type",
+          "signature": "type RecordPeriodScope",
+          "doc": "How a path's entries resolve against the period being materialized."
+        },
+        {
+          "name": "RecordPeriodScopeResolver",
+          "kind": "type",
+          "signature": "type RecordPeriodScopeResolver",
+          "doc": "Resolves the period scope of one path."
+        },
+        {
+          "name": "RecordReviewState",
+          "kind": "type",
+          "signature": "type RecordReviewState",
+          "doc": "Lifecycle of one entry."
+        },
+        {
+          "name": "RecordSchemaMap",
+          "kind": "type",
+          "signature": "type RecordSchemaMap",
+          "doc": "Path → validator."
+        },
+        {
+          "name": "RecordSourceLocator",
+          "kind": "interface",
+          "signature": "interface RecordSourceLocator",
+          "doc": "Position of the assertion inside its source."
+        },
+        {
+          "name": "recordUlid",
+          "kind": "function",
+          "signature": "(now?: number) => string",
+          "doc": "Mint a ULID."
+        },
+        {
+          "name": "RecordValueValidator",
+          "kind": "type",
+          "signature": "type RecordValueValidator",
+          "doc": "Something that can validate one value for one path: a `safeParse` object (zod and friends) or a plain function returning a typed outcome."
+        },
+        {
+          "name": "RecordWritePolicy",
+          "kind": "interface",
+          "signature": "interface RecordWritePolicy",
+          "doc": "Everything domain-specific about writing an entry, supplied by the consumer."
+        },
+        {
+          "name": "resolveWriteReviewState",
+          "kind": "function",
+          "signature": "(policy: RecordWritePolicy, sourceKind: string) => RecordOutcome<RecordReviewState>",
+          "doc": "Resolve the review state a write from `sourceKind` lands in, failing loud on a kind the policy never declared."
+        },
+        {
+          "name": "validateRecordValue",
+          "kind": "function",
+          "signature": "(validator: RecordValueValidator, value: unknown) => RecordOutcome<unknown>",
+          "doc": "Run one validator, normalizing both forms to a typed outcome and flattening a `safeParse` error into a readable message."
+        }
+      ]
+    },
+    {
+      "id": "./record/drizzle",
+      "source": "src/record/drizzle.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "createRecordStore",
+          "kind": "function",
+          "signature": "(options: CreateRecordStoreOptions) => RecordStore",
+          "doc": "Build a store bound to one table and one policy."
+        },
+        {
+          "name": "CreateRecordStoreOptions",
+          "kind": "interface",
+          "signature": "interface CreateRecordStoreOptions",
+          "doc": "Options for {@link createRecordStore}."
+        },
+        {
+          "name": "createRecordTable",
+          "kind": "function",
+          "signature": "{ <TExtra extends RecordExtraColumns>(options: CreateRecordTableOptions & { extraColumns: TExtra; }): RecordTableWithEx…",
+          "doc": "Build one record-entry table wired to the product's tables."
+        },
+        {
+          "name": "CreateRecordTableOptions",
+          "kind": "interface",
+          "signature": "interface CreateRecordTableOptions",
+          "doc": "Options for {@link createRecordTable}."
+        },
+        {
+          "name": "ListRecordEntriesInput",
+          "kind": "interface",
+          "signature": "interface ListRecordEntriesInput",
+          "doc": "Filters for {@link RecordStore.list}."
+        },
+        {
+          "name": "MaterializeRecordInput",
+          "kind": "interface",
+          "signature": "interface MaterializeRecordInput",
+          "doc": "Input to {@link RecordStore.materialize}."
+        },
+        {
+          "name": "MaterializeRecordResult",
+          "kind": "interface",
+          "signature": "interface MaterializeRecordResult",
+          "doc": "What a materialization produced."
+        },
+        {
+          "name": "ReadRecordHeadsInput",
+          "kind": "interface",
+          "signature": "interface ReadRecordHeadsInput",
+          "doc": "Input to {@link RecordStore.heads}."
+        },
+        {
+          "name": "RECORD_STORE_COLUMNS",
+          "kind": "const",
+          "signature": "ReadonlySet<string>",
+          "doc": "Column property names the store owns."
+        },
+        {
+          "name": "RecordAtomicStrategy",
+          "kind": "type",
+          "signature": "type RecordAtomicStrategy",
+          "doc": "How this store executes a two-statement atomic unit on the caller's driver."
+        },
+        {
+          "name": "RecordDatabase",
+          "kind": "type",
+          "signature": "type RecordDatabase",
+          "doc": "Any SQLite drizzle database."
+        },
+        {
+          "name": "RecordEntryRow",
+          "kind": "type",
+          "signature": "type RecordEntryRow",
+          "doc": "One stored entry, as selected."
+        },
+        {
+          "name": "RecordExtraColumns",
+          "kind": "type",
+          "signature": "type RecordExtraColumns",
+          "doc": "Product columns added to the entry table, keyed by the property name the store and the product read them under."
+        },
+        {
+          "name": "RecordParentTable",
+          "kind": "type",
+          "signature": "type RecordParentTable",
+          "doc": "A product table referenced by foreign key — only its `id` column is used."
+        },
+        {
+          "name": "RecordStore",
+          "kind": "interface",
+          "signature": "interface RecordStore",
+          "doc": "The store surface."
+        },
+        {
+          "name": "RecordTable",
+          "kind": "type",
+          "signature": "type RecordTable",
+          "doc": "The table shape {@link createRecordTable} produces."
+        },
+        {
+          "name": "RecordTableWithExtras",
+          "kind": "type",
+          "signature": "type RecordTableWithExtras",
+          "doc": "The record table plus the product's own columns, so a product's direct queries name them and the store still sees the shape it depends on."
+        },
+        {
+          "name": "resolveAtomicStrategy",
+          "kind": "function",
+          "signature": "(db: RecordDatabase) => RecordAtomicStrategy",
+          "doc": "Pick the driver's atomic primitive."
+        },
+        {
+          "name": "ReviewRecordEntryInput",
+          "kind": "interface",
+          "signature": "interface ReviewRecordEntryInput",
+          "doc": "Input to {@link RecordStore.review}."
+        },
+        {
+          "name": "toFoldable",
+          "kind": "function",
+          "signature": "(row: { path: string; id: string; createdAt: number; seq: number; dimension: string; period: number; conflict: boolean;…",
+          "doc": "Project a stored row onto the slice the pure fold reads."
+        },
+        {
+          "name": "WriteRecordEntryInput",
+          "kind": "interface",
+          "signature": "interface WriteRecordEntryInput",
+          "doc": "Input to {@link RecordStore.write}."
+        },
+        {
+          "name": "WriteRecordEntryResult",
+          "kind": "interface",
+          "signature": "interface WriteRecordEntryResult",
+          "doc": "What a write produced."
         }
       ]
     },
@@ -11259,6 +12191,12 @@
           "doc": null
         },
         {
+          "name": "assertNavHrefsRegistered",
+          "kind": "function",
+          "signature": "(items: readonly NavHrefItem[], routes: NavRouteTable, options?: NavHrefCheckOptions) => void",
+          "doc": "Fail unless every nav href resolves to a registered route."
+        },
+        {
           "name": "buildSessionNavItem",
           "kind": "function",
           "signature": "<TIcon = unknown>({ id, label, icon, href, activeSessionId, emptyLabel, defaultOpen, ...subItemOptions }: BuildSessionN…",
@@ -11281,6 +12219,12 @@
           "kind": "interface",
           "signature": "interface BuildSessionSubItemsOptions",
           "doc": null
+        },
+        {
+          "name": "checkNavHrefs",
+          "kind": "function",
+          "signature": "(items: readonly NavHrefItem[], routes: NavRouteTable, options?: NavHrefCheckOptions) => NavHrefReport",
+          "doc": "Check every nav href against the product's route table."
         },
         {
           "name": "ComposedSidebarSessions",
@@ -11307,16 +12251,76 @@
           "doc": null
         },
         {
+          "name": "flattenRouteTable",
+          "kind": "function",
+          "signature": "(table: NavRouteTable) => string[]",
+          "doc": "Every path pattern the table registers, rooted and de-duplicated."
+        },
+        {
           "name": "mergeSessionPages",
           "kind": "function",
           "signature": "(existing: SessionSummary[], incoming: SessionSummary[]) => SessionSummary[]",
           "doc": "Append a fetched page to held rows, dropping ids already shown."
         },
         {
+          "name": "NavDestination",
+          "kind": "interface",
+          "signature": "interface NavDestination",
+          "doc": "One rail destination as the product declares it, before a base is applied."
+        },
+        {
+          "name": "NavHrefCheckOptions",
+          "kind": "interface",
+          "signature": "interface NavHrefCheckOptions",
+          "doc": null
+        },
+        {
+          "name": "NavHrefItem",
+          "kind": "interface",
+          "signature": "interface NavHrefItem",
+          "doc": "A nav row as the guard needs to see it."
+        },
+        {
+          "name": "NavHrefProblem",
+          "kind": "interface",
+          "signature": "interface NavHrefProblem",
+          "doc": null
+        },
+        {
+          "name": "NavHrefProblemReason",
+          "kind": "type",
+          "signature": "type NavHrefProblemReason",
+          "doc": null
+        },
+        {
+          "name": "NavHrefReport",
+          "kind": "interface",
+          "signature": "interface NavHrefReport",
+          "doc": null
+        },
+        {
           "name": "NavRouteDef",
           "kind": "interface",
           "signature": "interface NavRouteDef",
           "doc": "One rail destination."
+        },
+        {
+          "name": "NavRouteTable",
+          "kind": "type",
+          "signature": "type NavRouteTable",
+          "doc": "A route table entry is either a bare pattern string or a router config node."
+        },
+        {
+          "name": "NavScope",
+          "kind": "type",
+          "signature": "type NavScope",
+          "doc": "The bases a product routes rail rows under."
+        },
+        {
+          "name": "NavScopeBases",
+          "kind": "type",
+          "signature": "type NavScopeBases",
+          "doc": "A base path per scope."
         },
         {
           "name": "railCollapsedCookie",
@@ -11343,6 +12347,12 @@
           "doc": "Read the persisted rail-collapse state from a request's `Cookie` header, so the server renders the rail in the state the user left it and the first client render does not re-flow."
         },
         {
+          "name": "RegisteredRoute",
+          "kind": "interface",
+          "signature": "interface RegisteredRoute",
+          "doc": "One entry of a registered route table."
+        },
+        {
           "name": "resolveActiveNavId",
           "kind": "function",
           "signature": "({ pathname, base, routes, aliases, claimsNothing, }: ResolveActiveNavIdOptions) => string | undefined",
@@ -11352,6 +12362,36 @@
           "name": "ResolveActiveNavIdOptions",
           "kind": "interface",
           "signature": "interface ResolveActiveNavIdOptions",
+          "doc": null
+        },
+        {
+          "name": "ResolvedNavDestination",
+          "kind": "interface",
+          "signature": "interface ResolvedNavDestination",
+          "doc": "A destination with its base applied."
+        },
+        {
+          "name": "resolveNavDestinations",
+          "kind": "function",
+          "signature": "<TScope extends string>(destinations: readonly NavDestination<TScope>[], bases: Readonly<Record<TScope, string>>) => Re…",
+          "doc": "Apply the bases to every destination, preserving declaration order."
+        },
+        {
+          "name": "resolveNavHref",
+          "kind": "function",
+          "signature": "<TScope extends string>(destination: NavDestination<TScope>, bases: Readonly<Record<TScope, string>>) => string",
+          "doc": "Apply a destination's scope base to its path."
+        },
+        {
+          "name": "resolveScopedActiveNavId",
+          "kind": "function",
+          "signature": "<TScope extends string>({ pathname, destinations, bases, aliases, claimsNothing, }: ResolveScopedActiveNavIdOptions<TSc…",
+          "doc": "The rail row to highlight, across scopes."
+        },
+        {
+          "name": "ResolveScopedActiveNavIdOptions",
+          "kind": "interface",
+          "signature": "interface ResolveScopedActiveNavIdOptions",
           "doc": null
         },
         {
@@ -13268,7 +14308,8 @@
       "source": "src/tools/index.ts",
       "dependsOn": [
         "crypto",
-        "eval"
+        "eval",
+        "openui"
       ],
       "error": null,
       "exports": [
@@ -14570,6 +15611,12 @@
           "doc": "Canonical media-reference boundary shared by every surface that persists a media url (sequences clips, design-canvas image/video src)."
         },
         {
+          "name": "checkFreeRouteLimit",
+          "kind": "function",
+          "signature": "(input: FreeRouteLimitInput) => Promise<FreeRouteLimitOutcome>",
+          "doc": "Decide whether one authenticated, unmetered call may run."
+        },
+        {
           "name": "checkRateLimit",
           "kind": "function",
           "signature": "(kv: KvLike, key: string, limit: number, windowSeconds: number) => Promise<RateLimitResult>",
@@ -14594,10 +15641,76 @@
           "doc": "Extract request context for audit trails."
         },
         {
+          "name": "FREE_ROUTE_BUDGETS",
+          "kind": "const",
+          "signature": "Readonly<Record<FreeRouteClass, RateLimitBudget>>",
+          "doc": "Default budget per cost class."
+        },
+        {
+          "name": "FreeRouteAllowance",
+          "kind": "interface",
+          "signature": "interface FreeRouteAllowance",
+          "doc": "What remains of the binding window after an allowed call."
+        },
+        {
+          "name": "FreeRouteClass",
+          "kind": "type",
+          "signature": "type FreeRouteClass",
+          "doc": "How expensive one call is, which is what picks the default budget."
+        },
+        {
+          "name": "FreeRouteDenialReason",
+          "kind": "type",
+          "signature": "type FreeRouteDenialReason",
+          "doc": "Why a call was refused."
+        },
+        {
+          "name": "FreeRouteDimension",
+          "kind": "type",
+          "signature": "type FreeRouteDimension",
+          "doc": "Which window refused the call."
+        },
+        {
+          "name": "FreeRouteIdentity",
+          "kind": "interface",
+          "signature": "interface FreeRouteIdentity",
+          "doc": "The authenticated caller behind one request."
+        },
+        {
+          "name": "FreeRouteLimitError",
+          "kind": "class",
+          "signature": "class FreeRouteLimitError",
+          "doc": "A correctable refusal: the caller maps `status` + `retryAfterSeconds` onto a response (see {@link freeRouteLimitResponse}) so the client learns what to do next."
+        },
+        {
+          "name": "FreeRouteLimitInput",
+          "kind": "interface",
+          "signature": "interface FreeRouteLimitInput",
+          "doc": null
+        },
+        {
+          "name": "FreeRouteLimitOutcome",
+          "kind": "type",
+          "signature": "type FreeRouteLimitOutcome",
+          "doc": "Typed outcome at the route boundary: an allowance, or a refusal that says how to correct it."
+        },
+        {
+          "name": "freeRouteLimitResponse",
+          "kind": "function",
+          "signature": "(error: FreeRouteLimitError, options?: FreeRouteLimitResponseOptions) => Response",
+          "doc": "The refusal as an HTTP response: the error's status, a JSON body carrying the machine-readable `reason`, and `Retry-After` when waiting can fix it."
+        },
+        {
+          "name": "FreeRouteLimitResponseOptions",
+          "kind": "interface",
+          "signature": "interface FreeRouteLimitResponseOptions",
+          "doc": null
+        },
+        {
           "name": "JsonObject",
           "kind": "type",
           "signature": "type JsonObject",
-          "doc": "Web-boundary utilities every agent app's routes hand-roll: JSON body parsing + narrowing, request-context extraction (real client IP behind Cloudflare), a KV-backed sliding-window rate limiter, and s…"
+          "doc": null
         },
         {
           "name": "KvLike",
@@ -14610,6 +15723,12 @@
           "kind": "function",
           "signature": "(request: Request) => Promise<[JsonObject, null] | [null, Response]>",
           "doc": "Parse + object-narrow a Request body."
+        },
+        {
+          "name": "RateLimitBudget",
+          "kind": "interface",
+          "signature": "interface RateLimitBudget",
+          "doc": "Requests allowed per identity inside a sliding window."
         },
         {
           "name": "RateLimitResult",
@@ -14652,6 +15771,24 @@
           "kind": "const",
           "signature": "Readonly<{ readonly 'Strict-Transport-Security': \"max-age=31536000; includeSubDomains; preload\"; readonly 'X-Content-Ty…",
           "doc": "Canonical generic response headers used by {@link addSecurityHeaders}."
+        },
+        {
+          "name": "withFreeRouteLimit",
+          "kind": "function",
+          "signature": "<TArgs>(options: WithFreeRouteLimitOptions<TArgs>, handler: (args: TArgs) => Response | Promise<Response>) => (args: TA…",
+          "doc": "Wrap an authenticated, unmetered, compute-bearing route handler in its budget."
+        },
+        {
+          "name": "WithFreeRouteLimitOptions",
+          "kind": "interface",
+          "signature": "interface WithFreeRouteLimitOptions",
+          "doc": null
+        },
+        {
+          "name": "WORKSPACE_BUDGET_MULTIPLIER",
+          "kind": "const",
+          "signature": "5",
+          "doc": "A workspace's shared ceiling defaults to this many times one member's, so a multi-seat tenant is bounded without a single active member tripping it."
         }
       ]
     },
@@ -14725,7 +15862,7 @@
         {
           "name": "ATTACHMENT_ACCEPT",
           "kind": "const",
-          "signature": "\"image/*,.pdf,.txt,.md,.csv,.json,.yaml,.yml,.html\"",
+          "signature": "\"image/*,.pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,.json,.yaml,.yml,.html\"",
           "doc": "Accept list for the composer file picker + type validation, same grammar as the native `<input accept>` attribute."
         },
         {
@@ -15233,6 +16370,12 @@
           "doc": null
         },
         {
+          "name": "EMPTY_RECORD_GRID_OVERLAY",
+          "kind": "const",
+          "signature": "RecordGridOverlay",
+          "doc": "An overlay holding nothing."
+        },
+        {
           "name": "EvidenceLineageTable",
           "kind": "function",
           "signature": "({ evidence, resolveSourceUrl, className }: EvidenceLineageTableProps) => Element",
@@ -15345,6 +16488,12 @@
           "kind": "function",
           "signature": "(msg: ChatMessageMetrics, models: CatalogModel[]) => string | null",
           "doc": "\"$0.0042\" from token counts × catalogue per-token pricing; null when unknown."
+        },
+        {
+          "name": "formatRecordGridValue",
+          "kind": "function",
+          "signature": "(column: RecordGridColumn, value: RecordGridValue, locale?: string | undefined) => string",
+          "doc": "Display text for a cell."
         },
         {
           "name": "formatSessionTimestamp",
@@ -15569,6 +16718,12 @@
           "doc": "Determine if a status is late answerable by checking if it is expired or cancelled"
         },
         {
+          "name": "isRecordGridCellApplicable",
+          "kind": "function",
+          "signature": "(column: RecordGridColumn, values: Readonly<Record<string, RecordGridValue>>) => boolean",
+          "doc": "True when the column's dependency (if any) is satisfied by the row's other values."
+        },
+        {
           "name": "isRenderableInteractionKind",
           "kind": "function",
           "signature": "(kind: string) => boolean",
@@ -15761,6 +16916,12 @@
           "doc": "Resolve interaction parsing outcome as success with value or failure with error message"
         },
         {
+          "name": "parseRecordGridInput",
+          "kind": "function",
+          "signature": "(column: RecordGridColumn, raw: string) => RecordGridCellOutcome",
+          "doc": "Turn what an editor control produced into a typed value."
+        },
+        {
           "name": "parseReviewQueueItem",
           "kind": "function",
           "signature": "(raw: unknown) => ReviewQueueItem | null",
@@ -15837,6 +16998,12 @@
           "kind": "type",
           "signature": "type ProducerWireEvent",
           "doc": "Represent events emitted by a producer during its operation for processing and handling"
+        },
+        {
+          "name": "projectRecordGridRows",
+          "kind": "function",
+          "signature": "(rows: readonly RecordGridRow[], overlay: RecordGridOverlay) => RecordGridRow[]",
+          "doc": "The rows to render: caller rows minus local deletes, with local cell edits applied, then locally-created rows."
         },
         {
           "name": "ProposalApprovalHandlers",
@@ -15989,6 +17156,12 @@
           "doc": null
         },
         {
+          "name": "pruneRecordGridOverlay",
+          "kind": "function",
+          "signature": "(rows: readonly RecordGridRow[], overlay: RecordGridOverlay) => RecordGridOverlay",
+          "doc": "Drop the overlay entries the caller's own rows have caught up with: a cell whose value now matches, a created row now present, a removed row now gone."
+        },
+        {
           "name": "QualityCheckList",
           "kind": "function",
           "signature": "({ checks, className }: QualityCheckListProps) => Element",
@@ -16023,6 +17196,180 @@
           "kind": "function",
           "signature": "(files: readonly FileMention[], query: string, limit: number) => FileMention[]",
           "doc": "Ranks `files` against `query` (case-insensitive), capped to `limit`: name-prefix matches first, then name-substring, then path-substring."
+        },
+        {
+          "name": "readRecordGridCell",
+          "kind": "function",
+          "signature": "(column: RecordGridColumn, raw: string) => RecordGridCellOutcome",
+          "doc": "Parse editor text and validate it in one step — what a committing cell editor calls."
+        },
+        {
+          "name": "RecordGrid",
+          "kind": "function",
+          "signature": "({ columns, rows, caption, state, error, onRetry, empty, onCreate, onUpdate, onDelete, newRowDefaults, addLabel, locale…",
+          "doc": "The shared editable record table."
+        },
+        {
+          "name": "RecordGridBooleanColumn",
+          "kind": "interface",
+          "signature": "interface RecordGridBooleanColumn",
+          "doc": "A checkbox."
+        },
+        {
+          "name": "RecordGridCellChange",
+          "kind": "interface",
+          "signature": "interface RecordGridCellChange",
+          "doc": "One committed cell edit, handed to `onUpdate`."
+        },
+        {
+          "name": "RecordGridCellOutcome",
+          "kind": "type",
+          "signature": "type RecordGridCellOutcome",
+          "doc": "Typed outcome for one cell."
+        },
+        {
+          "name": "RecordGridCellSource",
+          "kind": "interface",
+          "signature": "interface RecordGridCellSource",
+          "doc": "Where one cell's value came from."
+        },
+        {
+          "name": "RecordGridColumn",
+          "kind": "type",
+          "signature": "type RecordGridColumn",
+          "doc": "Every column shape the grid renders."
+        },
+        {
+          "name": "RecordGridColumnBase",
+          "kind": "interface",
+          "signature": "interface RecordGridColumnBase",
+          "doc": "Fields every column kind carries."
+        },
+        {
+          "name": "RecordGridCreateOutcome",
+          "kind": "type",
+          "signature": "type RecordGridCreateOutcome",
+          "doc": "Outcome of a create."
+        },
+        {
+          "name": "RecordGridCurrencyColumn",
+          "kind": "interface",
+          "signature": "interface RecordGridCurrencyColumn",
+          "doc": "A money amount."
+        },
+        {
+          "name": "RecordGridDateColumn",
+          "kind": "interface",
+          "signature": "interface RecordGridDateColumn",
+          "doc": "A calendar date held as `YYYY-MM-DD`; no time, no zone."
+        },
+        {
+          "name": "RecordGridDependency",
+          "kind": "interface",
+          "signature": "interface RecordGridDependency",
+          "doc": "A cell is only editable, rendered, and validated when the column it depends on holds `equals`."
+        },
+        {
+          "name": "recordGridEditorText",
+          "kind": "function",
+          "signature": "(column: RecordGridColumn, value: RecordGridValue) => string",
+          "doc": "The text an editor control starts with — the raw value, never the formatted one, so committing an untouched cell is a no-op."
+        },
+        {
+          "name": "RecordGridEmptyState",
+          "kind": "interface",
+          "signature": "interface RecordGridEmptyState",
+          "doc": "The empty state's content."
+        },
+        {
+          "name": "recordGridFail",
+          "kind": "function",
+          "signature": "(error: string) => RecordGridCellOutcome",
+          "doc": "Build a cell failure outcome carrying the message shown next to the cell."
+        },
+        {
+          "name": "RecordGridNumberColumn",
+          "kind": "interface",
+          "signature": "interface RecordGridNumberColumn",
+          "doc": "A plain number."
+        },
+        {
+          "name": "recordGridOk",
+          "kind": "function",
+          "signature": "(value: RecordGridValue) => RecordGridCellOutcome",
+          "doc": "Build a cell success outcome."
+        },
+        {
+          "name": "RecordGridOverlay",
+          "kind": "interface",
+          "signature": "interface RecordGridOverlay",
+          "doc": "Edits the grid has applied locally but the caller's `rows` prop has not yet caught up with."
+        },
+        {
+          "name": "RecordGridProps",
+          "kind": "interface",
+          "signature": "interface RecordGridProps",
+          "doc": "Properties for the editable, provenance-aware record grid."
+        },
+        {
+          "name": "RecordGridRow",
+          "kind": "interface",
+          "signature": "interface RecordGridRow",
+          "doc": "One row: an id, a flat value bag keyed by column id, and optional per-cell provenance."
+        },
+        {
+          "name": "recordGridRowLabel",
+          "kind": "function",
+          "signature": "(columns: readonly RecordGridColumn[], row: RecordGridRow) => string",
+          "doc": "Accessible name for a row's own controls."
+        },
+        {
+          "name": "RecordGridRowOutcome",
+          "kind": "type",
+          "signature": "type RecordGridRowOutcome",
+          "doc": "Typed outcome for a whole row of inputs (the add form)."
+        },
+        {
+          "name": "RecordGridSelectColumn",
+          "kind": "interface",
+          "signature": "interface RecordGridSelectColumn",
+          "doc": "One of a closed set of values."
+        },
+        {
+          "name": "RecordGridSelectOption",
+          "kind": "interface",
+          "signature": "interface RecordGridSelectOption",
+          "doc": "One option of a `select` column."
+        },
+        {
+          "name": "RecordGridSourceBasis",
+          "kind": "type",
+          "signature": "type RecordGridSourceBasis",
+          "doc": "How a value came to sit in a cell."
+        },
+        {
+          "name": "RecordGridState",
+          "kind": "type",
+          "signature": "type RecordGridState",
+          "doc": "Which of the three data states the caller is in."
+        },
+        {
+          "name": "RecordGridTextColumn",
+          "kind": "interface",
+          "signature": "interface RecordGridTextColumn",
+          "doc": "Free text, optionally length- or pattern-constrained."
+        },
+        {
+          "name": "RecordGridValue",
+          "kind": "type",
+          "signature": "type RecordGridValue",
+          "doc": "The value one cell can hold."
+        },
+        {
+          "name": "RecordGridWriteOutcome",
+          "kind": "type",
+          "signature": "type RecordGridWriteOutcome",
+          "doc": "Outcome of an update or a delete."
         },
         {
           "name": "resolveChatInteraction",
@@ -16107,6 +17454,12 @@
           "kind": "interface",
           "signature": "interface RunDrillInProps",
           "doc": "Define properties required to run a drill and handle its closure event"
+        },
+        {
+          "name": "sameRecordGridValue",
+          "kind": "function",
+          "signature": "(a: RecordGridValue | undefined, b: RecordGridValue | undefined) => boolean",
+          "doc": "Value equality across the grid's value union, treating `undefined` as `null` so an absent key and an explicit null never read as a change."
         },
         {
           "name": "SandboxTerminalConnection",
@@ -16227,6 +17580,12 @@
           "kind": "type",
           "signature": "type SubmitInteractionAnswer",
           "doc": "The cards' only side-effect seam: POST one resolution, report the normalized outcome."
+        },
+        {
+          "name": "sumRecordGridColumn",
+          "kind": "function",
+          "signature": "(rows: readonly RecordGridRow[], columnId: string) => number",
+          "doc": "Sum a numeric column over the rows that hold a number."
         },
         {
           "name": "tabTerminalConnectionId",
@@ -16415,6 +17774,18 @@
           "doc": "Whole seconds elapsed while `active`, ticking once a second."
         },
         {
+          "name": "validateRecordGridCell",
+          "kind": "function",
+          "signature": "(column: RecordGridColumn, value: RecordGridValue) => RecordGridCellOutcome",
+          "doc": "Check one already-typed value against its column."
+        },
+        {
+          "name": "validateRecordGridRow",
+          "kind": "function",
+          "signature": "(columns: readonly RecordGridColumn[], values: Readonly<Record<string, RecordGridValue>>) => RecordGridRowOutcome",
+          "doc": "Validate a whole value bag against the columns."
+        },
+        {
           "name": "waterfallLayout",
           "kind": "function",
           "signature": "(trace: FlowTrace) => WaterfallRow[]",
@@ -16431,6 +17802,48 @@
           "kind": "function",
           "signature": "(a: ProvenanceStanding, b: ProvenanceStanding) => ProvenanceStanding",
           "doc": "The weaker of two standings — `confirm` beats `check` beats `settled`."
+        },
+        {
+          "name": "withoutRecordGridCreated",
+          "kind": "function",
+          "signature": "(overlay: RecordGridOverlay, rowId: string) => RecordGridOverlay",
+          "doc": "Take back an optimistic create — the rollback path."
+        },
+        {
+          "name": "withoutRecordGridRemoved",
+          "kind": "function",
+          "signature": "(overlay: RecordGridOverlay, rowId: string) => RecordGridOverlay",
+          "doc": "Take back an optimistic delete — the rollback path."
+        },
+        {
+          "name": "withoutRecordGridUpdate",
+          "kind": "function",
+          "signature": "(overlay: RecordGridOverlay, rowId: string, columnId: string) => RecordGridOverlay",
+          "doc": "Take back one optimistic cell edit — the rollback path."
+        },
+        {
+          "name": "withRecordGridCreated",
+          "kind": "function",
+          "signature": "(overlay: RecordGridOverlay, row: RecordGridRow) => RecordGridOverlay",
+          "doc": "Record an optimistic create."
+        },
+        {
+          "name": "withRecordGridRemoved",
+          "kind": "function",
+          "signature": "(overlay: RecordGridOverlay, rowId: string) => RecordGridOverlay",
+          "doc": "Record an optimistic delete."
+        },
+        {
+          "name": "withRecordGridServerRow",
+          "kind": "function",
+          "signature": "(overlay: RecordGridOverlay, draftId: string, row: RecordGridRow) => RecordGridOverlay",
+          "doc": "Adopt a row the writer returned as canonical: for a locally-created row it replaces the draft; for an existing row it replaces the optimistic cells."
+        },
+        {
+          "name": "withRecordGridUpdate",
+          "kind": "function",
+          "signature": "(overlay: RecordGridOverlay, rowId: string, columnId: string, value: RecordGridValue) => RecordGridOverlay",
+          "doc": "Record one optimistic cell edit."
         },
         {
           "name": "WorkProductCard",
@@ -16455,6 +17868,224 @@
           "kind": "function",
           "signature": "(status: WorkProductStatus) => string",
           "doc": "Human label for a work-product status."
+        }
+      ]
+    },
+    {
+      "id": "./web-react/async",
+      "source": "src/web-react/async/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "AsyncEmptyAction",
+          "kind": "interface",
+          "signature": "interface AsyncEmptyAction",
+          "doc": null
+        },
+        {
+          "name": "AsyncEmptySpec",
+          "kind": "interface",
+          "signature": "interface AsyncEmptySpec",
+          "doc": null
+        },
+        {
+          "name": "asyncErrorMessage",
+          "kind": "function",
+          "signature": "(error: unknown, fallback?: string) => string",
+          "doc": "Best available human-readable message for a thrown value."
+        },
+        {
+          "name": "AsyncErrorRenderProps",
+          "kind": "interface",
+          "signature": "interface AsyncErrorRenderProps",
+          "doc": null
+        },
+        {
+          "name": "AsyncLoadContext",
+          "kind": "interface",
+          "signature": "interface AsyncLoadContext",
+          "doc": null
+        },
+        {
+          "name": "AsyncRequestError",
+          "kind": "class",
+          "signature": "class AsyncRequestError",
+          "doc": "A non-ok HTTP response, as a throwable."
+        },
+        {
+          "name": "AsyncResolution",
+          "kind": "type",
+          "signature": "type AsyncResolution",
+          "doc": "The state model without the retry action — what a reducer produces."
+        },
+        {
+          "name": "AsyncResourceState",
+          "kind": "type",
+          "signature": "type AsyncResourceState",
+          "doc": null
+        },
+        {
+          "name": "AsyncResourceStatus",
+          "kind": "type",
+          "signature": "type AsyncResourceStatus",
+          "doc": "- `idle` — no load has been attempted (the hook is disabled, or its inputs are not resolved yet)."
+        },
+        {
+          "name": "AsyncRetryable",
+          "kind": "interface",
+          "signature": "interface AsyncRetryable",
+          "doc": "Re-runs the load."
+        },
+        {
+          "name": "AsyncView",
+          "kind": "function",
+          "signature": "<T>({ state, children, empty, renderLoading, renderError, renderIdle, loadingLabel, retryLabel, className, }: AsyncView…",
+          "doc": "Renders the branch the state is actually in."
+        },
+        {
+          "name": "AsyncViewProps",
+          "kind": "interface",
+          "signature": "interface AsyncViewProps",
+          "doc": null
+        },
+        {
+          "name": "CONFIRMED_WRITE",
+          "kind": "const",
+          "signature": "unique symbol",
+          "doc": "The brand that makes \"Saved\" unreachable without a confirmed write."
+        },
+        {
+          "name": "ConfirmedMutation",
+          "kind": "interface",
+          "signature": "interface ConfirmedMutation",
+          "doc": null
+        },
+        {
+          "name": "confirmJson",
+          "kind": "function",
+          "signature": "<T>(response: Response, parse: (data: unknown) => T) => Promise<MutationOutcome<T>>",
+          "doc": "`confirmResponse` + a JSON body."
+        },
+        {
+          "name": "confirmResponse",
+          "kind": "function",
+          "signature": "(response: Response) => Promise<MutationOutcome<Response>>",
+          "doc": "Confirms only a 2xx response."
+        },
+        {
+          "name": "confirmWrite",
+          "kind": "function",
+          "signature": "<T>(value: T) => MutationConfirmed<T>",
+          "doc": "Confirms a write whose success is already established (an SDK call that throws on failure, a store returning its own typed outcome)."
+        },
+        {
+          "name": "DEFAULT_ASYNC_ERROR_MESSAGE",
+          "kind": "const",
+          "signature": "\"Something went wrong. Please try again.\"",
+          "doc": null
+        },
+        {
+          "name": "defaultIsEmpty",
+          "kind": "function",
+          "signature": "(value: unknown) => boolean",
+          "doc": "Default emptiness rule: `null`/`undefined`, an empty array, an empty `Map` or `Set`."
+        },
+        {
+          "name": "isConfirmedWrite",
+          "kind": "function",
+          "signature": "<T>(outcome: unknown) => outcome is MutationConfirmed<T>",
+          "doc": "True only for a value built by one of the confirm helpers."
+        },
+        {
+          "name": "MutationConfirmed",
+          "kind": "interface",
+          "signature": "interface MutationConfirmed",
+          "doc": null
+        },
+        {
+          "name": "MutationOutcome",
+          "kind": "type",
+          "signature": "type MutationOutcome",
+          "doc": null
+        },
+        {
+          "name": "MutationRejected",
+          "kind": "interface",
+          "signature": "interface MutationRejected",
+          "doc": null
+        },
+        {
+          "name": "MutationState",
+          "kind": "type",
+          "signature": "type MutationState",
+          "doc": null
+        },
+        {
+          "name": "MutationStatus",
+          "kind": "function",
+          "signature": "<T>({ state, labels, className }: MutationStatusProps<T>) => ReactElement<unknown, string | JSXElementConstructor<any>>…",
+          "doc": "The write's own status line."
+        },
+        {
+          "name": "MutationStatusLabels",
+          "kind": "interface",
+          "signature": "interface MutationStatusLabels",
+          "doc": null
+        },
+        {
+          "name": "MutationStatusProps",
+          "kind": "interface",
+          "signature": "interface MutationStatusProps",
+          "doc": null
+        },
+        {
+          "name": "readOkJson",
+          "kind": "function",
+          "signature": "{ (response: Response): Promise<unknown>; <T>(response: Response, parse: (data: unknown) => T): Promise<T>; }",
+          "doc": "`requireOk` + `response.json()`."
+        },
+        {
+          "name": "rejectWrite",
+          "kind": "function",
+          "signature": "(message: string, error?: unknown) => MutationRejected",
+          "doc": "A write that did not land."
+        },
+        {
+          "name": "requireOk",
+          "kind": "function",
+          "signature": "(response: Response) => Promise<Response>",
+          "doc": "Returns the response when ok; throws `AsyncRequestError` otherwise."
+        },
+        {
+          "name": "resolveAsyncValue",
+          "kind": "function",
+          "signature": "<T>(value: T, isEmpty?: (value: T) => boolean) => AsyncResolution<T>",
+          "doc": "Classifies a successfully loaded value into `ready` or `empty`."
+        },
+        {
+          "name": "useAsyncResource",
+          "kind": "function",
+          "signature": "<T>({ load, deps, enabled, initialValue, isEmpty, errorMessage, }: UseAsyncResourceOptions<T>) => AsyncResourceState<T>",
+          "doc": "The five-state fetch machine: `idle | loading | error | empty | ready`."
+        },
+        {
+          "name": "UseAsyncResourceOptions",
+          "kind": "interface",
+          "signature": "interface UseAsyncResourceOptions",
+          "doc": null
+        },
+        {
+          "name": "useConfirmedMutation",
+          "kind": "function",
+          "signature": "<TInput, TValue>({ mutate, onSucceeded, onFailed, errorMessage, }: UseConfirmedMutationOptions<TInput, TValue>) => Conf…",
+          "doc": "`idle | pending | succeeded | failed` over a write that must confirm itself."
+        },
+        {
+          "name": "UseConfirmedMutationOptions",
+          "kind": "interface",
+          "signature": "interface UseConfirmedMutationOptions",
+          "doc": null
         }
       ]
     },
