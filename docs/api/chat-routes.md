@@ -4,11 +4,11 @@
 
 Source: `src/chat-routes/index.ts`
 
-163 exports.
+171 exports.
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
-`const` — Sniffed-mime counterpart of `ATTACHMENT_ACCEPT`: the binary formats `sniffBinary` can identify from magic bytes among the accepted types.
+`const` — Sniffed-mime counterpart of `ATTACHMENT_ACCEPT`: the binary formats `sniffBinary` can identify from content among the accepted types.
 
 ```ts
 ReadonlySet<string>
@@ -75,7 +75,7 @@ interface AssistantRowValues
 `const` — Accept list for the composer file picker + type validation, same grammar as the native `<input accept>` attribute.
 
 ```ts
-"image/*,.pdf,.txt,.md,.csv,.json,.yaml,.yml,.html"
+"image/*,.pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,.json,.yaml,.yml,.html"
 ```
 
 ### `ATTACHMENT_MAX_COUNT`
@@ -774,6 +774,14 @@ type FilePartPromotionOutcome
 (event: { type?: unknown; }) => boolean
 ```
 
+### `MACRO_ENABLED_OOXML_SNIFFED_MIMES`
+
+`const` — Macro-enabled Office package mimes (`.docm`/`.xlsm`/`.pptm`), reported by `sniffBinary` but deliberately NOT in the default allow-list: a package carrying a VBA project is a different risk decision t…
+
+```ts
+ReadonlySet<string>
+```
+
 ### `MAX_ATTACHMENT_TOTAL_BYTES`
 
 `const` — Aggregate raw-byte ceiling across one message's attachments.
@@ -860,6 +868,62 @@ interface ModelFallbackInfo
 
 ```ts
 (prompt: string | readonly ChatTurnPartInput[]) => string | PromptInputPart[]
+```
+
+### `OOXML_PRESENTATION_MACRO_ENABLED_MIME`
+
+`const` — Sniffed mime for a macro-enabled PowerPoint package (`.pptm`).
+
+```ts
+"application/vnd.ms-powerpoint.presentation.macroEnabled.12"
+```
+
+### `OOXML_PRESENTATION_MIME`
+
+`const` — Sniffed mime for a PowerPoint OOXML package (`.pptx`).
+
+```ts
+"application/vnd.openxmlformats-officedocument.presentationml.presentation"
+```
+
+### `OOXML_SNIFFED_MIMES`
+
+`const` — The Office (OOXML) package mimes the default allow-list admits — the formats professionals actually send: Word contracts, Excel workpapers, PowerPoint decks.
+
+```ts
+ReadonlySet<string>
+```
+
+### `OOXML_SPREADSHEET_MACRO_ENABLED_MIME`
+
+`const` — Sniffed mime for a macro-enabled Excel package (`.xlsm`).
+
+```ts
+"application/vnd.ms-excel.sheet.macroEnabled.12"
+```
+
+### `OOXML_SPREADSHEET_MIME`
+
+`const` — Sniffed mime for an Excel OOXML package (`.xlsx`).
+
+```ts
+"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+```
+
+### `OOXML_WORD_MACRO_ENABLED_MIME`
+
+`const` — Sniffed mime for a macro-enabled Word package (`.docm`).
+
+```ts
+"application/vnd.ms-word.document.macroEnabled.12"
+```
+
+### `OOXML_WORD_MIME`
+
+`const` — Sniffed mime for a Word OOXML package (`.docx`).
+
+```ts
+"application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 ```
 
 ### `OpenModelStream`

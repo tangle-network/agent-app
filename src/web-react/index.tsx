@@ -49,6 +49,7 @@ export * from './work-product'
 export * from './sandbox-terminal'
 export * from './seat-paywall'
 export * from './session-history'
+export * from './record-grid'
 export {
   usePopover,
   usePending,

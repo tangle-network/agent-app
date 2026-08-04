@@ -1,3 +1,4 @@
+import { OPENUI_INTERACTIVE_AUTHORING_GUIDE } from '../openui/authoring'
 import type { AppToolTaxonomy, BuildAppToolsOptions } from './types'
 
 /** The four canonical app-tool names. Stable identifiers the model calls in
@@ -84,8 +85,9 @@ export function buildAppToolOpenAITools(
       function: {
         name: 'render_ui',
         description:
-          d?.render_ui ??
-          'Show a generated view live in the workspace. Validates the OpenUI JSON and persists the artifact. Executes immediately.',
+          (d?.render_ui ??
+            'Show a generated view live in the workspace. Validates the OpenUI JSON and persists the artifact. Executes immediately.') +
+          (opts?.interactiveUi ? `\n\n${OPENUI_INTERACTIVE_AUTHORING_GUIDE}` : ''),
         parameters: {
           type: 'object',
           properties: {

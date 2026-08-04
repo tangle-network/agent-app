@@ -4,7 +4,7 @@
 
 Source: `src/web/index.ts`
 
-16 exports.
+32 exports.
 
 ### `addSecurityHeaders`
 
@@ -20,6 +20,14 @@ Source: `src/web/index.ts`
 
 ```ts
 (url: string, what?: string) => void
+```
+
+### `checkFreeRouteLimit`
+
+`function` — Decide whether one authenticated, unmetered call may run.
+
+```ts
+(input: FreeRouteLimitInput) => Promise<FreeRouteLimitOutcome>
 ```
 
 ### `checkRateLimit`
@@ -54,9 +62,97 @@ interface CookieOptions
 (request: Request) => RequestContext
 ```
 
+### `FREE_ROUTE_BUDGETS`
+
+`const` — Default budget per cost class.
+
+```ts
+Readonly<Record<FreeRouteClass, RateLimitBudget>>
+```
+
+### `FreeRouteAllowance`
+
+`interface` — What remains of the binding window after an allowed call.
+
+```ts
+interface FreeRouteAllowance
+```
+
+### `FreeRouteClass`
+
+`type` — How expensive one call is, which is what picks the default budget.
+
+```ts
+type FreeRouteClass
+```
+
+### `FreeRouteDenialReason`
+
+`type` — Why a call was refused.
+
+```ts
+type FreeRouteDenialReason
+```
+
+### `FreeRouteDimension`
+
+`type` — Which window refused the call.
+
+```ts
+type FreeRouteDimension
+```
+
+### `FreeRouteIdentity`
+
+`interface` — The authenticated caller behind one request.
+
+```ts
+interface FreeRouteIdentity
+```
+
+### `FreeRouteLimitError`
+
+`class` — A correctable refusal: the caller maps `status` + `retryAfterSeconds` onto a response (see {@link freeRouteLimitResponse}) so the client learns what to do next.
+
+```ts
+class FreeRouteLimitError
+```
+
+### `FreeRouteLimitInput`
+
+`interface`
+
+```ts
+interface FreeRouteLimitInput
+```
+
+### `FreeRouteLimitOutcome`
+
+`type` — Typed outcome at the route boundary: an allowance, or a refusal that says how to correct it.
+
+```ts
+type FreeRouteLimitOutcome
+```
+
+### `freeRouteLimitResponse`
+
+`function` — The refusal as an HTTP response: the error's status, a JSON body carrying the machine-readable `reason`, and `Retry-After` when waiting can fix it.
+
+```ts
+(error: FreeRouteLimitError, options?: FreeRouteLimitResponseOptions) => Response
+```
+
+### `FreeRouteLimitResponseOptions`
+
+`interface`
+
+```ts
+interface FreeRouteLimitResponseOptions
+```
+
 ### `JsonObject`
 
-`type` — Web-boundary utilities every agent app's routes hand-roll: JSON body parsing + narrowing, request-context extraction (real client IP behind Cloudflare), a KV-backed sliding-window rate limiter, and s…
+`type`
 
 ```ts
 type JsonObject
@@ -76,6 +172,14 @@ interface KvLike
 
 ```ts
 (request: Request) => Promise<[JsonObject, null] | [null, Response]>
+```
+
+### `RateLimitBudget`
+
+`interface` — Requests allowed per identity inside a sliding window.
+
+```ts
+interface RateLimitBudget
 ```
 
 ### `RateLimitResult`
@@ -132,4 +236,28 @@ interface SecurityHeaderOptions
 
 ```ts
 Readonly<{ readonly 'Strict-Transport-Security': "max-age=31536000; includeSubDomains; preload"; readonly 'X-Content-Ty…
+```
+
+### `withFreeRouteLimit`
+
+`function` — Wrap an authenticated, unmetered, compute-bearing route handler in its budget.
+
+```ts
+<TArgs>(options: WithFreeRouteLimitOptions<TArgs>, handler: (args: TArgs) => Response | Promise<Response>) => (args: TA…
+```
+
+### `WithFreeRouteLimitOptions`
+
+`interface`
+
+```ts
+interface WithFreeRouteLimitOptions
+```
+
+### `WORKSPACE_BUDGET_MULTIPLIER`
+
+`const` — A workspace's shared ceiling defaults to this many times one member's, so a multi-seat tenant is bounded without a single active member tripping it.
+
+```ts
+5
 ```
