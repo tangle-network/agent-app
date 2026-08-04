@@ -11698,6 +11698,14 @@ interface ProvisionPayloadSections
 interface ProvisionProfileSection
 ```
 
+### `PYPI_EGRESS_DOMAINS`
+
+`const` — Hosts required when a product installs its pinned Python tooling at boot.
+
+```ts
+readonly ["pypi.org", "files.pythonhosted.org", "pypi.python.org"]
+```
+
 ### `readSandboxBinaryBytes`
 
 `function` — Reads a sandbox file as base64 and decodes it, verifying the decoded byte length against `expectedSize` (from a prior {@link statSandboxFileSize}).

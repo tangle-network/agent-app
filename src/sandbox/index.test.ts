@@ -504,6 +504,31 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     expect(createMock).not.toHaveBeenCalled()
   })
 
+  it('migrates an existing policy only when the shell explicitly enables it', async () => {
+    const desiredPolicy = { mode: 'strict' as const, allowDomains: ['relationships.example.com'] }
+    const get = vi.fn()
+      .mockResolvedValueOnce({ policy: { mode: 'open' }, source: 'platform' })
+      .mockResolvedValueOnce({ policy: desiredPolicy, source: 'sandbox' })
+    const update = vi.fn().mockResolvedValue({ policy: desiredPolicy, source: 'sandbox' })
+    const running = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      egress: { get, update },
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+
+    const box = await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
+      egressPolicy: desiredPolicy,
+      migrateEgressPolicy: true,
+    }), { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(box).toBe(running)
+    expect(update).toHaveBeenCalledWith(desiredPolicy)
+    expect(get).toHaveBeenCalledTimes(2)
+    expect(running.delete).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
   it('rejects blocked mode when a reused sandbox currently allows egress', async () => {
     const get = vi.fn().mockResolvedValue({
       policy: { mode: 'open' },

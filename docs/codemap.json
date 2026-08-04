@@ -9049,6 +9049,12 @@
           "doc": "Structural slice of the profile the payload gate reads: it only measures the profile's serialized size and names `resources.files` in the breakdown, so callers composing a payload outside the SDK (pr…"
         },
         {
+          "name": "PYPI_EGRESS_DOMAINS",
+          "kind": "const",
+          "signature": "readonly [\"pypi.org\", \"files.pythonhosted.org\", \"pypi.python.org\"]",
+          "doc": "Hosts required when a product installs its pinned Python tooling at boot."
+        },
+        {
           "name": "readSandboxBinaryBytes",
           "kind": "function",
           "signature": "(box: SandboxExecChannel, absolutePath: string, expectedSize: number, options?: SandboxExecOptions | undefined) => Prom…",
