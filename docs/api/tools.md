@@ -4,7 +4,7 @@
 
 Source: `src/tools/index.ts`
 
-65 exports.
+66 exports.
 
 ### `AddCitationArgs`
 
@@ -342,6 +342,14 @@ type McpProtocolVersion
 interface McpServerInfo
 ```
 
+### `McpToolCallContent`
+
+`interface`
+
+```ts
+interface McpToolCallContent
+```
+
 ### `McpToolDefinition`
 
 `interface` — One tool entry in the registry the handler owns.
@@ -368,7 +376,7 @@ interface OpenAIFunctionTool
 
 ### `readToolArgs`
 
-`function` — Read a tool's argument object from the request body, tolerant of MCP host aliases (`args` / `arguments`) or a bare body.
+`function` — Read a tool's argument object from the request body, tolerant of direct aliases (`args` / `arguments`), Streamable HTTP MCP (`params.arguments`), or a bare body.
 
 ```ts
 <T>(request: Request) => Promise<T | null>

@@ -8647,6 +8647,12 @@
           "doc": "Define options for building MCP server configurations in the app tool environment"
         },
         {
+          "name": "buildProductEgressPolicy",
+          "kind": "function",
+          "signature": "(publicOrigin: string | URL, extraDomains?: readonly string[]) => EgressPolicy",
+          "doc": null
+        },
+        {
           "name": "buildSandboxToolFileMounts",
           "kind": "function",
           "signature": "(options: BuildSandboxToolFileMountsOptions) => AgentProfileFileMount[]",
@@ -13300,6 +13306,12 @@
           "doc": "Describe the structure of server information including name and version"
         },
         {
+          "name": "McpToolCallContent",
+          "kind": "interface",
+          "signature": "interface McpToolCallContent",
+          "doc": null
+        },
+        {
           "name": "McpToolDefinition",
           "kind": "interface",
           "signature": "interface McpToolDefinition",
@@ -13321,7 +13333,7 @@
           "name": "readToolArgs",
           "kind": "function",
           "signature": "<T>(request: Request) => Promise<T | null>",
-          "doc": "Read a tool's argument object from the request body, tolerant of MCP host aliases (`args` / `arguments`) or a bare body."
+          "doc": "Read a tool's argument object from the request body, tolerant of direct aliases (`args` / `arguments`), Streamable HTTP MCP (`params.arguments`), or a bare body."
         },
         {
           "name": "RenderUiArgs",

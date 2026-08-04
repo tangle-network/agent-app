@@ -132,6 +132,26 @@ describe('buildAppToolMcpServer — custom tools', () => {
 })
 
 describe('handleAppToolRequest — custom tool end to end', () => {
+  const mcpOptions = {
+    tool: setConfig,
+    verifyToken: async () => true,
+    handlers: noopHandlers(),
+    taxonomy,
+  } as const
+
+  function mcpRequest(body: Record<string, unknown>): Request {
+    return new Request('https://app.example.com/api/tools/set-config', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer tok',
+        'X-Agent-App-User-Id': 'u',
+        'X-Agent-App-Workspace-Id': 'w',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
+  }
+
   it('authenticates, dispatches the custom tool, and returns its result (one-liner route)', async () => {
     const request = new Request('https://app.example.com/api/tools/set-config', {
       method: 'POST',
@@ -151,5 +171,88 @@ describe('handleAppToolRequest — custom tool end to end', () => {
     })
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ ok: true, saved: true, stage: 'scale' })
+  })
+
+  it('serves the same route as a stateless Streamable HTTP MCP server', async () => {
+    const initialize = await handleAppToolRequest(
+      mcpRequest({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: { protocolVersion: '2025-03-26' },
+      }),
+      mcpOptions,
+    )
+    expect(initialize.status).toBe(200)
+    expect(await initialize.json()).toMatchObject({
+      jsonrpc: '2.0',
+      id: 1,
+      result: { protocolVersion: '2025-03-26', capabilities: { tools: { listChanged: false } } },
+    })
+
+    const list = await handleAppToolRequest(
+      mcpRequest({ jsonrpc: '2.0', id: 2, method: 'tools/list' }),
+      mcpOptions,
+    )
+    expect(await list.json()).toMatchObject({
+      result: {
+        tools: [{ name: 'set_config', description: 'Update workspace settings.', inputSchema: setConfig.parameters }],
+      },
+    })
+
+    const notification = await handleAppToolRequest(
+      mcpRequest({ jsonrpc: '2.0', method: 'notifications/initialized' }),
+      mcpOptions,
+    )
+    expect(notification.status).toBe(202)
+
+    const call = await handleAppToolRequest(
+      mcpRequest({
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'tools/call',
+        params: { name: 'set_config', arguments: { stage: 'launch' } },
+      }),
+      mcpOptions,
+    )
+    const callBody = await call.json() as { result: { content: [{ text: string }] } }
+    expect(callBody.result.content[0].text).toContain('"stage":"launch"')
+  })
+
+  it('uses the shared MCP parser for malformed JSON-RPC requests', async () => {
+    const invalid = await handleAppToolRequest(
+      mcpRequest({ jsonrpc: '1.0', id: 1, method: 'tools/list' }),
+      mcpOptions,
+    )
+    expect(invalid.status).toBe(400)
+    expect(await invalid.json()).toMatchObject({ error: { code: -32600 } })
+  })
+
+  it('uses the MCP parser for an incomplete envelope identified by its Accept header', async () => {
+    const invalid = await handleAppToolRequest(
+      new Request('https://app.example.com/api/tools/set-config', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer tok',
+          'X-Agent-App-User-Id': 'u',
+          'X-Agent-App-Workspace-Id': 'w',
+          Accept: 'application/json, text/event-stream',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: 1, method: 'tools/list' }),
+      }),
+      mcpOptions,
+    )
+    expect(invalid.status).toBe(400)
+    expect(await invalid.json()).toMatchObject({ error: { code: -32600 } })
+  })
+
+  it('preserves the configured follow-up priority schema in the MCP manifest', async () => {
+    const list = await handleAppToolRequest(
+      mcpRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+      { ...mcpOptions, tool: 'schedule_followup', priorityValues: ['p0', 'p1'] },
+    )
+    const body = await list.json() as { result: { tools: [{ inputSchema: { properties: { priority: { enum: string[] } } } }] } }
+    expect(body.result.tools[0]!.inputSchema.properties.priority.enum).toEqual(['p0', 'p1'])
   })
 })
