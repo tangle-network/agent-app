@@ -15,6 +15,8 @@ export interface HandleToolRequestOptions extends DispatchOptions {
   headerNames?: ToolHeaderNames
   /** Optional model-facing description used by the MCP tools/list response. */
   description?: string
+  /** Product-specific values for the schedule_followup.priority schema. */
+  priorityValues?: readonly string[]
   /** Optional success-message builder for a friendlier tool result. */
   message?: (result: unknown) => string
 }
@@ -23,11 +25,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function isJsonRpcRequest(value: unknown): value is Record<string, unknown> & { jsonrpc: unknown } {
-  // Treat any body declaring `jsonrpc` as protocol traffic, including a bad
-  // version, so it receives the shared JSON-RPC invalid-request response
-  // instead of being mistaken for direct tool arguments.
-  return isRecord(value) && 'jsonrpc' in value
+function isMcpRequest(request: Request, value: unknown): boolean {
+  // A valid request declares jsonrpc. An incomplete envelope has no reliable
+  // body marker, so use the Streamable HTTP Accept contract as the explicit
+  // transport discriminator before falling back to direct tool arguments.
+  const acceptsMcp = request.headers
+    .get('accept')
+    ?.split(',')
+    .some((part) => part.trim().toLowerCase() === 'text/event-stream')
+  return (
+    isRecord(value)
+    && (
+      'jsonrpc' in value
+      || acceptsMcp === true
+      || request.headers.has('mcp-session-id')
+      || request.headers.has('mcp-protocol-version')
+    )
+  )
 }
 
 function toolName(tool: AppToolName | AppToolDefinition): string {
@@ -52,6 +66,7 @@ function mcpToolManifest(opts: HandleToolRequestOptions): {
     ...(opts.description && typeof opts.tool === 'string'
       ? { descriptions: { [opts.tool]: opts.description } }
       : {}),
+    ...(opts.priorityValues ? { priorityValues: opts.priorityValues } : {}),
     ...(typeof opts.tool === 'string' ? {} : { customTools: [opts.tool] }),
   })
   const definition = tools.find((entry) => entry.function.name === name)
@@ -125,7 +140,7 @@ export async function handleAppToolRequest(request: Request, opts: HandleToolReq
   // OpenAI/runtime surfaces and stateless Streamable HTTP MCP JSON-RPC used by
   // OpenCode. Keeping both at this boundary prevents every consumer from
   // writing a second route just to translate protocol envelopes.
-  if (isJsonRpcRequest(body)) {
+  if (isMcpRequest(request, body)) {
     return createAppToolMcpHandler(auth.ctx, opts)(request)
   }
 

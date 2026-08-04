@@ -72,7 +72,7 @@ interface BuildAppToolMcpServersOptions
 
 ### `buildProductEgressPolicy`
 
-`function` — Build the standard outbound policy for a product sandbox.
+`function`
 
 ```ts
 (publicOrigin: string | URL, extraDomains?: readonly string[]) => EgressPolicy

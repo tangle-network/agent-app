@@ -227,4 +227,32 @@ describe('handleAppToolRequest — custom tool end to end', () => {
     expect(invalid.status).toBe(400)
     expect(await invalid.json()).toMatchObject({ error: { code: -32600 } })
   })
+
+  it('uses the MCP parser for an incomplete envelope identified by its Accept header', async () => {
+    const invalid = await handleAppToolRequest(
+      new Request('https://app.example.com/api/tools/set-config', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer tok',
+          'X-Agent-App-User-Id': 'u',
+          'X-Agent-App-Workspace-Id': 'w',
+          Accept: 'application/json, text/event-stream',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: 1, method: 'tools/list' }),
+      }),
+      mcpOptions,
+    )
+    expect(invalid.status).toBe(400)
+    expect(await invalid.json()).toMatchObject({ error: { code: -32600 } })
+  })
+
+  it('preserves the configured follow-up priority schema in the MCP manifest', async () => {
+    const list = await handleAppToolRequest(
+      mcpRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+      { ...mcpOptions, tool: 'schedule_followup', priorityValues: ['p0', 'p1'] },
+    )
+    const body = await list.json() as { result: { tools: [{ inputSchema: { properties: { priority: { enum: string[] } } } }] } }
+    expect(body.result.tools[0]!.inputSchema.properties.priority.enum).toEqual(['p0', 'p1'])
+  })
 })

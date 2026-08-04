@@ -97,11 +97,20 @@ export async function authenticateToolRequest(request: Request, opts: Authentica
  *  aliases (`args` / `arguments`), Streamable HTTP MCP (`params.arguments`),
  *  or a bare body. Returns null on non-JSON. */
 export async function readToolArgs<T>(request: Request): Promise<T | null> {
-  let body: { args?: T; arguments?: T; params?: { arguments?: T }}
+  let body: unknown
   try {
-    body = (await request.json()) as typeof body
+    body = await request.json()
   } catch {
     return null
   }
-  return (body.args ?? body.arguments ?? body.params?.arguments ?? (body as T)) as T
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) return body as T
+  const record = body as Record<string, unknown>
+  if ('jsonrpc' in record) {
+    const params = record.params
+    if (typeof params === 'object' && params !== null && !Array.isArray(params)) {
+      return ((params as Record<string, unknown>).arguments ?? {}) as T
+    }
+    return {} as T
+  }
+  return (record.args ?? record.arguments ?? record) as T
 }

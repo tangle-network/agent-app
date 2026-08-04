@@ -170,4 +170,13 @@ describe('readToolArgs', () => {
 
     await expect(readToolArgs(request)).resolves.toEqual({ title: 'Review' })
   })
+
+  it('returns an empty object when an MCP call omits arguments', async () => {
+    const request = new Request('https://app.example.com/api/tools/propose', {
+      method: 'POST',
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'submit_proposal' } }),
+    })
+
+    await expect(readToolArgs(request)).resolves.toEqual({})
+  })
 })

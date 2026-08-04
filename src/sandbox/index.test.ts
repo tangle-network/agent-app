@@ -1116,8 +1116,8 @@ describe('pure seam helpers', () => {
       'WWW.IRS.GOV.',
     ])).toEqual({
       mode: 'strict',
-      allowDomains: ['legal.tangle.tools', 'www.irs.gov'],
-      includeImplicitDomains: true,
+      allowDomains: ['legal.tangle.tools', 'models.dev', 'www.irs.gov'],
+      includeImplicitDomains: false,
     })
   })
 
@@ -1128,10 +1128,8 @@ describe('pure seam helpers', () => {
     expect(() => buildProductEgressPolicy(origin)).toThrow(/http or https|Invalid URL/)
   })
 
-  it('rejects malformed extra domains instead of widening the policy', () => {
-    expect(() => buildProductEgressPolicy('https://legal.tangle.tools', [
-      'https://evil.example',
-    ])).toThrow('hostname or wildcard')
+  it.each(['https://evil.example', '*', 'bar.*.com', 'foo..com'])('rejects malformed extra domains instead of widening the policy: %s', (domain) => {
+    expect(() => buildProductEgressPolicy('https://legal.tangle.tools', [domain])).toThrow('hostname or wildcard')
   })
 
   it('flattenHistory returns the bare message when no history', () => {

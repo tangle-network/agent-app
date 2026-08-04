@@ -8650,7 +8650,7 @@
           "name": "buildProductEgressPolicy",
           "kind": "function",
           "signature": "(publicOrigin: string | URL, extraDomains?: readonly string[]) => EgressPolicy",
-          "doc": "Build the standard outbound policy for a product sandbox."
+          "doc": null
         },
         {
           "name": "buildSandboxToolFileMounts",
