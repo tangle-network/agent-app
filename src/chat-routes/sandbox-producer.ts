@@ -44,6 +44,7 @@ import {
 } from '../stream/index'
 import { buildModelChain, type ModelFailoverAttempt } from '../model-resolution/failover'
 import {
+  ModelFailoverTimeoutError,
   resolveEmptyTurnRetries,
   streamWithModelFailover,
   summarizeFailoverReason,
@@ -117,6 +118,14 @@ export interface SandboxChatProducerOptions {
   /** Opt out of failover while still using {@link openEvents}. `false` collapses
    *  the chain to `model` alone. */
   modelFailover?: false
+  /** Maximum time to open/start one model event source through its first event.
+   *  Default 120 seconds. This is separate from provider first-output latency
+   *  so cold sandbox startup is not mislabeled as an inference failure. */
+  openTimeoutMs?: number
+  /** Hard deadline after the source's first lifecycle event for the first
+   *  answer-bearing event. Default 60 seconds. Processing/lifecycle events do
+   *  not extend it. */
+  firstResponseTimeoutMs?: number
   /** Fired when a model is abandoned mid-chain (telemetry/alerting). The user
    *  already sees a transcript notice; this is for the operator. */
   onModelFallback?: (info: ModelFallbackInfo) => void
@@ -279,6 +288,7 @@ function toProducerWireEvent(event: JsonRecord): ProducerWireEvent {
 function sandboxStreamFailureDiagnostic(error: unknown): {
   userMessage: string
   failureNote: string
+  code: string
 } {
   const streamMessage = (error as { streamMessage?: unknown })?.streamMessage
   const message = typeof streamMessage === 'string'
@@ -301,7 +311,10 @@ function sandboxStreamFailureDiagnostic(error: unknown): {
   const failureNote = diagnosticText
     ? `sandbox-stream: ${message}; ${diagnosticText}`
     : `sandbox-stream: ${message}`
-  return { userMessage, failureNote }
+  const code = error instanceof ModelFailoverTimeoutError
+    ? error.code
+    : 'sandbox.stream_failed'
+  return { userMessage, failureNote, code }
 }
 
 /** Create a sandbox chat producer that manages chat turn routing with logging and interaction rendering options */
@@ -349,6 +362,10 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
       models: chain,
       open: options.openEvents,
       log,
+      ...(options.openTimeoutMs !== undefined ? { openTimeoutMs: options.openTimeoutMs } : {}),
+      ...(options.firstResponseTimeoutMs !== undefined
+        ? { firstResponseTimeoutMs: options.firstResponseTimeoutMs }
+        : {}),
       ...(options.emptyTurnRetries !== undefined ? { emptyTurnRetries: options.emptyTurnRetries } : {}),
       ...(options.onEmptyTurnRetry ? { onEmptyTurnRetry: options.onEmptyTurnRetry } : {}),
       onFallback: (info) => {
@@ -769,7 +786,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         type: 'error',
         data: {
           message: diagnostic.userMessage,
-          code: 'sandbox.stream_failed',
+          code: diagnostic.code,
           details: { failureNote: diagnostic.failureNote },
         },
       }

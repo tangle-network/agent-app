@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-171 exports.
+175 exports.
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
@@ -550,6 +550,22 @@ interface CreateSandboxFileIndexRouteOptions
 interface CreateUploadRouteOptions
 ```
 
+### `DEFAULT_MODEL_FIRST_RESPONSE_TIMEOUT_MS`
+
+`const` — Default ceiling for the first answer-bearing event after the source's first event.
+
+```ts
+60000
+```
+
+### `DEFAULT_MODEL_STREAM_OPEN_TIMEOUT_MS`
+
+`const` — Default ceiling for opening/starting one source through its first event.
+
+```ts
+120000
+```
+
 ### `DEFAULT_STALE_TURN_LOCK_GRACE_MS`
 
 `const` — Minimum age a lock must reach before the "sandbox unreachable ⇒ nothing can be running" fallback may force-release it.
@@ -838,6 +854,14 @@ number
 (path: string) => ChatMentionKind
 ```
 
+### `ModelAttemptTimeoutCode`
+
+`type` — Structured timeout codes surfaced by the producer on final exhaustion.
+
+```ts
+type ModelAttemptTimeoutCode
+```
+
 ### `ModelFailoverStreamHandle`
 
 `interface` — The failover-wrapped stream plus the attribution every consumer needs.
@@ -852,6 +876,14 @@ interface ModelFailoverStreamHandle
 
 ```ts
 interface ModelFailoverStreamOptions
+```
+
+### `ModelFailoverTimeoutError`
+
+`class` — Every configured model was exhausted and the final one timed out.
+
+```ts
+class ModelFailoverTimeoutError
 ```
 
 ### `ModelFallbackInfo`

@@ -89,15 +89,19 @@ export function buildChat(env: Env) {
         // client-visible byte. Never silent — the persisted row + billing
         // receipt name the model that served, and the transcript gets a notice.
         fallbackModels: ['gemini-2.5-flash-lite', 'gpt-5-mini'],
+        // Defaults keep cold source startup (120 s, through the first event)
+        // separate from provider first response (60 s after that event).
+        // Override with `openTimeoutMs` / `firstResponseTimeoutMs` only when a
+        // product has measured requirements that differ.
         // No separate producer planMode option: close over the product's
         // per-turn policy and auto-decline plan asks no card will render.
         isRenderableInteraction: (kind) =>
           kind === 'question' || (kind === 'plan' && planEnabled),
-        openEvents: ({ model, attempt }) => streamSandboxPrompt(shell, box, prompt, {
+        openEvents: ({ model, attempt, signal }) => streamSandboxPrompt(shell, box, prompt, {
           // A failover attempt is a NEW dispatch — its own execution identity.
           sessionId: identity.sessionId,
           executionId: attempt === 1 ? executionId : `${executionId}-f${attempt}`,
-          model, effort: body.effort,
+          model, effort: body.effort, signal,
           interactions: { question: true, plan: true },
         }),
       })
