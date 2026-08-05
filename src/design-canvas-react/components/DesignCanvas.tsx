@@ -621,8 +621,15 @@ export function DesignCanvas({
           </div>
         </div>
 
-        {/* Rulers + Workspace area */}
-        <div className="relative hidden min-h-0 flex-1 sm:block">
+        {/* Rulers + Workspace area. When rulers are shown the slot is inset by
+            20px (RULER_SIZE_PX in Rulers.tsx) so the Konva stage origin
+            coincides with the ruler tracks' origin — the stage's doc→screen
+            mapping (panX + doc·zoom) then agrees with every tick, marker, and
+            guide line (previously a uniform 20px offset). The ruler tracks,
+            guide overlay, and corner filler are absolutely positioned against
+            the slot's padding box, which padding does not move; only the
+            in-flow workspace shifts beneath them. */}
+        <div className={`relative hidden min-h-0 flex-1 sm:block ${editorState.showRulers ? 'pl-[20px] pt-[20px]' : ''}`}>
           {/* Rulers overlay inside the workspace container */}
           <Rulers
             pageWidth={activePage.width}
@@ -635,7 +642,8 @@ export function DesignCanvas({
             onGuidesChange={handleSetPageGuides}
           />
 
-          {/* Bleed overlay — absolutely positioned over the workspace */}
+          {/* Bleed overlay — absolutely positioned over the workspace. Its
+              origin must track the stage, so it takes the same ruler inset. */}
           {bleedScreen && activePage.bleed ? (
             <div
               className="pointer-events-none absolute inset-0 z-10 overflow-hidden"
@@ -644,8 +652,8 @@ export function DesignCanvas({
               <div
                 style={{
                   position: 'absolute',
-                  left: editorState.panX,
-                  top: editorState.panY,
+                  left: editorState.panX + (editorState.showRulers ? 20 : 0),
+                  top: editorState.panY + (editorState.showRulers ? 20 : 0),
                 }}
               >
                 <BleedTrimOverlay

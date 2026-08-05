@@ -26,7 +26,8 @@ import { createElement } from 'react'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { Stage } from 'react-konva'
 import Konva from 'konva'
-import { Workspace } from '../../src/design-canvas-react/components/Workspace'
+import { Workspace, WorkspaceView } from '../../src/design-canvas-react/components/Workspace'
+import { createSceneCommandStack } from '../../src/design-canvas-react/engine/command-stack'
 import {
   GridLayer,
   gridVerticalLines,
@@ -216,6 +217,60 @@ describe('node caching gate (!isSelected && !dragging)', () => {
       node.fire('dragstart', { target: node }, true)
     })
     expect(node.isCached()).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// (b2) Cache rasterization resolution — the bitmap must be rasterized at the
+// resolution the screen shows (zoom × devicePixelRatio). Konva's cache default
+// ignores zoom, so an unconfigured cache() is re-scaled at draw time: bilinear
+// blur at fit-page zooms, hard upscale on zoom-in. Asserted at the spy seam
+// because the effective raster ratio is not readable back off the node.
+// ---------------------------------------------------------------------------
+
+describe('node cache pixel ratio (screen-resolution rasterization)', () => {
+  function stubDevicePixelRatio(value: number): void {
+    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value })
+  }
+
+  it('caches with an explicit pixelRatio of zoom × devicePixelRatio', () => {
+    stubDevicePixelRatio(2)
+    const cacheSpy = vi.spyOn(Konva.Node.prototype, 'cache')
+    try {
+      // Initial view zoom is 1 (no ResizeObserver fire in jsdom → no fit).
+      render(createElement(Workspace, props([rect('ratio', 50, 50, 40, 40)])))
+      expect(cacheSpy).toHaveBeenCalledWith(expect.objectContaining({ pixelRatio: 2 }))
+    } finally {
+      cacheSpy.mockRestore()
+      stubDevicePixelRatio(1)
+    }
+  })
+
+  it('re-rasterizes at the new zoom × dpr when the view scales', () => {
+    stubDevicePixelRatio(2)
+    const stack = createSceneCommandStack(makeDoc([rect('rz', 50, 50, 40, 40)]), 'page-1')
+    const activePage = stack.getState().document.pages[0]!
+    const cacheSpy = vi.spyOn(Konva.Node.prototype, 'cache')
+    try {
+      render(
+        createElement(WorkspaceView, {
+          stack,
+          activePage,
+          canWrite: true,
+          onApplyOperations: vi.fn(async () => ({ rev: 2 })),
+        }),
+      )
+      cacheSpy.mockClear()
+      act(() => {
+        stack.setView({ zoom: 1.5 })
+      })
+      // 1.5 zoom × 2 dpr = 3 — re-rasterized for the scaled view, not left at
+      // the old bitmap.
+      expect(cacheSpy).toHaveBeenCalledWith(expect.objectContaining({ pixelRatio: 3 }))
+    } finally {
+      cacheSpy.mockRestore()
+      stubDevicePixelRatio(1)
+    }
   })
 })
 

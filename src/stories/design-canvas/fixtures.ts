@@ -16,6 +16,26 @@ import type { SceneOperation } from '../../design-canvas'
 // Scenes
 // ---------------------------------------------------------------------------
 
+/**
+ * Designed focal art for the multi-page scene's Story page — a real inline-SVG
+ * data URL so the demo page has one genuine image amid the intentional
+ * broken-media placeholders. Fixture documents bypass the insert-time media
+ * boundary (that guard only runs on `onApplyOperations` inserts), so a data
+ * URL is safe here even though hosts may not insert one.
+ */
+const HERO_ART_SRC = `data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600">' +
+    '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">' +
+    '<stop offset="0" stop-color="#3b82f6"/><stop offset="1" stop-color="#8b5cf6"/>' +
+    '</linearGradient></defs>' +
+    '<rect width="600" height="600" fill="url(#g)"/>' +
+    '<circle cx="450" cy="150" r="90" fill="#f59e0b"/>' +
+    '<circle cx="160" cy="440" r="110" fill="none" stroke="#f8fafc" stroke-width="20" opacity="0.85"/>' +
+    '<rect x="60" y="80" width="150" height="26" rx="13" fill="#f8fafc"/>' +
+    '<rect x="60" y="130" width="240" height="26" rx="13" fill="#f8fafc" opacity="0.6"/>' +
+    '</svg>',
+)}`
+
 /** Single-page poster scene — populated enough that every editor surface
  *  (layers, toolbar, rulers, guides) renders with real content. Text elements
  *  reference Inter, loaded in `.storybook/preview-head.html`. */
@@ -67,8 +87,11 @@ export function makeLaunchPosterScene(): SceneDocument {
             id: 'el-ellipse',
             kind: 'ellipse',
             name: 'Glow',
-            x: 640,
-            y: 220,
+            // Bottom-right accent, aligned to the content grid (right/bottom
+            // edges on the 940 margin) — clear of every text box, doubling as
+            // a halo behind the rotated Badge centered on it.
+            x: 660,
+            y: 660,
             rotation: 0,
             opacity: 0.85,
             locked: false,
@@ -150,7 +173,8 @@ export function makeLaunchPosterScene(): SceneDocument {
             id: 'el-rotated',
             kind: 'rect',
             name: 'Badge',
-            x: 760,
+            // Centered on the Glow halo (both center at 800,800).
+            x: 720,
             y: 720,
             rotation: 18,
             opacity: 1,
@@ -196,7 +220,9 @@ export function makeEmptyScene(): SceneDocument {
  * variety. Page 2 carries the layers-showcase set: a group with children,
  * a hidden element, a locked element, a slot-bound element, and one element
  * of every remaining kind (image/video included — their media never loads in
- * Storybook, which exercises the placeholder/broken treatments).
+ * Storybook, which exercises the placeholder/broken treatments). One
+ * data-URL art card (`el-hero-art`) gives the page a designed focal point
+ * amid the intentional placeholders.
  */
 export function makeMultiPageScene(): SceneDocument {
   const poster = makeLaunchPosterScene().pages[0]!
@@ -227,6 +253,24 @@ export function makeMultiPageScene(): SceneDocument {
             width: 900,
             height: 640,
             src: '/api/assets/hero.png',
+            fit: 'cover',
+          },
+          {
+            // The one designed focal point on the page: real art (inline SVG
+            // data URL) floating off the broken hero's bottom-right corner,
+            // clear of the header lockup below.
+            id: 'el-hero-art',
+            kind: 'image',
+            name: 'Hero art card',
+            x: 660,
+            y: 520,
+            rotation: 0,
+            opacity: 1,
+            locked: false,
+            visible: true,
+            width: 300,
+            height: 300,
+            src: HERO_ART_SRC,
             fit: 'cover',
           },
           {
@@ -286,7 +330,7 @@ export function makeMultiPageScene(): SceneDocument {
           {
             id: 'el-logo-lock',
             kind: 'rect',
-            name: 'Logo (locked)',
+            name: 'Logo',
             x: 880,
             y: 1720,
             rotation: 0,
@@ -301,7 +345,7 @@ export function makeMultiPageScene(): SceneDocument {
           {
             id: 'el-draft-note',
             kind: 'text',
-            name: 'Draft note (hidden)',
+            name: 'Draft note',
             x: 90,
             y: 1700,
             rotation: 0,

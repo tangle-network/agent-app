@@ -1,13 +1,17 @@
+import { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
 import { Rulers } from '../../design-canvas-react'
 import type { RulersProps } from '../../design-canvas-react'
+import type { PageGuides } from '../../design-canvas'
 import { makeLaunchPosterScene } from './fixtures'
 
 /**
  * Zoom-scaled canvas rulers with saved-guide rendering. Pure DOM (no Konva) —
  * they position absolutely against the workspace corner, so each story wraps
- * them in a relative box standing in for the canvas viewport. Drag out of a
- * ruler to create a guide; drag a guide back in to delete it.
+ * them in a relative box standing in for the canvas viewport. Saved guides
+ * render persistently, Figma-style: a marker in the ruler track plus a thin
+ * line spanning the canvas. Drag out of a ruler to create a guide; drag a
+ * guide back in to delete it.
  */
 const meta: Meta<typeof Rulers> = {
   title: 'Design Canvas/Rulers',
@@ -38,6 +42,16 @@ function RulerFrame({ label, ...props }: RulersProps & { label: string }) {
 
 const onGuidesChange = (guides: { vertical: number[]; horizontal: number[] }) =>
   console.log('[rulers story] guides', guides)
+
+/** RulerFrame wired to the real state seam: guides live in useState, so
+ *  dropped/moved/deleted guides actually persist (and keep rendering). */
+function StatefulRulerFrame({
+  initialGuides,
+  ...props
+}: Omit<RulersProps, 'guides' | 'onGuidesChange'> & { label: string; initialGuides: PageGuides }) {
+  const [guides, setGuides] = useState<PageGuides>(initialGuides)
+  return <RulerFrame {...props} guides={guides} onGuidesChange={setGuides} />
+}
 
 /** 1080×1080 page at 100% — ticks every 100 doc px. */
 export const AtFullZoom: Story = {
@@ -75,11 +89,13 @@ export const ZoomedAndScrolled: Story = {
   ),
 }
 
-/** Saved center guides from the poster scene render as marker lines. */
+/** Saved center guides from the poster scene render as persistent track
+ *  markers + thin canvas lines. Stateful: drag out a new guide, drag one back
+ *  into the ruler to delete it — the markers follow. */
 export const WithGuides: Story = {
   name: 'With saved guides',
   render: () => (
-    <RulerFrame
+    <StatefulRulerFrame
       label="With saved guides"
       pageWidth={posterPage.width}
       pageHeight={posterPage.height}
@@ -87,8 +103,7 @@ export const WithGuides: Story = {
       scrollLeft={0}
       scrollTop={0}
       showRulers
-      guides={posterPage.guides}
-      onGuidesChange={onGuidesChange}
+      initialGuides={posterPage.guides}
     />
   ),
 }

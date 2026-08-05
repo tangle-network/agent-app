@@ -159,7 +159,7 @@ export const EditorStates: Story = {
             <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
               {cell.label}
             </span>
-            <div className="h-[440px] overflow-hidden rounded-md border border-[var(--border-default)]">
+            <div className="h-[520px] overflow-hidden rounded-md border border-[var(--border-default)]">
               <EditorHarness
                 initial={cell.initial}
                 editorProps={cell.editorProps}

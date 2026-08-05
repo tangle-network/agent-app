@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react'
+import type { ReactNode } from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
 import { CanvasInsertPanel } from '../../design-canvas-react'
 import type { CanvasInsertPanelProps, InsertGeneration } from '../../design-canvas-react'
@@ -54,6 +56,51 @@ const loadGenerations: NonNullable<CanvasInsertPanelProps['loadGenerations']> = 
   return generations
 }
 
+/**
+ * Mount-effect drivers, mirroring the `AutoClick` pattern in
+ * chat-controls/fixtures.tsx: the panel owns its file input and active tab as
+ * internal state with no prop seam, so reaching post-interaction states in a
+ * static story means acting like a user after mount.
+ */
+
+/** Feeds a synthetic file through the hidden file input (a real `change`
+ *  event, so the panel's own upload handler runs) — upload outcomes render
+ *  without a manual file pick. No-op where `DataTransfer` is unavailable
+ *  (jsdom smoke mounts). */
+function AutoPickFile({ children, fileName }: { children: ReactNode; fileName: string }) {
+  const hostRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const input = hostRef.current?.querySelector<HTMLInputElement>('input[type="file"]')
+    if (!input || typeof DataTransfer === 'undefined') return
+    const transfer = new DataTransfer()
+    transfer.items.add(new File([new Uint8Array([137, 80, 78, 71])], fileName, { type: 'image/png' }))
+    input.files = transfer.files
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  }, [fileName])
+  return (
+    <div ref={hostRef} className="h-full min-h-0">
+      {children}
+    </div>
+  )
+}
+
+/** Clicks the tab with the given label after mount — the active tab is
+ *  internal state, so a story cannot open the panel on another tab directly. */
+function AutoOpenTab({ children, label }: { children: ReactNode; label: string }) {
+  const hostRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const host = hostRef.current
+    if (!host) return
+    const tab = Array.from(host.querySelectorAll('button')).find((button) => button.textContent?.trim() === label)
+    tab?.click()
+  }, [label])
+  return (
+    <div ref={hostRef} className="h-full min-h-0">
+      {children}
+    </div>
+  )
+}
+
 /** Default: the built-in starter template grid (heading, body, rect, ellipse). */
 export const Templates: Story = {
   render: () => <CanvasInsertPanel canWrite page={page} onInsert={onInsert} />,
@@ -80,20 +127,56 @@ export const AllTabs: Story = {
   ),
 }
 
-/** Upload failure surfaces as an inline error (click the dropzone after picking
- *  a file — the fake host rejects every upload). */
+/** Upload failure surfaces as an inline error: a mount effect picks a file
+ *  through the real input and the fake host rejects the upload. */
 export const UploadFailure: Story = {
   name: 'Upload failure (inline error)',
   render: () => (
-    <CanvasInsertPanel
-      canWrite
-      page={page}
-      onInsert={onInsert}
-      templates={[]}
-      onUploadImage={async (file) => {
-        throw new Error(`Upload failed for ${file.name}: 503 from the asset service`)
-      }}
-    />
+    <AutoPickFile fileName="hero-concept.png">
+      <CanvasInsertPanel
+        canWrite
+        page={page}
+        onInsert={onInsert}
+        templates={[]}
+        onUploadImage={async (file) => {
+          throw new Error(`Upload failed for ${file.name}: 503 from the asset service`)
+        }}
+      />
+    </AutoPickFile>
+  ),
+}
+
+/** Mid-upload busy state: the dropzone swaps to a spinner + "Uploading…"
+ *  while the host's store call is in flight (here it never resolves). */
+export const UploadInProgress: Story = {
+  name: 'Upload in progress (busy)',
+  render: () => (
+    <AutoPickFile fileName="background-texture.png">
+      <CanvasInsertPanel
+        canWrite
+        page={page}
+        onInsert={onInsert}
+        templates={[]}
+        onUploadImage={() => new Promise<string>(() => {})}
+      />
+    </AutoPickFile>
+  ),
+}
+
+/** Generations tab, auto-opened after mount: loaded tiles from the host
+ *  provider with their prompt labels as titles. */
+export const Generations: Story = {
+  name: 'Generations tab (populated)',
+  render: () => (
+    <AutoOpenTab label="Generations">
+      <CanvasInsertPanel
+        canWrite
+        page={page}
+        onInsert={onInsert}
+        onUploadImage={onUploadImage}
+        loadGenerations={loadGenerations}
+      />
+    </AutoOpenTab>
   ),
 }
 

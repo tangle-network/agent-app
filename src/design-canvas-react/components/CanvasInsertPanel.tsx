@@ -318,8 +318,8 @@ export function CanvasInsertPanel({
                 }}
                 className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-8 text-center transition-colors disabled:opacity-50 ${
                   dragOver
-                    ? 'border-[var(--brand-primary)] bg-[var(--brand-primary)]/5'
-                    : 'border-[var(--border-default)] hover:border-[var(--brand-primary)]/40'
+                    ? 'border-[var(--brand-primary)] bg-[color-mix(in_srgb,var(--brand-primary)_5%,transparent)]'
+                    : 'border-[var(--border-default)] hover:border-[color-mix(in_srgb,var(--brand-primary)_40%,transparent)]'
                 }`}
               >
                 {busy ? (
@@ -354,7 +354,7 @@ export function CanvasInsertPanel({
                   type="button"
                   disabled={busy}
                   onClick={() => void runInsert(() => tpl.build(page))}
-                  className="flex h-20 flex-col items-center justify-center gap-1.5 rounded-md border border-[var(--border-default)] bg-[var(--bg-input)] text-xs font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--brand-primary)]/40 disabled:opacity-50"
+                  className="flex h-20 flex-col items-center justify-center gap-1.5 rounded-md border border-[var(--border-default)] bg-[var(--bg-input)] text-xs font-medium text-[var(--text-primary)] transition-colors hover:border-[color-mix(in_srgb,var(--brand-primary)_40%,transparent)] disabled:opacity-50"
                 >
                   <span className="flex h-7 items-center justify-center">
                     <TemplatePreview shape={templateShape(tpl)} />

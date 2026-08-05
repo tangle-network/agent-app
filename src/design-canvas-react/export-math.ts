@@ -84,6 +84,28 @@ export function resolveExportParams(
 }
 
 // ---------------------------------------------------------------------------
+// Node bitmap-cache pixel ratio
+// ---------------------------------------------------------------------------
+
+/** Hard ceiling for node cache rasterization. Without it a deep zoom (max 32)
+ *  on a retina display would rasterize page-size elements into canvases beyond
+ *  browser backing-store limits; 4x supersampling covers every realistic
+ *  crispness-critical range (fit-page → 200% at dpr 2). */
+export const NODE_CACHE_PIXEL_RATIO_MAX = 4
+
+/**
+ * Pixel ratio a Konva node bitmap cache should rasterize at so the cached
+ * bitmap matches the screen exactly: the node's absolute scale (content-group
+ * zoom) × device pixel ratio. Konva's cache default ignores zoom, so the
+ * bitmap is re-scaled at draw time — bilinear-soft at fit-page zooms like
+ * 0.47, badly upscaled on zoom-in. ElementNode caches at this ratio and
+ * export.ts restores cleared caches at it, keeping one policy in one place.
+ */
+export function resolveNodeCachePixelRatio(absoluteScale: number, devicePixelRatio: number): number {
+  return Math.min(absoluteScale * devicePixelRatio, NODE_CACHE_PIXEL_RATIO_MAX)
+}
+
+// ---------------------------------------------------------------------------
 // CORS taint detection
 // ---------------------------------------------------------------------------
 
