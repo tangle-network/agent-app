@@ -235,3 +235,74 @@ export const MessageSizeComparison: Story = {
     </div>
   ),
 }
+
+// ── Quiet chrome (opt-in) ────────────────────────────────────────────────────
+
+/** The full 16-message thread from Long History under the opt-in quiet chrome:
+ *  no role labels, a hover-revealed meta lane (copy + demoted model/cost), and
+ *  neutral symmetric user bubbles. Hover a row to see the lane. */
+export const QuietLongHistory: Story = {
+  name: 'Quiet · Long History',
+  args: {
+    messages: chatThread,
+    approval,
+    onToolCallClick: (call: ChatToolCallInfo) => console.log('open run transcript', call.id),
+    chrome: 'quiet',
+  },
+}
+
+/** Quiet chrome with a turn in flight: streaming text, running tool call, and
+ *  a meta lane that carries only what exists yet (copy + model, no tok/s/cost
+ *  until the turn settles). */
+export const QuietStreamingInProgress: Story = {
+  name: 'Quiet · Streaming In Progress',
+  args: {
+    messages: [
+      { id: 's1', role: 'user', content: 'Export a print-resolution PNG for the record.' },
+      streamingAssistantMessage,
+    ],
+    loading: true,
+    chrome: 'quiet',
+  },
+}
+
+/** Quiet chrome on the pending-decision surface: the approval card is
+ *  identical to labeled mode — only the row chrome around it changes. */
+export const QuietProposalAwaitingApproval: Story = {
+  name: 'Quiet · Proposal Awaiting Approval',
+  args: {
+    messages: [
+      { id: 'p1', role: 'user', content: 'Render the poster and queue it for review.' },
+      proposalAwaitingApprovalMessage,
+    ],
+    approval,
+    chrome: 'quiet',
+  },
+}
+
+/**
+ * The redesign's comparison surface: the same six-turn thread at equal width,
+ * current labeled chrome next to the opt-in quiet chrome. Hover rows in the
+ * right column to reveal the meta lane; the left column never changes.
+ */
+export const BeforeAfter: Story = {
+  name: 'Before / After (current: labeled · new: quiet)',
+  render: () => (
+    <div className="flex items-start gap-6">
+      {(['labeled', 'quiet'] as const).map((chrome) => (
+        <section key={chrome} className="w-[560px] shrink-0 rounded-lg border border-border bg-background">
+          <p className="border-b border-border px-3 py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {chrome === 'labeled' ? 'current: labeled' : 'new: quiet'}
+          </p>
+          <ChatMessages
+            messages={densityThread}
+            models={chatCatalogModels}
+            renderMarkdown={renderMarkdown}
+            approval={approval}
+            chrome={chrome}
+          />
+        </section>
+      ))}
+    </div>
+  ),
+}

@@ -242,6 +242,9 @@ export interface ChatComposerProps {
 
   /** Cmd/Ctrl+L focuses the input and shows the hint. Default true. */
   focusShortcut?: boolean
+  /** Float the card on a soft two-layer foreground-tinted shadow (opt-in).
+   *  Elevation only — radius, ring, and control layout are unchanged. */
+  floating?: boolean
   /** Send button label. Default "Send". */
   sendLabel?: string
   className?: string
@@ -308,6 +311,7 @@ export function ChatComposer({
   dropTitle = 'Drop files to add context',
   dropDescription = 'They attach to your next message.',
   focusShortcut = true,
+  floating = false,
   sendLabel = 'Send',
   className,
 }: ChatComposerProps) {
@@ -673,7 +677,11 @@ export function ChatComposer({
           controls out of the card in the first place. */}
       <div
         data-testid="composer-card"
-        className="flex flex-col gap-1.5 rounded-2xl border border-border bg-card px-3 py-2.5 transition focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15"
+        className={`flex flex-col gap-1.5 rounded-2xl border border-border bg-card px-3 py-2.5 transition focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15 ${
+          floating
+            ? 'shadow-[0_1px_2px_hsl(var(--foreground)/0.05),0_12px_28px_hsl(var(--foreground)/0.07)] dark:shadow-[0_1px_2px_hsl(var(--foreground)/0.14),0_12px_28px_hsl(var(--foreground)/0.22)]'
+            : ''
+        }`}
       >
         <textarea
           ref={textareaRef}

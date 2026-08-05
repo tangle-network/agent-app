@@ -238,6 +238,13 @@ export interface ChatMessagesProps {
   /** Shared reading scale for both user and assistant prose. Defaults to 16px;
    *  `large` uses 17px without enlarging labels, tool chrome, or metadata. */
   messageSize?: 'default' | 'large'
+  /** Transcript chrome. `labeled` (default) keeps the always-on role label +
+   *  model/tok-s/cost meta line and the primary-tinted user bubble. `quiet`
+   *  drops the label row into a fixed-height meta lane at each row's bottom
+   *  (copy + the demoted meta, revealed on hover/focus, always visible on
+   *  touch) and renders user bubbles neutral with a symmetric radius.
+   *  Everything else — tool cards, reasoning, streaming — is identical. */
+  chrome?: 'labeled' | 'quiet'
   /** Catalogue models, for per-message cost from pricing. Pass [] to skip cost. */
   models?: CatalogModel[]
   /** Markdown renderer for assistant content; default renders pre-wrapped text. */
@@ -966,6 +973,68 @@ function SegmentedBody({
   )
 }
 
+// ── Quiet chrome ────────────────────────────────────────────────────────────
+
+/** The quiet chrome's per-row meta lane: a fixed ~18px strip that always
+ *  reserves its height (so the reveal is pure opacity — zero layout shift) and
+ *  fades in on row hover/focus-within, staying visible on touch via
+ *  `@media (hover: none)`. The fade is reduced-motion-guarded. */
+const QUIET_META_LANE_CLASS =
+  'mt-1 flex h-[18px] items-center gap-2 text-[11px] tracking-wide text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100'
+
+/** The text a copy of the message should carry: the ordered text runs when the
+ *  turn is segmented (they render in place of `content`), else `content`. */
+function copyTextOf(msg: ChatUiMessage): string {
+  const textRuns = msg.segments?.filter((s) => s.kind === 'text') ?? []
+  if (textRuns.length > 0) return textRuns.map((s) => s.content).join('\n\n')
+  return msg.content
+}
+
+/** Copies the message's plain text; swaps to a check for a beat on success.
+ *  Quiet chrome only — labeled mode's meta line is information, not action. */
+function CopyMessageButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(
+    () => () => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current)
+    },
+    [],
+  )
+  const copy = () => {
+    const clipboard = navigator.clipboard
+    if (!clipboard) return
+    void clipboard.writeText(text).then(
+      () => {
+        setCopied(true)
+        if (timerRef.current !== null) clearTimeout(timerRef.current)
+        timerRef.current = setTimeout(() => setCopied(false), 1200)
+      },
+      () => {},
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      aria-label="Copy message"
+      title="Copy message"
+      className="rounded p-0.5 text-muted-foreground transition hover:bg-accent/40 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {copied ? (
+        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      ) : (
+        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <rect x="9" y="9" width="13" height="13" rx="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
+      )}
+    </button>
+  )
+}
+
 function AssistantMessageImpl({
   msg,
   streaming,
@@ -980,6 +1049,7 @@ function AssistantMessageImpl({
   resolveAttachmentUrl,
   workProductCards,
   messageClassName,
+  chrome,
 }: {
   msg: ChatUiMessage
   streaming: boolean
@@ -994,6 +1064,7 @@ function AssistantMessageImpl({
   resolveAttachmentUrl?: (part: ChatAttachmentPart) => string
   workProductCards?: { onOpen?: (part: WorkProductPersistedPart) => void }
   messageClassName: string
+  chrome: 'labeled' | 'quiet'
 }) {
   // Smooth reveal: chunky network slabs (model bursts, flush windows, replay
   // polls) paint as a continuous typewriter. Reasoning often arrives as one
@@ -1042,14 +1113,17 @@ function AssistantMessageImpl({
     streaming && !!reasoning && !hasAnswerText,
   )
 
+  const quiet = chrome === 'quiet'
   return (
-    <div className="mx-auto w-full max-w-3xl px-6 py-3">
-      <div className="mb-1 flex items-baseline gap-2 text-[11px] tracking-wide text-muted-foreground">
-        <span className="font-semibold uppercase">{agentLabel}</span>
-        {msg.modelUsed && <span className="font-mono normal-case">{msg.modelUsed}</span>}
-        {formatTokensPerSecond(msg) && <span>{formatTokensPerSecond(msg)}</span>}
-        {formatModelCost(msg, models) && <span>{formatModelCost(msg, models)}</span>}
-      </div>
+    <div className={`mx-auto w-full max-w-3xl px-6 ${quiet ? 'group pb-1 pt-3' : 'py-3'}`}>
+      {!quiet && (
+        <div className="mb-1 flex items-baseline gap-2 text-[11px] tracking-wide text-muted-foreground">
+          <span className="font-semibold uppercase">{agentLabel}</span>
+          {msg.modelUsed && <span className="font-mono normal-case">{msg.modelUsed}</span>}
+          {formatTokensPerSecond(msg) && <span>{formatTokensPerSecond(msg)}</span>}
+          {formatModelCost(msg, models) && <span>{formatModelCost(msg, models)}</span>}
+        </div>
+      )}
       {reasoning && (
         <details className="mb-2 rounded-lg border-l-2 border-border/70 bg-muted/20 px-3 py-2" open={!hasAnswerText}>
           <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
@@ -1128,6 +1202,14 @@ function AssistantMessageImpl({
           />
         </div>
       )}
+      {quiet && (
+        <div data-testid="message-meta-lane" className={QUIET_META_LANE_CLASS}>
+          <CopyMessageButton text={copyTextOf(msg)} />
+          {msg.modelUsed && <span className="font-mono">{msg.modelUsed}</span>}
+          {formatTokensPerSecond(msg) && <span>{formatTokensPerSecond(msg)}</span>}
+          {formatModelCost(msg, models) && <span>{formatModelCost(msg, models)}</span>}
+        </div>
+      )}
     </div>
   )
 }
@@ -1158,11 +1240,13 @@ export function useThinkingSeconds(active: boolean): number {
   return seconds
 }
 
-function ThinkingRow({ agentLabel }: { agentLabel: string }) {
+function ThinkingRow({ agentLabel, chrome = 'labeled' }: { agentLabel: string; chrome?: 'labeled' | 'quiet' }) {
   const seconds = useThinkingSeconds(true)
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-3">
-      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{agentLabel}</p>
+      {chrome !== 'quiet' && (
+        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{agentLabel}</p>
+      )}
       <div className="flex items-center gap-2 text-base text-muted-foreground">
         <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
           <path d="M21 12a9 9 0 1 1-6.219-8.56" strokeLinecap="round" />
@@ -1202,11 +1286,13 @@ function StreamErrorRow({ message, onRetry }: { message: string; onRetry?: () =>
  * The message thread: one centered column; user messages are right-aligned
  * bubbles with a User label; agent messages carry an Agent meta line with
  * model id, tokens/sec, and cost, plus a collapsible thinking section and
- * tool-call chips.
+ * tool-call chips. `chrome="quiet"` opts into the label-free variant: the
+ * label/meta row becomes a hover-revealed meta lane under each row.
  */
 export function ChatMessages({
   messages,
   messageSize = 'default',
+  chrome = 'labeled',
   models = [],
   renderMarkdown,
   renderExtras,
@@ -1238,6 +1324,7 @@ export function ChatMessages({
     [renderMarkdown],
   )
   const lastIsUser = messages[messages.length - 1]?.role === 'user'
+  const quiet = chrome === 'quiet'
   if (messages.length === 0 && !loading && !error) {
     // Explicit renderEmpty wins (incl. `() => null` to opt out); otherwise show
     // the branded first-run state instead of a blank thread.
@@ -1254,13 +1341,19 @@ export function ChatMessages({
       {header}
       {messages.map((msg) =>
         msg.role === 'user' ? (
-          <div key={msg.id} className="mx-auto w-full max-w-3xl px-6 py-3">
-            <div className="ml-auto w-fit max-w-[85%]">
-              <p className="mb-1 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {userLabel}
-              </p>
+          <div key={msg.id} className={`mx-auto w-full max-w-3xl px-6 ${quiet ? 'group pb-1 pt-3' : 'py-3'}`}>
+            <div className={`ml-auto w-fit ${quiet ? 'max-w-[72%]' : 'max-w-[85%]'}`}>
+              {!quiet && (
+                <p className="mb-1 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {userLabel}
+                </p>
+              )}
               <div
-                className={`rounded-2xl rounded-tr-md bg-primary/10 px-4 py-2.5 ${messageClassName}`}
+                className={
+                  quiet
+                    ? `rounded-2xl bg-[color-mix(in_srgb,hsl(var(--secondary))_65%,hsl(var(--background)))] px-4 py-2.5 ${messageClassName}`
+                    : `rounded-2xl rounded-tr-md bg-primary/10 px-4 py-2.5 ${messageClassName}`
+                }
               >
                 <p className="whitespace-pre-wrap">{msg.content}</p>
               </div>
@@ -1274,6 +1367,11 @@ export function ChatMessages({
                 </div>
               )}
             </div>
+            {quiet && (
+              <div data-testid="message-meta-lane" className={`${QUIET_META_LANE_CLASS} justify-end`}>
+                <CopyMessageButton text={msg.content} />
+              </div>
+            )}
           </div>
         ) : (
           <AssistantMessage
@@ -1291,10 +1389,11 @@ export function ChatMessages({
             resolveAttachmentUrl={resolveAttachmentUrl}
             workProductCards={workProductCards}
             messageClassName={messageClassName}
+            chrome={chrome}
           />
         ),
       )}
-      {loading && lastIsUser && <ThinkingRow agentLabel={agentLabel} />}
+      {loading && lastIsUser && <ThinkingRow agentLabel={agentLabel} chrome={chrome} />}
       {error && !loading && <StreamErrorRow message={error} onRetry={onRetry} />}
     </>
   )

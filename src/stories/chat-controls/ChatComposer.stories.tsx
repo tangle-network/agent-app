@@ -136,6 +136,45 @@ export const Disabled: Story = {
   ),
 }
 
+/** Floating — the opt-in two-layer soft shadow; radius, ring, and controls
+ *  layout are unchanged (elevation only). Compare against Default. */
+export const Floating: Story = {
+  render: () => (
+    <ChatComposer
+      onSend={(message) => console.log('send', message)}
+      placeholder="Message the assistant…"
+      controls={useModelPill()}
+      floating
+    />
+  ),
+}
+
+/** Flat vs floating side by side — the elevation-only diff, judged against
+ *  both themes via the toolbar. */
+export const FlatVsFloating: Story = {
+  name: 'Flat vs floating',
+  decorators: [
+    (Story) => (
+      <div className="w-[640px] max-w-full p-4">
+        <Story />
+      </div>
+    ),
+  ],
+  render: () => {
+    const pill = useModelPill()
+    return (
+      <div className="space-y-7">
+        <Demo title="current: flat">
+          <ChatComposer onSend={() => {}} placeholder="Message the assistant…" controls={pill} />
+        </Demo>
+        <Demo title="new: floating">
+          <ChatComposer onSend={() => {}} placeholder="Message the assistant…" controls={pill} floating />
+        </Demo>
+      </div>
+    )
+  },
+}
+
 /** Every ComposerRoute state side by side — the spacing/polish audit. */
 export const AllStates: Story = {
   name: 'All states',

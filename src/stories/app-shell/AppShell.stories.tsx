@@ -80,6 +80,8 @@ interface SceneProps {
   streaming?: boolean
   approval?: ProposalApprovalHandlers
   emptyState?: ChatEmptyStateProps
+  /** Opt the transcript + composer into the quiet chrome / floating variants. */
+  quiet?: boolean
 }
 
 /**
@@ -87,7 +89,7 @@ interface SceneProps {
  * (local state, not console.log) because it is the interaction the sidebar
  * variants exist to evaluate; everything else is a logged callback.
  */
-function ShellScene({ args, messages, streaming = false, approval, emptyState }: SceneProps) {
+function ShellScene({ args, messages, streaming = false, approval, emptyState, quiet = false }: SceneProps) {
   const [collapsed, setCollapsed] = useState(false)
   return (
     <AppShell
@@ -101,6 +103,7 @@ function ShellScene({ args, messages, streaming = false, approval, emptyState }:
           isStreaming={streaming}
           placeholder="Message the agent…"
           controls={composerControls}
+          floating={quiet}
         />
       }
     >
@@ -113,6 +116,7 @@ function ShellScene({ args, messages, streaming = false, approval, emptyState }:
         userLabel="You"
         agentLabel="Agent"
         onToolCallClick={(call) => console.log('tool-call', call.id)}
+        chrome={quiet ? 'quiet' : 'labeled'}
       />
     </AppShell>
   )
@@ -172,6 +176,14 @@ export const EmptyState: Story = {
       }}
     />
   ),
+}
+
+/** The quiet transcript end to end: label-free rows with hover-revealed meta
+ *  lanes + the floating composer, inside the full shell. This is the
+ *  Conductor/qm-comparison surface — evaluate it against Default. */
+export const QuietTranscript: Story = {
+  name: 'Quiet transcript',
+  render: (args) => <ShellScene args={args} messages={chatThread} quiet />,
 }
 
 /** The approval gate, end to end: the queued proposal card gets Approve /

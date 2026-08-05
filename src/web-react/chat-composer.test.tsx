@@ -578,4 +578,18 @@ describe('ChatComposer seed', () => {
       expect(input.value).toBe('')
     })
   })
+
+  it('keeps the card flat by default and floats it on a two-layer shadow when `floating`', () => {
+    const { rerender } = render(<ChatComposer onSend={vi.fn()} />)
+    const flat = screen.getByTestId('composer-card').className
+    expect(flat).not.toContain('shadow-[')
+
+    rerender(<ChatComposer onSend={vi.fn()} floating />)
+    const elevated = screen.getByTestId('composer-card').className
+    expect(elevated).toContain('shadow-[')
+    expect(elevated).toContain('0_12px_28px')
+    // Radius/ring are unchanged — elevation only.
+    expect(elevated).toContain('rounded-2xl')
+    expect(elevated).toContain('focus-within:ring-2')
+  })
 })
