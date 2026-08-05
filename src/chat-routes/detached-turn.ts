@@ -93,6 +93,12 @@ export interface DetachedTurnOptions {
   fallbackModels?: SandboxChatProducerOptions['fallbackModels']
   /** Opt out of failover while still using {@link openEvents}. */
   modelFailover?: false
+  /** Maximum time to open/start one model event source through its first event.
+   *  Forwarded to the producer; default 120 seconds. */
+  openTimeoutMs?: SandboxChatProducerOptions['openTimeoutMs']
+  /** Hard deadline after the source's first lifecycle event for the first
+   *  answer-bearing event. Forwarded to the producer; default 60 seconds. */
+  firstResponseTimeoutMs?: SandboxChatProducerOptions['firstResponseTimeoutMs']
   /** Fired when a model is abandoned mid-chain (telemetry/alerting). */
   onModelFallback?: SandboxChatProducerOptions['onModelFallback']
   /** The PREFERRED model. Recorded on the persisted assistant message + usage
@@ -426,6 +432,10 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
     model: opts.model,
     ...(opts.fallbackModels ? { fallbackModels: opts.fallbackModels } : {}),
     ...(opts.modelFailover === false ? { modelFailover: false as const } : {}),
+    ...(opts.openTimeoutMs !== undefined ? { openTimeoutMs: opts.openTimeoutMs } : {}),
+    ...(opts.firstResponseTimeoutMs !== undefined
+      ? { firstResponseTimeoutMs: opts.firstResponseTimeoutMs }
+      : {}),
     ...(opts.onModelFallback ? { onModelFallback: opts.onModelFallback } : {}),
     isRenderableInteraction: opts.isRenderableInteraction,
     declineInteraction: opts.declineInteraction,

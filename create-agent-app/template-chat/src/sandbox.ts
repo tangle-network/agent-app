@@ -100,7 +100,7 @@ export function createSandboxProduce(env: AppEnv) {
       // that actually served, and the transcript gets a visible notice.
       // Opt out with `modelFailover: false` (or empty `fallbacks`).
       fallbackModels: config.model.fallbacks,
-      openEvents: ({ model: attemptModel, attempt }) =>
+      openEvents: ({ model: attemptModel, attempt, signal }) =>
         streamSandboxPrompt(shell, box, normalizeChatPromptForSandbox(prompt), {
           sessionId: identity.sessionId,
           // A failover attempt is a NEW dispatch, not a reconnect to the dead
@@ -108,6 +108,7 @@ export function createSandboxProduce(env: AppEnv) {
           // resume the failed execution instead of starting a fresh run.
           executionId: attempt === 1 ? executionId : `${executionId}-f${attempt}`,
           model: attemptModel,
+          signal,
           effort: body.effort ?? config.model.effort,
           harness: config.harness,
           systemPrompt: config.systemPrompt,
