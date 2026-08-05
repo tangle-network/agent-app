@@ -3,7 +3,8 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createTempRepo, passingSteps, type TempRepo } from './proof-fixture'
 import { attachSignoffProof } from './proof-attach'
-import { buildSignoffProof, gitIsAncestor, parseSignoffProof, readCommitFacts, sealProof, serializeSignoffProof, type SignoffProof, type SignoffProofStep } from './proof'
+import { gitIsAncestor, readCommitFacts } from './proof-git'
+import { buildSignoffProof, parseSignoffProof, sealProof, serializeSignoffProof, type SignoffProof, type SignoffProofStep } from './proof-record'
 import { formatSignoffVerification, requiredStepsFor, SIGNOFF_REQUIRED_STEPS, verifySignoffAtRev, verifySignoffProof, verifySignoffProofFile } from './proof-verify'
 
 const KEY = new Uint8Array(32).fill(7)

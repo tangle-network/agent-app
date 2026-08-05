@@ -41,7 +41,7 @@ import type { SignoffShuffleSpec, SignoffStepSpec } from './types'
  * twice. If a runner ever does need a separator, its config declares its own
  * `shuffle.args`.
  */
-export const DEFAULT_SHUFFLE_ARGS: readonly string[] = [
+const DEFAULT_SHUFFLE_ARGS: readonly string[] = [
   '--sequence.shuffle.files=true',
   '--sequence.seed={seed}',
 ]

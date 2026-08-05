@@ -7,86 +7,50 @@
  *
  * The threat model is in `proof-record.ts` and the carrier tradeoff is in
  * `proof-attach.ts`. Both are load-bearing; read them before relying on a proof.
+ *
+ * **Surface is narrowed to what a caller composes, not what this file happens
+ * to define.** The `agent-app-signoff` bin itself does NOT build or attach a
+ * proof today — it runs the gate and prints the plain report (`./cli.ts`); the
+ * proof pipeline below is the documented composition [`docs/signoff-proof.md`]
+ * a product wires into its OWN CI step. Schema internals, hashing primitives
+ * and low-level git plumbing (`canonicalJson`, `hashProofBody`, `sealProof`,
+ * `runGit`, the zod schemas, …) stay module-internal, where `knip` can see
+ * them unused rather than reading as committed public API with zero callers.
  */
 export {
-  NOT_EXECUTED_COMMAND,
-  NO_EXIT_CODE,
-  proofFromSignoffReport,
-  seedsFromReport,
-  type ProofFromReportInput,
-} from './proof-from-report'
-
-export {
-  SIGNOFF_PROOF_VERSION,
-  SIGNOFF_STEP_STATUSES,
-  buildSignoffProof,
-  canonicalJson,
-  canonicalizeProofBody,
-  collectToolingFacts,
-  formatSignoffSummary,
-  hashProofBody,
-  hashStepOutput,
-  macMatches,
-  parseSignoffProof,
-  readInstalledVersion,
-  readSignoffKey,
-  sealProof,
-  serializeSignoffProof,
-  signoffKeyId,
-  signoffProofBodySchema,
-  signoffProofSchema,
-  signoffProofSealSchema,
-  signoffProofStepSchema,
-  tangleDependencyNames,
-  type BuildSignoffProofInput,
-  type SignoffProof,
-  type SignoffProofBody,
-  type SignoffProofPeer,
-  type SignoffProofSeal,
-  type SignoffProofStep,
-  type SignoffProofSubject,
-  type ToolingFactsInput,
-} from './proof-record'
-
-export {
-  SIGNOFF_NOTES_GIT_CONFIG,
-  SIGNOFF_NOTES_REF,
-  attachSignoffProof,
-  listSignoffProofs,
-  readSignoffProofNote,
-  resolveSignoffProof,
-  type AttachSignoffProofInput,
-  type AttachedSignoffProof,
-  type SignoffProofLookup,
-} from './proof-attach'
-
-export {
-  SIGNOFF_REQUIRED_STEPS,
-  formatSignoffVerification,
-  requiredStepsFor,
-  verifySignoffAtRev,
   verifySignoffProof,
-  verifySignoffProofFile,
   type SignoffCommitBinding,
   type SignoffFailure,
   type SignoffFailureCode,
-  type SignoffLookupFailure,
   type SignoffVerification,
-  type SignoffVerifyOutcome,
-  type VerifySignoffAtRevInput,
-  type VerifySignoffFileInput,
   type VerifySignoffProofOptions,
 } from './proof-verify'
 
-export {
-  SignoffGitError,
-  computeWorktreeTree,
-  gitIsAncestor,
-  gitText,
-  readCommitFacts,
-  resolveCommit,
-  runGit,
-  type CommitFacts,
-  type GitResult,
-  type IsAncestorFn,
-} from './proof-git'
+export { formatSignoffSummary, parseSignoffProof, readSignoffKey } from './proof-record'
+export type {
+  SignoffProof,
+  SignoffProofBody,
+  SignoffProofPeer,
+  SignoffProofSeal,
+  SignoffProofStep,
+  SignoffProofSubject,
+} from './proof-record'
+
+/** Types needed to construct `VerifySignoffProofOptions.target`/`.isAncestor`
+ *  without pulling in this package's OWN git-shelling implementation — a
+ *  consumer supplies commit facts and ancestry however it already tracks
+ *  them (its own git library, a cache, …). */
+export type { CommitFacts, IsAncestorFn } from './proof-git'
+
+/**
+ * The SIGNING side — building a proof from a report and attaching it to the
+ * commit it verified. Nobody in this repo calls these today (the census that
+ * justified narrowing this barrel found zero callers, this pair included);
+ * they stay exported anyway because `docs/signoff-proof.md`'s documented
+ * composition is the ONLY way to reach them at all — `package.json` declares
+ * no `./signoff/proof-attach` or `./signoff/proof-from-report` subpath, so
+ * dropping these here would make a real, tested, documented capability
+ * unreachable from outside the package, not merely unexercised inside it.
+ */
+export { proofFromSignoffReport, type ProofFromReportInput } from './proof-from-report'
+export { attachSignoffProof, type AttachSignoffProofInput, type AttachedSignoffProof } from './proof-attach'

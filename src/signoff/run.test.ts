@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { formatSignoffReport, peakConcurrency } from './report'
+import { formatSignoffLine, formatSignoffReport, peakConcurrency } from './report'
 import { runSignoff } from './run'
 
 /**
@@ -101,6 +101,35 @@ describe('runSignoff (end to end)', () => {
     } finally {
       delete process.env.SIGNOFF_LOG
     }
+  })
+
+  it('the one-line summary carries the verdict, the commit it judged, and the step tally', async () => {
+    // CLAUDE.md accepts this line as PR proof in place of the report block, and
+    // `--quiet` prints it. Both readings depend on the sha and the tally being
+    // the run's real ones, not the shape of the sentence.
+    const passing = fixtureRepo({
+      steps: `[
+        { name: 'typecheck', run: "node -e \\"process.exit(0)\\"" },
+        { name: 'tests', run: "node -e \\"process.exit(0)\\"" },
+      ]`,
+    })
+    const green = await runSignoff({ repoDir: passing, cacheDir: temp('signoff-cache-'), source: 'head' })
+    const greenLine = formatSignoffLine(green)
+    expect(greenLine).toContain('signoff PASS')
+    expect(greenLine).toContain(green.repo.head.slice(0, 12))
+    expect(greenLine).toContain('2/2 steps')
+    expect(greenLine).toContain(`seed ${green.seedBase}`)
+    expect(greenLine.split('\n')).toHaveLength(1)
+
+    const failing = fixtureRepo({
+      steps: `[
+        { name: 'typecheck', run: "node -e \\"process.exit(1)\\"" },
+      ]`,
+    })
+    const red = await runSignoff({ repoDir: failing, cacheDir: temp('signoff-cache-'), source: 'head' })
+    const redLine = formatSignoffLine(red)
+    expect(redLine).toContain('signoff FAIL')
+    expect(redLine).toContain('0/1 steps')
   })
 
   it('a gitignored stale artifact in the developer checkout is NOT in the tree the steps see', async () => {

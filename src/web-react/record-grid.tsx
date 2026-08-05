@@ -17,9 +17,15 @@
  *  - **Provenance per cell.** An optional quote + link + basis, so a
  *    record-backed grid shows where a value came from without the product
  *    building a second surface for it.
- *  - **Three distinct data states.** Loading, error-with-retry, and empty are
- *    different renders — a failed fetch never looks like "no data yet" — and
- *    the empty state carries the CALLER's next action.
+ *  - **Three distinct data states, on `web-react/async`'s own contract.**
+ *    `state: AsyncResourceState<Row[]>` and `empty: AsyncEmptySpec` are the
+ *    same types every other screen fetches through — loading, error-with-
+ *    retry and empty are different renders, a failed fetch never looks like
+ *    "no data yet", and the empty state carries the CALLER's next action.
+ *    The optimistic overlay is layered on top of whichever `ready`/`empty`
+ *    value the caller last supplied, so a row created while the caller's own
+ *    status is still `empty` renders immediately rather than waiting for a
+ *    refetch.
  *  - **Keyboard-navigable, labelled controls.** Arrow keys move between cells,
  *    Enter edits, Escape cancels, and no destructive control is an unlabelled
  *    icon.
@@ -30,6 +36,7 @@
 
 import {
   Fragment,
+  isValidElement,
   useCallback,
   useEffect,
   useId,
@@ -40,6 +47,7 @@ import {
   type ReactNode,
 } from 'react'
 
+import { type AsyncEmptyAction, type AsyncEmptySpec, type AsyncResourceState } from './async'
 import {
   EMPTY_RECORD_GRID_OVERLAY,
   formatRecordGridValue,
@@ -68,19 +76,6 @@ import {
 
 export * from './record-grid-model'
 
-/** Which of the three data states the caller is in. Distinct renders: an
- *  errored fetch must never be indistinguishable from an empty result. */
-export type RecordGridState = 'loading' | 'error' | 'ready'
-
-/** The empty state's content. `action` is the caller's next step — a link into
- *  chat, an import button — because only the product knows what unblocks the
- *  reader. */
-export interface RecordGridEmptyState {
-  title: string
-  description?: string
-  action?: ReactNode
-}
-
 /** One committed cell edit, handed to `onUpdate`. */
 export interface RecordGridCellChange {
   /** The row as it was BEFORE the edit — what rollback restores. */
@@ -107,22 +102,20 @@ export type RecordGridCreateOutcome =
 export interface RecordGridProps {
   /** Column definitions, in render order. */
   columns: readonly RecordGridColumn[]
-  /** The caller's rows. Optimistic edits are layered over these and dropped as
-   *  this prop catches up. */
-  rows: readonly RecordGridRow[]
+  /** Fetch state over the caller's rows — `web-react/async`'s
+   *  `AsyncResourceState`, the same three-state contract every other screen
+   *  in the shell fetches through. `ready`/`empty`'s value is the base rows;
+   *  optimistic edits are layered over it and dropped as a later value
+   *  catches up. `error` always carries `retry` — there is no way to render a
+   *  failed fetch with no recovery action, by construction. */
+  state: AsyncResourceState<readonly RecordGridRow[]>
   /** Accessible name for the grid. Required — an unnamed grid is unusable with
    *  a screen reader. */
   caption: string
-  /** Data state. Defaults to `ready`. A non-empty `error` forces the error
-   *  state whatever this says, so a caller cannot render a failed fetch as an
-   *  empty list by forgetting one prop. */
-  state?: RecordGridState
-  /** The failure message the error state renders. */
-  error?: string | null
-  /** Re-run the caller's fetch. Absent → the error state offers no retry. */
-  onRetry?: () => void
-  /** What the empty state says, and what it offers next. */
-  empty: RecordGridEmptyState
+  /** What the empty state says, and what it offers next — `web-react/async`'s
+   *  `AsyncEmptySpec`, so an empty grid reads in the same words as an empty
+   *  list or panel elsewhere in the product. */
+  empty: AsyncEmptySpec
   /** Persist one created row. Absent → no add affordance. */
   onCreate?: (values: Readonly<Record<string, RecordGridValue>>) => Promise<RecordGridCreateOutcome>
   /** Persist one cell edit. Absent → every cell renders read-only. */
@@ -141,6 +134,10 @@ export interface RecordGridProps {
   loadingRowCount?: number
   className?: string
 }
+
+/** Stable empty base for `idle`/`loading`/`error` — a fresh `[]` every render
+ *  would retrigger the overlay-pruning effect for no reason. */
+const EMPTY_RECORD_GRID_ROWS: readonly RecordGridRow[] = []
 
 /** Internal map key. NUL cannot occur in a column or row id a product would
  *  write, and this key never reaches the DOM. */
@@ -183,15 +180,17 @@ const INPUT_CLASS =
   'w-full rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/40'
 
 const BASIS_TONES: Record<RecordGridSourceBasis, string> = {
-  source: 'border-primary/60 text-primary',
-  confirmed: 'border-success/60 text-success',
-  derived: 'border-border text-muted-foreground',
+  extracted: 'border-primary/60 text-primary',
+  entered: 'border-success/60 text-success',
+  computed: 'border-border text-muted-foreground',
+  asserted: 'border-warning/60 text-warning',
 }
 
 const BASIS_TITLES: Record<RecordGridSourceBasis, string> = {
-  source: 'Extracted from a source document',
-  confirmed: 'Confirmed by a person',
-  derived: 'Computed from other values',
+  extracted: 'Extracted from a source document',
+  entered: 'Confirmed by a person',
+  computed: 'Computed from other values',
+  asserted: 'Agent, unverified — no source recorded',
 }
 
 /**
@@ -201,11 +200,8 @@ const BASIS_TITLES: Record<RecordGridSourceBasis, string> = {
  */
 export function RecordGrid({
   columns,
-  rows,
   caption,
-  state = 'ready',
-  error,
-  onRetry,
+  state,
   empty,
   onCreate,
   onUpdate,
@@ -244,13 +240,18 @@ export function RecordGrid({
     setEditingState(next)
   }, [])
 
+  // `ready` and `empty` are the only variants carrying rows to project; the
+  // other three short-circuit below before `visibleRows` is ever read, so an
+  // empty base here is inert rather than wrong.
+  const callerRows = state.status === 'ready' || state.status === 'empty' ? state.value : EMPTY_RECORD_GRID_ROWS
+
   // Overlay entries the caller's own rows have caught up with are dropped, so
   // a later refresh of the same cell is never masked by a settled edit.
   useEffect(() => {
-    setOverlay((current) => pruneRecordGridOverlay(rows, current))
-  }, [rows])
+    setOverlay((current) => pruneRecordGridOverlay(callerRows, current))
+  }, [callerRows])
 
-  const visibleRows = useMemo(() => projectRecordGridRows(rows, overlay), [rows, overlay])
+  const visibleRows = useMemo(() => projectRecordGridRows(callerRows, overlay), [callerRows, overlay])
 
   const activeFocus = useMemo(() => {
     if (focus === null) return null
@@ -493,11 +494,10 @@ export function RecordGrid({
     [beginEdit, columns, editing, focusCell, onUpdate, visibleRows],
   )
 
-  // A message the caller handed us is ALWAYS surfaced: rendering a failed
-  // fetch as an empty list is the defect this component exists to remove.
-  const dataState: RecordGridState = typeof error === 'string' && error !== '' ? 'error' : state
-
-  if (dataState === 'loading') {
+  // `idle` and `loading` render the same busy block — from the reader's
+  // side, "not started" and "in flight" are the same wait
+  // (`web-react/async`'s own rule for the same two variants).
+  if (state.status === 'idle' || state.status === 'loading') {
     return (
       <div className={`space-y-3 ${className ?? ''}`}>
         {toolbar}
@@ -516,23 +516,19 @@ export function RecordGrid({
     )
   }
 
-  if (dataState === 'error') {
+  if (state.status === 'error') {
     return (
       <div className={`space-y-3 ${className ?? ''}`}>
         {toolbar}
         <div role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-4">
-          <p className="text-sm font-medium text-destructive">
-            {typeof error === 'string' && error !== '' ? error : `${caption} could not be loaded.`}
-          </p>
-          {onRetry && (
-            <button
-              type="button"
-              onClick={onRetry}
-              className="mt-3 rounded-md border border-destructive/40 px-3 py-1.5 text-xs font-medium text-destructive transition hover:bg-destructive/10"
-            >
-              Try again
-            </button>
-          )}
+          <p className="text-sm font-medium text-destructive">{state.message}</p>
+          <button
+            type="button"
+            onClick={state.retry}
+            className="mt-3 rounded-md border border-destructive/40 px-3 py-1.5 text-xs font-medium text-destructive transition hover:bg-destructive/10"
+          >
+            Try again
+          </button>
         </div>
       </div>
     )
@@ -568,7 +564,18 @@ export function RecordGrid({
               <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">{empty.description}</p>
             )}
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-              {empty.action}
+              {empty.action &&
+                (isValidElement(empty.action) ? (
+                  empty.action
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(empty.action as AsyncEmptyAction).onClick}
+                    className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30"
+                  >
+                    {(empty.action as AsyncEmptyAction).label}
+                  </button>
+                ))}
               {onCreate && (
                 <button
                   type="button"
@@ -926,7 +933,13 @@ interface SourceMarkerProps {
 /** The per-cell provenance affordance: a marker that opens the quote, the
  *  source's name, and a link to it. */
 function SourceMarker({ panelId, columnHeader, rowLabel, source, open, onToggle }: SourceMarkerProps) {
-  const basis: RecordGridSourceBasis = source.basis ?? 'source'
+  // An omitted basis is the DEFAULT path every first integration takes, so it
+  // must resolve to the weakest claim, not the strongest. `extracted` (and
+  // `source` before the rename) told the reader the figure was read out of a
+  // document the caller never named — a factual claim about a document that may
+  // not exist. `asserted` is the union's own "nothing outside the model behind
+  // it", which is exactly what a caller who stated no basis has established.
+  const basis: RecordGridSourceBasis = source.basis ?? 'asserted'
   return (
     <span className="relative inline-flex">
       <button

@@ -9,6 +9,7 @@
  * Exits 0 only when every check passes. Exits 1 on any failure, and on a commit
  * with no proof at all — "nobody signed this off" is a rejection, not a pass.
  */
+import { invokedAsScript } from './invoked-as-script'
 import { formatSignoffSummary, readSignoffKey } from './proof-record'
 import { formatSignoffVerification, verifySignoffAtRev, verifySignoffProofFile, type SignoffVerification } from './proof-verify'
 
@@ -94,9 +95,13 @@ function main(): number {
   return report(outcome, options)
 }
 
-try {
-  process.exit(main())
-} catch (error) {
-  process.stderr.write(`agent-app-verify-proof failed: ${error instanceof Error ? error.message : String(error)}\n`)
-  process.exit(1)
+/* c8 ignore start — process wiring, exercised by the bin itself */
+if (invokedAsScript(import.meta.url, process.argv[1])) {
+  try {
+    process.exit(main())
+  } catch (error) {
+    process.stderr.write(`agent-app-verify-proof failed: ${error instanceof Error ? error.message : String(error)}\n`)
+    process.exit(1)
+  }
 }
+/* c8 ignore stop */

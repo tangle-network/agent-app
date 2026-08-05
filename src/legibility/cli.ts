@@ -28,6 +28,7 @@ import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+import { invokedAsScript } from '../signoff/invoked-as-script'
 import { DEFAULT_CONFIG_FILE, LegibilityUsageError, mergeConfig, parseArgs, USAGE } from './cli-args'
 import { checkLegibility } from './index'
 import { formatLegibilityReport, legibilityReportToJson } from './report'
@@ -71,11 +72,15 @@ async function main(): Promise<number> {
   return report.ok ? 0 : 1
 }
 
-try {
-  process.exit(await main())
-} catch (error) {
-  const message = error instanceof Error ? error.message : String(error)
-  process.stderr.write(`agent-app-legibility-check: ${message}\n`)
-  if (error instanceof LegibilityUsageError) process.stderr.write(`${USAGE}\n`)
-  process.exit(2)
+/* c8 ignore start — process wiring, exercised by the bin itself */
+if (invokedAsScript(import.meta.url, process.argv[1])) {
+  try {
+    process.exit(await main())
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    process.stderr.write(`agent-app-legibility-check: ${message}\n`)
+    if (error instanceof LegibilityUsageError) process.stderr.write(`${USAGE}\n`)
+    process.exit(2)
+  }
 }
+/* c8 ignore stop */
