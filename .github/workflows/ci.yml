@@ -1,9 +1,22 @@
+# Post-merge safety net. NOT the merge gate.
+#
+# The merge gate is `pnpm signoff`, run locally against the exact commit that
+# will merge; `docs/SIGNOFF.md` states what that proves, what it cannot, and the
+# rule that a merge with no valid proof is a defect. This workflow runs only on
+# `main`, so it can no longer block a person waiting on a pull request. When it
+# fails it files an issue, because the merge already happened and a red tick on
+# a merged commit is nobody's job.
+#
+# The step list here and `signoff.config.mjs` are the same commands on purpose.
+# Adding a step here without adding it there makes the sign-off proof a weaker
+# claim than it reads as.
+#
+# `publish.yml` is untouched and still the release path.
 name: CI
 
 on:
   push:
     branches: [main]
-  pull_request:
 
 permissions:
   contents: read
@@ -29,9 +42,11 @@ jobs:
         with:
           persist-credentials: false
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      # One pin, one file. The local gate reads `.nvmrc` too, so this workflow
+      # and the merge gate cannot silently verify different runtimes.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
@@ -65,3 +80,55 @@ jobs:
       #     in knip's ignoreDependencies for exactly that reason — do not
       #     "clean them up".
       - run: pnpm run knip
+
+  # The safety net's output. A red post-merge run is a real defect on `main` and
+  # somebody has to own it, but nobody is standing in front of it waiting — the
+  # merge already happened. So it files an issue instead of being a red tick on
+  # a pull request nobody can merge past.
+  #
+  # One rolling issue, not one per push: a failing `main` usually fails several
+  # pushes in a row, and a fresh issue each time buries the first one, which is
+  # the one carrying the commit that broke it.
+  #
+  # `gh` rather than a JS action: it ships on `ubuntu-latest`, so this adds no
+  # third-party action to sha-pin and keep current.
+  safety-net-issue:
+    needs: [build]
+    if: always() && needs.build.result == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: File or append the safety-net failure
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title='Post-merge safety net is red on main'
+          body="$(printf '%s\n' \
+            "Commit \`${SHA}\` failed the post-merge safety net." \
+            "" \
+            "- run: ${RUN_URL}" \
+            "- pushed by: @${ACTOR}" \
+            "" \
+            "Reproduce locally with the merge gate:" \
+            "" \
+            '```' \
+            "git fetch origin && git checkout ${SHA}" \
+            "pnpm signoff --source head" \
+            '```' \
+            "" \
+            "If the gate passes here and failed on the runner, that difference is the finding." \
+            "See \`docs/SIGNOFF.md\` for what the local gate cannot prove.")"
+          number="$(gh issue list --state open --limit 100 --json number,title \
+            --jq "map(select(.title == \"${title}\")) | .[0].number // empty")"
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "$body"
+            echo "appended to issue #$number"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
