@@ -12493,6 +12493,817 @@
       ]
     },
     {
+      "id": "./signoff",
+      "source": "src/signoff/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "assertNodeVersion",
+          "kind": "function",
+          "signature": "(requirement: NodeVersionRequirement | null, running?: any) => void",
+          "doc": "Throw when the running Node cannot stand in for the declared one."
+        },
+        {
+          "name": "assertShuffleArgsReachTheRunner",
+          "kind": "function",
+          "signature": "(steps: readonly SignoffStepSpec[]) => void",
+          "doc": "Refuse a shuffled step whose command cannot receive the appended flags."
+        },
+        {
+          "name": "CleanTree",
+          "kind": "interface",
+          "signature": "interface CleanTree",
+          "doc": null
+        },
+        {
+          "name": "CommandResult",
+          "kind": "interface",
+          "signature": "interface CommandResult",
+          "doc": "The subprocess primitive every sign-off step runs through."
+        },
+        {
+          "name": "DEFAULT_SHUFFLE_ARGS",
+          "kind": "const",
+          "signature": "readonly string[]",
+          "doc": "Vitest file-order shuffle."
+        },
+        {
+          "name": "DEFAULT_SHUFFLE_RUNS",
+          "kind": "const",
+          "signature": "2",
+          "doc": null
+        },
+        {
+          "name": "deriveSeed",
+          "kind": "function",
+          "signature": "(base: number, stepName: string, index: number) => number",
+          "doc": "Derive a step's Nth seed from the base."
+        },
+        {
+          "name": "deriveSignoffConfig",
+          "kind": "function",
+          "signature": "(scripts: Readonly<Record<string, string>>) => { readonly config: SignoffConfig; readonly used: readonly string[]; }",
+          "doc": null
+        },
+        {
+          "name": "formatSignoffLine",
+          "kind": "function",
+          "signature": "(report: SignoffReport) => string",
+          "doc": "One line for a commit message, a PR comment, or a chat handoff."
+        },
+        {
+          "name": "formatSignoffReport",
+          "kind": "function",
+          "signature": "(report: SignoffReport) => string",
+          "doc": null
+        },
+        {
+          "name": "GraphNode",
+          "kind": "interface",
+          "signature": "interface GraphNode",
+          "doc": "The dependency graph, and running it as wide as the graph allows."
+        },
+        {
+          "name": "LoadedSignoffConfig",
+          "kind": "interface",
+          "signature": "interface LoadedSignoffConfig",
+          "doc": null
+        },
+        {
+          "name": "loadSignoffConfig",
+          "kind": "function",
+          "signature": "(options: LoadSignoffConfigOptions) => Promise<LoadedSignoffConfig>",
+          "doc": null
+        },
+        {
+          "name": "LoadSignoffConfigOptions",
+          "kind": "interface",
+          "signature": "interface LoadSignoffConfigOptions",
+          "doc": null
+        },
+        {
+          "name": "MANIFEST_FILES",
+          "kind": "const",
+          "signature": "readonly string[]",
+          "doc": "Basenames whose bytes decide what an install resolves to."
+        },
+        {
+          "name": "manifestCacheKey",
+          "kind": "function",
+          "signature": "(treePath: string, files: readonly string[]) => string",
+          "doc": "sha256 over each manifest's path and content — order-independent by sorting."
+        },
+        {
+          "name": "manifestFiles",
+          "kind": "function",
+          "signature": "(treePath: string) => string[]",
+          "doc": "Every manifest in the tree, repo-relative and sorted."
+        },
+        {
+          "name": "materializeCleanTree",
+          "kind": "function",
+          "signature": "(options: MaterializeOptions) => CleanTree",
+          "doc": null
+        },
+        {
+          "name": "MaterializeOptions",
+          "kind": "interface",
+          "signature": "interface MaterializeOptions",
+          "doc": "Materialize the pristine checkout every step runs against."
+        },
+        {
+          "name": "newSeedBase",
+          "kind": "function",
+          "signature": "() => number",
+          "doc": "A fresh base seed."
+        },
+        {
+          "name": "NodeVersionRequirement",
+          "kind": "interface",
+          "signature": "interface NodeVersionRequirement",
+          "doc": "Refuse to sign off on a runtime the product does not ship."
+        },
+        {
+          "name": "parseSignoffConfig",
+          "kind": "function",
+          "signature": "(value: unknown, where: string) => SignoffConfig",
+          "doc": null
+        },
+        {
+          "name": "peakConcurrency",
+          "kind": "function",
+          "signature": "(steps: readonly SignoffStepResult[]) => number",
+          "doc": "Concurrency actually achieved, measured from the step windows rather than asserted from the config."
+        },
+        {
+          "name": "planAttempts",
+          "kind": "function",
+          "signature": "(step: SignoffStepSpec, seedBase: number, overrideRuns?: number | undefined) => StepAttemptPlan[]",
+          "doc": "Expand one step into the commands that will actually run."
+        },
+        {
+          "name": "removeCleanTree",
+          "kind": "function",
+          "signature": "(tree: CleanTree) => void",
+          "doc": "Unregister and delete a materialized tree."
+        },
+        {
+          "name": "repoRootOf",
+          "kind": "function",
+          "signature": "(dir: string) => string",
+          "doc": null
+        },
+        {
+          "name": "ResolvedWorkflowPin",
+          "kind": "interface",
+          "signature": "interface ResolvedWorkflowPin",
+          "doc": null
+        },
+        {
+          "name": "resolveNodeRequirement",
+          "kind": "function",
+          "signature": "(repoRoot: string, configured?: string | undefined) => NodeVersionRequirement | null",
+          "doc": null
+        },
+        {
+          "name": "resolveStore",
+          "kind": "function",
+          "signature": "(options: ResolveStoreOptions) => StoreResolution",
+          "doc": null
+        },
+        {
+          "name": "ResolveStoreOptions",
+          "kind": "interface",
+          "signature": "interface ResolveStoreOptions",
+          "doc": null
+        },
+        {
+          "name": "resolveWorkflowNodePin",
+          "kind": "function",
+          "signature": "(repoRoot: string, majorOf: (raw: string) => number | null) => ResolvedWorkflowPin | null",
+          "doc": "One Node major for the whole merge gate, or a refusal that names why not."
+        },
+        {
+          "name": "runCommand",
+          "kind": "function",
+          "signature": "(options: RunCommandOptions) => Promise<CommandResult>",
+          "doc": "Run one shell command to completion and report what happened."
+        },
+        {
+          "name": "RunCommandOptions",
+          "kind": "interface",
+          "signature": "interface RunCommandOptions",
+          "doc": null
+        },
+        {
+          "name": "runGraph",
+          "kind": "function",
+          "signature": "<TNode extends GraphNode, TValue>(options: RunGraphOptions<TNode, TValue>) => Promise<TaskOutcome<TValue>[]>",
+          "doc": "Run the graph, honouring dependencies and the parallelism cap."
+        },
+        {
+          "name": "RunGraphOptions",
+          "kind": "interface",
+          "signature": "interface RunGraphOptions",
+          "doc": null
+        },
+        {
+          "name": "runSignoff",
+          "kind": "function",
+          "signature": "(options?: RunSignoffOptions) => Promise<SignoffReport>",
+          "doc": null
+        },
+        {
+          "name": "RunSignoffOptions",
+          "kind": "interface",
+          "signature": "interface RunSignoffOptions",
+          "doc": "The sign-off run: reproduce a clean CI environment, then go further."
+        },
+        {
+          "name": "scanMergeGateNodePins",
+          "kind": "function",
+          "signature": "(repoRoot: string) => WorkflowNodePin[]",
+          "doc": "Node pins declared by every workflow that gates a merge, in filename order."
+        },
+        {
+          "name": "SIGNOFF_CONFIG_FILES",
+          "kind": "const",
+          "signature": "readonly string[]",
+          "doc": "Where the step list comes from."
+        },
+        {
+          "name": "SignoffAttempt",
+          "kind": "interface",
+          "signature": "interface SignoffAttempt",
+          "doc": "One execution of a step's command."
+        },
+        {
+          "name": "SignoffConfig",
+          "kind": "interface",
+          "signature": "interface SignoffConfig",
+          "doc": "What a repo declares in `signoff.config.mjs` or a package.json `signoff` key."
+        },
+        {
+          "name": "SignoffConfigOrigin",
+          "kind": "type",
+          "signature": "type SignoffConfigOrigin",
+          "doc": "Where a config came from."
+        },
+        {
+          "name": "SignoffEvent",
+          "kind": "type",
+          "signature": "type SignoffEvent",
+          "doc": "Progress, for a CLI that prints as it goes rather than at the end."
+        },
+        {
+          "name": "SignoffHostFacts",
+          "kind": "interface",
+          "signature": "interface SignoffHostFacts",
+          "doc": null
+        },
+        {
+          "name": "SignoffInstallResult",
+          "kind": "interface",
+          "signature": "interface SignoffInstallResult",
+          "doc": null
+        },
+        {
+          "name": "SignoffInstallSpec",
+          "kind": "interface",
+          "signature": "interface SignoffInstallSpec",
+          "doc": "The hermetic install that precedes every step."
+        },
+        {
+          "name": "SignoffRepoFacts",
+          "kind": "interface",
+          "signature": "interface SignoffRepoFacts",
+          "doc": null
+        },
+        {
+          "name": "SignoffReport",
+          "kind": "interface",
+          "signature": "interface SignoffReport",
+          "doc": null
+        },
+        {
+          "name": "SignoffShuffleSpec",
+          "kind": "interface",
+          "signature": "interface SignoffShuffleSpec",
+          "doc": "How a step is re-run under different suite orders."
+        },
+        {
+          "name": "SignoffSource",
+          "kind": "type",
+          "signature": "type SignoffSource",
+          "doc": "Which bytes get verified."
+        },
+        {
+          "name": "SignoffStepResult",
+          "kind": "interface",
+          "signature": "interface SignoffStepResult",
+          "doc": null
+        },
+        {
+          "name": "SignoffStepSpec",
+          "kind": "interface",
+          "signature": "interface SignoffStepSpec",
+          "doc": "One verification step — a CI step, declared by the repo."
+        },
+        {
+          "name": "SignoffStepStatus",
+          "kind": "type",
+          "signature": "type SignoffStepStatus",
+          "doc": null
+        },
+        {
+          "name": "StepAttemptPlan",
+          "kind": "interface",
+          "signature": "interface StepAttemptPlan",
+          "doc": null
+        },
+        {
+          "name": "StoreResolution",
+          "kind": "interface",
+          "signature": "interface StoreResolution",
+          "doc": null
+        },
+        {
+          "name": "TaskOutcome",
+          "kind": "interface",
+          "signature": "interface TaskOutcome",
+          "doc": null
+        },
+        {
+          "name": "TaskStatus",
+          "kind": "type",
+          "signature": "type TaskStatus",
+          "doc": null
+        },
+        {
+          "name": "triggersOnPullRequest",
+          "kind": "function",
+          "signature": "(source: string) => boolean",
+          "doc": "Does this workflow run on `pull_request`?"
+        },
+        {
+          "name": "validateGraph",
+          "kind": "function",
+          "signature": "(nodes: readonly GraphNode[]) => void",
+          "doc": "Throws on a duplicate name, a dangling `needs`, or a cycle."
+        },
+        {
+          "name": "WorkflowNodePin",
+          "kind": "interface",
+          "signature": "interface WorkflowNodePin",
+          "doc": "Read the Node pin out of the workflows that gate a merge."
+        }
+      ]
+    },
+    {
+      "id": "./signoff/cli",
+      "source": "src/signoff/cli.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "parseArgs",
+          "kind": "function",
+          "signature": "(argv: readonly string[]) => ParsedArgs",
+          "doc": null
+        },
+        {
+          "name": "runSignoffCli",
+          "kind": "function",
+          "signature": "(argv: readonly string[]) => Promise<number>",
+          "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./signoff/proof",
+      "source": "src/signoff/proof.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "AttachedSignoffProof",
+          "kind": "interface",
+          "signature": "interface AttachedSignoffProof",
+          "doc": null
+        },
+        {
+          "name": "attachSignoffProof",
+          "kind": "function",
+          "signature": "(input: AttachSignoffProofInput) => AttachedSignoffProof",
+          "doc": null
+        },
+        {
+          "name": "AttachSignoffProofInput",
+          "kind": "interface",
+          "signature": "interface AttachSignoffProofInput",
+          "doc": null
+        },
+        {
+          "name": "buildSignoffProof",
+          "kind": "function",
+          "signature": "(input: BuildSignoffProofInput) => { body: { proofVersion: number; subject: { repo: string; commit: string; tree: strin…",
+          "doc": null
+        },
+        {
+          "name": "BuildSignoffProofInput",
+          "kind": "interface",
+          "signature": "interface BuildSignoffProofInput",
+          "doc": null
+        },
+        {
+          "name": "canonicalizeProofBody",
+          "kind": "function",
+          "signature": "(body: { proofVersion: number; subject: { repo: string; commit: string; tree: string; commitTree: string; parents: stri…",
+          "doc": null
+        },
+        {
+          "name": "canonicalJson",
+          "kind": "function",
+          "signature": "(value: CanonicalValue) => string",
+          "doc": "Deterministic JSON: object keys sorted, array order preserved, no whitespace."
+        },
+        {
+          "name": "collectToolingFacts",
+          "kind": "function",
+          "signature": "(input: ToolingFactsInput) => { node: string; pnpm: string | null; peers: { name: string; version: string | null; }[]; }",
+          "doc": "The versions that actually resolved on disk — the field CI's clean install makes trustworthy and a warm local `node_modules` does not."
+        },
+        {
+          "name": "CommitFacts",
+          "kind": "interface",
+          "signature": "interface CommitFacts",
+          "doc": null
+        },
+        {
+          "name": "computeWorktreeTree",
+          "kind": "function",
+          "signature": "(repoDir: string) => string",
+          "doc": "Hash the tree the checks actually ran against, including uncommitted and untracked (non-ignored) files."
+        },
+        {
+          "name": "formatSignoffSummary",
+          "kind": "function",
+          "signature": "(proof: { body: { proofVersion: number; subject: { repo: string; commit: string; tree: string; commitTree: string; pare…",
+          "doc": "The single line an operator pastes into a PR or a merge commit: how many steps ran, how long it took, the seeds, and the verdict."
+        },
+        {
+          "name": "formatSignoffVerification",
+          "kind": "function",
+          "signature": "(result: SignoffVerification) => string",
+          "doc": "One line per failure, prefixed by its code, in the order the checks ran."
+        },
+        {
+          "name": "gitIsAncestor",
+          "kind": "function",
+          "signature": "(repoDir: string) => IsAncestorFn",
+          "doc": null
+        },
+        {
+          "name": "GitResult",
+          "kind": "interface",
+          "signature": "interface GitResult",
+          "doc": null
+        },
+        {
+          "name": "gitText",
+          "kind": "function",
+          "signature": "(repoDir: string, args: readonly string[], options?: { readonly input?: string | undefined; readonly env?: Readonly<Rec…",
+          "doc": "Run git, or throw."
+        },
+        {
+          "name": "hashProofBody",
+          "kind": "function",
+          "signature": "(body: { proofVersion: number; subject: { repo: string; commit: string; tree: string; commitTree: string; parents: stri…",
+          "doc": null
+        },
+        {
+          "name": "hashStepOutput",
+          "kind": "function",
+          "signature": "(output: string) => string",
+          "doc": "The digest a runner records for a step's combined output."
+        },
+        {
+          "name": "IsAncestorFn",
+          "kind": "type",
+          "signature": "type IsAncestorFn",
+          "doc": "Is `ancestor` reachable from `descendant`?"
+        },
+        {
+          "name": "listSignoffProofs",
+          "kind": "function",
+          "signature": "(repoDir: string) => readonly { readonly commit: string; readonly proof: { body: { proofVersion: number; subject: { rep…",
+          "doc": "Every proof stored under the notes ref, paired with the commit it annotates."
+        },
+        {
+          "name": "macMatches",
+          "kind": "function",
+          "signature": "(expected: string, actual: string) => boolean",
+          "doc": "Constant-time comparison of two hex digests of equal length."
+        },
+        {
+          "name": "NO_EXIT_CODE",
+          "kind": "const",
+          "signature": "-1",
+          "doc": "A step that never executed has no exit code, so it is recorded as one no process can produce."
+        },
+        {
+          "name": "NOT_EXECUTED_COMMAND",
+          "kind": "const",
+          "signature": "\"(never executed)\"",
+          "doc": "The `command` of a step that never executed."
+        },
+        {
+          "name": "parseSignoffProof",
+          "kind": "function",
+          "signature": "(json: string) => { body: { proofVersion: number; subject: { repo: string; commit: string; tree: string; commitTree: st…",
+          "doc": "Parse an untrusted proof document, failing loud on any shape the verifier cannot reason about."
+        },
+        {
+          "name": "ProofFromReportInput",
+          "kind": "interface",
+          "signature": "interface ProofFromReportInput",
+          "doc": null
+        },
+        {
+          "name": "proofFromSignoffReport",
+          "kind": "function",
+          "signature": "(input: ProofFromReportInput) => { body: { proofVersion: number; subject: { repo: string; commit: string; tree: string;…",
+          "doc": null
+        },
+        {
+          "name": "readCommitFacts",
+          "kind": "function",
+          "signature": "(repoDir: string, rev: string) => CommitFacts",
+          "doc": null
+        },
+        {
+          "name": "readInstalledVersion",
+          "kind": "function",
+          "signature": "(repoDir: string, packageName: string) => string | null",
+          "doc": "Resolved version from the consumer's own `node_modules`, or `null` when the package is not there."
+        },
+        {
+          "name": "readSignoffKey",
+          "kind": "function",
+          "signature": "(path: string) => Uint8Array<ArrayBufferLike>",
+          "doc": "Read the local sign-off key."
+        },
+        {
+          "name": "readSignoffProofNote",
+          "kind": "function",
+          "signature": "(repoDir: string, rev: string) => SignoffProofLookup",
+          "doc": "The note attached to exactly this commit, or `found: false`."
+        },
+        {
+          "name": "requiredStepsFor",
+          "kind": "function",
+          "signature": "(repo: string) => readonly string[]",
+          "doc": "Throws for a repo with no table — an unrecognised repo has no bar, and no bar is not a pass."
+        },
+        {
+          "name": "resolveCommit",
+          "kind": "function",
+          "signature": "(repoDir: string, rev: string) => string",
+          "doc": "Resolve a revision to the commit it names, failing loud on an unknown rev."
+        },
+        {
+          "name": "resolveSignoffProof",
+          "kind": "function",
+          "signature": "(repoDir: string, rev: string) => SignoffProofLookup",
+          "doc": "Answer \"was this SHA signed off\" for any commit, including one produced by a rebase or a squash-merge of the branch that was actually verified."
+        },
+        {
+          "name": "runGit",
+          "kind": "function",
+          "signature": "(repoDir: string, args: readonly string[], options?: { readonly input?: string | undefined; readonly env?: Readonly<Rec…",
+          "doc": "Run git and hand back the raw result."
+        },
+        {
+          "name": "sealProof",
+          "kind": "function",
+          "signature": "(body: { proofVersion: number; subject: { repo: string; commit: string; tree: string; commitTree: string; parents: stri…",
+          "doc": null
+        },
+        {
+          "name": "seedsFromReport",
+          "kind": "function",
+          "signature": "(report: SignoffReport) => Record<string, string | number>",
+          "doc": "Every seed the run used, keyed so a reader can replay one step rather than the whole run."
+        },
+        {
+          "name": "serializeSignoffProof",
+          "kind": "function",
+          "signature": "(proof: { body: { proofVersion: number; subject: { repo: string; commit: string; tree: string; commitTree: string; pare…",
+          "doc": null
+        },
+        {
+          "name": "SIGNOFF_NOTES_GIT_CONFIG",
+          "kind": "const",
+          "signature": "readonly string[]",
+          "doc": "The git configuration a repo needs for notes to travel."
+        },
+        {
+          "name": "SIGNOFF_NOTES_REF",
+          "kind": "const",
+          "signature": "\"refs/notes/signoff\"",
+          "doc": null
+        },
+        {
+          "name": "SIGNOFF_PROOF_VERSION",
+          "kind": "const",
+          "signature": "1",
+          "doc": "Bumped when the canonical body shape changes; a verifier refuses versions it does not know."
+        },
+        {
+          "name": "SIGNOFF_REQUIRED_STEPS",
+          "kind": "const",
+          "signature": "Readonly<Record<string, readonly string[]>>",
+          "doc": "The steps a repo's sign-off MUST cover, transcribed from each repo's CI job."
+        },
+        {
+          "name": "SIGNOFF_STEP_STATUSES",
+          "kind": "const",
+          "signature": "readonly [\"passed\", \"failed\", \"skipped\", \"cancelled\", \"blocked\"]",
+          "doc": "The runner's step outcomes, restated as proof vocabulary."
+        },
+        {
+          "name": "SignoffCommitBinding",
+          "kind": "type",
+          "signature": "type SignoffCommitBinding",
+          "doc": "How the proof attaches to the commit that was asked about."
+        },
+        {
+          "name": "SignoffFailure",
+          "kind": "interface",
+          "signature": "interface SignoffFailure",
+          "doc": null
+        },
+        {
+          "name": "SignoffFailureCode",
+          "kind": "type",
+          "signature": "type SignoffFailureCode",
+          "doc": null
+        },
+        {
+          "name": "SignoffGitError",
+          "kind": "class",
+          "signature": "class SignoffGitError",
+          "doc": "A git invocation that exited non-zero, carrying stderr so the caller can act."
+        },
+        {
+          "name": "signoffKeyId",
+          "kind": "function",
+          "signature": "(key: Uint8Array<ArrayBufferLike>) => string",
+          "doc": null
+        },
+        {
+          "name": "SignoffLookupFailure",
+          "kind": "type",
+          "signature": "type SignoffLookupFailure",
+          "doc": null
+        },
+        {
+          "name": "SignoffProof",
+          "kind": "type",
+          "signature": "type SignoffProof",
+          "doc": null
+        },
+        {
+          "name": "SignoffProofBody",
+          "kind": "type",
+          "signature": "type SignoffProofBody",
+          "doc": null
+        },
+        {
+          "name": "signoffProofBodySchema",
+          "kind": "const",
+          "signature": "ZodObject<{ proofVersion: ZodNumber; subject: ZodObject<{ repo: ZodString; commit: ZodString; tree: ZodString; commitTr…",
+          "doc": null
+        },
+        {
+          "name": "SignoffProofLookup",
+          "kind": "type",
+          "signature": "type SignoffProofLookup",
+          "doc": null
+        },
+        {
+          "name": "SignoffProofPeer",
+          "kind": "type",
+          "signature": "type SignoffProofPeer",
+          "doc": null
+        },
+        {
+          "name": "signoffProofSchema",
+          "kind": "const",
+          "signature": "ZodObject<{ body: ZodObject<{ proofVersion: ZodNumber; subject: ZodObject<{ repo: ZodString; commit: ZodString; tree: Z…",
+          "doc": null
+        },
+        {
+          "name": "SignoffProofSeal",
+          "kind": "type",
+          "signature": "type SignoffProofSeal",
+          "doc": null
+        },
+        {
+          "name": "signoffProofSealSchema",
+          "kind": "const",
+          "signature": "ZodObject<{ algorithm: ZodEnum<{ sha256: \"sha256\"; \"hmac-sha256\": \"hmac-sha256\"; }>; bodySha256: ZodString; keyId: ZodN…",
+          "doc": null
+        },
+        {
+          "name": "SignoffProofStep",
+          "kind": "type",
+          "signature": "type SignoffProofStep",
+          "doc": null
+        },
+        {
+          "name": "signoffProofStepSchema",
+          "kind": "const",
+          "signature": "ZodObject<{ id: ZodString; command: ZodString; cwd: ZodString; status: ZodEnum<{ failed: \"failed\"; cancelled: \"cancelle…",
+          "doc": null
+        },
+        {
+          "name": "SignoffProofSubject",
+          "kind": "type",
+          "signature": "type SignoffProofSubject",
+          "doc": null
+        },
+        {
+          "name": "SignoffVerification",
+          "kind": "interface",
+          "signature": "interface SignoffVerification",
+          "doc": null
+        },
+        {
+          "name": "SignoffVerifyOutcome",
+          "kind": "type",
+          "signature": "type SignoffVerifyOutcome",
+          "doc": null
+        },
+        {
+          "name": "tangleDependencyNames",
+          "kind": "function",
+          "signature": "(repoDir: string) => readonly string[]",
+          "doc": "Every `@tangle-network/*` name the repo declares as a peer or a dependency."
+        },
+        {
+          "name": "ToolingFactsInput",
+          "kind": "interface",
+          "signature": "interface ToolingFactsInput",
+          "doc": null
+        },
+        {
+          "name": "verifySignoffAtRev",
+          "kind": "function",
+          "signature": "(input: VerifySignoffAtRevInput) => SignoffVerifyOutcome",
+          "doc": "Verify by revision: find the proof attached to that SHA (or to its content), then check it."
+        },
+        {
+          "name": "VerifySignoffAtRevInput",
+          "kind": "interface",
+          "signature": "interface VerifySignoffAtRevInput",
+          "doc": null
+        },
+        {
+          "name": "VerifySignoffFileInput",
+          "kind": "interface",
+          "signature": "interface VerifySignoffFileInput",
+          "doc": null
+        },
+        {
+          "name": "verifySignoffProof",
+          "kind": "function",
+          "signature": "(proof: { body: { proofVersion: number; subject: { repo: string; commit: string; tree: string; commitTree: string; pare…",
+          "doc": null
+        },
+        {
+          "name": "verifySignoffProofFile",
+          "kind": "function",
+          "signature": "(input: VerifySignoffFileInput) => SignoffVerification",
+          "doc": "Verify a proof document on disk."
+        },
+        {
+          "name": "VerifySignoffProofOptions",
+          "kind": "interface",
+          "signature": "interface VerifySignoffProofOptions",
+          "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./signoff/proof-cli",
+      "source": "src/signoff/proof-cli.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": []
+    },
+    {
       "id": "./skills",
       "source": "src/skills/index.ts",
       "dependsOn": [],

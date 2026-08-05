@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_90 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_94 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -64,6 +64,10 @@ _90 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./sequences-react`](api/sequences-react.md) | 108 | `brand`, `sequences` |
 | [`./sequences/drizzle`](api/sequences-drizzle.md) | 13 | `tools`, `web` |
 | [`./session-shell`](api/session-shell.md) | 48 | — |
+| [`./signoff`](api/signoff.md) | 60 | — |
+| [`./signoff/cli`](api/signoff-cli.md) | 2 | — |
+| [`./signoff/proof`](api/signoff-proof.md) | 68 | — |
+| [`./signoff/proof-cli`](api/signoff-proof-cli.md) | 0 | — |
 | [`./skills`](api/skills.md) | 27 | — |
 | [`./skills-placement`](api/skills-placement.md) | 6 | `harness`, `skills` |
 | [`./store`](api/store.md) | 10 | — |
@@ -614,6 +618,36 @@ Source: `src/session-shell/index.ts` · 48 exports
 `activeSessionIdFromPath`, `ActiveSessionIdOptions`, `assertNavHrefsRegistered`, `buildSessionNavItem`, `BuildSessionNavItemOptions`, `buildSessionSubItems`, `BuildSessionSubItemsOptions`, `checkNavHrefs`, `ComposedSidebarSessions`, `composeSidebarSessions`, `ComposeSidebarSessionsOptions`, `DEFAULT_RAIL_COOKIE_NAME`, `flattenRouteTable`, `mergeSessionPages`, `NavDestination`, `NavHrefCheckOptions`, `NavHrefItem`, `NavHrefProblem`, `NavHrefProblemReason`, `NavHrefReport`, `NavRouteDef`, `NavRouteTable`, `NavScope`, `NavScopeBases`, `railCollapsedCookie`, `RailCookieOptions`, `RailPrefetch`, `readRailCollapsedCookie`, `RegisteredRoute`, `resolveActiveNavId`, `ResolveActiveNavIdOptions`, `ResolvedNavDestination`, `resolveNavDestinations`, `resolveNavHref`, `resolveScopedActiveNavId`, `ResolveScopedActiveNavIdOptions`, `resolveSessionUnread`, `ResolveSessionUnreadOptions`, `sessionLabel`, `SessionPage`, `SessionRailAction`, `SessionRailNavItem`, `SessionRailSubItem`, `SessionRowActions`, `SessionSort`, `SessionSummary`, `UNTITLED_SESSION_LABEL`, `writeRailCollapsedCookie`
 
 [Full API →](api/session-shell.md)
+
+## `./signoff`
+
+Source: `src/signoff/index.ts` · 60 exports
+
+`assertNodeVersion`, `assertShuffleArgsReachTheRunner`, `CleanTree`, `CommandResult`, `DEFAULT_SHUFFLE_ARGS`, `DEFAULT_SHUFFLE_RUNS`, `deriveSeed`, `deriveSignoffConfig`, `formatSignoffLine`, `formatSignoffReport`, `GraphNode`, `LoadedSignoffConfig`, `loadSignoffConfig`, `LoadSignoffConfigOptions`, `MANIFEST_FILES`, `manifestCacheKey`, `manifestFiles`, `materializeCleanTree`, `MaterializeOptions`, `newSeedBase`, `NodeVersionRequirement`, `parseSignoffConfig`, `peakConcurrency`, `planAttempts`, `removeCleanTree`, `repoRootOf`, `ResolvedWorkflowPin`, `resolveNodeRequirement`, `resolveStore`, `ResolveStoreOptions`, `resolveWorkflowNodePin`, `runCommand`, `RunCommandOptions`, `runGraph`, `RunGraphOptions`, `runSignoff`, `RunSignoffOptions`, `scanMergeGateNodePins`, `SIGNOFF_CONFIG_FILES`, `SignoffAttempt`, `SignoffConfig`, `SignoffConfigOrigin`, `SignoffEvent`, `SignoffHostFacts`, `SignoffInstallResult`, `SignoffInstallSpec`, `SignoffRepoFacts`, `SignoffReport`, `SignoffShuffleSpec`, `SignoffSource`, `SignoffStepResult`, `SignoffStepSpec`, `SignoffStepStatus`, `StepAttemptPlan`, `StoreResolution`, `TaskOutcome`, `TaskStatus`, `triggersOnPullRequest`, `validateGraph`, `WorkflowNodePin`
+
+[Full API →](api/signoff.md)
+
+## `./signoff/cli`
+
+Source: `src/signoff/cli.ts` · 2 exports
+
+`parseArgs`, `runSignoffCli`
+
+[Full API →](api/signoff-cli.md)
+
+## `./signoff/proof`
+
+Source: `src/signoff/proof.ts` · 68 exports
+
+`AttachedSignoffProof`, `attachSignoffProof`, `AttachSignoffProofInput`, `buildSignoffProof`, `BuildSignoffProofInput`, `canonicalizeProofBody`, `canonicalJson`, `collectToolingFacts`, `CommitFacts`, `computeWorktreeTree`, `formatSignoffSummary`, `formatSignoffVerification`, `gitIsAncestor`, `GitResult`, `gitText`, `hashProofBody`, `hashStepOutput`, `IsAncestorFn`, `listSignoffProofs`, `macMatches`, `NO_EXIT_CODE`, `NOT_EXECUTED_COMMAND`, `parseSignoffProof`, `ProofFromReportInput`, `proofFromSignoffReport`, `readCommitFacts`, `readInstalledVersion`, `readSignoffKey`, `readSignoffProofNote`, `requiredStepsFor`, `resolveCommit`, `resolveSignoffProof`, `runGit`, `sealProof`, `seedsFromReport`, `serializeSignoffProof`, `SIGNOFF_NOTES_GIT_CONFIG`, `SIGNOFF_NOTES_REF`, `SIGNOFF_PROOF_VERSION`, `SIGNOFF_REQUIRED_STEPS`, `SIGNOFF_STEP_STATUSES`, `SignoffCommitBinding`, `SignoffFailure`, `SignoffFailureCode`, `SignoffGitError`, `signoffKeyId`, `SignoffLookupFailure`, `SignoffProof`, `SignoffProofBody`, `signoffProofBodySchema`, `SignoffProofLookup`, `SignoffProofPeer`, `signoffProofSchema`, `SignoffProofSeal`, `signoffProofSealSchema`, `SignoffProofStep`, `signoffProofStepSchema`, `SignoffProofSubject`, `SignoffVerification`, `SignoffVerifyOutcome`, `tangleDependencyNames`, `ToolingFactsInput`, `verifySignoffAtRev`, `VerifySignoffAtRevInput`, `VerifySignoffFileInput`, `verifySignoffProof`, `verifySignoffProofFile`, `VerifySignoffProofOptions`
+
+[Full API →](api/signoff-proof.md)
+
+## `./signoff/proof-cli`
+
+Source: `src/signoff/proof-cli.ts` · 0 exports
+
+_No public exports._
 
 ## `./skills`
 

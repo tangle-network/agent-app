@@ -35,10 +35,22 @@
     "agent-app-theme-check": "./dist/theme-contract/cli.js",
     "agent-app-legibility-check": "./dist/legibility/cli.js",
     "agent-app-preflight": "./dist/preflight/cli.js",
-    "agent-app-peer-check": "./dist/peer-floors/cli.js"
+    "agent-app-peer-check": "./dist/peer-floors/cli.js",
+    "agent-app-signoff": "./dist/signoff/cli.js",
+    "agent-app-verify-proof": "./dist/signoff/proof-cli.js"
   },
   "exports": {
     "./package.json": "./package.json",
+    "./signoff": {
+      "types": "./dist/signoff/index.d.ts",
+      "import": "./dist/signoff/index.js",
+      "default": "./dist/signoff/index.js"
+    },
+    "./signoff/proof": {
+      "types": "./dist/signoff/proof.d.ts",
+      "import": "./dist/signoff/proof.js",
+      "default": "./dist/signoff/proof.js"
+    },
     "./tools": {
       "types": "./dist/tools/index.d.ts",
       "import": "./dist/tools/index.js",
@@ -482,7 +494,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "docs:gen": "agent-docs",
-    "knip": "knip"
+    "knip": "knip",
+    "signoff": "node dist/signoff/cli.js"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260722.1",
