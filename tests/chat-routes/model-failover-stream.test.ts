@@ -137,6 +137,13 @@ describe('isCommittingSandboxEvent — the commit-point rule', () => {
     expect(isCommittingSandboxEvent(tokenPart)).toBe(true)
   })
 
+  it.each(['model-processing', 'model.processing'])(
+    'treats %s as non-committing liveness',
+    (type) => {
+      expect(isCommittingSandboxEvent({ type, data: { phase: 'generating' } })).toBe(false)
+    },
+  )
+
   it('commits on unknown event types — the safe direction is a missed failover, never a duplicated answer', () => {
     expect(isCommittingSandboxEvent({ type: 'token', data: { value: 'ok' } })).toBe(true)
     expect(isCommittingSandboxEvent({ type: 'some.future.event', data: {} })).toBe(true)
@@ -175,6 +182,183 @@ describe('classifyTerminalFailure — the RESOLVED outage shape', () => {
 })
 
 describe('streamWithModelFailover — over the verbatim sequences', () => {
+  it('bounds a silent preferred model, closes it, and serves the fallback', async () => {
+    vi.useFakeTimers()
+    try {
+      const opened: string[] = []
+      const closePrimary = vi.fn(async () => ({ done: true as const, value: undefined }))
+      let primaryStarted = false
+      const silentPrimary: AsyncIterable<unknown> = {
+        [Symbol.asyncIterator]: () => ({
+          next: () => {
+            if (!primaryStarted) {
+              primaryStarted = true
+              return Promise.resolve({ done: false as const, value: { type: 'start' } })
+            }
+            return new Promise<IteratorResult<unknown>>(() => {})
+          },
+          return: closePrimary,
+        }),
+      }
+      const handle = streamWithModelFailover({
+        models: ['silent-model', 'gpt-5-mini'],
+        firstResponseTimeoutMs: 50,
+        open: ({ model }) => {
+          opened.push(model)
+          return model === 'silent-model' ? silentPrimary : feed(HEALTHY_MODEL_SEQUENCE)
+        },
+      })
+
+      let events: Array<Record<string, unknown>> | undefined
+      void collect(handle.events).then((value) => { events = value })
+      await vi.advanceTimersByTimeAsync(50)
+      await Promise.resolve()
+
+      expect(opened).toEqual(['silent-model', 'gpt-5-mini'])
+      expect(events).toEqual(HEALTHY_MODEL_SEQUENCE)
+      expect(closePrimary).toHaveBeenCalledOnce()
+      expect(handle.servingModel()).toBe('gpt-5-mini')
+      expect(handle.attempts()[0]?.reason).toContain('first answer-bearing event')
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('uses one hard first-response deadline across both processing aliases', async () => {
+    vi.useFakeTimers()
+    try {
+      const liveness = [
+        { type: 'model-processing', data: { phase: 'thinking' } },
+        { type: 'model.processing', data: { phase: 'thinking' } },
+      ]
+      let index = 0
+      const closePrimary = vi.fn(async () => ({ done: true as const, value: undefined }))
+      const livenessOnly: AsyncIterable<unknown> = {
+        [Symbol.asyncIterator]: () => ({
+          next: async () => index < liveness.length
+            ? { done: false as const, value: liveness[index++] }
+            : new Promise<IteratorResult<unknown>>(() => {}),
+          return: closePrimary,
+        }),
+      }
+      const handle = streamWithModelFailover({
+        models: ['liveness-only', 'healthy'],
+        firstResponseTimeoutMs: 40,
+        open: ({ model }) => model === 'liveness-only' ? livenessOnly : feed(HEALTHY_MODEL_SEQUENCE),
+      })
+
+      let events: Array<Record<string, unknown>> | undefined
+      void collect(handle.events).then((value) => { events = value })
+      await vi.advanceTimersByTimeAsync(40)
+      await Promise.resolve()
+
+      expect(events).toEqual(HEALTHY_MODEL_SEQUENCE)
+      expect(closePrimary).toHaveBeenCalledOnce()
+      expect(handle.usedFallback()).toBe(true)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps source opening separate from the provider first-response deadline', async () => {
+    vi.useFakeTimers()
+    try {
+      async function* coldSource(): AsyncGenerator<unknown> {
+        await new Promise((resolve) => setTimeout(resolve, 80))
+        yield* feed(HEALTHY_MODEL_SEQUENCE)
+      }
+      const handle = streamWithModelFailover({
+        models: ['cold-model', 'fallback'],
+        openTimeoutMs: 100,
+        firstResponseTimeoutMs: 20,
+        // Async-generator setup runs on the first `next()`, not construction.
+        // That cold work belongs to the source-open phase.
+        open: ({ model }) => model === 'cold-model' ? coldSource() : feed(HEALTHY_MODEL_SEQUENCE),
+      })
+
+      let events: Array<Record<string, unknown>> | undefined
+      void collect(handle.events).then((value) => { events = value })
+      await vi.advanceTimersByTimeAsync(80)
+      await Promise.resolve()
+
+      expect(events).toEqual(HEALTHY_MODEL_SEQUENCE)
+      expect(handle.servingModel()).toBe('cold-model')
+      expect(handle.usedFallback()).toBe(false)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('bounds source opening and closes a source that arrives after abandonment', async () => {
+    vi.useFakeTimers()
+    try {
+      let resolveLate!: (source: AsyncIterable<unknown>) => void
+      const lateSource = new Promise<AsyncIterable<unknown>>((resolve) => { resolveLate = resolve })
+      const closeLate = vi.fn(async () => ({ done: true as const, value: undefined }))
+      const opened: string[] = []
+      let abandonedSignal: AbortSignal | undefined
+      const handle = streamWithModelFailover({
+        models: ['cold-model', 'healthy'],
+        openTimeoutMs: 30,
+        firstResponseTimeoutMs: 30,
+        open: ({ model, signal }) => {
+          opened.push(model)
+          if (model === 'cold-model') abandonedSignal = signal
+          return model === 'cold-model' ? lateSource : feed(HEALTHY_MODEL_SEQUENCE)
+        },
+      })
+
+      let events: Array<Record<string, unknown>> | undefined
+      void collect(handle.events).then((value) => { events = value })
+      await vi.advanceTimersByTimeAsync(30)
+      await Promise.resolve()
+
+      expect(opened).toEqual(['cold-model', 'healthy'])
+      expect(events).toEqual(HEALTHY_MODEL_SEQUENCE)
+      expect(abandonedSignal?.aborted).toBe(true)
+
+      resolveLate({
+        [Symbol.asyncIterator]: () => ({
+          next: () => new Promise<IteratorResult<unknown>>(() => {}),
+          return: closeLate,
+        }),
+      })
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(closeLate).toHaveBeenCalledOnce()
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('commits on reasoning before the deadline and never falls back after a later outage', async () => {
+    const opened: string[] = []
+    async function* reasoningThenFailure(): AsyncGenerator<unknown> {
+      yield {
+        type: 'message.part.updated',
+        data: { part: { id: 'reasoning-1', type: 'reasoning', text: 'Considering' } },
+      }
+      throw new Error('502 Bad Gateway after reasoning started')
+    }
+    const handle = streamWithModelFailover({
+      models: ['reasoning-model', 'fallback'],
+      firstResponseTimeoutMs: 50,
+      open: ({ model }) => {
+        opened.push(model)
+        return model === 'reasoning-model' ? reasoningThenFailure() : feed(HEALTHY_MODEL_SEQUENCE)
+      },
+    })
+
+    await expect(collect(handle.events)).rejects.toThrow('502 Bad Gateway after reasoning started')
+    expect(opened).toEqual(['reasoning-model'])
+    expect(handle.servingModel()).toBe('reasoning-model')
+    expect(handle.usedFallback()).toBe(false)
+  })
+
   it('abandons the dead model at its resolved error and serves the fallback, replaying its buffer intact', async () => {
     const opened: string[] = []
     const handle = streamWithModelFailover({
@@ -470,6 +654,62 @@ describe('createSandboxChatProducer — failover wiring', () => {
       usedFallback: true,
       attempts: [expect.objectContaining({ model: 'dead-model', ok: false }), { model: 'gpt-5-mini', ok: true }],
     })
+  })
+
+  it('surfaces a structured timeout when every configured model stays silent', async () => {
+    vi.useFakeTimers()
+    try {
+      const closed: string[] = []
+      const started = new Set<string>()
+      const signals = new Map<string, AbortSignal>()
+      const producer = createSandboxChatProducer({
+        model: 'silent-a',
+        fallbackModels: ['silent-b'],
+        firstResponseTimeoutMs: 25,
+        openEvents: ({ model, signal }) => {
+          signals.set(model, signal)
+          return {
+            [Symbol.asyncIterator]: () => ({
+              next: () => {
+                if (!started.has(model)) {
+                  started.add(model)
+                  return Promise.resolve({
+                    done: false as const,
+                    value: { type: 'model.processing', data: { phase: 'generating' } },
+                  })
+                }
+                return new Promise<IteratorResult<unknown>>(() => {})
+              },
+              return: async () => {
+                closed.push(model)
+                return { done: true as const, value: undefined }
+              },
+            }),
+          }
+        },
+        log: () => {},
+      })
+
+      let events: Array<Record<string, unknown>> | undefined
+      void collect(producer.stream as AsyncGenerator<unknown>).then((value) => { events = value })
+      await vi.advanceTimersByTimeAsync(50)
+      await Promise.resolve()
+
+      const terminal = events?.find((event) => event.type === 'error') as
+        | { data?: { code?: string; details?: { failureNote?: string } } }
+        | undefined
+      expect(terminal?.data?.code).toBe('provider_first_response_timeout')
+      expect(terminal?.data?.details?.failureNote).toContain('silent-b')
+      expect(closed).toEqual(['silent-a', 'silent-b'])
+      expect([...signals.values()].every((signal) => signal.aborted)).toBe(true)
+      expect(producer.modelFailover?.().attempts.map((attempt) => attempt.model)).toEqual([
+        'silent-a',
+        'silent-b',
+      ])
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('opt-out (`modelFailover: false`) opens only the preferred model and surfaces the failure', async () => {

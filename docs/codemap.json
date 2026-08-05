@@ -1564,6 +1564,18 @@
           "doc": "Define options to authorize uploads and configure file size limits and upload directory"
         },
         {
+          "name": "DEFAULT_MODEL_FIRST_RESPONSE_TIMEOUT_MS",
+          "kind": "const",
+          "signature": "60000",
+          "doc": "Default ceiling for the first answer-bearing event after the source's first event."
+        },
+        {
+          "name": "DEFAULT_MODEL_STREAM_OPEN_TIMEOUT_MS",
+          "kind": "const",
+          "signature": "120000",
+          "doc": "Default ceiling for opening/starting one source through its first event."
+        },
+        {
           "name": "DEFAULT_STALE_TURN_LOCK_GRACE_MS",
           "kind": "const",
           "signature": "number",
@@ -1780,6 +1792,12 @@
           "doc": "`image` when the path's extension is in the known image set (the same table {@link mediaTypeForMentionPath} reads), `file` otherwise."
         },
         {
+          "name": "ModelAttemptTimeoutCode",
+          "kind": "type",
+          "signature": "type ModelAttemptTimeoutCode",
+          "doc": "Structured timeout codes surfaced by the producer on final exhaustion."
+        },
+        {
           "name": "ModelFailoverStreamHandle",
           "kind": "interface",
           "signature": "interface ModelFailoverStreamHandle",
@@ -1790,6 +1808,12 @@
           "kind": "interface",
           "signature": "interface ModelFailoverStreamOptions",
           "doc": "Define inputs for streaming a turn across a model failover chain"
+        },
+        {
+          "name": "ModelFailoverTimeoutError",
+          "kind": "class",
+          "signature": "class ModelFailoverTimeoutError",
+          "doc": "Every configured model was exhausted and the final one timed out."
         },
         {
           "name": "ModelFallbackInfo",

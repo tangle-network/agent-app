@@ -38,12 +38,13 @@
  *   platform flake that a same-model re-run recovers (8 hard cases: 7/8
  *   delivered on the first pass, 8/8 with one re-run, at a cost of 1 extra turn
  *   in 9). Default `0`, so the behavior is unchanged unless a product asks.
- * - A chain of length 1 costs nothing: one attempt, no extra call, no added
- *   latency, byte-identical to no failover at all.
+ * - A responsive chain of length 1 costs no extra call or latency and remains
+ *   byte-identical to no failover. A silent chain is now deliberately bounded.
  */
 
 import {
   isUpstreamUnavailable,
+  ModelFailoverExhaustedError,
   readHttpStatusHint,
   runWithModelFailover,
   type ModelFailoverAttempt,
@@ -102,6 +103,7 @@ export function isCommittingSandboxEvent(event: unknown): boolean {
     type === 'execution.started' ||
     type === 'status' ||
     type === 'model-processing' ||
+    type === 'model.processing' ||
     type === 'session.created' ||
     type === 'session.updated' ||
     type === 'session.idle' ||
@@ -193,6 +195,8 @@ interface AttemptCommit {
   buffered: unknown[]
   /** `null` when the stream already ended during the probe. */
   iterator: AsyncIterator<unknown> | null
+  /** Cancel transport work when this attempt is drained or abandoned. */
+  abort: () => void
 }
 
 /**
@@ -204,6 +208,7 @@ interface AttemptOutage {
   committed: false
   error: string
   errorCode?: string
+  timeoutCode?: ModelAttemptTimeoutCode
 }
 
 type AttemptOutcome = AttemptCommit | AttemptOutage
@@ -213,6 +218,10 @@ export type OpenModelStream = (args: {
   model: string
   /** 1 for the preferred model, 2 for the first fallback, and so on. */
   attempt: number
+  /** Aborted when this attempt times out, is abandoned, or finishes. Forward
+   *  this to `streamSandboxPrompt(..., { signal })` so a blocked transport is
+   *  cancelled immediately rather than only receiving iterator.return(). */
+  signal: AbortSignal
 }) => AsyncIterable<unknown> | Promise<AsyncIterable<unknown>>
 
 /** Fired when a model is abandoned and the next one is about to be tried. */
@@ -227,6 +236,19 @@ export interface ModelFailoverStreamOptions {
   /** Preferred model first, then fallbacks in descending preference. */
   models: readonly string[]
   open: OpenModelStream
+  /**
+   * Maximum time to open/start one model's event source, including its first
+   * iterator pull. Default 120 seconds, matching the sandbox provisioning
+   * ceiling so cold infrastructure startup is bounded independently from
+   * provider inference.
+   */
+  openTimeoutMs?: number
+  /**
+   * Hard deadline from the source's first lifecycle event to its first
+   * answer-bearing event. Default 60 seconds. Processing/lifecycle events do
+   * not commit the attempt and do not extend this deadline.
+   */
+  firstResponseTimeoutMs?: number
   /** Override the commit-point rule. Default {@link isCommittingSandboxEvent}. */
   isCommitting?: (event: unknown) => boolean
   onFallback?: (info: ModelFallbackInfo) => void
@@ -268,6 +290,69 @@ export interface ModelFailoverStreamHandle {
   attempts(): ModelFailoverAttempt[]
   /** True when the preferred model did not serve — the attributability signal. */
   usedFallback(): boolean
+}
+
+/** Default ceiling for opening/starting one source through its first event. */
+export const DEFAULT_MODEL_STREAM_OPEN_TIMEOUT_MS = 120_000
+
+/** Default ceiling for the first answer-bearing event after the source's first event. */
+export const DEFAULT_MODEL_FIRST_RESPONSE_TIMEOUT_MS = 60_000
+
+/** Structured timeout codes surfaced by the producer on final exhaustion. */
+export type ModelAttemptTimeoutCode =
+  | 'model_stream_open_timeout'
+  | 'provider_first_response_timeout'
+
+/** Every configured model was exhausted and the final one timed out. */
+export class ModelFailoverTimeoutError extends ModelFailoverExhaustedError {
+  readonly code: ModelAttemptTimeoutCode
+  readonly model: string
+  readonly timeoutMs: number
+
+  constructor(input: {
+    attempts: ModelFailoverAttempt[]
+    code: ModelAttemptTimeoutCode
+    model: string
+    timeoutMs: number
+  }) {
+    super(input.attempts)
+    this.name = 'ModelFailoverTimeoutError'
+    this.code = input.code
+    this.model = input.model
+    this.timeoutMs = input.timeoutMs
+    this.message = input.code === 'model_stream_open_timeout'
+      ? `Opening the model event source for ${input.model} exceeded ${input.timeoutMs}ms.`
+      : `Model ${input.model} produced no first answer-bearing event within ${input.timeoutMs}ms.`
+  }
+}
+
+function resolveTimeoutMs(value: number | undefined, fallback: number, label: string): number {
+  if (value === undefined) return fallback
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new RangeError(`${label} must be a finite number greater than 0`)
+  }
+  return Math.max(1, Math.trunc(value))
+}
+
+const TIMED_OUT = Symbol('model-attempt-timed-out')
+
+function deadlineAfter(timeoutMs: number): {
+  promise: Promise<typeof TIMED_OUT>
+  clear: () => void
+} {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const promise = new Promise<typeof TIMED_OUT>((resolve) => {
+    timer = setTimeout(() => resolve(TIMED_OUT), timeoutMs)
+  })
+  return {
+    promise,
+    clear: () => {
+      if (timer !== undefined) {
+        clearTimeout(timer)
+        timer = undefined
+      }
+    },
+  }
 }
 
 /**
@@ -331,19 +416,36 @@ async function closeIterator(iterator: AsyncIterator<unknown>, log?: ModelFailov
  * Zero added latency on the happy path: the preferred model is opened first and,
  * the moment it emits anything meaningful, its events flow straight through.
  *
- * @throws ModelFailoverExhaustedError when every model's upstream is down, and
+ * @throws ModelFailoverTimeoutError when the final model times out,
+ *         ModelFailoverExhaustedError when every model's upstream is down, and
  *         re-throws a non-outage error from the FIRST model without walking the
- *         chain (both behaviors inherited from `runWithModelFailover`).
+ *         chain (the latter behaviors are inherited from
+ *         `runWithModelFailover`).
  */
 export function streamWithModelFailover(
   options: ModelFailoverStreamOptions,
 ): ModelFailoverStreamHandle {
   const committing = options.isCommitting ?? isCommittingSandboxEvent
   const emptyTurnRetries = resolveEmptyTurnRetries(options.emptyTurnRetries)
+  const openTimeoutMs = resolveTimeoutMs(
+    options.openTimeoutMs,
+    DEFAULT_MODEL_STREAM_OPEN_TIMEOUT_MS,
+    'openTimeoutMs',
+  )
+  const firstResponseTimeoutMs = resolveTimeoutMs(
+    options.firstResponseTimeoutMs,
+    DEFAULT_MODEL_FIRST_RESPONSE_TIMEOUT_MS,
+    'firstResponseTimeoutMs',
+  )
   let serving: string | undefined
   let trail: ModelFailoverAttempt[] = []
   let fellBack = false
   let attemptIndex = 0
+  let finalTimeout: {
+    code: ModelAttemptTimeoutCode
+    model: string
+    timeoutMs: number
+  } | undefined
 
   /**
    * One open-and-drain pass. `empty` marks the pass as an EMPTY TURN — the
@@ -355,24 +457,122 @@ export function streamWithModelFailover(
    */
   const drainOnce = async (model: string): Promise<{ outcome: AttemptOutcome; empty: boolean }> => {
     attemptIndex += 1
-    const source = await options.open({ model, attempt: attemptIndex })
-    const iterator = source[Symbol.asyncIterator]()
+    const controller = new AbortController()
+    const abort = (): void => {
+      if (!controller.signal.aborted) controller.abort()
+    }
+    const opening = Promise.resolve().then(() => options.open({
+      model,
+      attempt: attemptIndex,
+      signal: controller.signal,
+    }))
+    const openDeadline = deadlineAfter(openTimeoutMs)
+    let opened: AsyncIterable<unknown> | typeof TIMED_OUT
+    try {
+      opened = await Promise.race([opening, openDeadline.promise])
+    } catch (err) {
+      openDeadline.clear()
+      abort()
+      throw err
+    }
+    if (opened === TIMED_OUT) {
+      openDeadline.clear()
+      abort()
+      // A Promise cannot be forcibly cancelled. If the abandoned open settles
+      // later, close its iterator immediately so it cannot leak a connection.
+      void opening.then(
+        (lateSource) => {
+          try {
+            void closeIterator(lateSource[Symbol.asyncIterator](), options.log)
+          } catch (err) {
+            options.log?.('[chat-routes] closing a late model stream threw', {
+              error: err instanceof Error ? err.message : String(err),
+            })
+          }
+        },
+        (err) => {
+          options.log?.('[chat-routes] abandoned model stream open rejected after timeout', {
+            error: err instanceof Error ? err.message : String(err),
+          })
+        },
+      )
+      return {
+        outcome: {
+          committed: false,
+          error: `Opening the model event source for ${model} exceeded ${openTimeoutMs}ms`,
+          errorCode: 'model_stream_open_timeout',
+          timeoutCode: 'model_stream_open_timeout',
+        },
+        empty: false,
+      }
+    }
+
+    const source = opened
+    let iterator: AsyncIterator<unknown>
+    try {
+      iterator = source[Symbol.asyncIterator]()
+    } catch (err) {
+      openDeadline.clear()
+      abort()
+      throw err
+    }
     const buffered: unknown[] = []
+    // Starting the source includes its first pull. `streamSandboxPrompt` is an
+    // async generator, so its cold-start work does not execute until `next()`;
+    // counting that time as provider inference would collapse the two phases.
+    let next: IteratorResult<unknown> | typeof TIMED_OUT
+    try {
+      next = await Promise.race([
+        Promise.resolve(iterator.next()),
+        openDeadline.promise,
+      ])
+    } catch (err) {
+      openDeadline.clear()
+      abort()
+      void closeIterator(iterator, options.log)
+      throw err
+    }
+    openDeadline.clear()
+    if (next === TIMED_OUT) {
+      abort()
+      void closeIterator(iterator, options.log)
+      return {
+        outcome: {
+          committed: false,
+          error: `Starting the model event source for ${model} exceeded ${openTimeoutMs}ms`,
+          errorCode: 'model_stream_open_timeout',
+          timeoutCode: 'model_stream_open_timeout',
+        },
+        empty: false,
+      }
+    }
+    if (next.done) {
+      abort()
+      return { outcome: { committed: true, buffered, iterator: null, abort }, empty: true }
+    }
+
+    // One deadline for the WHOLE provider pre-response phase. Pulling a
+    // lifecycle or processing event races the same promise; liveness cannot
+    // reset the clock.
+    const firstResponseDeadline = deadlineAfter(firstResponseTimeoutMs)
 
     for (;;) {
-      // A THROWN failure propagates untouched: `runWithModelFailover` classifies
-      // it (outage → next model, anything else → re-thrown to the caller).
-      const next = await iterator.next()
-      if (next.done) {
-        // Clean end with nothing committing. Not an outage — but also not an
-        // answer, so it is re-runnable on the same model.
-        return { outcome: { committed: true, buffered, iterator: null }, empty: true }
-      }
-
       const event = next.value
-      const failure = classifyTerminalFailure(event)
+      let failure: TerminalFailure | null
+      let commits = false
+      try {
+        failure = classifyTerminalFailure(event)
+        commits = !failure && committing(event)
+      } catch (err) {
+        firstResponseDeadline.clear()
+        abort()
+        void closeIterator(iterator, options.log)
+        throw err
+      }
       if (failure?.outage) {
-        await closeIterator(iterator, options.log)
+        firstResponseDeadline.clear()
+        abort()
+        void closeIterator(iterator, options.log)
         return {
           outcome: {
             committed: false,
@@ -385,21 +585,80 @@ export function streamWithModelFailover(
 
       buffered.push(event)
       // A terminal NON-outage failure surfaces exactly as it does today.
-      if (failure) return { outcome: { committed: true, buffered, iterator }, empty: false }
-      if (committing(event)) {
-        return { outcome: { committed: true, buffered, iterator }, empty: isEmptyTerminalReceipt(event) }
+      if (failure) {
+        firstResponseDeadline.clear()
+        return { outcome: { committed: true, buffered, iterator, abort }, empty: false }
+      }
+      if (commits) {
+        firstResponseDeadline.clear()
+        return { outcome: { committed: true, buffered, iterator, abort }, empty: isEmptyTerminalReceipt(event) }
+      }
+
+      // A THROWN failure propagates untouched: `runWithModelFailover` classifies
+      // it (outage → next model, anything else → re-thrown to the caller).
+      try {
+        next = await Promise.race([
+          Promise.resolve(iterator.next()),
+          firstResponseDeadline.promise,
+        ])
+      } catch (err) {
+        firstResponseDeadline.clear()
+        abort()
+        void closeIterator(iterator, options.log)
+        throw err
+      }
+      if (next === TIMED_OUT) {
+        firstResponseDeadline.clear()
+        // Do not await `return()`: an async generator blocked inside `next()`
+        // may not settle its return until that pull completes. Invoking it is
+        // the cancellation signal; waiting for it would recreate the hang.
+        abort()
+        void closeIterator(iterator, options.log)
+        return {
+          outcome: {
+            committed: false,
+            error: `Model ${model} produced no first answer-bearing event within ${firstResponseTimeoutMs}ms`,
+            errorCode: 'provider_first_response_timeout',
+            timeoutCode: 'provider_first_response_timeout',
+          },
+          empty: false,
+        }
+      }
+      if (next.done) {
+        firstResponseDeadline.clear()
+        abort()
+        // Clean end with nothing committing. Not an outage — but also not an
+        // answer, so it is re-runnable on the same model.
+        return { outcome: { committed: true, buffered, iterator: null, abort }, empty: true }
       }
     }
   }
 
   const probe = async (model: string): Promise<AttemptOutcome> => {
+    // Only the FINAL attempted model decides the exhaustion code. Clear a
+    // prior model's timeout before this model can throw a different outage.
+    finalTimeout = undefined
     for (let retry = 0; ; retry += 1) {
       const pass = await drainOnce(model)
-      if (!pass.empty || retry >= emptyTurnRetries) return pass.outcome
+      if (!pass.empty || retry >= emptyTurnRetries) {
+        if (!pass.outcome.committed && pass.outcome.timeoutCode) {
+          finalTimeout = {
+            code: pass.outcome.timeoutCode,
+            model,
+            timeoutMs: pass.outcome.timeoutCode === 'model_stream_open_timeout'
+              ? openTimeoutMs
+              : firstResponseTimeoutMs,
+          }
+        } else {
+          finalTimeout = undefined
+        }
+        return pass.outcome
+      }
       // Discard the empty pass entirely — including its `step-finish` token
       // receipt, which must not be billed — and re-run the same model.
       const iterator = pass.outcome.committed ? pass.outcome.iterator : null
-      if (iterator) await closeIterator(iterator, options.log)
+      if (pass.outcome.committed) pass.outcome.abort()
+      if (iterator) void closeIterator(iterator, options.log)
       const info: EmptyTurnRetryInfo = { model, retry: retry + 1, remaining: emptyTurnRetries - retry - 1 }
       options.log?.('[chat-routes] turn completed with no assistant text; re-running the same model', {
         ...info,
@@ -437,13 +696,22 @@ export function streamWithModelFailover(
       // every model tried even though the turn produced nothing.
       const attempts = (err as { attempts?: ModelFailoverAttempt[] })?.attempts
       if (Array.isArray(attempts)) trail = attempts
+      if (err instanceof ModelFailoverExhaustedError && finalTimeout) {
+        throw new ModelFailoverTimeoutError({
+          attempts: trail,
+          ...finalTimeout,
+        })
+      }
       throw err
     }
 
     for (const event of handle.buffered) yield event
 
     const live = handle.iterator
-    if (!live) return
+    if (!live) {
+      handle.abort()
+      return
+    }
     try {
       for (;;) {
         const next = await live.next()
@@ -453,6 +721,7 @@ export function streamWithModelFailover(
     } finally {
       // The consumer may abandon this generator mid-turn (client drop); close
       // the underlying stream rather than leaking it.
+      handle.abort()
       await closeIterator(live, options.log)
     }
   })()
