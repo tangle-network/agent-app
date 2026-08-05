@@ -10392,6 +10392,12 @@
           "doc": "The workspace a warm targets."
         },
         {
+          "name": "SandboxProvisionedObservation",
+          "kind": "interface",
+          "signature": "interface SandboxProvisionedObservation",
+          "doc": "What `/sandbox` reports once a box is provisioned, reused, or resumed."
+        },
+        {
           "name": "SandboxReadiness",
           "kind": "type",
           "signature": "type SandboxReadiness",
@@ -10438,6 +10444,12 @@
           "kind": "interface",
           "signature": "interface SandboxScope",
           "doc": "Define a scope containing workspace and optional user identifiers for sandbox environments"
+        },
+        {
+          "name": "SandboxSpendHooks",
+          "kind": "interface",
+          "signature": "interface SandboxSpendHooks",
+          "doc": "Optional spend-verification seam on `ensureWorkspaceSandbox`."
         },
         {
           "name": "SandboxStepTransition",
@@ -13519,6 +13531,277 @@
           "doc": "Filter `harnesses` down to those with no mounted skill dir (deduped, first-seen order preserved) — the set that must fall back to `inline` delivery, or that a caller should warn about before offering…"
         }
       ]
+    },
+    {
+      "id": "./spend",
+      "source": "src/spend/index.ts",
+      "dependsOn": [
+        "sandbox"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "assertComputeBudget",
+          "kind": "function",
+          "signature": "(budget: ComputeBudget | undefined, workspaceId: string) => Promise<void>",
+          "doc": "Throw {@link ComputeBudgetExceededError} when the workspace is already past its cap."
+        },
+        {
+          "name": "BilledDurationBasis",
+          "kind": "type",
+          "signature": "type BilledDurationBasis",
+          "doc": "How a settled duration was arrived at — every duration finding carries one."
+        },
+        {
+          "name": "BoxRateResolver",
+          "kind": "type",
+          "signature": "type BoxRateResolver",
+          "doc": "A box's price, nanodollars per hour, used to derive an EXACT billed duration from a charge."
+        },
+        {
+          "name": "CeilingBasis",
+          "kind": "type",
+          "signature": "type CeilingBasis",
+          "doc": "Which fact bounds a box's billable time, weakest last."
+        },
+        {
+          "name": "chargeNanoUsd",
+          "kind": "function",
+          "signature": "(row: SettlementRow) => number",
+          "doc": "A charge's magnitude in unsigned nanodollars; 0 for credits."
+        },
+        {
+          "name": "ComputeBudget",
+          "kind": "interface",
+          "signature": "interface ComputeBudget",
+          "doc": "A per-workspace cap on sandbox compute."
+        },
+        {
+          "name": "ComputeBudgetExceededError",
+          "kind": "class",
+          "signature": "class ComputeBudgetExceededError",
+          "doc": "Provisioning refused because the workspace is already past its compute cap."
+        },
+        {
+          "name": "ComputeBudgetRefusal",
+          "kind": "interface",
+          "signature": "interface ComputeBudgetRefusal",
+          "doc": "Why provisioning was refused, with every number the decision used."
+        },
+        {
+          "name": "computeExpectedCeiling",
+          "kind": "function",
+          "signature": "(record: SpendBoxRecord, options: ComputeExpectedCeilingOptions) => ExpectedCeiling",
+          "doc": "The upper bound on how long one box could honestly have been billable."
+        },
+        {
+          "name": "ComputeExpectedCeilingOptions",
+          "kind": "interface",
+          "signature": "interface ComputeExpectedCeilingOptions",
+          "doc": null
+        },
+        {
+          "name": "createInMemorySpendLedgerStore",
+          "kind": "function",
+          "signature": "() => InMemorySpendLedgerStore",
+          "doc": "Create an in-memory expectation ledger."
+        },
+        {
+          "name": "createSandboxSpendHooks",
+          "kind": "function",
+          "signature": "(options: SandboxSpendHooksOptions) => SandboxSpendSeam",
+          "doc": "Build the object to hand `ensureWorkspaceSandbox`'s `spend` option."
+        },
+        {
+          "name": "createSpendLedger",
+          "kind": "function",
+          "signature": "(options: SpendLedgerOptions) => SpendLedger",
+          "doc": "Create the recording half over a product-supplied store."
+        },
+        {
+          "name": "DEFAULT_CEILING_TOLERANCE_MS",
+          "kind": "const",
+          "signature": "900000",
+          "doc": "Slack allowed between the product's bound and what the platform settled, before an overage is called a discrepancy."
+        },
+        {
+          "name": "ExpectedCeiling",
+          "kind": "interface",
+          "signature": "interface ExpectedCeiling",
+          "doc": "The upper bound on one box's billable duration, and what earned it."
+        },
+        {
+          "name": "foldSpendBoxRecord",
+          "kind": "function",
+          "signature": "(record: SpendBoxRecord, patch: SpendBoxPatch) => SpendBoxRecord",
+          "doc": "Apply one fold step."
+        },
+        {
+          "name": "formatSpendReport",
+          "kind": "function",
+          "signature": "(report: SpendReport) => string",
+          "doc": "Render a reconciliation for a human deciding whether to open a dispute."
+        },
+        {
+          "name": "InMemorySpendLedgerStore",
+          "kind": "interface",
+          "signature": "interface InMemorySpendLedgerStore",
+          "doc": "An in-memory store that also lets a test inspect and force state."
+        },
+        {
+          "name": "isCharge",
+          "kind": "function",
+          "signature": "(row: SettlementRow) => boolean",
+          "doc": "True when a row is a charge (the ledger stores charges as negative amounts)."
+        },
+        {
+          "name": "ObservedBalance",
+          "kind": "interface",
+          "signature": "interface ObservedBalance",
+          "doc": "The balance the product observes, and the floor it must not cross."
+        },
+        {
+          "name": "ObserveSandboxInput",
+          "kind": "interface",
+          "signature": "interface ObserveSandboxInput",
+          "doc": "What the product tells the ledger when it first sees a box."
+        },
+        {
+          "name": "parseSandboxGroupKey",
+          "kind": "function",
+          "signature": "(groupKey: string | null | undefined) => string | null",
+          "doc": "Read the sandbox id out of the platform's aggregation key, `sandbox:<id>`."
+        },
+        {
+          "name": "parseSettlementReference",
+          "kind": "function",
+          "signature": "(referenceId: string | null | undefined) => SettlementReference | null",
+          "doc": "Parse the platform's settlement idempotency key."
+        },
+        {
+          "name": "reconcileSpend",
+          "kind": "function",
+          "signature": "(options: ReconcileSpendOptions) => Promise<SpendReport>",
+          "doc": "Diff what the platform charged against what the product believes it asked for."
+        },
+        {
+          "name": "ReconcileSpendOptions",
+          "kind": "interface",
+          "signature": "interface ReconcileSpendOptions",
+          "doc": null
+        },
+        {
+          "name": "SandboxProvisionObservation",
+          "kind": "interface",
+          "signature": "interface SandboxProvisionObservation",
+          "doc": "What `/sandbox` reports once a box is provisioned, reused or resumed."
+        },
+        {
+          "name": "SandboxSpendHooksOptions",
+          "kind": "interface",
+          "signature": "interface SandboxSpendHooksOptions",
+          "doc": null
+        },
+        {
+          "name": "SandboxSpendSeam",
+          "kind": "interface",
+          "signature": "interface SandboxSpendSeam",
+          "doc": "The optional seam `EnsureWorkspaceSandboxOptions.spend` accepts."
+        },
+        {
+          "name": "SettlementReference",
+          "kind": "interface",
+          "signature": "interface SettlementReference",
+          "doc": "The parts of a settlement reference id, once parsed."
+        },
+        {
+          "name": "SettlementRow",
+          "kind": "interface",
+          "signature": "interface SettlementRow",
+          "doc": "One settled ledger row, in the shape the platform's `credit_transactions` table stores it."
+        },
+        {
+          "name": "settlementSandboxId",
+          "kind": "function",
+          "signature": "(row: SettlementRow) => string | null",
+          "doc": "The sandbox a settlement row is attributable to."
+        },
+        {
+          "name": "SPEND_CHECKS",
+          "kind": "const",
+          "signature": "readonly SpendCheckId[]",
+          "doc": null
+        },
+        {
+          "name": "SpendBoxPatch",
+          "kind": "interface",
+          "signature": "interface SpendBoxPatch",
+          "doc": "A fold step."
+        },
+        {
+          "name": "SpendBoxRecord",
+          "kind": "interface",
+          "signature": "interface SpendBoxRecord",
+          "doc": "One box, as the PRODUCT understands it."
+        },
+        {
+          "name": "SpendCheckId",
+          "kind": "type",
+          "signature": "type SpendCheckId",
+          "doc": "The checks this reconciler runs."
+        },
+        {
+          "name": "SpendFinding",
+          "kind": "interface",
+          "signature": "interface SpendFinding",
+          "doc": "One discrepancy, with every number the rule compared."
+        },
+        {
+          "name": "SpendLedger",
+          "kind": "interface",
+          "signature": "interface SpendLedger",
+          "doc": "The recording half of spend verification: the product's own account of what it asked the platform for."
+        },
+        {
+          "name": "SpendLedgerOptions",
+          "kind": "interface",
+          "signature": "interface SpendLedgerOptions",
+          "doc": null
+        },
+        {
+          "name": "SpendLedgerStorePort",
+          "kind": "interface",
+          "signature": "interface SpendLedgerStorePort",
+          "doc": "Persistence seam for the expectation ledger — the product implements it over its own tables."
+        },
+        {
+          "name": "SpendReport",
+          "kind": "interface",
+          "signature": "interface SpendReport",
+          "doc": "What one reconciliation pass concluded."
+        },
+        {
+          "name": "spendReportToJson",
+          "kind": "function",
+          "signature": "(report: SpendReport) => string",
+          "doc": "The report as a plain JSON value, for an alerting pipeline."
+        },
+        {
+          "name": "VelocityOptions",
+          "kind": "interface",
+          "signature": "interface VelocityOptions",
+          "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./spend/cli",
+      "source": "src/spend/cli.ts",
+      "dependsOn": [
+        "sandbox"
+      ],
+      "error": null,
+      "exports": []
     },
     {
       "id": "./store",

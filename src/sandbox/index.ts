@@ -609,6 +609,47 @@ export interface EnsureWorkspaceSandboxOptions {
   // instead of the service account that authenticated the create. Omitted =>
   // platform default (billing owner = create-auth principal) — unchanged.
   billingOwnerId?: string
+  // Optional consumer-side spend verification. Omitted, nothing here changes:
+  // no extra call, no extra await, no behavior difference. Wired, it is the one
+  // seam where a product both refuses to provision past a compute cap and
+  // records that a box is now billable against it.
+  //
+  // Structural on purpose. `@tangle-network/agent-app/spend` supplies an
+  // implementation (`createSandboxSpendHooks`), but this module takes no
+  // dependency on it — /spend composes /sandbox, and importing back the other
+  // way would invert the layering.
+  spend?: SandboxSpendHooks
+}
+
+/** What `/sandbox` reports once a box is provisioned, reused, or resumed. */
+export interface SandboxProvisionedObservation {
+  readonly workspaceId: string
+  readonly userId?: string
+  /** The platform's sandbox id — the join key to every settlement row. */
+  readonly sandboxId: string
+  /** The deterministic box key this workspace resolves to. */
+  readonly boxKey?: string | undefined
+  /** The idle timeout this box was asked to run with, seconds. */
+  readonly idleTimeoutSeconds: number
+  /** The max lifetime it was asked to run with, seconds, when one was asked for. */
+  readonly maxLifetimeSeconds?: number | undefined
+  readonly at: number
+}
+
+/**
+ * Optional spend-verification seam on `ensureWorkspaceSandbox`.
+ *
+ * The two halves have deliberately opposite failure contracts.
+ * `beforeProvision` is a GATE: it runs before anything is created and its throw
+ * propagates, because refusing to provision is the whole point of a budget cap.
+ * `onProvisioned` is an OBSERVER: its failures are swallowed, because
+ * bookkeeping must never take down the provisioning it is bookkeeping.
+ */
+export interface SandboxSpendHooks {
+  /** Runs before any create, resume, or reuse. Throw to refuse provisioning. */
+  beforeProvision?(input: { workspaceId: string; userId?: string }): Promise<void> | void
+  /** Runs after a box is available. Throwing here cannot fail the provision. */
+  onProvisioned?(observation: SandboxProvisionedObservation): Promise<void> | void
 }
 
 // Single-quote a string for safe interpolation into a shell command.
@@ -1979,6 +2020,55 @@ async function assertExistingBoxEgress(
 
 /** Resolve or create a workspace sandbox instance with optional reuse and progress tracking */
 export async function ensureWorkspaceSandbox(
+  shell: SandboxRuntimeConfig,
+  options: EnsureWorkspaceSandboxOptions,
+): Promise<SandboxInstance> {
+  // A budget refusal must land before any box exists, so it runs ahead of both
+  // the first attempt and the unbringable-box replacement below.
+  await options.spend?.beforeProvision?.({
+    workspaceId: options.workspaceId,
+    ...(options.userId ? { userId: options.userId } : {}),
+  })
+  const box = await bringUpWorkspaceSandbox(shell, options)
+  await observeProvisionedBox(shell, options, box)
+  return box
+}
+
+/**
+ * Report a now-billable box to the spend seam.
+ *
+ * Awaited rather than fired and forgotten: an expectation ledger with holes
+ * reports boxes it simply failed to record as `unknown-box`, and an alert that
+ * cries wolf is worse than no alert. The cost is one local write on a path that
+ * already makes at least one platform round trip, so it is not the term that
+ * decides provisioning latency.
+ *
+ * Errors are swallowed — the box is up, and failing the caller because
+ * bookkeeping failed would trade a real capability for a record of it.
+ */
+async function observeProvisionedBox(
+  shell: SandboxRuntimeConfig,
+  options: EnsureWorkspaceSandboxOptions,
+  box: SandboxInstance,
+): Promise<void> {
+  if (!options.spend?.onProvisioned) return
+  const resources = shell.resources ?? DEFAULT_SANDBOX_RESOURCES
+  try {
+    await options.spend.onProvisioned({
+      workspaceId: options.workspaceId,
+      ...(options.userId ? { userId: options.userId } : {}),
+      sandboxId: box.id,
+      boxKey: box.name,
+      idleTimeoutSeconds: resources.idleTimeoutSeconds,
+      maxLifetimeSeconds: resources.maxLifetimeSeconds,
+      at: Date.now(),
+    })
+  } catch {
+    // An observability seam must never take down the provision it reports on.
+  }
+}
+
+async function bringUpWorkspaceSandbox(
   shell: SandboxRuntimeConfig,
   options: EnsureWorkspaceSandboxOptions,
 ): Promise<SandboxInstance> {

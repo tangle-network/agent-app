@@ -3828,3 +3828,152 @@ describe('requireTransportableModel + SandboxModelResolutionError callers', () =
     }
   })
 })
+
+/**
+ * The spend seam is additive: a caller that does not wire it must see byte-identical
+ * behavior, and a caller that does must get a GATE whose throw stops provisioning
+ * and an OBSERVER whose throw cannot.
+ */
+describe('ensureWorkspaceSandbox — the spend seam', () => {
+  beforeEach(() => {
+    resetClientCache()
+    listMock.mockReset()
+    createMock.mockReset()
+    getMock.mockReset()
+    sandboxCtor.mockReset()
+  })
+
+  it('reports the provisioned box with the lifecycle numbers a ceiling needs', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox())
+    const onProvisioned = vi.fn()
+
+    await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }), {
+      workspaceId: 'w1',
+      userId: 'u1',
+      harness: 'opencode',
+      spend: { onProvisioned },
+    })
+
+    expect(onProvisioned).toHaveBeenCalledOnce()
+    expect(onProvisioned.mock.calls[0]![0]).toMatchObject({
+      workspaceId: 'w1',
+      userId: 'u1',
+      sandboxId: 'sandbox-1',
+      boxKey: 'box-w1',
+      // The values the box was actually asked to run with — the two bounds the
+      // expectation ceiling is built from.
+      idleTimeoutSeconds: 3600,
+      maxLifetimeSeconds: 86400,
+    })
+  })
+
+  it('forwards the shell\'s own resource numbers, not the defaults', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox())
+    const onProvisioned = vi.fn()
+
+    await ensureWorkspaceSandbox(
+      shellFor(
+        { apiKey: 'k', baseUrl: 'u' },
+        {
+          resources: {
+            image: 'universal',
+            cpuCores: 1,
+            memoryMB: 1024,
+            diskGB: 5,
+            maxLifetimeSeconds: 7200,
+            idleTimeoutSeconds: 600,
+          },
+        },
+      ),
+      { workspaceId: 'w1', harness: 'opencode', spend: { onProvisioned } },
+    )
+
+    expect(onProvisioned.mock.calls[0]![0]).toMatchObject({
+      idleTimeoutSeconds: 600,
+      maxLifetimeSeconds: 7200,
+    })
+  })
+
+  it('reports a REUSED box too — reuse is the platform charging for it again', async () => {
+    const running = fakeBox({ name: 'box-w1', metadata: { harness: 'opencode' } })
+    listMock.mockResolvedValue([running])
+    const onProvisioned = vi.fn()
+    await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }), {
+      workspaceId: 'w1',
+      harness: 'opencode',
+      spend: { onProvisioned },
+    })
+    expect(createMock).not.toHaveBeenCalled()
+    expect(onProvisioned).toHaveBeenCalledOnce()
+  })
+
+  it('refuses to provision when the gate throws, before anything is created', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox())
+    const onProvisioned = vi.fn()
+
+    await expect(
+      ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }), {
+        workspaceId: 'w1',
+        harness: 'opencode',
+        spend: {
+          beforeProvision: () => {
+            throw new Error('Compute budget exceeded for workspace w1')
+          },
+          onProvisioned,
+        },
+      }),
+    ).rejects.toThrow(/Compute budget exceeded/)
+
+    // Nothing was created, nothing was listed, and nothing was recorded.
+    expect(createMock).not.toHaveBeenCalled()
+    expect(listMock).not.toHaveBeenCalled()
+    expect(onProvisioned).not.toHaveBeenCalled()
+  })
+
+  it('receives the workspace the gate must decide about', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox())
+    const beforeProvision = vi.fn()
+    await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }), {
+      workspaceId: 'w1',
+      userId: 'u1',
+      harness: 'opencode',
+      spend: { beforeProvision },
+    })
+    expect(beforeProvision).toHaveBeenCalledWith({ workspaceId: 'w1', userId: 'u1' })
+  })
+
+  it('does not fail a provision because the observer failed', async () => {
+    listMock.mockResolvedValue([])
+    const box = fakeBox()
+    createMock.mockResolvedValue(box)
+
+    await expect(
+      ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }), {
+        workspaceId: 'w1',
+        harness: 'opencode',
+        spend: {
+          onProvisioned: () => {
+            throw new Error('the expectation store is down')
+          },
+        },
+      }),
+    ).resolves.toBe(box)
+  })
+
+  it('changes nothing for a caller that does not wire it', async () => {
+    listMock.mockResolvedValue([])
+    const box = fakeBox()
+    createMock.mockResolvedValue(box)
+    await expect(
+      ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }), {
+        workspaceId: 'w1',
+        harness: 'opencode',
+      }),
+    ).resolves.toBe(box)
+    expect(createMock).toHaveBeenCalledOnce()
+  })
+})

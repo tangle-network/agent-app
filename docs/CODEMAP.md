@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_94 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_96 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -59,7 +59,7 @@ _94 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./redact`](api/redact.md) | 14 | — |
 | [`./run`](api/run.md) | 10 | `harness` |
 | [`./runtime`](api/runtime.md) | 63 | `tools` |
-| [`./sandbox`](api/sandbox.md) | 165 | `harness`, `profile`, `runtime`, `tools` |
+| [`./sandbox`](api/sandbox.md) | 167 | `harness`, `profile`, `runtime`, `tools` |
 | [`./sequences`](api/sequences.md) | 113 | `tools`, `web` |
 | [`./sequences-react`](api/sequences-react.md) | 108 | `brand`, `sequences` |
 | [`./sequences/drizzle`](api/sequences-drizzle.md) | 13 | `tools`, `web` |
@@ -70,6 +70,8 @@ _94 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./signoff/proof-cli`](api/signoff-proof-cli.md) | 0 | — |
 | [`./skills`](api/skills.md) | 27 | — |
 | [`./skills-placement`](api/skills-placement.md) | 6 | `harness`, `skills` |
+| [`./spend`](api/spend.md) | 42 | `sandbox` |
+| [`./spend/cli`](api/spend-cli.md) | 0 | `sandbox` |
 | [`./store`](api/store.md) | 10 | — |
 | [`./stream`](api/stream.md) | 49 | `interactions`, `plans` |
 | [`./studio`](api/studio.md) | 37 | — |
@@ -573,11 +575,11 @@ Depends on: `tools`
 
 ## `./sandbox`
 
-Source: `src/sandbox/index.ts` · 165 exports
+Source: `src/sandbox/index.ts` · 167 exports
 
 Depends on: `harness`, `profile`, `runtime`, `tools`
 
-`adaptSandboxStream`, `AppToolDescriptor`, `assertEnvWithinLimits`, `assertProvisionPayloadWithinCap`, `assessWorkspaceSandboxSnapshot`, `attachReasoningEffort`, `buildAppToolMcpServers`, `BuildAppToolMcpServersOptions`, `buildProductEgressPolicy`, `buildSandboxToolFileMounts`, `BuildSandboxToolFileMountsOptions`, `buildSandboxToolPathSetupScript`, `classifySeveredStream`, `collectSandboxPromptText`, `createD1PrewarmClaimStore`, `createSandboxPrewarmer`, `createSandboxTerminalConnectionRoute`, `createWorkspaceSandboxManager`, `createWorkspaceSandboxRecoveryManager`, `D1PrewarmClaimStoreOptions`, `DEFAULT_PREWARM_CLAIM_TABLE`, `DEFAULT_PROVISION_TIMEOUT_MS`, `DEFAULT_SANDBOX_RESOURCES`, `DEFAULT_SIDECAR_PROCESS_PATTERN`, `deferredCorpusHash`, `deleteSecret`, `detectInteractiveQuestion`, `driveSandboxTurn`, `DriveSandboxTurnOptions`, `EGRESS_PROXY_RECOVERY_PHASE`, `EGRESS_PROXY_RECOVERY_REQUIRED`, `ensureWorkspaceSandbox`, `EnsureWorkspaceSandboxOptions`, `ENV_TOTAL_MAX_BYTES`, `ENV_VALUE_MAX_BYTES`, `flattenHistory`, `formatSandboxProvisioningSupportDetails`, `formatSandboxProvisioningUserMessage`, `getClient`, `isEgressProxyRecoveryRequiredError`, `isSandboxApiBearerAuthFailure`, `isSandboxApiSandboxMissingFailure`, `isSandboxAuthFailure`, `isSandboxHostCapacityFailure`, `isTerminalPromptEvent`, `isWorkspaceSandboxRecoveryAction`, `isWorkspaceSandboxRecoveryCode`, `isWorkspaceSandboxRecoveryState`, `isWorkspaceSandboxSnapshotRestoreError`, `LivenessProbeConfig`, `MemberSyncSeam`, `mergeExtraMcp`, `mergeHistoryIntoParts`, `mintSandboxScopedToken`, `ModelSelection`, `ModelSelectionError`, `ModelSelectionFailure`, `ModelSelectionSource`, `Outcome`, `peekWorkspaceSandbox`, `PeekWorkspaceSandboxOutcome`, `preferredWorkspaceSandboxRecoveryBoxKey`, `PREWARM_CLAIM_TABLE_DDL`, `PrewarmClaimD1Like`, `PrewarmClaimStore`, `PrewarmDecision`, `PrewarmEvent`, `PrewarmOutcome`, `PrewarmResult`, `ProfileComposeOptions`, `PromptInputPart`, `ProviderResolutionConfig`, `PROVISION_PAYLOAD_MAX_BYTES`, `ProvisionPayloadSections`, `ProvisionProfileSection`, `PYPI_EGRESS_DOMAINS`, `readSandboxBinaryBytes`, `readSecret`, `requireTransportableModel`, `resetClientCache`, `ResolvedModel`, `resolveModel`, `resolveModelSelection`, `resolveSandboxClientCredentials`, `ResolveSandboxClientCredentialsOptions`, `runSandboxPrompt`, `runSandboxToolPathSetup`, `SafeSandboxErrorCause`, `SafeSandboxErrorDiagnostics`, `SandboxBuildContext`, `SandboxClientCredentials`, `SandboxCredentialEnvironment`, `SandboxEgressPolicyMismatchError`, `SandboxEgressPolicySource`, `SandboxExecChannel`, `SandboxExecOptions`, `SandboxExistingBoxStage`, `SandboxFileBytesOutcome`, `SandboxFileSizeOutcome`, `SandboxModelResolutionError`, `SandboxPermissionLevel`, `SandboxPrewarmer`, `SandboxPrewarmerOptions`, `SandboxPrewarmScope`, `SandboxReadiness`, `SandboxRecoveryFailedError`, `SandboxRecoveryPhase`, `SandboxResourceConfig`, `SandboxRestoreSpec`, `SandboxRuntimeAuthRefreshError`, `SandboxRuntimeConfig`, `SandboxScope`, `SandboxStepTransition`, `SandboxStreamEvent`, `SandboxTerminalConnectionRouteOptions`, `sandboxToolBinDir`, `sandboxToolPath`, `SandboxToolPathOptions`, `sandboxToolRootDir`, `SandboxToolSpec`, `ScopedTokenResult`, `SecretStore`, `secretStoreFromClient`, `serializeSandboxProvisioningError`, `shellQuote`, `shouldRestoreWorkspaceSandboxRecovery`, `splitDeferredProfileFiles`, `statSandboxFileSize`, `StoppedSandboxResumeFailure`, `StoppedSandboxResumeRecovery`, `StorageConfig`, `storeSecret`, `streamSandboxPrompt`, `StreamSandboxPromptOptions`, `syncSandboxMemberAdd`, `syncSandboxMemberRemove`, `syncSandboxMemberRole`, `TerminalConnectionBoxLike`, `WORKSPACE_SANDBOX_HOST_EXHAUSTED`, `WORKSPACE_SANDBOX_MISSING`, `WORKSPACE_SANDBOX_RECOVERY_ACTIONS`, `WORKSPACE_SANDBOX_RECOVERY_CODES`, `WORKSPACE_SANDBOX_SNAPSHOT_MAX_AGE_MS`, `WORKSPACE_SANDBOX_UNRECOVERABLE`, `WorkspaceSandboxEnsureContext`, `WorkspaceSandboxInstanceLike`, `WorkspaceSandboxManager`, `WorkspaceSandboxManagerOptions`, `WorkspaceSandboxRecoveryAction`, `WorkspaceSandboxRecoveryCode`, `WorkspaceSandboxRecoveryDecision`, `workspaceSandboxRecoveryDiagnostic`, `workspaceSandboxRecoveryFromError`, `WorkspaceSandboxRecoveryManager`, `workspaceSandboxRecoveryMessage`, `workspaceSandboxRecoveryRecommendedActions`, `WorkspaceSandboxRecoveryRequiredError`, `WorkspaceSandboxRecoveryState`, `WorkspaceSandboxRecoveryStore`, `WorkspaceSandboxSnapshot`, `WorkspaceSandboxSnapshotAssessment`, `WorkspaceSandboxSnapshotAvailability`, `WorkspaceSandboxSnapshotFreshness`, `WriteProfileFilesOptions`, `writeProfileFilesToBox`
+`adaptSandboxStream`, `AppToolDescriptor`, `assertEnvWithinLimits`, `assertProvisionPayloadWithinCap`, `assessWorkspaceSandboxSnapshot`, `attachReasoningEffort`, `buildAppToolMcpServers`, `BuildAppToolMcpServersOptions`, `buildProductEgressPolicy`, `buildSandboxToolFileMounts`, `BuildSandboxToolFileMountsOptions`, `buildSandboxToolPathSetupScript`, `classifySeveredStream`, `collectSandboxPromptText`, `createD1PrewarmClaimStore`, `createSandboxPrewarmer`, `createSandboxTerminalConnectionRoute`, `createWorkspaceSandboxManager`, `createWorkspaceSandboxRecoveryManager`, `D1PrewarmClaimStoreOptions`, `DEFAULT_PREWARM_CLAIM_TABLE`, `DEFAULT_PROVISION_TIMEOUT_MS`, `DEFAULT_SANDBOX_RESOURCES`, `DEFAULT_SIDECAR_PROCESS_PATTERN`, `deferredCorpusHash`, `deleteSecret`, `detectInteractiveQuestion`, `driveSandboxTurn`, `DriveSandboxTurnOptions`, `EGRESS_PROXY_RECOVERY_PHASE`, `EGRESS_PROXY_RECOVERY_REQUIRED`, `ensureWorkspaceSandbox`, `EnsureWorkspaceSandboxOptions`, `ENV_TOTAL_MAX_BYTES`, `ENV_VALUE_MAX_BYTES`, `flattenHistory`, `formatSandboxProvisioningSupportDetails`, `formatSandboxProvisioningUserMessage`, `getClient`, `isEgressProxyRecoveryRequiredError`, `isSandboxApiBearerAuthFailure`, `isSandboxApiSandboxMissingFailure`, `isSandboxAuthFailure`, `isSandboxHostCapacityFailure`, `isTerminalPromptEvent`, `isWorkspaceSandboxRecoveryAction`, `isWorkspaceSandboxRecoveryCode`, `isWorkspaceSandboxRecoveryState`, `isWorkspaceSandboxSnapshotRestoreError`, `LivenessProbeConfig`, `MemberSyncSeam`, `mergeExtraMcp`, `mergeHistoryIntoParts`, `mintSandboxScopedToken`, `ModelSelection`, `ModelSelectionError`, `ModelSelectionFailure`, `ModelSelectionSource`, `Outcome`, `peekWorkspaceSandbox`, `PeekWorkspaceSandboxOutcome`, `preferredWorkspaceSandboxRecoveryBoxKey`, `PREWARM_CLAIM_TABLE_DDL`, `PrewarmClaimD1Like`, `PrewarmClaimStore`, `PrewarmDecision`, `PrewarmEvent`, `PrewarmOutcome`, `PrewarmResult`, `ProfileComposeOptions`, `PromptInputPart`, `ProviderResolutionConfig`, `PROVISION_PAYLOAD_MAX_BYTES`, `ProvisionPayloadSections`, `ProvisionProfileSection`, `PYPI_EGRESS_DOMAINS`, `readSandboxBinaryBytes`, `readSecret`, `requireTransportableModel`, `resetClientCache`, `ResolvedModel`, `resolveModel`, `resolveModelSelection`, `resolveSandboxClientCredentials`, `ResolveSandboxClientCredentialsOptions`, `runSandboxPrompt`, `runSandboxToolPathSetup`, `SafeSandboxErrorCause`, `SafeSandboxErrorDiagnostics`, `SandboxBuildContext`, `SandboxClientCredentials`, `SandboxCredentialEnvironment`, `SandboxEgressPolicyMismatchError`, `SandboxEgressPolicySource`, `SandboxExecChannel`, `SandboxExecOptions`, `SandboxExistingBoxStage`, `SandboxFileBytesOutcome`, `SandboxFileSizeOutcome`, `SandboxModelResolutionError`, `SandboxPermissionLevel`, `SandboxPrewarmer`, `SandboxPrewarmerOptions`, `SandboxPrewarmScope`, `SandboxProvisionedObservation`, `SandboxReadiness`, `SandboxRecoveryFailedError`, `SandboxRecoveryPhase`, `SandboxResourceConfig`, `SandboxRestoreSpec`, `SandboxRuntimeAuthRefreshError`, `SandboxRuntimeConfig`, `SandboxScope`, `SandboxSpendHooks`, `SandboxStepTransition`, `SandboxStreamEvent`, `SandboxTerminalConnectionRouteOptions`, `sandboxToolBinDir`, `sandboxToolPath`, `SandboxToolPathOptions`, `sandboxToolRootDir`, `SandboxToolSpec`, `ScopedTokenResult`, `SecretStore`, `secretStoreFromClient`, `serializeSandboxProvisioningError`, `shellQuote`, `shouldRestoreWorkspaceSandboxRecovery`, `splitDeferredProfileFiles`, `statSandboxFileSize`, `StoppedSandboxResumeFailure`, `StoppedSandboxResumeRecovery`, `StorageConfig`, `storeSecret`, `streamSandboxPrompt`, `StreamSandboxPromptOptions`, `syncSandboxMemberAdd`, `syncSandboxMemberRemove`, `syncSandboxMemberRole`, `TerminalConnectionBoxLike`, `WORKSPACE_SANDBOX_HOST_EXHAUSTED`, `WORKSPACE_SANDBOX_MISSING`, `WORKSPACE_SANDBOX_RECOVERY_ACTIONS`, `WORKSPACE_SANDBOX_RECOVERY_CODES`, `WORKSPACE_SANDBOX_SNAPSHOT_MAX_AGE_MS`, `WORKSPACE_SANDBOX_UNRECOVERABLE`, `WorkspaceSandboxEnsureContext`, `WorkspaceSandboxInstanceLike`, `WorkspaceSandboxManager`, `WorkspaceSandboxManagerOptions`, `WorkspaceSandboxRecoveryAction`, `WorkspaceSandboxRecoveryCode`, `WorkspaceSandboxRecoveryDecision`, `workspaceSandboxRecoveryDiagnostic`, `workspaceSandboxRecoveryFromError`, `WorkspaceSandboxRecoveryManager`, `workspaceSandboxRecoveryMessage`, `workspaceSandboxRecoveryRecommendedActions`, `WorkspaceSandboxRecoveryRequiredError`, `WorkspaceSandboxRecoveryState`, `WorkspaceSandboxRecoveryStore`, `WorkspaceSandboxSnapshot`, `WorkspaceSandboxSnapshotAssessment`, `WorkspaceSandboxSnapshotAvailability`, `WorkspaceSandboxSnapshotFreshness`, `WriteProfileFilesOptions`, `writeProfileFilesToBox`
 
 [Full API →](api/sandbox.md)
 
@@ -666,6 +668,24 @@ Depends on: `harness`, `skills`
 `ComposedSkills`, `composeSkillsForHarness`, `ComposeSkillsForHarnessInput`, `resolveSkillDir`, `SkillEntry`, `unsupportedSkillHarnesses`
 
 [Full API →](api/skills-placement.md)
+
+## `./spend`
+
+Source: `src/spend/index.ts` · 42 exports
+
+Depends on: `sandbox`
+
+`assertComputeBudget`, `BilledDurationBasis`, `BoxRateResolver`, `CeilingBasis`, `chargeNanoUsd`, `ComputeBudget`, `ComputeBudgetExceededError`, `ComputeBudgetRefusal`, `computeExpectedCeiling`, `ComputeExpectedCeilingOptions`, `createInMemorySpendLedgerStore`, `createSandboxSpendHooks`, `createSpendLedger`, `DEFAULT_CEILING_TOLERANCE_MS`, `ExpectedCeiling`, `foldSpendBoxRecord`, `formatSpendReport`, `InMemorySpendLedgerStore`, `isCharge`, `ObservedBalance`, `ObserveSandboxInput`, `parseSandboxGroupKey`, `parseSettlementReference`, `reconcileSpend`, `ReconcileSpendOptions`, `SandboxProvisionObservation`, `SandboxSpendHooksOptions`, `SandboxSpendSeam`, `SettlementReference`, `SettlementRow`, `settlementSandboxId`, `SPEND_CHECKS`, `SpendBoxPatch`, `SpendBoxRecord`, `SpendCheckId`, `SpendFinding`, `SpendLedger`, `SpendLedgerOptions`, `SpendLedgerStorePort`, `SpendReport`, `spendReportToJson`, `VelocityOptions`
+
+[Full API →](api/spend.md)
+
+## `./spend/cli`
+
+Source: `src/spend/cli.ts` · 0 exports
+
+Depends on: `sandbox`
+
+_No public exports._
 
 ## `./store`
 
