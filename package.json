@@ -36,6 +36,7 @@
     "agent-app-legibility-check": "./dist/legibility/cli.js",
     "agent-app-preflight": "./dist/preflight/cli.js",
     "agent-app-peer-check": "./dist/peer-floors/cli.js",
+    "agent-app-spend-check": "./dist/spend/cli.js",
     "agent-app-signoff": "./dist/signoff/cli.js",
     "agent-app-verify-proof": "./dist/signoff/proof-cli.js"
   },
@@ -482,6 +483,11 @@
       "types": "./dist/peer-floors/check.d.ts",
       "import": "./dist/peer-floors/check.js",
       "default": "./dist/peer-floors/check.js"
+    },
+    "./spend": {
+      "types": "./dist/spend/index.d.ts",
+      "import": "./dist/spend/index.js",
+      "default": "./dist/spend/index.js"
     }
   },
   "scripts": {
