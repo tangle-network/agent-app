@@ -114,7 +114,7 @@ export async function assertComputeBudget(
  * so a type import in the other direction would invert the dependency. The two
  * are pinned together by a compile-time assignment in this module's tests.
  */
-export interface SandboxProvisionObservation {
+export interface SpendProvisionObservation {
   readonly workspaceId: string
   readonly userId?: string
   readonly sandboxId: string
@@ -124,10 +124,15 @@ export interface SandboxProvisionObservation {
   readonly at: number
 }
 
-/** The optional seam `EnsureWorkspaceSandboxOptions.spend` accepts. */
+/**
+ * The optional seam `EnsureWorkspaceSandboxOptions.spend` and the turn
+ * primitives' `spend` option both accept. One object, wired in both places.
+ */
 export interface SandboxSpendSeam {
   beforeProvision?(input: { workspaceId: string; userId?: string }): Promise<void> | void
-  onProvisioned?(observation: SandboxProvisionObservation): Promise<void> | void
+  onProvisioned?(observation: SpendProvisionObservation): Promise<void> | void
+  /** Synchronous by contract — it sits on the turn path. See `createSandboxSpendHooks`. */
+  onActivity?(input: { sandboxId: string; at: number }): void
 }
 
 export interface SandboxSpendHooksOptions {
@@ -169,6 +174,14 @@ export function createSandboxSpendHooks(options: SandboxSpendHooksOptions): Sand
       } catch (err) {
         onError?.(err)
       }
+    },
+    onActivity(input) {
+      if (!ledger) return
+      // The turn path calls this synchronously and does not await it, so the
+      // promise is settled here rather than escaping as an unhandled rejection.
+      // Recording activity is a monotonic max, so a write that lands late — or
+      // out of order against another turn's — still converges.
+      void ledger.recordActivity(input.sandboxId, input.at).catch((err: unknown) => onError?.(err))
     },
   }
 }

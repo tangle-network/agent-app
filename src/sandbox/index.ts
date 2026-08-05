@@ -650,6 +650,31 @@ export interface SandboxSpendHooks {
   beforeProvision?(input: { workspaceId: string; userId?: string }): Promise<void> | void
   /** Runs after a box is available. Throwing here cannot fail the provision. */
   onProvisioned?(observation: SandboxProvisionedObservation): Promise<void> | void
+  /**
+   * The box is doing work. Fired by the turn primitives at the start of a turn
+   * and again when it settles.
+   *
+   * Deliberately SYNCHRONOUS and unawaited — this sits on the turn path, and a
+   * store write must not add latency to it or hold a stream open. An
+   * implementation that persists should enqueue and return; errors are
+   * swallowed here as they are for `onProvisioned`.
+   *
+   * Wiring it is what keeps the expectation ceiling honest for long turns:
+   * without it, `lastActivityAt` only advances when a box is provisioned, so a
+   * three-hour turn leaves the ceiling three hours too tight and manufactures a
+   * discrepancy out of the product's own silence.
+   */
+  onActivity?(input: { sandboxId: string; at: number }): void
+}
+
+/** Fire an activity tap without letting it affect the turn it reports on. */
+function emitSandboxActivity(spend: SandboxSpendHooks | undefined, box: SandboxInstance): void {
+  if (!spend?.onActivity) return
+  try {
+    spend.onActivity({ sandboxId: box.id, at: Date.now() })
+  } catch {
+    // An observability seam must never take down the turn it reports on.
+  }
 }
 
 // Single-quote a string for safe interpolation into a shell command.
@@ -2442,6 +2467,10 @@ export interface StreamSandboxPromptOptions {
   // it executed the shipped profile instead of re-deriving one and asserting
   // nothing. Invoked once, before the first event is yielded.
   onProfileResolved?: (fingerprint: ProfileFingerprint) => void
+  // Optional spend-verification activity tap. Omitted, nothing changes. Takes
+  // the SAME object `ensureWorkspaceSandbox` does, so a product builds one and
+  // wires it in both places; only `onActivity` is read here.
+  spend?: SandboxSpendHooks
 }
 
 type StreamPromptOptions = Parameters<SandboxInstance['streamPrompt']>[1]
@@ -2579,20 +2608,27 @@ export async function* streamSandboxPrompt(
     },
   } as StreamPromptOptions)
 
+  emitSandboxActivity(options?.spend, box)
   let severedFinishReason: string | null = null
-  for await (const event of stream) {
-    const step = classifySeveredStream(event)
-    if (step) severedFinishReason = step.kind === 'step-finish' && step.severed ? step.reason : null
-    if (severedFinishReason && isTerminalPromptEvent(event)) {
-      throw new Error(`sandbox model stream severed mid-turn (reason="${severedFinishReason}")`)
-    }
-    if (options?.disallowQuestions) {
-      const q = detectInteractiveQuestion(event)
-      if (q) {
-        throw new Error(`sandbox agent asked an interactive question during an autonomous run: ${q}`)
+  try {
+    for await (const event of stream) {
+      const step = classifySeveredStream(event)
+      if (step) severedFinishReason = step.kind === 'step-finish' && step.severed ? step.reason : null
+      if (severedFinishReason && isTerminalPromptEvent(event)) {
+        throw new Error(`sandbox model stream severed mid-turn (reason="${severedFinishReason}")`)
       }
+      if (options?.disallowQuestions) {
+        const q = detectInteractiveQuestion(event)
+        if (q) {
+          throw new Error(`sandbox agent asked an interactive question during an autonomous run: ${q}`)
+        }
+      }
+      yield event
     }
-    yield event
+  } finally {
+    // The box was working right up to here, however this turn ended — a throw,
+    // an abandoned generator and a clean finish all bill the same.
+    emitSandboxActivity(options?.spend, box)
   }
   // Reconnect-exhausted path: the stream ended on a severed step without a
   // terminal event. A truncated turn must fail loud, not return silently.
@@ -2962,6 +2998,11 @@ export async function driveSandboxTurn(
       // no consumer to answer a question. Interactive Q&A is streaming-path only.
       backend: { type: harness, profile, ...(model ? { model } : {}) },
     } as Parameters<SandboxInstance['driveTurn']>[1])
+    // The autonomous lane needs this most: a detached turn keeps the box
+    // billable with nobody watching, and every tick that reports `running` is
+    // fresh evidence it is still working. Without it the expectation ceiling
+    // rests on whenever the box was last provisioned.
+    emitSandboxActivity(options.spend, box)
     return ok(drive)
   } catch (err) {
     return fail(err)

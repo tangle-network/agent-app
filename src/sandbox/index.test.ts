@@ -75,6 +75,7 @@ import {
   ENV_VALUE_MAX_BYTES,
   ENV_TOTAL_MAX_BYTES,
   DEFAULT_SIDECAR_PROCESS_PATTERN,
+  DEFAULT_SANDBOX_RESOURCES,
   SandboxRuntimeAuthRefreshError,
   SandboxEgressPolicyMismatchError,
   SandboxRecoveryFailedError,
@@ -3862,9 +3863,10 @@ describe('ensureWorkspaceSandbox — the spend seam', () => {
       sandboxId: 'sandbox-1',
       boxKey: 'box-w1',
       // The values the box was actually asked to run with — the two bounds the
-      // expectation ceiling is built from.
-      idleTimeoutSeconds: 3600,
-      maxLifetimeSeconds: 86400,
+      // expectation ceiling is built from. Asserted against the shell defaults
+      // rather than literals, so the seam is pinned to what a box really gets.
+      idleTimeoutSeconds: DEFAULT_SANDBOX_RESOURCES.idleTimeoutSeconds,
+      maxLifetimeSeconds: DEFAULT_SANDBOX_RESOURCES.maxLifetimeSeconds,
     })
   })
 
@@ -3962,6 +3964,66 @@ describe('ensureWorkspaceSandbox — the spend seam', () => {
         },
       }),
     ).resolves.toBe(box)
+  })
+
+  it('taps turn activity on the streaming lane, at start and again when it settles', async () => {
+    const onActivity = vi.fn()
+    const box = fakeBox({
+      streamPrompt: vi.fn().mockReturnValue(
+        (async function* () {
+          yield { type: 'message.part.updated' }
+        })(),
+      ),
+    })
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' })
+    for await (const _ of streamSandboxPrompt(shell, box, 'go', { spend: { onActivity } })) void _
+    expect(onActivity).toHaveBeenCalledTimes(2)
+    expect(onActivity.mock.calls[0]![0].sandboxId).toBe('sandbox-1')
+  })
+
+  it('still reports the box as working when the turn throws mid-stream', async () => {
+    const onActivity = vi.fn()
+    const box = fakeBox({
+      streamPrompt: vi.fn().mockReturnValue(
+        (async function* () {
+          yield { type: 'message.part.updated' }
+          throw new Error('upstream died')
+        })(),
+      ),
+    })
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' })
+    await expect(
+      (async () => {
+        for await (const _ of streamSandboxPrompt(shell, box, 'go', { spend: { onActivity } })) void _
+      })(),
+    ).rejects.toThrow(/upstream died/)
+    // A turn that died still burned box time up to the moment it died.
+    expect(onActivity).toHaveBeenCalledTimes(2)
+  })
+
+  it('taps the autonomous lane, where nobody is watching the box burn', async () => {
+    const onActivity = vi.fn()
+    const box = fakeBox({ driveTurn: vi.fn().mockResolvedValue({ state: 'running' }) })
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' })
+    await expect(
+      driveSandboxTurn(shell, box, 'go', { sessionId: 's1', spend: { onActivity } }),
+    ).resolves.toMatchObject({ succeeded: true })
+    expect(onActivity).toHaveBeenCalledOnce()
+  })
+
+  it('does not fail a turn because the activity tap threw', async () => {
+    const box = fakeBox({ driveTurn: vi.fn().mockResolvedValue({ state: 'completed' }) })
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' })
+    await expect(
+      driveSandboxTurn(shell, box, 'go', {
+        sessionId: 's1',
+        spend: {
+          onActivity: () => {
+            throw new Error('the expectation store is down')
+          },
+        },
+      }),
+    ).resolves.toMatchObject({ succeeded: true })
   })
 
   it('changes nothing for a caller that does not wire it', async () => {

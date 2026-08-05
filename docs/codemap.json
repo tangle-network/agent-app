@@ -13691,12 +13691,6 @@
           "doc": null
         },
         {
-          "name": "SandboxProvisionObservation",
-          "kind": "interface",
-          "signature": "interface SandboxProvisionObservation",
-          "doc": "What `/sandbox` reports once a box is provisioned, reused or resumed."
-        },
-        {
           "name": "SandboxSpendHooksOptions",
           "kind": "interface",
           "signature": "interface SandboxSpendHooksOptions",
@@ -13706,7 +13700,7 @@
           "name": "SandboxSpendSeam",
           "kind": "interface",
           "signature": "interface SandboxSpendSeam",
-          "doc": "The optional seam `EnsureWorkspaceSandboxOptions.spend` accepts."
+          "doc": "The optional seam `EnsureWorkspaceSandboxOptions.spend` and the turn primitives' `spend` option both accept."
         },
         {
           "name": "SettlementReference",
@@ -13773,6 +13767,12 @@
           "kind": "interface",
           "signature": "interface SpendLedgerStorePort",
           "doc": "Persistence seam for the expectation ledger — the product implements it over its own tables."
+        },
+        {
+          "name": "SpendProvisionObservation",
+          "kind": "interface",
+          "signature": "interface SpendProvisionObservation",
+          "doc": "What `/sandbox` reports once a box is provisioned, reused or resumed."
         },
         {
           "name": "SpendReport",

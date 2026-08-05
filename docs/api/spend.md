@@ -206,14 +206,6 @@ interface ObserveSandboxInput
 interface ReconcileSpendOptions
 ```
 
-### `SandboxProvisionObservation`
-
-`interface` — What `/sandbox` reports once a box is provisioned, reused or resumed.
-
-```ts
-interface SandboxProvisionObservation
-```
-
 ### `SandboxSpendHooksOptions`
 
 `interface`
@@ -224,7 +216,7 @@ interface SandboxSpendHooksOptions
 
 ### `SandboxSpendSeam`
 
-`interface` — The optional seam `EnsureWorkspaceSandboxOptions.spend` accepts.
+`interface` — The optional seam `EnsureWorkspaceSandboxOptions.spend` and the turn primitives' `spend` option both accept.
 
 ```ts
 interface SandboxSpendSeam
@@ -316,6 +308,14 @@ interface SpendLedgerOptions
 
 ```ts
 interface SpendLedgerStorePort
+```
+
+### `SpendProvisionObservation`
+
+`interface` — What `/sandbox` reports once a box is provisioned, reused or resumed.
+
+```ts
+interface SpendProvisionObservation
 ```
 
 ### `SpendReport`

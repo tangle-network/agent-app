@@ -75,9 +75,9 @@ export {
   createSandboxSpendHooks,
   type ComputeBudget,
   type ComputeBudgetRefusal,
-  type SandboxProvisionObservation,
   type SandboxSpendHooksOptions,
   type SandboxSpendSeam,
+  type SpendProvisionObservation,
 } from './budget'
 
 export { formatSpendReport, spendReportToJson } from './report'

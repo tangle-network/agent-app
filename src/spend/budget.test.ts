@@ -137,6 +137,46 @@ describe('createSandboxSpendHooks', () => {
     await expect(hooks.beforeProvision?.({ workspaceId: 'ws_1' })).resolves.toBeUndefined()
   })
 
+  it('records turn activity, which is what keeps the ceiling honest for long turns', async () => {
+    const store = createInMemorySpendLedgerStore()
+    const hooks = createSandboxSpendHooks({ ledger: createSpendLedger({ store }) })
+    await hooks.onProvisioned?.({
+      workspaceId: 'ws_1',
+      sandboxId: 'sb_1',
+      idleTimeoutSeconds: 3600,
+      at: 1_000,
+    })
+
+    hooks.onActivity?.({ sandboxId: 'sb_1', at: 900_000 })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect((await store.load('sb_1'))?.lastActivityAt).toBe(900_000)
+  })
+
+  it('never throws or rejects out of the turn path when recording fails', async () => {
+    const onError = vi.fn()
+    const hooks = createSandboxSpendHooks({
+      ledger: createSpendLedger({
+        store: {
+          load: async () => null,
+          insert: async () => {
+            throw new Error('down')
+          },
+          update: async () => {
+            throw new Error('store is down')
+          },
+        },
+      }),
+      onError,
+    })
+    // Synchronous by contract: it must return, not return a promise to await.
+    expect(hooks.onActivity?.({ sandboxId: 'sb_1', at: 1 })).toBeUndefined()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(onError).toHaveBeenCalledOnce()
+  })
+
   it('satisfies /sandbox\'s structural seam, so the two declarations cannot drift apart', () => {
     // `/spend` re-declares this shape rather than importing it, to keep the
     // dependency pointing one way. This assignment is what proves the copy is

@@ -187,6 +187,22 @@ legal-agent has **no** sandbox lifecycle record today — it resolves its box by
 Boxes created there are invisible to `ensureWorkspaceSandbox`'s hook and will surface as `unknown-box` findings until either that path is routed through the shell or it calls `ledger.observeSandbox` itself.
 Naming it is the point: a reconciler that quietly ignored those boxes would be reporting a clean bill for an account that is not clean.
 
+### Turn activity
+
+The same object goes on the turn primitives, which is what keeps the ceiling honest for long turns.
+
+```ts
+for await (const event of streamSandboxPrompt(shell, box, prompt, { spend })) { /* … */ }
+await driveSandboxTurn(shell, box, prompt, { sessionId, spend })
+```
+
+`onActivity` fires at the start of a turn and again when it settles — including when it throws, because a turn that died still burned box time up to the moment it died.
+It is **synchronous by contract and unawaited**: it sits on the turn path, so a store write must not add latency to it or hold a stream open.
+`createSandboxSpendHooks` settles the write internally and routes failures to `onError`, so nothing escapes as an unhandled rejection.
+The autonomous lane needs it most — a detached turn keeps the box billable with nobody watching, and every tick that reports `running` is fresh evidence it is still working.
+
+Without this, `lastActivityAt` only advances when a box is provisioned, so a three-hour turn leaves the ceiling three hours too tight and manufactures a discrepancy out of the product's own silence.
+
 ### Scoping the ledger fetch
 
 The product supplies its own settled rows — this package never reaches for them, because the ledger is the counterparty's record and reading it is the product's authenticated business.
@@ -209,5 +225,5 @@ Exit 0 clean, 1 on findings, 2 on a usage or config error; a failing report goes
 ## What it does not do yet
 
 - **Nothing records stop or delete in production**, because neither shipped product stops or deletes a box — the 3 600 s platform idle timeout is the only reclamation today. The ceiling therefore rests on `idle-timeout` and `max-lifetime` in practice. Both are sound; `stopped`/`deleted` are simply tighter bounds waiting for a caller.
-- **Turn-level activity is not hooked automatically.** `ensureWorkspaceSandbox` is the only automatic recording seam. A product that runs long turns should call `ledger.recordActivity` from its turn path, and `recordDetachedRunStarted`/`Ended` around any detached run, or the ceiling will be tighter than the truth and produce false alarms.
+- **Detached runs must still be declared by the product.** The turn primitives tap activity automatically (see below), but `recordDetachedRunStarted`/`Ended` are the product's call — only it knows that a dispatch it made is one it will not watch finish. Without them a detached run looks like an ordinary turn that went quiet, and the ceiling will be tighter than the truth.
 - **The budget guard is a pre-check against spend already settled**, not a reservation. Settlement lags provisioning by design, so the cap overshoots by at most the unsettled tail — bounded by the box's own idle timeout. A cap that refuses one box late is worth more than one that cannot be implemented honestly.
