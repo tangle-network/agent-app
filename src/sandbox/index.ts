@@ -609,6 +609,72 @@ export interface EnsureWorkspaceSandboxOptions {
   // instead of the service account that authenticated the create. Omitted =>
   // platform default (billing owner = create-auth principal) — unchanged.
   billingOwnerId?: string
+  // Optional consumer-side spend verification. Omitted, nothing here changes:
+  // no extra call, no extra await, no behavior difference. Wired, it is the one
+  // seam where a product both refuses to provision past a compute cap and
+  // records that a box is now billable against it.
+  //
+  // Structural on purpose. `@tangle-network/agent-app/spend` supplies an
+  // implementation (`createSandboxSpendHooks`), but this module takes no
+  // dependency on it — /spend composes /sandbox, and importing back the other
+  // way would invert the layering.
+  spend?: SandboxSpendHooks
+}
+
+/** What `/sandbox` reports once a box is provisioned, reused, or resumed. */
+export interface SandboxProvisionedObservation {
+  readonly workspaceId: string
+  readonly userId?: string
+  /** The platform's sandbox id — the join key to every settlement row. */
+  readonly sandboxId: string
+  /** The deterministic box key this workspace resolves to. */
+  readonly boxKey?: string | undefined
+  /** The idle timeout this box was asked to run with, seconds. */
+  readonly idleTimeoutSeconds: number
+  /** The max lifetime it was asked to run with, seconds, when one was asked for. */
+  readonly maxLifetimeSeconds?: number | undefined
+  readonly at: number
+}
+
+/**
+ * Optional spend-verification seam on `ensureWorkspaceSandbox`.
+ *
+ * The two halves have deliberately opposite failure contracts.
+ * `beforeProvision` is a GATE: it runs before anything is created and its throw
+ * propagates, because refusing to provision is the whole point of a budget cap.
+ * `onProvisioned` is an OBSERVER: its failures are swallowed, because
+ * bookkeeping must never take down the provisioning it is bookkeeping.
+ */
+export interface SandboxSpendHooks {
+  /** Runs before any create, resume, or reuse. Throw to refuse provisioning. */
+  beforeProvision?(input: { workspaceId: string; userId?: string }): Promise<void> | void
+  /** Runs after a box is available. Throwing here cannot fail the provision. */
+  onProvisioned?(observation: SandboxProvisionedObservation): Promise<void> | void
+  /**
+   * The box is doing work. Fired by the turn primitives at the start of a turn
+   * and again when it settles.
+   *
+   * Deliberately SYNCHRONOUS and unawaited — this sits on the turn path, and a
+   * store write must not add latency to it or hold a stream open. An
+   * implementation that persists should enqueue and return; errors are
+   * swallowed here as they are for `onProvisioned`.
+   *
+   * Wiring it is what keeps the expectation ceiling honest for long turns:
+   * without it, `lastActivityAt` only advances when a box is provisioned, so a
+   * three-hour turn leaves the ceiling three hours too tight and manufactures a
+   * discrepancy out of the product's own silence.
+   */
+  onActivity?(input: { sandboxId: string; at: number }): void
+}
+
+/** Fire an activity tap without letting it affect the turn it reports on. */
+function emitSandboxActivity(spend: SandboxSpendHooks | undefined, box: SandboxInstance): void {
+  if (!spend?.onActivity) return
+  try {
+    spend.onActivity({ sandboxId: box.id, at: Date.now() })
+  } catch {
+    // An observability seam must never take down the turn it reports on.
+  }
 }
 
 // Single-quote a string for safe interpolation into a shell command.
@@ -1982,6 +2048,55 @@ export async function ensureWorkspaceSandbox(
   shell: SandboxRuntimeConfig,
   options: EnsureWorkspaceSandboxOptions,
 ): Promise<SandboxInstance> {
+  // A budget refusal must land before any box exists, so it runs ahead of both
+  // the first attempt and the unbringable-box replacement below.
+  await options.spend?.beforeProvision?.({
+    workspaceId: options.workspaceId,
+    ...(options.userId ? { userId: options.userId } : {}),
+  })
+  const box = await bringUpWorkspaceSandbox(shell, options)
+  await observeProvisionedBox(shell, options, box)
+  return box
+}
+
+/**
+ * Report a now-billable box to the spend seam.
+ *
+ * Awaited rather than fired and forgotten: an expectation ledger with holes
+ * reports boxes it simply failed to record as `unknown-box`, and an alert that
+ * cries wolf is worse than no alert. The cost is one local write on a path that
+ * already makes at least one platform round trip, so it is not the term that
+ * decides provisioning latency.
+ *
+ * Errors are swallowed — the box is up, and failing the caller because
+ * bookkeeping failed would trade a real capability for a record of it.
+ */
+async function observeProvisionedBox(
+  shell: SandboxRuntimeConfig,
+  options: EnsureWorkspaceSandboxOptions,
+  box: SandboxInstance,
+): Promise<void> {
+  if (!options.spend?.onProvisioned) return
+  const resources = shell.resources ?? DEFAULT_SANDBOX_RESOURCES
+  try {
+    await options.spend.onProvisioned({
+      workspaceId: options.workspaceId,
+      ...(options.userId ? { userId: options.userId } : {}),
+      sandboxId: box.id,
+      boxKey: box.name,
+      idleTimeoutSeconds: resources.idleTimeoutSeconds,
+      maxLifetimeSeconds: resources.maxLifetimeSeconds,
+      at: Date.now(),
+    })
+  } catch {
+    // An observability seam must never take down the provision it reports on.
+  }
+}
+
+async function bringUpWorkspaceSandbox(
+  shell: SandboxRuntimeConfig,
+  options: EnsureWorkspaceSandboxOptions,
+): Promise<SandboxInstance> {
   try {
     return await provisionWorkspaceSandbox(shell, options)
   } catch (err) {
@@ -2352,6 +2467,10 @@ export interface StreamSandboxPromptOptions {
   // it executed the shipped profile instead of re-deriving one and asserting
   // nothing. Invoked once, before the first event is yielded.
   onProfileResolved?: (fingerprint: ProfileFingerprint) => void
+  // Optional spend-verification activity tap. Omitted, nothing changes. Takes
+  // the SAME object `ensureWorkspaceSandbox` does, so a product builds one and
+  // wires it in both places; only `onActivity` is read here.
+  spend?: SandboxSpendHooks
 }
 
 type StreamPromptOptions = Parameters<SandboxInstance['streamPrompt']>[1]
@@ -2489,20 +2608,27 @@ export async function* streamSandboxPrompt(
     },
   } as StreamPromptOptions)
 
+  emitSandboxActivity(options?.spend, box)
   let severedFinishReason: string | null = null
-  for await (const event of stream) {
-    const step = classifySeveredStream(event)
-    if (step) severedFinishReason = step.kind === 'step-finish' && step.severed ? step.reason : null
-    if (severedFinishReason && isTerminalPromptEvent(event)) {
-      throw new Error(`sandbox model stream severed mid-turn (reason="${severedFinishReason}")`)
-    }
-    if (options?.disallowQuestions) {
-      const q = detectInteractiveQuestion(event)
-      if (q) {
-        throw new Error(`sandbox agent asked an interactive question during an autonomous run: ${q}`)
+  try {
+    for await (const event of stream) {
+      const step = classifySeveredStream(event)
+      if (step) severedFinishReason = step.kind === 'step-finish' && step.severed ? step.reason : null
+      if (severedFinishReason && isTerminalPromptEvent(event)) {
+        throw new Error(`sandbox model stream severed mid-turn (reason="${severedFinishReason}")`)
       }
+      if (options?.disallowQuestions) {
+        const q = detectInteractiveQuestion(event)
+        if (q) {
+          throw new Error(`sandbox agent asked an interactive question during an autonomous run: ${q}`)
+        }
+      }
+      yield event
     }
-    yield event
+  } finally {
+    // The box was working right up to here, however this turn ended — a throw,
+    // an abandoned generator and a clean finish all bill the same.
+    emitSandboxActivity(options?.spend, box)
   }
   // Reconnect-exhausted path: the stream ended on a severed step without a
   // terminal event. A truncated turn must fail loud, not return silently.
@@ -2872,6 +2998,11 @@ export async function driveSandboxTurn(
       // no consumer to answer a question. Interactive Q&A is streaming-path only.
       backend: { type: harness, profile, ...(model ? { model } : {}) },
     } as Parameters<SandboxInstance['driveTurn']>[1])
+    // The autonomous lane needs this most: a detached turn keeps the box
+    // billable with nobody watching, and every tick that reports `running` is
+    // fresh evidence it is still working. Without it the expectation ceiling
+    // rests on whenever the box was last provisioned.
+    emitSandboxActivity(options.spend, box)
     return ok(drive)
   } catch (err) {
     return fail(err)

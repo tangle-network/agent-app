@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-165 exports.
+167 exports.
 
 ### `adaptSandboxStream`
 
@@ -838,6 +838,14 @@ interface SandboxPrewarmerOptions
 interface SandboxPrewarmScope
 ```
 
+### `SandboxProvisionedObservation`
+
+`interface` — What `/sandbox` reports once a box is provisioned, reused, or resumed.
+
+```ts
+interface SandboxProvisionedObservation
+```
+
 ### `SandboxReadiness`
 
 `type` — Readiness for the UI.
@@ -900,6 +908,14 @@ interface SandboxRuntimeConfig
 
 ```ts
 interface SandboxScope
+```
+
+### `SandboxSpendHooks`
+
+`interface` — Optional spend-verification seam on `ensureWorkspaceSandbox`.
+
+```ts
+interface SandboxSpendHooks
 ```
 
 ### `SandboxStepTransition`

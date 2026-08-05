@@ -18,6 +18,8 @@ export default defineConfig({
     'sandbox/index': 'src/sandbox/index.ts',
     'peer-floors/check': 'src/peer-floors/check.ts',
     'peer-floors/cli': 'src/peer-floors/cli.ts',
+    'spend/index': 'src/spend/index.ts',
+    'spend/cli': 'src/spend/cli.ts',
     'run/index': 'src/run/index.ts',
     'harness/index': 'src/harness/index.ts',
     'config/index': 'src/config/index.ts',

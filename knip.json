@@ -66,6 +66,8 @@
     "src/signoff/proof.ts",
     "src/skills-placement/index.ts",
     "src/skills/index.ts",
+    "src/spend/cli.ts",
+    "src/spend/index.ts",
     "src/store/index.ts",
     "src/stream/index.ts",
     "src/studio-react/index.tsx",

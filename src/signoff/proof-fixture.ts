@@ -28,12 +28,20 @@ export function createTempRepo(options: { readonly name?: string } = {}): TempRe
   mkdirSync(hooks, { recursive: true })
 
   const git = (args: readonly string[]): string =>
-    execFileSync('git', ['-c', 'user.name=Signoff Fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false', '-c', `core.hooksPath=${hooks}`, ...args], {
-      cwd: dir,
-      encoding: 'utf8',
-    }).replace(/\n$/, '')
+    execFileSync('git', args, { cwd: dir, encoding: 'utf8' }).replace(/\n$/, '')
 
   git(['init', '-b', 'main'])
+  // Identity and hook settings live in the repo's LOCAL config, not on this
+  // helper's argv. The code under test spawns its own `git`, so a `-c` flag
+  // here reaches the fixture's own commands and nothing else — `git notes add`
+  // inside `attachSignoffProof` then runs with whatever identity the machine
+  // happens to supply. A developer's global `~/.gitconfig` covers that gap and
+  // a bare runner has none, which is precisely the machine-specific pass this
+  // module exists to make impossible.
+  git(['config', 'user.name', 'Signoff Fixture'])
+  git(['config', 'user.email', 'fixture@example.invalid'])
+  git(['config', 'commit.gpgsign', 'false'])
+  git(['config', 'core.hooksPath', hooks])
   const repo: TempRepo = {
     dir,
     git,
