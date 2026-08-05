@@ -775,3 +775,49 @@ describe("AssistantPanel composer seed", () => {
     expect(onComposerSeedApplied).toHaveBeenCalledOnce();
   });
 });
+
+
+describe("AssistantPanel composer attachments", () => {
+  it("wires the composer's attach surface through composerAttachments and reports sends", async () => {
+    const onAttach = vi.fn();
+    const onRemoveFile = vi.fn();
+    const onComposerSend = vi.fn();
+    const chat = makeChat();
+    render(
+      <AssistantClientProvider client={client}>
+        <AssistantPanel
+          chat={chat}
+          userId="u1"
+          onClose={() => {}}
+          composerAttachments={{
+            onAttach,
+            pendingFiles: [
+              { id: "f1", name: "notes.md", kind: "file", status: "ready" },
+            ],
+            onRemoveFile,
+          }}
+          onComposerSend={onComposerSend}
+        />
+      </AssistantClientProvider>,
+    );
+
+    // The attach button and the host-driven staged chip render.
+    expect(screen.getByLabelText("Attach files")).toBeTruthy();
+    expect(screen.getByText("notes.md")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Remove notes.md"));
+    expect(onRemoveFile).toHaveBeenCalledExactlyOnceWith("f1");
+
+    // A send reaches the chat AND reports to the host, which clears its
+    // staged attachment set on that signal.
+    const input = screen.getByLabelText("Message input");
+    fireEvent.change(input, { target: { value: "see attached" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(chat.send).toHaveBeenCalledExactlyOnceWith("see attached");
+    expect(onComposerSend).toHaveBeenCalledExactlyOnceWith("see attached");
+  });
+
+  it("keeps the composer text-only when composerAttachments is omitted", () => {
+    renderPanel(makeChat());
+    expect(screen.queryByLabelText("Attach files")).toBeNull();
+  });
+});

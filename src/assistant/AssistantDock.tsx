@@ -18,7 +18,7 @@ import {
   useRef,
 } from "react";
 import type { ToolDetailRenderers } from "../web-react";
-import { AssistantPanel } from "./AssistantPanel";
+import { AssistantPanel, type AssistantPanelProps } from "./AssistantPanel";
 import { useAssistantLauncher } from "./launcher";
 import { ResizeHandle } from "./ResizeHandle";
 import type {
@@ -66,6 +66,11 @@ export interface AssistantDockProps {
    *  {@link AssistantPanelProps.renderTranscript}); the dock chrome, composer,
    *  transport, and proposal flow stay owned by the panel. */
   renderTranscript?: (view: AssistantTranscriptView) => ReactNode;
+  /** Opt-in attachment surface for the dock's composer — forwarded to
+   *  {@link AssistantPanelProps.composerAttachments}. */
+  composerAttachments?: AssistantPanelProps["composerAttachments"];
+  /** Forwarded to {@link AssistantPanelProps.onComposerSend}. */
+  onComposerSend?: AssistantPanelProps["onComposerSend"];
 }
 
 /** Visible, focusable descendants of a container, in tab order. Visibility is
@@ -92,6 +97,8 @@ export function AssistantDock({
   toolRenderers,
   renderConfirmedResult,
   renderTranscript,
+  composerAttachments,
+  onComposerSend,
 }: AssistantDockProps) {
   const { open, openAssistant, closeAssistant, seed, clearSeed } =
     useAssistantLauncher();
@@ -109,11 +116,25 @@ export function AssistantDock({
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const wasOpenRef = useRef(false);
 
-  // Close on Escape.
+  // Close on Escape — except when a popover inside the dialog is open (the
+  // composer's model picker, …): that Escape belongs to the popover's own
+  // close handling (`usePopover`), and closing the whole drawer under it would
+  // drop the user's place in the conversation. A `usePopover` trigger carries
+  // BOTH aria-haspopup and aria-expanded, which distinguishes it from the
+  // transcript's expandable tool-card toggles (aria-expanded only) — those
+  // must not suppress the drawer's own Escape-to-close.
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeAssistant();
+      if (e.key !== "Escape") return;
+      if (
+        dialogRef.current?.querySelector(
+          '[aria-haspopup="true"][aria-expanded="true"]',
+        )
+      ) {
+        return;
+      }
+      closeAssistant();
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
@@ -217,6 +238,8 @@ export function AssistantDock({
           renderTranscript={renderTranscript}
           composerSeed={seed}
           onComposerSeedApplied={clearSeed}
+          composerAttachments={composerAttachments}
+          onComposerSend={onComposerSend}
         />
         {isDesktop && (
           <ResizeHandle

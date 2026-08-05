@@ -6,7 +6,7 @@ import {
   AssistantLauncherProvider,
   useAssistantLauncher,
 } from '../../assistant'
-import { STORY_USER_ID, stubClient } from './fixtures'
+import { STORY_USER_ID, stubClient, useStubAttachments } from './fixtures'
 
 /**
  * The whole assistant surface at app-shell scale: the dock mounted over a fake
@@ -118,6 +118,7 @@ function OpenOnMount() {
 }
 
 function Docked() {
+  const stub = useStubAttachments()
   return (
     <AssistantClientProvider client={stubClient}>
       <AssistantLauncherProvider>
@@ -132,6 +133,8 @@ function Docked() {
             console.log('[story] connect requirement', requirement.provider)
             return { connected: true }
           }}
+          composerAttachments={stub.attachments}
+          onComposerSend={stub.onSend}
         />
       </AssistantLauncherProvider>
     </AssistantClientProvider>
@@ -159,6 +162,7 @@ export const FullAssistantOpen: Story = {
 }
 
 function AppShellWithDock() {
+  const stub = useStubAttachments()
   return (
     <>
       <AppShell />
@@ -172,6 +176,8 @@ function AppShellWithDock() {
           console.log('[story] connect requirement', requirement.provider)
           return { connected: true }
         }}
+        composerAttachments={stub.attachments}
+        onComposerSend={stub.onSend}
       />
     </>
   )

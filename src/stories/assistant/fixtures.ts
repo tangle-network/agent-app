@@ -24,6 +24,8 @@ import type {
   UsageInfo,
 } from '../../assistant/types'
 import type { AssistantChat } from '../../assistant/useAssistantChat'
+import { useCallback, useRef, useState } from 'react'
+import type { ComposerFile } from '../../web-react'
 
 const STORY_USER_ID = 'u-story'
 
@@ -450,3 +452,49 @@ export function makeFakeChat(over: Partial<AssistantState> = {}): AssistantChat 
 }
 
 export { STORY_USER_ID }
+
+// ── Composer attachments stub ────────────────────────────────────────────────
+
+const STUB_UPLOAD_MS = 700
+
+/**
+ * A story-level stand-in for the host attachment pipeline (web-react's
+ * `useComposerAttachments` + an upload route): each picked/dropped file stages
+ * as an 'uploading' chip and flips to 'ready' after a beat, so stories exercise
+ * the composer's chip lifecycle with no network. `onSend` clears the staged
+ * set — wire it to the panel/dock `onComposerSend`.
+ */
+export function useStubAttachments(): {
+  attachments: {
+    onAttach: (files: FileList) => void
+    pendingFiles: ComposerFile[]
+    onRemoveFile: (id: string) => void
+  }
+  onSend: () => void
+} {
+  const [pendingFiles, setPendingFiles] = useState<ComposerFile[]>([])
+  const seq = useRef(0)
+
+  const onAttach = useCallback((files: FileList) => {
+    for (const file of Array.from(files)) {
+      const id = `att-${(seq.current += 1)}`
+      setPendingFiles((prev) => [
+        ...prev,
+        { id, name: file.name, size: file.size, kind: 'file', status: 'uploading' },
+      ])
+      setTimeout(() => {
+        setPendingFiles((prev) =>
+          prev.map((f) => (f.id === id ? { ...f, status: 'ready' } : f)),
+        )
+      }, STUB_UPLOAD_MS)
+    }
+  }, [])
+
+  const onRemoveFile = useCallback((id: string) => {
+    setPendingFiles((prev) => prev.filter((f) => f.id !== id))
+  }, [])
+
+  const onSend = useCallback(() => setPendingFiles([]), [])
+
+  return { attachments: { onAttach, pendingFiles, onRemoveFile }, onSend }
+}

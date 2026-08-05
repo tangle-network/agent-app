@@ -6,7 +6,7 @@ import {
   AssistantLauncherProvider,
   useAssistantLauncher,
 } from '../../assistant'
-import { STORY_USER_ID, stubClient } from './fixtures'
+import { STORY_USER_ID, stubClient, useStubAttachments } from './fixtures'
 
 /**
  * The floating launcher + right-side drawer, mounted over a fake page so the
@@ -119,4 +119,30 @@ export const DockWithSeed: Story = {
       </OpenOnMount>
     </>
   ),
+}
+
+/** The composer attachments seam end-to-end: the dock forwards the host's
+ *  attachment props to the panel's composer — the attach button, staged chips
+ *  flipping uploading → ready (stubbed), cleared on send. */
+export const DockWithAttachments: Story = {
+  name: 'Expanded with Attachments',
+  render: () => <DockAttachments />,
+}
+
+function DockAttachments() {
+  const stub = useStubAttachments()
+  return (
+    <>
+      <FakePage />
+      <OpenOnMount>
+        <AssistantDock
+          userId={STORY_USER_ID}
+          navigate={(path) => console.log('[story] navigate', path)}
+          balanceUsd={12.4}
+          composerAttachments={stub.attachments}
+          onComposerSend={stub.onSend}
+        />
+      </OpenOnMount>
+    </>
+  )
 }

@@ -325,6 +325,38 @@ describe('ChatComposer layout', () => {
   })
 })
 
+describe('ChatComposer controls strip', () => {
+  const models = [
+    model({ id: 'anthropic/sonnet', name: 'Claude Sonnet', provider: 'anthropic' }),
+    model({ id: 'openai/gpt-5', name: 'GPT-5', provider: 'openai' }),
+  ]
+
+  it('never makes the controls strip an overflow box (dock picker regression)', () => {
+    // A scroll/clip box between a control and its popover clips that popover on
+    // both axes (overflow-x:auto computes overflow-y to auto) — in the assistant
+    // dock this made the ModelPicker mount but paint zero pixels. The strip must
+    // wrap instead of scrolling, carrying no overflow utility at all, and the
+    // popover must still open and close inside it.
+    render(
+      <ChatComposer
+        onSend={() => {}}
+        controls={<ModelPicker value="anthropic/sonnet" onChange={() => {}} models={models} />}
+      />,
+    )
+    const strip = screen.getByTestId('composer-controls')
+    expect(strip.className).toContain('flex-wrap')
+    expect(strip.className).not.toMatch(/overflow(-[xy])?-(auto|scroll|hidden|clip)/)
+
+    // The popover lifecycle works inside the strip: closed → open → closed.
+    expect(strip.matches(':has([aria-expanded="true"])')).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: /Claude Sonnet/ }))
+    expect(screen.getByPlaceholderText('Search models...')).toBeTruthy()
+    expect(strip.matches(':has([aria-expanded="true"])')).toBe(true)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(strip.matches(':has([aria-expanded="true"])')).toBe(false)
+  })
+})
+
 describe('ModelPicker priorityGroup', () => {
   it('pins a labeled section above Recommended and does not duplicate the model below', () => {
     const models = [
@@ -347,6 +379,37 @@ describe('ModelPicker priorityGroup', () => {
     // The fine-tuned model appears exactly once (in the priority section, not
     // also under a "tuner" provider group).
     expect(screen.getAllByText('My Fine-Tune')).toHaveLength(1)
+  })
+})
+
+describe('ModelPicker popover viewport clamp', () => {
+  const models = [model({ id: 'anthropic/sonnet', name: 'Claude Sonnet', provider: 'anthropic' })]
+
+  function openPicker() {
+    const utils = render(<ModelPicker value="anthropic/sonnet" onChange={() => {}} models={models} />)
+    fireEvent.click(screen.getByRole('button', { name: /Claude Sonnet/ }))
+    const popover = screen.getByPlaceholderText('Search models...').closest('div.absolute') as HTMLElement
+    return { popover, unmount: utils.unmount }
+  }
+
+  it('shifts the popover left when it would overflow the viewport, no-op when it fits', () => {
+    const rect = (right: number) =>
+      ({ right, left: 0, top: 0, bottom: 0, width: 420, height: 300, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+
+    // Overflowing: right edge at 2000 in a 1024-wide window (jsdom default) —
+    // the narrow-dock case — shifts left by 2000 - (1024 - 16) = 992.
+    spy.mockReturnValue(rect(2000))
+    const first = openPicker()
+    expect(first.popover.style.transform).toBe('translateX(-992px)')
+    first.unmount()
+
+    // Fitting: right edge inside the window keeps the left anchor, no transform.
+    spy.mockReturnValue(rect(600))
+    const second = openPicker()
+    expect(second.popover.style.transform).toBe('')
+    second.unmount()
+    spy.mockRestore()
   })
 })
 

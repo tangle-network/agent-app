@@ -753,7 +753,10 @@ export function ChatComposer({
               visible — and the scroll offset that comes with it cuts the trigger's
               own left edge. Growing a second line is the cost of controls that
               stay operable. Rendered even when empty so Send stays right-aligned. */}
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          <div
+            data-testid="composer-controls"
+            className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5"
+          >
             {showInline && controls}
           </div>
 

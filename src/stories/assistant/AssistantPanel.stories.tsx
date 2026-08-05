@@ -10,6 +10,7 @@ import {
   streamingReasoning,
   STORY_USER_ID,
   stubClient,
+  useStubAttachments,
   workflowProposal,
 } from './fixtures'
 
@@ -142,6 +143,31 @@ export const PanelError: Story = {
       }}
     />
   ),
+}
+
+/** The composer's opt-in attachment surface: the attach button and staged-file
+ *  chips (flipping uploading → ready via the story's stub upload), cleared on
+ *  send. Mirrors the props a host wires through `composerAttachments`. */
+export const PanelWithAttachments: Story = {
+  name: 'With Attachments',
+  render: () => <PanelAttachments />,
+}
+
+function PanelAttachments() {
+  const stub = useStubAttachments()
+  return (
+    <Frame>
+      <AssistantPanel
+        chat={makeFakeChat()}
+        userId={STORY_USER_ID}
+        onClose={() => console.log('[story] close')}
+        navigate={(path) => console.log('[story] navigate', path)}
+        balanceUsd={12.4}
+        composerAttachments={stub.attachments}
+        onComposerSend={stub.onSend}
+      />
+    </Frame>
+  )
 }
 
 /** Balance under the $1 threshold: the quiet nudge above the composer. */

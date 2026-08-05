@@ -222,9 +222,23 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
   const [query, setQuery] = useState('')
   const { containerRef, triggerProps } = usePopover(open, setOpen)
   const inputRef = useRef<HTMLInputElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (open) inputRef.current?.focus()
+  }, [open])
+
+  // Keep the wide popover inside the viewport. It is left-anchored under the
+  // trigger, so inside a narrow RIGHT-docked shell (the assistant drawer near
+  // its minimum width) the 420px card runs past the window's right edge and
+  // the price/context column clips. Shift it left just enough to fit — a no-op
+  // whenever it already fits (the common case), so anchoring is unchanged.
+  useEffect(() => {
+    if (!open) return
+    const el = popoverRef.current
+    if (!el) return
+    const overflowRight = el.getBoundingClientRect().right - (window.innerWidth - 16)
+    el.style.transform = overflowRight > 0 ? `translateX(-${Math.ceil(overflowRight)}px)` : ''
   }, [open])
 
   const selected = models.find((m) => m.id === value)
@@ -275,7 +289,7 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
       </button>
 
       {open && (
-        <div className="absolute bottom-full left-0 z-50 mb-2 w-[420px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+        <div ref={popoverRef} className="absolute bottom-full left-0 z-50 mb-2 w-[420px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-card shadow-lg">
           <div className="border-b border-border px-3 py-2">
             <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
               <SearchGlyph className="h-3.5 w-3.5 text-muted-foreground" />
