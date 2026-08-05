@@ -8,9 +8,10 @@
  * scanning tests would make the gate loudest exactly where nothing ships.
  */
 
-import { type Dirent, readFileSync, readdirSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { readFileSync } from 'node:fs'
+import { relative } from 'node:path'
 import { lineIndex, positionAt, scanSource, type ScannedSource, type SourcePosition } from './source'
+import { walkSources } from './walk-sources'
 
 /** One file, lexed once, with its line index ready. */
 export interface ScannedFile {
@@ -23,19 +24,6 @@ export interface ScannedFile {
   readonly lineStarts: readonly number[]
   positionAt(offset: number): SourcePosition
 }
-
-const SOURCE_RE = /\.(tsx?|jsx?|mjs|cjs)$/
-const SKIP_DIRS = new Set([
-  'node_modules',
-  '.git',
-  'dist',
-  'build',
-  '.next',
-  '.react-router',
-  'coverage',
-  '.wrangler',
-  '.turbo',
-])
 
 /**
  * Paths never scanned. Tests and fixtures contain the defects on purpose;
@@ -53,24 +41,6 @@ const DEFAULT_IGNORE = [
   '.stories.',
   '/+types/',
 ]
-
-/** Recursively collect scannable files under `dir`. */
-function walkSources(dir: string, ignore: readonly string[] = []): string[] {
-  let entries: Dirent[]
-  try {
-    entries = readdirSync(dir, { withFileTypes: true })
-  } catch {
-    return []
-  }
-  const skip = [...DEFAULT_IGNORE, ...ignore]
-  return entries
-    .flatMap((entry) => {
-      const full = join(dir, entry.name)
-      if (entry.isDirectory()) return SKIP_DIRS.has(entry.name) ? [] : walkSources(full, ignore)
-      return SOURCE_RE.test(entry.name) ? [full] : []
-    })
-    .filter((file) => !skip.some((needle) => file.includes(needle)))
-}
 
 /** Read and lex one file. Returns null when it cannot be read. */
 export function scanFile(path: string): ScannedFile | null {
@@ -99,7 +69,7 @@ export function buildScannedFile(path: string, text: string): ScannedFile {
 
 /** Lex every scannable file under `srcDirs`. */
 export function scanSources(srcDirs: readonly string[], ignore: readonly string[] = []): ScannedFile[] {
-  const files = srcDirs.flatMap((dir) => walkSources(dir, ignore))
+  const files = srcDirs.flatMap((dir) => walkSources(dir, [...DEFAULT_IGNORE, ...ignore]))
   const unique = [...new Set(files)].sort()
   return unique.flatMap((path) => {
     const scanned = scanFile(path)

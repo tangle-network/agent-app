@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 
+import type { AsyncResourceState } from './async'
 import {
   RecordGrid,
   sumRecordGridColumn,
@@ -25,6 +26,22 @@ const ROWS: RecordGridRow[] = [
 
 const EMPTY = { title: 'No holders yet', description: 'Add a founder or an investor.' }
 
+const NOOP = (): void => {}
+
+/** `AsyncResourceState` fixtures — the same shapes `useAsyncResource` produces. */
+function readyState(rows: readonly RecordGridRow[]): AsyncResourceState<readonly RecordGridRow[]> {
+  return { status: 'ready', value: rows, retry: NOOP }
+}
+function emptyState(): AsyncResourceState<readonly RecordGridRow[]> {
+  return { status: 'empty', value: [], retry: NOOP }
+}
+function loadingState(): AsyncResourceState<readonly RecordGridRow[]> {
+  return { status: 'loading', retry: NOOP }
+}
+function errorState(message: string, retry: () => void = NOOP): AsyncResourceState<readonly RecordGridRow[]> {
+  return { status: 'error', message, error: new Error(message), retry }
+}
+
 async function flush(): Promise<void> {
   await act(async () => {
     await Promise.resolve()
@@ -36,7 +53,7 @@ describe('RecordGrid data states', () => {
     render(
       <RecordGrid
         columns={COLUMNS}
-        rows={[]}
+        state={emptyState()}
         caption="Cap table"
         empty={{ ...EMPTY, action: <a href="/app/chat">Ask the agent to import it</a> }}
       />,
@@ -50,15 +67,7 @@ describe('RecordGrid data states', () => {
   it('renders the error state with a retry, never the empty state', () => {
     const onRetry = vi.fn()
     render(
-      <RecordGrid
-        columns={COLUMNS}
-        rows={[]}
-        caption="Cap table"
-        state="error"
-        error="holders request failed: 503"
-        onRetry={onRetry}
-        empty={EMPTY}
-      />,
+      <RecordGrid columns={COLUMNS} state={errorState('holders request failed: 503', onRetry)} caption="Cap table" empty={EMPTY} />,
     )
     expect(screen.getByRole('alert').textContent).toContain('holders request failed: 503')
     expect(screen.queryByText('No holders yet')).toBeNull()
@@ -66,14 +75,8 @@ describe('RecordGrid data states', () => {
     expect(onRetry).toHaveBeenCalledTimes(1)
   })
 
-  it('surfaces an error message even when the caller forgot to set the state', () => {
-    render(<RecordGrid columns={COLUMNS} rows={[]} caption="Cap table" error="network down" empty={EMPTY} />)
-    expect(screen.getByRole('alert').textContent).toContain('network down')
-    expect(screen.queryByText('No holders yet')).toBeNull()
-  })
-
   it('renders a busy loading state distinct from both', () => {
-    render(<RecordGrid columns={COLUMNS} rows={[]} caption="Cap table" state="loading" empty={EMPTY} />)
+    render(<RecordGrid columns={COLUMNS} state={loadingState()} caption="Cap table" empty={EMPTY} />)
     const status = screen.getByRole('status')
     expect(status.getAttribute('aria-busy')).toBe('true')
     expect(screen.queryByText('No holders yet')).toBeNull()
@@ -84,7 +87,7 @@ describe('RecordGrid data states', () => {
 describe('RecordGrid cell validation', () => {
   it('rejects a typed cell, explains why, and does not write', async () => {
     const onUpdate = vi.fn<(change: RecordGridCellChange) => Promise<RecordGridWriteOutcome>>()
-    render(<RecordGrid columns={COLUMNS} rows={ROWS} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
+    render(<RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
 
     fireEvent.click(screen.getByRole('gridcell', { name: '100' }))
     const editor = screen.getByLabelText('Shares, Jane')
@@ -102,7 +105,7 @@ describe('RecordGrid cell validation', () => {
 
   it('rejects a value outside the column range with the bound and the value', async () => {
     const onUpdate = vi.fn<(change: RecordGridCellChange) => Promise<RecordGridWriteOutcome>>()
-    render(<RecordGrid columns={COLUMNS} rows={ROWS} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
+    render(<RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
 
     fireEvent.click(screen.getByRole('gridcell', { name: '100' }))
     const editor = screen.getByLabelText('Shares, Jane')
@@ -118,7 +121,7 @@ describe('RecordGrid cell validation', () => {
 
   it('commits a valid edit optimistically and keeps it when the write succeeds', async () => {
     const onUpdate = vi.fn(async (_change: RecordGridCellChange): Promise<RecordGridWriteOutcome> => ({ succeeded: true }))
-    render(<RecordGrid columns={COLUMNS} rows={ROWS} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
+    render(<RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
 
     fireEvent.click(screen.getByRole('gridcell', { name: '100' }))
     const editor = screen.getByLabelText('Shares, Jane')
@@ -139,7 +142,7 @@ describe('RecordGrid cell validation', () => {
 
   it('does not carry a rejected message into the next time the cell is opened', async () => {
     const onUpdate = vi.fn(async (_change: RecordGridCellChange): Promise<RecordGridWriteOutcome> => ({ succeeded: true }))
-    render(<RecordGrid columns={COLUMNS} rows={ROWS} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
+    render(<RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
 
     fireEvent.click(screen.getByRole('gridcell', { name: '100' }))
     const editor = screen.getByLabelText('Shares, Jane')
@@ -162,7 +165,7 @@ describe('RecordGrid cell validation', () => {
 
   it('does not write when the committed value is unchanged', async () => {
     const onUpdate = vi.fn(async (_change: RecordGridCellChange): Promise<RecordGridWriteOutcome> => ({ succeeded: true }))
-    render(<RecordGrid columns={COLUMNS} rows={ROWS} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
+    render(<RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
 
     fireEvent.click(screen.getByRole('gridcell', { name: 'Jane' }))
     await act(async () => {
@@ -178,7 +181,7 @@ describe('RecordGrid optimistic rollback', () => {
       succeeded: false,
       error: 'permission denied',
     }))
-    render(<RecordGrid columns={COLUMNS} rows={ROWS} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
+    render(<RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
 
     fireEvent.click(screen.getByRole('gridcell', { name: 'Jane' }))
     const editor = screen.getByLabelText('Holder, Jane')
@@ -199,7 +202,7 @@ describe('RecordGrid optimistic rollback', () => {
     const onUpdate = vi.fn(async (_change: RecordGridCellChange): Promise<RecordGridWriteOutcome> => {
       throw new Error('socket hang up')
     })
-    render(<RecordGrid columns={COLUMNS} rows={ROWS} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
+    render(<RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
 
     fireEvent.click(screen.getByRole('gridcell', { name: '100' }))
     const editor = screen.getByLabelText('Shares, Jane')
@@ -220,7 +223,7 @@ describe('RecordGrid optimistic rollback', () => {
       succeeded: true,
       value: { id: 'r1', values: { holder: 'Jane R.', shares: 500 } },
     }))
-    render(<RecordGrid columns={COLUMNS} rows={ROWS} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
+    render(<RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
 
     fireEvent.click(screen.getByRole('gridcell', { name: '100' }))
     const editor = screen.getByLabelText('Shares, Jane')
@@ -238,7 +241,7 @@ describe('RecordGrid optimistic rollback', () => {
 describe('RecordGrid delete', () => {
   it('confirms with labelled controls, removes optimistically, and restores on failure', async () => {
     const onDelete = vi.fn(async (_row: RecordGridRow): Promise<RecordGridWriteOutcome> => ({ succeeded: false, error: 'row is referenced' }))
-    render(<RecordGrid columns={COLUMNS} rows={ROWS} caption="Cap table" empty={EMPTY} onDelete={onDelete} />)
+    render(<RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} onDelete={onDelete} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete Jane' }))
     expect(screen.getByRole('button', { name: 'Keep Jane' })).toBeTruthy()
@@ -256,7 +259,7 @@ describe('RecordGrid delete', () => {
 
   it('keeps the row removed when the delete succeeds', async () => {
     const onDelete = vi.fn(async (_row: RecordGridRow): Promise<RecordGridWriteOutcome> => ({ succeeded: true }))
-    render(<RecordGrid columns={COLUMNS} rows={ROWS} caption="Cap table" empty={EMPTY} onDelete={onDelete} />)
+    render(<RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} onDelete={onDelete} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete Jane' }))
     await act(async () => {
@@ -270,7 +273,7 @@ describe('RecordGrid delete', () => {
 
   it('cancelling the confirmation leaves the row alone', () => {
     const onDelete = vi.fn(async (_row: RecordGridRow): Promise<RecordGridWriteOutcome> => ({ succeeded: true }))
-    render(<RecordGrid columns={COLUMNS} rows={ROWS} caption="Cap table" empty={EMPTY} onDelete={onDelete} />)
+    render(<RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} onDelete={onDelete} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete Jane' }))
     fireEvent.click(screen.getByRole('button', { name: 'Keep Jane' }))
@@ -295,7 +298,7 @@ describe('RecordGrid add form', () => {
 
   it('rejects an invalid draft with a per-field message and does not write', async () => {
     const onCreate = vi.fn<(values: Readonly<Record<string, RecordGridValue>>) => Promise<RecordGridCreateOutcome>>()
-    render(<RecordGrid columns={COLUMNS} rows={ROWS} caption="Cap table" empty={EMPTY} onCreate={onCreate} addLabel="Add holder" />)
+    render(<RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} onCreate={onCreate} addLabel="Add holder" />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Add holder' }))
     await act(async () => {
@@ -312,7 +315,7 @@ describe('RecordGrid add form', () => {
       succeeded: true,
       value: { id: 'srv-9', values: { holder: 'Ada', shares: 4000 } },
     }))
-    render(<RecordGrid columns={COLUMNS} rows={ROWS} caption="Cap table" empty={EMPTY} onCreate={onCreate} addLabel="Add holder" />)
+    render(<RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} onCreate={onCreate} addLabel="Add holder" />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Add holder' }))
     fireEvent.change(screen.getByLabelText(/^Holder/), { target: { value: 'Ada' } })
@@ -330,7 +333,7 @@ describe('RecordGrid add form', () => {
 
   it('drops the optimistic row and keeps the form when the create is refused', async () => {
     const onCreate = vi.fn(async (_values: Readonly<Record<string, RecordGridValue>>): Promise<RecordGridCreateOutcome> => ({ succeeded: false, error: 'duplicate holder' }))
-    render(<RecordGrid columns={COLUMNS} rows={ROWS} caption="Cap table" empty={EMPTY} onCreate={onCreate} addLabel="Add holder" />)
+    render(<RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} onCreate={onCreate} addLabel="Add holder" />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Add holder' }))
     fireEvent.change(screen.getByLabelText(/^Holder/), { target: { value: 'Ada' } })
@@ -351,7 +354,7 @@ describe('RecordGrid add form', () => {
       value: { id: 'x', values: {} },
     }))
     render(
-      <RecordGrid columns={VESTING_COLUMNS} rows={ROWS} caption="Cap table" empty={EMPTY} onCreate={onCreate} addLabel="Add holder" />,
+      <RecordGrid columns={VESTING_COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} onCreate={onCreate} addLabel="Add holder" />,
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Add holder' }))
@@ -369,7 +372,7 @@ describe('RecordGrid add form', () => {
     render(
       <RecordGrid
         columns={COLUMNS}
-        rows={[]}
+        state={emptyState()}
         caption="Cap table"
         empty={{ ...EMPTY, action: <a href="/app/chat">Ask the agent</a> }}
         onCreate={onCreate}
@@ -381,12 +384,38 @@ describe('RecordGrid add form', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add holder' }))
     expect((screen.getByLabelText(/^Shares/) as HTMLInputElement).value).toBe('1000')
   })
+
+  it('renders a row optimistically created while the caller state is still `empty`', async () => {
+    // `state.status` stays `empty` for the whole test — the caller never
+    // refetches. The overlay is what has to carry the created row into view;
+    // `AsyncResourceState`'s own `empty` branch has no way to know about it.
+    const onCreate = vi.fn(async (values: Readonly<Record<string, RecordGridValue>>): Promise<RecordGridCreateOutcome> => ({
+      succeeded: true,
+      value: { id: 'srv-1', values },
+    }))
+    render(
+      <RecordGrid columns={COLUMNS} state={emptyState()} caption="Cap table" empty={EMPTY} onCreate={onCreate} addLabel="Add holder" />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add holder' }))
+    fireEvent.change(screen.getByLabelText(/^Holder/), { target: { value: 'Ada' } })
+    fireEvent.change(screen.getByLabelText(/^Shares/), { target: { value: '4000' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    })
+    await flush()
+
+    expect(onCreate).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('grid', { name: 'Cap table' })).toBeTruthy()
+    expect(screen.getByText('Ada')).toBeTruthy()
+    expect(screen.queryByText('No holders yet')).toBeNull()
+  })
 })
 
 describe('RecordGrid keyboard navigation', () => {
   it('moves between cells with the arrow keys and opens the editor on Enter', () => {
     const onUpdate = vi.fn(async (_change: RecordGridCellChange): Promise<RecordGridWriteOutcome> => ({ succeeded: true }))
-    render(<RecordGrid columns={COLUMNS} rows={ROWS} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
+    render(<RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
 
     const cells = screen.getAllByRole('gridcell')
     const first = cells[0] as HTMLElement
@@ -408,7 +437,7 @@ describe('RecordGrid keyboard navigation', () => {
 
   it('stops at the edges and Home/End jump across the row', () => {
     const onUpdate = vi.fn(async (_change: RecordGridCellChange): Promise<RecordGridWriteOutcome> => ({ succeeded: true }))
-    render(<RecordGrid columns={COLUMNS} rows={ROWS} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
+    render(<RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
 
     const cells = screen.getAllByRole('gridcell')
     const first = cells[0] as HTMLElement
@@ -426,7 +455,7 @@ describe('RecordGrid keyboard navigation', () => {
 
   it('escapes an editor without writing', async () => {
     const onUpdate = vi.fn(async (_change: RecordGridCellChange): Promise<RecordGridWriteOutcome> => ({ succeeded: true }))
-    render(<RecordGrid columns={COLUMNS} rows={ROWS} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
+    render(<RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} onUpdate={onUpdate} />)
 
     fireEvent.click(screen.getByRole('gridcell', { name: 'Jane' }))
     const editor = screen.getByLabelText('Holder, Jane')
@@ -451,14 +480,14 @@ describe('RecordGrid provenance', () => {
           label: 'stock-purchase-agreement.pdf',
           locator: 'p.3',
           href: 'https://vault/spa.pdf',
-          basis: 'source',
+          basis: 'extracted',
         },
       },
     },
   ]
 
   it('opens the quote, source name, and link from a labelled control', () => {
-    render(<RecordGrid columns={COLUMNS} rows={SOURCED} caption="Cap table" empty={EMPTY} />)
+    render(<RecordGrid columns={COLUMNS} state={readyState(SOURCED)} caption="Cap table" empty={EMPTY} />)
 
     const marker = screen.getByRole('button', { name: 'Source for Shares, Jane' })
     expect(marker.getAttribute('aria-expanded')).toBe('false')
@@ -470,14 +499,28 @@ describe('RecordGrid provenance', () => {
   })
 
   it('renders no marker for a cell with no lineage', () => {
-    render(<RecordGrid columns={COLUMNS} rows={SOURCED} caption="Cap table" empty={EMPTY} />)
+    render(<RecordGrid columns={COLUMNS} state={readyState(SOURCED)} caption="Cap table" empty={EMPTY} />)
     expect(screen.queryByRole('button', { name: 'Source for Holder, Jane' })).toBeNull()
+  })
+
+  it('a source with no stated basis reads as agent-asserted, never as read out of a document', () => {
+    // The omission is the default path of every first integration, so what it
+    // renders is a factual claim the product makes on the caller's behalf.
+    const unstated: RecordGridRow[] = [
+      { id: 'r1', values: { holder: 'Jane', shares: 100 }, sources: { shares: { label: 'the agent' } } },
+    ]
+    render(<RecordGrid columns={COLUMNS} state={readyState(unstated)} caption="Cap table" empty={EMPTY} />)
+
+    const marker = screen.getByRole('button', { name: 'Source for Shares, Jane' })
+    expect(marker.getAttribute('title')).toBe('Agent, unverified — no source recorded')
+    fireEvent.click(marker)
+    expect(screen.queryByText(/Extracted from a source document/)).toBeNull()
   })
 })
 
 describe('RecordGrid read-only rendering', () => {
   it('marks cells read-only without an update seam and offers no delete', () => {
-    render(<RecordGrid columns={COLUMNS} rows={ROWS} caption="Cap table" empty={EMPTY} />)
+    render(<RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} />)
     const cell = screen.getByRole('gridcell', { name: 'Jane' })
     expect(cell.getAttribute('aria-readonly')).toBe('true')
     fireEvent.click(cell)
@@ -490,7 +533,7 @@ describe('RecordGrid read-only rendering', () => {
       COLUMNS[0] as RecordGridColumn,
       { id: 'shares', kind: 'number', header: 'Shares', footerValue: (rows) => sumRecordGridColumn(rows, 'shares') },
     ]
-    render(<RecordGrid columns={columns} rows={ROWS} caption="Cap table" empty={EMPTY} />)
+    render(<RecordGrid columns={columns} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} />)
     expect(screen.getByText('300')).toBeTruthy()
   })
 })

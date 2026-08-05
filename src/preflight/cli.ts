@@ -20,6 +20,7 @@ import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 import { existsSync } from 'node:fs'
 import { formatPreflightReport, runPreflight, type PreflightProbe } from './index'
+import { invokedAsScript } from '../signoff/invoked-as-script'
 
 const DEFAULT_CONFIG = 'preflight.config.mjs'
 
@@ -57,10 +58,7 @@ export async function runPreflightCli(argv: readonly string[]): Promise<number> 
 }
 
 /* c8 ignore start — process wiring, exercised by the bin itself */
-const invokedDirectly =
-  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href
-
-if (invokedDirectly) {
+if (invokedAsScript(import.meta.url, process.argv[1])) {
   runPreflightCli(process.argv.slice(2))
     .then((code) => {
       process.exit(code)

@@ -301,7 +301,10 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
                 ))}
               </>
             )}
-            {!loading && !filtered && (
+            {!loading && !filtered && models.length === 0 && (
+              <div className="px-3 py-4 text-center text-sm text-muted-foreground">No models available</div>
+            )}
+            {!loading && !filtered && models.length > 0 && (
               <>
                 {priorityGroup && sections.priority.length > 0 && (
                   <>

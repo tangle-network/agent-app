@@ -38,19 +38,19 @@ _96 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./interactions`](api/interactions.md) | 64 | — |
 | [`./knowledge`](api/knowledge.md) | 6 | — |
 | [`./knowledge-loop`](api/knowledge-loop.md) | 11 | `config` |
-| [`./legibility`](api/legibility.md) | 33 | — |
-| [`./legibility/cli`](api/legibility-cli.md) | 0 | — |
+| [`./legibility`](api/legibility.md) | 33 | `signoff` |
+| [`./legibility/cli`](api/legibility-cli.md) | 0 | `signoff` |
 | [`./missions`](api/missions.md) | 65 | — |
 | [`./model-resolution`](api/model-resolution.md) | 24 | — |
 | [`./object-store`](api/object-store.md) | 15 | `crypto` |
 | [`./openui`](api/openui.md) | 35 | — |
 | [`./openui-react`](api/openui-react.md) | 8 | `openui` |
-| [`./peer-floors/check`](api/peer-floors-check.md) | 8 | — |
-| [`./peer-floors/cli`](api/peer-floors-cli.md) | 0 | — |
+| [`./peer-floors/check`](api/peer-floors-check.md) | 8 | `signoff` |
+| [`./peer-floors/cli`](api/peer-floors-cli.md) | 0 | `signoff` |
 | [`./plans`](api/plans.md) | 12 | — |
 | [`./platform`](api/platform.md) | 67 | `billing`, `runtime`, `web` |
-| [`./preflight`](api/preflight.md) | 14 | — |
-| [`./preflight/cli`](api/preflight-cli.md) | 2 | — |
+| [`./preflight`](api/preflight.md) | 14 | `signoff` |
+| [`./preflight/cli`](api/preflight-cli.md) | 2 | `signoff` |
 | [`./preset-cloudflare`](api/preset-cloudflare.md) | 22 | `billing`, `crypto`, `knowledge`, `tools`, `web` |
 | [`./profile`](api/profile.md) | 45 | `skills` |
 | [`./prompt`](api/prompt.md) | 3 | — |
@@ -64,9 +64,9 @@ _96 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./sequences-react`](api/sequences-react.md) | 108 | `brand`, `sequences` |
 | [`./sequences/drizzle`](api/sequences-drizzle.md) | 13 | `tools`, `web` |
 | [`./session-shell`](api/session-shell.md) | 48 | — |
-| [`./signoff`](api/signoff.md) | 60 | — |
+| [`./signoff`](api/signoff.md) | 20 | — |
 | [`./signoff/cli`](api/signoff-cli.md) | 2 | — |
-| [`./signoff/proof`](api/signoff-proof.md) | 68 | — |
+| [`./signoff/proof`](api/signoff-proof.md) | 22 | — |
 | [`./signoff/proof-cli`](api/signoff-proof-cli.md) | 0 | — |
 | [`./skills`](api/skills.md) | 27 | — |
 | [`./skills-placement`](api/skills-placement.md) | 6 | `harness`, `skills` |
@@ -85,8 +85,8 @@ _96 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./teams/members-api`](api/teams-members-api.md) | 9 | — |
 | [`./teams/resend`](api/teams-resend.md) | 2 | — |
 | [`./theme`](api/theme.md) | 6 | — |
-| [`./theme-contract`](api/theme-contract.md) | 4 | — |
-| [`./theme-contract/cli`](api/theme-contract-cli.md) | 0 | — |
+| [`./theme-contract`](api/theme-contract.md) | 4 | `legibility`, `signoff` |
+| [`./theme-contract/cli`](api/theme-contract-cli.md) | 0 | `legibility`, `signoff` |
 | [`./theme/tailwind-preset`](api/theme-tailwind-preset.md) | 1 | — |
 | [`./tools`](api/tools.md) | 66 | `crypto`, `eval`, `openui` |
 | [`./trace`](api/trace.md) | 20 | `missions` |
@@ -96,7 +96,7 @@ _96 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./vault/lazy`](api/vault-lazy.md) | 2 | — |
 | [`./vault/server`](api/vault-server.md) | 8 | — |
 | [`./web`](api/web.md) | 32 | — |
-| [`./web-react`](api/web-react.md) | 349 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
+| [`./web-react`](api/web-react.md) | 347 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./web-react/async`](api/web-react-async.md) | 35 | — |
 | [`./web-react/terminal`](api/web-react-terminal.md) | 6 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./work-product`](api/work-product.md) | 90 | `eval-campaign`, `tools` |
@@ -399,6 +399,8 @@ Depends on: `config`
 
 Source: `src/legibility/index.ts` · 33 exports
 
+Depends on: `signoff`
+
 `BannedTerm`, `buildScannedFile`, `checkLegibility`, `COPY_CALLS`, `COPY_KEYS`, `DEFAULT_BANNED_TERMS`, `EmptyStateOptions`, `formatLegibilityReport`, `FormatOptions`, `JsxAttribute`, `JsxElement`, `LEGIBILITY_CHECKS`, `LegibilityCheckId`, `LegibilityConfig`, `LegibilityFinding`, `LegibilityReport`, `legibilityReportToJson`, `LegibilitySuppression`, `parseRouteConfig`, `ReachabilityOptions`, `READERLESS_PATHS`, `RouteEntry`, `scanFile`, `ScannedFile`, `ScannedSource`, `scanSource`, `scanSources`, `SegmentKind`, `SilentFailureOptions`, `SourceSegment`, `staticSegments`, `SuccessOptions`, `VocabularyOptions`
 
 [Full API →](api/legibility.md)
@@ -406,6 +408,8 @@ Source: `src/legibility/index.ts` · 33 exports
 ## `./legibility/cli`
 
 Source: `src/legibility/cli.ts` · 0 exports
+
+Depends on: `signoff`
 
 _No public exports._
 
@@ -457,6 +461,8 @@ Depends on: `openui`
 
 Source: `src/peer-floors/check.ts` · 8 exports
 
+Depends on: `signoff`
+
 `checkPeerFloors`, `CheckPeerFloorsOptions`, `describePeerFloorViolation`, `formatPeerFloorReport`, `PeerFloorReport`, `PeerFloorRow`, `PeerFloorVerdict`, `satisfiesRange`
 
 [Full API →](api/peer-floors-check.md)
@@ -464,6 +470,8 @@ Source: `src/peer-floors/check.ts` · 8 exports
 ## `./peer-floors/cli`
 
 Source: `src/peer-floors/cli.ts` · 0 exports
+
+Depends on: `signoff`
 
 _No public exports._
 
@@ -489,6 +497,8 @@ Depends on: `billing`, `runtime`, `web`
 
 Source: `src/preflight/index.ts` · 14 exports
 
+Depends on: `signoff`
+
 `formatPreflightReport`, `httpHeadProbe`, `HttpHeadProbeConfig`, `PreflightProbe`, `PreflightProbeResult`, `PreflightProbeVerdict`, `PreflightReport`, `requiredValueProbe`, `RequiredValueProbeConfig`, `routerChatProbe`, `RouterChatProbeConfig`, `runPreflight`, `sandboxAuthProbe`, `SandboxAuthProbeConfig`
 
 [Full API →](api/preflight.md)
@@ -496,6 +506,8 @@ Source: `src/preflight/index.ts` · 14 exports
 ## `./preflight/cli`
 
 Source: `src/preflight/cli.ts` · 2 exports
+
+Depends on: `signoff`
 
 `loadProbes`, `runPreflightCli`
 
@@ -623,9 +635,9 @@ Source: `src/session-shell/index.ts` · 48 exports
 
 ## `./signoff`
 
-Source: `src/signoff/index.ts` · 60 exports
+Source: `src/signoff/index.ts` · 20 exports
 
-`assertNodeVersion`, `assertShuffleArgsReachTheRunner`, `CleanTree`, `CommandResult`, `DEFAULT_SHUFFLE_ARGS`, `DEFAULT_SHUFFLE_RUNS`, `deriveSeed`, `deriveSignoffConfig`, `formatSignoffLine`, `formatSignoffReport`, `GraphNode`, `LoadedSignoffConfig`, `loadSignoffConfig`, `LoadSignoffConfigOptions`, `MANIFEST_FILES`, `manifestCacheKey`, `manifestFiles`, `materializeCleanTree`, `MaterializeOptions`, `newSeedBase`, `NodeVersionRequirement`, `parseSignoffConfig`, `peakConcurrency`, `planAttempts`, `removeCleanTree`, `repoRootOf`, `ResolvedWorkflowPin`, `resolveNodeRequirement`, `resolveStore`, `ResolveStoreOptions`, `resolveWorkflowNodePin`, `runCommand`, `RunCommandOptions`, `runGraph`, `RunGraphOptions`, `runSignoff`, `RunSignoffOptions`, `scanMergeGateNodePins`, `SIGNOFF_CONFIG_FILES`, `SignoffAttempt`, `SignoffConfig`, `SignoffConfigOrigin`, `SignoffEvent`, `SignoffHostFacts`, `SignoffInstallResult`, `SignoffInstallSpec`, `SignoffRepoFacts`, `SignoffReport`, `SignoffShuffleSpec`, `SignoffSource`, `SignoffStepResult`, `SignoffStepSpec`, `SignoffStepStatus`, `StepAttemptPlan`, `StoreResolution`, `TaskOutcome`, `TaskStatus`, `triggersOnPullRequest`, `validateGraph`, `WorkflowNodePin`
+`formatSignoffReport`, `LoadedSignoffConfig`, `loadSignoffConfig`, `LoadSignoffConfigOptions`, `runSignoff`, `RunSignoffOptions`, `SignoffAttempt`, `SignoffConfig`, `SignoffConfigOrigin`, `SignoffEvent`, `SignoffHostFacts`, `SignoffInstallResult`, `SignoffInstallSpec`, `SignoffRepoFacts`, `SignoffReport`, `SignoffShuffleSpec`, `SignoffSource`, `SignoffStepResult`, `SignoffStepSpec`, `SignoffStepStatus`
 
 [Full API →](api/signoff.md)
 
@@ -639,9 +651,9 @@ Source: `src/signoff/cli.ts` · 2 exports
 
 ## `./signoff/proof`
 
-Source: `src/signoff/proof.ts` · 68 exports
+Source: `src/signoff/proof.ts` · 22 exports
 
-`AttachedSignoffProof`, `attachSignoffProof`, `AttachSignoffProofInput`, `buildSignoffProof`, `BuildSignoffProofInput`, `canonicalizeProofBody`, `canonicalJson`, `collectToolingFacts`, `CommitFacts`, `computeWorktreeTree`, `formatSignoffSummary`, `formatSignoffVerification`, `gitIsAncestor`, `GitResult`, `gitText`, `hashProofBody`, `hashStepOutput`, `IsAncestorFn`, `listSignoffProofs`, `macMatches`, `NO_EXIT_CODE`, `NOT_EXECUTED_COMMAND`, `parseSignoffProof`, `ProofFromReportInput`, `proofFromSignoffReport`, `readCommitFacts`, `readInstalledVersion`, `readSignoffKey`, `readSignoffProofNote`, `requiredStepsFor`, `resolveCommit`, `resolveSignoffProof`, `runGit`, `sealProof`, `seedsFromReport`, `serializeSignoffProof`, `SIGNOFF_NOTES_GIT_CONFIG`, `SIGNOFF_NOTES_REF`, `SIGNOFF_PROOF_VERSION`, `SIGNOFF_REQUIRED_STEPS`, `SIGNOFF_STEP_STATUSES`, `SignoffCommitBinding`, `SignoffFailure`, `SignoffFailureCode`, `SignoffGitError`, `signoffKeyId`, `SignoffLookupFailure`, `SignoffProof`, `SignoffProofBody`, `signoffProofBodySchema`, `SignoffProofLookup`, `SignoffProofPeer`, `signoffProofSchema`, `SignoffProofSeal`, `signoffProofSealSchema`, `SignoffProofStep`, `signoffProofStepSchema`, `SignoffProofSubject`, `SignoffVerification`, `SignoffVerifyOutcome`, `tangleDependencyNames`, `ToolingFactsInput`, `verifySignoffAtRev`, `VerifySignoffAtRevInput`, `VerifySignoffFileInput`, `verifySignoffProof`, `verifySignoffProofFile`, `VerifySignoffProofOptions`
+`AttachedSignoffProof`, `attachSignoffProof`, `AttachSignoffProofInput`, `CommitFacts`, `formatSignoffSummary`, `IsAncestorFn`, `parseSignoffProof`, `ProofFromReportInput`, `proofFromSignoffReport`, `readSignoffKey`, `SignoffCommitBinding`, `SignoffFailure`, `SignoffFailureCode`, `SignoffProof`, `SignoffProofBody`, `SignoffProofPeer`, `SignoffProofSeal`, `SignoffProofStep`, `SignoffProofSubject`, `SignoffVerification`, `verifySignoffProof`, `VerifySignoffProofOptions`
 
 [Full API →](api/signoff-proof.md)
 
@@ -803,6 +815,8 @@ Source: `src/theme/index.ts` · 6 exports
 
 Source: `src/theme-contract/index.ts` · 4 exports
 
+Depends on: `legibility`, `signoff`
+
 `checkThemeContract`, `ThemeContractMiss`, `ThemeContractOptions`, `ThemeContractResult`
 
 [Full API →](api/theme-contract.md)
@@ -810,6 +824,8 @@ Source: `src/theme-contract/index.ts` · 4 exports
 ## `./theme-contract/cli`
 
 Source: `src/theme-contract/cli.ts` · 0 exports
+
+Depends on: `legibility`, `signoff`
 
 _No public exports._
 
@@ -893,11 +909,11 @@ Source: `src/web/index.ts` · 32 exports
 
 ## `./web-react`
 
-Source: `src/web-react/index.tsx` · 349 exports
+Source: `src/web-react/index.tsx` · 347 exports
 
 Depends on: `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product`
 
-`activityTone`, `ActivityTone`, `AgentActivityPage`, `AgentActivityPanel`, `AgentActivityPanelProps`, `AgentActivityRecord`, `AgentSessionControls`, `AgentSessionControlsProps`, `ATTACHMENT_ACCEPT`, `AttachmentFileResult`, `attachmentInputToPart`, `attachmentKindForMime`, `attachmentPartKey`, `attachmentPartsFromMessageParts`, `base64WireLen`, `buildAnswerData`, `buildMentionPromptBlock`, `cancelChatInteraction`, `cancelStatusFor`, `canTransitionInteractionStatus`, `CatalogModel`, `ChatAttachmentInput`, `ChatAttachmentKind`, `ChatAttachmentPart`, `ChatComposer`, `ChatComposerProps`, `ChatEmptyDoor`, `ChatEmptyState`, `ChatEmptyStateProps`, `ChatFreeTextField`, `ChatInteraction`, `ChatInteractionField`, `ChatInteractionRestoreMode`, `ChatInteractionStatus`, `ChatMentionKind`, `ChatMentionPart`, `ChatMessageMetrics`, `ChatMessages`, `ChatMessageSegment`, `ChatMessagesProps`, `ChatSelectField`, `ChatStreamCallbacks`, `ChatStreamToolCall`, `ChatStreamToolResult`, `ChatToolCallInfo`, `ChatTurnFilePartInput`, `ChatTurnPartInput`, `chatTurnRequestInit`, `ChatTurnRequestPayload`, `ChatUiMessage`, `composerAnswerData`, `composerAnswerDeliveries`, `ComposerAnswerDelivery`, `ComposerFile`, `ComposerFilePart`, `ComposerMentionProp`, `ComposerSendFailure`, `ComposerSendHandler`, `ComposerSendOutcome`, `ComposerSendPartsHandler`, `ComposerSendRejected`, `ComposerSendResult`, `consumeChatStream`, `ConsumeChatStreamResult`, `createDurableInteractionAnswerSubmitter`, `createDurablePlanDecisionClient`, `createInteractionAnswerSubmitter`, `createMemoryInteractionAttemptStore`, `createSessionInteractionAttemptStore`, `dedupeQuestionInteractionsByContent`, `DEFAULT_EFFORT_LEVELS`, `DEFAULT_MENTION_EMPTY_TEXT`, `DEFAULT_MENTION_LIMIT`, `DEFAULT_PROVENANCE_CONFIDENCE_POLICY`, `describeProvenance`, `describeProvenanceSourceStatus`, `DISPATCH_MAX_MEDIA_PARTS`, `DISPATCH_MAX_PARTS`, `DISPATCH_REQUEST_MAX_BYTES`, `DISPATCH_STRUCTURAL_RESERVE_BYTES`, `dispatchChatStreamLine`, `DurableChatCard`, `DurableChatCards`, `durableChatCardsFromParts`, `DurableChatCardsProps`, `DurableInteractionAnswerSubmitterOptions`, `DurablePlanCard`, `DurablePlanCardProps`, `DurablePlanClientError`, `DurablePlanCurrentInput`, `DurablePlanDecision`, `DurablePlanDecisionClient`, `DurablePlanDecisionClientOptions`, `DurablePlanDecisionInput`, `DurablePlanDecisionResult`, `DurablePlanFollowUpReceipt`, `EffortLevel`, `EffortPicker`, `EffortPickerProps`, `EMPTY_RECORD_GRID_OVERLAY`, `EvidenceLineageTable`, `EvidenceLineageTableProps`, `ExceptionList`, `ExceptionListProps`, `FetchSessionPage`, `fieldAcceptsFreeText`, `fieldAnswer`, `FieldValues`, `fieldValuesFromAnswers`, `FileIndexReadyResponse`, `FileIndexResponse`, `FileIndexWarmingResponse`, `FileMention`, `fileMentionsToParts`, `FlowWaterfall`, `FlowWaterfallProps`, `formatActivityCost`, `formatActivityDuration`, `formatModelCost`, `formatRecordGridValue`, `formatSessionTimestamp`, `formatTokensPerSecond`, `hasSecretField`, `hydrateChatInteractions`, `INDEX_REFRESH_AFTER_MS`, `INTERACTION_CANCEL_EVENT`, `INTERACTION_EVENT`, `INTERACTION_RESOLVED_EVENT`, `INTERACTION_SUBMIT_TIMEOUT_MESSAGE`, `INTERACTION_SUBMIT_TIMEOUT_MS`, `InteractionActionButton`, `InteractionAnswers`, `InteractionAnswerSubmission`, `InteractionAnswerSubmitterOptions`, `InteractionAnswerValue`, `InteractionAttemptStore`, `InteractionBadge`, `InteractionBadgeVariant`, `InteractionCancelData`, `InteractionData`, `interactionFromWireRequest`, `InteractionOutcome`, `interactionPartKey`, `InteractionPersistedPart`, `InteractionPlanCard`, `InteractionPlanCardProps`, `InteractionQuestionCard`, `InteractionQuestionCardProps`, `InteractionRequest`, `InteractionRequestWire`, `interactionStatusLabels`, `interactionSubmissionSignature`, `InteractionSubmitResult`, `interactionTerminalNotes`, `interactionToPersistedPart`, `isChatAttachmentPart`, `isLateAnswerableStatus`, `isRecordGridCellApplicable`, `isRenderableInteractionKind`, `isSafeInteractionFieldKey`, `isTerminalInteractionStatus`, `lateAnswerMessage`, `LinkLikeComponent`, `LinkLikeProps`, `loadAttachmentFile`, `loadingProvenanceSources`, `mediaTypeForMentionPath`, `mentionInputToPart`, `MentionItem`, `mentionKindForPath`, `mentionPartsFromMessageParts`, `MentionTextSegment`, `mergeActivityPages`, `mergeReviewQueuePages`, `MessageAttachments`, `MessageAttachmentsProps`, `MissionActivityLane`, `MissionActivityLaneProps`, `ModelPicker`, `ModelPickerProps`, `nextRevealCount`, `NoticeKind`, `noticePart`, `noticePartKey`, `NoticePersistedPart`, `parseInteractionAnswers`, `ParseInteractionAnswersResult`, `parseInteractionCancel`, `parseInteractionRequest`, `ParseInteractionResult`, `parseRecordGridInput`, `parseReviewQueueItem`, `pendingApprovalOf`, `persistedPartToInteraction`, `ProducerErrorEvent`, `ProducerNoticeEvent`, `ProducerPassthroughEvent`, `ProducerPassthroughEventType`, `ProducerReasoningEvent`, `ProducerTextEvent`, `ProducerToolCallEvent`, `ProducerToolResultEvent`, `ProducerUsageEvent`, `ProducerWireEvent`, `projectRecordGridRows`, `ProposalApprovalHandlers`, `PROVENANCE_BASES`, `ProvenanceBasis`, `provenanceBasisMeta`, `ProvenanceBasisMeta`, `ProvenanceConfidencePolicy`, `ProvenanceGap`, `ProvenanceGapKind`, `provenanceGaps`, `ProvenanceLegend`, `ProvenanceLegendProps`, `provenanceNextMove`, `ProvenanceRecord`, `ProvenanceSource`, `ProvenanceSourceStatus`, `ProvenanceStamp`, `ProvenanceStampProps`, `ProvenanceStanding`, `provenanceStandingMeta`, `ProvenanceStandingMeta`, `provenanceTriggerLabel`, `ProvenanceValue`, `ProvenanceValueProps`, `ProviderLogo`, `ProviderLogoProps`, `pruneRecordGridOverlay`, `QualityCheckList`, `QualityCheckListProps`, `questionInteractionContentSignature`, `QuestionOptionList`, `QuestionOptionListProps`, `rankFileMentions`, `readRecordGridCell`, `RecordGrid`, `RecordGridBooleanColumn`, `RecordGridCellChange`, `RecordGridCellOutcome`, `RecordGridCellSource`, `RecordGridColumn`, `RecordGridColumnBase`, `RecordGridCreateOutcome`, `RecordGridCurrencyColumn`, `RecordGridDateColumn`, `RecordGridDependency`, `recordGridEditorText`, `RecordGridEmptyState`, `recordGridFail`, `RecordGridNumberColumn`, `recordGridOk`, `RecordGridOverlay`, `RecordGridProps`, `RecordGridRow`, `recordGridRowLabel`, `RecordGridRowOutcome`, `RecordGridSelectColumn`, `RecordGridSelectOption`, `RecordGridSourceBasis`, `RecordGridState`, `RecordGridTextColumn`, `RecordGridValue`, `RecordGridWriteOutcome`, `resolveChatInteraction`, `resolveProvenanceStanding`, `responseErrorMessage`, `restoreChatInteractions`, `RestoreChatInteractionsOptions`, `ReviewQueueItem`, `ReviewQueuePage`, `ReviewQueuePanel`, `ReviewQueuePanelProps`, `ReviewQueueState`, `reviewQueueStateLabel`, `rollUpProvenanceStanding`, `RunDrillIn`, `RunDrillInProps`, `sameRecordGridValue`, `SandboxTerminalConnection`, `SandboxTerminalConnectionResponse`, `SeatPaywall`, `SeatPaywallProps`, `segmentMentionContent`, `SessionActionLabels`, `SessionActions`, `SessionActionsOptions`, `SessionBulkAction`, `SessionHistoryPanel`, `SessionHistoryPanelProps`, `SessionHistoryState`, `SessionPageQuery`, `settleInteractionSubmit`, `SmoothRevealOptions`, `stampInteractionAnswers`, `standingFromConfidence`, `StreamChatOptions`, `streamChatTurn`, `SubmitInteractionAnswer`, `sumRecordGridColumn`, `tabTerminalConnectionId`, `terminalizePendingChatInteractions`, `ToolDetailRenderers`, `ToolRunRecord`, `ToolRunStep`, `triggerAttachmentDownload`, `upsertChatInteraction`, `useChatInteractions`, `UseChatInteractionsOptions`, `UseChatInteractionsResult`, `useComposerAttachments`, `UseComposerAttachmentsOptions`, `UseComposerAttachmentsResult`, `useDurablePlanFlow`, `UseDurablePlanFlowOptions`, `UseDurablePlanFlowResult`, `useFileMentions`, `UseFileMentionsOptions`, `UseFileMentionsResult`, `useInfiniteScroll`, `UseInfiniteScrollOptions`, `usePending`, `usePopover`, `useSandboxTerminalConnection`, `UseSandboxTerminalConnectionOptions`, `UseSandboxTerminalConnectionResult`, `useSessionActions`, `useSessionHistory`, `UseSessionHistoryOptions`, `useSmoothText`, `useThinkingSeconds`, `validateRecordGridCell`, `validateRecordGridRow`, `waterfallLayout`, `WaterfallRow`, `weakerProvenanceStanding`, `withoutRecordGridCreated`, `withoutRecordGridRemoved`, `withoutRecordGridUpdate`, `withRecordGridCreated`, `withRecordGridRemoved`, `withRecordGridServerRow`, `withRecordGridUpdate`, `WorkProductCard`, `WorkProductCardProps`, `workProductPartsFromMessageParts`, `workProductStatusLabel`
+`activityTone`, `ActivityTone`, `AgentActivityPage`, `AgentActivityPanel`, `AgentActivityPanelProps`, `AgentActivityRecord`, `AgentSessionControls`, `AgentSessionControlsProps`, `ATTACHMENT_ACCEPT`, `AttachmentFileResult`, `attachmentInputToPart`, `attachmentKindForMime`, `attachmentPartKey`, `attachmentPartsFromMessageParts`, `base64WireLen`, `buildAnswerData`, `buildMentionPromptBlock`, `cancelChatInteraction`, `cancelStatusFor`, `canTransitionInteractionStatus`, `CatalogModel`, `ChatAttachmentInput`, `ChatAttachmentKind`, `ChatAttachmentPart`, `ChatComposer`, `ChatComposerProps`, `ChatEmptyDoor`, `ChatEmptyState`, `ChatEmptyStateProps`, `ChatFreeTextField`, `ChatInteraction`, `ChatInteractionField`, `ChatInteractionRestoreMode`, `ChatInteractionStatus`, `ChatMentionKind`, `ChatMentionPart`, `ChatMessageMetrics`, `ChatMessages`, `ChatMessageSegment`, `ChatMessagesProps`, `ChatSelectField`, `ChatStreamCallbacks`, `ChatStreamToolCall`, `ChatStreamToolResult`, `ChatToolCallInfo`, `ChatTurnFilePartInput`, `ChatTurnPartInput`, `chatTurnRequestInit`, `ChatTurnRequestPayload`, `ChatUiMessage`, `composerAnswerData`, `composerAnswerDeliveries`, `ComposerAnswerDelivery`, `ComposerFile`, `ComposerFilePart`, `ComposerMentionProp`, `ComposerSendFailure`, `ComposerSendHandler`, `ComposerSendOutcome`, `ComposerSendPartsHandler`, `ComposerSendRejected`, `ComposerSendResult`, `consumeChatStream`, `ConsumeChatStreamResult`, `createDurableInteractionAnswerSubmitter`, `createDurablePlanDecisionClient`, `createInteractionAnswerSubmitter`, `createMemoryInteractionAttemptStore`, `createSessionInteractionAttemptStore`, `dedupeQuestionInteractionsByContent`, `DEFAULT_EFFORT_LEVELS`, `DEFAULT_MENTION_EMPTY_TEXT`, `DEFAULT_MENTION_LIMIT`, `DEFAULT_PROVENANCE_CONFIDENCE_POLICY`, `describeProvenance`, `describeProvenanceSourceStatus`, `DISPATCH_MAX_MEDIA_PARTS`, `DISPATCH_MAX_PARTS`, `DISPATCH_REQUEST_MAX_BYTES`, `DISPATCH_STRUCTURAL_RESERVE_BYTES`, `dispatchChatStreamLine`, `DurableChatCard`, `DurableChatCards`, `durableChatCardsFromParts`, `DurableChatCardsProps`, `DurableInteractionAnswerSubmitterOptions`, `DurablePlanCard`, `DurablePlanCardProps`, `DurablePlanClientError`, `DurablePlanCurrentInput`, `DurablePlanDecision`, `DurablePlanDecisionClient`, `DurablePlanDecisionClientOptions`, `DurablePlanDecisionInput`, `DurablePlanDecisionResult`, `DurablePlanFollowUpReceipt`, `EffortLevel`, `EffortPicker`, `EffortPickerProps`, `EMPTY_RECORD_GRID_OVERLAY`, `EvidenceLineageTable`, `EvidenceLineageTableProps`, `ExceptionList`, `ExceptionListProps`, `FetchSessionPage`, `fieldAcceptsFreeText`, `fieldAnswer`, `FieldValues`, `fieldValuesFromAnswers`, `FileIndexReadyResponse`, `FileIndexResponse`, `FileIndexWarmingResponse`, `FileMention`, `fileMentionsToParts`, `FlowWaterfall`, `FlowWaterfallProps`, `formatActivityCost`, `formatActivityDuration`, `formatModelCost`, `formatRecordGridValue`, `formatSessionTimestamp`, `formatTokensPerSecond`, `hasSecretField`, `hydrateChatInteractions`, `INDEX_REFRESH_AFTER_MS`, `INTERACTION_CANCEL_EVENT`, `INTERACTION_EVENT`, `INTERACTION_RESOLVED_EVENT`, `INTERACTION_SUBMIT_TIMEOUT_MESSAGE`, `INTERACTION_SUBMIT_TIMEOUT_MS`, `InteractionActionButton`, `InteractionAnswers`, `InteractionAnswerSubmission`, `InteractionAnswerSubmitterOptions`, `InteractionAnswerValue`, `InteractionAttemptStore`, `InteractionBadge`, `InteractionBadgeVariant`, `InteractionCancelData`, `InteractionData`, `interactionFromWireRequest`, `InteractionOutcome`, `interactionPartKey`, `InteractionPersistedPart`, `InteractionPlanCard`, `InteractionPlanCardProps`, `InteractionQuestionCard`, `InteractionQuestionCardProps`, `InteractionRequest`, `InteractionRequestWire`, `interactionStatusLabels`, `interactionSubmissionSignature`, `InteractionSubmitResult`, `interactionTerminalNotes`, `interactionToPersistedPart`, `isChatAttachmentPart`, `isLateAnswerableStatus`, `isRecordGridCellApplicable`, `isRenderableInteractionKind`, `isSafeInteractionFieldKey`, `isTerminalInteractionStatus`, `lateAnswerMessage`, `LinkLikeComponent`, `LinkLikeProps`, `loadAttachmentFile`, `loadingProvenanceSources`, `mediaTypeForMentionPath`, `mentionInputToPart`, `MentionItem`, `mentionKindForPath`, `mentionPartsFromMessageParts`, `MentionTextSegment`, `mergeActivityPages`, `mergeReviewQueuePages`, `MessageAttachments`, `MessageAttachmentsProps`, `MissionActivityLane`, `MissionActivityLaneProps`, `ModelPicker`, `ModelPickerProps`, `nextRevealCount`, `NoticeKind`, `noticePart`, `noticePartKey`, `NoticePersistedPart`, `parseInteractionAnswers`, `ParseInteractionAnswersResult`, `parseInteractionCancel`, `parseInteractionRequest`, `ParseInteractionResult`, `parseRecordGridInput`, `parseReviewQueueItem`, `pendingApprovalOf`, `persistedPartToInteraction`, `ProducerErrorEvent`, `ProducerNoticeEvent`, `ProducerPassthroughEvent`, `ProducerPassthroughEventType`, `ProducerReasoningEvent`, `ProducerTextEvent`, `ProducerToolCallEvent`, `ProducerToolResultEvent`, `ProducerUsageEvent`, `ProducerWireEvent`, `projectRecordGridRows`, `ProposalApprovalHandlers`, `PROVENANCE_BASES`, `ProvenanceBasis`, `provenanceBasisMeta`, `ProvenanceBasisMeta`, `ProvenanceConfidencePolicy`, `ProvenanceGap`, `ProvenanceGapKind`, `provenanceGaps`, `ProvenanceLegend`, `ProvenanceLegendProps`, `provenanceNextMove`, `ProvenanceRecord`, `ProvenanceSource`, `ProvenanceSourceStatus`, `ProvenanceStamp`, `ProvenanceStampProps`, `ProvenanceStanding`, `provenanceStandingMeta`, `ProvenanceStandingMeta`, `provenanceTriggerLabel`, `ProvenanceValue`, `ProvenanceValueProps`, `ProviderLogo`, `ProviderLogoProps`, `pruneRecordGridOverlay`, `QualityCheckList`, `QualityCheckListProps`, `questionInteractionContentSignature`, `QuestionOptionList`, `QuestionOptionListProps`, `rankFileMentions`, `readRecordGridCell`, `RecordGrid`, `RecordGridBooleanColumn`, `RecordGridCellChange`, `RecordGridCellOutcome`, `RecordGridCellSource`, `RecordGridColumn`, `RecordGridColumnBase`, `RecordGridCreateOutcome`, `RecordGridCurrencyColumn`, `RecordGridDateColumn`, `RecordGridDependency`, `recordGridEditorText`, `recordGridFail`, `RecordGridNumberColumn`, `recordGridOk`, `RecordGridOverlay`, `RecordGridProps`, `RecordGridRow`, `recordGridRowLabel`, `RecordGridRowOutcome`, `RecordGridSelectColumn`, `RecordGridSelectOption`, `RecordGridSourceBasis`, `RecordGridTextColumn`, `RecordGridValue`, `RecordGridWriteOutcome`, `resolveChatInteraction`, `resolveProvenanceStanding`, `responseErrorMessage`, `restoreChatInteractions`, `RestoreChatInteractionsOptions`, `ReviewQueueItem`, `ReviewQueuePage`, `ReviewQueuePanel`, `ReviewQueuePanelProps`, `ReviewQueueState`, `reviewQueueStateLabel`, `rollUpProvenanceStanding`, `RunDrillIn`, `RunDrillInProps`, `sameRecordGridValue`, `SandboxTerminalConnection`, `SandboxTerminalConnectionResponse`, `SeatPaywall`, `SeatPaywallProps`, `segmentMentionContent`, `SessionActionLabels`, `SessionActions`, `SessionActionsOptions`, `SessionBulkAction`, `SessionHistoryPanel`, `SessionHistoryPanelProps`, `SessionHistoryState`, `SessionPageQuery`, `settleInteractionSubmit`, `SmoothRevealOptions`, `stampInteractionAnswers`, `standingFromConfidence`, `StreamChatOptions`, `streamChatTurn`, `SubmitInteractionAnswer`, `sumRecordGridColumn`, `tabTerminalConnectionId`, `terminalizePendingChatInteractions`, `ToolDetailRenderers`, `ToolRunRecord`, `ToolRunStep`, `triggerAttachmentDownload`, `upsertChatInteraction`, `useChatInteractions`, `UseChatInteractionsOptions`, `UseChatInteractionsResult`, `useComposerAttachments`, `UseComposerAttachmentsOptions`, `UseComposerAttachmentsResult`, `useDurablePlanFlow`, `UseDurablePlanFlowOptions`, `UseDurablePlanFlowResult`, `useFileMentions`, `UseFileMentionsOptions`, `UseFileMentionsResult`, `useInfiniteScroll`, `UseInfiniteScrollOptions`, `usePending`, `usePopover`, `useSandboxTerminalConnection`, `UseSandboxTerminalConnectionOptions`, `UseSandboxTerminalConnectionResult`, `useSessionActions`, `useSessionHistory`, `UseSessionHistoryOptions`, `useSmoothText`, `useThinkingSeconds`, `validateRecordGridCell`, `validateRecordGridRow`, `waterfallLayout`, `WaterfallRow`, `weakerProvenanceStanding`, `withoutRecordGridCreated`, `withoutRecordGridRemoved`, `withoutRecordGridUpdate`, `withRecordGridCreated`, `withRecordGridRemoved`, `withRecordGridServerRow`, `withRecordGridUpdate`, `WorkProductCard`, `WorkProductCardProps`, `workProductPartsFromMessageParts`, `workProductStatusLabel`
 
 [Full API →](api/web-react.md)
 

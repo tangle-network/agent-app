@@ -15,10 +15,10 @@ import type { SignoffReport, SignoffStepResult } from './types'
  * process can produce. `status` is what a reader and the verifier judge on;
  * this exists so the field is never a plausible-looking `0`.
  */
-export const NO_EXIT_CODE = -1
+const NO_EXIT_CODE = -1
 
 /** The `command` of a step that never executed. A skipped step had no command line. */
-export const NOT_EXECUTED_COMMAND = '(never executed)'
+const NOT_EXECUTED_COMMAND = '(never executed)'
 
 export interface ProofFromReportInput {
   readonly report: SignoffReport
@@ -50,7 +50,7 @@ function stepFromResult(result: SignoffStepResult, startedAtEpochMs: number): Si
 }
 
 /** Every seed the run used, keyed so a reader can replay one step rather than the whole run. */
-export function seedsFromReport(report: SignoffReport): Record<string, string | number> {
+function seedsFromReport(report: SignoffReport): Record<string, string | number> {
   const seeds: Record<string, string | number> = { base: report.seedBase }
   for (const step of report.steps) {
     step.attempts.forEach((attempt, index) => {

@@ -49,12 +49,12 @@ const sha256Hex = z.string().regex(/^[0-9a-f]{64}$/, 'must be a 64-hex sha256 di
  * union in BOTH directions, so a status added there fails this file's typecheck
  * instead of quietly arriving as an unmodelled string.
  */
-export const SIGNOFF_STEP_STATUSES = ['passed', 'failed', 'skipped', 'cancelled', 'blocked'] as const satisfies readonly SignoffStepStatus[]
+const SIGNOFF_STEP_STATUSES = ['passed', 'failed', 'skipped', 'cancelled', 'blocked'] as const satisfies readonly SignoffStepStatus[]
 type UnmodelledStatus = Exclude<SignoffStepStatus, (typeof SIGNOFF_STEP_STATUSES)[number]>
 const _everyRunnerStatusIsModelled: UnmodelledStatus[] = []
 void _everyRunnerStatusIsModelled
 
-export const signoffProofStepSchema = z.object({
+const signoffProofStepSchema = z.object({
   /** Stable id a repo's required-step table refers to (`typecheck`, `test`, `knip`, …). */
   id: z.string().min(1),
   command: z.string().min(1),
@@ -85,7 +85,7 @@ const signoffProofSubjectSchema = z.object({
   committedAt: isoString,
 })
 
-export const signoffProofBodySchema = z.object({
+const signoffProofBodySchema = z.object({
   proofVersion: z.number().int().positive(),
   subject: signoffProofSubjectSchema,
   signedAt: isoString,
@@ -114,7 +114,7 @@ export const signoffProofBodySchema = z.object({
   verdict: z.enum(['pass', 'fail']),
 })
 
-export const signoffProofSealSchema = z.object({
+const signoffProofSealSchema = z.object({
   algorithm: z.enum(['sha256', 'hmac-sha256']),
   /** sha256 over the canonical body. Chains the seal to every field, including the commit and tree. */
   bodySha256: sha256Hex,
@@ -123,7 +123,7 @@ export const signoffProofSealSchema = z.object({
   mac: sha256Hex.nullable(),
 })
 
-export const signoffProofSchema = z.object({
+const signoffProofSchema = z.object({
   body: signoffProofBodySchema,
   seal: signoffProofSealSchema,
 })
@@ -210,7 +210,7 @@ export function macMatches(expected: string, actual: string): boolean {
   return timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(actual, 'hex'))
 }
 
-export interface ToolingFactsInput {
+interface ToolingFactsInput {
   readonly repoDir: string
   /** Package names whose resolved on-disk version belongs in the proof. */
   readonly peerNames: readonly string[]
@@ -222,7 +222,7 @@ export interface ToolingFactsInput {
  * is invisible to typecheck and to a green suite (it fails at the wire call), so
  * the proof records what was really there rather than what the manifest asks for.
  */
-export function collectToolingFacts(input: ToolingFactsInput): SignoffProofBody['tooling'] {
+function collectToolingFacts(input: ToolingFactsInput): SignoffProofBody['tooling'] {
   return {
     node: process.version,
     pnpm: readPnpmVersion(input.repoDir),
@@ -238,7 +238,7 @@ function readPnpmVersion(repoDir: string): string | null {
 }
 
 /** Resolved version from the consumer's own `node_modules`, or `null` when the package is not there. */
-export function readInstalledVersion(repoDir: string, packageName: string): string | null {
+function readInstalledVersion(repoDir: string, packageName: string): string | null {
   try {
     const manifest = JSON.parse(readFileSync(join(repoDir, 'node_modules', packageName, 'package.json'), 'utf8')) as { version?: unknown }
     return typeof manifest.version === 'string' ? manifest.version : null
@@ -248,7 +248,7 @@ export function readInstalledVersion(repoDir: string, packageName: string): stri
 }
 
 /** Every `@tangle-network/*` name the repo declares as a peer or a dependency. */
-export function tangleDependencyNames(repoDir: string): readonly string[] {
+function tangleDependencyNames(repoDir: string): readonly string[] {
   const manifest = JSON.parse(readFileSync(join(repoDir, 'package.json'), 'utf8')) as {
     dependencies?: Record<string, string>
     peerDependencies?: Record<string, string>

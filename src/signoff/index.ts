@@ -39,51 +39,21 @@
  * ```
  *
  * The CLI form is the `agent-app-signoff` bin.
+ *
+ * **Surface is deliberately narrow.** The steps this runs — dependency-graph
+ * scheduling, seed planning, workflow-YAML pin scanning, the pnpm-store cache,
+ * the hermetic `git worktree`, the command runner — are this gate's OWN
+ * implementation, not things a consumer plausibly calls directly; the `agent-
+ * app-signoff` bin imports them from the sibling files (`./run`, `./report`),
+ * never through this barrel. What a consumer embeds is: run the gate, load its
+ * config, print the result. Everything else stays module-internal, where
+ * `knip` can see it unused rather than reading as committed public API with
+ * zero callers.
  */
 
 export { runSignoff, type RunSignoffOptions } from './run'
-export {
-  SIGNOFF_CONFIG_FILES,
-  deriveSignoffConfig,
-  loadSignoffConfig,
-  parseSignoffConfig,
-  type LoadSignoffConfigOptions,
-} from './config'
-export { formatSignoffLine, formatSignoffReport, peakConcurrency } from './report'
-export { assertNodeVersion, resolveNodeRequirement, type NodeVersionRequirement } from './node-version'
-export { runGraph, validateGraph, type GraphNode, type RunGraphOptions, type TaskOutcome, type TaskStatus } from './schedule'
-export {
-  assertShuffleArgsReachTheRunner,
-  DEFAULT_SHUFFLE_ARGS,
-  DEFAULT_SHUFFLE_RUNS,
-  deriveSeed,
-  newSeedBase,
-  planAttempts,
-  type StepAttemptPlan,
-} from './seeds'
-export {
-  resolveWorkflowNodePin,
-  scanMergeGateNodePins,
-  triggersOnPullRequest,
-  type ResolvedWorkflowPin,
-  type WorkflowNodePin,
-} from './workflow-pin'
-export {
-  MANIFEST_FILES,
-  manifestCacheKey,
-  manifestFiles,
-  resolveStore,
-  type ResolveStoreOptions,
-  type StoreResolution,
-} from './store'
-export {
-  materializeCleanTree,
-  removeCleanTree,
-  repoRootOf,
-  type CleanTree,
-  type MaterializeOptions,
-} from './workspace'
-export { runCommand, type CommandResult, type RunCommandOptions } from './exec'
+export { loadSignoffConfig, type LoadSignoffConfigOptions } from './config'
+export { formatSignoffReport } from './report'
 export type {
   LoadedSignoffConfig,
   SignoffAttempt,

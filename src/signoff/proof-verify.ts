@@ -219,7 +219,7 @@ export interface VerifySignoffAtRevInput {
   readonly expectRepo?: string
 }
 
-export type SignoffLookupFailure = { readonly found: false; readonly commit: string; readonly hint: readonly string[] }
+type SignoffLookupFailure = { readonly found: false; readonly commit: string; readonly hint: readonly string[] }
 export type SignoffVerifyOutcome = ({ readonly found: true } & SignoffVerification) | SignoffLookupFailure
 
 /** Verify by revision: find the proof attached to that SHA (or to its content), then check it. */

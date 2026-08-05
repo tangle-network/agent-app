@@ -46,9 +46,10 @@
  * browser-safe manifest test).
  */
 
-import { type Dirent, existsSync, readFileSync, readdirSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { walkSources } from '../legibility/walk-sources'
 
 /** Define options for scanning source directories and CSS token files in a theme contract */
 export interface ThemeContractOptions {
@@ -91,10 +92,6 @@ export interface ThemeContractResult {
   missing: ThemeContractMiss[]
 }
 
-/** Source extensions scanned for token references. */
-const SOURCE_RE = /\.(ts|tsx|js|jsx|mjs|cjs)$/
-const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'coverage'])
-
 /**
  * Known-dangerous Tailwind utility families and the elevation token each
  * resolves to, mirroring src/theme/tailwind-preset.ts. Ordered longest-suffix
@@ -124,20 +121,6 @@ const UTILITY_PREFIXES = 'bg|text|border|ring|fill|stroke'
  */
 function buildUtilityRe(suffix: string): RegExp {
   return new RegExp(`(?<![\\w-])(?:${UTILITY_PREFIXES})-${suffix}(?![\\w-])`, 'g')
-}
-
-/** Recursively collect scannable source files under a directory. */
-function walkSources(dir: string): string[] {
-  let entries: Dirent[]
-  try {
-    entries = readdirSync(dir, { withFileTypes: true })
-  } catch {
-    return []
-  }
-  return entries.flatMap((e) => {
-    if (e.isDirectory()) return SKIP_DIRS.has(e.name) ? [] : walkSources(join(dir, e.name))
-    return SOURCE_RE.test(e.name) && !e.name.endsWith('.d.ts') ? [join(dir, e.name)] : []
-  })
 }
 
 /**
@@ -188,7 +171,7 @@ export function checkThemeContract(opts: ThemeContractOptions): ThemeContractRes
   const allow = new Set(opts.allowlist ?? [])
   const isDefined = (name: string) => defined.has(name) || allow.has(name)
 
-  const files = opts.srcDirs.flatMap(walkSources)
+  const files = opts.srcDirs.flatMap((dir) => walkSources(dir, ['.d.ts']))
   const utilityMatchers = DANGEROUS_UTILITIES.map((u) => ({ ...u, re: buildUtilityRe(u.suffix) }))
 
   // Dedupe by varName (literal check) and by varName+utility (utility check),

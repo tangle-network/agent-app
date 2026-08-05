@@ -15,7 +15,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { invokedAsScript } from './invoked-as-script'
-import { formatSignoffReport } from './report'
+import { formatSignoffLine, formatSignoffReport } from './report'
 import { runSignoff, type RunSignoffOptions } from './run'
 import type { SignoffEvent, SignoffSource } from './types'
 
@@ -140,7 +140,11 @@ export async function runSignoffCli(argv: readonly string[]): Promise<number> {
     writeFileSync(abs, `${JSON.stringify(report, null, 2)}\n`)
   }
 
-  process.stdout.write(`${formatSignoffReport(report)}\n`)
+  // `--quiet` is documented as "verdict only", and CLAUDE.md names the one-line
+  // `signoff PASS <sha> …` summary as an accepted PR proof. Printing the full
+  // report here contradicted both, and left the only producer of that summary
+  // with no caller.
+  process.stdout.write(`${args.quiet ? formatSignoffLine(report) : formatSignoffReport(report)}\n`)
   return report.ok ? 0 : 1
 }
 

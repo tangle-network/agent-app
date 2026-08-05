@@ -24,7 +24,7 @@ import type { LoadedSignoffConfig, SignoffConfig, SignoffStepSpec } from './type
  *     declared one.
  */
 
-export const SIGNOFF_CONFIG_FILES: readonly string[] = ['signoff.config.mjs', 'signoff.config.js']
+const SIGNOFF_CONFIG_FILES: readonly string[] = ['signoff.config.mjs', 'signoff.config.js']
 
 const shuffleSchema = z.object({
   runs: z.number().int().positive().optional(),

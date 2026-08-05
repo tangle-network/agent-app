@@ -14,14 +14,20 @@
  * shell adds an engine.
  */
 import { checkPeerFloors, formatPeerFloorReport } from './check'
+import { invokedAsScript } from '../signoff/invoked-as-script'
 
-const appDir = process.argv[2] ?? process.cwd()
-
-try {
-  const report = checkPeerFloors({ appDir })
-  process.stdout.write(`${formatPeerFloorReport(report)}\n`)
-  process.exit(report.ok ? 0 : 1)
-} catch (err) {
-  process.stderr.write(`agent-app-peer-check failed: ${err instanceof Error ? err.message : String(err)}\n`)
-  process.exit(1)
+function main(): void {
+  const appDir = process.argv[2] ?? process.cwd()
+  try {
+    const report = checkPeerFloors({ appDir })
+    process.stdout.write(`${formatPeerFloorReport(report)}\n`)
+    process.exit(report.ok ? 0 : 1)
+  } catch (err) {
+    process.stderr.write(`agent-app-peer-check failed: ${err instanceof Error ? err.message : String(err)}\n`)
+    process.exit(1)
+  }
 }
+
+/* c8 ignore start — process wiring, exercised by the bin itself */
+if (invokedAsScript(import.meta.url, process.argv[1])) main()
+/* c8 ignore stop */

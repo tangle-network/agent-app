@@ -27,7 +27,7 @@ import { join, relative, sep } from 'node:path'
  */
 
 /** Basenames whose bytes decide what an install resolves to. */
-export const MANIFEST_FILES: readonly string[] = [
+const MANIFEST_FILES: readonly string[] = [
   'pnpm-lock.yaml',
   'pnpm-workspace.yaml',
   'package.json',

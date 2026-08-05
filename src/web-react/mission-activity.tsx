@@ -391,24 +391,35 @@ function ActivityRow({
  * product journaled, mission-spawned or not, with status, cost, drill-in, and
  * a mission link slot for promoted delegations.
  */
+/**
+ * `loading`/`error` collapsed onto one status rather than two independent
+ * booleans, so "loading and errored at once" is unrepresentable instead of
+ * merely avoided by careful set-ordering — the same discipline
+ * `web-react/async`'s `AsyncResourceState` enforces for a single fetch.
+ * `rows`/`cursor` stay separate state because they ACCUMULATE across pages,
+ * which a single-resolution status can't express — this is a cursor-paged
+ * panel (`useSessionHistory`'s shape), not a one-shot resource.
+ */
+type AgentActivityStatus = 'loading' | 'error' | 'ready'
+
 export function AgentActivityPanel({ fetchActivity, renderMissionRef, title = 'Agent activity', emptyLabel = 'No agent runs yet.' }: AgentActivityPanelProps) {
   const [rows, setRows] = useState<AgentActivityRecord[]>([])
   const [cursor, setCursor] = useState<string | undefined>(undefined)
-  const [loading, setLoading] = useState(false)
+  const [status, setStatus] = useState<AgentActivityStatus>('loading')
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(
     async (from?: string) => {
-      setLoading(true)
+      setStatus('loading')
       setError(null)
       try {
         const page = await fetchActivity(from)
         setRows((prev) => mergeActivityPages(from === undefined ? [] : prev, page.items))
         setCursor(page.nextCursor)
+        setStatus('ready')
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
-      } finally {
-        setLoading(false)
+        setStatus('error')
       }
     },
     [fetchActivity],
@@ -417,6 +428,8 @@ export function AgentActivityPanel({ fetchActivity, renderMissionRef, title = 'A
   useEffect(() => {
     void load()
   }, [load])
+
+  const loading = status === 'loading'
 
   return (
     <div className="space-y-2">
@@ -432,8 +445,12 @@ export function AgentActivityPanel({ fetchActivity, renderMissionRef, title = 'A
           <RefreshGlyph className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
-      {error && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">{error}</p>}
-      {!error && rows.length === 0 && !loading && <p className="px-1 text-sm text-muted-foreground">{emptyLabel}</p>}
+      {status === 'error' && (
+        <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          {error}
+        </p>
+      )}
+      {status === 'ready' && rows.length === 0 && <p className="px-1 text-sm text-muted-foreground">{emptyLabel}</p>}
       {/* While `loading` the list is empty AND the empty copy is suppressed, so
           without this the panel is silent to a screen reader from first paint
           until rows land. The region stays MOUNTED and its text changes, because

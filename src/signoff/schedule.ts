@@ -48,7 +48,7 @@ export function validateGraph(nodes: readonly GraphNode[]): void {
   for (const node of nodes) walk(node.name, [])
 }
 
-export type TaskStatus = 'passed' | 'failed' | 'skipped' | 'cancelled' | 'blocked'
+type TaskStatus = 'passed' | 'failed' | 'skipped' | 'cancelled' | 'blocked'
 
 export interface TaskOutcome<T> {
   readonly name: string

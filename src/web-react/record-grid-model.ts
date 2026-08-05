@@ -13,6 +13,8 @@
  * optimistic edit that can be taken back.
  */
 
+import type { ProvenanceBasis } from './provenance-model'
+
 /** The value one cell can hold. `null` is "no value on file". */
 export type RecordGridValue = string | number | boolean | null
 
@@ -38,14 +40,16 @@ export function recordGridFail(error: string): RecordGridCellOutcome {
   return { succeeded: false, error }
 }
 
-/** How a value came to sit in a cell. Rendered as the provenance tone. */
-export type RecordGridSourceBasis =
-  /** Extracted from a document or message the product can link to. */
-  | 'source'
-  /** A person entered or confirmed it. */
-  | 'confirmed'
-  /** Computed from other cells; the quote (if any) is the input, not the value. */
-  | 'derived'
+/**
+ * How a value came to sit in a cell. Rendered as the provenance tone.
+ *
+ * A type alias of `./provenance-model`'s `ProvenanceBasis`, not a lookalike:
+ * two vocabularies for the same concept — a grid cell's origin — shipped one
+ * day apart and would have drifted the moment either one added a value. The
+ * grid gains `asserted` for free (a cell an agent claimed with nothing behind
+ * it), where the caller previously had no way to say that.
+ */
+export type RecordGridSourceBasis = ProvenanceBasis
 
 /**
  * Where one cell's value came from. Optional on every row — a grid over data
@@ -60,7 +64,9 @@ export interface RecordGridCellSource {
   href?: string
   /** Position inside the source: a page, a line, a span — the caller's words. */
   locator?: string
-  /** How the value got here. Absent renders as a neutral marker. */
+  /** How the value got here. Absent renders as `asserted` — the weakest claim
+   *  in the union — because a caller that stated no basis has established
+   *  nothing about a document, and an omission must never read as one. */
   basis?: RecordGridSourceBasis
 }
 

@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-349 exports.
+347 exports.
 
 ### `activityTone`
 
@@ -32,7 +32,7 @@ interface AgentActivityPage
 
 ### `AgentActivityPanel`
 
-`function` — The standalone cross-context delegation surface: every agent run the product journaled, mission-spawned or not, with status, cost, drill-in, and a mission link slot for promoted delegations.
+`function`
 
 ```ts
 ({ fetchActivity, renderMissionRef, title, emptyLabel }: AgentActivityPanelProps) => Element
@@ -1915,7 +1915,7 @@ interface QuestionOptionListProps
 `function` — The shared editable record table.
 
 ```ts
-({ columns, rows, caption, state, error, onRetry, empty, onCreate, onUpdate, onDelete, newRowDefaults, addLabel, locale…
+({ columns, caption, state, empty, onCreate, onUpdate, onDelete, newRowDefaults, addLabel, locale, toolbar, loadingRowC…
 ```
 
 ### `RecordGridBooleanColumn`
@@ -2006,14 +2006,6 @@ interface RecordGridDependency
 (column: RecordGridColumn, value: RecordGridValue) => string
 ```
 
-### `RecordGridEmptyState`
-
-`interface` — The empty state's content.
-
-```ts
-interface RecordGridEmptyState
-```
-
 ### `recordGridFail`
 
 `function` — Build a cell failure outcome carrying the message shown next to the cell.
@@ -2100,14 +2092,6 @@ interface RecordGridSelectOption
 
 ```ts
 type RecordGridSourceBasis
-```
-
-### `RecordGridState`
-
-`type` — Which of the three data states the caller is in.
-
-```ts
-type RecordGridState
 ```
 
 ### `RecordGridTextColumn`
