@@ -19,12 +19,21 @@
 @import '@tangle-network/brand/styles/named-themes.css';
 
 /*
- * Every scope in THIS list defines the FULL `--hsl-*` shadcn set in
+ * Every scope in this list defines the FULL `--hsl-*` shadcn set in
  * named-themes.css (verified: background/foreground/card/card-foreground/
  * popover/popover-foreground/primary/primary-foreground/secondary/muted/
  * muted-foreground/accent/border/input/ring), so none of these resolve empty.
- * intelligence and tangle-dark are NOT in this list — see their own blocks
- * below.
+ * intelligence is NOT in this list — its scope is deliberately partial, and
+ * redeclaring the tokens it doesn't define would INVALIDATE them; see its own
+ * block below.
+ *
+ * tangle-dark IS listed although brand 1.1.0 does not ship its scope yet (it
+ * resolves through the local alias in main.ts until the brand bump). These
+ * declarations still carry no var() fallbacks: the preview.ts decorator
+ * probes for the scope and remaps data-theme to `dark` where it is absent,
+ * so this rule only ever matches when the scope exists. A fallback copy of
+ * tokens.css's dark values would be a second source of truth, free to drift
+ * from the first.
  *
  * Deliberately NOT bridged — these fall through to agent-app's own theme
  * values via the cascade, per theme darkness (the decorator adds the `.dark`
@@ -46,6 +55,7 @@
 [data-theme='aubergine-light'],
 [data-theme='arena'],
 [data-theme='arena-light'],
+[data-theme='tangle-dark'],
 [data-theme='tangle-light'] {
   --background: var(--hsl-background);
   --foreground: var(--hsl-foreground);
@@ -94,37 +104,4 @@
   --border: var(--hsl-border);
   --input: var(--hsl-input);
   --canvas-backdrop: var(--depth-1);
-}
-
-/*
- * tangle-dark — the scope EXISTS in the local brand checkout's named-themes.css
- * (brand-repo `feat/tangle-dark-theme` branch) but not in a published release
- * yet; the vite alias in .storybook/main.ts points this file's @import at that
- * checkout, so it resolves here today and for everyone after the brand bump.
- * Like every other dark named scope it carries the full --hsl-* set, so the
- * bridge below mirrors the full-bridge declarations — each with a fallback to
- * agent-app's own `.dark` value (its --neutral-* ramp tokens, the exact
- * declarations in tokens.css's dark scope). Where neither the alias nor the
- * release provides the scope (CI, other machines on brand 1.1.0) the
- * fallbacks make the toolbar entry render as agent-dark instead of a page of
- * guaranteed-invalid tokens; once the scope resolves they are dead code —
- * delete the fallbacks (and the alias) on the brand bump.
- */
-[data-theme='tangle-dark'] {
-  --background: var(--hsl-background, var(--neutral-16-hsl));
-  --foreground: var(--hsl-foreground, var(--neutral-94-hsl));
-  --card: var(--hsl-card, var(--neutral-19-hsl));
-  --card-foreground: var(--hsl-card-foreground, var(--neutral-94-hsl));
-  --popover: var(--hsl-popover, var(--neutral-25-hsl));
-  --popover-foreground: var(--hsl-popover-foreground, var(--neutral-94-hsl));
-  --primary: var(--hsl-primary, 239 84% 74%);
-  --primary-foreground: var(--hsl-primary-foreground, var(--neutral-16-hsl));
-  --secondary: var(--hsl-secondary, var(--neutral-22-hsl));
-  --muted: var(--hsl-muted, var(--neutral-22-hsl));
-  --muted-foreground: var(--hsl-muted-foreground, var(--neutral-70-hsl));
-  --accent: var(--hsl-accent, var(--neutral-22-hsl));
-  --border: var(--hsl-border, var(--neutral-25-hsl));
-  --input: var(--hsl-input, var(--neutral-22-hsl));
-  --ring: var(--hsl-ring, 239 84% 74%);
-  --canvas-backdrop: var(--depth-1, hsl(var(--neutral-16-hsl)));
 }
