@@ -1,11 +1,7 @@
 import { AgentWorkspaceLayout } from '@tangle-network/agent-app/workspace-react'
-import {
-  EntryComposer,
-  type AgentProfileOption,
-  type HarnessType,
-  type ModelInfo,
-  type ReasoningLevel,
-} from '@tangle-network/agent-app/chat-react'
+import { EntryComposer } from '@tangle-network/agent-app/chat-react'
+import type { CatalogModel } from '@tangle-network/agent-app/web-react'
+import type { Harness } from '@tangle-network/agent-app/harness'
 import { useState, type ComponentType, type SVGProps } from 'react'
 import type { SessionSummary } from '@tangle-network/agent-app/session-shell'
 
@@ -39,44 +35,43 @@ const sessions: SessionSummary[] = [
   { id: 'pricing-review', title: 'Pricing review', updatedAt: '2026-07-31T16:00:00.000Z' },
 ]
 
-const models: ModelInfo[] = [
+// The catalog spans providers on purpose: switching the harness to Codex must
+// snap the model to an OpenAI id. An anthropic-only catalog defeats the demo —
+// the snap keeps the original id when nothing fits, showing an incoherent pair.
+const models: CatalogModel[] = [
   {
     id: 'anthropic/claude-opus-4-8',
     name: 'Claude Opus 4.8',
-    _provider: 'anthropic',
-    context_length: 200_000,
-    architecture: { modality: 'text' },
-  } as ModelInfo,
+    provider: 'anthropic',
+    contextLength: 200_000,
+    supportsTools: true,
+    supportsReasoning: true,
+    featured: true,
+  },
   {
     id: 'anthropic/claude-sonnet-4-6',
     name: 'Claude Sonnet 4.6',
-    _provider: 'anthropic',
-    context_length: 200_000,
-    architecture: { modality: 'text' },
-  } as ModelInfo,
-]
-
-const profiles: AgentProfileOption[] = [
-  {
-    id: 'assistant',
-    name: 'Assistant',
-    description: 'General-purpose agent',
-    builtin: true,
+    provider: 'anthropic',
+    contextLength: 200_000,
+    supportsTools: true,
+    supportsReasoning: true,
+    featured: false,
   },
   {
-    id: 'reviewer',
-    name: 'Reviewer',
-    description: 'Checks work against the brief',
-    capabilities: ['review'],
-    builtin: true,
+    id: 'openai/gpt-5.2',
+    name: 'GPT-5.2',
+    provider: 'openai',
+    contextLength: 400_000,
+    supportsTools: true,
+    supportsReasoning: true,
+    featured: false,
   },
 ]
 
 export function WorkspaceRoute() {
   const [model, setModel] = useState('anthropic/claude-opus-4-8')
-  const [harness, setHarness] = useState<HarnessType>('claude-code')
-  const [effort, setEffort] = useState<ReasoningLevel>('auto')
-  const [profile, setProfile] = useState('assistant')
+  const [harness, setHarness] = useState<Harness>('claude-code')
+  const [effort, setEffort] = useState('medium')
   const [planMode, setPlanMode] = useState(false)
 
   const navItems = [
@@ -114,16 +109,14 @@ export function WorkspaceRoute() {
         placeholder="Ask the agent anything…"
         onSubmit={() => {}}
         agent={{
-          profile: { value: profile, onChange: setProfile, profiles },
-          harness: {
-            value: harness,
-            onChange: setHarness,
-            available: ['claude-code', 'opencode', 'codex'],
-          },
-          model: { value: model, onChange: setModel, models },
-          effort: { value: effort, onChange: setEffort },
-          layout: 'responsive',
-          menuPlacement: 'down',
+          models,
+          model,
+          onModelChange: setModel,
+          harness,
+          onHarnessChange: setHarness,
+          availableHarnesses: ['claude-code', 'opencode', 'codex'],
+          effort,
+          onEffortChange: setEffort,
         }}
         planMode={{ enabled: planMode, setEnabled: setPlanMode }}
         footer={<p className="text-center text-xs text-muted-foreground">Your workspace keeps every conversation in History.</p>}

@@ -8,10 +8,9 @@
  * thinking-budget pill IS `EffortPicker` — the canonical ecosystem pickers.
  * sandbox-ui's `dashboard/ModelPicker` and the model menu inside sandbox-ui's
  * `chat/AgentSessionControls` are legacy (deprecated, frozen, removed at
- * sandbox-ui's next major), and so is the `/chat-react` `ComposerAgentControls`
- * adapter that renders sandbox-ui's strip — it stays exported because removing
- * a published symbol is a major, but new code belongs here. A surface that
- * still renders the sandbox-ui strip is showing the old design; migrate it
+ * sandbox-ui's next major), and the `/chat-react` `ComposerAgentControls`
+ * adapter that rendered sandbox-ui's strip is REMOVED — a surface that still
+ * renders the sandbox-ui strip is showing the old design; migrate it
  * (props mapping in `docs/ui-picker-canon.md`).
  *
  * Dependency-free beyond React by design: `/web-react` must not force the
