@@ -35,6 +35,9 @@ const sessions: SessionSummary[] = [
   { id: 'pricing-review', title: 'Pricing review', updatedAt: '2026-07-31T16:00:00.000Z' },
 ]
 
+// The catalog spans providers on purpose: switching the harness to Codex must
+// snap the model to an OpenAI id. An anthropic-only catalog defeats the demo —
+// the snap keeps the original id when nothing fits, showing an incoherent pair.
 const models: CatalogModel[] = [
   {
     id: 'anthropic/claude-opus-4-8',
@@ -50,6 +53,15 @@ const models: CatalogModel[] = [
     name: 'Claude Sonnet 4.6',
     provider: 'anthropic',
     contextLength: 200_000,
+    supportsTools: true,
+    supportsReasoning: true,
+    featured: false,
+  },
+  {
+    id: 'openai/gpt-5.2',
+    name: 'GPT-5.2',
+    provider: 'openai',
+    contextLength: 400_000,
     supportsTools: true,
     supportsReasoning: true,
     featured: false,

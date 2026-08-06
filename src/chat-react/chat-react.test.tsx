@@ -15,11 +15,12 @@ import type { CatalogModel } from '../runtime/model-catalog'
  *
  * The agent control row itself is the CANONICAL `AgentSessionControls` from
  * `/web-react` (its model menu is the canonical `ModelPicker`); picker
- * behavior — catalog grouping, harness↔model coherence, effort levels — is
- * tested where it is implemented (`src/web-react/controls.test.tsx` and
- * `src/harness`). What stays pinned here is the ASSEMBLY contract: the row
- * renders when the product supplies selections and is absent when it does
- * not.
+ * behavior is tested where it is implemented — catalog rendering in
+ * `src/web-react/controls.test.tsx`, the harness↔model coherence wiring in
+ * `src/web-react/agent-session-controls.test.tsx`, and the snap policy
+ * itself in `src/harness/index.test.ts`. What stays pinned here is the
+ * ASSEMBLY contract: the row renders when the product supplies selections
+ * and is absent when it does not.
  *
  * Each was proven able to fail by breaking the code it guards; see the PR.
  */

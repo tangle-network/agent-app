@@ -1,8 +1,8 @@
 /**
- * The vocabulary the composer surfaces speak. The agent-identity pickers
- * (model / harness / effort) are the canonical `AgentSessionControls` from
- * `../web-react` — see "UI chrome ownership (picker canon)" in AGENTS.md;
- * the legacy sandbox-ui adapter that used to live here was removed.
+ * The plan-mode toggle state an entry surface docks beside the composer. The
+ * agent-identity pickers (model / harness / effort) speak the canonical
+ * `AgentSessionControls` vocabulary from `../web-react` — see "UI chrome
+ * ownership (picker canon)" in AGENTS.md.
  */
 export interface ComposerPlanModeSelection {
   enabled: boolean

@@ -1047,7 +1047,7 @@
           "name": "ComposerPlanModeSelection",
           "kind": "interface",
           "signature": "interface ComposerPlanModeSelection",
-          "doc": "The vocabulary the composer surfaces speak."
+          "doc": "The plan-mode toggle state an entry surface docks beside the composer."
         },
         {
           "name": "EntryComposer",

@@ -24,7 +24,7 @@ interface ComposerModeControlsProps
 
 ### `ComposerPlanModeSelection`
 
-`interface` — The vocabulary the composer surfaces speak.
+`interface` — The plan-mode toggle state an entry surface docks beside the composer.
 
 ```ts
 interface ComposerPlanModeSelection

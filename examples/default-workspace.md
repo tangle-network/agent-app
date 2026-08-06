@@ -92,11 +92,14 @@ passes the real data and callback that makes it work.
 `@tangle-network/agent-app/web-react` — the entry composer renders the
 canonical `AgentSessionControls` cluster, nothing else. Named-profile picking
 is deliberately NOT part of that cluster: a product that offers profiles
-renders its own picker (the `modes` dock or a settings surface).
+renders its own picker beside the composer or on a settings surface — not in
+the `modes` dock, where a mode is an on/off switch, not a value picker.
 
-Omit an unavailable capability and its control stays hidden; do not pass a
-placeholder URL, empty catalog, or inert callback just to make the row look
-complete.
+An unavailable capability hides at the granularity the canon gives you: omit
+`agent` and the whole row stays hidden; `agent.showHarness={false}` drops the
+backend control; the effort pill hides itself when the selected model does not
+support reasoning. Do not pass a placeholder URL, empty catalog, or inert
+callback just to make the row look complete.
 
 A product-owned profile picker consumes a safe display catalog: a stable `id`,
 `name`, description, capability labels, and `builtin` status.
