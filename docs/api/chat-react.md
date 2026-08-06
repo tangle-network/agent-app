@@ -4,63 +4,7 @@
 
 Source: `src/chat-react/index.tsx`
 
-18 exports.
-
-### `AgentProfileCapability`
-
-`interface` — A selectable tool group offered by the create/edit form.
-
-```ts
-interface AgentProfileCapability
-```
-
-### `AgentProfileDraft`
-
-`interface` — The editable shape the create/edit form emits.
-
-```ts
-interface AgentProfileDraft
-```
-
-### `AgentProfileOption`
-
-`interface` — An agent profile: a named bundle of toolset + persona layered over the same model and session.
-
-```ts
-interface AgentProfileOption
-```
-
-### `ComposerAgentControls`
-
-`function` — The composer's agent-identity control: profile, backend, model, and reasoning effort, over sandbox-ui's `AgentSessionControls`.
-
-```ts
-({ model, harness, profile, effort, className, context, layout, menuPlacement, filterModelsToHarness, }: ComposerAgentC…
-```
-
-### `ComposerAgentControlsProps`
-
-`interface`
-
-```ts
-interface ComposerAgentControlsProps
-```
-
-### `ComposerEffortSelection`
-
-`interface`
-
-```ts
-interface ComposerEffortSelection
-```
-
-### `ComposerHarnessSelection`
-
-`interface`
-
-```ts
-interface ComposerHarnessSelection
-```
+5 exports.
 
 ### `ComposerModeControls`
 
@@ -78,28 +22,12 @@ interface ComposerHarnessSelection
 interface ComposerModeControlsProps
 ```
 
-### `ComposerModelSelection`
-
-`interface` — The model half of the composer's agent identity.
-
-```ts
-interface ComposerModelSelection
-```
-
 ### `ComposerPlanModeSelection`
 
-`interface`
+`interface` — The vocabulary the composer surfaces speak.
 
 ```ts
 interface ComposerPlanModeSelection
-```
-
-### `ComposerProfileSelection`
-
-`type` — A selectable named bundle of persona and tool groups.
-
-```ts
-type ComposerProfileSelection
 ```
 
 ### `EntryComposer`
@@ -116,36 +44,4 @@ type ComposerProfileSelection
 
 ```ts
 interface EntryComposerProps
-```
-
-### `HarnessType`
-
-`type` — The execution runner for an agent — WHICH runtime materializes and runs an `AgentProfile`.
-
-```ts
-type HarnessType
-```
-
-### `ModelInfo`
-
-`interface` — Wire-format model entry as returned by `/v1/models` on the Tangle Router (and most OpenAI-compatible gateways).
-
-```ts
-interface ModelInfo
-```
-
-### `ReasoningEffort`
-
-`type`
-
-```ts
-type ReasoningEffort
-```
-
-### `ReasoningLevel`
-
-`type` — A reasoning selection: `auto` is a UI-only sentinel ("let the harness/model default decide", sends no explicit override); every other value is the canonical `ReasoningEffort` from `@tangle-network/ag…
-
-```ts
-type ReasoningLevel
 ```

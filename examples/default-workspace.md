@@ -80,21 +80,26 @@ passes the real data and callback that makes it work.
 
 | Product capability | `EntryComposer` input |
 | --- | --- |
-| Named agent profile / persona / tool groups | `agent.profile` |
-| Selectable agent backend | `agent.harness` |
-| Selectable model catalog | `agent.model` |
-| Thinking effort | `agent.effort` |
+| Selectable agent backend | `agent.harness` + `agent.onHarnessChange` (`agent.availableHarnesses` to restrict) |
+| Selectable model catalog | `agent.models` + `agent.model` + `agent.onModelChange` (canonical ids) |
+| Thinking effort | `agent.effort` + `agent.onEffortChange` |
 | Plan-approval mode | `planMode`, only when the selected backend supports it |
 | File upload | `uploadUrl`, only when the endpoint accepts the shared attachment contract |
 | `@` file mentions | `mentions`, only when a real file index exists |
 | Product-specific behavior | `modes` |
 
+`agent` is the canonical `AgentSessionControlsProps` from
+`@tangle-network/agent-app/web-react` — the entry composer renders the
+canonical `AgentSessionControls` cluster, nothing else. Named-profile picking
+is deliberately NOT part of that cluster: a product that offers profiles
+renders its own picker (the `modes` dock or a settings surface).
+
 Omit an unavailable capability and its control stays hidden; do not pass a
 placeholder URL, empty catalog, or inert callback just to make the row look
 complete.
 
-The profile picker consumes a safe display catalog: a stable `id`, `name`,
-description, capability labels, and `builtin` status.
+A product-owned profile picker consumes a safe display catalog: a stable `id`,
+`name`, description, capability labels, and `builtin` status.
 It is not the full runtime `AgentProfile`, and the browser's catalog is never
 authority for prompts, tools, permissions, connections, or backend access.
 The product resolves the selected id server-side to the actual prompt, model
@@ -113,11 +118,13 @@ import {
 <EntryComposer
   heading="What do you want to work on?"
   agent={{
-    profile: data.profile,
-    harness: data.harness,
+    models: data.models,
     model: data.model,
+    onModelChange: data.setModel,
+    harness: data.harness,
+    onHarnessChange: data.setHarness,
     effort: data.effort,
-    layout: 'responsive',
+    onEffortChange: data.setEffort,
   }}
   planMode={data.planMode as ComposerPlanModeSelection | undefined}
   uploadUrl={data.uploadUrl}

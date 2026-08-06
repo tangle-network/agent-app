@@ -93,13 +93,16 @@ the outer workspace and expandable session rail.
 They pair it with `EntryComposer` from `/chat-react` for the new-session route
 and `SessionHistoryPanel` from `/web-react` for the full history route.
 
-`EntryComposer` is the capability-driven default: pass the real profile,
-backend, model, and thinking selections through `agent`; pass `planMode` only
+`EntryComposer` is the capability-driven default: pass the real backend,
+model, and thinking selections through `agent` (the canonical
+`AgentSessionControlsProps` from `/web-react`); pass `planMode` only
 when the selected backend supports plan approval; pass `uploadUrl` only when a
 real attachment endpoint exists; and pass `mentions` only when a real file
 index exists.
 Missing capability data hides that control instead of rendering a dead one.
-The profile selection is a display catalog; the product resolves its id to the
+Named-profile picking is not part of the canonical cluster — a product that
+offers profiles renders its own picker beside the composer. The profile
+selection is a display catalog; the product resolves its id to the
 runtime `AgentProfile` before session creation.
 Keep the browser catalog to stable display metadata and capability labels; do not
 treat client-supplied prompt, tool, permission, connection, or backend fields as
@@ -205,7 +208,7 @@ What it proves, what it cannot prove, and the flags: [`docs/SIGNOFF.md`](./docs/
 
 ## UI chrome ownership (picker canon)
 
-Model/effort/harness picking has exactly one canonical implementation: `ModelPicker`, `EffortPicker`, and `AgentSessionControls` from `@tangle-network/agent-app/web-react`. sandbox-ui's `dashboard/ModelPicker` and the model menu in `chat/AgentSessionControls` are legacy — deprecated, frozen, removed at sandbox-ui's next major. Boundary: sandbox-ui owns rendering primitives (terminal, code surface, session chrome primitives); agent-app owns composed, seam-driven app-shell surfaces (transcript, composer controls, pickers, assistant). If you are about to add a picker/menu/control to sandbox-ui, stop — it belongs here. Products still on legacy pickers: bump to current sandbox-ui and adopt the canon (see the migration note in docs/).
+Model/effort/harness picking has exactly one canonical implementation: `ModelPicker`, `EffortPicker`, and `AgentSessionControls` from `@tangle-network/agent-app/web-react`. sandbox-ui's `dashboard/ModelPicker` and the model menu in `chat/AgentSessionControls` are legacy — deprecated, frozen, removed at sandbox-ui's next major. agent-app's own adapter over that strip, `/chat-react`'s `ComposerAgentControls`, is REMOVED (not merely deprecated): `EntryComposer`'s `agent` prop takes the canonical `AgentSessionControlsProps` directly. Boundary: sandbox-ui owns rendering primitives (terminal, code surface, session chrome primitives); agent-app owns composed, seam-driven app-shell surfaces (transcript, composer controls, pickers, assistant). If you are about to add a picker/menu/control to sandbox-ui, stop — it belongs here. Products still on legacy pickers: bump to current sandbox-ui and adopt the canon (see the migration note in docs/).
 
 ## Develop
 
