@@ -5,6 +5,11 @@
  *
  * `HarnessType` is agent-interface's enum surfaced through sandbox-ui's picker;
  * `ReasoningLevel` is sandbox-ui's `auto | ReasoningEffort` union.
+ *
+ * LEGACY: these spellings serve the deprecated `ComposerAgentControls` adapter.
+ * Canonical code speaks `/harness`'s `Harness` union and plain effort-id
+ * strings (see `/web-react`'s `EffortPicker`); they are re-exported here only
+ * so the legacy adapter's props keep resolving.
  */
 export type { HarnessType } from '@tangle-network/sandbox-ui/dashboard'
 export type { ModelInfo } from '@tangle-network/sandbox-ui/dashboard'

@@ -203,12 +203,20 @@ pnpm signoff --source head   # the mode that authorizes a merge
 
 What it proves, what it cannot prove, and the flags: [`docs/SIGNOFF.md`](./docs/SIGNOFF.md). The doctrine and the measured evidence: [`docs/local-signoff.md`](./docs/local-signoff.md).
 
+## UI chrome ownership (picker canon)
+
+Model/effort/harness picking has exactly one canonical implementation: `ModelPicker`, `EffortPicker`, and `AgentSessionControls` from `@tangle-network/agent-app/web-react`. sandbox-ui's `dashboard/ModelPicker` and the model menu in `chat/AgentSessionControls` are legacy — deprecated, frozen, removed at sandbox-ui's next major. Boundary: sandbox-ui owns rendering primitives (terminal, code surface, session chrome primitives); agent-app owns composed, seam-driven app-shell surfaces (transcript, composer controls, pickers, assistant). If you are about to add a picker/menu/control to sandbox-ui, stop — it belongs here. Products still on legacy pickers: bump to current sandbox-ui and adopt the canon (see the migration note in docs/).
+
 ## Develop
 
 ```bash
 pnpm install
 pnpm typecheck && pnpm test && pnpm build
 ```
+
+### Storybook
+
+`pnpm storybook` (port 6006) / `pnpm build-storybook`. Stories live in `src/stories/<area>/` — CSF3, `Area/Component` titles, shared fixtures in `src/stories/fixtures/`, one story per component state plus side-by-side composites. `.storybook/` holds the config; a toolbar decorator flips `data-theme`/`.dark` on `<html>` (stories never set theme themselves). Stories are typechecked (tsconfig includes `src`) and knip-gated via the `src/**/*.stories.{ts,tsx}` entry glob — keep both green. Import components from package source via relative paths, never the package name (that resolves to the built dist).
 tsup (ESM + d.ts), vitest, tsc. Every change keeps tests green. **No `Co-Authored-By` / AI-attribution in commits** (repo-wide). Commit identity is the global git config (`Drew Stone <drewstone329@gmail.com>`) — never override it.
 
 ### Prove a new test can fail — before you claim it passes

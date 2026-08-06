@@ -13,7 +13,12 @@
 import { History, MessageSquarePlus, Minus, Plus, X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogModel } from "../runtime/model-catalog";
-import { ChatComposer, ModelPicker, type ToolDetailRenderers } from "../web-react";
+import {
+  ChatComposer,
+  type ComposerFile,
+  ModelPicker,
+  type ToolDetailRenderers,
+} from "../web-react";
 import { AssistantHistory } from "./AssistantHistory";
 import type { AssistantModels } from "./client";
 import { isLowBalance, presentError } from "./presentation";
@@ -64,6 +69,24 @@ export interface AssistantPanelProps {
    *  clears its seed state (consume-once). */
   composerSeed?: string | null;
   onComposerSeedApplied?: () => void;
+  /** Opt-in attachment surface for the composer, mirroring `ChatComposer`'s
+   *  attachment props: pass `onAttach` to show the attach button and accept
+   *  drag-and-drop, and drive the staged-file chips with `pendingFiles` /
+   *  `onRemoveFile` (web-react's `useComposerAttachments` owns that lifecycle).
+   *  Omitted, the composer stays text-only. The assistant wire carries text
+   *  only, so a host that stages files owns getting their content to the model
+   *  (e.g. inlined on the next `chat.send`); `onComposerSend` is the signal to
+   *  consume and clear the staged set. */
+  composerAttachments?: {
+    onAttach: (files: FileList) => void;
+    onAttachFolder?: (files: FileList) => void;
+    pendingFiles?: ComposerFile[];
+    onRemoveFile?: (id: string) => void;
+    accept?: string;
+  };
+  /** Fired when the composer sends (alongside `chat.send`) — the host's signal
+   *  to consume and clear its staged attachments. */
+  onComposerSend?: (message: string) => void;
 }
 
 const EMPTY_STATE =
@@ -175,6 +198,8 @@ export function AssistantPanel({
   renderTranscript,
   composerSeed = null,
   onComposerSeedApplied,
+  composerAttachments,
+  onComposerSend,
 }: AssistantPanelProps) {
   const models = useAssistantModels();
   const threads = useAssistantThreads(userId);
@@ -606,6 +631,7 @@ export function AssistantPanel({
           onSend={(message) => {
             setView("chat");
             chat.send(message);
+            onComposerSend?.(message);
           }}
           onCancel={chat.stop}
           isStreaming={streaming}
@@ -613,6 +639,11 @@ export function AssistantPanel({
           placeholder="Message the assistant…"
           seed={composerSeed}
           onSeedApplied={onComposerSeedApplied}
+          onAttach={composerAttachments?.onAttach}
+          onAttachFolder={composerAttachments?.onAttachFolder}
+          pendingFiles={composerAttachments?.pendingFiles}
+          onRemoveFile={composerAttachments?.onRemoveFile}
+          accept={composerAttachments?.accept}
           controls={
             pickerModels.length > 0 ? (
               <ModelPicker

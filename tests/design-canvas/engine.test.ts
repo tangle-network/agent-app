@@ -730,6 +730,21 @@ describe('createZoomPanMath', () => {
     expect(result.panY).toBe(0)
   })
 
+  it('fitPage caps default padding on tiny viewports instead of clamping to minZoom', () => {
+    // Composite mini-editor cell: 694x135 canvas, 1080px page. Uncapped
+    // padding: 135 - 96 = 39 available → 39/1080 = 0.036 → clamped to 0.05
+    // (the composite-story regression). Capped at 135*0.2 = 27 → 81 available.
+    const result = zpm.fitPage({ width: 1080, height: 1080 }, { width: 694, height: 135 })
+    expect(result.zoom).toBeCloseTo(81 / 1080, 5)
+    expect(result.panY).toBeCloseTo((135 - 1080 * result.zoom) / 2, 5)
+  })
+
+  it('fitPage keeps the full 48px padding when the 20% cap is above it', () => {
+    // minDim 700 → cap 140 ≥ 48 → historical padding preserved byte-identically.
+    const result = zpm.fitPage({ width: 1080, height: 1080 }, { width: 864, height: 700 })
+    expect(result.zoom).toBeCloseTo(604 / 1080, 5)
+  })
+
   it('documentToScreen / screenToDocument are inverses', () => {
     const state = { zoom: 2, panX: 50, panY: -30 }
     const docPt = { x: 100, y: 200 }

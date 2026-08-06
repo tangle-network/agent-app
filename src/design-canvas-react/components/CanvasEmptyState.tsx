@@ -97,7 +97,7 @@ export function CanvasEmptyState({
       role="group"
       aria-label="Start your design"
     >
-      <div className="pointer-events-auto flex w-full max-w-lg flex-col items-center gap-5 rounded-xl border border-[var(--border-default)] bg-[var(--bg-input)]/95 px-6 py-7 text-center shadow-xl backdrop-blur sm:px-8">
+      <div className="pointer-events-auto flex w-full max-w-lg flex-col items-center gap-5 rounded-xl border border-[var(--border-default)] bg-[color-mix(in_srgb,var(--bg-input)_95%,transparent)] px-6 py-7 text-center shadow-xl backdrop-blur sm:px-8">
         <span className="flex items-center gap-2 text-[var(--text-muted)]">
           <BrandKnot size={22} className="shrink-0" />
           <span className="text-[11px] font-medium uppercase tracking-[0.14em]">Tangle Design</span>
@@ -116,7 +116,7 @@ export function CanvasEmptyState({
               onClick={onClick}
               className="group flex min-h-[44px] flex-col items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[hsl(var(--card))] px-3 py-4 text-center transition-colors hover:border-[var(--brand-primary)]"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] transition-colors group-hover:bg-[var(--brand-primary)]/15">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)] text-[var(--brand-primary)] transition-colors group-hover:bg-[color-mix(in_srgb,var(--brand-primary)_15%,transparent)]">
                 <Icon className="h-4 w-4" />
               </span>
               <span className="text-[13px] font-medium text-[var(--text-primary)]">{label}</span>

@@ -61,6 +61,11 @@ export interface ComposerEffortSelection {
  */
 export type ComposerProfileSelection = AgentSessionProfileControl
 
+/**
+ * @deprecated Part of the legacy sandbox-ui adapter — see
+ * {@link ComposerAgentControls}. New code uses `AgentSessionControlsProps`
+ * from `@tangle-network/agent-app/web-react`.
+ */
 export interface ComposerAgentControlsProps {
   model: ComposerModelSelection
   /** Omit on a router-backed composer: a direct model call has no CLI backend,
@@ -158,8 +163,16 @@ function modelsForContext(
  * The composer's agent-identity control: profile, backend, model, and
  * reasoning effort, over sandbox-ui's `AgentSessionControls`.
  *
- * This is an ADAPTER, not a second implementation. sandbox-ui owns the control
- * and the harness↔model coherence policy (the catalog is filtered to the
+ * @deprecated Use `AgentSessionControls` from `@tangle-network/agent-app/web-react`
+ * — the canonical picker cluster (its model menu IS the canonical
+ * `ModelPicker`). sandbox-ui's `AgentSessionControls` and `dashboard/ModelPicker`
+ * are legacy: deprecated, frozen, and removed at sandbox-ui's next major. This
+ * adapter stays exported and fully functional because removing a published
+ * symbol is a major, but it renders the OLD design; new code must not adopt
+ * it. Props mapping for the migration lives in `docs/ui-picker-canon.md`.
+ *
+ * This is an ADAPTER, not a second implementation. The harness↔model coherence
+ * policy is the shared one (the catalog is filtered to the
  * selected harness, the effort re-clamps to what the harness/model pair
  * supports, and a harness that ignores a picker is marked with its dead control
  * disabled). What lives here is the app-shell wiring every product otherwise

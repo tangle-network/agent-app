@@ -1,0 +1,13 @@
+<!--
+  The library deliberately ships no webfonts, and neither tokens.css nor the
+  playground declares one — the one concrete family the surfaces reference is
+  Inter (design-canvas text elements, e.g. src/stories/fixtures/canvas.ts).
+  Konva text measures against real loaded fonts, so Storybook — as a consumer —
+  loads Inter here. Everything else uses the system stack from storybook.css.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+  rel="stylesheet"
+/>

@@ -258,7 +258,7 @@ function SelectControl<T extends string>({
                 onChange(opt.value)
                 setOpen(false)
               }}
-              className={`px-3 py-1 text-left text-[12px] hover:bg-[var(--brand-primary)]/10 ${
+              className={`px-3 py-1 text-left text-[12px] hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)] ${
                 opt.value === value ? 'text-[var(--brand-primary)]' : 'text-[var(--text-primary)]'
               }`}
             >
@@ -343,7 +343,7 @@ function FontPicker({
                     setQuery('')
                   }}
                   style={{ fontFamily: family }}
-                  className={`block w-full px-3 py-1 text-left text-[13px] hover:bg-[var(--brand-primary)]/10 ${
+                  className={`block w-full px-3 py-1 text-left text-[13px] hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)] ${
                     family === value ? 'text-[var(--brand-primary)]' : 'text-[var(--text-primary)]'
                   }`}
                 >
@@ -362,8 +362,10 @@ function FontPicker({
  * Color control: a swatch button (showing the current color) that opens a
  * popover with a native color picker + hex field. Replaces the bare
  * <input type="color"> chrome while keeping the string value/onChange contract.
+ * `none` renders the no-color idiom (white swatch with a diagonal slash) for
+ * values that are set but not in effect — e.g. a stroke whose width is 0.
  */
-function ColorSwatch({ label, value, onCommit, disabled }: { label: string; value: string; onCommit(v: string): void; disabled?: boolean }) {
+function ColorSwatch({ label, value, onCommit, disabled, none = false }: { label: string; value: string; onCommit(v: string): void; disabled?: boolean; none?: boolean }) {
   const [open, setOpen] = useState(false)
   const normalized = value.startsWith('#') ? value : '#ffffff'
 
@@ -377,11 +379,18 @@ function ColorSwatch({ label, value, onCommit, disabled }: { label: string; valu
           <button
             type="button"
             disabled={disabled}
-            aria-label={`${label} color`}
+            aria-label={none ? `${label} color (none)` : `${label} color`}
+            title={none ? 'None' : undefined}
             onClick={() => setOpen((v) => !v)}
-            className="h-6 w-10 rounded border border-[var(--border-default)] disabled:cursor-default disabled:opacity-40"
-            style={{ backgroundColor: normalized }}
-          />
+            className="relative h-6 w-10 overflow-hidden rounded border border-[var(--border-default)] disabled:cursor-default disabled:opacity-40"
+            style={{ backgroundColor: none ? '#ffffff' : normalized }}
+          >
+            {none ? (
+              <svg className="absolute inset-0 h-full w-full" viewBox="0 0 40 24" preserveAspectRatio="none" aria-hidden>
+                <line x1="1" y1="23" x2="39" y2="1" stroke="var(--text-danger)" strokeWidth="1.5" />
+              </svg>
+            ) : null}
+          </button>
         }
       >
         <div className={`${POPOVER_PANEL} w-40 gap-2 p-2`}>
@@ -707,7 +716,7 @@ function SelectionControls({
               <button
                 type="button"
                 onClick={() => { onBindSlot(slotInput.trim() || null); setSlotPopoverOpen(false) }}
-                className="flex-1 rounded border border-[var(--brand-primary)] px-2 py-0.5 text-[11px] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/10"
+                className="flex-1 rounded border border-[var(--brand-primary)] px-2 py-0.5 text-[11px] text-[var(--brand-primary)] hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)]"
               >
                 {slotInput.trim() ? 'Bind' : 'Unbind'}
               </button>
@@ -797,7 +806,7 @@ function ShapeControls({ element, canWrite, onPatch, showCornerRadius }: { eleme
   return (
     <>
       <ColorSwatch label="Fill" value={element.fill} onCommit={(v) => onPatch({ fill: v })} disabled={!canWrite} />
-      <ColorSwatch label="Stroke" value={element.stroke ?? '#000000'} onCommit={(v) => onPatch({ stroke: v })} disabled={!canWrite} />
+      <ColorSwatch label="Stroke" value={element.stroke ?? '#000000'} onCommit={(v) => onPatch({ stroke: v })} disabled={!canWrite} none={(element.strokeWidth ?? 0) === 0} />
       <NumberInput label="Stroke W" value={element.strokeWidth ?? 0} min={0} onCommit={(v) => onPatch({ strokeWidth: v })} className="w-14" />
       {showCornerRadius && 'cornerRadius' in element ? (
         <NumberInput label="Corner R" value={(element as RectElement).cornerRadius ?? 0} min={0} onCommit={(v) => onPatch({ cornerRadius: v })} className="w-14" />
@@ -856,7 +865,7 @@ function ImageControls({ element, canWrite, onPatch }: { element: ImageElement; 
               type="button"
               disabled={!swapUrl.trim() || swapUrl.trim() === element.src}
               onClick={() => { onPatch({ src: swapUrl.trim() }); setSwapOpen(false) }}
-              className="flex-1 rounded border border-[var(--brand-primary)] px-2 py-0.5 text-[11px] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/10 disabled:cursor-default disabled:opacity-40"
+              className="flex-1 rounded border border-[var(--brand-primary)] px-2 py-0.5 text-[11px] text-[var(--brand-primary)] hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)] disabled:cursor-default disabled:opacity-40"
             >
               Replace
             </button>
@@ -928,6 +937,9 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides, pa
           if (preset) onSetPageProps({ width: preset.width, height: preset.height })
         }}
         options={presetOptions}
+        // Preset labels run long ("US Letter Landscape") — w-24 truncates them
+        // to "Instagram …"; w-44 matches the listbox width and fits them all.
+        buttonClassName="w-44"
       />
 
       {/* Custom W × H */}

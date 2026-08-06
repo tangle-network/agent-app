@@ -1,7 +1,9 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": [
+    "src/**/*.stories.{ts,tsx}",
     "src/**/*.test.{ts,tsx}",
+    "src/stories/fixtures/**/*.ts",
     "src/app-auth/index.ts",
     "src/assets/index.ts",
     "src/assistant/index.ts",

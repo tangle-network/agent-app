@@ -29,6 +29,7 @@ import { memo, useEffect, useRef, useState } from 'react'
 import { Group, Rect, Ellipse, Line, Text, Image as KonvaImage } from 'react-konva'
 import type Konva from 'konva'
 import { ellipseCenterFromTopLeft } from './transform-math'
+import { resolveNodeCachePixelRatio } from '../export-math'
 import { lightTheme, type CanvasRenderPalette } from '../../theme/theme'
 import type {
   SceneElement,
@@ -176,8 +177,15 @@ function useDragBindings(props: ElementNodeProps, originX: number, originY: numb
  * Gated OFF while `isSelected || dragging`: a selected node is under the
  * transformer (resize/rotate must redraw live) and a dragging node moves every
  * frame — a cached bitmap would freeze its visuals. On select/drag start the
- * cache is cleared; on deselect/drop it is re-cached. `zoom` is a dependency so
- * the bitmap re-rasterizes at the current scale and never looks blurry.
+ * cache is cleared; on deselect/drop it is re-cached.
+ *
+ * The bitmap is rasterized at zoom × devicePixelRatio (the resolution the
+ * screen actually shows): Konva's cache default ignores zoom, so an un-
+ * configured cache is re-scaled at draw time — bilinear-soft at fit-page
+ * zooms like 0.47, badly upscaled on zoom-in. `zoom` is a dependency so the
+ * bitmap re-rasterizes at the current scale. export.ts clears these caches
+ * before rasterizing so high-resolution exports re-draw vectors instead of
+ * upscaling the screen-resolution bitmaps.
  */
 function useNodeCache(
   ref: React.RefObject<Konva.Node | null>,
@@ -194,14 +202,15 @@ function useNodeCache(
       node.clearCache()
       return
     }
-    node.cache()
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
+    node.cache({ pixelRatio: resolveNodeCachePixelRatio(zoom, dpr) })
     return () => {
       // Drop the bitmap when the node unmounts or before re-caching so a stale
       // bitmap is never left attached across a prop change.
       node.clearCache()
     }
     // `invalidateKey` (the element reference) re-rasterizes the bitmap when any
-    // element attribute changes; `zoom` keeps it crisp at the current scale.
+    // element attribute changes; `zoom` re-rasterizes at the current scale.
   }, [ref, isSelected, dragging, zoom, invalidateKey])
 }
 

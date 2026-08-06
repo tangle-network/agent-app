@@ -20,6 +20,7 @@ import {
   identifyTaintedSrc,
   isExportHiddenNodeName,
   resolveExportParams,
+  resolveNodeCachePixelRatio,
 } from './export-math'
 
 // ---------------------------------------------------------------------------
@@ -32,6 +33,13 @@ interface KonvaNodeLike {
   visible(): boolean
   visible(v: boolean): void
   getAttr(key: string): unknown
+  isCached(): boolean
+  clearCache(): void
+  cache(config?: { pixelRatio?: number }): void
+  getAbsoluteScale(): { x: number; y: number }
+  /** Konva.Container only — leaf shapes lack it; the cache walk treats its
+   *  absence as "no children". */
+  getChildren?(): KonvaNodeLike[]
 }
 
 interface KonvaLayerLike {
@@ -53,6 +61,45 @@ interface KonvaStageLike {
     width: number
     height: number
   }): string
+}
+
+/** A node whose bitmap cache was cleared for export, with the pixel ratio to
+ *  restore it at (screen resolution: absolute scale × device pixel ratio). */
+interface ClearedNodeCache {
+  node: KonvaNodeLike
+  pixelRatio: number
+}
+
+/**
+ * Clear every bitmap cache on the stage so toDataURL re-rasterizes vectors at
+ * the export pixel ratio instead of upscaling screen-resolution bitmaps (the
+ * caches are rasterized for the current zoom × dpr — see ElementNode
+ * useNodeCache). Recursive: cached elements sit inside nested Groups. Returns
+ * the cleared nodes with the ratio each must be re-cached at — the same
+ * policy ElementNode applies — so the editor keeps its pan/zoom snappiness
+ * after the export.
+ */
+function clearNodeCaches(stage: KonvaStageLike): ClearedNodeCache[] {
+  const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
+  const cleared: ClearedNodeCache[] = []
+  const walk = (node: KonvaNodeLike): void => {
+    if (node.isCached()) {
+      cleared.push({ node, pixelRatio: resolveNodeCachePixelRatio(node.getAbsoluteScale().x, dpr) })
+      node.clearCache()
+    }
+    for (const child of node.getChildren?.() ?? []) walk(child)
+  }
+  for (const layer of stage.getLayers()) {
+    for (const child of layer.getChildren()) walk(child)
+  }
+  return cleared
+}
+
+/** Re-cache nodes cleared by clearNodeCaches at their screen pixel ratio. */
+function restoreNodeCaches(cleared: ClearedNodeCache[]): void {
+  for (const { node, pixelRatio } of cleared) {
+    node.cache({ pixelRatio })
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -110,6 +157,11 @@ export async function exportPageDataUrl(
   const stageScale = stage.scaleX()
   const stageCrop = documentCropToStageCoords(cropRect, stageScale, stage.x(), stage.y())
 
+  // Clear screen-resolution bitmap caches so the raster re-draws vectors at
+  // the export pixel ratio; restored before returning (both paths) so the
+  // editor keeps its cached pan/zoom rendering.
+  const clearedCaches = clearNodeCaches(stage)
+
   let dataUrl: string
   try {
     dataUrl = stage.toDataURL({
@@ -122,11 +174,12 @@ export async function exportPageDataUrl(
       height: stageCrop.height,
     })
   } catch (err) {
-    // Restore visibility before rethrowing so the editor is not left in a
-    // broken state.
+    // Restore visibility and caches before rethrowing so the editor is not
+    // left in a broken state.
     for (const node of hiddenNodes) {
       node.visible(true)
     }
+    restoreNodeCaches(clearedCaches)
 
     if (err instanceof Error && err.name === 'SecurityError') {
       const taintedSrc = identifyTaintedSrc(imageSrcs)
@@ -145,10 +198,11 @@ export async function exportPageDataUrl(
     throw err
   }
 
-  // Restore visibility.
+  // Restore visibility and the screen-resolution caches.
   for (const node of hiddenNodes) {
     node.visible(true)
   }
+  restoreNodeCaches(clearedCaches)
 
   return dataUrl
 }

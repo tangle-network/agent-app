@@ -216,15 +216,34 @@ function ModelRow({
  * Searchable model picker pill + popover: a featured/recommended section
  * first, then per-provider groups in catalogue order (the server already
  * sorts providers by tier).
+ *
+ * This is the CANONICAL ecosystem model picker (see "UI chrome ownership
+ * (picker canon)" in AGENTS.md). sandbox-ui's `dashboard/ModelPicker` is
+ * legacy — deprecated, frozen, removed at sandbox-ui's next major; new code
+ * belongs here.
  */
 export function ModelPicker({ value, onChange, models, loading, renderProviderBadge, recommendedLabel = 'Recommended', priorityGroup }: ModelPickerProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const { containerRef, triggerProps } = usePopover(open, setOpen)
   const inputRef = useRef<HTMLInputElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (open) inputRef.current?.focus()
+  }, [open])
+
+  // Keep the wide popover inside the viewport. It is left-anchored under the
+  // trigger, so inside a narrow RIGHT-docked shell (the assistant drawer near
+  // its minimum width) the 420px card runs past the window's right edge and
+  // the price/context column clips. Shift it left just enough to fit — a no-op
+  // whenever it already fits (the common case), so anchoring is unchanged.
+  useEffect(() => {
+    if (!open) return
+    const el = popoverRef.current
+    if (!el) return
+    const overflowRight = el.getBoundingClientRect().right - (window.innerWidth - 16)
+    el.style.transform = overflowRight > 0 ? `translateX(-${Math.ceil(overflowRight)}px)` : ''
   }, [open])
 
   const selected = models.find((m) => m.id === value)
@@ -275,7 +294,7 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
       </button>
 
       {open && (
-        <div className="absolute bottom-full left-0 z-50 mb-2 w-[420px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+        <div ref={popoverRef} className="absolute bottom-full left-0 z-50 mb-2 w-[420px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-card shadow-lg">
           <div className="border-b border-border px-3 py-2">
             <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
               <SearchGlyph className="h-3.5 w-3.5 text-muted-foreground" />
@@ -373,7 +392,10 @@ export interface EffortPickerProps {
 
 /** Thinking-budget selector pill, styled to match {@link ModelPicker}. Show
  *  it only when the selected model `supportsReasoning`. "Thinking" is the
- *  plain-English name for what was internally called "effort". */
+ *  plain-English name for what was internally called "effort".
+ *
+ *  The CANONICAL ecosystem effort picker — sandbox-ui's reasoning menu (inside
+ *  its `chat/AgentSessionControls`) is legacy and frozen. */
 export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, label = 'Thinking' }: EffortPickerProps) {
   const [open, setOpen] = useState(false)
   const { containerRef, triggerProps } = usePopover(open, setOpen)

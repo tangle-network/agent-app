@@ -59,7 +59,7 @@ export function ExportControl({ defaults, onExport, className }: ExportControlPr
             setOpen(false)
           }
         }}
-        className="flex h-8 items-center gap-1.5 rounded-md border border-[var(--border-default)] px-2.5 text-xs font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--brand-primary)]/40"
+        className="flex h-8 items-center gap-1.5 rounded-md border border-[var(--border-default)] px-2.5 text-xs font-medium text-[var(--text-primary)] transition-colors hover:border-[color-mix(in_srgb,var(--brand-primary)_40%,transparent)]"
       >
         <ExportGlyph className="h-3.5 w-3.5" />
         Export
@@ -123,7 +123,7 @@ export function ExportControl({ defaults, onExport, className }: ExportControlPr
             type="button"
             aria-label="Export image"
             onClick={confirm}
-            className="rounded border border-[var(--brand-primary)] px-2 py-1 text-[11px] font-medium text-[var(--brand-primary)] transition-colors hover:bg-[var(--brand-primary)]/10"
+            className="rounded border border-[var(--brand-primary)] px-2 py-1 text-[11px] font-medium text-[var(--brand-primary)] transition-colors hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)]"
           >
             Export
           </button>
