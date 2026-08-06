@@ -447,7 +447,7 @@ The corollary is the enforceable half: a component that hardcodes its own durati
 
 - **One animation, two meanings.** `animate-pulse` appears **17 times** carrying two unrelated signals — a loading skeleton (`src/vault/VaultPane.tsx`, `src/web-react/session-history.tsx`, `src/web-react/message-attachments.tsx`) and a live-running status dot (`src/web-react/index.tsx`, `src/web-react/mission-activity.tsx`, `src/studio-react/result-canvas.tsx`, `src/assistant/AssistantPanel.tsx`). A reader cannot learn what pulsing means when it means both "no data yet" and "work in progress".
 - **A component inventing its own timing.** `src/studio-react/composer-hero.tsx` hardcodes `duration-300` — a fourth number in a three-number scale, and one that does not move under `prefers-reduced-motion`.
-- **A spinner with nothing to say.** Six `animate-spin` uses; a spinner without a label naming what is being waited on communicates only "something", which is the one thing the reader already knew.
+- **A spinner with nothing to say.** Seven `animate-spin` uses; a spinner without a label naming what is being waited on communicates only "something", which is the one thing the reader already knew.
 
 ---
 

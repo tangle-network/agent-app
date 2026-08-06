@@ -1611,6 +1611,81 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     expect(running.resume).not.toHaveBeenCalled()
   })
 
+  it('reuses a recent liveness verification and probes again after the default TTL', async () => {
+    vi.useFakeTimers({ now: 10_000 })
+    try {
+      const exec = vi.fn().mockImplementation(async (command: string) => ({
+        stdout: command.startsWith('pgrep') ? '123\n' : 'alive\n',
+        exitCode: 0,
+      }))
+      const getEgress = vi.fn().mockResolvedValue({
+        policy: { mode: 'open' },
+        source: 'sandbox',
+      })
+      const bootstrap = vi.fn().mockResolvedValue({ succeeded: true, value: undefined })
+      const running = fakeBox({
+        name: 'box-w1',
+        exec,
+        egress: { get: getEgress, update: vi.fn() },
+      } as unknown as Partial<SandboxInstance>)
+      listMock.mockResolvedValue([running])
+      const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+        livenessProbe: {},
+        egressPolicy: { mode: 'open' },
+        bootstrap,
+      })
+
+      await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+      await vi.advanceTimersByTimeAsync(4_999)
+      await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+
+      expect(exec).toHaveBeenCalledTimes(2)
+
+      await vi.advanceTimersByTimeAsync(2)
+      await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+
+      expect(exec).toHaveBeenCalledTimes(4)
+      expect(getEgress).toHaveBeenCalledTimes(3)
+      expect(bootstrap).toHaveBeenCalledTimes(3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('lets dispatch fail loud when a cached box dies without deleting the workspace', async () => {
+    let alive = true
+    const del = vi.fn().mockResolvedValue(undefined)
+    const exec = vi.fn().mockImplementation(async (command: string) => {
+      if (!alive) throw new Error('sandbox is gone')
+      return {
+        stdout: command.startsWith('pgrep') ? '123\n' : 'alive\n',
+        exitCode: 0,
+      }
+    })
+    const streamPrompt = vi.fn(async function* () {
+      throw new Error('dispatch connection refused')
+    })
+    const running = fakeBox({
+      name: 'box-w1',
+      delete: del,
+      exec,
+      streamPrompt,
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      livenessProbe: { cacheTtlMs: 60_000 },
+    })
+
+    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+    alive = false
+    const cached = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(exec).toHaveBeenCalledTimes(2)
+    await expect(cached.streamPrompt('hello').next()).rejects.toThrow('dispatch connection refused')
+    expect(del).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
   it('rejects a BRE-escaped alternation before probing or restarting the box (#342)', async () => {
     const running = fakeBox({ name: 'box-w1', exec: vi.fn() })
     listMock.mockImplementation(({ status }: { status: string }) =>

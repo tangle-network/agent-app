@@ -5065,6 +5065,14 @@ interface MarqueeSelectOptions
 interface MultiSetAttrsEntry
 ```
 
+### `NODE_CACHE_PIXEL_RATIO_MAX`
+
+`const` — Hard ceiling for node cache rasterization.
+
+```ts
+4
+```
+
 ### `nudgeDelta`
 
 `function` — Map an arrow key to a document-px delta.
@@ -5143,6 +5151,14 @@ interface ResolvedExportParams
 
 ```ts
 (page: ScenePage, opts: { format: "png" | "jpeg"; pixelRatio?: number | undefined; includeBleed?: boolean | undefined;…
+```
+
+### `resolveNodeCachePixelRatio`
+
+`function` — Pixel ratio a Konva node bitmap cache should rasterize at so the cached bitmap matches the screen exactly: the node's absolute scale (content-group zoom) × device pixel ratio.
+
+```ts
+(absoluteScale: number, devicePixelRatio: number) => number
 ```
 
 ### `Rulers`
@@ -5806,6 +5822,14 @@ interface MarqueeSelectOptions
 interface MultiSetAttrsEntry
 ```
 
+### `NODE_CACHE_PIXEL_RATIO_MAX`
+
+`const` — Hard ceiling for node cache rasterization.
+
+```ts
+4
+```
+
 ### `nudgeDelta`
 
 `function` — Map an arrow key to a document-px delta.
@@ -5868,6 +5892,14 @@ interface ResolvedExportParams
 
 ```ts
 (page: ScenePage, opts: { format: "png" | "jpeg"; pixelRatio?: number | undefined; includeBleed?: boolean | undefined;…
+```
+
+### `resolveNodeCachePixelRatio`
+
+`function` — Pixel ratio a Konva node bitmap cache should rasterize at so the cached bitmap matches the screen exactly: the node's absolute scale (content-group zoom) × device pixel ratio.
+
+```ts
+(absoluteScale: number, devicePixelRatio: number) => number
 ```
 
 ### `scaleForPreset`
@@ -13245,7 +13277,7 @@ readonly ["pypi.org", "files.pythonhosted.org", "pypi.python.org"]
 
 ### `resetClientCache`
 
-`function` — Reset the client cache to clear stored data and force fresh retrieval
+`function` — Reset the process-local sandbox client and liveness-verification caches.
 
 ```ts
 () => void
@@ -21508,7 +21540,7 @@ interface ChatMessageMetrics
 `function` — The message thread: one centered column; user messages are right-aligned bubbles with a User label; agent messages carry an Agent meta line with model id, tokens/sec, and cost, plus a collapsible thi…
 
 ```ts
-({ messages, messageSize, models, renderMarkdown, renderExtras, durableCards, userLabel, agentLabel, loading, approval,…
+({ messages, messageSize, chrome, models, renderMarkdown, renderExtras, durableCards, userLabel, agentLabel, loading, a…
 ```
 
 ### `ChatMessageSegment`

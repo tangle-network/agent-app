@@ -3898,6 +3898,12 @@
           "doc": "Define an entry linking page and element IDs with current and prior scene attribute patches"
         },
         {
+          "name": "NODE_CACHE_PIXEL_RATIO_MAX",
+          "kind": "const",
+          "signature": "4",
+          "doc": "Hard ceiling for node cache rasterization."
+        },
+        {
           "name": "nudgeDelta",
           "kind": "function",
           "signature": "(key: \"ArrowLeft\" | \"ArrowRight\" | \"ArrowUp\" | \"ArrowDown\", shift: boolean) => NudgeDelta",
@@ -3956,6 +3962,12 @@
           "kind": "function",
           "signature": "(page: ScenePage, opts: { format: \"png\" | \"jpeg\"; pixelRatio?: number | undefined; includeBleed?: boolean | undefined;…",
           "doc": "Resolve the full set of toDataURL params from a page, format, pixel ratio, bleed flag, and optional preset."
+        },
+        {
+          "name": "resolveNodeCachePixelRatio",
+          "kind": "function",
+          "signature": "(absoluteScale: number, devicePixelRatio: number) => number",
+          "doc": "Pixel ratio a Konva node bitmap cache should rasterize at so the cached bitmap matches the screen exactly: the node's absolute scale (content-group zoom) × device pixel ratio."
         },
         {
           "name": "Rulers",
@@ -4462,6 +4474,12 @@
           "doc": "Define an entry linking page and element IDs with current and prior scene attribute patches"
         },
         {
+          "name": "NODE_CACHE_PIXEL_RATIO_MAX",
+          "kind": "const",
+          "signature": "4",
+          "doc": "Hard ceiling for node cache rasterization."
+        },
+        {
           "name": "nudgeDelta",
           "kind": "function",
           "signature": "(key: \"ArrowLeft\" | \"ArrowRight\" | \"ArrowUp\" | \"ArrowDown\", shift: boolean) => NudgeDelta",
@@ -4508,6 +4526,12 @@
           "kind": "function",
           "signature": "(page: ScenePage, opts: { format: \"png\" | \"jpeg\"; pixelRatio?: number | undefined; includeBleed?: boolean | undefined;…",
           "doc": "Resolve the full set of toDataURL params from a page, format, pixel ratio, bleed flag, and optional preset."
+        },
+        {
+          "name": "resolveNodeCachePixelRatio",
+          "kind": "function",
+          "signature": "(absoluteScale: number, devicePixelRatio: number) => number",
+          "doc": "Pixel ratio a Konva node bitmap cache should rasterize at so the cached bitmap matches the screen exactly: the node's absolute scale (content-group zoom) × device pixel ratio."
         },
         {
           "name": "scaleForPreset",
@@ -10257,7 +10281,7 @@
           "name": "resetClientCache",
           "kind": "function",
           "signature": "() => void",
-          "doc": "Reset the client cache to clear stored data and force fresh retrieval"
+          "doc": "Reset the process-local sandbox client and liveness-verification caches."
         },
         {
           "name": "ResolvedModel",
@@ -16656,7 +16680,7 @@
         {
           "name": "ChatMessages",
           "kind": "function",
-          "signature": "({ messages, messageSize, models, renderMarkdown, renderExtras, durableCards, userLabel, agentLabel, loading, approval,…",
+          "signature": "({ messages, messageSize, chrome, models, renderMarkdown, renderExtras, durableCards, userLabel, agentLabel, loading, a…",
           "doc": "The message thread: one centered column; user messages are right-aligned bubbles with a User label; agent messages carry an Agent meta line with model id, tokens/sec, and cost, plus a collapsible thi…"
         },
         {
