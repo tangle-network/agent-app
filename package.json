@@ -157,6 +157,11 @@
       "import": "./dist/billing/index.js",
       "default": "./dist/billing/index.js"
     },
+    "./alerting": {
+      "types": "./dist/alerting/index.d.ts",
+      "import": "./dist/alerting/index.js",
+      "default": "./dist/alerting/index.js"
+    },
     "./preflight": {
       "types": "./dist/preflight/index.d.ts",
       "import": "./dist/preflight/index.js",
