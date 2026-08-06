@@ -29,6 +29,8 @@ function Frame({ children }: { children: ReactNode }) {
 const log = {
   onSelect: (threadId: string) => console.log('[story] select thread', threadId),
   onDelete: (threadId: string) => console.log('[story] delete thread', threadId),
+  error: null as string | null,
+  onRetry: () => console.log('[story] retry load'),
 }
 
 /** Populated: the active conversation highlighted, relative timestamps, a null
@@ -78,6 +80,25 @@ export const HistoryLoading: Story = {
         activeBusy={false}
         canRemove
         {...log}
+      />
+    </Frame>
+  ),
+}
+
+/** The thread fetch failed: the error branch renders the reason and wires the
+ *  retry button to onRetry (loaded stays false — error never reads as empty). */
+export const HistoryLoadError: Story = {
+  name: 'Load Error',
+  render: () => (
+    <Frame>
+      <AssistantHistory
+        threads={[]}
+        loaded={false}
+        activeThreadId={null}
+        activeBusy={false}
+        canRemove
+        {...log}
+        error="Couldn't load conversations — the assistant service is unreachable."
       />
     </Frame>
   ),
