@@ -5,10 +5,18 @@
  * WHY THIS EXISTS: on 2026-08-06 every Slack credential the org held was found
  * dead at once — the fleet incoming webhook 404ing (`no_service`), a second
  * company webhook likewise, and the bot token answering `account_inactive`.
- * Every alert any product had "sent" for an unknown number of months went
- * nowhere. Nothing noticed, because nothing checked: an incoming webhook is
- * write-only and unverifiable, and the one consumer that did check treated a
- * transport-level 200 as delivery.
+ *
+ * This failure has already been paid for once, with numbers: in
+ * `agent-dev-container`, a revoked webhook let the CI healthcheck sit dead for
+ * 18 days — 2,567 consecutive failures, 27 successes, zero alerts — because
+ * fifteen call sites across six workflows posted with no body inspection and
+ * then asserted delivery. That repo fixed the reporting (its `post-slack.sh`
+ * confirms 2xx AND Slack's literal `ok` body, and fails closed otherwise) and
+ * that half of the lesson is theirs, adopted here.
+ *
+ * What their fix cannot do, and this module can, is answer the question BEFORE
+ * an alert needs to fire. A fail-closed post still only discovers a dead
+ * credential at the moment a page is lost. That is the second half.
  *
  * Two design consequences, and they are the whole module:
  *
@@ -25,7 +33,8 @@
  *    as a delivered page. The body is always parsed, and the outcome
  *    distinguishes a MISSING credential (configuration absent — not an
  *    incident) from a DEAD one (the alerting channel itself is broken — the
- *    loudest thing this module can report).
+ *    loudest thing this module can report). A summary that calls those two the
+ *    same thing is the defect wearing a different hat.
  *
  * The caller decides what to do with a non-delivery; this module never throws
  * on one, because an alerting path that can take down the thing it reports on
