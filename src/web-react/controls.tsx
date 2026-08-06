@@ -216,6 +216,11 @@ function ModelRow({
  * Searchable model picker pill + popover: a featured/recommended section
  * first, then per-provider groups in catalogue order (the server already
  * sorts providers by tier).
+ *
+ * This is the CANONICAL ecosystem model picker (see "UI chrome ownership
+ * (picker canon)" in AGENTS.md). sandbox-ui's `dashboard/ModelPicker` is
+ * legacy — deprecated, frozen, removed at sandbox-ui's next major; new code
+ * belongs here.
  */
 export function ModelPicker({ value, onChange, models, loading, renderProviderBadge, recommendedLabel = 'Recommended', priorityGroup }: ModelPickerProps) {
   const [open, setOpen] = useState(false)
@@ -387,7 +392,10 @@ export interface EffortPickerProps {
 
 /** Thinking-budget selector pill, styled to match {@link ModelPicker}. Show
  *  it only when the selected model `supportsReasoning`. "Thinking" is the
- *  plain-English name for what was internally called "effort". */
+ *  plain-English name for what was internally called "effort".
+ *
+ *  The CANONICAL ecosystem effort picker — sandbox-ui's reasoning menu (inside
+ *  its `chat/AgentSessionControls`) is legacy and frozen. */
 export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, label = 'Thinking' }: EffortPickerProps) {
   const [open, setOpen] = useState(false)
   const { containerRef, triggerProps } = usePopover(open, setOpen)

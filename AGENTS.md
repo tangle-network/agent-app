@@ -203,6 +203,10 @@ pnpm signoff --source head   # the mode that authorizes a merge
 
 What it proves, what it cannot prove, and the flags: [`docs/SIGNOFF.md`](./docs/SIGNOFF.md). The doctrine and the measured evidence: [`docs/local-signoff.md`](./docs/local-signoff.md).
 
+## UI chrome ownership (picker canon)
+
+Model/effort/harness picking has exactly one canonical implementation: `ModelPicker`, `EffortPicker`, and `AgentSessionControls` from `@tangle-network/agent-app/web-react`. sandbox-ui's `dashboard/ModelPicker` and the model menu in `chat/AgentSessionControls` are legacy — deprecated, frozen, removed at sandbox-ui's next major. Boundary: sandbox-ui owns rendering primitives (terminal, code surface, session chrome primitives); agent-app owns composed, seam-driven app-shell surfaces (transcript, composer controls, pickers, assistant). If you are about to add a picker/menu/control to sandbox-ui, stop — it belongs here. Products still on legacy pickers: bump to current sandbox-ui and adopt the canon (see the migration note in docs/).
+
 ## Develop
 
 ```bash

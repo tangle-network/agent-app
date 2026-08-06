@@ -5,10 +5,15 @@ import { ModelPicker } from '../../web-react'
 import { AutoClick, catalogModels, DEFAULT_MODEL_ID } from './fixtures'
 
 /**
- * The searchable model pill. The popover opens UPWARD from the trigger, so the
- * open-state stories pad the wrapper's top to keep the popover inside the
- * canvas. `AutoClick` presses the trigger on mount — the only way to hold the
- * popover open for a static shot.
+ * The searchable model pill — THE canonical ecosystem model picker
+ * (`agent-app/web-react`; see "UI chrome ownership (picker canon)" in
+ * AGENTS.md). sandbox-ui's `dashboard/ModelPicker` and the model menu inside
+ * its `chat/AgentSessionControls` are legacy and frozen; every product surface
+ * should render this one.
+ *
+ * The popover opens UPWARD from the trigger, so the open-state stories pad the
+ * wrapper's top to keep the popover inside the canvas. `AutoClick` presses the
+ * trigger on mount — the only way to hold the popover open for a static shot.
  */
 
 const meta: Meta<typeof ModelPicker> = {

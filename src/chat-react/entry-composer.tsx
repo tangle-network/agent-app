@@ -24,6 +24,11 @@ export interface EntryComposerProps {
    * omit it and the composer ships without one. Omitting is a real choice for a
    * surface with nothing to choose — it should never be an oversight, which is
    * why this is one prop rather than a free-form slot a caller can forget.
+   *
+   * NOTE: this prop routes through the deprecated `ComposerAgentControls`
+   * adapter (sandbox-ui's legacy strip). It keeps working until sandbox-ui's
+   * next major; the canonical picker cluster is `AgentSessionControls` from
+   * `/web-react` (see `docs/ui-picker-canon.md`).
    */
   agent?: ComposerAgentControlsProps
   /**

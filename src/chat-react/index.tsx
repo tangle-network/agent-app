@@ -8,19 +8,20 @@
  * that renders sandbox-ui's `AgentComposer` / `AgentSessionControls` lives here.
  * (Same rule, same shape as `/work-product-react`.)
  *
- * WHY THIS EXISTS. sandbox-ui already owns the composer and the picker cluster;
- * this subpath owns the app-shell ASSEMBLY over them — which controls an entry
- * surface gets, the model-id boundary, the harness-snap suppression, the submit
- * gate. Three products each re-derived that assembly and each dropped a
- * different control, so the same "shared" components produced three different
- * capability sets. One assembly, three products, domain by parameter.
+ * WHY THIS EXISTS. sandbox-ui owns the composer chrome; this subpath owns the
+ * app-shell ASSEMBLY over it — which controls an entry surface gets, the
+ * model-id boundary, the harness-snap suppression, the submit gate. Three
+ * products each re-derived that assembly and each dropped a different control,
+ * so the same "shared" components produced three different capability sets. One
+ * assembly, three products, domain by parameter.
  *
- * NOT canonical, and deliberately not re-exported here: `/web-react`'s own
- * `AgentSessionControls`. It predates sandbox-ui's, no product in the fleet
- * imports it, and sandbox-ui's is the richer one (backend logos, harness↔model
- * compatibility, the locked/fork trigger, three layouts). It stays exported from
- * `/web-react` because removing a published symbol is a major, but new code
- * should reach for {@link ComposerAgentControls}.
+ * PICKER CANON. The pickers this subpath renders are NOT the canonical ones:
+ * `ComposerAgentControls` adapts sandbox-ui's legacy `AgentSessionControls` and
+ * is deprecated with it (removed at sandbox-ui's next major). The canonical
+ * model/effort/harness cluster is `/web-react`'s `AgentSessionControls`, whose
+ * model menu IS the canonical `ModelPicker` — see "UI chrome ownership (picker
+ * canon)" in AGENTS.md and the migration note in `docs/ui-picker-canon.md`.
+ * The exports below stay working; new code must not adopt them.
  */
 
 export {

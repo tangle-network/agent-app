@@ -1,19 +1,22 @@
 /**
- * @deprecated for chat composers — use `ComposerAgentControls` from
- * `@tangle-network/agent-app/chat-react`, which adapts sandbox-ui's
- * `AgentSessionControls`. That one is the canonical control: it carries the
- * backend logos, the harness↔model compatibility table, the locked/fork
- * trigger and three trigger layouts, and it is what every product in the fleet
- * actually renders. This component predates it and no product imports it. It
- * stays exported because removing a published symbol is a major; it is not a
- * second supported implementation.
- *
- * Still correct for a surface that genuinely cannot take the sandbox-ui peer —
- * it is dependency-free beyond React by design.
- *
- * `AgentSessionControls` — the model + harness + reasoning-effort cluster a chat
- * composer docks. One component so every product's two composers (and every
+ * `AgentSessionControls` — the CANONICAL model + harness + reasoning-effort
+ * cluster a chat composer docks (see "UI chrome ownership (picker canon)" in
+ * AGENTS.md). One component so every product's two composers (and every
  * product) share the same control surface and harness↔model coherence policy.
+ *
+ * PICKER CANON. The model menu below IS `/web-react`'s `ModelPicker` and the
+ * thinking-budget pill IS `EffortPicker` — the canonical ecosystem pickers.
+ * sandbox-ui's `dashboard/ModelPicker` and the model menu inside sandbox-ui's
+ * `chat/AgentSessionControls` are legacy (deprecated, frozen, removed at
+ * sandbox-ui's next major), and so is the `/chat-react` `ComposerAgentControls`
+ * adapter that renders sandbox-ui's strip — it stays exported because removing
+ * a published symbol is a major, but new code belongs here. A surface that
+ * still renders the sandbox-ui strip is showing the old design; migrate it
+ * (props mapping in `docs/ui-picker-canon.md`).
+ *
+ * Dependency-free beyond React by design: `/web-react` must not force the
+ * optional sandbox-ui peer, so this component — the canonical one — can never
+ * require it.
  *
  * Two layouts, additive — the default preserves the prior hand-rolled behavior:
  *  - `layout="inline"` (default): model, harness, and effort sit side by side as

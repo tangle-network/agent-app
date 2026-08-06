@@ -6,7 +6,10 @@ import type { Harness } from '../../harness'
 import { AutoClick, catalogModels, DEFAULT_MODEL_ID, NON_REASONING_MODEL_ID } from './fixtures'
 
 /**
- * The model + harness + effort cluster a composer docks. Both layouts are
+ * The model + harness + effort cluster a composer docks — the CANONICAL
+ * session-controls surface: its model menu is the canonical `ModelPicker` and
+ * its thinking pill is `EffortPicker` (see "UI chrome ownership (picker
+ * canon)" in AGENTS.md). Both layouts are
  * interactive: switching the harness snaps an incompatible model to that
  * harness's catalog option, and switching the model snaps the harness — the
  * coherence policy runs in the component, so these stories exercise it live.
