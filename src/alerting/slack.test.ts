@@ -148,10 +148,10 @@ describe('postSlackAlert', () => {
   })
 
   // A product that has not adopted Slack must not have a failing alert path.
-  it('treats an absent token or channel as configuration, not an incident', async () => {
+  it('treats an absent credential or a tokenless channel as configuration, not an incident', async () => {
     const { impl, calls } = stubFetch([{ json: { ok: true } }])
 
-    const noToken = await postSlackAlert({
+    const noCredential = await postSlackAlert({
       token: undefined,
       channel: '#infra-alerts',
       text: 'x',
@@ -164,10 +164,107 @@ describe('postSlackAlert', () => {
       fetchImpl: impl,
     })
 
-    if (noToken.delivered || noChannel.delivered) throw new Error('unreachable')
-    expect(noToken.reason).toBe('not-configured')
+    if (noCredential.delivered || noChannel.delivered) throw new Error('unreachable')
+    expect(noCredential.reason).toBe('not-configured')
     expect(noChannel.reason).toBe('not-configured')
     expect(calls).toHaveLength(0)
+  })
+})
+
+describe('postSlackAlert over an incoming webhook', () => {
+  const WEBHOOK = 'https://hooks.slack.com/services/T0/B0/secret'
+
+  /** A webhook answers in plain text, not JSON. */
+  function stubText(
+    answers: Array<{ body: string; status?: number }>,
+  ): { impl: typeof fetch; calls: Array<{ url: string; init: RequestInit | undefined }> } {
+    const calls: Array<{ url: string; init: RequestInit | undefined }> = []
+    let index = 0
+    const impl = (async (url: string, init?: RequestInit) => {
+      calls.push({ url: String(url), init })
+      const answer = answers[Math.min(index, answers.length - 1)]
+      index += 1
+      if (!answer) throw new Error('stubText was called with no queued answer')
+      return new Response(answer.body, { status: answer.status ?? 200 })
+    }) as unknown as typeof fetch
+    return { impl, calls }
+  }
+
+  it('delivers on a 2xx with the literal ok body', async () => {
+    const { impl, calls } = stubText([{ body: 'ok' }])
+
+    const outcome = await postSlackAlert({ webhookUrl: WEBHOOK, text: 'page', fetchImpl: impl })
+
+    expect(outcome.delivered).toBe(true)
+    const [call] = calls
+    expect(call?.url).toBe(WEBHOOK)
+    // A webhook carries its own channel; naming one would be ignored at best.
+    expect(JSON.parse(String(call?.init?.body))).toEqual({ text: 'page' })
+  })
+
+  // The measured agent-dev-container case: a revoked webhook answers under a
+  // 200, so a status-only check reads it as a delivered page.
+  it('fails on a revoked webhook answering no_service under a 200', async () => {
+    const { impl } = stubText([{ body: 'no_service', status: 200 }])
+
+    const outcome = await postSlackAlert({
+      webhookUrl: WEBHOOK,
+      text: 'page',
+      fetchImpl: impl,
+      sleepImpl: noSleep,
+    })
+
+    if (outcome.delivered) throw new Error('unreachable')
+    expect(outcome.reason).toBe('credential')
+    expect(outcome.detail).toContain('revoked')
+  })
+
+  it('fails on a deleted webhook answering 404', async () => {
+    const { impl } = stubText([{ body: 'no_service', status: 404 }])
+
+    const outcome = await postSlackAlert({
+      webhookUrl: WEBHOOK,
+      text: 'page',
+      fetchImpl: impl,
+      sleepImpl: noSleep,
+    })
+
+    if (outcome.delivered) throw new Error('unreachable')
+    expect(outcome.reason).toBe('credential')
+  })
+
+  it('separates an archived channel from a revoked webhook', async () => {
+    const { impl } = stubText([{ body: 'channel_is_archived' }])
+
+    const outcome = await postSlackAlert({
+      webhookUrl: WEBHOOK,
+      text: 'page',
+      fetchImpl: impl,
+      sleepImpl: noSleep,
+    })
+
+    if (outcome.delivered) throw new Error('unreachable')
+    expect(outcome.reason).toBe('channel')
+  })
+
+  // A dead token must surface as the incident it is. Quietly succeeding over a
+  // second transport is precisely how the last outage stayed invisible.
+  it('never falls back to a webhook when a token is configured and dead', async () => {
+    const { impl, calls } = stubFetch([{ json: { ok: false, error: 'invalid_auth' } }])
+
+    const outcome = await postSlackAlert({
+      token: 'xoxb-dead',
+      channel: '#infra-alerts',
+      webhookUrl: WEBHOOK,
+      text: 'page',
+      fetchImpl: impl,
+      sleepImpl: noSleep,
+    })
+
+    if (outcome.delivered) throw new Error('unreachable')
+    expect(outcome.reason).toBe('credential')
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.url).toBe('https://slack.com/api/chat.postMessage')
   })
 })
 

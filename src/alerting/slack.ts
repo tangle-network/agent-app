@@ -2,9 +2,12 @@
  * `/alerting` — post an operational alert to Slack, and say honestly when it
  * did not arrive.
  *
- * WHY THIS EXISTS: on 2026-08-06 every Slack credential the org held was found
- * dead at once — the fleet incoming webhook 404ing (`no_service`), a second
- * company webhook likewise, and the bot token answering `account_inactive`.
+ * WHY THIS EXISTS: on 2026-08-06 an audit of every Slack credential the org
+ * held found three of four dead — the fleet incoming webhook 404ing
+ * (`no_service`), a second company webhook likewise, and the bot token
+ * answering `account_inactive`. One ops webhook was still live. Nobody knew
+ * which was which until each was tested by hand, and that is the actual
+ * problem: the credentials were indistinguishable from where the code stood.
  *
  * This failure has already been paid for once, with numbers: in
  * `agent-dev-container`, a revoked webhook let the CI healthcheck sit dead for
@@ -20,12 +23,17 @@
  *
  * Two design consequences, and they are the whole module:
  *
- * 1. **A bot token and `chat.postMessage`, never an incoming webhook.** One
- *    credential reaches every channel (a webhook is bolted to one), it is
- *    revocable and rotatable in place, and — the part that matters — it is
+ * 1. **A bot token and `chat.postMessage` is the preferred transport; an
+ *    incoming webhook is supported because one is usually what you already
+ *    have.** A token reaches every channel (a webhook is bolted to one), is
+ *    revocable and rotatable in place, and — the part that matters — is
  *    VERIFIABLE: `auth.test` answers whether the credential is alive without
  *    posting anything, which is what lets `/preflight` fail a deploy on a dead
- *    alerting channel instead of discovering it during an incident.
+ *    alerting channel instead of discovering it during an incident. A webhook
+ *    can only be tested by posting to it, which is why the three dead
+ *    credentials above went unnoticed. A token is never fallen back FROM: if
+ *    one is configured and dead, delivering over a webhook instead would hide
+ *    the very condition worth reporting.
  *
  * 2. **Slack answers `ok:false` under HTTP 200.** `invalid_auth`,
  *    `channel_not_found` and `not_in_channel` all arrive as a successful
@@ -98,16 +106,33 @@ export type SlackAlertOutcome =
 /** Define configuration options for posting an alert message to a Slack channel */
 export interface SlackAlertOptions {
   /**
-   * Slack bot token (`xoxb-…`) with `chat:write`. An empty or absent value is
-   * `not-configured`, never an error — a product that has not adopted Slack
-   * yet must not fail its alerting path.
+   * Slack bot token (`xoxb-…`) with `chat:write`. The PREFERRED transport,
+   * because it is the only one whose liveness can be checked before an alert
+   * needs it. An empty or absent value is `not-configured`, never an error — a
+   * product that has not adopted Slack yet must not fail its alerting path.
    */
-  token: string | undefined
+  token?: string | undefined
   /**
    * Channel to post to: a name (`#infra-alerts`) or an id (`C01234567`). The
-   * bot must be a member; Slack answers `not_in_channel` otherwise.
+   * bot must be a member; Slack answers `not_in_channel` otherwise. Required
+   * with `token`, meaningless with `webhookUrl` (a webhook carries its own
+   * channel, fixed when it was created).
    */
-  channel: string | undefined
+  channel?: string | undefined
+  /**
+   * Slack incoming-webhook URL, used only when no `token` is configured.
+   *
+   * It works and it needs no setup, which is why it is supported — but it
+   * cannot be verified without posting, cannot be pointed at a second channel,
+   * and gives back an error token instead of a code. Two of the three webhooks
+   * this org has held were found revoked. Treat it as the transport you have,
+   * not the one you want.
+   *
+   * When a `token` is also configured this is IGNORED rather than used as a
+   * fallback: a dead token must surface as the incident it is, and quietly
+   * succeeding over a second transport is how the last outage stayed invisible.
+   */
+  webhookUrl?: string | undefined
   /** Message body as Slack mrkdwn. Newlines are preserved. */
   text: string
   /**
@@ -191,18 +216,22 @@ const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => set
 export async function postSlackAlert(options: SlackAlertOptions): Promise<SlackAlertOutcome> {
   const token = options.token?.trim()
   const channel = options.channel?.trim()
-  if (!token) {
+  const webhookUrl = options.webhookUrl?.trim()
+
+  if (!token && !webhookUrl) {
     return {
       delivered: false,
       reason: 'not-configured',
-      detail: 'no Slack bot token configured — set SLACK_BOT_TOKEN to route alerts to Slack',
+      detail:
+        'no Slack credential configured — set SLACK_BOT_TOKEN (preferred, verifiable) ' +
+        'or SLACK_WEBHOOK_URL to route alerts to Slack',
     }
   }
-  if (!channel) {
+  if (token && !channel) {
     return {
       delivered: false,
       reason: 'not-configured',
-      detail: 'no Slack channel configured — set the alert channel (e.g. #infra-alerts)',
+      detail: 'a Slack bot token is set but no channel is — set the alert channel (e.g. #infra-alerts)',
     }
   }
 
@@ -210,6 +239,13 @@ export async function postSlackAlert(options: SlackAlertOptions): Promise<SlackA
   const sleep = options.sleepImpl ?? defaultSleep
   const attempts = Math.max(1, options.attempts ?? DEFAULT_ATTEMPTS)
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
+
+  // A token is never fallen back FROM. If one is configured and dead, that is
+  // the incident, and delivering over a webhook instead would hide exactly the
+  // condition this module exists to surface.
+  const transport: SlackTransport = token
+    ? { kind: 'token', token, channel: channel as string }
+    : { kind: 'webhook', url: webhookUrl as string }
 
   let lastTransient: SlackAlertFailure = {
     delivered: false,
@@ -222,15 +258,10 @@ export async function postSlackAlert(options: SlackAlertOptions): Promise<SlackA
     const timer = setTimeout(() => controller.abort(), timeoutMs)
     let response: Response
     try {
-      response = await fetchImpl(`${SLACK_API}/chat.postMessage`, {
+      response = await fetchImpl(requestUrl(transport), {
         method: 'POST',
-        headers: {
-          // The token rides a header, never a query string: a URL is logged by
-          // proxies and retained in error messages; a header is not.
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json; charset=utf-8',
-        },
-        body: JSON.stringify({ channel, text: options.text }),
+        headers: requestHeaders(transport),
+        body: JSON.stringify(requestBody(transport, options.text)),
         signal: controller.signal,
       })
     } catch (error) {
@@ -255,28 +286,99 @@ export async function postSlackAlert(options: SlackAlertOptions): Promise<SlackA
       continue
     }
 
-    // Everything below is a settled answer: Slack replies 200 with the verdict
-    // in the BODY, so a status check alone would read `invalid_auth` as a
-    // delivered page. That misreading is why this module exists.
-    let body: { ok?: boolean; error?: string; channel?: string; ts?: string }
-    try {
-      body = (await response.json()) as typeof body
-    } catch {
-      return {
-        delivered: false,
-        reason: 'api',
-        detail: `Slack returned ${response.status} with an unreadable body`,
-      }
-    }
-
-    if (body.ok === true) {
-      return { delivered: true, channel: body.channel ?? channel, ts: body.ts ?? '' }
-    }
-    return classifySlackError(body.error ?? `http_${response.status}`, channel)
+    // Everything below is a settled answer. BOTH transports put the verdict in
+    // the BODY under a 200 — the API as `{"ok":false,"error":…}`, a webhook as
+    // an error token where the literal `ok` should be — so a status check alone
+    // reads a revoked credential as a delivered page. That misreading is why
+    // this module exists.
+    return transport.kind === 'token'
+      ? await settleTokenResponse(response, transport.channel)
+      : await settleWebhookResponse(response)
   }
 
   return lastTransient
 }
+
+type SlackTransport =
+  | { kind: 'token'; token: string; channel: string }
+  | { kind: 'webhook'; url: string }
+
+function requestUrl(transport: SlackTransport): string {
+  return transport.kind === 'token' ? `${SLACK_API}/chat.postMessage` : transport.url
+}
+
+function requestHeaders(transport: SlackTransport): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json; charset=utf-8' }
+  // The token rides a header, never a query string: a URL is logged by proxies
+  // and retained in error messages; a header is not. (A webhook URL IS the
+  // credential and has no such option — one more reason to prefer a token.)
+  if (transport.kind === 'token') headers.Authorization = `Bearer ${transport.token}`
+  return headers
+}
+
+function requestBody(transport: SlackTransport, text: string): Record<string, string> {
+  // A webhook carries its own channel, fixed when it was created; naming one
+  // here would be ignored at best and rejected at worst.
+  return transport.kind === 'token' ? { channel: transport.channel, text } : { text }
+}
+
+async function settleTokenResponse(
+  response: Response,
+  channel: string,
+): Promise<SlackAlertOutcome> {
+  let body: { ok?: boolean; error?: string; channel?: string; ts?: string }
+  try {
+    body = (await response.json()) as typeof body
+  } catch {
+    return {
+      delivered: false,
+      reason: 'api',
+      detail: `Slack returned ${response.status} with an unreadable body`,
+    }
+  }
+  if (body.ok === true) {
+    return { delivered: true, channel: body.channel ?? channel, ts: body.ts ?? '' }
+  }
+  return classifySlackError(body.error ?? `http_${response.status}`, channel)
+}
+
+/**
+ * A webhook confirms delivery with a 2xx AND the literal three-byte body `ok`.
+ * A revoked one answers `no_service` / `no_team`, sometimes under a 200. Both
+ * halves are required: this is the shape `agent-dev-container` proved against a
+ * stand-in webhook, where a healthy, a revoked and a deleted webhook produced
+ * byte-identical output under a status-only check.
+ */
+async function settleWebhookResponse(response: Response): Promise<SlackAlertOutcome> {
+  const body = (await response.text().catch(() => '')).trim()
+  if (response.ok && body === 'ok') {
+    // A webhook reports neither the channel it posted to nor a message id.
+    return { delivered: true, channel: '(webhook)', ts: '' }
+  }
+  const error = body || `http_${response.status}`
+  const reason: SlackFailureReason = WEBHOOK_CREDENTIAL_ERRORS.has(error)
+    ? 'credential'
+    : WEBHOOK_CHANNEL_ERRORS.has(error)
+      ? 'channel'
+      : 'api'
+  return {
+    delivered: false,
+    reason,
+    detail:
+      reason === 'credential'
+        ? `the Slack webhook is revoked (${error}) — no alert can arrive until a human mints a new one. ` +
+          'Prefer replacing it with a bot token, whose liveness can be checked before an alert needs it.'
+        : reason === 'channel'
+          ? `Slack refused the webhook's channel (${error}) — the channel was archived, or the app lost access.`
+          : `Slack refused the webhook post (${error}).`,
+  }
+}
+
+/** Webhook error tokens that mean the webhook itself is gone. */
+const WEBHOOK_CREDENTIAL_ERRORS = new Set(['no_service', 'no_team', 'invalid_token'])
+
+/** Webhook error tokens that mean the webhook is valid but its channel is not usable. */
+const WEBHOOK_CHANNEL_ERRORS = new Set(['channel_not_found', 'channel_is_archived', 'action_prohibited'])
 
 /** Define configuration options for verifying that a Slack bot token is live */
 export interface SlackCredentialCheckOptions {

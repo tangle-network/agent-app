@@ -5,6 +5,62 @@
   "slug": "tangle-network/agent-app",
   "entries": [
     {
+      "id": "./alerting",
+      "source": "src/alerting/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "checkSlackCredential",
+          "kind": "function",
+          "signature": "(options: SlackCredentialCheckOptions) => Promise<SlackCredentialVerdict>",
+          "doc": "Ask Slack whether the bot token is alive, WITHOUT posting anything."
+        },
+        {
+          "name": "postSlackAlert",
+          "kind": "function",
+          "signature": "(options: SlackAlertOptions) => Promise<SlackAlertOutcome>",
+          "doc": "Post one alert to a Slack channel."
+        },
+        {
+          "name": "SlackAlertFailure",
+          "kind": "interface",
+          "signature": "interface SlackAlertFailure",
+          "doc": "An alert that did not arrive, and why."
+        },
+        {
+          "name": "SlackAlertOptions",
+          "kind": "interface",
+          "signature": "interface SlackAlertOptions",
+          "doc": "Define configuration options for posting an alert message to a Slack channel"
+        },
+        {
+          "name": "SlackAlertOutcome",
+          "kind": "type",
+          "signature": "type SlackAlertOutcome",
+          "doc": "What one `postSlackAlert` call did."
+        },
+        {
+          "name": "SlackCredentialCheckOptions",
+          "kind": "interface",
+          "signature": "interface SlackCredentialCheckOptions",
+          "doc": "Define configuration options for verifying that a Slack bot token is live"
+        },
+        {
+          "name": "SlackCredentialVerdict",
+          "kind": "type",
+          "signature": "type SlackCredentialVerdict",
+          "doc": "What `checkSlackCredential` concluded."
+        },
+        {
+          "name": "SlackFailureReason",
+          "kind": "type",
+          "signature": "type SlackFailureReason",
+          "doc": "Why an alert did not reach Slack."
+        }
+      ]
+    },
+    {
       "id": "./app-auth",
       "source": "src/app-auth/index.ts",
       "dependsOn": [
@@ -8332,6 +8388,7 @@
       "id": "./preflight",
       "source": "src/preflight/index.ts",
       "dependsOn": [
+        "alerting",
         "signoff"
       ],
       "error": null,
@@ -8419,6 +8476,18 @@
           "kind": "interface",
           "signature": "interface SandboxAuthProbeConfig",
           "doc": "Define configuration options for probing sandbox authentication endpoints"
+        },
+        {
+          "name": "slackAlertProbe",
+          "kind": "function",
+          "signature": "(config: SlackAlertProbeConfig) => PreflightProbe",
+          "doc": "Probe that the Slack alerting credential is alive, via `auth.test` — no message is posted."
+        },
+        {
+          "name": "SlackAlertProbeConfig",
+          "kind": "interface",
+          "signature": "interface SlackAlertProbeConfig",
+          "doc": "Define configuration options for probing that the Slack alerting channel is live"
         }
       ]
     },
@@ -8426,6 +8495,7 @@
       "id": "./preflight/cli",
       "source": "src/preflight/cli.ts",
       "dependsOn": [
+        "alerting",
         "signoff"
       ],
       "error": null,
