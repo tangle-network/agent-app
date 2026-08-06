@@ -640,7 +640,7 @@ readonly ["pypi.org", "files.pythonhosted.org", "pypi.python.org"]
 
 ### `resetClientCache`
 
-`function` — Reset the client cache to clear stored data and force fresh retrieval
+`function` — Reset the process-local sandbox client and liveness-verification caches.
 
 ```ts
 () => void

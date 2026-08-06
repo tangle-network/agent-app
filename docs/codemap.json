@@ -10257,7 +10257,7 @@
           "name": "resetClientCache",
           "kind": "function",
           "signature": "() => void",
-          "doc": "Reset the client cache to clear stored data and force fresh retrieval"
+          "doc": "Reset the process-local sandbox client and liveness-verification caches."
         },
         {
           "name": "ResolvedModel",

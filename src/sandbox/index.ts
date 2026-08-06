@@ -342,6 +342,16 @@ export interface LivenessProbeConfig {
   sidecarProcessPattern?: (harness: Harness) => string
   execTimeoutMs?: number
   psTimeoutMs?: number
+  /**
+   * Reuse a successful liveness result for this many milliseconds for the
+   * same box id. Defaults to 5 seconds; set to 0 to probe on every reuse.
+   *
+   * Only the exec/sidecar probe is cached. Runtime readiness, egress policy,
+   * deferred-file materialization, and bootstrap still run on every reuse.
+   * A box that dies during this window is surfaced by the next dispatch and
+   * is probed again after the TTL; the cache never triggers box deletion.
+   */
+  cacheTtlMs?: number
 }
 
 /** Define options for composing a user profile including prompts, files, servers, and name */
@@ -511,6 +521,7 @@ interface ClientCacheEntry {
 }
 
 let _cached: ClientCacheEntry | null = null
+const livenessVerifiedAt = new Map<string, number>()
 
 function getClientFromCreds(creds: SandboxClientCredentials): Sandbox {
   const fingerprint = `${creds.apiKey} ${creds.baseUrl}`
@@ -534,9 +545,10 @@ export function getClient(shell: SandboxRuntimeConfig): Sandbox {
   return getClientFromCreds(creds as SandboxClientCredentials)
 }
 
-/** Reset the client cache to clear stored data and force fresh retrieval */
+/** Reset the process-local sandbox client and liveness-verification caches. */
 export function resetClientCache(): void {
   _cached = null
+  livenessVerifiedAt.clear()
 }
 
 /** Describe an application tool with its name, unique key, and description */
@@ -1414,6 +1426,7 @@ async function listStopped(
 async function deleteBox(box: SandboxInstance): Promise<Outcome<void>> {
   try {
     await box.delete()
+    livenessVerifiedAt.delete(box.id)
     return ok(undefined)
   } catch (err) {
     return fail(err)
@@ -1591,6 +1604,21 @@ async function isBoxAlive(
   } catch {
     return false
   }
+}
+
+const DEFAULT_LIVENESS_CACHE_TTL_MS = 5_000
+
+function hasRecentLivenessVerification(
+  box: SandboxInstance,
+  probe: LivenessProbeConfig,
+  now = Date.now(),
+): boolean {
+  const ttlMs = probe.cacheTtlMs ?? DEFAULT_LIVENESS_CACHE_TTL_MS
+  if (!Number.isFinite(ttlMs) || ttlMs <= 0) return false
+  const verifiedAt = livenessVerifiedAt.get(box.id)
+  if (verifiedAt !== undefined && now - verifiedAt < ttlMs) return true
+  livenessVerifiedAt.delete(box.id)
+  return false
 }
 
 const RUNTIME_CONNECTION_WAIT_MS = 30_000
@@ -1794,9 +1822,16 @@ async function isReusableBox(
   harness: Harness,
   probe: LivenessProbeConfig | undefined,
 ): Promise<boolean> {
-  if (sandboxEdgeFailed(box)) return false
-  if (!sandboxRuntimeUrl(box)) return false
-  return isBoxAlive(box, harness, probe)
+  if (sandboxEdgeFailed(box) || !sandboxRuntimeUrl(box)) {
+    livenessVerifiedAt.delete(box.id)
+    return false
+  }
+  if (!probe) return true
+  if (hasRecentLivenessVerification(box, probe)) return true
+  const alive = await isBoxAlive(box, harness, probe)
+  if (alive) livenessVerifiedAt.set(box.id, Date.now())
+  else livenessVerifiedAt.delete(box.id)
+  return alive
 }
 
 // Resume a stopped box and wait for it to reach running.
@@ -1806,6 +1841,7 @@ async function resumeStoppedBox(
   onProgress?: (event: ProvisionEvent) => void,
 ): Promise<Outcome<SandboxInstance>> {
   try {
+    livenessVerifiedAt.delete(box.id)
     await box.resume()
     await box.waitFor('running', { timeoutMs, ...(onProgress ? { onProgress } : {}) })
     return ok(box)
