@@ -19,10 +19,12 @@
 @import '@tangle-network/brand/styles/named-themes.css';
 
 /*
- * Every scope listed here defines the FULL `--hsl-*` shadcn set in
+ * Every scope in THIS list defines the FULL `--hsl-*` shadcn set in
  * named-themes.css (verified: background/foreground/card/card-foreground/
  * popover/popover-foreground/primary/primary-foreground/secondary/muted/
  * muted-foreground/accent/border/input/ring), so none of these resolve empty.
+ * intelligence and tangle-dark are NOT in this list — see their own blocks
+ * below.
  *
  * Deliberately NOT bridged — these fall through to agent-app's own theme
  * values via the cascade, per theme darkness (the decorator adds the `.dark`
@@ -42,6 +44,7 @@
  */
 [data-theme='aubergine'],
 [data-theme='aubergine-light'],
+[data-theme='arena'],
 [data-theme='arena-light'],
 [data-theme='tangle-light'] {
   --background: var(--hsl-background);
@@ -63,4 +66,65 @@
    * neutral fallback would read off-palette under a tinted theme; brand's
    * depth-1 is each theme's L0 canvas color, and every named scope sets it. */
   --canvas-backdrop: var(--depth-1);
+}
+
+/*
+ * intelligence — dark-only, PARTIAL scope. named-themes.css deliberately
+ * overrides only the surface ladder (background/card/popover/secondary/muted/
+ * muted-foreground/accent/border/input) and leaves foreground / the
+ * *-foregrounds / primary / ring on brand's neutral dark spine ("the accent
+ * stays Tangle, only the surfaces carry the product's identity"). So this
+ * block bridges ONLY the tokens the scope defines — putting intelligence in
+ * the full bridge above would redeclare the rest against undefined --hsl-*
+ * sources and INVALIDATE them instead of letting them fall back. The
+ * un-bridged tokens fall through to agent-app's `.dark` values, which are the
+ * same neutral tangle dark (indigo primary/ring) brand intends. The selector
+ * carries `.dark` for the same reason brand's does: the scope is dark-only
+ * and must never stand over a light page (the toolbar decorator always sets
+ * the class — see AGENT_THEMES in preview.ts).
+ */
+.dark[data-theme='intelligence'] {
+  --background: var(--hsl-background);
+  --card: var(--hsl-card);
+  --popover: var(--hsl-popover);
+  --secondary: var(--hsl-secondary);
+  --muted: var(--hsl-muted);
+  --muted-foreground: var(--hsl-muted-foreground);
+  --accent: var(--hsl-accent);
+  --border: var(--hsl-border);
+  --input: var(--hsl-input);
+  --canvas-backdrop: var(--depth-1);
+}
+
+/*
+ * tangle-dark — the scope EXISTS in the local brand checkout's named-themes.css
+ * (brand-repo `feat/tangle-dark-theme` branch) but not in a published release
+ * yet; the vite alias in .storybook/main.ts points this file's @import at that
+ * checkout, so it resolves here today and for everyone after the brand bump.
+ * Like every other dark named scope it carries the full --hsl-* set, so the
+ * bridge below mirrors the full-bridge declarations — each with a fallback to
+ * agent-app's own `.dark` value (its --neutral-* ramp tokens, the exact
+ * declarations in tokens.css's dark scope). Where neither the alias nor the
+ * release provides the scope (CI, other machines on brand 1.1.0) the
+ * fallbacks make the toolbar entry render as agent-dark instead of a page of
+ * guaranteed-invalid tokens; once the scope resolves they are dead code —
+ * delete the fallbacks (and the alias) on the brand bump.
+ */
+[data-theme='tangle-dark'] {
+  --background: var(--hsl-background, var(--neutral-16-hsl));
+  --foreground: var(--hsl-foreground, var(--neutral-94-hsl));
+  --card: var(--hsl-card, var(--neutral-19-hsl));
+  --card-foreground: var(--hsl-card-foreground, var(--neutral-94-hsl));
+  --popover: var(--hsl-popover, var(--neutral-25-hsl));
+  --popover-foreground: var(--hsl-popover-foreground, var(--neutral-94-hsl));
+  --primary: var(--hsl-primary, 239 84% 74%);
+  --primary-foreground: var(--hsl-primary-foreground, var(--neutral-16-hsl));
+  --secondary: var(--hsl-secondary, var(--neutral-22-hsl));
+  --muted: var(--hsl-muted, var(--neutral-22-hsl));
+  --muted-foreground: var(--hsl-muted-foreground, var(--neutral-70-hsl));
+  --accent: var(--hsl-accent, var(--neutral-22-hsl));
+  --border: var(--hsl-border, var(--neutral-25-hsl));
+  --input: var(--hsl-input, var(--neutral-22-hsl));
+  --ring: var(--hsl-ring, 239 84% 74%);
+  --canvas-backdrop: var(--depth-1, hsl(var(--neutral-16-hsl)));
 }

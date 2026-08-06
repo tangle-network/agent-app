@@ -20,13 +20,27 @@ interface AgentTheme {
   dark: boolean
 }
 
+/**
+ * Every brand named theme (brand's named-themes.css) plus agent-app's own two.
+ * `dark` drives the `.dark` class: arena and intelligence ARE dark themes
+ * (intelligence's brand selector `.dark[data-theme="intelligence"]` even
+ * REQUIRES the class — without it the scope matches nothing), and tangle-dark
+ * is dark by name. `light` is brand's canonical light spine — in this
+ * Storybook it resolves to the same tokens as agent-light, because agent-app's
+ * tokens.css owns the `:root` light values; it is listed so the toolbar
+ * mirrors the brand vocabulary one for one.
+ */
 const AGENT_THEMES: Record<string, AgentTheme> = {
   'agent-dark': { dataTheme: 'dark', dark: true },
-  'agent-light': { dataTheme: 'light', dark: false },
   aubergine: { dataTheme: 'aubergine', dark: true },
+  arena: { dataTheme: 'arena', dark: true },
+  intelligence: { dataTheme: 'intelligence', dark: true },
+  'tangle-dark': { dataTheme: 'tangle-dark', dark: true },
+  'agent-light': { dataTheme: 'light', dark: false },
   'aubergine-light': { dataTheme: 'aubergine-light', dark: false },
   'arena-light': { dataTheme: 'arena-light', dark: false },
   'tangle-light': { dataTheme: 'tangle-light', dark: false },
+  light: { dataTheme: 'light', dark: false },
 }
 
 // Toolbar values from the old binary dark/light switcher, so existing
@@ -78,12 +92,16 @@ const preview: Preview = {
         title: 'Theme',
         icon: 'paintbrush',
         items: [
-          { value: 'agent-dark', title: 'Agent Dark (current)' },
-          { value: 'agent-light', title: 'Agent Light (current)' },
-          { value: 'aubergine', title: 'Aubergine' },
-          { value: 'aubergine-light', title: 'Aubergine Light' },
-          { value: 'arena-light', title: 'Arena Light' },
-          { value: 'tangle-light', title: 'Tangle Light' },
+          { value: 'agent-dark', title: 'Dark · Agent Dark (current)' },
+          { value: 'aubergine', title: 'Dark · Aubergine' },
+          { value: 'arena', title: 'Dark · Arena' },
+          { value: 'intelligence', title: 'Dark · Intelligence' },
+          { value: 'tangle-dark', title: 'Dark · Tangle Dark' },
+          { value: 'agent-light', title: 'Light · Agent Light (current)' },
+          { value: 'aubergine-light', title: 'Light · Aubergine Light' },
+          { value: 'arena-light', title: 'Light · Arena Light' },
+          { value: 'tangle-light', title: 'Light · Tangle Light' },
+          { value: 'light', title: 'Light · Brand Light' },
         ],
         dynamicTitle: true,
       },
