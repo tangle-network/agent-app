@@ -45,7 +45,7 @@ export function ResultCanvas({
     <section className={`${cardClass} p-5`}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className={`${cfg.color} text-[10px]`}>{cfg.label}</Badge>
+          <Badge variant="outline" className={`${cfg.color} text-[11px]`}>{cfg.label}</Badge>
           <span className="text-sm font-medium text-foreground">{runLabel}</span>
           {isWorking && <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />}
         </div>
@@ -65,7 +65,7 @@ export function ResultCanvas({
             key={generation.id}
             type="button"
             onClick={() => onSelect(generation)}
-            className="studio-bloom group relative aspect-video overflow-hidden rounded-lg border border-border bg-muted/40 transition-colors hover:border-primary/40"
+            className="studio-bloom group relative aspect-video overflow-hidden rounded-lg border border-border bg-secondary transition-colors hover:border-primary/40"
           >
             <CanvasTile generation={generation} />
           </button>

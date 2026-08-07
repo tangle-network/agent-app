@@ -67,7 +67,7 @@ export const AllStates: Story = {
         { label: '3200% — max', zoom: 32 },
       ].map((cell) => (
         <div key={cell.label} className="flex flex-col items-start gap-1.5">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">{cell.label}</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">{cell.label}</span>
           <div className="rounded-md border border-[var(--border-default)] bg-[var(--bg-input)] p-2">
             <ZoomControls zoom={cell.zoom} onZoom={(zoom) => console.log('[zoom story] zoom', zoom)} onFit={onFit} />
           </div>

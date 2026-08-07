@@ -76,7 +76,7 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
 
   return (
     <div className="flex h-full flex-col overflow-hidden text-[var(--text-primary)]">
-      <div className="shrink-0 border-b border-[var(--border-default)] px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+      <div className="shrink-0 border-b border-[var(--border-default)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">
         Layers
       </div>
 
@@ -122,7 +122,7 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
                 setDragOverIndex(null)
               }}
               className={[
-                'group flex items-center gap-1.5 py-1 pr-2 text-[13px] transition-colors',
+                'group flex items-center gap-1.5 py-1 pr-2 text-sm transition-colors',
                 isSelected ? 'bg-[color-mix(in_srgb,var(--brand-primary)_15%,transparent)] text-[var(--text-primary)]' : 'hover:bg-[color-mix(in_srgb,var(--border-default)_40%,transparent)] text-[var(--text-secondary)]',
                 dragOverIndex === row.ownerIndex ? 'border-t border-[var(--brand-primary)]' : '',
               ].join(' ')}
@@ -139,7 +139,7 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
                     if (event.key === 'Escape') setRenamingId(null)
                     event.stopPropagation()
                   }}
-                  className="min-w-0 flex-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0 text-[13px] text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
+                  className="min-w-0 flex-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0 text-sm text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
                 />
               ) : (
                 // Selection is a real button (sibling of the eye/lock buttons) so

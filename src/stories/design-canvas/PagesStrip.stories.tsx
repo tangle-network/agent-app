@@ -94,7 +94,7 @@ export const AllStates: Story = {
         { label: 'Manage disabled (review)', props: baseProps({ canManagePages: false }) },
       ].map((row) => (
         <div key={row.label} className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">{row.label}</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">{row.label}</span>
           <div className="rounded-md border border-[var(--border-default)]">
             <PagesStrip {...row.props} />
           </div>

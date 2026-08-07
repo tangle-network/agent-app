@@ -299,7 +299,7 @@ export function ComposerHero({
         <div className="mt-5">
           <Label
             htmlFor="studio-prompt"
-            className="mb-1.5 block text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+            className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground"
           >
             Prompt
           </Label>
@@ -379,7 +379,7 @@ export function ComposerHero({
                       <span className="shrink-0 text-muted-foreground">· {selectedModelOption.provider}</span>
                     )}
                     {selectedModelOption.status !== 'available' && (
-                      <span className="shrink-0 rounded-full bg-warning/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-warning">
+                      <span className="shrink-0 rounded-full bg-warning/10 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-warning">
                         {selectedModelOption.status}
                       </span>
                     )}
@@ -396,7 +396,7 @@ export function ComposerHero({
                         {model.name || model.id}{model.provider ? ` · ${model.provider}` : ''}
                       </span>
                       {model.status !== 'available' && (
-                        <span className="shrink-0 text-[10px] capitalize text-muted-foreground">{model.status}</span>
+                        <span className="shrink-0 text-[11px] capitalize text-muted-foreground">{model.status}</span>
                       )}
                     </span>
                   </SelectItem>
@@ -468,7 +468,7 @@ export function ComposerHero({
             <>
               Schedule a post
               {selectedConnectedDestinations.length > 0 && (
-                <Badge variant="outline" className="ml-1 text-[10px]">
+                <Badge variant="outline" className="ml-1 text-[11px]">
                   {selectedConnectedDestinations.length}
                 </Badge>
               )}
@@ -510,7 +510,7 @@ export function ComposerHero({
       <Button onClick={generate} disabled={!canSubmit} size="lg" className="mt-5 w-full">
         <Sparkles className="mr-2 h-4 w-4" />
         Generate
-        <span className="ml-2 text-[10px] opacity-60">⌘↵</span>
+        <span className="ml-2 text-[11px] opacity-60">⌘↵</span>
       </Button>
     </section>
   )

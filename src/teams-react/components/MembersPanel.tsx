@@ -150,14 +150,14 @@ function MemberRow({ member, canManage, onChangeRole, onRemove }: MemberRowProps
   return (
     <div className="flex items-center justify-between border-b border-[var(--border-default)] py-2 last:border-0">
       <div className="flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--bg-input)] text-xs font-bold text-[var(--text-secondary)]">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--bg-input)] text-xs font-semibold text-[var(--text-secondary)]">
           {initial}
         </div>
         <div>
           <p className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
             {label}
             {pending && (
-              <span className="rounded border border-[var(--border-default)] px-1.5 py-0.5 text-[10px] uppercase text-[var(--text-muted)]">
+              <span className="rounded border border-[var(--border-default)] px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">
                 Pending
               </span>
             )}
