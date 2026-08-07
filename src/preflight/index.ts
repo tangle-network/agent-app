@@ -13,7 +13,7 @@
  *
  * A probe is `{ name, run, critical? }`; `run()` returns `{ ok, detail? }`.
  * The standard builders (`requiredValueProbe`, `routerChatProbe`,
- * `sandboxAuthProbe`, `httpHeadProbe`) each take explicit config — they read
+ * `sandboxAuthProbe`, `httpHeadProbe`, `slackAlertProbe`) each take explicit config — they read
  * nothing global — so the same probe runs identically in a deploy step, a test,
  * or a local check. `runPreflight` fans
  * the probes out, times each, and folds them into a pass/fail report: any
@@ -59,6 +59,8 @@ export interface PreflightReport {
   criticalFailures: number
   durationMs: number
 }
+
+import { checkSlackCredential } from '../alerting/slack'
 
 /** Deploy-time deadline for a single probe. Cold upstreams are slow; a dead
  *  endpoint should still fail fast, so 10s is the ceiling, not the target. */
@@ -382,6 +384,56 @@ export function httpHeadProbe(config: HttpHeadProbeConfig): PreflightProbe {
             detail: `UNREACHABLE ${config.url} (${outcome.message}) — check ${urlLabel}`,
           }
       }
+    },
+  }
+}
+
+/** Define configuration options for probing that the Slack alerting channel is live */
+export interface SlackAlertProbeConfig {
+  /** Slack bot token (`xoxb-…`). */
+  token: string | undefined
+  /** Probe name in the report. Default `'slack-alerting'`. */
+  name?: string
+  /**
+   * Default `false`. A dead alerting channel is a serious finding but not a
+   * reason to refuse a deploy — the deploy is often the fix for whatever the
+   * alerts were about, and blocking it would make a broken alert channel an
+   * outage of its own.
+   */
+  critical?: boolean
+  /** Env-var name of the token, named verbatim in a dead-credential failure. */
+  keySecret?: string
+  /** Per-probe deadline. Default 10s. */
+  timeoutMs?: number
+  /** Injection seam for tests; defaults to global `fetch`. */
+  fetchImpl?: typeof fetch
+}
+
+/**
+ * Probe that the Slack alerting credential is alive, via `auth.test` — no
+ * message is posted.
+ *
+ * This closes the gap that hid a total alerting outage: every Slack credential
+ * the org held was revoked at once and nothing noticed, because an incoming
+ * webhook is write-only (the only way to test one is to post to it) and the
+ * secret sat in the store looking configured. A bot token can be ASKED, so a
+ * deploy can answer the question nobody was asking.
+ *
+ * Non-critical by default — see `critical`.
+ */
+export function slackAlertProbe(config: SlackAlertProbeConfig): PreflightProbe {
+  const keyLabel = config.keySecret ?? 'SLACK_BOT_TOKEN'
+  return {
+    name: config.name ?? 'slack-alerting',
+    critical: config.critical ?? false,
+    run: async () => {
+      const verdict = await checkSlackCredential({
+        token: config.token,
+        timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        fetchImpl: config.fetchImpl,
+      })
+      if (verdict.live) return { ok: true, detail: `live as ${verdict.botId} in ${verdict.team}` }
+      return { ok: false, detail: `${verdict.detail} (secret: ${keyLabel})` }
     },
   }
 }

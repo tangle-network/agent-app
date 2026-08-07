@@ -2,10 +2,11 @@
 
 # agent-app code map
 
-_96 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_97 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
+| [`./alerting`](api/alerting.md) | 8 | — |
 | [`./app-auth`](api/app-auth.md) | 11 | `platform` |
 | [`./assets`](api/assets.md) | 43 | — |
 | [`./assistant`](api/assistant.md) | 55 | `runtime`, `web-react` |
@@ -49,8 +50,8 @@ _96 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./peer-floors/cli`](api/peer-floors-cli.md) | 0 | `signoff` |
 | [`./plans`](api/plans.md) | 12 | — |
 | [`./platform`](api/platform.md) | 67 | `billing`, `runtime`, `web` |
-| [`./preflight`](api/preflight.md) | 14 | `signoff` |
-| [`./preflight/cli`](api/preflight-cli.md) | 2 | `signoff` |
+| [`./preflight`](api/preflight.md) | 16 | `alerting`, `signoff` |
+| [`./preflight/cli`](api/preflight-cli.md) | 2 | `alerting`, `signoff` |
 | [`./preset-cloudflare`](api/preset-cloudflare.md) | 22 | `billing`, `crypto`, `knowledge`, `tools`, `web` |
 | [`./profile`](api/profile.md) | 45 | `skills` |
 | [`./prompt`](api/prompt.md) | 3 | — |
@@ -104,6 +105,14 @@ _96 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./workspace-react`](api/workspace-react.md) | 4 | `session-shell` |
 
 ---
+
+## `./alerting`
+
+Source: `src/alerting/index.ts` · 8 exports
+
+`checkSlackCredential`, `postSlackAlert`, `SlackAlertFailure`, `SlackAlertOptions`, `SlackAlertOutcome`, `SlackCredentialCheckOptions`, `SlackCredentialVerdict`, `SlackFailureReason`
+
+[Full API →](api/alerting.md)
 
 ## `./app-auth`
 
@@ -495,11 +504,11 @@ Depends on: `billing`, `runtime`, `web`
 
 ## `./preflight`
 
-Source: `src/preflight/index.ts` · 14 exports
+Source: `src/preflight/index.ts` · 16 exports
 
-Depends on: `signoff`
+Depends on: `alerting`, `signoff`
 
-`formatPreflightReport`, `httpHeadProbe`, `HttpHeadProbeConfig`, `PreflightProbe`, `PreflightProbeResult`, `PreflightProbeVerdict`, `PreflightReport`, `requiredValueProbe`, `RequiredValueProbeConfig`, `routerChatProbe`, `RouterChatProbeConfig`, `runPreflight`, `sandboxAuthProbe`, `SandboxAuthProbeConfig`
+`formatPreflightReport`, `httpHeadProbe`, `HttpHeadProbeConfig`, `PreflightProbe`, `PreflightProbeResult`, `PreflightProbeVerdict`, `PreflightReport`, `requiredValueProbe`, `RequiredValueProbeConfig`, `routerChatProbe`, `RouterChatProbeConfig`, `runPreflight`, `sandboxAuthProbe`, `SandboxAuthProbeConfig`, `slackAlertProbe`, `SlackAlertProbeConfig`
 
 [Full API →](api/preflight.md)
 
@@ -507,7 +516,7 @@ Depends on: `signoff`
 
 Source: `src/preflight/cli.ts` · 2 exports
 
-Depends on: `signoff`
+Depends on: `alerting`, `signoff`
 
 `loadProbes`, `runPreflightCli`
 

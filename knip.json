@@ -47,6 +47,7 @@
     "src/peer-floors/cli.ts",
     "src/plans/index.ts",
     "src/platform/index.ts",
+    "src/alerting/index.ts",
     "src/preflight/cli.ts",
     "src/preflight/index.ts",
     "src/preset-cloudflare/index.ts",

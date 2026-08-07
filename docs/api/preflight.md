@@ -4,7 +4,7 @@
 
 Source: `src/preflight/index.ts`
 
-14 exports.
+16 exports.
 
 ### `formatPreflightReport`
 
@@ -116,4 +116,20 @@ interface RouterChatProbeConfig
 
 ```ts
 interface SandboxAuthProbeConfig
+```
+
+### `slackAlertProbe`
+
+`function` — Probe that the Slack alerting credential is alive, via `auth.test` — no message is posted.
+
+```ts
+(config: SlackAlertProbeConfig) => PreflightProbe
+```
+
+### `SlackAlertProbeConfig`
+
+`interface` — Define configuration options for probing that the Slack alerting channel is live
+
+```ts
+interface SlackAlertProbeConfig
 ```
