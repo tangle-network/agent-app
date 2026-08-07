@@ -24,19 +24,29 @@
 :root {
   /* ── The neutral ramp ────────────────────────────────────────────────────
      ONE ladder, both themes: light reads it from the top down, dark from the
-     bottom up. Stop names ARE their oklch lightness (`--neutral-91` is
-     L 0.91), so the ladder rule is checkable rather than conventional:
+     bottom up. A stop's name is its oklch lightness × 100, rounded to the
+     nearest integer (`--neutral-94` is L 0.945), so the rule stays checkable
+     rather than conventional. Chroma comes in TWO bands, because the two ends
+     of the ladder do different work:
 
-         L = 0.16 + 0.03n      n = 0 … 28      (0.16 is the darkest surface,
-                                                1.00 the terminal white)
+       dark band   L ≤ 0.4 — the dark theme's surface ladder: chroma
+                   0.014–0.018 at hue 280, falling as L rises. The deep
+                   surfaces carry the deliberate cool cast; the border stop
+                   carries least, so a hairline reads as an edge, not a tint.
+                   The lightness steps here are deliberately SMALL — at the
+                   bottom of sRGB, rungs 0.03 apart measure 1.05:1, which is
+                   physically imperceptible, so this band's separation comes
+                   from the whole stack (fill step + border tier + shadow),
+                   not from any single rung.
+       light band  L ≥ 0.8 — chroma 0.004–0.008 at hue 280: the tinted-canvas
+                   values from the elevation audit. The mid stops (49, 70 —
+                   text, not surfaces) keep the legacy 0.004 at hue 286; at
+                   that chroma the 6° hue difference is below what sRGB shows.
 
-     Chroma is a CONSTANT 0.004 at hue 286 — one deliberate cool cast, not a
-     wandering one. The HSL these tokens replaced carried "S 5–7%" throughout
-     and that reads as consistent, but HSL saturation is not chroma: the same
-     nominal 5–7% produced 0.0014 chroma at L 0.976 and 0.0154 at L 0.478, so
-     the old ramp visibly GAINED blue as it darkened. Look at the `-hsl` mirrors
-     below to see the same fact from the other side — holding chroma constant
-     needs S 17.2% at L 0.97 and S 1.3% at L 0.49.
+     HSL saturation is not chroma, which is why the `-hsl` mirrors wander in
+     S% while the oklch sources hold their bands: the ramp this replaced
+     carried a nominal "S 5–7%" throughout that produced 0.0014 chroma at
+     L 0.976 and 0.0154 at L 0.478 — visibly gaining blue as it darkened.
 
      The terminal stop is chroma 0 because sRGB admits no chroma at L 1.
 
@@ -48,24 +58,39 @@
      rather than a derivation. tests/theme/tokens-contract.test.ts converts
      every oklch stop to HSL and fails if its mirror has drifted, so the two
      forms cannot disagree without a red test. */
-  --neutral-16: oklch(0.16 0.004 286);
-  --neutral-16-hsl: 240.1 6.8% 5.5%;
-  --neutral-19: oklch(0.19 0.004 286);
-  --neutral-19-hsl: 240 4.9% 8%;
-  --neutral-22: oklch(0.22 0.004 286);
-  --neutral-22-hsl: 239.9 3.8% 10.7%;
-  --neutral-25: oklch(0.25 0.004 286);
-  --neutral-25-hsl: 239.9 3.1% 13.5%;
+  /* dark band — the dark theme's surface ladder, bottom up: canvas-backdrop,
+     background, input (recessed), card, secondary/muted/accent, popover,
+     border. The first three RETUNE the stops the light theme's ink also reads;
+     the top four are new rungs. */
+  --neutral-16: oklch(0.16 0.018 280);
+  --neutral-16-hsl: 234.9 28.5% 6.4%;
+  --neutral-19: oklch(0.19 0.018 280);
+  --neutral-19-hsl: 234.5 21.2% 9%;
+  --neutral-22: oklch(0.215 0.018 280);
+  --neutral-22-hsl: 234.2 17.6% 11.3%;
+  --neutral-24: oklch(0.235 0.018 280);
+  --neutral-24-hsl: 234.1 15.5% 13.1%;
+  --neutral-28: oklch(0.285 0.017 280);
+  --neutral-28-hsl: 233.8 11.4% 17.8%;
+  --neutral-33: oklch(0.325 0.016 280);
+  --neutral-33-hsl: 233.6 9.1% 21.7%;
+  --neutral-36: oklch(0.365 0.014 280);
+  --neutral-36-hsl: 233.4 7% 25.6%;
+  /* mid stops — text, both themes */
   --neutral-49: oklch(0.49 0.004 286);
   --neutral-49-hsl: 239.7 1.3% 38.2%;
   --neutral-70: oklch(0.7 0.004 286);
   --neutral-70-hsl: 239.6 1.5% 62.5%;
-  --neutral-91: oklch(0.91 0.004 286);
-  --neutral-91-hsl: 239.6 5.2% 88.7%;
-  --neutral-94: oklch(0.94 0.004 286);
-  --neutral-94-hsl: 239.6 8% 92.6%;
-  --neutral-97: oklch(0.97 0.004 286);
-  --neutral-97-hsl: 239.6 17.2% 96.5%;
+  /* light band — the light theme's surfaces, bottom up: border/input,
+     canvas-backdrop, background, secondary/muted/accent, terminal white. */
+  --neutral-85: oklch(0.85 0.0079 280);
+  --neutral-85-hsl: 233.1 6.8% 81.4%;
+  --neutral-92: oklch(0.925 0.0069 280);
+  --neutral-92-hsl: 233.1 12.5% 90.9%;
+  --neutral-94: oklch(0.945 0.0059 280);
+  --neutral-94-hsl: 233.2 14.8% 93.4%;
+  --neutral-96: oklch(0.965 0.0049 280);
+  --neutral-96-hsl: 233.2 19.9% 95.9%;
   --neutral-100: oklch(1 0 0);
   --neutral-100-hsl: 0 0% 100%;
 
@@ -76,24 +101,24 @@
      tuned for AA as TEXT. agent-app keeps its own light-default /
      [data-theme="dark"] scope model (brand is dark-default), so /theme stays
      dependency-free — only the values are shared, not the cascade. */
-  --background: var(--neutral-100-hsl);
+  --background: var(--neutral-94-hsl);
   --foreground: var(--neutral-16-hsl);
-  --card: var(--neutral-97-hsl);
+  --card: var(--neutral-100-hsl);
   --card-foreground: var(--neutral-16-hsl);
   --popover: var(--neutral-100-hsl);
   --popover-foreground: var(--neutral-16-hsl);
   --primary: 245 62% 57%;
   --primary-foreground: var(--neutral-100-hsl);
-  --secondary: var(--neutral-94-hsl);
+  --secondary: var(--neutral-96-hsl);
   --secondary-foreground: var(--neutral-22-hsl);
-  --muted: var(--neutral-94-hsl);
+  --muted: var(--neutral-96-hsl);
   --muted-foreground: var(--neutral-49-hsl);
-  --accent: var(--neutral-94-hsl);
+  --accent: var(--neutral-96-hsl);
   --accent-foreground: var(--neutral-22-hsl);
   --destructive: 0 72% 41%;
   --destructive-foreground: var(--neutral-100-hsl);
-  --border: var(--neutral-91-hsl);
-  --input: var(--neutral-91-hsl);
+  --border: var(--neutral-85-hsl);
+  --input: var(--neutral-85-hsl);
   --ring: 245 62% 57%;
   /* status colors — brand hues (teal/gold/red), but lightness kept dark enough
      to clear WCAG AA when used AS TEXT on tinted chips. Brand's own status
@@ -107,12 +132,12 @@
      `--warning-foreground` is paired with — and the reason that pairing cannot
      serve both. Measured on the shipped approval card: no single lightness
      clears AA in both themes, because the tint tracks the page. On the light
-     card rgb(251,248,240) the ramp needs L <= 30% (L 38% is 3.07:1); on the dark
-     card rgb(27,22,16) it needs L >= 34% (L 28% is 3.27:1). So this token
-     re-themes where `--warning` and `--warning-foreground` deliberately do not.
-     28% / 56% are the values with margin either side of those knees: 5.17:1
-     light, 10.11:1 dark. */
-  --warning-strong: 41 96% 28%;
+     page the tint composites to rgb(233,230,227) and the ramp needs L <= 27%
+     (L 28% is 4.43:1); on the dark page rgb(32,29,29) it needs L >= 36%
+     (L 34% is 4.06:1). So this token re-themes where `--warning` and
+     `--warning-foreground` deliberately do not. 27% / 56% are the values with
+     margin either side of those knees: 4.69:1 light, 9.12:1 dark. */
+  --warning-strong: 41 96% 27%;
 
   /* canvas/sequences aliases — full colors, resolve to the triples above */
   --bg-input: hsl(var(--card));
@@ -140,8 +165,9 @@
 
   /* canvas-only surfaces (not part of the shadcn vocabulary). Name matches the
      `--canvas-backdrop` the design-canvas Workspace references (with a #1a1a1a
-     fallback). One ramp stop below the sheet, so the page reads as lifted. */
-  --canvas-backdrop: hsl(var(--neutral-91-hsl));
+     fallback). Two ramp stops BELOW the page, so elevation reads the right way
+     up: canvas under page, white card lifted above both. */
+  --canvas-backdrop: hsl(var(--neutral-92-hsl));
 
   /* Keyboard focus ring. Resolves through `--ring`, so the dark scope re-themes
      it by the same cascade every other token here uses. */
@@ -216,34 +242,49 @@
        hsl(--border)   full strength: form-field edges (`--input`), and any
                        edge a component deliberately emphasises
 
-     LIGHT is 40% / 60%, chosen against OUR surfaces rather than copied. A 1px
-     hairline, contrast of the composited line against the surface it sits on,
-     rendered and read back by playground/scripts/token-render.mjs:
+     LIGHT is 40% / 60%. A 1px hairline, contrast of the composited line
+     against the surface it sits on, rendered and read back by
+     playground/scripts/token-render.mjs:
 
        alpha   on background   on card   on muted
-        22%        1.060         1.044     1.026    the reference's soft value
-        40%        1.108         1.072     1.036    quiet, still resolves
-        60%        1.176         1.120     1.063    reads as a container
-       100%        1.311         1.205     1.102    reads as a box
+        22%        1.065         1.098     1.081
+        40%        1.125         1.188     1.143
+        60%        1.198         1.309     1.236
+       100%        1.345         1.584     1.428
 
-     40% is the quietest alpha at which a 1px line still resolves on `--card`,
-     which is where most of this package's dividers actually sit — at 22% it is
-     simply not there.
-     The card edge is 60% rather than the reference's 55% because ours has to
-     clear the soft tier by enough to read as a DIFFERENT decision (1.176 vs
-     1.108), while our card already carries a fill step of its own (L 0.97 on a
-     1.00 background) that the reference's card — the same colour as its
-     background — does not have.
+     40% keeps a divider quiet on `--background` (1.125), where most of this
+     package's dividers sit, while the white card's fill step does the
+     containing; 60% is far enough above it (1.309 vs 1.198) to read as a
+     DIFFERENT decision, short of the 1.584 that reads as a box.
 
-     DARK INVERTS: both tiers are FULL strength. Same measurement, our dark
-     ramp, and it forces the opposite answer. Dark `--border` (L 0.25) is
-     already at the edge of visible at 100% — 1.212 on background, 1.158 on
-     card, 1.085 on muted — and the same 40% takes those to 1.057 / 1.048 /
-     1.023. That is not a quieter line, it is no line. A tier system that
-     erases the thing it is tiering is worse than no tiers, so dark collapses
-     the three to one. */
+     DARK is 60% / 80% — the tiers no longer collapse there. They used to:
+     the old dark border (L 0.25) was already at the edge of visible at full
+     strength (1.158 on card), so a softened tier was not a quieter line but
+     no line, and dark ran both tiers at 100%. The ladder revision lifted the
+     dark border to L 0.365, and the same measurement now leaves room to
+     spare:
+
+       alpha   on background   on card   on muted
+        60%        1.320         1.265     1.173
+        80%        1.489         1.389     1.253
+       100%        1.716         1.553     1.339
+
+     The soft tier at 60% clears the 1.07 hairline floor on every surface it
+     divides, and the card edge at 80% sits clearly above it — same method,
+     opposite conclusion, because the border colour itself moved. */
   --border-soft: color-mix(in oklch, hsl(var(--border)) 40%, transparent);
   --card-edge: color-mix(in oklch, hsl(var(--border)) 60%, transparent);
+
+  /* ── Elevation shadows ───────────────────────────────────────────────────
+     Two foreground-tinted lifts, so elevation is a token rather than an
+     arbitrary value at each call site. `--shadow-raised` promotes the proven
+     floating-composer values (src/web-react/chat-composer.tsx) unchanged;
+     `--shadow-overlay` is the higher lift for popovers and dialogs. Dark
+     doubles the alpha — the same shadow over a near-black surface reads at
+     roughly half its light-theme strength, so the dark theme compensates at
+     the token, not at every component. */
+  --shadow-raised: 0 1px 2px hsl(var(--foreground) / 0.05), 0 12px 28px hsl(var(--foreground) / 0.07);
+  --shadow-overlay: 0 2px 6px hsl(var(--foreground) / 0.06), 0 16px 40px hsl(var(--foreground) / 0.1);
 }
 
 /**
@@ -286,31 +327,31 @@
      ladder and only differ in which stop each role picks.
      `--warning-foreground` (dark text on a solid gold chip) is theme-invariant
      and is therefore absent, not omitted: the cascade already carries it. */
-  --background: var(--neutral-16-hsl);
+  --background: var(--neutral-19-hsl);
   --foreground: var(--neutral-94-hsl);
-  --card: var(--neutral-19-hsl);
+  --card: var(--neutral-24-hsl);
   --card-foreground: var(--neutral-94-hsl);
-  --popover: var(--neutral-25-hsl);
+  --popover: var(--neutral-33-hsl);
   --popover-foreground: var(--neutral-94-hsl);
   /* 74% L (brand's #818CF8 intent) so primary clears AA as TEXT on a primary/10
      tint in dark. That lightness is also why the foreground has to INVERT here:
      the light theme's white-on-indigo is 6.01:1, but the same white on this
      74%-L lavender rgb(137,137,245) is 3.02:1 — measured failing on the
-     "Approve & run" button. A dark foreground on the same fill is 6.44:1, so
+     "Approve & run" button. A dark foreground on the same fill is 6.27:1, so
      the solid button reads in both themes and the tint keeps its AA as text. */
   --primary: 239 84% 74%;
   --primary-foreground: var(--neutral-16-hsl);
-  --secondary: var(--neutral-22-hsl);
+  --secondary: var(--neutral-28-hsl);
   --secondary-foreground: var(--neutral-94-hsl);
-  --muted: var(--neutral-22-hsl);
+  --muted: var(--neutral-28-hsl);
   --muted-foreground: var(--neutral-70-hsl);
-  --accent: var(--neutral-22-hsl);
+  --accent: var(--neutral-28-hsl);
   --accent-foreground: var(--neutral-94-hsl);
   --destructive: 348 90% 68%;
-  --destructive-foreground: var(--neutral-25-hsl);
+  --destructive-foreground: var(--neutral-24-hsl);
   /* @see the :root declaration — this is the tier that re-themes. */
   --warning-strong: 40 94% 56%;
-  --border: var(--neutral-25-hsl);
+  --border: var(--neutral-36-hsl);
   --input: var(--neutral-22-hsl);
   --ring: 239 84% 74%;
   --success: 160 70% 52%;
@@ -319,10 +360,16 @@
 
   --canvas-backdrop: hsl(var(--neutral-16-hsl));
 
-  /* The tier inversion. Full strength for BOTH tiers — see the measurement in
-     the :root block: a softened dark hairline is not quieter, it is absent. */
-  --border-soft: hsl(var(--border));
-  --card-edge: hsl(var(--border));
+  /* The dark tiers, re-joined. The border is now strong enough (L 0.365) that
+     softening leaves a visible line — see the measurement in the :root block:
+     60% reads 1.265 on the card, where the old border at FULL strength read
+     1.158. Dark runs the same three tiers as light, one step stronger. */
+  --border-soft: color-mix(in oklch, hsl(var(--border)) 60%, transparent);
+  --card-edge: color-mix(in oklch, hsl(var(--border)) 80%, transparent);
+
+  /* Doubled alphas against the near-black surfaces — @see :root. */
+  --shadow-raised: 0 1px 2px hsl(var(--foreground) / 0.14), 0 12px 28px hsl(var(--foreground) / 0.22);
+  --shadow-overlay: 0 2px 6px hsl(var(--foreground) / 0.12), 0 16px 40px hsl(var(--foreground) / 0.2);
 }
 
 /**
