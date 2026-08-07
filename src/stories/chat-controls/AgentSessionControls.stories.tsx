@@ -3,7 +3,7 @@ import { useState } from 'react'
 
 import { AgentSessionControls, type AgentSessionControlsProps } from '../../web-react'
 import type { Harness } from '../../harness'
-import { AutoClick, catalogModels, DEFAULT_MODEL_ID, NON_REASONING_MODEL_ID } from './fixtures'
+import { AutoClick, catalogModels, DEFAULT_MODEL_ID, NON_REASONING_MODEL_ID, withPopoverHeadroom } from './fixtures'
 
 /**
  * The model + harness + effort cluster a composer docks — the CANONICAL
@@ -48,42 +48,45 @@ type Story = StoryObj<typeof AgentSessionControls>
 
 /** Inline (default): model, harness, and effort pills side by side. */
 export const Inline: Story = {
+  decorators: [withPopoverHeadroom],
   render: () => useSessionControls(),
 }
 
 /** Compact: the model stays inline; harness + effort tuck behind the gear. */
 export const Compact: Story = {
+  decorators: [withPopoverHeadroom],
   render: () => useSessionControls({ layout: 'compact' }),
 }
 
 /** Compact with the gear popover held open — the plain-English settings copy. */
 export const CompactOpen: Story = {
   name: 'Compact — gear open',
-  parameters: { layout: 'padded' },
+  decorators: [withPopoverHeadroom],
   render: () => (
-    <div className="pt-[320px]">
-      <AutoClick selector="button[title^='Model settings']">
-        {useSessionControls({ layout: 'compact' })}
-      </AutoClick>
-    </div>
+    <AutoClick selector="button[title^='Model settings']">
+      {useSessionControls({ layout: 'compact' })}
+    </AutoClick>
   ),
 }
 
 /** Single-harness product — the harness pill is hidden entirely. */
 export const HarnessHidden: Story = {
   name: 'Harness hidden',
+  decorators: [withPopoverHeadroom],
   render: () => useSessionControls({ showHarness: false }),
 }
 
 /** A non-reasoning model selected — the effort pill drops out. */
 export const NonReasoningModel: Story = {
   name: 'Non-reasoning model',
+  decorators: [withPopoverHeadroom],
   render: () => useSessionControls({ initialModel: NON_REASONING_MODEL_ID }),
 }
 
 /** Catalogue still loading — the model pill renders its loading state. */
 export const ModelsLoading: Story = {
   name: 'Models loading',
+  decorators: [withPopoverHeadroom],
   render: () => useSessionControls({ models: [], modelsLoading: true }),
 }
 

@@ -128,6 +128,8 @@ export const Hidden: Story = {
 /** Density + guide states side by side. */
 export const AllStates: Story = {
   name: 'All states (composite)',
+  // Side-by-side ruler row — left-anchored so it can never clip.
+  parameters: { layout: 'padded' },
   render: () => (
     <div className="flex flex-wrap items-start gap-4">
       <RulerFrame

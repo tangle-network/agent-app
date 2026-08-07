@@ -2,13 +2,24 @@ import type { Meta, StoryObj } from '@storybook/react'
 import { useState, type ReactNode } from 'react'
 
 import { ChatComposer, ModelPicker } from '../../web-react'
-import { catalogModels, DEFAULT_MODEL_ID, pendingComposerFiles, pendingComposerFilesWithError } from './fixtures'
+import {
+  catalogModels,
+  DEFAULT_MODEL_ID,
+  pendingComposerFiles,
+  pendingComposerFilesWithError,
+  withPopoverHeadroom,
+} from './fixtures'
 
 /**
  * Mirrors the playground's ComposerRoute state wiring: the model pill sits on
  * the composer's own action row (`controlsPlacement: 'inline'`, the default),
  * with the `above` opt-out as the fifth state. Each state story is interactive
  * (type, attach chips, Stop), so hover/focus polish is judgeable live.
+ *
+ * Every story docks a `ModelPicker`, whose popover opens UPWARD — so the whole
+ * file wraps in `withPopoverHeadroom` (anchors the composer at the bottom of
+ * a 520px block) and clicking the pill can never clip into unscrollable
+ * negative-Y space, whatever the canvas height.
  */
 
 function useModelPill() {
@@ -31,6 +42,7 @@ const meta: Meta<typeof ChatComposer> = {
   title: 'ChatControls/ChatComposer',
   component: ChatComposer,
   decorators: [
+    withPopoverHeadroom,
     (Story) => (
       <div className="w-[576px] max-w-full p-4">
         <Story />

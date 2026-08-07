@@ -10,6 +10,17 @@ const agentAppPreset = presetModule.default ?? presetModule
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   presets: [agentAppPreset],
+  theme: {
+    extend: {
+      fontFamily: {
+        // The brand mono stack (`--font-mono` in @tangle-network/brand's
+        // tokens.css). Geist Mono is loaded in .storybook/preview-head.html;
+        // without this mapping Tailwind's default ui-monospace stack owns
+        // `font-mono` and every mono surface renders per-machine OS mono.
+        mono: ['"Geist Mono"', '"JetBrains Mono"', 'ui-monospace', 'monospace'],
+      },
+    },
+  },
   // The package sources plus the linked UI libraries whose components are
   // re-exported into agent-app surfaces (e.g. sandbox-ui/primitives' Dialog,
   // consumed by studio-react). Without scanning them, their class strings

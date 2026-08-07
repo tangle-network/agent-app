@@ -57,6 +57,8 @@ export const Interactive: Story = {
 /** The four boundary/mid states side by side. */
 export const AllStates: Story = {
   name: 'All states (composite)',
+  // Side-by-side cell row — left-anchored so it can never clip.
+  parameters: { layout: 'padded' },
   decorators: [],
   render: () => (
     <div className="flex items-center gap-4">

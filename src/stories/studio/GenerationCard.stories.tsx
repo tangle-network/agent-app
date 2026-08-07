@@ -57,6 +57,8 @@ export const WithPublishPackage: Story = {
 /** Every media tile variant and status side by side. */
 export const AllStates: Story = {
   name: 'All types & statuses',
+  // Two-column tile grid — left-anchored so it can never clip.
+  parameters: { layout: 'padded' },
   decorators: [
     (Story) => (
       <div className="w-[720px] p-4">

@@ -197,6 +197,8 @@ export const ViewOnly: Story = {
 /** The rail's faces side by side. */
 export const AllStates: Story = {
   name: 'All states (composite)',
+  // Side-by-side rail row (~1250px) — left-anchored so it can never clip.
+  parameters: { layout: 'padded' },
   decorators: [],
   render: () => (
     <div className="flex items-start gap-4">

@@ -12,6 +12,9 @@ import { makeLaunchPosterScene, makeMultiPageScene } from './fixtures'
 const meta: Meta<typeof Toolbar> = {
   title: 'Design Canvas/Toolbar',
   component: Toolbar,
+  // Every story renders the full 1024px toolbar row — a wide composite that
+  // stays left-anchored rather than risking the centered-layout edge.
+  parameters: { layout: 'padded' },
   decorators: [
     (Story) => (
       <div className="w-[1024px] rounded-md border border-[var(--border-default)]">
