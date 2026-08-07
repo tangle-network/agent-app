@@ -21,7 +21,7 @@ const ASSIGNABLE: { value: WorkspaceRole; label: string }[] = [
   { value: 'admin', label: 'Admin' },
 ]
 
-const BADGE_BASE = 'inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-medium uppercase'
+const BADGE_BASE = 'inline-flex items-center rounded border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.05em]'
 
 // Lifecycle status: green = in, amber = awaiting, red = killed, muted = lapsed.
 const STATUS_BADGE: Record<InvitationView['status'], string> = {

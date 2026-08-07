@@ -41,6 +41,33 @@ function SparkleGlyph({ className }: { className?: string }) {
   )
 }
 
+/** lucide `brain` (v1.27) inlined — `/web-react` ships no icon-library
+ *  dependency, so the thinking glyph follows the same pattern as the rest of
+ *  this set. */
+function BrainGlyph({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 18V5" />
+      <path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4" />
+      <path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5" />
+      <path d="M17.997 5.125a4 4 0 0 1 2.526 5.77" />
+      <path d="M18 18a4 4 0 0 0 2-7.464" />
+      <path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517" />
+      <path d="M6 18a4 4 0 0 1-2-7.464" />
+      <path d="M6.003 5.125a4 4 0 0 0-2.526 5.77" />
+    </svg>
+  )
+}
+
+/** lucide `check` — the selected-row mark in the picker menus. */
+export function CheckGlyph({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  )
+}
+
 /**
  * Keyboard + pointer model for a trigger-and-popover pair, dependency-free.
  * Outside-mousedown and Escape both close; Escape also returns focus to the
@@ -93,6 +120,18 @@ export function usePopover(open: boolean, setOpen: (open: boolean) => void) {
  * offset negative draws the same ring just inside the row instead.
  */
 export const POPOVER_OPTION_FOCUS = 'focus-visible:[outline-offset:-2px]'
+
+/**
+ * The one overlay elevation for floating surfaces — picker menus, popovers,
+ * drawers, modals. The theme's `shadow-overlay` utility is landing with the
+ * token work; until it does, this is the composer's raised-card literal kept
+ * in a single place so every overlay paints the same shadow and the later
+ * token swap is a one-line edit (`shadow-overlay` here, `shadow-raised` on
+ * the composer card).
+ * TODO(theme): swap to `shadow-overlay` once the preset ships it.
+ */
+export const OVERLAY_SHADOW =
+  'shadow-[0_1px_2px_hsl(var(--foreground)/0.05),0_12px_28px_hsl(var(--foreground)/0.07)] dark:shadow-[0_1px_2px_hsl(var(--foreground)/0.14),0_12px_28px_hsl(var(--foreground)/0.22)]'
 
 /**
  * Guard an async action against double-submit. `run` ignores re-entrant calls
@@ -194,13 +233,13 @@ function ModelRow({
       type="button"
       onClick={onSelect}
       className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
-        selected ? 'bg-primary/10 font-medium' : 'hover:bg-accent/30'
+        selected ? 'bg-primary/10 font-medium' : 'hover:bg-accent'
       }`}
     >
       {renderProviderBadge ? renderProviderBadge(model.provider) : <ProviderLogo provider={model.provider} size={16} />}
       <span className="truncate">{model.name}</span>
       {!model.supportsTools && (
-        <span className="shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+        <span className="shrink-0 rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
           no tools
         </span>
       )}
@@ -286,7 +325,7 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
         type="button"
         {...triggerProps}
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30"
+        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent"
       >
         {selected ? (renderProviderBadge ? renderProviderBadge(selected.provider) : <ProviderLogo provider={selected.provider} size={16} />) : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}
         <span className="max-w-[160px] truncate">{selected?.name ?? value}</span>
@@ -294,7 +333,7 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
       </button>
 
       {open && (
-        <div ref={popoverRef} className="absolute bottom-full left-0 z-50 mb-2 w-[420px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+        <div ref={popoverRef} className={`absolute bottom-full left-0 z-50 mb-2 w-[420px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-popover ${OVERLAY_SHADOW}`}>
           <div className="border-b border-border px-3 py-2">
             <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
               <SearchGlyph className="h-3.5 w-3.5 text-muted-foreground" />
@@ -378,6 +417,58 @@ export const DEFAULT_EFFORT_LEVELS: readonly EffortLevel[] = [
   { id: 'high', label: 'Extended' },
 ]
 
+// ── effort strength meter ─────────────────────────────────────────────────
+
+/** Segments the meter draws — fixed geometry so the ladder stays tabular
+ *  across levels (and across the trigger and its menu rows). */
+export const EFFORT_METER_SEGMENTS = 4
+
+/** Filled-segment opacity ladder: translucent on the left, heavy on the
+ *  right — the ramp carries strength even at a glance, the count carries it
+ *  exactly. Unfilled segments sit at a fixed ghost opacity. */
+const EFFORT_METER_FILL_OPACITY = [0.25, 0.5, 0.75, 1] as const
+const EFFORT_METER_GHOST_OPACITY = 0.15
+
+/** Level ids that mean "no reasoning" — the meter renders all-ghost. */
+const OFF_LEVEL_IDS: ReadonlySet<string> = new Set(['off', 'none'])
+
+/**
+ * Filled-segment count for a level: 0 for off/none (or an id the levels list
+ * does not carry); otherwise the level's position among the non-off choices
+ * scaled onto the meter, so the ladder reads low < medium < high and the top
+ * level fills the whole scale. The canonical four levels land 0 / 1 / 2 / 4.
+ */
+export function effortMeterFill(
+  levelId: string,
+  levels: readonly EffortLevel[] = DEFAULT_EFFORT_LEVELS,
+): number {
+  if (OFF_LEVEL_IDS.has(levelId)) return 0
+  const active = levels.filter((l) => !OFF_LEVEL_IDS.has(l.id))
+  const index = active.findIndex((l) => l.id === levelId)
+  if (index < 0 || active.length === 0) return 0
+  return Math.max(1, Math.floor(((index + 1) * EFFORT_METER_SEGMENTS) / active.length))
+}
+
+/**
+ * The thinking-strength meter: four 12px bars, filled count = level, filled
+ * opacity ramping 25→100% left to right (unfilled at a faint ghost). Purely
+ * decorative — the level name is always rendered as text beside it, so the
+ * meter is `aria-hidden` and adds no second accessible name.
+ */
+export function EffortMeter({ fill, className }: { fill: number; className?: string }) {
+  return (
+    <span aria-hidden className={`inline-flex items-center gap-[2px] ${className ?? ''}`}>
+      {Array.from({ length: EFFORT_METER_SEGMENTS }, (_, i) => (
+        <span
+          key={i}
+          className="h-3 w-[3px] rounded-full bg-current"
+          style={{ opacity: i < fill ? EFFORT_METER_FILL_OPACITY[i] : EFFORT_METER_GHOST_OPACITY }}
+        />
+      ))}
+    </span>
+  )
+}
+
 export interface EffortPickerProps {
   value: string
   onChange: (id: string) => void
@@ -408,17 +499,20 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
         {...triggerProps}
         onClick={() => setOpen(!open)}
         title={label ? `${label} — how hard the agent reasons before answering` : 'Reasoning effort'}
-        className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30"
+        className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent"
       >
-        <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />
+        <BrainGlyph className="h-3.5 w-3.5 text-muted-foreground" />
         <span>
           {label ? <span className="text-muted-foreground">{label}: </span> : null}
           {selected?.label}
         </span>
+        {selected && (
+          <EffortMeter fill={effortMeterFill(selected.id, levels)} className="text-foreground" />
+        )}
         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
       </button>
       {open && (
-        <div role="menu" className="absolute bottom-full left-0 z-50 mb-2 w-40 overflow-hidden rounded-xl border border-border bg-card p-1 shadow-lg">
+        <div role="menu" className={`absolute bottom-full left-0 z-50 mb-2 w-44 overflow-hidden rounded-xl border border-border bg-popover p-1 ${OVERLAY_SHADOW}`}>
           {levels.map((l) => (
             <button
               key={l.id}
@@ -429,11 +523,14 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
                 onChange(l.id)
                 setOpen(false)
               }}
-              className={`flex min-h-[40px] w-full items-center rounded-md px-3 py-2 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
-                l.id === value ? 'bg-primary/10 font-medium' : 'hover:bg-accent/30'
+              className={`flex min-h-[40px] w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
+                l.id === value ? 'bg-primary/10 font-medium' : 'hover:bg-accent'
               }`}
             >
-              {l.label}
+              <BrainGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="truncate">{l.label}</span>
+              <EffortMeter fill={effortMeterFill(l.id, levels)} className="ml-auto text-foreground" />
+              {l.id === value && <CheckGlyph className="h-3.5 w-3.5 shrink-0 text-primary" />}
             </button>
           ))}
         </div>

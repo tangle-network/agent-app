@@ -235,7 +235,7 @@ function AttachmentChip({ part, resolveFileUrl, fetchFile }: AttachmentPartProps
     'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px]',
     status === 'error'
       ? 'border-destructive/40 bg-destructive/10 text-destructive'
-      : 'border-border bg-muted/60 text-muted-foreground',
+      : 'border-border bg-secondary text-muted-foreground',
   ].join(' ')
 
   return (

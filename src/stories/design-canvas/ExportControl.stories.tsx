@@ -57,10 +57,12 @@ export const OpenWithDefaults: Story = {
 /** Trigger plus both popover configurations in one glance. */
 export const AllStates: Story = {
   name: 'All states (composite)',
+  // Trigger + open-popover cells side by side — left-anchored so nothing clips.
+  parameters: { layout: 'padded' },
   render: () => (
     <div className="flex items-start gap-4">
       <div className="flex flex-col gap-1.5">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Closed</span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">Closed</span>
         <div className="flex w-[200px] justify-end rounded-md border border-[var(--border-default)] bg-[var(--bg-input)] p-2">
           <ExportControl onExport={onExport} />
         </div>
@@ -70,7 +72,7 @@ export const AllStates: Story = {
         { label: 'Open — JPEG @ 2x', defaults: { format: 'jpeg', pixelRatio: 2 } as const },
       ].map((cell) => (
         <div key={cell.label} className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">{cell.label}</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">{cell.label}</span>
           <div className="h-[230px] w-[260px] rounded-md border border-[var(--border-default)] p-2">
             <OpenExportControl onExport={onExport} defaults={cell.defaults} />
           </div>

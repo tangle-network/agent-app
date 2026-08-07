@@ -4,8 +4,8 @@
 `src/theme/tailwind-preset.ts` maps utility class names onto those tokens.
 `src/theme/theme.ts` mirrors the colours into JS for the Konva canvas, which paints to a bitmap and cannot resolve `var(--…)`.
 
-Structural reference: [Cabinet](https://runcabinet.com) (MIT) — the oklch authoring layer, the radius-from-one-root scheme, and the three-tier border idea with its per-mode inversion are theirs.
-Every number below is ours: the tiers were re-measured against our surfaces and two of the four decisions came out differently.
+Structural reference: [Cabinet](https://runcabinet.com) (MIT) — the oklch authoring layer, the radius-from-one-root scheme, and the three-tier border idea are theirs.
+Every number below is ours: the tiers were re-measured against our surfaces, and the surface ladders were re-rung after an elevation audit measured the dark theme's deep surfaces at 1.05:1 against each other — physically imperceptible.
 
 ---
 
@@ -22,9 +22,9 @@ The shape that satisfies the constraint:
 
 | layer | form | who reads it |
 | --- | --- | --- |
-| `--neutral-91` | `oklch(0.91 0.004 286)` — the **source** | new work; anything that needs a full colour (`color-mix`, canvas backdrop) |
-| `--neutral-91-hsl` | `239.6 5.2% 88.7%` — the **mirror** | the semantic layer |
-| `--border` | `var(--neutral-91-hsl)` | every consumer's existing `hsl(var(--border))`, unchanged |
+| `--neutral-94` | `oklch(0.945 0.0059 280)` — the **source** | new work; anything that needs a full colour (`color-mix`, canvas backdrop) |
+| `--neutral-94-hsl` | `233.2 14.8% 93.4%` — the **mirror** | the semantic layer |
+| `--border` | `var(--neutral-85-hsl)` | every consumer's existing `hsl(var(--border))`, unchanged |
 
 CSS cannot convert oklch into a bare channel triple, so the mirror is written out rather than derived.
 `tests/theme/tokens-contract.test.ts` converts each oklch stop to HSL and fails if its mirror has moved, so the two forms cannot disagree without a red test.
@@ -32,10 +32,11 @@ CSS cannot convert oklch into a bare channel triple, so the mirror is written ou
 **What this does NOT change:** any token name, the `hsl(var(--x))` consumption pattern, the `/50` opacity modifier, `--radius-md`'s value, or any exported symbol.
 `AgentAppTheme` gained two optional fields.
 
-**What DOES change visibly on upgrade,** and there are exactly two things:
+**What DOES change visibly on upgrade** — the elevation revision, and it is the point of the change:
 
-1. `border-border` now paints the soft tier in light mode (see [Border tiers](#4-border-tiers-that-invert-per-mode)). In dark it is unchanged, because the tiers collapse there. This is the point of the change; opting out is one line, below.
-2. Every neutral moved to its nearest ramp rung. The largest move is ΔL 0.0124 in oklch lightness, which is at or under one just-noticeable difference for a flat area; brand hues did not move at all. Full table in [the ramp](#2-chroma-discipline-and-the-ladder).
+1. The dark theme's surface ladder is re-rung: the canvas drops to `#0c0c15`, the card lifts to `#1c1d27`, and the border to `#3d3e46`, with the chroma band (0.014–0.018 at hue 280) carrying a deliberate cool cast. The old deep surfaces measured 1.05:1 against each other — physically imperceptible — so cards did not read as containers. They do now.
+2. The light theme inverts its elevation back the right way up: the canvas is tinted (`#e5e6eb`), the page sits above it (`#ececf1`), and the card is white paper on top. Previously the card sat *below* the page.
+3. `border-border` paints the soft tier in both themes — 40% in light, and 60% in dark, where the lifted border leaves room to soften (the tiers used to collapse to full strength there). Opting out is one line, below.
 
 ---
 
@@ -60,53 +61,65 @@ Those two numbers describe the *same* tint.
 
 ## 2. Chroma discipline and the ladder
 
-**One constant chroma, not zero.** `0.004` at hue `286`.
+**Two chroma bands, not zero and not wandering.**
 
-Zero was the other option and it is wrong for this fleet.
+Zero was an option and it is wrong for this fleet.
 The dark surfaces — the largest painted areas in these products — are deliberately cool, matching `@tangle-network/brand` (Tangle Quiet), and chroma 0 would visibly warm all of them.
-The defect was never that the neutrals carried a tint; it was that the tint wandered by 11x.
-So the tint stays and stops moving.
+The defect to avoid was never that neutrals carry a tint; it is a tint that *wanders* (the pre-oklch ramp spread 11x across stops that all read as "the same 5–7% blue").
+So the tint is banded and each band is checkable:
 
-The terminal stop is chroma 0 because sRGB admits no chroma at L 1 — white is the only colour there.
+| band | stops | chroma | hue | job |
+| --- | --- | --- | --- | --- |
+| dark (L ≤ 0.4) | 16, 19, 22, 24, 28, 33, 36 | 0.014–0.018, falling as L rises | 280 | the dark theme's surface ladder |
+| mid | 49, 70 | 0.004 | 286 | muted text, both themes |
+| light (L ≥ 0.8) | 85, 92, 94, 96 | 0.0049–0.0079 | 280 | the light theme's tinted surfaces |
+| terminal | 100 | 0 | — | white; sRGB admits no chroma at L 1 |
 
-**The ladder.** One rule, checkable, and the stop's name is its lightness:
+The mid stops keep the legacy hue 286 because moving them would repaint muted text for a 6° difference that is below what sRGB can show at C 0.004.
+
+**Why the dark band's steps are small.** The first ladder ruled `L = 0.16 + 0.03n` — equal perceptual steps, checkable, and *wrong at the bottom of sRGB*: adjacent deep rungs measured 1.05:1 against each other, which is physically imperceptible, so the dark theme's card did not read as a container on its page.
+The fix is not bigger ΔL steps — at these lightnesses sRGB simply has no contrast to spend.
+The fix is that separation comes from the *whole stack*: a small fill step, a border tier that survives (below), and a shadow that lifts (section 5).
+The chain the band ships:
 
 ```
-L = 0.16 + 0.03n        n = 0 … 28
---neutral-16  --neutral-19  --neutral-22  --neutral-25  …  --neutral-97  --neutral-100
+canvas #0c0c15 → background #12131c → input #181922 → card #1c1d27 → secondary #282933 → popover #32333c → border #3d3e46
+          1.052         1.058            1.044          1.160             1.151            1.180   (adjacent contrast)
+
+canvas → card 1.163     card → popover 1.335
 ```
 
-**Step size 0.03**, base 0.16, terminal 1.00.
-0.03 is not arbitrary: fitting the fifteen distinct neutrals this replaced against every uniform step from 0.02 to 0.07 put the best possible fit at 0.0289 with a worst error of 0.0075, and 0.03 — a step you can hold in your head, whose every rung is a two-decimal number — costs 0.0041 more.
+Note the new rungs the old ladder had no room for: the canvas-backdrop sits *below* the background (they used to be the same colour), and the input is *recessed* — darker than the card it sits in, where the old input floated above it.
 
-Only the ten rungs the system uses are declared.
-A ramp token nobody paints with is dead weight; the *rule* is the ladder, and the test enforces it on whatever is declared.
+**The stop's name is its lightness**, L × 100 rounded to the nearest integer — `--neutral-94` is L 0.945.
+The rule is enforced by the contract test on whatever stops are declared; only the rungs the system uses are declared.
 
 Both themes read the same ladder and differ only in which rung each role picks — light from the top down, dark from the bottom up.
 The dark scope never redefines the ramp, and a test fails if it starts to.
 
 ### Where every neutral landed
 
-| mode | token | was | ramp stop | ΔL |
-| --- | --- | --- | --- | --- |
-| light | `--background` / `--popover` | `0 0% 100%` (L 1.0000) | `--neutral-100` (L 1.00) | +0.0000 |
-| light | `--card` | `240 7% 97%` (L 0.9759) | `--neutral-97` (L 0.97) | -0.0059 |
-| light | `--secondary` / `--muted` / `--accent` | `240 6% 93%` (L 0.9439) | `--neutral-94` (L 0.94) | -0.0039 |
-| light | `--canvas-backdrop` | `240 7% 90%` (L 0.9190) | `--neutral-91` (L 0.91) | -0.0090 |
-| light | `--border` / `--input` | `240 6% 89%` (L 0.9115) | `--neutral-91` (L 0.91) | -0.0015 |
-| light | `--muted-foreground` | `240 5% 38%` (L 0.4784) | `--neutral-49` (L 0.49) | +0.0116 |
-| light | `--secondary-foreground` / `--accent-foreground` | `0 0% 10%` (L 0.2156) | `--neutral-22` (L 0.22) | +0.0044 |
-| light | `--foreground` / `--card-foreground` / `--popover-foreground` | `0 0% 5%` (L 0.1579) | `--neutral-16` (L 0.16) | +0.0021 |
-| dark | every `*-foreground` | `240 6% 93%` (L 0.9439) | `--neutral-94` (L 0.94) | -0.0039 |
-| dark | `--muted-foreground` | `240 4% 62%` (L 0.6894) | `--neutral-70` (L 0.70) | +0.0106 |
-| dark | `--popover` | `240 4% 13%` (L 0.2439) | `--neutral-25` (L 0.25) | +0.0061 |
-| dark | `--border` | `240 3% 13%` (L 0.2450) | `--neutral-25` (L 0.25) | +0.0050 |
-| dark | `--destructive-foreground` | `0 0% 12%` (L 0.2376) | `--neutral-25` (L 0.25) | +0.0124 |
-| dark | `--secondary` / `--muted` / `--accent` / `--input` | `240 5% 11%` (L 0.2218) | `--neutral-22` (L 0.22) | -0.0018 |
-| dark | `--card` | `240 5% 8%` (L 0.1894) | `--neutral-19` (L 0.19) | +0.0006 |
-| dark | `--background` / `--canvas-backdrop` | `240 8% 5%` (L 0.1540) | `--neutral-16` (L 0.16) | +0.0060 |
+| mode | token | was (pre-revision) | ramp stop |
+| --- | --- | --- | --- |
+| light | `--card` / `--popover` | `--neutral-97` (L 0.97) | `--neutral-100` — white paper |
+| light | `--background` | `--neutral-100` (white) | `--neutral-94` (`#ececf1`) |
+| light | `--secondary` / `--muted` / `--accent` | `--neutral-94` | `--neutral-96` (`#f3f3f7`) |
+| light | `--canvas-backdrop` | `--neutral-91` | `--neutral-92` (`#e5e6eb`) |
+| light | `--border` / `--input` | `--neutral-91` | `--neutral-85` (`#cccdd3`) |
+| light | `--muted-foreground` | `--neutral-49` | `--neutral-49` (unchanged) |
+| light | `--foreground` and the other dark inks | `--neutral-16` | `--neutral-16`, retuned into the dark band (`#0c0c15`) |
+| dark | `--canvas-backdrop` | `--neutral-16` | `--neutral-16` (`#0c0c15`) |
+| dark | `--background` | `--neutral-16` | `--neutral-19` (`#12131c`) |
+| dark | `--input` | `--neutral-22` | `--neutral-22` (`#181922`, recessed) |
+| dark | `--card` | `--neutral-19` | `--neutral-24` (`#1c1d27`) |
+| dark | `--secondary` / `--muted` / `--accent` | `--neutral-22` | `--neutral-28` (`#282933`) |
+| dark | `--popover` | `--neutral-25` | `--neutral-33` (`#32333c`) |
+| dark | `--border` | `--neutral-25` | `--neutral-36` (`#3d3e46`) |
+| dark | every `*-foreground` | `--neutral-94` | `--neutral-94`, retuned with the light background (`#ececf1`) |
+| dark | `--muted-foreground` | `--neutral-70` | `--neutral-70` (unchanged) |
+| dark | `--destructive-foreground` | `--neutral-25` | `--neutral-24` |
 
-`--canvas-backdrop` and `--border` now share a rung; they were 0.0075 apart and never touch.
+Stops 25, 91 and 97 are gone — every role they had picked a new rung.
 
 `--primary`, `--destructive`, `--ring`, `--success` and `--warning` keep their measured HSL exactly.
 Moving them would move agent-app off the brand palette and off status colours that were tuned to clear WCAG AA as *text* on tinted chips.
@@ -117,16 +130,21 @@ Every text pair that carries a WCAG obligation still clears AA.
 
 | pair | before | after |
 | --- | --- | --- |
-| light `--foreground` on `--background` | 19.47 | 19.42 |
-| light `--muted-foreground` on `--background` | 6.61 | 6.27 |
-| light `--muted-foreground` on `--muted` | 5.60 | 5.25 |
-| light `--secondary-foreground` on `--secondary` | 14.84 | 14.52 |
-| dark `--foreground` on `--background` | 16.61 | 16.27 |
-| dark `--foreground` on `--popover` | 13.82 | 13.42 |
-| dark `--muted-foreground` on `--background` | 7.03 | 7.26 |
-| dark `--muted-foreground` on `--muted` | 6.19 | 6.48 |
+| light `--foreground` on `--background` | 19.41 | 16.53 |
+| light `--foreground` on `--card` | 17.77 | 19.46 |
+| light `--muted-foreground` on `--background` | 6.26 | 5.31 |
+| light `--muted-foreground` on `--card` | 5.73 | 6.26 |
+| light `--muted-foreground` on `--muted` | 5.24 | 5.64 |
+| light `--secondary-foreground` on `--secondary` | 14.52 | 15.77 |
+| dark `--foreground` on `--background` | 16.26 | 15.70 |
+| dark `--foreground` on `--card` | 15.49 | 14.22 |
+| dark `--foreground` on `--popover` | 13.41 | 10.65 |
+| dark `--muted-foreground` on `--background` | 7.26 | 6.92 |
+| dark `--muted-foreground` on `--card` | 6.92 | 6.26 |
+| dark `--muted-foreground` on `--muted` | 6.48 | 5.40 |
+| dark `--muted-foreground` on `--popover` | 5.98 | 4.69 |
 
-Light muted text gives up the most (5.60 → 5.25 at its tightest) and stays well clear of 4.5; dark muted text gains.
+The tightest pair — muted text on the dark popover at 4.69 — still clears 4.5; the audit pre-verified these values before a line of CSS moved.
 
 ---
 
@@ -171,15 +189,15 @@ The preset instead adds three semantic names Tailwind does not own:
 
 ---
 
-## 4. Border tiers that invert per mode
+## 4. Border tiers
 
 Three strengths of the same border colour, because a divider inside a panel and the edge of a card floated on the page are not the same line.
 Shipping one strength for both is what makes a UI read boxy.
 
 | tier | light | dark | for |
 | --- | --- | --- | --- |
-| `--border-soft` | 40% | **100%** | dividers, de-emphasised edges — what `border-border` maps to |
-| `--card-edge` | 60% | **100%** | a container that must read as a container |
+| `--border-soft` | 40% | 60% | dividers, de-emphasised edges — what `border-border` maps to |
+| `--card-edge` | 60% | 80% | a container that must read as a container |
 | `hsl(var(--border))` | 100% | 100% | form-field edges (`--input`), deliberate emphasis (`border-strong`) |
 
 ### The measurement
@@ -188,35 +206,25 @@ A 1px hairline, contrast of the composited line against the surface it sits on, 
 
 | alpha | light: background | light: card | light: muted | dark: background | dark: card | dark: muted |
 | --- | --- | --- | --- | --- | --- | --- |
-| 22% | 1.060 | 1.044 | 1.026 | 1.031 | 1.020 | 1.012 |
-| 40% | 1.108 | 1.072 | 1.036 | 1.057 | 1.048 | 1.023 |
-| 60% | 1.176 | 1.120 | 1.063 | 1.108 | 1.081 | 1.046 |
-| 100% | 1.311 | 1.205 | 1.102 | 1.212 | 1.158 | 1.085 |
+| 22% | 1.065 | 1.098 | 1.081 | 1.086 | 1.078 | 1.060 |
+| 40% | 1.125 | 1.188 | 1.143 | 1.193 | 1.169 | 1.116 |
+| 60% | 1.198 | 1.309 | 1.236 | 1.320 | 1.265 | 1.173 |
+| 80% | 1.269 | 1.437 | 1.321 | 1.489 | 1.389 | 1.253 |
+| 100% | 1.345 | 1.584 | 1.428 | 1.716 | 1.553 | 1.339 |
 
-### Why light is 40 / 60 and not the reference's 22 / 55
+### Why light stayed 40 / 60
 
-The reference's light `--card` is `oklch(1 0 0)` — the *same colour as its background*, 1.000 contrast.
-Its card edge is the only thing separating a card from the page, so 22% for a divider and 55% for a card edge is the right split for that system.
+The light surfaces moved — the card is now white paper over a tinted page, so the fill step does the containing and the soft tier only has to *confirm* it.
+40% keeps a divider quiet on `--background` (1.125), where most of this package's dividers actually sit, and the card edge at 60% (1.309 on the card) reads as a different decision, short of the 1.584 that reads as a box.
 
-Ours is not that system.
-Our light `--card` is L 0.97 on a L 1.00 background, a fill step of 1.091 on its own, so the edge only has to confirm a container the fill already suggests.
-That argues for a *weaker* card edge — and the measurement argues the other way for the soft tier, because that same darker card leaves a hairline less room: at 22% a divider on `--card` sits at 1.044 and is simply not visible.
+### Why dark softens now (it used to collapse)
 
-So both numbers moved, in opposite directions from the reference:
+The tiers previously collapsed to full strength in dark, and the collapse was correct *for that border*: the old dark `--border` (L 0.25) measured 1.158 on its card at 100% — already at the edge of visible — so a softened tier was not a quieter line, it was no line.
 
-- **soft 40%** — the point at which a divider still resolves on `--card` (1.072), which is where most of this package's dividers actually sit.
-- **card edge 60%** — far enough above the soft tier (1.176 vs 1.108) to read as a different decision, and short of the 1.311 that reads as a box.
-
-The two candidate values in between, 35% and 45%, are within measurement noise of their neighbours on `--card`; the render is what separated them, not the ratio.
-
-### Why dark inverts
-
-The same measurement on the dark ramp forces the opposite answer.
-Dark `--border` (L 0.25) is *already* at the edge of visible at full strength — 1.212 on background, 1.158 on card, 1.085 on muted.
-Applying the light soft tier takes those to 1.057 / 1.048 / 1.023, which is not a quieter line, it is no line.
-
-A tier system that erases the thing it is tiering is worse than no tiers, so dark collapses the three to one.
-The load-bearing test is `dark INVERTS: both tiers are full strength` — "harmonising" dark to soften like light is the exact change that erases the border, and that test is what stops it.
+The ladder revision lifted the dark border to L 0.365, and the same measurement now leaves room everywhere: the soft tier at 60% clears the 1.07 hairline floor on background (1.320), card (1.265) and muted (1.173) — the surface where the old border at *full* strength managed only 1.085.
+Same method, opposite conclusion, because the border colour itself moved.
+So dark runs the same three tiers as light, one step stronger: 60 / 80 / 100.
+The contract test pins both ends — "harmonising" dark down to 40/60 and collapsing it back to 100/100 both go red.
 
 ### The preset is the lever
 
@@ -263,7 +271,31 @@ To adopt the tiers there, point that one line at the tier: `--color-border: var(
 
 ---
 
-## 5. Motion
+## 5. Elevation shadows
+
+Two foreground-tinted lifts, so elevation is a token rather than an arbitrary value at each call site:
+
+```css
+--shadow-raised:  0 1px 2px hsl(var(--foreground) / 0.05), 0 12px 28px hsl(var(--foreground) / 0.07);
+--shadow-overlay: 0 2px 6px hsl(var(--foreground) / 0.06), 0 16px 40px hsl(var(--foreground) / 0.1);
+```
+
+| token | for | provenance |
+| --- | --- | --- |
+| `shadow-raised` | the floating composer | the values `chat-composer.tsx` already shipped, promoted unchanged |
+| `shadow-overlay` | popovers and dialogs | the higher lift of the pair |
+
+Tinted with `--foreground` rather than black for the same reason the ramp carries chroma: a black shadow over a cool-dark surface reads muddy, a foreground-tinted one reads as depth.
+
+**Dark doubles the alpha** (0.14/0.22 raised, 0.12/0.20 overlay).
+The same shadow over a near-black surface reads at roughly half its light-theme strength, so the dark theme compensates at the token — not at every component, which is where it would be forgotten.
+Both values read `var(--foreground)`, so the "every concrete :root token has a dark override" guard exempts them as derived; the dark alphas are the one thing the cascade cannot derive, and a dedicated test names both tokens in both scopes for exactly that reason.
+
+The preset registers both as `shadow-raised` / `shadow-overlay`, names Tailwind does not already own.
+
+---
+
+## 6. Motion
 
 There were no motion tokens.
 64 transitions in this package ran on Tailwind's implicit 150 ms and default curve, with one `duration-300` and no named easing anywhere.
@@ -339,7 +371,7 @@ Measured in Chromium, both preference states:
 
 ---
 
-## 6. Foreground pairings that a theme flip inverts
+## 7. Foreground pairings that a theme flip inverts
 
 The tiers above stop an edge from disappearing.
 This is the other direction: a foreground token that is right against one theme's fill and illegible against the other's.
@@ -352,22 +384,22 @@ The approval card is not that surface: it is `bg-warning/[0.06]`, a tint that tr
 
 No single lightness fixes it, which is the whole reason a third token exists:
 
-| ramp | light card `rgb(251,248,240)` | dark card `rgb(27,22,16)` |
+| ramp | light tint `rgb(233,230,227)` | dark tint `rgb(32,29,29)` |
 | --- | --- | --- |
-| `hsl(41 96% 28%)` | **5.17** | 3.27 |
-| `hsl(41 96% 30%)` | 4.67 | 3.63 |
-| `hsl(41 96% 34%)` | 3.77 | 4.50 |
-| `hsl(41 96% 38%)` (`--warning`) | 3.07 | 5.51 |
-| `hsl(40 94% 56%)` | 1.67 | **10.11** |
+| `hsl(41 96% 27%)` | **4.69** | 2.88 |
+| `hsl(41 96% 30%)` | 3.96 | 3.41 |
+| `hsl(41 96% 34%)` | 3.20 | 4.21 |
+| `hsl(41 96% 38%)` (`--warning`) | 2.62 | 5.15 |
+| `hsl(40 94% 56%)` | 1.48 | **9.12** |
 
-Light needs L ≤ 30%, dark needs L ≥ 34%, and the windows do not overlap.
-So `--warning-strong` re-themes (28% / 56%) where `--warning` and `--warning-foreground` deliberately do not, and the preset exposes it as `text-warning-strong` **alongside** `warning.DEFAULT` and `warning.foreground` rather than displacing either.
+Light needs L ≤ 27%, dark needs L ≥ 36%, and the windows do not overlap.
+So `--warning-strong` re-themes (27% / 56%) where `--warning` and `--warning-foreground` deliberately do not, and the preset exposes it as `text-warning-strong` **alongside** `warning.DEFAULT` and `warning.foreground` rather than displacing either.
 
 ### `--primary-foreground` inverts in dark
 
 Dark `--primary` is `239 84% 74%` so that primary clears AA *as text* on a `primary/10` tint.
 That same lightness makes the **solid** button a light fill, and the inherited white label measured **3.02:1** on it.
-Dark now takes `--primary-foreground: var(--neutral-16-hsl)` — 6.44:1 on the same fill — while light keeps white on indigo at 6.01:1.
+Dark now takes `--primary-foreground: var(--neutral-16-hsl)` — 6.27:1 on the same fill — while light keeps white on indigo at 6.01:1.
 This is a visible change to every solid primary button in dark across the fleet, and it is the only value that makes the label readable.
 
 ### A divider token is not a graphic
@@ -394,12 +426,15 @@ Colours are rasterised on a canvas before being read: `getComputedStyle` keeps a
 `tests/theme/tokens-contract.test.ts`:
 
 - every `var(--…)` a React surface references is defined, and every `var(--…)` tokens.css references is defined by tokens.css
-- every ramp stop sits on `L = 0.16 + 0.03n`, and its name equals its lightness
-- chroma is the one constant (0 only at L 1), hue is the one hue
+- every ramp stop is named its lightness (L × 100, rounded)
+- chroma is banded (0.014–0.018 at hue 280 in the dark band, ≤ 0.008 in the light band, 0 only at L 1), and the dark band's chroma falls as L rises
+- the dark ladder keeps its measured separation: no adjacent pair below 1.04:1, canvas→card above 1.14:1
 - every oklch stop's HSL mirror still resolves to the same colour
 - every neutral semantic token points at a ramp stop rather than a loose triple
 - light/dark parity, and the dark block never restates a value verbatim or redefines the ramp
-- the light tiers are ordered and still resolve as a 1px line; **dark keeps both at full strength**; the same softening measurably buys less in dark
+- the light tiers are ordered and still resolve as a 1px line; dark runs 60/80 and both tiers clear the hairline floor on every surface they divide
+- both elevation shadows are defined in both themes, dark strengthens every layer, and the preset exposes `shadow-raised` / `shadow-overlay`
+- the MD3 surface ladder maps monotonically (`high` → secondary, `highest` → popover)
 - the radius steps all derive from one root, `--radius-md` is still `0.5rem`, and bare `--radius` is not defined
 - every duration collapses under reduced motion, to a non-zero value; the floor reaches untokenised motion; `data-motion="essential"` is exempt
 - the JS mirror in `theme.ts` matches tokens.css in both modes

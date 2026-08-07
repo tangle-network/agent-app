@@ -4,10 +4,18 @@
   Inter (design-canvas text elements, e.g. src/stories/fixtures/canvas.ts).
   Konva text measures against real loaded fonts, so Storybook — as a consumer —
   loads Inter here. Everything else uses the system stack from storybook.css.
+
+  Geist Mono: the brand mono stack (`--font-mono` in @tangle-network/brand's
+  tokens.css) leads with it, and the Storybook Tailwind config maps `font-mono`
+  to that stack — without a real load every mono surface (tool-call commands,
+  run logs, code) fell back to OS mono, which differs per machine. Both Geist
+  Mono and plain Geist are on Google Fonts; plain Geist is NOT loaded because
+  the brand sans stack leads with Inter (already loaded above), so Geist would
+  never render anyway.
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link
-  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"
   rel="stylesheet"
 />

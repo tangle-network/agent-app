@@ -72,8 +72,8 @@ export function PublishPackageComposer({
               onClick={() => onDestinationToggle(destination.id)}
               className={`rounded-md border p-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                 active
-                  ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
-                  : 'border-border bg-[var(--md3-surface-container-low)] hover:bg-muted/50'
+                  ? 'border-primary bg-primary/10 ring-1 ring-primary/20'
+                  : 'border-border bg-[var(--md3-surface-container-low)] hover:bg-accent'
               }`}
             >
               <div className="flex items-center justify-between gap-2">
@@ -104,7 +104,7 @@ export function PublishPackageComposer({
           </NativeSelect>
         </Field>
       </div>
-      <div className="flex items-center gap-2 rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
+      <div className="flex items-center gap-2 rounded-md bg-secondary p-2 text-xs text-muted-foreground">
         <CalendarClock className="h-3.5 w-3.5" />
         Publish packages stay attached to generated media and can run through connected GTM apps.
       </div>

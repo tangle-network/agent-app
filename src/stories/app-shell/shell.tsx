@@ -53,7 +53,7 @@ interface ShellUser {
 // ── small pieces ──────────────────────────────────────────────────────────────
 
 const iconButtonClass =
-  'rounded-md p-1.5 text-muted-foreground transition hover:bg-accent/50 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+  'rounded-md p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
 function initialsOf(name: string): string {
   return name
@@ -113,7 +113,7 @@ function SessionRow({
       className={`flex w-full items-center gap-2 rounded-md text-left transition ${rhythm} ${
         active
           ? 'bg-accent font-medium text-accent-foreground'
-          : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+          : 'text-muted-foreground hover:bg-accent hover:text-foreground'
       }`}
     >
       <span className="min-w-0 flex-1 truncate">{session.title}</span>
@@ -152,7 +152,7 @@ function CollapsedRail(props: AppSidebarProps) {
             className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ${
               s.id === activeId
                 ? 'bg-accent text-foreground'
-                : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
             }`}
           >
             <MessageSquare className="h-4 w-4" />
@@ -246,7 +246,7 @@ export function AppSidebar(props: AppSidebarProps) {
         <button
           type="button"
           onClick={onOpenApprovals}
-          className="flex w-full items-center gap-2 rounded-md px-2.5 py-[7px] text-sm text-muted-foreground transition hover:bg-accent/50 hover:text-foreground"
+          className="flex w-full items-center gap-2 rounded-md px-2.5 py-[7px] text-sm text-muted-foreground transition hover:bg-accent hover:text-foreground"
         >
           <ShieldCheck className="h-4 w-4 shrink-0" />
           <span className="flex-1 text-left">Approvals</span>
@@ -259,7 +259,7 @@ export function AppSidebar(props: AppSidebarProps) {
         <button
           type="button"
           onClick={onOpenSettings}
-          className="flex w-full items-center gap-2 rounded-md px-2.5 py-[7px] text-sm text-muted-foreground transition hover:bg-accent/50 hover:text-foreground"
+          className="flex w-full items-center gap-2 rounded-md px-2.5 py-[7px] text-sm text-muted-foreground transition hover:bg-accent hover:text-foreground"
         >
           <Settings className="h-4 w-4 shrink-0" />
           <span className="flex-1 text-left">Settings</span>
@@ -271,7 +271,7 @@ export function AppSidebar(props: AppSidebarProps) {
           <button
             type="button"
             onClick={onOpenAccount}
-            className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition hover:bg-accent/50"
+            className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition hover:bg-accent"
           >
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">
               {initialsOf(user.name)}

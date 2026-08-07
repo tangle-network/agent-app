@@ -100,7 +100,7 @@ export function CanvasEmptyState({
       <div className="pointer-events-auto flex w-full max-w-lg flex-col items-center gap-5 rounded-xl border border-[var(--border-default)] bg-[color-mix(in_srgb,var(--bg-input)_95%,transparent)] px-6 py-7 text-center shadow-xl backdrop-blur sm:px-8">
         <span className="flex items-center gap-2 text-[var(--text-muted)]">
           <BrandKnot size={22} className="shrink-0" />
-          <span className="text-[11px] font-medium uppercase tracking-[0.14em]">Tangle Design</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.05em]">Tangle Design</span>
         </span>
 
         <div className="flex flex-col gap-1.5">
@@ -119,7 +119,7 @@ export function CanvasEmptyState({
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)] text-[var(--brand-primary)] transition-colors group-hover:bg-[color-mix(in_srgb,var(--brand-primary)_15%,transparent)]">
                 <Icon className="h-4 w-4" />
               </span>
-              <span className="text-[13px] font-medium text-[var(--text-primary)]">{label}</span>
+              <span className="text-sm font-medium text-[var(--text-primary)]">{label}</span>
               <span className="text-[11px] leading-4 text-[var(--text-muted)]">{hint}</span>
             </button>
           ))}

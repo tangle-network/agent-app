@@ -91,6 +91,8 @@ export const Interactive: Story = {
 /** Populated / empty / read-only side by side — the spacing + state polish check. */
 export const AllStates: Story = {
   name: 'All states (composite)',
+  // Side-by-side panel row — left-anchored so it can never clip.
+  parameters: { layout: 'padded' },
   decorators: [],
   render: () => (
     <div className="flex items-start gap-4">
@@ -100,7 +102,7 @@ export const AllStates: Story = {
         { label: 'Read only', node: <LayersPanel {...baseProps(noopPage)} canWrite={false} /> },
       ].map((cell) => (
         <div key={cell.label} className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">{cell.label}</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">{cell.label}</span>
           <div className="h-[460px] w-[280px] border border-[var(--border-default)] bg-[var(--bg-input)]">{cell.node}</div>
         </div>
       ))}

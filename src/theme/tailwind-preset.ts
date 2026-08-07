@@ -12,7 +12,7 @@
  * values (bg-[var(--bg-input)]), which Tailwind supports without color config.
  *
  * Beyond colour this preset also maps the border TIERS, the semantic radius
- * steps, and the motion scale. See docs/design-tokens.md.
+ * steps, the motion scale, and the elevation shadows. See docs/design-tokens.md.
  */
 
 const withForeground = (name: string) => ({
@@ -63,9 +63,18 @@ const agentAppPreset = {
         // MD3 surface ladder — wires sandbox-ui's `bg-surface-container*`
         // utilities (used by AgentComposer + its pickers) onto the shadcn
         // elevation triples, so those components render on-palette here.
+        // Monotonic in the dark theme: card (L 0.235) < secondary (0.285) <
+        // popover (0.325) — the rungs a container climbs as it floats higher.
         'surface-container': 'hsl(var(--card))',
-        'surface-container-high': 'hsl(var(--popover))',
-        'surface-container-highest': 'hsl(var(--secondary))',
+        'surface-container-high': 'hsl(var(--secondary))',
+        'surface-container-highest': 'hsl(var(--popover))',
+      },
+      // Elevation shadows — `shadow-raised` for the floating composer,
+      // `shadow-overlay` for popovers/dialogs. Both re-theme through
+      // tokens.css (dark doubles the alpha at the token).
+      boxShadow: {
+        raised: 'var(--shadow-raised)',
+        overlay: 'var(--shadow-overlay)',
       },
       // Border tiers. `borderColor` is a separate scale from `colors`, so
       // pointing `border-border` at the soft tier here leaves `bg-border` /

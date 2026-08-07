@@ -197,6 +197,8 @@ export const ViewOnly: Story = {
 /** The rail's faces side by side. */
 export const AllStates: Story = {
   name: 'All states (composite)',
+  // Side-by-side rail row (~1250px) — left-anchored so it can never clip.
+  parameters: { layout: 'padded' },
   decorators: [],
   render: () => (
     <div className="flex items-start gap-4">
@@ -221,7 +223,7 @@ export const AllStates: Story = {
         { label: 'View only', node: <CanvasInsertPanel canWrite={false} page={page} onInsert={onInsert} /> },
       ].map((cell) => (
         <div key={cell.label} className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">{cell.label}</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">{cell.label}</span>
           <div className="h-[520px] w-[300px] border border-[var(--border-default)]">{cell.node}</div>
         </div>
       ))}

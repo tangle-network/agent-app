@@ -4,7 +4,7 @@
  * Three questions the CSS itself cannot answer, and one browser can:
  *
  *  1. At what alpha does a 1px hairline still RESOLVE on each surface? The
- *     border tiers in tokens.css are 40% / 60% in light and full strength in
+ *     border tiers in tokens.css are 40% / 60% in light and 60% / 80% in
  *     dark, and those numbers came from looking at this sweep at 1:1 pixel
  *     scale — not from copying a reference implementation whose card had no
  *     fill contrast of its own. A contrast ratio narrows the candidates; only
@@ -33,7 +33,7 @@ const tokensCss = resolve(here, '..', '..', 'src', 'theme', 'tokens.css')
 const outIndex = process.argv.indexOf('--out')
 const outDir = outIndex > -1 ? process.argv[outIndex + 1] : null
 
-const ALPHAS = [22, 30, 35, 40, 45, 55, 60, 70, 100]
+const ALPHAS = [22, 30, 35, 40, 45, 55, 60, 70, 80, 100]
 /** Surface pairs a 1px hairline actually has to survive on. */
 const SURFACES = [
   ['background', 'hsl(var(--background))'],

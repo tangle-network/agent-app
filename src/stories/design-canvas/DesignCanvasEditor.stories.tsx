@@ -74,7 +74,7 @@ function EditorHarness({ initial, editorProps, className = 'h-screen w-full', wi
           withPanels
             ? ({ selectedElements }) => (
                 <div className="flex h-full flex-col gap-2 bg-[var(--bg-input)] p-4 text-sm text-[var(--text-secondary)]">
-                  <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">
                     Agent panel (host slot)
                   </span>
                   <p className="text-xs leading-5 text-[var(--text-muted)]">
@@ -156,7 +156,7 @@ export const EditorStates: Story = {
       <div className="grid grid-cols-2 gap-4 bg-[var(--canvas-backdrop)] p-4">
         {cells.map((cell) => (
           <div key={cell.label} className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">
               {cell.label}
             </span>
             <div className="h-[520px] overflow-hidden rounded-md border border-[var(--border-default)]">

@@ -33,6 +33,7 @@ import {
   sessionLabel,
   UNTITLED_SESSION_LABEL,
 } from '../session-shell/index'
+import { OVERLAY_SHADOW } from './controls'
 
 // ---------------------------------------------------------------------------
 // useInfiniteScroll
@@ -491,7 +492,7 @@ function DialogButton({
 }) {
   const tone =
     variant === 'ghost'
-      ? 'text-muted-foreground hover:bg-accent/30 hover:text-foreground'
+      ? 'text-muted-foreground hover:bg-accent hover:text-foreground'
       : variant === 'destructive'
         ? 'bg-destructive text-destructive-foreground hover:opacity-90'
         : 'bg-primary text-primary-foreground hover:opacity-90'
@@ -545,7 +546,7 @@ function SessionDialog({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="relative w-full max-w-sm rounded-xl border border-border bg-card p-5 shadow-lg"
+        className={`relative w-full max-w-sm rounded-xl border border-border bg-popover p-5 ${OVERLAY_SHADOW}`}
       >
         <h2 className="text-sm font-semibold text-foreground">{title}</h2>
         <div className="mt-3">{children}</div>
@@ -831,7 +832,7 @@ export function SessionHistoryPanel({
                     type="button"
                     onClick={() => setSelectedIds(new Set(history.items.map((item) => item.id)))}
                     disabled={allVisibleSelected || history.items.length === 0}
-                    className="h-8 rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition hover:bg-accent/30 disabled:opacity-50"
+                    className="h-8 rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition hover:bg-accent disabled:opacity-50"
                   >
                     Select all
                   </button>
@@ -839,7 +840,7 @@ export function SessionHistoryPanel({
                     type="button"
                     onClick={() => setSelectedIds(new Set())}
                     disabled={selectedCount === 0}
-                    className="h-8 rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition hover:bg-accent/30 disabled:opacity-50"
+                    className="h-8 rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition hover:bg-accent disabled:opacity-50"
                   >
                     Deselect all
                   </button>
@@ -875,7 +876,7 @@ export function SessionHistoryPanel({
                     type="button"
                     onClick={() => openBulkAction({ kind: 'older-than', days: parsedAgeDays })}
                     disabled={!validAgeDays}
-                    className="h-8 rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition hover:bg-accent/30 disabled:opacity-50"
+                    className="h-8 rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition hover:bg-accent disabled:opacity-50"
                   >
                     {deleteLabel} older
                   </button>
@@ -883,7 +884,7 @@ export function SessionHistoryPanel({
                     type="button"
                     onClick={() => openBulkAction({ kind: 'newer-than', days: parsedAgeDays })}
                     disabled={!validAgeDays}
-                    className="h-8 rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition hover:bg-accent/30 disabled:opacity-50"
+                    className="h-8 rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition hover:bg-accent disabled:opacity-50"
                   >
                     {deleteLabel} recent
                   </button>
@@ -1004,7 +1005,7 @@ function ErrorBlock({ message, onRetry, inline }: { message: string; onRetry: ()
       <button
         type="button"
         onClick={onRetry}
-        className="h-8 rounded-md border border-border px-3 text-xs font-medium text-foreground transition hover:bg-accent/30"
+        className="h-8 rounded-md border border-border px-3 text-xs font-medium text-foreground transition hover:bg-accent"
       >
         Retry
       </button>
@@ -1051,7 +1052,7 @@ function SessionRow({
   const showUnread = Boolean(session.unread) && !responding
 
   return (
-    <div className="group relative flex items-center gap-2 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/20">
+    <div className="group relative flex items-center gap-2 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent">
       {selectable && (
         <input
           type="checkbox"
@@ -1089,7 +1090,7 @@ function SessionRow({
           {menuOpen && (
             <>
               <div className="fixed inset-0 z-20" onClick={() => setMenuOpen(false)} aria-hidden />
-              <div className="absolute right-0 z-30 mt-1 w-36 overflow-hidden rounded-md border border-border bg-card py-1 shadow-lg">
+              <div className={`absolute right-0 z-30 mt-1 w-36 overflow-hidden rounded-md border border-border bg-popover py-1 ${OVERLAY_SHADOW}`}>
                 {onRename && (
                   <button
                     type="button"
@@ -1097,7 +1098,7 @@ function SessionRow({
                       setMenuOpen(false)
                       onRename(session)
                     }}
-                    className="block w-full px-3 py-1.5 text-left text-xs text-foreground transition hover:bg-accent/30"
+                    className="block w-full px-3 py-1.5 text-left text-xs text-foreground transition hover:bg-accent"
                   >
                     {renameLabel}
                   </button>
@@ -1113,7 +1114,7 @@ function SessionRow({
                     className={`block w-full px-3 py-1.5 text-left text-xs transition ${
                       action.destructive
                         ? 'text-destructive hover:bg-destructive/10'
-                        : 'text-foreground hover:bg-accent/30'
+                        : 'text-foreground hover:bg-accent'
                     }`}
                   >
                     {action.label}

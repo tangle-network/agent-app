@@ -217,13 +217,13 @@ export function WorkProductPane({
                     <button
                       type="button"
                       onClick={() => void loadCompare(prior, entry)}
-                      className="rounded-md border border-border px-2 py-0.5 text-[11px] font-medium text-foreground transition hover:bg-accent/30"
+                      className="rounded-md border border-border px-2 py-0.5 text-[11px] font-medium text-foreground transition hover:bg-accent"
                     >
                       Compare v{prior.version} → v{entry.version}
                     </button>
                   )}
                 </div>
-                {entry.reviewNote && <p className="mt-1 text-[13px] leading-snug text-foreground">{entry.reviewNote}</p>}
+                {entry.reviewNote && <p className="mt-1 text-sm leading-snug text-foreground">{entry.reviewNote}</p>}
                 <ProvenanceStamp provenance={entry.provenance} className="mt-1" />
               </div>
             )

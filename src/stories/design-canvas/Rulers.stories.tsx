@@ -26,7 +26,7 @@ const posterPage = makeLaunchPosterScene().pages[0]!
 function RulerFrame({ label, ...props }: RulersProps & { label: string }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">{label}</span>
+      <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">{label}</span>
       {/* Inline style for the frame size: the rulers are absolutely positioned,
           so a collapsed wrapper hides them entirely — don't rely on a utility
           class being present in the preview's stylesheet. */}
@@ -128,6 +128,8 @@ export const Hidden: Story = {
 /** Density + guide states side by side. */
 export const AllStates: Story = {
   name: 'All states (composite)',
+  // Side-by-side ruler row — left-anchored so it can never clip.
+  parameters: { layout: 'padded' },
   render: () => (
     <div className="flex flex-wrap items-start gap-4">
       <RulerFrame

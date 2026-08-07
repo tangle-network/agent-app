@@ -74,7 +74,7 @@ export const AllStates: Story = {
         ] as Array<[string, Generation]>
       ).map(([label, generation]) => (
         <section key={label} className="border-b border-border pb-8 last:border-b-0">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">{label}</p>
           <GenerationDetail
             generation={generation}
             vaultHref={demoVaultHref}

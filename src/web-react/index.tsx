@@ -18,7 +18,7 @@
 
 import { useEffect, useMemo, useRef, useState, memo, type ReactNode } from 'react'
 import { useSmoothText } from './smooth-text'
-import { ChevronDown, POPOVER_OPTION_FOCUS, usePending } from './controls'
+import { ChevronDown, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, usePending } from './controls'
 import { BrandMark } from './brand-mark'
 import { DurableChatCards, type DurableChatCardsProps } from './durable-chat-cards'
 import { attachmentPartsFromMessageParts, type ChatAttachmentPart } from './chat-attachments'
@@ -43,6 +43,7 @@ export * from './chat-attachments'
 export * from './message-attachments'
 export * from './use-composer-attachments'
 export * from './provider-logo'
+export * from './harness-glyphs'
 export * from './smooth-text'
 export * from './mission-activity'
 export * from './work-product'
@@ -56,7 +57,11 @@ export {
   usePending,
   ModelPicker,
   EffortPicker,
+  EffortMeter,
+  effortMeterFill,
   DEFAULT_EFFORT_LEVELS,
+  EFFORT_METER_SEGMENTS,
+  OVERLAY_SHADOW,
   type ModelPickerProps,
   type EffortPickerProps,
   type EffortLevel,
@@ -132,7 +137,7 @@ export interface RunDrillInProps {
  */
 export function RunDrillIn({ run, onClose }: RunDrillInProps) {
   return (
-    <div className="fixed inset-y-0 right-0 z-50 flex w-[480px] max-w-full flex-col border-l border-border bg-card shadow-xl">
+    <div className={`fixed inset-y-0 right-0 z-50 flex w-[480px] max-w-full flex-col border-l border-border bg-popover ${OVERLAY_SHADOW}`}>
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
         <span
           className={`h-2 w-2 shrink-0 rounded-full ${
@@ -147,7 +152,7 @@ export function RunDrillIn({ run, onClose }: RunDrillInProps) {
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-accent/30 hover:text-foreground"
+          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground"
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
             <path d="M18 6 6 18M6 6l12 12" />
@@ -345,7 +350,7 @@ export function ChatEmptyState({
               key={i}
               type="button"
               onClick={door.onSelect}
-              className="group flex min-h-[44px] flex-col items-start rounded-xl border border-border bg-card px-4 py-3 text-left transition hover:border-primary/40 hover:bg-accent/30"
+              className="group flex min-h-[44px] flex-col items-start rounded-xl border border-border bg-card px-4 py-3 text-left transition hover:border-primary/40 hover:bg-accent"
             >
               <span className="text-sm font-semibold text-foreground">{door.label}</span>
               {door.description && (
@@ -634,7 +639,7 @@ function ProposalCard({
           {meta.length > 0 && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {meta.map((m, i) => (
-                <span key={i} className="rounded-full bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                <span key={i} className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                   {m}
                 </span>
               ))}
@@ -657,7 +662,7 @@ function ProposalCard({
               type="button"
               disabled={deciding}
               onClick={() => decide(() => approval.onReject(pending.proposalId, call.id))}
-              className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-border bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-accent/30 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-border bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
             >
               Reject
             </button>
@@ -690,7 +695,7 @@ function FollowupCard({ call }: { call: ChatToolCallInfo }) {
   const a = (call.args ?? {}) as Record<string, unknown>
   const when = typeof a.when === 'string' ? a.when : typeof a.at === 'string' ? a.at : typeof a.schedule === 'string' ? a.schedule : null
   return (
-    <div className="w-fit min-w-[260px] max-w-full rounded-lg border border-border/60 border-l-2 border-l-primary/60 bg-muted/20 px-3 py-2 text-sm">
+    <div className="w-fit min-w-[260px] max-w-full rounded-lg border border-border/60 border-l-2 border-l-primary/60 bg-secondary px-3 py-2 text-sm">
       <div className="flex items-center gap-2">
         <ToolGlyph name={call.name} className="h-3.5 w-3.5 shrink-0 text-primary/80" />
         <span className="min-w-0 flex-1 truncate font-medium text-foreground">{friendlyToolTitle(call)}</span>
@@ -744,7 +749,7 @@ function ToolCallCard({
   return (
     <div
       className={`w-fit min-w-[280px] max-w-full rounded-lg border text-xs transition ${
-        failed ? 'border-destructive/40 bg-destructive/5' : 'border-border/60 bg-muted/20'
+        failed ? 'border-destructive/40 bg-destructive/5' : 'border-border/60 bg-secondary'
       }`}
     >
       {/* Header is a flex row, NOT a button, so any controls are siblings of the
@@ -790,7 +795,7 @@ function ToolCallCard({
             <button
               type="button"
               onClick={() => onOpenRun(call, message)}
-              className="mt-2 rounded border border-border bg-card px-2 py-1 text-[11px] font-medium transition hover:bg-accent/30"
+              className="mt-2 rounded border border-border bg-card px-2 py-1 text-[11px] font-medium transition hover:bg-accent"
             >
               Open full transcript →
             </button>
@@ -952,7 +957,7 @@ function SegmentedBody({
           !g.calls.some(isImportantTool) ? (
           <details
             key={`tools-${g.index}`}
-            className="rounded-lg border-l-2 border-border/70 bg-muted/20 px-3 py-2"
+            className="rounded-lg border-l-2 border-border/70 bg-secondary px-3 py-2"
           >
             <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
               Worked through {g.calls.length} steps
@@ -1019,7 +1024,7 @@ function CopyMessageButton({ text }: { text: string }) {
       onClick={copy}
       aria-label="Copy message"
       title="Copy message"
-      className="rounded p-0.5 text-muted-foreground transition hover:bg-accent/40 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="rounded p-0.5 text-muted-foreground transition hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       {copied ? (
         <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -1125,7 +1130,7 @@ function AssistantMessageImpl({
         </div>
       )}
       {reasoning && (
-        <details className="mb-2 rounded-lg border-l-2 border-border/70 bg-muted/20 px-3 py-2" open={!hasAnswerText}>
+        <details className="mb-2 rounded-lg border-l-2 border-border/70 bg-secondary px-3 py-2" open={!hasAnswerText}>
           <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
             {!hasAnswerText ? (
               <span className="animate-pulse">

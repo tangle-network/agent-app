@@ -117,6 +117,8 @@ export const Interactive: Story = {
 /** The whole interview arc on one canvas. */
 export const AllStates: Story = {
   name: 'All states',
+  // Two-column grid of 520px cells at xl — left-anchored so it can never clip.
+  parameters: { layout: 'padded' },
   render: () => (
     <div className="grid gap-8 p-4 xl:grid-cols-2">
       {(
@@ -129,7 +131,7 @@ export const AllStates: Story = {
         ] as const
       ).map(([label, view]) => (
         <div key={label} className="w-[520px]">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">{label}</p>
           <div className="rounded-lg border border-border p-6">
             <IntakeInterview view={view} {...loggingCallbacks(view)} />
           </div>

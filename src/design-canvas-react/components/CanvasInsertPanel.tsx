@@ -154,13 +154,13 @@ function TemplatePreview({ shape }: { shape: TemplateShape }) {
   if (shape === 'ellipse') {
     return <span className="block h-7 w-7 rounded-full bg-[var(--brand-primary)]" aria-hidden />
   }
-  // Text tiles show a glyph: a bold "T" for a heading, a paragraph mark "¶"
-  // for body copy.
+  // Text tiles show a glyph: a semibold "T" for a heading, a paragraph mark
+  // "¶" for body copy.
   if (shape === 'heading' || shape === 'body') {
     return (
       <span
         className={`block leading-none text-[var(--text-primary)] ${
-          shape === 'heading' ? 'text-2xl font-bold' : 'text-lg'
+          shape === 'heading' ? 'text-2xl font-semibold' : 'text-lg'
         }`}
         aria-hidden
       >

@@ -126,7 +126,7 @@ export function ProposalCard({
               {renderGraph?.(view.preview.content)}
             </div>
           ) : (
-            <pre className="mt-1 max-h-48 overflow-auto rounded border border-border bg-muted/50 p-2 text-xs">
+            <pre className="mt-1 max-h-48 overflow-auto rounded border border-border bg-secondary p-2 text-xs">
               <code>{view.preview.content}</code>
             </pre>
           )}

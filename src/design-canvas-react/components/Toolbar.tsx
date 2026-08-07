@@ -159,7 +159,7 @@ function Popover({
   )
 }
 
-const FIELD_LABEL = 'text-[9px] uppercase tracking-wide text-[var(--text-muted)]'
+const FIELD_LABEL = 'text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]'
 
 function NumberInput({
   label,
@@ -198,7 +198,7 @@ function NumberInput({
           if (event.key === 'Enter') commit((event.target as HTMLInputElement).value)
           if (event.key === 'Escape') setRaw(null)
         }}
-        className={`${className} rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-center text-[12px] text-[var(--text-primary)] focus:border-[var(--brand-primary)]`}
+        className={`${className} rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-center text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)]`}
       />
     </label>
   )
@@ -240,7 +240,7 @@ function SelectControl<T extends string>({
             aria-haspopup="listbox"
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
-            className={`${buttonClassName} flex items-center justify-between gap-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-left text-[12px] text-[var(--text-primary)] hover:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40`}
+            className={`${buttonClassName} flex items-center justify-between gap-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-left text-xs text-[var(--text-primary)] hover:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40`}
           >
             <span className="truncate">{current?.label ?? value}</span>
             <span className="text-[8px] text-[var(--text-muted)]">▾</span>
@@ -258,7 +258,7 @@ function SelectControl<T extends string>({
                 onChange(opt.value)
                 setOpen(false)
               }}
-              className={`px-3 py-1 text-left text-[12px] hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)] ${
+              className={`px-3 py-1 text-left text-xs hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)] ${
                 opt.value === value ? 'text-[var(--brand-primary)]' : 'text-[var(--text-primary)]'
               }`}
             >
@@ -310,7 +310,7 @@ function FontPicker({
             aria-expanded={open}
             aria-label="Font family"
             onClick={() => setOpen((v) => !v)}
-            className="flex w-28 items-center justify-between gap-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-left text-[12px] text-[var(--text-primary)] hover:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40"
+            className="flex w-28 items-center justify-between gap-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-left text-xs text-[var(--text-primary)] hover:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40"
             style={{ fontFamily: value }}
           >
             <span className="truncate">{value}</span>
@@ -325,7 +325,7 @@ function FontPicker({
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search fonts"
             aria-label="Search fonts"
-            className="m-1 rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-[12px] text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
+            className="m-1 rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
           />
           <div role="listbox" className="max-h-60 overflow-y-auto py-1">
             {filtered.length === 0 ? (
@@ -343,7 +343,7 @@ function FontPicker({
                     setQuery('')
                   }}
                   style={{ fontFamily: family }}
-                  className={`block w-full px-3 py-1 text-left text-[13px] hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)] ${
+                  className={`block w-full px-3 py-1 text-left text-sm hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)] ${
                     family === value ? 'text-[var(--brand-primary)]' : 'text-[var(--text-primary)]'
                   }`}
                 >
@@ -406,7 +406,7 @@ function ColorSwatch({ label, value, onCommit, disabled, none = false }: { label
             aria-label={`${label} hex value`}
             value={value}
             onChange={(event) => onCommit(event.target.value)}
-            className="rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-[12px] text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
+            className="rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
           />
         </div>
       </Popover>
@@ -710,7 +710,7 @@ function SelectionControls({
               value={slotInput}
               onChange={(event) => setSlotInput(event.target.value)}
               placeholder="slot-name"
-              className="rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-[12px] text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
+              className="rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
             />
             <div className="flex gap-2">
               <button
@@ -858,7 +858,7 @@ function ImageControls({ element, canWrite, onPatch }: { element: ImageElement; 
             onChange={(event) => setSwapUrl(event.target.value)}
             placeholder="https://… image URL"
             aria-label="New image URL"
-            className="rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-[12px] text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
+            className="rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
           />
           <div className="flex gap-2">
             <button
@@ -922,7 +922,7 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides, pa
         value={page.name}
         disabled={!canWrite}
         onChange={(event) => onSetPageProps({ name: event.target.value })}
-        className="w-28 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-[12px] text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
+        className="w-28 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
       />
 
       {SEP}
@@ -956,7 +956,7 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides, pa
             if (event.key === 'Enter') commitDimension('width', (event.target as HTMLInputElement).value)
             if (event.key === 'Escape') setCustomW(null)
           }}
-          className="w-16 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-center text-[12px] text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
+          className="w-16 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-center text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
         />
       </label>
       <span className="text-[var(--text-muted)]">×</span>
@@ -973,7 +973,7 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides, pa
             if (event.key === 'Enter') commitDimension('height', (event.target as HTMLInputElement).value)
             if (event.key === 'Escape') setCustomH(null)
           }}
-          className="w-16 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-center text-[12px] text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
+          className="w-16 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-center text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
         />
       </label>
 

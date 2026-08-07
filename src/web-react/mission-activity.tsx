@@ -211,7 +211,7 @@ export function FlowWaterfall({ trace }: FlowWaterfallProps) {
           <span className="truncate font-mono text-[11px] text-muted-foreground" title={row.name}>
             {row.name}
           </span>
-          <div className="relative h-2 rounded-sm bg-muted/40">
+          <div className="relative h-2 rounded-sm bg-secondary">
             <div
               className={`absolute inset-y-0 rounded-sm ${row.ok ? BAR_CLASS[row.kind] : 'bg-destructive/80'} ${row.approx ? 'opacity-70' : ''}`}
               style={{ left: `${row.offsetPct}%`, width: `${row.widthPct}%` }}
@@ -283,7 +283,7 @@ export function MissionActivityLane({ activity, startedAt, nowMs }: MissionActiv
         timeline
       </button>
       {expanded && (
-        <div className="rounded-md border border-border/50 bg-muted/10 p-2">
+        <div className="rounded-md border border-border/50 bg-secondary p-2">
           <FlowWaterfall
             trace={stepActivityFlowTrace(activity, {
               ...(startedAt !== undefined ? { startedAt } : {}),
@@ -344,7 +344,7 @@ function ActivityRow({
                 ? 'bg-destructive/10 text-destructive'
                 : tone === 'live'
                   ? 'bg-warning/10 text-warning'
-                  : 'bg-muted/60 text-muted-foreground'
+                  : 'bg-secondary text-muted-foreground'
           }`}
         >
           {record.status}
@@ -355,7 +355,7 @@ function ActivityRow({
       {open && (
         <div className="space-y-2.5 border-t border-border/40 px-3 py-2.5">
           {record.durationMs !== undefined && (
-            <div className="rounded-md border border-border/50 bg-muted/10 p-2">
+            <div className="rounded-md border border-border/50 bg-secondary p-2">
               <FlowWaterfall trace={stepActivityFlowTrace([record])} />
             </div>
           )}
@@ -440,7 +440,7 @@ export function AgentActivityPanel({ fetchActivity, renderMissionRef, title = 'A
           onClick={() => void load()}
           disabled={loading}
           aria-label="Refresh"
-          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-accent/30 hover:text-foreground disabled:opacity-50"
+          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:opacity-50"
         >
           <RefreshGlyph className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
         </button>
@@ -470,7 +470,7 @@ export function AgentActivityPanel({ fetchActivity, renderMissionRef, title = 'A
           type="button"
           onClick={() => void load(cursor)}
           disabled={loading}
-          className="w-full rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-accent/30 disabled:opacity-50"
+          className="w-full rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-accent disabled:opacity-50"
         >
           Older runs
         </button>
