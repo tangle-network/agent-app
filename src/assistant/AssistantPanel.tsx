@@ -566,7 +566,7 @@ export function AssistantPanel({
       {low && (
         <div
           role="status"
-          className="mx-4 mb-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm"
+          className="mx-4 mb-2 rounded-lg border border-border bg-secondary px-3 py-2 text-sm"
         >
           <p className="text-foreground">Your credit balance is running low.</p>
           <button
@@ -589,7 +589,7 @@ export function AssistantPanel({
         view === "chat" && (
           <div
             role="status"
-            className="mx-4 mb-2 flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm"
+            className="mx-4 mb-2 flex items-center gap-3 rounded-lg border border-border bg-secondary px-3 py-2 text-sm"
           >
             <p className="min-w-0 flex-1 text-foreground">
               Paused after a lot of steps.

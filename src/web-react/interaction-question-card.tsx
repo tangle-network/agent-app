@@ -80,7 +80,7 @@ export function InteractionActionButton({
 }) {
   const variantClasses = variant === 'primary'
     ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
-    : 'border border-border bg-transparent text-foreground hover:bg-accent/40'
+    : 'border border-border bg-transparent text-foreground hover:bg-accent'
   return (
     <button
       type="button"
@@ -132,7 +132,7 @@ export function QuestionOptionList({
         // accessible NAME must be the option label alone — the description is
         // linked as aria-describedby, not folded into the name.
         return (
-          <label key={`${option.value}-${optionIndex}`} htmlFor={inputId} className="flex cursor-pointer gap-2 rounded-lg border border-border/70 p-3 transition-colors hover:bg-muted/50">
+          <label key={`${option.value}-${optionIndex}`} htmlFor={inputId} className="flex cursor-pointer gap-2 rounded-lg border border-border/70 p-3 transition-colors hover:bg-accent">
             <input
               id={inputId}
               type={multi ? 'checkbox' : 'radio'}

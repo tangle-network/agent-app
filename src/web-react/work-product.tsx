@@ -53,7 +53,7 @@ const STATE_LABELS: Record<ReviewQueueState, string> = {
 }
 
 const STATE_TONES: Record<ReviewQueueState, string> = {
-  intake: 'bg-muted/40 text-muted-foreground',
+  intake: 'bg-secondary text-muted-foreground',
   missing_info: 'bg-warning/10 text-warning',
   working: 'bg-primary/10 text-primary',
   ready_for_review: 'bg-success/10 text-success',
@@ -77,7 +77,7 @@ const STATUS_TONES: Record<WorkProductStatus, string> = {
   ready: 'bg-success/10 text-success',
   changes_requested: 'bg-warning/10 text-warning',
   approved: 'bg-success/10 text-success',
-  superseded: 'bg-muted/40 text-muted-foreground',
+  superseded: 'bg-secondary text-muted-foreground',
 }
 
 /** Human label for a queue state. */
@@ -156,7 +156,7 @@ export function WorkProductCard({ part, onOpen, className }: WorkProductCardProp
         <button
           type="button"
           onClick={() => onOpen(part)}
-          className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-accent/30"
+          className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-accent"
         >
           Review
         </button>
@@ -243,7 +243,7 @@ export function ReviewQueuePanel({
           onClick={() => void load()}
           disabled={loading}
           aria-label="Refresh"
-          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-accent/30 hover:text-foreground disabled:opacity-50"
+          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:opacity-50"
         >
           <svg viewBox="0 0 24 24" className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M21 12a9 9 0 1 1-2.64-6.36" />
@@ -268,7 +268,7 @@ export function ReviewQueuePanel({
             <button
               type="button"
               onClick={() => onSelect?.(item)}
-              className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 text-left transition hover:border-primary/40 hover:bg-accent/20"
+              className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 text-left transition hover:border-primary/40 hover:bg-accent"
             >
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-foreground">
@@ -297,7 +297,7 @@ export function ReviewQueuePanel({
           type="button"
           onClick={() => void load(cursor)}
           disabled={loading}
-          className="w-full rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-accent/30 disabled:opacity-50"
+          className="w-full rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-accent disabled:opacity-50"
         >
           Load more
         </button>
@@ -409,7 +409,7 @@ export function EvidenceLineageTable({ evidence, resolveSourceUrl, className }: 
 const SEVERITY_TONES: Record<ExceptionEntry['severity'], string> = {
   blocking: 'bg-destructive/10 text-destructive',
   material: 'bg-warning/10 text-warning',
-  advisory: 'bg-muted/40 text-muted-foreground',
+  advisory: 'bg-secondary text-muted-foreground',
 }
 
 /** Properties for the severity-badged exception list */
@@ -513,7 +513,7 @@ export function ProvenanceStamp({ provenance, backtest, className }: ProvenanceS
       </span>
       {provenance.servingModels.length > 0 ? (
         provenance.servingModels.map((model) => (
-          <span key={model} className="rounded-full bg-muted/40 px-2 py-0.5 font-mono">
+          <span key={model} className="rounded-full bg-secondary px-2 py-0.5 font-mono">
             {model}
           </span>
         ))

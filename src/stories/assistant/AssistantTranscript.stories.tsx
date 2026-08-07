@@ -53,7 +53,7 @@ const EMPTY_STATE = (
  *  `@xyflow/react` graph from `./workflows`): three nodes in a flow column, so
  *  the proposal card's Graph/YAML toggle has something to switch between. */
 const renderGraph = (_yaml: string) => (
-  <div className="flex h-full flex-col items-center justify-center gap-2 bg-muted/30 p-3">
+  <div className="flex h-full flex-col items-center justify-center gap-2 bg-secondary p-3">
     <div className="rounded-md border border-border bg-card px-3 py-1.5 text-foreground text-xs">
       Schedule — Mondays 09:00
     </div>

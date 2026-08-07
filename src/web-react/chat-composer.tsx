@@ -646,7 +646,7 @@ export function ChatComposer({
               className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${
                 f.status === 'error'
                   ? 'border-destructive/40 text-destructive'
-                  : 'border-border bg-muted/50 text-foreground'
+                  : 'border-border bg-secondary text-foreground'
               }`}
             >
               {f.kind === 'folder' ? <FolderGlyph className="h-3 w-3 shrink-0" /> : <PaperclipGlyph className="h-3 w-3 shrink-0" />}
@@ -714,7 +714,7 @@ export function ChatComposer({
                 disabled={disabled}
                 aria-label="Attach files"
                 title="Attach files"
-                className="shrink-0 rounded-lg p-2 text-muted-foreground transition hover:bg-accent/40 hover:text-foreground disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="shrink-0 rounded-lg p-2 text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <PaperclipGlyph className="h-4 w-4" />
               </button>
@@ -729,7 +729,7 @@ export function ChatComposer({
                 disabled={disabled}
                 aria-label="Attach folder"
                 title="Attach folder"
-                className="shrink-0 rounded-lg p-2 text-muted-foreground transition hover:bg-accent/40 hover:text-foreground disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="shrink-0 rounded-lg p-2 text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <FolderGlyph className="h-4 w-4" />
               </button>

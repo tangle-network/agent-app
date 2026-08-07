@@ -48,6 +48,7 @@ import {
 } from 'react'
 
 import { type AsyncEmptyAction, type AsyncEmptySpec, type AsyncResourceState } from './async'
+import { OVERLAY_SHADOW } from './controls'
 import {
   EMPTY_RECORD_GRID_OVERLAY,
   formatRecordGridValue,
@@ -509,7 +510,7 @@ export function RecordGrid({
         >
           <span className="sr-only">Loading {caption}</span>
           {Array.from({ length: Math.max(1, loadingRowCount) }, (_, index) => (
-            <div key={index} className="h-8 animate-pulse rounded-md bg-muted/50" aria-hidden />
+            <div key={index} className="h-8 animate-pulse rounded-md bg-secondary" aria-hidden />
           ))}
         </div>
       </div>
@@ -571,7 +572,7 @@ export function RecordGrid({
                   <button
                     type="button"
                     onClick={(empty.action as AsyncEmptyAction).onClick}
-                    className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30"
+                    className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent"
                   >
                     {(empty.action as AsyncEmptyAction).label}
                   </button>
@@ -580,7 +581,7 @@ export function RecordGrid({
                 <button
                   type="button"
                   onClick={openAdd}
-                  className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30"
+                  className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent"
                 >
                   {addLabel}
                 </button>
@@ -744,7 +745,7 @@ export function RecordGrid({
                               type="button"
                               aria-label={`Keep ${rowLabel}`}
                               onClick={() => setConfirmDelete(null)}
-                              className="rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition hover:bg-accent/30"
+                              className="rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition hover:bg-accent"
                             >
                               Cancel
                             </button>
@@ -811,7 +812,7 @@ export function RecordGrid({
           <button
             type="button"
             onClick={openAdd}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent"
           >
             <svg
               viewBox="0 0 24 24"
@@ -970,7 +971,7 @@ function SourceMarker({ panelId, columnHeader, rowLabel, source, open, onToggle 
         <span
           id={panelId}
           role="note"
-          className="absolute left-0 top-5 z-10 w-64 rounded-lg border border-border bg-card p-3 text-left shadow-lg"
+          className={`absolute left-0 top-5 z-10 w-64 rounded-lg border border-border bg-popover p-3 text-left ${OVERLAY_SHADOW}`}
         >
           {source.quote && (
             <span className="block border-l-2 border-primary/50 pl-2 text-xs italic leading-snug text-foreground">
@@ -1102,7 +1103,7 @@ function AddRecordForm({
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-accent/30"
+          className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-accent"
         >
           Cancel
         </button>

@@ -32,7 +32,7 @@ function ResizeHarness() {
         Drag the grip on the panel’s left edge, or focus it and press ← / →.
         Committed width logs to the console ({MIN_WIDTH}–{MAX_WIDTH}px).
       </p>
-      <div className="relative flex min-h-0 flex-1 justify-end bg-muted/20">
+      <div className="relative flex min-h-0 flex-1 justify-end bg-secondary">
         <div
           className="relative flex h-full flex-col border-border border-l bg-background shadow-xl"
           style={{ width }}

@@ -17,7 +17,7 @@ import {
   useEffect,
   useRef,
 } from "react";
-import type { ToolDetailRenderers } from "../web-react";
+import { OVERLAY_SHADOW, type ToolDetailRenderers } from "../web-react";
 import { AssistantPanel, type AssistantPanelProps } from "./AssistantPanel";
 import { useAssistantLauncher } from "./launcher";
 import { ResizeHandle } from "./ResizeHandle";
@@ -209,7 +209,7 @@ export function AssistantDock({
     <>
       <div
         aria-hidden="true"
-        className="fixed inset-0 z-40 bg-black/40"
+        className="fixed inset-0 z-40 bg-black/50"
         onClick={() => closeAssistant()}
       />
       <div
@@ -220,7 +220,7 @@ export function AssistantDock({
         tabIndex={-1}
         onKeyDown={trapTab}
         style={isDesktop ? { width: `${width}px` } : undefined}
-        className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-border border-l shadow-xl focus:outline-none"
+        className={`fixed inset-y-0 right-0 z-50 flex w-full flex-col border-border border-l ${OVERLAY_SHADOW} focus:outline-none`}
       >
         <AssistantPanel
           key={userId ?? "anon"}
