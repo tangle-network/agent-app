@@ -19,10 +19,21 @@
 @import '@tangle-network/brand/styles/named-themes.css';
 
 /*
- * Every scope listed here defines the FULL `--hsl-*` shadcn set in
+ * Every scope in this list defines the FULL `--hsl-*` shadcn set in
  * named-themes.css (verified: background/foreground/card/card-foreground/
  * popover/popover-foreground/primary/primary-foreground/secondary/muted/
  * muted-foreground/accent/border/input/ring), so none of these resolve empty.
+ * intelligence is NOT in this list — its scope is deliberately partial, and
+ * redeclaring the tokens it doesn't define would INVALIDATE them; see its own
+ * block below.
+ *
+ * tangle-dark IS listed although brand 1.1.0 does not ship its scope yet (it
+ * resolves through the local alias in main.ts until the brand bump). These
+ * declarations still carry no var() fallbacks: the preview.ts decorator
+ * probes for the scope and remaps data-theme to `dark` where it is absent,
+ * so this rule only ever matches when the scope exists. A fallback copy of
+ * tokens.css's dark values would be a second source of truth, free to drift
+ * from the first.
  *
  * Deliberately NOT bridged — these fall through to agent-app's own theme
  * values via the cascade, per theme darkness (the decorator adds the `.dark`
@@ -42,7 +53,9 @@
  */
 [data-theme='aubergine'],
 [data-theme='aubergine-light'],
+[data-theme='arena'],
 [data-theme='arena-light'],
+[data-theme='tangle-dark'],
 [data-theme='tangle-light'] {
   --background: var(--hsl-background);
   --foreground: var(--hsl-foreground);
@@ -62,5 +75,33 @@
   /* Canvas-only surface (not in the shadcn vocabulary). agent-app's own
    * neutral fallback would read off-palette under a tinted theme; brand's
    * depth-1 is each theme's L0 canvas color, and every named scope sets it. */
+  --canvas-backdrop: var(--depth-1);
+}
+
+/*
+ * intelligence — dark-only, PARTIAL scope. named-themes.css deliberately
+ * overrides only the surface ladder (background/card/popover/secondary/muted/
+ * muted-foreground/accent/border/input) and leaves foreground / the
+ * *-foregrounds / primary / ring on brand's neutral dark spine ("the accent
+ * stays Tangle, only the surfaces carry the product's identity"). So this
+ * block bridges ONLY the tokens the scope defines — putting intelligence in
+ * the full bridge above would redeclare the rest against undefined --hsl-*
+ * sources and INVALIDATE them instead of letting them fall back. The
+ * un-bridged tokens fall through to agent-app's `.dark` values, which are the
+ * same neutral tangle dark (indigo primary/ring) brand intends. The selector
+ * carries `.dark` for the same reason brand's does: the scope is dark-only
+ * and must never stand over a light page (the toolbar decorator always sets
+ * the class — see AGENT_THEMES in preview.ts).
+ */
+.dark[data-theme='intelligence'] {
+  --background: var(--hsl-background);
+  --card: var(--hsl-card);
+  --popover: var(--hsl-popover);
+  --secondary: var(--hsl-secondary);
+  --muted: var(--hsl-muted);
+  --muted-foreground: var(--hsl-muted-foreground);
+  --accent: var(--hsl-accent);
+  --border: var(--hsl-border);
+  --input: var(--hsl-input);
   --canvas-backdrop: var(--depth-1);
 }

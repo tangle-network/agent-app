@@ -14,7 +14,7 @@ _97 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./brand`](api/brand.md) | 5 | — |
 | [`./brand-extraction`](api/brand-extraction.md) | 19 | — |
 | [`./catalog`](api/catalog.md) | 7 | `runtime` |
-| [`./chat-react`](api/chat-react.md) | 18 | `chat-routes`, `runtime`, `web-react` |
+| [`./chat-react`](api/chat-react.md) | 5 | `chat-routes`, `runtime`, `web-react` |
 | [`./chat-routes`](api/chat-routes.md) | 175 | `chat-store`, `interactions`, `model-resolution`, `plans`, `sandbox`, `stream`, `web` |
 | [`./chat-store`](api/chat-store.md) | 64 | `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product` |
 | [`./config`](api/config.md) | 13 | `knowledge`, `runtime` |
@@ -178,11 +178,11 @@ Depends on: `runtime`
 
 ## `./chat-react`
 
-Source: `src/chat-react/index.tsx` · 18 exports
+Source: `src/chat-react/index.tsx` · 5 exports
 
 Depends on: `chat-routes`, `runtime`, `web-react`
 
-`AgentProfileCapability`, `AgentProfileDraft`, `AgentProfileOption`, `ComposerAgentControls`, `ComposerAgentControlsProps`, `ComposerEffortSelection`, `ComposerHarnessSelection`, `ComposerModeControls`, `ComposerModeControlsProps`, `ComposerModelSelection`, `ComposerPlanModeSelection`, `ComposerProfileSelection`, `EntryComposer`, `EntryComposerProps`, `HarnessType`, `ModelInfo`, `ReasoningEffort`, `ReasoningLevel`
+`ComposerModeControls`, `ComposerModeControlsProps`, `ComposerPlanModeSelection`, `EntryComposer`, `EntryComposerProps`
 
 [Full API →](api/chat-react.md)
 

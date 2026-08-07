@@ -6,10 +6,11 @@ Model/effort/harness picking has exactly one canonical implementation:
 
 sandbox-ui's `dashboard/ModelPicker` and the model menu in
 `chat/AgentSessionControls` are **legacy** — deprecated, frozen, and removed at
-sandbox-ui's next major. The same applies to agent-app's
-`/chat-react` `ComposerAgentControls`, which is an adapter over the legacy
-sandbox-ui strip: it stays exported and working (removing a published symbol is
-a major) but renders the old design and must not be adopted by new code.
+sandbox-ui's next major. agent-app's `/chat-react` `ComposerAgentControls`
+adapter over that legacy strip is **removed**: it no longer exists, and
+`EntryComposer`'s `agent` prop now takes the canonical
+`AgentSessionControlsProps` directly. The props mapping below is the migration
+path for any product still holding the old nested selection shape.
 
 ## Boundary
 
@@ -54,7 +55,7 @@ field, so no harness or effort control belongs there.
 | — | `supportsTools` (required; drives the "no tools" badge) |
 | `architecture`, `logos`, `hostProvider`, `modelLab`, `maxReasoningEffort` | — (not carried; provider branding is derived from `provider`) |
 
-### `AgentSessionControls` (sandbox-ui `chat/AgentSessionControls`, or the deprecated `/chat-react` `ComposerAgentControls` adapter → `agent-app/web-react` `AgentSessionControls`)
+### `AgentSessionControls` (sandbox-ui `chat/AgentSessionControls`, or the removed `/chat-react` `ComposerAgentControls` adapter → `agent-app/web-react` `AgentSessionControls`)
 
 | legacy prop | canonical prop | Notes |
 | --- | --- | --- |

@@ -4,9 +4,9 @@ import { ATTACHMENT_ACCEPT, useComposerAttachments } from '../web-react/use-comp
 import type { UseFileMentionsResult } from '../web-react/use-file-mentions'
 import type { ChatAttachmentInput, FileMention } from '../chat-routes/wire'
 import {
-  ComposerAgentControls,
-  type ComposerAgentControlsProps,
-} from './composer-agent-controls'
+  AgentSessionControls,
+  type AgentSessionControlsProps,
+} from '../web-react/agent-session-controls'
 import { ComposerModeControls } from './composer-mode-controls'
 import type { ComposerPlanModeSelection } from './types'
 
@@ -20,17 +20,18 @@ export interface EntryComposerProps {
   sendLabel?: string
   disabled?: boolean
   /**
-   * Agent identity (profile/backend/model/effort). Pass it and the control row renders;
+   * Agent identity (backend/model/effort). Pass it and the control row renders;
    * omit it and the composer ships without one. Omitting is a real choice for a
    * surface with nothing to choose — it should never be an oversight, which is
    * why this is one prop rather than a free-form slot a caller can forget.
    *
-   * NOTE: this prop routes through the deprecated `ComposerAgentControls`
-   * adapter (sandbox-ui's legacy strip). It keeps working until sandbox-ui's
-   * next major; the canonical picker cluster is `AgentSessionControls` from
-   * `/web-react` (see `docs/ui-picker-canon.md`).
+   * This is the CANONICAL picker cluster: `AgentSessionControls` from
+   * `/web-react` (its model menu IS the canonical `ModelPicker`). The legacy
+   * sandbox-ui adapter that used to back this prop was removed; the props
+   * mapping for migrating a stored selection lives in
+   * `docs/ui-picker-canon.md`.
    */
-  agent?: ComposerAgentControlsProps
+  agent?: AgentSessionControlsProps
   /**
    * Product-specific behavioral controls docked on the LEFT. A mode is an
    * on/off switch, not a value picker, so it sits apart from agent identity.
@@ -96,8 +97,8 @@ export interface EntryComposerProps {
  * themselves.
  *
  * The docked in-thread composer is NOT this component — it renders
- * `AgentComposer` directly with the same {@link ComposerAgentControls}, because
- * a docked composer has a transcript above it and no hero layout.
+ * `AgentComposer` directly with the same canonical `AgentSessionControls`,
+ * because a docked composer has a transcript above it and no hero layout.
  */
 export function EntryComposer({
   heading,
@@ -197,7 +198,7 @@ export function EntryComposer({
           }
           controls={modes ?? <ComposerModeControls planMode={planMode} />}
           trailing={
-            agent ? <ComposerAgentControls menuPlacement="down" {...agent} /> : undefined
+            agent ? <AgentSessionControls {...agent} /> : undefined
           }
         />
         {footer ? <div className="mt-7">{footer}</div> : null}
