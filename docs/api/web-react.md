@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-356 exports.
+357 exports.
 
 ### `activityTone`
 
@@ -364,6 +364,14 @@ interface ChatStreamToolResult
 
 ```ts
 interface ChatToolCallInfo
+```
+
+### `chatToolCallPart`
+
+`function` — Adapt a chat tool call to the canonical `@tangle-network/ui` `ToolPart`, so the row renders through ui's `InlineToolItem` — one run-row grammar shared with every other Tangle run view (the same adapt…
+
+```ts
+(call: ChatToolCallInfo) => ToolPart
 ```
 
 ### `ChatTurnFilePartInput`

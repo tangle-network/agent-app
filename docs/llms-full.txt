@@ -21724,6 +21724,14 @@ interface ChatStreamToolResult
 interface ChatToolCallInfo
 ```
 
+### `chatToolCallPart`
+
+`function` — Adapt a chat tool call to the canonical `@tangle-network/ui` `ToolPart`, so the row renders through ui's `InlineToolItem` — one run-row grammar shared with every other Tangle run view (the same adapt…
+
+```ts
+(call: ChatToolCallInfo) => ToolPart
+```
+
 ### `ChatTurnFilePartInput`
 
 `interface` — A non-text prompt part the upload route hands back and the client echoes on send.
