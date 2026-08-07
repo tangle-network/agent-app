@@ -6,8 +6,8 @@
  * component references an undefined token or tokens.css drops a required one.
  *
  * It also pins the parts of the token system CSS itself cannot keep honest:
- * the neutral ramp's ladder rule, the oklch source against its HSL mirror, the
- * per-mode border-tier inversion, the radius ladder's one root, the
+ * the neutral ramp's two-band rule, the oklch source against its HSL mirror,
+ * the per-mode border-tier strengths, the radius ladder's one root, the
  * reduced-motion collapse, and the JS mirror in src/theme/theme.ts.
  */
 
@@ -190,33 +190,75 @@ const parseOklch = (value: string): [number, number, number] => {
 }
 
 describe('the neutral ramp', () => {
-  const RAMP_BASE = 0.16
-  const RAMP_STEP = 0.03
-  const RAMP_CHROMA = 0.004
-  const RAMP_HUE = 286
+  const DARK_BAND_MAX_L = 0.4
+  const DARK_BAND_HUE = 280
+  const DARK_BAND_CHROMA: readonly [number, number] = [0.014, 0.018]
+  const LIGHT_BAND_MAX_CHROMA = 0.008
+  const LIGHT_BAND_HUES = [280, 286]
 
-  it('every stop sits on the ladder L = 0.16 + 0.03n', () => {
+  it('every stop is named its lightness', () => {
+    // The stop's name is its oklch lightness × 100, rounded to the nearest
+    // integer — that is what keeps the ladder legible at every call site
+    // instead of only in this file.
     const offenders: string[] = []
     for (const [key, { oklch }] of rampStops()) {
       const [lightness] = parseOklch(oklch)
-      const n = (lightness - RAMP_BASE) / RAMP_STEP
-      if (Math.abs(n - Math.round(n)) > 1e-9) offenders.push(`--neutral-${key}: L ${lightness} is not a rung (n = ${n})`)
-      // The stop's NAME is its lightness — that is what makes the ladder legible
-      // at every call site instead of only in this file.
-      if (Math.abs(lightness * 100 - key) > 1e-9) offenders.push(`--neutral-${key}: name disagrees with L ${lightness}`)
+      if (Math.abs(lightness * 100 - key) > 0.5) offenders.push(`--neutral-${key}: name disagrees with L ${lightness}`)
     }
     expect(offenders, offenders.join('\n')).toEqual([])
   })
 
-  it('chroma is one constant, not a wandering one', () => {
+  it('chroma is banded, not wandering', () => {
+    // The dark band (the dark theme's surface ladder) carries the deliberate
+    // cool cast at hue 280; the light band stays near-neutral. The legacy mid
+    // stops keep hue 286 — at C 0.004 the 6° is below what sRGB can show.
     const offenders: string[] = []
     for (const [key, { oklch }] of rampStops()) {
       const [lightness, chroma, hue] = parseOklch(oklch)
       // sRGB admits no chroma at L 1 — white is the only colour there.
-      const expected = lightness >= 1 ? 0 : RAMP_CHROMA
-      if (chroma !== expected) offenders.push(`--neutral-${key}: chroma ${chroma}, expected ${expected}`)
-      if (chroma > 0 && hue !== RAMP_HUE) offenders.push(`--neutral-${key}: hue ${hue}, expected ${RAMP_HUE}`)
+      if (lightness >= 1) {
+        if (chroma !== 0) offenders.push(`--neutral-${key}: chroma ${chroma} at L 1, expected 0`)
+        continue
+      }
+      if (lightness <= DARK_BAND_MAX_L) {
+        const [lo, hi] = DARK_BAND_CHROMA
+        if (chroma < lo || chroma > hi) offenders.push(`--neutral-${key}: dark-band chroma ${chroma}, expected ${lo}–${hi}`)
+        if (hue !== DARK_BAND_HUE) offenders.push(`--neutral-${key}: dark-band hue ${hue}, expected ${DARK_BAND_HUE}`)
+      } else {
+        if (chroma > LIGHT_BAND_MAX_CHROMA) offenders.push(`--neutral-${key}: light-band chroma ${chroma} > ${LIGHT_BAND_MAX_CHROMA}`)
+        if (!LIGHT_BAND_HUES.includes(hue)) offenders.push(`--neutral-${key}: light-band hue ${hue}, expected one of ${LIGHT_BAND_HUES}`)
+      }
     }
+    expect(offenders, offenders.join('\n')).toEqual([])
+  })
+
+  it('the dark ladder keeps its measured separation', () => {
+    // The audit that shaped this band measured the OLD deep surfaces at
+    // 1.05:1 between adjacent rungs — physically imperceptible, so cards did
+    // not read as containers. The chain floor keeps a future retune from
+    // quietly re-flattening it, and the canvas→card span is the hierarchy the
+    // fix exists for. Measured on the shipped stops: chain steps 1.052 /
+    // 1.058 / 1.044 / 1.160 / 1.151 / 1.180, canvas→card 1.163.
+    const CHAIN_FLOOR = 1.04
+    const CANVAS_TO_CARD = 1.14
+    const band = [...rampStops()]
+      .map(([key, { oklch }]) => ({ key, rgb: oklchToRgb(parseOklch(oklch)), l: parseOklch(oklch)[0] }))
+      .filter((s) => s.l <= DARK_BAND_MAX_L)
+      .sort((a, b) => a.l - b.l)
+    expect(band.length).toBeGreaterThanOrEqual(7)
+    const offenders: string[] = []
+    let prevChroma = Infinity
+    for (let i = 0; i < band.length; i++) {
+      const [, chroma] = parseOklch(rampStops().get(band[i]!.key)!.oklch)
+      if (chroma > prevChroma) offenders.push(`--neutral-${band[i]!.key}: chroma rises as the band lifts`)
+      prevChroma = chroma
+      if (i > 0) {
+        const step = contrastRatio(band[i - 1]!.rgb, band[i]!.rgb)
+        if (step < CHAIN_FLOOR) offenders.push(`--neutral-${band[i - 1]!.key} → --neutral-${band[i]!.key}: ${step.toFixed(3)} < ${CHAIN_FLOOR}`)
+      }
+    }
+    const canvasToCard = contrastRatio(stopRgb(16), stopRgb(24))
+    if (canvasToCard < CANVAS_TO_CARD) offenders.push(`canvas→card ${canvasToCard.toFixed(3)} < ${CANVAS_TO_CARD}`)
     expect(offenders, offenders.join('\n')).toEqual([])
   })
 
@@ -278,13 +320,13 @@ function tierStrength(value: string): number {
 
 describe('border tiers', () => {
   // Calibrated against the rendered 1px hairline: at 1.039 contrast (Cabinet's
-  // 22% applied to our light card) the line is not there; at 1.073 (our 40%) it
-  // is. Anything the system ships as a VISIBLE edge has to clear this.
+  // 22% applied to our old light card) the line is not there; at 1.072 (our old
+  // 40%) it is. Anything the system ships as a VISIBLE edge has to clear this.
   const HAIRLINE_FLOOR = 1.07
-  const LIGHT_BORDER = 91
-  const LIGHT_CARD = 97
-  const DARK_BORDER = 25
-  const DARK_CARD = 19
+  const LIGHT_BORDER = 85
+  const LIGHT_CARD = 100
+  const DARK_BORDER = 36
+  const DARK_CARD = 24
 
   const tiers = (defs: Map<string, string>) => ({
     soft: tierStrength(defs.get('--border-soft')!),
@@ -297,12 +339,16 @@ describe('border tiers', () => {
     expect(cardEdge).toBeLessThan(1)
   })
 
-  it('dark INVERTS: both tiers are full strength', () => {
-    // The load-bearing assertion. "Harmonising" dark to soften like light is
-    // the exact change that erases the border, and this is what stops it.
+  it('dark runs the same three tiers, one step stronger', () => {
+    // The tiers USED to collapse to full strength in dark — the old border
+    // (L 0.25) measured 1.158 on its card at 100%, so any softening erased the
+    // line. The ladder revision lifted the border to L 0.365, which buys the
+    // room to soften: 60% on the new card reads 1.292 in this test's composite
+    // model (1.265 rendered). "Harmonising" dark back to light's 40/60 — or
+    // collapsing it to 100/100 again — both fail here.
     const { soft, cardEdge } = tiers(darkDefs())
-    expect(soft).toBe(1)
-    expect(cardEdge).toBe(1)
+    expect(soft).toBe(0.6)
+    expect(cardEdge).toBe(0.8)
   })
 
   it('the shipped light tiers still resolve as a 1px line on a card', () => {
@@ -313,18 +359,51 @@ describe('border tiers', () => {
     expect(contrastRatio(compositeOver(border, cardEdge, card), card)).toBeGreaterThanOrEqual(HAIRLINE_FLOOR)
   })
 
-  it('the same softening buys less in dark, which is why dark does not soften', () => {
-    const { soft } = tiers(rootDefs())
-    const lightCard = stopRgb(LIGHT_CARD)
-    const darkCard = stopRgb(DARK_CARD)
-    const lightSoftened = contrastRatio(compositeOver(stopRgb(LIGHT_BORDER), soft, lightCard), lightCard)
-    const darkSoftened = contrastRatio(compositeOver(stopRgb(DARK_BORDER), soft, darkCard), darkCard)
-    expect(darkSoftened).toBeLessThan(lightSoftened)
-    expect(darkSoftened).toBeLessThan(HAIRLINE_FLOOR)
-    // …and dark starts with less headroom to give away in the first place.
-    const darkFull = contrastRatio(stopRgb(DARK_BORDER), darkCard)
-    const lightFull = contrastRatio(stopRgb(LIGHT_BORDER), lightCard)
-    expect(darkFull).toBeLessThan(lightFull)
+  it('the shipped dark tiers clear the hairline floor on every surface they divide', () => {
+    // The premise that collapsed the old tiers is gone: in this test's
+    // composite model, 60% reads 1.348 / 1.292 / 1.196 / 1.103 on background /
+    // card / muted / popover — all above the floor the old FULL-strength
+    // border could not clear on muted (1.085).
+    const { soft, cardEdge } = tiers(darkDefs())
+    const border = stopRgb(DARK_BORDER)
+    for (const surface of [19, 24, 28, 33].map(stopRgb)) {
+      expect(contrastRatio(compositeOver(border, soft, surface), surface)).toBeGreaterThanOrEqual(HAIRLINE_FLOOR)
+      expect(contrastRatio(compositeOver(border, cardEdge, surface), surface)).toBeGreaterThanOrEqual(HAIRLINE_FLOOR)
+    }
+  })
+})
+
+describe('elevation shadows', () => {
+  /** The alpha of every layer in a `0 1px 2px hsl(var(--foreground) / 0.05), …` value. */
+  const alphas = (value: string) => [...value.matchAll(/\/\s*([\d.]+)\s*\)/g)].map((m) => Number(m[1]))
+
+  it('both themes define both elevation tokens', () => {
+    // Both values read var(--foreground), so the parity guard above exempts
+    // them as "derived" — but the dark ALPHA is a deliberate doubling the
+    // cascade cannot derive, so this guard names them directly.
+    for (const name of ['--shadow-raised', '--shadow-overlay']) {
+      expect(rootDefs().has(name), `${name} missing from :root`).toBe(true)
+      expect(darkDefs().has(name), `${name} missing from the dark scope`).toBe(true)
+    }
+  })
+
+  it('dark strengthens every layer against the near-black surfaces', () => {
+    // The same shadow over a near-black surface reads at roughly half its
+    // light-theme strength, so dark compensates at the token rather than at
+    // every component.
+    for (const name of ['--shadow-raised', '--shadow-overlay']) {
+      const light = alphas(rootDefs().get(name)!)
+      const dark = alphas(darkDefs().get(name)!)
+      expect(dark.length, `${name} layer count`).toBe(light.length)
+      expect(light.length, `${name} should be a two-layer ambient`).toBe(2)
+      dark.forEach((a, i) => expect(a, `${name} layer ${i}: dark ${a} vs light ${light[i]}`).toBeGreaterThan(light[i]!))
+    }
+  })
+
+  it('the preset exposes them as shadow-raised / shadow-overlay utilities', () => {
+    const boxShadow = agentAppPreset.theme.extend.boxShadow
+    expect(boxShadow.raised).toBe('var(--shadow-raised)')
+    expect(boxShadow.overlay).toBe('var(--shadow-overlay)')
   })
 })
 
@@ -347,8 +426,8 @@ describe('border tiers', () => {
 describe('foreground pairings clear AA in BOTH themes', () => {
   const AA_SMALL = 4.5
   const TINT_ALPHA = 0.06
-  const LIGHT_PAGE = 100
-  const DARK_PAGE = 16
+  const LIGHT_PAGE = 94
+  const DARK_PAGE = 19
 
   const triple = (defs: Map<string, string>, name: string): Rgb => {
     const raw = defs.get(name)
@@ -538,11 +617,11 @@ describe('the JS mirror in src/theme/theme.ts', () => {
     })
   }
 
-  it('carries the border tiers, and dark keeps them full strength', () => {
+  it('carries the same border tiers as tokens.css, in both modes', () => {
     expect(tierStrength(lightTheme.borderSoft!)).toBe(tierStrength(rootDefs().get('--border-soft')!))
     expect(tierStrength(lightTheme.cardEdge!)).toBe(tierStrength(rootDefs().get('--card-edge')!))
-    expect(tierStrength(darkTheme.borderSoft!)).toBe(1)
-    expect(tierStrength(darkTheme.cardEdge!)).toBe(1)
+    expect(tierStrength(darkTheme.borderSoft!)).toBe(tierStrength(darkDefs().get('--border-soft')!))
+    expect(tierStrength(darkTheme.cardEdge!)).toBe(tierStrength(darkDefs().get('--card-edge')!))
   })
 
   it('themeToCssVars never emits a softer edge than the theme asked for', () => {
@@ -587,6 +666,15 @@ describe('the Tailwind preset', () => {
     expect(borderColor).not.toHaveProperty('input')
     expect(colors.border).toBe('hsl(var(--border))')
     expect(colors.input).toBe('hsl(var(--input))')
+  })
+
+  it('climbs the MD3 surface ladder monotonically', () => {
+    // card < secondary < popover on the dark ladder (L 0.235 / 0.285 / 0.325).
+    // Mapping high→popover / highest→secondary INVERTED the top two rungs —
+    // the picker floating above the composer painted DARKER than it.
+    expect(colors['surface-container']).toBe('hsl(var(--card))')
+    expect(colors['surface-container-high']).toBe('hsl(var(--secondary))')
+    expect(colors['surface-container-highest']).toBe('hsl(var(--popover))')
   })
 
   it('adds radius and motion under names Tailwind does not already own', () => {
