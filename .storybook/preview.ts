@@ -143,6 +143,19 @@ const preview: Preview = {
   },
   parameters: {
     backgrounds: { disable: true },
+    /**
+     * Center by default: most stories render a single component, and the
+     * padded default anchored every one of them top-left. Stories that render
+     * wide composites (> ~1100px) or multi-cell AllStates grids keep an
+     * explicit `layout: 'padded'` — under `centered` an over-wide canvas
+     * clips on the LEFT with no scroll affordance. Full-app shells keep
+     * `fullscreen`. Upward-opening popovers (ModelPicker, EffortPicker, the
+     * gear menu) use the `withPopoverHeadroom` decorator from
+     * src/stories/chat-controls/fixtures.tsx regardless of layout — inline
+     * `bottom-full` popovers otherwise extend into unscrollable negative-Y
+     * space above the canvas.
+     */
+    layout: 'centered',
     controls: {
       matchers: {
         color: /(background|color)$/i,

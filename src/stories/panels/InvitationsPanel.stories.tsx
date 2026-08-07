@@ -117,6 +117,8 @@ export const Interactive: Story = {
 /** Lifecycle badges, delivery badges, and the role gate side by side. */
 export const AllStates: Story = {
   name: 'All states',
+  // Two-column grid of 440px cells at lg — left-anchored so it can never clip.
+  parameters: { layout: 'padded' },
   render: () => (
     <div className="grid gap-8 p-4 lg:grid-cols-2">
       {(

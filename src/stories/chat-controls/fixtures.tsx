@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useRef, type ReactNode } from 'react'
+import type { Decorator } from '@storybook/react'
 
 import type {
   AgentActivityPage,
@@ -608,6 +609,29 @@ export function AutoClick({ children, selector }: { children: ReactNode; selecto
   }, [selector])
   return <div ref={hostRef}>{children}</div>
 }
+
+/**
+ * Real positive-Y headroom for upward-opening popovers. ModelPicker,
+ * EffortPicker, and AgentSessionControls' menus are inline-absolute
+ * `bottom-full` popovers: opened near the canvas top they extend into
+ * negative-Y space, which the iframe cannot scroll to — the popover reads as
+ * clipped no matter the layout. (The old `pt-[NNNpx]` wrappers only pushed
+ * the trigger down a fixed amount; the popover still overflowed whenever the
+ * canvas was shorter than the pad plus the popover.)
+ *
+ * This decorator anchors the story to the BOTTOM of a 520px-tall block
+ * (`flex items-end`), so the popover opens into canvas space above the
+ * trigger. 520px covers the tallest popover (ModelPicker ~470px; the gear
+ * menu ~260px and EffortPicker ~210px fit with room to spare). Works under
+ * both `centered` and `padded` layouts.
+ *
+ *   decorators: [withPopoverHeadroom]
+ */
+export const withPopoverHeadroom: Decorator = (Story) => (
+  <div className="flex min-h-[520px] items-end">
+    <Story />
+  </div>
+)
 
 /**
  * Minimal line-based markdown renderer for the plan/question cards'

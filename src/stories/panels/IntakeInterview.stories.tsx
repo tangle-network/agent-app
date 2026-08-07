@@ -117,6 +117,8 @@ export const Interactive: Story = {
 /** The whole interview arc on one canvas. */
 export const AllStates: Story = {
   name: 'All states',
+  // Two-column grid of 520px cells at xl — left-anchored so it can never clip.
+  parameters: { layout: 'padded' },
   render: () => (
     <div className="grid gap-8 p-4 xl:grid-cols-2">
       {(

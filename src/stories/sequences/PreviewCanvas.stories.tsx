@@ -82,6 +82,8 @@ export const DrawError: Story = {
 /** The three paint states side by side: caption frame, black gap, plain frame. */
 export const AllStates: Story = {
   name: 'All States',
+  // Three-column grid up to 1100px wide — left-anchored so it can never clip.
+  parameters: { layout: 'padded' },
   decorators: [
     (Story) => (
       <div className="w-full max-w-[1100px]">

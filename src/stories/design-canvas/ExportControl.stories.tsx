@@ -57,6 +57,8 @@ export const OpenWithDefaults: Story = {
 /** Trigger plus both popover configurations in one glance. */
 export const AllStates: Story = {
   name: 'All states (composite)',
+  // Trigger + open-popover cells side by side — left-anchored so nothing clips.
+  parameters: { layout: 'padded' },
   render: () => (
     <div className="flex items-start gap-4">
       <div className="flex flex-col gap-1.5">

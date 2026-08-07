@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react'
 import { useState } from 'react'
 
 import { EffortPicker, EffortMeter, effortMeterFill, DEFAULT_EFFORT_LEVELS } from '../../web-react'
-import { AutoClick } from './fixtures'
+import { AutoClick, withPopoverHeadroom } from './fixtures'
 
 /**
  * The thinking-budget pill. Only ever shown for `supportsReasoning` models —
@@ -20,6 +20,7 @@ type Story = StoryObj<typeof EffortPicker>
 
 /** Closed pill, interactive — click to switch the reasoning budget. */
 export const Interactive: Story = {
+  decorators: [withPopoverHeadroom],
   render: () => {
     const [effort, setEffort] = useState('medium')
     return <EffortPicker value={effort} onChange={setEffort} />
@@ -28,15 +29,13 @@ export const Interactive: Story = {
 
 /** Open menu: Off / Quick / Standard / Extended. */
 export const Open: Story = {
-  parameters: { layout: 'padded' },
+  decorators: [withPopoverHeadroom],
   render: () => {
     const [effort, setEffort] = useState('high')
     return (
-      <div className="pt-[260px]">
-        <AutoClick>
-          <EffortPicker value={effort} onChange={setEffort} />
-        </AutoClick>
-      </div>
+      <AutoClick>
+        <EffortPicker value={effort} onChange={setEffort} />
+      </AutoClick>
     )
   },
 }
@@ -44,6 +43,7 @@ export const Open: Story = {
 /** Relabelled levels — ids stay stable, only the copy changes. */
 export const CustomLabels: Story = {
   name: 'Custom labels',
+  decorators: [withPopoverHeadroom],
   render: () => {
     const [effort, setEffort] = useState('fast')
     return (
@@ -63,6 +63,7 @@ export const CustomLabels: Story = {
 /** No prefix label — just the level name on the pill. */
 export const NoLabel: Story = {
   name: 'No label',
+  decorators: [withPopoverHeadroom],
   args: { value: 'low', onChange: () => {}, label: '' },
 }
 
