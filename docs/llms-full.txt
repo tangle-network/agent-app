@@ -21988,12 +21988,36 @@ interface DurablePlanDecisionResult
 interface DurablePlanFollowUpReceipt
 ```
 
+### `EFFORT_METER_SEGMENTS`
+
+`const` — Segments the meter draws — fixed geometry so the ladder stays tabular across levels (and across the trigger and its menu rows).
+
+```ts
+4
+```
+
 ### `EffortLevel`
 
 `interface` — One reasoning-budget level: the engine `id` is unchanged (the value the product sends to the loop); only the user-facing `label` is renamed to the plainer "how hard should it think" vocabulary from d…
 
 ```ts
 interface EffortLevel
+```
+
+### `EffortMeter`
+
+`function` — The thinking-strength meter: four 12px bars, filled count = level, filled opacity ramping 25→100% left to right (unfilled at a faint ghost).
+
+```ts
+({ fill, className }: { fill: number; className?: string | undefined; }) => Element
+```
+
+### `effortMeterFill`
+
+`function` — Filled-segment count for a level: 0 for off/none (or an id the levels list does not carry); otherwise the level's position among the non-off choices scaled onto the meter, so the ladder reads low < m…
+
+```ts
+(levelId: string, levels?: readonly EffortLevel[]) => number
 ```
 
 ### `EffortPicker`
@@ -22194,6 +22218,22 @@ interface FlowWaterfallProps
 
 ```ts
 (msg: ChatMessageMetrics) => string | null
+```
+
+### `HarnessGlyph`
+
+`function` — Brand mark for a harness — size it from the call site (`className="h-4 w-4"`).
+
+```ts
+({ harness, className }: HarnessGlyphProps) => ReactNode
+```
+
+### `HarnessGlyphProps`
+
+`interface`
+
+```ts
+interface HarnessGlyphProps
 ```
 
 ### `hasSecretField`
@@ -22698,6 +22738,14 @@ type NoticeKind
 
 ```ts
 type NoticePersistedPart
+```
+
+### `OVERLAY_SHADOW`
+
+`const` — The one overlay elevation for floating surfaces — picker menus, popovers, drawers, modals.
+
+```ts
+"shadow-[0_1px_2px_hsl(var(--foreground)/0.05),0_12px_28px_hsl(var(--foreground)/0.07)] dark:shadow-[0_1px_2px_hsl(var(…
 ```
 
 ### `parseInteractionAnswers`

@@ -17024,10 +17024,28 @@
           "doc": "Stable authority receipt for the follow-up turn dispatched by a plan decision."
         },
         {
+          "name": "EFFORT_METER_SEGMENTS",
+          "kind": "const",
+          "signature": "4",
+          "doc": "Segments the meter draws — fixed geometry so the ladder stays tabular across levels (and across the trigger and its menu rows)."
+        },
+        {
           "name": "EffortLevel",
           "kind": "interface",
           "signature": "interface EffortLevel",
           "doc": "One reasoning-budget level: the engine `id` is unchanged (the value the product sends to the loop); only the user-facing `label` is renamed to the plainer \"how hard should it think\" vocabulary from d…"
+        },
+        {
+          "name": "EffortMeter",
+          "kind": "function",
+          "signature": "({ fill, className }: { fill: number; className?: string | undefined; }) => Element",
+          "doc": "The thinking-strength meter: four 12px bars, filled count = level, filled opacity ramping 25→100% left to right (unfilled at a faint ghost)."
+        },
+        {
+          "name": "effortMeterFill",
+          "kind": "function",
+          "signature": "(levelId: string, levels?: readonly EffortLevel[]) => number",
+          "doc": "Filled-segment count for a level: 0 for off/none (or an id the levels list does not carry); otherwise the level's position among the non-off choices scaled onto the meter, so the ladder reads low < m…"
         },
         {
           "name": "EffortPicker",
@@ -17178,6 +17196,18 @@
           "kind": "function",
           "signature": "(msg: ChatMessageMetrics) => string | null",
           "doc": "\"38 tok/s\" from completion tokens over first-token→end duration; null when unknown."
+        },
+        {
+          "name": "HarnessGlyph",
+          "kind": "function",
+          "signature": "({ harness, className }: HarnessGlyphProps) => ReactNode",
+          "doc": "Brand mark for a harness — size it from the call site (`className=\"h-4 w-4\"`)."
+        },
+        {
+          "name": "HarnessGlyphProps",
+          "kind": "interface",
+          "signature": "interface HarnessGlyphProps",
+          "doc": null
         },
         {
           "name": "hasSecretField",
@@ -17556,6 +17586,12 @@
           "kind": "type",
           "signature": "type NoticePersistedPart",
           "doc": "Define a persisted notice part with type, id, kind, and text properties"
+        },
+        {
+          "name": "OVERLAY_SHADOW",
+          "kind": "const",
+          "signature": "\"shadow-[0_1px_2px_hsl(var(--foreground)/0.05),0_12px_28px_hsl(var(--foreground)/0.07)] dark:shadow-[0_1px_2px_hsl(var(…",
+          "doc": "The one overlay elevation for floating surfaces — picker menus, popovers, drawers, modals."
         },
         {
           "name": "parseInteractionAnswers",
