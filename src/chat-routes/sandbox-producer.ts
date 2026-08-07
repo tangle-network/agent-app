@@ -421,8 +421,8 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
   const partMap = new Map<string, JsonRecord>()
   const tracker: TextTracker = { seen: new Map() }
   const usage: ChatTurnUsage = {}
-  /** Tool ids already announced as `tool_call` / settled as `tool_result`. */
-  const announcedTools = new Set<string>()
+  /** Whether each announced tool_call carried populated arguments. */
+  const announcedToolArgs = new Map<string, boolean>()
   const settledTools = new Set<string>()
   /** Id-less step boundaries: one occurrence per key, never merged. */
   let stepCounter = 0
@@ -526,11 +526,18 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
             const state = asRecord(persisted?.state)
             const toolId = String(persisted?.id ?? '')
             const toolName = String(persisted?.tool ?? 'tool')
-            if (toolId && !announcedTools.has(toolId)) {
-              announcedTools.add(toolId)
+            const args = asRecord(state?.input) ?? {}
+            const hasPopulatedArgs = Object.keys(args).length > 0
+            const announcedWithPopulatedArgs = announcedToolArgs.get(toolId)
+            if (
+              toolId &&
+              (announcedWithPopulatedArgs === undefined ||
+                (!announcedWithPopulatedArgs && hasPopulatedArgs && !settledTools.has(toolId)))
+            ) {
+              announcedToolArgs.set(toolId, hasPopulatedArgs)
               yield {
                 type: 'tool_call',
-                call: { toolCallId: toolId, toolName, args: asRecord(state?.input) ?? {} },
+                call: { toolCallId: toolId, toolName, args },
               }
             }
             const status = String(state?.status ?? '')

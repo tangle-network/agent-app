@@ -254,6 +254,102 @@ describe('createSandboxChatProducer', () => {
     expect(parts[0]).toMatchObject({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'completed', output: '3 hits' } })
   })
 
+  it('re-announces a tool once when its input arrives after the pending frame', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([
+        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'pending' } }),
+        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'running', input: { q: 'x' } } }),
+        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'running', input: { q: 'x' } } }),
+        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'completed', input: { q: 'x' }, output: '3 hits' } }),
+      ]),
+    })
+
+    expect(await drain(producer.stream)).toEqual([
+      { type: 'tool_call', call: { toolCallId: 'call-1', toolName: 'search', args: {} } },
+      { type: 'tool_call', call: { toolCallId: 'call-1', toolName: 'search', args: { q: 'x' } } },
+      {
+        type: 'tool_result',
+        toolCallId: 'call-1',
+        toolName: 'search',
+        outcome: { ok: true, result: '3 hits' },
+      },
+    ])
+  })
+
+  it('re-announces populated input before the result when it first arrives on completion', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([
+        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'pending' } }),
+        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'completed', input: { q: 'x' }, output: '3 hits' } }),
+      ]),
+    })
+
+    expect(await drain(producer.stream)).toEqual([
+      { type: 'tool_call', call: { toolCallId: 'call-1', toolName: 'search', args: {} } },
+      { type: 'tool_call', call: { toolCallId: 'call-1', toolName: 'search', args: { q: 'x' } } },
+      {
+        type: 'tool_result',
+        toolCallId: 'call-1',
+        toolName: 'search',
+        outcome: { ok: true, result: '3 hits' },
+      },
+    ])
+  })
+
+  it('does not re-announce empty input or updates after settlement', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([
+        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'pending' } }),
+        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'running', input: {} } }),
+        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'completed', input: {}, output: 'done' } }),
+        // A populated update after tool_result must not reopen the settled row.
+        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'completed', input: { late: true }, output: 'done' } }),
+      ]),
+    })
+
+    expect(await drain(producer.stream)).toEqual([
+      { type: 'tool_call', call: { toolCallId: 'call-1', toolName: 'search', args: {} } },
+      {
+        type: 'tool_result',
+        toolCallId: 'call-1',
+        toolName: 'search',
+        outcome: { ok: true, result: 'done' },
+      },
+    ])
+  })
+
+  it('re-announces each tool in a parallel batch when its input arrives', async () => {
+    const producer = createSandboxChatProducer({
+      events: feed([
+        partUpdated({ type: 'tool', id: 'call-1', tool: 'read', state: { status: 'pending' } }),
+        partUpdated({ type: 'tool', id: 'call-2', tool: 'glob', state: { status: 'pending' } }),
+        partUpdated({ type: 'tool', id: 'call-1', tool: 'read', state: { status: 'running', input: { path: 'a.ts' } } }),
+        partUpdated({ type: 'tool', id: 'call-2', tool: 'glob', state: { status: 'running', input: { pattern: '*.ts' } } }),
+        partUpdated({ type: 'tool', id: 'call-1', tool: 'read', state: { status: 'completed', input: { path: 'a.ts' }, output: 'a' } }),
+        partUpdated({ type: 'tool', id: 'call-2', tool: 'glob', state: { status: 'completed', input: { pattern: '*.ts' }, output: ['a.ts'] } }),
+      ]),
+    })
+
+    expect(await drain(producer.stream)).toEqual([
+      { type: 'tool_call', call: { toolCallId: 'call-1', toolName: 'read', args: {} } },
+      { type: 'tool_call', call: { toolCallId: 'call-2', toolName: 'glob', args: {} } },
+      { type: 'tool_call', call: { toolCallId: 'call-1', toolName: 'read', args: { path: 'a.ts' } } },
+      { type: 'tool_call', call: { toolCallId: 'call-2', toolName: 'glob', args: { pattern: '*.ts' } } },
+      {
+        type: 'tool_result',
+        toolCallId: 'call-1',
+        toolName: 'read',
+        outcome: { ok: true, result: 'a' },
+      },
+      {
+        type: 'tool_result',
+        toolCallId: 'call-2',
+        toolName: 'glob',
+        outcome: { ok: true, result: ['a.ts'] },
+      },
+    ])
+  })
+
   it('terminalizes a tool left running when the stream ends abnormally', async () => {
     const producer = createSandboxChatProducer({
       events: feed([
