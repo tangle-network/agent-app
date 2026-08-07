@@ -1,4 +1,5 @@
 import { DEFAULT_CEILING_TOLERANCE_MS, computeExpectedCeiling } from './ceiling'
+import { decideBoxOwnership } from './ownership'
 import { chargeNanoUsd, parseSettlementReference, settlementSandboxId } from './reference'
 import type { SpendLedgerStorePort } from './store'
 import {
@@ -9,6 +10,9 @@ import {
   type SpendBoxRecord,
   type SpendCheckId,
   type SpendFinding,
+  type SpendOwnershipRule,
+  type SpendOwnershipSummary,
+  type SpendOwnershipVerdict,
   type SpendReport,
 } from './types'
 
@@ -65,13 +69,30 @@ export interface ReconcileSpendOptions {
   /**
    * Settled ledger rows, supplied by the product's own authenticated fetch.
    *
-   * MUST be scoped to boxes this product owns. Products bill to a shared company
-   * key, so an unscoped fetch returns every sibling product's settlements and
-   * every one is a correct — and useless — `unknown-box` finding.
+   * The fetch can only scope to a WALLET — `product: 'sandbox'` is the
+   * platform's service taxonomy, not this product's — so on an account running
+   * more than one of our products these rows carry the siblings' boxes too.
+   * {@link ReconcileSpendOptions.ownership} is what separates them.
    */
   readonly rows: readonly SettlementRow[]
   /** The product's expectation ledger. */
   readonly store: SpendLedgerStorePort
+  /**
+   * Which of those rows are THIS product's — see {@link SpendOwnershipRule} and
+   * the shipped `ownedByBillingKeys`.
+   *
+   * Omitting it is safe and changes nothing: the pass claims every box, which is
+   * the behaviour that shipped, and the direction that over-reports rather than
+   * under-reports. It is not silent about it — `report.ownership.declared` is
+   * `false`, `formatSpendReport` says so above the findings, and every
+   * `unknown-box` finding states on its face that a sibling product's box is
+   * indistinguishable from a charge that is not ours.
+   *
+   * Declaring it never weakens the ledger-backed checks: ownership is consulted
+   * ONLY for boxes with no expectation record, so `over-ceiling` on a recorded
+   * box fires whatever the rule says.
+   */
+  readonly ownership?: SpendOwnershipRule
   /** Treated as "now". Default `Date.now()`. */
   readonly asOf?: number
   /** Ceiling slack. Default {@link DEFAULT_CEILING_TOLERANCE_MS}. */
@@ -146,6 +167,61 @@ function median(values: readonly number[]): number {
   return (((sorted[mid - 1] as number) + (sorted[mid] as number)) / 2)
 }
 
+/**
+ * What an `unknown-box` finding can honestly claim about WHOSE box it is.
+ *
+ * Three different statements, because the reader's next action differs: chase a
+ * charge inside our own billing identity, chase a charge nothing attributes,
+ * or first go and declare an ownership rule so the question can be answered at
+ * all. A single message covering all three would be the vaguest of the three.
+ */
+function unknownBoxAttribution(
+  ownership: SpendOwnershipRule | null,
+  verdict: SpendOwnershipVerdict,
+): string {
+  if (!ownership) {
+    return (
+      ' No ownership rule was declared for this pass, so a sibling product\'s box on the same ' +
+      'wallet reads exactly like a charge that is not ours — this finding could be either.'
+    )
+  }
+  if (verdict === 'undecidable') {
+    return (
+      ` The ownership rule (${ownership.label}) could not decide it: the settlement carries no ` +
+      'billing-key attribution to exclude it by, so it is reported rather than dropped.'
+    )
+  }
+  return ` The ownership rule (${ownership.label}) attributes it to THIS product.`
+}
+
+function unknownBoxRemedy(
+  ownership: SpendOwnershipRule | null,
+  verdict: SpendOwnershipVerdict,
+  sandboxId: string,
+): string {
+  const lookup = `Look up ${sandboxId} on the platform before disputing.`
+  if (!ownership) {
+    return (
+      'Declare `ownership` (see `ownedByBillingKeys`) so a sibling product\'s box stops reading as ' +
+      'a discrepancy — without it this check cannot tell one from a charge that is not ours. ' +
+      'Until then, treat this as one of three things: a sibling product on the same wallet, a box ' +
+      `provisioned outside the recorded seam, or a box that is not ours at all. ${lookup}`
+    )
+  }
+  if (verdict === 'undecidable') {
+    return (
+      'An unattributable charge on a shared wallet is exactly what a phantom charge looks like, so ' +
+      'it is reported by design rather than excluded. Confirm the row genuinely predates key ' +
+      `attribution before dismissing it. ${lookup}`
+    )
+  }
+  return (
+    'This box is inside this product\'s own billing attribution and the product never recorded it, ' +
+    'so it is either a provision that bypassed the recorded seam or a charge that is not ours. ' +
+    `${lookup}`
+  )
+}
+
 function emptyFinding(check: SpendCheckId): Omit<SpendFinding, 'message' | 'remedy'> {
   return {
     check,
@@ -182,9 +258,16 @@ export async function reconcileSpend(options: ReconcileSpendOptions): Promise<Sp
   const checksRun = SPEND_CHECKS.filter((check) => !skip.has(check))
   const runs = (check: SpendCheckId): boolean => !skip.has(check)
 
+  const ownership = options.ownership ?? null
+
   const findings: SpendFinding[] = []
   let settledNanoUsd = 0
   let creditedNanoUsd = 0
+  let ownedBoxes = 0
+  let ownedNanoUsd = 0
+  let undecidableBoxes = 0
+  let foreignNanoUsd = 0
+  const foreignSandboxIds: string[] = []
 
   // ── group charges by the box they are attributable to ──────────────────────
   const byBox = new Map<string, SettlementRow[]>()
@@ -211,6 +294,26 @@ export async function reconcileSpend(options: ReconcileSpendOptions): Promise<Sp
     const referenceIds = rows.map((row) => row.referenceId ?? row.id)
     const charged = rows.reduce((sum, row) => sum + chargeNanoUsd(row), 0)
 
+    // A box the product RECORDED is this product's by construction, and no
+    // ownership rule may un-own it. That is what stops a wrong or over-narrow
+    // rule from hiding an over-ceiling finding: the ledger decides recorded-ness,
+    // the rule decides attribution, and the rule only ever gets a say about the
+    // residue neither of them has claimed.
+    const verdict: SpendOwnershipVerdict = record
+      ? 'mine'
+      : ownership
+        ? decideBoxOwnership(ownership, sandboxId, rows)
+        : 'mine'
+
+    if (verdict === 'foreign') {
+      foreignSandboxIds.push(sandboxId)
+      foreignNanoUsd += charged
+      continue
+    }
+    ownedBoxes += 1
+    ownedNanoUsd += charged
+    if (verdict === 'undecidable') undecidableBoxes += 1
+
     // ── unknown-box ──────────────────────────────────────────────────────────
     if (!record) {
       if (runs('unknown-box')) {
@@ -222,12 +325,9 @@ export async function reconcileSpend(options: ReconcileSpendOptions): Promise<Sp
           settledNanoUsd: charged,
           message:
             `${usd(charged)} settled across ${rows.length} row(s) against sandbox ${sandboxId}, ` +
-            'which this product has no record of ever asking for.',
-          remedy:
-            'Either the fetch is not scoped to this product\'s own boxes (fix the scope — a shared ' +
-            'billing key returns every sibling product\'s settlements), or a box was provisioned ' +
-            'outside the recorded seam, or the platform billed a box that is not ours. Identify ' +
-            `which by looking up ${sandboxId} on the platform before disputing.`,
+            'which this product has no record of ever asking for.' +
+            unknownBoxAttribution(ownership, verdict),
+          remedy: unknownBoxRemedy(ownership, verdict, sandboxId),
         })
       }
       continue
@@ -301,6 +401,14 @@ export async function reconcileSpend(options: ReconcileSpendOptions): Promise<Sp
     for (const row of options.rows) {
       const charge = chargeNanoUsd(row)
       if (charge === 0) continue
+      // Velocity is decided per ROW, not per box, because a row naming no
+      // sandbox at all still counts toward what this product spent. A sibling's
+      // burst is excluded rather than paged on: a product cannot dispute a
+      // charge it did not incur, and leaving them in makes one product's
+      // incident wake every product on the wallet.
+      if (ownership && ownership.decide({ row, sandboxId: settlementSandboxId(row) }) === 'foreign') {
+        continue
+      }
       const bucketStart = Math.floor(row.createdAt / cfg.windowMs) * cfg.windowMs
       const bucket = buckets.get(bucketStart)
       if (bucket) {
@@ -337,7 +445,12 @@ export async function reconcileSpend(options: ReconcileSpendOptions): Promise<Sp
           `across ${bucket.references.length} row(s), against a trailing median of ` +
           `${usd(trailingMedian)} over ${trailing.length} prior window(s) — ` +
           `${Number.isFinite(ratio) ? `${ratio.toFixed(1)}x` : 'no prior spend to compare against'}, ` +
-          `over the ${cfg.multiple}x threshold.`,
+          `over the ${cfg.multiple}x threshold.` +
+          (ownership
+            ? ` Counted over this product's own rows only (${ownership.label}); the wallet total ` +
+              'for the window is higher when a sibling product settled into it.'
+            : ' Counted over every row on the wallet, which on a shared account includes any ' +
+              'sibling product\'s spend.'),
         remedy:
           'A burst of this shape is what a settlement defect looks like from the consumer side: ' +
           'long-dormant intervals cashed out at once. Check whether these rows carry interval ' +
@@ -365,6 +478,17 @@ export async function reconcileSpend(options: ReconcileSpendOptions): Promise<Sp
     }
   }
 
+  const ownershipSummary: SpendOwnershipSummary = {
+    declared: ownership !== null,
+    label: ownership?.label ?? null,
+    ownedBoxes,
+    ownedNanoUsd,
+    undecidableBoxes,
+    foreignBoxes: foreignSandboxIds.length,
+    foreignNanoUsd,
+    foreignSandboxIds,
+  }
+
   return {
     ok: findings.length === 0,
     findings,
@@ -373,6 +497,7 @@ export async function reconcileSpend(options: ReconcileSpendOptions): Promise<Sp
     boxesExamined: byBox.size,
     settledNanoUsd,
     creditedNanoUsd,
+    ownership: ownershipSummary,
     asOf,
   }
 }

@@ -1,4 +1,4 @@
-import type { SpendFinding, SpendReport } from './types'
+import type { SpendFinding, SpendOwnershipSummary, SpendReport } from './types'
 
 const NANO_PER_USD = 1_000_000_000
 
@@ -22,6 +22,7 @@ export function formatSpendReport(report: SpendReport): string {
       `as of ${new Date(report.asOf).toISOString()}`,
   )
   lines.push(`checks: ${report.checksRun.join(', ') || '(none)'}`)
+  for (const line of ownershipLines(report.ownership)) lines.push(line)
 
   if (report.ok) {
     lines.push('')
@@ -41,6 +42,41 @@ export function formatSpendReport(report: SpendReport): string {
     lines.push(`    → ${finding.remedy}`)
   }
   return lines.join('\n')
+}
+
+/**
+ * What the pass claimed and what it set aside — printed on EVERY report,
+ * clean ones included.
+ *
+ * A clean report that does not say what it looked at is the failure this
+ * closes: an over-narrow ownership rule and a genuinely quiet account produce
+ * the same "OK" line, and only the excluded numbers tell them apart. The
+ * excluded box ids are printed in full for the same reason — an exclusion a
+ * reader cannot audit is one they have to take on trust.
+ */
+function ownershipLines(ownership: SpendOwnershipSummary): string[] {
+  if (!ownership.declared) {
+    return [
+      `scope: NOT DECLARED — all ${ownership.ownedBoxes} settled box(es) claimed as this ` +
+        'product\'s. A sibling product\'s box on this wallet is reported as unknown-box; pass ' +
+        '`ownership` (see `ownedByBillingKeys`) to tell the two apart.',
+    ]
+  }
+  const lines = [
+    `scope: ${ownership.label} — ${ownership.ownedBoxes} box(es) ${usd(ownership.ownedNanoUsd)} ` +
+      `owned, ${ownership.foreignBoxes} box(es) ${usd(ownership.foreignNanoUsd)} excluded as ` +
+      'another product\'s',
+  ]
+  if (ownership.undecidableBoxes > 0) {
+    lines.push(
+      `       ${ownership.undecidableBoxes} of the owned box(es) carried no billing-key ` +
+        'attribution and were claimed fail-closed',
+    )
+  }
+  if (ownership.foreignSandboxIds.length > 0) {
+    lines.push(`       excluded: ${ownership.foreignSandboxIds.join(', ')}`)
+  }
+  return lines
 }
 
 /** Every measured field a finding carries, including the ones it left null. */
