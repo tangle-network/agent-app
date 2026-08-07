@@ -152,7 +152,7 @@ export function AssistantHistory({
                 return (
                   <li
                     key={t.id}
-                    className={`group flex items-center transition-colors hover:bg-muted/60 ${
+                    className={`group flex items-center transition-colors hover:bg-accent ${
                       active ? "bg-primary/10" : ""
                     }`}
                   >

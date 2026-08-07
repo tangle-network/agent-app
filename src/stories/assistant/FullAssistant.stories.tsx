@@ -28,7 +28,7 @@ type Story = StoryObj<typeof AssistantDock>
 
 /** Stand-in workflow-graph renderer for the live proposal card. */
 const renderGraph = (_yaml: string) => (
-  <div className="flex h-full flex-col items-center justify-center gap-2 bg-muted/30 p-3">
+  <div className="flex h-full flex-col items-center justify-center gap-2 bg-secondary p-3">
     <div className="rounded-md border border-border bg-card px-3 py-1.5 text-foreground text-xs">
       Schedule — Mondays 09:00
     </div>

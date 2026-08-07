@@ -57,7 +57,7 @@ export * from './provenance-model'
 const BASIS_TONES: Record<ProvenanceBasis, string> = {
   extracted: 'border-primary/30 bg-primary/10 text-primary',
   entered: 'border-success/30 bg-success/10 text-success',
-  computed: 'border-border bg-muted/50 text-foreground',
+  computed: 'border-border bg-secondary text-foreground',
   asserted: 'border-warning/40 bg-warning/10 text-warning',
 }
 
@@ -239,7 +239,7 @@ function SourceRow({
             <button
               type="button"
               onClick={() => onRetrySource(source, record)}
-              className="ml-2 rounded border border-border px-1.5 py-0.5 text-[11px] font-medium text-foreground hover:bg-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="ml-2 rounded border border-border px-1.5 py-0.5 text-[11px] font-medium text-foreground hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               Try again
             </button>

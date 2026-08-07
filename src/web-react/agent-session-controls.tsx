@@ -44,7 +44,8 @@ import {
   type Harness,
 } from '../harness'
 import type { CatalogModel } from '../runtime/model-catalog'
-import { ModelPicker, EffortPicker, usePopover } from './controls'
+import { ModelPicker, EffortPicker, CheckGlyph, OVERLAY_SHADOW, usePopover } from './controls'
+import { HarnessGlyph } from './harness-glyphs'
 
 /** Plain-English labels for the harnesses a product is likely to expose. Unknown
  *  ids fall back to the raw value so a new backend still renders a usable label. */
@@ -89,7 +90,9 @@ function GearGlyph({ className }: { className?: string }) {
 const FOCUS_RING =
   ''
 
-/** Pill-styled harness picker — inline, no sandbox-ui dependency. */
+/** Pill-styled harness picker — inline, no sandbox-ui dependency. The brand
+ *  marks come from `./harness-glyphs` (the set the legacy sandbox-ui picker
+ *  shipped, vendored inline). */
 function HarnessPicker({
   value,
   onChange,
@@ -109,13 +112,16 @@ function HarnessPicker({
         {...triggerProps}
         onClick={() => setOpen(!open)}
         title="Agent backend"
-        className={`inline-flex w-full items-center justify-between gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30 ${FOCUS_RING}`}
+        className={`inline-flex w-full items-center justify-between gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent ${FOCUS_RING}`}
       >
-        <span className="truncate">{harnessLabel(value)}</span>
-        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="flex min-w-0 items-center gap-1.5">
+          <HarnessGlyph harness={value} className="h-4 w-4 shrink-0 text-foreground" />
+          <span className="truncate">{harnessLabel(value)}</span>
+        </span>
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       </button>
       {open && (
-        <div role="menu" className="absolute bottom-full left-0 z-50 mb-2 max-h-64 w-full min-w-[220px] overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-lg">
+        <div role="menu" className={`absolute bottom-full left-0 z-50 mb-2 max-h-64 w-full min-w-[248px] overflow-y-auto rounded-xl border border-border bg-popover p-1 ${OVERLAY_SHADOW}`}>
           {options.map((h) => (
             <button
               key={h}
@@ -126,11 +132,13 @@ function HarnessPicker({
                 onChange(h)
                 setOpen(false)
               }}
-              className={`flex w-full items-center rounded-md px-3 py-2 text-left text-sm transition ${FOCUS_RING} ${
-                h === value ? 'bg-primary/10 font-medium' : 'hover:bg-accent/30'
+              className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition ${FOCUS_RING} ${
+                h === value ? 'bg-primary/10 font-medium' : 'hover:bg-accent'
               }`}
             >
-              {harnessLabel(h)}
+              <HarnessGlyph harness={h} className="h-4 w-4 shrink-0 text-foreground" />
+              <span className="truncate">{harnessLabel(h)}</span>
+              {h === value && <CheckGlyph className="ml-auto h-3.5 w-3.5 shrink-0 text-primary" />}
             </button>
           ))}
         </div>
@@ -250,7 +258,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
             <GearGlyph className="h-4 w-4" />
           </button>
           {open && (
-            <div className="absolute bottom-full left-0 z-50 mb-2 w-72 space-y-3 rounded-xl border border-border bg-card p-3 shadow-lg">
+            <div className={`absolute bottom-full left-0 z-50 mb-2 w-72 space-y-3 rounded-xl border border-border bg-popover p-3 ${OVERLAY_SHADOW}`}>
               {showHarness && (
                 <div className="space-y-1.5">
                   <p className="text-xs font-medium text-foreground">Agent backend</p>

@@ -157,7 +157,7 @@ function ErrorBlock({
       <button
         type="button"
         onClick={retry}
-        className="h-8 rounded-md border border-border px-3 text-xs font-medium text-foreground transition hover:bg-accent/30"
+        className="h-8 rounded-md border border-border px-3 text-xs font-medium text-foreground transition hover:bg-accent"
       >
         {retryLabel}
       </button>
@@ -177,7 +177,7 @@ function EmptyBlock({ spec }: { spec: AsyncEmptySpec }): ReactElement {
           <button
             type="button"
             onClick={(spec.action as AsyncEmptyAction).onClick}
-            className="h-8 rounded-md border border-border px-3 text-xs font-medium text-foreground transition hover:bg-accent/30"
+            className="h-8 rounded-md border border-border px-3 text-xs font-medium text-foreground transition hover:bg-accent"
           >
             {(spec.action as AsyncEmptyAction).label}
           </button>

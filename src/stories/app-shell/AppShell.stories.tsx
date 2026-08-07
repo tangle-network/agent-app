@@ -57,7 +57,7 @@ type Story = StoryObj<typeof meta>
 // ── shared scene ──────────────────────────────────────────────────────────────
 
 const controlChipClass =
-  'inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground transition hover:bg-accent/40 hover:text-foreground'
+  'inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground'
 
 const composerControls = (
   <>

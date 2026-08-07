@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import { useState } from 'react'
 
-import { AgentSessionControls, type AgentSessionControlsProps } from '../../web-react'
+import { AgentSessionControls, HarnessGlyph, type AgentSessionControlsProps } from '../../web-react'
 import type { Harness } from '../../harness'
 import { AutoClick, catalogModels, DEFAULT_MODEL_ID, NON_REASONING_MODEL_ID } from './fixtures'
 
@@ -16,6 +16,21 @@ import { AutoClick, catalogModels, DEFAULT_MODEL_ID, NON_REASONING_MODEL_ID } fr
  */
 
 const HARNESSES: Harness[] = ['opencode', 'claude-code', 'codex']
+
+/** A wider harness list for the glyph stories — every branded mark plus the
+ *  lucide fallbacks, so the menu shows the whole vocabulary at once. */
+const GLYPH_HARNESSES: Harness[] = [
+  'opencode',
+  'claude-code',
+  'codex',
+  'kimi-code',
+  'amp',
+  'openclaw',
+  'hermes',
+  'factory-droids',
+  'nanoclaw',
+  'cli-base',
+]
 
 function useSessionControls(options: Partial<AgentSessionControlsProps> & { initialModel?: string } = {}) {
   const { initialModel, ...overrides } = options
@@ -108,6 +123,80 @@ export const AllStates: Story = {
       <div>
         <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Non-reasoning model</p>
         {useSessionControls({ initialModel: NON_REASONING_MODEL_ID })}
+      </div>
+    </div>
+  ),
+}
+
+/** Harness menu held open across the branded set — every mark visible in its
+ *  row, selected one checked. */
+export const HarnessMenuOpen: Story = {
+  name: 'Harness menu open',
+  parameters: { layout: 'padded' },
+  render: () => (
+    <div className="pt-[460px]">
+      <AutoClick selector="button[title='Agent backend']">
+        {useSessionControls({ availableHarnesses: GLYPH_HARNESSES })}
+      </AutoClick>
+    </div>
+  ),
+}
+
+/**
+ * Close-up for design review: every harness mark next to its name — the
+ * vendored brand artwork (currentColor, so it tracks the theme), the lucide
+ * fallbacks for harnesses with no published mark, and the neutral bot an
+ * unknown id falls back to.
+ */
+export const Glyphs: Story = {
+  parameters: { layout: 'padded' },
+  render: () => (
+    <div className="flex flex-col gap-8 p-4">
+      <div>
+        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Brand marks</p>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          {(['opencode', 'claude-code', 'codex', 'kimi-code', 'amp', 'openclaw', 'hermes'] as Harness[]).map((h) => (
+            <span key={h} className="inline-flex items-center gap-2 text-sm text-foreground">
+              <HarnessGlyph harness={h} className="h-5 w-5 text-foreground" />
+              {h}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div>
+        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Fallbacks (no published mark) + unknown id
+        </p>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          {(['factory-droids', 'nanoclaw', 'cli-base'] as Harness[]).map((h) => (
+            <span key={h} className="inline-flex items-center gap-2 text-sm text-foreground">
+              <HarnessGlyph harness={h} className="h-5 w-5 text-foreground" />
+              {h}
+            </span>
+          ))}
+          <span className="inline-flex items-center gap-2 text-sm text-foreground">
+            <HarnessGlyph harness={'made-up-harness' as Harness} className="h-5 w-5 text-foreground" />
+            made-up-harness (unknown)
+          </span>
+        </div>
+      </div>
+      <div>
+        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">In the trigger pill</p>
+        <div className="flex flex-wrap items-center gap-3">
+          {(['opencode', 'claude-code', 'codex'] as Harness[]).map((h) => (
+            <AgentSessionControls
+              key={h}
+              models={catalogModels}
+              model={DEFAULT_MODEL_ID}
+              onModelChange={() => {}}
+              harness={h}
+              onHarnessChange={() => {}}
+              availableHarnesses={GLYPH_HARNESSES}
+              effort="medium"
+              onEffortChange={() => {}}
+            />
+          ))}
+        </div>
       </div>
     </div>
   ),
