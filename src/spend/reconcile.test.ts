@@ -73,8 +73,11 @@ describe('unknown-box', () => {
     expect(report.findings[0]?.check).toBe('unknown-box')
     expect(report.findings[0]?.sandboxId).toBe('sb_stranger')
     expect(report.findings[0]?.settledNanoUsd).toBe(7 * USD)
-    // The remedy names the most likely cause first: an unscoped fetch.
-    expect(report.findings[0]?.remedy).toContain('scoped')
+    // With no ownership rule the reconciler cannot tell a sibling product's box
+    // from a charge that is not ours, so the remedy leads with declaring one
+    // rather than with a cause it has no evidence for.
+    expect(report.findings[0]?.remedy).toContain('ownedByBillingKeys')
+    expect(report.findings[0]?.message).toContain('No ownership rule was declared')
   })
 
   it('stays silent on a known box, and on rows that name no sandbox at all', async () => {

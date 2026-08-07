@@ -38,6 +38,10 @@ That is the gap this closes: **a platform billing defect should cost an alert, n
 - **Cost the product genuinely incurred.**
   A box left running for a week because nobody stopped it is a product bug, and the reconciler will correctly say nothing.
   The budget guard is the control for that, not the reconciler.
+- **A sibling product's spend on the same wallet.**
+  Excluded by `ownership` and reported as a number, never as a finding — see [Whose box is this?](#whose-box-is-this-ownership).
+  The product that owns those boxes runs its own reconciliation; a product cannot dispute a charge it did not incur.
+  Two products sharing one platform API key are indistinguishable here by construction, and the answer is a second key.
 
 The asymmetry that makes the whole thing safe: every bound this computes is an **upper** bound, and every derivation error pushes toward a false alarm rather than a missed charge.
 A false alarm costs a human five minutes.
@@ -104,6 +108,82 @@ Findings on that basis carry the caveat inline, and supplying `nanoUsdPerHour` u
 | `velocity.minAbsoluteNanoUsd` | 1 000 000 000 ($1.00) | Without a floor the rule is useless — a trailing median of a tenth of a cent makes every ordinary day a 5× outlier. Set from the incident's own distribution: the smallest of the eight affected wallets took $1.98, and the two rows in the same window that were *genuine* were sub-cent. The floor sits above the noise and below every real finding. |
 | `velocity.minTrailingWindows` | 3 | Below this a median means nothing, so the rule stays silent and a product's genuine first days are not an anomaly. |
 | `velocity.windowMs` | 86 400 000 (24 h) | The incident settled inside seven minutes; any window wider than the burst catches it, and a day is the unit an operator reasons in. |
+
+## Whose box is this? (`ownership`)
+
+A settlement naming a sandbox the product has never heard of is one of two completely different things, and from inside one product they arrive identical:
+
+- **a sibling product's box** on the same wallet — nothing is wrong, and reporting it is noise that trains a human to ignore the check;
+- **a charge that is not ours** — the incident's day-one signature, and the only thing a product with no lifecycle bookkeeping can catch at all.
+
+Measured: seeding one gtm box plus one legal-agent settlement row on the same wallet produced `{ ok: false, findingCount: 1 }`, blaming a box that was never gtm's.
+
+### What we did not do
+
+**Filter the settlements down to boxes already in the expectation ledger.**
+It removes the false findings and removes the check with them.
+"We were billed for a box we never asked for" *is* a box that is not in the ledger, so filtering on the ledger makes a phantom charge unrepresentable — the ledger's own contents would define the answer, and a product that recorded nothing would be certified clean.
+A design that trades the incident detection away to remove false positives is the wrong design however clean the report looks.
+
+**Match a product-owned box-name prefix.**
+Unimplementable on today's platform, not merely weak.
+The sandbox id on a settlement row is the orchestrator's project ref, minted as `sandbox-<12 hex>` from a SHA-256 of (owner, idempotency key) — `makeSandboxProjectRef`, `products/sandbox/api/src/routes/sandboxes.ts` — and surfaced as the SDK's `id`.
+The `name` a product asks for never reaches the ledger row, and the charge's `description` carries only the resource spec (`Sandbox compute: 2vCPU/4GB × 2.00h`).
+There is no name in the data to match.
+A prefix rule wired anyway would classify every row as another product's and report a clean bill for an unchecked account — the same silence, arrived at more confidently.
+
+### What we did
+
+Split the residue on the one field the **platform** stamps per product: `credit_transactions.key_id`, the API key the box was created under, written from the box's own creation metadata at settlement time.
+
+```ts
+import { ownedByBillingKeys, reconcileSpend } from '@tangle-network/agent-app/spend'
+
+await reconcileSpend({
+  rows,
+  store,
+  ownership: ownedByBillingKeys([process.env.SANDBOX_API_KEY_ID!]),
+})
+```
+
+| Box | Verdict | Outcome |
+|---|---|---|
+| In the expectation ledger | `mine`, and the rule is never consulted | Full checks — `over-ceiling` fires whatever any rule says |
+| Not recorded, stamped with one of our keys | `mine` | **`unknown-box` finding** — a phantom-charge candidate |
+| Not recorded, stamped with another key | `foreign` | Reported in `report.ownership`, never a finding |
+| Not recorded, no key stamped | `undecidable` | **`unknown-box` finding** — fail closed |
+
+Three rules keep the detection intact, and each is a test:
+
+1. **A recorded box is never excluded.** Ownership is consulted only for boxes with no ledger record, so a rule that is wrong or over-narrow cannot hide an `over-ceiling` finding. The incident's own 23 findings survive any rule at all.
+2. **Undecidable fails closed.** A row with no key attribution is claimed. Silence is never the answer to "I don't know", and an unattributable charge on a shared wallet is precisely the shape of the thing this module watches for.
+3. **A box is claimed if any of its rows claims it.** `mine` > `undecidable` > `foreign`. Both directions push toward reporting, which is the only direction that cannot lose money.
+
+Because the rule reads a stamp the platform already wrote, a product cannot widen its own claim by asserting one — it can only recognise attribution or fail to.
+
+### The deployment requirement this creates
+
+**Each product needs its own platform API key.**
+Two products sharing one key are genuinely indistinguishable after settlement: nothing on the row differs, so no consumer-side predicate can separate them and the honest verdict for both is `undecidable` — every sibling box reported, back to the original noise.
+The fix for that is a second key, not a cleverer predicate.
+
+### Absence is loud, not silent
+
+`ownership` is optional and omitting it changes nothing about the findings: the pass claims every box, which is the behaviour that shipped and the direction that over-reports rather than under-reports.
+What it does not do is keep quiet about it.
+
+- `report.ownership.declared` is `false`.
+- `formatSpendReport` prints `scope: NOT DECLARED — …` above the findings.
+- Every `unknown-box` message says a sibling product's box reads exactly like a charge that is not ours, and the remedy names `ownedByBillingKeys`.
+
+The same reasoning runs the other way for a declared rule.
+A clean report and a rule so narrow it verified nothing produce the same `OK` line, so the scope line and the excluded box ids print on **every** report, clean ones included — an exclusion a reader cannot audit is one they have to take on trust.
+
+### Velocity moves with it
+
+With a rule declared, `velocity` counts only this product's rows.
+A product cannot dispute a charge it did not incur, and leaving the siblings in means one product's incident wakes every product on the wallet.
+The finding says which basis it used, and the wallet-level total stays visible in `report.ownership`.
 
 ## Calibration against the incident
 
@@ -206,9 +286,12 @@ Without this, `lastActivityAt` only advances when a box is provisioned, so a thr
 ### Scoping the ledger fetch
 
 The product supplies its own settled rows — this package never reaches for them, because the ledger is the counterparty's record and reading it is the product's authenticated business.
-**That fetch must be scoped to boxes the product owns.**
-Products bill to a shared company key, so an unscoped fetch returns every sibling product's settlements and every one of them is a correct, useless `unknown-box` finding.
-Scope by `group_key` (`sandbox:<id>`) against the product's own box ids, or by the `key_id` the product's boxes were created under.
+The fetch is `GET /v1/billing/transactions?product=sandbox`, and the most it can narrow to is a **wallet**: `product` there is the platform's own service taxonomy, written by `agent-dev-container` for every sandbox compute charge from every consumer app.
+So on an account running two of our products, each product's fetch returns the other product's boxes.
+
+The endpoint does accept `keyId`, and filtering there is worth doing — it moves less data.
+It is not a substitute for declaring ownership in the reconciler, for two reasons: a `keyId` filter silently drops rows the platform left unattributed (exactly the rows worth seeing), and a reconciliation that cannot state what it excluded cannot be audited.
+Declare `ownership` whether or not the fetch also filters.
 
 ### Running it
 

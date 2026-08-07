@@ -130,9 +130,11 @@ export interface ExpectedCeiling {
  * reaches for them, because the ledger is the counterparty's record and reading
  * it is the product's authenticated business.
  *
- * The product's fetch MUST scope rows to boxes it owns. Products bill to a
- * shared company key, so an unscoped fetch returns every sibling product's
- * settlements and every one of them is a correct `unknown-box` finding.
+ * The rows a product can fetch are scoped to the BILLING OWNER, not to the
+ * product: `product: 'sandbox'` is the platform's service taxonomy and every
+ * consumer app's compute wears it. So a wallet running two of our products
+ * returns both products' settlements, and telling them apart is
+ * {@link SpendOwnershipRule}'s job.
  */
 export interface SettlementRow {
   /** The ledger row id, for the dispute. */
@@ -163,6 +165,109 @@ export interface SettlementRow {
    * Null is the common case: the platform does not store duration on the row.
    */
   readonly billedMs: number | null
+  /**
+   * The platform API key the charge was triggered by — `credit_transactions.key_id`,
+   * stamped from the box's own creation metadata at settlement time and exposed
+   * by `/v1/billing/transactions` (which also filters on it).
+   *
+   * This is the ONLY field on a settlement row that can be attributed back to a
+   * PRODUCT rather than to a wallet or to the platform's service taxonomy, which
+   * is why {@link SpendOwnershipRule}'s shipped constructor is built on it. The
+   * sandbox id cannot do the job: the platform mints it as `sandbox-<12 hex>`
+   * from a hash of (owner, idempotency key), so a product's own box naming never
+   * reaches the ledger row.
+   *
+   * Optional, and `null` is a real answer: the platform leaves it null on legacy
+   * rows and an export may not carry the column at all. A missing key is
+   * `undecidable`, never `foreign` — see {@link SpendOwnershipVerdict}.
+   */
+  readonly keyId?: string | null
+}
+
+// ── whose box is this? ────────────────────────────────────────────────────────
+
+/**
+ * What one settlement is attributable to, from inside ONE product.
+ *
+ * The distinction this type exists for: a sibling product's box and a charge
+ * that is not ours at all look identical from inside a single product, because
+ * both arrive as a settlement naming a sandbox this product's expectation ledger
+ * has never heard of. Dropping both loses the check's whole purpose; reporting
+ * both makes it noise. Only a platform-stamped attribution field separates them.
+ */
+export type SpendOwnershipVerdict =
+  /** Attributable to THIS product. An unrecorded one is a phantom-charge candidate. */
+  | 'mine'
+  /** Attributable to a DIFFERENT product on the same wallet. Reported, never a finding. */
+  | 'foreign'
+  /**
+   * The row carries nothing that decides it. Counted as `mine` — FAIL CLOSED.
+   * An unattributable charge on a shared wallet is precisely the shape of the
+   * thing this module exists to catch, so the ambiguous case costs a human five
+   * minutes rather than costing the product the detection.
+   */
+  | 'undecidable'
+
+/** One settlement, presented to an ownership rule. */
+export interface SpendOwnershipCandidate {
+  readonly row: SettlementRow
+  /** The sandbox the row is attributable to, or null for a row naming none. */
+  readonly sandboxId: string | null
+}
+
+/**
+ * The product's declaration of which settlements are its own.
+ *
+ * The one hard constraint on `decide`: it must answer from PROPERTIES OF THE
+ * ROW. A rule that answers by looking the sandbox up in the product's own
+ * expectation ledger deletes `unknown-box` entirely — every unrecorded box would
+ * be `foreign` by construction, and "we were billed for a box we never asked
+ * for" would become unrepresentable. The ledger already decides recorded-ness;
+ * this decides ATTRIBUTION, and the two must stay independent.
+ *
+ * `decide` must not throw. If it does, the throw propagates and the whole pass
+ * fails — a reconciliation whose ownership rule is broken has no verdict worth
+ * printing, and swallowing it would turn a broken rule into a clean bill.
+ */
+export interface SpendOwnershipRule {
+  /** Named in the report and on every finding, so a reader knows what was excluded. */
+  readonly label: string
+  decide(candidate: SpendOwnershipCandidate): SpendOwnershipVerdict
+}
+
+/**
+ * What this pass scoped itself to — present on every report, including a clean
+ * one, because "nothing fired" and "nothing was looked at" are different
+ * answers and a report that cannot tell them apart is the failure this closes.
+ */
+export interface SpendOwnershipSummary {
+  /**
+   * False when the caller declared no rule. The pass then treats every box as
+   * its own — today's behaviour, which over-reports rather than under-reports —
+   * and every `unknown-box` finding says on its face that a sibling product's
+   * box is indistinguishable from a charge that is not ours.
+   */
+  readonly declared: boolean
+  /** The rule's label, or null when none was declared. */
+  readonly label: string | null
+  /** Boxes this pass treated as this product's, and what they were charged. */
+  readonly ownedBoxes: number
+  readonly ownedNanoUsd: number
+  /**
+   * Of those, the boxes no rule could decide. Counted as owned (fail-closed) and
+   * reported separately so a product can see how much of its own verdict rests
+   * on rows that carried no attribution.
+   */
+  readonly undecidableBoxes: number
+  /** Boxes attributed to another product on the same wallet. Never findings. */
+  readonly foreignBoxes: number
+  readonly foreignNanoUsd: number
+  /**
+   * Their ids, in full — an exclusion a reader cannot audit is an exclusion
+   * they have to trust, and this module's whole posture is that nothing about
+   * money is taken on trust.
+   */
+  readonly foreignSandboxIds: readonly string[]
 }
 
 /** The parts of a settlement reference id, once parsed. */
@@ -260,6 +365,8 @@ export interface SpendReport {
   readonly settledNanoUsd: number
   /** Total credited back across every examined row, unsigned nanodollars. */
   readonly creditedNanoUsd: number
+  /** What this pass claimed as its own, and what it excluded as another product's. */
+  readonly ownership: SpendOwnershipSummary
   /** The instant the pass treated as "now". */
   readonly asOf: number
 }

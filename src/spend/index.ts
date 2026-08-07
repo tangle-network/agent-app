@@ -8,7 +8,10 @@
  *    of box lifecycle, and the upper bound on billable time it implies
  *    (`ceiling.ts`).
  * 2. **Reconciler** (`reconcile.ts`) — settled ledger rows against that record,
- *    producing typed findings a human disputes.
+ *    producing typed findings a human disputes. Which of those rows are this
+ *    product's at all is `ownership.ts`: the platform's settlement feed is
+ *    scoped to a WALLET, and two of our products on one account otherwise
+ *    report each other's boxes as discrepancies.
  * 3. **Budget guard** (`budget.ts`) — a per-workspace compute cap enforced at
  *    the one moment a consumer still can: before asking for another box.
  *
@@ -33,8 +36,14 @@ export {
   type SpendBoxRecord,
   type SpendCheckId,
   type SpendFinding,
+  type SpendOwnershipCandidate,
+  type SpendOwnershipRule,
+  type SpendOwnershipSummary,
+  type SpendOwnershipVerdict,
   type SpendReport,
 } from './types'
+
+export { decideBoxOwnership, ownedByBillingKeys } from './ownership'
 
 export {
   createInMemorySpendLedgerStore,

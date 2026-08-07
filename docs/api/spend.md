@@ -4,7 +4,7 @@
 
 Source: `src/spend/index.ts`
 
-42 exports.
+48 exports.
 
 ### `assertComputeBudget`
 
@@ -110,6 +110,14 @@ interface ComputeExpectedCeilingOptions
 (options: SpendLedgerOptions) => SpendLedger
 ```
 
+### `decideBoxOwnership`
+
+`function` — One box's verdict, folded over every row that settled against it.
+
+```ts
+(rule: SpendOwnershipRule, sandboxId: string, rows: readonly SettlementRow[]) => SpendOwnershipVerdict
+```
+
 ### `DEFAULT_CEILING_TOLERANCE_MS`
 
 `const` — Slack allowed between the product's bound and what the platform settled, before an overage is called a discrepancy.
@@ -172,6 +180,14 @@ interface ObservedBalance
 
 ```ts
 interface ObserveSandboxInput
+```
+
+### `ownedByBillingKeys`
+
+`function` — Claim every settlement the platform stamped with one of these API keys.
+
+```ts
+(keyIds: readonly string[]) => SpendOwnershipRule
 ```
 
 ### `parseSandboxGroupKey`
@@ -308,6 +324,38 @@ interface SpendLedgerOptions
 
 ```ts
 interface SpendLedgerStorePort
+```
+
+### `SpendOwnershipCandidate`
+
+`interface` — One settlement, presented to an ownership rule.
+
+```ts
+interface SpendOwnershipCandidate
+```
+
+### `SpendOwnershipRule`
+
+`interface` — The product's declaration of which settlements are its own.
+
+```ts
+interface SpendOwnershipRule
+```
+
+### `SpendOwnershipSummary`
+
+`interface` — What this pass scoped itself to — present on every report, including a clean one, because "nothing fired" and "nothing was looked at" are different answers and a report that cannot tell them apart is…
+
+```ts
+interface SpendOwnershipSummary
+```
+
+### `SpendOwnershipVerdict`
+
+`type` — What one settlement is attributable to, from inside ONE product.
+
+```ts
+type SpendOwnershipVerdict
 ```
 
 ### `SpendProvisionObservation`

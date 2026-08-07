@@ -71,7 +71,7 @@ _97 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./signoff/proof-cli`](api/signoff-proof-cli.md) | 0 | — |
 | [`./skills`](api/skills.md) | 27 | — |
 | [`./skills-placement`](api/skills-placement.md) | 6 | `harness`, `skills` |
-| [`./spend`](api/spend.md) | 42 | `sandbox` |
+| [`./spend`](api/spend.md) | 48 | `sandbox` |
 | [`./spend/cli`](api/spend-cli.md) | 0 | `sandbox` |
 | [`./store`](api/store.md) | 10 | — |
 | [`./stream`](api/stream.md) | 49 | `interactions`, `plans` |
@@ -692,11 +692,11 @@ Depends on: `harness`, `skills`
 
 ## `./spend`
 
-Source: `src/spend/index.ts` · 42 exports
+Source: `src/spend/index.ts` · 48 exports
 
 Depends on: `sandbox`
 
-`assertComputeBudget`, `BilledDurationBasis`, `BoxRateResolver`, `CeilingBasis`, `chargeNanoUsd`, `ComputeBudget`, `ComputeBudgetExceededError`, `ComputeBudgetRefusal`, `computeExpectedCeiling`, `ComputeExpectedCeilingOptions`, `createInMemorySpendLedgerStore`, `createSandboxSpendHooks`, `createSpendLedger`, `DEFAULT_CEILING_TOLERANCE_MS`, `ExpectedCeiling`, `foldSpendBoxRecord`, `formatSpendReport`, `InMemorySpendLedgerStore`, `isCharge`, `ObservedBalance`, `ObserveSandboxInput`, `parseSandboxGroupKey`, `parseSettlementReference`, `reconcileSpend`, `ReconcileSpendOptions`, `SandboxSpendHooksOptions`, `SandboxSpendSeam`, `SettlementReference`, `SettlementRow`, `settlementSandboxId`, `SPEND_CHECKS`, `SpendBoxPatch`, `SpendBoxRecord`, `SpendCheckId`, `SpendFinding`, `SpendLedger`, `SpendLedgerOptions`, `SpendLedgerStorePort`, `SpendProvisionObservation`, `SpendReport`, `spendReportToJson`, `VelocityOptions`
+`assertComputeBudget`, `BilledDurationBasis`, `BoxRateResolver`, `CeilingBasis`, `chargeNanoUsd`, `ComputeBudget`, `ComputeBudgetExceededError`, `ComputeBudgetRefusal`, `computeExpectedCeiling`, `ComputeExpectedCeilingOptions`, `createInMemorySpendLedgerStore`, `createSandboxSpendHooks`, `createSpendLedger`, `decideBoxOwnership`, `DEFAULT_CEILING_TOLERANCE_MS`, `ExpectedCeiling`, `foldSpendBoxRecord`, `formatSpendReport`, `InMemorySpendLedgerStore`, `isCharge`, `ObservedBalance`, `ObserveSandboxInput`, `ownedByBillingKeys`, `parseSandboxGroupKey`, `parseSettlementReference`, `reconcileSpend`, `ReconcileSpendOptions`, `SandboxSpendHooksOptions`, `SandboxSpendSeam`, `SettlementReference`, `SettlementRow`, `settlementSandboxId`, `SPEND_CHECKS`, `SpendBoxPatch`, `SpendBoxRecord`, `SpendCheckId`, `SpendFinding`, `SpendLedger`, `SpendLedgerOptions`, `SpendLedgerStorePort`, `SpendOwnershipCandidate`, `SpendOwnershipRule`, `SpendOwnershipSummary`, `SpendOwnershipVerdict`, `SpendProvisionObservation`, `SpendReport`, `spendReportToJson`, `VelocityOptions`
 
 [Full API →](api/spend.md)
 
