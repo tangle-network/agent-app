@@ -48,7 +48,7 @@ export const Positions: Story = {
         { frame: 599, label: 'frame 599 (sequence end)' },
       ].map(({ frame, label }) => (
         <div key={frame}>
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">{label}</p>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">{label}</p>
           <TrackArea frame={frame} zoom={1} />
         </div>
       ))}

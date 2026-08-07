@@ -29,7 +29,7 @@ export function GenerationDetail({
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-lg bg-muted/50">
+      <div className="overflow-hidden rounded-lg bg-secondary">
         {generation.type === 'image' && generation.result ? (
           <img src={generation.result} alt={generation.prompt} className="max-h-[420px] w-full object-contain" />
         ) : (generation.type === 'video' || generation.type === 'avatar') && generation.result ? (
@@ -61,19 +61,19 @@ export function GenerationDetail({
       <div className="flex flex-wrap items-center gap-4">
         {generation.model && (
           <div>
-            <span className="block text-[10px] font-medium text-muted-foreground">Model</span>
+            <span className="block text-[11px] font-medium text-muted-foreground">Model</span>
             <span className="text-xs text-foreground">{generation.model}</span>
           </div>
         )}
         {generation.cost != null && (
           <div>
-            <span className="block text-[10px] font-medium text-muted-foreground">Cost</span>
+            <span className="block text-[11px] font-medium text-muted-foreground">Cost</span>
             <span className="text-xs text-foreground">${generation.cost.toFixed(4)}</span>
           </div>
         )}
         {generation.createdAt && (
           <div>
-            <span className="block text-[10px] font-medium text-muted-foreground">Created</span>
+            <span className="block text-[11px] font-medium text-muted-foreground">Created</span>
             <span className="text-xs text-foreground">{new Date(generation.createdAt).toLocaleString()}</span>
           </div>
         )}
@@ -82,7 +82,7 @@ export function GenerationDetail({
       {generation.type === 'transcription' && generation.result && (
         <div>
           <span className="mb-1 block text-xs font-medium text-muted-foreground">Transcription</span>
-          <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg bg-muted/50 p-4 text-sm text-foreground">
+          <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg bg-secondary p-4 text-sm text-foreground">
             {generation.result}
           </pre>
         </div>

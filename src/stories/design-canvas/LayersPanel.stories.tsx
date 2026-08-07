@@ -100,7 +100,7 @@ export const AllStates: Story = {
         { label: 'Read only', node: <LayersPanel {...baseProps(noopPage)} canWrite={false} /> },
       ].map((cell) => (
         <div key={cell.label} className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">{cell.label}</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">{cell.label}</span>
           <div className="h-[460px] w-[280px] border border-[var(--border-default)] bg-[var(--bg-input)]">{cell.node}</div>
         </div>
       ))}

@@ -98,7 +98,7 @@ export function PagesStrip({
       {label ? (
         <div className="flex items-center gap-1.5 px-3 pt-1.5 text-[var(--text-muted)]">
           <PageGlyph className="h-3 w-3" />
-          <span className="text-[10px] font-medium uppercase tracking-[0.08em]">{label}</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.05em]">{label}</span>
         </div>
       ) : null}
       <div
@@ -171,7 +171,7 @@ export function PagesStrip({
             </div>
 
             {/* Page name */}
-            <span className="max-w-[80px] truncate text-[10px] text-[var(--text-secondary)]">
+            <span className="max-w-[80px] truncate text-[11px] text-[var(--text-secondary)]">
               {page.name}
             </span>
             </button>
@@ -217,7 +217,7 @@ export function PagesStrip({
           className="flex h-[72px] w-[80px] shrink-0 flex-col items-center justify-center gap-1 rounded border border-dashed border-[var(--border-default)] text-[var(--text-muted)] transition hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]"
         >
           <PlusGlyph className="h-4 w-4" />
-          <span className="text-[10px]">Add page</span>
+          <span className="text-[11px]">Add page</span>
         </button>
       ) : null}
       </div>

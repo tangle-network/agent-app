@@ -23,7 +23,7 @@ export function GenerationCard({
   return (
     <button type="button" onClick={() => onSelect(generation)} className="group text-left animate-row-in">
       <Card className="overflow-hidden transition-all group-hover:border-primary/50 group-hover:shadow-md">
-        <div className="relative aspect-video bg-muted/50">
+        <div className="relative aspect-video bg-secondary">
           {generation.type === 'image' && generation.result ? (
             <img src={generation.result} alt={generation.prompt} className="h-full w-full object-cover" />
           ) : (generation.type === 'video' || generation.type === 'avatar') && generation.result ? (
@@ -47,7 +47,7 @@ export function GenerationCard({
             </div>
           )}
           <div className="absolute left-2 top-2">
-            <Badge variant="outline" className={`${cfg.color} text-[10px] backdrop-blur-sm`}>
+            <Badge variant="outline" className={`${cfg.color} text-[11px]`}>
               {cfg.label}
             </Badge>
           </div>
@@ -56,26 +56,26 @@ export function GenerationCard({
         <CardContent className="p-3">
           <p className="mb-2 line-clamp-2 text-xs text-foreground">{generation.prompt}</p>
           {status === 'failed' && (
-            <p className="mb-2 line-clamp-2 text-[10px] text-destructive">{generationError(generation)}</p>
+            <p className="mb-2 line-clamp-2 text-[11px] text-destructive">{generationError(generation)}</p>
           )}
           <div className="flex items-center justify-between">
             {generation.model && (
-              <span className="truncate text-[10px] text-muted-foreground">{generation.model}</span>
+              <span className="truncate text-[11px] text-muted-foreground">{generation.model}</span>
             )}
             <div className="flex shrink-0 items-center gap-2">
               {generation.cost != null && (
-                <span className="text-[10px] text-muted-foreground">${generation.cost.toFixed(3)}</span>
+                <span className="text-[11px] text-muted-foreground">${generation.cost.toFixed(3)}</span>
               )}
-              <span className="text-[10px] text-muted-foreground">{relativeTime(generation.createdAt)}</span>
+              <span className="text-[11px] text-muted-foreground">{relativeTime(generation.createdAt)}</span>
             </div>
           </div>
           {isPublishPackage(publishPackage) && (
-            <div className="mt-3 rounded-md border border-border bg-muted/30 p-2">
-              <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium text-foreground">
+            <div className="mt-3 rounded-md border border-border bg-secondary p-2">
+              <div className="mb-1 flex items-center gap-1.5 text-[11px] font-medium text-foreground">
                 <Send className="h-3 w-3" />
                 {(publishPackage.destinations ?? []).join(', ') || 'Publish package'}
               </div>
-              <p className="line-clamp-2 text-[10px] text-muted-foreground">
+              <p className="line-clamp-2 text-[11px] text-muted-foreground">
                 {publishPackage.caption || 'Caption pending'}
               </p>
             </div>
@@ -103,7 +103,7 @@ export function GenerationStatusBadge({
 
   return (
     <div className={inline ? '' : 'absolute bottom-2 left-2'}>
-      <Badge variant="outline" className={`${className} text-[10px] backdrop-blur-sm`}>
+      <Badge variant="outline" className={`${className} text-[11px]`}>
         {label}
       </Badge>
     </div>

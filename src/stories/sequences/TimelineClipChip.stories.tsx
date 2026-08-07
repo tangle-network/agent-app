@@ -176,7 +176,7 @@ export const AllStates: Story = {
       <div className="flex flex-col gap-3">
         {rows.map(({ label, height, spec }) => (
           <div key={label}>
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">{label}</p>
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">{label}</p>
             <Lane height={height}>
               <Chip spec={spec} />
             </Lane>

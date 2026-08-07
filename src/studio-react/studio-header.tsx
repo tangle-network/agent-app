@@ -25,7 +25,7 @@ export function StudioHeader({
           <Images className="mr-1.5 h-4 w-4" />
           Library
           {count > 0 && (
-            <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/15 px-1.5 text-[10px] font-semibold text-primary">
+            <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/15 px-1.5 text-[11px] font-semibold text-primary">
               {count}
             </span>
           )}

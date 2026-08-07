@@ -129,7 +129,7 @@ export const AllStates: Story = {
         ] as const
       ).map(([label, view]) => (
         <div key={label} className="w-[520px]">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">{label}</p>
           <div className="rounded-lg border border-border p-6">
             <IntakeInterview view={view} {...loggingCallbacks(view)} />
           </div>
