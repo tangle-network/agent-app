@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-357 exports.
+360 exports.
 
 ### `activityTone`
 
@@ -796,6 +796,22 @@ interface DurablePlanFollowUpReceipt
 
 ```ts
 interface EffortLevel
+```
+
+### `effortLevelLabel`
+
+`function` — The user-facing label for an engine level id: the canonical vocabulary when the id is one this package names, otherwise the id itself made readable (`auto` -> "Auto", `ultra-code` -> "Ultra code").
+
+```ts
+(id: string) => string
+```
+
+### `effortLevelsFromIds`
+
+`function` — Build a levels list from the engine ids a backend applies — the shape the removed `ComposerAgentControls` took as `reasoning.available`, so a product migrating that list has one call to make instead…
+
+```ts
+(ids: readonly string[]) => readonly EffortLevel[]
 ```
 
 ### `EffortMeter`
@@ -1988,6 +2004,14 @@ interface QuestionOptionListProps
 
 ```ts
 (column: RecordGridColumn, raw: string) => RecordGridCellOutcome
+```
+
+### `reconcileEffortLevels`
+
+`function` — The list {@link EffortPicker} RENDERS for `value` — the declared levels, plus `value` itself when the declaration omits it.
+
+```ts
+(value: string, levels?: readonly EffortLevel[]) => readonly EffortLevel[]
 ```
 
 ### `RecordGrid`
