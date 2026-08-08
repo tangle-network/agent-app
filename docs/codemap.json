@@ -17144,6 +17144,18 @@
           "doc": "One reasoning-budget level: the engine `id` is unchanged (the value the product sends to the loop); only the user-facing `label` is renamed to the plainer \"how hard should it think\" vocabulary from d…"
         },
         {
+          "name": "effortLevelLabel",
+          "kind": "function",
+          "signature": "(id: string) => string",
+          "doc": "The user-facing label for an engine level id: the canonical vocabulary when the id is one this package names, otherwise the id itself made readable (`auto` -> \"Auto\", `ultra-code` -> \"Ultra code\")."
+        },
+        {
+          "name": "effortLevelsFromIds",
+          "kind": "function",
+          "signature": "(ids: readonly string[]) => readonly EffortLevel[]",
+          "doc": "Build a levels list from the engine ids a backend applies — the shape the removed `ComposerAgentControls` took as `reasoning.available`, so a product migrating that list has one call to make instead…"
+        },
+        {
           "name": "EffortMeter",
           "kind": "function",
           "signature": "({ fill, className }: { fill: number; className?: string | undefined; }) => Element",
@@ -18018,6 +18030,12 @@
           "kind": "function",
           "signature": "(column: RecordGridColumn, raw: string) => RecordGridCellOutcome",
           "doc": "Parse editor text and validate it in one step — what a committing cell editor calls."
+        },
+        {
+          "name": "reconcileEffortLevels",
+          "kind": "function",
+          "signature": "(value: string, levels?: readonly EffortLevel[]) => readonly EffortLevel[]",
+          "doc": "The list {@link EffortPicker} RENDERS for `value` — the declared levels, plus `value` itself when the declaration omits it."
         },
         {
           "name": "RecordGrid",

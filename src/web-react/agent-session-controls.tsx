@@ -172,6 +172,15 @@ export interface AgentSessionControlsProps {
    * selected harness/model passes that subset here. Without it the strip
    * offers every level and the backend silently ignores the ones it does not
    * apply — a control that reports a choice the system never made.
+   *
+   * This is the COMPLETE renderable set, not an allow-list layered over a
+   * default one — the removed `ComposerAgentControls`' `available` list was the
+   * latter, and its picker injected the `auto` sentinel itself. A list that
+   * omits the current {@link effort} is still safe: `EffortPicker` reconciles
+   * the selected value into the rendered list under its own name rather than
+   * resolving it to a different entry (`reconcileEffortLevels`). Build the list
+   * from engine ids with `effortLevelsFromIds`; the migration is in
+   * `docs/ui-picker-canon.md`.
    */
   effortLevels?: readonly EffortLevel[]
   /**

@@ -61,13 +61,53 @@ field, so no harness or effort control belongs there.
 | --- | --- | --- |
 | `model: { value, onChange, models, loading, … }` | `model`, `onModelChange`, `models: CatalogModel[]`, `modelsLoading` | Flattened onto the top level. `value` must be the canonical id. `model.disabled`, `model.recents`, `model.popular`, `model.modalities`, `model.excludeProviders` have no equivalent — trim the array before passing. |
 | `harness: { value, onChange, available, locked, lockReason, onNewChat, disabled }` | `harness`, `onHarnessChange`, `availableHarnesses` | `Harness` is `/harness`'s union, not sandbox-ui's `HarnessType`. The locked/fork affordance (session pinning) is product state: render the canonical control only while unpinned, or render your own locked chip — the canonical control keeps harness switching live. |
-| `reasoning: { value, onChange, available }` | `effort`, `onEffortChange` | `effort` is a plain engine-id string (`off`/`low`/`medium`/`high` by default — see `DEFAULT_EFFORT_LEVELS`). sandbox-ui's `auto` sentinel has no equivalent; map it to your product's default level. |
+| `reasoning: { value, onChange, available }` | `effort`, `onEffortChange`, `effortLevels` | `effort` is a plain engine-id string (`off`/`low`/`medium`/`high` by default — see `DEFAULT_EFFORT_LEVELS`). **`available` is not `effortLevels` — read the next section before mapping it across.** |
 | `layout: "inline" \| "gear" \| "combined"` | `layout: "inline" \| "compact"` | `gear`/`combined` both become `compact` (model inline, harness + effort behind a gear popover with plain-English copy). |
 | `context: "chat" \| "all"` | — | No flag: offer only what the surface supports (`availableHarnesses`, pre-filtered `models`). |
 | `filterModelsToHarness` | — | No equivalent. The canonical control always enforces coherence both ways via `/harness`'s `snapModelToHarness` / `snapHarnessToModel`. |
 | `profile` | — | Agent-profile picking is not part of the canon cluster. |
 | `menuPlacement`, `trailing` | — | Menus open upward; extras dock beside the control in your own row. |
 | `className` | `className` | Same. |
+
+### `reasoning.available` → `effortLevels` — the two lists are not the same thing
+
+This is the one mapping in the table that a product can get wrong while
+following it exactly, so it gets its own section.
+
+`available` was an **allow-list layered over the picker's own vocabulary**, and
+that picker injected the `auto` sentinel itself — which is why `available`
+deliberately excluded `auto`. `effortLevels` is the **complete renderable set**,
+forwarded verbatim to `EffortPicker`. Map one onto the other and you drop
+`auto` from the list while your sessions still run on it.
+
+```ts
+// WRONG — the list no longer carries the value the session is on.
+effortLevels: available.map((id) => ({ id, label: id })),
+
+// RIGHT — canonical labels, and every value the product can actually hold.
+import { effortLevelsFromIds } from '@tangle-network/agent-app/web-react'
+effortLevels: effortLevelsFromIds(['auto', ...available]),
+```
+
+`effortLevelsFromIds` keeps the canonical vocabulary (`low` → "Quick", `high` →
+"Extended") instead of a hand-written label map per product, which is how
+"Quick" and "Low" drift apart across two surfaces of the same app.
+
+**A list that still omits the running value is safe, not a wrong label.**
+`EffortPicker` reconciles the selected value into the rendered list under its
+own name (`reconcileEffortLevels`, labelled by `effortLevelLabel` — `auto` →
+"Auto"), so a selected value can never render as a *different* list entry. The
+reconciled row draws no strength meter: it has no rung on a ladder it was not
+declared on, and an all-ghost meter is what `off` looks like. It leaves every
+declared level on the rung it already had, and it disappears as soon as the
+user picks a declared level. A blank `effort` renders as no selection (`—`),
+never as the middle level.
+
+The guarantee is runtime rather than a type on purpose. A product stores its
+effort as a plain `string`, so "`value` is one of `levels`" is not expressible
+at the call sites that produce this bug; a generic pairing would bind only at
+literal-const call sites and would have caught none of the real ones while
+reading as though it caught all of them.
 
 The `ComposerAgentControls` adapter's wiring that products relied on —
 canonical-id boundary, harness-snap suppression for per-harness remembered

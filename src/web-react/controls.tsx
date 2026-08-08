@@ -417,6 +417,55 @@ export const DEFAULT_EFFORT_LEVELS: readonly EffortLevel[] = [
   { id: 'high', label: 'Extended' },
 ]
 
+/**
+ * The user-facing label for an engine level id: the canonical vocabulary when
+ * the id is one this package names, otherwise the id itself made readable
+ * (`auto` -> "Auto", `ultra-code` -> "Ultra code"). Never invents a depth word,
+ * so an id nobody declared a label for still reads as ITSELF and never as some
+ * other level.
+ */
+export function effortLevelLabel(id: string): string {
+  const known = DEFAULT_EFFORT_LEVELS.find((l) => l.id === id)
+  if (known) return known.label
+  const words = id.replace(/[-_]+/g, ' ').trim()
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : id
+}
+
+/**
+ * Build a levels list from the engine ids a backend applies — the shape the
+ * removed `ComposerAgentControls` took as `reasoning.available`, so a product
+ * migrating that list has one call to make instead of a hand-written label map
+ * per product (which is how "Quick" and "Low" drift apart across surfaces).
+ */
+export function effortLevelsFromIds(ids: readonly string[]): readonly EffortLevel[] {
+  return ids.map((id) => ({ id, label: effortLevelLabel(id) }))
+}
+
+/**
+ * The list {@link EffortPicker} RENDERS for `value` — the declared levels, plus
+ * `value` itself when the declaration omits it.
+ *
+ * A picker cannot honestly resolve a selected value it was not given, and the
+ * failure it used to take instead — fall back to the middle entry — renders the
+ * session's real depth as a DIFFERENT level's name. That is exactly the defect
+ * `levels` was added to prevent: the legacy adapter's `available` list excluded
+ * the `auto` sentinel because the old picker injected it, so a product mapping
+ * that list straight across ships a session running on `auto` labelled
+ * "Extended". Admitting the value is not offering a new choice — it is
+ * reporting the state the session is already in, and it disappears from the
+ * list as soon as the user picks a declared level.
+ *
+ * A blank value is not admitted (there is no honest label for it); the picker
+ * renders no selection instead.
+ */
+export function reconcileEffortLevels(
+  value: string,
+  levels: readonly EffortLevel[] = DEFAULT_EFFORT_LEVELS,
+): readonly EffortLevel[] {
+  if (!value || levels.some((l) => l.id === value)) return levels
+  return [{ id: value, label: effortLevelLabel(value) }, ...levels]
+}
+
 // ── effort strength meter ─────────────────────────────────────────────────
 
 /** Segments the meter draws — fixed geometry so the ladder stays tabular
@@ -474,7 +523,12 @@ export interface EffortPickerProps {
   onChange: (id: string) => void
   /** Selectable levels (engine id + user-facing label). Defaults to the plain
    *  "Thinking" vocabulary; override to relabel without changing the ids the
-   *  runtime receives. */
+   *  runtime receives.
+   *
+   *  A list that omits the current `value` is not a rendering error the picker
+   *  papers over: `value` is reconciled INTO the rendered list under its own
+   *  name (see {@link reconcileEffortLevels}), because a control must report
+   *  the depth the session is running at and never some other list entry. */
   levels?: readonly EffortLevel[]
   /** Prefix shown before the active level on the pill — the "what is this"
    *  context the bare value lacked. Default "Thinking". Pass '' to hide it. */
@@ -490,7 +544,14 @@ export interface EffortPickerProps {
 export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, label = 'Thinking' }: EffortPickerProps) {
   const [open, setOpen] = useState(false)
   const { containerRef, triggerProps } = usePopover(open, setOpen)
-  const selected = levels.find((l) => l.id === value) ?? levels[2] ?? levels[0]
+  const rendered = reconcileEffortLevels(value, levels)
+  // The strength ladder is computed over the DECLARED levels only, so admitting
+  // the selected value cannot shift where the declared ones sit on the meter.
+  // A level the declaration does not carry has no position on that ladder, so
+  // it renders with NO meter — an all-ghost meter is what `off` looks like, and
+  // "we cannot place this" is not "no thinking".
+  const isDeclared = (id: string) => levels.some((l) => l.id === id)
+  const selected = rendered.find((l) => l.id === value)
 
   return (
     <div ref={containerRef} className="relative inline-flex">
@@ -504,16 +565,16 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
         <BrainGlyph className="h-3.5 w-3.5 text-muted-foreground" />
         <span>
           {label ? <span className="text-muted-foreground">{label}: </span> : null}
-          {selected?.label}
+          {selected ? selected.label : '—'}
         </span>
-        {selected && (
+        {selected && isDeclared(selected.id) && (
           <EffortMeter fill={effortMeterFill(selected.id, levels)} className="text-foreground" />
         )}
         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
       </button>
       {open && (
         <div role="menu" className={`absolute bottom-full left-0 z-50 mb-2 w-44 overflow-hidden rounded-xl border border-border bg-popover p-1 ${OVERLAY_SHADOW}`}>
-          {levels.map((l) => (
+          {rendered.map((l) => (
             <button
               key={l.id}
               type="button"
@@ -529,8 +590,12 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
             >
               <BrainGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <span className="truncate">{l.label}</span>
-              <EffortMeter fill={effortMeterFill(l.id, levels)} className="ml-auto text-foreground" />
-              {l.id === value && <CheckGlyph className="h-3.5 w-3.5 shrink-0 text-primary" />}
+              {isDeclared(l.id) && (
+                <EffortMeter fill={effortMeterFill(l.id, levels)} className="ml-auto text-foreground" />
+              )}
+              {l.id === value && (
+                <CheckGlyph className={`${isDeclared(l.id) ? '' : 'ml-auto '}h-3.5 w-3.5 shrink-0 text-primary`} />
+              )}
             </button>
           ))}
         </div>
