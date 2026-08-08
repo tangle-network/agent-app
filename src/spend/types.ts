@@ -270,6 +270,104 @@ export interface SpendOwnershipSummary {
   readonly foreignSandboxIds: readonly string[]
 }
 
+// ── what the product EXPECTED to be billed for ────────────────────────────────
+
+/**
+ * The stretch of time a reconciliation pass covers — the same window the
+ * product's own ledger fetch was scoped to.
+ *
+ * Declared by the caller rather than derived from the rows, because deriving it
+ * from the rows is circular: a feed that returns nothing would produce a
+ * zero-width window that expects nothing and certifies itself.
+ */
+export interface SpendWindow {
+  /** Inclusive start, epoch ms. */
+  readonly startAt: number
+  /** Inclusive end, epoch ms. */
+  readonly endAt: number
+}
+
+/**
+ * One box's life, measured against a reconciliation window.
+ *
+ * The live interval is `[createdAt, horizon]`, where the horizon is the SAME one
+ * `computeExpectedCeiling` derives — so a box cannot count as live for the
+ * expectation check and dead for the ceiling check.
+ */
+export interface SpendBoxLiveness {
+  readonly sandboxId: string
+  readonly workspaceId: string
+  /** First instant the box could have been billable. */
+  readonly liveFrom: number
+  /** Last instant it could have been, evaluated at the window's end. */
+  readonly liveUntil: number
+  /** Which fact closed the interval — the ceiling's own vocabulary. */
+  readonly basis: CeilingBasis
+  /** True when any of that life fell inside the window. */
+  readonly overlaps: boolean
+  /** How much of it did, in ms. Zero for a box that did not overlap. */
+  readonly liveMsInWindow: number
+  /**
+   * True when the overlap is long enough that a settlement should have landed.
+   * A box that came up moments before the window closed is live but not yet
+   * expected — settlement lags provisioning, and demanding a row inside that lag
+   * would report the platform's ordinary queue as a defect.
+   */
+  readonly expectSettlement: boolean
+}
+
+/**
+ * What this pass EXPECTED to be billed for — present on every report, including
+ * a clean one, for the same reason {@link SpendOwnershipSummary} is: "nothing
+ * fired" and "nothing was expected" and "nothing could be expected" are three
+ * different answers and a report that cannot tell them apart is the failure this
+ * closes.
+ */
+export interface SpendExpectationSummary {
+  /**
+   * False when the caller declared no window, or the store cannot list its
+   * boxes. The pass then cannot say what it expected — which is reported, never
+   * rounded down to a clean bill.
+   */
+  readonly declared: boolean
+  readonly window: SpendWindow | null
+  /** Live ms inside the window before a settlement is expected of a box. */
+  readonly graceMs: number
+  /** Boxes whose life overlapped the window at all. */
+  readonly liveBoxes: number
+  /** Of those, the ones live long enough that a settlement should have landed. */
+  readonly expectedBoxes: number
+  /** Of those, the ones at least one settlement this pass claimed did land against. */
+  readonly settledBoxes: number
+  /**
+   * The expected boxes nothing settled against, in full — the exhibit list for
+   * "the check stopped checking", and an expectation a reader cannot audit is
+   * one they have to take on trust.
+   */
+  readonly unsettledSandboxIds: readonly string[]
+}
+
+/**
+ * How much this pass is entitled to claim about the bill.
+ *
+ * `ok` is gated on this, which is what makes an examined-nobody pass
+ * structurally incapable of rendering as a clean bill.
+ */
+export type SpendCoverage =
+  /** The pass examined this product's settlements, or knows what it expected. */
+  | 'verified'
+  /**
+   * Expectation was declared and no box was live long enough to expect a bill.
+   * Zero settlements is the RIGHT answer — an idle product, not a defect, and
+   * the one case in which a pass that examined nobody is still clean.
+   */
+  | 'nothing-expected'
+  /**
+   * The pass examined none of this product's settlements and cannot say what it
+   * expected. The CHECK is suspect, not the bill.
+   */
+  | 'unverified'
+
 /** The parts of a settlement reference id, once parsed. */
 export interface SettlementReference {
   /** `stop` | `compute` | `egress` | `gpu-lease` | anything the platform adds. */
@@ -307,12 +405,24 @@ export type SpendCheckId =
   | 'velocity'
   /** The balance the product observes has gone below its floor. */
   | 'negative-balance'
+  /**
+   * The product expected settlements and saw none — the only check whose
+   * subject is the CHECK rather than the bill.
+   *
+   * Every other rule is driven by a settlement row, so all of them go quiet
+   * together when the rows stop arriving: an empty ledger fetch, a stale
+   * ownership rule that excludes every box, an expectation ledger naming
+   * nobody. This is the rule that fires when the others cannot, and it reads as
+   * "do not trust this report" rather than "dispute this charge".
+   */
+  | 'silent-ledger'
 
 export const SPEND_CHECKS: readonly SpendCheckId[] = [
   'unknown-box',
   'over-ceiling',
   'velocity',
   'negative-balance',
+  'silent-ledger',
 ]
 
 /**
@@ -345,16 +455,35 @@ export interface SpendFinding {
   readonly windowNanoUsd: number | null
   readonly trailingMedianNanoUsd: number | null
   readonly velocityRatio: number | null
+  /** `velocity` and `silent-ledger` — the window the finding is about. */
   readonly windowStartAt: number | null
+  readonly windowEndAt: number | null
   /** `negative-balance` — the observed balance and the floor it broke. */
   readonly balanceNanoUsd: number | null
   readonly balanceFloorNanoUsd: number | null
+  /** `silent-ledger` — how many boxes were expected to settle, and how many did. */
+  readonly expectedBoxes: number | null
+  readonly settledBoxes: number | null
+  /** `silent-ledger`, per-box form — how long that box was live inside the window. */
+  readonly liveMsInWindow: number | null
 }
 
 /** What one reconciliation pass concluded. */
 export interface SpendReport {
-  /** True when nothing fired. `ok === findings.length === 0`. */
+  /**
+   * True when nothing fired AND the pass earned the right to say so:
+   * `findings.length === 0 && coverage !== 'unverified'`.
+   *
+   * The second half is not decoration. Every rule but `silent-ledger` is driven
+   * by a settlement row, so a pass that read no rows — an empty ledger fetch, a
+   * stale ownership rule excluding every box, an expectation ledger naming
+   * nobody — fires nothing and used to report a clean bill. `coverage` is what
+   * makes that shape unrepresentable, and it holds even when a caller skips the
+   * `silent-ledger` check: the skip removes the finding, never the verdict.
+   */
   readonly ok: boolean
+  /** How much this pass is entitled to claim. See {@link SpendCoverage}. */
+  readonly coverage: SpendCoverage
   readonly findings: readonly SpendFinding[]
   readonly checksRun: readonly SpendCheckId[]
   /** Rows the pass read, including the ones no rule looked at. */
@@ -367,6 +496,8 @@ export interface SpendReport {
   readonly creditedNanoUsd: number
   /** What this pass claimed as its own, and what it excluded as another product's. */
   readonly ownership: SpendOwnershipSummary
+  /** What this pass expected to be billed for, and what did not arrive. */
+  readonly expectation: SpendExpectationSummary
   /** The instant the pass treated as "now". */
   readonly asOf: number
 }

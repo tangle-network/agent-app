@@ -4,7 +4,23 @@
 
 Source: `src/spend/index.ts`
 
-48 exports.
+60 exports.
+
+### `AllExcludedAssessment`
+
+`interface` — {@link assessAllExcluded}'s verdict, with the reason a pager message needs.
+
+```ts
+interface AllExcludedAssessment
+```
+
+### `AllExcludedBasis`
+
+`type` — Why {@link assessAllExcluded} answered the way it did.
+
+```ts
+type AllExcludedBasis
+```
 
 ### `assertComputeBudget`
 
@@ -14,12 +30,44 @@ Source: `src/spend/index.ts`
 (budget: ComputeBudget | undefined, workspaceId: string) => Promise<void>
 ```
 
+### `assertSpendWindow`
+
+`function` — Reject a window that cannot be reconciled, rather than examining nobody inside it.
+
+```ts
+(window: SpendWindow) => void
+```
+
+### `assessAllExcluded`
+
+`function` — Should "we saw settlements but none of them were ours" page a human?
+
+```ts
+(report: SpendReport) => AllExcludedAssessment
+```
+
 ### `BilledDurationBasis`
 
 `type` — How a settled duration was arrived at — every duration finding carries one.
 
 ```ts
 type BilledDurationBasis
+```
+
+### `boxLivenessInWindow`
+
+`function` — One box's live interval, and whether the product should have been billed for it inside this window.
+
+```ts
+(record: SpendBoxRecord, window: SpendWindow, options?: BoxLivenessOptions) => SpendBoxLiveness
+```
+
+### `BoxLivenessOptions`
+
+`interface` — Options for {@link boxLivenessInWindow}.
+
+```ts
+interface BoxLivenessOptions
 ```
 
 ### `BoxRateResolver`
@@ -121,6 +169,14 @@ interface ComputeExpectedCeilingOptions
 ### `DEFAULT_CEILING_TOLERANCE_MS`
 
 `const` — Slack allowed between the product's bound and what the platform settled, before an overage is called a discrepancy.
+
+```ts
+900000
+```
+
+### `DEFAULT_EXPECTATION_GRACE_MS`
+
+`const` — How much live time a box needs inside the window before a settlement is EXPECTED for it.
 
 ```ts
 900000
@@ -270,6 +326,14 @@ interface SettlementRow
 readonly SpendCheckId[]
 ```
 
+### `SpendBoxLiveness`
+
+`interface` — One box's life, measured against a reconciliation window.
+
+```ts
+interface SpendBoxLiveness
+```
+
 ### `SpendBoxPatch`
 
 `interface` — A fold step.
@@ -292,6 +356,22 @@ interface SpendBoxRecord
 
 ```ts
 type SpendCheckId
+```
+
+### `SpendCoverage`
+
+`type` — How much this pass is entitled to claim about the bill.
+
+```ts
+type SpendCoverage
+```
+
+### `SpendExpectationSummary`
+
+`interface` — What this pass EXPECTED to be billed for — present on every report, including a clean one, for the same reason {@link SpendOwnershipSummary} is: "nothing fired" and "nothing was expected" and "nothin…
+
+```ts
+interface SpendExpectationSummary
 ```
 
 ### `SpendFinding`
@@ -380,6 +460,22 @@ interface SpendReport
 
 ```ts
 (report: SpendReport) => string
+```
+
+### `SpendWindow`
+
+`interface` — The stretch of time a reconciliation pass covers — the same window the product's own ledger fetch was scoped to.
+
+```ts
+interface SpendWindow
+```
+
+### `undeclaredExpectation`
+
+`function` — The expectation summary a pass that declared none reports.
+
+```ts
+(graceMs: number) => SpendExpectationSummary
 ```
 
 ### `VelocityOptions`

@@ -11,7 +11,11 @@
  *    producing typed findings a human disputes. Which of those rows are this
  *    product's at all is `ownership.ts`: the platform's settlement feed is
  *    scoped to a WALLET, and two of our products on one account otherwise
- *    report each other's boxes as discrepancies.
+ *    report each other's boxes as discrepancies. What the product EXPECTED to be
+ *    billed for is `liveness.ts`: every other rule is driven by a settlement
+ *    row, so they all go quiet together when the rows stop arriving, and only an
+ *    expectation derived from the ledger can tell an idle window from a check
+ *    that stopped checking.
  * 3. **Budget guard** (`budget.ts`) — a per-workspace compute cap enforced at
  *    the one moment a consumer still can: before asking for another box.
  *
@@ -32,18 +36,33 @@ export {
   type ExpectedCeiling,
   type SettlementReference,
   type SettlementRow,
+  type SpendBoxLiveness,
   type SpendBoxPatch,
   type SpendBoxRecord,
   type SpendCheckId,
+  type SpendCoverage,
+  type SpendExpectationSummary,
   type SpendFinding,
   type SpendOwnershipCandidate,
   type SpendOwnershipRule,
   type SpendOwnershipSummary,
   type SpendOwnershipVerdict,
   type SpendReport,
+  type SpendWindow,
 } from './types'
 
 export { decideBoxOwnership, ownedByBillingKeys } from './ownership'
+
+export {
+  DEFAULT_EXPECTATION_GRACE_MS,
+  assertSpendWindow,
+  assessAllExcluded,
+  boxLivenessInWindow,
+  undeclaredExpectation,
+  type AllExcludedAssessment,
+  type AllExcludedBasis,
+  type BoxLivenessOptions,
+} from './liveness'
 
 export {
   createInMemorySpendLedgerStore,

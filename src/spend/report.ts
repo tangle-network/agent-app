@@ -1,4 +1,9 @@
-import type { SpendFinding, SpendOwnershipSummary, SpendReport } from './types'
+import type {
+  SpendExpectationSummary,
+  SpendFinding,
+  SpendOwnershipSummary,
+  SpendReport,
+} from './types'
 
 const NANO_PER_USD = 1_000_000_000
 
@@ -23,11 +28,24 @@ export function formatSpendReport(report: SpendReport): string {
   )
   lines.push(`checks: ${report.checksRun.join(', ') || '(none)'}`)
   for (const line of ownershipLines(report.ownership)) lines.push(line)
+  for (const line of expectationLines(report.expectation)) lines.push(line)
 
   if (report.ok) {
     lines.push('')
     lines.push('OK — no discrepancy between the product\'s expectations and the settled ledger.')
     return lines.join('\n')
+  }
+
+  // A pass that examined nobody is not clean and is not a dispute either. Say
+  // which of the two this is before the reader starts reading findings as
+  // charges to argue about.
+  if (report.coverage === 'unverified') {
+    lines.push('')
+    lines.push(
+      'UNVERIFIED — this pass examined none of this product\'s settlements and could not say what ' +
+        'it expected, so it cannot certify the bill either way. Read the finding below as "do not ' +
+        'trust this report", not as "dispute this charge".',
+    )
   }
 
   lines.push('')
@@ -79,6 +97,36 @@ function ownershipLines(ownership: SpendOwnershipSummary): string[] {
   return lines
 }
 
+/**
+ * What this pass expected to be billed for — printed on EVERY report, clean ones
+ * included, for the same reason the scope line is.
+ *
+ * An undeclared expectation is the difference between "we were billed for
+ * everything we asked for" and "we found nothing to complain about in whatever
+ * rows arrived", and only this line tells a reader which report they are
+ * holding.
+ */
+function expectationLines(expectation: SpendExpectationSummary): string[] {
+  if (!expectation.declared) {
+    return [
+      'expectation: NOT DECLARED — this pass is driven entirely by the settlement rows it was ' +
+        'handed, so it can say nothing about a box it asked for and was never billed for. Pass ' +
+        '`window` and implement `listLiveBetween` on the expectation store to close that direction.',
+    ]
+  }
+  const window = expectation.window
+  const span = window ? `${new Date(window.startAt).toISOString()} → ${new Date(window.endAt).toISOString()}` : '—'
+  const lines = [
+    `expectation: ${span} — ${expectation.liveBoxes} box(es) live, ${expectation.expectedBoxes} ` +
+      `expected to settle (≥ ${(expectation.graceMs / 60_000).toFixed(0)} min live), ` +
+      `${expectation.settledBoxes} did`,
+  ]
+  if (expectation.unsettledSandboxIds.length > 0) {
+    lines.push(`       nothing settled against: ${expectation.unsettledSandboxIds.join(', ')}`)
+  }
+  return lines
+}
+
 /** Every measured field a finding carries, including the ones it left null. */
 function measuredFields(finding: SpendFinding): Array<[string, string]> {
   const ms = (value: number | null): string =>
@@ -93,11 +141,15 @@ function measuredFields(finding: SpendFinding): Array<[string, string]> {
     ['ceiling basis', finding.ceilingBasis ?? '—'],
     ['duration basis', finding.durationBasis ?? '—'],
     ['window', finding.windowStartAt === null ? '—' : new Date(finding.windowStartAt).toISOString()],
+    ['window end', finding.windowEndAt === null ? '—' : new Date(finding.windowEndAt).toISOString()],
     ['window spend', usd(finding.windowNanoUsd)],
     ['trailing median', usd(finding.trailingMedianNanoUsd)],
     ['ratio', finding.velocityRatio === null ? '—' : `${finding.velocityRatio.toFixed(1)}x`],
     ['balance', usd(finding.balanceNanoUsd)],
     ['balance floor', usd(finding.balanceFloorNanoUsd)],
+    ['expected boxes', finding.expectedBoxes === null ? '—' : String(finding.expectedBoxes)],
+    ['settled boxes', finding.settledBoxes === null ? '—' : String(finding.settledBoxes)],
+    ['live in window', ms(finding.liveMsInWindow)],
   ]
 }
 

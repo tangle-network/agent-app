@@ -1,4 +1,4 @@
-import type { SpendBoxPatch, SpendBoxRecord } from './types'
+import type { SpendBoxPatch, SpendBoxRecord, SpendWindow } from './types'
 
 /**
  * Persistence seam for the expectation ledger — the product implements it over
@@ -21,6 +21,30 @@ export interface SpendLedgerStorePort {
    *  statement as the record, or ignore them if the table has no extra columns. */
   insert(record: SpendBoxRecord, extras?: Record<string, unknown>): Promise<SpendBoxRecord>
   update(sandboxId: string, patch: SpendBoxPatch): Promise<SpendBoxRecord | null>
+  /**
+   * OPTIONAL — every box that could have been live during the window.
+   *
+   * This is the one capability that lets a reconciliation answer "were we NOT
+   * billed for something we DID ask for". Without it the pass is driven entirely
+   * by settlement rows, so a feed that returns nothing fires nothing and reads
+   * as a clean bill. Omitting it is safe and additive: the pass reports
+   * `expectation.declared: false` and refuses to certify a bill it could not
+   * check (see {@link SpendReport.coverage}).
+   *
+   * **It may over-return.** The reconciler re-derives liveness itself with
+   * `boxLivenessInWindow`, so a store that returns every row it has is correct,
+   * merely slower. That is deliberate: the definition of "live" must live in one
+   * place, not once per product's SQL. The intended predicate is the coarse one
+   * a WHERE clause can express —
+   *
+   * ```sql
+   * WHERE created_at <= :endAt AND (deleted_at IS NULL OR deleted_at >= :startAt)
+   * ```
+   *
+   * — and the exact answer (idle timeout, max lifetime, stop, open detached run)
+   * is the reconciler's.
+   */
+  listLiveBetween?(window: SpendWindow): Promise<readonly SpendBoxRecord[]>
 }
 
 /**
@@ -96,6 +120,18 @@ export function createInMemorySpendLedgerStore(): InMemorySpendLedgerStore {
       const next = foldSpendBoxRecord(current, patch)
       rows.set(sandboxId, next)
       return structuredClone(next)
+    },
+    async listLiveBetween(window) {
+      // Deliberately the COARSE predicate a product's SQL can express, not the
+      // exact one: the idle-timeout / max-lifetime / detached-run derivation is
+      // the reconciler's, and this over-returning is what proves the reconciler
+      // re-filters rather than trusting whatever a store hands it.
+      return [...rows.values()]
+        .filter(
+          (row) =>
+            row.createdAt <= window.endAt && (row.deletedAt === null || row.deletedAt >= window.startAt),
+        )
+        .map((row) => structuredClone(row))
     },
     records() {
       return [...rows.values()].map((row) => structuredClone(row))
