@@ -4,4 +4,12 @@
 
 Source: `src/peer-floors/cli.ts`
 
-0 exports.
+1 export.
+
+### `parsePeerCheckArgs`
+
+`function`
+
+```ts
+(argv: readonly string[]) => CliArgs
+```

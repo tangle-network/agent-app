@@ -1,0 +1,7 @@
+{
+  "name": "fixture-vendored-tarball",
+  "dependencies": {
+    "@tangle-network/agent-app": "^0.45.33",
+    "@tangle-network/agent-interface": "0.43.0"
+  }
+}

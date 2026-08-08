@@ -1,0 +1,7 @@
+{
+  "name": "agent-app-playground",
+  "private": true,
+  "dependencies": {
+    "@tangle-network/agent-app": "file:.."
+  }
+}

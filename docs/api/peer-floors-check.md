@@ -4,7 +4,31 @@
 
 Source: `src/peer-floors/check.ts`
 
-8 exports.
+21 exports.
+
+### `checkDependencySources`
+
+`function` — Audit one repository for dependencies whose source is not the registry.
+
+```ts
+(options: CheckDependencySourcesOptions) => DependencySourceReport
+```
+
+### `CheckDependencySourcesOptions`
+
+`interface`
+
+```ts
+interface CheckDependencySourcesOptions
+```
+
+### `checkInstalledIntegrity`
+
+`function` — Check each installed package under `scope` against the content-addressed store it was installed from.
+
+```ts
+(args: { repoDir: string; modulesDir: string; scope: string; }) => { coverage: InstalledIntegrityCoverage; findings: De…
+```
 
 ### `checkPeerFloors`
 
@@ -22,6 +46,54 @@ Source: `src/peer-floors/check.ts`
 interface CheckPeerFloorsOptions
 ```
 
+### `classifyDependencySpecifier`
+
+`function` — Classify one dependency specifier by the SOURCE it names.
+
+```ts
+(specifier: string) => DependencySourceProtocol
+```
+
+### `DependencySourceCheck`
+
+`type` — Which of the five scans produced a finding.
+
+```ts
+type DependencySourceCheck
+```
+
+### `DependencySourceFinding`
+
+`interface`
+
+```ts
+interface DependencySourceFinding
+```
+
+### `DependencySourceProtocol`
+
+`type` — How a specifier says a dependency should be obtained.
+
+```ts
+type DependencySourceProtocol
+```
+
+### `DependencySourceReport`
+
+`interface`
+
+```ts
+interface DependencySourceReport
+```
+
+### `describeDependencySourceFinding`
+
+`function` — One finding rendered as the failure a reader has to act on.
+
+```ts
+(finding: DependencySourceFinding) => string
+```
+
 ### `describePeerFloorViolation`
 
 `function` — The failure message for one violating row.
@@ -30,12 +102,36 @@ interface CheckPeerFloorsOptions
 (row: PeerFloorRow, shellVersion: string, shell?: string) => string
 ```
 
+### `formatDependencySourceReport`
+
+`function`
+
+```ts
+(report: DependencySourceReport) => string
+```
+
 ### `formatPeerFloorReport`
 
 `function`
 
 ```ts
 (report: PeerFloorReport, shell?: string) => string
+```
+
+### `InstalledIntegrityCoverage`
+
+`interface` — What the on-disk integrity pass was able to examine — reported on EVERY run, clean or not, because "checked nothing" and "checked everything and found nothing" render identically otherwise.
+
+```ts
+interface InstalledIntegrityCoverage
+```
+
+### `LocalPathSource`
+
+`type` — The legitimate-exception rule, stated once so it is not a path allowlist.
+
+```ts
+type LocalPathSource
 ```
 
 ### `PeerFloorReport`
@@ -60,6 +156,14 @@ interface PeerFloorRow
 
 ```ts
 type PeerFloorVerdict
+```
+
+### `resolveLocalPathSource`
+
+`function`
+
+```ts
+(args: { fromDir: string; repoDir: string; path: string; name: string; }) => LocalPathSource
 ```
 
 ### `satisfiesRange`
