@@ -24,7 +24,12 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { createElement } from 'react'
+import { renderToString } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+
+import { AgentSessionControls } from '../../src/web-react/agent-session-controls'
+import { POPOVER_SURFACE_ATTR } from '../../src/web-react/controls'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const CANON_FILES = ['src/web-react/controls.tsx', 'src/web-react/agent-session-controls.tsx']
@@ -51,5 +56,43 @@ describe('picker canon: no in-place floating panel', () => {
       return total + (source.match(/<PopoverSurface\b/g)?.length ?? 0)
     }, 0)
     expect(surfaces).toBe(4)
+  })
+})
+
+describe('picker canon: still server-renders', () => {
+  // This file runs with NO DOM, which is the point: portaling brought
+  // `react-dom` and viewport measurement onto a subpath every SSR product
+  // renders on every request. What that buys is bounded and worth stating —
+  // measured against react-dom 19.2.8, this goes red when a DOM read moves into
+  // a component BODY (`window.innerWidth` in `PopoverSurface` → the render
+  // throws), and it does NOT exercise the portal's own
+  // `typeof document === 'undefined'` guard, which is unreachable here because
+  // a picker is always closed on the server and `!open` returns first.
+  it('renders the control cluster with no DOM and mounts no panel', () => {
+    const html = renderToString(
+        createElement(AgentSessionControls, {
+          models: [
+            {
+              id: 'anthropic/claude-opus-4',
+              name: 'Claude Opus 4',
+              provider: 'anthropic',
+              contextLength: 1_000_000,
+              supportsTools: true,
+              supportsReasoning: true,
+              featured: true,
+            },
+          ],
+          model: 'anthropic/claude-opus-4',
+          onModelChange: () => {},
+          harness: 'claude-code',
+          onHarnessChange: () => {},
+          effort: 'medium',
+          onEffortChange: () => {},
+        }),
+    )
+
+    expect(html).toContain('Claude Opus 4')
+    expect(html).toContain('aria-expanded="false"')
+    expect(html).not.toContain(POPOVER_SURFACE_ATTR)
   })
 })

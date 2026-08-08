@@ -163,6 +163,16 @@ const POPOVER_MIN_HEIGHT = 120
 export const POPOVER_SURFACE_ATTR = 'data-agent-app-popover'
 const POPOVER_PATH_SEPARATOR = '/'
 
+/**
+ * `PopoverSurface` is now mounted (closed) inside every server-rendered
+ * composer, so its hooks run on the server once per composer per request.
+ * React 18 logs "useLayoutEffect does nothing on the server" for that; React 19
+ * does not (measured silent on react-dom 19.2.8). The peer floor is `react >=18`,
+ * so bind the synchronous hook only where there is a DOM and the effect hook
+ * elsewhere — placement never runs on the server either way.
+ */
+const useBrowserLayoutEffect = typeof document !== 'undefined' ? useLayoutEffect : useEffect
+
 export interface PopoverSurfaceProps {
   open: boolean
   /** The trigger the panel anchors to — `usePopover`'s `triggerRef`. */
@@ -256,7 +266,7 @@ export function PopoverSurface({
 
   // Layout effect: placement is resolved before the browser paints, so the
   // panel is never seen at the origin it mounts at.
-  useLayoutEffect(() => {
+  useBrowserLayoutEffect(() => {
     if (!open) {
       setStyle({ position: 'fixed', top: 0, left: 0, visibility: 'hidden' })
       return

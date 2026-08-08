@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-353 exports.
+356 exports.
 
 ### `activityTone`
 
@@ -1604,6 +1604,30 @@ type ParseInteractionResult
 
 ```ts
 (part: Record<string, unknown>) => ChatInteraction | null
+```
+
+### `POPOVER_SURFACE_ATTR`
+
+`const` — Marks the portaled panel in the DOM.
+
+```ts
+"data-agent-app-popover"
+```
+
+### `PopoverSurface`
+
+`function` — The floating panel every canonical picker opens.
+
+```ts
+({ open, triggerRef, panelRef, className, role, id, matchTriggerWidth, children, }: PopoverSurfaceProps) => ReactPortal…
+```
+
+### `PopoverSurfaceProps`
+
+`interface`
+
+```ts
+interface PopoverSurfaceProps
 ```
 
 ### `ProducerErrorEvent`
