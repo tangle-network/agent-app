@@ -23,7 +23,7 @@ function setup(overrides: Partial<Parameters<typeof AgentSessionControls>[0]> = 
   const onModelChange = vi.fn()
   const onHarnessChange = vi.fn()
   const onEffortChange = vi.fn()
-  render(
+  const view = render(
     createElement(AgentSessionControls, {
       models: MODELS,
       model: 'anthropic/claude-opus-4-6',
@@ -35,7 +35,7 @@ function setup(overrides: Partial<Parameters<typeof AgentSessionControls>[0]> = 
       ...overrides,
     }),
   )
-  return { onModelChange, onHarnessChange, onEffortChange }
+  return { onModelChange, onHarnessChange, onEffortChange, unmount: view.unmount }
 }
 
 describe('layout', () => {
@@ -82,9 +82,45 @@ describe('harness↔model coherence', () => {
 
 describe('effort visibility', () => {
   it('hides the effort picker when the selected model lacks reasoning support', () => {
+    const reasoning = setup({ effort: 'medium' })
+    // The default vocabulary is Off/Quick/Standard/Extended — assert against a
+    // label the picker actually renders, or the check passes on any tree.
+    expect(screen.getByText('Standard')).toBeTruthy()
+    reasoning.unmount()
+
     const noReason: CatalogModel[] = [{ ...MODELS[0]!, supportsReasoning: false }]
-    setup({ models: noReason, model: noReason[0]!.id })
-    // "Medium" is the effort pill's default label; absent when effort is hidden
-    expect(screen.queryByText('Medium')).toBeNull()
+    setup({ models: noReason, model: noReason[0]!.id, effort: 'medium' })
+    expect(screen.queryByText('Standard')).toBeNull()
+  })
+})
+
+describe('effort levels', () => {
+  // A product whose backend applies only a subset of the levels for the
+  // selected harness/model must be able to say so. Without this the strip
+  // offers every level and the backend silently ignores the ones it does not
+  // apply — a control reporting a choice the system never made.
+  it('offers only the levels the product declares, in both layouts', () => {
+    const levels = [
+      { id: 'low', label: 'Low' },
+      { id: 'high', label: 'High' },
+    ] as const
+
+    setup({ effort: 'low', effortLevels: levels })
+    fireEvent.click(screen.getByText('Low'))
+
+    expect(screen.getByText('High')).toBeTruthy()
+    expect(screen.queryByText('Standard')).toBeNull()
+
+    cleanup()
+
+    setup({ effort: 'low', effortLevels: levels, layout: 'compact' })
+    fireEvent.click(screen.getByTitle(/Model settings/))
+    fireEvent.click(screen.getByText('Low'))
+    expect(screen.queryByText('Standard')).toBeNull()
+  })
+
+  it('falls back to the default vocabulary when the product declares none', () => {
+    setup({ effort: 'medium' })
+    expect(screen.getByText('Standard')).toBeTruthy()
   })
 })
