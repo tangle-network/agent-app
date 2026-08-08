@@ -16826,6 +16826,12 @@
           "doc": "Describe the structure and state of a tool call within a chat interaction"
         },
         {
+          "name": "chatToolCallPart",
+          "kind": "function",
+          "signature": "(call: ChatToolCallInfo) => ToolPart",
+          "doc": "Adapt a chat tool call to the canonical `@tangle-network/ui` `ToolPart`, so the row renders through ui's `InlineToolItem` — one run-row grammar shared with every other Tangle run view (the same adapt…"
+        },
+        {
           "name": "ChatTurnFilePartInput",
           "kind": "interface",
           "signature": "interface ChatTurnFilePartInput",

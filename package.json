@@ -579,6 +579,7 @@
     "@tangle-network/brand": ">=1.1.0",
     "@tangle-network/sandbox": ">=0.15.2",
     "@tangle-network/sandbox-ui": ">=0.91.5",
+    "@tangle-network/ui": ">=11.2.2",
     "@xyflow/react": ">=12.0.0",
     "better-auth": ">=1.6.16",
     "drizzle-orm": ">=0.36",
@@ -626,6 +627,9 @@
       "optional": true
     },
     "@tangle-network/sandbox-ui": {
+      "optional": true
+    },
+    "@tangle-network/ui": {
       "optional": true
     },
     "@tangle-network/brand": {

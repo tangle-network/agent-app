@@ -136,7 +136,7 @@ export const ErroredToolCall: Story = {
 }
 
 /** Reasoning-heavy, tool-heavy: a settled 4-tool run collapses into one
- *  disclosure; a later turn interleaves text and tool cards chronologically. */
+ *  disclosure; a later turn interleaves text and tool rows chronologically. */
 export const ReasoningToolHeavy: Story = {
   name: 'Reasoning + Tool Heavy',
   args: { messages: reasoningToolThread },
@@ -145,7 +145,7 @@ export const ReasoningToolHeavy: Story = {
 /**
  * Consumer-extension DX: the host injects a per-tool detail body via
  * `toolRenderers` (here a styled cost panel for `usage_report`). Expand the
- * "Usage report" card to see it replace the generic key/value detail.
+ * "Usage report" row to see it replace the generic key/value detail.
  */
 export const CustomToolRenderer: Story = {
   name: 'Custom Tool Renderer',
@@ -179,7 +179,7 @@ export const CustomToolRenderer: Story = {
   render: (args: ChatMessagesProps) => (
     <>
       <p className="mx-auto w-full max-w-3xl px-6 pb-1 pt-3 text-xs text-muted-foreground">
-        Expand the “Usage report” card — its detail body comes from this story’s `toolRenderers` entry.
+        Expand the “Usage report” row — its detail body comes from this story’s `toolRenderers` entry.
       </p>
       <ChatMessages {...args} />
     </>
