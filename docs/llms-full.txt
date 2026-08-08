@@ -22964,6 +22964,30 @@ type ParseInteractionResult
 (part: Record<string, unknown>) => ChatInteraction | null
 ```
 
+### `POPOVER_SURFACE_ATTR`
+
+`const` — Marks the portaled panel in the DOM.
+
+```ts
+"data-agent-app-popover"
+```
+
+### `PopoverSurface`
+
+`function` — The floating panel every canonical picker opens.
+
+```ts
+({ open, triggerRef, panelRef, className, role, id, matchTriggerWidth, children, }: PopoverSurfaceProps) => ReactPortal…
+```
+
+### `PopoverSurfaceProps`
+
+`interface`
+
+```ts
+interface PopoverSurfaceProps
+```
+
 ### `ProducerErrorEvent`
 
 `interface` — Represent an error event emitted by a producer containing message, code, and optional details

@@ -17756,6 +17756,24 @@
           "doc": "Reads a persisted/streamed `interaction` part back into a `ChatInteraction`."
         },
         {
+          "name": "POPOVER_SURFACE_ATTR",
+          "kind": "const",
+          "signature": "\"data-agent-app-popover\"",
+          "doc": "Marks the portaled panel in the DOM."
+        },
+        {
+          "name": "PopoverSurface",
+          "kind": "function",
+          "signature": "({ open, triggerRef, panelRef, className, role, id, matchTriggerWidth, children, }: PopoverSurfaceProps) => ReactPortal…",
+          "doc": "The floating panel every canonical picker opens."
+        },
+        {
+          "name": "PopoverSurfaceProps",
+          "kind": "interface",
+          "signature": "interface PopoverSurfaceProps",
+          "doc": null
+        },
+        {
           "name": "ProducerErrorEvent",
           "kind": "interface",
           "signature": "interface ProducerErrorEvent",

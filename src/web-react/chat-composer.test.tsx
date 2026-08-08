@@ -384,32 +384,58 @@ describe('ModelPicker priorityGroup', () => {
 
 describe('ModelPicker popover viewport clamp', () => {
   const models = [model({ id: 'anthropic/sonnet', name: 'Claude Sonnet', provider: 'anthropic' })]
+  const PANEL_WIDTH = 420
+  // jsdom's window is 1024 wide and the surface keeps a 16px margin, so the
+  // rightmost the 420px panel may start is 1024 - 420 - 16.
+  const RIGHT_BOUND = 1024 - PANEL_WIDTH - 16
 
   function openPicker() {
     const utils = render(<ModelPicker value="anthropic/sonnet" onChange={() => {}} models={models} />)
     fireEvent.click(screen.getByRole('button', { name: /Claude Sonnet/ }))
-    const popover = screen.getByPlaceholderText('Search models...').closest('div.absolute') as HTMLElement
+    const popover = screen
+      .getByPlaceholderText('Search models...')
+      .closest('[data-agent-app-popover]') as HTMLElement
     return { popover, unmount: utils.unmount }
   }
 
-  it('shifts the popover left when it would overflow the viewport, no-op when it fits', () => {
-    const rect = (right: number) =>
-      ({ right, left: 0, top: 0, bottom: 0, width: 420, height: 300, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect
-    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+  it('clamps the panel into the viewport when the trigger sits near the right edge', () => {
+    // The panel is anchored to the trigger in VIEWPORT coordinates now, so the
+    // clamp is the resolved `left` rather than a corrective transform on a
+    // left-anchored box. jsdom lays nothing out, so the trigger's rect and the
+    // panel's own width both have to be supplied.
+    const anchor = (left: number) =>
+      ({
+        left,
+        right: left + 210,
+        top: 500,
+        bottom: 534,
+        width: 210,
+        height: 34,
+        x: left,
+        y: 500,
+        toJSON: () => ({}),
+      }) as DOMRect
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+    const widthSpy = vi
+      .spyOn(HTMLElement.prototype, 'offsetWidth', 'get')
+      .mockReturnValue(PANEL_WIDTH)
 
-    // Overflowing: right edge at 2000 in a 1024-wide window (jsdom default) —
-    // the narrow-dock case — shifts left by 2000 - (1024 - 16) = 992.
-    spy.mockReturnValue(rect(2000))
+    // Narrow dock: a trigger at x=900 would put the panel's right edge past the
+    // window, so it stops at the bound instead of running off-screen.
+    rectSpy.mockReturnValue(anchor(900))
     const first = openPicker()
-    expect(first.popover.style.transform).toBe('translateX(-992px)')
+    expect(first.popover.style.position).toBe('fixed')
+    expect(first.popover.style.left).toBe(`${RIGHT_BOUND}px`)
     first.unmount()
 
-    // Fitting: right edge inside the window keeps the left anchor, no transform.
-    spy.mockReturnValue(rect(600))
+    // Roomy: the panel fits, so it keeps the trigger's own left edge.
+    rectSpy.mockReturnValue(anchor(100))
     const second = openPicker()
-    expect(second.popover.style.transform).toBe('')
+    expect(second.popover.style.left).toBe('100px')
     second.unmount()
-    spy.mockRestore()
+
+    rectSpy.mockRestore()
+    widthSpy.mockRestore()
   })
 })
 
