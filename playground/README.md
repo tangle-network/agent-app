@@ -43,6 +43,25 @@ Returns real WCAG violations (exact contrast ratios, missing labels/roles) with
 element selectors — the trustworthy alternative to LLM "visual" audits. Prefer
 this for visual QA.
 
+## Popover hit-test audit
+
+```bash
+npm run dev                                        # in one shell
+SHOT_DIR=/tmp/popover node scripts/popover-hit-test.mjs   # /composer × light/dark
+```
+
+Opens every canonical picker mounted in `/composer`'s **host scroll rail** and
+asks the only question that decides whether a user can use it:
+`document.elementFromPoint` at the open panel's own centre must return the
+panel. A unit test cannot answer it — the defect this exists for shipped with
+the right roles, the right items and the right `getBoundingClientRect()`, and
+painted zero pixels, because the host's `overflow-x-auto` rail clipped the
+panel away. Exits non-zero on any unreachable popover and writes one screenshot
+per popover when `SHOT_DIR` is set.
+
+Triggers are enumerated by ARIA inside `[data-popover-audit]`, so a picker added
+to those hosts is covered without touching the script.
+
 > Note: `vite.config.ts` pins `react`/`react-dom`/`react-konva`/`konva` to the
 > playground's own copies — agent-app is linked by symlink, so without the alias
 > Vite would resolve React from the parent repo's devDeps (v19) and mismatch

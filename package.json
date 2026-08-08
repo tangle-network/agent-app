@@ -501,7 +501,7 @@
     "prepare": "tsup",
     "test": "vitest run",
     "test:generated": "node .github/scripts/test-generated-projects.mjs",
-    "test:gates": "vitest run src/sandbox/index.test.ts src/profile/index.test.ts tests/chat-stream.test.ts tests/browser-safe-subpaths.test.ts tests/test-quality.test.ts tests/knip-entries-fresh.test.ts",
+    "test:gates": "vitest run src/sandbox/index.test.ts src/profile/index.test.ts tests/chat-stream.test.ts tests/browser-safe-subpaths.test.ts tests/test-quality.test.ts tests/knip-entries-fresh.test.ts tests/web-react/popover-escapes-host.test.tsx tests/web-react/popover-canon-source.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "docs:gen": "agent-docs",
@@ -586,6 +586,7 @@
     "lucide-react": ">=1",
     "pdf-lib": ">=1.17",
     "react": ">=18",
+    "react-dom": ">=18",
     "react-konva": ">=18",
     "react-router": ">=8.3.0",
     "resend": ">=6"
@@ -646,6 +647,9 @@
       "optional": true
     },
     "pdf-lib": {
+      "optional": true
+    },
+    "react-dom": {
       "optional": true
     }
   },

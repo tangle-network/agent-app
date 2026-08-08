@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import {
+  AgentSessionControls,
   ChatComposer,
   ModelPicker,
   type ComposerFile,
 } from '@tangle-network/agent-app/web-react'
+import type { Harness } from '@tangle-network/agent-app/harness'
 import { makeModels } from '../fixtures'
 
 /**
@@ -24,9 +26,39 @@ function Demo({ title, children }: { title: string; children: React.ReactNode })
   )
 }
 
+/**
+ * The composer control rail a real host docks these controls into, reproduced
+ * verbatim.
+ *
+ * The class string is copied from the shipped `@tangle-network/sandbox-ui`
+ * bundle (its `ChatComposer` action row). `overflow-x-auto` makes the rail a
+ * SCROLL CONTAINER, and a scroll container clips every positioned descendant
+ * whose containing block sits inside it — which used to erase the picker
+ * popovers entirely: correct DOM, correct `getBoundingClientRect()`, zero
+ * pixels painted, no click able to land. The pickers must survive being
+ * mounted here, so the popover hit-test audit drives exactly this markup.
+ */
+function HostScrollRail({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div data-popover-audit={label} className="rounded-2xl border border-border bg-card p-3">
+      <div className="flex items-end gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="ml-auto flex shrink-0 items-center gap-2">{children}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ComposerRoute() {
   const models = makeModels()
   const [model, setModel] = useState(models[0]!.id)
+  const [railModel, setRailModel] = useState(models[0]!.id)
+  const [railHarness, setRailHarness] = useState<Harness>('claude-code')
+  const [railEffort, setRailEffort] = useState('medium')
+  const [compactModel, setCompactModel] = useState(models[0]!.id)
+  const [compactHarness, setCompactHarness] = useState<Harness>('claude-code')
+  const [compactEffort, setCompactEffort] = useState('medium')
   const pill = (
     <ModelPicker value={model} onChange={setModel} models={models} />
   )
@@ -101,6 +133,35 @@ export function ComposerRoute() {
               controls={pill}
             />
           </div>
+        </Demo>
+
+        <Demo title="Host scroll rail (inline) — model, backend, thinking">
+          <HostScrollRail label="rail-inline">
+            <AgentSessionControls
+              models={models}
+              model={railModel}
+              onModelChange={setRailModel}
+              harness={railHarness}
+              onHarnessChange={setRailHarness}
+              effort={railEffort}
+              onEffortChange={setRailEffort}
+            />
+          </HostScrollRail>
+        </Demo>
+
+        <Demo title="Host scroll rail (compact) — model + settings gear">
+          <HostScrollRail label="rail-compact">
+            <AgentSessionControls
+              layout="compact"
+              models={models}
+              model={compactModel}
+              onModelChange={setCompactModel}
+              harness={compactHarness}
+              onHarnessChange={setCompactHarness}
+              effort={compactEffort}
+              onEffortChange={setCompactEffort}
+            />
+          </HostScrollRail>
         </Demo>
       </div>
     </div>

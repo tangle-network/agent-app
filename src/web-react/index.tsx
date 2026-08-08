@@ -55,6 +55,8 @@ export * from './record-grid'
 export {
   usePopover,
   usePending,
+  PopoverSurface,
+  POPOVER_SURFACE_ATTR,
   ModelPicker,
   EffortPicker,
   EffortMeter,
@@ -65,6 +67,7 @@ export {
   type ModelPickerProps,
   type EffortPickerProps,
   type EffortLevel,
+  type PopoverSurfaceProps,
 } from './controls'
 export {
   AgentSessionControls,

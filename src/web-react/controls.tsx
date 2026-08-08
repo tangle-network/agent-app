@@ -10,7 +10,19 @@
  * shared design tokens; the glyphs are inline SVGs, no icon-library dependency.
  */
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+} from 'react'
+import { createPortal } from 'react-dom'
 import { ProviderLogo } from './provider-logo'
 import type { CatalogModel } from '../runtime/model-catalog'
 
@@ -74,15 +86,34 @@ export function CheckGlyph({ className }: { className?: string }) {
  * trigger so keyboard users aren't dropped at the top of the document. The
  * returned `triggerProps` carry the ARIA contract (`aria-haspopup`/
  * `aria-expanded`); spread them onto the trigger button.
+ *
+ * `panelRef` belongs to the popover panel and MUST be wired when the panel is
+ * rendered through {@link PopoverSurface}: a portaled panel is not inside
+ * `containerRef`, so a container-only outside test reads every click on the
+ * menu's own rows as an outside click and closes before the row's handler runs.
  */
 export function usePopover(open: boolean, setOpen: (open: boolean) => void) {
   const containerRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
     function onMouseDown(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (containerRef.current?.contains(target)) return
+      const panel = panelRef.current
+      if (panel?.contains(target)) return
+      // A popover opened FROM this one portals as a SIBLING at body level, so
+      // `contains` cannot see it and a click on its rows would read as outside.
+      // Surfaces stamp their ancestor chain, so descendancy survives the portal.
+      const ownPath = panel?.getAttribute(POPOVER_SURFACE_ATTR)
+      const hitPath =
+        target instanceof Element
+          ? target.closest(`[${POPOVER_SURFACE_ATTR}]`)?.getAttribute(POPOVER_SURFACE_ATTR)
+          : null
+      if (ownPath && hitPath && (hitPath === ownPath || hitPath.startsWith(`${ownPath}${POPOVER_PATH_SEPARATOR}`))) return
+      setOpen(false)
     }
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
@@ -101,12 +132,169 @@ export function usePopover(open: boolean, setOpen: (open: boolean) => void) {
   return {
     containerRef,
     triggerRef,
+    panelRef,
     triggerProps: {
       ref: triggerRef,
       'aria-haspopup': true as const,
       'aria-expanded': open,
     },
   }
+}
+
+// ── PopoverSurface ────────────────────────────────────────────────────────
+
+/** Distance between the trigger and the panel it opens. */
+const POPOVER_GAP = 8
+/** Minimum distance the panel keeps from every viewport edge. */
+const POPOVER_VIEWPORT_MARGIN = 16
+/** Floor for the computed max-height, so a cramped side still shows rows
+ *  rather than collapsing to a sliver the user cannot read. */
+const POPOVER_MIN_HEIGHT = 120
+
+/**
+ * Marks the portaled panel in the DOM. Products and audits (see
+ * `playground/scripts/popover-hit-test.mjs`) select on this rather than on a
+ * Tailwind class, which is presentation and free to change.
+ *
+ * Its VALUE is the surface's ancestor path (`outer/inner`), which is what
+ * restores "is this click inside my popover" after the portal flattens two
+ * nested panels into two siblings of `<body>`.
+ */
+export const POPOVER_SURFACE_ATTR = 'data-agent-app-popover'
+const POPOVER_PATH_SEPARATOR = '/'
+
+export interface PopoverSurfaceProps {
+  open: boolean
+  /** The trigger the panel anchors to — `usePopover`'s `triggerRef`. */
+  triggerRef: RefObject<HTMLElement | null>
+  /** `usePopover`'s `panelRef`; also what the outside-click test consults. */
+  panelRef: RefObject<HTMLDivElement | null>
+  /** Presentation classes. Placement and elevation are owned here — a caller
+   *  must not pass `absolute`/`fixed`/`top-*`/`bottom-*`/`z-*`. */
+  className?: string
+  role?: string
+  id?: string
+  /** Make the panel at least as wide as its trigger. A portaled panel has no
+   *  `w-full` to inherit — the trigger is no longer its offset parent — so a
+   *  menu that used to stretch to a full-width trigger declares it here. */
+  matchTriggerWidth?: boolean
+  children: ReactNode
+}
+
+/**
+ * The floating panel every canonical picker opens.
+ *
+ * It renders through a PORTAL to `document.body` and anchors itself to the
+ * trigger in viewport coordinates, because an in-place `absolute` panel's
+ * visibility is decided by markup this package does not own. Measured in
+ * production: the shipped chat composer docks these controls inside a
+ * horizontally scrolling rail (`overflow-x-auto`), and a scroll container
+ * clips every positioned descendant whose containing block sits inside it —
+ * so a correct 420x457 menu with correct coordinates painted zero pixels and
+ * could not be clicked. An ancestor `transform`/`filter`/`contain` would trap
+ * it the same way through the stacking context instead of the clip. Leaving
+ * the DOM subtree is the only placement a host cannot re-break.
+ *
+ * Placement prefers ABOVE the trigger (these controls dock at the bottom of a
+ * composer), flips below when there is more room there, clamps horizontally
+ * into the viewport, and caps its own height to the space on the chosen side.
+ * The panel is `visibility: hidden` for the measure pass so it never paints at
+ * the pre-placement origin.
+ */
+export function PopoverSurface({
+  open,
+  triggerRef,
+  panelRef,
+  className,
+  role,
+  id,
+  matchTriggerWidth,
+  children,
+}: PopoverSurfaceProps) {
+  const surfaceId = useId()
+  const [style, setStyle] = useState<CSSProperties>(() => ({
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    visibility: 'hidden',
+  }))
+
+  const place = useCallback(() => {
+    const trigger = triggerRef.current
+    const panel = panelRef.current
+    if (!trigger || !panel) return
+    const anchor = trigger.getBoundingClientRect()
+    const viewportWidth = window.innerWidth
+    const viewportHeight = window.innerHeight
+
+    // `scrollHeight` is the panel's CONTENT height, so it does not feed back
+    // on the `maxHeight` this function just applied — reading `offsetHeight`
+    // here would measure the previous pass's clamp and ratchet the panel
+    // smaller on every scroll event.
+    const contentHeight = panel.scrollHeight
+    const panelWidth = panel.offsetWidth
+
+    const roomAbove = anchor.top - POPOVER_GAP - POPOVER_VIEWPORT_MARGIN
+    const roomBelow = viewportHeight - anchor.bottom - POPOVER_GAP - POPOVER_VIEWPORT_MARGIN
+    const above = contentHeight <= roomAbove || roomAbove >= roomBelow
+    const maxHeight = Math.max(POPOVER_MIN_HEIGHT, above ? roomAbove : roomBelow)
+    const height = Math.min(contentHeight, maxHeight)
+
+    const top = above ? Math.max(POPOVER_VIEWPORT_MARGIN, anchor.top - POPOVER_GAP - height) : anchor.bottom + POPOVER_GAP
+    const rightBound = Math.max(POPOVER_VIEWPORT_MARGIN, viewportWidth - panelWidth - POPOVER_VIEWPORT_MARGIN)
+    const left = Math.min(Math.max(POPOVER_VIEWPORT_MARGIN, anchor.left), rightBound)
+
+    setStyle({
+      position: 'fixed',
+      top,
+      left,
+      maxHeight,
+      visibility: 'visible',
+      ...(matchTriggerWidth ? { minWidth: anchor.width } : {}),
+    })
+  }, [matchTriggerWidth, panelRef, triggerRef])
+
+  // Layout effect: placement is resolved before the browser paints, so the
+  // panel is never seen at the origin it mounts at.
+  useLayoutEffect(() => {
+    if (!open) {
+      setStyle({ position: 'fixed', top: 0, left: 0, visibility: 'hidden' })
+      return
+    }
+    place()
+  }, [open, place])
+
+  useEffect(() => {
+    if (!open) return
+    const onViewportChange = () => place()
+    // `capture` so the rail's OWN scroll re-anchors the panel — a scroll inside
+    // an ancestor does not bubble to window.
+    window.addEventListener('scroll', onViewportChange, true)
+    window.addEventListener('resize', onViewportChange)
+    return () => {
+      window.removeEventListener('scroll', onViewportChange, true)
+      window.removeEventListener('resize', onViewportChange)
+    }
+  }, [open, place])
+
+  if (!open || typeof document === 'undefined') return null
+
+  const ownerPath = triggerRef.current?.closest?.(`[${POPOVER_SURFACE_ATTR}]`)?.getAttribute(POPOVER_SURFACE_ATTR)
+  const path = ownerPath ? `${ownerPath}${POPOVER_PATH_SEPARATOR}${surfaceId}` : surfaceId
+
+  return createPortal(
+    <div
+      ref={panelRef}
+      id={id}
+      role={role}
+      style={style}
+      {...{ [POPOVER_SURFACE_ATTR]: path }}
+      className={`z-[1000] ${className ?? ''}`}
+    >
+      {children}
+    </div>,
+    document.body,
+  )
 }
 
 /**
@@ -264,25 +452,12 @@ function ModelRow({
 export function ModelPicker({ value, onChange, models, loading, renderProviderBadge, recommendedLabel = 'Recommended', priorityGroup }: ModelPickerProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const { containerRef, triggerProps } = usePopover(open, setOpen)
+  const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
   const inputRef = useRef<HTMLInputElement>(null)
-  const popoverRef = useRef<HTMLDivElement>(null)
+  const panelId = useId()
 
   useEffect(() => {
     if (open) inputRef.current?.focus()
-  }, [open])
-
-  // Keep the wide popover inside the viewport. It is left-anchored under the
-  // trigger, so inside a narrow RIGHT-docked shell (the assistant drawer near
-  // its minimum width) the 420px card runs past the window's right edge and
-  // the price/context column clips. Shift it left just enough to fit — a no-op
-  // whenever it already fits (the common case), so anchoring is unchanged.
-  useEffect(() => {
-    if (!open) return
-    const el = popoverRef.current
-    if (!el) return
-    const overflowRight = el.getBoundingClientRect().right - (window.innerWidth - 16)
-    el.style.transform = overflowRight > 0 ? `translateX(-${Math.ceil(overflowRight)}px)` : ''
   }, [open])
 
   const selected = models.find((m) => m.id === value)
@@ -324,6 +499,7 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
       <button
         type="button"
         {...triggerProps}
+        aria-controls={open ? panelId : undefined}
         onClick={() => setOpen(!open)}
         className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent"
       >
@@ -332,9 +508,14 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
       </button>
 
-      {open && (
-        <div ref={popoverRef} className={`absolute bottom-full left-0 z-50 mb-2 w-[420px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-popover ${OVERLAY_SHADOW}`}>
-          <div className="border-b border-border px-3 py-2">
+      <PopoverSurface
+        open={open}
+        id={panelId}
+        triggerRef={triggerRef}
+        panelRef={panelRef}
+        className={`flex w-[420px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border border-border bg-popover ${OVERLAY_SHADOW}`}
+      >
+          <div className="shrink-0 border-b border-border px-3 py-2">
             <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
               <SearchGlyph className="h-3.5 w-3.5 text-muted-foreground" />
               <input
@@ -347,7 +528,9 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
               />
             </div>
           </div>
-          <div className="max-h-[400px] overflow-y-auto p-1 pb-2">
+          {/* `min-h-0` is what lets the list absorb the surface's computed
+              max-height on a short viewport instead of overflowing the panel. */}
+          <div className="max-h-[400px] min-h-0 overflow-y-auto p-1 pb-2">
             {loading && <div className="px-3 py-4 text-center text-sm text-muted-foreground">Loading models...</div>}
             {!loading && filtered && (
               <>
@@ -391,8 +574,7 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
               </>
             )}
           </div>
-        </div>
-      )}
+      </PopoverSurface>
     </div>
   )
 }
@@ -489,7 +671,8 @@ export interface EffortPickerProps {
  *  its `chat/AgentSessionControls`) is legacy and frozen. */
 export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, label = 'Thinking' }: EffortPickerProps) {
   const [open, setOpen] = useState(false)
-  const { containerRef, triggerProps } = usePopover(open, setOpen)
+  const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
+  const panelId = useId()
   const selected = levels.find((l) => l.id === value) ?? levels[2] ?? levels[0]
 
   return (
@@ -497,6 +680,7 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
       <button
         type="button"
         {...triggerProps}
+        aria-controls={open ? panelId : undefined}
         onClick={() => setOpen(!open)}
         title={label ? `${label} — how hard the agent reasons before answering` : 'Reasoning effort'}
         className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent"
@@ -511,8 +695,14 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
         )}
         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
       </button>
-      {open && (
-        <div role="menu" className={`absolute bottom-full left-0 z-50 mb-2 w-44 overflow-hidden rounded-xl border border-border bg-popover p-1 ${OVERLAY_SHADOW}`}>
+      <PopoverSurface
+        open={open}
+        id={panelId}
+        role="menu"
+        triggerRef={triggerRef}
+        panelRef={panelRef}
+        className={`w-44 overflow-y-auto rounded-xl border border-border bg-popover p-1 ${OVERLAY_SHADOW}`}
+      >
           {levels.map((l) => (
             <button
               key={l.id}
@@ -533,8 +723,7 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
               {l.id === value && <CheckGlyph className="h-3.5 w-3.5 shrink-0 text-primary" />}
             </button>
           ))}
-        </div>
-      )}
+      </PopoverSurface>
     </div>
   )
 }
