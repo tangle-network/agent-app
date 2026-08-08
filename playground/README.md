@@ -19,7 +19,11 @@ npm run dev      # http://localhost:4321
 Routes: **`/canvas`** (DesignCanvasEditor — toolbar, layers, rulers, pages),
 **`/timeline`** (sequences TimelineEditor — clips + captions, transport), **`/chat`**
 (web-react chat shell — messages, tool-call + proposal cards, stream-error + Retry,
-Model/Effort pickers), **`/workspace`** (the default `AgentWorkspaceLayout` +
+Model/Effort pickers), **`/composer`** (ChatComposer inside the real host scroll
+rail — see the popover hit-test below), **`/records`** (`SessionHistoryPanel`'s
+row-actions kebab and `RecordGrid`'s per-cell source popover, each mounted in a
+short clipping host — the popover hit-test below covers this route too),
+**`/workspace`** (the default `AgentWorkspaceLayout` +
 `EntryComposer` composition with the shared profile, backend, model, thinking,
 and plan controls).
 
@@ -47,17 +51,20 @@ this for visual QA.
 
 ```bash
 npm run dev                                        # in one shell
-SHOT_DIR=/tmp/popover node scripts/popover-hit-test.mjs   # /composer × light/dark
+SHOT_DIR=/tmp/popover node scripts/popover-hit-test.mjs                    # /composer × light/dark
+SHOT_DIR=/tmp/popover ROUTE=/records node scripts/popover-hit-test.mjs     # /records × light/dark
 ```
 
-Opens every canonical picker mounted in `/composer`'s **host scroll rail** and
-asks the only question that decides whether a user can use it:
-`document.elementFromPoint` at the open panel's own centre must return the
-panel. A unit test cannot answer it — the defect this exists for shipped with
-the right roles, the right items and the right `getBoundingClientRect()`, and
-painted zero pixels, because the host's `overflow-x-auto` rail clipped the
-panel away. Exits non-zero on any unreachable popover and writes one screenshot
-per popover when `SHOT_DIR` is set.
+Opens every canonical picker mounted in `/composer`'s **host scroll rail** (or,
+with `ROUTE=/records`, the session-history kebab menu and the record-grid
+source popover, each in its own short clipping host) and asks the only
+question that decides whether a user can use it: `document.elementFromPoint`
+at the open panel's own centre must return the panel. A unit test cannot
+answer it — the defect this exists for shipped with the right roles, the
+right items and the right `getBoundingClientRect()`, and painted zero pixels,
+because the host's clipping ancestor erased the panel. Exits non-zero on any
+unreachable popover and writes one screenshot per popover when `SHOT_DIR` is
+set.
 
 Triggers are enumerated by ARIA inside `[data-popover-audit]`, so a picker added
 to those hosts is covered without touching the script.

@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 /**
- * The canonical pickers must survive the container a HOST mounts them in.
+ * The canonical pickers — and, as of the session-history/record-grid
+ * migration, every other `bg-popover` surface in `/web-react` — must survive
+ * the container a HOST mounts them in.
  *
  * The defect this pins shipped to production: the composer docks the model and
  * thinking pills inside a horizontally scrolling control rail
@@ -22,6 +24,14 @@
  * `contain` or stacking context can reach it. Leave the panel inside the
  * trigger's subtree and this file goes red — which is what the browser audit
  * measured 10 popovers failing on before the portal landed.
+ *
+ * The session-history kebab menu and the record-grid source popover carried
+ * this exact shape and are proven the same way below: mounted inside the
+ * SAME reproduction of the composer's scrolling rail (their own real hosts —
+ * a `overflow-y-auto` session list, an `overflow-x-auto` table wrapper — are
+ * self-clipping for the identical reason, but jsdom has no layout engine to
+ * measure that against; the structural DOM-ancestry assertion here is
+ * mechanism-identical either way).
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -31,6 +41,10 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { AgentSessionControls } from '../../src/web-react/agent-session-controls'
 import { POPOVER_SURFACE_ATTR } from '../../src/web-react/controls'
 import type { CatalogModel } from '../../src/runtime/model-catalog'
+import { SessionHistoryPanel, type SessionHistoryState } from '../../src/web-react/session-history'
+import type { SessionSummary } from '../../src/session-shell/index'
+import { RecordGrid, type RecordGridColumn, type RecordGridRow } from '../../src/web-react/record-grid'
+import type { AsyncResourceState } from '../../src/web-react/async'
 
 afterEach(cleanup)
 
@@ -188,6 +202,131 @@ describe('canonical picker popovers escape their host container', () => {
   it('an outside click still closes the popover', () => {
     renderInHost()
     fireEvent.click(screen.getByRole('button', { name: /Thinking/ }))
+    expect(openPanels()).toHaveLength(1)
+    fireEvent.mouseDown(document.body)
+    expect(openPanels()).toHaveLength(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// session-history kebab menu
+// ---------------------------------------------------------------------------
+
+function testSession(id: string, over: Partial<SessionSummary> = {}): SessionSummary {
+  return { id, title: `Session ${id}`, updatedAt: '2026-07-24T10:00:00.000Z', ...over }
+}
+
+function renderSessionRowMenuInHost() {
+  const onRename = vi.fn()
+  const onDelete = vi.fn()
+  const history: SessionHistoryState = {
+    items: [testSession('a')],
+    hasMore: false,
+    isLoadingFirst: false,
+    isLoadingMore: false,
+    isError: false,
+    loadMore: () => {},
+    retry: () => {},
+    reload: () => {},
+  }
+  render(
+    createElement(
+      ScrollRailHost,
+      null,
+      createElement(SessionHistoryPanel, {
+        history,
+        hasAnySessions: true,
+        query: '',
+        onQueryChange: () => {},
+        sort: 'newest',
+        onSortChange: () => {},
+        hrefForSession: (id: string) => `/app/ws_1/chat/${id}`,
+        onRename,
+        onDelete,
+      }),
+    ),
+  )
+  return { onRename, onDelete }
+}
+
+describe('session-history kebab menu escapes its host container', () => {
+  it('the row-actions panel portals out of a scrolling host', () => {
+    renderSessionRowMenuInHost()
+    fireEvent.click(screen.getByLabelText('Session actions'))
+    const panel = openPanels()
+    expect(panel).toHaveLength(1)
+    expectEscapesHost(panel[0]!)
+    expect(within(panel[0]!).getByText('Rename')).toBeTruthy()
+    expect(within(panel[0]!).getByText('Delete')).toBeTruthy()
+  })
+
+  it('a click on a portaled row action still reaches its handler', () => {
+    const { onDelete } = renderSessionRowMenuInHost()
+    fireEvent.click(screen.getByLabelText('Session actions'))
+    const row = within(openPanels()[0]!).getByText('Delete')
+    fireEvent.mouseDown(row)
+    fireEvent.click(row)
+    expect(onDelete).toHaveBeenCalledWith(expect.objectContaining({ id: 'a' }))
+  })
+})
+
+// ---------------------------------------------------------------------------
+// record-grid source popover
+// ---------------------------------------------------------------------------
+
+const RECORD_GRID_COLUMNS: RecordGridColumn[] = [
+  { id: 'holder', kind: 'text', header: 'Holder', required: true },
+  { id: 'shares', kind: 'number', header: 'Shares', integer: true, min: 1 },
+]
+
+const RECORD_GRID_ROWS: RecordGridRow[] = [
+  {
+    id: 'r1',
+    values: { holder: 'Jane', shares: 100 },
+    sources: {
+      shares: {
+        quote: 'Jane Doe — 100 shares of Common Stock',
+        label: 'stock-purchase-agreement.pdf',
+        locator: 'p.3',
+        href: 'https://vault/spa.pdf',
+        basis: 'extracted',
+      },
+    },
+  },
+]
+
+function readyRecordGridState(): AsyncResourceState<readonly RecordGridRow[]> {
+  return { status: 'ready', value: RECORD_GRID_ROWS, retry: () => {} }
+}
+
+function renderRecordGridInHost() {
+  render(
+    createElement(
+      ScrollRailHost,
+      null,
+      createElement(RecordGrid, {
+        columns: RECORD_GRID_COLUMNS,
+        state: readyRecordGridState(),
+        caption: 'Cap table',
+        empty: { title: 'No holders yet', description: 'Add a founder or an investor.' },
+      }),
+    ),
+  )
+}
+
+describe('record-grid source popover escapes its host container', () => {
+  it('the provenance panel portals out of a scrolling host', () => {
+    renderRecordGridInHost()
+    fireEvent.click(screen.getByRole('button', { name: 'Source for Shares, Jane' }))
+    const panel = openPanels()
+    expect(panel).toHaveLength(1)
+    expectEscapesHost(panel[0]!)
+    expect(within(panel[0]!).getByText(/stock-purchase-agreement\.pdf/)).toBeTruthy()
+  })
+
+  it('an outside click still closes the provenance panel', () => {
+    renderRecordGridInHost()
+    fireEvent.click(screen.getByRole('button', { name: 'Source for Shares, Jane' }))
     expect(openPanels()).toHaveLength(1)
     fireEvent.mouseDown(document.body)
     expect(openPanels()).toHaveLength(0)

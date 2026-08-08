@@ -1,5 +1,6 @@
 /**
- * Source-level half of the picker-canon popover invariant.
+ * Source-level half of the picker-canon popover invariant, plus the
+ * package-wide generalization of it.
  *
  * `tests/web-react/popover-escapes-host.test.tsx` proves that the popovers
  * which exist TODAY portal out of a clipping host. It cannot see the fifth
@@ -13,14 +14,25 @@
  * Declaring `absolute` on that same element is the defect, and the fix is
  * `PopoverSurface`.
  *
- * Scope is the picker canon named in AGENTS.md ("UI chrome ownership"), not all
- * of `web-react`: the surfaces outside it — the session-history kebab menu and
- * the record-grid source popover — are still in-place today and carry the same
- * latent risk, but converting them is a separate change with its own anchoring
- * decisions, so this gate does not silently claim them.
+ * Two scopes, on purpose:
+ *  - "picker canon" pins the picker cluster named in AGENTS.md ("UI chrome
+ *    ownership") to EXACTLY four `PopoverSurface` uses, so deleting the portal
+ *    from one of the four cannot pass by leaving the other three intact.
+ *  - "web-react popovers" is the class-level gate: every non-test `.tsx` file
+ *    directly under `/web-react` is scanned for the same `bg-popover` +
+ *    `absolute` anti-pattern, not just the canon files. The session-history
+ *    kebab menu and the record-grid source popover shipped this way once —
+ *    they are migrated to `PopoverSurface` now — and this second describe
+ *    block is what stops a THIRD one from shipping quietly: the defect is
+ *    unrepresentable anywhere a `bg-popover` surface is authored on this
+ *    subpath, not merely absent from the four files someone remembered to
+ *    check. (Scope is `/web-react`, not the whole package: `design-canvas-react`
+ *    is a separate design system — its own local `Popover` helper, its own
+ *    `--bg-input` CSS-var tokens instead of `bg-popover` — reviewed and
+ *    intentionally left out of this gate; see AGENTS.md.)
  */
 
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -32,19 +44,32 @@ import { AgentSessionControls } from '../../src/web-react/agent-session-controls
 import { POPOVER_SURFACE_ATTR } from '../../src/web-react/controls'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+const WEB_REACT_DIR = join(repoRoot, 'src/web-react')
 const CANON_FILES = ['src/web-react/controls.tsx', 'src/web-react/agent-session-controls.tsx']
+
+function findOffenders(files: string[]): string[] {
+  const offenders: string[] = []
+  for (const file of files) {
+    readFileSync(join(repoRoot, file), 'utf8')
+      .split('\n')
+      .forEach((line, i) => {
+        if (line.includes('bg-popover') && /\babsolute\b/.test(line)) offenders.push(`${file}:${i + 1}`)
+      })
+  }
+  return offenders
+}
+
+/** Every non-test `.tsx` source file directly under `/web-react` — the whole
+ *  surface a `bg-popover` panel can be authored on in this subpath. */
+function webReactSourceFiles(): string[] {
+  return readdirSync(WEB_REACT_DIR)
+    .filter((name) => name.endsWith('.tsx') && !name.endsWith('.test.tsx'))
+    .map((name) => join('src/web-react', name))
+}
 
 describe('picker canon: no in-place floating panel', () => {
   it('no canonical picker surface positions itself with `absolute`', () => {
-    const offenders: string[] = []
-    for (const file of CANON_FILES) {
-      readFileSync(join(repoRoot, file), 'utf8')
-        .split('\n')
-        .forEach((line, i) => {
-          if (line.includes('bg-popover') && /\babsolute\b/.test(line)) offenders.push(`${file}:${i + 1}`)
-        })
-    }
-    expect(offenders, 'use PopoverSurface — an in-place absolute panel is what a host clips away').toEqual([])
+    expect(findOffenders(CANON_FILES), 'use PopoverSurface — an in-place absolute panel is what a host clips away').toEqual([])
   })
 
   it('every canonical picker renders its panel through PopoverSurface', () => {
@@ -56,6 +81,16 @@ describe('picker canon: no in-place floating panel', () => {
       return total + (source.match(/<PopoverSurface\b/g)?.length ?? 0)
     }, 0)
     expect(surfaces).toBe(4)
+  })
+})
+
+describe('web-react popovers: the anti-pattern is unrepresentable subpath-wide', () => {
+  it('no `bg-popover` surface anywhere under /web-react positions itself with `absolute`', () => {
+    const offenders = findOffenders(webReactSourceFiles())
+    expect(
+      offenders,
+      'use PopoverSurface — an in-place absolute panel is what a host clips away (this check is not limited to the picker canon)',
+    ).toEqual([])
   })
 })
 
