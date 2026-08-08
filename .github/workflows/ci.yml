@@ -132,3 +132,46 @@ jobs:
           else
             gh issue create --title "$title" --body "$body"
           fi
+
+  # The other half of the alarm, and the reason it is here rather than on a
+  # human's list: an alarm that only ever turns ON is an alarm people learn to
+  # ignore. The rolling issue above stayed open through seven consecutive green
+  # runs on `main` because clearing it was nobody's job, so a reader had no way
+  # to tell a live break from a fixed one without opening the Actions tab.
+  #
+  # A green run on `main` makes this issue's title false, so the run that proves
+  # it closes it, with the commit and the run link as the evidence. If `main`
+  # breaks again the job above files a fresh issue carrying the commit that
+  # broke it — which is what "one rolling issue" was always for.
+  #
+  # Not a verification step, so nothing here belongs in `signoff.config.mjs`:
+  # this job reports on the gate, it is not part of it.
+  safety-net-clear:
+    needs: [build]
+    if: always() && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Close the safety-net issue once main is green
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title='Post-merge safety net is red on main'
+          number="$(gh issue list --state open --limit 100 --json number,title \
+            --jq "map(select(.title == \"${title}\")) | .[0].number // empty")"
+          if [ -z "$number" ]; then
+            echo "no open safety-net issue to clear"
+            exit 0
+          fi
+          gh issue close "$number" --reason completed --comment "$(printf '%s\n' \
+            "Green on \`main\` at \`${SHA}\` — closing." \
+            "" \
+            "- run: ${RUN_URL}" \
+            "" \
+            "Closed by the post-merge safety net itself. A later break files a new issue carrying the commit that broke it.")"
+          echo "closed issue #$number"
