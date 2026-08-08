@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createElement } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { AgentSessionControls } from '../../src/web-react/agent-session-controls'
+import { effortLevelsFromIds } from '../../src/web-react/controls'
 import type { CatalogModel } from '../../src/runtime/model-catalog'
 
 afterEach(cleanup)
@@ -122,5 +123,37 @@ describe('effort levels', () => {
   it('falls back to the default vocabulary when the product declares none', () => {
     setup({ effort: 'medium' })
     expect(screen.getByText('Standard')).toBeTruthy()
+  })
+
+  // The migration defect, end to end. The shape `effortLevels` replaced — the
+  // removed `ComposerAgentControls`' `reasoning.available` — excluded the `auto`
+  // sentinel because that picker injected it itself. A product mapping its old
+  // list straight across therefore omits `auto` while its sessions still RUN on
+  // auto, and the strip used to answer that with the middle entry: "Thinking:
+  // Extended" on a session doing no such thing. A control must never report a
+  // depth the system is not using — which is the whole reason `effortLevels`
+  // exists, so its own migration path may not reintroduce it.
+  it('reports a running value the declared list omits, never another level', () => {
+    const available = ['low', 'medium', 'high']
+    const levels = effortLevelsFromIds(available)
+
+    setup({ effort: 'auto', effortLevels: levels })
+    expect(screen.getByText('Auto')).toBeTruthy()
+    expect(screen.queryByText('Extended')).toBeNull()
+    expect(screen.queryByText('Standard')).toBeNull()
+
+    cleanup()
+
+    setup({ effort: 'auto', effortLevels: levels, layout: 'compact' })
+    fireEvent.click(screen.getByTitle(/Model settings/))
+    expect(screen.getByText('Auto')).toBeTruthy()
+    expect(screen.queryByText('Extended')).toBeNull()
+  })
+
+  it('still lets the user switch to a declared level from the reconciled value', () => {
+    const { onEffortChange } = setup({ effort: 'auto', effortLevels: effortLevelsFromIds(['low', 'high']) })
+    fireEvent.click(screen.getByText('Auto'))
+    fireEvent.click(screen.getByText('Extended'))
+    expect(onEffortChange).toHaveBeenCalledWith('high')
   })
 })

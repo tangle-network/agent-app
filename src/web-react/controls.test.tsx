@@ -1,8 +1,18 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 
-import { ModelPicker, EffortPicker, EffortMeter, effortMeterFill, DEFAULT_EFFORT_LEVELS, EFFORT_METER_SEGMENTS } from './controls'
+import {
+  ModelPicker,
+  EffortPicker,
+  EffortMeter,
+  effortMeterFill,
+  effortLevelLabel,
+  effortLevelsFromIds,
+  reconcileEffortLevels,
+  DEFAULT_EFFORT_LEVELS,
+  EFFORT_METER_SEGMENTS,
+} from './controls'
 import type { CatalogModel } from '../runtime/model-catalog'
 
 function model(id: string, overrides: Partial<CatalogModel> = {}): CatalogModel {
@@ -114,5 +124,117 @@ describe('EffortPicker thinking glyph + meter', () => {
     if (!selected) throw new Error('medium row did not render')
     expect(selected.getAttribute('aria-checked')).toBe('true')
     expect(selected.textContent).toContain('Standard')
+  })
+})
+
+describe('effortLevelLabel', () => {
+  it('keeps the canonical vocabulary for ids this package names', () => {
+    expect(effortLevelLabel('low')).toBe('Quick')
+    expect(effortLevelLabel('high')).toBe('Extended')
+  })
+
+  it('makes an unnamed id readable as ITSELF, never as another level', () => {
+    expect(effortLevelLabel('auto')).toBe('Auto')
+    expect(effortLevelLabel('ultra-code')).toBe('Ultra code')
+    expect(effortLevelLabel('x_high')).toBe('X high')
+  })
+})
+
+describe('effortLevelsFromIds', () => {
+  it('maps a backend id list onto the canonical labels in order', () => {
+    expect(effortLevelsFromIds(['auto', 'low', 'high'])).toEqual([
+      { id: 'auto', label: 'Auto' },
+      { id: 'low', label: 'Quick' },
+      { id: 'high', label: 'Extended' },
+    ])
+  })
+})
+
+describe('reconcileEffortLevels', () => {
+  const declared = [
+    { id: 'low', label: 'Quick' },
+    { id: 'medium', label: 'Standard' },
+    { id: 'high', label: 'Extended' },
+  ]
+
+  it('returns the declared list untouched when it carries the value', () => {
+    expect(reconcileEffortLevels('medium', declared)).toBe(declared)
+  })
+
+  it('admits a selected value the declaration omits, under its own name', () => {
+    expect(reconcileEffortLevels('auto', declared)).toEqual([{ id: 'auto', label: 'Auto' }, ...declared])
+  })
+
+  it('admits nothing for a blank value — there is no honest label for it', () => {
+    expect(reconcileEffortLevels('', declared)).toBe(declared)
+  })
+})
+
+describe('EffortPicker with a value the declared levels omit', () => {
+  // The migration defect this guards: the removed ComposerAgentControls took an
+  // `available` list whose picker injected the `auto` sentinel ITSELF, so a
+  // product mapping that list straight onto `levels` omits `auto` while its
+  // sessions still run on it. Resolving the unlisted value to a list entry
+  // renders a depth the system is not using.
+  const declared = [
+    { id: 'low', label: 'Quick' },
+    { id: 'medium', label: 'Standard' },
+    { id: 'high', label: 'Extended' },
+  ]
+
+  it('labels the trigger with the running value, not another level', () => {
+    const { container } = render(<EffortPicker value="auto" onChange={() => {}} levels={declared} />)
+    expect(container.textContent).toContain('Auto')
+    expect(container.textContent).not.toContain('Extended')
+    expect(container.textContent).not.toContain('Standard')
+  })
+
+  it('claims no strength for a value it cannot place on the ladder', () => {
+    render(<EffortPicker value="auto" onChange={() => {}} levels={declared} />)
+    const trigger = screen.getByRole('button', { expanded: false })
+    // an all-ghost meter is what `off` looks like; "cannot place" is not "off"
+    expect(trigger.querySelectorAll('[aria-hidden] > span').length).toBe(0)
+  })
+
+  it('offers the running value as a checked row and still offers every declared level', () => {
+    render(<EffortPicker value="auto" onChange={() => {}} levels={declared} />)
+    openPicker()
+    const rows = screen.getAllByRole('menuitemradio')
+    expect(rows.map((r) => r.textContent)).toEqual(['Auto', 'Quick', 'Standard', 'Extended'])
+    expect(rows[0]?.getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('leaves the declared levels on the same rungs they had without it', () => {
+    render(<EffortPicker value="auto" onChange={() => {}} levels={declared} />)
+    openPicker()
+    const fills = screen
+      .getAllByRole('menuitemradio')
+      .map(
+        (row) =>
+          Array.from(row.querySelectorAll('[aria-hidden] > span')).filter(
+            (s) => Number((s as HTMLElement).style.opacity) > 0.2,
+          ).length,
+      )
+    // reconciled row draws no meter at all; low/medium/high keep 1/2/4
+    expect(fills).toEqual([0, 1, 2, EFFORT_METER_SEGMENTS])
+  })
+
+  it('drops the reconciled row once the user picks a declared level', () => {
+    const onChange = vi.fn()
+    const { rerender } = render(<EffortPicker value="auto" onChange={onChange} levels={declared} />)
+    openPicker()
+    fireEvent.click(screen.getByText('Quick'))
+    expect(onChange).toHaveBeenCalledWith('low')
+    rerender(<EffortPicker value="low" onChange={onChange} levels={declared} />)
+    openPicker()
+    expect(screen.queryByText('Auto')).toBeNull()
+    expect(screen.getAllByRole('menuitemradio').length).toBe(declared.length)
+  })
+
+  it('renders no selection for a blank value rather than resolving it to a level', () => {
+    const { container } = render(<EffortPicker value="" onChange={() => {}} levels={declared} />)
+    expect(container.textContent).not.toContain('Standard')
+    expect(container.textContent).not.toContain('Extended')
+    expect(container.textContent).toContain('—')
   })
 })
