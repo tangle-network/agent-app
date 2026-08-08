@@ -2,6 +2,15 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 /**
+ * The second half of this gate lives in `./dependency-source` and ships on the
+ * SAME subpath and the SAME `agent-app-peer-check` bin, because it answers the
+ * question underneath this one: a floor comparison reads a version, and a
+ * version is not an identity — a vendored `pnpm pack` of an unmerged branch
+ * carries the same `0.45.33` a real release does.
+ */
+export * from './dependency-source'
+
+/**
  * Audit a consumer's installed tree against the peer floors this package
  * declares.
  *

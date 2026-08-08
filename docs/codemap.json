@@ -7754,6 +7754,24 @@
       "error": null,
       "exports": [
         {
+          "name": "checkDependencySources",
+          "kind": "function",
+          "signature": "(options: CheckDependencySourcesOptions) => DependencySourceReport",
+          "doc": "Audit one repository for dependencies whose source is not the registry."
+        },
+        {
+          "name": "CheckDependencySourcesOptions",
+          "kind": "interface",
+          "signature": "interface CheckDependencySourcesOptions",
+          "doc": null
+        },
+        {
+          "name": "checkInstalledIntegrity",
+          "kind": "function",
+          "signature": "(args: { repoDir: string; modulesDir: string; scope: string; }) => { coverage: InstalledIntegrityCoverage; findings: De…",
+          "doc": "Check each installed package under `scope` against the content-addressed store it was installed from."
+        },
+        {
           "name": "checkPeerFloors",
           "kind": "function",
           "signature": "(options: CheckPeerFloorsOptions) => PeerFloorReport",
@@ -7766,16 +7784,70 @@
           "doc": null
         },
         {
+          "name": "classifyDependencySpecifier",
+          "kind": "function",
+          "signature": "(specifier: string) => DependencySourceProtocol",
+          "doc": "Classify one dependency specifier by the SOURCE it names."
+        },
+        {
+          "name": "DependencySourceCheck",
+          "kind": "type",
+          "signature": "type DependencySourceCheck",
+          "doc": "Which of the five scans produced a finding."
+        },
+        {
+          "name": "DependencySourceFinding",
+          "kind": "interface",
+          "signature": "interface DependencySourceFinding",
+          "doc": null
+        },
+        {
+          "name": "DependencySourceProtocol",
+          "kind": "type",
+          "signature": "type DependencySourceProtocol",
+          "doc": "How a specifier says a dependency should be obtained."
+        },
+        {
+          "name": "DependencySourceReport",
+          "kind": "interface",
+          "signature": "interface DependencySourceReport",
+          "doc": null
+        },
+        {
+          "name": "describeDependencySourceFinding",
+          "kind": "function",
+          "signature": "(finding: DependencySourceFinding) => string",
+          "doc": "One finding rendered as the failure a reader has to act on."
+        },
+        {
           "name": "describePeerFloorViolation",
           "kind": "function",
           "signature": "(row: PeerFloorRow, shellVersion: string, shell?: string) => string",
           "doc": "The failure message for one violating row."
         },
         {
+          "name": "formatDependencySourceReport",
+          "kind": "function",
+          "signature": "(report: DependencySourceReport) => string",
+          "doc": null
+        },
+        {
           "name": "formatPeerFloorReport",
           "kind": "function",
           "signature": "(report: PeerFloorReport, shell?: string) => string",
           "doc": null
+        },
+        {
+          "name": "InstalledIntegrityCoverage",
+          "kind": "interface",
+          "signature": "interface InstalledIntegrityCoverage",
+          "doc": "What the on-disk integrity pass was able to examine — reported on EVERY run, clean or not, because \"checked nothing\" and \"checked everything and found nothing\" render identically otherwise."
+        },
+        {
+          "name": "LocalPathSource",
+          "kind": "type",
+          "signature": "type LocalPathSource",
+          "doc": "The legitimate-exception rule, stated once so it is not a path allowlist."
         },
         {
           "name": "PeerFloorReport",
@@ -7796,6 +7868,12 @@
           "doc": "Installed, and inside the declared range."
         },
         {
+          "name": "resolveLocalPathSource",
+          "kind": "function",
+          "signature": "(args: { fromDir: string; repoDir: string; path: string; name: string; }) => LocalPathSource",
+          "doc": null
+        },
+        {
           "name": "satisfiesRange",
           "kind": "function",
           "signature": "(version: string, range: string) => boolean",
@@ -7810,7 +7888,14 @@
         "signoff"
       ],
       "error": null,
-      "exports": []
+      "exports": [
+        {
+          "name": "parsePeerCheckArgs",
+          "kind": "function",
+          "signature": "(argv: readonly string[]) => CliArgs",
+          "doc": null
+        }
+      ]
     },
     {
       "id": "./plans",
