@@ -45,6 +45,7 @@ import {
 } from '../harness'
 import type { CatalogModel } from '../runtime/model-catalog'
 import { ModelPicker, EffortPicker, CheckGlyph, OVERLAY_SHADOW, usePopover } from './controls'
+import type { EffortLevel } from './controls'
 import { HarnessGlyph } from './harness-glyphs'
 
 /** Plain-English labels for the harnesses a product is likely to expose. Unknown
@@ -164,6 +165,16 @@ export interface AgentSessionControlsProps {
   effort: string
   onEffortChange(effort: string): void
   /**
+   * Levels to offer, forwarded verbatim to {@link EffortPicker}. Omit for the
+   * default vocabulary.
+   *
+   * A product whose backend applies only a SUBSET of the levels for the
+   * selected harness/model passes that subset here. Without it the strip
+   * offers every level and the backend silently ignores the ones it does not
+   * apply — a control that reports a choice the system never made.
+   */
+  effortLevels?: readonly EffortLevel[]
+  /**
    * `inline` (default): model, harness, effort side by side — the prior
    * behavior. `compact`: model inline, harness + effort behind a gear popover.
    */
@@ -206,6 +217,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
     availableHarnesses,
     effort,
     onEffortChange,
+    effortLevels,
     layout = 'inline',
     showHarness = true,
     renderProviderBadge,
@@ -235,7 +247,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
         {showHarness && (
           <HarnessPicker value={harness} onChange={onHarness} available={availableHarnesses} />
         )}
-        {showEffort && <EffortPicker value={effort} onChange={onEffortChange} />}
+        {showEffort && <EffortPicker value={effort} onChange={onEffortChange} levels={effortLevels} />}
       </div>
     )
   }
@@ -271,7 +283,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
               {showEffort && (
                 <div className="space-y-1.5">
                   <p className="text-xs font-medium text-foreground">Thinking</p>
-                  <EffortPicker value={effort} onChange={onEffortChange} label="" />
+                  <EffortPicker value={effort} onChange={onEffortChange} levels={effortLevels} label="" />
                   <p className="text-[11px] leading-snug text-muted-foreground">
                     How hard the agent thinks before answering. Higher is slower but more thorough.
                   </p>
