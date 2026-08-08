@@ -1,4 +1,10 @@
 import { DEFAULT_CEILING_TOLERANCE_MS, computeExpectedCeiling } from './ceiling'
+import {
+  DEFAULT_EXPECTATION_GRACE_MS,
+  assertSpendWindow,
+  boxLivenessInWindow,
+  undeclaredExpectation,
+} from './liveness'
 import { decideBoxOwnership } from './ownership'
 import { chargeNanoUsd, parseSettlementReference, settlementSandboxId } from './reference'
 import type { SpendLedgerStorePort } from './store'
@@ -7,13 +13,17 @@ import {
   type BilledDurationBasis,
   type CeilingBasis,
   type SettlementRow,
+  type SpendBoxLiveness,
   type SpendBoxRecord,
   type SpendCheckId,
+  type SpendCoverage,
+  type SpendExpectationSummary,
   type SpendFinding,
   type SpendOwnershipRule,
   type SpendOwnershipSummary,
   type SpendOwnershipVerdict,
   type SpendReport,
+  type SpendWindow,
 } from './types'
 
 /** How many nanodollars in one US dollar. The ledger's unit. */
@@ -107,6 +117,27 @@ export interface ReconcileSpendOptions {
   readonly workspaceId?: string
   /** Checks to leave out of this pass. */
   readonly skip?: readonly SpendCheckId[]
+  /**
+   * The stretch of time these `rows` were fetched for.
+   *
+   * Declaring it — together with a store that implements `listLiveBetween` — is
+   * what lets the pass answer the direction every settlement-driven rule is
+   * blind to: *were we NOT billed for something we DID ask for*. The expectation
+   * ledger already holds the answer; nothing new is stored for it.
+   *
+   * Omitting it is additive and changes no existing finding. It is not silent:
+   * `report.expectation.declared` is `false`, `formatSpendReport` prints
+   * `expectation: NOT DECLARED` above the findings, and a pass that also
+   * examined none of this product's settlements reports `coverage: 'unverified'`
+   * and cannot render as a clean bill.
+   */
+  readonly window?: SpendWindow
+  /**
+   * Live ms a box needs inside the window before a settlement is EXPECTED of it.
+   * Default {@link DEFAULT_EXPECTATION_GRACE_MS} (15 min — the platform's own
+   * declared-normal settlement lag). Shrink it for a short window.
+   */
+  readonly expectationGraceMs?: number
 }
 
 function usd(nano: number): string {
@@ -238,9 +269,119 @@ function emptyFinding(check: SpendCheckId): Omit<SpendFinding, 'message' | 'reme
     trailingMedianNanoUsd: null,
     velocityRatio: null,
     windowStartAt: null,
+    windowEndAt: null,
     balanceNanoUsd: null,
     balanceFloorNanoUsd: null,
+    expectedBoxes: null,
+    settledBoxes: null,
+    liveMsInWindow: null,
   }
+}
+
+function iso(at: number): string {
+  return new Date(at).toISOString()
+}
+
+/**
+ * The `silent-ledger` findings — the only ones whose subject is the CHECK.
+ *
+ * Three distinct shapes, because the reader's next action differs in each:
+ *
+ * - **the whole expectation is silent** — every box this product had live in the
+ *   window settled nothing. One aggregate finding, because there is one cause
+ *   and N per-box findings would spread it across N pages.
+ * - **one box is silent** while its siblings settled normally. Per-box, because
+ *   the cause is specific to that box and the rest of the pass is working.
+ * - **the pass examined nobody and expected nothing** — no window declared, no
+ *   settlement claimed. It cannot tell an idle window from a check that stopped
+ *   checking, and says so instead of answering optimistically.
+ */
+function silentLedgerFindings(input: {
+  readonly expectation: SpendExpectationSummary
+  readonly unsettled: readonly SpendBoxLiveness[]
+  readonly coverage: SpendCoverage
+  readonly ownership: SpendOwnershipRule | null
+  readonly workspaceId: string | null
+  readonly rowsExamined: number
+  readonly boxesExamined: number
+  readonly ownedBoxes: number
+  readonly foreignBoxes: number
+}): SpendFinding[] {
+  const { expectation, unsettled, ownership, workspaceId } = input
+  const scope = ownership ? `the ownership rule (${ownership.label})` : 'no ownership rule (none declared)'
+
+  if (input.coverage === 'unverified') {
+    return [
+      {
+        ...emptyFinding('silent-ledger'),
+        workspaceId,
+        expectedBoxes: 0,
+        settledBoxes: 0,
+        message:
+          `This pass examined none of this product's settlements — ${input.rowsExamined} row(s) read, ` +
+          `${input.boxesExamined} box(es), ${input.foreignBoxes} excluded by ${scope}, 0 claimed as ` +
+          'this product\'s — and no expectation was declared, so it cannot tell a genuinely idle ' +
+          'window from a check that stopped checking. A clean bill is not one of the answers ' +
+          'available here.',
+        remedy:
+          'Declare `window` and implement `listLiveBetween` on the expectation store, so this pass ' +
+          'can state what it EXPECTED to be billed for and an empty result becomes an answer ' +
+          'instead of a silence. Until then, verify the ledger fetch by hand for this window ' +
+          'before treating the account as checked.',
+      },
+    ]
+  }
+
+  if (unsettled.length === 0) return []
+  const window = expectation.window
+  const span = window ? ` in the window ${iso(window.startAt)} → ${iso(window.endAt)}` : ''
+
+  // Every expected box silent: one cause, one finding.
+  if (unsettled.length === expectation.expectedBoxes) {
+    return [
+      {
+        ...emptyFinding('silent-ledger'),
+        workspaceId,
+        expectedBoxes: expectation.expectedBoxes,
+        settledBoxes: 0,
+        ...(window ? { windowStartAt: window.startAt, windowEndAt: window.endAt } : {}),
+        message:
+          `Nothing settled against ANY of the ${expectation.expectedBoxes} box(es) this product had ` +
+          `live${span}, out of ${expectation.liveBoxes} that overlapped it. ` +
+          `${input.rowsExamined} row(s) were read and ${input.foreignBoxes} box(es) excluded by ${scope}. ` +
+          'A window in which this product ran boxes and was billed for none of them is far more ' +
+          'likely to be a broken check than a free week — an empty or mis-scoped ledger fetch, a ' +
+          'rotated key the ownership rule does not name, or a feed that quietly stopped returning ' +
+          'rows all produce exactly this shape. Treat this report as unverified, not as clean.',
+        remedy:
+          'Check the fetch before the bill: re-run the transactions query for this exact window by ' +
+          'hand and compare the row count with `rowsExamined` above. If the rows are there, the ' +
+          'ownership rule is excluding them — compare its key ids against the key the boxes were ' +
+          `created under. Boxes expected: ${expectation.unsettledSandboxIds.join(', ')}.`,
+      },
+    ]
+  }
+
+  // A subset: the pass is working, these boxes are the anomaly.
+  return unsettled.map((box) => ({
+    ...emptyFinding('silent-ledger'),
+    sandboxId: box.sandboxId,
+    workspaceId: box.workspaceId || workspaceId,
+    expectedBoxes: expectation.expectedBoxes,
+    settledBoxes: expectation.settledBoxes,
+    liveMsInWindow: box.liveMsInWindow,
+    ...(window ? { windowStartAt: window.startAt, windowEndAt: window.endAt } : {}),
+    message:
+      `Sandbox ${box.sandboxId} was live for ${hours(box.liveMsInWindow)}${span} and nothing settled ` +
+      `against it, while ${expectation.settledBoxes} of this product's other expected box(es) settled ` +
+      `normally. Its life ended on basis ${box.basis} at ${iso(box.liveUntil)}.`,
+    remedy:
+      'One silent box beside working siblings is not a discount. Check, in order: whether its ' +
+      'settlement is merely late (the platform treats up to 900 s of compute-settlement lag as ' +
+      'normal, and `expectationGraceMs` is the dial for it); whether this box was created under a ' +
+      'key the ownership rule does not claim, so its charges are landing on another product\'s ' +
+      `report; and whether the expectation ledger's own record for ${box.sandboxId} is stale.`,
+  }))
 }
 
 /**
@@ -259,6 +400,11 @@ export async function reconcileSpend(options: ReconcileSpendOptions): Promise<Sp
   const runs = (check: SpendCheckId): boolean => !skip.has(check)
 
   const ownership = options.ownership ?? null
+  const graceMs = options.expectationGraceMs ?? DEFAULT_EXPECTATION_GRACE_MS
+  // A malformed window would expect nothing and certify an unchecked account,
+  // which is the failure this whole addition exists to close — so it throws
+  // rather than degrading to a pass that examines nobody.
+  if (options.window) assertSpendWindow(options.window)
 
   const findings: SpendFinding[] = []
   let settledNanoUsd = 0
@@ -268,6 +414,8 @@ export async function reconcileSpend(options: ReconcileSpendOptions): Promise<Sp
   let undecidableBoxes = 0
   let foreignNanoUsd = 0
   const foreignSandboxIds: string[] = []
+  /** Boxes this pass claimed — the join key the expectation check settles against. */
+  const ownedSandboxIds = new Set<string>()
 
   // ── group charges by the box they are attributable to ──────────────────────
   const byBox = new Map<string, SettlementRow[]>()
@@ -312,6 +460,7 @@ export async function reconcileSpend(options: ReconcileSpendOptions): Promise<Sp
     }
     ownedBoxes += 1
     ownedNanoUsd += charged
+    ownedSandboxIds.add(sandboxId)
     if (verdict === 'undecidable') undecidableBoxes += 1
 
     // ── unknown-box ──────────────────────────────────────────────────────────
@@ -489,8 +638,72 @@ export async function reconcileSpend(options: ReconcileSpendOptions): Promise<Sp
     foreignSandboxIds,
   }
 
+  // ── silent-ledger: what did we EXPECT to be billed for? ────────────────────
+  //
+  // Every rule above is driven by a settlement row, so all of them go quiet
+  // together when the rows stop arriving. This is the one that reads the other
+  // direction — off the expectation ledger the pass already has — and it needs
+  // both halves: a window the caller declares (deriving it from the rows would
+  // be circular) and a store that can list its own boxes.
+  const window = options.window ?? null
+  const canList = typeof options.store.listLiveBetween === 'function'
+  let expectation: SpendExpectationSummary = undeclaredExpectation(graceMs)
+  let unsettled: SpendBoxLiveness[] = []
+
+  if (window && canList) {
+    const candidates = await options.store.listLiveBetween!(window)
+    // The store may over-return; liveness is re-derived here so the definition
+    // of "live" lives in one place rather than once per product's SQL.
+    const live = candidates
+      .map((record) => boxLivenessInWindow(record, window, { graceMs }))
+      .filter((box) => box.overlaps)
+    const expected = live.filter((box) => box.expectSettlement)
+    unsettled = expected.filter((box) => !ownedSandboxIds.has(box.sandboxId))
+    expectation = {
+      declared: true,
+      window,
+      graceMs,
+      liveBoxes: live.length,
+      expectedBoxes: expected.length,
+      settledBoxes: expected.length - unsettled.length,
+      unsettledSandboxIds: unsettled.map((box) => box.sandboxId),
+    }
+  }
+
+  // A pass that claimed one of its own settlements HAS examined something. Past
+  // that, only a declared expectation can tell "nothing was billed because
+  // nothing ran" from "nothing was billed because the check broke".
+  const coverage: SpendCoverage =
+    ownedBoxes > 0
+      ? 'verified'
+      : expectation.declared
+        ? expectation.expectedBoxes > 0
+          ? 'verified'
+          : 'nothing-expected'
+        : 'unverified'
+
+  if (runs('silent-ledger')) {
+    findings.push(
+      ...silentLedgerFindings({
+        expectation,
+        unsettled,
+        coverage,
+        ownership,
+        workspaceId,
+        rowsExamined: options.rows.length,
+        boxesExamined: byBox.size,
+        ownedBoxes,
+        foreignBoxes: foreignSandboxIds.length,
+      }),
+    )
+  }
+
   return {
-    ok: findings.length === 0,
+    // `coverage` is the second half of the gate deliberately: skipping the
+    // `silent-ledger` check removes its findings, never the verdict, so no
+    // combination of options can make an examined-nobody pass report clean.
+    ok: findings.length === 0 && coverage !== 'unverified',
+    coverage,
     findings,
     checksRun,
     rowsExamined: options.rows.length,
@@ -498,6 +711,7 @@ export async function reconcileSpend(options: ReconcileSpendOptions): Promise<Sp
     settledNanoUsd,
     creditedNanoUsd,
     ownership: ownershipSummary,
+    expectation,
     asOf,
   }
 }

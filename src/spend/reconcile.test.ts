@@ -355,10 +355,17 @@ describe('velocity', () => {
 })
 
 describe('negative-balance', () => {
+  // A window with an empty expectation ledger is what makes these passes
+  // examine-nobody-but-legitimately: nothing was live, so nothing was expected,
+  // and the balance rule is the only one with anything to say. Without it a
+  // zero-row pass is `unverified` by construction — see `liveness.test.ts`.
+  const idleWindow = { startAt: T0 - DAY, endAt: T0 }
+
   it('reports a balance under its floor', async () => {
     const report = await reconcileSpend({
       rows: [],
       store: createInMemorySpendLedgerStore(),
+      window: idleWindow,
       asOf: T0,
       balance: { nanoUsd: -15_810_000_000 },
     })
@@ -371,6 +378,7 @@ describe('negative-balance', () => {
     const report = await reconcileSpend({
       rows: [],
       store: createInMemorySpendLedgerStore(),
+      window: idleWindow,
       asOf: T0,
       balance: { nanoUsd: 5 * USD, floorNanoUsd: 20 * USD },
     })
@@ -381,6 +389,7 @@ describe('negative-balance', () => {
     const report = await reconcileSpend({
       rows: [],
       store: createInMemorySpendLedgerStore(),
+      window: idleWindow,
       asOf: T0,
     })
     expect(report.ok).toBe(true)
@@ -410,7 +419,10 @@ describe('the report itself', () => {
       asOf: T0 + DAY,
       skip: ['unknown-box', 'velocity'],
     })
-    expect(report.checksRun).toEqual(['over-ceiling', 'negative-balance'])
+    expect(report.checksRun).toEqual(['over-ceiling', 'negative-balance', 'silent-ledger'])
+    // The settled box is claimed as this product's, so the pass examined
+    // something and is entitled to say the bill is clean.
+    expect(report.coverage).toBe('verified')
     expect(report.ok).toBe(true)
   })
 })

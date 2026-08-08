@@ -13053,16 +13053,52 @@
       "error": null,
       "exports": [
         {
+          "name": "AllExcludedAssessment",
+          "kind": "interface",
+          "signature": "interface AllExcludedAssessment",
+          "doc": "{@link assessAllExcluded}'s verdict, with the reason a pager message needs."
+        },
+        {
+          "name": "AllExcludedBasis",
+          "kind": "type",
+          "signature": "type AllExcludedBasis",
+          "doc": "Why {@link assessAllExcluded} answered the way it did."
+        },
+        {
           "name": "assertComputeBudget",
           "kind": "function",
           "signature": "(budget: ComputeBudget | undefined, workspaceId: string) => Promise<void>",
           "doc": "Throw {@link ComputeBudgetExceededError} when the workspace is already past its cap."
         },
         {
+          "name": "assertSpendWindow",
+          "kind": "function",
+          "signature": "(window: SpendWindow) => void",
+          "doc": "Reject a window that cannot be reconciled, rather than examining nobody inside it."
+        },
+        {
+          "name": "assessAllExcluded",
+          "kind": "function",
+          "signature": "(report: SpendReport) => AllExcludedAssessment",
+          "doc": "Should \"we saw settlements but none of them were ours\" page a human?"
+        },
+        {
           "name": "BilledDurationBasis",
           "kind": "type",
           "signature": "type BilledDurationBasis",
           "doc": "How a settled duration was arrived at — every duration finding carries one."
+        },
+        {
+          "name": "boxLivenessInWindow",
+          "kind": "function",
+          "signature": "(record: SpendBoxRecord, window: SpendWindow, options?: BoxLivenessOptions) => SpendBoxLiveness",
+          "doc": "One box's live interval, and whether the product should have been billed for it inside this window."
+        },
+        {
+          "name": "BoxLivenessOptions",
+          "kind": "interface",
+          "signature": "interface BoxLivenessOptions",
+          "doc": "Options for {@link boxLivenessInWindow}."
         },
         {
           "name": "BoxRateResolver",
@@ -13141,6 +13177,12 @@
           "kind": "const",
           "signature": "900000",
           "doc": "Slack allowed between the product's bound and what the platform settled, before an overage is called a discrepancy."
+        },
+        {
+          "name": "DEFAULT_EXPECTATION_GRACE_MS",
+          "kind": "const",
+          "signature": "900000",
+          "doc": "How much live time a box needs inside the window before a settlement is EXPECTED for it."
         },
         {
           "name": "ExpectedCeiling",
@@ -13251,6 +13293,12 @@
           "doc": null
         },
         {
+          "name": "SpendBoxLiveness",
+          "kind": "interface",
+          "signature": "interface SpendBoxLiveness",
+          "doc": "One box's life, measured against a reconciliation window."
+        },
+        {
           "name": "SpendBoxPatch",
           "kind": "interface",
           "signature": "interface SpendBoxPatch",
@@ -13267,6 +13315,18 @@
           "kind": "type",
           "signature": "type SpendCheckId",
           "doc": "The checks this reconciler runs."
+        },
+        {
+          "name": "SpendCoverage",
+          "kind": "type",
+          "signature": "type SpendCoverage",
+          "doc": "How much this pass is entitled to claim about the bill."
+        },
+        {
+          "name": "SpendExpectationSummary",
+          "kind": "interface",
+          "signature": "interface SpendExpectationSummary",
+          "doc": "What this pass EXPECTED to be billed for — present on every report, including a clean one, for the same reason {@link SpendOwnershipSummary} is: \"nothing fired\" and \"nothing was expected\" and \"nothin…"
         },
         {
           "name": "SpendFinding",
@@ -13333,6 +13393,18 @@
           "kind": "function",
           "signature": "(report: SpendReport) => string",
           "doc": "The report as a plain JSON value, for an alerting pipeline."
+        },
+        {
+          "name": "SpendWindow",
+          "kind": "interface",
+          "signature": "interface SpendWindow",
+          "doc": "The stretch of time a reconciliation pass covers — the same window the product's own ledger fetch was scoped to."
+        },
+        {
+          "name": "undeclaredExpectation",
+          "kind": "function",
+          "signature": "(graceMs: number) => SpendExpectationSummary",
+          "doc": "The expectation summary a pass that declared none reports."
         },
         {
           "name": "VelocityOptions",

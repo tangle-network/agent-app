@@ -25,6 +25,7 @@ That is the gap this closes: **a platform billing defect should cost an alert, n
 - Drift: a settlement path that quietly starts billing on a different boundary than the product assumes.
 - A box the product never asked for, billed against the product's key.
 - Unbounded exposure: spend continuing to accrue with nothing watching and nothing stopping.
+- **The check itself going quiet while looking green** — an empty ledger fetch, an expectation ledger naming nobody, an ownership rule that stopped matching after a key rotation. See [Were we billed for everything we asked for?](#were-we-billed-for-everything-we-asked-for-window).
 
 **Does NOT defend against, by design**
 
@@ -185,6 +186,118 @@ With a rule declared, `velocity` counts only this product's rows.
 A product cannot dispute a charge it did not incur, and leaving the siblings in means one product's incident wakes every product on the wallet.
 The finding says which basis it used, and the wallet-level total stays visible in `report.ownership`.
 
+## Were we billed for everything we asked for? (`window`)
+
+Every rule above is driven by a settlement row.
+That makes the reconciler able to answer exactly one direction of the question — *were we billed for something we did not ask for, or for more than allowed* — and structurally unable to answer the other: *were we NOT billed for something we DID ask for*.
+With no row there is nothing to iterate, and a rule that never fires reports a clean bill.
+
+Three real shapes fall straight through that hole, and each of them used to render as `ok: true`:
+
+| Shape | What the report said | What was true |
+|---|---|---|
+| The expectation ledger names no box, so the pass examines nobody | `ok: true` | Nothing was checked |
+| The billing endpoint quietly starts returning zero rows | `ok: true`, `rowsExamined: 0` | The feed is broken |
+| A stale or rotated key list excludes every box | `ok: true`, everything `foreign` | The ownership rule stopped matching |
+
+In all three the check stopped checking while looking green — which is the exact failure class this module exists to prevent, reproduced inside the module.
+
+### The discriminator is already in the ledger
+
+The expectation ledger records when the product first saw a box, the last work it observed, and any stop or delete it knows about.
+Those are precisely the inputs `computeExpectedCeiling` already folds into a **horizon** — the latest instant a box could still have been billable.
+So a box's live interval is `[createdAt, horizon]`, taken from the same fold the ceiling check uses rather than from a second definition of "running" that could drift from it.
+No new store, no new column, no new event.
+
+A box whose live interval overlaps the reconciliation window is a box the product **expected** to be billed for.
+
+```ts
+import { reconcileSpend } from '@tangle-network/agent-app/spend'
+
+const report = await reconcileSpend({
+  rows,
+  store,                                        // must implement `listLiveBetween`
+  ownership: ownedByBillingKeys([keyId]),
+  window: { startAt: since, endAt: now },       // the window `rows` was fetched for
+})
+```
+
+The window is **declared, never derived from the rows** — deriving it from the rows is circular, since a feed returning nothing would produce a window that expects nothing and certifies itself.
+A window that ends at or before it starts throws rather than examining nobody inside it.
+
+`listLiveBetween` is a new **optional** method on `SpendLedgerStorePort`, and it may over-return.
+The reconciler re-derives liveness itself, so the intended implementation is the coarse predicate a `WHERE` clause can express and the exact answer stays in one place:
+
+```sql
+WHERE created_at <= :endAt AND (deleted_at IS NULL OR deleted_at >= :startAt)
+```
+
+### The new outcome: `silent-ledger`
+
+The fifth check, and the only one whose subject is the **check** rather than the bill.
+It reads as *do not trust this report*, not as *dispute this charge*, and it has three shapes because the reader's next action differs in each:
+
+| Shape | Finding | Reader's next action |
+|---|---|---|
+| Every expected box settled nothing | One aggregate finding | Re-run the transactions query for the window by hand and compare the row count |
+| One box silent while its siblings settled | One finding per box | Check settlement lag, then whether that box was created under an unclaimed key |
+| The pass examined nobody and expected nothing | One finding | Declare `window` and implement `listLiveBetween` — the question is currently unanswerable |
+
+### Settlement lag, and why the grace period is load-bearing
+
+Settlement lags provisioning.
+A box that came up ninety seconds before the window closed has no settlement yet and never should have, so expecting one would report the platform's ordinary queue behaviour as a defect.
+Expectation is therefore asserted only for boxes with at least `expectationGraceMs` of live time **inside** the window.
+
+| Knob | Default | Why |
+|---|---|---|
+| `expectationGraceMs` | 900 000 (15 min) | The same number as `toleranceMs`, from the other side: the platform's runbook clears a compute-settlement incident when `oldestAgeSeconds` is "back under 900", so 900 s is lag the platform has already declared normal. Shrink it for a short window, or the window expects nothing at all. |
+
+### A clean bill is now something a pass has to earn
+
+`report.coverage` is the new gate, and `ok` is `findings.length === 0 && coverage !== 'unverified'`.
+
+| `coverage` | When | `ok` can be true? |
+|---|---|---|
+| `verified` | The pass claimed at least one of its own settlements, or declared an expectation with boxes in it | Yes |
+| `nothing-expected` | Expectation declared, and no box was live long enough to expect a bill — an idle product | Yes. This is the one case where a pass that examined nobody is still clean |
+| `unverified` | The pass examined none of this product's settlements and could not say what it expected | **No** |
+
+The gate sits on `coverage`, not on the finding, deliberately: `skip: ['silent-ledger']` removes the noise, never the verdict, so no combination of options can make an examined-nobody pass report clean.
+
+### Gating the all-excluded pathology
+
+Consumers raise an alarm on `boxesExamined > 0 && ownedBoxes === 0` — "we saw settlements but none were ours".
+That shape has two completely different causes and the naive test cannot tell them apart: an ownership rule gone stale after a key rotation, or **a product that was legitimately idle while a sibling settled on the same wallet**.
+Under the naive test an idle product pages every single day, which is how a real alert gets muted.
+
+`assessAllExcluded` is the shared answer, so seven consumers do not each re-derive it:
+
+```ts
+import { assessAllExcluded } from '@tangle-network/agent-app/spend'
+
+const excluded = assessAllExcluded(report)
+if (excluded.pathological) alert('spend scope', excluded.reason)
+```
+
+| `basis` | `pathological` | Meaning |
+|---|---|---|
+| `not-all-excluded` | `false` | The pass examined its own settlements |
+| `expected-boxes-live` | `true` | Boxes of ours were live and every settlement read as a sibling's — the rule has stopped matching |
+| `nothing-expected` | `false` | Declared expectation, nothing live: an idle product beside a busy sibling |
+| `not-declared` | `true` | No expectation declared, so the question is unanswerable. **Fails closed** — today's behaviour, and the `reason` names the fix |
+
+### Absence is loud here too
+
+Exactly the discipline `ownership` already follows.
+Omitting `window`, or wiring a store with no `listLiveBetween`, changes no existing finding and is never silent:
+
+- `report.expectation.declared` is `false`.
+- `formatSpendReport` prints `expectation: NOT DECLARED — …` above the findings.
+- A pass that also examined none of its own settlements prints `UNVERIFIED — …` and cannot be `ok`.
+
+A declared expectation prints its window, its live/expected/settled counts and every unsettled box id on **every** report, clean ones included — an expectation a reader cannot audit is one they have to take on trust.
+
 ## Calibration against the incident
 
 `src/spend/calibration.test.ts` runs the reconstructed incident (`src/spend/fixtures/incident-parked-time.ts`) through the reconciler.
@@ -309,4 +422,6 @@ Exit 0 clean, 1 on findings, 2 on a usage or config error; a failing report goes
 
 - **Nothing records stop or delete in production**, because neither shipped product stops or deletes a box — the 3 600 s platform idle timeout is the only reclamation today. The ceiling therefore rests on `idle-timeout` and `max-lifetime` in practice. Both are sound; `stopped`/`deleted` are simply tighter bounds waiting for a caller.
 - **Detached runs must still be declared by the product.** The turn primitives tap activity automatically (see below), but `recordDetachedRunStarted`/`Ended` are the product's call — only it knows that a dispatch it made is one it will not watch finish. Without them a detached run looks like an ordinary turn that went quiet, and the ceiling will be tighter than the truth.
+- **`silent-ledger` needs a store that can list its boxes.** `listLiveBetween` is optional and no shipped product implements it yet, so today every product's pass reports `expectation.declared: false` until it adds the one query. That is loud rather than silent — but until it lands, a pass that examines nobody is reported as `unverified`, not fixed.
+- **A settlement the platform never posted at all is indistinguishable from one this product's ownership rule cannot see.** `silent-ledger` reports the shape; which of the two it is comes from re-running the fetch by hand, which is why that is the first line of the remedy.
 - **The budget guard is a pre-check against spend already settled**, not a reservation. Settlement lags provisioning by design, so the cap overshoots by at most the unsettled tail — bounded by the box's own idle timeout. A cap that refuses one box late is worth more than one that cannot be implemented honestly.
