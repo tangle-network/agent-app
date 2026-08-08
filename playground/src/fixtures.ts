@@ -14,6 +14,9 @@ import type { VideoFrameProvider } from '@tangle-network/agent-app/sequences-rea
 import type {
   CatalogModel,
   ChatUiMessage,
+  RecordGridColumn,
+  RecordGridRow,
+  SessionSummary,
 } from '@tangle-network/agent-app/web-react'
 
 // ── /canvas — multi-element SceneDocument ─────────────────────────────────────
@@ -343,6 +346,54 @@ export function makeModels(): CatalogModel[] {
       supportsTools: false,
       supportsReasoning: false,
       featured: false,
+    },
+  ]
+}
+
+// ── /records — session history rows + a provenance-cited record grid ──────────
+
+export function makeSessions(): SessionSummary[] {
+  return [
+    { id: 's1', title: 'Q3 model routing plan', updatedAt: '2026-08-05T14:00:00.000Z' },
+    { id: 's2', title: 'Vendor contract review', updatedAt: '2026-08-04T09:30:00.000Z', unread: true },
+    { id: 's3', title: 'Cap table cleanup', updatedAt: '2026-08-01T18:15:00.000Z' },
+    { id: 's4', title: 'Onboarding checklist', updatedAt: '2026-07-29T11:05:00.000Z' },
+  ]
+}
+
+export const RECORD_GRID_COLUMNS: RecordGridColumn[] = [
+  { id: 'holder', kind: 'text', header: 'Holder', required: true },
+  { id: 'shares', kind: 'number', header: 'Shares', integer: true, min: 1 },
+  { id: 'class', kind: 'text', header: 'Class' },
+]
+
+export function makeRecordGridRows(): RecordGridRow[] {
+  return [
+    {
+      id: 'r1',
+      values: { holder: 'Jane Doe', shares: 100000, class: 'Common' },
+      sources: {
+        shares: {
+          quote: 'Jane Doe — 100,000 shares of Common Stock',
+          label: 'stock-purchase-agreement.pdf',
+          locator: 'p.3',
+          href: 'https://vault/spa.pdf',
+          basis: 'extracted',
+        },
+      },
+    },
+    {
+      id: 'r2',
+      values: { holder: 'Acme Ventures', shares: 250000, class: 'Preferred' },
+      sources: {
+        shares: {
+          quote: 'Acme Ventures — 250,000 shares of Series A Preferred',
+          label: 'series-a-purchase-agreement.pdf',
+          locator: 'p.7',
+          href: 'https://vault/series-a.pdf',
+          basis: 'extracted',
+        },
+      },
     },
   ]
 }

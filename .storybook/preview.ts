@@ -63,17 +63,6 @@ const LEGACY_THEME_VALUES: Record<string, string> = {
 }
 
 /**
- * True when the loaded named-themes.css carries the scope currently selected
- * on documentElement, probed via the spine token every named scope sets.
- * agent-app defines no `--hsl-*` of its own, so an empty read means the scope
- * is absent.
- */
-const brandScopeLoaded = (): boolean =>
-  getComputedStyle(document.documentElement).getPropertyValue('--hsl-background') !== ''
-
-let tangleDarkFallbackWarned = false
-
-/**
  * Applies the Storybook toolbar theme to the document the way a product shell
  * would: `data-theme` on `document.documentElement` (which is also :root, so
  * the brand named scopes and the alias bridge in brand-themes.css resolve on
@@ -87,21 +76,6 @@ const withAgentTheme: Decorator = (Story, context) => {
   const root = document.documentElement
   root.setAttribute('data-theme', theme.dataTheme ?? key)
   root.classList.toggle('dark', theme.dark)
-
-  if (key === 'tangle-dark' && !brandScopeLoaded()) {
-    // brand ≤1.1.0 ships no tangle-dark scope; where the local alias (see
-    // main.ts) is absent too, every token the bridge redeclares for it would
-    // be guaranteed-invalid. Render agent-dark instead — loudly, once per
-    // session, rather than silently painting agent-dark's values under a
-    // tangle-dark label (which a CSS var() fallback would do, and drift).
-    root.setAttribute('data-theme', 'dark')
-    if (!tangleDarkFallbackWarned) {
-      tangleDarkFallbackWarned = true
-      console.info(
-        "[storybook] brand's tangle-dark scope is not loaded (brand ≤1.1.0 and no local alias — see .storybook/main.ts); rendering agent-dark.",
-      )
-    }
-  }
 
   // `body` background forced from the ACTIVE theme's own `--background`
   // triple — var-driven, so every theme (including the brand named ones)

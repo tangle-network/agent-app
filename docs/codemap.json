@@ -16911,6 +16911,12 @@
           "doc": "Describe the structure and state of a tool call within a chat interaction"
         },
         {
+          "name": "chatToolCallPart",
+          "kind": "function",
+          "signature": "(call: ChatToolCallInfo) => ToolPart",
+          "doc": "Adapt a chat tool call to the canonical `@tangle-network/ui` `ToolPart`, so the row renders through ui's `InlineToolItem` — one run-row grammar shared with every other Tangle run view (the same adapt…"
+        },
+        {
           "name": "ChatTurnFilePartInput",
           "kind": "interface",
           "signature": "interface ChatTurnFilePartInput",
@@ -17839,6 +17845,24 @@
           "kind": "function",
           "signature": "(part: Record<string, unknown>) => ChatInteraction | null",
           "doc": "Reads a persisted/streamed `interaction` part back into a `ChatInteraction`."
+        },
+        {
+          "name": "POPOVER_SURFACE_ATTR",
+          "kind": "const",
+          "signature": "\"data-agent-app-popover\"",
+          "doc": "Marks the portaled panel in the DOM."
+        },
+        {
+          "name": "PopoverSurface",
+          "kind": "function",
+          "signature": "({ open, triggerRef, panelRef, className, role, id, matchTriggerWidth, children, }: PopoverSurfaceProps) => ReactPortal…",
+          "doc": "The floating panel every canonical picker opens."
+        },
+        {
+          "name": "PopoverSurfaceProps",
+          "kind": "interface",
+          "signature": "interface PopoverSurfaceProps",
+          "doc": null
         },
         {
           "name": "ProducerErrorEvent",
