@@ -20,11 +20,16 @@
  *
  * `playground/src/routes/ComposerRoute.tsx` mounts the pickers inside the real
  * host rail markup (see `HostScrollRail`), so this drives the shape that broke
- * rather than an idealised one. Triggers are enumerated by ARIA
- * (`button[aria-haspopup]`), so a picker added to the audited hosts is covered
- * without editing this file.
+ * rather than an idealised one. `playground/src/routes/RecordsRoute.tsx` does
+ * the same for the session-history kebab menu and the record-grid source
+ * popover — neither owns a scroll rail of its own, so it uses `ClipHost`, a
+ * short `overflow: auto` host, the general form of the same defect. Triggers
+ * are enumerated by ARIA (`button[aria-haspopup]`), so a picker added to the
+ * audited hosts is covered without editing this file — set `ROUTE` to point at
+ * a different route (default `/composer`).
  *
- * Usage: start the demo (npm run dev), then `node scripts/popover-hit-test.mjs`.
+ * Usage: start the demo (npm run dev), then `node scripts/popover-hit-test.mjs`
+ * (or `ROUTE=/records node scripts/popover-hit-test.mjs`).
  * Exits non-zero if any popover is unreachable. `SHOT_DIR` writes a screenshot
  * per popover.
  */

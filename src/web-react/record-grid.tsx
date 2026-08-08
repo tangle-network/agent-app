@@ -48,7 +48,7 @@ import {
 } from 'react'
 
 import { type AsyncEmptyAction, type AsyncEmptySpec, type AsyncResourceState } from './async'
-import { OVERLAY_SHADOW } from './controls'
+import { OVERLAY_SHADOW, PopoverSurface, usePopover } from './controls'
 import {
   EMPTY_RECORD_GRID_OVERLAY,
   formatRecordGridValue,
@@ -931,8 +931,22 @@ interface SourceMarkerProps {
   onToggle: () => void
 }
 
-/** The per-cell provenance affordance: a marker that opens the quote, the
- *  source's name, and a link to it. */
+/**
+ * The per-cell provenance affordance: a marker that opens the quote, the
+ * source's name, and a link to it.
+ *
+ * Renders its panel through `PopoverSurface` (not an in-place `absolute`
+ * span): the grid is a scrollable table by construction — `overflow-x-auto`/
+ * `overflow-y-auto` on the scroll region is the whole reason `RecordGrid`
+ * stays usable with many columns/rows — and that scroll container clips every
+ * positioned descendant whose containing block sits inside it exactly the way
+ * the composer's control rail clipped the model/thinking menus (see AGENTS.md
+ * "UI chrome ownership (picker canon)"). `open` stays parent-owned (only one
+ * marker across the grid may be open at a time); `usePopover` never calls
+ * `setOpen(true)` itself — its listeners only run while `open` is already
+ * true — so translating its `setOpen(false)` into the existing `onToggle`
+ * flip is safe.
+ */
 function SourceMarker({ panelId, columnHeader, rowLabel, source, open, onToggle }: SourceMarkerProps) {
   // An omitted basis is the DEFAULT path every first integration takes, so it
   // must resolve to the weakest claim, not the strongest. `extracted` (and
@@ -941,12 +955,19 @@ function SourceMarker({ panelId, columnHeader, rowLabel, source, open, onToggle 
   // not exist. `asserted` is the union's own "nothing outside the model behind
   // it", which is exactly what a caller who stated no basis has established.
   const basis: RecordGridSourceBasis = source.basis ?? 'asserted'
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (!next) onToggle()
+    },
+    [onToggle],
+  )
+  const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
   return (
-    <span className="relative inline-flex">
+    <span ref={containerRef} className="relative inline-flex">
       <button
         type="button"
+        {...triggerProps}
         aria-label={`Source for ${columnHeader}, ${rowLabel}`}
-        aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         title={BASIS_TITLES[basis]}
         onClick={(event) => {
@@ -967,35 +988,36 @@ function SourceMarker({ panelId, columnHeader, rowLabel, source, open, onToggle 
           <path d="M9 8h6M9 12h6M9 16h3" />
         </svg>
       </button>
-      {open && (
-        <span
-          id={panelId}
-          role="note"
-          className={`absolute left-0 top-5 z-10 w-64 rounded-lg border border-border bg-popover p-3 text-left ${OVERLAY_SHADOW}`}
-        >
-          {source.quote && (
-            <span className="block border-l-2 border-primary/50 pl-2 text-xs italic leading-snug text-foreground">
-              “{source.quote}”
-            </span>
-          )}
-          <span className="mt-2 block text-[11px] text-muted-foreground">
-            {source.label ?? 'Source'}
-            {source.locator ? ` · ${source.locator}` : ''}
-            {` · ${BASIS_TITLES[basis]}`}
+      <PopoverSurface
+        open={open}
+        id={panelId}
+        role="note"
+        triggerRef={triggerRef}
+        panelRef={panelRef}
+        className={`w-64 rounded-lg border border-border bg-popover p-3 text-left ${OVERLAY_SHADOW}`}
+      >
+        {source.quote && (
+          <span className="block border-l-2 border-primary/50 pl-2 text-xs italic leading-snug text-foreground">
+            “{source.quote}”
           </span>
-          {source.href && (
-            <a
-              href={source.href}
-              target="_blank"
-              rel="noreferrer"
-              onClick={(event) => event.stopPropagation()}
-              className="mt-1.5 inline-block text-[11px] font-medium text-primary underline-offset-2 hover:underline"
-            >
-              Open source
-            </a>
-          )}
+        )}
+        <span className="mt-2 block text-[11px] text-muted-foreground">
+          {source.label ?? 'Source'}
+          {source.locator ? ` · ${source.locator}` : ''}
+          {` · ${BASIS_TITLES[basis]}`}
         </span>
-      )}
+        {source.href && (
+          <a
+            href={source.href}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(event) => event.stopPropagation()}
+            className="mt-1.5 inline-block text-[11px] font-medium text-primary underline-offset-2 hover:underline"
+          >
+            Open source
+          </a>
+        )}
+      </PopoverSurface>
     </span>
   )
 }

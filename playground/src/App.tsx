@@ -4,6 +4,7 @@ import { CanvasRoute } from './routes/CanvasRoute'
 import { TimelineRoute } from './routes/TimelineRoute'
 import { ChatRoute } from './routes/ChatRoute'
 import { ComposerRoute } from './routes/ComposerRoute'
+import { RecordsRoute } from './routes/RecordsRoute'
 import { WorkspaceRoute } from './routes/WorkspaceRoute'
 
 type ThemeName = 'light' | 'dark'
@@ -13,6 +14,7 @@ const ROUTES = [
   { path: '/timeline', label: 'Storyboard' },
   { path: '/chat', label: 'Agent' },
   { path: '/composer', label: 'Composer' },
+  { path: '/records', label: 'Records' },
   { path: '/workspace', label: 'Workspace' },
 ] as const
 
@@ -94,6 +96,7 @@ export function App() {
             {path === '/timeline' && <TimelineRoute />}
             {path === '/chat' && <ChatRoute />}
             {path === '/composer' && <ComposerRoute />}
+            {path === '/records' && <RecordsRoute />}
           </main>
         </>
       )}
