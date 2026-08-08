@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-356 exports.
+360 exports.
 
 ### `activityTone`
 
@@ -364,6 +364,14 @@ interface ChatStreamToolResult
 
 ```ts
 interface ChatToolCallInfo
+```
+
+### `chatToolCallPart`
+
+`function` — Adapt a chat tool call to the canonical `@tangle-network/ui` `ToolPart`, so the row renders through ui's `InlineToolItem` — one run-row grammar shared with every other Tangle run view (the same adapt…
+
+```ts
+(call: ChatToolCallInfo) => ToolPart
 ```
 
 ### `ChatTurnFilePartInput`
@@ -1620,6 +1628,30 @@ type ParseInteractionResult
 
 ```ts
 (part: Record<string, unknown>) => ChatInteraction | null
+```
+
+### `POPOVER_SURFACE_ATTR`
+
+`const` — Marks the portaled panel in the DOM.
+
+```ts
+"data-agent-app-popover"
+```
+
+### `PopoverSurface`
+
+`function` — The floating panel every canonical picker opens.
+
+```ts
+({ open, triggerRef, panelRef, className, role, id, matchTriggerWidth, children, }: PopoverSurfaceProps) => ReactPortal…
+```
+
+### `PopoverSurfaceProps`
+
+`interface`
+
+```ts
+interface PopoverSurfaceProps
 ```
 
 ### `ProducerErrorEvent`

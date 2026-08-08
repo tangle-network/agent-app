@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
  * Regression guard for the live white-screen crash: clicking a bash/python/skill
- * tool chip in the chat blew up the whole surface with
+ * tool row in the chat blew up the whole surface with
  * `Cannot read properties of undefined (reading 'length')`.
  *
  * Root cause: `DefaultToolDetail` assumed every tool result is the
@@ -23,8 +23,11 @@ function messageWith(call: ChatToolCallInfo): ChatUiMessage[] {
   return [{ id: 'm1', role: 'assistant', content: '', toolCalls: [call] }]
 }
 
-function expandOnlyCard(): void {
-  fireEvent.click(screen.getByRole('button', { name: 'Expand details' }))
+/** The canonical row's whole header is the expand toggle (RunRowShell's
+ *  Collapsible.Trigger) — there is no separate chevron button. `title` is the
+ *  row's humanized title text. */
+function expandOnlyRow(title: string): void {
+  fireEvent.click(screen.getByRole('button', { name: title }))
 }
 
 describe('DefaultToolDetail — non-envelope tool outputs render without crashing', () => {
@@ -39,7 +42,7 @@ describe('DefaultToolDetail — non-envelope tool outputs render without crashin
     }
     render(createElement(ChatMessages, { messages: messageWith(call) }))
     // Pre-fix this throws inside render triggered by the click.
-    expect(() => expandOnlyCard()).not.toThrow()
+    expect(() => expandOnlyRow('Run skill')).not.toThrow()
     // Post-fix the raw output is shown under a Result header.
     expect(screen.getByText('bare-string-output-xyz')).toBeTruthy()
   })
@@ -53,7 +56,7 @@ describe('DefaultToolDetail — non-envelope tool outputs render without crashin
       result: undefined,
     }
     render(createElement(ChatMessages, { messages: messageWith(call) }))
-    expect(() => expandOnlyCard()).not.toThrow()
+    expect(() => expandOnlyRow('Run python')).not.toThrow()
     // The call args still render; there is simply no Result section.
     expect(screen.getByText('code')).toBeTruthy()
   })
@@ -67,6 +70,6 @@ describe('DefaultToolDetail — non-envelope tool outputs render without crashin
       result: { ok: true },
     }
     render(createElement(ChatMessages, { messages: messageWith(call) }))
-    expect(() => expandOnlyCard()).not.toThrow()
+    expect(() => expandOnlyRow('Do thing')).not.toThrow()
   })
 })

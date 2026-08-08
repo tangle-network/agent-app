@@ -159,9 +159,17 @@
      utilities are wired separately in the preset. */
   --md3-outline-variant: hsl(var(--border));
   --md3-surface-container-low: hsl(var(--card));
+  /* `--md3-surface-container` (the canonical run-row fill) joins low on `card`:
+     the brand ladder's low/container distinction compresses onto the shadcn
+     ladder here, exactly as the preset's `surface-container*` mapping does. */
+  --md3-surface-container: hsl(var(--card));
   --accent-surface-soft: hsl(var(--accent));
   --accent-text: hsl(var(--accent-foreground));
   --status-error: hsl(var(--destructive));
+  /* Status text on a tint (the run-row status dots + collapsed error line) —
+     full colors via the triples, so the dark scope re-themes them too. */
+  --surface-success-text: hsl(var(--success));
+  --surface-danger-text: hsl(var(--destructive));
 
   /* canvas-only surfaces (not part of the shadcn vocabulary). Name matches the
      `--canvas-backdrop` the design-canvas Workspace references (with a #1a1a1a
@@ -272,6 +280,11 @@
      The soft tier at 60% clears the 1.07 hairline floor on every surface it
      divides, and the card edge at 80% sits clearly above it — same method,
      opposite conclusion, because the border colour itself moved. */
+  /* `--border-subtle` is the quietest tier — the resting edge of the canonical
+     run rows (`@tangle-network/ui`'s RunRowShell), which strengthen to
+     `border-border` on hover/open. 22% is the measured hairline row in the
+     table below; the row's fill step does the containing. */
+  --border-subtle: color-mix(in oklch, hsl(var(--border)) 22%, transparent);
   --border-soft: color-mix(in oklch, hsl(var(--border)) 40%, transparent);
   --card-edge: color-mix(in oklch, hsl(var(--border)) 60%, transparent);
 
@@ -364,6 +377,10 @@
      softening leaves a visible line — see the measurement in the :root block:
      60% reads 1.265 on the card, where the old border at FULL strength read
      1.158. Dark runs the same three tiers as light, one step stronger. */
+  /* Dark subtle tier at 40%: interpolating the dark measurement table, it sits
+     above the 1.07 hairline floor yet clearly below soft's 1.320 — the same
+     one-step-down relationship the light tiers keep. */
+  --border-subtle: color-mix(in oklch, hsl(var(--border)) 40%, transparent);
   --border-soft: color-mix(in oklch, hsl(var(--border)) 60%, transparent);
   --card-edge: color-mix(in oklch, hsl(var(--border)) 80%, transparent);
 

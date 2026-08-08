@@ -60,6 +60,10 @@ jobs:
       #   systemPrompt >40 KB        — model degrades to empty answers
       #   unhandled onErrorEvent     — a failed turn renders as a silent blank
       #   node import in a browser   — client bundle throws on module load
+      #   an in-place picker popover — a host scroll rail clips the model and
+      #                                thinking menus to nothing: right DOM,
+      #                                right coordinates, zero pixels, no click
+      #                                able to land
       #   a test that cannot fail    — the meta-class behind all of the above
       - name: Incident-class gates
         run: pnpm run test:gates

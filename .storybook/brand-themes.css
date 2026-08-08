@@ -27,13 +27,10 @@
  * redeclaring the tokens it doesn't define would INVALIDATE them; see its own
  * block below.
  *
- * tangle-dark IS listed although brand 1.1.0 does not ship its scope yet (it
- * resolves through the local alias in main.ts until the brand bump). These
- * declarations still carry no var() fallbacks: the preview.ts decorator
- * probes for the scope and remaps data-theme to `dark` where it is absent,
- * so this rule only ever matches when the scope exists. A fallback copy of
- * tokens.css's dark values would be a second source of truth, free to drift
- * from the first.
+ * tangle-dark IS listed: brand ≥1.3.0 ships its scope. These declarations
+ * carry no var() fallbacks — they only ever match when the scope exists.
+ * A fallback copy of tokens.css's dark values would be a second source of
+ * truth, free to drift from the first.
  *
  * Deliberately NOT bridged — these fall through to agent-app's own theme
  * values via the cascade, per theme darkness (the decorator adds the `.dark`

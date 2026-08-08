@@ -46,7 +46,7 @@ export const chatCatalogModels: CatalogModel[] = [
 
 // ── Individual tool calls ─────────────────────────────────────────────────────
 
-/** A completed sandbox command, args + result captured for the expanded card. */
+/** A completed sandbox command, args + result captured for the expanded row. */
 export const doneShellToolCall: ChatToolCallInfo = {
   id: 'tc-shell',
   name: 'sandbox_run_command',
@@ -57,8 +57,8 @@ export const doneShellToolCall: ChatToolCallInfo = {
 
 /**
  * A proposal the human has not ruled on yet: `pendingApprovalOf` keys on
- * `result.status === 'queued_for_approval'` + a proposalId, so the card renders
- * the Approve/Reject affordance when the story passes `approval` handlers.
+ * `result.status === 'queued_for_approval'` + a proposalId, so the row becomes
+ * the Approve/Reject decision card when the story passes `approval` handlers.
  */
 export const proposalToolCall: ChatToolCallInfo = {
   id: 'tc-proposal',
@@ -68,7 +68,7 @@ export const proposalToolCall: ChatToolCallInfo = {
   result: { ok: true, result: { status: 'queued_for_approval', proposalId: 'prop-42' } },
 }
 
-/** A tool call whose run failed — the card renders the error state + message. */
+/** A tool call whose run failed — the row renders the error state + message. */
 export const erroredToolCall: ChatToolCallInfo = {
   id: 'tc-followup',
   name: 'schedule_followup',
@@ -77,7 +77,7 @@ export const erroredToolCall: ChatToolCallInfo = {
   result: { ok: false, message: 'scheduler unavailable: upstream 503' },
 }
 
-/** A tool call still executing — no `result` yet, card shows the running dot. */
+/** A tool call still executing — no `result` yet, the row shows the spinner. */
 export const runningToolCall: ChatToolCallInfo = {
   id: 'tc-export',
   name: 'canvas_export',
@@ -86,8 +86,8 @@ export const runningToolCall: ChatToolCallInfo = {
 }
 
 /**
- * A settled `schedule_followup` — NOT a decision and not a failure, so the card
- * renders as the quiet left-rule follow-up variant (its own visual kind).
+ * A settled `schedule_followup` — NOT a decision and not a failure, so it
+ * renders as the quiet follow-up row (its own visual kind).
  */
 export const scheduledFollowupToolCall: ChatToolCallInfo = {
   id: 'tc-followup-2',

@@ -19,6 +19,7 @@ import {
   type RefObject,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -33,7 +34,7 @@ import {
   sessionLabel,
   UNTITLED_SESSION_LABEL,
 } from '../session-shell/index'
-import { OVERLAY_SHADOW } from './controls'
+import { OVERLAY_SHADOW, PopoverSurface, usePopover } from './controls'
 
 // ---------------------------------------------------------------------------
 // useInfiniteScroll
@@ -1045,6 +1046,8 @@ function SessionRow({
   onSelectedChange: (selected: boolean) => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const panelId = useId()
+  const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(menuOpen, setMenuOpen)
   const extras = extraActions?.(session) ?? []
   const hasMenu = Boolean(onRename) || Boolean(onDelete) || extras.length > 0
   // An unread dot next to a live responding indicator is two signals for one
@@ -1074,11 +1077,12 @@ function SessionRow({
       </Link>
       <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{timestamp}</span>
       {hasMenu && (
-        <div className="relative shrink-0">
+        <div ref={containerRef} className="relative shrink-0">
           <button
             type="button"
+            {...triggerProps}
             aria-label="Session actions"
-            aria-expanded={menuOpen}
+            aria-controls={menuOpen ? panelId : undefined}
             onClick={() => setMenuOpen((open) => !open)}
             // Visible by default and hover-revealed only from `sm:` up: a
             // touch device has no hover, so an opacity-0 kebab is an action
@@ -1087,54 +1091,59 @@ function SessionRow({
           >
             <span aria-hidden className="text-base leading-none">⋯</span>
           </button>
-          {menuOpen && (
-            <>
-              <div className="fixed inset-0 z-20" onClick={() => setMenuOpen(false)} aria-hidden />
-              <div className={`absolute right-0 z-30 mt-1 w-36 overflow-hidden rounded-md border border-border bg-popover py-1 ${OVERLAY_SHADOW}`}>
-                {onRename && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      onRename(session)
-                    }}
-                    className="block w-full px-3 py-1.5 text-left text-xs text-foreground transition hover:bg-accent"
-                  >
-                    {renameLabel}
-                  </button>
-                )}
-                {extras.map((action) => (
-                  <button
-                    key={action.id}
-                    type="button"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      action.onSelect()
-                    }}
-                    className={`block w-full px-3 py-1.5 text-left text-xs transition ${
-                      action.destructive
-                        ? 'text-destructive hover:bg-destructive/10'
-                        : 'text-foreground hover:bg-accent'
-                    }`}
-                  >
-                    {action.label}
-                  </button>
-                ))}
-                {onDelete && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      onDelete(session)
-                    }}
-                    className="block w-full px-3 py-1.5 text-left text-xs text-destructive transition hover:bg-destructive/10"
-                  >
-                    {deleteLabel}
-                  </button>
-                )}
-              </div>
-            </>
-          )}
+          <PopoverSurface
+            open={menuOpen}
+            id={panelId}
+            role="menu"
+            triggerRef={triggerRef}
+            panelRef={panelRef}
+            className={`w-36 overflow-hidden rounded-md border border-border bg-popover py-1 ${OVERLAY_SHADOW}`}
+          >
+            {onRename && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false)
+                  onRename(session)
+                }}
+                className="block w-full px-3 py-1.5 text-left text-xs text-foreground transition hover:bg-accent"
+              >
+                {renameLabel}
+              </button>
+            )}
+            {extras.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false)
+                  action.onSelect()
+                }}
+                className={`block w-full px-3 py-1.5 text-left text-xs transition ${
+                  action.destructive
+                    ? 'text-destructive hover:bg-destructive/10'
+                    : 'text-foreground hover:bg-accent'
+                }`}
+              >
+                {action.label}
+              </button>
+            ))}
+            {onDelete && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false)
+                  onDelete(session)
+                }}
+                className="block w-full px-3 py-1.5 text-left text-xs text-destructive transition hover:bg-destructive/10"
+              >
+                {deleteLabel}
+              </button>
+            )}
+          </PopoverSurface>
         </div>
       )}
     </div>

@@ -2,8 +2,8 @@
  * `@tangle-network/agent-app/web-react` — the shared chat-shell components
  * every agent app's web UI hand-rolls: a model picker over the runtime's
  * model catalogue, a reasoning-effort selector, and a message thread with
- * User/Agent identity, per-message model + cost + tokens/sec metrics, tool
- * chips, and a collapsible thinking section.
+ * User/Agent identity, per-message model + cost + tokens/sec metrics,
+ * canonical tool rows, and a collapsible thinking section.
  *
  * Works for BOTH chat shapes: router-backed copilots (LoopEvents from
  * `runtime/openai-stream`) and sandbox-backed chats — the thread renders
@@ -11,12 +11,21 @@
  *
  * Styling contract: Tailwind classes against the shared design tokens
  * (`bg-card`, `border-border`, `text-muted-foreground`, `bg-primary`, …) that
- * Tangle app shells define. No icon library — the few glyphs are inline SVGs.
- * Markdown and provider logos are injected (`renderMarkdown`,
- * `renderProviderBadge`) so this package stays dependency-free beyond React.
+ * Tangle app shells define. No icon library of its own — the few local glyphs
+ * are inline SVGs. Markdown and provider logos are injected (`renderMarkdown`,
+ * `renderProviderBadge`).
+ *
+ * Tool rows compose the canonical run-row grammar from `@tangle-network/ui`
+ * (`InlineToolItem` over `RunRowShell`): `chatToolCallPart` adapts each
+ * `ChatToolCallInfo` to ui's `ToolPart` (the same adapter pattern ui's own
+ * `ToolCallStep` uses), so the chat surface and every other Tangle run view
+ * share one row implementation instead of drifting. That makes
+ * `@tangle-network/ui` a peer of this subpath.
  */
 
 import { useEffect, useMemo, useRef, useState, memo, type ReactNode } from 'react'
+import { InlineToolItem } from '@tangle-network/ui/run'
+import type { ToolPart } from '@tangle-network/ui/types'
 import { useSmoothText } from './smooth-text'
 import { ChevronDown, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, usePending } from './controls'
 import { BrandMark } from './brand-mark'
@@ -55,6 +64,8 @@ export * from './record-grid'
 export {
   usePopover,
   usePending,
+  PopoverSurface,
+  POPOVER_SURFACE_ATTR,
   ModelPicker,
   EffortPicker,
   EffortMeter,
@@ -68,6 +79,7 @@ export {
   type ModelPickerProps,
   type EffortPickerProps,
   type EffortLevel,
+  type PopoverSurfaceProps,
 } from './controls'
 export {
   AgentSessionControls,
@@ -217,9 +229,9 @@ export function pendingApprovalOf(call: ChatToolCallInfo): { proposalId: string 
 
 /** One ordered piece of an assistant turn: a run of answer text, or a tool
  *  call, in the sequence the agent emitted them. A message carrying `segments`
- *  is rendered in order — interleaving text and tool chips — so the agent's
+ *  is rendered in order — interleaving text and tool rows — so the agent's
  *  pre- and post-tool reasoning reads chronologically instead of as one text
- *  blob with the tool chips collected after it. */
+ *  blob with the tool rows collected after it. */
 export type ChatMessageSegment =
   | { kind: 'text'; content: string }
   | { kind: 'tool'; call: ChatToolCallInfo }
@@ -251,7 +263,7 @@ export interface ChatMessagesProps {
    *  drops the label row into a fixed-height meta lane at each row's bottom
    *  (copy + the demoted meta, revealed on hover/focus, always visible on
    *  touch) and renders user bubbles neutral with a symmetric radius.
-   *  Everything else — tool cards, reasoning, streaming — is identical. */
+   *  Everything else — tool rows, reasoning, streaming — is identical. */
   chrome?: 'labeled' | 'quiet'
   /** Catalogue models, for per-message cost from pricing. Pass [] to skip cost. */
   models?: CatalogModel[]
@@ -267,11 +279,12 @@ export interface ChatMessagesProps {
   /** Render the trailing "agent is thinking" row. */
   loading?: boolean
   /** Approve/Reject handlers for proposals awaiting approval. When omitted the
-   *  chip still shows "awaiting approval" but without action buttons. */
+   *  card still shows "awaiting approval" but without action buttons. */
   approval?: ProposalApprovalHandlers
-  /** Open a full-transcript view (e.g. {@link RunDrillIn}) from a tool card. */
+  /** Open a full-transcript view (e.g. {@link RunDrillIn}) from a tool row's
+   *  actions slot. */
   onToolCallClick?: (call: ChatToolCallInfo, message: ChatUiMessage) => void
-  /** Per-tool custom detail renderers for expanded tool cards. */
+  /** Per-tool custom detail renderers for the expanded tool row body. */
   toolRenderers?: ToolDetailRenderers
   /** Stream-error affordance: when the turn failed (a thrown transport error or
    *  a loop-level `onErrorEvent`), pass the message here to render an error row.
@@ -415,6 +428,37 @@ function ToolGlyph({ name, className }: { name: string; className?: string }) {
 
 function toolOutcomeOf(call: ChatToolCallInfo): { ok?: boolean; result?: Record<string, unknown>; message?: string } | undefined {
   return call.result as { ok?: boolean; result?: Record<string, unknown>; message?: string } | undefined
+}
+
+/** A call that failed — by status OR by an `ok:false` outcome envelope. Shared
+ *  by the row adapter, the collapse guard, and the card itself so the three can
+ *  never disagree about what "failed" means. */
+function toolCallFailed(call: ChatToolCallInfo): boolean {
+  return call.status === 'error' || toolOutcomeOf(call)?.ok === false
+}
+
+/**
+ * Adapt a chat tool call to the canonical `@tangle-network/ui` `ToolPart`, so
+ * the row renders through ui's `InlineToolItem` — one run-row grammar shared
+ * with every other Tangle run view (the same adapter pattern ui's own
+ * `ToolCallStep` uses for its flat props). `sandbox_run_command` maps to ui's
+ * canonical `bash` name so the row takes the command category (terminal icon);
+ * every other tool keeps its real name. agent-app carries no per-call timings,
+ * so `state.time` stays unset and the row shows no duration.
+ */
+export function chatToolCallPart(call: ChatToolCallInfo): ToolPart {
+  const failed = toolCallFailed(call)
+  return {
+    type: 'tool',
+    id: call.id,
+    tool: call.name === 'sandbox_run_command' ? 'bash' : call.name,
+    state: {
+      status: call.status === 'running' ? 'running' : failed ? 'error' : 'completed',
+      input: call.args,
+      output: call.result,
+      error: failed ? (toolOutcomeOf(call)?.message ?? 'Tool failed') : undefined,
+    },
+  }
 }
 
 /** The four visual kinds a tool call presents as. They are *different kinds of
@@ -693,19 +737,44 @@ function ProposalCard({
 }
 
 /** A scheduled follow-up — a pending, time-based intent, not a decision and not
- *  a completed action (audit finding #5). Quiet left-rule card with a clock. */
+ *  a completed action (audit finding #5). Re-skinned onto the shared run-row
+ *  geometry (full width, 24px icon chip, xs title, mono `when` in the
+ *  description slot) so it reads as a sibling of the canonical tool rows; it
+ *  is not a tool invocation, so the row does not expand. */
 function FollowupCard({ call }: { call: ChatToolCallInfo }) {
   const a = (call.args ?? {}) as Record<string, unknown>
   const when = typeof a.when === 'string' ? a.when : typeof a.at === 'string' ? a.at : typeof a.schedule === 'string' ? a.schedule : null
   return (
-    <div className="w-fit min-w-[260px] max-w-full rounded-lg border border-border/60 border-l-2 border-l-primary/60 bg-secondary px-3 py-2 text-sm">
-      <div className="flex items-center gap-2">
-        <ToolGlyph name={call.name} className="h-3.5 w-3.5 shrink-0 text-primary/80" />
-        <span className="min-w-0 flex-1 truncate font-medium text-foreground">{friendlyToolTitle(call)}</span>
+    <div className="flex items-start gap-2">
+      <div className="min-w-0 flex-1 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--md3-surface-container)]">
+        <div className="flex w-full items-center gap-2.5 px-3 py-2">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-border bg-muted text-muted-foreground">
+            <ToolGlyph name={call.name} className="h-3.5 w-3.5" />
+          </span>
+          <span className="shrink-0 whitespace-nowrap text-xs font-medium text-foreground">{friendlyToolTitle(call)}</span>
+          {when && (
+            <span className="hidden min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground sm:inline">{when}</span>
+          )}
+        </div>
       </div>
-      {when && <p className="mt-0.5 pl-[22px] text-[12px] text-muted-foreground">{when}</p>}
     </div>
   )
+}
+
+/** Row title: short and past-tense. A command's text moves to the canonical
+ *  mono description slot instead of filling the title. */
+function toolRowTitle(call: ChatToolCallInfo): string {
+  if (call.name === 'sandbox_run_command') return 'Ran command'
+  return friendlyToolTitle(call)
+}
+
+/** The collapsed row's inline description — the canonical row's mono slot. Only
+ *  a command has a natural one-liner; every other tool's title already carries
+ *  its identifying argument. */
+function toolRowDescription(call: ChatToolCallInfo): string | undefined {
+  if (call.name !== 'sandbox_run_command') return undefined
+  const command = call.args?.command
+  return typeof command === 'string' && command ? command : undefined
 }
 
 function ToolCallCard({
@@ -721,14 +790,12 @@ function ToolCallCard({
   onOpenRun?: (call: ChatToolCallInfo, message: ChatUiMessage) => void
   renderers?: ToolDetailRenderers
 }) {
-  const [expanded, setExpanded] = useState(false)
   const pending = call.status === 'done' ? pendingApprovalOf(call) : null
   const kind = blockKindOf(call)
-  const failed = call.status === 'error' || toolOutcomeOf(call)?.ok === false
-  const custom = renderers?.[call.name]?.(call, message)
+  const failed = toolCallFailed(call)
 
-  // A proposal awaiting approval is a pending DECISION, not a tool chip — it
-  // gets its own prominent card with primary Approve / quiet Reject.
+  // A proposal awaiting approval is a pending DECISION, not a tool row — it
+  // keeps its own prominent card with primary Approve / quiet Reject.
   if (pending) {
     return (
       <ProposalCard
@@ -740,72 +807,40 @@ function ToolCallCard({
       />
     )
   }
-  // A scheduled follow-up is a time-based intent — distinct from a tool chip.
+  // A scheduled follow-up is a time-based intent — its own quiet row, distinct
+  // from a tool invocation.
   if (kind === 'followup' && !failed) {
     return <FollowupCard call={call} />
   }
 
-  // A command chip reads as a past-tense action; its command text is monospace
-  // (audit finding #1 minor). Everything else is a generic tool step. Both share
-  // one card shape so the transcript reads as a worklog, not a flat list.
-  const isCommand = kind === 'command'
+  // Command and generic tool calls render through the canonical InlineToolItem
+  // row (category icon chip, title, mono description, status, hairline expand).
+  // The expanded body stays agent-app's — the host's custom renderer, the
+  // terminal ShellDetail for commands, or the generic args/result view — via
+  // ui's `renderToolDetail` seam, and `onOpenRun` maps to the row's actions
+  // slot, so no agent-app capability is lost to the shared chrome.
+  const custom = renderers?.[call.name]?.(call, message)
   return (
-    <div
-      className={`w-fit min-w-[280px] max-w-full rounded-lg border text-xs transition ${
-        failed ? 'border-destructive/40 bg-destructive/5' : 'border-border/60 bg-secondary'
-      }`}
-    >
-      {/* Header is a flex row, NOT a button, so any controls are siblings of the
-          expand toggle rather than nested inside it (axe: nested-interactive). */}
-      <div className="flex w-full items-center gap-2 px-3 py-2">
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          aria-expanded={expanded}
-          className="flex min-w-0 flex-1 items-center gap-2 rounded text-left"
-        >
-          <span
-            className={`h-2 w-2 shrink-0 rounded-full ${
-              call.status === 'running' ? 'animate-pulse bg-warning' : failed ? 'bg-destructive' : 'bg-success'
-            }`}
-          />
-          <ToolGlyph name={call.name} className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <span
-            className={`min-w-0 flex-1 truncate ${
-              isCommand ? 'font-mono text-[12px] tracking-tight text-foreground/90' : 'font-medium'
-            }`}
+    <InlineToolItem
+      part={chatToolCallPart(call)}
+      title={toolRowTitle(call)}
+      description={toolRowDescription(call)}
+      renderToolDetail={() =>
+        custom ??
+        (call.name === 'sandbox_run_command' ? <ShellDetail call={call} /> : <DefaultToolDetail call={call} />)
+      }
+      actions={
+        onOpenRun && call.name.startsWith('sandbox_') ? (
+          <button
+            type="button"
+            onClick={() => onOpenRun(call, message)}
+            className="rounded border border-border bg-card px-2 py-1 text-[11px] font-medium transition hover:bg-accent"
           >
-            {friendlyToolTitle(call)}
-          </span>
-        </button>
-        <span className="shrink-0 text-[11px] text-muted-foreground">
-          {call.status === 'running' ? 'running…' : failed ? 'failed' : 'done'}
-        </span>
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          aria-label={expanded ? 'Collapse details' : 'Expand details'}
-          aria-expanded={expanded}
-          className="shrink-0 rounded p-0.5"
-        >
-          <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
-        </button>
-      </div>
-      {expanded && (
-        <div className="border-t border-border/40 px-3 py-2.5">
-          {custom ?? (call.name === 'sandbox_run_command' ? <ShellDetail call={call} /> : <DefaultToolDetail call={call} />)}
-          {onOpenRun && call.name.startsWith('sandbox_') && (
-            <button
-              type="button"
-              onClick={() => onOpenRun(call, message)}
-              className="mt-2 rounded border border-border bg-card px-2 py-1 text-[11px] font-medium transition hover:bg-accent"
-            >
-              Open full transcript →
-            </button>
-          )}
-        </div>
-      )}
-    </div>
+            Open full transcript →
+          </button>
+        ) : undefined
+      }
+    />
   )
 }
 
@@ -857,20 +892,19 @@ function SegmentText({
 
 /** A settled run of at least this many consecutive tool calls collapses into a
  *  single "Worked through N steps" disclosure so a long multi-step turn does not
- *  flood the transcript. Below it, tool cards render inline as before. */
+ *  flood the transcript. Below it, tool rows render inline as before. */
 const COLLAPSE_TOOL_RUN_AT = 3
 
 /** A tool call the user must not miss even in a settled run — a failure (by
- *  status OR by an `ok:false` outcome, matching `ToolCallCard`'s own predicate),
+ *  status OR by an `ok:false` outcome, the shared `toolCallFailed` predicate),
  *  a card awaiting their approval, or a tool still `running` after the turn has
  *  settled (i.e. stuck / timed out). A run containing one is NEVER collapsed, so
  *  a failed, blocked, or stuck turn can't hide behind a "Worked through N steps"
  *  summary and read as successful. */
 function isImportantTool(call: ChatToolCallInfo): boolean {
   return (
-    call.status === 'error' ||
     call.status === 'running' ||
-    toolOutcomeOf(call)?.ok === false ||
+    toolCallFailed(call) ||
     pendingApprovalOf(call) !== null
   )
 }
@@ -879,7 +913,7 @@ function isImportantTool(call: ChatToolCallInfo): boolean {
  *  run carries the streaming caret; if the last segment is instead a tool, a
  *  trailing caret keeps the gap before the next run from looking frozen. Any
  *  `toolCalls` not represented in `segments` (a partially-migrated producer that
- *  set both) still render, so a tool chip is never silently dropped. A settled
+ *  set both) still render, so a tool row is never silently dropped. A settled
  *  run of many tool calls collapses into one disclosure — see below. */
 function SegmentedBody({
   segments,
@@ -958,14 +992,13 @@ function SegmentedBody({
         ) : !streaming &&
           g.calls.length >= COLLAPSE_TOOL_RUN_AT &&
           !g.calls.some(isImportantTool) ? (
-          <details
-            key={`tools-${g.index}`}
-            className="rounded-lg border-l-2 border-border/70 bg-secondary px-3 py-2"
-          >
-            <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
+          // The fold is a quiet disclosure line, not a filled box — the
+          // canonical rows inside it carry the row chrome.
+          <details key={`tools-${g.index}`}>
+            <summary className="cursor-pointer select-none rounded-md px-1 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
               Worked through {g.calls.length} steps
             </summary>
-            <div className="mt-2 flex flex-col gap-2">
+            <div className="mt-1.5 flex flex-col gap-1.5">
               {g.calls.map(renderToolCard)}
             </div>
           </details>
@@ -1294,7 +1327,7 @@ function StreamErrorRow({ message, onRetry }: { message: string; onRetry?: () =>
  * The message thread: one centered column; user messages are right-aligned
  * bubbles with a User label; agent messages carry an Agent meta line with
  * model id, tokens/sec, and cost, plus a collapsible thinking section and
- * tool-call chips. `chrome="quiet"` opts into the label-free variant: the
+ * tool rows. `chrome="quiet"` opts into the label-free variant: the
  * label/meta row becomes a hover-revealed meta lane under each row.
  */
 export function ChatMessages({

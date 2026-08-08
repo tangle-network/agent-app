@@ -37,14 +37,14 @@
  * sandbox-ui dependency.
  */
 
-import { useMemo, useState, type ReactNode } from 'react'
+import { useId, useMemo, useState, type ReactNode } from 'react'
 import {
   snapHarnessToModel,
   snapModelToHarness,
   type Harness,
 } from '../harness'
 import type { CatalogModel } from '../runtime/model-catalog'
-import { ModelPicker, EffortPicker, CheckGlyph, OVERLAY_SHADOW, usePopover } from './controls'
+import { ModelPicker, EffortPicker, CheckGlyph, OVERLAY_SHADOW, PopoverSurface, usePopover } from './controls'
 import type { EffortLevel } from './controls'
 import { HarnessGlyph } from './harness-glyphs'
 
@@ -104,13 +104,15 @@ function HarnessPicker({
   available?: ReadonlyArray<Harness>
 }) {
   const [open, setOpen] = useState(false)
-  const { containerRef, triggerProps } = usePopover(open, setOpen)
+  const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
+  const panelId = useId()
   const options = available ?? (Object.keys(HARNESS_LABELS) as Harness[])
   return (
     <div ref={containerRef} className="relative inline-flex">
       <button
         type="button"
         {...triggerProps}
+        aria-controls={open ? panelId : undefined}
         onClick={() => setOpen(!open)}
         title="Agent backend"
         className={`inline-flex w-full items-center justify-between gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent ${FOCUS_RING}`}
@@ -121,8 +123,15 @@ function HarnessPicker({
         </span>
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       </button>
-      {open && (
-        <div role="menu" className={`absolute bottom-full left-0 z-50 mb-2 max-h-64 w-full min-w-[248px] overflow-y-auto rounded-xl border border-border bg-popover p-1 ${OVERLAY_SHADOW}`}>
+      <PopoverSurface
+        open={open}
+        id={panelId}
+        role="menu"
+        triggerRef={triggerRef}
+        panelRef={panelRef}
+        matchTriggerWidth
+        className={`max-h-64 min-w-[248px] overflow-y-auto rounded-xl border border-border bg-popover p-1 ${OVERLAY_SHADOW}`}
+      >
           {options.map((h) => (
             <button
               key={h}
@@ -142,8 +151,7 @@ function HarnessPicker({
               {h === value && <CheckGlyph className="ml-auto h-3.5 w-3.5 shrink-0 text-primary" />}
             </button>
           ))}
-        </div>
-      )}
+      </PopoverSurface>
     </div>
   )
 }
@@ -234,7 +242,8 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
   } = props
   const { onModel, onHarness } = useCoherentHandlers(props)
   const [open, setOpen] = useState(false)
-  const { containerRef: popoverRef, triggerProps } = usePopover(open, setOpen)
+  const { containerRef: popoverRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
+  const panelId = useId()
 
   const selectedModel = models.find((m) => m.id === model)
   const showEffort = selectedModel?.supportsReasoning ?? true
@@ -271,6 +280,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
           <button
             type="button"
             {...triggerProps}
+            aria-controls={open ? panelId : undefined}
             onClick={() => setOpen(!open)}
             title="Model settings — pick the agent backend and how hard it thinks"
             className={`flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-[state=open]:bg-muted ${FOCUS_RING}`}
@@ -278,8 +288,13 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
           >
             <GearGlyph className="h-4 w-4" />
           </button>
-          {open && (
-            <div className={`absolute bottom-full left-0 z-50 mb-2 w-72 space-y-3 rounded-xl border border-border bg-popover p-3 ${OVERLAY_SHADOW}`}>
+          <PopoverSurface
+            open={open}
+            id={panelId}
+            triggerRef={triggerRef}
+            panelRef={panelRef}
+            className={`w-72 space-y-3 overflow-y-auto rounded-xl border border-border bg-popover p-3 ${OVERLAY_SHADOW}`}
+          >
               {showHarness && (
                 <div className="space-y-1.5">
                   <p className="text-xs font-medium text-foreground">Agent backend</p>
@@ -298,8 +313,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
                   </p>
                 </div>
               )}
-            </div>
-          )}
+          </PopoverSurface>
         </div>
       )}
     </div>

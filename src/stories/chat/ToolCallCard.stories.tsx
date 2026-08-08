@@ -14,8 +14,10 @@ import { renderMarkdown } from './markdown'
 /**
  * `ToolCallCard` (and its ProposalCard / FollowupCard faces) is an internal
  * component — consumers reach it only through a message's `toolCalls`. These
- * stories therefore mount one-card threads through `ChatMessages`, exactly as
- * a consumer would produce each state.
+ * stories therefore mount one-row threads through `ChatMessages`, exactly as
+ * a consumer would produce each state. Tool rows compose the canonical
+ * `@tangle-network/ui` `InlineToolItem`; the proposal card stays its own
+ * surface.
  */
 
 /** A minimal assistant turn carrying a single tool call. */
@@ -36,7 +38,7 @@ const approval = {
   onReject: (proposalId: string, toolCallId: string) => console.log('reject', proposalId, toolCallId),
 }
 
-/** Keep the one-card threads at a realistic chat-column width. */
+/** Keep the one-row threads at a realistic chat-column width. */
 const cardWidth = (Story: React.ComponentType) => (
   <div className="w-[560px]">
     <Story />
@@ -63,27 +65,29 @@ const meta: Meta<typeof ChatMessages> = {
 export default meta
 type Story = StoryObj<typeof ChatMessages>
 
-/** Settled sandbox command: green dot, mono title; expand for the terminal
+/** Settled sandbox command: the canonical row — terminal chip, past-tense
+ *  title, the command in the mono description slot; expand for the terminal
  *  detail (command, stdout, exit code). */
 export const Success: Story = {
   args: { messages: threadWith(doneShellToolCall) },
   decorators: [cardWidth],
 }
 
-/** Still executing: pulsing amber dot and "running…", no result body yet. */
+/** Still executing: the row's accent spinner, no result body yet. */
 export const Running: Story = {
   args: { messages: threadWith(runningToolCall) },
   decorators: [cardWidth],
 }
 
-/** Failed run: destructive border/background, "failed", error message inside. */
+/** Failed run: red status dot, the collapsed error line under the row, and
+ *  the error detail inside. */
 export const Error: Story = {
   args: { messages: threadWith(erroredToolCall) },
   decorators: [cardWidth],
 }
 
-/** Settled follow-up: a time-based intent, not an action — quiet left-rule
- *  card with the scheduled time. */
+/** Settled follow-up: a time-based intent, not an action — a quiet row with
+ *  the clock chip and the scheduled time in the mono slot. */
 export const ScheduledFollowup: Story = {
   name: 'Scheduled Followup',
   args: { messages: threadWith(scheduledFollowupToolCall) },
@@ -104,9 +108,10 @@ export const AwaitingApprovalReadOnly: Story = {
   decorators: [cardWidth],
 }
 
-/** Every card kind side by side — the at-a-glance check that the four visual
+/** Every kind side by side — the at-a-glance check that the four visual
  *  kinds (command / proposal / followup / generic) plus the failure and
- *  running states actually read differently. */
+ *  running states actually read differently: full-width quiet rows for work,
+ *  the prominent card reserved for the pending decision. */
 export const Variants: Story = {
   name: 'All Variants',
   parameters: { layout: 'fullscreen' },
