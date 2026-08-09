@@ -7,8 +7,10 @@ import type {
 
 const NANO_PER_USD = 1_000_000_000
 
-function usd(nano: number | null): string {
-  return nano === null ? '—' : `$${(nano / NANO_PER_USD).toFixed(2)}`
+function usd(nano: number | null | undefined): string {
+  // Nullish for the same reason the date rows are: an absent field must read as
+  // "not measured", never as `$NaN`, and never as a throw on the alert path.
+  return nano == null ? '—' : `$${(nano / NANO_PER_USD).toFixed(2)}`
 }
 
 /**
@@ -106,8 +108,11 @@ function ownershipLines(ownership: SpendOwnershipSummary): string[] {
  * rows arrived", and only this line tells a reader which report they are
  * holding.
  */
-function expectationLines(expectation: SpendExpectationSummary): string[] {
-  if (!expectation.declared) {
+function expectationLines(expectation: SpendExpectationSummary | undefined): string[] {
+  // A report assembled before this block existed carries no expectation at all.
+  // That is exactly what "NOT DECLARED" describes, and the formatter feeds the
+  // ALERT path — a throw here takes down the page it was about to send.
+  if (!expectation?.declared) {
     return [
       'expectation: NOT DECLARED — this pass is driven entirely by the settlement rows it was ' +
         'handed, so it can say nothing about a box it asked for and was never billed for. Pass ' +
@@ -129,8 +134,12 @@ function expectationLines(expectation: SpendExpectationSummary): string[] {
 
 /** Every measured field a finding carries, including the ones it left null. */
 function measuredFields(finding: SpendFinding): Array<[string, string]> {
-  const ms = (value: number | null): string =>
-    value === null ? '—' : `${(value / 3_600_000).toFixed(2)}h`
+  // Nullish, not `=== null`: a field a caller left off is `undefined`, and the
+  // date rows below turn that into `new Date(undefined).toISOString()`, which
+  // throws RangeError on the alert path. An absent value renders as the same
+  // em dash a null renders as — the formatter never invents a number.
+  const ms = (value: number | null | undefined): string =>
+    value == null ? '—' : `${(value / 3_600_000).toFixed(2)}h`
   return [
     ['sandbox', finding.sandboxId ?? '—'],
     ['workspace', finding.workspaceId ?? '—'],
@@ -140,15 +149,15 @@ function measuredFields(finding: SpendFinding): Array<[string, string]> {
     ['overage', ms(finding.overageMs)],
     ['ceiling basis', finding.ceilingBasis ?? '—'],
     ['duration basis', finding.durationBasis ?? '—'],
-    ['window', finding.windowStartAt === null ? '—' : new Date(finding.windowStartAt).toISOString()],
-    ['window end', finding.windowEndAt === null ? '—' : new Date(finding.windowEndAt).toISOString()],
+    ['window', finding.windowStartAt == null ? '—' : new Date(finding.windowStartAt).toISOString()],
+    ['window end', finding.windowEndAt == null ? '—' : new Date(finding.windowEndAt).toISOString()],
     ['window spend', usd(finding.windowNanoUsd)],
     ['trailing median', usd(finding.trailingMedianNanoUsd)],
-    ['ratio', finding.velocityRatio === null ? '—' : `${finding.velocityRatio.toFixed(1)}x`],
+    ['ratio', finding.velocityRatio == null ? '—' : `${finding.velocityRatio.toFixed(1)}x`],
     ['balance', usd(finding.balanceNanoUsd)],
     ['balance floor', usd(finding.balanceFloorNanoUsd)],
-    ['expected boxes', finding.expectedBoxes === null ? '—' : String(finding.expectedBoxes)],
-    ['settled boxes', finding.settledBoxes === null ? '—' : String(finding.settledBoxes)],
+    ['expected boxes', finding.expectedBoxes == null ? '—' : String(finding.expectedBoxes)],
+    ['settled boxes', finding.settledBoxes == null ? '—' : String(finding.settledBoxes)],
     ['live in window', ms(finding.liveMsInWindow)],
   ]
 }
