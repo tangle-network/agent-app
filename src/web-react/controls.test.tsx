@@ -138,6 +138,15 @@ describe('effortLevelLabel', () => {
     expect(effortLevelLabel('ultra-code')).toBe('Ultra code')
     expect(effortLevelLabel('x_high')).toBe('X high')
   })
+
+  it('names the rungs above `high` that a harness actually applies', () => {
+    expect(effortLevelLabel('xhigh')).toBe('Extra')
+    expect(effortLevelLabel('ultracode')).toBe('Ultra')
+  })
+
+  it('does not OFFER those rungs by default — most backends do not apply them', () => {
+    expect(DEFAULT_EFFORT_LEVELS.map((l) => l.id)).toEqual(['off', 'low', 'medium', 'high'])
+  })
 })
 
 describe('effortLevelsFromIds', () => {

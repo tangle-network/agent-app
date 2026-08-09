@@ -602,11 +602,35 @@ export interface EffortLevel {
   label: string
 }
 
+/**
+ * The engine ids this package NAMES, and the word each one reads as.
+ *
+ * Deliberately WIDER than {@link DEFAULT_EFFORT_LEVELS}: the default list is
+ * what a picker OFFERS when a product declares nothing, while this is the
+ * vocabulary — the labels a named id keeps wherever it appears. The two are
+ * different questions, and folding them together is what made a real engine
+ * rung read as its own id: `xhigh` and `ultracode` are rungs claude-code
+ * applies above `high`, so a product declaring them got "Xhigh" while every
+ * neighbouring rung had a plain English word. Naming them here is what stops
+ * each product inventing its own — the drift `effortLevelsFromIds` exists to
+ * prevent. They stay OUT of the offered default because most backends do not
+ * apply them, and offering a rung the backend ignores is the defect
+ * `effortLevels` was added to close.
+ */
+const KNOWN_EFFORT_LABELS = {
+  off: 'Off',
+  low: 'Quick',
+  medium: 'Standard',
+  high: 'Extended',
+  xhigh: 'Extra',
+  ultracode: 'Ultra',
+} as const
+
 export const DEFAULT_EFFORT_LEVELS: readonly EffortLevel[] = [
-  { id: 'off', label: 'Off' },
-  { id: 'low', label: 'Quick' },
-  { id: 'medium', label: 'Standard' },
-  { id: 'high', label: 'Extended' },
+  { id: 'off', label: KNOWN_EFFORT_LABELS.off },
+  { id: 'low', label: KNOWN_EFFORT_LABELS.low },
+  { id: 'medium', label: KNOWN_EFFORT_LABELS.medium },
+  { id: 'high', label: KNOWN_EFFORT_LABELS.high },
 ]
 
 /**
@@ -617,8 +641,8 @@ export const DEFAULT_EFFORT_LEVELS: readonly EffortLevel[] = [
  * other level.
  */
 export function effortLevelLabel(id: string): string {
-  const known = DEFAULT_EFFORT_LEVELS.find((l) => l.id === id)
-  if (known) return known.label
+  const known = (KNOWN_EFFORT_LABELS as Record<string, string | undefined>)[id]
+  if (known) return known
   const words = id.replace(/[-_]+/g, ' ').trim()
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : id
 }
