@@ -102,7 +102,7 @@ export function SeatPaywall({
   const introductory = offer?.introductory ?? null
   return (
     <div className="flex min-h-[60vh] w-full items-center justify-center p-6">
-      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-sm">
+      <div className="w-full max-w-md rounded-2xl border border-card-edge bg-card p-8">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {product}
         </p>

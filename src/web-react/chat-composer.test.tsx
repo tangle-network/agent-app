@@ -668,15 +668,16 @@ describe('ChatComposer seed', () => {
     })
   })
 
-  it('keeps the card flat by default and floats it on a two-layer shadow when `floating`', () => {
+  it('keeps the card flat by default and floats it on the raised-elevation token when `floating`', () => {
     const { rerender } = render(<ChatComposer onSend={vi.fn()} />)
     const flat = screen.getByTestId('composer-card').className
-    expect(flat).not.toContain('shadow-[')
+    expect(flat).not.toContain('shadow-raised')
 
     rerender(<ChatComposer onSend={vi.fn()} floating />)
     const elevated = screen.getByTestId('composer-card').className
-    expect(elevated).toContain('shadow-[')
-    expect(elevated).toContain('0_12px_28px')
+    // The theme's `shadow-raised` utility — `--shadow-raised` promotes the
+    // composer's proven two-layer values unchanged (src/theme/tokens.css).
+    expect(elevated).toContain('shadow-raised')
     // Radius/ring are unchanged — elevation only.
     expect(elevated).toContain('rounded-2xl')
     expect(elevated).toContain('focus-within:ring-2')

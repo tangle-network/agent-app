@@ -321,15 +321,12 @@ export const POPOVER_OPTION_FOCUS = 'focus-visible:[outline-offset:-2px]'
 
 /**
  * The one overlay elevation for floating surfaces — picker menus, popovers,
- * drawers, modals. The theme's `shadow-overlay` utility is landing with the
- * token work; until it does, this is the composer's raised-card literal kept
- * in a single place so every overlay paints the same shadow and the later
- * token swap is a one-line edit (`shadow-overlay` here, `shadow-raised` on
- * the composer card).
- * TODO(theme): swap to `shadow-overlay` once the preset ships it.
+ * drawers, modals. Reads the theme's `--shadow-overlay` token through the
+ * preset's `shadow-overlay` utility (dark doubles the alpha at the token), so
+ * every overlay lifts with the same shadow and re-themes from one source. The
+ * floating composer uses the quieter `shadow-raised` rung instead.
  */
-export const OVERLAY_SHADOW =
-  'shadow-[0_1px_2px_hsl(var(--foreground)/0.05),0_12px_28px_hsl(var(--foreground)/0.07)] dark:shadow-[0_1px_2px_hsl(var(--foreground)/0.14),0_12px_28px_hsl(var(--foreground)/0.22)]'
+export const OVERLAY_SHADOW = 'shadow-overlay'
 
 /**
  * Guard an async action against double-submit. `run` ignores re-entrant calls
@@ -523,10 +520,10 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
         id={panelId}
         triggerRef={triggerRef}
         panelRef={panelRef}
-        className={`flex w-[420px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border border-border bg-popover ${OVERLAY_SHADOW}`}
+        className={`flex w-[420px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border border-card-edge bg-popover ${OVERLAY_SHADOW}`}
       >
           <div className="shrink-0 border-b border-border px-3 py-2">
-            <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
+            <div className="flex items-center gap-2 rounded-lg border border-strong bg-background px-3 py-2">
               <SearchGlyph className="h-3.5 w-3.5 text-muted-foreground" />
               <input
                 ref={inputRef}
@@ -796,7 +793,7 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
         role="menu"
         triggerRef={triggerRef}
         panelRef={panelRef}
-        className={`w-44 overflow-y-auto rounded-xl border border-border bg-popover p-1 ${OVERLAY_SHADOW}`}
+        className={`w-44 overflow-y-auto rounded-xl border border-card-edge bg-popover p-1 ${OVERLAY_SHADOW}`}
       >
           {rendered.map((l) => (
             <button

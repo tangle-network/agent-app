@@ -171,7 +171,7 @@ export function AssistantDock({
         type="button"
         onClick={openDialog}
         aria-label="Open assistant"
-        className="fixed right-4 bottom-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-colors hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
+        className="fixed right-4 bottom-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-raised transition-colors hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
       >
         <MessageSquare className="h-6 w-6" />
       </button>
@@ -220,7 +220,7 @@ export function AssistantDock({
         tabIndex={-1}
         onKeyDown={trapTab}
         style={isDesktop ? { width: `${width}px` } : undefined}
-        className={`fixed inset-y-0 right-0 z-50 flex w-full flex-col border-border border-l ${OVERLAY_SHADOW} focus:outline-none`}
+        className={`fixed inset-y-0 right-0 z-50 flex w-full flex-col border-card-edge border-l ${OVERLAY_SHADOW} focus:outline-none`}
       >
         <AssistantPanel
           key={userId ?? "anon"}

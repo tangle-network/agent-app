@@ -178,7 +178,7 @@ function groupColumns(
 }
 
 const INPUT_CLASS =
-  'w-full rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/40'
+  'w-full rounded-md border border-strong bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/40'
 
 const BASIS_TONES: Record<RecordGridSourceBasis, string> = {
   extracted: 'border-primary/60 text-primary',
@@ -506,7 +506,7 @@ export function RecordGrid({
           role="status"
           aria-busy="true"
           aria-live="polite"
-          className="space-y-2 rounded-xl border border-border bg-card p-4"
+          className="space-y-2 rounded-xl border border-card-edge bg-card p-4"
         >
           <span className="sr-only">Loading {caption}</span>
           {Array.from({ length: Math.max(1, loadingRowCount) }, (_, index) => (
@@ -599,7 +599,7 @@ export function RecordGrid({
   return (
     <div className={`space-y-3 ${className ?? ''}`}>
       {toolbar}
-      <div className="overflow-x-auto rounded-xl border border-border bg-card">
+      <div className="overflow-x-auto rounded-xl border border-card-edge bg-card">
         <table
           role="grid"
           aria-label={caption}
@@ -632,7 +632,7 @@ export function RecordGrid({
               const rowError = rowErrors[row.id]
               return (
                 <Fragment key={row.id}>
-                  <tr role="row" aria-busy={pending} className={`border-b border-border/50 ${pending ? 'opacity-60' : ''}`}>
+                  <tr role="row" aria-busy={pending} className={`border-b border-border ${pending ? 'opacity-60' : ''}`}>
                     {columns.map((column) => {
                       const key = cellKey(row.id, column.id)
                       const applicable = isRecordGridCellApplicable(column, row.values)
@@ -776,7 +776,7 @@ export function RecordGrid({
                     )}
                   </tr>
                   {rowError !== undefined && (
-                    <tr role="row" className="border-b border-border/50">
+                    <tr role="row" className="border-b border-border">
                       <td role="gridcell" colSpan={columnSpan} className="px-3 pb-2">
                         <p role="alert" className="rounded-md bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive">
                           {rowError}
@@ -994,7 +994,7 @@ function SourceMarker({ panelId, columnHeader, rowLabel, source, open, onToggle 
         role="note"
         triggerRef={triggerRef}
         panelRef={panelRef}
-        className={`w-64 rounded-lg border border-border bg-popover p-3 text-left ${OVERLAY_SHADOW}`}
+        className={`w-64 rounded-lg border border-card-edge bg-popover p-3 text-left ${OVERLAY_SHADOW}`}
       >
         {source.quote && (
           <span className="block border-l-2 border-primary/50 pl-2 text-xs italic leading-snug text-foreground">
@@ -1060,7 +1060,7 @@ function AddRecordForm({
         event.preventDefault()
         onSubmit()
       }}
-      className="space-y-4 rounded-xl border border-border bg-card p-4"
+      className="space-y-4 rounded-xl border border-card-edge bg-card p-4"
     >
       <h3 className="text-sm font-semibold text-foreground">{label}</h3>
       {formError !== null && (
@@ -1074,7 +1074,7 @@ function AddRecordForm({
         return (
           <fieldset
             key={group.label ?? '_'}
-            className={group.label === null ? 'min-w-0' : 'min-w-0 rounded-lg border border-border/70 p-3'}
+            className={group.label === null ? 'min-w-0' : 'min-w-0 rounded-lg border border-card-edge p-3'}
           >
             {group.label !== null && (
               <legend className="px-1 text-xs font-medium text-muted-foreground">{group.label}</legend>

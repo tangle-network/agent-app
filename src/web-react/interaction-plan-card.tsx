@@ -174,7 +174,7 @@ export function InteractionPlanCard({
   const approved = status === 'answered'
 
   return (
-    <div className={`rounded-xl border border-border bg-card p-4 shadow-sm ${className ?? ''}`}>
+    <div className={`rounded-xl border border-card-edge bg-card p-4 ${className ?? ''}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <InteractionBadge variant="outline">Plan</InteractionBadge>

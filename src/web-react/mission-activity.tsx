@@ -247,7 +247,7 @@ export function MissionActivityLane({ activity, startedAt, nowMs }: MissionActiv
   if (activity.length === 0) return null
 
   return (
-    <div className="mt-1 border-l border-border/50 pl-3">
+    <div className="mt-1 border-l border-border pl-3">
       {activity.map((run) => {
         const tone = activityTone(run.status)
         const cost = formatActivityCost(run.costUsd)
@@ -283,7 +283,7 @@ export function MissionActivityLane({ activity, startedAt, nowMs }: MissionActiv
         timeline
       </button>
       {expanded && (
-        <div className="rounded-md border border-border/50 bg-secondary p-2">
+        <div className="rounded-md border border-border bg-secondary p-2">
           <FlowWaterfall
             trace={stepActivityFlowTrace(activity, {
               ...(startedAt !== undefined ? { startedAt } : {}),
@@ -322,7 +322,7 @@ function ActivityRow({
   const duration = formatActivityDuration(record.durationMs)
 
   return (
-    <div className="rounded-lg border border-border/60 bg-card">
+    <div className="rounded-lg border border-card-edge bg-card">
       <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm">
         <StatusDot tone={tone} />
         <span className="min-w-0 flex-1 truncate">
@@ -353,9 +353,9 @@ function ActivityRow({
         <ChevronGlyph className={`h-3 w-3 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="space-y-2.5 border-t border-border/40 px-3 py-2.5">
+        <div className="space-y-2.5 border-t border-border px-3 py-2.5">
           {record.durationMs !== undefined && (
-            <div className="rounded-md border border-border/50 bg-secondary p-2">
+            <div className="rounded-md border border-border bg-secondary p-2">
               <FlowWaterfall trace={stepActivityFlowTrace([record])} />
             </div>
           )}

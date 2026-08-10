@@ -449,7 +449,7 @@ export function useSessionActions({
                 void submitRename()
               }
             }}
-            className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground"
+            className="mt-1.5 h-9 w-full rounded-md border border-strong bg-background px-3 text-sm text-foreground"
           />
         </SessionDialog>
       )}
@@ -547,7 +547,7 @@ function SessionDialog({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`relative w-full max-w-sm rounded-xl border border-border bg-popover p-5 ${OVERLAY_SHADOW}`}
+        className={`relative w-full max-w-sm rounded-xl border border-card-edge bg-popover p-5 ${OVERLAY_SHADOW}`}
       >
         <h2 className="text-sm font-semibold text-foreground">{title}</h2>
         <div className="mt-3">{children}</div>
@@ -814,20 +814,20 @@ export function SessionHistoryPanel({
                 onChange={(e) => onQueryChange(e.target.value)}
                 placeholder="Search your sessions…"
                 aria-label="Search sessions"
-                className="h-9 min-w-0 appearance-none rounded-md border border-border bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground sm:flex-1 [&::-webkit-search-cancel-button]:appearance-none"
+                className="h-9 min-w-0 appearance-none rounded-md border border-strong bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground sm:flex-1 [&::-webkit-search-cancel-button]:appearance-none"
               />
               <select
                 value={sort}
                 onChange={(e) => onSortChange(e.target.value as SessionSort)}
                 aria-label="Sort sessions"
-                className="h-9 shrink-0 appearance-none rounded-md border border-border bg-card px-2 text-sm text-foreground sm:w-[132px]"
+                className="h-9 shrink-0 appearance-none rounded-md border border-strong bg-card px-2 text-sm text-foreground sm:w-[132px]"
               >
                 <option value="newest">Newest</option>
                 <option value="oldest">Oldest</option>
               </select>
             </div>
             {onBulkAction && (
-              <div className={`flex flex-col gap-2 border-t border-border/60 px-3 py-3 ${column}`}>
+              <div className={`flex flex-col gap-2 border-t border-border px-3 py-3 ${column}`}>
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
@@ -870,7 +870,7 @@ export function SessionHistoryPanel({
                     value={ageDays}
                     onChange={(event) => setAgeDays(event.target.value)}
                     aria-invalid={ageDays.length > 0 && !validAgeDays}
-                    className="h-8 w-20 rounded-md border border-border bg-card px-2 text-xs tabular-nums text-foreground"
+                    className="h-8 w-20 rounded-md border border-strong bg-card px-2 text-xs tabular-nums text-foreground"
                   />
                   <span className="text-xs text-muted-foreground">days</span>
                   <button
@@ -1055,7 +1055,7 @@ function SessionRow({
   const showUnread = Boolean(session.unread) && !responding
 
   return (
-    <div className="group relative flex items-center gap-2 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent">
+    <div className={`group relative flex items-center gap-2 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent ${selected ? 'bg-primary/10' : ''}`}>
       {selectable && (
         <input
           type="checkbox"
@@ -1097,7 +1097,7 @@ function SessionRow({
             role="menu"
             triggerRef={triggerRef}
             panelRef={panelRef}
-            className={`w-36 overflow-hidden rounded-md border border-border bg-popover py-1 ${OVERLAY_SHADOW}`}
+            className={`w-36 overflow-hidden rounded-md border border-card-edge bg-popover py-1 ${OVERLAY_SHADOW}`}
           >
             {onRename && (
               <button

@@ -130,7 +130,7 @@ function HarnessPicker({
         triggerRef={triggerRef}
         panelRef={panelRef}
         matchTriggerWidth
-        className={`max-h-64 min-w-[248px] overflow-y-auto rounded-xl border border-border bg-popover p-1 ${OVERLAY_SHADOW}`}
+        className={`max-h-64 min-w-[248px] overflow-y-auto rounded-xl border border-card-edge bg-popover p-1 ${OVERLAY_SHADOW}`}
       >
           {options.map((h) => (
             <button
@@ -293,7 +293,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
             id={panelId}
             triggerRef={triggerRef}
             panelRef={panelRef}
-            className={`w-72 space-y-3 overflow-y-auto rounded-xl border border-border bg-popover p-3 ${OVERLAY_SHADOW}`}
+            className={`w-72 space-y-3 overflow-y-auto rounded-xl border border-card-edge bg-popover p-3 ${OVERLAY_SHADOW}`}
           >
               {showHarness && (
                 <div className="space-y-1.5">

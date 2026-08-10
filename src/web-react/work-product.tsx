@@ -347,7 +347,7 @@ export function EvidenceLineageTable({ evidence, resolveSourceUrl, className }: 
             const url = resolveSourceUrl?.(entry)
             const locator = locatorLabel(entry)
             return (
-              <tr key={entry.id} className="border-b border-border/50 align-top">
+              <tr key={entry.id} className="border-b border-border align-top">
                 <td className="py-2 pr-3 font-mono text-xs text-foreground">{entry.target}</td>
                 <td className="py-2 pr-3 text-[13px] leading-snug text-foreground">
                   {entry.claim}

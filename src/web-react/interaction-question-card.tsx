@@ -132,7 +132,7 @@ export function QuestionOptionList({
         // accessible NAME must be the option label alone — the description is
         // linked as aria-describedby, not folded into the name.
         return (
-          <label key={`${option.value}-${optionIndex}`} htmlFor={inputId} className="flex cursor-pointer gap-2 rounded-lg border border-border/70 p-3 transition-colors hover:bg-accent">
+          <label key={`${option.value}-${optionIndex}`} htmlFor={inputId} className="flex cursor-pointer gap-2 rounded-lg border border-strong p-3 transition-colors hover:bg-accent">
             <input
               id={inputId}
               type={multi ? 'checkbox' : 'radio'}
@@ -409,7 +409,7 @@ export function InteractionQuestionCard({
   }
 
   return (
-    <div className={`rounded-xl border border-border bg-card p-4 shadow-sm ${className ?? ''}`}>
+    <div className={`rounded-xl border border-card-edge bg-card p-4 ${className ?? ''}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <InteractionBadge variant="outline">{kindLabel ?? 'Question'}</InteractionBadge>

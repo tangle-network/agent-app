@@ -196,7 +196,7 @@ function SourceRow({
   const openable = status === 'ready' && (onOpenSource !== undefined || source.href !== undefined)
 
   return (
-    <li className="rounded-md border border-border/60 bg-background/40 px-2.5 py-2">
+    <li className="rounded-md border border-card-edge bg-card px-2.5 py-2">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="text-[13px] font-medium text-foreground">{source.label}</span>
         {source.locator && <span className="text-[11px] text-muted-foreground">{source.locator}</span>}
@@ -440,7 +440,7 @@ export function ProvenanceValue({
           )}
 
           {inputs.length > 0 && (
-            <div className="border-t border-border/60 pt-2">
+            <div className="border-t border-border pt-2">
               <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                 {record.derivation ? `Computed from ${record.derivation}` : 'Computed from'}
               </p>
