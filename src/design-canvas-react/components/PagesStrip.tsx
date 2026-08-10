@@ -138,7 +138,7 @@ export function PagesStrip({
               'group relative flex shrink-0 flex-col items-center gap-1 rounded p-1 transition',
               isActive
                 ? 'ring-2 ring-[var(--brand-primary)]'
-                : 'hover:bg-[color-mix(in_srgb,var(--border-default)_40%,transparent)]',
+                : 'hover:bg-[hsl(var(--accent))]',
               dragOverIndex === index ? 'ring-1 ring-[color-mix(in_srgb,var(--brand-primary)_60%,transparent)]' : '',
             ].join(' ')}
           >

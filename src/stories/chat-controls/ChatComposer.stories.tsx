@@ -33,7 +33,7 @@ function Demo({ title, children }: { title: string; children: ReactNode }) {
       <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
         {title}
       </h3>
-      <div className="rounded-2xl border border-border bg-card/40 p-4">{children}</div>
+      <div className="rounded-2xl border border-card-edge bg-card p-4">{children}</div>
     </section>
   )
 }

@@ -583,7 +583,7 @@ export function ChatComposer({
       onDrop={onAttach ? handleDrop : undefined}
     >
       {dragOver && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl border-2 border-dashed border-primary/50 bg-card/95">
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl border-2 border-dashed border-primary/50 bg-card">
           <div className="text-center">
             <span className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <UploadGlyph className="h-5 w-5" />
@@ -677,10 +677,8 @@ export function ChatComposer({
           controls out of the card in the first place. */}
       <div
         data-testid="composer-card"
-        className={`flex flex-col gap-1.5 rounded-2xl border border-border bg-card px-3 py-2.5 transition focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15 ${
-          floating
-            ? 'shadow-[0_1px_2px_hsl(var(--foreground)/0.05),0_12px_28px_hsl(var(--foreground)/0.07)] dark:shadow-[0_1px_2px_hsl(var(--foreground)/0.14),0_12px_28px_hsl(var(--foreground)/0.22)]'
-            : ''
+        className={`flex flex-col gap-1.5 rounded-2xl border border-card-edge bg-card px-3 py-2.5 transition focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15 ${
+          floating ? 'shadow-raised' : ''
         }`}
       >
         <textarea

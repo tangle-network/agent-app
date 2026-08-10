@@ -97,7 +97,7 @@ export function CanvasEmptyState({
       role="group"
       aria-label="Start your design"
     >
-      <div className="pointer-events-auto flex w-full max-w-lg flex-col items-center gap-5 rounded-xl border border-[var(--border-default)] bg-[color-mix(in_srgb,var(--bg-input)_95%,transparent)] px-6 py-7 text-center shadow-xl backdrop-blur sm:px-8">
+      <div className="pointer-events-auto flex w-full max-w-lg flex-col items-center gap-5 rounded-xl border border-[var(--card-edge)] bg-[hsl(var(--popover))] px-6 py-7 text-center shadow-[var(--shadow-overlay)] sm:px-8">
         <span className="flex items-center gap-2 text-[var(--text-muted)]">
           <BrandKnot size={22} className="shrink-0" />
           <span className="text-[11px] font-semibold uppercase tracking-[0.05em]">Tangle Design</span>

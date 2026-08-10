@@ -123,7 +123,7 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
               }}
               className={[
                 'group flex items-center gap-1.5 py-1 pr-2 text-sm transition-colors',
-                isSelected ? 'bg-[color-mix(in_srgb,var(--brand-primary)_15%,transparent)] text-[var(--text-primary)]' : 'hover:bg-[color-mix(in_srgb,var(--border-default)_40%,transparent)] text-[var(--text-secondary)]',
+                isSelected ? 'bg-[color-mix(in_srgb,var(--brand-primary)_15%,transparent)] text-[var(--text-primary)]' : 'hover:bg-[hsl(var(--accent))] text-[var(--text-secondary)]',
                 dragOverIndex === row.ownerIndex ? 'border-t border-[var(--brand-primary)]' : '',
               ].join(' ')}
               style={{ paddingLeft: 8 + row.depth * INDENT_PX }}

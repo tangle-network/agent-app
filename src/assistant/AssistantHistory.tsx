@@ -124,7 +124,7 @@ export function AssistantHistory({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search conversations"
             aria-label="Search conversations"
-            className="w-full rounded-md border border-border bg-surface-container-high py-1.5 pr-2 pl-8 text-foreground text-sm placeholder:text-muted-foreground"
+            className="w-full rounded-md border border-strong bg-surface-container-high py-1.5 pr-2 pl-8 text-foreground text-sm placeholder:text-muted-foreground"
           />
         </div>
       </div>
@@ -153,7 +153,9 @@ export function AssistantHistory({
                   <li
                     key={t.id}
                     className={`group flex items-center transition-colors hover:bg-accent ${
-                      active ? "bg-primary/10" : ""
+                      active
+                        ? "bg-primary/10 shadow-[inset_2px_0_0_hsl(var(--primary))]"
+                        : ""
                     }`}
                   >
                     <button

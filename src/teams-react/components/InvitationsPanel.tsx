@@ -188,7 +188,7 @@ function InvitationRow({ invitation, canManage, busy, onCopy, onResend, onRevoke
   })
 
   return (
-    <div className="rounded-lg border border-[var(--border-default)] p-3">
+    <div className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-input)] p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-[var(--text-primary)]">{invitation.email}</p>

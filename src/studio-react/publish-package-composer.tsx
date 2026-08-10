@@ -42,7 +42,7 @@ export function PublishPackageComposer({
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         {connectionError ? (
-          <div className="flex items-center gap-2 rounded-md border border-warning/20 bg-warning/5 px-2.5 py-1.5 text-xs text-warning">
+          <div className="flex items-center gap-2 rounded-md border border-warning/25 bg-warning/10 px-2.5 py-1.5 text-xs text-warning">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
             Couldn't load connected apps. Check Integrations.
           </div>

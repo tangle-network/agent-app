@@ -17801,7 +17801,7 @@
         {
           "name": "OVERLAY_SHADOW",
           "kind": "const",
-          "signature": "\"shadow-[0_1px_2px_hsl(var(--foreground)/0.05),0_12px_28px_hsl(var(--foreground)/0.07)] dark:shadow-[0_1px_2px_hsl(var(…",
+          "signature": "\"shadow-overlay\"",
           "doc": "The one overlay elevation for floating surfaces — picker menus, popovers, drawers, modals."
         },
         {

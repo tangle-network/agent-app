@@ -97,9 +97,11 @@ export function GenerationStatusBadge({
   if (status === 'succeeded') return null
 
   const label = status === 'failed' ? 'Failed' : status === 'running' ? 'Running' : 'Pending'
+  // Solid tint mixed onto the card surface — the badge floats over media, so an
+  // alpha fill would let the thumbnail bleed through.
   const className = status === 'failed'
-    ? 'border-destructive/25 bg-destructive/10 text-destructive'
-    : 'border-warning/25 bg-warning/10 text-warning'
+    ? 'border-destructive/30 bg-[color-mix(in_srgb,hsl(var(--destructive))_10%,hsl(var(--card)))] text-destructive'
+    : 'border-warning/30 bg-[color-mix(in_srgb,hsl(var(--warning))_10%,hsl(var(--card)))] text-warning'
 
   return (
     <div className={inline ? '' : 'absolute bottom-2 left-2'}>

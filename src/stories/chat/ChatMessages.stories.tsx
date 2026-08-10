@@ -13,6 +13,7 @@ import {
   usageReportMessage,
 } from './fixtures'
 import { renderMarkdown } from './markdown'
+import { WithRunDrillIn } from './run-drill-in'
 
 /** Approve/Reject wired to the console — the proposal card's live affordance. */
 const approval = {
@@ -93,8 +94,12 @@ export const LongHistory: Story = {
   args: {
     messages: chatThread,
     approval,
-    onToolCallClick: (call: ChatToolCallInfo) => console.log('open run transcript', call.id),
   },
+  render: (args) => (
+    <WithRunDrillIn>
+      {(onToolCallClick) => <ChatMessages {...args} onToolCallClick={onToolCallClick} />}
+    </WithRunDrillIn>
+  ),
 }
 
 /** A turn in flight: the last assistant message types out with the caret, its
@@ -158,7 +163,7 @@ export const CustomToolRenderer: Story = {
           | undefined
         const r = outcome?.result ?? {}
         return (
-          <div className="flex items-center gap-4 rounded-md border border-border/60 bg-card px-3 py-2">
+          <div className="flex items-center gap-4 rounded-md border border-card-edge bg-card px-3 py-2">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Prompt</p>
               <p className="font-mono text-sm text-foreground">{(r.promptTokens ?? 0).toLocaleString()}</p>
@@ -246,9 +251,13 @@ export const QuietLongHistory: Story = {
   args: {
     messages: chatThread,
     approval,
-    onToolCallClick: (call: ChatToolCallInfo) => console.log('open run transcript', call.id),
     chrome: 'quiet',
   },
+  render: (args) => (
+    <WithRunDrillIn>
+      {(onToolCallClick) => <ChatMessages {...args} onToolCallClick={onToolCallClick} />}
+    </WithRunDrillIn>
+  ),
 }
 
 /** Quiet chrome with a turn in flight: streaming text, running tool call, and

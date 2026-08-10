@@ -152,7 +152,7 @@ export interface RunDrillInProps {
  */
 export function RunDrillIn({ run, onClose }: RunDrillInProps) {
   return (
-    <div className={`fixed inset-y-0 right-0 z-50 flex w-[480px] max-w-full flex-col border-l border-border bg-popover ${OVERLAY_SHADOW}`}>
+    <div className={`fixed inset-y-0 right-0 z-50 flex w-[480px] max-w-full flex-col border-l border-card-edge bg-popover ${OVERLAY_SHADOW}`}>
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
         <span
           className={`h-2 w-2 shrink-0 rounded-full ${
@@ -179,8 +179,8 @@ export function RunDrillIn({ run, onClose }: RunDrillInProps) {
           <p className="text-sm text-muted-foreground">No steps recorded yet.</p>
         )}
         {run.steps.map((step, i) => (
-          <div key={i} className="rounded-lg border border-border/60 bg-background">
-            <div className="flex items-baseline gap-2 border-b border-border/40 px-3 py-1.5">
+          <div key={i} className="rounded-lg border border-card-edge bg-card">
+            <div className="flex items-baseline gap-2 border-b border-border px-3 py-1.5">
               <span className={`font-mono text-[11px] ${step.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>
                 {step.status === 'error' ? '✗' : '$'}
               </span>
@@ -1166,7 +1166,7 @@ function AssistantMessageImpl({
         </div>
       )}
       {reasoning && (
-        <details className="mb-2 rounded-lg border-l-2 border-border/70 bg-secondary px-3 py-2" open={!hasAnswerText}>
+        <details className="mb-2 rounded-lg border-l-2 border-border bg-secondary px-3 py-2" open={!hasAnswerText}>
           <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
             {!hasAnswerText ? (
               <span className="animate-pulse">
