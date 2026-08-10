@@ -266,3 +266,49 @@ describe('effortMeterFill — a sentinel has no rung', () => {
     expect(effortMeterFill('none', withAuto)).toBe(0)
   })
 })
+
+/**
+ * `EffortPicker` is a PUBLISHED export, so the width switch has to be opt-in:
+ * a product mounting it bare on a composer row keeps the shrink-wrapped pill it
+ * has today, and only a caller that asks for `fullWidth` — the compact
+ * `AgentSessionControls` gear popover does — gets an expanding one.
+ *
+ * The panel is portaled, so a full-width TRIGGER does not widen its menu on its
+ * own: `matchTriggerWidth` is what carries the width across the portal, and
+ * that is asserted here because jsdom reports every rect as zero and cannot see
+ * the resulting pixels.
+ */
+describe('EffortPicker width', () => {
+  function root(trigger: HTMLElement): HTMLElement {
+    const parent = trigger.parentElement
+    if (!parent) throw new Error('picker root did not render')
+    return parent
+  }
+
+  it('shrink-wraps by default', () => {
+    render(<EffortPicker value="medium" onChange={() => {}} />)
+    const trigger = screen.getByRole('button', { expanded: false })
+    expect(root(trigger).className).toContain('inline-flex')
+    expect(root(trigger).className).not.toContain('w-full')
+    expect(trigger.className).not.toContain('w-full')
+  })
+
+  it('fills its container when asked', () => {
+    render(<EffortPicker value="medium" onChange={() => {}} fullWidth />)
+    const trigger = screen.getByRole('button', { expanded: false })
+    expect(root(trigger).className).toContain('w-full')
+    expect(root(trigger).className).not.toContain('inline-flex')
+    expect(trigger.className).toContain('w-full')
+  })
+
+  it('carries the trigger width across the portal only when full width', () => {
+    const { unmount } = render(<EffortPicker value="medium" onChange={() => {}} fullWidth />)
+    openPicker()
+    expect(screen.getByRole('menu').getAttribute('style')).toContain('min-width')
+    unmount()
+
+    render(<EffortPicker value="medium" onChange={() => {}} />)
+    openPicker()
+    expect(screen.getByRole('menu').getAttribute('style')).not.toContain('min-width')
+  })
+})

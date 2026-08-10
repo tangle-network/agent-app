@@ -67,6 +67,24 @@ export const NoLabel: Story = {
   args: { value: 'low', onChange: () => {}, label: '' },
 }
 
+/**
+ * `fullWidth` — the opt-in the compact `AgentSessionControls` popover uses. The
+ * default pill (top) shrink-wraps so a composer row's neighbours stay put; the
+ * `fullWidth` pill (bottom) fills the stack and parks its chevron on the
+ * trailing edge. Both are shown against the same box so the difference is the
+ * point of the story.
+ */
+export const FullWidth: Story = {
+  name: 'Full width (stacked panel)',
+  parameters: { layout: 'padded' },
+  render: () => (
+    <div className="w-72 space-y-3 rounded-xl border border-border bg-card p-3">
+      <EffortPicker value="medium" onChange={() => {}} label="" />
+      <EffortPicker value="medium" onChange={() => {}} label="" fullWidth />
+    </div>
+  ),
+}
+
 /** All four default levels side by side. */
 export const AllStates: Story = {
   name: 'All states',
