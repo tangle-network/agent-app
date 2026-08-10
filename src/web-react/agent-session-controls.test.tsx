@@ -80,3 +80,92 @@ describe('AgentSessionControls coherence', () => {
     expect(onHarnessChange).toHaveBeenCalledWith('codex')
   })
 })
+
+/**
+ * Compact-popover GEOMETRY. jsdom computes no layout, so what is pinned is the
+ * class contract that produces it: a full-width control is a `w-full` trigger
+ * whose ROOT also expands — a `w-full` button inside a shrink-wrapped root
+ * fills a box the button itself sized, which is exactly the shipped defect
+ * (#414: Agent backend stopped short of the popover edge, Thinking was
+ * narrower still). The inline half is asserted in the same file because the
+ * fix is only correct if it did NOT expand the composer-row pills.
+ */
+function harnessTrigger(): HTMLElement {
+  return screen.getByTitle('Agent backend')
+}
+
+function effortTrigger(): HTMLElement {
+  const el = screen.getByTitle(/^Thinking|^Reasoning effort/)
+  if (!(el instanceof HTMLButtonElement)) throw new Error('effort trigger did not render')
+  return el
+}
+
+/** The picker root — the box that holds the trigger. */
+function rootOf(trigger: HTMLElement): HTMLElement {
+  const root = trigger.parentElement
+  if (!root) throw new Error('picker root did not render')
+  return root
+}
+
+function openGear(): void {
+  fireEvent.click(screen.getByTitle(/^Model settings/))
+}
+
+/** The one panel currently open, wherever the portal put it. */
+function openMenu(): HTMLElement {
+  return screen.getByRole('menu')
+}
+
+describe('AgentSessionControls compact geometry', () => {
+  it('gives Agent backend and Thinking full-width roots and triggers', () => {
+    renderControls({ layout: 'compact' })
+    openGear()
+
+    for (const trigger of [harnessTrigger(), effortTrigger()]) {
+      expect(trigger.className).toContain('w-full')
+      expect(rootOf(trigger).className).toContain('w-full')
+      expect(rootOf(trigger).className).not.toContain('inline-flex')
+    }
+  })
+
+  it('gives both controls the canonical pill radius', () => {
+    renderControls({ layout: 'compact' })
+    openGear()
+
+    for (const trigger of [harnessTrigger(), effortTrigger()]) {
+      expect(trigger.className).toContain('rounded-full')
+      expect(trigger.className).not.toContain('rounded-lg')
+    }
+  })
+
+  // The menus are portaled to `<body>`, so a widened trigger cannot widen them
+  // by containment — `matchTriggerWidth` is the only thing that carries the
+  // width across, and it lands as an inline `min-width` on the panel.
+  it('carries both trigger widths across the portal to their menus', () => {
+    renderControls({ layout: 'compact' })
+    openGear()
+
+    fireEvent.click(harnessTrigger())
+    expect(openMenu().getAttribute('style')).toContain('min-width')
+    fireEvent.click(harnessTrigger())
+
+    fireEvent.click(effortTrigger())
+    expect(openMenu().getAttribute('style')).toContain('min-width')
+  })
+})
+
+describe('AgentSessionControls inline geometry', () => {
+  it('keeps the composer-row pills intrinsically sized', () => {
+    renderControls()
+
+    for (const trigger of [harnessTrigger(), effortTrigger()]) {
+      expect(rootOf(trigger).className).toContain('inline-flex')
+      expect(rootOf(trigger).className).not.toContain('w-full')
+    }
+  })
+
+  it('still matches the canonical pill radius', () => {
+    renderControls()
+    expect(harnessTrigger().className).toContain('rounded-full')
+  })
+})

@@ -22304,7 +22304,7 @@ interface EffortLevel
 `function` — Thinking-budget selector pill, styled to match {@link ModelPicker}.
 
 ```ts
-({ value, onChange, levels, label }: EffortPickerProps) => Element
+({ value, onChange, levels, label, fullWidth }: EffortPickerProps) => Element
 ```
 
 ### `EffortPickerProps`

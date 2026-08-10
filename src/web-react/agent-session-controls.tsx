@@ -44,7 +44,7 @@ import {
   type Harness,
 } from '../harness'
 import type { CatalogModel } from '../runtime/model-catalog'
-import { ModelPicker, EffortPicker, CheckGlyph, OVERLAY_SHADOW, PopoverSurface, usePopover } from './controls'
+import { ModelPicker, EffortPicker, CheckGlyph, OVERLAY_SHADOW, pickerRootClass, PopoverSurface, usePopover } from './controls'
 import type { EffortLevel } from './controls'
 import { HarnessGlyph } from './harness-glyphs'
 
@@ -91,31 +91,44 @@ function GearGlyph({ className }: { className?: string }) {
 const FOCUS_RING =
   ''
 
-/** Pill-styled harness picker — inline, no sandbox-ui dependency. The brand
- *  marks come from `./harness-glyphs` (the set the legacy sandbox-ui picker
- *  shipped, vendored inline). */
+/**
+ * Pill-styled harness picker — inline, no sandbox-ui dependency. The brand
+ * marks come from `./harness-glyphs` (the set the legacy sandbox-ui picker
+ * shipped, vendored inline).
+ *
+ * `rounded-full` + `min-h-[36px]`, not `rounded-lg` at whatever height the
+ * padding gives: this pill sits beside `ModelPicker` and `EffortPicker` in
+ * both layouts, and both of those are 36px pills. A single odd-shaped control
+ * is what made the compact popover read as a pile of unrelated widgets rather
+ * than one selector stack.
+ *
+ * `fullWidth` is opt-in and means what it means on `EffortPicker` — see
+ * {@link pickerRootClass}.
+ */
 function HarnessPicker({
   value,
   onChange,
   available,
+  fullWidth = false,
 }: {
   value: Harness
   onChange: (h: Harness) => void
   available?: ReadonlyArray<Harness>
+  fullWidth?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
   const panelId = useId()
   const options = available ?? (Object.keys(HARNESS_LABELS) as Harness[])
   return (
-    <div ref={containerRef} className="relative inline-flex">
+    <div ref={containerRef} className={pickerRootClass(fullWidth)}>
       <button
         type="button"
         {...triggerProps}
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen(!open)}
         title="Agent backend"
-        className={`inline-flex w-full items-center justify-between gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent ${FOCUS_RING}`}
+        className={`inline-flex min-h-[36px] w-full items-center justify-between gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent ${FOCUS_RING}`}
       >
         <span className="flex min-w-0 items-center gap-1.5">
           <HarnessGlyph harness={value} className="h-4 w-4 shrink-0 text-foreground" />
@@ -298,7 +311,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
               {showHarness && (
                 <div className="space-y-1.5">
                   <p className="text-xs font-medium text-foreground">Agent backend</p>
-                  <HarnessPicker value={harness} onChange={onHarness} available={availableHarnesses} />
+                  <HarnessPicker value={harness} onChange={onHarness} available={availableHarnesses} fullWidth />
                   <p className="text-[11px] leading-snug text-muted-foreground">
                     The engine that runs the agent. Switching it keeps your model choice compatible.
                   </p>
@@ -307,7 +320,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
               {showEffort && (
                 <div className="space-y-1.5">
                   <p className="text-xs font-medium text-foreground">Thinking</p>
-                  <EffortPicker value={effort} onChange={onEffortChange} levels={effortLevels} label="" />
+                  <EffortPicker value={effort} onChange={onEffortChange} levels={effortLevels} label="" fullWidth />
                   <p className="text-[11px] leading-snug text-muted-foreground">
                     How hard the agent thinks before answering. Higher is slower but more thorough.
                   </p>

@@ -329,6 +329,25 @@ export const POPOVER_OPTION_FOCUS = 'focus-visible:[outline-offset:-2px]'
 export const OVERLAY_SHADOW = 'shadow-overlay'
 
 /**
+ * Root geometry for a picker — the box that holds the trigger — in one place
+ * because every picker in this family has to agree on it.
+ *
+ * Shrink-wrapping (`inline-flex`) is the default: these controls dock on a
+ * composer row where an expanding pill shoves its neighbours around. A STACKED
+ * panel wants the opposite — the compact `AgentSessionControls` gear popover
+ * lays its controls out in a column, and a shrink-wrapped root there makes a
+ * trigger's own `w-full` a no-op, since it fills a box the trigger itself
+ * sized. That is what left Agent backend short of the panel edge and Thinking
+ * narrower still.
+ *
+ * The panel is portaled ({@link PopoverSurface}), so widening the root widens
+ * the TRIGGER only. A menu that should follow it declares `matchTriggerWidth`.
+ */
+export function pickerRootClass(fullWidth: boolean): string {
+  return `relative ${fullWidth ? 'flex w-full' : 'inline-flex'}`
+}
+
+/**
  * Guard an async action against double-submit. `run` ignores re-entrant calls
  * while a promise is in flight and flips `pending` so the caller can disable
  * the control — the fix for double-charge / double-approve on a slow network.
@@ -758,6 +777,9 @@ export interface EffortPickerProps {
   /** Prefix shown before the active level on the pill — the "what is this"
    *  context the bare value lacked. Default "Thinking". Pass '' to hide it. */
   label?: string
+  /** Fill the container instead of shrink-wrapping — opt-in, default `false`;
+   *  see {@link pickerRootClass} for when and why. */
+  fullWidth?: boolean
 }
 
 /** Thinking-budget selector pill, styled to match {@link ModelPicker}. Show
@@ -766,7 +788,7 @@ export interface EffortPickerProps {
  *
  *  The CANONICAL ecosystem effort picker — sandbox-ui's reasoning menu (inside
  *  its `chat/AgentSessionControls`) is legacy and frozen. */
-export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, label = 'Thinking' }: EffortPickerProps) {
+export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, label = 'Thinking', fullWidth = false }: EffortPickerProps) {
   const [open, setOpen] = useState(false)
   const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
   const panelId = useId()
@@ -780,24 +802,26 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
   const selected = rendered.find((l) => l.id === value)
 
   return (
-    <div ref={containerRef} className="relative inline-flex">
+    <div ref={containerRef} className={pickerRootClass(fullWidth)}>
       <button
         type="button"
         {...triggerProps}
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen(!open)}
         title={label ? `${label} — how hard the agent reasons before answering` : 'Reasoning effort'}
-        className="inline-flex min-h-[36px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent"
+        className={`inline-flex min-h-[36px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent ${fullWidth ? 'w-full' : ''}`}
       >
-        <BrainGlyph className="h-3.5 w-3.5 text-muted-foreground" />
-        <span>
+        <BrainGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        {/* Full width gives the label the slack, so the meter and chevron park
+            on the trailing edge and the glyph stays against the text. */}
+        <span className={fullWidth ? 'flex-1 truncate text-left' : undefined}>
           {label ? <span className="text-muted-foreground">{label}: </span> : null}
           {selected ? selected.label : '—'}
         </span>
         {selected && isDeclared(selected.id) && (
-          <EffortMeter fill={effortMeterFill(selected.id, levels)} className="text-foreground" />
+          <EffortMeter fill={effortMeterFill(selected.id, levels)} className="shrink-0 text-foreground" />
         )}
-        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       </button>
       <PopoverSurface
         open={open}
@@ -805,6 +829,9 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
         role="menu"
         triggerRef={triggerRef}
         panelRef={panelRef}
+        // A portaled panel has no `w-full` to inherit, so a full-width trigger
+        // hands its measured width to the panel instead.
+        matchTriggerWidth={fullWidth}
         className={`w-44 overflow-y-auto rounded-xl border border-card-edge bg-popover p-1 ${OVERLAY_SHADOW}`}
       >
           {rendered.map((l) => (

@@ -73,7 +73,12 @@ export const Compact: Story = {
   render: () => useSessionControls({ layout: 'compact' }),
 }
 
-/** Compact with the gear popover held open — the plain-English settings copy. */
+/**
+ * Compact with the gear popover held open — the plain-English settings copy,
+ * and the state to eyeball for #414: Agent backend and Thinking must both
+ * reach the panel's inner edge and carry the same pill radius as the model
+ * selector, so the panel reads as one control stack.
+ */
 export const CompactOpen: Story = {
   name: 'Compact — gear open',
   decorators: [withPopoverHeadroom],

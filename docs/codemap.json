@@ -17261,7 +17261,7 @@
         {
           "name": "EffortPicker",
           "kind": "function",
-          "signature": "({ value, onChange, levels, label }: EffortPickerProps) => Element",
+          "signature": "({ value, onChange, levels, label, fullWidth }: EffortPickerProps) => Element",
           "doc": "Thinking-budget selector pill, styled to match {@link ModelPicker}."
         },
         {
