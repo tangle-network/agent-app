@@ -3,7 +3,7 @@
  * package-wide generalization of it.
  *
  * `tests/web-react/popover-escapes-host.test.tsx` proves that the popovers
- * which exist TODAY portal out of a clipping host. It cannot see the fifth
+ * which exist TODAY portal out of a clipping host. It cannot see the sixth
  * picker someone adds next month the old way, and the old way is what took the
  * model and thinking menus off the screen in production: an `absolute` panel
  * anchored inside its trigger's container, whose visibility is then decided by
@@ -16,8 +16,8 @@
  *
  * Two scopes, on purpose:
  *  - "picker canon" pins the picker cluster named in AGENTS.md ("UI chrome
- *    ownership") to EXACTLY four `PopoverSurface` uses, so deleting the portal
- *    from one of the four cannot pass by leaving the other three intact.
+ *    ownership") to EXACTLY five `PopoverSurface` uses, so deleting the portal
+ *    from one of the five cannot pass by leaving the other four intact.
  *  - "web-react popovers" is the class-level gate: every non-test `.tsx` file
  *    directly under `/web-react` is scanned for the same `bg-popover` +
  *    `absolute` anti-pattern, not just the canon files. The session-history
@@ -25,7 +25,7 @@
  *    they are migrated to `PopoverSurface` now — and this second describe
  *    block is what stops a THIRD one from shipping quietly: the defect is
  *    unrepresentable anywhere a `bg-popover` surface is authored on this
- *    subpath, not merely absent from the four files someone remembered to
+ *    subpath, not merely absent from the picker files someone remembered to
  *    check. (Scope is `/web-react`, not the whole package: `design-canvas-react`
  *    is a separate design system — its own local `Popover` helper, its own
  *    `--bg-input` CSS-var tokens instead of `bg-popover` — reviewed and
@@ -74,13 +74,13 @@ describe('picker canon: no in-place floating panel', () => {
 
   it('every canonical picker renders its panel through PopoverSurface', () => {
     // A panel that is not a `PopoverSurface` is not portaled, whatever else it
-    // declares. Counting them pins the four the canon ships, so deleting the
-    // portal from one of them cannot pass by leaving the other three intact.
+    // declares. Counting them pins the five the canon ships, so deleting the
+    // portal from one of them cannot pass by leaving the other four intact.
     const surfaces = CANON_FILES.reduce((total, file) => {
       const source = readFileSync(join(repoRoot, file), 'utf8')
       return total + (source.match(/<PopoverSurface\b/g)?.length ?? 0)
     }, 0)
-    expect(surfaces).toBe(4)
+    expect(surfaces).toBe(5)
   })
 })
 
