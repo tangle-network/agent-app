@@ -27,9 +27,9 @@ function GhostLane({
   laneWidth: number
 }) {
   return (
-    <div className="flex border-b border-[var(--border-default)] last:border-b-0 opacity-60">
+    <div className="flex border-b border-[var(--border-soft)] last:border-b-0">
       <div
-        className={`sticky left-0 z-10 flex w-36 shrink-0 items-center gap-2 border-r border-[var(--border-default)] bg-[var(--bg-input)] px-2.5 ${height}`}
+        className={`sticky left-0 z-10 flex w-36 shrink-0 items-center gap-2 border-r border-[var(--border-soft)] bg-[var(--bg-input)] px-2.5 ${height}`}
       >
         <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--text-muted)]">{label}</span>

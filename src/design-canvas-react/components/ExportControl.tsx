@@ -75,7 +75,7 @@ export function ExportControl({ defaults, onExport, className }: ExportControlPr
               setOpen(false)
             }
           }}
-          className="absolute right-0 top-full z-50 mt-1 flex w-52 flex-col gap-3 rounded-md border border-[var(--border-default)] bg-[var(--bg-input)] p-3 shadow-lg"
+          className="absolute right-0 top-full z-50 mt-1 flex w-52 flex-col gap-3 rounded-md border border-[var(--card-edge)] bg-[hsl(var(--popover))] p-3 shadow-[var(--shadow-overlay)]"
         >
           <div className="flex flex-col gap-1.5">
             <span className="text-[11px] font-medium text-[var(--text-muted)]">Format</span>
