@@ -398,7 +398,7 @@ export function AssistantPanel({
   };
 
   return (
-    <div className="relative flex h-full flex-col bg-popover">
+    <div className="relative flex h-full flex-col bg-card">
       {/* Header: identity + active-conversation title, and the conversation-level
           actions (text size, history, new, close). */}
       <div className="border-border border-b">
