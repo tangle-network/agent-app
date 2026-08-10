@@ -169,3 +169,105 @@ describe('AgentSessionControls inline geometry', () => {
     expect(harnessTrigger().className).toContain('rounded-full')
   })
 })
+
+/**
+ * The LOCKED harness contract. A thread that already has messages cannot change
+ * backend, and the shape that state has to keep is a visible selector reporting
+ * the harness the thread is on — hiding it (`showHarness: false`) is what drove
+ * products to render their own lock label outside the panel, which is the
+ * regression this replaces.
+ *
+ * The lock is asserted by BEHAVIOUR (no menu, no `onHarnessChange`) rather than
+ * by the presence of a disabled attribute, because the native `disabled` is
+ * exactly what this must not use: it drops the control out of the tab order and
+ * swallows pointer events, so the one control with something to explain becomes
+ * the one that cannot be asked.
+ */
+const LOCK_REASON = 'This thread already has messages — start a new chat to switch backend.'
+
+describe('AgentSessionControls locked harness', () => {
+  it('keeps the backend visible and reporting the current harness', () => {
+    renderControls({ layout: 'compact', harnessLockReason: LOCK_REASON })
+    openGear()
+    expect(harnessTrigger().textContent).toContain('Claude Code (Anthropic)')
+  })
+
+  it('opens no menu and never emits a harness change', () => {
+    const { onHarnessChange } = renderControls({ layout: 'compact', harnessLockReason: LOCK_REASON })
+    openGear()
+    fireEvent.click(harnessTrigger())
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(onHarnessChange).not.toHaveBeenCalled()
+  })
+
+  it('stays reachable and answerable — aria-disabled, not the native disabled', () => {
+    renderControls({ layout: 'compact', harnessLockReason: LOCK_REASON })
+    openGear()
+    const trigger = harnessTrigger()
+    expect(trigger.getAttribute('aria-disabled')).toBe('true')
+    expect(trigger.hasAttribute('disabled')).toBe(false)
+    // Nothing to expand any more, so the popup contract comes off with it.
+    expect(trigger.getAttribute('aria-haspopup')).toBeNull()
+    expect(trigger.getAttribute('aria-expanded')).toBeNull()
+  })
+
+  it('names the reason to assistive tech whether or not the hint is up', () => {
+    renderControls({ layout: 'compact', harnessLockReason: LOCK_REASON })
+    openGear()
+    const describedBy = harnessTrigger().getAttribute('aria-describedby')
+    expect(describedBy).toBeTruthy()
+    expect(document.getElementById(describedBy ?? '')?.textContent).toBe(LOCK_REASON)
+  })
+
+  it('shows the reason on POINTER hover', () => {
+    renderControls({ layout: 'compact', harnessLockReason: LOCK_REASON })
+    openGear()
+    expect(screen.queryByRole('tooltip')).toBeNull()
+    fireEvent.mouseEnter(harnessTrigger())
+    expect(screen.getByRole('tooltip').textContent).toBe(LOCK_REASON)
+    fireEvent.mouseLeave(harnessTrigger())
+    expect(screen.queryByRole('tooltip')).toBeNull()
+  })
+
+  it('shows the reason on KEYBOARD focus — the half a native disabled would lose', () => {
+    renderControls({ layout: 'compact', harnessLockReason: LOCK_REASON })
+    openGear()
+    fireEvent.focus(harnessTrigger())
+    expect(screen.getByRole('tooltip').textContent).toBe(LOCK_REASON)
+    fireEvent.blur(harnessTrigger())
+    expect(screen.queryByRole('tooltip')).toBeNull()
+  })
+
+  it('locks the inline layout too — a pinned thread is a domain state, not a layout', () => {
+    const { onHarnessChange } = renderControls({ harnessLockReason: LOCK_REASON })
+    fireEvent.click(harnessTrigger())
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(onHarnessChange).not.toHaveBeenCalled()
+    fireEvent.focus(harnessTrigger())
+    expect(screen.getByRole('tooltip').textContent).toBe(LOCK_REASON)
+  })
+
+  it('does not let the model→harness snap change a pinned harness', () => {
+    // Unlocked, this exact click snaps the harness to codex (asserted above).
+    const { onModelChange, onHarnessChange } = renderControls({ harnessLockReason: LOCK_REASON })
+    const trigger = screen.getByText('Claude Opus 4.8').closest('button')
+    if (!trigger) throw new Error('model trigger did not render')
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByText('GPT-5.2'))
+    expect(onModelChange).toHaveBeenCalledWith('openai/gpt-5.2')
+    expect(onHarnessChange).not.toHaveBeenCalled()
+  })
+
+  it('leaves an UNLOCKED harness fully selectable', () => {
+    const { onHarnessChange } = renderControls({ layout: 'compact' })
+    openGear()
+    const trigger = harnessTrigger()
+    expect(trigger.getAttribute('aria-disabled')).toBeNull()
+    expect(trigger.getAttribute('aria-haspopup')).toBe('true')
+    fireEvent.mouseEnter(trigger)
+    expect(screen.queryByRole('tooltip')).toBeNull()
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByText('OpenCode (any model)'))
+    expect(onHarnessChange).toHaveBeenCalledWith('opencode')
+  })
+})

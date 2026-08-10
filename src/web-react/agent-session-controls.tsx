@@ -37,7 +37,7 @@
  * sandbox-ui dependency.
  */
 
-import { useId, useMemo, useState, type ReactNode } from 'react'
+import { useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   snapHarnessToModel,
   snapModelToHarness,
@@ -78,6 +78,16 @@ function ChevronDown({ className }: { className?: string }) {
   )
 }
 
+/** lucide `lock` — the closed padlock on a pinned harness trigger. */
+function LockGlyph({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  )
+}
+
 function GearGlyph({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -104,40 +114,94 @@ const FOCUS_RING =
  *
  * `fullWidth` is opt-in and means what it means on `EffortPicker` — see
  * {@link pickerRootClass}.
+ *
+ * `lockReason` PINS the control: it keeps its selector shape and keeps
+ * reporting the harness the thread is on, opens nothing, and explains itself
+ * on hover AND on keyboard focus. Three deliberate choices there:
+ *
+ *  - `aria-disabled`, never the native `disabled` attribute. A disabled button
+ *    is removed from the tab order and fires no pointer events in most
+ *    browsers, so the one control that has something to explain would become
+ *    the one control that can never be asked.
+ *  - the reason rides a permanent visually-hidden node that `aria-describedby`
+ *    points at, so assistive tech has it whether or not the floating hint is
+ *    up; the floating copy is `aria-hidden` so nothing is announced twice.
+ *  - the hint is a {@link PopoverSurface}, not an absolutely-positioned div —
+ *    the compact panel is an `overflow-y-auto` box, which clips a positioned
+ *    descendant, and that surface is this package's answer to exactly that.
  */
 function HarnessPicker({
   value,
   onChange,
   available,
   fullWidth = false,
+  lockReason,
 }: {
   value: Harness
   onChange: (h: Harness) => void
   available?: ReadonlyArray<Harness>
   fullWidth?: boolean
+  lockReason?: string
 }) {
   const [open, setOpen] = useState(false)
+  const [hintOpen, setHintOpen] = useState(false)
   const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
+  const hintPanelRef = useRef<HTMLDivElement>(null)
   const panelId = useId()
+  const reasonId = useId()
+  const locked = lockReason !== undefined
   const options = available ?? (Object.keys(HARNESS_LABELS) as Harness[])
+  const showHint = () => setHintOpen(true)
+  const hideHint = () => setHintOpen(false)
   return (
     <div ref={containerRef} className={pickerRootClass(fullWidth)}>
       <button
         type="button"
         {...triggerProps}
-        aria-controls={open ? panelId : undefined}
-        onClick={() => setOpen(!open)}
+        aria-haspopup={locked ? undefined : true}
+        aria-expanded={locked ? undefined : open}
+        aria-controls={!locked && open ? panelId : undefined}
+        aria-disabled={locked || undefined}
+        aria-describedby={locked ? reasonId : undefined}
+        onClick={locked ? undefined : () => setOpen(!open)}
+        onMouseEnter={locked ? showHint : undefined}
+        onMouseLeave={locked ? hideHint : undefined}
+        onFocus={locked ? showHint : undefined}
+        onBlur={locked ? hideHint : undefined}
         title="Agent backend"
-        className={`inline-flex min-h-[36px] w-full items-center justify-between gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent ${FOCUS_RING}`}
+        className={`inline-flex min-h-[36px] w-full items-center justify-between gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition ${
+          locked ? 'cursor-default' : 'hover:bg-accent'
+        } ${FOCUS_RING}`}
       >
         <span className="flex min-w-0 items-center gap-1.5">
           <HarnessGlyph harness={value} className="h-4 w-4 shrink-0 text-foreground" />
           <span className="truncate">{harnessLabel(value)}</span>
         </span>
-        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        {locked ? (
+          <LockGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        ) : (
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        )}
       </button>
+      {locked && (
+        <>
+          <span id={reasonId} className="sr-only">
+            {lockReason}
+          </span>
+          <PopoverSurface
+            open={hintOpen}
+            role="tooltip"
+            triggerRef={triggerRef}
+            panelRef={hintPanelRef}
+            matchTriggerWidth={fullWidth}
+            className={`max-w-[248px] rounded-lg border border-card-edge bg-popover px-2.5 py-1.5 text-[11px] leading-snug text-muted-foreground ${OVERLAY_SHADOW}`}
+          >
+            <span aria-hidden>{lockReason}</span>
+          </PopoverSurface>
+        </>
+      )}
       <PopoverSurface
-        open={open}
+        open={!locked && open}
         id={panelId}
         role="menu"
         triggerRef={triggerRef}
@@ -211,6 +275,23 @@ export interface AgentSessionControlsProps {
   layout?: 'inline' | 'compact'
   /** Hide the harness control entirely (single-harness products). */
   showHarness?: boolean
+  /**
+   * PIN the harness and say why, in the user's words ("This thread already has
+   * messages — start a new chat to switch backend"). Presence IS the lock:
+   * there is no separate boolean, because a lock a user cannot read is the
+   * thing this prop exists to replace.
+   *
+   * The control stays VISIBLE and reports the harness the thread is on — the
+   * shape a locked selector has to keep, since a thread whose backend is fixed
+   * is exactly when a user wants to know what it is. Hiding it (`showHarness:
+   * false`) is what pushed products into rendering their own lock label
+   * outside the panel.
+   *
+   * While locked, `onHarnessChange` is never called — not from the picker, and
+   * not from the model↔harness coherence policy either. See
+   * {@link useCoherentHandlers}.
+   */
+  harnessLockReason?: string
   renderProviderBadge?: (provider: string) => ReactNode
   className?: string
 }
@@ -218,13 +299,21 @@ export interface AgentSessionControlsProps {
 /**
  * Apply the harness↔model coherence policy and emit the resulting change(s).
  * Returned from a hook-free helper so both layouts share one implementation.
+ *
+ * A LOCKED harness ({@link AgentSessionControlsProps.harnessLockReason}) is
+ * authoritative over the snap: picking a model whose native backend differs
+ * still changes the model, and leaves the harness alone. The alternative —
+ * snapping a harness the UI has just told the user cannot change — is the one
+ * behaviour a lock must not have.
  */
 function useCoherentHandlers(props: AgentSessionControlsProps) {
-  const { model, models, harness, onModelChange, onHarnessChange } = props
+  const { model, models, harness, onModelChange, onHarnessChange, harnessLockReason } = props
   const canonicalIds = useMemo(() => models.map((m) => m.id), [models])
+  const harnessLocked = harnessLockReason !== undefined
 
   const onModel = (next: string) => {
     onModelChange(next)
+    if (harnessLocked) return
     const nextHarness = snapHarnessToModel(harness, next)
     if (nextHarness !== harness) onHarnessChange(nextHarness)
   }
@@ -250,6 +339,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
     effortLevels,
     layout = 'inline',
     showHarness = true,
+    harnessLockReason,
     renderProviderBadge,
     className,
   } = props
@@ -276,7 +366,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
       <div className={`flex items-center gap-1.5 ${className ?? ''}`}>
         {modelPicker}
         {showHarness && (
-          <HarnessPicker value={harness} onChange={onHarness} available={availableHarnesses} />
+          <HarnessPicker value={harness} onChange={onHarness} available={availableHarnesses} lockReason={harnessLockReason} />
         )}
         {showEffort && <EffortPicker value={effort} onChange={onEffortChange} levels={effortLevels} />}
       </div>
@@ -311,7 +401,13 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
               {showHarness && (
                 <div className="space-y-1.5">
                   <p className="text-xs font-medium text-foreground">Agent backend</p>
-                  <HarnessPicker value={harness} onChange={onHarness} available={availableHarnesses} fullWidth />
+                  <HarnessPicker
+                    value={harness}
+                    onChange={onHarness}
+                    available={availableHarnesses}
+                    fullWidth
+                    lockReason={harnessLockReason}
+                  />
                   <p className="text-[11px] leading-snug text-muted-foreground">
                     The engine that runs the agent. Switching it keeps your model choice compatible.
                   </p>

@@ -96,6 +96,41 @@ export const HarnessHidden: Story = {
   render: () => useSessionControls({ showHarness: false }),
 }
 
+/**
+ * A thread that already has messages: the backend is PINNED. The control keeps
+ * its selector shape and keeps reporting the harness the thread is on — it
+ * just wears a padlock instead of a chevron and opens nothing. Hover it, or
+ * Tab to it, to see the reason; the keyboard half is the one a native
+ * `disabled` button would lose, since it would not be focusable at all.
+ *
+ * Compare with `Compact — gear open`: same panel, same geometry, one locked
+ * control. That is the whole point — a product should not need a second lock
+ * label outside the panel.
+ */
+export const CompactHarnessLocked: Story = {
+  name: 'Compact — harness locked',
+  decorators: [withPopoverHeadroom],
+  render: () => (
+    <AutoClick selector="button[title^='Model settings']">
+      {useSessionControls({
+        layout: 'compact',
+        harnessLockReason: 'This thread already has messages — start a new chat to switch backend.',
+      })}
+    </AutoClick>
+  ),
+}
+
+/** The same lock on the inline row: a pinned thread is a domain state, so it
+ *  reads the same wherever the controls are docked. */
+export const InlineHarnessLocked: Story = {
+  name: 'Inline — harness locked',
+  decorators: [withPopoverHeadroom],
+  render: () =>
+    useSessionControls({
+      harnessLockReason: 'This thread already has messages — start a new chat to switch backend.',
+    }),
+}
+
 /** A non-reasoning model selected — the effort pill drops out. */
 export const NonReasoningModel: Story = {
   name: 'Non-reasoning model',
@@ -131,6 +166,12 @@ export const AllStates: Story = {
       <div>
         <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Non-reasoning model</p>
         {useSessionControls({ initialModel: NON_REASONING_MODEL_ID })}
+      </div>
+      <div>
+        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Harness locked</p>
+        {useSessionControls({
+          harnessLockReason: 'This thread already has messages — start a new chat to switch backend.',
+        })}
       </div>
     </div>
   ),
