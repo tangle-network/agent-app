@@ -247,3 +247,22 @@ describe('EffortPicker with a value the declared levels omit', () => {
     expect(container.textContent).toContain('—')
   })
 })
+
+describe('effortMeterFill — a sentinel has no rung', () => {
+  const withAuto = [
+    { id: 'auto', label: 'Auto' },
+    { id: 'none', label: 'None' },
+    { id: 'high', label: 'Extended' },
+  ]
+
+  it('draws nothing for `auto`, which names a policy and not a depth', () => {
+    // Measured defect: with `auto` declared first, every harness read "Auto" at
+    // a FULL meter — including one with no agent to think at all.
+    expect(effortMeterFill('auto', withAuto)).toBe(0)
+  })
+
+  it('does not let `auto` shift where the real rungs sit', () => {
+    expect(effortMeterFill('high', withAuto)).toBe(EFFORT_METER_SEGMENTS)
+    expect(effortMeterFill('none', withAuto)).toBe(0)
+  })
+})

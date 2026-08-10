@@ -511,7 +511,7 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
         {...triggerProps}
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent"
+        className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent"
       >
         {selected ? (renderProviderBadge ? renderProviderBadge(selected.provider) : <ProviderLogo provider={selected.provider} size={16} />) : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}
         <span className="max-w-[160px] truncate">{selected?.name ?? value}</span>
@@ -698,6 +698,18 @@ const EFFORT_METER_GHOST_OPACITY = 0.15
 const OFF_LEVEL_IDS: ReadonlySet<string> = new Set(['off', 'none'])
 
 /**
+ * Ids that name a POLICY rather than a depth: `auto` means "let the harness and
+ * model decide", so it has no position on a strength ladder.
+ *
+ * Without this it lands wherever the declaration puts it and draws a filled
+ * meter — measured on a product that offers `auto` first: every harness read
+ * `Auto` at a FULL four bars, including `cli-base`, which has no agent to think
+ * at all. A meter is a claim about how hard the run will think, and a sentinel
+ * cannot make that claim.
+ */
+const UNPLACEABLE_LEVEL_IDS: ReadonlySet<string> = new Set(['auto'])
+
+/**
  * Filled-segment count for a level: 0 for off/none (or an id the levels list
  * does not carry); otherwise the level's position among the non-off choices
  * scaled onto the meter, so the ladder reads low < medium < high and the top
@@ -707,8 +719,8 @@ export function effortMeterFill(
   levelId: string,
   levels: readonly EffortLevel[] = DEFAULT_EFFORT_LEVELS,
 ): number {
-  if (OFF_LEVEL_IDS.has(levelId)) return 0
-  const active = levels.filter((l) => !OFF_LEVEL_IDS.has(l.id))
+  if (OFF_LEVEL_IDS.has(levelId) || UNPLACEABLE_LEVEL_IDS.has(levelId)) return 0
+  const active = levels.filter((l) => !OFF_LEVEL_IDS.has(l.id) && !UNPLACEABLE_LEVEL_IDS.has(l.id))
   const index = active.findIndex((l) => l.id === levelId)
   if (index < 0 || active.length === 0) return 0
   return Math.max(1, Math.floor(((index + 1) * EFFORT_METER_SEGMENTS) / active.length))
@@ -767,7 +779,7 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
   // A level the declaration does not carry has no position on that ladder, so
   // it renders with NO meter — an all-ghost meter is what `off` looks like, and
   // "we cannot place this" is not "no thinking".
-  const isDeclared = (id: string) => levels.some((l) => l.id === id)
+  const isDeclared = (id: string) => levels.some((l) => l.id === id) && !UNPLACEABLE_LEVEL_IDS.has(id)
   const selected = rendered.find((l) => l.id === value)
 
   return (
@@ -778,7 +790,7 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen(!open)}
         title={label ? `${label} — how hard the agent reasons before answering` : 'Reasoning effort'}
-        className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent"
+        className="inline-flex min-h-[36px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent"
       >
         <BrainGlyph className="h-3.5 w-3.5 text-muted-foreground" />
         <span>
