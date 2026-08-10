@@ -114,7 +114,7 @@ const FONT_FAMILIES = [
 const SEP = <div className="mx-1 h-5 w-px shrink-0 bg-[var(--border-default)]" />
 
 const POPOVER_PANEL =
-  'absolute top-full left-0 z-50 mt-1 flex flex-col rounded border border-[var(--border-default)] bg-[var(--bg-input)] shadow-lg'
+  'absolute top-full left-0 z-50 mt-1 flex flex-col rounded border border-[var(--card-edge)] bg-[hsl(var(--popover))] shadow-[var(--shadow-overlay)]'
 
 /**
  * Click-outside / Escape-to-close popover anchored under its trigger. The

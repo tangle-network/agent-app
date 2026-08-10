@@ -7,16 +7,19 @@ export interface TypeConfig {
   color: string
 }
 
-const IMAGE: TypeConfig = { label: 'Image', icon: Image, color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' }
+/* Type badges sit on top of media thumbnails, so the tint is mixed SOLID onto
+   the card surface — the kind hue survives but no photo bleeds through an
+   alpha fill. The /30 border is the badge's edge tier over busy media. */
+const IMAGE: TypeConfig = { label: 'Image', icon: Image, color: 'bg-[color-mix(in_srgb,#3b82f6_10%,hsl(var(--card)))] text-blue-600 border-blue-500/30' }
 
 // string-keyed so list cards can index by Generation.type
 /** Map type keys to their corresponding configuration objects including labels, icons, and colors */
 export const TYPE_CONFIG: Record<string, TypeConfig> = {
   image: IMAGE,
-  video: { label: 'Video', icon: Video, color: 'bg-red-500/10 text-red-600 border-red-500/20' },
-  avatar: { label: 'Avatar', icon: Film, color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' },
-  speech: { label: 'Audio', icon: Mic, color: 'bg-orange-500/10 text-orange-600 border-orange-500/20' },
-  transcription: { label: 'Transcript', icon: FileText, color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' },
+  video: { label: 'Video', icon: Video, color: 'bg-[color-mix(in_srgb,#ef4444_10%,hsl(var(--card)))] text-red-600 border-red-500/30' },
+  avatar: { label: 'Avatar', icon: Film, color: 'bg-[color-mix(in_srgb,#a855f7_10%,hsl(var(--card)))] text-purple-600 border-purple-500/30' },
+  speech: { label: 'Audio', icon: Mic, color: 'bg-[color-mix(in_srgb,#f97316_10%,hsl(var(--card)))] text-orange-600 border-orange-500/30' },
+  transcription: { label: 'Transcript', icon: FileText, color: 'bg-[color-mix(in_srgb,#10b981_10%,hsl(var(--card)))] text-emerald-600 border-emerald-500/30' },
 }
 
 // Safe lookup for an arbitrary `Generation.type` — always defined (the table is

@@ -11,7 +11,7 @@ export function StudioHeader({
   canGenerate: boolean
 }) {
   return (
-    <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur-md">
+    <header className="sticky top-0 z-20 border-b border-border bg-card">
       <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <div className="min-w-0">
           <h1 className="text-lg font-semibold tracking-tight text-foreground">Studio</h1>

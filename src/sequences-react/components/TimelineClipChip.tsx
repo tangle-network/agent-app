@@ -105,12 +105,16 @@ interface GesturePreview {
   moved: boolean
 }
 
+/** Per-kind chip tint, mixed SOLID onto the lane surface (`--bg-input`, the
+ *  editor's own fill) so a dragged chip never shows the lanes beneath through
+ *  an alpha fill — the hue identity stays, the translucency is gone. The 40%
+ *  border is the border-tier equivalent for edges. */
 const KIND_TONES: Record<SequenceTrackKind, string> = {
-  video: 'border-sky-400/40 bg-sky-500/15',
-  audio: 'border-emerald-400/40 bg-emerald-500/15',
-  caption: 'border-amber-400/40 bg-amber-500/15',
-  reference: 'border-zinc-400/40 bg-zinc-500/15',
-  agent: 'border-violet-400/40 bg-violet-500/15',
+  video: 'border-sky-400/40 bg-[color-mix(in_srgb,#0ea5e9_15%,var(--bg-input))]',
+  audio: 'border-emerald-400/40 bg-[color-mix(in_srgb,#10b981_15%,var(--bg-input))]',
+  caption: 'border-amber-400/40 bg-[color-mix(in_srgb,#f59e0b_15%,var(--bg-input))]',
+  reference: 'border-zinc-400/40 bg-[color-mix(in_srgb,#71717a_15%,var(--bg-input))]',
+  agent: 'border-violet-400/40 bg-[color-mix(in_srgb,#8b5cf6_15%,var(--bg-input))]',
 }
 
 /** Spec'd cache key is the clip id: a clip's waveform survives re-renders and
@@ -489,13 +493,13 @@ export function TimelineClipChip(props: TimelineClipChipProps) {
 
       <div className="relative flex h-full min-w-0 items-stretch gap-1.5 px-1.5 py-1">
         {isVisualMedia ? (
-          <canvas ref={posterRef} className="h-full w-10 shrink-0 rounded-sm bg-black/40 object-cover" />
+          <canvas ref={posterRef} className="h-full w-10 shrink-0 rounded-sm bg-black object-cover" />
         ) : null}
         <div className="min-w-0 flex-1">
           <div className="truncate text-[11px] font-medium leading-4 text-[var(--text-primary)]">
             {isCaption && typeof clip.text === 'string' ? clip.text : clip.label}
           </div>
-          <span className="mt-0.5 inline-block rounded bg-black/30 px-1 font-mono text-[9px] leading-3 text-[var(--text-secondary)]">
+          <span className="mt-0.5 inline-block rounded bg-[hsl(var(--background))] px-1 font-mono text-[9px] leading-3 text-[var(--text-secondary)]">
             {formatTimecode(shown.durationFrames, fps)}
           </span>
         </div>
@@ -513,7 +517,7 @@ export function TimelineClipChip(props: TimelineClipChipProps) {
             event.stopPropagation()
           }}
           onBlur={commitText}
-          className="agent-app-edit-selection absolute inset-0 z-10 w-full bg-black/80 px-1.5 text-[11px] text-[var(--text-primary)] ring-1 ring-[var(--brand-primary)]"
+          className="agent-app-edit-selection absolute inset-0 z-10 w-full bg-[hsl(var(--popover))] px-1.5 text-[11px] text-[var(--text-primary)] ring-1 ring-[var(--brand-primary)]"
           aria-label="Caption text"
         />
       ) : null}
@@ -522,7 +526,7 @@ export function TimelineClipChip(props: TimelineClipChipProps) {
         <>
           <span
             data-trim-handle="start"
-            className="absolute bottom-0 left-0 top-0 z-10 w-1.5 cursor-ew-resize bg-transparent opacity-0 transition group-hover:opacity-100 group-hover:bg-[var(--brand-primary)]/60"
+            className="absolute bottom-0 left-0 top-0 z-10 w-1.5 cursor-ew-resize bg-transparent opacity-0 transition group-hover:opacity-100 group-hover:bg-[var(--brand-primary)]"
             onPointerDown={(event) => beginGesture(event, 'trim-start')}
             onPointerMove={updateGesture}
             onPointerUp={finishGesture}
@@ -531,7 +535,7 @@ export function TimelineClipChip(props: TimelineClipChipProps) {
           />
           <span
             data-trim-handle="end"
-            className="absolute bottom-0 right-0 top-0 z-10 w-1.5 cursor-ew-resize bg-transparent opacity-0 transition group-hover:opacity-100 group-hover:bg-[var(--brand-primary)]/60"
+            className="absolute bottom-0 right-0 top-0 z-10 w-1.5 cursor-ew-resize bg-transparent opacity-0 transition group-hover:opacity-100 group-hover:bg-[var(--brand-primary)]"
             onPointerDown={(event) => beginGesture(event, 'trim-end')}
             onPointerMove={updateGesture}
             onPointerUp={finishGesture}
