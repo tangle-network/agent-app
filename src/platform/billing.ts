@@ -10,6 +10,7 @@
  */
 
 import type { PlatformBillingClient, PlatformIdentity } from '../billing/index'
+import { resolveTangleExecutionEnvironment } from '../runtime/model'
 
 /** Define available subscription tiers for the TanglePlan service */
 export type TanglePlanTier = 'free' | 'pro' | 'enterprise'
@@ -373,7 +374,7 @@ export const FREE_TIER_SPEND_CAP_USD = 0
 
 /**
  * Default name of the per-app feature flag that controls seat billing.
- * Billing is enabled unless an operator explicitly disables it.
+ * Explicit values override the environment default.
  */
 export const DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR = 'SEAT_BILLING_ENABLED'
 
@@ -385,8 +386,9 @@ export interface SeatBillingFlagOptions {
 }
 
 /**
- * Seat billing is ON unless the flag is explicitly false, zero, off, or
- * disabled. A missing environment or variable keeps billing enabled.
+ * An explicit flag controls seat billing in every environment.
+ * Without a flag, known development and test environments default to OFF.
+ * Deployed and unknown environments default to ON.
  */
 export function isSeatBillingEnabled(opts: SeatBillingFlagOptions = {}): boolean {
   const env =
@@ -394,14 +396,15 @@ export function isSeatBillingEnabled(opts: SeatBillingFlagOptions = {}): boolean
     (typeof process !== 'undefined' ? (process.env as Record<string, string | undefined>) : undefined)
   if (!env) return true
   const flag = env[opts.flagEnvVar ?? DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR]?.trim().toLowerCase()
-  if (!flag) return true
-  return flag !== 'false' && flag !== '0' && flag !== 'off' && flag !== 'disabled'
+  if (flag) return flag !== 'false' && flag !== '0' && flag !== 'off' && flag !== 'disabled'
+  const environment = resolveTangleExecutionEnvironment(env)
+  return environment !== 'development' && environment !== 'test'
 }
 
 /**
- * Read a user's entitlement for one product. An absent key or unavailable seat
- * endpoint denies access. An explicitly disabled billing flag also denies
- * access, so configuration drift cannot restore product-funded use.
+ * Read a user's entitlement for one product.
+ * An absent key or disabled flag returns no access.
+ * Transport failures propagate so the product can return a retryable error.
  *
  * @param flag — pass {@link isSeatBillingEnabled} (or your own boolean) so the
  *   product owns when the gate engages. When false, no network call is made.
@@ -414,11 +417,7 @@ export async function getProductEntitlement(
 ): Promise<ProductEntitlement> {
   if (!flag) return unavailableEntitlement()
   if (!userApiKey) return unavailableEntitlement()
-  try {
-    return await http.getProductEntitlement(userApiKey, productId)
-  } catch {
-    return unavailableEntitlement()
-  }
+  return http.getProductEntitlement(userApiKey, productId)
 }
 
 function unavailableEntitlement(): ProductEntitlement {

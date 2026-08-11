@@ -8165,7 +8165,7 @@
           "name": "isSeatBillingEnabled",
           "kind": "function",
           "signature": "(opts?: SeatBillingFlagOptions) => boolean",
-          "doc": "Seat billing is ON unless the flag is explicitly false, zero, off, or disabled."
+          "doc": "An explicit flag controls seat billing in every environment."
         },
         {
           "name": "isTangleBearerMissingError",

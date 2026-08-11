@@ -55,17 +55,17 @@ describe('getProductEntitlement availability policy', () => {
     expect(isProductEntitled(ent)).toBe(false)
   })
 
-  it('denies access when the seat endpoint is unavailable', async () => {
-    const ent = await getProductEntitlement(
-      httpWith(async () => {
-        throw new Error('seat endpoint not found')
-      }),
-      'key',
-      'gtm',
-      true,
-    )
-    expect(ent.hasSeat).toBe(false)
-    expect(isProductEntitled(ent)).toBe(false)
+  it('propagates seat endpoint failures so callers can return a retryable error', async () => {
+    await expect(
+      getProductEntitlement(
+        httpWith(async () => {
+          throw new Error('seat endpoint not found')
+        }),
+        'key',
+        'gtm',
+        true,
+      ),
+    ).rejects.toThrow('seat endpoint not found')
   })
 
   it('passes through a real platform answer when reachable', async () => {
@@ -83,8 +83,19 @@ describe('getProductEntitlement availability policy', () => {
 })
 
 describe('isSeatBillingEnabled', () => {
-  it('defaults ON when unset', () => {
+  it('defaults ON when the environment is unknown', () => {
     expect(isSeatBillingEnabled({ env: {} })).toBe(true)
+  })
+  it('defaults ON in deployed environments', () => {
+    for (const value of ['production', 'staging', 'preview']) {
+      expect(isSeatBillingEnabled({ env: { APP_ENV: value } })).toBe(true)
+    }
+  })
+  it('defaults OFF only in known development and test environments', () => {
+    for (const value of ['development', 'dev', 'local', 'test']) {
+      expect(isSeatBillingEnabled({ env: { APP_ENV: value } })).toBe(false)
+    }
+    expect(isSeatBillingEnabled({ env: { NODE_ENV: 'test' } })).toBe(false)
   })
   it('OFF for falsey values', () => {
     for (const value of ['false', '0', 'off', 'disabled', ' FALSE ']) {
@@ -95,6 +106,18 @@ describe('isSeatBillingEnabled', () => {
     for (const v of ['true', '1', 'on', 'enabled', 'TRUE', ' On ']) {
       expect(isSeatBillingEnabled({ env: { SEAT_BILLING_ENABLED: v } })).toBe(true)
     }
+  })
+  it('explicit values override the environment default', () => {
+    expect(
+      isSeatBillingEnabled({
+        env: { APP_ENV: 'development', SEAT_BILLING_ENABLED: 'true' },
+      }),
+    ).toBe(true)
+    expect(
+      isSeatBillingEnabled({
+        env: { APP_ENV: 'production', SEAT_BILLING_ENABLED: 'false' },
+      }),
+    ).toBe(false)
   })
   it('honours a custom flag name', () => {
     expect(

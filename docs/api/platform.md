@@ -240,7 +240,7 @@ interface HubProxyRoutes
 
 ### `isSeatBillingEnabled`
 
-`function` — Seat billing is ON unless the flag is explicitly false, zero, off, or disabled.
+`function` — An explicit flag controls seat billing in every environment.
 
 ```ts
 (opts?: SeatBillingFlagOptions) => boolean
