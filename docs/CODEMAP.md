@@ -31,8 +31,8 @@ _97 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./forms`](api/forms.md) | 29 | — |
 | [`./harness`](api/harness.md) | 13 | — |
 | [`./intakes`](api/intakes.md) | 29 | — |
-| [`./intakes-react`](api/intakes-react.md) | 3 | `intakes` |
-| [`./intakes-react/lazy`](api/intakes-react-lazy.md) | 2 | `intakes` |
+| [`./intakes-react`](api/intakes-react.md) | 3 | `brand`, `intakes` |
+| [`./intakes-react/lazy`](api/intakes-react-lazy.md) | 2 | `brand`, `intakes` |
 | [`./intakes/api`](api/intakes-api.md) | 3 | — |
 | [`./intakes/drizzle`](api/intakes-drizzle.md) | 18 | — |
 | [`./integrations`](api/integrations.md) | 10 | — |
@@ -75,12 +75,12 @@ _97 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./spend/cli`](api/spend-cli.md) | 0 | `sandbox` |
 | [`./store`](api/store.md) | 10 | — |
 | [`./stream`](api/stream.md) | 49 | `interactions`, `plans` |
-| [`./studio`](api/studio.md) | 37 | — |
-| [`./studio-react`](api/studio-react.md) | 30 | `studio` |
+| [`./studio`](api/studio.md) | 43 | — |
+| [`./studio-react`](api/studio-react.md) | 30 | `studio`, `web-react` |
 | [`./tangle`](api/tangle.md) | 7 | — |
 | [`./teams`](api/teams.md) | 37 | — |
-| [`./teams-react`](api/teams-react.md) | 10 | `teams` |
-| [`./teams-react/lazy`](api/teams-react-lazy.md) | 6 | `teams` |
+| [`./teams-react`](api/teams-react.md) | 10 | `brand`, `teams` |
+| [`./teams-react/lazy`](api/teams-react-lazy.md) | 6 | `brand`, `teams` |
 | [`./teams/drizzle`](api/teams-drizzle.md) | 26 | — |
 | [`./teams/invitations-api`](api/teams-invitations-api.md) | 13 | — |
 | [`./teams/members-api`](api/teams-members-api.md) | 9 | — |
@@ -338,7 +338,7 @@ Source: `src/intakes/index.ts` · 29 exports
 
 Source: `src/intakes-react/index.ts` · 3 exports
 
-Depends on: `intakes`
+Depends on: `brand`, `intakes`
 
 `IntakeInterview`, `IntakeInterviewProps`, `IntakeView`
 
@@ -348,7 +348,7 @@ Depends on: `intakes`
 
 Source: `src/intakes-react/lazy.tsx` · 2 exports
 
-Depends on: `intakes`
+Depends on: `brand`, `intakes`
 
 `IntakeInterviewLazy`, `IntakeInterviewProps`
 
@@ -730,9 +730,9 @@ Depends on: `interactions`, `plans`
 
 ## `./studio`
 
-Source: `src/studio/index.ts` · 37 exports
+Source: `src/studio/index.ts` · 43 exports
 
-`buildGenerationRequestBody`, `buildPublishPackage`, `CADENCES`, `DESTINATIONS`, `failedOptimisticGeneration`, `Generation`, `GENERATION_TYPES`, `generationError`, `generationMergeKey`, `GenerationRequestFields`, `generationStatus`, `GenerationStatus`, `GenerationType`, `generationVaultPath`, `isDestinationConnected`, `isGenerationType`, `isLocalGeneration`, `isPublishPackage`, `latestBatchOf`, `MAX_IMAGE_COUNT`, `MediaModelCatalogResponse`, `MediaModelOption`, `MediaModelStatus`, `mergeLiveGeneration`, `mergeLoaderAndLive`, `MIN_IMAGE_COUNT`, `modelMessage`, `normalizeImageCount`, `optimisticGeneration`, `outputPathFor`, `preferredModelId`, `PublishDestination`, `PublishPackage`, `relativeTime`, `selectedModelsWithDefaults`, `StudioIntegrationConnection`, `userSafeGenerationMessage`
+`buildGenerationRequestBody`, `buildPublishPackage`, `CADENCES`, `DESTINATIONS`, `failedOptimisticGeneration`, `Generation`, `GENERATION_TYPES`, `generationError`, `generationMergeKey`, `GenerationRequestFields`, `generationStatus`, `GenerationStatus`, `GenerationType`, `generationVaultPath`, `IMAGE_QUALITIES`, `IMAGE_SIZE_HINT`, `IMAGE_SIZE_PATTERN`, `isDestinationConnected`, `isGenerationType`, `isLocalGeneration`, `isPublishPackage`, `latestBatchOf`, `MAX_IMAGE_COUNT`, `MediaModelCatalogResponse`, `MediaModelOption`, `MediaModelStatus`, `mergeLiveGeneration`, `mergeLoaderAndLive`, `MIN_IMAGE_COUNT`, `modelMessage`, `normalizeImageCount`, `optimisticGeneration`, `outputPathFor`, `preferredModelId`, `PublishDestination`, `PublishPackage`, `relativeTime`, `selectedModelsWithDefaults`, `StudioIntegrationConnection`, `userSafeGenerationMessage`, `VIDEO_ASPECT_RATIOS`, `VIDEO_DURATIONS`, `VIDEO_RESOLUTIONS`
 
 [Full API →](api/studio.md)
 
@@ -740,7 +740,7 @@ Source: `src/studio/index.ts` · 37 exports
 
 Source: `src/studio-react/index.tsx` · 30 exports
 
-Depends on: `studio`
+Depends on: `studio`, `web-react`
 
 `AvatarComposer`, `ComposerDisclosure`, `ComposerHero`, `Field`, `filterGenerations`, `GenerationCard`, `GenerationDetail`, `GenerationDetailModal`, `GenerationGrid`, `GenerationStatusBadge`, `ImageComposer`, `LibraryDrawer`, `LibraryPanel`, `NativeSelect`, `PublishPackageComposer`, `ResultCanvas`, `SpeechComposer`, `Stepper`, `StudioHeader`, `StudioRole`, `StudioSheet`, `StudioWorkspace`, `StudioWorkspaceProps`, `TranscriptionComposer`, `TranscriptionOptions`, `TYPE_CONFIG`, `TypeConfig`, `typeConfigFor`, `useStudioGenerations`, `VideoComposer`
 
@@ -766,7 +766,7 @@ Source: `src/teams/index.ts` · 37 exports
 
 Source: `src/teams-react/index.ts` · 10 exports
 
-Depends on: `teams`
+Depends on: `brand`, `teams`
 
 `InvitationsPanel`, `InvitationsPanelProps`, `InvitationView`, `InviteAcceptDetails`, `InviteAcceptPage`, `InviteAcceptPageProps`, `InviteAcceptStatus`, `MembersPanel`, `MembersPanelProps`, `MemberView`
 
@@ -776,7 +776,7 @@ Depends on: `teams`
 
 Source: `src/teams-react/lazy.tsx` · 6 exports
 
-Depends on: `teams`
+Depends on: `brand`, `teams`
 
 `InvitationsPanelLazy`, `InvitationsPanelProps`, `InviteAcceptPageLazy`, `InviteAcceptPageProps`, `MembersPanelLazy`, `MembersPanelProps`
 

@@ -415,7 +415,7 @@
           "name": "adaptTranscript",
           "kind": "function",
           "signature": "(view: AssistantTranscriptView) => AdaptedTranscript",
-          "doc": "Fold the transcript view into web-react `ChatUiMessage[]`: each user message is 1:1; the assistant/`tool`/`status` messages between two user turns collapse into one assistant message whose ordered `s…"
+          "doc": "Fold the transcript view into transcript-order blocks: message runs (web-react `ChatUiMessage[]`) broken by quiet status lines."
         },
         {
           "name": "AssistantChat",
@@ -541,7 +541,7 @@
           "name": "AssistantTranscript",
           "kind": "function",
           "signature": "({ view, renderMarkdown, toolRenderers, renderConfirmedResult, emptyState, }: AssistantTranscriptProps) => Element",
-          "doc": "Render the assistant conversation with web-react's `ChatMessages`."
+          "doc": "Render the assistant conversation: message runs through web-react's `ChatMessages` (quiet chrome — the label/meta row becomes a hover-revealed lane, which keeps the narrow dock panel uncluttered), st…"
         },
         {
           "name": "AssistantTranscriptProps",
@@ -5834,6 +5834,7 @@
       "id": "./intakes-react",
       "source": "src/intakes-react/index.ts",
       "dependsOn": [
+        "brand",
         "intakes"
       ],
       "error": null,
@@ -5862,6 +5863,7 @@
       "id": "./intakes-react/lazy",
       "source": "src/intakes-react/lazy.tsx",
       "dependsOn": [
+        "brand",
         "intakes"
       ],
       "error": null,
@@ -13972,6 +13974,24 @@
           "doc": "Resolve the vault path string from a Generation object or return null if unavailable"
         },
         {
+          "name": "IMAGE_QUALITIES",
+          "kind": "const",
+          "signature": "readonly [\"low\", \"medium\", \"high\", \"auto\"]",
+          "doc": "Provide the valid image quality values for generation requests"
+        },
+        {
+          "name": "IMAGE_SIZE_HINT",
+          "kind": "const",
+          "signature": "\"1024x1024, 1536x1024, 1024x1536, or auto\"",
+          "doc": "Provide a placeholder hint listing the accepted image size values"
+        },
+        {
+          "name": "IMAGE_SIZE_PATTERN",
+          "kind": "const",
+          "signature": "string",
+          "doc": "Provide a validation pattern for the free-form image size field (WxH or auto)"
+        },
+        {
           "name": "isDestinationConnected",
           "kind": "function",
           "signature": "(destination: PublishDestination, connections: StudioIntegrationConnection[]) => boolean",
@@ -14108,6 +14128,24 @@
           "kind": "function",
           "signature": "(message?: string | undefined) => string",
           "doc": "Resolve a user-safe generation message by filtering sensitive or error-related content"
+        },
+        {
+          "name": "VIDEO_ASPECT_RATIOS",
+          "kind": "const",
+          "signature": "readonly [\"16:9\", \"9:16\", \"1:1\"]",
+          "doc": "Provide the valid video aspect ratio values for generation requests"
+        },
+        {
+          "name": "VIDEO_DURATIONS",
+          "kind": "const",
+          "signature": "readonly [\"4\", \"6\", \"8\", \"10\", \"12\"]",
+          "doc": "Provide the valid video duration values (seconds) for generation requests"
+        },
+        {
+          "name": "VIDEO_RESOLUTIONS",
+          "kind": "const",
+          "signature": "readonly [\"720p\", \"1080p\"]",
+          "doc": "Provide the valid video resolution values for generation requests"
         }
       ]
     },
@@ -14115,7 +14153,8 @@
       "id": "./studio-react",
       "source": "src/studio-react/index.tsx",
       "dependsOn": [
-        "studio"
+        "studio",
+        "web-react"
       ],
       "error": null,
       "exports": [
@@ -14585,6 +14624,7 @@
       "id": "./teams-react",
       "source": "src/teams-react/index.ts",
       "dependsOn": [
+        "brand",
         "teams"
       ],
       "error": null,
@@ -14655,6 +14695,7 @@
       "id": "./teams-react/lazy",
       "source": "src/teams-react/lazy.tsx",
       "dependsOn": [
+        "brand",
         "teams"
       ],
       "error": null,
