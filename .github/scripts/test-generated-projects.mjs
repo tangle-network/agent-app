@@ -138,10 +138,20 @@ function installAndRunScaffolder({
     },
   })
 
-  run('pnpm', ['install', '--ignore-scripts', '--strict-peer-dependencies', '--store-dir', storeDir], {
-    cwd: runner,
-    env,
-  })
+  // The runner carries no pnpm-workspace.yaml of its own, so pnpm's
+  // workspace-root search walks up out of the scratch dir and can land on a
+  // stray pnpm-workspace.yaml in the OS temp dir (or whatever TMPDIR points
+  // into). pnpm then installs THAT workspace — printing "Already up to date"
+  // while never creating the runner's node_modules — and the gate dies with
+  // ENOENT reading the scaffolder's installed package.json. --ignore-workspace
+  // pins this install to the runner directory alone. The generated project
+  // needs no such flag: its template pnpm-workspace.yaml already makes it its
+  // own workspace root.
+  run(
+    'pnpm',
+    ['install', '--ignore-workspace', '--ignore-scripts', '--strict-peer-dependencies', '--store-dir', storeDir],
+    { cwd: runner, env },
+  )
 
   const installedPackage = JSON.parse(
     readFileSync(join(runner, 'node_modules', '@tangle-network', 'create-agent-app', 'package.json'), 'utf8'),
