@@ -119,7 +119,7 @@ export function StudioWorkspace({
                 : 'No generations yet'}
             </p>
             <p className="max-w-sm text-xs text-muted-foreground">
-              When workspace members generate images, video, voice, avatars, or transcripts, they appear in the library.
+              Team generations appear in the library.
             </p>
             <Button size="sm" variant="outline" onClick={openLibrary}>
               <Images className="mr-1.5 h-4 w-4" />

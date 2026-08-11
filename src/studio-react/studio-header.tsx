@@ -18,7 +18,7 @@ export function StudioHeader({
           <p className="truncate text-xs text-muted-foreground">
             {canGenerate
               ? 'Generate images, video, voice, avatars, and transcripts.'
-              : 'Browse images, video, voice, avatars, and transcripts your team has created.'}
+              : "Browse your team's generations."}
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={onOpenLibrary} className="shrink-0">

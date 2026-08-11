@@ -76,6 +76,6 @@ export function ComposerDisclosure({ summary, children }: { summary: ReactNode; 
 
 export function NativeSelect(props: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select {...props} className="h-9 w-full rounded-md border border-input bg-[var(--md3-surface-container-low)] px-3 text-sm" />
+    <select {...props} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" />
   )
 }

@@ -33,7 +33,7 @@ export function LibraryPanel({
     <div className="flex min-w-0 flex-col">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <Tabs value={typeFilter ?? 'all'} onValueChange={(v) => onFilterChange(v === 'all' ? null : v)}>
-          <TabsList className="h-9 justify-start gap-1 overflow-x-auto overflow-y-hidden rounded-lg border border-border bg-[var(--md3-surface-container-low)] p-1">
+          <TabsList className="h-9 justify-start gap-1 overflow-x-auto overflow-y-hidden rounded-lg border border-border bg-background p-1">
             <TabsTrigger
               value="all"
               className="rounded-md px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:bg-primary/10 data-[state=active]:font-semibold data-[state=active]:text-primary data-[state=active]:shadow-none"

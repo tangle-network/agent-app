@@ -46,7 +46,10 @@ export function GenerationDetail({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="outline" className={cfg.color}>{cfg.label}</Badge>
+        <Badge variant="outline" className={`${cfg.color} gap-1`}>
+          <Icon className="h-3 w-3" />
+          {cfg.label}
+        </Badge>
         <GenerationStatusBadge generation={generation} inline />
         {generationError(generation) && (
           <span className="text-xs text-destructive">{generationError(generation)}</span>
@@ -54,35 +57,37 @@ export function GenerationDetail({
       </div>
 
       <div>
-        <span className="mb-1 block text-xs font-medium text-muted-foreground">Prompt</span>
+        <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">Prompt</span>
         <p className="text-sm text-foreground">{generation.prompt}</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
         {generation.model && (
           <div>
-            <span className="block text-[11px] font-medium text-muted-foreground">Model</span>
+            <span className="block text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">Model</span>
             <span className="text-xs text-foreground">{generation.model}</span>
           </div>
         )}
         {generation.cost != null && (
           <div>
-            <span className="block text-[11px] font-medium text-muted-foreground">Cost</span>
-            <span className="text-xs text-foreground">${generation.cost.toFixed(4)}</span>
+            <span className="block text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">Cost</span>
+            <span className="text-xs text-foreground">${generation.cost.toFixed(3)}</span>
           </div>
         )}
         {generation.createdAt && (
           <div>
-            <span className="block text-[11px] font-medium text-muted-foreground">Created</span>
-            <span className="text-xs text-foreground">{new Date(generation.createdAt).toLocaleString()}</span>
+            <span className="block text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">Created</span>
+            <span className="text-xs text-foreground">
+              {new Date(generation.createdAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+            </span>
           </div>
         )}
       </div>
 
       {generation.type === 'transcription' && generation.result && (
         <div>
-          <span className="mb-1 block text-xs font-medium text-muted-foreground">Transcription</span>
-          <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg bg-secondary p-4 text-sm text-foreground">
+          <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">Transcription</span>
+          <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg bg-secondary p-4 font-mono text-[13px] tabular-nums text-foreground">
             {generation.result}
           </pre>
         </div>
