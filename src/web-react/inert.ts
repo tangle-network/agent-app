@@ -11,6 +11,7 @@
  * | `inert={false}` | `<div>x</div>` — NO attribute   | `<div>x</div>` — NO attribute   |
  * | `inert={''}`    | `<div inert="">x</div>` — inert | `<div>x</div>` — NO attribute   |
  * | `inert={true}`  | `<div>x</div>` — NO attribute   | `<div inert="">x</div>` — inert |
+ * | `inert={'1'}`   | `<div inert="1">x</div>` — inert | `<div inert="">x</div>` — inert |
  *
  * React 18 warns on the two it drops (`Received \`false\`/\`true\` for a
  * non-boolean attribute \`inert\`.`); React 19 warns on the one it drops
@@ -18,37 +19,39 @@
  *
  * So the FALSE case needs no help: both majors already emit nothing, and a
  * plain `inert={!open}` binding never made an open panel inert on either. The
- * TRUE case is the one with no shared spelling — `true` is inert only on 19,
- * `''` only on 18, and there is no third value that is inert on both. Left as a
- * plain boolean binding, a COLLAPSED panel stays focusable and screen-reader
- * readable on React 18, which `peerDependencies` (`react >=18`) admits.
+ * TRUE case is the defect — `true` is dropped by 18 and `''` is dropped by 19,
+ * so a plain boolean binding leaves a COLLAPSED panel focusable and
+ * screen-reader readable on React 18, which `peerDependencies` (`react >=18`)
+ * admits.
  *
- * That is what this helper is for, and why it is a function rather than a JSX
- * binding: the branch is a fact about the running React, so it belongs
- * somewhere a test can pass both majors in.
+ * The last row is the answer, and it is why this file no longer detects
+ * anything. `inert` is an HTML boolean attribute: its PRESENCE is what makes an
+ * element inert, whatever the value reads. A non-empty string is emitted by
+ * both majors, warned about by neither, and inert on both — so there is one
+ * spelling and no branch.
  */
-
-import { version as reactVersion } from 'react'
 
 /**
  * Props that make an element inert when `inert` is true, and nothing at all
  * when it is false.
- *
- * `reactMajor` is a parameter so both spellings stay testable on one installed
- * React; callers pass nothing and get the running version.
  */
-export function inertProps(
-  inert: boolean,
-  reactMajor: number = Number.parseInt(reactVersion, 10),
-): { inert?: boolean } {
+export function inertProps(inert: boolean): { inert?: boolean } {
   if (!inert) return {}
-  // React 18's spelling is a string that @types/react 19 cannot describe, since
-  // it declares `inert` a boolean — hence the cast.
+  // One spelling, no version detection. `inert` is an HTML boolean attribute:
+  // its PRESENCE is what makes an element inert, whatever the value reads.
+  // A non-empty string is therefore inert on both majors, measured:
   //
-  // NaN takes the 19 branch (`NaN < 19` is false), which is a bet and is stated
-  // as one: the table above measured no value that is inert on both majors, so
-  // an unreadable version has to pick. It picks 19 because `Number.parseInt`
-  // reads `18` out of every published React 18 version string, so a version
-  // that does not parse is not React 18.
-  return reactMajor < 19 ? ({ inert: '' } as unknown as { inert?: boolean }) : { inert: true }
+  //   React 18.3.1  inert="1"  ->  <div inert="1">   present, no warning
+  //   React 19.2.8  inert="1"  ->  <div inert="">    present, no warning
+  //
+  // The values that DIFFER are the ones this used to branch on — `true` is
+  // dropped by 18, `''` is dropped by 19 — so branching meant detecting the
+  // major, and detecting the major meant `Number.parseInt(version)`, which
+  // reads 0 out of every `0.0.0-experimental-*` canary and routed React 19
+  // pre-releases to the 18 spelling. Half of all published React versions
+  // carry that shape. A value that needs no detection cannot get the detection
+  // wrong.
+  //
+  // The cast is because @types/react 19 declares `inert` a boolean.
+  return { inert: '1' } as unknown as { inert?: boolean }
 }
