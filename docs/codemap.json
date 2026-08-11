@@ -17115,6 +17115,12 @@
           "doc": "Only a name, never a metric: it exists so the accessible label is never empty."
         },
         {
+          "name": "DEFAULT_SPARKLINE_UNAVAILABLE_LABEL",
+          "kind": "const",
+          "signature": "\"No readings available\"",
+          "doc": "Nothing was measurable, which is not the same as nothing was measured yet — and \"No history yet\" over a series that arrived full of `NaN` reads as the metric being new when the producer is broken."
+        },
+        {
           "name": "DEFAULT_SPARKLINE_WIDTH",
           "kind": "const",
           "signature": "96",
@@ -18617,7 +18623,7 @@
         {
           "name": "Sparkline",
           "kind": "function",
-          "signature": "({ values, label, format, width, height, emptyLabel, className, }: SparklineProps) => ReactElement<unknown, string | JS…",
+          "signature": "({ values, label, format, width, height, emptyLabel, unavailableLabel, className, }: SparklineProps) => ReactElement<un…",
           "doc": "The series glyph."
         },
         {
@@ -18648,7 +18654,7 @@
           "name": "sparklineLabel",
           "kind": "function",
           "signature": "(values: readonly number[], { label, format }?: SparklineLabelOptions) => string",
-          "doc": "The accessible name: metric, how many readings, the range, and the direction."
+          "doc": "The accessible name: metric, how many readings, how many are missing, the range, and the direction."
         },
         {
           "name": "SparklineLabelOptions",

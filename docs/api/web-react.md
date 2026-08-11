@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-393 exports.
+394 exports.
 
 ### `activityTone`
 
@@ -636,6 +636,14 @@ ProvenanceConfidencePolicy
 
 ```ts
 "Trend"
+```
+
+### `DEFAULT_SPARKLINE_UNAVAILABLE_LABEL`
+
+`const` — Nothing was measurable, which is not the same as nothing was measured yet — and "No history yet" over a series that arrived full of `NaN` reads as the metric being new when the producer is broken.
+
+```ts
+"No readings available"
 ```
 
 ### `DEFAULT_SPARKLINE_WIDTH`
@@ -2643,7 +2651,7 @@ interface SmoothRevealOptions
 `function` — The series glyph.
 
 ```ts
-({ values, label, format, width, height, emptyLabel, className, }: SparklineProps) => ReactElement<unknown, string | JS…
+({ values, label, format, width, height, emptyLabel, unavailableLabel, className, }: SparklineProps) => ReactElement<un…
 ```
 
 ### `SparklineDirection`
@@ -2680,7 +2688,7 @@ interface SparklineGeometryOptions
 
 ### `sparklineLabel`
 
-`function` — The accessible name: metric, how many readings, the range, and the direction.
+`function` — The accessible name: metric, how many readings, how many are missing, the range, and the direction.
 
 ```ts
 (values: readonly number[], { label, format }?: SparklineLabelOptions) => string

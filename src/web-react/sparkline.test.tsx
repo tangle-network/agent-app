@@ -58,11 +58,42 @@ describe('sparklineGeometry', () => {
     expect(geometry.direction).toBe('rising')
   })
 
-  it('drops non-finite readings rather than plotting them as zero', () => {
+  it('does not plot a non-finite reading as zero, and counts it as a gap', () => {
     expect(sparklineReadings([1, Number.NaN, 3, Number.POSITIVE_INFINITY])).toEqual([1, 3])
     const geometry = sparklineGeometry([10, Number.NaN, 12])
     expect(geometry.readings).toEqual([10, 12])
     expect(sparklinePointsAttribute(geometry.points)).not.toContain('NaN')
+    // Not plotted is not the same as not there. The count is what the
+    // accessible name has to state, and what a silent filter threw away.
+    expect(geometry.gaps).toBe(1)
+  })
+
+  it('breaks the line at a missing reading instead of drawing straight across it', () => {
+    const geometry = sparklineGeometry([1, Number.NaN, 3], { width: 100, height: 20, inset: 0 })
+    expect(geometry.gaps).toBe(1)
+    // Two runs of one sample each: there is no pair of ADJACENT readings, so
+    // there is no segment to stroke. A single polyline over these two points
+    // draws a rise between samples 0 and 2 that nobody measured.
+    expect(geometry.segments).toHaveLength(2)
+    expect(geometry.segments.map((segment) => segment.length)).toEqual([1, 1])
+    // The x axis is the SAMPLE index, so the hole keeps its width — the two
+    // readings sit at the ends of a three-sample window, not side by side.
+    expect(geometry.points.map((point) => point.x)).toEqual([0, 100])
+  })
+
+  it('keeps consecutive readings in one run and splits only at the gap', () => {
+    const geometry = sparklineGeometry([1, 2, Number.NaN, 5, 6], { width: 100, height: 20, inset: 0 })
+    expect(geometry.segments.map((segment) => segment.length)).toEqual([2, 2])
+    expect(geometry.segments[0]?.map((point) => point.x)).toEqual([0, 25])
+    expect(geometry.segments[1]?.map((point) => point.x)).toEqual([75, 100])
+  })
+
+  it('counts every sample it could not read, including a series with nothing usable', () => {
+    const geometry = sparklineGeometry([Number.NaN, Number.POSITIVE_INFINITY])
+    expect(geometry.readings).toEqual([])
+    expect(geometry.points).toEqual([])
+    expect(geometry.segments).toEqual([])
+    expect(geometry.gaps).toBe(2)
   })
 
   it('calls a series that returns to its start net unchanged, not rising', () => {
@@ -87,6 +118,27 @@ describe('sparklineLabel', () => {
   it('reports one reading and none at all as different things', () => {
     expect(sparklineLabel([3], { label: 'Runs' })).toBe('Runs: one reading, 3')
     expect(sparklineLabel([], { label: 'Runs' })).toBe('Runs: no readings yet')
+  })
+
+  it('states the readings it could not use rather than announcing a shorter series', () => {
+    // Measured before this fix: `[1, NaN, 3]` announced "2 readings, range 1 to
+    // 3, rising from 1 to 3" — a complete-sounding sentence about a series with
+    // a hole in it. The card's figure slot already refuses to let a
+    // non-measurement look measured; the series says it in the same words.
+    expect(sparklineLabel([1, Number.NaN, 3], { label: 'Cost' })).toBe(
+      'Cost: 2 readings, 1 not available, range 1 to 3, rising from 1 to 3',
+    )
+    expect(sparklineLabel([4, Number.NaN, 4], { label: 'Pass rate' })).toBe(
+      'Pass rate: 2 readings, 1 not available, unchanged at 4',
+    )
+    expect(sparklineLabel([Number.NaN, 7], { label: 'Runs' })).toBe('Runs: one reading, 1 not available, 7')
+  })
+
+  it('separates a metric with no history from one whose readings were unusable', () => {
+    // "no readings yet" is a claim about a NEW metric. A series that arrived
+    // full of NaN is a broken producer, and borrowing that sentence hides it.
+    expect(sparklineLabel([], { label: 'Cost' })).toBe('Cost: no readings yet')
+    expect(sparklineLabel([Number.NaN, Number.NaN], { label: 'Cost' })).toBe('Cost: no readings, 2 not available')
   })
 })
 
@@ -139,6 +191,41 @@ describe('<Sparkline>', () => {
     expect(container.querySelector('[data-sparkline="empty"]')?.getAttribute('class')).toBe(
       'text-[11px] text-muted-foreground mt-2',
     )
+  })
+
+  it('renders a gap as a break in the drawing, never as a continuous line', () => {
+    const { container } = render(<Sparkline values={[1, Number.NaN, 3]} label="Cost" />)
+    const chart = screen.getByRole('img', { name: /Cost/ })
+    expect(chart.getAttribute('data-gaps')).toBe('1')
+    // Neither reading has a neighbour, so there is nothing to stroke: two dots.
+    // A polyline here is the two-point line the fix exists to stop drawing.
+    expect(container.querySelectorAll('polyline')).toHaveLength(0)
+    expect(container.querySelectorAll('circle')).toHaveLength(2)
+    expect(chart.getAttribute('aria-label')).toContain('1 not available')
+  })
+
+  it('draws one stroke per run of consecutive readings', () => {
+    const { container } = render(<Sparkline values={[1, 2, Number.NaN, 5, 6]} label="Cost" />)
+    expect(container.querySelectorAll('polyline')).toHaveLength(2)
+    expect(svg(container)?.getAttribute('data-gaps')).toBe('1')
+    // One end marker, because there is one latest reading.
+    expect(container.querySelectorAll('circle')).toHaveLength(1)
+  })
+
+  it('carries no gap attribute at all for a series with none', () => {
+    const { container } = render(<Sparkline values={[1, 2, 3]} label="Cost" />)
+    expect(svg(container)?.hasAttribute('data-gaps')).toBe(false)
+    expect(container.querySelectorAll('polyline')).toHaveLength(1)
+  })
+
+  it('says a series that arrived unreadable is unavailable, not new', () => {
+    const { container } = render(<Sparkline values={[Number.NaN, Number.NaN]} label="Cost" />)
+    expect(container.querySelector('[data-sparkline="empty"]')).toBeNull()
+    const unavailable = container.querySelector('[data-sparkline="unavailable"]')
+    expect(unavailable?.textContent).toContain('No readings available')
+    expect(unavailable?.textContent).not.toContain('No history yet')
+    // …and the sentence assistive tech gets names the metric and the count.
+    expect(unavailable?.textContent).toContain('Cost: no readings, 2 not available')
   })
 
   it('is reachable by its metric name rather than as an unnamed graphic', () => {

@@ -23,6 +23,16 @@
  *    divides by `max - min`, which is `0` for a perfectly stable metric, and
  *    the resulting `NaN` lands in the `points` attribute — SVG drops the whole
  *    polyline, so the metric that never moved is the one that disappears.
+ *  - **a missing reading renders as a GAP, and the accessible name says so.**
+ *    A `null` from a hole in a series and a `NaN` from a producer's unguarded
+ *    division are not smaller series — they are readings nobody has. Deleting
+ *    them closed the line straight across the hole and announced a count that
+ *    was short by the number deleted: measured on `[1, NaN, 3]`, one continuous
+ *    two-point line labelled "2 readings, rising from 1 to 3", with nothing
+ *    anywhere saying a reading was unreadable. The card's figure slot already
+ *    refuses to let a non-measurement look measured; the series one line below
+ *    it holds the same rule. The x axis is the SAMPLE index, so the hole keeps
+ *    its width, the line breaks at it, and the label carries "N not available".
  *
  * Accessibility: `role="img"` with an `aria-label` naming the metric, its range
  * and its direction. A sparkline with no accessible name is decoration a screen
@@ -50,7 +60,16 @@ export interface SparklinePoint {
 export interface SparklineGeometry {
   /** The finite readings, in order — what was actually plotted. */
   readonly readings: readonly number[]
+  /** Every plotted point, in order. Positions are on the SAMPLE axis, so a
+   *  missing reading leaves its width behind rather than closing up. */
   readonly points: readonly SparklinePoint[]
+  /** The points split into runs of CONSECUTIVE samples. One run is one stroke:
+   *  a line drawn across a missing reading states a movement nobody measured. */
+  readonly segments: readonly (readonly SparklinePoint[])[]
+  /** Samples that carried no usable reading — a `null`, a `NaN`, an infinity.
+   *  Counted rather than discarded, because the accessible name has to state
+   *  them: a shorter series announced as a complete one is the silent loss. */
+  readonly gaps: number
   readonly min: number
   readonly max: number
   readonly first: number
@@ -75,6 +94,10 @@ const DOT_RADIUS = 1.75
  *  empty. Every caller in this package passes the metric's own title. */
 export const DEFAULT_SPARKLINE_LABEL = 'Trend'
 export const DEFAULT_SPARKLINE_EMPTY_LABEL = 'No history yet'
+/** Nothing was measurable, which is not the same as nothing was measured yet —
+ *  and "No history yet" over a series that arrived full of `NaN` reads as the
+ *  metric being new when the producer is broken. */
+export const DEFAULT_SPARKLINE_UNAVAILABLE_LABEL = 'No readings available'
 
 const NUMBER_FORMAT = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 })
 
@@ -86,16 +109,24 @@ export function formatSparklineValue(value: number): string {
   return NUMBER_FORMAT.format(value)
 }
 
+function isReading(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
 /**
  * The readings that can be plotted.
  *
  * A `null` from a gap in a series, or a `NaN` from a division a producer did
- * not guard, is dropped rather than coerced to `0`: plotting a missing reading
- * at the baseline draws a cliff that never happened, which is a worse lie than
- * the shorter series.
+ * not guard, is not plotted rather than coerced to `0`: plotting a missing
+ * reading at the baseline draws a cliff that never happened.
+ *
+ * This returns the readings ALONE, so it cannot tell a caller how many are
+ * missing. That is what {@link SparklineGeometry.gaps} is for, and what the
+ * accessible name reports — dropping a sample and then announcing the shorter
+ * count as the whole series is the defect, not the filter.
  */
 export function sparklineReadings(values: readonly number[]): number[] {
-  return values.filter((value) => typeof value === 'number' && Number.isFinite(value))
+  return values.filter(isReading)
 }
 
 /** Two decimals: enough for a 96px glyph, and it keeps the serialised `points`
@@ -114,9 +145,19 @@ export function sparklineGeometry(
   values: readonly number[],
   { width = DEFAULT_SPARKLINE_WIDTH, height = DEFAULT_SPARKLINE_HEIGHT, inset = DEFAULT_INSET }: SparklineGeometryOptions = {},
 ): SparklineGeometry {
-  const readings = sparklineReadings(values)
+  const samples = values.length
+  // Kept WITH their sample index: the index is the x axis, so a missing reading
+  // leaves a hole of the right width instead of the series closing up and
+  // drawing a straight line over the sample nobody has.
+  const plotted: Array<{ readonly index: number; readonly value: number }> = []
+  for (let index = 0; index < samples; index += 1) {
+    const value = values[index]
+    if (isReading(value)) plotted.push({ index, value })
+  }
+  const readings = plotted.map((entry) => entry.value)
+  const gaps = samples - readings.length
   if (readings.length === 0) {
-    return { readings, points: [], min: 0, max: 0, first: 0, last: 0, direction: 'flat' }
+    return { readings, points: [], segments: [], gaps, min: 0, max: 0, first: 0, last: 0, direction: 'flat' }
   }
 
   // Folded rather than `Math.min(...readings)`: a spread of a long series
@@ -137,18 +178,38 @@ export function sparklineGeometry(
   const left = inset
   const right = width - inset
 
-  const points = readings.map((value, index) => ({
-    // A single reading sits in the middle rather than at the left edge, where
-    // it reads as the start of a line whose rest failed to render.
-    x: round(readings.length === 1 ? width / 2 : left + ((right - left) * index) / (readings.length - 1)),
+  const points = plotted.map(({ index, value }) => ({
+    // A series of ONE SAMPLE sits in the middle rather than at the left edge,
+    // where it reads as the start of a line whose rest failed to render. A
+    // single reading among several samples keeps its own position — that is the
+    // one thing that says where in the window the reading is.
+    x: round(samples <= 1 ? width / 2 : left + ((right - left) * index) / (samples - 1)),
     // `span === 0` is the stable metric. Mid-height is the honest render of it;
     // dividing by the span here is the NaN that erases the whole polyline.
     y: round(span === 0 ? height / 2 : bottom - ((bottom - top) * (value - min)) / span),
   }))
 
+  // One segment per run of CONSECUTIVE samples. A run break is a gap, and a
+  // stroke across it would state a movement between two readings that are not
+  // next to each other.
+  const segments: SparklinePoint[][] = []
+  let run: SparklinePoint[] = []
+  let previous = Number.NEGATIVE_INFINITY
+  plotted.forEach(({ index }, position) => {
+    if (index !== previous + 1 && run.length > 0) {
+      segments.push(run)
+      run = []
+    }
+    run.push(points[position] as SparklinePoint)
+    previous = index
+  })
+  if (run.length > 0) segments.push(run)
+
   return {
     readings,
     points,
+    segments,
+    gaps,
     min,
     max,
     first,
@@ -168,26 +229,35 @@ export interface SparklineLabelOptions {
 }
 
 /**
- * The accessible name: metric, how many readings, the range, and the direction.
+ * The accessible name: metric, how many readings, how many are missing, the
+ * range, and the direction.
  *
- * Both halves are load-bearing. The range without the direction describes a
- * shape that could have been walked in either order; the direction without the
- * range says "rising" about a metric that moved by a rounding error.
+ * All of it is load-bearing. The range without the direction describes a shape
+ * that could have been walked in either order; the direction without the range
+ * says "rising" about a metric that moved by a rounding error; and the count
+ * without the gaps is the number of readings that SURVIVED announced as the
+ * number that were taken — the shape a reader cannot see is exactly the one
+ * this sentence exists to carry.
  */
 export function sparklineLabel(
   values: readonly number[],
   { label = DEFAULT_SPARKLINE_LABEL, format = formatSparklineValue }: SparklineLabelOptions = {},
 ): string {
-  const { readings, min, max, first, last, direction } = sparklineGeometry(values)
-  if (readings.length === 0) return `${label}: no readings yet`
-  if (readings.length === 1) return `${label}: one reading, ${format(first)}`
-  if (max === min) return `${label}: ${readings.length} readings, unchanged at ${format(first)}`
+  const { readings, gaps, min, max, first, last, direction } = sparklineGeometry(values)
+  // The card's own word for a figure it does not have is "Not available"; a
+  // series uses the same word rather than a second vocabulary for one fact.
+  const missing = gaps === 0 ? '' : `, ${gaps} not available`
+  // "no readings yet" is a claim about a NEW metric. A series that arrived and
+  // was unreadable is a different state and must not borrow that sentence.
+  if (readings.length === 0) return gaps === 0 ? `${label}: no readings yet` : `${label}: no readings${missing}`
+  if (readings.length === 1) return `${label}: one reading${missing}, ${format(first)}`
+  if (max === min) return `${label}: ${readings.length} readings${missing}, unchanged at ${format(first)}`
   // A series can cover ground and come back — the range is real, the net move
   // is not, and "flat" alone would hide the first while "rising" would invent
   // the second.
   const movement = direction === 'flat' ? 'net unchanged' : direction
   return (
-    `${label}: ${readings.length} readings, range ${format(min)} to ${format(max)}, ` +
+    `${label}: ${readings.length} readings${missing}, range ${format(min)} to ${format(max)}, ` +
     `${movement} from ${format(first)} to ${format(last)}`
   )
 }
@@ -200,8 +270,12 @@ export interface SparklineProps {
   format?: (value: number) => string
   width?: number
   height?: number
-  /** Shown instead of a line when there is nothing to plot. */
+  /** Shown instead of a line when the metric has no history yet. */
   emptyLabel?: string
+  /** Shown instead of a line when every sample arrived unreadable — a different
+   *  state from "no history yet", and one the reader has to be able to tell
+   *  apart, because one is a new metric and the other is a broken producer. */
+  unavailableLabel?: string
   className?: string
 }
 
@@ -213,32 +287,40 @@ export function Sparkline({
   width = DEFAULT_SPARKLINE_WIDTH,
   height = DEFAULT_SPARKLINE_HEIGHT,
   emptyLabel = DEFAULT_SPARKLINE_EMPTY_LABEL,
+  unavailableLabel = DEFAULT_SPARKLINE_UNAVAILABLE_LABEL,
   className,
 }: SparklineProps): ReactElement {
   const geometry = sparklineGeometry(values, { width, height })
   const accessibleName = sparklineLabel(values, { label, format })
 
   if (geometry.points.length === 0) {
-    // Words, not a flat line at zero. The metric name stays in the reading
-    // order for assistive tech, where "No history yet" on its own would be one
-    // of several unattributed phrases on a deck of cards.
+    // Words, not a flat line at zero. The sentence assistive tech gets is the
+    // same one the chart would have carried, so a deck of cards never produces
+    // an unattributed phrase — and a series that arrived unreadable says that,
+    // rather than borrowing the copy for a metric with no history yet.
     return (
-      <span data-sparkline="empty" className={joinClasses('text-[11px] text-muted-foreground', className)}>
-        <span className="sr-only">{label}: </span>
-        {emptyLabel}
+      <span
+        data-sparkline={geometry.gaps > 0 ? 'unavailable' : 'empty'}
+        className={joinClasses('text-[11px] text-muted-foreground', className)}
+      >
+        <span className="sr-only">{accessibleName}</span>
+        <span aria-hidden="true">{geometry.gaps > 0 ? unavailableLabel : emptyLabel}</span>
       </span>
     )
   }
 
-  const isPoint = geometry.points.length === 1
+  const drawsLine = geometry.segments.some((segment) => segment.length > 1)
   const end = geometry.points[geometry.points.length - 1] as SparklinePoint
 
   return (
     <svg
       role="img"
       aria-label={accessibleName}
-      data-sparkline={isPoint ? 'point' : 'line'}
+      data-sparkline={drawsLine ? 'line' : 'point'}
       data-direction={geometry.direction}
+      // Readable from the DOM because "the line broke here" is not a thing a
+      // caller can measure off a `points` attribute.
+      data-gaps={geometry.gaps > 0 ? geometry.gaps : undefined}
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
@@ -247,17 +329,31 @@ export function Sparkline({
       // order; the label is what carries this element, not focus.
       focusable="false"
     >
-      {isPoint ? null : (
-        <polyline
-          points={sparklinePointsAttribute(geometry.points)}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={STROKE_WIDTH}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          vectorEffect="non-scaling-stroke"
-        />
-      )}
+      {/* One stroke per run of consecutive samples. A reading with no neighbour
+          is a dot for the same reason a one-reading series is: there is nothing
+          beside it to draw a line to, and drawing one anyway would invent the
+          sample the gap is there to report. */}
+      {geometry.segments.map((segment, index) => {
+        const key = `segment-${index}`
+        if (segment.length > 1) {
+          return (
+            <polyline
+              key={key}
+              points={sparklinePointsAttribute(segment)}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={STROKE_WIDTH}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          )
+        }
+        const only = segment[0] as SparklinePoint
+        // The latest-reading dot below already paints this one.
+        if (only.x === end.x && only.y === end.y) return null
+        return <circle key={key} cx={only.x} cy={only.y} r={DOT_RADIUS} fill="currentColor" />
+      })}
       {/* The latest reading, marked. Without it the eye has to decide which end
           of the line is "now", and half the readers guess wrong. */}
       <circle cx={end.x} cy={end.y} r={DOT_RADIUS} fill="currentColor" />

@@ -14,9 +14,9 @@
  * `useAsyncResource` and asserts the empty copy is nowhere on the screen.
  */
 
-import { useState } from 'react'
+import { useState, type ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createEvent, fireEvent, render, screen } from '@testing-library/react'
+import { act, createEvent, fireEvent, render, screen } from '@testing-library/react'
 
 import { useAsyncResource, type AsyncResourceState } from './async'
 import {
@@ -60,8 +60,56 @@ function press(target: HTMLElement, key: string): Event {
   return event
 }
 
-/** `insightPageSize` warns once per distinct bad value for the life of the
- *  module, so every test below uses a page size no other test uses. */
+/**
+ * A load the test resolves by hand, so "while the refresh is in flight" is a
+ * window rather than a race. Every refresh assertion below is about what the
+ * reader is standing in DURING the reload, which a self-resolving promise gives
+ * no chance to observe.
+ */
+function gate(): { promise: Promise<readonly Insight[]>; settle: (value: readonly Insight[]) => Promise<void> } {
+  let resolve!: (value: readonly Insight[]) => void
+  const promise = new Promise<readonly Insight[]>((done) => {
+    resolve = done
+  })
+  return {
+    promise,
+    settle: async (value) => {
+      await act(async () => {
+        resolve(value)
+        await promise
+      })
+    },
+  }
+}
+
+/** A deck behind a reloadable resource, with every load held open. */
+function reloadableDeck(): { Screen: () => ReactElement; gates: Array<ReturnType<typeof gate>> } {
+  const gates: Array<ReturnType<typeof gate>> = []
+  function Screen(): ReactElement {
+    const [reload, setReload] = useState(0)
+    const state = useAsyncResource<readonly Insight[]>({
+      load: () => {
+        const next = gate()
+        gates.push(next)
+        return next.promise
+      },
+      deps: [reload],
+    })
+    return (
+      <>
+        <button type="button" onClick={() => setReload((n) => n + 1)}>
+          Refresh
+        </button>
+        <InsightDeck state={state} empty={{ title: 'No insights yet' }} pageSize={2} />
+      </>
+    )
+  }
+  return { Screen, gates }
+}
+
+/** `insightPageSize` names a bounded number of bad values per FAULT for the life
+ *  of the module, so every test below uses a page size no other test uses, and
+ *  the one test whose subject IS that cache imports its own copy. */
 let warnings: string[] = []
 
 beforeEach(() => {
@@ -278,6 +326,29 @@ describe('insight paging', () => {
     expect(insightPageCount(-4, 3)).toBe(1)
     expect(insightPageSlice([1, 2, 3], Number.NaN, 3)).toEqual([1, 2, 3])
   })
+
+  it('stops naming bad page sizes rather than growing the warning cache without a bound', async () => {
+    // The cache lives for the life of the MODULE, so this test owns its own
+    // copy. Pure function calls only — nothing is rendered from it, so the
+    // second React this pulls in is never used.
+    vi.resetModules()
+    const fresh = await import('./insight-card')
+
+    // 500 distinct fractional sizes is one drag-resize of a deck whose page
+    // size is measured from its viewport — the very case the module cites for
+    // normalising instead of throwing. Dedupe by VALUE kept 499 entries and
+    // printed 499 lines of the same sentence about a different decimal.
+    for (let index = 0; index < 500; index += 1) fresh.insightPageSize(2 + (index + 1) / 1000)
+    expect(warnings).toHaveLength(9)
+    expect(warnings[0]).toContain('2.001')
+    expect(warnings[8]).toContain('suppressed')
+
+    const printed = warnings.length
+    for (let index = 0; index < 500; index += 1) fresh.insightPageSize(9 + (index + 1) / 997)
+    // Latched: the bucket now holds nothing and prints nothing, however many
+    // more values arrive.
+    expect(warnings).toHaveLength(printed)
+  })
 })
 
 // ── the deck ──────────────────────────────────────────────────────────────
@@ -387,9 +458,93 @@ describe('<InsightDeck>', () => {
   })
 
   it('keeps the reader on their page across a refresh', async () => {
-    function Screen() {
+    const { Screen, gates } = reloadableDeck()
+    render(<Screen />)
+    await gates[0]!.settle(six)
+    expect(screen.getByText('Page 1 of 3')).toBeTruthy()
+
+    fireEvent.keyDown(deck(), { key: 'ArrowRight' })
+    expect(screen.getByText('Page 2 of 3')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    // The reload is in flight and the reader is still reading. The deck used to
+    // hand this state straight to `AsyncView`, which swapped the whole ready
+    // subtree for a busy block; the page NUMBER survived that because it is held
+    // above the boundary, and everything the reader was looking at did not.
+    expect(screen.getByText('Page 2 of 3')).toBeTruthy()
+    expect(titles()).toEqual(['Metric 3', 'Metric 4'])
+    expect(deck().getAttribute('aria-busy')).toBe('true')
+
+    await gates[1]!.settle(six)
+    expect(screen.getByText('Page 2 of 3')).toBeTruthy()
+    // A poll the reader did not ask for must not take their place from them.
+    expect(titles()).toEqual(['Metric 3', 'Metric 4'])
+    expect(deck().getAttribute('aria-busy')).toBe('false')
+  })
+
+  it('keeps keyboard focus through a refresh instead of dropping the reader on the body', async () => {
+    const { Screen, gates } = reloadableDeck()
+    render(<Screen />)
+    await gates[0]!.settle(six)
+
+    const next = screen.getByRole('button', { name: 'Next insights' })
+    next.focus()
+    expect(document.activeElement).toBe(next)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    // Measured before this fix: `document.activeElement` was `document.body`
+    // both during and after the reload, so a keyboard reader paging a polling
+    // deck was returned to the top of the document on every poll.
+    expect(document.activeElement).toBe(next)
+
+    await gates[1]!.settle(six)
+    expect(document.activeElement).toBe(next)
+  })
+
+  it('does not re-mount a settled card on a refresh, so nothing re-animates', async () => {
+    const { Screen, gates } = reloadableDeck()
+    render(<Screen />)
+    await gates[0]!.settle(six)
+    const before = cards()
+    expect(before).toHaveLength(2)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    await gates[1]!.settle(six)
+
+    const after = cards()
+    // `.agent-arrive` runs on MOUNT, so a new node is a replayed entrance. The
+    // whole visible page used to flash on every poll — 600ms of arrival plus a
+    // 50ms stagger — on cards whose numbers had not moved.
+    expect(after).toHaveLength(before.length)
+    after.forEach((card, index) => expect(card).toBe(before[index]))
+    expect(before.every((card) => card.isConnected)).toBe(true)
+  })
+
+  it('still refuses to paint stale insights over an empty answer', async () => {
+    const { Screen, gates } = reloadableDeck()
+    render(<Screen />)
+    await gates[0]!.settle(six)
+    expect(cards()).toHaveLength(2)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    await gates[1]!.settle([])
+    // Carrying the last page across a WAIT must never become carrying it across
+    // an ANSWER: `empty` is what the resource said, and it replaces what is on
+    // screen. The async module's invariant is untouched by the bridge.
+    expect(screen.getByText('No insights yet')).toBeTruthy()
+    expect(cards()).toHaveLength(0)
+  })
+
+  it('still renders a failed refresh as a failure, never as the insights it used to have', async () => {
+    function Screen(): ReactElement {
       const [reload, setReload] = useState(0)
-      const state = useAsyncResource<readonly Insight[]>({ load: async () => six, deps: [reload] })
+      const state = useAsyncResource<readonly Insight[]>({
+        load: async () => {
+          if (reload === 0) return six
+          throw new Error('Insights are unavailable right now.')
+        },
+        deps: [reload],
+      })
       return (
         <>
           <button type="button" onClick={() => setReload((n) => n + 1)}>
@@ -402,17 +557,12 @@ describe('<InsightDeck>', () => {
 
     render(<Screen />)
     await screen.findByText('Page 1 of 3')
-    fireEvent.keyDown(deck(), { key: 'ArrowRight' })
-    expect(screen.getByText('Page 2 of 3')).toBeTruthy()
-
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
-    // The refresh really does tear the ready subtree down — which is why page
-    // state held inside it did not survive one, and why it is held above.
-    expect(screen.queryByText('Page 2 of 3')).toBeNull()
 
-    expect(await screen.findByText('Page 2 of 3')).toBeTruthy()
-    // A poll the reader did not ask for must not take their place from them.
-    expect(titles()).toEqual(['Metric 3', 'Metric 4'])
+    await screen.findByText('Insights are unavailable right now.')
+    expect(cards()).toHaveLength(0)
+    expect(screen.queryByText('No insights yet')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
   })
 
   it('shows every insight even when the page size is not a whole number', () => {
@@ -482,6 +632,144 @@ describe('<InsightDeck>', () => {
     expect(dot.className).toContain('w-6')
     // …and the graphic stays 8px: the padding carries the target, not the dot.
     expect(dot.querySelector('span')?.className).toContain('h-2 w-2')
+  })
+
+  it('paints the inactive page dot in a token that clears the 3:1 non-text floor', () => {
+    render(<InsightDeck state={ready(six)} empty={{ title: 'No insights yet' }} pageSize={2} />)
+    const inactive = screen.getByRole('button', { name: 'Page 2 of 3' }).querySelector('span')
+    const current = screen.getByRole('button', { name: 'Page 1 of 3' }).querySelector('span')
+
+    // `bg-border` is the divider tint, tuned to be barely there: measured in
+    // Chromium it painted rgb(204,205,211) on rgb(236,236,241) — 1.35:1, under
+    // half of what WCAG 2.2 SC 1.4.11 asks of a graphic that carries meaning.
+    // The text-grade muted foreground is what this file's own sparkline note
+    // says clears that bar, and it measures 5.32:1 on the same background.
+    expect(inactive?.className).toContain('bg-muted-foreground')
+    expect(inactive?.className).not.toContain('bg-border')
+
+    // Once the inactive dot is legible, tone alone can no longer say which page
+    // is current — foreground on muted-foreground is 2.27:1 in dark. The second
+    // channel is shape: same 8px height, wider bar, which also survives forced
+    // colours where every token collapses.
+    expect(current?.className).toContain('bg-foreground')
+    expect(current?.className).toContain('h-2 w-4')
+    expect(inactive?.className).toContain('h-2 w-2')
+  })
+
+  it('puts focus on the deck when a page turn destroys the control the reader was on', () => {
+    const onClick = vi.fn()
+    const actionable = six.map((item) => ({ ...item, action: { label: `Open ${item.id}`, onClick } }))
+    render(<InsightDeck state={ready(actionable)} empty={{ title: 'No insights yet' }} pageSize={2} />)
+
+    const action = screen.getByRole('button', { name: 'Open 1' })
+    action.focus()
+    expect(document.activeElement).toBe(action)
+
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'ArrowRight' })
+    expect(titles()).toEqual(['Metric 3', 'Metric 4'])
+    // The card the reader was standing on is removed by design — the page
+    // prefix in the key is what replays the arrival. Measured before this fix,
+    // focus went to `document.body`. It goes to the deck: the paging owner, a
+    // tab stop while there is a page to reach, and the one element from which
+    // every paging key still works.
+    expect(document.activeElement).toBe(deck())
+    expect(onClick).not.toHaveBeenCalled()
+  })
+
+  it('leaves focus on a pager control that survives the page turn', () => {
+    render(<InsightDeck state={ready(six)} empty={{ title: 'No insights yet' }} pageSize={2} />)
+    const next = screen.getByRole('button', { name: 'Next insights' })
+    next.focus()
+
+    fireEvent.click(next)
+    expect(screen.getByText('Page 2 of 3')).toBeTruthy()
+    // Taking focus off the button the reader is clicking would be the same
+    // defect pointed the other way, so the recovery is scoped to the cards.
+    expect(document.activeElement).toBe(next)
+  })
+
+  it('leaves the arrow keys to a card action that is an ARIA widget', () => {
+    const combobox = (
+      <button type="button" role="combobox" aria-expanded={false}>
+        Choose a window
+      </button>
+    )
+    const withWidget = [{ ...insight('1'), action: combobox }, insight('2'), insight('3'), insight('4')]
+    render(<InsightDeck state={ready(withWidget)} empty={{ title: 'No insights yet' }} pageSize={2} />)
+
+    const widget = screen.getByRole('combobox')
+    widget.focus()
+    // A combobox is a `<button>` far more often than a `<select>`, so a guard
+    // that reads tag names lets the deck steal the arrows the widget navigates
+    // with. Measured: this key was consumed and the deck paged to 2.
+    expect(press(widget, 'ArrowRight').defaultPrevented).toBe(false)
+    expect(screen.getByText('Page 1 of 2')).toBeTruthy()
+    expect(titles()).toEqual(['Metric 1', 'Metric 2'])
+  })
+
+  it('leaves the arrow keys to a widget the focused element only sits inside', () => {
+    const slider = (
+      <div role="slider" aria-label="Window" aria-valuenow={2} aria-valuemin={1} aria-valuemax={7}>
+        <button type="button">Drag</button>
+      </div>
+    )
+    const withWidget = [{ ...insight('1'), action: slider }, insight('2'), insight('3'), insight('4')]
+    render(<InsightDeck state={ready(withWidget)} empty={{ title: 'No insights yet' }} pageSize={2} />)
+
+    const handle = screen.getByRole('button', { name: 'Drag' })
+    handle.focus()
+    // Focus inside a composite widget lands on a descendant, so the role that
+    // owns the keys is on an ancestor and not on the event target.
+    expect(press(handle, 'ArrowLeft').defaultPrevented).toBe(false)
+    expect(press(handle, 'End').defaultPrevented).toBe(false)
+    expect(screen.getByText('Page 1 of 2')).toBeTruthy()
+  })
+
+  it('reports the page the reader ends up on, including one the deck clamped them to', () => {
+    const reported: number[] = []
+    const record = (page: number): void => {
+      reported.push(page)
+    }
+    const { rerender } = render(
+      <InsightDeck state={ready(six)} empty={{ title: 'No insights yet' }} pageSize={2} onPageChange={record} />,
+    )
+    press(deck(), 'End')
+    expect(screen.getByText('Page 3 of 3')).toBeTruthy()
+    expect(reported).toEqual([2])
+
+    // The list shrinks under the reader — a poll that returned fewer insights.
+    // The clamp shows the last page that exists; before this fix the caller was
+    // never told, so a parent persisting the page to a URL or to storage kept
+    // writing a page number nothing could reach.
+    rerender(
+      <InsightDeck
+        state={ready(six.slice(0, 2))}
+        empty={{ title: 'No insights yet' }}
+        pageSize={2}
+        onPageChange={record}
+      />,
+    )
+    expect(reported).toEqual([2, 0])
+
+    // Clamped, not written back: the list grows again and the reader is where
+    // they were, which is also what the caller hears.
+    rerender(<InsightDeck state={ready(six)} empty={{ title: 'No insights yet' }} pageSize={2} onPageChange={record} />)
+    expect(screen.getByText('Page 3 of 3')).toBeTruthy()
+    expect(reported).toEqual([2, 0, 2])
+  })
+
+  it('keeps the page announcement mounted when the deck collapses to one page', () => {
+    const { rerender } = render(<InsightDeck state={ready(six)} empty={{ title: 'No insights yet' }} pageSize={2} />)
+    const status = screen.getByRole('status')
+    expect(status.textContent).toBe('Page 1 of 3')
+
+    rerender(<InsightDeck state={ready(six.slice(0, 2))} empty={{ title: 'No insights yet' }} pageSize={2} />)
+    // Held inside the `pageCount > 1` branch, this element was destroyed along
+    // with the pager — so the one change most worth announcing was the change
+    // that removed the thing that would have announced it. Same node, new text.
+    expect(screen.getByRole('status')).toBe(status)
+    expect(status.textContent).toBe('Page 1 of 1')
+    expect(screen.queryByRole('button', { name: 'Next insights' })).toBeNull()
   })
 
   it('keeps the pager focusable at the ends instead of dropping it out of the tab order', () => {

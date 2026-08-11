@@ -27,10 +27,11 @@
  * (`docs/async-state-module.md`).
  *
  * Motion: cards arrive with `.agent-arrive`, staggered by `--stagger-index`
- * from the deck, and a page turn remounts them so the next page arrives as a
- * sequence instead of swapping text under cards that never moved. Every piece
- * of that is decoration, carries no `data-motion`, and collapses under
- * `prefers-reduced-motion` — the live label included.
+ * from the deck, and a page TURN remounts them so the next page arrives as a
+ * sequence instead of swapping text under cards that never moved. A REFRESH is
+ * the opposite case and gets the opposite treatment — see the deck's own note.
+ * Every piece of that is decoration, carries no `data-motion`, and collapses
+ * under `prefers-reduced-motion` — the live label included.
  *
  * The live label does NOT opt out, and the reasoning is worth stating because
  * the opposite reads plausible. What tells the reader a figure is still being
@@ -45,6 +46,8 @@
 import {
   isValidElement,
   useCallback,
+  useEffect,
+  useRef,
   useState,
   type CSSProperties,
   type KeyboardEvent,
@@ -283,8 +286,10 @@ function renderInsightAction(action: InsightAction | ReactElement): ReactNode {
 // ── the deck ──────────────────────────────────────────────────────────────
 
 export interface Insight extends InsightCardProps {
-  /** Stable across refreshes: it keys the card, and a key that moves replays
-   *  the arrival on every poll. */
+  /** Stable across refreshes: it keys the card. Paired with the deck holding
+   *  the last loaded page across a reload, a stable id is what lets a settled
+   *  card keep its own DOM node — and therefore not replay its arrival — when
+   *  a poll returns the same insight. */
   readonly id: string
 }
 
@@ -293,7 +298,65 @@ export const DEFAULT_INSIGHT_PAGE_SIZE = 3
  *  of controls; the counter and the arrows carry it from there. */
 const MAX_PAGE_DOTS = 8
 
-const warnedPageSizes = new Set<number>()
+/**
+ * What is wrong with a page size — and the key the warning dedupes on.
+ *
+ * Dedupe by VALUE alone is the leak: the size is often computed from a measured
+ * viewport, a drag-resize produces a new fractional value on every frame, and a
+ * `Set<number>` that never forgets then grows once per frame while the console
+ * fills with the same sentence about a different decimal. Measured: 500 distinct
+ * fractional sizes, 499 retained entries, 499 lines.
+ *
+ * The fault is the useful unit — a caller who passed `2.5` has one mistake to
+ * fix, not five hundred — so the cache is a fixed three buckets, each of which
+ * names the first {@link MAX_NAMED_PAGE_SIZES} distinct values it sees and then
+ * latches shut and drops what it was holding.
+ */
+type PageSizeFault = 'not-a-number' | 'below-one' | 'fractional'
+
+const PAGE_SIZE_FAULT_REASON: Record<PageSizeFault, string> = {
+  'not-a-number': 'A page size that is not a number cannot count cards at all.',
+  'below-one': 'A page size below one card gives the deck a page nothing fits on.',
+  fractional: 'A fractional page size hides cards on no page at all.',
+}
+
+/** Distinct offending values each fault names before it goes quiet. Naming the
+ *  first few is the developer aid; naming the five-hundredth is noise sitting on
+ *  top of a leak. */
+const MAX_NAMED_PAGE_SIZES = 8
+
+const warnedPageSizes: Record<PageSizeFault, { readonly named: Set<number>; latched: boolean }> = {
+  'not-a-number': { named: new Set<number>(), latched: false },
+  'below-one': { named: new Set<number>(), latched: false },
+  fractional: { named: new Set<number>(), latched: false },
+}
+
+function pageSizeFault(pageSize: number): PageSizeFault {
+  if (!Number.isFinite(pageSize)) return 'not-a-number'
+  if (pageSize < 1) return 'below-one'
+  return 'fractional'
+}
+
+function warnPageSize(pageSize: number): void {
+  const fault = pageSizeFault(pageSize)
+  const record = warnedPageSizes[fault]
+  // Once per distinct value, and only while the bucket is still naming values:
+  // this runs on every render of every deck, and a warning repeated sixty times
+  // a second is one nobody reads.
+  if (record.latched || record.named.has(pageSize)) return
+  record.named.add(pageSize)
+  console.warn(
+    `[insight-card] pageSize must be a whole number of cards, 1 or more — received ${String(pageSize)}. ` +
+      `Using ${DEFAULT_INSIGHT_PAGE_SIZE}. ${PAGE_SIZE_FAULT_REASON[fault]}`,
+  )
+  if (record.named.size >= MAX_NAMED_PAGE_SIZES) {
+    // Nothing more will be printed for this fault, so the values it was keeping
+    // in order to dedupe are dead weight — the bucket ends holding nothing.
+    record.named.clear()
+    record.latched = true
+    console.warn(`[insight-card] further "${fault}" pageSize warnings are suppressed.`)
+  }
+}
 
 /**
  * The page size — ONE definition, read by the count and by the slice.
@@ -312,15 +375,7 @@ const warnedPageSizes = new Set<number>()
  */
 export function insightPageSize(pageSize: number = DEFAULT_INSIGHT_PAGE_SIZE): number {
   if (Number.isInteger(pageSize) && pageSize >= 1) return pageSize
-  // Once per distinct value: this runs on every render of every deck, and a
-  // warning repeated sixty times a second is one nobody reads.
-  if (!warnedPageSizes.has(pageSize)) {
-    warnedPageSizes.add(pageSize)
-    console.warn(
-      `[insight-card] pageSize must be a whole number of cards, 1 or more — received ${String(pageSize)}. ` +
-        `Using ${DEFAULT_INSIGHT_PAGE_SIZE}. A fractional page size hides cards on no page at all.`,
-    )
-  }
+  warnPageSize(pageSize)
   return DEFAULT_INSIGHT_PAGE_SIZE
 }
 
@@ -365,6 +420,15 @@ export interface InsightDeckProps {
   loadingLabel?: string
   retryLabel?: string
   className?: string
+  /**
+   * The page the reader is ON, whatever moved them there.
+   *
+   * That includes the render-time clamp: a list that shrinks under a reader
+   * standing on page 3 leaves them on the last page that exists, and a parent
+   * persisting this to a URL or to storage would otherwise keep writing a page
+   * number nothing can reach. Reported once per effective page, never twice for
+   * the same one.
+   */
   onPageChange?: (page: number) => void
 }
 
@@ -372,15 +436,34 @@ export interface InsightDeckProps {
  * The paged deck.
  *
  * `AsyncView` owns the non-`ready` branches, which is what makes the invariant
- * structural here: this component has no branch of its own that could render
- * the empty copy over a failure, because it never sees a state that is not
- * `ready`.
+ * structural here: the cards are rendered from one branch of that component,
+ * and no branch of this one could paint the empty copy over a failure.
  *
- * The page number is held HERE, above that boundary, and not inside the
- * component that renders the cards. A refresh re-enters `loading`, `AsyncView`
- * swaps the ready subtree for the busy block, and every piece of state inside it
- * is destroyed — so a poll the reader did not ask for would throw them back to
- * page 1 mid-read. Above the boundary it survives the round trip.
+ * **A REFRESH DOES NOT REPLACE WHAT IS ON SCREEN.** `useAsyncResource` re-enters
+ * `loading` with no value held on every reload, and handing that straight to
+ * `AsyncView` swaps the ready subtree for the busy block — which destroys the
+ * DOM the reader is standing in. Measured, on a real reload: `document.
+ * activeElement` fell to `document.body`, so a keyboard reader mid-page lost
+ * their place on every automatic poll; and every settled card was a NEW node, so
+ * `.agent-arrive` replayed across the whole visible page — the exact flash this
+ * surface's motion rules exist to prevent. Holding the page NUMBER above the
+ * boundary fixed the counter and none of that, because the subtree under it was
+ * still being torn down.
+ *
+ * So the deck holds the last insights it rendered and keeps handing them to the
+ * SAME `AsyncView` branch while a reload is in flight: same element, same
+ * position, same keys — React reuses the nodes, focus stays where the reader put
+ * it, and nothing re-animates. `aria-busy` on the region is the signal that a
+ * load is in flight; a per-card one is `live` on the card.
+ *
+ * The bridge is only ever over a WAIT. `error` and `empty` are answers about the
+ * resource, so they drop what was held and render their own branch — a failed
+ * fetch still cannot paint stale numbers, and the async module's invariant is
+ * untouched.
+ *
+ * It bridges one resource, not one component: if the SUBJECT changes (a
+ * different workspace, a different window), give the deck a `key` so it remounts
+ * rather than showing the previous subject's numbers while the new ones load.
  */
 export function InsightDeck({
   state,
@@ -393,9 +476,26 @@ export function InsightDeck({
   onPageChange,
 }: InsightDeckProps): ReactElement {
   const [page, setPage] = useState(0)
-  const selectPage = useCallback(
+  const [held, setHeld] = useState<readonly Insight[] | null>(null)
+
+  // Adjusted during render, which is what keeps the swap out of the DOM: an
+  // effect runs after the commit, so the teardown this exists to prevent would
+  // already have happened by the time it fired.
+  const answered = state.status === 'error' || state.status === 'empty'
+  const carried = state.status === 'ready' ? state.value : answered ? null : held
+  if (carried !== held) setHeld(carried)
+
+  const shown: AsyncResourceState<readonly Insight[]> =
+    carried !== null && state.status !== 'ready' ? { status: 'ready', value: carried, retry: state.retry } : state
+  const refreshing = shown !== state
+
+  // The last page reported to the caller. A clamp and a navigation both settle
+  // on an effective page, and the caller hears about each one exactly once.
+  const reported = useRef(0)
+  const settlePage = useCallback(
     (next: number) => {
-      setPage(next)
+      if (reported.current === next) return
+      reported.current = next
       onPageChange?.(next)
     },
     [onPageChange],
@@ -403,7 +503,7 @@ export function InsightDeck({
 
   return (
     <AsyncView
-      state={state}
+      state={shown}
       empty={empty}
       loadingLabel={loadingLabel}
       retryLabel={retryLabel}
@@ -418,11 +518,69 @@ export function InsightDeck({
           pageSize={pageSize}
           className={className}
           page={page}
-          onSelectPage={selectPage}
+          busy={refreshing}
+          onSelectPage={setPage}
+          onPageSettled={settlePage}
         />
       )}
     </AsyncView>
   )
+}
+
+/** Tag names whose own keyboard model owns the arrow keys. */
+const EDITABLE_TAG = /^(INPUT|TEXTAREA|SELECT)$/
+
+/**
+ * ARIA roles that own the arrow keys, checked because the TAG name cannot
+ * answer the question.
+ *
+ * `action` takes an arbitrary element, so a card's next action is routinely a
+ * composed widget: a combobox is a `<button aria-expanded>` far more often than
+ * it is a `<select>`, a slider is a `<div role="slider">`, a menu button opens a
+ * `role="menu"`. Measured on the documented object form: `<button
+ * role="combobox">` inside a card had its `ArrowRight` swallowed by the deck,
+ * which then paged away from the control the reader was operating.
+ *
+ * Walked up to the deck rather than read off the event target, because focus
+ * inside a composite widget lands on a descendant — the `role="grid"` is the
+ * ancestor of the `role="gridcell"` that has focus.
+ */
+const ARROW_KEY_ROLES: ReadonlySet<string> = new Set([
+  'application',
+  'combobox',
+  'grid',
+  'gridcell',
+  'listbox',
+  'menu',
+  'menubar',
+  'menuitem',
+  'menuitemcheckbox',
+  'menuitemradio',
+  'option',
+  'radiogroup',
+  'row',
+  'scrollbar',
+  'searchbox',
+  'slider',
+  'spinbutton',
+  'tab',
+  'tablist',
+  'textbox',
+  'tree',
+  'treegrid',
+  'treeitem',
+])
+
+function ownsArrowKeys(target: EventTarget | null, boundary: EventTarget | null): boolean {
+  let node = target instanceof Element ? target : null
+  while (node !== null && node !== boundary) {
+    if (EDITABLE_TAG.test(node.tagName)) return true
+    if (node instanceof HTMLElement && node.isContentEditable) return true
+    const role = node.getAttribute('role')
+    if (role !== null && role.split(/\s+/).some((token) => ARROW_KEY_ROLES.has(token))) return true
+    node = node.parentElement
+  }
+  return false
 }
 
 function InsightPages({
@@ -431,23 +589,59 @@ function InsightPages({
   pageSize,
   className,
   page,
+  busy,
   onSelectPage,
+  onPageSettled,
 }: {
   insights: readonly Insight[]
   label: string
   pageSize: number
   className?: string
   page: number
+  busy: boolean
   onSelectPage: (page: number) => void
+  onPageSettled: (page: number) => void
 }): ReactElement {
   const size = insightPageSize(pageSize)
   const pageCount = insightPageCount(insights.length, size)
   // Clamped at render, not only on navigation: the list can shrink between
   // renders (a retry returning fewer insights) and held state would point past
   // the end. Clamped rather than written back, so a list that grows again
-  // returns the reader to where they were.
+  // returns the reader to where they were — and the caller is TOLD which page
+  // that leaves them on, through `onPageSettled` below.
   const current = Math.min(Math.max(page, 0), pageCount - 1)
   const visible = insightPageSlice(insights, current, size)
+
+  const sectionRef = useRef<HTMLElement | null>(null)
+  const listRef = useRef<HTMLUListElement | null>(null)
+  /** Set by a page turn that was made from INSIDE the cards, which the turn is
+   *  about to replace. */
+  const recoverFocus = useRef(false)
+
+  // One report per effective page, from either cause. Held above this component
+  // so a remount cannot re-report a page the caller already has.
+  useEffect(() => {
+    onPageSettled(current)
+  }, [current, onPageSettled])
+
+  // Where focus goes on a page turn, decided rather than dropped.
+  //
+  // A page turn deliberately REMOUNTS the cards (the page-prefixed key — that is
+  // what replays the arrival), so a reader standing on a card's action is
+  // standing on a node that is about to be removed: measured, `document.
+  // activeElement` became `document.body`. The deck is the answer. It owns the
+  // paging, it survives the turn, it is a tab stop whenever there is a page to
+  // turn to, and every paging key works from it — so the reader keeps paging
+  // instead of being returned to the top of the document.
+  //
+  // A turn made from a PAGER control moves nothing: those buttons outlive the
+  // turn, and taking focus off the "Next insights" the reader is clicking would
+  // be the same defect pointed the other way.
+  useEffect(() => {
+    if (!recoverFocus.current) return
+    recoverFocus.current = false
+    sectionRef.current?.focus()
+  }, [current])
 
   /** `true` when the page actually moved — which is what decides whether the
    *  key that asked for it is consumed. */
@@ -455,6 +649,8 @@ function InsightPages({
     (next: number): boolean => {
       const clamped = Math.min(Math.max(next, 0), pageCount - 1)
       if (clamped === current) return false
+      const active = typeof document === 'undefined' ? null : document.activeElement
+      recoverFocus.current = active instanceof Node && (listRef.current?.contains(active) ?? false)
       onSelectPage(clamped)
       return true
     },
@@ -463,10 +659,10 @@ function InsightPages({
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>): void => {
     if (event.defaultPrevented) return
-    const target = event.target as HTMLElement | null
-    // A card's action may be a text field or a select; arrow keys belong to
-    // those before they belong to paging.
-    if (target && (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.isContentEditable)) return
+    // A card's action may be a text field, a select, or any ARIA widget whose
+    // own keyboard model owns the arrows; they belong to it before they belong
+    // to paging.
+    if (ownsArrowKeys(event.target, event.currentTarget)) return
     let moved = false
     switch (event.key) {
       case 'ArrowRight':
@@ -494,8 +690,14 @@ function InsightPages({
 
   return (
     <section
+      ref={sectionRef}
       aria-label={label}
       data-insight-deck=""
+      // Emitted in both states rather than added when the reload starts: a
+      // region that only gains the attribute while busy gives assistive tech no
+      // transition to report. The deck keeps its cards through the reload, so
+      // this is the only thing that says one is happening.
+      aria-busy={busy}
       className={joinClasses('space-y-3', className)}
       onKeyDown={onKeyDown}
       // The deck itself is the paging control, so it has to be somewhere a
@@ -506,22 +708,40 @@ function InsightPages({
       tabIndex={pageCount > 1 ? 0 : undefined}
       aria-keyshortcuts={pageCount > 1 ? 'ArrowLeft ArrowRight PageUp PageDown Home End' : undefined}
     >
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <ul ref={listRef} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {visible.map(({ id, style, ...card }, index) => (
           // The page index is in the key on purpose: a page turn is an arrival,
           // and reusing the node would swap the text under a card that never
           // moved. Remounting replays `.agent-arrive` with the new stagger.
+          //
+          // A REFRESH is the other case and the key is why it behaves the other
+          // way: the page has not changed and the id is stable, so the key
+          // matches, React keeps the node, and a card that was already settled
+          // does not arrive a second time. The key does BOTH jobs — but only
+          // because the deck now keeps this subtree mounted across a reload
+          // (see `InsightDeck`); a key is never compared across a teardown.
           <li key={`${current}:${id}`}>
             <InsightCard {...card} style={staggerStyle(index, style)} />
           </li>
         ))}
       </ul>
 
-      {pageCount > 1 ? (
-        <div className="flex items-center justify-between gap-2">
-          <p role="status" aria-live="polite" className="text-[11px] text-muted-foreground">
-            Page {current + 1} of {pageCount}
-          </p>
+      {/* The live region is mounted whatever shape the deck is in. Held inside
+          the `pageCount > 1` branch it was DESTROYED the moment a shrinking list
+          collapsed the deck onto one page — measured: a reader on page 3 of 3
+          watched the list drop to two insights, the counter unmounted with the
+          pager, and the one change most worth announcing was the change that
+          removed the thing that would have announced it. Mounted, its text goes
+          from "Page 3 of 3" to "Page 1 of 1" and the reader is told. */}
+      <div className={pageCount > 1 ? 'flex items-center justify-between gap-2' : undefined}>
+        <p
+          role="status"
+          aria-live="polite"
+          className={pageCount > 1 ? 'text-[11px] text-muted-foreground' : 'sr-only'}
+        >
+          Page {current + 1} of {pageCount}
+        </p>
+        {pageCount > 1 ? (
           <div className="flex items-center gap-1">
             <PagerButton label="Previous insights" glyph="‹" atEnd={current === 0} onClick={() => goTo(current - 1)} />
             {pageCount <= MAX_PAGE_DOTS
@@ -542,14 +762,32 @@ function InsightPages({
                     onClick={() => goTo(index)}
                     className="group flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
                   >
-                    {/* The hover now belongs to the target, not to the graphic:
+                    {/* `bg-muted-foreground`, NOT `bg-border`. A divider token is
+                        tuned to be barely there, and measured in Chromium the
+                        inactive dot painted rgb(204,205,211) on rgb(236,236,241)
+                        — 1.35:1, less than half the 3:1 WCAG 2.2 SC 1.4.11 asks
+                        of a meaningful graphic. This card's own sparkline note
+                        already says the text-grade muted foreground clears that
+                        bar and a divider tint does not; the dots are the same
+                        kind of graphic and now use the same token.
+
+                        The CURRENT page then needs a second channel, because
+                        tone alone no longer carries it: foreground against
+                        muted-foreground is 3.10:1 in light but 2.27:1 in dark.
+                        So the current page is a WIDER bar at the same 8px
+                        height — a difference in shape, which survives both a
+                        low-contrast theme and forced colours, and still sits
+                        inside the 24px target with the pitch unchanged.
+
+                        The hover belongs to the target, not to the graphic:
                         `group-hover` keeps the whole 24px square reactive
                         instead of only the 8px the eye is aiming at. */}
                     <span
                       aria-hidden="true"
-                      className={`block h-2 w-2 rounded-full transition ${
-                        index === current ? 'bg-foreground' : 'bg-border group-hover:bg-muted-foreground'
-                      }`}
+                      className={joinClasses(
+                        'block rounded-full transition',
+                        index === current ? 'h-2 w-4 bg-foreground' : 'h-2 w-2 bg-muted-foreground group-hover:bg-foreground',
+                      )}
                     />
                   </button>
                 ))
@@ -561,8 +799,8 @@ function InsightPages({
               onClick={() => goTo(current + 1)}
             />
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </section>
   )
 }
