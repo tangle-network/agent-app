@@ -17567,7 +17567,7 @@
         {
           "name": "InteractionQuestionCard",
           "kind": "function",
-          "signature": "({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, sourceNote, timeoutNote, renderMarkdown, c…",
+          "signature": "({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, timeoutNote, renderMarkdown, className, }:…",
           "doc": null
         },
         {
@@ -18119,7 +18119,7 @@
         {
           "name": "QuestionOptionList",
           "kind": "function",
-          "signature": "({ groupName, idPrefix, options, multi, selectedValues, disabled, onToggle, }: QuestionOptionListProps) => Element",
+          "signature": "({ groupName, idPrefix, options, multi, selectedValues, disabled, onToggle, answered, }: QuestionOptionListProps) => El…",
           "doc": "The radio/checkbox option rows for a select field."
         },
         {

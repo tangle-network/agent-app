@@ -14,7 +14,6 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import type { ChatAttachmentPart } from './chat-attachments'
-import { formatBytes } from '../chat-routes/wire'
 
 // ── glyphs (no icon-library dependency) ───────────────────────────────────
 
@@ -47,6 +46,17 @@ function WarningGlyph({ className }: { className?: string }) {
 
 function iconForMediaType(mediaType: string | undefined): (props: { className?: string }) => ReactNode {
   return mediaType?.startsWith('image/') ? ImageGlyph : FileGlyph
+}
+
+/** Display byte size for a chip: "1.2 MB" / "47 KB" — one rounded figure with a
+ *  spaced unit. Deliberately NOT the wire formatter (`formatBytes` in
+ *  chat-routes/wire), whose exact "1MB 152KB" decomposition serves limit-error
+ *  messages; a chip wants a glanceable approximation. */
+function formatDisplayBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  const mb = bytes / (1024 * 1024)
+  return `${mb >= 10 ? Math.round(mb) : mb.toFixed(1)} MB`
 }
 
 // ── display name ────────────────────────────────────────────────────────
@@ -158,7 +168,7 @@ function AttachmentThumbnailError({ name }: { name: string }) {
   return (
     <span className="inline-flex h-16 w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-md border border-destructive/40 bg-destructive/10 px-1 text-center text-destructive">
       <WarningGlyph className="h-4 w-4 shrink-0" />
-      <span className="line-clamp-2 text-[10px] leading-tight">{name}</span>
+      <span className="line-clamp-2 text-[11px] leading-tight">{name}</span>
     </span>
   )
 }
@@ -174,7 +184,7 @@ function AttachmentUnavailable({ shape }: { shape: 'thumbnail' | 'chip' }) {
         className="inline-flex h-16 w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-md border border-border bg-muted px-1 text-center text-muted-foreground"
       >
         <WarningGlyph className="h-4 w-4 shrink-0" />
-        <span className="line-clamp-2 text-[10px] leading-tight">Attachment unavailable</span>
+        <span className="line-clamp-2 text-[11px] leading-tight">Attachment unavailable</span>
       </span>
     )
   }
@@ -300,7 +310,7 @@ function AttachmentChip({ part, resolveFileUrl, fetchFile }: AttachmentPartProps
     >
       <Icon className="h-3 w-3 shrink-0" />
       {displayName}
-      {typeof part.size === 'number' && <span className="text-muted-foreground/70">· {formatBytes(part.size)}</span>}
+      {typeof part.size === 'number' && <span className="text-muted-foreground/70">· {formatDisplayBytes(part.size)}</span>}
     </button>
   )
 }

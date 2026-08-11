@@ -50,13 +50,26 @@ async function flush() {
 }
 
 describe('InteractionPlanCard', () => {
-  it('renders the plan body (plain-text fallback) with a waiting chip and expand control', () => {
+  it('renders the plan body (plain-text fallback) with a waiting chip and no collapse UI when nothing overflows', () => {
     const { container } = mount(PLAN_INTERACTION)
     expect(container.textContent).toContain('Waiting for your approval')
     expect(container.textContent).toContain('Do the thing')
-    const toggle = screen.getByRole('button', { name: /Show full plan/ })
-    fireEvent.click(toggle)
-    expect(screen.getByRole('button', { name: /Collapse plan/ })).toBeTruthy()
+    // jsdom measures zero height, so nothing overflows — the fade and toggle
+    // exist only when the measured body exceeds the collapsed cap.
+    expect(screen.queryByRole('button', { name: /Show full plan/ })).toBeNull()
+    expect(container.querySelector('.bg-gradient-to-t')).toBeNull()
+  })
+
+  it('gates the collapse toggle on the measured body height and expands on click', () => {
+    const scrollHeight = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(500)
+    try {
+      mount(PLAN_INTERACTION)
+      const toggle = screen.getByRole('button', { name: /Show full plan/ })
+      fireEvent.click(toggle)
+      expect(screen.getByRole('button', { name: /Collapse plan/ })).toBeTruthy()
+    } finally {
+      scrollHeight.mockRestore()
+    }
   })
 
   it('renders through the injected markdown renderer', () => {

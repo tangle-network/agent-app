@@ -1243,7 +1243,7 @@ interface InteractionPlanCardProps
 `function`
 
 ```ts
-({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, sourceNote, timeoutNote, renderMarkdown, c…
+({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, timeoutNote, renderMarkdown, className, }:…
 ```
 
 ### `InteractionQuestionCardProps`
@@ -1979,7 +1979,7 @@ interface QualityCheckListProps
 `function` — The radio/checkbox option rows for a select field.
 
 ```ts
-({ groupName, idPrefix, options, multi, selectedValues, disabled, onToggle, }: QuestionOptionListProps) => Element
+({ groupName, idPrefix, options, multi, selectedValues, disabled, onToggle, answered, }: QuestionOptionListProps) => El…
 ```
 
 ### `QuestionOptionListProps`

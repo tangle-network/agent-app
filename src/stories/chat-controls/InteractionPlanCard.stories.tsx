@@ -63,6 +63,7 @@ export const Approved: Story = {
     interaction: approvedPlanInteraction,
     canWrite: true,
     submitAnswer: okSubmitAnswer,
+    renderMarkdown: renderStoryMarkdown,
   },
 }
 
@@ -73,6 +74,7 @@ export const Declined: Story = {
     interaction: declinedPlanInteraction,
     canWrite: true,
     submitAnswer: okSubmitAnswer,
+    renderMarkdown: renderStoryMarkdown,
   },
 }
 
@@ -83,6 +85,7 @@ export const Expired: Story = {
     canWrite: true,
     submitAnswer: okSubmitAnswer,
     onReRequest: okReRequest,
+    renderMarkdown: renderStoryMarkdown,
   },
 }
 
@@ -109,13 +112,14 @@ export const AllStates: Story = {
         onResolved={logResolved}
         renderMarkdown={renderStoryMarkdown}
       />
-      <InteractionPlanCard interaction={approvedPlanInteraction} canWrite submitAnswer={okSubmitAnswer} />
-      <InteractionPlanCard interaction={declinedPlanInteraction} canWrite submitAnswer={okSubmitAnswer} />
+      <InteractionPlanCard interaction={approvedPlanInteraction} canWrite submitAnswer={okSubmitAnswer} renderMarkdown={renderStoryMarkdown} />
+      <InteractionPlanCard interaction={declinedPlanInteraction} canWrite submitAnswer={okSubmitAnswer} renderMarkdown={renderStoryMarkdown} />
       <InteractionPlanCard
         interaction={expiredPlanInteraction}
         canWrite
         submitAnswer={okSubmitAnswer}
         onReRequest={okReRequest}
+        renderMarkdown={renderStoryMarkdown}
       />
     </div>
   ),
