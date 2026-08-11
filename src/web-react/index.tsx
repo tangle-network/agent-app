@@ -850,7 +850,11 @@ function ToolCallCard({
 function StreamingCaret() {
   return (
     <span
-      className="ml-0.5 inline-block h-[1.1em] w-[3px] translate-y-[2px] animate-pulse rounded-sm bg-foreground/70"
+      // `animate-pulse` is a 2s ease-in-out opacity fade — a breathing
+      // placeholder, not a caret. A caret is a hard 1s step blink, which is
+      // what every text surface the user has ever typed into does.
+      className="ml-0.5 inline-block h-[1.1em] w-[3px] translate-y-[2px] animate-[agent-caret_1s_step-end_infinite] rounded-sm bg-foreground/70"
+      data-motion="essential"
       aria-hidden
     />
   )
@@ -881,7 +885,12 @@ function SegmentText({
   // this stays rules-of-hooks safe.)
   if (!content.trim() && !showCaret) return null
   return (
-    <div className={messageClassName}>
+    // A settled run arrives from a short blur; the LIVE run does not, because
+    // its text is already being revealed character by character and animating
+    // the container on top of that makes the paragraph shimmer while it types.
+    // The distinction is what separates "the answer materialised" from "the
+    // log was appended to".
+    <div className={`${messageClassName}${streaming ? '' : ' agent-stream-in'}`}>
       {body}
       {/* Gate on showCaret (not the smoothed `text`, which is '' on the first
           frame) so the caret is steady from the start instead of flickering. */}
@@ -1169,8 +1178,14 @@ function AssistantMessageImpl({
         <details className="mb-2 rounded-lg border-l-2 border-border bg-secondary px-3 py-2" open={!hasAnswerText}>
           <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
             {!hasAnswerText ? (
-              <span className="animate-pulse">
-                Thinking{thinkingSeconds >= 3 ? ` · ${thinkingSeconds}s` : '…'}
+              // A pulse dims the whole word on a loop, which is the same cue a
+              // skeleton placeholder uses — it reads as "nothing here yet". A
+              // sweep travels THROUGH the glyphs, which reads as work in
+              // flight, and the elapsed seconds say how much. `essential`
+              // because it is the only signal separating a working agent from
+              // a stuck one, and reduced-motion still collapses its duration.
+              <span className="agent-shimmer" data-motion="essential">
+                Thinking{thinkingSeconds >= 1 ? ` · ${thinkingSeconds}s` : '…'}
               </span>
             ) : thinkMsRef.current != null ? (
               `Thought for ${Math.max(1, Math.round(thinkMsRef.current / 1000))}s`
