@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  FREE_TIER_SPEND_CAP_USD,
   getProductEntitlement,
   isProductEntitled,
   isSeatBillingEnabled,
@@ -22,34 +23,39 @@ const ENT: ProductEntitlement = {
 }
 
 describe('isProductEntitled', () => {
+  it('defines no product-funded free spend', () => {
+    expect(FREE_TIER_SPEND_CAP_USD).toBe(0)
+  })
+
   it('entitled when a seat is held', () => {
     expect(isProductEntitled({ ...ENT, hasSeat: true, onFreeTier: false })).toBe(true)
   })
-  it('entitled on the free tier without a seat', () => {
-    expect(isProductEntitled({ ...ENT, hasSeat: false, onFreeTier: true })).toBe(true)
+  it('does not grant product access from the retired free-tier signal', () => {
+    expect(isProductEntitled({ ...ENT, hasSeat: false, onFreeTier: true })).toBe(false)
   })
   it('not entitled with no seat and free tier exhausted', () => {
     expect(isProductEntitled({ ...ENT, hasSeat: false, onFreeTier: false })).toBe(false)
   })
 })
 
-describe('getProductEntitlement fail-open', () => {
-  it('returns hasSeat=true when the flag is off, without calling the platform', async () => {
+describe('getProductEntitlement availability policy', () => {
+  it('denies access when the flag is off, without calling the platform', async () => {
     const spy = vi.fn()
     const ent = await getProductEntitlement(httpWith(spy), 'key', 'gtm', false)
     expect(spy).not.toHaveBeenCalled()
-    expect(ent.hasSeat).toBe(true)
-    expect(isProductEntitled(ent)).toBe(true)
+    expect(ent.hasSeat).toBe(false)
+    expect(isProductEntitled(ent)).toBe(false)
   })
 
-  it('returns hasSeat=true when no key is present', async () => {
+  it('denies access when no user key is present', async () => {
     const spy = vi.fn()
     const ent = await getProductEntitlement(httpWith(spy), null, 'gtm', true)
     expect(spy).not.toHaveBeenCalled()
-    expect(ent.hasSeat).toBe(true)
+    expect(ent.hasSeat).toBe(false)
+    expect(isProductEntitled(ent)).toBe(false)
   })
 
-  it('returns hasSeat=true when the seat endpoint throws (pre-rollout / 5xx)', async () => {
+  it('denies access when the seat endpoint is unavailable', async () => {
     const ent = await getProductEntitlement(
       httpWith(async () => {
         throw new Error('seat endpoint not found')
@@ -58,8 +64,8 @@ describe('getProductEntitlement fail-open', () => {
       'gtm',
       true,
     )
-    expect(ent.hasSeat).toBe(true)
-    expect(isProductEntitled(ent)).toBe(true)
+    expect(ent.hasSeat).toBe(false)
+    expect(isProductEntitled(ent)).toBe(false)
   })
 
   it('passes through a real platform answer when reachable', async () => {
@@ -77,12 +83,13 @@ describe('getProductEntitlement fail-open', () => {
 })
 
 describe('isSeatBillingEnabled', () => {
-  it('defaults OFF when unset', () => {
-    expect(isSeatBillingEnabled({ env: {} })).toBe(false)
+  it('defaults ON when unset', () => {
+    expect(isSeatBillingEnabled({ env: {} })).toBe(true)
   })
   it('OFF for falsey values', () => {
-    expect(isSeatBillingEnabled({ env: { SEAT_BILLING_ENABLED: 'false' } })).toBe(false)
-    expect(isSeatBillingEnabled({ env: { SEAT_BILLING_ENABLED: '0' } })).toBe(false)
+    for (const value of ['false', '0', 'off', 'disabled', ' FALSE ']) {
+      expect(isSeatBillingEnabled({ env: { SEAT_BILLING_ENABLED: value } })).toBe(false)
+    }
   })
   it('ON for truthy values', () => {
     for (const v of ['true', '1', 'on', 'enabled', 'TRUE', ' On ']) {
@@ -192,5 +199,34 @@ describe('createPlatformBillingHttp.getProductEntitlement transport', () => {
       hasSeat: false,
       onFreeTier: false,
     })
+  })
+
+  it('discards a stale platform free-tier grant when no paid seat exists', async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              seatStatus: 'none',
+              hasSeat: false,
+              onFreeTier: true,
+              lifetimeSpentUsd: 0,
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    ) as unknown as typeof fetch
+    const http = createPlatformBillingHttp({
+      baseUrl: 'https://id.tangle.tools',
+      serviceToken: 'svc',
+      productSlug: 'gtm',
+      fetchImpl,
+    })
+
+    const ent = await http.getProductEntitlement('user-key', 'gtm')
+
+    expect(ent.onFreeTier).toBe(false)
+    expect(isProductEntitled(ent)).toBe(false)
   })
 })
