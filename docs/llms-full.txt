@@ -767,6 +767,14 @@ interface ConnectionRequirement
 type ConnectionRequirementKind
 ```
 
+### `ConnectionRequirementRef`
+
+`interface` — Names one requirement in the same list, by its (provider, kind) identity.
+
+```ts
+interface ConnectionRequirementRef
+```
+
 ### `ConnectRequirementResult`
 
 `interface` — Outcome of a host-driven, in-place connect for a single proposal requirement (see {@link AssistantDockProps.onConnectRequirement }).

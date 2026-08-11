@@ -4,7 +4,7 @@
 
 Source: `src/assistant/index.ts`
 
-55 exports.
+56 exports.
 
 ### `adaptTranscript`
 
@@ -252,6 +252,14 @@ interface ConnectionRequirement
 
 ```ts
 type ConnectionRequirementKind
+```
+
+### `ConnectionRequirementRef`
+
+`interface` — Names one requirement in the same list, by its (provider, kind) identity.
+
+```ts
+interface ConnectionRequirementRef
 ```
 
 ### `ConnectRequirementResult`

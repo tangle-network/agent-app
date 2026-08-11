@@ -9,7 +9,7 @@ _97 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./alerting`](api/alerting.md) | 8 | — |
 | [`./app-auth`](api/app-auth.md) | 11 | `platform` |
 | [`./assets`](api/assets.md) | 43 | — |
-| [`./assistant`](api/assistant.md) | 55 | `runtime`, `web-react` |
+| [`./assistant`](api/assistant.md) | 56 | `runtime`, `web-react` |
 | [`./billing`](api/billing.md) | 19 | — |
 | [`./brand`](api/brand.md) | 5 | — |
 | [`./brand-extraction`](api/brand-extraction.md) | 19 | — |
@@ -134,11 +134,11 @@ Source: `src/assets/index.ts` · 43 exports
 
 ## `./assistant`
 
-Source: `src/assistant/index.ts` · 55 exports
+Source: `src/assistant/index.ts` · 56 exports
 
 Depends on: `runtime`, `web-react`
 
-`adaptTranscript`, `AssistantChat`, `AssistantClient`, `AssistantClientConfig`, `AssistantClientInputError`, `AssistantClientProvider`, `AssistantDeliveryMode`, `AssistantDock`, `AssistantDockProps`, `assistantIsThinking`, `AssistantLauncher`, `AssistantLauncherProvider`, `AssistantModelOption`, `AssistantModels`, `AssistantModelsResult`, `AssistantPanel`, `AssistantPanelProps`, `AssistantSendOptions`, `AssistantStreamEvent`, `AssistantThreads`, `AssistantThreadSummary`, `AssistantTranscript`, `AssistantTranscriptProps`, `AssistantTranscriptView`, `ChatMessage`, `ChatRequest`, `ChatRole`, `ConfirmedResult`, `ConfirmResult`, `ConnectionRequirement`, `ConnectionRequirementKind`, `ConnectRequirementResult`, `createAssistantClient`, `DeltaEventData`, `DoneEventData`, `ErrorEventData`, `PendingProposal`, `ProposalCard`, `ProposalCardProps`, `ReasoningEventData`, `ThreadEventData`, `ThreadHistoryResult`, `ToolActivityStatus`, `ToolCallEventData`, `ToolOutcome`, `ToolProposalEventData`, `ToolResultEventData`, `UsageEventData`, `UsageInfo`, `useAssistantChat`, `UseAssistantChatOptions`, `useAssistantClient`, `useAssistantLauncher`, `useAssistantModels`, `useAssistantThreads`
+`adaptTranscript`, `AssistantChat`, `AssistantClient`, `AssistantClientConfig`, `AssistantClientInputError`, `AssistantClientProvider`, `AssistantDeliveryMode`, `AssistantDock`, `AssistantDockProps`, `assistantIsThinking`, `AssistantLauncher`, `AssistantLauncherProvider`, `AssistantModelOption`, `AssistantModels`, `AssistantModelsResult`, `AssistantPanel`, `AssistantPanelProps`, `AssistantSendOptions`, `AssistantStreamEvent`, `AssistantThreads`, `AssistantThreadSummary`, `AssistantTranscript`, `AssistantTranscriptProps`, `AssistantTranscriptView`, `ChatMessage`, `ChatRequest`, `ChatRole`, `ConfirmedResult`, `ConfirmResult`, `ConnectionRequirement`, `ConnectionRequirementKind`, `ConnectionRequirementRef`, `ConnectRequirementResult`, `createAssistantClient`, `DeltaEventData`, `DoneEventData`, `ErrorEventData`, `PendingProposal`, `ProposalCard`, `ProposalCardProps`, `ReasoningEventData`, `ThreadEventData`, `ThreadHistoryResult`, `ToolActivityStatus`, `ToolCallEventData`, `ToolOutcome`, `ToolProposalEventData`, `ToolResultEventData`, `UsageEventData`, `UsageInfo`, `useAssistantChat`, `UseAssistantChatOptions`, `useAssistantClient`, `useAssistantLauncher`, `useAssistantModels`, `useAssistantThreads`
 
 [Full API →](api/assistant.md)
 
