@@ -98,7 +98,7 @@ describe('isSeatBillingEnabled', () => {
     expect(isSeatBillingEnabled({ env: { NODE_ENV: 'test' } })).toBe(false)
   })
   it('OFF for falsey values', () => {
-    for (const value of ['false', '0', 'off', 'disabled', ' FALSE ']) {
+    for (const value of ['false', '0', 'off', 'disabled', 'no', ' FALSE ']) {
       expect(isSeatBillingEnabled({ env: { SEAT_BILLING_ENABLED: value } })).toBe(false)
     }
   })
@@ -140,7 +140,7 @@ describe('seatCheckoutUrl', () => {
 })
 
 describe('createPlatformBillingHttp.getProductEntitlement transport', () => {
-  it('unwraps the {success,data} envelope and derives onFreeTier off hasSeat', async () => {
+  it('unwraps the {success,data} envelope and retires the free-tier signal', async () => {
     const fetchImpl = vi.fn(async (url: string | URL) => {
       expect(String(url)).toBe(
         'https://id.tangle.tools/v1/billing/product-entitlement?product=gtm',
@@ -153,7 +153,7 @@ describe('createPlatformBillingHttp.getProductEntitlement transport', () => {
             currentPeriodEnd: '2026-07-14T00:00:00.000Z',
             lifetimeSpentUsd: 3.2,
             hasSeat: true,
-            // platform also true, but a held seat must force onFreeTier false
+            // The library retires this stale platform signal for every seat state.
             onFreeTier: true,
             offer: {
               currency: 'usd',

@@ -396,7 +396,7 @@ export function isSeatBillingEnabled(opts: SeatBillingFlagOptions = {}): boolean
     (typeof process !== 'undefined' ? (process.env as Record<string, string | undefined>) : undefined)
   if (!env) return true
   const flag = env[opts.flagEnvVar ?? DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR]?.trim().toLowerCase()
-  if (flag) return flag !== 'false' && flag !== '0' && flag !== 'off' && flag !== 'disabled'
+  if (flag) return !['false', '0', 'off', 'disabled', 'no'].includes(flag)
   const environment = resolveTangleExecutionEnvironment(env)
   return environment !== 'development' && environment !== 'test'
 }
