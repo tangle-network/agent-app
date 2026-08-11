@@ -2,6 +2,7 @@ import { Card, CardContent, Badge } from '@tangle-network/sandbox-ui/primitives'
 import { Send } from 'lucide-react'
 import {
   type Generation,
+  DESTINATIONS,
   generationError,
   generationStatus,
   isPublishPackage,
@@ -30,10 +31,7 @@ export function GenerationCard({
             <video src={generation.result} className="h-full w-full object-cover" muted />
           ) : generation.type === 'speech' && generation.result ? (
             <div className="flex h-full items-center justify-center">
-              <div className="flex items-center gap-2">
-                <Icon className="h-6 w-6 text-muted-foreground/40" />
-                <span className="text-xs text-muted-foreground">Audio</span>
-              </div>
+              <Icon className="h-6 w-6 text-muted-foreground/40" />
             </div>
           ) : generation.type === 'transcription' && generation.result ? (
             <div className="flex h-full items-center justify-center p-4">
@@ -47,14 +45,15 @@ export function GenerationCard({
             </div>
           )}
           <div className="absolute left-2 top-2">
-            <Badge variant="outline" className={`${cfg.color} text-[11px]`}>
+            <Badge variant="outline" className={`${cfg.color} gap-1 text-[11px]`}>
+              <Icon className="h-3 w-3" />
               {cfg.label}
             </Badge>
           </div>
           <GenerationStatusBadge generation={generation} />
         </div>
         <CardContent className="p-3">
-          <p className="mb-2 line-clamp-2 text-xs text-foreground">{generation.prompt}</p>
+          <p className="mb-2 line-clamp-2 text-sm font-medium text-foreground">{generation.prompt}</p>
           {status === 'failed' && (
             <p className="mb-2 line-clamp-2 text-[11px] text-destructive">{generationError(generation)}</p>
           )}
@@ -73,7 +72,9 @@ export function GenerationCard({
             <div className="mt-3 rounded-md border border-border bg-secondary p-2">
               <div className="mb-1 flex items-center gap-1.5 text-[11px] font-medium text-foreground">
                 <Send className="h-3 w-3" />
-                {(publishPackage.destinations ?? []).join(', ') || 'Publish package'}
+                {(publishPackage.destinations ?? [])
+                  .map((id) => DESTINATIONS.find((destination) => destination.id === id)?.label ?? id)
+                  .join(', ') || 'Publish package'}
               </div>
               <p className="line-clamp-2 text-[11px] text-muted-foreground">
                 {publishPackage.caption || 'Caption pending'}

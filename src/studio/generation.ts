@@ -92,6 +92,22 @@ export const DESTINATIONS: PublishDestination[] = [
 /** Provide an array of predefined cadence options for scheduling or approval processes */
 export const CADENCES = ['Manual approval', 'Publish now', 'Daily creative drop', 'Weekly series']
 
+// Enumerated generation options — the values the tangle media models (OpenAI-shaped
+// image/video APIs) actually accept. Composers render these as selects so an
+// enumerated field can never carry free text the provider would reject.
+/** Provide the valid image quality values for generation requests */
+export const IMAGE_QUALITIES = ['low', 'medium', 'high', 'auto'] as const
+/** Provide a placeholder hint listing the accepted image size values */
+export const IMAGE_SIZE_HINT = '1024x1024, 1536x1024, 1024x1536, or auto'
+/** Provide a validation pattern for the free-form image size field (WxH or auto) */
+export const IMAGE_SIZE_PATTERN = String.raw`(\d{3,4}x\d{3,4}|auto)`
+/** Provide the valid video duration values (seconds) for generation requests */
+export const VIDEO_DURATIONS = ['4', '6', '8', '10', '12'] as const
+/** Provide the valid video resolution values for generation requests */
+export const VIDEO_RESOLUTIONS = ['720p', '1080p'] as const
+/** Provide the valid video aspect ratio values for generation requests */
+export const VIDEO_ASPECT_RATIOS = ['16:9', '9:16', '1:1'] as const
+
 /** Define the minimum number of images required for processing or validation */
 export const MIN_IMAGE_COUNT = 1
 /** Define the maximum number of images allowed for upload or display */

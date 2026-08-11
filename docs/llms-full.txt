@@ -521,7 +521,7 @@ Source: `src/assistant/index.ts` · depends on `runtime`, `web-react`
 
 ### `adaptTranscript`
 
-`function` — Fold the transcript view into web-react `ChatUiMessage[]`: each user message is 1:1; the assistant/`tool`/`status` messages between two user turns collapse into one assistant message whose ordered `s…
+`function` — Fold the transcript view into transcript-order blocks: message runs (web-react `ChatUiMessage[]`) broken by quiet status lines.
 
 ```ts
 (view: AssistantTranscriptView) => AdaptedTranscript
@@ -689,7 +689,7 @@ interface AssistantThreadSummary
 
 ### `AssistantTranscript`
 
-`function` — Render the assistant conversation with web-react's `ChatMessages`.
+`function` — Render the assistant conversation: message runs through web-react's `ChatMessages` (quiet chrome — the label/meta row becomes a hover-revealed lane, which keeps the narrow dock panel uncluttered), st…
 
 ```ts
 ({ view, renderMarkdown, toolRenderers, renderConfirmedResult, emptyState, }: AssistantTranscriptProps) => Element
@@ -7563,7 +7563,7 @@ interface ResolvedContextSignals
 
 ## `./intakes-react`
 
-Source: `src/intakes-react/index.ts` · depends on `intakes`
+Source: `src/intakes-react/index.ts` · depends on `brand`, `intakes`
 
 ### `IntakeInterview`
 
@@ -7592,7 +7592,7 @@ interface IntakeView
 
 ## `./intakes-react/lazy`
 
-Source: `src/intakes-react/lazy.tsx` · depends on `intakes`
+Source: `src/intakes-react/lazy.tsx` · depends on `brand`, `intakes`
 
 ### `IntakeInterviewLazy`
 
@@ -18084,6 +18084,30 @@ type GenerationType
 (generation: Generation) => string | null
 ```
 
+### `IMAGE_QUALITIES`
+
+`const` — Provide the valid image quality values for generation requests
+
+```ts
+readonly ["low", "medium", "high", "auto"]
+```
+
+### `IMAGE_SIZE_HINT`
+
+`const` — Provide a placeholder hint listing the accepted image size values
+
+```ts
+"1024x1024, 1536x1024, 1024x1536, or auto"
+```
+
+### `IMAGE_SIZE_PATTERN`
+
+`const` — Provide a validation pattern for the free-form image size field (WxH or auto)
+
+```ts
+string
+```
+
 ### `isDestinationConnected`
 
 `function` — Determine if a destination has any active connections in the given list of studio integration connections
@@ -18268,10 +18292,34 @@ interface StudioIntegrationConnection
 (message?: string | undefined) => string
 ```
 
+### `VIDEO_ASPECT_RATIOS`
+
+`const` — Provide the valid video aspect ratio values for generation requests
+
+```ts
+readonly ["16:9", "9:16", "1:1"]
+```
+
+### `VIDEO_DURATIONS`
+
+`const` — Provide the valid video duration values (seconds) for generation requests
+
+```ts
+readonly ["4", "6", "8", "10", "12"]
+```
+
+### `VIDEO_RESOLUTIONS`
+
+`const` — Provide the valid video resolution values for generation requests
+
+```ts
+readonly ["720p", "1080p"]
+```
+
 
 ## `./studio-react`
 
-Source: `src/studio-react/index.tsx` · depends on `studio`
+Source: `src/studio-react/index.tsx` · depends on `studio`, `web-react`
 
 ### `AvatarComposer`
 
@@ -18878,7 +18926,7 @@ type WorkspaceRole
 
 ## `./teams-react`
 
-Source: `src/teams-react/index.ts` · depends on `teams`
+Source: `src/teams-react/index.ts` · depends on `brand`, `teams`
 
 ### `InvitationsPanel`
 
@@ -18963,7 +19011,7 @@ interface MemberView
 
 ## `./teams-react/lazy`
 
-Source: `src/teams-react/lazy.tsx` · depends on `teams`
+Source: `src/teams-react/lazy.tsx` · depends on `brand`, `teams`
 
 ### `InvitationsPanelLazy`
 
@@ -22712,7 +22760,7 @@ interface InteractionPlanCardProps
 `function`
 
 ```ts
-({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, sourceNote, timeoutNote, renderMarkdown, c…
+({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, timeoutNote, renderMarkdown, className, }:…
 ```
 
 ### `InteractionQuestionCardProps`
@@ -23448,7 +23496,7 @@ interface QualityCheckListProps
 `function` — The radio/checkbox option rows for a select field.
 
 ```ts
-({ groupName, idPrefix, options, multi, selectedValues, disabled, onToggle, }: QuestionOptionListProps) => Element
+({ groupName, idPrefix, options, multi, selectedValues, disabled, onToggle, answered, }: QuestionOptionListProps) => El…
 ```
 
 ### `QuestionOptionListProps`

@@ -124,10 +124,13 @@ describe('assistant stories smoke', () => {
     })
   }
 
-  it('Panel Empty shows the zero-state copy', async () => {
+  it('Panel Empty shows the branded zero-state', async () => {
     await mount(panelModule.default, panelModule.PanelEmpty)
     expect(
-      screen.getByText(/Ask me to create a workflow/i),
+      screen.getByText(/Ask the assistant to do something/i),
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: /^Create a workflow/ }),
     ).toBeTruthy()
   })
 

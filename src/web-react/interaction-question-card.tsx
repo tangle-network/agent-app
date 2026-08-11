@@ -109,6 +109,9 @@ export interface QuestionOptionListProps {
   selectedValues: string[]
   disabled: boolean
   onToggle: (value: string) => void
+  /** Terminal answered state: the selected rows highlight (primary edge, tint,
+   *  trailing check) so the card shows WHAT was answered, not just that it was. */
+  answered?: boolean
 }
 
 /** The radio/checkbox option rows for a select field. Renders a fragment of
@@ -122,17 +125,25 @@ export function QuestionOptionList({
   selectedValues,
   disabled,
   onToggle,
+  answered = false,
 }: QuestionOptionListProps) {
   return (
     <>
       {options.map((option, optionIndex) => {
         const inputId = `${idPrefix}-${optionIndex}`
         const checked = selectedValues.includes(option.value)
+        const highlighted = answered && checked
         // The whole row is a wrapping <label> for click target, but the input's
         // accessible NAME must be the option label alone — the description is
         // linked as aria-describedby, not folded into the name.
         return (
-          <label key={`${option.value}-${optionIndex}`} htmlFor={inputId} className="flex cursor-pointer gap-2 rounded-lg border border-strong p-3 transition-colors hover:bg-accent">
+          <label
+            key={`${option.value}-${optionIndex}`}
+            htmlFor={inputId}
+            className={`flex gap-2 rounded-lg border p-3 transition-colors ${
+              highlighted ? 'border-primary bg-primary/5' : 'border-strong'
+            } ${disabled ? 'cursor-default' : 'cursor-pointer hover:bg-accent'}`}
+          >
             <input
               id={inputId}
               type={multi ? 'checkbox' : 'radio'}
@@ -145,10 +156,11 @@ export function QuestionOptionList({
               aria-describedby={option.description ? `${inputId}-description` : undefined}
               className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
             />
-            <span className="min-w-0">
+            <span className="min-w-0 flex-1">
               <span id={`${inputId}-label`} className="block text-sm font-medium leading-5 text-foreground">{option.label}</span>
               {option.description && <span id={`${inputId}-description`} className="mt-0.5 block text-xs leading-5 text-muted-foreground">{option.description}</span>}
             </span>
+            {highlighted && <CheckGlyph className="mt-0.5 h-4 w-4 shrink-0 text-primary" />}
           </label>
         )
       })}
@@ -178,11 +190,6 @@ export interface InteractionQuestionCardProps {
   onLateAnswer?: (message: string) => boolean | void | Promise<boolean | void>
   /** Overrides the kind badge ("Question"). */
   kindLabel?: string
-  /** Overrides the header note ("The agent asked for input"). Set it whenever an
-   *  agent is not the one asking — a host that parks on a human at the graph
-   *  level is not an agent's mid-run question, and a card that claims otherwise
-   *  misreports why the work stopped. */
-  sourceNote?: string
   /** What happens if nobody answers, rendered beside the submit action.
    *
    *  The caller owns both the clock and the copy: this card holds no timer, so a
@@ -254,7 +261,6 @@ export function InteractionQuestionCard({
   onResolved,
   onLateAnswer,
   kindLabel,
-  sourceNote,
   timeoutNote,
   renderMarkdown,
   className,
@@ -409,19 +415,19 @@ export function InteractionQuestionCard({
   }
 
   return (
-    <div className={`rounded-xl border border-card-edge bg-card p-4 ${className ?? ''}`}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <InteractionBadge variant="outline">{kindLabel ?? 'Question'}</InteractionBadge>
-          <InteractionBadge variant={answered ? 'default' : status === 'expired' || status === 'declined' ? 'destructive' : 'outline'}>
-            {STATUS_LABELS[status]}
-          </InteractionBadge>
-        </div>
-        <span className="text-xs text-muted-foreground">{sourceNote ?? 'The agent asked for input'}</span>
+    // `dark:[color-scheme:dark]` keeps the native radios/checkboxes on the
+    // dark control scheme — without it they paint light-scheme white on the
+    // dark card.
+    <div className={`rounded-xl border border-card-edge bg-card p-4 dark:[color-scheme:dark] ${className ?? ''}`}>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <InteractionBadge variant="outline">{kindLabel ?? 'Question'}</InteractionBadge>
+        <InteractionBadge variant={answered ? 'default' : status === 'expired' || status === 'declined' ? 'destructive' : 'outline'}>
+          {STATUS_LABELS[status]}
+        </InteractionBadge>
       </div>
 
       {interaction.title.trim() && interaction.fields.every((field) => field.label !== interaction.title) && (
-        <p className="mb-3 text-sm font-medium leading-5 text-foreground">{interaction.title}</p>
+        <p className="mb-3 text-[15px] font-semibold leading-snug text-foreground">{interaction.title}</p>
       )}
       {interaction.body && (renderMarkdown
         ? <div className="mb-3 text-sm leading-5 text-muted-foreground">{renderMarkdown(interaction.body)}</div>
@@ -445,6 +451,7 @@ export function InteractionQuestionCard({
                     selectedValues={value.selected ?? []}
                     disabled={disabled}
                     onToggle={(optionValue) => toggleSelected(select, optionValue)}
+                    answered={answered}
                   />
                   {select.allowCustom === true && (
                     <input

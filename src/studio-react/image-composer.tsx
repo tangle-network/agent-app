@@ -1,6 +1,13 @@
 import { Input } from '@tangle-network/sandbox-ui/primitives'
-import { MIN_IMAGE_COUNT, MAX_IMAGE_COUNT, normalizeImageCount } from '../studio'
-import { Field, Stepper } from './composer-shell'
+import {
+  IMAGE_QUALITIES,
+  IMAGE_SIZE_HINT,
+  IMAGE_SIZE_PATTERN,
+  MIN_IMAGE_COUNT,
+  MAX_IMAGE_COUNT,
+  normalizeImageCount,
+} from '../studio'
+import { Field, NativeSelect, Stepper } from './composer-shell'
 
 export function ImageComposer({
   size,
@@ -20,8 +27,22 @@ export function ImageComposer({
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Size"><Input value={size} onChange={(event) => onSizeChange(event.target.value)} className="bg-background" /></Field>
-        <Field label="Quality"><Input value={quality} onChange={(event) => onQualityChange(event.target.value)} className="bg-background" /></Field>
+        <Field label="Size">
+          <Input
+            value={size}
+            onChange={(event) => onSizeChange(event.target.value)}
+            pattern={IMAGE_SIZE_PATTERN}
+            placeholder={IMAGE_SIZE_HINT}
+            className="bg-background"
+          />
+        </Field>
+        <Field label="Quality">
+          <NativeSelect value={quality} onChange={(event) => onQualityChange(event.target.value)}>
+            {IMAGE_QUALITIES.map((option) => (
+              <option key={option} value={option}>{option.charAt(0).toUpperCase() + option.slice(1)}</option>
+            ))}
+          </NativeSelect>
+        </Field>
       </div>
       <Field label="Images">
         <Stepper

@@ -225,7 +225,8 @@ export function describeProposal(proposal: PendingProposal): ProposalView {
       if (args.product != null)
         fields.push({ label: "Product", value: str(args.product) });
       if (args.budgetUsd != null)
-        fields.push({ label: "Budget (USD)", value: str(args.budgetUsd) });
+        // Money reads as money: "$25", with the unit off the label.
+        fields.push({ label: "Budget", value: `$${str(args.budgetUsd)}` });
       return { title: "Create API key", preview: null, fields };
     }
     case "revoke_api_key":

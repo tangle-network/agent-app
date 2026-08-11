@@ -217,10 +217,10 @@ export function FlowWaterfall({ trace }: FlowWaterfallProps) {
               style={{ left: `${row.offsetPct}%`, width: `${row.widthPct}%` }}
             />
           </div>
-          <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground/70">{row.durationLabel}</span>
+          <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/70">{row.durationLabel}</span>
         </div>
       ))}
-      <p className="pt-0.5 text-right font-mono text-[10px] tabular-nums text-muted-foreground/60">
+      <p className="pt-0.5 text-right font-mono text-[11px] tabular-nums text-muted-foreground/60">
         {(trace.totalMs / 1000).toFixed(1)}s{cost ? ` · ${cost}` : ''}
       </p>
     </div>
@@ -260,13 +260,13 @@ export function MissionActivityLane({ activity, startedAt, nowMs }: MissionActiv
               <span className="text-muted-foreground"> — {run.detail}</span>
             </span>
             {tone === 'live' && (run.iteration !== undefined || run.phase !== undefined) && (
-              <span className="shrink-0 rounded-full bg-warning/10 px-1.5 py-0.5 font-mono text-[10px] text-warning">
+              <span className="shrink-0 rounded-full bg-warning/10 px-1.5 py-0.5 font-mono text-[11px] text-warning">
                 {[run.iteration !== undefined ? `iter ${run.iteration}` : null, run.phase ?? null]
                   .filter(Boolean)
                   .join(' · ')}
               </span>
             )}
-            <span className="flex shrink-0 items-center gap-1.5 font-mono text-[10px] tabular-nums text-muted-foreground/70">
+            <span className="flex shrink-0 items-center gap-1.5 font-mono text-[11px] tabular-nums text-muted-foreground/70">
               {tone !== 'live' && tone !== 'ok' && <span>{run.status}</span>}
               {cost && <span>{cost}</span>}
               {duration && <span>{duration}</span>}
@@ -277,7 +277,7 @@ export function MissionActivityLane({ activity, startedAt, nowMs }: MissionActiv
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="flex items-center gap-1 py-0.5 text-[10px] font-medium text-muted-foreground/70 transition hover:text-foreground"
+        className="flex items-center gap-1 py-0.5 text-[11px] font-medium text-muted-foreground/70 transition hover:text-foreground"
       >
         <ChevronGlyph className={`h-3 w-3 transition-transform ${expanded ? 'rotate-180' : ''}`} />
         timeline
@@ -330,14 +330,14 @@ function ActivityRow({
           <span className="text-muted-foreground"> — {record.detail}</span>
         </span>
         {tone === 'live' && (record.iteration !== undefined || record.phase !== undefined) && (
-          <span className="shrink-0 rounded-full bg-warning/10 px-2 py-0.5 font-mono text-[10px] text-warning">
+          <span className="shrink-0 rounded-full bg-warning/10 px-2 py-0.5 font-mono text-[11px] text-warning">
             {[record.iteration !== undefined ? `iter ${record.iteration}` : null, record.phase ?? null]
               .filter(Boolean)
               .join(' · ')}
           </span>
         )}
         <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
             tone === 'ok'
               ? 'bg-success/10 text-success'
               : tone === 'error'

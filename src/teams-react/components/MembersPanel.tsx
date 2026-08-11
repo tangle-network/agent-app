@@ -15,12 +15,7 @@ import { useState } from 'react'
 import type { WorkspaceRole } from '../../teams/roles'
 import { hasWorkspaceRole } from '../../teams/roles'
 import type { MemberView, MembersPanelProps } from '../contracts'
-
-const ASSIGNABLE: { value: WorkspaceRole; label: string }[] = [
-  { value: 'viewer', label: 'Viewer' },
-  { value: 'editor', label: 'Editor' },
-  { value: 'admin', label: 'Admin' },
-]
+import { RoleSelect } from './RoleSelect'
 
 export function MembersPanel({
   members,
@@ -80,6 +75,10 @@ export function MembersPanel({
 
   return (
     <section className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-semibold text-[var(--text-primary)]">Members</h4>
+        <span className="text-xs text-[var(--text-muted)]">{members.length} total</span>
+      </div>
       <div className="flex flex-col gap-2">
         {members.map((member) => (
           <MemberRow
@@ -108,21 +107,16 @@ export function MembersPanel({
               onKeyDown={(event) => { if (event.key === 'Enter') void submitInvite() }}
               className="flex-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
             />
-            <select
+            <RoleSelect
               value={inviteRole}
-              aria-label="Invite role"
-              onChange={(event) => setInviteRole(event.target.value as WorkspaceRole)}
-              className="rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-1.5 text-xs text-[var(--text-secondary)]"
-            >
-              {ASSIGNABLE.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
+              ariaLabel="Invite role"
+              onChange={setInviteRole}
+            />
             <button
               type="button"
               onClick={() => void submitInvite()}
               disabled={inviting || !inviteEmail.trim()}
-              className="rounded bg-[var(--brand-primary)] px-3 py-1.5 text-sm text-white disabled:opacity-50"
+              className="rounded bg-[var(--brand-primary)] px-3 py-1.5 text-sm text-[hsl(var(--primary-foreground))] disabled:opacity-50"
             >
               {inviting ? 'Inviting…' : 'Invite'}
             </button>
@@ -175,16 +169,11 @@ function MemberRow({ member, canManage, onChangeRole, onRemove }: MemberRowProps
           </span>
         ) : editable ? (
           <>
-            <select
+            <RoleSelect
               value={member.role}
-              aria-label={`Role for ${label}`}
-              onChange={(event) => onChangeRole(member.id, event.target.value as WorkspaceRole)}
-              className="rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-1 text-xs text-[var(--text-secondary)]"
-            >
-              {ASSIGNABLE.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
+              ariaLabel={`Role for ${label}`}
+              onChange={(role) => onChangeRole(member.id, role)}
+            />
             <button
               type="button"
               aria-label={`Remove ${label}`}
