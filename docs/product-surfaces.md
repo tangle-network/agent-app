@@ -447,7 +447,7 @@ The corollary is the enforceable half: a component that hardcodes its own durati
 
 - **One animation, two meanings.** `animate-pulse` appears **15 times** carrying two unrelated signals — a loading skeleton (`src/vault/VaultPane.tsx`, `src/web-react/session-history.tsx`, `src/web-react/message-attachments.tsx`) and a live-running status dot (`src/web-react/mission-activity.tsx`, `src/studio-react/result-canvas.tsx`, `src/assistant/AssistantPanel.tsx`). A reader cannot learn what pulsing means when it means both "no data yet" and "work in progress". Down from 16: the streaming caret was the clearest case of the wrong meaning — a caret that eases in and out over 2s reads as a placeholder — and now blinks on a hard step (`agent-caret`). The waiting label moved off it for the same reason, to a sweep that says work is in flight rather than that the space is empty.
 - **A component inventing its own timing.** `src/studio-react/composer-hero.tsx` hardcodes `duration-300` — a fourth number in a three-number scale, and one that does not move under `prefers-reduced-motion`.
-- **A spinner with nothing to say.** Seven `animate-spin` uses; a spinner without a label naming what is being waited on communicates only "something", which is the one thing the reader already knew.
+- **A spinner with nothing to say.** Eight `animate-spin` uses; a spinner without a label naming what is being waited on communicates only "something", which is the one thing the reader already knew.
 
 ---
 

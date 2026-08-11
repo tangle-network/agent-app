@@ -160,7 +160,7 @@ export function RunDrillIn({ run, onClose }: RunDrillInProps) {
           }`}
         />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{run.title}</p>
+          <p className="truncate text-[15px] font-semibold">{run.title}</p>
           <p className="truncate font-mono text-[11px] text-muted-foreground">{run.toolName}</p>
         </div>
         <button
@@ -185,8 +185,8 @@ export function RunDrillIn({ run, onClose }: RunDrillInProps) {
                 {step.status === 'error' ? '✗' : '$'}
               </span>
               <code className="min-w-0 flex-1 truncate font-mono text-xs">{step.label}</code>
-              <span className="shrink-0 text-[10px] text-muted-foreground">
-                {new Date(step.at).toLocaleTimeString()}
+              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                {new Date(step.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
               </span>
             </div>
             {step.detail && (
@@ -198,7 +198,7 @@ export function RunDrillIn({ run, onClose }: RunDrillInProps) {
         ))}
       </div>
       <p className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
-        Readonly drill-in. Follow up in the main chat.
+        Read-only transcript — reply in the main chat.
       </p>
     </div>
   )
@@ -255,8 +255,9 @@ export interface ChatUiMessage extends ChatMessageMetrics {
 /** Define properties for rendering chat messages with optional models, markdown, extras, and durable cards */
 export interface ChatMessagesProps {
   messages: ChatUiMessage[]
-  /** Shared reading scale for both user and assistant prose. Defaults to 16px;
-   *  `large` uses 17px without enlarging labels, tool chrome, or metadata. */
+  /** Shared reading scale for both user and assistant prose. Defaults to 15px
+   *  at a 1.6 line height; `large` uses 16px at the same leading without
+   *  enlarging labels, tool chrome, or metadata. */
   messageSize?: 'default' | 'large'
   /** Transcript chrome. `labeled` (default) keeps the always-on role label +
    *  model/tok-s/cost meta line and the primary-tinted user bubble. `quiet`
@@ -324,6 +325,8 @@ export interface ChatEmptyDoor {
   label: string
   description?: string
   onSelect: () => void
+  /** Optional glyph rendered left of the label. */
+  icon?: ReactNode
 }
 
 /** Define properties for rendering the chat empty state with customizable text and starting doors */
@@ -349,18 +352,28 @@ export function ChatEmptyState({
   subline = 'Describe the outcome you want. The agent works through it step by step, and pauses for your approval before anything irreversible.',
   doors,
 }: ChatEmptyStateProps) {
+  // Column count follows the doors actually offered: one door centers on a
+  // narrow measure, two split evenly, three take the full row — a lone door
+  // stretched across three tracks read as a mistake, not a choice.
+  const doorCount = Math.min(doors?.length ?? 0, 3)
+  const doorsGridClass =
+    doorCount === 1
+      ? 'mx-auto max-w-sm sm:grid-cols-1'
+      : doorCount === 2
+        ? 'sm:grid-cols-2'
+        : 'sm:grid-cols-3'
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col items-center px-6 py-12 text-center sm:py-20">
       <span className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/15">
         <BrandMark size={32} className="shrink-0" />
       </span>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{productName}</p>
-      <h2 className="mt-1.5 text-balance text-2xl font-semibold leading-tight text-foreground sm:text-[28px]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">{productName}</p>
+      <h2 className="mt-1.5 text-balance text-2xl font-semibold leading-tight text-foreground">
         {headline}
       </h2>
       {subline && <p className="mt-3 max-w-md text-[15px] leading-relaxed text-muted-foreground">{subline}</p>}
       {doors && doors.length > 0 && (
-        <div className="mt-7 grid w-full gap-2.5 sm:grid-cols-3">
+        <div className={`mt-7 grid w-full gap-2.5 ${doorsGridClass}`}>
           {doors.slice(0, 3).map((door, i) => (
             <button
               key={i}
@@ -368,7 +381,10 @@ export function ChatEmptyState({
               onClick={door.onSelect}
               className="group flex min-h-[44px] flex-col items-start rounded-xl border border-border bg-card px-4 py-3 text-left transition hover:border-primary/40 hover:bg-accent"
             >
-              <span className="text-sm font-semibold text-foreground">{door.label}</span>
+              <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                {door.icon}
+                {door.label}
+              </span>
               {door.description && (
                 <span className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{door.description}</span>
               )}
@@ -519,9 +535,11 @@ function friendlyToolTitle(call: ChatToolCallInfo): string {
  *  the proposal's real arguments (audit chat finding #2 — "approving a black box
  *  is the fastest way to lose trust"). Domain stays a parameter: we only read
  *  conventional fields (destinations/targets/channels, cost, reach) when present
- *  — nothing here is baked to a specific product's proposal type. Returns null
- *  when there's nothing meaningful to preview. */
-function proposalPreview(call: ChatToolCallInfo): { summary: string | null; meta: string[] } {
+ *  — nothing here is baked to a specific product's proposal type. When the agent
+ *  wrote no summary, the preview is the proposal's TYPE slug rendered mono —
+ *  never a "type: title" derivation, which restated the title the card header
+ *  already carries. Returns nulls when there's nothing meaningful to preview. */
+function proposalPreview(call: ChatToolCallInfo): { summary: string | null; meta: string[]; typeSlug: string | null } {
   const a = (call.args ?? {}) as Record<string, unknown>
   const asString = (v: unknown): string | null =>
     typeof v === 'string' && v.trim() ? v.trim() : null
@@ -532,13 +550,8 @@ function proposalPreview(call: ChatToolCallInfo): { summary: string | null; meta
         ? [asString(v) as string]
         : []
 
-  // The verb: a free-form summary the agent wrote, else derive from type.
-  const verbPhrase =
-    asString(a.summary) ??
-    asString(a.description) ??
-    (asString(a.type)
-      ? `${String(a.type).replace(/_/g, ' ')}${asString(a.title) ? `: ${asString(a.title)}` : ''}`
-      : null)
+  // The verb: only a free-form summary the agent actually wrote.
+  const verbPhrase = asString(a.summary) ?? asString(a.description) ?? null
 
   const destinations = [
     ...asList(a.destinations),
@@ -548,6 +561,9 @@ function proposalPreview(call: ChatToolCallInfo): { summary: string | null; meta
   ]
   const dest = destinations.length ? ` to ${destinations.join(' and ')}` : ''
   const summary = verbPhrase ? `${verbPhrase}${dest}` : destinations.length ? `Publish to ${destinations.join(' and ')}` : null
+  // No authored summary: the raw type slug (`asset_publish`) says what kind of
+  // action this is without duplicating the header's "Approve: {title}?".
+  const typeSlug = summary === null ? asString(a.type) : null
 
   // Cost / reach: surfaced when the data carries it, formatted lightly.
   const meta: string[] = []
@@ -558,7 +574,7 @@ function proposalPreview(call: ChatToolCallInfo): { summary: string | null; meta
   if (typeof reach === 'number' && reach > 0) meta.push(`reaches ~${reach.toLocaleString()}`)
   else if (asString(reach)) meta.push(asString(reach) as string)
 
-  return { summary, meta }
+  return { summary, meta, typeSlug }
 }
 
 function truncate(v: unknown, max = 240): string {
@@ -623,13 +639,13 @@ function DefaultToolDetail({ call }: { call: ChatToolCallInfo }) {
     <div className="space-y-2">
       {call.args && Object.keys(call.args).length > 0 && (
         <div>
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Called with</p>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Called with</p>
           <KvRows data={call.args} />
         </div>
       )}
       {envelope ? (
         <div>
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             {envelope.ok === false ? 'Failed' : 'Result'}
           </p>
           {envelope.ok === false ? (
@@ -642,7 +658,7 @@ function DefaultToolDetail({ call }: { call: ChatToolCallInfo }) {
         </div>
       ) : result != null ? (
         <div>
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Result</p>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Result</p>
           <p className="font-mono text-[11px] text-muted-foreground">{truncate(result)}</p>
         </div>
       ) : null}
@@ -669,7 +685,7 @@ function ProposalCard({
   renderers?: ToolDetailRenderers
 }) {
   const [expanded, setExpanded] = useState(false)
-  const { summary, meta } = proposalPreview(call)
+  const { summary, meta, typeSlug } = proposalPreview(call)
   const custom = renderers?.[call.name]?.(call, message)
   const { pending: deciding, run: decide } = usePending()
 
@@ -680,9 +696,15 @@ function ProposalCard({
           <ToolGlyph name={call.name} className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-warning-strong">Needs your approval</p>
+          {/* Without handlers the card is read-only: the eyebrow reports the
+              state ("Awaiting approval") instead of demanding an action the
+              viewer cannot take, and the footer adds no second note. */}
+          <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-warning-strong">
+            {approval ? 'Needs your approval' : 'Awaiting approval'}
+          </p>
           <p className="mt-0.5 text-[15px] font-semibold leading-snug text-foreground">{friendlyToolTitle(call)}</p>
-          {summary && <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{summary}</p>}
+          {summary && <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{summary}</p>}
+          {typeSlug && <p className="mt-1 font-mono text-xs text-muted-foreground">{typeSlug}</p>}
           {meta.length > 0 && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {meta.map((m, i) => (
@@ -695,13 +717,13 @@ function ProposalCard({
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 px-4 pb-3.5 pt-3">
-        {approval ? (
+        {approval && (
           <>
             <button
               type="button"
               disabled={deciding}
               onClick={() => decide(() => approval.onApprove(pending.proposalId, call.id))}
-              className="inline-flex min-h-[40px] flex-1 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:min-w-[160px]"
+              className="inline-flex min-h-[40px] flex-1 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:min-w-[160px]"
             >
               Approve &amp; run
             </button>
@@ -714,8 +736,6 @@ function ProposalCard({
               Reject
             </button>
           </>
-        ) : (
-          <span className="text-[12px] font-medium text-muted-foreground">Awaiting approval…</span>
         )}
         <button
           type="button"
@@ -736,14 +756,31 @@ function ProposalCard({
   )
 }
 
+/** "Mon, Jun 22 · 9:00 AM" for an ISO timestamp; anything unparseable renders
+ *  as written — a producer's "Tomorrow 9am" is already human copy. The raw
+ *  value stays on the row's `title` for the exact instant. */
+function formatFollowupWhen(when: string): string {
+  const date = new Date(when)
+  if (Number.isNaN(date.getTime())) return when
+  const day = date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
+  const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  return `${day} · ${time}`
+}
+
 /** A scheduled follow-up — a pending, time-based intent, not a decision and not
  *  a completed action (audit finding #5). Re-skinned onto the shared run-row
- *  geometry (full width, 24px icon chip, xs title, mono `when` in the
- *  description slot) so it reads as a sibling of the canonical tool rows; it
- *  is not a tool invocation, so the row does not expand. */
+ *  geometry (full width, 24px icon chip, xs title, `when` in the description
+ *  slot) so it reads as a sibling of the canonical tool rows; it is not a tool
+ *  invocation, so the row does not expand. It carries the same trailing status
+ *  cue its siblings do (spinner while the schedule call is in flight, a settled
+ *  dot after), and a FAILED schedule keeps the follow-up identity — the clock —
+ *  with the failure reported in place instead of falling back to a generic
+ *  tool row. */
 function FollowupCard({ call }: { call: ChatToolCallInfo }) {
   const a = (call.args ?? {}) as Record<string, unknown>
   const when = typeof a.when === 'string' ? a.when : typeof a.at === 'string' ? a.at : typeof a.schedule === 'string' ? a.schedule : null
+  const failed = toolCallFailed(call)
+  const errorText = failed ? (toolOutcomeOf(call)?.message ?? 'Scheduling failed') : null
   return (
     <div className="flex items-start gap-2">
       <div className="min-w-0 flex-1 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--md3-surface-container)]">
@@ -753,9 +790,23 @@ function FollowupCard({ call }: { call: ChatToolCallInfo }) {
           </span>
           <span className="shrink-0 whitespace-nowrap text-xs font-medium text-foreground">{friendlyToolTitle(call)}</span>
           {when && (
-            <span className="hidden min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground sm:inline">{when}</span>
+            <span title={when} className="hidden min-w-0 flex-1 truncate font-mono text-xs tabular-nums text-muted-foreground sm:inline">
+              {formatFollowupWhen(when)}
+            </span>
           )}
+          <span className="ml-auto flex shrink-0 items-center gap-1.5">
+            {call.status === 'running' ? (
+              <svg className="h-3 w-3 shrink-0 animate-spin text-[var(--accent-text)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${failed ? 'bg-[var(--surface-danger-text)]' : 'bg-[var(--surface-success-text)]'}`} />
+            )}
+          </span>
         </div>
+        {errorText && (
+          <div className="border-t border-border px-3 py-2 text-xs text-[var(--surface-danger-text)]">{errorText}</div>
+        )}
       </div>
     </div>
   )
@@ -792,7 +843,6 @@ function ToolCallCard({
 }) {
   const pending = call.status === 'done' ? pendingApprovalOf(call) : null
   const kind = blockKindOf(call)
-  const failed = toolCallFailed(call)
 
   // A proposal awaiting approval is a pending DECISION, not a tool row — it
   // keeps its own prominent card with primary Approve / quiet Reject.
@@ -808,8 +858,10 @@ function ToolCallCard({
     )
   }
   // A scheduled follow-up is a time-based intent — its own quiet row, distinct
-  // from a tool invocation.
-  if (kind === 'followup' && !failed) {
+  // from a tool invocation. A FAILED schedule keeps the row too (destructive
+  // dot + error subline) rather than falling through to the generic tool row
+  // and losing the clock identity.
+  if (kind === 'followup') {
     return <FollowupCard call={call} />
   }
 
@@ -834,9 +886,14 @@ function ToolCallCard({
           <button
             type="button"
             onClick={() => onOpenRun(call, message)}
-            className="rounded border border-border bg-card px-2 py-1 text-[11px] font-medium transition hover:bg-accent"
+            aria-label="Open full transcript"
+            title="Open full transcript"
+            className="rounded-md p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground"
           >
-            Open full transcript →
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M7 17 17 7" />
+              <path d="M7 7h10v10" />
+            </svg>
           </button>
         ) : undefined
       }
@@ -1004,7 +1061,7 @@ function SegmentedBody({
           // The fold is a quiet disclosure line, not a filled box — the
           // canonical rows inside it carry the row chrome.
           <details key={`tools-${g.index}`}>
-            <summary className="cursor-pointer select-none rounded-md px-1 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
+            <summary className="cursor-pointer select-none rounded-md py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
               Worked through {g.calls.length} steps
             </summary>
             <div className="mt-1.5 flex flex-col gap-1.5">
@@ -1028,9 +1085,11 @@ function SegmentedBody({
 /** The quiet chrome's per-row meta lane: a fixed ~18px strip that always
  *  reserves its height (so the reveal is pure opacity — zero layout shift) and
  *  fades in on row hover/focus-within, staying visible on touch via
- *  `@media (hover: none)`. The fade is reduced-motion-guarded. */
+ *  `@media (hover: none)`. The fade is reduced-motion-guarded. Tabular figures
+ *  keep the tok/s and cost columns from jittering as they change; no letter
+ *  tracking — a meta lane is data, not an eyebrow. */
 const QUIET_META_LANE_CLASS =
-  'mt-1 flex h-[18px] items-center gap-2 text-[11px] tracking-wide text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100'
+  'mt-1 flex h-[18px] items-center gap-2 text-[11px] tabular-nums text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100'
 
 /** The text a copy of the message should carry: the ordered text runs when the
  *  turn is segmented (they render in place of `content`), else `content`. */
@@ -1167,8 +1226,8 @@ function AssistantMessageImpl({
   return (
     <div className={`mx-auto w-full max-w-3xl px-6 ${quiet ? 'group pb-1 pt-3' : 'py-3'}`}>
       {!quiet && (
-        <div className="mb-1 flex items-baseline gap-2 text-[11px] tracking-wide text-muted-foreground">
-          <span className="font-semibold uppercase">{agentLabel}</span>
+        <div className="mb-1 flex items-baseline gap-2 text-[11px] tabular-nums text-muted-foreground">
+          <span className="font-semibold uppercase tracking-[0.05em]">{agentLabel}</span>
           {msg.modelUsed && <span className="font-mono normal-case">{msg.modelUsed}</span>}
           {formatTokensPerSecond(msg) && <span>{formatTokensPerSecond(msg)}</span>}
           {formatModelCost(msg, models) && <span>{formatModelCost(msg, models)}</span>}
@@ -1193,7 +1252,7 @@ function AssistantMessageImpl({
               'Thought process'
             )}
           </summary>
-          <div ref={reasoningScrollRef} className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap text-[13px] leading-relaxed text-muted-foreground">
+          <div ref={reasoningScrollRef} className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
             {reasoning}
           </div>
         </details>
@@ -1301,9 +1360,9 @@ function ThinkingRow({ agentLabel, chrome = 'labeled' }: { agentLabel: string; c
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-3">
       {chrome !== 'quiet' && (
-        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{agentLabel}</p>
+        <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">{agentLabel}</p>
       )}
-      <div className="flex items-center gap-2 text-base text-muted-foreground">
+      <div className="flex items-center gap-2 text-[15px] text-muted-foreground">
         <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
           <path d="M21 12a9 9 0 1 1-6.219-8.56" strokeLinecap="round" />
         </svg>
@@ -1369,8 +1428,8 @@ export function ChatMessages({
 }: ChatMessagesProps) {
   const messageClassName =
     messageSize === 'large'
-      ? 'agent-app-message-copy text-[17px] leading-[1.75]'
-      : 'agent-app-message-copy text-base leading-[1.75]'
+      ? 'agent-app-message-copy text-[16px] leading-[1.6]'
+      : 'agent-app-message-copy text-[15px] leading-[1.6]'
   // Stabilize the fallback renderer's identity so it doesn't change every
   // render — otherwise the memoized `AssistantMessage` (and its per-frame body
   // memo) would invalidate on every parent render when no `renderMarkdown` is
@@ -1400,7 +1459,7 @@ export function ChatMessages({
           <div key={msg.id} className={`mx-auto w-full max-w-3xl px-6 ${quiet ? 'group pb-1 pt-3' : 'py-3'}`}>
             <div className={`ml-auto w-fit ${quiet ? 'max-w-[72%]' : 'max-w-[85%]'}`}>
               {!quiet && (
-                <p className="mb-1 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="mb-1 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
                   {userLabel}
                 </p>
               )}

@@ -77,12 +77,14 @@ describe('MessageAttachments', () => {
     expect(screen.getByText('a.png')).toBeTruthy()
   })
 
-  it('renders a file chip with name and formatted size', () => {
+  it('renders a file chip with name and display-formatted size', () => {
     const { fetchFile } = fakeFetchFile()
     render(<MessageAttachments parts={[filePart]} resolveFileUrl={resolveFileUrl} fetchFile={fetchFile} />)
     const button = screen.getByRole('button')
     expect(button.textContent).toContain('b.csv')
-    expect(button.textContent).toContain('512B')
+    // The chip uses the display formatter ("512 B" / "47 KB" / "1.2 MB"), not
+    // the wire formatter's exact "512B" decomposition.
+    expect(button.textContent).toContain('512 B')
   })
 
   it('does not fetch a chip on mount', () => {
