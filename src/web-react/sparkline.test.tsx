@@ -125,6 +125,22 @@ describe('<Sparkline>', () => {
     expect(chart.getAttribute('data-direction')).toBe('falling')
   })
 
+  it('leaves no stray separator in the empty state class attribute', () => {
+    const { container } = render(<Sparkline values={[]} label="Runs" />)
+    // Interpolating an absent `className` emitted `class="… text-muted-foreground "`
+    // on every caller that passed none.
+    const attribute = container.querySelector('[data-sparkline="empty"]')?.getAttribute('class') ?? ''
+    expect(attribute).toBe(attribute.trim())
+    expect(attribute).not.toContain('  ')
+  })
+
+  it('joins a caller class with exactly one separator', () => {
+    const { container } = render(<Sparkline values={[]} label="Runs" className="mt-2" />)
+    expect(container.querySelector('[data-sparkline="empty"]')?.getAttribute('class')).toBe(
+      'text-[11px] text-muted-foreground mt-2',
+    )
+  })
+
   it('is reachable by its metric name rather than as an unnamed graphic', () => {
     render(<Sparkline values={[1, 2]} label="Mission throughput" />)
     // A sparkline with no accessible name is decoration a screen reader cannot

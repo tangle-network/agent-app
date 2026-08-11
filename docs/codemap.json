@@ -17547,6 +17547,12 @@
           "doc": "Always at least one page, so \"Page 1 of 0\" cannot be rendered."
         },
         {
+          "name": "insightPageSize",
+          "kind": "function",
+          "signature": "(pageSize?: number) => number",
+          "doc": "The page size — ONE definition, read by the count and by the slice."
+        },
+        {
           "name": "insightPageSlice",
           "kind": "function",
           "signature": "<T>(items: readonly T[], page: number, pageSize?: number) => readonly T[]",

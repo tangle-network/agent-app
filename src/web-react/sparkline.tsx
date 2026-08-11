@@ -37,6 +37,8 @@
 
 import type { ReactElement } from 'react'
 
+import { joinClasses } from './class-names'
+
 /** Where a series ended relative to where it started. */
 export type SparklineDirection = 'rising' | 'falling' | 'flat'
 
@@ -221,7 +223,7 @@ export function Sparkline({
     // order for assistive tech, where "No history yet" on its own would be one
     // of several unattributed phrases on a deck of cards.
     return (
-      <span data-sparkline="empty" className={`text-[11px] text-muted-foreground ${className ?? ''}`}>
+      <span data-sparkline="empty" className={joinClasses('text-[11px] text-muted-foreground', className)}>
         <span className="sr-only">{label}: </span>
         {emptyLabel}
       </span>

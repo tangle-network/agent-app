@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-392 exports.
+393 exports.
 
 ### `activityTone`
 
@@ -1212,6 +1212,14 @@ type InsightDirection
 
 ```ts
 (total: number, pageSize?: number) => number
+```
+
+### `insightPageSize`
+
+`function` — The page size — ONE definition, read by the count and by the slice.
+
+```ts
+(pageSize?: number) => number
 ```
 
 ### `insightPageSlice`

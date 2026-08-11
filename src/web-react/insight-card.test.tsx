@@ -14,8 +14,9 @@
  * `useAsyncResource` and asserts the empty copy is nowhere on the screen.
  */
 
-import { describe, expect, it } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { useState } from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createEvent, fireEvent, render, screen } from '@testing-library/react'
 
 import { useAsyncResource, type AsyncResourceState } from './async'
 import {
@@ -25,6 +26,7 @@ import {
   insightDelta,
   insightDeltaTone,
   insightPageCount,
+  insightPageSize,
   insightPageSlice,
   type Insight,
 } from './insight-card'
@@ -40,6 +42,38 @@ function insight(id: string, over: Partial<Insight> = {}): Insight {
 function cards(): HTMLElement[] {
   return Array.from(document.querySelectorAll<HTMLElement>('[data-insight-card]'))
 }
+
+function titles(): Array<string | undefined> {
+  return cards().map((card) => card.querySelector('h3')?.textContent ?? undefined)
+}
+
+function deck(): HTMLElement {
+  return screen.getByRole('region', { name: 'Insights' })
+}
+
+/** Dispatches a real cancelable `keydown` and hands the event back, so a test
+ *  can ask what the deck did with it — `fireEvent`'s shorthand throws that
+ *  answer away, and "was this key consumed" is exactly the question. */
+function press(target: HTMLElement, key: string): Event {
+  const event = createEvent.keyDown(target, { key })
+  fireEvent(target, event)
+  return event
+}
+
+/** `insightPageSize` warns once per distinct bad value for the life of the
+ *  module, so every test below uses a page size no other test uses. */
+let warnings: string[] = []
+
+beforeEach(() => {
+  warnings = []
+  vi.spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
+    warnings.push(args.map(String).join(' '))
+  })
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 // ── the delta ─────────────────────────────────────────────────────────────
 
@@ -131,18 +165,65 @@ describe('<InsightCard>', () => {
     expect(container.querySelector('[data-insight-card]')?.className).toContain('agent-arrive')
   })
 
-  it('marks the live label essential, so it survives reduced motion', () => {
+  it('renders a non-finite figure as unavailable, never as the string "NaN"', () => {
+    // The producer divided by a zero denominator. `Intl.NumberFormat` formats
+    // that as "NaN", which lands in the figure slot looking like a reading.
+    const { container } = render(<InsightCard title="Cost per run" value={Number.NaN} unit="USD" previous={4} />)
+    expect(container.textContent).not.toContain('NaN')
+    expect(container.querySelector('[data-insight-value="unavailable"]')?.textContent).toContain('—')
+    // The dash alone is silence to a screen reader, so the state is spelled out.
+    expect(container.textContent).toContain('Not available')
+    // The unit goes with the figure: "— USD" still claims a measurement in
+    // dollars, and there was no measurement.
+    expect(container.textContent).not.toContain('USD')
+    expect(container.querySelector('[data-insight-delta]')).toBeNull()
+  })
+
+  it('renders an infinite figure as unavailable, never as "∞"', () => {
+    const { container } = render(<InsightCard title="Throughput" value={Number.POSITIVE_INFINITY} unit="runs" />)
+    expect(container.textContent).not.toContain('∞')
+    expect(container.querySelector('[data-insight-value="unavailable"]')).not.toBeNull()
+    expect(container.querySelector('.tabular-nums')).toBeNull()
+  })
+
+  it('still renders a real zero as a number, not as unavailable', () => {
+    // The guard is about finiteness, not falsiness: a measured 0 is a reading.
+    const { container } = render(<InsightCard title="Failures" value={0} unit="runs" />)
+    expect(container.querySelector('[data-insight-value="unavailable"]')).toBeNull()
+    expect(container.textContent).toContain('0')
+    expect(container.textContent).toContain('runs')
+  })
+
+  it('does not override reduced motion for the live label', () => {
     const { container } = render(<InsightCard title="Spend today" value={41} live liveLabel="Updating" />)
-    const label = container.querySelector('[data-motion="essential"]')
-    // The shimmer is the only signal that the number is not final yet; a
-    // decorative marking would collapse it and leave a settled-looking figure.
+    const label = container.querySelector('[data-insight-live]')
     expect(label?.textContent).toBe('Updating')
     expect(label?.className).toContain('agent-shimmer')
+    // The WORD is the signal — a settled card does not render it at all — and
+    // the sweep through its glyphs is emphasis on top. So a reader who asked for
+    // less motion keeps the whole signal and loses only the sweep, and there is
+    // nothing here worth overriding their request for.
+    expect(label?.hasAttribute('data-motion')).toBe(false)
+    expect(container.querySelector('[data-motion="essential"]')).toBeNull()
+  })
+
+  it('drops the live label entirely once the figure is final', () => {
+    const { container } = render(<InsightCard title="Spend today" value={41} liveLabel="Updating" />)
+    // This is what makes the label's PRESENCE the signal, with or without motion.
+    expect(container.querySelector('[data-insight-live]')).toBeNull()
+    expect(container.textContent).not.toContain('Updating')
   })
 
   it('names its series after the metric', () => {
     render(<InsightCard title="Spend today" value={9} series={[1, 5, 9]} />)
     expect(screen.getByRole('img', { name: /Spend today/ })).toBeTruthy()
+  })
+
+  it('builds its class attribute without a stray separator', () => {
+    const { container } = render(<InsightCard title="Runs" value={3} />)
+    const attribute = container.querySelector('[data-insight-card]')?.getAttribute('class') ?? ''
+    expect(attribute).toBe(attribute.trim())
+    expect(attribute).not.toContain('  ')
   })
 })
 
@@ -158,6 +239,44 @@ describe('insight paging', () => {
     const items = [1, 2, 3, 4, 5]
     expect(insightPageSlice(items, 9, 2)).toEqual([5])
     expect(insightPageSlice(items, -3, 2)).toEqual([1, 2])
+  })
+
+  it('counts and slices with the SAME page size, so no item lands on no page', () => {
+    const items = [1, 2, 3, 4, 5]
+    // The defect this pins: a count that divided by the raw 2.5 reported two
+    // pages while a slice that floored it showed two items each — so item 5 sat
+    // on no page the reader could reach, with nothing on screen to say so.
+    const count = insightPageCount(items.length, 2.5)
+    const walked = Array.from({ length: count }, (_, page) => insightPageSlice(items, page, 2.5)).flat()
+    expect(walked).toEqual(items)
+    expect(warnings.join('\n')).toContain('2.5')
+  })
+
+  it('normalises a page size that is not a whole count of cards', () => {
+    // 3 is DEFAULT_INSIGHT_PAGE_SIZE: a usable deck beats a thrown render, and
+    // the caller hears about it either way.
+    expect(insightPageSize(0)).toBe(3)
+    expect(insightPageSize(-2)).toBe(3)
+    expect(insightPageSize(Number.NaN)).toBe(3)
+    expect(insightPageSize(Number.POSITIVE_INFINITY)).toBe(3)
+    expect(insightPageSize(undefined)).toBe(3)
+    expect(insightPageSize(4)).toBe(4)
+    expect(warnings).toHaveLength(4)
+  })
+
+  it('warns once per offending value rather than once per render', () => {
+    insightPageSize(1.5)
+    insightPageSize(1.5)
+    insightPageSize(1.5)
+    // A warning repeated on every render of every deck is one nobody reads.
+    expect(warnings.filter((line) => line.includes('1.5'))).toHaveLength(1)
+  })
+
+  it('refuses to report a page count from a total it cannot count', () => {
+    // "Page 1 of NaN" is the paging form of the figure that renders one.
+    expect(insightPageCount(Number.NaN, 3)).toBe(1)
+    expect(insightPageCount(-4, 3)).toBe(1)
+    expect(insightPageSlice([1, 2, 3], Number.NaN, 3)).toEqual([1, 2, 3])
   })
 })
 
@@ -198,24 +317,171 @@ describe('<InsightDeck>', () => {
 
   it('pages with the keyboard and reports where the reader is', () => {
     render(<InsightDeck state={ready(six)} empty={{ title: 'No insights yet' }} pageSize={2} />)
-    const deck = screen.getByRole('region', { name: 'Insights' })
+    // Driven from the focused element rather than by aiming an event at the
+    // section: a handler that only fires when a test targets it directly proves
+    // the handler, not that anyone can reach it.
+    deck().focus()
+    expect(document.activeElement).toBe(deck())
 
     expect(screen.getByText('Page 1 of 3')).toBeTruthy()
-    expect(cards().map((card) => card.querySelector('h3')?.textContent)).toEqual(['Metric 1', 'Metric 2'])
+    expect(titles()).toEqual(['Metric 1', 'Metric 2'])
 
-    fireEvent.keyDown(deck, { key: 'ArrowRight' })
-    expect(cards().map((card) => card.querySelector('h3')?.textContent)).toEqual(['Metric 3', 'Metric 4'])
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'ArrowRight' })
+    expect(titles()).toEqual(['Metric 3', 'Metric 4'])
     expect(screen.getByText('Page 2 of 3')).toBeTruthy()
 
-    fireEvent.keyDown(deck, { key: 'End' })
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'End' })
     expect(screen.getByText('Page 3 of 3')).toBeTruthy()
 
-    fireEvent.keyDown(deck, { key: 'Home' })
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Home' })
     expect(screen.getByText('Page 1 of 3')).toBeTruthy()
     // Already at the first page: paging back is a no-op, not a wrap onto the
     // last one, which would read as the deck having lost its place.
-    fireEvent.keyDown(deck, { key: 'ArrowLeft' })
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'ArrowLeft' })
     expect(screen.getByText('Page 1 of 3')).toBeTruthy()
+  })
+
+  it('puts the paging surface in the tab order, and only when there is a page to reach', () => {
+    const { unmount } = render(<InsightDeck state={ready(six)} empty={{ title: 'No insights yet' }} pageSize={2} />)
+    expect(deck().getAttribute('tabindex')).toBe('0')
+    expect(deck().getAttribute('aria-keyshortcuts')).toContain('ArrowRight')
+    unmount()
+
+    render(<InsightDeck state={ready([insight('a'), insight('b')])} empty={{ title: 'No insights yet' }} pageSize={3} />)
+    // One page: there is nothing to page to, so the deck takes no tab stop off
+    // the reader on the way to the rest of the screen.
+    expect(deck().hasAttribute('tabindex')).toBe(false)
+  })
+
+  it('pages from the pager button a reader tabbed onto', () => {
+    render(<InsightDeck state={ready(six)} empty={{ title: 'No insights yet' }} pageSize={2} />)
+    const next = screen.getByRole('button', { name: 'Next insights' })
+    next.focus()
+    expect(document.activeElement).toBe(next)
+
+    // The handler lives on the deck and the event bubbles, so the arrows keep
+    // working from the control the reader is standing on.
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'ArrowRight' })
+    expect(screen.getByText('Page 2 of 3')).toBeTruthy()
+  })
+
+  it('consumes only the keys that actually turned a page', () => {
+    render(<InsightDeck state={ready(six)} empty={{ title: 'No insights yet' }} pageSize={2} />)
+    expect(press(deck(), 'ArrowRight').defaultPrevented).toBe(true)
+
+    press(deck(), 'End')
+    expect(screen.getByText('Page 3 of 3')).toBeTruthy()
+    // At the last page these move nothing. Swallowing them there costs the
+    // reader the scroll the browser would have done, for no gain at all.
+    expect(press(deck(), 'ArrowRight').defaultPrevented).toBe(false)
+    expect(press(deck(), 'PageDown').defaultPrevented).toBe(false)
+    expect(press(deck(), 'End').defaultPrevented).toBe(false)
+    expect(press(deck(), 'a').defaultPrevented).toBe(false)
+  })
+
+  it('leaves every paging key to the browser on a single-page deck', () => {
+    render(<InsightDeck state={ready([insight('a')])} empty={{ title: 'No insights yet' }} pageSize={3} />)
+    for (const key of ['ArrowRight', 'ArrowLeft', 'PageUp', 'PageDown', 'Home', 'End']) {
+      expect(press(deck(), key).defaultPrevented, key).toBe(false)
+    }
+  })
+
+  it('keeps the reader on their page across a refresh', async () => {
+    function Screen() {
+      const [reload, setReload] = useState(0)
+      const state = useAsyncResource<readonly Insight[]>({ load: async () => six, deps: [reload] })
+      return (
+        <>
+          <button type="button" onClick={() => setReload((n) => n + 1)}>
+            Refresh
+          </button>
+          <InsightDeck state={state} empty={{ title: 'No insights yet' }} pageSize={2} />
+        </>
+      )
+    }
+
+    render(<Screen />)
+    await screen.findByText('Page 1 of 3')
+    fireEvent.keyDown(deck(), { key: 'ArrowRight' })
+    expect(screen.getByText('Page 2 of 3')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    // The refresh really does tear the ready subtree down — which is why page
+    // state held inside it did not survive one, and why it is held above.
+    expect(screen.queryByText('Page 2 of 3')).toBeNull()
+
+    expect(await screen.findByText('Page 2 of 3')).toBeTruthy()
+    // A poll the reader did not ask for must not take their place from them.
+    expect(titles()).toEqual(['Metric 3', 'Metric 4'])
+  })
+
+  it('shows every insight even when the page size is not a whole number', () => {
+    const five = Array.from({ length: 5 }, (_, i) => insight(String(i + 1)))
+    // 1.25 divided one way for the count and another for the slice: four pages
+    // of one card, and the fifth insight on none of them.
+    render(<InsightDeck state={ready(five)} empty={{ title: 'No insights yet' }} pageSize={1.25} />)
+    const seen = new Set(titles())
+    expect(screen.getByText('Page 1 of 2')).toBeTruthy()
+    press(deck(), 'ArrowRight')
+    for (const title of titles()) seen.add(title)
+    expect(seen).toEqual(new Set(['Metric 1', 'Metric 2', 'Metric 3', 'Metric 4', 'Metric 5']))
+    expect(warnings.join('\n')).toContain('1.25')
+  })
+
+  it('replays the entrance on a page turn instead of swapping text into a card that stayed', () => {
+    render(<InsightDeck state={ready(six)} empty={{ title: 'No insights yet' }} pageSize={2} />)
+    const before = cards()[0] as HTMLElement
+
+    fireEvent.keyDown(deck(), { key: 'ArrowRight' })
+    const after = cards()[0] as HTMLElement
+    // A NEW element is the mechanism: `.agent-arrive` runs on mount, so a card
+    // that was reused would show page two's number with no arrival at all.
+    expect(after).not.toBe(before)
+    expect(before.isConnected).toBe(false)
+    expect(after.className).toContain('agent-arrive')
+  })
+
+  it('keys a card by its page as well as its id, so a repeated id still arrives', () => {
+    const repeated = [
+      insight('a'),
+      { ...insight('shared'), title: 'Yesterday' },
+      insight('b'),
+      { ...insight('shared'), title: 'Today' },
+    ]
+    render(<InsightDeck state={ready(repeated)} empty={{ title: 'No insights yet' }} pageSize={2} />)
+    const before = cards()[1] as HTMLElement
+    expect(before.querySelector('h3')?.textContent).toBe('Yesterday')
+
+    fireEvent.keyDown(deck(), { key: 'ArrowRight' })
+    const after = cards()[1] as HTMLElement
+    expect(after.querySelector('h3')?.textContent).toBe('Today')
+    // Keyed by id alone, React matches the repeated key across the turn and
+    // reuses that node: the text changes under a card that never moved.
+    expect(after).not.toBe(before)
+  })
+
+  it('marks the current page dot with the token ARIA defines for pagination', () => {
+    render(<InsightDeck state={ready(six)} empty={{ title: 'No insights yet' }} pageSize={2} />)
+    // `aria-current="true"` is the generic token; `page` is the one a pagination
+    // control is defined to carry, and the one a screen reader reads as a page.
+    expect(screen.getByRole('button', { name: 'Page 1 of 3' }).getAttribute('aria-current')).toBe('page')
+    expect(screen.getByRole('button', { name: 'Page 2 of 3' }).hasAttribute('aria-current')).toBe(false)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Page 2 of 3' }))
+    expect(screen.getByRole('button', { name: 'Page 2 of 3' }).getAttribute('aria-current')).toBe('page')
+    expect(screen.getByRole('button', { name: 'Page 1 of 3' }).hasAttribute('aria-current')).toBe(false)
+  })
+
+  it('gives each page dot a 24px target without growing the dot', () => {
+    render(<InsightDeck state={ready(six)} empty={{ title: 'No insights yet' }} pageSize={2} />)
+    const dot = screen.getByRole('button', { name: 'Page 2 of 3' })
+    // WCAG 2.2 SC 2.5.8 asks for 24x24 CSS px. The Spacing exception cannot
+    // cover an 8px dot at a 12px pitch — the 24px circles around two adjacent
+    // centres overlap — so the target has to be real.
+    expect(dot.className).toContain('h-6')
+    expect(dot.className).toContain('w-6')
+    // …and the graphic stays 8px: the padding carries the target, not the dot.
+    expect(dot.querySelector('span')?.className).toContain('h-2 w-2')
   })
 
   it('keeps the pager focusable at the ends instead of dropping it out of the tab order', () => {
@@ -244,5 +510,12 @@ describe('<InsightDeck>', () => {
     render(<InsightDeck state={ready([insight('a'), insight('b')])} empty={{ title: 'No insights yet' }} pageSize={3} />)
     expect(screen.queryByRole('button', { name: 'Next insights' })).toBeNull()
     expect(cards()).toHaveLength(2)
+  })
+
+  it('builds its class attribute without a stray separator', () => {
+    render(<InsightDeck state={ready(six)} empty={{ title: 'No insights yet' }} pageSize={2} />)
+    const attribute = deck().getAttribute('class') ?? ''
+    expect(attribute).toBe(attribute.trim())
+    expect(attribute).not.toContain('  ')
   })
 })
