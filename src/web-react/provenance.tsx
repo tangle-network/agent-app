@@ -198,7 +198,7 @@ function SourceRow({
   return (
     <li className="rounded-md border border-card-edge bg-card px-2.5 py-2">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="text-[13px] font-medium text-foreground">{source.label}</span>
+        <span className="text-sm font-medium text-foreground">{source.label}</span>
         {source.locator && <span className="text-[11px] text-muted-foreground">{source.locator}</span>}
         {openable &&
           (onOpenSource ? (
@@ -348,7 +348,7 @@ export function ProvenanceValue({
       >
         {summary}
         <span
-          className={`ml-1.5 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${BASIS_TONES[record.basis]}`}
+          className={`ml-1.5 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-medium ${BASIS_TONES[record.basis]}`}
         >
           <BasisGlyph basis={record.basis} className="h-3 w-3" />
           {basisMeta.label}
@@ -375,7 +375,7 @@ export function ProvenanceValue({
           aria-expanded={open}
           aria-controls={panelId}
           aria-label={provenanceTriggerLabel(record, standing)}
-          className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium transition hover:brightness-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${BASIS_TONES[record.basis]}`}
+          className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-medium transition hover:brightness-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${BASIS_TONES[record.basis]}`}
         >
           <BasisGlyph basis={record.basis} className="h-3 w-3" />
           <span aria-hidden>{basisMeta.label}</span>
@@ -384,7 +384,7 @@ export function ProvenanceValue({
           // Legible at rest: what to do about the value does not wait for
           // someone to open the panel. `aria-hidden` because the trigger's
           // accessible name already carries it — this is the visual half.
-          <span aria-hidden className={`text-[10px] font-medium ${STANDING_TONES[standing]}`}>
+          <span aria-hidden className={`text-[11px] font-medium ${STANDING_TONES[standing]}`}>
             {standingMeta.label}
           </span>
         )}
@@ -441,7 +441,7 @@ export function ProvenanceValue({
 
           {inputs.length > 0 && (
             <div className="border-t border-border pt-2">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              <p className="text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground">
                 {record.derivation ? `Computed from ${record.derivation}` : 'Computed from'}
               </p>
               <ul className="mt-1.5 space-y-1.5">
@@ -486,7 +486,7 @@ export function ProvenanceLegend({ bases, className }: ProvenanceLegendProps) {
         return (
           <li key={basis} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <span
-              className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${BASIS_TONES[basis]}`}
+              className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-medium ${BASIS_TONES[basis]}`}
             >
               <BasisGlyph basis={basis} className="h-3 w-3" />
               {meta.label}

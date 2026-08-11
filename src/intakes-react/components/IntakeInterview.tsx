@@ -16,6 +16,7 @@ import { useEffect, useState } from 'react'
 import type { IntakeAnswerValue, IntakeQuestion } from '../../intakes/model'
 import { validateAnswer } from '../../intakes/model'
 import type { IntakeInterviewProps, IntakeView } from '../contracts'
+import { BrandMark } from './BrandMark'
 
 export function IntakeInterview({
   view: initialView,
@@ -83,17 +84,26 @@ export function IntakeInterview({
   return (
     <section className="flex flex-col gap-5">
       <header className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold text-[var(--text-primary)]">{view.title}</h2>
+        <span className="mb-1 flex items-center gap-2 text-[var(--text-muted)]">
+          <BrandMark size={20} className="shrink-0" />
+          <span className="text-[11px] font-semibold uppercase tracking-[0.05em]">Tangle Intake</span>
+        </span>
+        <h2 className="text-xl font-semibold text-[var(--text-primary)]">{view.title}</h2>
         {view.description && <p className="text-sm text-[var(--text-muted)]">{view.description}</p>}
         <ProgressBar answered={view.progress.answered} total={view.progress.total} />
       </header>
 
       {view.completed ? (
-        <p className="text-sm text-[var(--text-secondary)]">Thanks — your intake is complete.</p>
+        <div className="flex items-center gap-2.5 rounded-lg border border-[hsl(var(--success)/0.4)] bg-[hsl(var(--success)/0.08)] px-3.5 py-3">
+          <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-[var(--surface-success-text)]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <p className="text-sm text-[var(--text-primary)]">You're all set — every answer is saved. You can close this panel.</p>
+        </div>
       ) : question ? (
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <p className="text-base font-medium text-[var(--text-primary)]">{question.prompt}</p>
+            <p className="text-sm font-medium text-[var(--text-primary)]">{question.prompt}</p>
             {question.help && <p className="text-xs text-[var(--text-muted)]">{question.help}</p>}
           </div>
 
@@ -103,8 +113,8 @@ export function IntakeInterview({
             <button
               type="button"
               onClick={() => void submit()}
-              disabled={busy}
-              className="rounded bg-[var(--brand-primary)] px-4 py-1.5 text-sm text-white disabled:opacity-50"
+              disabled={busy || isDraftEmpty(draft)}
+              className="rounded bg-[var(--brand-primary)] px-4 py-1.5 text-sm text-[hsl(var(--primary-foreground))] disabled:opacity-50"
             >
               {busy ? 'Saving…' : 'Continue'}
             </button>
@@ -118,7 +128,7 @@ export function IntakeInterview({
               type="button"
               onClick={() => void finish()}
               disabled={busy}
-              className="rounded bg-[var(--brand-primary)] px-4 py-1.5 text-sm text-white disabled:opacity-50"
+              className="rounded bg-[var(--brand-primary)] px-4 py-1.5 text-sm text-[hsl(var(--primary-foreground))] disabled:opacity-50"
             >
               {busy ? 'Finishing…' : 'Finish'}
             </button>
@@ -161,7 +171,7 @@ function AnswerField({ question, value, onChange, onSubmit }: AnswerFieldProps) 
               onClick={() => onChange(opt.v)}
               className={`rounded border px-4 py-1.5 text-sm ${
                 value === opt.v
-                  ? 'border-[var(--brand-primary)] bg-[var(--brand-primary)] text-white'
+                  ? 'border-[var(--brand-primary)] bg-[var(--brand-primary)] text-[hsl(var(--primary-foreground))]'
                   : 'border-[var(--border-default)] bg-[var(--bg-input)] text-[var(--text-secondary)]'
               }`}
             >
@@ -189,12 +199,13 @@ function AnswerField({ question, value, onChange, onSubmit }: AnswerFieldProps) 
               key={option.value}
               type="button"
               onClick={() => onChange(option.value)}
-              className={`rounded border px-3 py-2 text-left text-sm ${
+              className={`flex items-center gap-2 rounded border px-3 py-2 text-left text-sm ${
                 value === option.value
-                  ? 'border-[var(--brand-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]'
+                  ? 'border-[var(--brand-primary)] bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)] text-[var(--text-primary)]'
                   : 'border-[var(--border-default)] bg-[var(--bg-input)] text-[var(--text-secondary)]'
               }`}
             >
+              {value === option.value && <ChoiceCheck />}
               {option.label}
             </button>
           ))}
@@ -213,12 +224,13 @@ function AnswerField({ question, value, onChange, onSubmit }: AnswerFieldProps) 
                 onClick={() =>
                   onChange(on ? selected.filter((v) => v !== option.value) : [...selected, option.value])
                 }
-                className={`rounded border px-3 py-2 text-left text-sm ${
+                className={`flex items-center gap-2 rounded border px-3 py-2 text-left text-sm ${
                   on
-                    ? 'border-[var(--brand-primary)] bg-[var(--bg-input)] text-[var(--text-primary)]'
+                    ? 'border-[var(--brand-primary)] bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)] text-[var(--text-primary)]'
                     : 'border-[var(--border-default)] bg-[var(--bg-input)] text-[var(--text-secondary)]'
                 }`}
               >
+                {on && <ChoiceCheck />}
                 {option.label}
               </button>
             )
@@ -238,6 +250,15 @@ function AnswerField({ question, value, onChange, onSubmit }: AnswerFieldProps) 
         />
       )
   }
+}
+
+/** Leading check for a selected choice option (single/multi-select). */
+function ChoiceCheck() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-[var(--brand-primary)]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  )
 }
 
 function ProgressBar({ answered, total }: { answered: number; total: number }) {
@@ -260,6 +281,15 @@ function currentAnswer(view: IntakeView): IntakeAnswerValue {
 
 function defaultDraft(question: IntakeQuestion): IntakeAnswerValue {
   return question.type === 'multi-select' ? [] : null
+}
+
+/** No answer yet — null, empty text, or an empty multi-select. `false` and `0`
+ *  are real answers and never gate Continue. */
+function isDraftEmpty(value: IntakeAnswerValue): boolean {
+  if (value === null || value === undefined) return true
+  if (typeof value === 'string') return value.trim() === ''
+  if (Array.isArray(value)) return value.length === 0
+  return false
 }
 
 /** Trim text answers before submit; pass others through unchanged. */

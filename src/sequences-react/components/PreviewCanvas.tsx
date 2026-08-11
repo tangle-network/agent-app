@@ -39,6 +39,8 @@ export function PreviewCanvas({ timeline, clock, frameProvider, className }: Pre
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [size, setSize] = useState<CanvasSize | null>(null)
   const [drawError, setDrawError] = useState<string | null>(null)
+  /** No enabled video/image clip under the playhead — the void state. */
+  const [emptyFrame, setEmptyFrame] = useState(false)
   const paintQueueRef = useRef<{ running: boolean; queuedFrame: number | null }>({ running: false, queuedFrame: null })
   /** Latest paint inputs, readable from the async queue without re-binding it. */
   const paintInputsRef = useRef({ timeline, frameProvider, size })
@@ -78,6 +80,20 @@ export function PreviewCanvas({ timeline, clock, frameProvider, className }: Pre
       const { timeline: current, frameProvider: provider, size: cssSize } = paintInputsRef.current
       const canvas = canvasRef.current
       if (!canvas || !cssSize) return
+
+      // The playhead may rest at durationFrames (sequence end); paint the
+      // final addressable frame there.
+      const paintFrame = Math.max(0, Math.min(frame, current.sequence.durationFrames - 1))
+      const snapshot = snapshotFrame(current, paintFrame)
+
+      const mediaEntries = snapshot.active.filter(({ track, clip }) => (
+        track.kind === 'video' && !track.muted && clip.media !== undefined && (clip.media.kind === 'video' || clip.media.kind === 'image')
+      ))
+      const top = mediaEntries[mediaEntries.length - 1]
+      // Track the void independent of paint success: the overlay is a layout
+      // concern, so it also applies where canvas 2D is unavailable (tests).
+      setEmptyFrame(!(top && top.clip.media))
+
       const ctx = canvas.getContext('2d')
       // Canvas 2D is unavailable in non-browser test environments; layout
       // still renders, only pixels are skipped.
@@ -91,15 +107,6 @@ export function PreviewCanvas({ timeline, clock, frameProvider, className }: Pre
       ctx.fillStyle = '#000'
       ctx.fillRect(0, 0, cssSize.width, cssSize.height)
 
-      // The playhead may rest at durationFrames (sequence end); paint the
-      // final addressable frame there.
-      const paintFrame = Math.max(0, Math.min(frame, current.sequence.durationFrames - 1))
-      const snapshot = snapshotFrame(current, paintFrame)
-
-      const mediaEntries = snapshot.active.filter(({ track, clip }) => (
-        track.kind === 'video' && !track.muted && clip.media !== undefined && (clip.media.kind === 'video' || clip.media.kind === 'image')
-      ))
-      const top = mediaEntries[mediaEntries.length - 1]
       if (top && top.clip.media) {
         const sourceSeconds = framesToSeconds(top.clip.sourceInFrame + (paintFrame - top.clip.startFrame), current.sequence.fps)
         await provider.drawFrame(top.clip.media.url, sourceSeconds, ctx, {
@@ -172,6 +179,11 @@ export function PreviewCanvas({ timeline, clock, frameProvider, className }: Pre
         className="block"
         style={size ? { width: `${size.width}px`, height: `${size.height}px` } : { width: '100%', height: '100%' }}
       />
+      {emptyFrame && !drawError ? (
+        <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-[11px] text-[var(--text-muted)]">
+          No media at the playhead
+        </p>
+      ) : null}
       {drawError ? (
         <p className="absolute inset-x-3 bottom-2 truncate rounded bg-[hsl(var(--destructive))] px-2 py-1 text-center text-xs text-[hsl(var(--destructive-foreground))]" role="alert">
           {drawError}
