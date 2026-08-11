@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, fireEvent, render } from '@testing-library/react'
 
 // No `../brand` mock: web-react reaches the Tangle mark through `./brand-mark`,
 // a lazy boundary that degrades to reserved space when the opt-in
@@ -17,6 +17,15 @@ afterEach(cleanup)
  *  array-index access. */
 function indexIn(container: HTMLElement, needle: string): number {
   return (container.textContent ?? '').indexOf(needle)
+}
+
+/** The reasoning trace's disclosure control — the button that replaced the
+ *  `<summary>`, found by the region it declares rather than by its label, which
+ *  changes with the turn's phase ("Thinking…" / "Thought for 3s"). */
+function reasoningToggle(container: HTMLElement): HTMLElement {
+  const toggle = container.querySelector('button[aria-controls][aria-expanded]')
+  if (!toggle) throw new Error('no reasoning disclosure button rendered')
+  return toggle as HTMLElement
 }
 
 describe('ChatMessages segmented turns', () => {
@@ -187,7 +196,61 @@ describe('ChatMessages segmented turns', () => {
     // The answer exists, so the reasoning box is collapsed and NOT pulsing
     // "Thinking…" — even though `content` is '' and the answer is in a segment.
     expect(container.textContent).not.toContain('Thinking…')
-    expect(container.querySelector('details')?.open).toBe(false)
+    // INVERTED: this read `querySelector('details')?.open === false`. The
+    // reasoning trace is no longer a `<details>` — a native disclosure has no
+    // transition to give, so the box snapped to full height at the exact moment
+    // the answer landed. It is now a button + `.agent-disclose`, whose
+    // `data-open` drives a grid-row animation over the trace's REAL height. The
+    // collapsed state is the same state; only who reports it changed.
+    expect(container.querySelector('details')).toBeNull()
+    const disclosure = container.querySelector('.agent-disclose')
+    expect(disclosure?.getAttribute('data-open')).toBe('false')
+    expect(reasoningToggle(container).getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('opens the reasoning disclosure while no answer text exists yet', () => {
+    const message: ChatUiMessage = {
+      id: 'm1',
+      role: 'assistant',
+      content: '',
+      reasoning: 'Considering the options.',
+    }
+    const { container } = render(<ChatMessages messages={[message]} />)
+    // Reasoning but no answer — the turn is still thinking, so the trace is
+    // open and its label sweeps rather than sitting static.
+    expect(container.querySelector('.agent-disclose')?.getAttribute('data-open')).toBe('true')
+    expect(reasoningToggle(container).getAttribute('aria-expanded')).toBe('true')
+    const waiting = container.querySelector('.agent-shimmer')
+    expect(waiting?.getAttribute('data-motion')).toBe('essential')
+  })
+
+  it('names the reasoning trace it controls, and keeps a click from being undone by the next frame', () => {
+    const message: ChatUiMessage = {
+      id: 'm1',
+      role: 'assistant',
+      content: '',
+      reasoning: 'Considering the options.',
+    }
+    const { container, rerender } = render(<ChatMessages messages={[message]} />)
+    const toggle = reasoningToggle(container)
+    // The button names the region, which is what `<summary>` got from the
+    // browser and a button has to state.
+    const controlled = toggle.getAttribute('aria-controls')
+    expect(controlled).toBeTruthy()
+    // `getElementById`, not a selector: `useId` mints ids containing characters
+    // a CSS selector would have to escape.
+    expect(document.getElementById(controlled!)?.textContent).toContain('Considering the options.')
+
+    // `<details open={…}>` could not hold this: React re-asserted the attribute
+    // on every render, so a reader who opened the box mid-stream lost it to the
+    // next chunk of tokens. The explicit toggle outranks the default from then
+    // on, across a re-render carrying more reasoning.
+    fireEvent.click(toggle)
+    expect(container.querySelector('.agent-disclose')?.getAttribute('data-open')).toBe('false')
+    rerender(
+      <ChatMessages messages={[{ ...message, reasoning: 'Considering the options. Still going.' }]} />,
+    )
+    expect(container.querySelector('.agent-disclose')?.getAttribute('data-open')).toBe('false')
   })
 
   it('renders a pending proposal as a primary Approve / quiet Reject decision card with a preview', () => {

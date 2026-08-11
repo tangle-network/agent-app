@@ -28,6 +28,7 @@ import type {
   ChatFreeTextField,
 } from './chat-interactions'
 import { isTerminalInteractionStatus } from './chat-interactions'
+import { staggerStyle } from './motion'
 import {
   buildAnswerData,
   fieldValuesFromAnswers,
@@ -113,7 +114,14 @@ export interface QuestionOptionListProps {
 
 /** The radio/checkbox option rows for a select field. Renders a fragment of
  *  option `<label>` rows so a card keeps its own wrapping layout and appends
- *  its own write-in input. */
+ *  its own write-in input.
+ *
+ *  The rows arrive as a SEQUENCE (`.agent-arrive` + `--stagger-index`), which
+ *  is the difference between reading a list and being shown one: the eye is
+ *  told there are N choices and in what order before it has read any of them.
+ *  The index is safe to take straight from the map because an option list does
+ *  not re-sort under a mounted card — a different set of options is a
+ *  different `key`, and a different ask resets the card wholesale. */
 export function QuestionOptionList({
   groupName,
   idPrefix,
@@ -132,7 +140,12 @@ export function QuestionOptionList({
         // accessible NAME must be the option label alone — the description is
         // linked as aria-describedby, not folded into the name.
         return (
-          <label key={`${option.value}-${optionIndex}`} htmlFor={inputId} className="flex cursor-pointer gap-2 rounded-lg border border-strong p-3 transition-colors hover:bg-accent">
+          <label
+            key={`${option.value}-${optionIndex}`}
+            htmlFor={inputId}
+            style={staggerStyle(optionIndex)}
+            className="agent-arrive flex cursor-pointer gap-2 rounded-lg border border-strong p-3 transition-colors hover:bg-accent"
+          >
             <input
               id={inputId}
               type={multi ? 'checkbox' : 'radio'}
@@ -409,7 +422,13 @@ export function InteractionQuestionCard({
   }
 
   return (
-    <div className={`rounded-xl border border-card-edge bg-card p-4 ${className ?? ''}`}>
+    // The card LANDS. This is the moment the run stopped and handed the turn
+    // back — a surface that blinks into place reads as chrome that was always
+    // there, which is exactly the wrong reading for the one thing on screen
+    // waiting on the reader. `.agent-arrive` runs once on mount; a status
+    // change (answered, expired, a failed submit) re-renders the same DOM node
+    // and therefore does NOT replay it.
+    <div className={`agent-arrive rounded-xl border border-card-edge bg-card p-4 ${className ?? ''}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <InteractionBadge variant="outline">{kindLabel ?? 'Question'}</InteractionBadge>

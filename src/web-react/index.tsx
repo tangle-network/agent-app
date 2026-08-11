@@ -23,10 +23,11 @@
  * `@tangle-network/ui` a peer of this subpath.
  */
 
-import { useEffect, useMemo, useRef, useState, memo, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, memo, type ReactNode } from 'react'
 import { InlineToolItem } from '@tangle-network/ui/run'
 import type { ToolPart } from '@tangle-network/ui/types'
 import { useSmoothText } from './smooth-text'
+import { useArrivalStyle } from './motion'
 import { ChevronDown, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, usePending } from './controls'
 import { BrandMark } from './brand-mark'
 import { DurableChatCards, type DurableChatCardsProps } from './durable-chat-cards'
@@ -783,34 +784,50 @@ function ToolCallCard({
   approval,
   onOpenRun,
   renderers,
+  staggerIndex,
 }: {
   call: ChatToolCallInfo
   message: ChatUiMessage
   approval?: ProposalApprovalHandlers
   onOpenRun?: (call: ChatToolCallInfo, message: ChatUiMessage) => void
   renderers?: ToolDetailRenderers
+  /** Position in the surrounding run, so a group of rows arrives as a
+   *  sequence. Frozen at mount by `useArrivalStyle`. */
+  staggerIndex?: number
 }) {
+  const arrival = useArrivalStyle(staggerIndex ?? 0)
   const pending = call.status === 'done' ? pendingApprovalOf(call) : null
   const kind = blockKindOf(call)
   const failed = toolCallFailed(call)
 
+  // One wrapper for all three row shapes, because `InlineToolItem` takes a
+  // `className` but no `style`, and the stagger index has to ride an element
+  // this package controls. The row arrives ONCE: a call going running → done →
+  // failed re-renders this same node (its key is the call id, never its
+  // status), and a CSS animation does not replay on a re-render.
+  const arrive = (row: ReactNode) => (
+    <div className="agent-arrive" style={arrival}>
+      {row}
+    </div>
+  )
+
   // A proposal awaiting approval is a pending DECISION, not a tool row — it
   // keeps its own prominent card with primary Approve / quiet Reject.
   if (pending) {
-    return (
+    return arrive(
       <ProposalCard
         call={call}
         message={message}
         pending={pending}
         approval={approval}
         renderers={renderers}
-      />
+      />,
     )
   }
   // A scheduled follow-up is a time-based intent — its own quiet row, distinct
   // from a tool invocation.
   if (kind === 'followup' && !failed) {
-    return <FollowupCard call={call} />
+    return arrive(<FollowupCard call={call} />)
   }
 
   // Command and generic tool calls render through the canonical InlineToolItem
@@ -820,7 +837,7 @@ function ToolCallCard({
   // ui's `renderToolDetail` seam, and `onOpenRun` maps to the row's actions
   // slot, so no agent-app capability is lost to the shared chrome.
   const custom = renderers?.[call.name]?.(call, message)
-  return (
+  return arrive(
     <InlineToolItem
       part={chatToolCallPart(call)}
       title={toolRowTitle(call)}
@@ -840,7 +857,7 @@ function ToolCallCard({
           </button>
         ) : undefined
       }
-    />
+    />,
   )
 }
 
@@ -950,7 +967,11 @@ function SegmentedBody({
   const leftoverToolCalls = (msg.toolCalls ?? []).filter(
     (tc) => !segmentToolIds.has(tc.id),
   )
-  const renderToolCard = (call: ChatToolCallInfo) => (
+  // `index` is the row's position WITHIN its group, so a run of six steps
+  // cascades once instead of every group in the turn sharing one clock. The
+  // index is stable to take from the map because segments only ever APPEND: a
+  // row already on screen keeps the position it arrived at.
+  const renderToolCard = (call: ChatToolCallInfo, index: number) => (
     <ToolCallCard
       key={`tool-${call.id}`}
       call={call}
@@ -958,6 +979,7 @@ function SegmentedBody({
       approval={approval}
       onOpenRun={onToolCallClick}
       renderers={toolRenderers}
+      staggerIndex={index}
     />
   )
   // Group consecutive tool segments so a SETTLED run of many tool calls (a
@@ -1003,6 +1025,15 @@ function SegmentedBody({
           !g.calls.some(isImportantTool) ? (
           // The fold is a quiet disclosure line, not a filled box — the
           // canonical rows inside it carry the row chrome.
+          //
+          // Deliberately still a `<details>` and NOT `.agent-disclose`: a
+          // closed `<details>` gives its children no box at all, so their
+          // `.agent-arrive` has not run yet and the run genuinely cascades on
+          // the click that reveals it. `.agent-disclose` keeps the subtree laid
+          // out and merely clipped, which would spend the arrival behind a zero
+          // height and open onto rows that were already there. The reasoning
+          // box is the opposite case — it is open while the model thinks, so
+          // what has to animate there is the HEIGHT.
           <details key={`tools-${g.index}`}>
             <summary className="cursor-pointer select-none rounded-md px-1 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
               Worked through {g.calls.length} steps
@@ -1162,6 +1193,14 @@ function AssistantMessageImpl({
   const thinkingSeconds = useThinkingSeconds(
     streaming && !!reasoning && !hasAnswerText,
   )
+  const reasoningId = useId()
+  // Open while the model is still thinking, closed once the answer starts —
+  // and a click outranks that default from then on. `<details open={…}>` could
+  // not express the second half: React re-asserts the attribute on every
+  // render, so a reader who opened the box mid-stream had it shut again by the
+  // next frame of tokens.
+  const [reasoningToggled, setReasoningToggled] = useState<boolean | null>(null)
+  const reasoningOpen = reasoningToggled ?? !hasAnswerText
 
   const quiet = chrome === 'quiet'
   return (
@@ -1175,8 +1214,26 @@ function AssistantMessageImpl({
         </div>
       )}
       {reasoning && (
-        <details className="mb-2 rounded-lg border-l-2 border-border bg-secondary px-3 py-2" open={!hasAnswerText}>
-          <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
+        // A button + `.agent-disclose` rather than `<details>`: a native
+        // disclosure has no transition to give, so the trace SNAPPED to full
+        // height the moment the answer arrived — the single largest layout jump
+        // in a turn, at the exact moment the reader is trying to start reading.
+        // The grid row animates the content's REAL height (0fr → 1fr), which a
+        // max-height guess cannot do without either clipping a long trace or
+        // easing toward a number it never reaches. The keyboard contract
+        // `<details>` supplied for free is restated explicitly: a real
+        // `<button>` (Enter/Space, focusable, in the tab order) carrying
+        // `aria-expanded` and `aria-controls` — which also announces the state
+        // that a `<summary>` leaves to the browser.
+        <div className="mb-2 rounded-lg border-l-2 border-border bg-secondary px-3 py-2">
+          <button
+            type="button"
+            onClick={() => setReasoningToggled(!reasoningOpen)}
+            aria-expanded={reasoningOpen}
+            aria-controls={reasoningId}
+            className="flex w-full select-none items-center gap-1.5 text-left text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ChevronDown className={`h-3 w-3 shrink-0 transition-transform ${reasoningOpen ? '' : '-rotate-90'}`} />
             {!hasAnswerText ? (
               // A pulse dims the whole word on a loop, which is the same cue a
               // skeleton placeholder uses — it reads as "nothing here yet". A
@@ -1192,11 +1249,26 @@ function AssistantMessageImpl({
             ) : (
               'Thought process'
             )}
-          </summary>
-          <div ref={reasoningScrollRef} className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap text-[13px] leading-relaxed text-muted-foreground">
-            {reasoning}
+          </button>
+          <div className="agent-disclose" data-open={reasoningOpen ? 'true' : 'false'}>
+            {/* The single child `.agent-disclose` clips. The scroller is its
+                child rather than itself, so `overflow-hidden` from the grid rule
+                and `overflow-y-auto` from the trace's own cap never contend for
+                the same element. `inert` restores the last thing `<details>`
+                gave for free: a collapsed trace is genuinely gone — not read by
+                a screen reader, not hit by find-in-page — rather than merely
+                clipped to nothing. */}
+            <div inert={!reasoningOpen}>
+              <div
+                id={reasoningId}
+                ref={reasoningScrollRef}
+                className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap text-[13px] leading-relaxed text-muted-foreground"
+              >
+                {reasoning}
+              </div>
+            </div>
           </div>
-        </details>
+        </div>
       )}
       {segments && segments.length > 0 ? (
         <SegmentedBody
@@ -1217,7 +1289,7 @@ function AssistantMessageImpl({
           </div>
           {msg.toolCalls && msg.toolCalls.length > 0 && (
             <div className="mt-2 flex flex-col gap-1.5">
-              {msg.toolCalls.map((tc) => (
+              {msg.toolCalls.map((tc, index) => (
                 <ToolCallCard
                   key={tc.id}
                   call={tc}
@@ -1225,6 +1297,7 @@ function AssistantMessageImpl({
                   approval={approval}
                   onOpenRun={onToolCallClick}
                   renderers={toolRenderers}
+                  staggerIndex={index}
                 />
               ))}
             </div>

@@ -21,6 +21,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import type { StepAgentActivity } from '../missions/agent-activity'
 import type { FlowTrace } from '../trace/index'
 import { stepActivityFlowTrace } from '../trace/mission-flow'
+import { useArrivalStyle } from './motion'
 
 // ── pure helpers ──────────────────────────────────────────────────────────
 
@@ -172,16 +173,42 @@ function TraceIdCopy({ traceId }: { traceId: string }) {
   )
 }
 
+/**
+ * The tone dot. A live run's dot no longer pulses: `animate-pulse` is the same
+ * 2s fade a loading skeleton uses, so one animation was carrying two unrelated
+ * meanings ("no data yet" and "work in progress") and a reader could not learn
+ * either. The dot keeps the tone — hue plus the screen-reader word — and the
+ * "in flight" signal moves to the one thing on the row that can say it in the
+ * shipped vocabulary: the run's own label, sweeping (see {@link RunLabel}).
+ */
 function StatusDot({ tone }: { tone: ActivityTone }) {
   return (
     <span className="inline-flex items-center">
       <span
         aria-hidden
         className={`h-2 w-2 shrink-0 rounded-full ${
-          tone === 'live' ? 'animate-pulse bg-warning' : tone === 'ok' ? 'bg-success' : tone === 'error' ? 'bg-destructive' : 'bg-muted-foreground/40'
+          tone === 'live' ? 'bg-warning' : tone === 'ok' ? 'bg-success' : tone === 'error' ? 'bg-destructive' : 'bg-muted-foreground/40'
         }`}
       />
       <span className="sr-only">{tone}</span>
+    </span>
+  )
+}
+
+/**
+ * `tool — detail` for one run. While the run is live the tool name sweeps: the
+ * same cue the chat surface's waiting label uses, and the only signal on the
+ * row separating an agent that is working from one that is stuck, which is why
+ * it declares `data-motion="essential"`. A settled run is plain text — nothing
+ * is in flight, so nothing moves.
+ */
+function RunLabel({ tool, detail, live }: { tool: string; detail: string; live: boolean }) {
+  return (
+    <span className="min-w-0 flex-1 truncate">
+      <span className={live ? 'agent-shimmer font-medium' : 'font-medium'} data-motion={live ? 'essential' : undefined}>
+        {tool}
+      </span>
+      <span className="text-muted-foreground"> — {detail}</span>
     </span>
   )
 }
@@ -239,8 +266,45 @@ export interface MissionActivityLaneProps {
 }
 
 /**
+ * One delegated run in the lane. A component rather than a `.map` body so the
+ * arrival can be frozen at mount — a row that is already on screen and merely
+ * changes status must not re-animate, and a stagger index recomputed from a
+ * live array is exactly how that happens.
+ */
+function LaneRow({ run, staggerIndex }: { run: StepAgentActivity; staggerIndex: number }) {
+  const arrival = useArrivalStyle(staggerIndex)
+  const tone = activityTone(run.status)
+  const cost = formatActivityCost(run.costUsd)
+  const duration = formatActivityDuration(run.durationMs)
+  return (
+    <div className="agent-arrive flex items-center gap-2 py-1 text-xs" style={arrival}>
+      <StatusDot tone={tone} />
+      <RunLabel tool={run.tool} detail={run.detail} live={tone === 'live'} />
+      {tone === 'live' && (run.iteration !== undefined || run.phase !== undefined) && (
+        <span className="shrink-0 rounded-full bg-warning/10 px-1.5 py-0.5 font-mono text-[10px] text-warning">
+          {[run.iteration !== undefined ? `iter ${run.iteration}` : null, run.phase ?? null]
+            .filter(Boolean)
+            .join(' · ')}
+        </span>
+      )}
+      <span className="flex shrink-0 items-center gap-1.5 font-mono text-[10px] tabular-nums text-muted-foreground/70">
+        {tone !== 'live' && tone !== 'ok' && <span>{run.status}</span>}
+        {cost && <span>{cost}</span>}
+        {duration && <span>{duration}</span>}
+      </span>
+    </div>
+  )
+}
+
+/**
  * Collapsed sub-rows under a mission step — one row per delegated run —
  * expanding to the step's waterfall. Renders nothing for an empty lane.
+ *
+ * A sub-row appears because a delegated run STARTED or FINISHED, which is the
+ * one kind of list change worth choreographing: it arrives, and the group
+ * arrives as a sequence. Keying on `taskId` is what keeps the rest still — the
+ * snapshot re-renders every poll, and a row whose status merely advanced holds
+ * the DOM node it already had.
  */
 export function MissionActivityLane({ activity, startedAt, nowMs }: MissionActivityLaneProps) {
   const [expanded, setExpanded] = useState(false)
@@ -248,32 +312,9 @@ export function MissionActivityLane({ activity, startedAt, nowMs }: MissionActiv
 
   return (
     <div className="mt-1 border-l border-border pl-3">
-      {activity.map((run) => {
-        const tone = activityTone(run.status)
-        const cost = formatActivityCost(run.costUsd)
-        const duration = formatActivityDuration(run.durationMs)
-        return (
-          <div key={run.taskId} className="flex items-center gap-2 py-1 text-xs">
-            <StatusDot tone={tone} />
-            <span className="min-w-0 flex-1 truncate">
-              <span className="font-medium">{run.tool}</span>
-              <span className="text-muted-foreground"> — {run.detail}</span>
-            </span>
-            {tone === 'live' && (run.iteration !== undefined || run.phase !== undefined) && (
-              <span className="shrink-0 rounded-full bg-warning/10 px-1.5 py-0.5 font-mono text-[10px] text-warning">
-                {[run.iteration !== undefined ? `iter ${run.iteration}` : null, run.phase ?? null]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </span>
-            )}
-            <span className="flex shrink-0 items-center gap-1.5 font-mono text-[10px] tabular-nums text-muted-foreground/70">
-              {tone !== 'live' && tone !== 'ok' && <span>{run.status}</span>}
-              {cost && <span>{cost}</span>}
-              {duration && <span>{duration}</span>}
-            </span>
-          </div>
-        )
-      })}
+      {activity.map((run, index) => (
+        <LaneRow key={run.taskId} run={run} staggerIndex={index} />
+      ))}
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
@@ -312,23 +353,24 @@ export interface AgentActivityPanelProps {
 function ActivityRow({
   record,
   renderMissionRef,
+  staggerIndex,
 }: {
   record: AgentActivityRecord
   renderMissionRef?: AgentActivityPanelProps['renderMissionRef']
+  /** Position in the page as it was FIRST rendered — see `useArrivalStyle`. */
+  staggerIndex: number
 }) {
+  const arrival = useArrivalStyle(staggerIndex)
   const [open, setOpen] = useState(false)
   const tone = activityTone(record.status)
   const cost = formatActivityCost(record.costUsd)
   const duration = formatActivityDuration(record.durationMs)
 
   return (
-    <div className="rounded-lg border border-card-edge bg-card">
+    <div className="agent-arrive rounded-lg border border-card-edge bg-card" style={arrival}>
       <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm">
         <StatusDot tone={tone} />
-        <span className="min-w-0 flex-1 truncate">
-          <span className="font-medium">{record.tool}</span>
-          <span className="text-muted-foreground"> — {record.detail}</span>
-        </span>
+        <RunLabel tool={record.tool} detail={record.detail} live={tone === 'live'} />
         {tone === 'live' && (record.iteration !== undefined || record.phase !== undefined) && (
           <span className="shrink-0 rounded-full bg-warning/10 px-2 py-0.5 font-mono text-[10px] text-warning">
             {[record.iteration !== undefined ? `iter ${record.iteration}` : null, record.phase ?? null]
@@ -461,8 +503,8 @@ export function AgentActivityPanel({ fetchActivity, renderMissionRef, title = 'A
         {loading ? 'Loading activity…' : ''}
       </span>
       <div className="space-y-1.5" aria-busy={loading}>
-        {rows.map((record) => (
-          <ActivityRow key={record.taskId} record={record} renderMissionRef={renderMissionRef} />
+        {rows.map((record, index) => (
+          <ActivityRow key={record.taskId} record={record} renderMissionRef={renderMissionRef} staggerIndex={index} />
         ))}
       </div>
       {cursor && (

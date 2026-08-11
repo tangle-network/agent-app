@@ -559,3 +559,48 @@ describe('InteractionQuestionCard host overrides', () => {
     expect(container.textContent).not.toContain('Answered')
   })
 })
+
+/**
+ * An approval is the moment the run stops and hands the turn back. The card
+ * arriving — and its choices arriving as a sequence — is what makes that read
+ * as an event rather than as chrome that was always on the page.
+ */
+describe('InteractionQuestionCard arrival choreography', () => {
+  /** `--stagger-index` off every element the shipped arrival class is on. */
+  function staggerIndexes(container: HTMLElement): string[] {
+    return Array.from(container.querySelectorAll<HTMLElement>('.agent-arrive')).map((el) =>
+      el.style.getPropertyValue('--stagger-index'))
+  }
+
+  it('lands the card and staggers its options', () => {
+    const { container } = mount(SELECT_INTERACTION)
+    const card = container.firstElementChild as HTMLElement
+    expect(card.className).toContain('agent-arrive')
+    // The card itself carries no index (it is not in a group); each option
+    // carries its own position, which is what turns two labels into a sequence.
+    expect(staggerIndexes(container)).toEqual(['', '0', '1'])
+  })
+
+  it('does not re-animate a card that merely changed state', async () => {
+    const { container } = mount(SELECT_INTERACTION)
+    const card = container.firstElementChild as HTMLElement
+    const optionBefore = screen.getByLabelText('Formal').closest('label')
+    fireEvent.click(screen.getByLabelText('Formal'))
+    fireEvent.click(submitButton())
+    await flush()
+    expect(container.textContent).toContain('Answered')
+    // Answering is a state change on the SAME nodes. A CSS animation replays
+    // only on a remount, so identity is the whole guarantee: same card element,
+    // same option element, therefore no second entrance for a card the reader
+    // has already been looking at.
+    expect(container.firstElementChild).toBe(card)
+    expect(screen.getByLabelText('Formal').closest('label')).toBe(optionBefore)
+  })
+
+  it('declares no essential motion — an entrance carries no meaning to preserve', () => {
+    const { container } = mount(SELECT_INTERACTION)
+    // `data-motion="essential"` exempts a subtree from the reduced-motion
+    // collapse. Only a live-status signal earns that; an entrance must collapse.
+    expect(container.querySelector('[data-motion]')).toBeNull()
+  })
+})

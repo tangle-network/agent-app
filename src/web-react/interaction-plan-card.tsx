@@ -24,6 +24,7 @@ import {
   type SubmitInteractionAnswer,
 } from './interaction-card-support'
 import { InteractionActionButton, InteractionBadge } from './interaction-question-card'
+import { staggerStyle } from './motion'
 
 function CheckGlyph({ className }: { className?: string }) {
   return (
@@ -174,7 +175,11 @@ export function InteractionPlanCard({
   const approved = status === 'answered'
 
   return (
-    <div className={`rounded-xl border border-card-edge bg-card p-4 ${className ?? ''}`}>
+    // Same arrival as the question card: an approval is the run stopping, and
+    // the card that carries it should land rather than appear. Once on screen
+    // it never re-animates — approving, rejecting or a 410 changes state on the
+    // same DOM node, and a CSS animation does not replay on a re-render.
+    <div className={`agent-arrive rounded-xl border border-card-edge bg-card p-4 ${className ?? ''}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <InteractionBadge variant="outline">Plan</InteractionBadge>
@@ -214,9 +219,12 @@ export function InteractionPlanCard({
       )}
 
       {interaction.fields.length > 0 && (
+        // The plan card's answer surface is its fields, not an option list, so
+        // the fields are what stagger — the producer decides how many there
+        // are, and a spec with three of them should read as three, in order.
         <div className="mt-3 space-y-4">
-          {interaction.fields.map((field) => (
-            <fieldset key={field.name} className="space-y-2">
+          {interaction.fields.map((field, fieldIndex) => (
+            <fieldset key={field.name} style={staggerStyle(fieldIndex)} className="agent-arrive space-y-2">
               <p className="text-sm font-medium leading-5 text-foreground">{field.label}</p>
               {fieldAcceptsFreeText(field) ? (
                 <textarea
