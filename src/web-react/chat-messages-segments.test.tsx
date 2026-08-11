@@ -390,10 +390,11 @@ describe('ChatMessages segmented turns', () => {
     }
     // `loading` + last message → this turn is streaming.
     const { container } = render(<ChatMessages messages={[message]} loading />)
-    // The decorative caret is the only aria-hidden pulsing span (the tool's own
-    // running dot is not aria-hidden).
-    expect(
-      container.querySelector('span[aria-hidden].animate-pulse'),
-    ).not.toBeNull()
+    // The caret blinks on a hard step, not a pulse: `animate-pulse` is a 2s
+    // ease fade, which is the cue a skeleton placeholder uses. Asserting the
+    // caret animation by name also keeps this from passing on any other
+    // decorative span that happens to pulse.
+    const caret = container.querySelector('span[aria-hidden][class*="agent-caret"]')
+    expect(caret).not.toBeNull()
   })
 })

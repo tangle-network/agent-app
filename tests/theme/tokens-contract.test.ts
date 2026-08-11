@@ -125,6 +125,11 @@ describe('theme token contract', () => {
     '--warning-foreground',
     '--duration-instant', '--duration-fast', '--duration-base', '--duration-slow',
     '--ease-standard', '--ease-entrance', '--ease-exit',
+    // Entrance choreography is timing and distance for the same reason: text
+    // does not resolve out of a deeper blur, and a row does not travel further,
+    // because the theme is dark.
+    '--duration-stream', '--duration-arrive', '--ease-expo',
+    '--stagger-step', '--stagger-index', '--arrive-distance', '--stream-blur',
   ]
   // The ramp is mode-independent BY CONSTRUCTION — one ladder, and the two modes
   // differ only in which stop each role picks. Restating it in the dark scope

@@ -238,6 +238,40 @@
   --motion-surface: var(--duration-base) var(--ease-entrance);
   --motion-dismiss: var(--duration-instant) var(--ease-exit);
 
+  /* ── Entrance choreography ───────────────────────────────────────────────
+     The durations above answer "how fast does an existing thing change".
+     These answer "how does a thing that was not there ARRIVE", which is most
+     of what an agent surface does: text streams in, rows appear as work
+     completes, a trace expands, a pending label waits.
+
+     Shipping the ladder without these is why this package had FOUR durations,
+     THREE curves, and ZERO keyframes on `/web-react` — every arrival was a
+     pop, which reads as cheap no matter how correct the colours are.
+
+     `--motion-stream` is longer than `base` on purpose: streamed text arrives
+     continuously, so each chunk overlaps its neighbours and a fast curve makes
+     the paragraph flicker. `--motion-arrive` is the row/card entrance and is
+     meant to be staggered by index (see `--stagger-step`). */
+  --duration-stream: 420ms;
+  --duration-arrive: 600ms;
+  --ease-expo: cubic-bezier(0.23, 1, 0.32, 1);
+  --motion-stream: var(--duration-stream) var(--ease-expo);
+  --motion-arrive: var(--duration-arrive) var(--ease-expo);
+  /* Per-item delay in a staggered group. 5 items = 200ms tail, which stays
+     under the 250ms an interface can add before it reads as latency. */
+  --stagger-step: 50ms;
+  /* Position in a staggered group, overridden PER ELEMENT by the caller. It is
+     declared here with a zero default rather than read through a `var()`
+     fallback so the file never references a token it does not define — an
+     undefined `var()` resolves to nothing and paints silently, which is the
+     failure the token contract exists to catch. */
+  --stagger-index: 0;
+  /* How far an arriving surface travels, and how far a streamed chunk resolves
+     from. Both are small: motion that announces itself is motion you notice
+     twice. */
+  --arrive-distance: 8px;
+  --stream-blur: 4px;
+
   /* ── Border tiers ────────────────────────────────────────────────────────
      Three strengths of the SAME border colour, because a divider inside a
      panel and the edge of a card floated on the page are not the same line,
@@ -390,6 +424,140 @@
 }
 
 /**
+ * Entrance keyframes and the classes that ride them.
+ *
+ * They live in this file, not in a component, because a product already
+ * imports this stylesheet and because a keyframe defined inside a bundled
+ * component is a keyframe a precompiled consumer does not get — the same gap
+ * that shipped a picker with no text tier.
+ *
+ * Every duration below is a TOKEN, which is what makes the reduced-motion
+ * block underneath cover them without a second media query.
+ */
+
+/* Streamed text: each chunk resolves out of a small blur instead of popping
+   in. This is the single most visible difference between a chat that feels
+   alive and one that feels like a log being appended to. */
+@keyframes agent-stream-in {
+  from {
+    opacity: 0;
+    filter: blur(var(--stream-blur));
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+/* A row, card or chip that was not there a moment ago. Travels a short
+   distance so the eye is told WHERE it came from. */
+@keyframes agent-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(var(--arrive-distance));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* A control appearing in place — a chip, a badge, a menu row. No travel,
+   because it did not come from anywhere. */
+@keyframes agent-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The insertion caret at the end of streaming text. A hard step blink, not a
+   fade: a caret that eases is a caret that reads as a loading placeholder. */
+@keyframes agent-caret {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* A label that is WAITING. The sweep is what separates "the agent is working"
+   from "the interface is stuck": a static label cannot tell you which. */
+@keyframes agent-shimmer {
+  from {
+    background-position: 150% center;
+  }
+  to {
+    background-position: -50% center;
+  }
+}
+
+.agent-stream-in {
+  animation: agent-stream-in var(--motion-stream) both;
+}
+
+.agent-arrive {
+  animation: agent-arrive var(--motion-arrive) both;
+}
+
+.agent-pop-in {
+  animation: agent-pop-in var(--motion-control) both;
+}
+
+/* Stagger by index: set `--stagger-index` and a group arrives as a sequence
+   rather than as a flash. Capped at 8 so a 200-row list does not open with a
+   10-second cascade — past the cap every row shares the last delay. */
+.agent-arrive {
+  animation-delay: calc(min(var(--stagger-index), 8) * var(--stagger-step));
+}
+
+/* The waiting label. `background-clip: text` over a moving gradient, so the
+   shimmer runs THROUGH the glyphs rather than behind them. Marked essential:
+   it is the only signal that work is still in flight. */
+.agent-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted-foreground)) 0%,
+    hsl(var(--foreground)) 45%,
+    hsl(var(--muted-foreground)) 60%
+  );
+  background-size: 250% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: agent-shimmer 1.4s linear infinite;
+}
+
+/* Height-auto disclosure without measuring anything in JavaScript. The row
+   animates between 0fr and 1fr; the child needs `min-height: 0` and
+   `overflow: hidden` to be clipped while it travels. A max-height guess is the
+   usual alternative and it either clips tall content or eases against a number
+   the content never reaches. */
+.agent-disclose {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--motion-surface), opacity var(--motion-control);
+  opacity: 0;
+}
+
+.agent-disclose > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.agent-disclose[data-open='true'] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+/**
  * Reduced motion, at the token layer and at the floor.
  *
  * Two rules, because they cover two different populations. Collapsing the
@@ -420,6 +588,11 @@
     --duration-fast: 1ms;
     --duration-base: 1ms;
     --duration-slow: 1ms;
+    --duration-stream: 1ms;
+    --duration-arrive: 1ms;
+    /* The stagger is a delay, not a duration, and a collapsed animation with a
+       live delay still arrives as a visible cascade. */
+    --stagger-step: 0ms;
   }
 
   *:where(:not([data-motion='essential'], [data-motion='essential'] *)) {
