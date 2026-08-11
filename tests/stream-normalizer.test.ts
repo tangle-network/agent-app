@@ -122,6 +122,31 @@ describe('normalizePersistedPart — full storable vocabulary', () => {
       .toEqual({ type: 'image', mediaType: 'image/png', url: 'data:image/png;base64,AA' })
   })
 
+  it('round-trips the real promoted durable attachment shape (name + size survive)', () => {
+    expect(normalizePersistedPart({
+      type: 'file',
+      path: 'uploads/agent/2026-08-11/out-abc123.csv',
+      name: 'out.csv',
+      size: 512,
+      mediaType: 'text/csv',
+    })).toEqual({
+      type: 'file',
+      path: 'uploads/agent/2026-08-11/out-abc123.csv',
+      name: 'out.csv',
+      size: 512,
+      mediaType: 'text/csv',
+    })
+  })
+
+  it('drops malformed optional name/size rather than persisting garbage', () => {
+    expect(normalizePersistedPart({ type: 'file', path: 'a.csv', name: 'a.csv', size: Number.NaN }))
+      .toEqual({ type: 'file', path: 'a.csv', name: 'a.csv' })
+    expect(normalizePersistedPart({ type: 'file', path: 'a.csv', name: 'a.csv', size: '512' }))
+      .toEqual({ type: 'file', path: 'a.csv', name: 'a.csv' })
+    expect(normalizePersistedPart({ type: 'file', path: 'a.csv', name: '' }))
+      .toEqual({ type: 'file', path: 'a.csv' })
+  })
+
   it('keeps the step-finish usage receipt and step-start marker', () => {
     expect(normalizePersistedPart({
       type: 'step-finish', reason: 'stop', tokens: { input: 5, output: 2 }, cost: 0.01,

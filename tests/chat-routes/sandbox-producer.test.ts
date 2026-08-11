@@ -660,9 +660,13 @@ describe('createSandboxChatProducer', () => {
   })
 
   it('promotes a file part exactly once across duplicate stream events and drops the raw url-bearing part', async () => {
+    // Real `promoteAgentFilePart` contract: `{ type, path, name, size, mediaType }` —
+    // no `id`, no `filename`. `name`/`size` must survive persistence (the #418
+    // regression: normalization used to strip both, leaving blank attachment
+    // chips and an `undefined` download filename).
     const promoteFilePart = vi.fn(async (raw: Record<string, unknown>) => ({
       succeeded: true as const,
-      part: { type: 'file', id: raw.id, filename: raw.filename, path: `vault/${raw.filename}` },
+      part: { type: 'file', path: `vault/${raw.filename}`, name: raw.filename, size: 512, mediaType: 'text/csv' },
       key: `attachment:vault/${raw.filename}`,
     }))
     const producer = createSandboxChatProducer({
@@ -678,7 +682,7 @@ describe('createSandboxChatProducer', () => {
 
     expect(promoteFilePart).toHaveBeenCalledOnce()
     expect(producer.assistantParts?.()).toEqual([
-      { type: 'file', id: 'f1', filename: 'out.csv', path: 'vault/out.csv' },
+      { type: 'file', path: 'vault/out.csv', name: 'out.csv', size: 512, mediaType: 'text/csv' },
     ])
   })
 
@@ -817,7 +821,7 @@ describe('createSandboxChatProducer', () => {
       call += 1
       return {
         succeeded: true as const,
-        part: { type: 'file', filename: `mystery-${call}.bin`, path: `vault/mystery-${call}.bin` },
+        part: { type: 'file', name: `mystery-${call}.bin`, path: `vault/mystery-${call}.bin` },
         key: `attachment:vault/mystery-${call}.bin`,
       }
     })
@@ -836,8 +840,8 @@ describe('createSandboxChatProducer', () => {
     // (here, the outcome's own `key`) rather than one collapsing onto the
     // other's memo entry.
     expect(producer.assistantParts?.()).toEqual([
-      { type: 'file', filename: 'mystery-1.bin', path: 'vault/mystery-1.bin' },
-      { type: 'file', filename: 'mystery-2.bin', path: 'vault/mystery-2.bin' },
+      { type: 'file', name: 'mystery-1.bin', path: 'vault/mystery-1.bin' },
+      { type: 'file', name: 'mystery-2.bin', path: 'vault/mystery-2.bin' },
     ])
   })
 
