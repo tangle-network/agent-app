@@ -175,7 +175,7 @@ describe("ProposalCard", () => {
   );
 
   it("shows the provider's brand icon next to a requirement", () => {
-    render(
+    const { container } = render(
       <ProposalCard
         proposal={withReq({
           provider: "github",
@@ -187,8 +187,12 @@ describe("ProposalCard", () => {
         onCancel={noop}
       />,
     );
-    // The shared ProviderLogo renders the provider mark as an inline SVG.
-    expect(screen.getByRole("img", { name: "github" })).toBeTruthy();
+    // The shared sandbox-ui ProviderIcon resolves the provider's real mark
+    // (an <img> walking the brand-candidate chain — jsdom never fires its
+    // load/error events, so the first candidate is what renders).
+    expect(
+      container.querySelector('img[src="https://cdn.activepieces.com/pieces/github.png"]'),
+    ).not.toBeNull();
     // The label + status still render alongside the icon.
     expect(screen.getByText("GitHub App")).toBeTruthy();
     expect(screen.getByText("installed")).toBeTruthy();
@@ -331,7 +335,7 @@ describe("ProposalCard", () => {
   });
 
   it("renders the host-supplied provider icon when renderProviderIcon is wired", () => {
-    render(
+    const { container } = render(
       <ProposalCard
         proposal={withReq({ provider: "slack", connected: false })}
         confirming={false}
@@ -342,14 +346,14 @@ describe("ProposalCard", () => {
         )}
       />,
     );
-    // The host mark shows, and the built-in ProviderLogo fallback (an <svg
-    // role="img"> labelled with the provider) is not rendered.
+    // The host mark shows, and the shared ProviderIcon fallback (an <img>
+    // walking the provider's brand candidates) is not rendered.
     expect(screen.getByTestId("host-icon").textContent).toBe("slack-brand");
-    expect(screen.queryByRole("img", { name: "slack" })).toBeNull();
+    expect(container.querySelector('img[src*="slack"]')).toBeNull();
   });
 
-  it("falls back to the built-in provider mark when renderProviderIcon is absent or returns nothing", () => {
-    const { rerender } = render(
+  it("falls back to the shared ProviderIcon mark when renderProviderIcon is absent or returns nothing", () => {
+    const { container, rerender } = render(
       <ProposalCard
         proposal={withReq({ provider: "slack", connected: false })}
         confirming={false}
@@ -357,8 +361,11 @@ describe("ProposalCard", () => {
         onCancel={noop}
       />,
     );
-    // No handler → the built-in ProviderLogo renders.
-    expect(screen.getByRole("img", { name: "slack" })).toBeTruthy();
+    // No handler → the shared ProviderIcon renders (slack's first candidate is
+    // the full-color vector mark).
+    expect(
+      container.querySelector('img[src="https://svgl.app/library/slack.svg"]'),
+    ).not.toBeNull();
 
     // A handler that returns null for a provider it doesn't recognize also
     // falls back rather than rendering an empty icon slot.
@@ -371,12 +378,14 @@ describe("ProposalCard", () => {
         renderProviderIcon={() => null}
       />,
     );
-    expect(screen.getByRole("img", { name: "slack" })).toBeTruthy();
+    expect(
+      container.querySelector('img[src="https://svgl.app/library/slack.svg"]'),
+    ).not.toBeNull();
   });
 
-  it("falls back to the built-in mark (no crash) when renderProviderIcon throws", () => {
+  it("falls back to the shared mark (no crash) when renderProviderIcon throws", () => {
     // An untrusted host callback that throws for an unrecognized provider must
-    // not take down the row — it degrades to the built-in ProviderLogo.
+    // not take down the row — it degrades to the shared ProviderIcon.
     expect(() =>
       render(
         <ProposalCard
@@ -390,6 +399,8 @@ describe("ProposalCard", () => {
         />,
       ),
     ).not.toThrow();
-    expect(screen.getByRole("img", { name: "slack" })).toBeTruthy();
+    expect(
+      document.querySelector('img[src="https://svgl.app/library/slack.svg"]'),
+    ).not.toBeNull();
   });
 });

@@ -14,10 +14,16 @@
  */
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { ProviderLogo } from "../web-react/provider-logo";
+import { ProviderIcon } from "@tangle-network/sandbox-ui/integrations";
 import { describeProposal } from "./presentation";
 import { providerLabel } from "./provider-label";
 import type { ConnectionRequirement, PendingProposal } from "./types";
+
+/** Section labels ("New skills", "Workflow definition", "Integrations") share one
+ *  eyebrow recipe — small, capped, tracked, muted — so the card's sections read
+ *  as one system instead of three ad-hoc sizes. */
+const EYEBROW_CLASS =
+  "text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground";
 
 export interface ProposalCardProps {
   proposal: PendingProposal;
@@ -39,7 +45,8 @@ export interface ProposalCardProps {
   /** Render the brand icon for an integration requirement's provider. The host
    *  owns the provider→icon mapping (its integrations catalog); when absent, or
    *  when it returns a nullish node for a provider it doesn't recognize, the row
-   *  falls back to the built-in {@link ProviderLogo} mark. */
+   *  falls back to the shared sandbox-ui {@link ProviderIcon} mark (the same
+   *  brand resolution the integrations catalog uses). */
   renderProviderIcon?: (provider: string) => ReactNode;
 }
 
@@ -60,16 +67,13 @@ export function ProposalCard({
 
   return (
     <div className="rounded-lg border border-primary/40 bg-card p-3 text-sm">
-      <p className="font-medium text-foreground">{view.title}</p>
-      <p className="text-muted-foreground text-xs">
-        Confirm to run this action on your account.
-      </p>
+      <p className="font-semibold text-[15px] text-foreground">{view.title}</p>
 
       {view.fields.length > 0 && (
         <dl className="mt-2 space-y-1">
           {view.fields.map((f) => (
-            <div key={f.label} className="flex gap-2 text-xs">
-              <dt className="shrink-0 text-muted-foreground">{f.label}</dt>
+            <div key={f.label} className="grid grid-cols-[auto_1fr] gap-x-3 text-xs">
+              <dt className="text-muted-foreground">{f.label}</dt>
               <dd className="truncate text-foreground" title={f.value}>
                 {f.value}
               </dd>
@@ -80,7 +84,7 @@ export function ProposalCard({
 
       {view.skills && view.skills.length > 0 && (
         <div className="mt-2">
-          <p className="text-muted-foreground text-xs">New skills</p>
+          <p className={EYEBROW_CLASS}>New skills</p>
           <ul className="mt-1 space-y-0.5">
             {view.skills.map((s) => (
               <li key={s.name} className="text-foreground text-xs">
@@ -97,14 +101,17 @@ export function ProposalCard({
       {view.preview && (
         <div className="mt-2">
           <div className="flex items-center justify-between">
-            <p className="text-muted-foreground text-xs">{view.preview.label}</p>
+            <p className={EYEBROW_CLASS}>{view.preview.label}</p>
             {showGraph && (
               <div className="flex gap-2 text-xs">
                 <button
                   type="button"
                   onClick={() => setTab("graph")}
+                  aria-pressed={tab === "graph"}
                   className={
-                    tab === "graph" ? "text-foreground" : "text-muted-foreground"
+                    tab === "graph"
+                      ? "font-medium text-foreground underline decoration-primary underline-offset-4"
+                      : "text-muted-foreground hover:text-foreground"
                   }
                 >
                   Graph
@@ -112,8 +119,11 @@ export function ProposalCard({
                 <button
                   type="button"
                   onClick={() => setTab("yaml")}
+                  aria-pressed={tab === "yaml"}
                   className={
-                    tab === "yaml" ? "text-foreground" : "text-muted-foreground"
+                    tab === "yaml"
+                      ? "font-medium text-foreground underline decoration-primary underline-offset-4"
+                      : "text-muted-foreground hover:text-foreground"
                   }
                 >
                   YAML
@@ -126,7 +136,10 @@ export function ProposalCard({
               {renderGraph?.(view.preview.content)}
             </div>
           ) : (
-            <pre className="mt-1 max-h-48 overflow-auto rounded border border-border bg-secondary p-2 text-xs">
+            // max-h fits a whole number of lines at text-xs' 16px leading —
+            // 1px border + 8px top padding, 12 lines = 202px — so the scroll
+            // cut lands on a line boundary, never mid-glyph.
+            <pre className="mt-1 max-h-[202px] overflow-auto rounded border border-border bg-secondary p-2 font-mono text-xs tabular-nums">
               <code>{view.preview.content}</code>
             </pre>
           )}
@@ -135,7 +148,7 @@ export function ProposalCard({
 
       {proposal.requirements && proposal.requirements.length > 0 && (
         <div className="mt-3 rounded border border-border p-2">
-          <p className="text-muted-foreground text-xs">Integrations</p>
+          <p className={EYEBROW_CLASS}>Integrations</p>
           <ul className="mt-1 space-y-1">
             {proposal.requirements.map((r) => (
               <RequirementRow
@@ -148,8 +161,7 @@ export function ProposalCard({
             ))}
           </ul>
           <p className="mt-1 text-muted-foreground text-xs">
-            Connect the items above, then confirm — your proposal stays here until
-            you do.
+            Connect the items above, then confirm.
           </p>
         </div>
       )}
@@ -165,7 +177,7 @@ export function ProposalCard({
           type="button"
           onClick={onConfirm}
           disabled={confirming || !proposal.proposalId}
-          className="rounded bg-primary px-3 py-1.5 text-primary-foreground text-sm disabled:opacity-50"
+          className="rounded-md bg-primary px-3 py-1.5 font-medium text-primary-foreground text-sm disabled:opacity-50"
         >
           {confirming ? "Confirming…" : "Confirm"}
         </button>
@@ -173,7 +185,7 @@ export function ProposalCard({
           type="button"
           onClick={onCancel}
           disabled={confirming}
-          className="rounded border border-border px-3 py-1.5 text-foreground text-sm disabled:opacity-50"
+          className="rounded-md border border-border px-3 py-1.5 font-medium text-foreground text-sm disabled:opacity-50"
         >
           Cancel
         </button>
@@ -277,11 +289,13 @@ function RequirementRow({
   };
 
   // Host-supplied brand icon (its integrations catalog knows the real provider
-  // marks); fall back to the built-in model mark when the host didn't wire one or
-  // returns nothing for a provider it doesn't recognize. `renderProviderIcon` is
-  // an untrusted host callback run during render, so contain a throw (a host that
-  // indexes a catalog without guarding an unknown provider) the same way
-  // `onConnect` is contained above — one bad mark must not crash the card.
+  // marks); fall back to the shared sandbox-ui ProviderIcon (real integration
+  // marks — Slack, GitHub, … — with a deterministic monogram behind them) when
+  // the host didn't wire one or returns nothing for a provider it doesn't
+  // recognize. `renderProviderIcon` is an untrusted host callback run during
+  // render, so contain a throw (a host that indexes a catalog without guarding
+  // an unknown provider) the same way `onConnect` is contained above — one bad
+  // mark must not crash the card.
   let providerIcon: ReactNode;
   try {
     providerIcon = renderProviderIcon?.(req.provider) ?? null;
@@ -290,10 +304,16 @@ function RequirementRow({
   }
 
   return (
-    <li className="flex items-center justify-between gap-2 text-xs">
+    <li className="flex items-center justify-between gap-2 text-sm">
       <span className="flex min-w-0 items-center gap-2">
-        {providerIcon ?? <ProviderLogo provider={req.provider} size={16} />}
-        <span className="truncate text-foreground">{kindLabel}</span>
+        {providerIcon ?? (
+          <ProviderIcon
+            id={req.provider}
+            size={16}
+            className="rounded-[4px]"
+          />
+        )}
+        <span className="truncate font-medium text-foreground">{kindLabel}</span>
         <span className="flex shrink-0 items-center gap-1">
           {/* Filled vs outlined dot is a non-color (shape) cue for the
               connected state, so it reads for color-blind users too — the
@@ -316,7 +336,7 @@ function RequirementRow({
           type="button"
           onClick={handleConnect}
           disabled={connecting}
-          className="shrink-0 rounded border border-primary px-2 py-0.5 font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
+          className="shrink-0 rounded border border-primary px-2 py-0.5 font-medium text-primary text-sm transition-colors hover:bg-primary/10 disabled:opacity-50"
         >
           {connecting
             ? isApp

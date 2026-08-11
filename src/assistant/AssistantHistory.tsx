@@ -133,6 +133,37 @@ export function AssistantHistory({
         <AsyncView
           state={state}
           loadingLabel="Loading…"
+          // The error branch speaks the same dialect as the panel's error
+          // banner and the transcript's stream-error row: alert glyph +
+          // destructive text, not a muted "empty-looking" paragraph.
+          renderError={({ message, retry }) => (
+            <div
+              role="alert"
+              className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center"
+            >
+              <svg
+                className="h-4 w-4 text-destructive"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 8v4m0 4h.01" />
+              </svg>
+              <p className="max-w-md text-destructive text-sm">{message}</p>
+              <button
+                type="button"
+                onClick={retry}
+                className="rounded border border-destructive/40 bg-card px-2 py-0.5 font-medium text-[11px] text-destructive transition hover:bg-destructive/10"
+              >
+                Retry
+              </button>
+            </div>
+          )}
           empty={{
             title: trimmed
               ? "No conversations match your search."

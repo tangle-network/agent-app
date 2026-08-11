@@ -5,7 +5,9 @@ import type {
   AssistantTranscriptView,
   PendingProposal,
 } from '../../assistant/types'
+import { ChatEmptyState } from '../../web-react'
 import {
+  confirmedMessages,
   longHistoryMessages,
   populatedMessages,
   settledUsage,
@@ -43,10 +45,30 @@ function viewOf(over: Partial<AssistantTranscriptView>): AssistantTranscriptView
   }
 }
 
+/** The panel's branded first-run state, recreated: doors log instead of
+ *  seeding a composer (the transcript story has none). Labels only — see
+ *  EMPTY_DOORS in AssistantPanel for why descriptions are dropped on this
+ *  narrow surface. */
 const EMPTY_STATE = (
-  <p className="px-4 py-8 text-center text-muted-foreground text-sm">
-    Ask me to create a workflow, check your usage, or manage your API keys.
-  </p>
+  <ChatEmptyState
+    productName="Assistant"
+    headline="Ask the assistant to do something"
+    subline="Create workflows, check usage, or manage API keys — I'll pause for approval before anything changes."
+    doors={[
+      {
+        label: 'Create a workflow',
+        onSelect: () => console.log('[story] door: create workflow'),
+      },
+      {
+        label: 'Check usage',
+        onSelect: () => console.log('[story] door: check usage'),
+      },
+      {
+        label: 'Manage API keys',
+        onSelect: () => console.log('[story] door: manage keys'),
+      },
+    ]}
+  />
 )
 
 /** A stand-in for the host's workflow-graph renderer (the real one is the
@@ -132,6 +154,20 @@ export const TranscriptStreaming: Story = {
   ),
 }
 
+/** A confirmed mutating action: the result lands as a quiet centered status
+ *  line (check glyph, muted small text) — not a full assistant-labeled turn. */
+export const TranscriptConfirmedAction: Story = {
+  name: 'Confirmed Action (status line)',
+  render: () => (
+    <Frame>
+      <AssistantTranscript
+        view={viewOf({ messages: confirmedMessages, usage: settledUsage })}
+        emptyState={EMPTY_STATE}
+      />
+    </Frame>
+  ),
+}
+
 /** A pending proposal rendered inline after its proposing turn, via the same
  *  bound `renderProposal` slot the panel supplies. */
 export const TranscriptWithProposal: Story = {
@@ -177,12 +213,12 @@ export const TranscriptLongHistory: Story = {
   ),
 }
 
-/** The transcript's four working states side by side. */
+/** The transcript's five working states side by side. */
 export const TranscriptStates: Story = {
   name: 'All States',
   parameters: { layout: 'padded' },
   render: () => (
-    <div className="grid grid-cols-4 gap-4">
+    <div className="grid grid-cols-5 gap-4">
       {(
         [
           ['Empty', viewOf({})],
@@ -212,6 +248,7 @@ export const TranscriptStates: Story = {
               renderProposal,
             }),
           ],
+          ['Confirmed', viewOf({ messages: confirmedMessages, usage: settledUsage })],
         ] satisfies ReadonlyArray<readonly [string, AssistantTranscriptView]>
       ).map(([label, view]) => (
         <div key={label} className="flex flex-col gap-1">
