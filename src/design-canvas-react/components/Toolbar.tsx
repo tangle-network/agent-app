@@ -25,6 +25,7 @@ import {
   BleedGlyph,
   BoldGlyph,
   BringFrontGlyph,
+  ChevronDownGlyph,
   GridGlyph,
   GroupGlyph,
   ItalicGlyph,
@@ -243,7 +244,7 @@ function SelectControl<T extends string>({
             className={`${buttonClassName} flex items-center justify-between gap-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-left text-xs text-[var(--text-primary)] hover:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40`}
           >
             <span className="truncate">{current?.label ?? value}</span>
-            <span className="text-[8px] text-[var(--text-muted)]">▾</span>
+            <ChevronDownGlyph className="h-3 w-3 shrink-0 text-[var(--text-muted)]" />
           </button>
         }
       >
@@ -314,7 +315,7 @@ function FontPicker({
             style={{ fontFamily: value }}
           >
             <span className="truncate">{value}</span>
-            <span className="text-[8px] text-[var(--text-muted)]">▾</span>
+            <ChevronDownGlyph className="h-3 w-3 shrink-0 text-[var(--text-muted)]" />
           </button>
         }
       >
@@ -922,7 +923,7 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides, pa
         value={page.name}
         disabled={!canWrite}
         onChange={(event) => onSetPageProps({ name: event.target.value })}
-        className="w-28 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
+        className="w-28 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40"
       />
 
       {SEP}
@@ -956,7 +957,7 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides, pa
             if (event.key === 'Enter') commitDimension('width', (event.target as HTMLInputElement).value)
             if (event.key === 'Escape') setCustomW(null)
           }}
-          className="w-16 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-center text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
+          className="w-16 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-center text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40"
         />
       </label>
       <span className="text-[var(--text-muted)]">×</span>
@@ -973,7 +974,7 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides, pa
             if (event.key === 'Enter') commitDimension('height', (event.target as HTMLInputElement).value)
             if (event.key === 'Escape') setCustomH(null)
           }}
-          className="w-16 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-center text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
+          className="w-16 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-center text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40"
         />
       </label>
 

@@ -2,8 +2,8 @@
  * `./work-product-react` — the sandbox-ui-composed review pane. It follows the
  * optional-peer rule: this is the ONLY work-product surface
  * that imports `@tangle-network/sandbox-ui` (its `workbench` primitives:
- * `PillTabs`, `CodeSurface`, `DiffView`, `FileBreadcrumb`,
- * `computeDiffStats`). `/web-react`'s queue/card/lineage components stay
+ * `PillTabs`, `CodeSurface`, `DiffView`, `FileBreadcrumb`).
+ * `/web-react`'s queue/card/lineage components stay
  * sandbox-ui-free; importing THIS subpath requires the otherwise optional
  * sandbox-ui peer.
  *
@@ -20,7 +20,6 @@ import {
   DiffView,
   FileBreadcrumb,
   PillTabs,
-  computeDiffStats,
   type PillTabItem,
 } from '@tangle-network/sandbox-ui/workbench'
 
@@ -118,10 +117,6 @@ export function WorkProductPane({
   const [compareError, setCompareError] = useState<string | null>(null)
 
   const diffFilename = filenameOf(artifact?.path, artifact?.title ?? workProduct.scopeKey)
-  const diffStats = useMemo(
-    () => (hasDiff ? computeDiffStats(baseline ?? '', body) : null),
-    [hasDiff, baseline, body],
-  )
 
   const loadCompare = useCallback(
     async (from: WorkProductVersionEntry, to: WorkProductVersionEntry) => {
@@ -180,12 +175,7 @@ export function WorkProductPane({
 
       {tab === 'diff' && hasDiff && (
         <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-border">
-          {diffStats && (
-            <p className="border-b border-border px-3 py-2 text-[11px] text-muted-foreground">
-              <span className="text-success">+{diffStats.added}</span>{' '}
-              <span className="text-destructive">−{diffStats.removed}</span>
-            </p>
-          )}
+          {/* DiffView's own file header already carries the +/− counts. */}
           <DiffView filename={diffFilename} baseline={baseline ?? ''} current={body} />
         </div>
       )}

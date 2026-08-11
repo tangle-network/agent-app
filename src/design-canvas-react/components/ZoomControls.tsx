@@ -4,7 +4,7 @@
  * onZoom.
  */
 
-import { ZoomFitGlyph } from './glyphs'
+import { MinusGlyph, PlusGlyph, ZoomFitGlyph } from './glyphs'
 import { BTN_SM } from './icon-button'
 
 export interface ZoomControlsProps {
@@ -50,7 +50,7 @@ export function ZoomControls({ zoom, onZoom, onFit, fitLabel = 'Fit to screen' }
         disabled={zoom <= MIN}
         className={BTN_SM}
       >
-        <span className="text-base leading-none">−</span>
+        <MinusGlyph className="h-3.5 w-3.5" />
       </button>
 
       <button
@@ -70,7 +70,7 @@ export function ZoomControls({ zoom, onZoom, onFit, fitLabel = 'Fit to screen' }
         disabled={zoom >= MAX}
         className={BTN_SM}
       >
-        <span className="text-sm leading-none">+</span>
+        <PlusGlyph className="h-3.5 w-3.5" />
       </button>
     </div>
   )

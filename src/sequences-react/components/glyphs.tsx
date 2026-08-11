@@ -109,3 +109,6 @@ export const ExportGlyph = glyph(
     <path d="M12 3v12M8 7l4-4 4 4" />
   </>,
 )
+
+export const PlusGlyph = glyph(<path d="M12 5v14M5 12h14" />)
+export const MinusGlyph = glyph(<path d="M5 12h14" />)

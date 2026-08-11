@@ -13,6 +13,8 @@
  *  - `loadGenerations?()` — optional provider for "already generated in this
  *    workspace" images; omit to hide the tab.
  *  - `templates?` — optional template set; defaults to {@link DEFAULT_INSERT_TEMPLATES}.
+ *    A host-passed (composed) set labels its tab "Templates"; the built-in
+ *    primitives label it "Elements".
  *
  * Insertion goes through `onInsert`, which the host wires to its
  * `onApplyOperations` pipeline (server-validated, undoable) — the same path
@@ -177,11 +179,15 @@ export function CanvasInsertPanel({
   onInsert,
   onUploadImage,
   loadGenerations,
-  templates = DEFAULT_INSERT_TEMPLATES,
+  templates,
   accept = DEFAULT_ACCEPT,
   className,
 }: CanvasInsertPanelProps) {
-  const [tab, setTab] = useState<Tab>(() => (templates.length > 0 ? 'templates' : 'uploads'))
+  // Host-passed templates are composed page sections ("Templates"); the
+  // built-in set is single primitives, so its tab reads "Elements".
+  const resolvedTemplates = templates ?? DEFAULT_INSERT_TEMPLATES
+  const templatesLabel = templates !== undefined ? 'Templates' : 'Elements'
+  const [tab, setTab] = useState<Tab>(() => (resolvedTemplates.length > 0 ? 'templates' : 'uploads'))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [dragOver, setDragOver] = useState(false)
@@ -191,15 +197,15 @@ export function CanvasInsertPanel({
 
   useEffect(() => {
     if (tab === 'uploads' && !onUploadImage) {
-      setTab(templates.length > 0 ? 'templates' : loadGenerations ? 'generations' : 'uploads')
+      setTab(resolvedTemplates.length > 0 ? 'templates' : loadGenerations ? 'generations' : 'uploads')
     }
-    if (tab === 'templates' && templates.length === 0) {
+    if (tab === 'templates' && resolvedTemplates.length === 0) {
       setTab(onUploadImage ? 'uploads' : loadGenerations ? 'generations' : 'uploads')
     }
     if (tab === 'generations' && !loadGenerations) {
-      setTab(templates.length > 0 ? 'templates' : onUploadImage ? 'uploads' : 'templates')
+      setTab(resolvedTemplates.length > 0 ? 'templates' : onUploadImage ? 'uploads' : 'templates')
     }
-  }, [tab, templates.length, onUploadImage, loadGenerations])
+  }, [tab, resolvedTemplates.length, onUploadImage, loadGenerations])
 
   useEffect(() => {
     if (tab !== 'generations' || generationsLoaded || !loadGenerations) return
@@ -264,7 +270,7 @@ export function CanvasInsertPanel({
 
   const tabs: Array<{ id: Tab; label: string; icon: (p: { className?: string }) => ReactElement; show: boolean }> = [
     { id: 'uploads', label: 'Uploads', icon: ImageGlyph, show: !!onUploadImage },
-    { id: 'templates', label: 'Templates', icon: ShapesGlyph, show: templates.length > 0 },
+    { id: 'templates', label: templatesLabel, icon: ShapesGlyph, show: resolvedTemplates.length > 0 },
     { id: 'generations', label: 'Generations', icon: SparkleGlyph, show: !!loadGenerations },
   ]
   const visibleTabs = tabs.filter((t) => t.show)
@@ -348,7 +354,7 @@ export function CanvasInsertPanel({
 
           {tab === 'templates' && (
             <div className="grid grid-cols-2 gap-2">
-              {templates.map((tpl) => (
+              {resolvedTemplates.map((tpl) => (
                 <button
                   key={tpl.id}
                   type="button"

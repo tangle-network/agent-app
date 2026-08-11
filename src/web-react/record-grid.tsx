@@ -607,7 +607,7 @@ export function RecordGrid({
           onKeyDown={handleGridKeyDown}
         >
           <thead>
-            <tr role="row" className="border-b border-border text-[11px] uppercase tracking-wide text-muted-foreground">
+            <tr role="row" className="border-b border-border text-[11px] uppercase tracking-[0.05em] text-muted-foreground">
               {columns.map((column) => (
                 <th
                   key={column.id}

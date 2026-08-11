@@ -6,6 +6,7 @@
  */
 
 import type { ZoomMath } from '../contracts'
+import { MinusGlyph, PlusGlyph } from './glyphs'
 
 export interface ZoomControlProps {
   zoomMath: ZoomMath
@@ -47,7 +48,7 @@ export function ZoomControl({ zoomMath, zoom, onZoomChange, fitZoom }: ZoomContr
         onClick={() => setSlider(slider - sliderStep * 10)}
         className={ZOOM_STEP_BUTTON}
       >
-        −
+        <MinusGlyph className="h-3.5 w-3.5" />
       </button>
       <input
         type="range"
@@ -66,7 +67,7 @@ export function ZoomControl({ zoomMath, zoom, onZoomChange, fitZoom }: ZoomContr
         onClick={() => setSlider(slider + sliderStep * 10)}
         className={ZOOM_STEP_BUTTON}
       >
-        +
+        <PlusGlyph className="h-3.5 w-3.5" />
       </button>
       <output
         aria-hidden

@@ -104,7 +104,7 @@ export function CanvasEmptyState({
         </span>
 
         <div className="flex flex-col gap-1.5">
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h2>
+          <h2 className="text-xl font-semibold text-[var(--text-primary)]">{title}</h2>
           <p className="text-sm leading-5 text-[var(--text-secondary)]">{subtitle}</p>
         </div>
 

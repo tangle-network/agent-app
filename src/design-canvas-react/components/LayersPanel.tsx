@@ -155,7 +155,11 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
                   className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 bg-transparent text-left"
                 >
                   <KindIcon kind={element.kind} className="h-3.5 w-3.5 shrink-0 opacity-60" />
-                  {element.slot ? <SlotGlyph className="h-3 w-3 shrink-0 text-[var(--brand-primary)]" /> : null}
+                  {element.slot ? (
+                    <span title={`Bound to slot: ${element.slot}`} className="inline-flex shrink-0">
+                      <SlotGlyph className="h-3 w-3 text-[var(--brand-primary)]" />
+                    </span>
+                  ) : null}
                   <span className="min-w-0 flex-1 truncate">{element.name}</span>
                 </button>
               )}
