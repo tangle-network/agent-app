@@ -49,6 +49,22 @@ function iconForMediaType(mediaType: string | undefined): (props: { className?: 
   return mediaType?.startsWith('image/') ? ImageGlyph : FileGlyph
 }
 
+// ── display name ────────────────────────────────────────────────────────
+
+/** Resolve a display name for an attachment part. `isChatAttachmentPart`
+ *  only checks `type`/`path` (by design — a structural guard, not a
+ *  provenance proof), so a stored part can carry `path` with no `name` if it
+ *  was written before a normalization fix landed. Rather than rendering a
+ *  blank label or downloading a file named `undefined`, fall back to the
+ *  storage path's own basename; only when even that is unusable (e.g. a
+ *  path ending in `/`) does a caller need the explicit unavailable state. */
+function attachmentDisplayName(part: ChatAttachmentPart): string | null {
+  if (typeof part.name === 'string' && part.name.trim().length > 0) return part.name
+  const base = part.path.split('/').pop() ?? ''
+  const trimmed = base.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
 // ── file loading + cache ───────────────────────────────────────────────────
 
 /** Typed outcome of fetching one attachment's raw bytes. Callers must check
@@ -147,6 +163,32 @@ function AttachmentThumbnailError({ name }: { name: string }) {
   )
 }
 
+/** Non-clickable placeholder for a stored part with no usable name at all
+ *  (no `name`, and no basename could be derived from `path`) — never a blank
+ *  clickable control, and never a download named `undefined`. */
+function AttachmentUnavailable({ shape }: { shape: 'thumbnail' | 'chip' }) {
+  if (shape === 'thumbnail') {
+    return (
+      <span
+        aria-disabled="true"
+        className="inline-flex h-16 w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-md border border-border bg-muted px-1 text-center text-muted-foreground"
+      >
+        <WarningGlyph className="h-4 w-4 shrink-0" />
+        <span className="line-clamp-2 text-[10px] leading-tight">Attachment unavailable</span>
+      </span>
+    )
+  }
+  return (
+    <span
+      aria-disabled="true"
+      className="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
+    >
+      <WarningGlyph className="h-3 w-3 shrink-0" />
+      Attachment unavailable
+    </span>
+  )
+}
+
 interface AttachmentPartProps {
   part: ChatAttachmentPart
   resolveFileUrl: (part: ChatAttachmentPart) => string
@@ -155,12 +197,15 @@ interface AttachmentPartProps {
 
 function AttachmentThumbnail({ part, resolveFileUrl, fetchFile }: AttachmentPartProps) {
   const url = resolveFileUrl(part)
+  const displayName = attachmentDisplayName(part)
   const [result, setResult] = useState<AttachmentFileResult | null>(null)
 
   // Images fetch eagerly on mount — unlike the chip, which fetches only on
   // click — so the transcript shows a real thumbnail rather than a
-  // placeholder icon.
+  // placeholder icon. Skipped entirely for a part with no usable display
+  // name — there is nothing meaningful to label the fetched bytes with.
   useEffect(() => {
+    if (!displayName) return
     let cancelled = false
     setResult(null)
     loadAttachmentFile(url, fetchFile).then((next) => {
@@ -169,7 +214,7 @@ function AttachmentThumbnail({ part, resolveFileUrl, fetchFile }: AttachmentPart
     return () => {
       cancelled = true
     }
-  }, [url, fetchFile])
+  }, [url, fetchFile, displayName])
 
   const objectUrl = useAttachmentObjectUrl(result?.ok ? result.blob : undefined)
 
@@ -178,6 +223,9 @@ function AttachmentThumbnail({ part, resolveFileUrl, fetchFile }: AttachmentPart
     window.open(objectUrl, '_blank', 'noopener')
   }, [objectUrl])
 
+  if (!displayName) {
+    return <AttachmentUnavailable shape="thumbnail" />
+  }
   if (!result) {
     // The shimmer stays hidden and UNROLED. Giving each placeholder a role
     // would put a dozen of them in the accessibility tree of one transcript
@@ -186,17 +234,17 @@ function AttachmentThumbnail({ part, resolveFileUrl, fetchFile }: AttachmentPart
     return <span aria-hidden="true" className="inline-block h-16 w-16 shrink-0 animate-pulse rounded-md bg-muted" />
   }
   if (!result.ok || !objectUrl) {
-    return <AttachmentThumbnailError name={part.name} />
+    return <AttachmentThumbnailError name={displayName} />
   }
 
   return (
     <button
       type="button"
       onClick={handleClick}
-      aria-label={`Open ${part.name}`}
+      aria-label={`Open ${displayName}`}
       className="h-16 w-16 shrink-0 overflow-hidden rounded-md border border-border"
     >
-      <img src={objectUrl} alt={part.name} className="h-16 w-16 object-cover" />
+      <img src={objectUrl} alt={displayName} className="h-16 w-16 object-cover" />
     </button>
   )
 }
@@ -204,13 +252,14 @@ function AttachmentThumbnail({ part, resolveFileUrl, fetchFile }: AttachmentPart
 // ── chip (files) ─────────────────────────────────────────────────────────
 
 function AttachmentChip({ part, resolveFileUrl, fetchFile }: AttachmentPartProps) {
+  const displayName = attachmentDisplayName(part)
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   // Files fetch ONLY on click — an unopened chip never issues a network
   // request, unlike an eagerly-fetched thumbnail.
   const handleClick = useCallback(() => {
-    if (status === 'loading') return
+    if (!displayName || status === 'loading') return
     setStatus('loading')
     setErrorMessage(null)
     const url = resolveFileUrl(part)
@@ -220,7 +269,7 @@ function AttachmentChip({ part, resolveFileUrl, fetchFile }: AttachmentPartProps
         setErrorMessage(result.message)
         return
       }
-      const download = triggerAttachmentDownload(part.name, result.blob)
+      const download = triggerAttachmentDownload(displayName, result.blob)
       if (!download.ok) {
         setStatus('error')
         setErrorMessage(download.message)
@@ -228,7 +277,11 @@ function AttachmentChip({ part, resolveFileUrl, fetchFile }: AttachmentPartProps
       }
       setStatus('idle')
     })
-  }, [status, resolveFileUrl, part, fetchFile])
+  }, [displayName, status, resolveFileUrl, part, fetchFile])
+
+  if (!displayName) {
+    return <AttachmentUnavailable shape="chip" />
+  }
 
   const Icon = status === 'error' ? WarningGlyph : iconForMediaType(part.mediaType)
   const className = [
@@ -246,7 +299,7 @@ function AttachmentChip({ part, resolveFileUrl, fetchFile }: AttachmentPartProps
       className={className}
     >
       <Icon className="h-3 w-3 shrink-0" />
-      {part.name}
+      {displayName}
       {typeof part.size === 'number' && <span className="text-muted-foreground/70">· {formatBytes(part.size)}</span>}
     </button>
   )

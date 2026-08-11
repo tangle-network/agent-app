@@ -136,10 +136,15 @@ export function normalizePersistedPart(rawPart: JsonRecord): JsonRecord | null {
       type,
       ...(id ? { id } : {}),
       ...(asString(rawPart.filename) ? { filename: asString(rawPart.filename) } : {}),
+      // `name`: the durable attachment display name `promoteAgentFilePart`
+      // writes. Coexists with `filename` (legacy raw-harness shape) — kept
+      // separate rather than unified so neither producer's shape is lossy.
+      ...(asString(rawPart.name) ? { name: asString(rawPart.name) } : {}),
       ...(asString(rawPart.mediaType) ? { mediaType: asString(rawPart.mediaType) } : {}),
       ...(asString(rawPart.url) ? { url: asString(rawPart.url) } : {}),
       ...(asString(rawPart.path) ? { path: asString(rawPart.path) } : {}),
       ...(type === 'file' && asString(rawPart.content) ? { content: asString(rawPart.content) } : {}),
+      ...(typeof rawPart.size === 'number' && Number.isFinite(rawPart.size) ? { size: rawPart.size } : {}),
     }
   }
 
