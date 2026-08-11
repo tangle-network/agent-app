@@ -233,13 +233,14 @@ describe('ChatMessages segmented turns', () => {
     }
     const { container } = render(<ChatMessages messages={[message]} />)
     const clipped = () => container.querySelector('.agent-disclose')!.firstElementChild!
-    // Open: the attribute must be ABSENT, not present-and-false. React 18 does
-    // not know `inert` and renders `inert={false}` as the string "false", which
-    // the browser reads as inert — an `inert={!open}` binding makes the open
-    // panel the unfocusable one on a React this package's peer range admits.
+    // Open: the attribute must be ABSENT, not present-and-false — HTML reads
+    // any value as inert, the string "false" included.
     expect(clipped().hasAttribute('inert')).toBe(false)
     fireEvent.click(reasoningToggle(container))
     // Collapsed: genuinely gone — not read aloud, not hit by find-in-page.
+    // This asserts the attribute the INSTALLED React emits. The spelling that
+    // produces it differs by major (measured in `./inert`), which is why the
+    // component goes through `inertProps` instead of binding a boolean.
     expect(clipped().hasAttribute('inert')).toBe(true)
   })
 

@@ -616,12 +616,22 @@
      rid of, and running it anyway because the element declared itself essential
      is the override this file calls a defect.
 
-     So the meaning is carried without the motion. The sweep stops; the gradient
-     comes off (it exists only to be moved) and the label holds full-strength
-     text under a dotted rule. A settled label beside it is muted and undecorated
-     — `mission-activity`'s live run against its finished siblings, the chat
-     trace's "Thinking · 12s" against "Thought for 12s" — so the reader can still
-     tell in-flight from done at a glance, from a still frame.
+     So the meaning is carried without the motion. The sweep stops and the
+     gradient comes off (it exists only to be moved), which puts the glyphs back
+     under `color` instead of leaving them transparent windows onto it.
+
+     The DOTTED RULE is the discriminator, and it is the only one. Measured in
+     Chromium under `prefers-reduced-motion: reduce`, light and dark: the live
+     label computes `text-decoration: underline dotted` where a settled label
+     beside it computes `none`, and the two resolve to the SAME color and the
+     same weight. That is by construction — `color: inherit` hands the label
+     whatever its context already uses, and the settled label shares that
+     context. In `mission-activity`'s lane both tool names read rgb(12,12,21)
+     light / rgb(236,236,241) dark; in the chat trace toggle "Thinking · 12s"
+     and "Thought for 12s" both read rgb(96,96,99) light / rgb(158,158,160)
+     dark, because that button is `text-muted-foreground`. So the reader tells
+     in-flight from done by the rule under the word, from a still frame — not by
+     tone and not by weight.
 
      Not `content: '…'` or any other generated text: this element's text is read
      by a screen reader, and adding pseudo-content changes what is announced. */

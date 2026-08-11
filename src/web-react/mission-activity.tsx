@@ -204,10 +204,12 @@ function StatusDot({ tone }: { tone: ActivityTone }) {
  *
  * `essential` exempts the label from the blanket reduced-motion collapse; it
  * does NOT keep the sweep running at a reader who asked for less motion. Under
- * `prefers-reduced-motion` tokens.css stops the animation and holds the live
- * label in a static state instead — full-strength text under a dotted rule —
- * which its settled, muted, undecorated siblings on the same lane still do not
- * have. The distinction survives; only the movement goes.
+ * `prefers-reduced-motion` tokens.css stops the animation and leaves a dotted
+ * rule under the live tool name that its settled siblings on this lane do not
+ * carry. That rule is the WHOLE distinction: measured in Chromium, a live and a
+ * settled tool name on this lane compute the same color and the same weight
+ * (rgb(12,12,21) light / rgb(236,236,241) dark, 500) and differ only in
+ * `text-decoration`. The distinction survives; only the movement goes.
  */
 function RunLabel({ tool, detail, live }: { tool: string; detail: string; live: boolean }) {
   return (

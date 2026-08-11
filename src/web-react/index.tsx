@@ -1274,9 +1274,11 @@ function AssistantMessageImpl({
               // a stuck one — and `essential` is an exemption from the blanket
               // floor, never a licence to sweep forever at someone who asked
               // for less motion: under `prefers-reduced-motion` tokens.css
-              // stops this animation and holds the label in a static state
-              // (full-strength text under a dotted rule) that a settled label
-              // still does not have.
+              // stops this animation and leaves a dotted rule under the word
+              // that the settled label ("Thought for 12s") does not carry. The
+              // rule is the only difference — measured in Chromium, both labels
+              // compute this button's own `text-muted-foreground`, so tone
+              // separates neither.
               <span className="agent-shimmer" data-motion="essential">
                 Thinking{thinkingSeconds >= 1 ? ` · ${thinkingSeconds}s` : '…'}
               </span>
@@ -1295,12 +1297,13 @@ function AssistantMessageImpl({
                 a screen reader, not hit by find-in-page — rather than merely
                 clipped to nothing.
 
-                It is emitted only when it must be ON. `inert={!open}` reads
-                correctly and is wrong on React 18, which this package's peer
-                range admits: React 18 does not know the attribute, writes
-                `inert="false"` through verbatim, and HTML reads any value as
-                inert — so the OPEN panel would be the unfocusable one. See
-                `./inert`. */}
+                The attribute is emitted only when it must be ON, and its
+                spelling is branched on the running React. `inert={!open}` is
+                correct on React 19 and half-broken on React 18, which this
+                package's peer range admits: React 18 DROPS a boolean `inert`
+                (with a warning), so the COLLAPSED panel would stay focusable
+                and screen-reader readable — 18 wants `inert=""`, which React 19
+                in turn drops. Measured on both majors in `./inert`. */}
             <div {...inertProps(!reasoningOpen)}>
               <div
                 id={reasoningId}

@@ -445,7 +445,8 @@ The corollary is the enforceable half: a component that hardcodes its own durati
 
 One kind of motion may opt out of the collapse — `data-motion="essential"`, for a signal whose meaning a 1ms flash would destroy, such as a sweep that says work is in flight.
 The exemption is from the blanket rule, never from the request: an element that declares it owes its own reduced-motion answer in `src/theme/tokens.css`, and an animation with no end condition owes it most.
-The waiting label is the one such case shipped here — under `prefers-reduced-motion` its sweep stops and the label holds a static state, full-strength text under a dotted rule, that its settled siblings do not have, so "in flight" still reads from a still frame.
+The waiting label is the one such case shipped here — under `prefers-reduced-motion` its sweep stops and a dotted rule stays under the word, which its settled siblings do not carry, so "in flight" still reads from a still frame.
+That rule is the whole difference, and colour is not part of it: measured in Chromium under `prefers-reduced-motion: reduce`, a live label and the settled label beside it compute the same `color` and the same weight in both themes, because `.agent-shimmer` restores `color: inherit` and the settled label shares that context.
 
 **Rejected** (measured in this package's `src/**`, 2026-08-04):
 
