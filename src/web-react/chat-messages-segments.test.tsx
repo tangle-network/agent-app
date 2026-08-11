@@ -224,6 +224,59 @@ describe('ChatMessages segmented turns', () => {
     expect(waiting?.getAttribute('data-motion')).toBe('essential')
   })
 
+  it('marks only the COLLAPSED reasoning trace inert', () => {
+    const message: ChatUiMessage = {
+      id: 'm1',
+      role: 'assistant',
+      content: '',
+      reasoning: 'Considering the options.',
+    }
+    const { container } = render(<ChatMessages messages={[message]} />)
+    const clipped = () => container.querySelector('.agent-disclose')!.firstElementChild!
+    // Open: the attribute must be ABSENT, not present-and-false. React 18 does
+    // not know `inert` and renders `inert={false}` as the string "false", which
+    // the browser reads as inert — an `inert={!open}` binding makes the open
+    // panel the unfocusable one on a React this package's peer range admits.
+    expect(clipped().hasAttribute('inert')).toBe(false)
+    fireEvent.click(reasoningToggle(container))
+    // Collapsed: genuinely gone — not read aloud, not hit by find-in-page.
+    expect(clipped().hasAttribute('inert')).toBe(true)
+  })
+
+  it('keeps a tool row on its own DOM node when it migrates from toolCalls into a segment', () => {
+    const call = { id: 't1', name: 'validate_workflow', status: 'running' as const }
+    const before: ChatUiMessage = {
+      id: 'm1',
+      role: 'assistant',
+      content: '',
+      segments: [{ kind: 'text', content: 'Working.' }],
+      // The producer reported the call before the segment carrying it arrived,
+      // so it renders through the leftover path first.
+      toolCalls: [call],
+    }
+    const { container, rerender } = render(<ChatMessages messages={[before]} loading />)
+    const arrivedRow = () =>
+      Array.from(container.querySelectorAll('.agent-arrive')).find((el) =>
+        (el.textContent ?? '').includes('Validate workflow'))
+    const first = arrivedRow()
+    expect(first).toBeTruthy()
+
+    rerender(
+      <ChatMessages
+        messages={[{
+          ...before,
+          segments: [{ kind: 'text', content: 'Working.' }, { kind: 'tool', call }],
+        }]}
+        loading
+      />,
+    )
+    // The row the reader has been watching must be the SAME element. React
+    // identity is per parent, so a leftover card wrapped in a per-group <div>
+    // once it becomes a segment is an unmount plus a mount, and `.agent-arrive`
+    // plays again on a row that never left the screen.
+    expect(arrivedRow()).toBe(first)
+  })
+
   it('names the reasoning trace it controls, and keeps a click from being undone by the next frame', () => {
     const message: ChatUiMessage = {
       id: 'm1',

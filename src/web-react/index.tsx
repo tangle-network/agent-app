@@ -27,6 +27,7 @@ import { useEffect, useId, useMemo, useRef, useState, memo, type ReactNode } fro
 import { InlineToolItem } from '@tangle-network/ui/run'
 import type { ToolPart } from '@tangle-network/ui/types'
 import { useSmoothText } from './smooth-text'
+import { inertProps } from './inert'
 import { useArrivalStyle } from './motion'
 import { ChevronDown, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, usePending } from './controls'
 import { BrandMark } from './brand-mark'
@@ -1004,54 +1005,76 @@ function SegmentedBody({
     }
   }
 
-  return (
-    <div className="flex flex-col gap-2">
-      {groups.map((g) =>
-        g.kind === 'text' ? (
-          <SegmentText
-            // Segments only ever append within a turn, so the index is a stable
-            // key — a finalized run keeps its slot as later runs/tools are added,
-            // so its smooth-text state isn't reset.
-            key={`text-${g.index}`}
-            content={g.content}
-            // Only the trailing run of the live turn types out + shows the caret.
-            streaming={streaming && g.index === lastIndex}
-            showCaret={streaming && g.index === lastIndex}
-            renderBody={renderBody}
-            messageClassName={messageClassName}
-          />
-        ) : !streaming &&
-          g.calls.length >= COLLAPSE_TOOL_RUN_AT &&
-          !g.calls.some(isImportantTool) ? (
-          // The fold is a quiet disclosure line, not a filled box — the
-          // canonical rows inside it carry the row chrome.
-          //
-          // Deliberately still a `<details>` and NOT `.agent-disclose`: a
-          // closed `<details>` gives its children no box at all, so their
-          // `.agent-arrive` has not run yet and the run genuinely cascades on
-          // the click that reveals it. `.agent-disclose` keeps the subtree laid
-          // out and merely clipped, which would spend the arrival behind a zero
-          // height and open onto rows that were already there. The reasoning
-          // box is the opposite case — it is open while the model thinks, so
-          // what has to animate there is the HEIGHT.
-          <details key={`tools-${g.index}`}>
-            <summary className="cursor-pointer select-none rounded-md px-1 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
-              Worked through {g.calls.length} steps
-            </summary>
-            <div className="mt-1.5 flex flex-col gap-1.5">
-              {g.calls.map(renderToolCard)}
-            </div>
-          </details>
-        ) : (
-          <div key={`tools-${g.index}`} className="flex flex-col gap-2">
+  // ONE flat child list rather than a wrapper element per group, because React
+  // identity is per PARENT: a call the producer reports in `toolCalls` before
+  // the segment carrying it arrives starts life in `leftoverToolCalls` and later
+  // lands in a `tool` segment, and a change of parent is an unmount plus a mount
+  // — the row replays its entrance although the reader has been watching it for
+  // seconds. Flat, every card is a sibling keyed on its call id, so that
+  // migration is a re-order at worst and usually not even that (segments append,
+  // and a leftover sits at the end, which is exactly where its segment lands).
+  // The outer `gap-2` is what the removed per-group wrapper supplied, so the
+  // layout is byte-for-byte what it was.
+  const children: ReactNode[] = []
+  for (const g of groups) {
+    if (g.kind === 'text') {
+      children.push(
+        <SegmentText
+          // Segments only ever append within a turn, so the index is a stable
+          // key — a finalized run keeps its slot as later runs/tools are added,
+          // so its smooth-text state isn't reset.
+          key={`text-${g.index}`}
+          content={g.content}
+          // Only the trailing run of the live turn types out + shows the caret.
+          streaming={streaming && g.index === lastIndex}
+          showCaret={streaming && g.index === lastIndex}
+          renderBody={renderBody}
+          messageClassName={messageClassName}
+        />,
+      )
+      continue
+    }
+    if (
+      !streaming &&
+      g.calls.length >= COLLAPSE_TOOL_RUN_AT &&
+      !g.calls.some(isImportantTool)
+    ) {
+      // The fold is a quiet disclosure line, not a filled box — the canonical
+      // rows inside it carry the row chrome.
+      //
+      // Deliberately still a `<details>` and NOT `.agent-disclose`: a closed
+      // `<details>` gives its children no box at all, so their `.agent-arrive`
+      // has not run yet and the run genuinely cascades on the click that
+      // reveals it. `.agent-disclose` keeps the subtree laid out and merely
+      // clipped, which would spend the arrival behind a zero height and open
+      // onto rows that were already there. The reasoning box is the opposite
+      // case — it is open while the model thinks, so what has to animate there
+      // is the HEIGHT.
+      //
+      // The key names the FOLD, not the group: folded and unfolded are two
+      // different elements for one group, and one key over two element types is
+      // how React is told to tear a subtree down and rebuild it — replaying the
+      // entrance of every row in it.
+      children.push(
+        <details key={`tools-fold-${g.index}`}>
+          <summary className="cursor-pointer select-none rounded-md px-1 py-0.5 text-xs font-medium text-muted-foreground [transition:color_var(--motion-control)] hover:text-foreground">
+            Worked through {g.calls.length} steps
+          </summary>
+          <div className="mt-1.5 flex flex-col gap-1.5">
             {g.calls.map(renderToolCard)}
           </div>
-        ),
-      )}
-      {leftoverToolCalls.map(renderToolCard)}
-      {streaming && segments[lastIndex]?.kind === 'tool' && <StreamingCaret />}
-    </div>
-  )
+        </details>,
+      )
+      continue
+    }
+    g.calls.forEach((call, index) => children.push(renderToolCard(call, index)))
+  }
+  leftoverToolCalls.forEach((call, index) => children.push(renderToolCard(call, index)))
+  if (streaming && segments[lastIndex]?.kind === 'tool') {
+    children.push(<StreamingCaret key="streaming-caret" />)
+  }
+
+  return <div className="flex flex-col gap-2">{children}</div>
 }
 
 // ── Quiet chrome ────────────────────────────────────────────────────────────
@@ -1231,16 +1254,29 @@ function AssistantMessageImpl({
             onClick={() => setReasoningToggled(!reasoningOpen)}
             aria-expanded={reasoningOpen}
             aria-controls={reasoningId}
-            className="flex w-full select-none items-center gap-1.5 text-left text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            // `transition-colors`/`transition-transform` carry TAILWIND's
+            // duration and curve (150ms, its own cubic-bezier), not this
+            // package's — a component that writes its own timing is the defect
+            // `docs/product-surfaces.md` Pattern 4 rejects. The label reads
+            // `--motion-control` (the token for a colour change) and the chevron
+            // reads `--motion-surface`, the SAME pair `.agent-disclose` runs its
+            // grid row on, so the arrow and the panel it points at travel
+            // together instead of on two clocks.
+            className="flex w-full select-none items-center gap-1.5 text-left text-xs font-medium text-muted-foreground [transition:color_var(--motion-control)] hover:text-foreground"
           >
-            <ChevronDown className={`h-3 w-3 shrink-0 transition-transform ${reasoningOpen ? '' : '-rotate-90'}`} />
+            <ChevronDown className={`h-3 w-3 shrink-0 [transition:transform_var(--motion-surface)] ${reasoningOpen ? '' : '-rotate-90'}`} />
             {!hasAnswerText ? (
               // A pulse dims the whole word on a loop, which is the same cue a
               // skeleton placeholder uses — it reads as "nothing here yet". A
               // sweep travels THROUGH the glyphs, which reads as work in
               // flight, and the elapsed seconds say how much. `essential`
               // because it is the only signal separating a working agent from
-              // a stuck one, and reduced-motion still collapses its duration.
+              // a stuck one — and `essential` is an exemption from the blanket
+              // floor, never a licence to sweep forever at someone who asked
+              // for less motion: under `prefers-reduced-motion` tokens.css
+              // stops this animation and holds the label in a static state
+              // (full-strength text under a dotted rule) that a settled label
+              // still does not have.
               <span className="agent-shimmer" data-motion="essential">
                 Thinking{thinkingSeconds >= 1 ? ` · ${thinkingSeconds}s` : '…'}
               </span>
@@ -1257,8 +1293,15 @@ function AssistantMessageImpl({
                 the same element. `inert` restores the last thing `<details>`
                 gave for free: a collapsed trace is genuinely gone — not read by
                 a screen reader, not hit by find-in-page — rather than merely
-                clipped to nothing. */}
-            <div inert={!reasoningOpen}>
+                clipped to nothing.
+
+                It is emitted only when it must be ON. `inert={!open}` reads
+                correctly and is wrong on React 18, which this package's peer
+                range admits: React 18 does not know the attribute, writes
+                `inert="false"` through verbatim, and HTML reads any value as
+                inert — so the OPEN panel would be the unfocusable one. See
+                `./inert`. */}
+            <div {...inertProps(!reasoningOpen)}>
               <div
                 id={reasoningId}
                 ref={reasoningScrollRef}

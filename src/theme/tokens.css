@@ -520,7 +520,8 @@
 
 /* The waiting label. `background-clip: text` over a moving gradient, so the
    shimmer runs THROUGH the glyphs rather than behind them. Marked essential:
-   it is the only signal that work is still in flight. */
+   it is the only signal that work is still in flight. Its reduced-motion
+   answer is at the bottom of this file, with the floor it opts out of. */
 .agent-shimmer {
   background: linear-gradient(
     90deg,
@@ -581,6 +582,13 @@
  * out by declaring `data-motion="essential"`; the exclusion covers that element
  * and its subtree, and `:where()` keeps the selector at zero specificity so a
  * consumer's own `!important` can still win.
+ *
+ * `essential` is an exemption from the BLANKET rule, not a licence to keep
+ * running. It exists because collapsing a meaning-carrying animation to a 1ms
+ * flash destroys the meaning, so the element gets to answer for itself — and it
+ * then OWES that answer. An element with no end condition owes it most, which
+ * is why `.agent-shimmer` states its own below: the sweep stops, and what it
+ * was saying is re-stated as a static difference the reader can still see.
  */
 @media (prefers-reduced-motion: reduce) {
   :root {
@@ -599,6 +607,32 @@
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
+  }
+
+  /* The waiting label's own answer. It is `data-motion="essential"` because the
+     sweep is the ONLY thing separating an agent that is working from one that
+     is stuck, so the floor above must not collapse it — but an INFINITE
+     animation is exactly what someone asking for reduced motion is asking to be
+     rid of, and running it anyway because the element declared itself essential
+     is the override this file calls a defect.
+
+     So the meaning is carried without the motion. The sweep stops; the gradient
+     comes off (it exists only to be moved) and the label holds full-strength
+     text under a dotted rule. A settled label beside it is muted and undecorated
+     — `mission-activity`'s live run against its finished siblings, the chat
+     trace's "Thinking · 12s" against "Thought for 12s" — so the reader can still
+     tell in-flight from done at a glance, from a still frame.
+
+     Not `content: '…'` or any other generated text: this element's text is read
+     by a screen reader, and adding pseudo-content changes what is announced. */
+  .agent-shimmer {
+    animation: none;
+    background: none;
+    background-clip: border-box;
+    -webkit-background-clip: border-box;
+    color: inherit;
+    text-decoration: underline dotted currentColor;
+    text-underline-offset: 3px;
   }
 
   html {

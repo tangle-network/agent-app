@@ -24,7 +24,6 @@ import {
   type SubmitInteractionAnswer,
 } from './interaction-card-support'
 import { InteractionActionButton, InteractionBadge } from './interaction-question-card'
-import { staggerStyle } from './motion'
 
 function CheckGlyph({ className }: { className?: string }) {
   return (
@@ -219,12 +218,23 @@ export function InteractionPlanCard({
       )}
 
       {interaction.fields.length > 0 && (
-        // The plan card's answer surface is its fields, not an option list, so
-        // the fields are what stagger — the producer decides how many there
-        // are, and a spec with three of them should read as three, in order.
+        // The fields do NOT carry their own `.agent-arrive`. One level per
+        // surface: the card is the thing that was not there a moment ago, and a
+        // second entrance nested inside a travelling parent composes two
+        // translations and two opacity ramps over the same pixels — the card
+        // lands while its contents are still arriving into it, which reads as
+        // instability rather than as sequence.
+        //
+        // The card level is the one that survives, because a stagger is a claim
+        // that these appeared one after another and inside a landing card that
+        // claim is false — they all appeared with it. The question card keeps
+        // its option rows staggered for the opposite reason: those are the
+        // CHOICES being offered, and telling the eye there are three of them
+        // before it has read any is information about the decision. A form's
+        // fields carry no such count to announce.
         <div className="mt-3 space-y-4">
-          {interaction.fields.map((field, fieldIndex) => (
-            <fieldset key={field.name} style={staggerStyle(fieldIndex)} className="agent-arrive space-y-2">
+          {interaction.fields.map((field) => (
+            <fieldset key={field.name} className="space-y-2">
               <p className="text-sm font-medium leading-5 text-foreground">{field.label}</p>
               {fieldAcceptsFreeText(field) ? (
                 <textarea

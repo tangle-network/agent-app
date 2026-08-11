@@ -201,6 +201,13 @@ function StatusDot({ tone }: { tone: ActivityTone }) {
  * row separating an agent that is working from one that is stuck, which is why
  * it declares `data-motion="essential"`. A settled run is plain text — nothing
  * is in flight, so nothing moves.
+ *
+ * `essential` exempts the label from the blanket reduced-motion collapse; it
+ * does NOT keep the sweep running at a reader who asked for less motion. Under
+ * `prefers-reduced-motion` tokens.css stops the animation and holds the live
+ * label in a static state instead — full-strength text under a dotted rule —
+ * which its settled, muted, undecorated siblings on the same lane still do not
+ * have. The distinction survives; only the movement goes.
  */
 function RunLabel({ tool, detail, live }: { tool: string; detail: string; live: boolean }) {
   return (

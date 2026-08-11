@@ -190,6 +190,23 @@ describe('InteractionPlanCard', () => {
     expect(screen.queryByRole('button', { name: 'Ask agent to re-submit the plan' })).toBeNull()
   })
 
+  it('arrives at ONE level — the card, never the card and its fields both', () => {
+    const { container } = mount({
+      ...PLAN_INTERACTION,
+      fields: [
+        { type: 'text', name: 'a', label: 'First', required: false },
+        { type: 'text', name: 'b', label: 'Second', required: false },
+      ],
+    })
+    const arriving = Array.from(container.querySelectorAll('.agent-arrive'))
+    // A second entrance nested inside a travelling parent composes two
+    // translations and two opacity ramps over the same pixels: the card lands
+    // while its own contents are still arriving into it. The card is the thing
+    // that was not there a moment ago; its fields came with it.
+    expect(arriving).toEqual([container.firstElementChild])
+    expect(container.querySelectorAll('fieldset')).toHaveLength(2)
+  })
+
   it('shows Asking… and disables the button while the re-request is in flight', async () => {
     let resolve!: (value: boolean) => void
     const onReRequest = vi.fn(() => new Promise<boolean>((res) => { resolve = res }))
