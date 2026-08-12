@@ -165,15 +165,15 @@ export const CustomToolRenderer: Story = {
         return (
           <div className="flex items-center gap-4 rounded-md border border-card-edge bg-card px-3 py-2">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Prompt</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prompt</p>
               <p className="font-mono text-sm text-foreground">{(r.promptTokens ?? 0).toLocaleString()}</p>
             </div>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Completion</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Completion</p>
               <p className="font-mono text-sm text-foreground">{(r.completionTokens ?? 0).toLocaleString()}</p>
             </div>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Est. cost</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Est. cost</p>
               <p className="font-mono text-sm text-foreground">${(r.estimatedCostUsd ?? 0).toFixed(4)}</p>
             </div>
           </div>
@@ -202,7 +202,7 @@ export const DensityComparison: Story = {
     <div className="flex items-start gap-6">
       {[480, 720, 960].map((width) => (
         <section key={width} className="shrink-0 rounded-lg border border-border bg-background" style={{ width }}>
-          <p className="border-b border-border px-3 py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="border-b border-border px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {width}px container
           </p>
           <ChatMessages
@@ -225,7 +225,7 @@ export const MessageSizeComparison: Story = {
     <div className="flex items-start gap-6">
       {(['default', 'large'] as const).map((size) => (
         <section key={size} className="w-[520px] shrink-0 rounded-lg border border-border bg-background">
-          <p className="border-b border-border px-3 py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="border-b border-border px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             messageSize: {size}
           </p>
           <ChatMessages
@@ -300,7 +300,7 @@ export const BeforeAfter: Story = {
     <div className="flex items-start gap-6">
       {(['labeled', 'quiet'] as const).map((chrome) => (
         <section key={chrome} className="w-[560px] shrink-0 rounded-lg border border-border bg-background">
-          <p className="border-b border-border px-3 py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="border-b border-border px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {chrome === 'labeled' ? 'current: labeled' : 'new: quiet'}
           </p>
           <ChatMessages

@@ -60,7 +60,7 @@ export const ZoomLadder: Story = {
         { zoom: 4, label: 'zoom 4 — frame work' },
       ].map(({ zoom, label }) => (
         <div key={zoom}>
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">{label}</p>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">{label}</p>
           <div className="overflow-x-auto rounded-t-md border border-[var(--border-default)]">
             <TimelineRuler fps={30} durationFrames={600} zoom={zoom} onScrub={(frame) => console.log('onScrub', frame)} />
           </div>

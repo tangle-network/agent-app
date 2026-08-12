@@ -182,7 +182,7 @@ function Shell({ title, body, children }: { title: string; body?: string; childr
     <div className="mx-auto flex w-full max-w-sm flex-col">
       <span className="mb-4 flex items-center gap-2 text-[var(--text-muted)]">
         <BrandMark size={22} className="shrink-0" />
-        <span className="text-[11px] font-semibold uppercase tracking-[0.05em]">Tangle Teams</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.05em]">Tangle Teams</span>
       </span>
       <h1 className="mb-1 text-xl font-semibold tracking-tight text-[var(--text-primary)]">{title}</h1>
       {body && <p className="mb-6 text-sm text-[var(--text-secondary)]">{body}</p>}

@@ -30,7 +30,7 @@ function useModelPill() {
 function Demo({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-2">
-      <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+      <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
         {title}
       </h3>
       <div className="rounded-2xl border border-card-edge bg-card p-4">{children}</div>

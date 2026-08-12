@@ -16,7 +16,7 @@ import { hasWorkspaceRole } from '../../teams/roles'
 import type { InvitationView, InvitationsPanelProps } from '../contracts'
 import { RoleSelect } from './RoleSelect'
 
-const BADGE_BASE = 'inline-flex items-center rounded border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.05em]'
+const BADGE_BASE = 'inline-flex items-center rounded border px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.05em]'
 
 // Lifecycle status: green = in, amber = awaiting, red = killed, muted = lapsed.
 const STATUS_BADGE: Record<InvitationView['status'], string> = {

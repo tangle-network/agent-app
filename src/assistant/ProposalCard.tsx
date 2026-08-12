@@ -23,7 +23,7 @@ import type { ConnectionRequirement, PendingProposal } from "./types";
  *  eyebrow recipe — small, capped, tracked, muted — so the card's sections read
  *  as one system instead of three ad-hoc sizes. */
 const EYEBROW_CLASS =
-  "text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground";
+  "text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground";
 
 export interface ProposalCardProps {
   proposal: PendingProposal;

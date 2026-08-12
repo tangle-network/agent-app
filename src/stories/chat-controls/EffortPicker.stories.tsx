@@ -110,7 +110,7 @@ export const Glyphs: Story = {
   render: () => (
     <div className="flex flex-col gap-8 p-4">
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Trigger per level
         </p>
         <div className="flex flex-wrap items-center gap-3">
@@ -120,7 +120,7 @@ export const Glyphs: Story = {
         </div>
       </div>
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Meter ladder (2×)
         </p>
         <div className="flex items-end gap-8">

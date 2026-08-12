@@ -45,7 +45,7 @@ export function GenerationCard({
             </div>
           )}
           <div className="absolute left-2 top-2">
-            <Badge variant="outline" className={`${cfg.color} gap-1 text-[11px]`}>
+            <Badge variant="outline" className={`${cfg.color} gap-1 text-xs`}>
               <Icon className="h-3 w-3" />
               {cfg.label}
             </Badge>
@@ -55,28 +55,28 @@ export function GenerationCard({
         <CardContent className="p-3">
           <p className="mb-2 line-clamp-2 text-sm font-medium text-foreground">{generation.prompt}</p>
           {status === 'failed' && (
-            <p className="mb-2 line-clamp-2 text-[11px] text-destructive">{generationError(generation)}</p>
+            <p className="mb-2 line-clamp-2 text-xs text-destructive">{generationError(generation)}</p>
           )}
           <div className="flex items-center justify-between">
             {generation.model && (
-              <span className="truncate text-[11px] text-muted-foreground">{generation.model}</span>
+              <span className="truncate text-xs text-muted-foreground">{generation.model}</span>
             )}
             <div className="flex shrink-0 items-center gap-2">
               {generation.cost != null && (
-                <span className="text-[11px] text-muted-foreground">${generation.cost.toFixed(3)}</span>
+                <span className="text-xs text-muted-foreground">${generation.cost.toFixed(3)}</span>
               )}
-              <span className="text-[11px] text-muted-foreground">{relativeTime(generation.createdAt)}</span>
+              <span className="text-xs text-muted-foreground">{relativeTime(generation.createdAt)}</span>
             </div>
           </div>
           {isPublishPackage(publishPackage) && (
             <div className="mt-3 rounded-md border border-border bg-secondary p-2">
-              <div className="mb-1 flex items-center gap-1.5 text-[11px] font-medium text-foreground">
+              <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-foreground">
                 <Send className="h-3 w-3" />
                 {(publishPackage.destinations ?? [])
                   .map((id) => DESTINATIONS.find((destination) => destination.id === id)?.label ?? id)
                   .join(', ') || 'Publish package'}
               </div>
-              <p className="line-clamp-2 text-[11px] text-muted-foreground">
+              <p className="line-clamp-2 text-xs text-muted-foreground">
                 {publishPackage.caption || 'Caption pending'}
               </p>
             </div>
@@ -106,7 +106,7 @@ export function GenerationStatusBadge({
 
   return (
     <div className={inline ? '' : 'absolute bottom-2 left-2'}>
-      <Badge variant="outline" className={`${className} text-[11px]`}>
+      <Badge variant="outline" className={`${className} text-xs`}>
         {label}
       </Badge>
     </div>

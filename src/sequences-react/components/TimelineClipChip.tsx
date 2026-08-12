@@ -501,7 +501,7 @@ export function TimelineClipChip(props: TimelineClipChipProps) {
           <canvas ref={posterRef} className="h-full w-10 shrink-0 rounded-sm bg-black object-cover" />
         ) : null}
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[11px] font-medium leading-4 text-[var(--text-primary)]">
+          <div className="truncate text-xs font-medium leading-4 text-[var(--text-primary)]">
             {isCaption && typeof clip.text === 'string' ? clip.text : clip.label}
           </div>
           <span className="mt-0.5 inline-block rounded bg-[hsl(var(--background))] px-1 font-mono text-[9px] leading-3 text-[var(--text-secondary)]">
@@ -522,7 +522,7 @@ export function TimelineClipChip(props: TimelineClipChipProps) {
             event.stopPropagation()
           }}
           onBlur={commitText}
-          className="agent-app-edit-selection absolute inset-0 z-10 w-full bg-[hsl(var(--popover))] px-1.5 text-[11px] text-[var(--text-primary)] ring-1 ring-[var(--brand-primary)]"
+          className="agent-app-edit-selection absolute inset-0 z-10 w-full bg-[hsl(var(--popover))] px-1.5 text-xs text-[var(--text-primary)] ring-1 ring-[var(--brand-primary)]"
           aria-label="Caption text"
         />
       ) : null}

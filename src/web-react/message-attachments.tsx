@@ -168,7 +168,7 @@ function AttachmentThumbnailError({ name }: { name: string }) {
   return (
     <span className="inline-flex h-16 w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-md border border-destructive/40 bg-destructive/10 px-1 text-center text-destructive">
       <WarningGlyph className="h-4 w-4 shrink-0" />
-      <span className="line-clamp-2 text-[11px] leading-tight">{name}</span>
+      <span className="line-clamp-2 text-xs leading-tight">{name}</span>
     </span>
   )
 }
@@ -184,14 +184,14 @@ function AttachmentUnavailable({ shape }: { shape: 'thumbnail' | 'chip' }) {
         className="inline-flex h-16 w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-md border border-border bg-muted px-1 text-center text-muted-foreground"
       >
         <WarningGlyph className="h-4 w-4 shrink-0" />
-        <span className="line-clamp-2 text-[11px] leading-tight">Attachment unavailable</span>
+        <span className="line-clamp-2 text-xs leading-tight">Attachment unavailable</span>
       </span>
     )
   }
   return (
     <span
       aria-disabled="true"
-      className="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
+      className="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
     >
       <WarningGlyph className="h-3 w-3 shrink-0" />
       Attachment unavailable
@@ -295,7 +295,7 @@ function AttachmentChip({ part, resolveFileUrl, fetchFile }: AttachmentPartProps
 
   const Icon = status === 'error' ? WarningGlyph : iconForMediaType(part.mediaType)
   const className = [
-    'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px]',
+    'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs',
     status === 'error'
       ? 'border-destructive/40 bg-destructive/10 text-destructive'
       : 'border-border bg-secondary text-muted-foreground',

@@ -706,7 +706,7 @@ export function ChatComposer({
           // permanent dead space under the caret.
           rows={2}
           aria-label="Message input"
-          className="max-h-[168px] min-h-[56px] w-full resize-none bg-transparent px-1.5 py-1 text-[15px] leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
+          className="max-h-[168px] min-h-[56px] w-full resize-none bg-transparent px-1.5 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
         />
 
         <div className="flex items-end gap-2">
@@ -792,8 +792,8 @@ export function ChatComposer({
       {focusShortcut && (
         <div className="mt-1.5 flex justify-end px-1">
           <span className="text-xs text-muted-foreground">
-            <kbd className="rounded border border-border bg-background px-1 py-0.5 text-[11px]">{IS_APPLE_PLATFORM ? 'Cmd' : 'Ctrl'}</kbd>
-            <kbd className="ml-0.5 rounded border border-border bg-background px-1 py-0.5 text-[11px]">L</kbd>
+            <kbd className="rounded border border-border bg-background px-1 py-0.5 text-xs">{IS_APPLE_PLATFORM ? 'Cmd' : 'Ctrl'}</kbd>
+            <kbd className="ml-0.5 rounded border border-border bg-background px-1 py-0.5 text-xs">L</kbd>
             <span className="ml-1">to focus</span>
           </span>
         </div>

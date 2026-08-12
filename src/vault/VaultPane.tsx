@@ -964,7 +964,7 @@ function SourceEditor({
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
       <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
-        <p className="truncate font-mono text-[11px] text-muted-foreground">{path}</p>
+        <p className="truncate font-mono text-xs text-muted-foreground">{path}</p>
         <div className="flex shrink-0 items-center gap-2">
           <span className="rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground">
             {dirty ? 'Unsaved changes' : 'Saved'}

@@ -106,7 +106,7 @@ export function SeatPaywall({
   return (
     <div className="flex min-h-[60vh] w-full items-center justify-center p-6">
       <div className="w-full max-w-md rounded-2xl border border-card-edge bg-card p-8">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+        <p className="text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground">
           {product}
         </p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
