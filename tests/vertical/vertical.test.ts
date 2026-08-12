@@ -12,6 +12,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
+import { buildInteractionRequest } from '../test-utils/interaction-request'
 import {
   consumeChatStream,
   streamChatTurn,
@@ -108,9 +109,8 @@ const FULL_TURN_SCRIPT: ProducerEvent[] = [
 ]
 
 function question(id: string, overrides: Partial<InteractionRequestWire> = {}): InteractionRequestWire {
-  return {
+  return buildInteractionRequest({
     id,
-    kind: 'question',
     title: 'Which tone should the summary use?',
     answerSpec: {
       fields: [
@@ -128,7 +128,7 @@ function question(id: string, overrides: Partial<InteractionRequestWire> = {}): 
       ],
     },
     ...overrides,
-  } as InteractionRequestWire
+  })
 }
 
 // ── scenario 1: full turn ────────────────────────────────────────────────────

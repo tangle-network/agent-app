@@ -251,7 +251,7 @@ type InteractionData
 `function` — Reads a wire request into the client's pending `ChatInteraction`.
 
 ```ts
-(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: "text"; name: string; label: string…
+(request: InteractionRequest) => ChatInteraction
 ```
 
 ### `InteractionOutcome`
@@ -280,10 +280,10 @@ type InteractionPersistedPart
 
 ### `InteractionRequest`
 
-`type`
+`interface`
 
 ```ts
-type InteractionRequest
+interface InteractionRequest
 ```
 
 ### `InteractionRequestWire`
@@ -307,7 +307,7 @@ type InteractionRouteLogger
 `function` — Builds the persisted/streamed `interaction` part from a wire request.
 
 ```ts
-(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: "text"; name: string; label: string…
+(request: InteractionRequest, status: ChatInteractionStatus, cancelReason?: string | undefined, answers?: InteractionAn…
 ```
 
 ### `isRenderableInteractionKind`
@@ -347,7 +347,7 @@ type InteractionRouteLogger
 `function` — Outstanding (unanswered) interactions for the session — the sidecar's registry is authoritative, so this is the reconnect/reload source of truth.
 
 ```ts
-(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<{ id: string; kind: string; title: str…
+(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<InteractionRequest[]>>
 ```
 
 ### `mapInteractionRespondFailure`

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { createSandboxChatProducer } from '../../src/chat-routes/index'
+import { buildInteractionRequest } from '../test-utils/interaction-request'
 
 function partUpdated(part: Record<string, unknown>, delta?: string): Record<string, unknown> {
   return { type: 'message.part.updated', data: { part, ...(delta !== undefined ? { delta } : {}) } }
@@ -18,14 +19,7 @@ async function* throwingFeed(events: Array<Record<string, unknown>>, error: Erro
 function interaction(id: string, kind: string): Record<string, unknown> {
   return {
     type: 'interaction',
-    data: {
-      request: {
-        id,
-        kind,
-        title: 'Need input',
-        answerSpec: { fields: [] },
-      },
-    },
+    data: { request: buildInteractionRequest({ id, kind, title: 'Need input', answerSpec: { fields: [] } }) },
   }
 }
 
@@ -609,7 +603,7 @@ describe('createSandboxChatProducer', () => {
       events: feed([
         {
           type: 'interaction',
-          data: { request: { id: 'q-1', kind: 'question', title: 'Need input', answerSpec: { fields: [] } } },
+          data: { request: buildInteractionRequest({ id: 'q-1', title: 'Need input', answerSpec: { fields: [] } }) },
         },
         { type: 'interaction.cancel', data: { id: 'q-1', reason: 'timeout' } },
       ]),

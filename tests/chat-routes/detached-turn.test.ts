@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { buildInteractionRequest } from '../test-utils/interaction-request'
 
 import { runDetachedTurn, type AssistantDraftStore } from '../../src/chat-routes/index'
 import { createMemoryTurnEventStore } from '../../src/stream/index'
@@ -381,7 +382,9 @@ describe('runDetachedTurn', () => {
       // resolves it so an unattended autonomous run cannot deadlock.
       yield {
         type: 'interaction',
-        data: { request: { id: 'ask-1', kind: 'shell_permission', title: 'ok?', answerSpec: { fields: [] } } },
+        data: {
+          request: buildInteractionRequest({ id: 'ask-1', kind: 'shell_permission', title: 'ok?', answerSpec: { fields: [] } }),
+        },
       }
       yield { type: 'result', data: { finalText: 'done' } }
     }

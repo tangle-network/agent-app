@@ -71,8 +71,16 @@ export function fieldValuesFromAnswers(
   return values
 }
 
-/** The submitted value for one field, or null when it has no answer yet. */
-export function fieldAnswer(field: ChatInteractionField, values: FieldValues): InteractionData[string] | null {
+/** The submitted value for one field, or null when it has no answer yet.
+ *
+ *  Returns `InteractionAnswers[string]`, not the wider `InteractionData[string]`:
+ *  a card reads its value out of a rendered control, so every branch below
+ *  yields a plain scalar or string array. `InteractionData` also admits a
+ *  one-use `secret_handle` reference, which no control here can produce and
+ *  which `onResolved` must never receive — that path persists into the visible
+ *  transcript. Declaring the narrow type keeps the handle out by construction
+ *  rather than by review. */
+export function fieldAnswer(field: ChatInteractionField, values: FieldValues): InteractionAnswers[string] | null {
   const value = values[field.name] ?? {}
   if (field.type === 'select') {
     const custom = (field as ChatSelectField).allowCustom === true ? value.custom?.trim() : undefined
@@ -91,8 +99,8 @@ export function fieldAnswer(field: ChatInteractionField, values: FieldValues): I
 
 /** All required fields answered → the respond payload; else null (not
  *  submittable yet). Optional unanswered fields are omitted. */
-export function buildAnswerData(fields: ChatInteractionField[], values: FieldValues): InteractionData | null {
-  const data: InteractionData = {}
+export function buildAnswerData(fields: ChatInteractionField[], values: FieldValues): InteractionAnswers | null {
+  const data: InteractionAnswers = {}
   for (const field of fields) {
     const answer = fieldAnswer(field, values)
     if (answer === null) {

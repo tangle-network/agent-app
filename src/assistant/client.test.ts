@@ -305,14 +305,18 @@ describe("streamChat", () => {
     const proposal = events.find((e) => e.type === "tool_proposal");
     if (proposal?.type !== "tool_proposal") throw new Error("no proposal");
     const requirements = proposal.data.requirements ?? [];
+    // Length first: the two "no prerequisite" assertions below would pass
+    // vacuously on a short list, and a dropped requirement is itself the bug
+    // this test exists to catch.
     expect(requirements).toHaveLength(3);
-    expect(requirements[1]?.prerequisite).toEqual({
+    const [oauth, app, slack] = requirements;
+    expect(app?.prerequisite).toEqual({
       provider: "github",
       kind: "integration",
     });
     // `null` and a kindless reference both mean "nothing blocks this row".
-    expect(requirements[0]?.prerequisite).toBeUndefined();
-    expect(requirements[2]?.prerequisite).toBeUndefined();
+    expect(oauth?.prerequisite).toBeUndefined();
+    expect(slack?.prerequisite).toBeUndefined();
   });
 
   it("parses CRLF-framed events end to end", async () => {

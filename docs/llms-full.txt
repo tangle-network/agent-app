@@ -8131,7 +8131,7 @@ type InteractionData
 `function` — Reads a wire request into the client's pending `ChatInteraction`.
 
 ```ts
-(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: "text"; name: string; label: string…
+(request: InteractionRequest) => ChatInteraction
 ```
 
 ### `InteractionOutcome`
@@ -8160,10 +8160,10 @@ type InteractionPersistedPart
 
 ### `InteractionRequest`
 
-`type`
+`interface`
 
 ```ts
-type InteractionRequest
+interface InteractionRequest
 ```
 
 ### `InteractionRequestWire`
@@ -8187,7 +8187,7 @@ type InteractionRouteLogger
 `function` — Builds the persisted/streamed `interaction` part from a wire request.
 
 ```ts
-(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: "text"; name: string; label: string…
+(request: InteractionRequest, status: ChatInteractionStatus, cancelReason?: string | undefined, answers?: InteractionAn…
 ```
 
 ### `isRenderableInteractionKind`
@@ -8227,7 +8227,7 @@ type InteractionRouteLogger
 `function` — Outstanding (unanswered) interactions for the session — the sidecar's registry is authoritative, so this is the reconnect/reload source of truth.
 
 ```ts
-(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<{ id: string; kind: string; title: str…
+(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<InteractionRequest[]>>
 ```
 
 ### `mapInteractionRespondFailure`
@@ -13359,14 +13359,6 @@ readonly ["pypi.org", "files.pythonhosted.org", "pypi.python.org"]
 (box: SandboxExecChannel, absolutePath: string, expectedSize: number, options?: SandboxExecOptions | undefined) => Prom…
 ```
 
-### `readSecret`
-
-`function` — Resolve a secret value from the store by its name and return the outcome asynchronously
-
-```ts
-(store: SecretStore, name: string) => Promise<Outcome<string>>
-```
-
 ### `requireTransportableModel`
 
 `function` — Shared fail-loud policy for the sandbox platform's three internal model callers (`ensureWorkspaceSandbox`'s `backendModelAtCreate`, `streamSandboxPrompt`, `driveSandboxTurn`): a `ModelSelection` in,…
@@ -13729,7 +13721,7 @@ interface ScopedTokenResult
 
 ### `SecretStore`
 
-`interface` — Define methods to create, update, retrieve, and delete secrets asynchronously
+`interface` — Write-only secret port: create, replace, and delete a secret by name.
 
 ```ts
 interface SecretStore
@@ -13809,7 +13801,7 @@ interface StorageConfig
 
 ### `storeSecret`
 
-`function` — Resolve storing a secret by creating or updating it in the given SecretStore
+`function` — Resolve storing a secret by creating it, or replacing it when it exists
 
 ```ts
 (store: SecretStore, name: string, value: string) => Promise<Outcome<void>>
@@ -22904,7 +22896,7 @@ type InteractionData
 `function` — Reads a wire request into the client's pending `ChatInteraction`.
 
 ```ts
-(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: "text"; name: string; label: string…
+(request: InteractionRequest) => ChatInteraction
 ```
 
 ### `InteractionOutcome`
@@ -22965,10 +22957,10 @@ interface InteractionQuestionCardProps
 
 ### `InteractionRequest`
 
-`type`
+`interface`
 
 ```ts
-type InteractionRequest
+interface InteractionRequest
 ```
 
 ### `InteractionRequestWire`
@@ -23016,7 +23008,7 @@ type InteractionSubmitResult
 `function` — Builds the persisted/streamed `interaction` part from a wire request.
 
 ```ts
-(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: "text"; name: string; label: string…
+(request: InteractionRequest, status: ChatInteractionStatus, cancelReason?: string | undefined, answers?: InteractionAn…
 ```
 
 ### `isChatAttachmentPart`
@@ -23072,7 +23064,7 @@ type InteractionSubmitResult
 `function` — Renders the late answer as a self-contained chat message: the original question, its context, and the user's answer(s).
 
 ```ts
-(interaction: ChatInteraction, data: Record<string, string | number | boolean | string[]>) => string
+(interaction: ChatInteraction, data: InteractionData) => string
 ```
 
 ### `LinkLikeComponent`
@@ -23960,7 +23952,7 @@ type RecordGridWriteOutcome
 `function` — Reload restore from the answer route's GET list.
 
 ```ts
-(list: ChatInteraction[], outstanding: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: "text"…
+(list: ChatInteraction[], outstanding: InteractionRequest[], options?: RestoreChatInteractionsOptions) => ChatInteracti…
 ```
 
 ### `RestoreChatInteractionsOptions`

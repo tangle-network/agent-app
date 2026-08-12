@@ -208,7 +208,11 @@ export function InteractionPlanCard({
     : values
 
   return (
-    <div className={`rounded-xl border border-card-edge bg-card p-4 ${className ?? ''}`}>
+    // Same arrival as the question card: an approval is the run stopping, and
+    // the card that carries it should land rather than appear. Once on screen
+    // it never re-animates — approving, rejecting or a 410 changes state on the
+    // same DOM node, and a CSS animation does not replay on a re-render.
+    <div className={`agent-arrive rounded-xl border border-card-edge bg-card p-4 ${className ?? ''}`}>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <InteractionBadge variant="outline">Plan</InteractionBadge>
         <InteractionBadge variant={approved ? 'default' : status === 'expired' || status === 'declined' ? 'destructive' : 'outline'}>
@@ -248,6 +252,20 @@ export function InteractionPlanCard({
       )}
 
       {interaction.fields.length > 0 && status === 'pending' && (
+        // The fields do NOT carry their own `.agent-arrive`. One level per
+        // surface: the card is the thing that was not there a moment ago, and a
+        // second entrance nested inside a travelling parent composes two
+        // translations and two opacity ramps over the same pixels — the card
+        // lands while its contents are still arriving into it, which reads as
+        // instability rather than as sequence.
+        //
+        // The card level is the one that survives, because a stagger is a claim
+        // that these appeared one after another and inside a landing card that
+        // claim is false — they all appeared with it. The question card keeps
+        // its option rows staggered for the opposite reason: those are the
+        // CHOICES being offered, and telling the eye there are three of them
+        // before it has read any is information about the decision. A form's
+        // fields carry no such count to announce.
         <div className="mt-3 space-y-4">
           {interaction.fields.map((field) => (
             <fieldset key={field.name} className="space-y-2">

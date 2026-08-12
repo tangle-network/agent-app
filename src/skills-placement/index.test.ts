@@ -24,6 +24,7 @@ const EXPECTED_SKILL_DIR: Record<Harness, string | null> = {
   amp: null,
   'factory-droids': null,
   pi: '.pi/skills',
+  prime: '.prime/agent/skills',
   hermes: null,
   forge: null,
   openclaw: 'skills',
