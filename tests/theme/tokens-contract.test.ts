@@ -568,6 +568,18 @@ describe('motion', () => {
     expect(body).toContain("[data-motion='essential']")
   })
 
+  it('the one endless essential animation answers reduced motion instead of running', () => {
+    // `data-motion="essential"` exempts an element from the floor so a
+    // meaning-carrying animation is not collapsed into a 1ms flash. It is not a
+    // licence to sweep forever at a reader who asked for less motion, and the
+    // waiting label is the only exempt animation with NO end condition, so it
+    // owes its own answer: stop moving, and re-state what the movement said as a
+    // static difference a settled label does not have.
+    const shimmer = blockBody(reducedBody(), /\.agent-shimmer\s*\{/)
+    expect(shimmer, 'the sweep must stop').toMatch(/animation:\s*none/)
+    expect(shimmer, 'and the label must still read as in-flight').toMatch(/text-decoration:\s*underline/)
+  })
+
   it('each composite pairs a duration token with an easing token', () => {
     const root = rootDefs()
     const composites = [...root].filter(([k]) => k.startsWith('--motion-'))
