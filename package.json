@@ -518,7 +518,7 @@
     "@storybook/react": "^10.5.5",
     "@storybook/react-vite": "^10.5.5",
     "@tangle-network/agent-docs": "0.2.1",
-    "@tangle-network/agent-eval": "0.143.0",
+    "@tangle-network/agent-eval": "0.145.0",
     "@tangle-network/agent-integrations": "0.53.37",
     "@tangle-network/agent-interface": "0.43.0",
     "@tangle-network/agent-knowledge": "7.0.8",

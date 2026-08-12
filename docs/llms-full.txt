@@ -6574,10 +6574,10 @@ interface CompletionVerdict
 
 ### `CorrectnessChecker`
 
-`type` — Decides whether a produced item's content actually fulfils a requirement.
+`interface` — Decides whether a produced item's content actually fulfils a requirement.
 
 ```ts
-type CorrectnessChecker
+interface CorrectnessChecker
 ```
 
 ### `createLlmCorrectnessChecker`

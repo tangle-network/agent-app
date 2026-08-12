@@ -5072,8 +5072,8 @@
         },
         {
           "name": "CorrectnessChecker",
-          "kind": "type",
-          "signature": "type CorrectnessChecker",
+          "kind": "interface",
+          "signature": "interface CorrectnessChecker",
           "doc": "Decides whether a produced item's content actually fulfils a requirement."
         },
         {
