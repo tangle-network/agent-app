@@ -199,8 +199,10 @@ describe("ProposalCard", () => {
   });
 
   /** Both GitHub grants unmet, as the server reports them: the connection first,
-   *  then the App install that is claimed through it. */
-  const GITHUB_BOTH_UNMET: ConnectionRequirement[] = [
+   *  then the App install that is claimed through it. A TUPLE, not an array:
+   *  the pair is the fixture's whole point, and under `noUncheckedIndexedAccess`
+   *  only a tuple lets a test read either row without asserting it exists. */
+  const GITHUB_BOTH_UNMET: [ConnectionRequirement, ConnectionRequirement] = [
     {
       provider: "github",
       kind: "integration",
