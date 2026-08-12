@@ -73,7 +73,7 @@ export function ZoomControl({ zoomMath, zoom, onZoomChange, fitZoom }: ZoomContr
         aria-hidden
         title={fitZoom ? 'Zoom (100% = fits the whole sequence)' : 'Zoom'}
         onClick={fitZoom ? () => onZoomChange(fitZoom) : undefined}
-        className={`w-11 select-none text-right font-mono text-[11px] tabular-nums text-[var(--text-muted)] ${
+        className={`w-11 select-none text-right font-mono text-xs tabular-nums text-[var(--text-muted)] ${
           fitZoom ? 'cursor-pointer hover:text-[var(--text-primary)]' : ''
         }`}
       >

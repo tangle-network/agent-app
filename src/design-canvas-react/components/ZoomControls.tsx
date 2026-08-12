@@ -57,7 +57,7 @@ export function ZoomControls({ zoom, onZoom, onFit, fitLabel = 'Fit to screen' }
         type="button"
         aria-label="Reset to 100%"
         onClick={resetHundred}
-        className="rounded px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-[var(--text-secondary)] transition hover:bg-[var(--border-default)] hover:text-[var(--text-primary)]"
+        className="rounded px-1.5 py-0.5 font-mono text-xs tabular-nums text-[var(--text-secondary)] transition hover:bg-[var(--border-default)] hover:text-[var(--text-primary)]"
         title="Reset to 100%"
       >
         {Math.round(zoom * 100)}%

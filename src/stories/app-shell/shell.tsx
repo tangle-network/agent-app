@@ -230,7 +230,7 @@ export function AppSidebar(props: AppSidebarProps) {
       <nav className="mt-1 flex-1 overflow-y-auto px-2 pb-2" aria-label="Chat sessions">
         {sections.map((section) => (
           <div key={section.id} className="pt-3">
-            <p className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+            <p className="px-2.5 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
               {section.label}
             </p>
             <div className="flex flex-col gap-px">
@@ -273,12 +273,12 @@ export function AppSidebar(props: AppSidebarProps) {
             onClick={onOpenAccount}
             className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition hover:bg-accent"
           >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
               {initialsOf(user.name)}
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[13px] font-medium leading-4 text-foreground">{user.name}</span>
-              <span className="block truncate text-[11px] leading-4 text-muted-foreground">{user.email}</span>
+              <span className="block truncate text-xs leading-4 text-muted-foreground">{user.email}</span>
             </span>
             <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           </button>
@@ -316,14 +316,14 @@ function ShellHeader({
       <div className="min-w-0 flex-1 px-1">
         <p className="truncate text-sm font-semibold leading-5 text-foreground">{title}</p>
         {subtitle && (
-          <p className="flex items-center gap-1.5 truncate text-[11px] leading-4 text-muted-foreground">
+          <p className="flex items-center gap-1.5 truncate text-xs leading-4 text-muted-foreground">
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" aria-label="Sandbox connected" />
             {subtitle}
           </p>
         )}
       </div>
       {pendingApprovals > 0 && (
-        <span className="hidden shrink-0 items-center gap-1.5 rounded-full bg-warning/15 px-2.5 py-1 text-[11px] font-semibold text-warning sm:inline-flex">
+        <span className="hidden shrink-0 items-center gap-1.5 rounded-full bg-warning/15 px-2.5 py-1 text-xs font-semibold text-warning sm:inline-flex">
           <ShieldCheck className="h-3.5 w-3.5" />
           {pendingApprovals} awaiting approval
         </span>

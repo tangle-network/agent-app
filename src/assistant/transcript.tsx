@@ -385,7 +385,7 @@ export function AssistantTranscript({
       !view.isStreaming &&
       view.usage?.costUsd != null &&
       !view.usage.replayed ? (
-        <p className="mt-1 text-[11px] text-muted-foreground">
+        <p className="mt-1 text-xs text-muted-foreground">
           {formatTurnCost(view.usage.costUsd)} this turn
         </p>
       ) : null;

@@ -76,13 +76,13 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
 
   return (
     <div className="flex h-full flex-col overflow-hidden text-[var(--text-primary)]">
-      <div className="shrink-0 border-b border-[var(--border-default)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">
+      <div className="shrink-0 border-b border-[var(--border-default)] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">
         Layers
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {visible.length === 0 ? (
-          <div className="px-3 py-2 text-[11px] text-[var(--text-muted)]">No layers yet</div>
+          <div className="px-3 py-2 text-xs text-[var(--text-muted)]">No layers yet</div>
         ) : null}
         {visible.map((row) => {
           const { element } = row
@@ -208,7 +208,7 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
         })}
 
         {rows.length > LAYERS_PANEL_ROW_LIMIT ? (
-          <div className="px-3 py-2 text-[11px] text-[var(--text-muted)]">
+          <div className="px-3 py-2 text-xs text-[var(--text-muted)]">
             +{rows.length - LAYERS_PANEL_ROW_LIMIT} more elements — select a group to scope the list
           </div>
         ) : null}

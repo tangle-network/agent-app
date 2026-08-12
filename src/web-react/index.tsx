@@ -161,7 +161,7 @@ export function RunDrillIn({ run, onClose }: RunDrillInProps) {
         />
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-semibold">{run.title}</p>
-          <p className="truncate font-mono text-[11px] text-muted-foreground">{run.toolName}</p>
+          <p className="truncate font-mono text-xs text-muted-foreground">{run.toolName}</p>
         </div>
         <button
           type="button"
@@ -181,23 +181,23 @@ export function RunDrillIn({ run, onClose }: RunDrillInProps) {
         {run.steps.map((step, i) => (
           <div key={i} className="rounded-lg border border-card-edge bg-card">
             <div className="flex items-baseline gap-2 border-b border-border px-3 py-1.5">
-              <span className={`font-mono text-[11px] ${step.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>
+              <span className={`font-mono text-xs ${step.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>
                 {step.status === 'error' ? '✗' : '$'}
               </span>
               <code className="min-w-0 flex-1 truncate font-mono text-xs">{step.label}</code>
-              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                 {new Date(step.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
               </span>
             </div>
             {step.detail && (
-              <pre className="max-h-48 overflow-auto whitespace-pre-wrap px-3 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+              <pre className="max-h-48 overflow-auto whitespace-pre-wrap px-3 py-2 font-mono text-xs leading-relaxed text-muted-foreground">
                 {step.detail}
               </pre>
             )}
           </div>
         ))}
       </div>
-      <p className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
+      <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
         Read-only transcript — reply in the main chat.
       </p>
     </div>
@@ -255,8 +255,8 @@ export interface ChatUiMessage extends ChatMessageMetrics {
 /** Define properties for rendering chat messages with optional models, markdown, extras, and durable cards */
 export interface ChatMessagesProps {
   messages: ChatUiMessage[]
-  /** Shared reading scale for both user and assistant prose. Defaults to 15px
-   *  at a 1.6 line height; `large` uses 16px at the same leading without
+  /** Shared reading scale for both user and assistant prose. Defaults to 16px
+   *  at a 1.6 line height; `large` uses 17px at the same leading without
    *  enlarging labels, tool chrome, or metadata. */
   messageSize?: 'default' | 'large'
   /** Transcript chrome. `labeled` (default) keeps the always-on role label +
@@ -367,7 +367,7 @@ export function ChatEmptyState({
       <span className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/15">
         <BrandMark size={32} className="shrink-0" />
       </span>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">{productName}</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground">{productName}</p>
       <h2 className="mt-1.5 text-balance text-2xl font-semibold leading-tight text-foreground">
         {headline}
       </h2>
@@ -594,8 +594,8 @@ function KvRows({ data }: { data: Record<string, unknown> }) {
     <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
       {entries.map(([k, v]) => (
         <div key={k} className="contents">
-          <dt className="font-mono text-[11px] text-muted-foreground">{k}</dt>
-          <dd className="min-w-0 whitespace-pre-wrap break-words font-mono text-[11px] text-muted-foreground">
+          <dt className="font-mono text-xs text-muted-foreground">{k}</dt>
+          <dd className="min-w-0 whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">
             {truncate(v)}
           </dd>
         </div>
@@ -609,7 +609,7 @@ function ShellDetail({ call }: { call: ChatToolCallInfo }) {
   const outcome = toolOutcomeOf(call)
   const r = (outcome?.result ?? {}) as { stdout?: string; stderr?: string; exitCode?: number }
   return (
-    <div className="overflow-hidden rounded-md bg-zinc-900 font-mono text-[11px] leading-relaxed">
+    <div className="overflow-hidden rounded-md bg-zinc-900 font-mono text-xs leading-relaxed">
       <div className="flex items-center gap-2 px-3 pt-2 text-zinc-400">
         <span className="select-none text-zinc-500">$</span>
         <span className="min-w-0 flex-1 truncate text-zinc-200">{String(call.args?.command ?? '')}</span>
@@ -639,13 +639,13 @@ function DefaultToolDetail({ call }: { call: ChatToolCallInfo }) {
     <div className="space-y-2">
       {call.args && Object.keys(call.args).length > 0 && (
         <div>
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Called with</p>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Called with</p>
           <KvRows data={call.args} />
         </div>
       )}
       {envelope ? (
         <div>
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {envelope.ok === false ? 'Failed' : 'Result'}
           </p>
           {envelope.ok === false ? (
@@ -653,13 +653,13 @@ function DefaultToolDetail({ call }: { call: ChatToolCallInfo }) {
           ) : envelope.result && typeof envelope.result === 'object' ? (
             <KvRows data={envelope.result as Record<string, unknown>} />
           ) : envelope.result != null ? (
-            <p className="font-mono text-[11px] text-muted-foreground">{truncate(envelope.result)}</p>
+            <p className="font-mono text-xs text-muted-foreground">{truncate(envelope.result)}</p>
           ) : null}
         </div>
       ) : result != null ? (
         <div>
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Result</p>
-          <p className="font-mono text-[11px] text-muted-foreground">{truncate(result)}</p>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Result</p>
+          <p className="font-mono text-xs text-muted-foreground">{truncate(result)}</p>
         </div>
       ) : null}
     </div>
@@ -699,7 +699,7 @@ function ProposalCard({
           {/* Without handlers the card is read-only: the eyebrow reports the
               state ("Awaiting approval") instead of demanding an action the
               viewer cannot take, and the footer adds no second note. */}
-          <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-warning-strong">
+          <p className="text-xs font-semibold uppercase tracking-[0.05em] text-warning-strong">
             {approval ? 'Needs your approval' : 'Awaiting approval'}
           </p>
           <p className="mt-0.5 text-[15px] font-semibold leading-snug text-foreground">{friendlyToolTitle(call)}</p>
@@ -708,7 +708,7 @@ function ProposalCard({
           {meta.length > 0 && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {meta.map((m, i) => (
-                <span key={i} className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                <span key={i} className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">
                   {m}
                 </span>
               ))}
@@ -1089,7 +1089,7 @@ function SegmentedBody({
  *  keep the tok/s and cost columns from jittering as they change; no letter
  *  tracking — a meta lane is data, not an eyebrow. */
 const QUIET_META_LANE_CLASS =
-  'mt-1 flex h-[18px] items-center gap-2 text-[11px] tabular-nums text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100'
+  'mt-1 flex h-[18px] items-center gap-2 text-xs tabular-nums text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100'
 
 /** The text a copy of the message should carry: the ordered text runs when the
  *  turn is segmented (they render in place of `content`), else `content`. */
@@ -1226,7 +1226,7 @@ function AssistantMessageImpl({
   return (
     <div className={`mx-auto w-full max-w-3xl px-6 ${quiet ? 'group pb-1 pt-3' : 'py-3'}`}>
       {!quiet && (
-        <div className="mb-1 flex items-baseline gap-2 text-[11px] tabular-nums text-muted-foreground">
+        <div className="mb-1 flex items-baseline gap-2 text-xs tabular-nums text-muted-foreground">
           <span className="font-semibold uppercase tracking-[0.05em]">{agentLabel}</span>
           {msg.modelUsed && <span className="font-mono normal-case">{msg.modelUsed}</span>}
           {formatTokensPerSecond(msg) && <span>{formatTokensPerSecond(msg)}</span>}
@@ -1360,7 +1360,7 @@ function ThinkingRow({ agentLabel, chrome = 'labeled' }: { agentLabel: string; c
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-3">
       {chrome !== 'quiet' && (
-        <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">{agentLabel}</p>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground">{agentLabel}</p>
       )}
       <div className="flex items-center gap-2 text-[15px] text-muted-foreground">
         <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -1387,7 +1387,7 @@ function StreamErrorRow({ message, onRetry }: { message: string; onRetry?: () =>
           <button
             type="button"
             onClick={onRetry}
-            className={`shrink-0 rounded border border-destructive/40 bg-card px-2 py-0.5 text-[11px] font-medium text-destructive transition hover:bg-destructive/10 ${POPOVER_OPTION_FOCUS}`}
+            className={`shrink-0 rounded border border-destructive/40 bg-card px-2 py-0.5 text-xs font-medium text-destructive transition hover:bg-destructive/10 ${POPOVER_OPTION_FOCUS}`}
           >
             Retry
           </button>
@@ -1428,8 +1428,8 @@ export function ChatMessages({
 }: ChatMessagesProps) {
   const messageClassName =
     messageSize === 'large'
-      ? 'agent-app-message-copy text-[16px] leading-[1.6]'
-      : 'agent-app-message-copy text-[15px] leading-[1.6]'
+      ? 'agent-app-message-copy text-[17px] leading-[1.6]'
+      : 'agent-app-message-copy text-base leading-[1.6]'
   // Stabilize the fallback renderer's identity so it doesn't change every
   // render — otherwise the memoized `AssistantMessage` (and its per-frame body
   // memo) would invalidate on every parent render when no `renderMarkdown` is
@@ -1459,7 +1459,7 @@ export function ChatMessages({
           <div key={msg.id} className={`mx-auto w-full max-w-3xl px-6 ${quiet ? 'group pb-1 pt-3' : 'py-3'}`}>
             <div className={`ml-auto w-fit ${quiet ? 'max-w-[72%]' : 'max-w-[85%]'}`}>
               {!quiet && (
-                <p className="mb-1 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+                <p className="mb-1 text-right text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground">
                   {userLabel}
                 </p>
               )}

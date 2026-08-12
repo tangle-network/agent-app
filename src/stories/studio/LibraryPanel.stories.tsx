@@ -47,11 +47,11 @@ export const PopulatedVsEmpty: Story = {
   render: () => (
     <div className="flex flex-col gap-10">
       <section>
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">Populated</p>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground">Populated</p>
         <PanelDemo generations={libraryGenerations} />
       </section>
       <section>
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">Empty</p>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground">Empty</p>
         <PanelDemo generations={[]} />
       </section>
     </div>

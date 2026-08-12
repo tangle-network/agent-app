@@ -152,23 +152,23 @@ export const AllStates: Story = {
   render: () => (
     <div className="flex flex-col gap-6 p-4">
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Inline</p>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Inline</p>
         {useSessionControls()}
       </div>
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Compact</p>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Compact</p>
         {useSessionControls({ layout: 'compact' })}
       </div>
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Harness hidden</p>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Harness hidden</p>
         {useSessionControls({ showHarness: false })}
       </div>
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Non-reasoning model</p>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Non-reasoning model</p>
         {useSessionControls({ initialModel: NON_REASONING_MODEL_ID })}
       </div>
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Harness locked</p>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Harness locked</p>
         {useSessionControls({
           harnessLockReason: 'This thread already has messages — start a new chat to switch backend.',
         })}
@@ -202,7 +202,7 @@ export const Glyphs: Story = {
   render: () => (
     <div className="flex flex-col gap-8 p-4">
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Brand marks</p>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Brand marks</p>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           {(['opencode', 'claude-code', 'codex', 'kimi-code', 'amp', 'openclaw', 'hermes'] as Harness[]).map((h) => (
             <span key={h} className="inline-flex items-center gap-2 text-sm text-foreground">
@@ -213,7 +213,7 @@ export const Glyphs: Story = {
         </div>
       </div>
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Fallbacks (no published mark) + unknown id
         </p>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -230,7 +230,7 @@ export const Glyphs: Story = {
         </div>
       </div>
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">In the trigger pill</p>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">In the trigger pill</p>
         <div className="flex flex-wrap items-center gap-3">
           {(['opencode', 'claude-code', 'codex'] as Harness[]).map((h) => (
             <AgentSessionControls

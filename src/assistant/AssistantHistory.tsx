@@ -158,7 +158,7 @@ export function AssistantHistory({
               <button
                 type="button"
                 onClick={retry}
-                className="rounded border border-destructive/40 bg-card px-2 py-0.5 font-medium text-[11px] text-destructive transition hover:bg-destructive/10"
+                className="rounded border border-destructive/40 bg-card px-2 py-0.5 font-medium text-xs text-destructive transition hover:bg-destructive/10"
               >
                 Retry
               </button>
@@ -204,7 +204,7 @@ export function AssistantHistory({
                         {title}
                       </span>
                       {ms != null && (
-                        <span className="text-[11px] text-muted-foreground">
+                        <span className="text-xs text-muted-foreground">
                           {timeAgo(ms)}
                         </span>
                       )}

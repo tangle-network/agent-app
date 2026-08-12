@@ -128,7 +128,7 @@ export const Variants: Story = {
       <div className="flex flex-wrap items-start gap-8">
         {panels.map((panel) => (
           <figure key={panel.label} className="w-[560px]">
-            <figcaption className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <figcaption className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {panel.label}
             </figcaption>
             <ChatMessages

@@ -86,7 +86,7 @@ export function IntakeInterview({
       <header className="flex flex-col gap-1">
         <span className="mb-1 flex items-center gap-2 text-[var(--text-muted)]">
           <BrandMark size={20} className="shrink-0" />
-          <span className="text-[11px] font-semibold uppercase tracking-[0.05em]">Tangle Intake</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.05em]">Tangle Intake</span>
         </span>
         <h2 className="text-xl font-semibold text-[var(--text-primary)]">{view.title}</h2>
         {view.description && <p className="text-sm text-[var(--text-muted)]">{view.description}</p>}

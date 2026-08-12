@@ -285,7 +285,7 @@ export function ComposerHero({
               role="tab"
               aria-selected={active}
               onClick={() => changeType(key)}
-              className={`flex flex-col items-center gap-1.5 rounded-lg border px-1 pb-2 pt-2.5 text-[11px] transition-all ${
+              className={`flex flex-col items-center gap-1.5 rounded-lg border px-1 pb-2 pt-2.5 text-xs transition-all ${
                 active
                   ? 'border-primary/30 bg-primary/10 font-semibold text-primary'
                   : 'border-border bg-background font-medium text-muted-foreground hover:border-foreground/20 hover:text-foreground'
@@ -302,7 +302,7 @@ export function ComposerHero({
         <div className="mt-5">
           <Label
             htmlFor="studio-prompt"
-            className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground"
+            className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground"
           >
             Prompt
           </Label>
@@ -332,7 +332,7 @@ export function ComposerHero({
                     setPrompt(suggestion.prompt)
                     changeType(suggestion.type)
                   }}
-                  className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
+                  className="rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
                 >
                   {suggestion.label}
                 </button>
@@ -385,7 +385,7 @@ export function ComposerHero({
                       <span className="shrink-0 text-muted-foreground">· {selectedModelOption.provider}</span>
                     )}
                     {selectedModelOption.status !== 'available' && (
-                      <span className="shrink-0 rounded-full bg-warning/10 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-warning">
+                      <span className="shrink-0 rounded-full bg-warning/10 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-[0.05em] text-warning">
                         {selectedModelOption.status}
                       </span>
                     )}
@@ -405,7 +405,7 @@ export function ComposerHero({
                         </span>
                       </span>
                       {model.status !== 'available' && (
-                        <span className="shrink-0 text-[11px] capitalize text-muted-foreground">{model.status}</span>
+                        <span className="shrink-0 text-xs capitalize text-muted-foreground">{model.status}</span>
                       )}
                     </span>
                   </SelectItem>
@@ -477,7 +477,7 @@ export function ComposerHero({
             <>
               Schedule a post
               {selectedConnectedDestinations.length > 0 && (
-                <Badge variant="outline" className="ml-1 text-[11px]">
+                <Badge variant="outline" className="ml-1 text-xs">
                   {selectedConnectedDestinations.length}
                 </Badge>
               )}
@@ -524,7 +524,7 @@ export function ComposerHero({
       >
         <Sparkles className="mr-2 h-4 w-4" />
         Generate
-        <span className="ml-2 text-[11px] opacity-60">⌘↵</span>
+        <span className="ml-2 text-xs opacity-60">⌘↵</span>
       </Button>
     </section>
   )

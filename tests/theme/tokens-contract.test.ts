@@ -243,7 +243,7 @@ describe('the neutral ramp', () => {
     // not read as containers. The chain floor keeps a future retune from
     // quietly re-flattening it, and the canvas→card span is the hierarchy the
     // fix exists for. Measured on the shipped stops: chain steps 1.052 /
-    // 1.058 / 1.044 / 1.160 / 1.151 / 1.180, canvas→card 1.163.
+    // 1.058 / 1.160 / 1.140 / 1.090 / 1.060, canvas→card 1.246.
     const CHAIN_FLOOR = 1.04
     const CANVAS_TO_CARD = 1.14
     const band = [...rampStops()]
@@ -262,7 +262,7 @@ describe('the neutral ramp', () => {
         if (step < CHAIN_FLOOR) offenders.push(`--neutral-${band[i - 1]!.key} → --neutral-${band[i]!.key}: ${step.toFixed(3)} < ${CHAIN_FLOOR}`)
       }
     }
-    const canvasToCard = contrastRatio(stopRgb(16), stopRgb(24))
+    const canvasToCard = contrastRatio(stopRgb(16), stopRgb(26))
     if (canvasToCard < CANVAS_TO_CARD) offenders.push(`canvas→card ${canvasToCard.toFixed(3)} < ${CANVAS_TO_CARD}`)
     expect(offenders, offenders.join('\n')).toEqual([])
   })
@@ -366,12 +366,12 @@ describe('border tiers', () => {
 
   it('the shipped dark tiers clear the hairline floor on every surface they divide', () => {
     // The premise that collapsed the old tiers is gone: in this test's
-    // composite model, 60% reads 1.348 / 1.292 / 1.196 / 1.103 on background /
+    // composite model, 60% reads above the floor on background /
     // card / muted / popover — all above the floor the old FULL-strength
     // border could not clear on muted (1.085).
     const { soft, cardEdge } = tiers(darkDefs())
     const border = stopRgb(DARK_BORDER)
-    for (const surface of [19, 24, 28, 33].map(stopRgb)) {
+    for (const surface of [19, 26, 30, 32].map(stopRgb)) {
       expect(contrastRatio(compositeOver(border, soft, surface), surface)).toBeGreaterThanOrEqual(HAIRLINE_FLOOR)
       expect(contrastRatio(compositeOver(border, cardEdge, surface), surface)).toBeGreaterThanOrEqual(HAIRLINE_FLOOR)
     }
@@ -674,7 +674,7 @@ describe('the Tailwind preset', () => {
   })
 
   it('climbs the MD3 surface ladder monotonically', () => {
-    // card < secondary < popover on the dark ladder (L 0.235 / 0.285 / 0.325).
+    // card < secondary < popover on the dark ladder (L 0.26 / 0.30 / 0.32).
     // Mapping high→popover / highest→secondary INVERTED the top two rungs —
     // the picker floating above the composer painted DARKER than it.
     expect(colors['surface-container']).toBe('hsl(var(--card))')

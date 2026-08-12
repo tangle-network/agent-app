@@ -41,11 +41,11 @@ export const AllStates: Story = {
   render: () => (
     <div className="flex flex-col gap-6">
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Healthy</p>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Healthy</p>
         <FlowWaterfall trace={posterFlowTrace} />
       </div>
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">With failure</p>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">With failure</p>
         <FlowWaterfall trace={failedFlowTrace} />
       </div>
     </div>

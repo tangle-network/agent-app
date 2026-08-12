@@ -151,7 +151,7 @@ function MemberRow({ member, canManage, onChangeRole, onRemove }: MemberRowProps
           <p className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
             {label}
             {pending && (
-              <span className="rounded border border-[var(--border-default)] px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">
+              <span className="rounded border border-[var(--border-default)] px-1.5 py-0.5 text-xs font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">
                 Pending
               </span>
             )}

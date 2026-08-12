@@ -97,23 +97,23 @@ export const AllStates: Story = {
   render: () => (
     <div className="flex flex-col gap-6">
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">User bubble (end)</p>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">User bubble (end)</p>
         <MessageAttachments parts={mixedAttachmentParts} resolveFileUrl={resolveAttachmentUrl} fetchFile={fetchAttachmentOk} />
       </div>
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Assistant (start)</p>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Assistant (start)</p>
         <MessageAttachments parts={mixedAttachmentParts} resolveFileUrl={resolveAttachmentUrl} fetchFile={fetchAttachmentOk} justify="start" />
       </div>
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Loading</p>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Loading</p>
         <MessageAttachments parts={imageAttachmentParts} resolveFileUrl={resolveAttachmentUrl} fetchFile={fetchAttachmentHangs} />
       </div>
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Load error</p>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Load error</p>
         <MessageAttachments parts={imageAttachmentParts} resolveFileUrl={resolveAttachmentUrl} fetchFile={fetchAttachmentMissing} />
       </div>
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">File chips</p>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">File chips</p>
         <MessageAttachments parts={fileAttachmentParts} resolveFileUrl={resolveAttachmentUrl} fetchFile={fetchAttachmentOk} />
       </div>
     </div>

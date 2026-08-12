@@ -208,7 +208,7 @@ export function FlowWaterfall({ trace }: FlowWaterfallProps) {
     <div className="space-y-1">
       {rows.map((row, i) => (
         <div key={i} className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto] items-center gap-2">
-          <span className="truncate font-mono text-[11px] text-muted-foreground" title={row.name}>
+          <span className="truncate font-mono text-xs text-muted-foreground" title={row.name}>
             {row.name}
           </span>
           <div className="relative h-2 rounded-sm bg-secondary">
@@ -217,10 +217,10 @@ export function FlowWaterfall({ trace }: FlowWaterfallProps) {
               style={{ left: `${row.offsetPct}%`, width: `${row.widthPct}%` }}
             />
           </div>
-          <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/70">{row.durationLabel}</span>
+          <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground/70">{row.durationLabel}</span>
         </div>
       ))}
-      <p className="pt-0.5 text-right font-mono text-[11px] tabular-nums text-muted-foreground/60">
+      <p className="pt-0.5 text-right font-mono text-xs tabular-nums text-muted-foreground/60">
         {(trace.totalMs / 1000).toFixed(1)}s{cost ? ` · ${cost}` : ''}
       </p>
     </div>
@@ -260,13 +260,13 @@ export function MissionActivityLane({ activity, startedAt, nowMs }: MissionActiv
               <span className="text-muted-foreground"> — {run.detail}</span>
             </span>
             {tone === 'live' && (run.iteration !== undefined || run.phase !== undefined) && (
-              <span className="shrink-0 rounded-full bg-warning/10 px-1.5 py-0.5 font-mono text-[11px] text-warning">
+              <span className="shrink-0 rounded-full bg-warning/10 px-1.5 py-0.5 font-mono text-xs text-warning">
                 {[run.iteration !== undefined ? `iter ${run.iteration}` : null, run.phase ?? null]
                   .filter(Boolean)
                   .join(' · ')}
               </span>
             )}
-            <span className="flex shrink-0 items-center gap-1.5 font-mono text-[11px] tabular-nums text-muted-foreground/70">
+            <span className="flex shrink-0 items-center gap-1.5 font-mono text-xs tabular-nums text-muted-foreground/70">
               {tone !== 'live' && tone !== 'ok' && <span>{run.status}</span>}
               {cost && <span>{cost}</span>}
               {duration && <span>{duration}</span>}
@@ -277,7 +277,7 @@ export function MissionActivityLane({ activity, startedAt, nowMs }: MissionActiv
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="flex items-center gap-1 py-0.5 text-[11px] font-medium text-muted-foreground/70 transition hover:text-foreground"
+        className="flex items-center gap-1 py-0.5 text-xs font-medium text-muted-foreground/70 transition hover:text-foreground"
       >
         <ChevronGlyph className={`h-3 w-3 transition-transform ${expanded ? 'rotate-180' : ''}`} />
         timeline
@@ -330,14 +330,14 @@ function ActivityRow({
           <span className="text-muted-foreground"> — {record.detail}</span>
         </span>
         {tone === 'live' && (record.iteration !== undefined || record.phase !== undefined) && (
-          <span className="shrink-0 rounded-full bg-warning/10 px-2 py-0.5 font-mono text-[11px] text-warning">
+          <span className="shrink-0 rounded-full bg-warning/10 px-2 py-0.5 font-mono text-xs text-warning">
             {[record.iteration !== undefined ? `iter ${record.iteration}` : null, record.phase ?? null]
               .filter(Boolean)
               .join(' · ')}
           </span>
         )}
         <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+          className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
             tone === 'ok'
               ? 'bg-success/10 text-success'
               : tone === 'error'
@@ -349,7 +349,7 @@ function ActivityRow({
         >
           {record.status}
         </span>
-        {cost && <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">{cost}</span>}
+        {cost && <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{cost}</span>}
         <ChevronGlyph className={`h-3 w-3 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
@@ -359,7 +359,7 @@ function ActivityRow({
               <FlowWaterfall trace={stepActivityFlowTrace([record])} />
             </div>
           )}
-          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono text-[11px]">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono text-xs">
             <dt className="text-muted-foreground/60">task</dt>
             <dd className="truncate text-muted-foreground">{record.taskId}</dd>
             <dt className="text-muted-foreground/60">started</dt>

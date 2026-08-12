@@ -180,7 +180,7 @@ export function PreviewCanvas({ timeline, clock, frameProvider, className }: Pre
         style={size ? { width: `${size.width}px`, height: `${size.height}px` } : { width: '100%', height: '100%' }}
       />
       {emptyFrame && !drawError ? (
-        <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-[11px] text-[var(--text-muted)]">
+        <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-[var(--text-muted)]">
           No media at the playhead
         </p>
       ) : null}

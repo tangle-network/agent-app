@@ -520,7 +520,7 @@ export function DesignCanvas({
   if (!activePage) {
     return (
       <div className={`flex h-full items-center justify-center bg-[var(--bg-input)] ${className ?? ''}`}>
-        <p className="text-[11px] text-[var(--text-muted)]">This document has no pages.</p>
+        <p className="text-xs text-[var(--text-muted)]">This document has no pages.</p>
       </div>
     )
   }

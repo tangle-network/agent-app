@@ -46,7 +46,7 @@ export function ResultCanvas({
     <section className={`${cardClass} p-5`}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className={`${cfg.color} gap-1 text-[11px]`}>
+          <Badge variant="outline" className={`${cfg.color} gap-1 text-xs`}>
             <Icon className="h-3 w-3" />
             {cfg.label}
           </Badge>

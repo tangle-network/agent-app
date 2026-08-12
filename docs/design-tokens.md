@@ -80,13 +80,16 @@ The mid stops keep the legacy hue 286 because moving them would repaint muted te
 **Why the dark band's steps are small.** The first ladder ruled `L = 0.16 + 0.03n` — equal perceptual steps, checkable, and *wrong at the bottom of sRGB*: adjacent deep rungs measured 1.05:1 against each other, which is physically imperceptible, so the dark theme's card did not read as a container on its page.
 The fix is not bigger ΔL steps — at these lightnesses sRGB simply has no contrast to spend.
 The fix is that separation comes from the *whole stack*: a small fill step, a border tier that survives (below), and a shadow that lifts (section 5).
-The chain the band ships:
+The chain the band ships (strengthened 2026-08 — the first revision's 1.05→1.16
+canvas→card still read as border-only separation on real displays, so the fill
+rungs moved up one lightness band while keeping the border tier and the
+canvas/input relationship):
 
 ```
-canvas #0c0c15 → background #12131c → input #181922 → card #1c1d27 → secondary #282933 → popover #32333c → border #3d3e46
-          1.052         1.058            1.044          1.160             1.151            1.180   (adjacent contrast)
+canvas #0c0c15 → background #12131c → input #181922 → card #22232c → secondary #2c2d36 → popover #31323c → border #3d3e46
+          1.052         1.058            1.160          1.140             1.090            1.060   (adjacent contrast)
 
-canvas → card 1.163     card → popover 1.335
+canvas → card 1.246     card → popover 1.240
 ```
 
 Note the new rungs the old ladder had no room for: the canvas-backdrop sits *below* the background (they used to be the same colour), and the input is *recessed* — darker than the card it sits in, where the old input floated above it.
@@ -111,13 +114,13 @@ The dark scope never redefines the ramp, and a test fails if it starts to.
 | dark | `--canvas-backdrop` | `--neutral-16` | `--neutral-16` (`#0c0c15`) |
 | dark | `--background` | `--neutral-16` | `--neutral-19` (`#12131c`) |
 | dark | `--input` | `--neutral-22` | `--neutral-22` (`#181922`, recessed) |
-| dark | `--card` | `--neutral-19` | `--neutral-24` (`#1c1d27`) |
-| dark | `--secondary` / `--muted` / `--accent` | `--neutral-22` | `--neutral-28` (`#282933`) |
-| dark | `--popover` | `--neutral-25` | `--neutral-33` (`#32333c`) |
+| dark | `--card` | `--neutral-19` | `--neutral-26` (`#22232c`) |
+| dark | `--secondary` / `--muted` / `--accent` | `--neutral-22` | `--neutral-30` (`#2c2d36`) |
+| dark | `--popover` | `--neutral-25` | `--neutral-32` (`#31323c`) |
 | dark | `--border` | `--neutral-25` | `--neutral-36` (`#3d3e46`) |
 | dark | every `*-foreground` | `--neutral-94` | `--neutral-94`, retuned with the light background (`#ececf1`) |
 | dark | `--muted-foreground` | `--neutral-70` | `--neutral-70` (unchanged) |
-| dark | `--destructive-foreground` | `--neutral-25` | `--neutral-24` |
+| dark | `--destructive-foreground` | `--neutral-25` | `--neutral-22` |
 
 Stops 25, 91 and 97 are gone — every role they had picked a new rung.
 

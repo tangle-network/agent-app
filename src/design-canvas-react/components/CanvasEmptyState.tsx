@@ -100,7 +100,7 @@ export function CanvasEmptyState({
       <div className="pointer-events-auto flex w-full max-w-lg flex-col items-center gap-5 rounded-xl border border-[var(--card-edge)] bg-[hsl(var(--popover))] px-6 py-7 text-center shadow-[var(--shadow-overlay)] sm:px-8">
         <span className="flex items-center gap-2 text-[var(--text-muted)]">
           <BrandKnot size={22} className="shrink-0" />
-          <span className="text-[11px] font-semibold uppercase tracking-[0.05em]">Tangle Design</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.05em]">Tangle Design</span>
         </span>
 
         <div className="flex flex-col gap-1.5">
@@ -120,7 +120,7 @@ export function CanvasEmptyState({
                 <Icon className="h-4 w-4" />
               </span>
               <span className="text-sm font-medium text-[var(--text-primary)]">{label}</span>
-              <span className="text-[11px] leading-4 text-[var(--text-muted)]">{hint}</span>
+              <span className="text-xs leading-4 text-[var(--text-muted)]">{hint}</span>
             </button>
           ))}
         </div>

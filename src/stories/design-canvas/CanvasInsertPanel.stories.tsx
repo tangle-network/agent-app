@@ -223,7 +223,7 @@ export const AllStates: Story = {
         { label: 'View only', node: <CanvasInsertPanel canWrite={false} page={page} onInsert={onInsert} /> },
       ].map((cell) => (
         <div key={cell.label} className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">{cell.label}</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">{cell.label}</span>
           <div className="h-[520px] w-[300px] border border-[var(--border-default)]">{cell.node}</div>
         </div>
       ))}

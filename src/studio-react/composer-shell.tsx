@@ -17,7 +17,7 @@ export function Field({
     <div className={className}>
       <Label
         htmlFor={htmlFor}
-        className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground"
+        className="text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground"
       >
         {label}
       </Label>

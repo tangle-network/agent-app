@@ -606,7 +606,7 @@ export function AssistantPanel({
               <button
                 type="button"
                 onClick={() => navigate?.(errorView.cta?.to ?? "")}
-                className="mt-1.5 rounded border border-destructive/40 bg-card px-2 py-0.5 font-medium text-[11px] text-destructive transition hover:bg-destructive/10"
+                className="mt-1.5 rounded border border-destructive/40 bg-card px-2 py-0.5 font-medium text-xs text-destructive transition hover:bg-destructive/10"
               >
                 {errorView.cta.label}
               </button>
