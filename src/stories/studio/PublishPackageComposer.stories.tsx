@@ -116,15 +116,15 @@ export const ConnectionStates: Story = {
   render: () => (
     <div className="flex flex-col gap-10">
       <section>
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">Connected</p>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground">Connected</p>
         <PublishDemo connections={demoConnections} canManageIntegrations integrationsHref="/app/ws-demo/integrations" initialSelected={['instagram']} />
       </section>
       <section>
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">None connected</p>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground">None connected</p>
         <PublishDemo connections={[]} canManageIntegrations={false} />
       </section>
       <section>
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">Load error</p>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground">Load error</p>
         <PublishDemo connections={[]} connectionError={new Error('fetch failed')} canManageIntegrations={false} />
       </section>
     </div>

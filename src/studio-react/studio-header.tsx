@@ -18,14 +18,14 @@ export function StudioHeader({
           <p className="truncate text-xs text-muted-foreground">
             {canGenerate
               ? 'Generate images, video, voice, avatars, and transcripts.'
-              : 'Browse images, video, voice, avatars, and transcripts your team has created.'}
+              : "Browse your team's generations."}
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={onOpenLibrary} className="shrink-0">
           <Images className="mr-1.5 h-4 w-4" />
           Library
           {count > 0 && (
-            <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/15 px-1.5 text-[11px] font-semibold text-primary">
+            <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/15 px-1.5 text-xs font-semibold text-primary">
               {count}
             </span>
           )}

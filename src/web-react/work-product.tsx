@@ -92,7 +92,7 @@ export function workProductStatusLabel(status: WorkProductStatus): string {
 
 function StatePill({ state }: { state: ReviewQueueState }) {
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${STATE_TONES[state]}`}>
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATE_TONES[state]}`}>
       {STATE_LABELS[state]}
     </span>
   )
@@ -100,7 +100,7 @@ function StatePill({ state }: { state: ReviewQueueState }) {
 
 function StatusPill({ status }: { status: WorkProductStatus }) {
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_TONES[status]}`}>
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_TONES[status]}`}>
       {STATUS_LABELS[status]}
     </span>
   )
@@ -146,7 +146,7 @@ export function WorkProductCard({ part, onOpen, className }: WorkProductCardProp
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-foreground">{part.title}</p>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           {part.kind && <span className="font-mono">{part.kind}</span>}
           {part.kind && ' · '}v{part.ref.version}
         </p>
@@ -273,9 +273,9 @@ export function ReviewQueuePanel({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-foreground">
                   {item.workProduct?.title ?? item.scopeKey}
-                  {item.workProduct && <span className="ml-1.5 text-[11px] text-muted-foreground">v{item.workProduct.version}</span>}
+                  {item.workProduct && <span className="ml-1.5 text-xs text-muted-foreground">v{item.workProduct.version}</span>}
                 </p>
-                <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
+                <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                   {item.workProduct?.kind && <span className="font-mono">{item.workProduct.kind}</span>}
                   {item.pendingAsk && <span>asks: {item.pendingAsk.title}</span>}
                   {item.blockingExceptions > 0 && (
@@ -336,7 +336,7 @@ export function EvidenceLineageTable({ evidence, resolveSourceUrl, className }: 
     <div className={`overflow-x-auto ${className ?? ''}`}>
       <table className="w-full border-collapse text-left text-sm">
         <thead>
-          <tr className="border-b border-border text-[11px] uppercase tracking-wide text-muted-foreground">
+          <tr className="border-b border-border text-xs uppercase tracking-[0.05em] text-muted-foreground">
             <th className="py-1.5 pr-3 font-medium">Target</th>
             <th className="py-1.5 pr-3 font-medium">Claim</th>
             <th className="py-1.5 font-medium">Source</th>
@@ -349,7 +349,7 @@ export function EvidenceLineageTable({ evidence, resolveSourceUrl, className }: 
             return (
               <tr key={entry.id} className="border-b border-border align-top">
                 <td className="py-2 pr-3 font-mono text-xs text-foreground">{entry.target}</td>
-                <td className="py-2 pr-3 text-[13px] leading-snug text-foreground">
+                <td className="py-2 pr-3 text-sm leading-snug text-foreground">
                   {entry.claim}
                   {entry.locator.quote && (
                     // The basis is what a reviewer weighs, so it has to be
@@ -373,7 +373,7 @@ export function EvidenceLineageTable({ evidence, resolveSourceUrl, className }: 
                     >
                       “{entry.locator.quote}”
                       {entry.locator.quoteBasis && (
-                        <span className="ml-1.5 align-middle text-[10px] not-italic uppercase tracking-wide text-muted-foreground">
+                        <span className="ml-1.5 align-middle text-xs not-italic uppercase tracking-[0.05em] text-muted-foreground">
                           {entry.locator.quoteBasis === 'span' ? 'from source' : 'verified'}
                         </span>
                       )}
@@ -427,14 +427,14 @@ export function ExceptionList({ exceptions, className }: ExceptionListProps) {
     <ul className={`space-y-1.5 ${className ?? ''}`}>
       {exceptions.map((entry) => (
         <li key={entry.id} className="flex items-start gap-2.5 rounded-lg border border-border bg-card px-3 py-2">
-          <span className={`mt-0.5 inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${SEVERITY_TONES[entry.severity]}`}>
+          <span className={`mt-0.5 inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.05em] ${SEVERITY_TONES[entry.severity]}`}>
             {entry.severity}
           </span>
           <div className="min-w-0 flex-1">
-            <p className={`text-[13px] leading-snug ${entry.resolved ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+            <p className={`text-sm leading-snug ${entry.resolved ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
               {entry.message}
             </p>
-            <p className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] text-muted-foreground">
+            <p className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-muted-foreground">
               <span className="font-mono">{entry.kind}</span>
               {entry.targets && entry.targets.length > 0 && <span className="font-mono">{entry.targets.join(', ')}</span>}
               {entry.resolved && <span>resolved{entry.resolvedBy ? ` by ${entry.resolvedBy}` : ''}</span>}
@@ -474,11 +474,11 @@ export function QualityCheckList({ checks, className }: QualityCheckListProps) {
             </svg>
           )}
           <div className="min-w-0 flex-1">
-            <p className="text-[13px] text-foreground">
+            <p className="text-sm text-foreground">
               {check.name}
-              <span className="ml-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">{check.source}</span>
+              <span className="ml-1.5 text-xs uppercase tracking-[0.05em] text-muted-foreground">{check.source}</span>
             </p>
-            {check.detail && <p className="text-[11px] leading-snug text-muted-foreground">{check.detail}</p>}
+            {check.detail && <p className="text-xs leading-snug text-muted-foreground">{check.detail}</p>}
           </div>
         </li>
       ))}
@@ -499,17 +499,22 @@ export interface ProvenanceStampProps {
   className?: string
 }
 
+/** Truncated id with an ellipsis marker, so a sliced hash never passes as complete. */
+function truncateId(id: string, length: number): string {
+  return id.length > length ? `${id.slice(0, length)}…` : id
+}
+
 /** The audit line a reviewer approves against: which configuration produced
  *  this document, what served it, and how that configuration measured on its
  *  backtest. */
 export function ProvenanceStamp({ provenance, backtest, className }: ProvenanceStampProps) {
   return (
-    <div className={`flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-muted-foreground ${className ?? ''}`}>
+    <div className={`flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground ${className ?? ''}`}>
       <span className="font-mono" title={provenance.profileHash}>
-        profile {provenance.profileHash ? provenance.profileHash.slice(0, 10) : '—'}
+        profile {provenance.profileHash ? truncateId(provenance.profileHash, 10) : '—'}
       </span>
       <span className="font-mono" title={provenance.runId}>
-        run {provenance.runId ? provenance.runId.slice(0, 10) : '—'}
+        run {provenance.runId ? truncateId(provenance.runId, 10) : '—'}
       </span>
       {provenance.servingModels.length > 0 ? (
         provenance.servingModels.map((model) => (

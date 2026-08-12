@@ -1,7 +1,7 @@
 import { Link } from 'react-router'
 import { Badge, Button, Input, Textarea } from '@tangle-network/sandbox-ui/primitives'
-import type { IntegrationConnection } from '@tangle-network/sandbox-ui/integrations'
-import { AlertTriangle, CalendarClock, Check } from 'lucide-react'
+import { ProviderIcon, type IntegrationConnection } from '@tangle-network/sandbox-ui/integrations'
+import { AlertTriangle, Check } from 'lucide-react'
 import { CADENCES, DESTINATIONS, isDestinationConnected } from '../studio'
 import { Field, NativeSelect } from './composer-shell'
 
@@ -50,7 +50,7 @@ export function PublishPackageComposer({
           <p className="text-xs text-muted-foreground">
             {connectionsLoading
               ? 'Checking connected apps…'
-              : 'Stage captions, destinations, cadence. Saved with the generated asset.'}
+              : 'Saved with the generated asset.'}
           </p>
         )}
         {integrationsHref && canManageIntegrations && (
@@ -73,12 +73,13 @@ export function PublishPackageComposer({
               className={`rounded-md border p-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                 active
                   ? 'border-primary bg-primary/10 ring-1 ring-primary/20'
-                  : 'border-border bg-[var(--md3-surface-container-low)] hover:bg-accent'
+                  : 'border-border bg-background hover:bg-accent'
               }`}
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">
                   {active && <Check className="h-3.5 w-3.5 text-primary" />}
+                  <ProviderIcon id={destination.providerIds[0] ?? destination.id} displayName={destination.label} size={16} className="rounded" />
                   {destination.label}
                 </span>
                 <Badge variant={active || connected ? 'default' : 'outline'}>{active ? 'Selected' : connected ? 'Ready' : 'Not connected'}</Badge>
@@ -89,24 +90,20 @@ export function PublishPackageComposer({
         })}
       </div>
       <Field label="Caption" className="space-y-2">
-        <Textarea value={caption} onChange={(event) => onCaptionChange(event.target.value)} rows={3} placeholder="Write or generate the caption for selected destinations..." className="bg-[var(--md3-surface-container-low)]" />
+        <Textarea value={caption} onChange={(event) => onCaptionChange(event.target.value)} rows={3} placeholder="Write or generate the caption for selected destinations..." className="bg-background" />
       </Field>
       <Field label="Description / CTA" className="space-y-2">
-        <Textarea value={postDescription} onChange={(event) => onDescriptionChange(event.target.value)} rows={2} placeholder="Release note, product context, link, or approval instruction..." className="bg-[var(--md3-surface-container-low)]" />
+        <Textarea value={postDescription} onChange={(event) => onDescriptionChange(event.target.value)} rows={2} placeholder="Release note, product context, link, or approval instruction..." className="bg-background" />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Mentions" className="space-y-2">
-          <Input value={mentions} onChange={(event) => onMentionsChange(event.target.value)} placeholder="@creator, @partner" className="bg-[var(--md3-surface-container-low)]" />
+          <Input value={mentions} onChange={(event) => onMentionsChange(event.target.value)} placeholder="@creator, @partner" className="bg-background" />
         </Field>
         <Field label="Cadence" className="space-y-2">
           <NativeSelect value={cadence} onChange={(event) => onCadenceChange(event.target.value)}>
             {CADENCES.map((option) => <option key={option} value={option}>{option}</option>)}
           </NativeSelect>
         </Field>
-      </div>
-      <div className="flex items-center gap-2 rounded-md bg-secondary p-2 text-xs text-muted-foreground">
-        <CalendarClock className="h-3.5 w-3.5" />
-        Publish packages stay attached to generated media and can run through connected GTM apps.
       </div>
     </div>
   )

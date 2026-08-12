@@ -1,5 +1,6 @@
 import { Input } from '@tangle-network/sandbox-ui/primitives'
-import { Field } from './composer-shell'
+import { VIDEO_ASPECT_RATIOS, VIDEO_DURATIONS, VIDEO_RESOLUTIONS } from '../studio'
+import { Field, NativeSelect } from './composer-shell'
 
 export function VideoComposer({
   duration,
@@ -22,9 +23,21 @@ export function VideoComposer({
 }) {
   return (
     <div className="grid grid-cols-2 gap-3">
-      <Field label="Duration (s)"><Input value={duration} onChange={(event) => onDurationChange(event.target.value)} className="bg-background" /></Field>
-      <Field label="Resolution"><Input value={resolution} onChange={(event) => onResolutionChange(event.target.value)} className="bg-background" /></Field>
-      <Field label="Aspect ratio"><Input value={aspectRatio} onChange={(event) => onAspectRatioChange(event.target.value)} className="bg-background" /></Field>
+      <Field label="Duration (s)">
+        <NativeSelect value={duration} onChange={(event) => onDurationChange(event.target.value)}>
+          {VIDEO_DURATIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+        </NativeSelect>
+      </Field>
+      <Field label="Resolution">
+        <NativeSelect value={resolution} onChange={(event) => onResolutionChange(event.target.value)}>
+          {VIDEO_RESOLUTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+        </NativeSelect>
+      </Field>
+      <Field label="Aspect ratio">
+        <NativeSelect value={aspectRatio} onChange={(event) => onAspectRatioChange(event.target.value)}>
+          {VIDEO_ASPECT_RATIOS.map((option) => <option key={option} value={option}>{option}</option>)}
+        </NativeSelect>
+      </Field>
       <Field label="Reference image URL"><Input value={referenceImageUrl} onChange={(event) => onReferenceImageUrlChange(event.target.value)} className="bg-background" /></Field>
     </div>
   )

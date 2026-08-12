@@ -2,8 +2,8 @@
  * `./work-product-react` — the sandbox-ui-composed review pane. It follows the
  * optional-peer rule: this is the ONLY work-product surface
  * that imports `@tangle-network/sandbox-ui` (its `workbench` primitives:
- * `PillTabs`, `CodeSurface`, `DiffView`, `FileBreadcrumb`,
- * `computeDiffStats`). `/web-react`'s queue/card/lineage components stay
+ * `PillTabs`, `CodeSurface`, `DiffView`, `FileBreadcrumb`).
+ * `/web-react`'s queue/card/lineage components stay
  * sandbox-ui-free; importing THIS subpath requires the otherwise optional
  * sandbox-ui peer.
  *
@@ -20,7 +20,6 @@ import {
   DiffView,
   FileBreadcrumb,
   PillTabs,
-  computeDiffStats,
   type PillTabItem,
 } from '@tangle-network/sandbox-ui/workbench'
 
@@ -118,10 +117,6 @@ export function WorkProductPane({
   const [compareError, setCompareError] = useState<string | null>(null)
 
   const diffFilename = filenameOf(artifact?.path, artifact?.title ?? workProduct.scopeKey)
-  const diffStats = useMemo(
-    () => (hasDiff ? computeDiffStats(baseline ?? '', body) : null),
-    [hasDiff, baseline, body],
-  )
 
   const loadCompare = useCallback(
     async (from: WorkProductVersionEntry, to: WorkProductVersionEntry) => {
@@ -150,9 +145,9 @@ export function WorkProductPane({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-foreground">
             {artifact?.title ?? workProduct.scopeKey}
-            <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">v{workProduct.version}</span>
+            <span className="ml-1.5 text-xs font-normal text-muted-foreground">v{workProduct.version}</span>
           </p>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {artifact?.kind && <span className="font-mono">{artifact.kind} · </span>}
             {workProductStatusLabel(workProduct.status)}
             {unresolvedBlockingExceptions(workProduct.exceptions).length > 0 && (
@@ -180,12 +175,7 @@ export function WorkProductPane({
 
       {tab === 'diff' && hasDiff && (
         <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-border">
-          {diffStats && (
-            <p className="border-b border-border px-3 py-2 text-[11px] text-muted-foreground">
-              <span className="text-success">+{diffStats.added}</span>{' '}
-              <span className="text-destructive">−{diffStats.removed}</span>
-            </p>
-          )}
+          {/* DiffView's own file header already carries the +/− counts. */}
           <DiffView filename={diffFilename} baseline={baseline ?? ''} current={body} />
         </div>
       )}
@@ -210,14 +200,14 @@ export function WorkProductPane({
               <div key={`${entry.version}:${entry.status}:${entry.at}`} className="rounded-lg border border-border bg-card px-3 py-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-medium text-foreground">v{entry.version}</span>
-                  <span className="text-[11px] text-muted-foreground">{workProductStatusLabel(entry.status)}</span>
-                  {entry.reviewedBy && <span className="text-[11px] text-muted-foreground">by {entry.reviewedBy}</span>}
+                  <span className="text-xs text-muted-foreground">{workProductStatusLabel(entry.status)}</span>
+                  {entry.reviewedBy && <span className="text-xs text-muted-foreground">by {entry.reviewedBy}</span>}
                   <span className="flex-1" />
                   {loadVersionBody && prior?.artifactPath && entry.artifactPath && (
                     <button
                       type="button"
                       onClick={() => void loadCompare(prior, entry)}
-                      className="rounded-md border border-border px-2 py-0.5 text-[11px] font-medium text-foreground transition hover:bg-accent"
+                      className="rounded-md border border-border px-2 py-0.5 text-xs font-medium text-foreground transition hover:bg-accent"
                     >
                       Compare v{prior.version} → v{entry.version}
                     </button>
@@ -231,7 +221,7 @@ export function WorkProductPane({
           {compareError && <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">{compareError}</p>}
           {compare && (
             <div className="overflow-auto rounded-lg border border-border">
-              <p className="border-b border-border px-3 py-2 text-[11px] text-muted-foreground">
+              <p className="border-b border-border px-3 py-2 text-xs text-muted-foreground">
                 v{compare.fromVersion} → v{compare.toVersion}
               </p>
               <DiffView filename={diffFilename} baseline={compare.baseline} current={compare.current} />

@@ -86,7 +86,7 @@ describe('usePending — SeatPaywall checkout', () => {
     const d = deferred()
     const onCheckout = vi.fn(() => d.promise)
     render(createElement(SeatPaywall, { product: 'Creative', onCheckout }))
-    const cta = screen.getByRole('button', { name: /Unlock Creative/ })
+    const cta = screen.getByRole('button', { name: /Continue to checkout/ })
     fireEvent.click(cta)
     fireEvent.click(cta)
     expect(onCheckout).toHaveBeenCalledTimes(1)
@@ -95,7 +95,7 @@ describe('usePending — SeatPaywall checkout', () => {
       d.resolve()
       await d.promise
     })
-    await waitFor(() => expect(screen.getByRole('button', { name: /Unlock Creative/ })).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: /Continue to checkout/ })).toBeTruthy())
   })
 
   it('shows the exact introductory and recurring price-to-credit offer', () => {

@@ -58,7 +58,7 @@ export function TranscriptionOptions({
           <option value="vtt">VTT</option>
         </NativeSelect>
       </Field>
-      <Field label="Temperature"><Input type="number" min="0" max="1" step="0.1" value={temperature} onChange={(event) => onTemperatureChange(event.target.value)} className="bg-[var(--md3-surface-container-low)]" /></Field>
+      <Field label="Temperature"><Input type="number" min="0" max="1" step="0.1" value={temperature} onChange={(event) => onTemperatureChange(event.target.value)} className="bg-background" /></Field>
     </>
   )
 }

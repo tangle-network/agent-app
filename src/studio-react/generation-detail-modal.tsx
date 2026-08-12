@@ -22,7 +22,7 @@ export function GenerationDetailModal({
     <Dialog open={generation != null} onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto border-card-edge bg-popover shadow-overlay">
         <DialogHeader>
-          <DialogTitle className="text-left text-base">{cfg?.label ?? 'Generation'}</DialogTitle>
+          <DialogTitle className="text-left text-[15px] font-semibold">{cfg ? `${cfg.label} generation` : 'Generation'}</DialogTitle>
         </DialogHeader>
         {generation && (
           <GenerationDetail generation={generation} vaultHref={vaultHref} onNavigate={onClose} />

@@ -25,6 +25,7 @@ import {
   BleedGlyph,
   BoldGlyph,
   BringFrontGlyph,
+  ChevronDownGlyph,
   GridGlyph,
   GroupGlyph,
   ItalicGlyph,
@@ -159,7 +160,7 @@ function Popover({
   )
 }
 
-const FIELD_LABEL = 'text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]'
+const FIELD_LABEL = 'text-xs font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]'
 
 function NumberInput({
   label,
@@ -243,7 +244,7 @@ function SelectControl<T extends string>({
             className={`${buttonClassName} flex items-center justify-between gap-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-left text-xs text-[var(--text-primary)] hover:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40`}
           >
             <span className="truncate">{current?.label ?? value}</span>
-            <span className="text-[8px] text-[var(--text-muted)]">▾</span>
+            <ChevronDownGlyph className="h-3 w-3 shrink-0 text-[var(--text-muted)]" />
           </button>
         }
       >
@@ -314,7 +315,7 @@ function FontPicker({
             style={{ fontFamily: value }}
           >
             <span className="truncate">{value}</span>
-            <span className="text-[8px] text-[var(--text-muted)]">▾</span>
+            <ChevronDownGlyph className="h-3 w-3 shrink-0 text-[var(--text-muted)]" />
           </button>
         }
       >
@@ -329,7 +330,7 @@ function FontPicker({
           />
           <div role="listbox" className="max-h-60 overflow-y-auto py-1">
             {filtered.length === 0 ? (
-              <div className="px-3 py-2 text-[11px] text-[var(--text-muted)]">No matches</div>
+              <div className="px-3 py-2 text-xs text-[var(--text-muted)]">No matches</div>
             ) : (
               filtered.map((family) => (
                 <button
@@ -716,14 +717,14 @@ function SelectionControls({
               <button
                 type="button"
                 onClick={() => { onBindSlot(slotInput.trim() || null); setSlotPopoverOpen(false) }}
-                className="flex-1 rounded border border-[var(--brand-primary)] px-2 py-0.5 text-[11px] text-[var(--brand-primary)] hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)]"
+                className="flex-1 rounded border border-[var(--brand-primary)] px-2 py-0.5 text-xs text-[var(--brand-primary)] hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)]"
               >
                 {slotInput.trim() ? 'Bind' : 'Unbind'}
               </button>
               <button
                 type="button"
                 onClick={() => setSlotPopoverOpen(false)}
-                className="rounded border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]"
+                className="rounded border border-[var(--border-default)] px-2 py-0.5 text-xs text-[var(--text-secondary)]"
               >
                 Cancel
               </button>
@@ -865,14 +866,14 @@ function ImageControls({ element, canWrite, onPatch }: { element: ImageElement; 
               type="button"
               disabled={!swapUrl.trim() || swapUrl.trim() === element.src}
               onClick={() => { onPatch({ src: swapUrl.trim() }); setSwapOpen(false) }}
-              className="flex-1 rounded border border-[var(--brand-primary)] px-2 py-0.5 text-[11px] text-[var(--brand-primary)] hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)] disabled:cursor-default disabled:opacity-40"
+              className="flex-1 rounded border border-[var(--brand-primary)] px-2 py-0.5 text-xs text-[var(--brand-primary)] hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)] disabled:cursor-default disabled:opacity-40"
             >
               Replace
             </button>
             <button
               type="button"
               onClick={() => setSwapOpen(false)}
-              className="rounded border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]"
+              className="rounded border border-[var(--border-default)] px-2 py-0.5 text-xs text-[var(--text-secondary)]"
             >
               Cancel
             </button>
@@ -922,7 +923,7 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides, pa
         value={page.name}
         disabled={!canWrite}
         onChange={(event) => onSetPageProps({ name: event.target.value })}
-        className="w-28 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
+        className="w-28 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40"
       />
 
       {SEP}
@@ -956,7 +957,7 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides, pa
             if (event.key === 'Enter') commitDimension('width', (event.target as HTMLInputElement).value)
             if (event.key === 'Escape') setCustomW(null)
           }}
-          className="w-16 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-center text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
+          className="w-16 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-center text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40"
         />
       </label>
       <span className="text-[var(--text-muted)]">×</span>
@@ -973,7 +974,7 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides, pa
             if (event.key === 'Enter') commitDimension('height', (event.target as HTMLInputElement).value)
             if (event.key === 'Escape') setCustomH(null)
           }}
-          className="w-16 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-center text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
+          className="w-16 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-center text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40"
         />
       </label>
 

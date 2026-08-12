@@ -108,13 +108,18 @@ interface GesturePreview {
 /** Per-kind chip tint, mixed SOLID onto the lane surface (`--bg-input`, the
  *  editor's own fill) so a dragged chip never shows the lanes beneath through
  *  an alpha fill — the hue identity stays, the translucency is gone. The 40%
- *  border is the border-tier equivalent for edges. */
+ *  border is the border-tier equivalent for edges. Hues are the semantic
+ *  tokens at matched alpha, not hardcoded sky/emerald/amber/zinc/violet: the
+ *  system palette has no blue, so video takes the brand primary as the
+ *  program's primary content and agent shares it (agent output is first-class
+ *  product output) — kind identity on the timeline comes from the labelled
+ *  track, the tint is decoration. */
 const KIND_TONES: Record<SequenceTrackKind, string> = {
-  video: 'border-sky-400/40 bg-[color-mix(in_srgb,#0ea5e9_15%,var(--bg-input))]',
-  audio: 'border-emerald-400/40 bg-[color-mix(in_srgb,#10b981_15%,var(--bg-input))]',
-  caption: 'border-amber-400/40 bg-[color-mix(in_srgb,#f59e0b_15%,var(--bg-input))]',
-  reference: 'border-zinc-400/40 bg-[color-mix(in_srgb,#71717a_15%,var(--bg-input))]',
-  agent: 'border-violet-400/40 bg-[color-mix(in_srgb,#8b5cf6_15%,var(--bg-input))]',
+  video: 'border-[hsl(var(--primary)/0.4)] bg-[color-mix(in_srgb,hsl(var(--primary))_15%,var(--bg-input))]',
+  audio: 'border-[hsl(var(--success)/0.4)] bg-[color-mix(in_srgb,hsl(var(--success))_15%,var(--bg-input))]',
+  caption: 'border-[hsl(var(--warning)/0.4)] bg-[color-mix(in_srgb,hsl(var(--warning))_15%,var(--bg-input))]',
+  reference: 'border-[hsl(var(--muted-foreground)/0.4)] bg-[color-mix(in_srgb,hsl(var(--muted-foreground))_15%,var(--bg-input))]',
+  agent: 'border-[hsl(var(--primary)/0.4)] bg-[color-mix(in_srgb,hsl(var(--primary))_15%,var(--bg-input))]',
 }
 
 /** Spec'd cache key is the clip id: a clip's waveform survives re-renders and
@@ -496,7 +501,7 @@ export function TimelineClipChip(props: TimelineClipChipProps) {
           <canvas ref={posterRef} className="h-full w-10 shrink-0 rounded-sm bg-black object-cover" />
         ) : null}
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[11px] font-medium leading-4 text-[var(--text-primary)]">
+          <div className="truncate text-xs font-medium leading-4 text-[var(--text-primary)]">
             {isCaption && typeof clip.text === 'string' ? clip.text : clip.label}
           </div>
           <span className="mt-0.5 inline-block rounded bg-[hsl(var(--background))] px-1 font-mono text-[9px] leading-3 text-[var(--text-secondary)]">
@@ -517,7 +522,7 @@ export function TimelineClipChip(props: TimelineClipChipProps) {
             event.stopPropagation()
           }}
           onBlur={commitText}
-          className="agent-app-edit-selection absolute inset-0 z-10 w-full bg-[hsl(var(--popover))] px-1.5 text-[11px] text-[var(--text-primary)] ring-1 ring-[var(--brand-primary)]"
+          className="agent-app-edit-selection absolute inset-0 z-10 w-full bg-[hsl(var(--popover))] px-1.5 text-xs text-[var(--text-primary)] ring-1 ring-[var(--brand-primary)]"
           aria-label="Caption text"
         />
       ) : null}

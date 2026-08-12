@@ -453,7 +453,7 @@ function ModelRow({
       {renderProviderBadge ? renderProviderBadge(model.provider) : <ProviderLogo provider={model.provider} size={16} />}
       <span className="truncate">{model.name}</span>
       {!model.supportsTools && (
-        <span className="shrink-0 rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+        <span className="shrink-0 rounded bg-secondary px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
           no tools
         </span>
       )}

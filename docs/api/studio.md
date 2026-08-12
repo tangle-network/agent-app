@@ -4,7 +4,7 @@
 
 Source: `src/studio/index.ts`
 
-37 exports.
+43 exports.
 
 ### `buildGenerationRequestBody`
 
@@ -116,6 +116,30 @@ type GenerationType
 
 ```ts
 (generation: Generation) => string | null
+```
+
+### `IMAGE_QUALITIES`
+
+`const` — Provide the valid image quality values for generation requests
+
+```ts
+readonly ["low", "medium", "high", "auto"]
+```
+
+### `IMAGE_SIZE_HINT`
+
+`const` — Provide a placeholder hint listing the accepted image size values
+
+```ts
+"1024x1024, 1536x1024, 1024x1536, or auto"
+```
+
+### `IMAGE_SIZE_PATTERN`
+
+`const` — Provide a validation pattern for the free-form image size field (WxH or auto)
+
+```ts
+string
 ```
 
 ### `isDestinationConnected`
@@ -300,4 +324,28 @@ interface StudioIntegrationConnection
 
 ```ts
 (message?: string | undefined) => string
+```
+
+### `VIDEO_ASPECT_RATIOS`
+
+`const` — Provide the valid video aspect ratio values for generation requests
+
+```ts
+readonly ["16:9", "9:16", "1:1"]
+```
+
+### `VIDEO_DURATIONS`
+
+`const` — Provide the valid video duration values (seconds) for generation requests
+
+```ts
+readonly ["4", "6", "8", "10", "12"]
+```
+
+### `VIDEO_RESOLUTIONS`
+
+`const` — Provide the valid video resolution values for generation requests
+
+```ts
+readonly ["720p", "1080p"]
 ```

@@ -107,7 +107,7 @@ export const EditorWithHostPanels: Story = {
         onCreateExport={() => console.log('onCreateExport')}
         renderAssetShelf={() => (
           <div className="flex items-center gap-2 px-3 py-2">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">
+            <span className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">
               Assets — drag onto a lane
             </span>
             {[
@@ -134,11 +134,11 @@ export const EditorWithHostPanels: Story = {
         renderSidePanel={({ selectedClips, playheadFrame }) => (
           <div className="flex h-full flex-col gap-3 p-3 text-xs text-[var(--text-secondary)]">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">Inspector</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">Inspector</p>
               <p className="mt-1 font-mono">playhead: frame {playheadFrame}</p>
             </div>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">
                 Selection ({selectedClips.length})
               </p>
               {selectedClips.length === 0 ? (

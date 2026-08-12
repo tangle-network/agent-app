@@ -4,7 +4,7 @@
  * onZoom.
  */
 
-import { ZoomFitGlyph } from './glyphs'
+import { MinusGlyph, PlusGlyph, ZoomFitGlyph } from './glyphs'
 import { BTN_SM } from './icon-button'
 
 export interface ZoomControlsProps {
@@ -50,14 +50,14 @@ export function ZoomControls({ zoom, onZoom, onFit, fitLabel = 'Fit to screen' }
         disabled={zoom <= MIN}
         className={BTN_SM}
       >
-        <span className="text-base leading-none">−</span>
+        <MinusGlyph className="h-3.5 w-3.5" />
       </button>
 
       <button
         type="button"
         aria-label="Reset to 100%"
         onClick={resetHundred}
-        className="rounded px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-[var(--text-secondary)] transition hover:bg-[var(--border-default)] hover:text-[var(--text-primary)]"
+        className="rounded px-1.5 py-0.5 font-mono text-xs tabular-nums text-[var(--text-secondary)] transition hover:bg-[var(--border-default)] hover:text-[var(--text-primary)]"
         title="Reset to 100%"
       >
         {Math.round(zoom * 100)}%
@@ -70,7 +70,7 @@ export function ZoomControls({ zoom, onZoom, onFit, fitLabel = 'Fit to screen' }
         disabled={zoom >= MAX}
         className={BTN_SM}
       >
-        <span className="text-sm leading-none">+</span>
+        <PlusGlyph className="h-3.5 w-3.5" />
       </button>
     </div>
   )

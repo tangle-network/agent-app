@@ -33,6 +33,9 @@ const SCALES: ReadonlyArray<{ value: number; label: string }> = [
   { value: 2, label: '2x' },
 ]
 
+/** Same eyebrow the toolbar fields use (Toolbar's FIELD_LABEL). */
+const FIELD_LABEL = 'text-xs font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]'
+
 export function ExportControl({ defaults, onExport, className }: ExportControlProps) {
   const [open, setOpen] = useState(false)
   const [format, setFormat] = useState<'png' | 'jpeg'>(defaults?.format ?? 'png')
@@ -78,7 +81,7 @@ export function ExportControl({ defaults, onExport, className }: ExportControlPr
           className="absolute right-0 top-full z-50 mt-1 flex w-52 flex-col gap-3 rounded-md border border-[var(--card-edge)] bg-[hsl(var(--popover))] p-3 shadow-[var(--shadow-overlay)]"
         >
           <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-medium text-[var(--text-muted)]">Format</span>
+            <span className={FIELD_LABEL}>Format</span>
             <div className="flex gap-1.5">
               {FORMATS.map((f) => (
                 <button
@@ -86,7 +89,7 @@ export function ExportControl({ defaults, onExport, className }: ExportControlPr
                   type="button"
                   aria-pressed={format === f.id}
                   onClick={() => setFormat(f.id)}
-                  className={`flex-1 rounded border px-2 py-1 text-[11px] transition-colors ${
+                  className={`flex-1 rounded border px-2 py-1 text-xs transition-colors ${
                     format === f.id
                       ? 'border-[var(--brand-primary)] text-[var(--brand-primary)]'
                       : 'border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -99,7 +102,7 @@ export function ExportControl({ defaults, onExport, className }: ExportControlPr
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-medium text-[var(--text-muted)]">Scale</span>
+            <span className={FIELD_LABEL}>Scale</span>
             <div className="flex gap-1.5">
               {SCALES.map((s) => (
                 <button
@@ -107,7 +110,7 @@ export function ExportControl({ defaults, onExport, className }: ExportControlPr
                   type="button"
                   aria-pressed={pixelRatio === s.value}
                   onClick={() => setPixelRatio(s.value)}
-                  className={`flex-1 rounded border px-2 py-1 text-[11px] transition-colors ${
+                  className={`flex-1 rounded border px-2 py-1 text-xs transition-colors ${
                     pixelRatio === s.value
                       ? 'border-[var(--brand-primary)] text-[var(--brand-primary)]'
                       : 'border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -123,7 +126,7 @@ export function ExportControl({ defaults, onExport, className }: ExportControlPr
             type="button"
             aria-label="Export image"
             onClick={confirm}
-            className="rounded border border-[var(--brand-primary)] px-2 py-1 text-[11px] font-medium text-[var(--brand-primary)] transition-colors hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)]"
+            className="rounded border border-[var(--brand-primary)] px-2 py-1 text-xs font-medium text-[var(--brand-primary)] transition-colors hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)]"
           >
             Export
           </button>

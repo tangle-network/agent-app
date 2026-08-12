@@ -26,13 +26,14 @@ export function ResultCanvas({
         </div>
         <p className="text-sm font-medium text-foreground">Your creations appear here</p>
         <p className="max-w-xs text-xs text-muted-foreground">
-          Write a prompt above and hit Generate — your latest result blooms here, and everything lives in your library.
+          Generate above — results appear here and are saved to your library.
         </p>
       </section>
     )
   }
 
   const cfg = typeConfigFor(batch[0]?.type ?? 'image')
+  const Icon = cfg.icon
   const statuses = batch.map(generationStatus)
   const runLabel = statuses.some((s) => s === 'pending' || s === 'running')
     ? 'Generating…'
@@ -45,7 +46,10 @@ export function ResultCanvas({
     <section className={`${cardClass} p-5`}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className={`${cfg.color} text-[11px]`}>{cfg.label}</Badge>
+          <Badge variant="outline" className={`${cfg.color} gap-1 text-xs`}>
+            <Icon className="h-3 w-3" />
+            {cfg.label}
+          </Badge>
           <span className="text-sm font-medium text-foreground">{runLabel}</span>
           {isWorking && <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />}
         </div>
@@ -72,7 +76,7 @@ export function ResultCanvas({
         ))}
       </div>
 
-      {batch.length > 1 && (
+      {batch.length > 1 && !isWorking && (
         <p className="mt-2 text-xs text-muted-foreground">{batch.length} results from this run</p>
       )}
     </section>

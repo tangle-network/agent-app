@@ -607,7 +607,7 @@ export function RecordGrid({
           onKeyDown={handleGridKeyDown}
         >
           <thead>
-            <tr role="row" className="border-b border-border text-[11px] uppercase tracking-wide text-muted-foreground">
+            <tr role="row" className="border-b border-border text-xs uppercase tracking-[0.05em] text-muted-foreground">
               {columns.map((column) => (
                 <th
                   key={column.id}
@@ -662,7 +662,7 @@ export function RecordGrid({
                               onCancel={() => cancelEdit(row, column)}
                             />
                             {cellError !== undefined && (
-                              <p id={errorId} role="alert" className="mt-1 text-[11px] leading-snug text-destructive">
+                              <p id={errorId} role="alert" className="mt-1 text-xs leading-snug text-destructive">
                                 {cellError}
                               </p>
                             )}
@@ -1001,7 +1001,7 @@ function SourceMarker({ panelId, columnHeader, rowLabel, source, open, onToggle 
             “{source.quote}”
           </span>
         )}
-        <span className="mt-2 block text-[11px] text-muted-foreground">
+        <span className="mt-2 block text-xs text-muted-foreground">
           {source.label ?? 'Source'}
           {source.locator ? ` · ${source.locator}` : ''}
           {` · ${BASIS_TITLES[basis]}`}
@@ -1012,7 +1012,7 @@ function SourceMarker({ panelId, columnHeader, rowLabel, source, open, onToggle 
             target="_blank"
             rel="noreferrer"
             onClick={(event) => event.stopPropagation()}
-            className="mt-1.5 inline-block text-[11px] font-medium text-primary underline-offset-2 hover:underline"
+            className="mt-1.5 inline-block text-xs font-medium text-primary underline-offset-2 hover:underline"
           >
             Open source
           </a>
@@ -1101,9 +1101,9 @@ function AddRecordForm({
                       describedBy={message === undefined ? undefined : errorId}
                       onValue={(next) => setDraft({ ...draft, [column.id]: next })}
                     />
-                    {column.hint && <p className="mt-1 text-[11px] text-muted-foreground">{column.hint}</p>}
+                    {column.hint && <p className="mt-1 text-xs text-muted-foreground">{column.hint}</p>}
                     {message !== undefined && (
-                      <p id={errorId} role="alert" className="mt-1 text-[11px] text-destructive">
+                      <p id={errorId} role="alert" className="mt-1 text-xs text-destructive">
                         {message}
                       </p>
                     )}

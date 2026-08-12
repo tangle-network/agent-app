@@ -341,7 +341,7 @@ function applyStreamEvent(
           {
             id: `cap-${event.data.turnId}`,
             role: "status",
-            text: "Paused after a lot of steps — continue when you're ready and I'll pick up where I left off.",
+            text: "Paused at the step limit — continue when you're ready and I'll pick up where I left off.",
           },
         ]);
       }

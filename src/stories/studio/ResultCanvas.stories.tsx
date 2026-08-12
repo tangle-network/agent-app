@@ -66,7 +66,7 @@ export const AllStates: Story = {
         ] as Array<[string, Generation[]]>
       ).map(([label, batch]) => (
         <section key={label}>
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">{label}</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground">{label}</p>
           <ResultCanvas
             batch={batch}
             onOpenLibrary={() => console.log('onOpenLibrary')}

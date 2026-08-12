@@ -17,7 +17,7 @@ export function Field({
     <div className={className}>
       <Label
         htmlFor={htmlFor}
-        className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground"
+        className="text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground"
       >
         {label}
       </Label>
@@ -76,6 +76,6 @@ export function ComposerDisclosure({ summary, children }: { summary: ReactNode; 
 
 export function NativeSelect(props: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select {...props} className="h-9 w-full rounded-md border border-input bg-[var(--md3-surface-container-low)] px-3 text-sm" />
+    <select {...props} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" />
   )
 }

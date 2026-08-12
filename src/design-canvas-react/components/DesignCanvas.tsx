@@ -519,8 +519,8 @@ export function DesignCanvas({
 
   if (!activePage) {
     return (
-      <div className={`flex h-full items-center justify-center bg-[var(--bg-input)] text-[var(--text-muted)] ${className ?? ''}`}>
-        No pages in document
+      <div className={`flex h-full items-center justify-center bg-[var(--bg-input)] ${className ?? ''}`}>
+        <p className="text-xs text-[var(--text-muted)]">This document has no pages.</p>
       </div>
     )
   }
@@ -616,7 +616,7 @@ export function DesignCanvas({
           <div className="flex flex-col gap-1">
             <p className="text-sm font-semibold text-[var(--text-primary)]">Best edited on a larger screen</p>
             <p className="text-xs leading-5 text-[var(--text-secondary)]">
-              The design canvas needs room to work. Open this on a tablet or desktop to edit pages, elements, and export.
+              Open this on a tablet or desktop to edit and export.
             </p>
           </div>
         </div>

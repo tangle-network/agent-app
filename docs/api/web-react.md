@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-360 exports.
+394 exports.
 
 ### `activityTone`
 
@@ -582,6 +582,14 @@ interface ConsumeChatStreamResult
 readonly EffortLevel[]
 ```
 
+### `DEFAULT_INSIGHT_PAGE_SIZE`
+
+`const`
+
+```ts
+3
+```
+
 ### `DEFAULT_MENTION_EMPTY_TEXT`
 
 `const` — Popover empty-state copy for a `ready` index whose query matched nothing.
@@ -604,6 +612,46 @@ readonly EffortLevel[]
 
 ```ts
 ProvenanceConfidencePolicy
+```
+
+### `DEFAULT_SPARKLINE_EMPTY_LABEL`
+
+`const`
+
+```ts
+"No history yet"
+```
+
+### `DEFAULT_SPARKLINE_HEIGHT`
+
+`const`
+
+```ts
+24
+```
+
+### `DEFAULT_SPARKLINE_LABEL`
+
+`const` — Only a name, never a metric: it exists so the accessible label is never empty.
+
+```ts
+"Trend"
+```
+
+### `DEFAULT_SPARKLINE_UNAVAILABLE_LABEL`
+
+`const` — Nothing was measurable, which is not the same as nothing was measured yet — and "No history yet" over a series that arrived full of `NaN` reads as the metric being new when the producer is broken.
+
+```ts
+"No readings available"
+```
+
+### `DEFAULT_SPARKLINE_WIDTH`
+
+`const`
+
+```ts
+96
 ```
 
 ### `describeProvenance`
@@ -998,6 +1046,14 @@ interface FlowWaterfallProps
 (durationMs?: number | undefined) => string | null
 ```
 
+### `formatInsightDelta`
+
+`function` — The delta as words: direction, magnitude, and the baseline it is measured against.
+
+```ts
+(delta: InsightDelta, format?: (value: number) => string) => string
+```
+
 ### `formatModelCost`
 
 `function` — "$0.0042" from token counts × catalogue per-token pricing; null when unknown.
@@ -1020,6 +1076,14 @@ interface FlowWaterfallProps
 
 ```ts
 (isoDate: string | null) => string
+```
+
+### `formatSparklineValue`
+
+`function` — The package's default number rendering, pinned to `en-US` so a card and its series read the same on every host — a series formatted by the server's locale and a value formatted by the browser's is a…
+
+```ts
+(value: number) => string
 ```
 
 ### `formatTokensPerSecond`
@@ -1068,6 +1132,126 @@ interface HarnessGlyphProps
 
 ```ts
 number
+```
+
+### `Insight`
+
+`interface`
+
+```ts
+interface Insight
+```
+
+### `InsightAction`
+
+`interface`
+
+```ts
+interface InsightAction
+```
+
+### `InsightCard`
+
+`function`
+
+```ts
+({ title, value, unit, previous, polarity, format, series, seriesLabel, description, action, live, liveLabel, className…
+```
+
+### `InsightCardProps`
+
+`interface`
+
+```ts
+interface InsightCardProps
+```
+
+### `InsightDeck`
+
+`function` — The paged deck.
+
+```ts
+({ state, empty, label, pageSize, loadingLabel, retryLabel, className, onPageChange, }: InsightDeckProps) => ReactEleme…
+```
+
+### `InsightDeckProps`
+
+`interface`
+
+```ts
+interface InsightDeckProps
+```
+
+### `insightDelta`
+
+`function` — The move, or `null` when there is no honest one to state.
+
+```ts
+(value: unknown, previous: unknown) => InsightDelta | null
+```
+
+### `InsightDelta`
+
+`interface`
+
+```ts
+interface InsightDelta
+```
+
+### `insightDeltaTone`
+
+`function` — Maps a direction onto good/bad news, which only the caller knows.
+
+```ts
+(direction: InsightDirection, polarity?: InsightPolarity) => InsightTone
+```
+
+### `InsightDirection`
+
+`type`
+
+```ts
+type InsightDirection
+```
+
+### `insightPageCount`
+
+`function` — Always at least one page, so "Page 1 of 0" cannot be rendered.
+
+```ts
+(total: number, pageSize?: number) => number
+```
+
+### `insightPageSize`
+
+`function` — The page size — ONE definition, read by the count and by the slice.
+
+```ts
+(pageSize?: number) => number
+```
+
+### `insightPageSlice`
+
+`function` — The items on `page`, with the page clamped into range — a deck whose list shrank under the reader shows the last page that exists, never a blank one.
+
+```ts
+<T>(items: readonly T[], page: number, pageSize?: number) => readonly T[]
+```
+
+### `InsightPolarity`
+
+`type` — Which way is good news for THIS metric.
+
+```ts
+type InsightPolarity
+```
+
+### `InsightTone`
+
+`type`
+
+```ts
+type InsightTone
 ```
 
 ### `INTERACTION_CANCEL_EVENT`
@@ -1243,7 +1427,7 @@ interface InteractionPlanCardProps
 `function`
 
 ```ts
-({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, sourceNote, timeoutNote, renderMarkdown, c…
+({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, timeoutNote, renderMarkdown, className, }:…
 ```
 
 ### `InteractionQuestionCardProps`
@@ -1979,7 +2163,7 @@ interface QualityCheckListProps
 `function` — The radio/checkbox option rows for a select field.
 
 ```ts
-({ groupName, idPrefix, options, multi, selectedValues, disabled, onToggle, }: QuestionOptionListProps) => Element
+({ groupName, idPrefix, options, multi, selectedValues, disabled, onToggle, answered, }: QuestionOptionListProps) => El…
 ```
 
 ### `QuestionOptionListProps`
@@ -2460,6 +2644,94 @@ interface SessionPageQuery
 
 ```ts
 interface SmoothRevealOptions
+```
+
+### `Sparkline`
+
+`function` — The series glyph.
+
+```ts
+({ values, label, format, width, height, emptyLabel, unavailableLabel, className, }: SparklineProps) => ReactElement<un…
+```
+
+### `SparklineDirection`
+
+`type` — Where a series ended relative to where it started.
+
+```ts
+type SparklineDirection
+```
+
+### `sparklineGeometry`
+
+`function` — Plots the series into the viewBox.
+
+```ts
+(values: readonly number[], { width, height, inset }?: SparklineGeometryOptions) => SparklineGeometry
+```
+
+### `SparklineGeometry`
+
+`interface`
+
+```ts
+interface SparklineGeometry
+```
+
+### `SparklineGeometryOptions`
+
+`interface`
+
+```ts
+interface SparklineGeometryOptions
+```
+
+### `sparklineLabel`
+
+`function` — The accessible name: metric, how many readings, how many are missing, the range, and the direction.
+
+```ts
+(values: readonly number[], { label, format }?: SparklineLabelOptions) => string
+```
+
+### `SparklineLabelOptions`
+
+`interface`
+
+```ts
+interface SparklineLabelOptions
+```
+
+### `SparklinePoint`
+
+`interface`
+
+```ts
+interface SparklinePoint
+```
+
+### `sparklinePointsAttribute`
+
+`function` — `"2,14 48,3 94,21"` — the `points` attribute of the polyline.
+
+```ts
+(points: readonly SparklinePoint[]) => string
+```
+
+### `SparklineProps`
+
+`interface`
+
+```ts
+interface SparklineProps
+```
+
+### `sparklineReadings`
+
+`function` — The readings that can be plotted.
+
+```ts
+(values: readonly number[]) => number[]
 ```
 
 ### `stampInteractionAnswers`

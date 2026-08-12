@@ -38,6 +38,12 @@ import {
 
 // ── glyphs (no icon-library dependency) ───────────────────────────────────
 
+/** The focus-shortcut hint names the platform's modifier: Cmd on Apple,
+ *  Ctrl everywhere else (the handler itself listens for both). SSR-safe —
+ *  defaults to Ctrl when there's no navigator to ask. */
+const IS_APPLE_PLATFORM =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
+
 function SendGlyph({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -700,7 +706,7 @@ export function ChatComposer({
           // permanent dead space under the caret.
           rows={2}
           aria-label="Message input"
-          className="max-h-[168px] min-h-[56px] w-full resize-none bg-transparent px-1.5 py-1 text-[15px] leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
+          className="max-h-[168px] min-h-[56px] w-full resize-none bg-transparent px-1.5 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
         />
 
         <div className="flex items-end gap-2">
@@ -786,8 +792,8 @@ export function ChatComposer({
       {focusShortcut && (
         <div className="mt-1.5 flex justify-end px-1">
           <span className="text-xs text-muted-foreground">
-            <kbd className="rounded border border-border bg-background px-1 py-0.5 text-[10px]">Cmd</kbd>
-            <kbd className="ml-0.5 rounded border border-border bg-background px-1 py-0.5 text-[10px]">L</kbd>
+            <kbd className="rounded border border-border bg-background px-1 py-0.5 text-xs">{IS_APPLE_PLATFORM ? 'Cmd' : 'Ctrl'}</kbd>
+            <kbd className="ml-0.5 rounded border border-border bg-background px-1 py-0.5 text-xs">L</kbd>
             <span className="ml-1">to focus</span>
           </span>
         </div>

@@ -71,11 +71,24 @@ function renderPanel(
 }
 
 describe("AssistantPanel transcript seam", () => {
-  it("renders the built-in transcript (empty state) when no renderTranscript is supplied", () => {
+  it("renders the built-in transcript (branded empty state) when no renderTranscript is supplied", () => {
     renderPanel(makeChat());
     expect(
-      screen.getByText(/Ask me to create a workflow/i),
+      screen.getByText(/Ask the assistant to do something/i),
     ).toBeTruthy();
+    expect(
+      screen.getByText(/pause for approval before anything changes/i),
+    ).toBeTruthy();
+  });
+
+  it("seeds the composer from an empty-state door", () => {
+    renderPanel(makeChat());
+    const input = screen.getByLabelText("Message input") as HTMLTextAreaElement;
+    expect(input.value).toBe("");
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Create a workflow/ }),
+    );
+    expect(input.value).toBe("Create a workflow that ");
   });
 
   it("hands the host renderTranscript the live view and a bound renderProposal that renders the ProposalCard", () => {
@@ -100,7 +113,7 @@ describe("AssistantPanel transcript seam", () => {
 
     // The host renderer ran instead of the built-in timeline.
     expect(screen.getByTestId("host-transcript")).toBeTruthy();
-    expect(screen.queryByText(/Ask me to create a workflow/i)).toBeNull();
+    expect(screen.queryByText(/Ask the assistant to do something/i)).toBeNull();
 
     // The view carries the panel-derived surface the contract promises.
     expect(captured).not.toBeNull();

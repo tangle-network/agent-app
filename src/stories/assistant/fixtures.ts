@@ -142,6 +142,18 @@ export const populatedMessages: ChatMessage[] = [
   },
 ]
 
+/** A settled confirmed action: the proposal flow ended in the quiet status
+ *  line ("Created workflow …") rather than an assistant-labeled turn. */
+export const confirmedMessages: ChatMessage[] = [
+  { id: 'cu1', role: 'user', text: 'Create the Monday poster workflow.' },
+  {
+    id: 'ca1',
+    role: 'assistant',
+    text: 'Here’s the draft — confirm it above and I’ll create it.',
+  },
+  { id: 'cs1', role: 'status', text: 'Created workflow "launch-poster-monday".' },
+]
+
 /** A turn mid-stream: preamble text, a running tool chip, and an open (still
  *  empty) bubble the deltas are accumulating into. */
 export const streamingMessages: ChatMessage[] = [

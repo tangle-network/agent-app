@@ -63,7 +63,7 @@ export const AllStates: Story = {
   render: () => (
     <div className="flex flex-col gap-6">
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Populated</p>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Populated</p>
         <AgentActivityPanel
           fetchActivity={fetchActivityPopulated}
           renderMissionRef={(ref) => (
@@ -74,11 +74,11 @@ export const AllStates: Story = {
         />
       </div>
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Empty</p>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Empty</p>
         <AgentActivityPanel fetchActivity={fetchActivityEmpty} />
       </div>
       <div>
-        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Load error</p>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Load error</p>
         <AgentActivityPanel fetchActivity={fetchActivityError} />
       </div>
     </div>

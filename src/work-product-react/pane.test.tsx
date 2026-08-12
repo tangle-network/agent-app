@@ -64,9 +64,10 @@ const RECORD: WorkProductRecord = {
 describe('WorkProductPane (sandbox-ui composition)', () => {
   it('defaults to the product-chosen tab: diff for a redline product', () => {
     render(<WorkProductPane workProduct={RECORD} defaultTab="diff" />)
-    // Diff stats from computeDiffStats over baseline → current.
-    expect(screen.getByText('+1')).toBeTruthy()
-    expect(screen.getByText('−1')).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Diff' }).getAttribute('aria-selected')).toBe('true')
+    // The pane carries no stats row of its own — DiffView's file header owns
+    // the +/− counts. A non-empty patch means the empty-diff fallback is absent.
+    expect(screen.queryByText('No changes — baseline and working copy are identical.')).toBeNull()
   })
 
   it('lineage tab renders the evidence table', () => {

@@ -30,7 +30,7 @@ function useModelPill() {
 function Demo({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-2">
-      <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+      <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
         {title}
       </h3>
       <div className="rounded-2xl border border-card-edge bg-card p-4">{children}</div>
@@ -59,7 +59,7 @@ export const Empty: Story = {
   render: () => (
     <ChatComposer
       onSend={(message) => console.log('send', message)}
-      placeholder="Message the assistant…"
+      placeholder="Message the agent…"
       controls={useModelPill()}
     />
   ),
@@ -70,7 +70,7 @@ export const Typed: Story = {
   render: () => (
     <ChatComposer
       onSend={(message) => console.log('send', message)}
-      placeholder="Message the assistant…"
+      placeholder="Message the agent…"
       controls={useModelPill()}
       initialValue="Create a workflow that reviews opened PRs with a cheap but good model and posts the review as a comment."
     />
@@ -84,7 +84,7 @@ export const Streaming: Story = {
       onSend={(message) => console.log('send', message)}
       onCancel={() => console.log('cancel')}
       isStreaming
-      placeholder="Message the assistant…"
+      placeholder="Message the agent…"
       controls={useModelPill()}
     />
   ),
@@ -127,7 +127,7 @@ export const AbovePlacement: Story = {
   render: () => (
     <ChatComposer
       onSend={(message) => console.log('send', message)}
-      placeholder="Message the assistant…"
+      placeholder="Message the agent…"
       controls={useModelPill()}
       controlsPlacement="above"
       focusShortcut={false}
@@ -154,7 +154,7 @@ export const Floating: Story = {
   render: () => (
     <ChatComposer
       onSend={(message) => console.log('send', message)}
-      placeholder="Message the assistant…"
+      placeholder="Message the agent…"
       controls={useModelPill()}
       floating
     />
@@ -177,10 +177,10 @@ export const FlatVsFloating: Story = {
     return (
       <div className="space-y-7">
         <Demo title="current: flat">
-          <ChatComposer onSend={() => {}} placeholder="Message the assistant…" controls={pill} />
+          <ChatComposer onSend={() => {}} placeholder="Message the agent…" controls={pill} />
         </Demo>
         <Demo title="new: floating">
-          <ChatComposer onSend={() => {}} placeholder="Message the assistant…" controls={pill} floating />
+          <ChatComposer onSend={() => {}} placeholder="Message the agent…" controls={pill} floating />
         </Demo>
       </div>
     )
@@ -202,18 +202,18 @@ export const AllStates: Story = {
     return (
       <div className="space-y-7">
         <Demo title="Default — model pill on the action row, empty">
-          <ChatComposer onSend={() => {}} placeholder="Message the assistant…" controls={pill} />
+          <ChatComposer onSend={() => {}} placeholder="Message the agent…" controls={pill} />
         </Demo>
         <Demo title="Typed — Send enabled">
           <ChatComposer
             onSend={() => {}}
-            placeholder="Message the assistant…"
+            placeholder="Message the agent…"
             controls={pill}
             initialValue="Create a workflow that reviews opened PRs with a cheap but good model and posts the review as a comment."
           />
         </Demo>
         <Demo title="Streaming — Send becomes Stop">
-          <ChatComposer onSend={() => {}} onCancel={() => {}} isStreaming placeholder="Message the assistant…" controls={pill} />
+          <ChatComposer onSend={() => {}} onCancel={() => {}} isStreaming placeholder="Message the agent…" controls={pill} />
         </Demo>
         <Demo title="Attachments — attach button, drag-drop, pending chips">
           <ChatComposer
@@ -239,7 +239,7 @@ export const AllStates: Story = {
         <Demo title="Above placement — pill outside the card (no focus hint)">
           <ChatComposer
             onSend={() => {}}
-            placeholder="Message the assistant…"
+            placeholder="Message the agent…"
             controls={pill}
             controlsPlacement="above"
             focusShortcut={false}

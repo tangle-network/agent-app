@@ -5,13 +5,17 @@
  * pending proposals); `adaptTranscript` collapses each turn into one assistant
  * message whose ordered `segments` carry that turn's text runs and tool chips in
  * emission order, so `ChatMessages` renders them interleaved (text → tool →
- * text) rather than as one text blob followed by a tool group.
+ * text) rather than as one text blob followed by a tool group. `status`
+ * messages are NOT folded into a turn: each becomes a quiet centered status
+ * line rendered by this component between `ChatMessages` runs — a settled
+ * action's note ("Created workflow …"), not an assistant-labeled turn.
  *
  * A host can swap this whole renderer via `AssistantPanelProps.renderTranscript`;
  * the markdown renderer and per-tool detail renderers are injected so this
  * subpath stays free of any product-specific markdown/tool dependency.
  */
 
+import { Check } from "lucide-react";
 import { useCallback, useMemo, type ReactNode } from "react";
 import {
   ChatMessages,
@@ -50,7 +54,30 @@ const TOOL_STATUS: Record<string, ToolStatus> = {
   failed: "error",
 };
 
+/** A run of chat messages between two status lines, rendered through one
+ *  `ChatMessages`. */
+interface MessageRun {
+  kind: "run";
+  messages: ChatUiMessage[];
+}
+
+/** A settled action's one-line note ("Created workflow …", "Action cancelled."),
+ *  rendered as a quiet centered line — not routed into `ChatMessages`, where a
+ *  `system` row would paint as a full assistant-labeled turn. */
+interface StatusLine {
+  kind: "status";
+  /** The status message's own id — keys the row and any confirmed result. */
+  id: string;
+  text: string;
+}
+
+type TranscriptBlock = MessageRun | StatusLine;
+
 interface AdaptedTranscript {
+  /** Transcript-order blocks: message runs broken by status lines. */
+  blocks: TranscriptBlock[];
+  /** Every adapted chat message across all runs, flattened (status rows
+   *  excluded — they are the blocks' status lines). */
   messages: ChatUiMessage[];
   /** The assistant message under which pending proposals should render, or null
    *  when there are none. */
@@ -58,8 +85,8 @@ interface AdaptedTranscript {
   /** The current/most-recent turn's assistant message — where the turn cost line
    *  renders (it carries the turn's metrics), or null when there is none. */
   metricsHostId: string | null;
-  /** Confirmed-tool results to render under their (system) message, keyed by that
-   *  message's id — carried from a `status` message's retained `result` so a host
+  /** Confirmed-tool results to render under their status line, keyed by that
+   *  line's id — carried from a `status` message's retained `result` so a host
    *  card (e.g. a one-time API-key reveal) renders inline right after the action. */
   confirmedResults: Map<string, ConfirmedResult>;
 }
@@ -81,18 +108,28 @@ function adaptToolResult(outcome: ToolOutcome): unknown {
 type TurnMessage = ChatUiMessage & { segments: ChatMessageSegment[] };
 
 /**
- * Fold the transcript view into web-react `ChatUiMessage[]`: each user message is
- * 1:1; the assistant/`tool`/`status` messages between two user turns collapse
+ * Fold the transcript view into transcript-order blocks: message runs (web-react
+ * `ChatUiMessage[]`) broken by quiet status lines. Within a run, each user
+ * message is 1:1; the assistant/`tool` messages between two user turns collapse
  * into one assistant message whose ordered `segments` carry the turn's text runs
  * and tool chips IN EMISSION ORDER (with each finished tool's outcome as the chip
  * `result`). The joined text is also kept on `content` — web-react reads it as the
  * "answer has started" signal that gates the reasoning box. The live turn's
  * reasoning preview and model label hang on the last assistant message, and
- * `proposalHostId` names the message the pending proposals render under.
+ * `proposalHostId` names the message the pending proposals render under. A
+ * `status` message ends the current run and becomes a {@link StatusLine} block.
  */
 export function adaptTranscript(view: AssistantTranscriptView): AdaptedTranscript {
-  const messages: ChatUiMessage[] = [];
+  const blocks: TranscriptBlock[] = [];
   const confirmedResults = new Map<string, ConfirmedResult>();
+  // The run under construction — flushed into `blocks` when a status line
+  // breaks it (and once more at the end, after the proposal host / metrics are
+  // hung, so a synthesized host lands in the same run as its turn).
+  let run: ChatUiMessage[] = [];
+  const flushRun = () => {
+    if (run.length > 0) blocks.push({ kind: "run", messages: run });
+    run = [];
+  };
   let turn: TurnMessage | null = null;
   // The assistant message of the CURRENT turn — the one opened since the most
   // recent user message — or null when the live turn has produced no assistant
@@ -102,7 +139,7 @@ export function adaptTranscript(view: AssistantTranscriptView): AdaptedTranscrip
 
   const openTurn = (id: string): TurnMessage => {
     const message: TurnMessage = { id, role: "assistant", content: "", segments: [] };
-    messages.push(message);
+    run.push(message);
     turn = message;
     currentTurnAssistant = message;
     return message;
@@ -119,7 +156,7 @@ export function adaptTranscript(view: AssistantTranscriptView): AdaptedTranscrip
 
   for (const msg of view.messages) {
     if (msg.role === "user") {
-      messages.push({ id: msg.id, role: "user", content: msg.text });
+      run.push({ id: msg.id, role: "user", content: msg.text });
       turn = null;
       currentTurnAssistant = null;
     } else if (msg.role === "assistant") {
@@ -148,11 +185,14 @@ export function adaptTranscript(view: AssistantTranscriptView): AdaptedTranscrip
         },
       });
     } else {
-      // `status` — an informational system note that ends the assistant turn.
-      messages.push({ id: msg.id, role: "system", content: msg.text });
+      // `status` — an informational note that ends the assistant turn. It does
+      // NOT join the run: rendered as a quiet status line of its own, so a
+      // confirmed action no longer paints as a full assistant-labeled turn.
+      flushRun();
+      blocks.push({ kind: "status", id: msg.id, text: msg.text });
       // A confirmed mutating tool that returned a renderable result attaches it
-      // to its status message; carry it out keyed by this system message's id so
-      // the host card renders inline right under the status line.
+      // to its status line; carry it out keyed by that line's id so the host
+      // card renders inline right under the line.
       if (msg.result) confirmedResults.set(msg.id, msg.result);
       turn = null;
     }
@@ -186,6 +226,8 @@ export function adaptTranscript(view: AssistantTranscriptView): AdaptedTranscrip
     }
   }
 
+  flushRun();
+
   // A turn that produced no body and had nothing turn-level hung on it renders as
   // a bare "Assistant" header. That state is the at-send frame before the first
   // delta; drop it so an empty turn never flashes a blank bubble. The proposal
@@ -201,8 +243,23 @@ export function adaptTranscript(view: AssistantTranscriptView): AdaptedTranscrip
     m.durationMs == null &&
     m.id !== proposalHostId;
 
+  const kept: TranscriptBlock[] = [];
+  const messages: ChatUiMessage[] = [];
+  for (const block of blocks) {
+    if (block.kind === "status") {
+      kept.push(block);
+      continue;
+    }
+    const visible = block.messages.filter((m) => !isEmptyShell(m));
+    if (visible.length > 0) {
+      kept.push({ kind: "run", messages: visible });
+      messages.push(...visible);
+    }
+  }
+
   return {
-    messages: messages.filter((m) => !isEmptyShell(m)),
+    blocks: kept,
+    messages,
     proposalHostId,
     metricsHostId:
       currentTurnAssistant && !isEmptyShell(currentTurnAssistant)
@@ -245,11 +302,41 @@ export interface AssistantTranscriptProps {
   emptyState?: ReactNode;
 }
 
+/** A settled action's note as a quiet centered line — a check glyph and muted
+ *  small text, no assistant label, no bubble. The confirmed result card (e.g.
+ *  the one-time API-key reveal) hangs directly under its line. */
+function StatusRow({
+  text,
+  result,
+  renderConfirmedResult,
+}: {
+  text: string;
+  result?: ConfirmedResult;
+  renderConfirmedResult?: (result: ConfirmedResult) => ReactNode;
+}) {
+  // Only when the host supplied a renderer AND it returns a node for this
+  // result — a renderer that returns null (a tool it doesn't handle) must add
+  // no wrapper, or every other confirmed tool would get an empty `mt-3` spacer
+  // under its status line.
+  const confirmed = result && renderConfirmedResult ? renderConfirmedResult(result) : null;
+  return (
+    <div className="mx-auto w-full max-w-3xl px-6 py-1">
+      <p className="flex items-center justify-center gap-1.5 text-center text-muted-foreground text-xs">
+        <Check aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+        {text}
+      </p>
+      {confirmed ? <div className="mt-3">{confirmed}</div> : null}
+    </div>
+  );
+}
+
 /**
- * Render the assistant conversation with web-react's `ChatMessages`. Pending
- * proposals render via the panel's bound `view.renderProposal`, placed inline
- * after the proposing turn through `renderExtras`; the settled turn cost renders
- * once under its assistant bubble.
+ * Render the assistant conversation: message runs through web-react's
+ * `ChatMessages` (quiet chrome — the label/meta row becomes a hover-revealed
+ * lane, which keeps the narrow dock panel uncluttered), status lines through
+ * {@link StatusRow}. Pending proposals render via the panel's bound
+ * `view.renderProposal`, placed inline after the proposing turn through
+ * `renderExtras`; the settled turn cost renders once under its assistant bubble.
  */
 export function AssistantTranscript({
   view,
@@ -258,7 +345,7 @@ export function AssistantTranscript({
   renderConfirmedResult,
   emptyState,
 }: AssistantTranscriptProps) {
-  const { messages, proposalHostId, metricsHostId, confirmedResults } = useMemo(
+  const { blocks, proposalHostId, metricsHostId, confirmedResults } = useMemo(
     () => adaptTranscript(view),
     [view],
   );
@@ -271,66 +358,73 @@ export function AssistantTranscript({
     [renderMarkdown],
   );
 
-  if (messages.length === 0 && !view.isStreaming) {
+  if (blocks.length === 0 && !view.isStreaming) {
     return <>{emptyState}</>;
   }
 
+  // renderExtras places the pending proposal cards after their proposing turn
+  // and the settled turn's at-cost figure under its bubble. (A confirmed
+  // tool's host card renders with its status line — see StatusRow.)
+  const extras = (message: ChatUiMessage): ReactNode => {
+    const proposals =
+      message.id === proposalHostId && view.pendingProposals.length > 0 ? (
+        <div className="mt-3 flex flex-col gap-3">
+          {view.pendingProposals.map((proposal) => (
+            <ProposalSlot
+              key={proposal.callId}
+              proposal={proposal}
+              render={view.renderProposal}
+            />
+          ))}
+        </div>
+      ) : null;
+    // The settled turn's at-cost figure, shown once under its assistant
+    // bubble. Hidden while streaming and for a replayed (uncharged) turn.
+    const cost =
+      message.id === metricsHostId &&
+      !view.isStreaming &&
+      view.usage?.costUsd != null &&
+      !view.usage.replayed ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          {formatTurnCost(view.usage.costUsd)} this turn
+        </p>
+      ) : null;
+    if (!proposals && !cost) return null;
+    return (
+      <>
+        {proposals}
+        {cost}
+      </>
+    );
+  };
+
   return (
-    <ChatMessages
-      messages={messages}
-      // ChatMessages derives the streaming message internally, so only
-      // `isStreaming` is needed; `view.isThinking` is a subset of it.
-      loading={view.isStreaming}
-      agentLabel="Assistant"
-      renderMarkdown={markdown}
-      toolRenderers={toolRenderers}
-      renderEmpty={() => <>{emptyState}</>}
-      renderExtras={(message) => {
-        const proposals =
-          message.id === proposalHostId && view.pendingProposals.length > 0 ? (
-            <div className="mt-3 flex flex-col gap-3">
-              {view.pendingProposals.map((proposal) => (
-                <ProposalSlot
-                  key={proposal.callId}
-                  proposal={proposal}
-                  render={view.renderProposal}
-                />
-              ))}
-            </div>
-          ) : null;
-        // A confirmed tool's host card, rendered inline under its status line
-        // (e.g. the one-time API-key reveal). Only when the host supplied a
-        // renderer AND it returns a node for this result — a renderer that
-        // returns null (a tool it doesn't handle) must add no wrapper, or every
-        // other confirmed tool would get an empty `mt-3` spacer under its status.
-        const confirmed = confirmedResults.get(message.id);
-        const confirmedNode =
-          confirmed && renderConfirmedResult
-            ? renderConfirmedResult(confirmed)
-            : null;
-        const confirmedCard = confirmedNode ? (
-          <div className="mt-3">{confirmedNode}</div>
-        ) : null;
-        // The settled turn's at-cost figure, shown once under its assistant
-        // bubble. Hidden while streaming and for a replayed (uncharged) turn.
-        const cost =
-          message.id === metricsHostId &&
-          !view.isStreaming &&
-          view.usage?.costUsd != null &&
-          !view.usage.replayed ? (
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              {formatTurnCost(view.usage.costUsd)} this turn
-            </p>
-          ) : null;
-        if (!proposals && !cost && !confirmedCard) return null;
-        return (
-          <>
-            {confirmedCard}
-            {proposals}
-            {cost}
-          </>
-        );
-      }}
-    />
+    <>
+      {blocks.map((block, i) =>
+        block.kind === "status" ? (
+          <StatusRow
+            key={block.id}
+            text={block.text}
+            result={confirmedResults.get(block.id)}
+            renderConfirmedResult={renderConfirmedResult}
+          />
+        ) : (
+          <ChatMessages
+            // Only the trailing run can hold the live turn, so only it streams
+            // (earlier runs are settled history).
+            key={i}
+            messages={block.messages}
+            // ChatMessages derives the streaming message internally, so only
+            // `isStreaming` is needed; `view.isThinking` is a subset of it.
+            loading={view.isStreaming && i === blocks.length - 1}
+            agentLabel="Assistant"
+            chrome="quiet"
+            renderMarkdown={markdown}
+            toolRenderers={toolRenderers}
+            renderExtras={extras}
+          />
+        ),
+      )}
+    </>
   );
 }

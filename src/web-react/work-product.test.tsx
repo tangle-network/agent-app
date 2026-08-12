@@ -181,7 +181,7 @@ describe('ProvenanceStamp', () => {
     render(
       <ProvenanceStamp provenance={{ profileHash: '3f2a998877665544', runId: 'turn-abcdef12345', servingModels: [] }} />,
     )
-    expect(screen.getByText('profile 3f2a998877')).toBeTruthy()
+    expect(screen.getByText('profile 3f2a998877…')).toBeTruthy()
     expect(screen.getByText('serving model pending')).toBeTruthy()
   })
 

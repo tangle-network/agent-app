@@ -32,14 +32,20 @@ function setup(overrides: Partial<Parameters<typeof CanvasInsertPanel>[0]> = {})
 }
 
 describe('tabs', () => {
-  it('shows Uploads + Templates by default, hides Generations without a provider', () => {
+  it('shows Uploads + Elements by default, hides Generations without a provider', () => {
     setup()
     expect(screen.getByText('Uploads')).toBeTruthy()
-    expect(screen.getByText('Templates')).toBeTruthy()
+    expect(screen.getByText('Elements')).toBeTruthy()
     expect(screen.queryByText('Generations')).toBeNull()
   })
 
-  it('supports a templates-only insert rail when uploads are not wired', () => {
+  it('labels the tab Templates only when the host passes a composed set', () => {
+    setup({ templates: [{ id: 't', label: 'Hero', build: () => [] }] })
+    expect(screen.getByText('Templates')).toBeTruthy()
+    expect(screen.queryByText('Elements')).toBeNull()
+  })
+
+  it('supports an elements-only insert rail when uploads are not wired', () => {
     render(
       createElement(CanvasInsertPanel, {
         canWrite: true,
@@ -48,7 +54,7 @@ describe('tabs', () => {
       }),
     )
     expect(screen.queryByText('Uploads')).toBeNull()
-    expect(screen.getByText('Templates')).toBeTruthy()
+    expect(screen.getByText('Elements')).toBeTruthy()
     expect(screen.getByText('Heading')).toBeTruthy()
   })
 
@@ -111,7 +117,7 @@ describe('upload → insert', () => {
 describe('templates', () => {
   it('inserts a template through onInsert', async () => {
     const { onInsert } = setup()
-    fireEvent.click(screen.getByText('Templates'))
+    fireEvent.click(screen.getByText('Elements'))
     await act(async () => {
       fireEvent.click(screen.getByText('Heading'))
     })
@@ -122,7 +128,7 @@ describe('templates', () => {
 
   it('renders a distinguishable preview per tile (not four identical chips)', () => {
     setup()
-    fireEvent.click(screen.getByText('Templates'))
+    fireEvent.click(screen.getByText('Elements'))
     // Heading → "T" glyph, Body text → "¶" glyph. Their presence proves the
     // text tiles are visually distinct from each other and from the shape tiles.
     expect(screen.getByText('T')).toBeTruthy()

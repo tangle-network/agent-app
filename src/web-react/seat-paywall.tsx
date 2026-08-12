@@ -32,7 +32,7 @@ export interface SeatPaywallProps {
   offer?: ProductSeatOffer
   /** Optional one-line value prop under the headline. */
   tagline?: string
-  /** CTA label. Default "Unlock {product}". */
+  /** CTA label. Default "Continue to checkout". */
   ctaLabel?: string
   /** Value-prop bullets. Default = product/usage-derived only; pass your own to
    *  supply product-specific value props (the shell bakes no GTM copy). */
@@ -81,7 +81,10 @@ function Benefit({ children }: { children: ReactNode }): ReactNode {
 /**
  * Centered card paywall. The price line reads
  * "$100/mo · includes $50/mo of AI usage" so the included allowance anchors the
- * value without ever exposing the ratio.
+ * value without ever exposing the ratio — and says it ONCE: the default
+ * benefits don't restate the usage line the subline already carries, and the
+ * CTA is the next step ("Continue to checkout"), not a third repeat of the
+ * eyebrow + headline's "Unlock {product}".
  */
 export function SeatPaywall({
   product,
@@ -103,7 +106,7 @@ export function SeatPaywall({
   return (
     <div className="flex min-h-[60vh] w-full items-center justify-center p-6">
       <div className="w-full max-w-md rounded-2xl border border-card-edge bg-card p-8">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <p className="text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground">
           {product}
         </p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
@@ -139,9 +142,11 @@ export function SeatPaywall({
         )}
 
         <ul className="mt-6 space-y-2.5">
+          {/* Default benefits leave the usage allowance to the price subline,
+              which always states it — listing it again here read the same
+              number three times on one card. */}
           {(benefits ?? [
             `Full access to ${product}`,
-            `${recurringUsage}/mo of AI usage included`,
           ]).map((benefit, i) => (
             <Benefit key={i}>{benefit}</Benefit>
           ))}
@@ -153,7 +158,7 @@ export function SeatPaywall({
           onClick={() => run(onCheckout)}
           className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {pending ? 'Opening checkout…' : ctaLabel ?? `Unlock ${product}`}
+          {pending ? 'Opening checkout…' : ctaLabel ?? 'Continue to checkout'}
         </button>
         {footnote && (
           <p className="mt-3 text-center text-xs text-muted-foreground/70">

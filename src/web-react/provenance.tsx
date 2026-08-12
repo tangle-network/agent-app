@@ -198,14 +198,14 @@ function SourceRow({
   return (
     <li className="rounded-md border border-card-edge bg-card px-2.5 py-2">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="text-[13px] font-medium text-foreground">{source.label}</span>
-        {source.locator && <span className="text-[11px] text-muted-foreground">{source.locator}</span>}
+        <span className="text-sm font-medium text-foreground">{source.label}</span>
+        {source.locator && <span className="text-xs text-muted-foreground">{source.locator}</span>}
         {openable &&
           (onOpenSource ? (
             <button
               type="button"
               onClick={() => onOpenSource(source, record)}
-              className="rounded px-1 text-[11px] font-medium text-primary underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded px-1 text-xs font-medium text-primary underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               Open {source.label}
             </button>
@@ -214,7 +214,7 @@ function SourceRow({
               href={source.href}
               target="_blank"
               rel="noreferrer"
-              className="rounded px-1 text-[11px] font-medium text-primary underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded px-1 text-xs font-medium text-primary underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               Open {source.label}
             </a>
@@ -232,14 +232,14 @@ function SourceRow({
         // here".
         <p
           role="status"
-          className={`mt-1 text-[11px] ${status === 'unavailable' ? 'text-destructive' : 'text-muted-foreground'}`}
+          className={`mt-1 text-xs ${status === 'unavailable' ? 'text-destructive' : 'text-muted-foreground'}`}
         >
           {statusLine}
           {status === 'unavailable' && onRetrySource && (
             <button
               type="button"
               onClick={() => onRetrySource(source, record)}
-              className="ml-2 rounded border border-border px-1.5 py-0.5 text-[11px] font-medium text-foreground hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="ml-2 rounded border border-border px-1.5 py-0.5 text-xs font-medium text-foreground hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               Try again
             </button>
@@ -329,7 +329,7 @@ export function ProvenanceValue({
 
   const summary: ReactNode = (
     <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
-      {record.label && <span className="text-[11px] text-muted-foreground">{record.label}</span>}
+      {record.label && <span className="text-xs text-muted-foreground">{record.label}</span>}
       <span className={hasValue ? 'text-sm text-foreground' : 'text-sm italic text-muted-foreground'}>
         {hasValue ? record.display : missingValueLabel}
       </span>
@@ -348,12 +348,12 @@ export function ProvenanceValue({
       >
         {summary}
         <span
-          className={`ml-1.5 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${BASIS_TONES[record.basis]}`}
+          className={`ml-1.5 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs font-medium ${BASIS_TONES[record.basis]}`}
         >
           <BasisGlyph basis={record.basis} className="h-3 w-3" />
           {basisMeta.label}
         </span>
-        <span className="mt-0.5 block text-[11px] text-muted-foreground">{describeProvenance(record)}</span>
+        <span className="mt-0.5 block text-xs text-muted-foreground">{describeProvenance(record)}</span>
       </div>
     )
   }
@@ -375,7 +375,7 @@ export function ProvenanceValue({
           aria-expanded={open}
           aria-controls={panelId}
           aria-label={provenanceTriggerLabel(record, standing)}
-          className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium transition hover:brightness-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${BASIS_TONES[record.basis]}`}
+          className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs font-medium transition hover:brightness-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${BASIS_TONES[record.basis]}`}
         >
           <BasisGlyph basis={record.basis} className="h-3 w-3" />
           <span aria-hidden>{basisMeta.label}</span>
@@ -384,7 +384,7 @@ export function ProvenanceValue({
           // Legible at rest: what to do about the value does not wait for
           // someone to open the panel. `aria-hidden` because the trigger's
           // accessible name already carries it — this is the visual half.
-          <span aria-hidden className={`text-[10px] font-medium ${STANDING_TONES[standing]}`}>
+          <span aria-hidden className={`text-xs font-medium ${STANDING_TONES[standing]}`}>
             {standingMeta.label}
           </span>
         )}
@@ -399,11 +399,11 @@ export function ProvenanceValue({
         >
           <div>
             <p className="text-[12px] leading-snug text-foreground">{describeProvenance(record)}</p>
-            <p className={`mt-0.5 text-[11px] leading-snug ${STANDING_TONES[standing]}`}>
+            <p className={`mt-0.5 text-xs leading-snug ${STANDING_TONES[standing]}`}>
               {standingMeta.label} — {provenanceNextMove(record, standing, confidencePolicy)}
             </p>
             {basisMeta.checkableAgainst === null && (
-              <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+              <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
                 {basisMeta.meaning} There is nothing outside the model to check it against.
               </p>
             )}
@@ -428,20 +428,20 @@ export function ProvenanceValue({
             .map((gap) => (
               // An unavailable source already states itself on its own row; a
               // structural gap has no row to state it, so it gets one here.
-              <p key={gap.kind} className="rounded-md bg-destructive/10 px-2 py-1.5 text-[11px] leading-snug text-destructive">
+              <p key={gap.kind} className="rounded-md bg-destructive/10 px-2 py-1.5 text-xs leading-snug text-destructive">
                 {gap.message}
               </p>
             ))}
 
           {loading.length > 0 && sources.length === 0 && (
-            <p role="status" className="text-[11px] text-muted-foreground">
+            <p role="status" className="text-xs text-muted-foreground">
               Looking up where this came from…
             </p>
           )}
 
           {inputs.length > 0 && (
             <div className="border-t border-border pt-2">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              <p className="text-xs font-medium uppercase tracking-[0.05em] text-muted-foreground">
                 {record.derivation ? `Computed from ${record.derivation}` : 'Computed from'}
               </p>
               <ul className="mt-1.5 space-y-1.5">
@@ -484,9 +484,9 @@ export function ProvenanceLegend({ bases, className }: ProvenanceLegendProps) {
       {bases.map((basis) => {
         const meta = provenanceBasisMeta(basis)
         return (
-          <li key={basis} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <li key={basis} className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span
-              className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${BASIS_TONES[basis]}`}
+              className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs font-medium ${BASIS_TONES[basis]}`}
             >
               <BasisGlyph basis={basis} className="h-3 w-3" />
               {meta.label}

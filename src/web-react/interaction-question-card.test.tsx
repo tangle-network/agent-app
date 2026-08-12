@@ -63,7 +63,6 @@ function mount(
     onResolved?: (id: string, status: string) => void
     onLateAnswer?: (message: string) => boolean | void | Promise<boolean | void>
     kindLabel?: string
-    sourceNote?: string
     timeoutNote?: React.ReactNode
     renderMarkdown?: (markdown: string) => React.ReactNode
   } = {},
@@ -77,7 +76,6 @@ function mount(
       onResolved={props.onResolved}
       onLateAnswer={props.onLateAnswer}
       kindLabel={props.kindLabel}
-      sourceNote={props.sourceNote}
       timeoutNote={props.timeoutNote}
       renderMarkdown={props.renderMarkdown}
     />,
@@ -349,20 +347,17 @@ describe('InteractionQuestionCard', () => {
 })
 
 describe('InteractionQuestionCard host overrides', () => {
-  it('names the agent as the asker by default', () => {
+  it('badges the ask as a question by default, with no static right-note', () => {
     const { container } = mount(SELECT_INTERACTION)
     expect(container.textContent).toContain('Question')
-    expect(container.textContent).toContain('The agent asked for input')
+    // The status badge says what the static "The agent asked for input" note
+    // used to repeat — the note is gone in every state.
+    expect(container.textContent).not.toContain('The agent asked for input')
   })
 
-  it('lets a non-agent host say who is actually asking', () => {
-    const { container } = mount(SELECT_INTERACTION, {
-      kindLabel: 'Decision',
-      sourceNote: 'This run is waiting on you',
-    })
+  it('lets a non-agent host rename the kind badge', () => {
+    const { container } = mount(SELECT_INTERACTION, { kindLabel: 'Decision' })
     expect(container.textContent).toContain('Decision')
-    expect(container.textContent).toContain('This run is waiting on you')
-    expect(container.textContent).not.toContain('The agent asked for input')
   })
 
   it('renders the body through the host renderer, and as plain text without one', () => {

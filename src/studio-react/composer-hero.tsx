@@ -24,6 +24,7 @@ import {
   userSafeGenerationMessage,
 } from '../studio'
 import { TYPE_CONFIG, typeConfigFor } from './type-config'
+import { ProviderLogo } from '../web-react/provider-logo'
 import { ComposerDisclosure, Field } from './composer-shell'
 import { ImageComposer } from './image-composer'
 import { VideoComposer } from './video-composer'
@@ -145,10 +146,12 @@ export function ComposerHero({
         setMediaModels(data)
         setSelectedModels((current) => selectedModelsWithDefaults(current, data))
       })
-      .catch((err) => {
+      .catch(() => {
         if (cancelled) return
         setMediaModels(null)
-        setMediaModelsError(err instanceof Error ? err.message : 'Could not load media models')
+        // Never surface the raw fetch/parse error — a non-JSON 404 page reads
+        // as `Unexpected token 'N', "Not Found" is not valid JSON` to users.
+        setMediaModelsError('Could not load media models')
       })
       .finally(() => {
         if (!cancelled) setMediaModelsLoading(false)
@@ -262,13 +265,13 @@ export function ComposerHero({
   return (
     <section className={`rounded-2xl border border-border p-5 shadow-sm ${surfaceClassName}`}>
       <div className={`mb-5 ${align === 'center' ? 'text-center' : 'text-left'}`}>
-        <h1
+        <h2
           className={`font-semibold tracking-tight text-foreground transition-all duration-300 ${
             align === 'center' ? 'text-xl' : 'text-base'
           }`}
         >
           Media Generation
-        </h1>
+        </h2>
       </div>
 
       <div role="tablist" aria-label="Generation type" className="grid grid-cols-5 gap-1.5">
@@ -282,7 +285,7 @@ export function ComposerHero({
               role="tab"
               aria-selected={active}
               onClick={() => changeType(key)}
-              className={`flex flex-col items-center gap-1.5 rounded-lg border px-1 pb-2 pt-2.5 text-[11px] transition-all ${
+              className={`flex flex-col items-center gap-1.5 rounded-lg border px-1 pb-2 pt-2.5 text-xs transition-all ${
                 active
                   ? 'border-primary/30 bg-primary/10 font-semibold text-primary'
                   : 'border-border bg-background font-medium text-muted-foreground hover:border-foreground/20 hover:text-foreground'
@@ -299,7 +302,7 @@ export function ComposerHero({
         <div className="mt-5">
           <Label
             htmlFor="studio-prompt"
-            className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground"
+            className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground"
           >
             Prompt
           </Label>
@@ -329,7 +332,7 @@ export function ComposerHero({
                     setPrompt(suggestion.prompt)
                     changeType(suggestion.type)
                   }}
-                  className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
+                  className="rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
                 >
                   {suggestion.label}
                 </button>
@@ -338,7 +341,7 @@ export function ComposerHero({
           </div>
           {type === 'transcription' && (
             <p className="mt-2 text-xs text-muted-foreground">
-              Optional — biases the transcript's spelling, vocabulary, and speaker names. It isn't an instruction for the model to follow.
+              Optional — biases spelling, vocabulary, and speaker names (not an instruction).
             </p>
           )}
         </div>
@@ -374,12 +377,15 @@ export function ComposerHero({
               <SelectTrigger id="studio-media-model" className="h-9 w-full bg-background">
                 {selectedModelOption ? (
                   <span className="flex min-w-0 items-center gap-2">
+                    {selectedModelOption.provider && (
+                      <ProviderLogo provider={selectedModelOption.provider} size={14} />
+                    )}
                     <span className="truncate">{selectedModelOption.name || selectedModelOption.id}</span>
                     {selectedModelOption.provider && (
                       <span className="shrink-0 text-muted-foreground">· {selectedModelOption.provider}</span>
                     )}
                     {selectedModelOption.status !== 'available' && (
-                      <span className="shrink-0 rounded-full bg-warning/10 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-warning">
+                      <span className="shrink-0 rounded-full bg-warning/10 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-[0.05em] text-warning">
                         {selectedModelOption.status}
                       </span>
                     )}
@@ -392,11 +398,14 @@ export function ComposerHero({
                 {modelsForType.map((model) => (
                   <SelectItem key={model.id} value={model.id} disabled={model.status === 'unavailable'}>
                     <span className="flex w-full items-center justify-between gap-3">
-                      <span className="truncate">
-                        {model.name || model.id}{model.provider ? ` · ${model.provider}` : ''}
+                      <span className="flex min-w-0 items-center gap-2">
+                        {model.provider && <ProviderLogo provider={model.provider} size={14} />}
+                        <span className="truncate">
+                          {model.name || model.id}{model.provider ? ` · ${model.provider}` : ''}
+                        </span>
                       </span>
                       {model.status !== 'available' && (
-                        <span className="shrink-0 text-[11px] capitalize text-muted-foreground">{model.status}</span>
+                        <span className="shrink-0 text-xs capitalize text-muted-foreground">{model.status}</span>
                       )}
                     </span>
                   </SelectItem>
@@ -446,11 +455,11 @@ export function ComposerHero({
                 onChange={(event) => setNegativePrompt(event.target.value)}
                 rows={2}
                 placeholder="Avoid artifacts, off-style composition..."
-                className="bg-[var(--md3-surface-container-low)]"
+                className="bg-background"
               />
             </Field>
             <Field label="Save to">
-              <Input value={outputPath} onChange={(event) => setOutputPath(event.target.value)} className="bg-[var(--md3-surface-container-low)]" />
+              <Input value={outputPath} onChange={(event) => setOutputPath(event.target.value)} className="bg-background" />
             </Field>
             {type === 'transcription' && (
               <TranscriptionOptions
@@ -468,7 +477,7 @@ export function ComposerHero({
             <>
               Schedule a post
               {selectedConnectedDestinations.length > 0 && (
-                <Badge variant="outline" className="ml-1 text-[11px]">
+                <Badge variant="outline" className="ml-1 text-xs">
                   {selectedConnectedDestinations.length}
                 </Badge>
               )}
@@ -507,10 +516,15 @@ export function ComposerHero({
         </div>
       )}
 
-      <Button onClick={generate} disabled={!canSubmit} size="lg" className="mt-5 w-full">
+      <Button
+        onClick={generate}
+        disabled={!canSubmit}
+        size="lg"
+        className="mt-5 w-full disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
+      >
         <Sparkles className="mr-2 h-4 w-4" />
         Generate
-        <span className="ml-2 text-[11px] opacity-60">⌘↵</span>
+        <span className="ml-2 text-xs opacity-60">⌘↵</span>
       </Button>
     </section>
   )

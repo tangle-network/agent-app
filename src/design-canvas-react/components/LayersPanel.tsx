@@ -76,13 +76,13 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
 
   return (
     <div className="flex h-full flex-col overflow-hidden text-[var(--text-primary)]">
-      <div className="shrink-0 border-b border-[var(--border-default)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">
+      <div className="shrink-0 border-b border-[var(--border-default)] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">
         Layers
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {visible.length === 0 ? (
-          <div className="px-3 py-2 text-[11px] text-[var(--text-muted)]">No layers yet</div>
+          <div className="px-3 py-2 text-xs text-[var(--text-muted)]">No layers yet</div>
         ) : null}
         {visible.map((row) => {
           const { element } = row
@@ -155,7 +155,11 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
                   className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 bg-transparent text-left"
                 >
                   <KindIcon kind={element.kind} className="h-3.5 w-3.5 shrink-0 opacity-60" />
-                  {element.slot ? <SlotGlyph className="h-3 w-3 shrink-0 text-[var(--brand-primary)]" /> : null}
+                  {element.slot ? (
+                    <span title={`Bound to slot: ${element.slot}`} className="inline-flex shrink-0">
+                      <SlotGlyph className="h-3 w-3 text-[var(--brand-primary)]" />
+                    </span>
+                  ) : null}
                   <span className="min-w-0 flex-1 truncate">{element.name}</span>
                 </button>
               )}
@@ -204,7 +208,7 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
         })}
 
         {rows.length > LAYERS_PANEL_ROW_LIMIT ? (
-          <div className="px-3 py-2 text-[11px] text-[var(--text-muted)]">
+          <div className="px-3 py-2 text-xs text-[var(--text-muted)]">
             +{rows.length - LAYERS_PANEL_ROW_LIMIT} more elements — select a group to scope the list
           </div>
         ) : null}

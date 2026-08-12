@@ -60,11 +60,15 @@ export function ProviderLogo({ provider, size = 16 }: ProviderLogoProps): ReactN
       </svg>
     )
   }
-  const mono = MONOGRAM[key] ?? { bg: '#f3f4f6', fg: '#6b7280' }
+  // Unknown providers fall back to a neutral monogram drawn from theme tokens
+  // (secondary tile, muted glyph) — the previous hardcoded grays (#f3f4f6 /
+  // #6b7280) were tuned for light mode and read as a washed-out hole on dark.
+  // `style` rather than the `fill` attribute so the var() references resolve.
+  const mono = MONOGRAM[key]
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" role="img" aria-label={key || 'model'}>
-      <rect width="16" height="16" rx="4" fill={mono.bg} />
-      <text x="8" y="11.6" textAnchor="middle" fill={mono.fg} fontSize="9" fontWeight="700" fontFamily="system-ui, sans-serif">
+      <rect width="16" height="16" rx="4" style={{ fill: mono ? mono.bg : 'hsl(var(--secondary))' }} />
+      <text x="8" y="11.6" textAnchor="middle" style={{ fill: mono ? mono.fg : 'hsl(var(--muted-foreground))' }} fontSize="9" fontWeight="700" fontFamily="system-ui, sans-serif">
         {(key || '?').charAt(0).toUpperCase()}
       </text>
     </svg>

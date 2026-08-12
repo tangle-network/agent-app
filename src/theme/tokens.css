@@ -61,19 +61,21 @@
   /* dark band — the dark theme's surface ladder, bottom up: canvas-backdrop,
      background, input (recessed), card, secondary/muted/accent, popover,
      border. The first three RETUNE the stops the light theme's ink also reads;
-     the top four are new rungs. */
+     the top four are new rungs. Steps bg→card→secondary→popover measure
+     1.19/1.14/1.09 (card→popover 1.24) — ChatGPT-class steps at brand chroma:
+     visible on real displays, not just on the reference monitor. */
   --neutral-16: oklch(0.16 0.018 280);
   --neutral-16-hsl: 234.9 28.5% 6.4%;
   --neutral-19: oklch(0.19 0.018 280);
   --neutral-19-hsl: 234.5 21.2% 9%;
   --neutral-22: oklch(0.215 0.018 280);
   --neutral-22-hsl: 234.2 17.6% 11.3%;
-  --neutral-24: oklch(0.235 0.018 280);
-  --neutral-24-hsl: 234.1 15.5% 13.1%;
-  --neutral-28: oklch(0.285 0.017 280);
-  --neutral-28-hsl: 233.8 11.4% 17.8%;
-  --neutral-33: oklch(0.325 0.016 280);
-  --neutral-33-hsl: 233.6 9.1% 21.7%;
+  --neutral-26: oklch(0.26 0.017 280);
+  --neutral-26-hsl: 233.8 12.9% 15.4%;
+  --neutral-30: oklch(0.3 0.017 280);
+  --neutral-30-hsl: 233.7 10.7% 19.3%;
+  --neutral-32: oklch(0.32 0.016 280);
+  --neutral-32-hsl: 233.6 9.3% 21.2%;
   --neutral-36: oklch(0.365 0.014 280);
   --neutral-36-hsl: 233.4 7% 25.6%;
   /* mid stops — text, both themes */
@@ -376,9 +378,9 @@
      and is therefore absent, not omitted: the cascade already carries it. */
   --background: var(--neutral-19-hsl);
   --foreground: var(--neutral-94-hsl);
-  --card: var(--neutral-24-hsl);
+  --card: var(--neutral-26-hsl);
   --card-foreground: var(--neutral-94-hsl);
-  --popover: var(--neutral-33-hsl);
+  --popover: var(--neutral-32-hsl);
   --popover-foreground: var(--neutral-94-hsl);
   /* 74% L (brand's #818CF8 intent) so primary clears AA as TEXT on a primary/10
      tint in dark. That lightness is also why the foreground has to INVERT here:
@@ -388,14 +390,14 @@
      the solid button reads in both themes and the tint keeps its AA as text. */
   --primary: 239 84% 74%;
   --primary-foreground: var(--neutral-16-hsl);
-  --secondary: var(--neutral-28-hsl);
+  --secondary: var(--neutral-30-hsl);
   --secondary-foreground: var(--neutral-94-hsl);
-  --muted: var(--neutral-28-hsl);
+  --muted: var(--neutral-30-hsl);
   --muted-foreground: var(--neutral-70-hsl);
-  --accent: var(--neutral-28-hsl);
+  --accent: var(--neutral-30-hsl);
   --accent-foreground: var(--neutral-94-hsl);
   --destructive: 348 90% 68%;
-  --destructive-foreground: var(--neutral-24-hsl);
+  --destructive-foreground: var(--neutral-22-hsl);
   /* @see the :root declaration — this is the tier that re-themes. */
   --warning-strong: 40 94% 56%;
   --border: var(--neutral-36-hsl);

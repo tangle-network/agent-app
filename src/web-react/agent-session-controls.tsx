@@ -194,7 +194,7 @@ function HarnessPicker({
             triggerRef={triggerRef}
             panelRef={hintPanelRef}
             matchTriggerWidth={fullWidth}
-            className={`max-w-[248px] rounded-lg border border-card-edge bg-popover px-2.5 py-1.5 text-[11px] leading-snug text-muted-foreground ${OVERLAY_SHADOW}`}
+            className={`max-w-[248px] rounded-lg border border-card-edge bg-popover px-2.5 py-1.5 text-xs leading-snug text-muted-foreground ${OVERLAY_SHADOW}`}
           >
             <span aria-hidden>{lockReason}</span>
           </PopoverSurface>
@@ -408,7 +408,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
                     fullWidth
                     lockReason={harnessLockReason}
                   />
-                  <p className="text-[11px] leading-snug text-muted-foreground">
+                  <p className="text-xs leading-snug text-muted-foreground">
                     The engine that runs the agent. Switching it keeps your model choice compatible.
                   </p>
                 </div>
@@ -417,7 +417,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
                 <div className="space-y-1.5">
                   <p className="text-xs font-medium text-foreground">Thinking</p>
                   <EffortPicker value={effort} onChange={onEffortChange} levels={effortLevels} label="" fullWidth />
-                  <p className="text-[11px] leading-snug text-muted-foreground">
+                  <p className="text-xs leading-snug text-muted-foreground">
                     How hard the agent thinks before answering. Higher is slower but more thorough.
                   </p>
                 </div>
