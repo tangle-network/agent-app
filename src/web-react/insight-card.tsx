@@ -57,6 +57,7 @@ import {
 
 import { AsyncView, type AsyncEmptySpec, type AsyncResourceState } from './async'
 import { joinClasses } from './class-names'
+import { staggerStyle } from './motion'
 import { Sparkline, formatSparklineValue } from './sparkline'
 
 // ── the delta, and its honesty rules ──────────────────────────────────────
@@ -397,14 +398,6 @@ export function insightPageSlice<T>(items: readonly T[], page: number, pageSize:
   const requested = Number.isFinite(page) ? Math.floor(page) : 0
   const safe = Math.min(Math.max(requested, 0), count - 1)
   return items.slice(safe * size, safe * size + size)
-}
-
-/** `--stagger-index` as a typed style, so the arrival delay is a token
- *  calculation in CSS rather than a duration written in TypeScript. */
-type StaggerStyle = CSSProperties & Record<'--stagger-index', number>
-
-function staggerStyle(index: number, base?: CSSProperties): StaggerStyle {
-  return { ...base, '--stagger-index': index }
 }
 
 export interface InsightDeckProps {

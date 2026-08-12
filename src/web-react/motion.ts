@@ -21,9 +21,14 @@ import { useState, type CSSProperties } from 'react'
  * Use it directly only where the group's order is FIXED once rendered — an
  * ask's option rows, a turn's append-only tool segments. A list that can
  * re-sort wants {@link useArrivalStyle}.
+ *
+ * `base` merges a caller's own style, because a row that carries layout of its
+ * own would otherwise have to spread the two itself at every call site, and the
+ * spread order matters: the index must win, or a stale `--stagger-index` on the
+ * base silently overrides the position being asked for.
  */
-export function staggerStyle(index: number): CSSProperties {
-  return { '--stagger-index': index } as CSSProperties
+export function staggerStyle(index: number, base?: CSSProperties): CSSProperties {
+  return { ...base, '--stagger-index': index } as CSSProperties
 }
 
 /**
