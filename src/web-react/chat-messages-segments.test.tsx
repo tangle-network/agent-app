@@ -355,6 +355,34 @@ describe('ChatMessages segmented turns', () => {
     expect(container.textContent).toContain('Tomorrow 9am')
   })
 
+  it('keeps the clock identity when the schedule FAILS, and still arrives once', () => {
+    // A failed schedule is still a follow-up: it reports the failure in place
+    // rather than falling through to the generic tool row, which would drop the
+    // clock the reader is looking for. The row is `.agent-arrive` like every
+    // other one — the failure changes what the row SAYS, never what it is.
+    const message: ChatUiMessage = {
+      id: 'm1',
+      role: 'assistant',
+      content: '',
+      toolCalls: [
+        {
+          id: 't1',
+          name: 'schedule_followup',
+          status: 'error',
+          args: { title: 'post launch poster', when: 'Tomorrow 9am' },
+          result: { ok: false, message: 'Scheduler rejected the time' },
+        },
+      ],
+    }
+    const { container } = render(<ChatMessages messages={[message]} />)
+    expect(container.textContent).toContain('Scheduled: post launch poster')
+    expect(container.textContent).toContain('Tomorrow 9am')
+    expect(container.textContent).toContain('Scheduler rejected the time')
+    const row = Array.from(container.querySelectorAll('.agent-arrive')).find((el) =>
+      (el.textContent ?? '').includes('post launch poster'))
+    expect(row).toBeTruthy()
+  })
+
   it('shows the branded first-run state when there are no messages', () => {
     const onSelect = vi.fn()
     const { container, getByText } = render(
