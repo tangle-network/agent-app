@@ -78,7 +78,31 @@ function logStep(name: string): string {
   return `node logargs.mjs ${name}`
 }
 
-describe('runSignoff (end to end)', () => {
+/**
+ * Every test in this suite runs REAL work: `git init`, a real commit, a real
+ * `git worktree add`, a real install command and a real step graph of
+ * subprocesses. Several run `runSignoff` twice. Vitest's default 5 000 ms is a
+ * budget for a unit test, and against this shape it is a stopwatch on the
+ * machine rather than an assertion about the gate.
+ *
+ * It has already fired in exactly that way: `pnpm signoff --source head` at
+ * a9e2995 went red on "the one-line summary carries the verdict…" — timed out
+ * at 5 000 ms while the same test measures ~1 s idle and passes 14 of 14 runs.
+ * Nothing about the gate was broken; the box was carrying other work, and this
+ * gate manufactures its own load (`maxParallel: 4`, plus a second shuffled pass
+ * over the whole suite). A merge gate that goes red because the machine was
+ * busy is a gate people learn to re-run instead of read, and `docs/
+ * local-signoff.md` already names the remedy: do not encode machine speed in a
+ * per-test timeout.
+ *
+ * So the budget here is generous and deliberate. It is not a performance
+ * assertion — a genuinely hung subprocess still fails, two orders of magnitude
+ * later, and the gate's OWN `timeoutMs` is what pins step-level hangs (see the
+ * `hangs` fixture below).
+ */
+const E2E_TIMEOUT_MS = 120_000
+
+describe('runSignoff (end to end)', { timeout: E2E_TIMEOUT_MS }, () => {
   it('runs every declared step in a clean tree and reports a pass', async () => {
     const log = join(temp('signoff-log-'), 'log.txt')
     writeFileSync(log, '')

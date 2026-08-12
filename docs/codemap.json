@@ -17114,6 +17114,12 @@
           "doc": null
         },
         {
+          "name": "DEFAULT_INSIGHT_PAGE_SIZE",
+          "kind": "const",
+          "signature": "3",
+          "doc": null
+        },
+        {
           "name": "DEFAULT_MENTION_EMPTY_TEXT",
           "kind": "const",
           "signature": "\"No matching files\"",
@@ -17130,6 +17136,36 @@
           "kind": "const",
           "signature": "ProvenanceConfidencePolicy",
           "doc": "The starting policy."
+        },
+        {
+          "name": "DEFAULT_SPARKLINE_EMPTY_LABEL",
+          "kind": "const",
+          "signature": "\"No history yet\"",
+          "doc": null
+        },
+        {
+          "name": "DEFAULT_SPARKLINE_HEIGHT",
+          "kind": "const",
+          "signature": "24",
+          "doc": null
+        },
+        {
+          "name": "DEFAULT_SPARKLINE_LABEL",
+          "kind": "const",
+          "signature": "\"Trend\"",
+          "doc": "Only a name, never a metric: it exists so the accessible label is never empty."
+        },
+        {
+          "name": "DEFAULT_SPARKLINE_UNAVAILABLE_LABEL",
+          "kind": "const",
+          "signature": "\"No readings available\"",
+          "doc": "Nothing was measurable, which is not the same as nothing was measured yet — and \"No history yet\" over a series that arrived full of `NaN` reads as the metric being new when the producer is broken."
+        },
+        {
+          "name": "DEFAULT_SPARKLINE_WIDTH",
+          "kind": "const",
+          "signature": "96",
+          "doc": null
         },
         {
           "name": "describeProvenance",
@@ -17426,6 +17462,12 @@
           "doc": "\"8s\" / \"2m 05s\" / \"1h 12m\"; null when unknown."
         },
         {
+          "name": "formatInsightDelta",
+          "kind": "function",
+          "signature": "(delta: InsightDelta, format?: (value: number) => string) => string",
+          "doc": "The delta as words: direction, magnitude, and the baseline it is measured against."
+        },
+        {
           "name": "formatModelCost",
           "kind": "function",
           "signature": "(msg: ChatMessageMetrics, models: CatalogModel[]) => string | null",
@@ -17442,6 +17484,12 @@
           "kind": "function",
           "signature": "(isoDate: string | null) => string",
           "doc": "Compact relative time."
+        },
+        {
+          "name": "formatSparklineValue",
+          "kind": "function",
+          "signature": "(value: number) => string",
+          "doc": "The package's default number rendering, pinned to `en-US` so a card and its series read the same on every host — a series formatted by the server's locale and a value formatted by the browser's is a…"
         },
         {
           "name": "formatTokensPerSecond",
@@ -17478,6 +17526,96 @@
           "kind": "const",
           "signature": "number",
           "doc": "How long a `ready` index is served before a background refetch — long enough that a full session's worth of popover opens don't repeatedly hit the index endpoint, short enough that a stale listing do…"
+        },
+        {
+          "name": "Insight",
+          "kind": "interface",
+          "signature": "interface Insight",
+          "doc": null
+        },
+        {
+          "name": "InsightAction",
+          "kind": "interface",
+          "signature": "interface InsightAction",
+          "doc": null
+        },
+        {
+          "name": "InsightCard",
+          "kind": "function",
+          "signature": "({ title, value, unit, previous, polarity, format, series, seriesLabel, description, action, live, liveLabel, className…",
+          "doc": null
+        },
+        {
+          "name": "InsightCardProps",
+          "kind": "interface",
+          "signature": "interface InsightCardProps",
+          "doc": null
+        },
+        {
+          "name": "InsightDeck",
+          "kind": "function",
+          "signature": "({ state, empty, label, pageSize, loadingLabel, retryLabel, className, onPageChange, }: InsightDeckProps) => ReactEleme…",
+          "doc": "The paged deck."
+        },
+        {
+          "name": "InsightDeckProps",
+          "kind": "interface",
+          "signature": "interface InsightDeckProps",
+          "doc": null
+        },
+        {
+          "name": "insightDelta",
+          "kind": "function",
+          "signature": "(value: unknown, previous: unknown) => InsightDelta | null",
+          "doc": "The move, or `null` when there is no honest one to state."
+        },
+        {
+          "name": "InsightDelta",
+          "kind": "interface",
+          "signature": "interface InsightDelta",
+          "doc": null
+        },
+        {
+          "name": "insightDeltaTone",
+          "kind": "function",
+          "signature": "(direction: InsightDirection, polarity?: InsightPolarity) => InsightTone",
+          "doc": "Maps a direction onto good/bad news, which only the caller knows."
+        },
+        {
+          "name": "InsightDirection",
+          "kind": "type",
+          "signature": "type InsightDirection",
+          "doc": null
+        },
+        {
+          "name": "insightPageCount",
+          "kind": "function",
+          "signature": "(total: number, pageSize?: number) => number",
+          "doc": "Always at least one page, so \"Page 1 of 0\" cannot be rendered."
+        },
+        {
+          "name": "insightPageSize",
+          "kind": "function",
+          "signature": "(pageSize?: number) => number",
+          "doc": "The page size — ONE definition, read by the count and by the slice."
+        },
+        {
+          "name": "insightPageSlice",
+          "kind": "function",
+          "signature": "<T>(items: readonly T[], page: number, pageSize?: number) => readonly T[]",
+          "doc": "The items on `page`, with the page clamped into range — a deck whose list shrank under the reader shows the last page that exists, never a blank one."
+        },
+        {
+          "name": "InsightPolarity",
+          "kind": "type",
+          "signature": "type InsightPolarity",
+          "doc": "Which way is good news for THIS metric."
+        },
+        {
+          "name": "InsightTone",
+          "kind": "type",
+          "signature": "type InsightTone",
+          "doc": null
         },
         {
           "name": "INTERACTION_CANCEL_EVENT",
@@ -18522,6 +18660,72 @@
           "kind": "interface",
           "signature": "interface SmoothRevealOptions",
           "doc": "Define configuration options for controlling smooth text reveal animation rates"
+        },
+        {
+          "name": "Sparkline",
+          "kind": "function",
+          "signature": "({ values, label, format, width, height, emptyLabel, unavailableLabel, className, }: SparklineProps) => ReactElement<un…",
+          "doc": "The series glyph."
+        },
+        {
+          "name": "SparklineDirection",
+          "kind": "type",
+          "signature": "type SparklineDirection",
+          "doc": "Where a series ended relative to where it started."
+        },
+        {
+          "name": "sparklineGeometry",
+          "kind": "function",
+          "signature": "(values: readonly number[], { width, height, inset }?: SparklineGeometryOptions) => SparklineGeometry",
+          "doc": "Plots the series into the viewBox."
+        },
+        {
+          "name": "SparklineGeometry",
+          "kind": "interface",
+          "signature": "interface SparklineGeometry",
+          "doc": null
+        },
+        {
+          "name": "SparklineGeometryOptions",
+          "kind": "interface",
+          "signature": "interface SparklineGeometryOptions",
+          "doc": null
+        },
+        {
+          "name": "sparklineLabel",
+          "kind": "function",
+          "signature": "(values: readonly number[], { label, format }?: SparklineLabelOptions) => string",
+          "doc": "The accessible name: metric, how many readings, how many are missing, the range, and the direction."
+        },
+        {
+          "name": "SparklineLabelOptions",
+          "kind": "interface",
+          "signature": "interface SparklineLabelOptions",
+          "doc": null
+        },
+        {
+          "name": "SparklinePoint",
+          "kind": "interface",
+          "signature": "interface SparklinePoint",
+          "doc": null
+        },
+        {
+          "name": "sparklinePointsAttribute",
+          "kind": "function",
+          "signature": "(points: readonly SparklinePoint[]) => string",
+          "doc": "`\"2,14 48,3 94,21\"` — the `points` attribute of the polyline."
+        },
+        {
+          "name": "SparklineProps",
+          "kind": "interface",
+          "signature": "interface SparklineProps",
+          "doc": null
+        },
+        {
+          "name": "sparklineReadings",
+          "kind": "function",
+          "signature": "(values: readonly number[]) => number[]",
+          "doc": "The readings that can be plotted."
         },
         {
           "name": "stampInteractionAnswers",
