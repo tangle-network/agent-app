@@ -200,7 +200,7 @@ describe("ProposalCard", () => {
 
   /** Both GitHub grants unmet, as the server reports them: the connection first,
    *  then the App install that is claimed through it. */
-  const GITHUB_BOTH_UNMET: ConnectionRequirement[] = [
+  const GITHUB_BOTH_UNMET: [ConnectionRequirement, ConnectionRequirement] = [
     {
       provider: "github",
       kind: "integration",

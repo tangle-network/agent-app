@@ -305,13 +305,14 @@ describe("streamChat", () => {
     const proposal = events.find((e) => e.type === "tool_proposal");
     if (proposal?.type !== "tool_proposal") throw new Error("no proposal");
     const requirements = proposal.data.requirements ?? [];
-    expect(requirements[1].prerequisite).toEqual({
+    expect(requirements).toHaveLength(3);
+    expect(requirements[1]?.prerequisite).toEqual({
       provider: "github",
       kind: "integration",
     });
     // `null` and a kindless reference both mean "nothing blocks this row".
-    expect(requirements[0].prerequisite).toBeUndefined();
-    expect(requirements[2].prerequisite).toBeUndefined();
+    expect(requirements[0]?.prerequisite).toBeUndefined();
+    expect(requirements[2]?.prerequisite).toBeUndefined();
   });
 
   it("parses CRLF-framed events end to end", async () => {
