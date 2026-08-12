@@ -199,23 +199,24 @@ describe("ProposalCard", () => {
   });
 
   /** Both GitHub grants unmet, as the server reports them: the connection first,
-   *  then the App install that is claimed through it. A TUPLE, not an array:
-   *  the pair is the fixture's whole point, and under `noUncheckedIndexedAccess`
-   *  only a tuple lets a test read either row without asserting it exists. */
-  const GITHUB_BOTH_UNMET: [ConnectionRequirement, ConnectionRequirement] = [
-    {
-      provider: "github",
-      kind: "integration",
-      connected: false,
-      connectUrl: "/app/integrations",
-    },
-    {
-      provider: "github",
-      kind: "github_app",
-      connected: false,
-      connectUrl: "https://github.example/install",
-      prerequisite: { provider: "github", kind: "integration" },
-    },
+   *  then the App install that is claimed through it. Named individually so a
+   *  test can vary one without indexing the pair. */
+  const GITHUB_OAUTH_UNMET: ConnectionRequirement = {
+    provider: "github",
+    kind: "integration",
+    connected: false,
+    connectUrl: "/app/integrations",
+  };
+  const GITHUB_APP_UNMET: ConnectionRequirement = {
+    provider: "github",
+    kind: "github_app",
+    connected: false,
+    connectUrl: "https://github.example/install",
+    prerequisite: { provider: "github", kind: "integration" },
+  };
+  const GITHUB_BOTH_UNMET: ConnectionRequirement[] = [
+    GITHUB_OAUTH_UNMET,
+    GITHUB_APP_UNMET,
   ];
 
   it("withholds a connect whose prerequisite is still unmet", () => {
@@ -246,8 +247,8 @@ describe("ProposalCard", () => {
     // The parent flips the prerequisite after an in-place connect; the card
     // recomputes from the same list, so the install appears without a reload.
     const requirements: ConnectionRequirement[] = [
-      { ...GITHUB_BOTH_UNMET[0], connected: true },
-      GITHUB_BOTH_UNMET[1],
+      { ...GITHUB_OAUTH_UNMET, connected: true },
+      GITHUB_APP_UNMET,
     ];
     render(
       <ProposalCard
