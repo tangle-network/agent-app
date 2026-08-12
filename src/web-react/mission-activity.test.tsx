@@ -174,4 +174,23 @@ describe('activity rows — arrival and the live signal', () => {
     expect(container.querySelector('.animate-pulse')).toBeNull()
     expect(screen.getByText('live')).toBeTruthy()
   })
+
+  it('reports the iteration and phase of a live run, and nothing once it settles', () => {
+    // The badge answers "how far in is this" while a run is in flight. It
+    // survived a component extraction (the lane row became `LaneRow` so the
+    // arrival index could be frozen at mount), which is exactly the move that
+    // drops a branch quietly — the row still renders, minus one span.
+    const live = render(
+      <MissionActivityLane activity={[record('t1', { status: 'running', iteration: 3, phase: 'plan' })]} />,
+    )
+    expect(live.container.textContent).toContain('iter 3 · plan')
+
+    // Settled: the run is no longer moving through phases, so the badge goes.
+    // Asserted on this render's OWN container, so the live row above cannot
+    // satisfy it.
+    const done = render(
+      <MissionActivityLane activity={[record('t2', { status: 'completed', iteration: 3, phase: 'plan' })]} />,
+    )
+    expect(done.container.textContent).not.toContain('iter 3')
+  })
 })
