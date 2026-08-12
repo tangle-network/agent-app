@@ -127,11 +127,20 @@ function CollapsedRail(props: AppSidebarProps) {
   const recent = sections.flatMap((s) => s.sessions).slice(0, 6)
   return (
     <aside className={`flex h-full w-[52px] shrink-0 flex-col items-center gap-1 border-r border-border bg-card py-2 ${className ?? ''}`}>
-      <span className="flex h-8 w-8 items-center justify-center">
-        <TangleKnot size={20} />
-      </span>
-      <button type="button" onClick={onToggleCollapse} aria-label="Expand sidebar" className={iconButtonClass}>
-        <PanelLeft className="h-4 w-4" />
+      <button
+        type="button"
+        onClick={onToggleCollapse}
+        aria-label="Expand sidebar"
+        title="Expand sidebar"
+        className="group relative flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {/* The brand mark IS the expand affordance: at rest it reads as the
+            product logo; on hover it yields to the expand chevron, so the rail
+            spends no extra row on a dedicated toggle. */}
+        <span className="flex items-center justify-center transition-opacity motion-reduce:transition-none group-hover:opacity-0">
+          <TangleKnot size={20} />
+        </span>
+        <PanelLeft className="absolute h-4 w-4 opacity-0 transition-opacity motion-reduce:transition-none group-hover:opacity-100" />
       </button>
       <button
         type="button"
