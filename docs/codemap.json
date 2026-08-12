@@ -8089,7 +8089,7 @@
           "name": "DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR",
           "kind": "const",
           "signature": "\"SEAT_BILLING_ENABLED\"",
-          "doc": "Default name of the per-app feature flag gating seat billing."
+          "doc": "Default name of the per-app feature flag that controls seat billing."
         },
         {
           "name": "DEFAULT_TANGLE_TIER_POLICY",
@@ -8100,8 +8100,8 @@
         {
           "name": "FREE_TIER_SPEND_CAP_USD",
           "kind": "const",
-          "signature": "2",
-          "doc": "Lifetime free-tier cap: $2 (200¢) cumulative inference spend, expressed in dollars."
+          "signature": "0",
+          "doc": "Product-funded free inference spend is disabled."
         },
         {
           "name": "getProductEntitlement",
@@ -8161,13 +8161,13 @@
           "name": "isProductEntitled",
           "kind": "function",
           "signature": "(ent: ProductEntitlement) => boolean",
-          "doc": "Entitled = holds an active seat OR is still inside the free tier."
+          "doc": "Product access requires an active paid or trialing seat."
         },
         {
           "name": "isSeatBillingEnabled",
           "kind": "function",
           "signature": "(opts?: SeatBillingFlagOptions) => boolean",
-          "doc": "Seat billing is OFF unless the flag is explicitly truthy ('true'/'1'/'on'/ 'enabled')."
+          "doc": "An explicit flag controls seat billing in every environment."
         },
         {
           "name": "isTangleBearerMissingError",

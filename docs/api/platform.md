@@ -136,7 +136,7 @@ interface BillableBalanceState
 
 ### `DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR`
 
-`const` — Default name of the per-app feature flag gating seat billing.
+`const` — Default name of the per-app feature flag that controls seat billing.
 
 ```ts
 "SEAT_BILLING_ENABLED"
@@ -152,10 +152,10 @@ Record<TanglePlanTier, TangleTierPolicy>
 
 ### `FREE_TIER_SPEND_CAP_USD`
 
-`const` — Lifetime free-tier cap: $2 (200¢) cumulative inference spend, expressed in dollars.
+`const` — Product-funded free inference spend is disabled.
 
 ```ts
-2
+0
 ```
 
 ### `getProductEntitlement`
@@ -232,7 +232,7 @@ interface HubProxyRoutes
 
 ### `isProductEntitled`
 
-`function` — Entitled = holds an active seat OR is still inside the free tier.
+`function` — Product access requires an active paid or trialing seat.
 
 ```ts
 (ent: ProductEntitlement) => boolean
@@ -240,7 +240,7 @@ interface HubProxyRoutes
 
 ### `isSeatBillingEnabled`
 
-`function` — Seat billing is OFF unless the flag is explicitly truthy ('true'/'1'/'on'/ 'enabled').
+`function` — An explicit flag controls seat billing in every environment.
 
 ```ts
 (opts?: SeatBillingFlagOptions) => boolean
