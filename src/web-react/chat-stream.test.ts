@@ -5,20 +5,20 @@ import {
   type ChatStreamCallbacks,
 } from './chat-stream'
 import type { ChatInteraction } from './chat-interactions'
+import { buildInteractionRequest } from '../../tests/test-utils/interaction-request'
 
 // A well-formed sidecar `interaction` ask: a `question` with one text field.
 // Matches the wire shape the sidecar emits and a real chat consumer already
 // parses — `{type:'interaction', data:{request}}`.
 function questionRequest() {
-  return {
+  return buildInteractionRequest({
     id: 'ask-1',
-    kind: 'question',
     title: 'Which segment should we target first?',
     body: 'Pick the primary ICP.',
     answerSpec: {
       fields: [{ type: 'text', name: 'answer', label: 'Your answer' }],
     },
-  }
+  })
 }
 
 function interactionLine(): string {

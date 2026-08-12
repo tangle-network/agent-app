@@ -5072,8 +5072,8 @@
         },
         {
           "name": "CorrectnessChecker",
-          "kind": "type",
-          "signature": "type CorrectnessChecker",
+          "kind": "interface",
+          "signature": "interface CorrectnessChecker",
           "doc": "Decides whether a produced item's content actually fulfils a requirement."
         },
         {
@@ -6287,7 +6287,7 @@
         {
           "name": "interactionFromWireRequest",
           "kind": "function",
-          "signature": "(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: \"text\"; name: string; label: string…",
+          "signature": "(request: InteractionRequest) => ChatInteraction",
           "doc": "Reads a wire request into the client's pending `ChatInteraction`."
         },
         {
@@ -6310,8 +6310,8 @@
         },
         {
           "name": "InteractionRequest",
-          "kind": "type",
-          "signature": "type InteractionRequest",
+          "kind": "interface",
+          "signature": "interface InteractionRequest",
           "doc": null
         },
         {
@@ -6329,7 +6329,7 @@
         {
           "name": "interactionToPersistedPart",
           "kind": "function",
-          "signature": "(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: \"text\"; name: string; label: string…",
+          "signature": "(request: InteractionRequest, status: ChatInteractionStatus, cancelReason?: string | undefined, answers?: InteractionAn…",
           "doc": "Builds the persisted/streamed `interaction` part from a wire request."
         },
         {
@@ -6359,7 +6359,7 @@
         {
           "name": "listSessionInteractions",
           "kind": "function",
-          "signature": "(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<{ id: string; kind: string; title: str…",
+          "signature": "(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<InteractionRequest[]>>",
           "doc": "Outstanding (unanswered) interactions for the session — the sidecar's registry is authoritative, so this is the reconnect/reload source of truth."
         },
         {
@@ -10351,12 +10351,6 @@
           "doc": "Reads a sandbox file as base64 and decodes it, verifying the decoded byte length against `expectedSize` (from a prior {@link statSandboxFileSize})."
         },
         {
-          "name": "readSecret",
-          "kind": "function",
-          "signature": "(store: SecretStore, name: string) => Promise<Outcome<string>>",
-          "doc": "Resolve a secret value from the store by its name and return the outcome asynchronously"
-        },
-        {
           "name": "requireTransportableModel",
           "kind": "function",
           "signature": "(selection: ModelSelection, context: string) => ResolvedModel | undefined",
@@ -10630,7 +10624,7 @@
           "name": "SecretStore",
           "kind": "interface",
           "signature": "interface SecretStore",
-          "doc": "Define methods to create, update, retrieve, and delete secrets asynchronously"
+          "doc": "Write-only secret port: create, replace, and delete a secret by name."
         },
         {
           "name": "secretStoreFromClient",
@@ -10690,7 +10684,7 @@
           "name": "storeSecret",
           "kind": "function",
           "signature": "(store: SecretStore, name: string, value: string) => Promise<Outcome<void>>",
-          "doc": "Resolve storing a secret by creating or updating it in the given SecretStore"
+          "doc": "Resolve storing a secret by creating it, or replacing it when it exists"
         },
         {
           "name": "streamSandboxPrompt",
@@ -17716,7 +17710,7 @@
         {
           "name": "interactionFromWireRequest",
           "kind": "function",
-          "signature": "(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: \"text\"; name: string; label: string…",
+          "signature": "(request: InteractionRequest) => ChatInteraction",
           "doc": "Reads a wire request into the client's pending `ChatInteraction`."
         },
         {
@@ -17763,8 +17757,8 @@
         },
         {
           "name": "InteractionRequest",
-          "kind": "type",
-          "signature": "type InteractionRequest",
+          "kind": "interface",
+          "signature": "interface InteractionRequest",
           "doc": null
         },
         {
@@ -17800,7 +17794,7 @@
         {
           "name": "interactionToPersistedPart",
           "kind": "function",
-          "signature": "(request: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: \"text\"; name: string; label: string…",
+          "signature": "(request: InteractionRequest, status: ChatInteractionStatus, cancelReason?: string | undefined, answers?: InteractionAn…",
           "doc": "Builds the persisted/streamed `interaction` part from a wire request."
         },
         {
@@ -17842,7 +17836,7 @@
         {
           "name": "lateAnswerMessage",
           "kind": "function",
-          "signature": "(interaction: ChatInteraction, data: Record<string, string | number | boolean | string[]>) => string",
+          "signature": "(interaction: ChatInteraction, data: InteractionData) => string",
           "doc": "Renders the late answer as a self-contained chat message: the original question, its context, and the user's answer(s)."
         },
         {
@@ -18508,7 +18502,7 @@
         {
           "name": "restoreChatInteractions",
           "kind": "function",
-          "signature": "(list: ChatInteraction[], outstanding: { id: string; kind: string; title: string; answerSpec: { fields: ({ type: \"text\"…",
+          "signature": "(list: ChatInteraction[], outstanding: InteractionRequest[], options?: RestoreChatInteractionsOptions) => ChatInteracti…",
           "doc": "Reload restore from the answer route's GET list."
         },
         {

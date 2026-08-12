@@ -2866,11 +2866,17 @@ export async function syncSandboxMemberRole(
   }
 }
 
-/** Define methods to create, update, retrieve, and delete secrets asynchronously */
+/**
+ * Write-only secret port: create, replace, and delete a secret by name.
+ *
+ * There is no read method. The platform's secrets API returns names and
+ * timestamps only — a stored value is never served back, it is injected into
+ * the sandbox as an environment variable. A `get` here could only ever return
+ * a value this process already held, so the port does not offer one.
+ */
 export interface SecretStore {
   create: (name: string, value: string) => Promise<void>
   update: (name: string, value: string) => Promise<void>
-  get: (name: string) => Promise<string>
   delete: (name: string) => Promise<void>
 }
 
@@ -2881,17 +2887,22 @@ export function secretStoreFromClient(shell: SandboxRuntimeConfig): SecretStore 
     create: async (name, value) => {
       await client.secrets.create(name, value)
     },
+    // The API has no replace route, so a replacement is a delete followed by a
+    // create. That pair is NOT atomic: if the create fails, the secret is left
+    // deleted rather than at its previous value. `storeSecret` reports that
+    // state instead of reporting a generic write failure, because a caller
+    // retrying a lost secret needs to know it is now absent.
     update: async (name, value) => {
-      await client.secrets.update(name, value)
+      await client.secrets.delete(name)
+      await client.secrets.create(name, value)
     },
-    get: (name) => client.secrets.get(name),
     delete: async (name) => {
       await client.secrets.delete(name)
     },
   }
 }
 
-/** Resolve storing a secret by creating or updating it in the given SecretStore */
+/** Resolve storing a secret by creating it, or replacing it when it exists */
 export async function storeSecret(
   store: SecretStore,
   name: string,
@@ -2905,17 +2916,13 @@ export async function storeSecret(
       await store.update(name, value)
       return ok(undefined)
     } catch (err) {
-      return fail(new Error(`Failed to store sandbox secret ${name}`, { cause: err }))
+      return fail(
+        new Error(
+          `Failed to store sandbox secret ${name}. A replacement deletes before it creates, so ${name} may now be absent rather than holding its previous value.`,
+          { cause: err },
+        ),
+      )
     }
-  }
-}
-
-/** Resolve a secret value from the store by its name and return the outcome asynchronously */
-export async function readSecret(store: SecretStore, name: string): Promise<Outcome<string>> {
-  try {
-    return ok(await store.get(name))
-  } catch (err) {
-    return fail(err)
   }
 }
 

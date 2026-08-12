@@ -114,10 +114,9 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/agent-interface']
 
     expect(range).toBeDefined()
-    expect(satisfiesRange('0.42.0', range!)).toBe(false)
-    expect(satisfiesRange('0.42.1', range!)).toBe(true)
-    expect(satisfiesRange('0.43.0', range!)).toBe(true)
-    expect(satisfiesRange('0.44.0', range!)).toBe(false)
+    expect(satisfiesRange('0.46.1', range!)).toBe(false)
+    expect(satisfiesRange('0.47.0', range!)).toBe(true)
+    expect(satisfiesRange('0.48.0', range!)).toBe(false)
   })
 
   // The floors this shell PUBLISHES must be satisfiable by the tree it is

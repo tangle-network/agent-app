@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
+import { buildInteractionRequest } from '../../tests/test-utils/interaction-request'
 import { parseInteractionRequest } from './contract'
 
 /** A minimal valid wire request with the two shared field controls. */
 function wireRequest() {
-  return {
+  return buildInteractionRequest({
     id: 'ask-1',
-    kind: 'question',
     title: 'Which segment should we target first?',
     answerSpec: {
       fields: [
@@ -21,7 +21,7 @@ function wireRequest() {
         },
       ],
     },
-  }
+  })
 }
 
 describe('parseInteractionRequest', () => {

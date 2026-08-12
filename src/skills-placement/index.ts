@@ -38,6 +38,7 @@ const HARNESS_BRIDGE: Partial<Record<Harness, HarnessId>> = {
   'kimi-code': 'kimi-code',
   codex: 'codex',
   pi: 'pi',
+  prime: 'prime',
   hermes: 'hermes',
   openclaw: 'openclaw',
 }
