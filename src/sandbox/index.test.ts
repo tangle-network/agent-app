@@ -12,6 +12,12 @@ const createMock = vi.fn()
 const listMock = vi.fn()
 const getMock = vi.fn()
 const sandboxCtor = vi.fn()
+// Mirrors the real `SecretsManager`, which is create/list/delete only — a
+// stored value is never served back. A mock offering `update` or `get` would
+// let `secretStoreFromClient` pass here while throwing against the SDK.
+const secretsCreateMock = vi.fn()
+const secretsListMock = vi.fn()
+const secretsDeleteMock = vi.fn()
 
 vi.mock('@tangle-network/sandbox/core', () => ({
   Sandbox: class {
@@ -19,10 +25,9 @@ vi.mock('@tangle-network/sandbox/core', () => ({
     create = createMock
     get = getMock
     secrets = {
-      create: vi.fn(),
-      update: vi.fn(),
-      get: vi.fn(),
-      delete: vi.fn(),
+      create: secretsCreateMock,
+      list: secretsListMock,
+      delete: secretsDeleteMock,
     }
     constructor(opts: { apiKey: string; baseUrl: string }) {
       sandboxCtor(opts)
@@ -52,7 +57,7 @@ import {
   attachReasoningEffort,
   syncSandboxMemberAdd,
   storeSecret,
-  readSecret,
+  secretStoreFromClient,
   deleteSecret,
   mintSandboxScopedToken,
   resolveSandboxClientCredentials,
@@ -146,6 +151,9 @@ beforeEach(() => {
   listMock.mockReset()
   getMock.mockReset()
   sandboxCtor.mockReset()
+  secretsCreateMock.mockReset()
+  secretsListMock.mockReset()
+  secretsDeleteMock.mockReset()
 })
 
 describe('getClient credential-fingerprint cache', () => {
@@ -1302,7 +1310,6 @@ describe('secret CRUD typed outcomes', () => {
     return {
       create: vi.fn().mockResolvedValue(undefined),
       update: vi.fn().mockResolvedValue(undefined),
-      get: vi.fn().mockResolvedValue('v'),
       delete: vi.fn().mockResolvedValue(undefined),
       ...over,
     }
@@ -1325,9 +1332,24 @@ describe('secret CRUD typed outcomes', () => {
     if (!r.succeeded) expect(r.error.message).toContain('Failed to store sandbox secret N')
   })
 
-  it('readSecret returns the value', async () => {
-    const r = await readSecret(store(), 'N')
-    expect(r.succeeded && r.value).toBe('v')
+  it('storeSecret warns that a failed replacement leaves the secret absent', async () => {
+    const s = store({
+      create: vi.fn().mockRejectedValue(new Error('c')),
+      update: vi.fn().mockRejectedValue(new Error('u')),
+    })
+    const r = await storeSecret(s, 'N', 'v')
+    expect(r.succeeded).toBe(false)
+    if (!r.succeeded) expect(r.error.message).toContain('may now be absent')
+  })
+
+  it('secretStoreFromClient replaces by deleting before creating (no update route)', async () => {
+    const s = secretStoreFromClient(shellFor({ apiKey: 'k1', baseUrl: 'https://s' }))
+    await s.update('N', 'v')
+    expect(secretsDeleteMock).toHaveBeenCalledWith('N')
+    expect(secretsCreateMock).toHaveBeenCalledWith('N', 'v')
+    expect(secretsDeleteMock.mock.invocationCallOrder[0]).toBeLessThan(
+      secretsCreateMock.mock.invocationCallOrder[0]!,
+    )
   })
 
   it('deleteSecret returns a typed failure rather than swallowing', async () => {

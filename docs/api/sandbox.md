@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-167 exports.
+166 exports.
 
 ### `adaptSandboxStream`
 
@@ -622,14 +622,6 @@ readonly ["pypi.org", "files.pythonhosted.org", "pypi.python.org"]
 (box: SandboxExecChannel, absolutePath: string, expectedSize: number, options?: SandboxExecOptions | undefined) => Prom…
 ```
 
-### `readSecret`
-
-`function` — Resolve a secret value from the store by its name and return the outcome asynchronously
-
-```ts
-(store: SecretStore, name: string) => Promise<Outcome<string>>
-```
-
 ### `requireTransportableModel`
 
 `function` — Shared fail-loud policy for the sandbox platform's three internal model callers (`ensureWorkspaceSandbox`'s `backendModelAtCreate`, `streamSandboxPrompt`, `driveSandboxTurn`): a `ModelSelection` in,…
@@ -992,7 +984,7 @@ interface ScopedTokenResult
 
 ### `SecretStore`
 
-`interface` — Define methods to create, update, retrieve, and delete secrets asynchronously
+`interface` — Write-only secret port: create, replace, and delete a secret by name.
 
 ```ts
 interface SecretStore
@@ -1072,7 +1064,7 @@ interface StorageConfig
 
 ### `storeSecret`
 
-`function` — Resolve storing a secret by creating or updating it in the given SecretStore
+`function` — Resolve storing a secret by creating it, or replacing it when it exists
 
 ```ts
 (store: SecretStore, name: string, value: string) => Promise<Outcome<void>>
