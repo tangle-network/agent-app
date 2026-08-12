@@ -198,6 +198,92 @@ describe("ProposalCard", () => {
     expect(screen.getByText("installed")).toBeTruthy();
   });
 
+  /** Both GitHub grants unmet, as the server reports them: the connection first,
+   *  then the App install that is claimed through it. */
+  const GITHUB_BOTH_UNMET: ConnectionRequirement[] = [
+    {
+      provider: "github",
+      kind: "integration",
+      connected: false,
+      connectUrl: "/app/integrations",
+    },
+    {
+      provider: "github",
+      kind: "github_app",
+      connected: false,
+      connectUrl: "https://github.example/install",
+      prerequisite: { provider: "github", kind: "integration" },
+    },
+  ];
+
+  it("withholds a connect whose prerequisite is still unmet", () => {
+    // Installing the App is claimed through the GitHub connection, so the setup
+    // callback refuses an install attempted first. Offering it here only sends
+    // the user to GitHub for a claim that cannot succeed.
+    const onConnect = vi.fn(() => Promise.resolve());
+    render(
+      <ProposalCard
+        proposal={proposal({ requirements: GITHUB_BOTH_UNMET })}
+        confirming={false}
+        onConfirm={noop}
+        onCancel={noop}
+        onConnect={onConnect}
+      />,
+    );
+
+    // The connection is offered; the install is not, and says what comes first.
+    expect(screen.getByRole("button", { name: "Connect" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Install" })).toBeNull();
+    expect(screen.getByText("Connect GitHub first")).toBeTruthy();
+    // The App's own status is still stated — withheld, not hidden.
+    expect(screen.getByText("GitHub App")).toBeTruthy();
+    expect(screen.getByText("not installed")).toBeTruthy();
+  });
+
+  it("offers the install as soon as its prerequisite is connected", () => {
+    // The parent flips the prerequisite after an in-place connect; the card
+    // recomputes from the same list, so the install appears without a reload.
+    const requirements: ConnectionRequirement[] = [
+      { ...GITHUB_BOTH_UNMET[0], connected: true },
+      GITHUB_BOTH_UNMET[1],
+    ];
+    render(
+      <ProposalCard
+        proposal={proposal({ requirements })}
+        confirming={false}
+        onConfirm={noop}
+        onCancel={noop}
+        onConnect={vi.fn(() => Promise.resolve())}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Install" })).toBeTruthy();
+    expect(screen.queryByText("Connect GitHub first")).toBeNull();
+  });
+
+  it("ignores a prerequisite naming a requirement the proposal does not carry", () => {
+    // A satisfied prerequisite is dropped from a filtered list; nothing is left
+    // to wait for, so the requirement stays actionable rather than stranded.
+    render(
+      <ProposalCard
+        proposal={withReq({
+          provider: "github",
+          kind: "github_app",
+          connected: false,
+          connectUrl: "https://github.example/install",
+          prerequisite: { provider: "github", kind: "integration" },
+        })}
+        confirming={false}
+        onConfirm={noop}
+        onCancel={noop}
+        onConnect={vi.fn(() => Promise.resolve())}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Install" })).toBeTruthy();
+    expect(screen.queryByText(/first/)).toBeNull();
+  });
+
   it("calls the in-place connect handler instead of navigating when onConnect is set", () => {
     const navigate = vi.fn();
     const onConnect = vi.fn(() => Promise.resolve());

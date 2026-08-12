@@ -17,6 +17,7 @@ import type {
   ChatMessage,
   ChatRequest,
   ConnectionRequirement,
+  ConnectionRequirementRef,
   PendingProposal,
 } from "./types";
 
@@ -179,12 +180,27 @@ function parseRequirement(raw: unknown): ConnectionRequirement | null {
     typeof r.connectUrl === "string" || r.connectUrl === null
       ? r.connectUrl
       : undefined;
+  // The card WITHHOLDS a connect on this, so a half-read reference would
+  // withhold on nothing — it is validated whole or dropped.
+  const prerequisite = parsePrerequisite(r.prerequisite);
   return {
     provider: r.provider,
     connected: r.connected,
     ...(kind ? { kind } : {}),
     ...(connectUrl !== undefined ? { connectUrl } : {}),
+    ...(prerequisite ? { prerequisite } : {}),
   };
+}
+
+/** Validate a requirement's `prerequisite` reference, or undefined to drop it.
+ *  Both fields are required: the reference is matched by (provider, kind), so a
+ *  half-read one would match the wrong row or none at all. */
+function parsePrerequisite(v: unknown): ConnectionRequirementRef | undefined {
+  if (!v || typeof v !== "object") return undefined;
+  const ref = v as Record<string, unknown>;
+  if (typeof ref.provider !== "string" || ref.provider === "") return undefined;
+  if (ref.kind !== "integration" && ref.kind !== "github_app") return undefined;
+  return { provider: ref.provider, kind: ref.kind };
 }
 
 /** Parse a proposal's connection requirements, dropping malformed entries.

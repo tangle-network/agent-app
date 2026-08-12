@@ -598,6 +598,12 @@
           "doc": "What kind of connection a requirement names — drives the card's label and connect target."
         },
         {
+          "name": "ConnectionRequirementRef",
+          "kind": "interface",
+          "signature": "interface ConnectionRequirementRef",
+          "doc": "Names one requirement in the same list, by its (provider, kind) identity."
+        },
+        {
           "name": "ConnectRequirementResult",
           "kind": "interface",
           "signature": "interface ConnectRequirementResult",

@@ -17,7 +17,11 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { ProviderIcon } from "@tangle-network/sandbox-ui/integrations";
 import { describeProposal } from "./presentation";
 import { providerLabel } from "./provider-label";
-import type { ConnectionRequirement, PendingProposal } from "./types";
+import type {
+  ConnectionRequirement,
+  ConnectionRequirementKind,
+  PendingProposal,
+} from "./types";
 
 /** Section labels ("New skills", "Workflow definition", "Integrations") share one
  *  eyebrow recipe — small, capped, tracked, muted — so the card's sections read
@@ -64,6 +68,9 @@ export function ProposalCard({
   const [tab, setTab] = useState<"graph" | "yaml">("graph");
   const isWorkflow = view.preview?.kind === "workflow";
   const showGraph = isWorkflow && !!renderGraph;
+  // Held once so each row can be told what it waits on: whether a requirement is
+  // blocked is a question about the WHOLE list, which no row can answer alone.
+  const requirements = proposal.requirements ?? [];
 
   return (
     <div className="rounded-lg border border-primary/40 bg-card p-3 text-sm">
@@ -146,14 +153,15 @@ export function ProposalCard({
         </div>
       )}
 
-      {proposal.requirements && proposal.requirements.length > 0 && (
+      {requirements.length > 0 && (
         <div className="mt-3 rounded border border-border p-2">
           <p className={EYEBROW_CLASS}>Integrations</p>
           <ul className="mt-1 space-y-1">
-            {proposal.requirements.map((r) => (
+            {requirements.map((r) => (
               <RequirementRow
-                key={`${r.provider}-${r.kind ?? "integration"}`}
+                key={`${r.provider}-${requirementKind(r)}`}
                 req={r}
+                blockedBy={blockingPrerequisite(r, requirements)}
                 navigate={navigate}
                 onConnect={onConnect}
                 renderProviderIcon={renderProviderIcon}
@@ -220,13 +228,51 @@ function openConnect(target: string, navigate?: (path: string) => void) {
   }
 }
 
+/** The kind a requirement is rendered as. Absent on proposals predating the
+ *  field, which the card has always treated as an integration. */
+function requirementKind(req: ConnectionRequirement): ConnectionRequirementKind {
+  return req.kind ?? "integration";
+}
+
+/**
+ * The requirement that must be satisfied before `req` can be, while it is still
+ * unsatisfied — so the row can withhold a connect that could only be refused.
+ *
+ * Undefined when nothing blocks it: no prerequisite, one already connected, or
+ * one naming a requirement this proposal does not carry (there is nothing to
+ * wait for, and guessing would strand the row).
+ */
+function blockingPrerequisite(
+  req: ConnectionRequirement,
+  all: readonly ConnectionRequirement[],
+): ConnectionRequirement | undefined {
+  const ref = req.prerequisite;
+  if (!ref) return undefined;
+  const match = all.find(
+    (r) => r.provider === ref.provider && requirementKind(r) === ref.kind,
+  );
+  return match && !match.connected ? match : undefined;
+}
+
+/** What to say in place of a connect the user cannot use yet — the step that
+ *  comes first, in the same words its own row offers. */
+function blockedNote(prerequisite: ConnectionRequirement): string {
+  const label = providerLabel(prerequisite.provider);
+  return requirementKind(prerequisite) === "github_app"
+    ? `Install ${label} App first`
+    : `Connect ${label} first`;
+}
+
 function RequirementRow({
   req,
+  blockedBy,
   navigate,
   onConnect,
   renderProviderIcon,
 }: {
   req: ConnectionRequirement;
+  /** The unmet requirement this one waits on, when there is one. */
+  blockedBy?: ConnectionRequirement;
   navigate?: (path: string) => void;
   onConnect?: (requirement: ConnectionRequirement) => void | Promise<void>;
   renderProviderIcon?: (provider: string) => ReactNode;
@@ -244,7 +290,7 @@ function RequirementRow({
   }, []);
 
   const label = providerLabel(req.provider);
-  const isApp = req.kind === "github_app";
+  const isApp = requirementKind(req) === "github_app";
   const kindLabel = isApp ? `${label} App` : label;
   const statusText = req.connected
     ? isApp
@@ -257,8 +303,14 @@ function RequirementRow({
   // owns the connect experience). Without one, `connectUrl === null` means "no
   // connect target to offer" (e.g. a github_app requirement on a deploy with no
   // app slug) — show the status without a link.
+  //
+  // A blocked requirement is never actionable, whatever the host wired: the
+  // GitHub App install is claimed through the GitHub connection, so offering it
+  // first only sends the user to GitHub for a claim the platform then refuses.
   const canConnect =
-    !req.connected && (Boolean(onConnect) || req.connectUrl !== null);
+    !req.connected &&
+    !blockedBy &&
+    (Boolean(onConnect) || req.connectUrl !== null);
   const target = req.connectUrl ?? "/app/integrations";
 
   // In-place connect when the host wired a handler; otherwise navigate to the
@@ -331,6 +383,14 @@ function RequirementRow({
           </span>
         </span>
       </span>
+      {blockedBy && !req.connected && (
+        // Named rather than silent: a row with no affordance and no reason reads
+        // as broken. The step it waits on is the row above (the server lists a
+        // prerequisite first), so this points at something already on screen.
+        <span className="shrink-0 text-muted-foreground text-xs">
+          {blockedNote(blockedBy)}
+        </span>
+      )}
       {canConnect && (
         <button
           type="button"
