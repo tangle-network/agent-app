@@ -523,7 +523,7 @@
     "@tangle-network/agent-interface": "0.47.0",
     "@tangle-network/agent-knowledge": "7.2.4",
     "@tangle-network/agent-profile-materialize": "0.14.0",
-    "@tangle-network/agent-runtime": "0.132.13",
+    "@tangle-network/agent-runtime": "0.133.0",
     "@tangle-network/brand": "1.4.0",
     "@tangle-network/sandbox": "0.21.1",
     "@tangle-network/sandbox-ui": "0.100.1",
