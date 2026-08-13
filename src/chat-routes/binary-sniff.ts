@@ -5,10 +5,10 @@
  * the client. Extension-based allowlists lie (a renamed `.docx`, a PNG saved
  * as `.txt`), so classification reads the actual bytes: a magic-byte table
  * for common binary formats first, then a UTF-8 decode attempt for
- * everything else. Two families need more than a fixed-offset signature and
- * get a reader of their own — ISO-BMFF brands (`sniffFtyp`) and OOXML Office
- * packages, whose PKZIP container is shared with every other `.zip`
- * (`sniffOoxml`).
+ * everything else. Three families need more than a fixed-offset signature and
+ * get a reader of their own — ISO-BMFF brands (`sniffFtyp`), EBML containers
+ * (`sniffEbml`), and OOXML Office packages, whose PKZIP container is shared
+ * with every other `.zip` (`sniffOoxml`).
  *
  * Lifted near-verbatim from gtm-agent's `src/lib/binary-sniff.ts` (the
  * source PRs hardened this against real corruption/gate bugs: gtm#584,
@@ -79,6 +79,91 @@ function sniffFtyp(bytes: Uint8Array): string | null {
   if (asciiAt(bytes, 8, 'heic') || asciiAt(bytes, 8, 'heix') || asciiAt(bytes, 8, 'hevc') || asciiAt(bytes, 8, 'hevx')) return 'image/heic'
   if (asciiAt(bytes, 8, 'mif1') || asciiAt(bytes, 8, 'msf1')) return 'image/heif'
   return 'video/mp4'
+}
+
+const EBML_HEADER_ID = 0x1a45dfa3
+const EBML_DOC_TYPE_ID = 0x4282
+/** A normal EBML header is only a few dozen bytes. This cap keeps a crafted
+ *  header from choosing how much untrusted input the DocType reader scans. */
+const EBML_HEADER_SCAN_BYTES = 4 * 1024
+
+interface EbmlVint {
+  length: number
+  value: number
+}
+
+/** Read an EBML variable-width integer. Element IDs retain their marker bit;
+ *  element sizes remove it. Values too large for exact JS integer arithmetic,
+ *  unknown-size sentinels, and truncated encodings are rejected. */
+function readEbmlVint(
+  bytes: Uint8Array,
+  offset: number,
+  maxLength: number,
+  stripMarker: boolean,
+): EbmlVint | null {
+  const first = bytes[offset]
+  if (first === undefined || first === 0) return null
+
+  let marker = 0x80
+  let length = 1
+  while ((first & marker) === 0) {
+    marker >>= 1
+    length++
+  }
+  if (length > maxLength || offset + length > bytes.length) return null
+
+  if (stripMarker) {
+    let unknown = (first & (marker - 1)) === marker - 1
+    for (let index = 1; index < length; index++) unknown &&= bytes[offset + index] === 0xff
+    if (unknown) return null
+  }
+
+  let value = stripMarker ? first & (marker - 1) : first
+  for (let index = 1; index < length; index++) {
+    value = value * 0x100 + bytes[offset + index]!
+    if (!Number.isSafeInteger(value)) return null
+  }
+  return { length, value }
+}
+
+/** WebM and Matroska share the EBML magic. Their header's bounded DocType
+ *  element is the distinguishing signal; other or malformed EBML containers
+ *  remain recognized only as unknown binary. */
+function sniffEbml(bytes: Uint8Array): string | null {
+  const headerId = readEbmlVint(bytes, 0, 4, false)
+  if (headerId?.value !== EBML_HEADER_ID) return null
+
+  const headerSize = readEbmlVint(bytes, headerId.length, 8, true)
+  if (!headerSize) return null
+  const headerStart = headerId.length + headerSize.length
+  const headerEnd = headerStart + headerSize.value
+  if (!Number.isSafeInteger(headerEnd) || headerEnd > bytes.length) return null
+  const scanEnd = Math.min(headerEnd, headerStart + EBML_HEADER_SCAN_BYTES)
+
+  let cursor = headerStart
+  while (cursor < scanEnd) {
+    const id = readEbmlVint(bytes, cursor, 4, false)
+    if (!id) return null
+    const size = readEbmlVint(bytes, cursor + id.length, 8, true)
+    if (!size) return null
+    const valueStart = cursor + id.length + size.length
+    const valueEnd = valueStart + size.value
+    if (!Number.isSafeInteger(valueEnd) || valueEnd > headerEnd || valueEnd > scanEnd) return null
+
+    if (id.value === EBML_DOC_TYPE_ID) {
+      let docType = ''
+      for (let index = valueStart; index < valueEnd; index++) {
+        const byte = bytes[index]!
+        if (byte > 0x7f) return null
+        docType += String.fromCharCode(byte)
+      }
+      if (docType === 'webm') return 'video/webm'
+      if (docType === 'matroska') return 'video/x-matroska'
+      return null
+    }
+    cursor = valueEnd
+  }
+  return null
 }
 
 /** `BM` alone matches ordinary prose ("BMW…"), so require the BMP header's
@@ -391,6 +476,9 @@ function sniffMagicBytes(bytes: Uint8Array): string | null {
   if (bytesStartWith(bytes, 0, [0x1f, 0x8b])) return 'application/gzip'
   if (sniffId3(bytes) || bytesStartWith(bytes, 0, [0xff, 0xfb])) return 'audio/mpeg'
   if (asciiAt(bytes, 0, 'OggS')) return 'audio/ogg'
+
+  const ebml = sniffEbml(bytes)
+  if (ebml) return ebml
 
   const riff = sniffRiff(bytes)
   if (riff) return riff
