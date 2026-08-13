@@ -35,6 +35,15 @@ const sourceRoot = join(packageRoot, "src");
  */
 const DEFINITION = join("src", "theme", "tailwind-preset.ts");
 
+/**
+ * Every shipped `.ts`/`.tsx` under `src`, tests and stories excluded.
+ *
+ * Only `fixtures` is skipped, and only because those files are inputs to other
+ * suites rather than package source. Helpers and mocks are deliberately NOT
+ * exempt: a bare class in one of them is still a bare class someone will copy,
+ * and none of the usual folder names for them exists under `src` today, so an
+ * exclusion for them would be untested surface guarding nothing.
+ */
 function sourceFiles(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
@@ -51,17 +60,30 @@ function sourceFiles(dir: string): string[] {
   return out;
 }
 
-/** Comments name the utility while explaining it; only code counts. */
-function withoutComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*/g, "");
+/**
+ * Whether a file writes the bare utility anywhere.
+ *
+ * Subtraction rather than a lookbehind: the two legitimate ways the name
+ * appears are removed by their full literal text, so whatever is left is a bare
+ * class by construction. A lookbehind that excluded the arbitrary form would
+ * have to encode the exact characters preceding the name, which is a detail of
+ * how the value happens to be spelled rather than of what is being excluded.
+ */
+function usesBareUtility(source: string): boolean {
+  const code = source
+    // Comments name the utility while explaining it; only code counts.
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*/g, "")
+    // The arbitrary form — the thing this gate wants callers to write.
+    .replace(/shadow-\[var\(--shadow-overlay\)\]/g, "")
+    // The CSS custom property, which shares the name minus the dashes.
+    .replace(/--shadow-overlay/g, "");
+  return /\bshadow-overlay\b/.test(code);
 }
-
-/** The bare utility — not the arbitrary form, and not the CSS variable. */
-const BARE = /(?<!\[var\(-)(?<!-)\bshadow-overlay\b/;
 
 const offenders = sourceFiles(sourceRoot)
   .filter((file) => relative(packageRoot, file) !== DEFINITION)
-  .filter((file) => BARE.test(withoutComments(readFileSync(file, "utf8"))))
+  .filter((file) => usesBareUtility(readFileSync(file, "utf8")))
   .map((file) => relative(packageRoot, file));
 
 describe("overlay elevation survives a host without this package's preset", () => {
