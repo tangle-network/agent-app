@@ -4,7 +4,7 @@
 
 Source: `src/redact/index.ts`
 
-14 exports.
+15 exports.
 
 ### `buildRedactedDocument`
 
@@ -60,6 +60,14 @@ type RedactedDocSegment
 
 ```ts
 interface RedactedDocument
+```
+
+### `redactErrorMessage`
+
+`function` — Sanitize an untrusted backend error for server logs.
+
+```ts
+(input: unknown, fallback?: string) => string
 ```
 
 ### `redactForIngestion`

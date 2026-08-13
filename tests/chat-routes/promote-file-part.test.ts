@@ -1,16 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
-  promoteAgentFilePart,
+  promoteAgentFilePart as runPromoteAgentFilePart,
   PROMOTE_MAX_FILE_BYTES,
+  type PromoteAgentFilePartOptions,
   type RawAgentFilePart,
 } from '../../src/chat-routes/promote-file-part'
-import type { WriteAttachmentFn } from '../../src/chat-routes/attachment-store'
+import type { AttachmentWriteReceipt, WriteAttachmentFn } from '../../src/chat-routes/attachment-store'
 import type { SandboxExecChannel } from '../../src/sandbox/binary-read'
 
 // Written from scratch (gtm had no promote test): the harness hands back a
 // `type:"file"` part whose bytes live in a `data:` URI or a sandbox path, and
 // promotion writes them into the product store via the injected writer, naming
-// the file deterministically so a re-promote overwrites in place.
+// the logical file name deterministically while each write gets an immutable
+// ownership key.
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = ''
@@ -19,6 +21,18 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 const FIXED_CLOCK = () => new Date('2026-07-23T12:00:00.000Z')
+const abortAttachment = async () => undefined
+
+function promoteAgentFilePart(
+  options: Omit<PromoteAgentFilePartOptions, 'abortAttachment'>,
+) {
+  return runPromoteAgentFilePart({
+    ...options,
+    abortAttachment,
+    createWriteId: options.createWriteId ?? (() => 'test-1'),
+    logger: options.logger ?? { error: () => undefined },
+  })
+}
 
 /** Records every write and answers `ok` (or a fixed failure). */
 function recordingWriter(fail?: string): {
@@ -52,7 +66,8 @@ function recordingWriter(fail?: string): {
       originalName: opts.originalName,
       size: opts.size,
     })
-    return fail ? { ok: false, reason: fail } : { ok: true }
+    const receipt: AttachmentWriteReceipt = { ownership: opts.ownership, rollback: () => undefined }
+    return fail ? { ok: false, reason: fail, receipt } : { ok: true, receipt }
   }
   return { fn, writes }
 }
@@ -83,7 +98,7 @@ describe('promoteAgentFilePart — data URI', () => {
     expect(result.part.name).toBe('photo.png')
     expect(result.part.size).toBe(5)
     expect(result.part.mediaType).toBe('image/png')
-    expect(result.part.path).toMatch(/^uploads\/agent\/2026-07-23\/photo-[0-9a-f]{8}\.png$/)
+    expect(result.part.path).toMatch(/^uploads\/agent\/2026-07-23\/photo-[0-9a-f]{8}\.png--test-1$/)
 
     expect(writes).toHaveLength(1)
     expect(writes[0]!.scopeId).toBe('ws')
@@ -151,7 +166,7 @@ describe('promoteAgentFilePart — sandbox path', () => {
     expect(result.part.mediaType).toBe('application/pdf')
     expect(result.part.type).toBe('file')
     expect(result.part.size).toBe(5)
-    expect(result.part.path).toMatch(/^uploads\/agent\/2026-07-23\/report-[0-9a-f]{8}\.pdf$/)
+    expect(result.part.path).toMatch(/^uploads\/agent\/2026-07-23\/report-[0-9a-f]{8}\.pdf--test-1$/)
     expect(writes[0]!.path).toBe(result.part.path)
   })
 
@@ -227,7 +242,7 @@ describe('promoteAgentFilePart — failure modes', () => {
     expect(result.succeeded).toBe(false)
     if (result.succeeded) return
     expect(result.filename).toBe('photo.png')
-    expect(result.reason).toBe('disk full')
+    expect(result.reason).toBe('Attachment storage is temporarily unavailable. Please try again.')
   })
 
   it('rejects a malformed part carrying no url', async () => {
@@ -240,22 +255,58 @@ describe('promoteAgentFilePart — failure modes', () => {
   })
 
   it('never throws when the writer throws — folds it into the outcome', async () => {
+    const logs: unknown[] = []
     const fn: WriteAttachmentFn = async () => {
-      throw new Error('coordinator down')
+      throw new Error('coordinator down X-Amz-Signature=super-secret-signature')
     }
     const raw: RawAgentFilePart = { type: 'file', filename: 'photo.png', url: `data:image/png;base64,${HELLO_B64}` }
-    const result = await promoteAgentFilePart({ raw, scopeId: 'ws', sessionId: 't1', writeAttachment: fn, now: FIXED_CLOCK })
+    const result = await promoteAgentFilePart({
+      raw,
+      scopeId: 'ws',
+      sessionId: 't1',
+      writeAttachment: fn,
+      logger: { error: (...args: unknown[]) => logs.push(args) },
+      now: FIXED_CLOCK,
+    })
     expect(result.succeeded).toBe(false)
     if (result.succeeded) return
-    expect(result.reason).toContain('coordinator down')
+    expect(result.reason).toBe('Attachment storage is temporarily unavailable. Please try again.')
+    expect(JSON.stringify(result)).not.toContain('super-secret-signature')
+    expect(JSON.stringify(logs)).not.toContain('super-secret-signature')
+    expect(JSON.stringify(logs)).toContain('[REDACTED:credential]')
   })
 })
 
 describe('promoteAgentFilePart — determinism', () => {
-  it('promotes the same source part to a stable path across re-promotion', async () => {
+  it('adds a fresh immutable ownership key to each physical promotion', async () => {
+    let nextId = 0
     const raw: RawAgentFilePart = { type: 'file', id: 'part-9', filename: 'photo.png', url: `data:image/png;base64,${HELLO_B64}` }
-    const a = await promoteAgentFilePart({ raw, scopeId: 'ws', sessionId: 't1', writeAttachment: recordingWriter().fn, now: FIXED_CLOCK })
-    const b = await promoteAgentFilePart({ raw, scopeId: 'ws', sessionId: 't2', writeAttachment: recordingWriter().fn, now: FIXED_CLOCK })
+    const a = await promoteAgentFilePart({
+      raw,
+      scopeId: 'ws',
+      sessionId: 't1',
+      writeAttachment: recordingWriter().fn,
+      createWriteId: () => `attempt-${++nextId}`,
+      now: FIXED_CLOCK,
+    })
+    const b = await promoteAgentFilePart({
+      raw,
+      scopeId: 'ws',
+      sessionId: 't2',
+      writeAttachment: recordingWriter().fn,
+      createWriteId: () => `attempt-${++nextId}`,
+      now: FIXED_CLOCK,
+    })
+    expect(a.succeeded && b.succeeded).toBe(true)
+    if (!a.succeeded || !b.succeeded) return
+    expect(a.part.path).not.toBe(b.part.path)
+    expect(a.part.path.replace(/--attempt-1$/, '')).toBe(b.part.path.replace(/--attempt-2$/, ''))
+  })
+
+  it('can reproduce the same physical path when the caller reuses an ownership id', async () => {
+    const raw: RawAgentFilePart = { type: 'file', id: 'part-9', filename: 'photo.png', url: `data:image/png;base64,${HELLO_B64}` }
+    const a = await promoteAgentFilePart({ raw, scopeId: 'ws', sessionId: 't1', writeAttachment: recordingWriter().fn, createWriteId: () => 'same-attempt', now: FIXED_CLOCK })
+    const b = await promoteAgentFilePart({ raw, scopeId: 'ws', sessionId: 't2', writeAttachment: recordingWriter().fn, createWriteId: () => 'same-attempt', now: FIXED_CLOCK })
     expect(a.succeeded && b.succeeded).toBe(true)
     if (!a.succeeded || !b.succeeded) return
     expect(a.part.path).toBe(b.part.path)
@@ -292,7 +343,7 @@ describe('promoteAgentFilePart — determinism', () => {
     })
     expect(result.succeeded).toBe(true)
     if (!result.succeeded) return
-    expect(result.part.path).toMatch(/^assets\/image\/photo\.png#[0-9a-f]{8}$/)
+    expect(result.part.path).toMatch(/^assets\/image\/photo\.png#[0-9a-f]{8}--test-1$/)
   })
 
   it('does not exceed the default cap for a small file', async () => {

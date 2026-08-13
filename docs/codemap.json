@@ -1133,12 +1133,19 @@
         "interactions",
         "model-resolution",
         "plans",
+        "redact",
         "sandbox",
         "stream",
         "web"
       ],
       "error": null,
       "exports": [
+        {
+          "name": "AbortAttachmentWriteFn",
+          "kind": "type",
+          "signature": "type AbortAttachmentWriteFn",
+          "doc": "Clean up a write whose function threw after the store may have committed."
+        },
         {
           "name": "ALLOWED_ATTACHMENT_SNIFFED_MIMES",
           "kind": "const",
@@ -1200,6 +1207,12 @@
           "doc": "Most files a single request may carry: the composer staging cap, the upload route's per-request cap, and the chat body's `attachments` cap."
         },
         {
+          "name": "ATTACHMENT_STORAGE_FAILURE_MESSAGE",
+          "kind": "const",
+          "signature": "\"Attachment storage is temporarily unavailable. Please try again.\"",
+          "doc": "Public-safe outcome for a storage outage."
+        },
+        {
           "name": "AttachmentPathArgs",
           "kind": "interface",
           "signature": "interface AttachmentPathArgs",
@@ -1242,10 +1255,28 @@
           "doc": "Outcome of the injected `authorize` seam: auth + rate limiting + scope resolution, all in one place so a 429 rides `{ok:false, response}` exactly like a 401 does — this factory has no rate-limit opin…"
         },
         {
+          "name": "AttachmentUploadLogger",
+          "kind": "type",
+          "signature": "type AttachmentUploadLogger",
+          "doc": "The logger receives only sanitized backend details."
+        },
+        {
+          "name": "AttachmentWriteOptions",
+          "kind": "interface",
+          "signature": "interface AttachmentWriteOptions",
+          "doc": "Options passed to a writer."
+        },
+        {
+          "name": "AttachmentWriteOwnership",
+          "kind": "interface",
+          "signature": "interface AttachmentWriteOwnership",
+          "doc": "The ownership identity for one attempted write."
+        },
+        {
           "name": "AttachmentWriteReceipt",
           "kind": "interface",
           "signature": "interface AttachmentWriteReceipt",
-          "doc": "Compensation for a successful attachment write."
+          "doc": "Compensation for one attachment write."
         },
         {
           "name": "AttachmentWriteResult",
@@ -1714,6 +1745,12 @@
           "kind": "function",
           "signature": "(bytes: number) => string",
           "doc": "Render a raw byte count as a human-readable size (`512B`, `3KB`, `12MB 500KB`)."
+        },
+        {
+          "name": "immutableAttachmentPath",
+          "kind": "function",
+          "signature": "(logicalPath: string, ownershipId: string) => string",
+          "doc": "Add an ownership id to a logical path and return an immutable store key."
         },
         {
           "name": "INLINE_PARTS_MAX_BYTES",
@@ -9382,6 +9419,12 @@
           "doc": "Define a document composed of multiple redacted content segments"
         },
         {
+          "name": "redactErrorMessage",
+          "kind": "function",
+          "signature": "(input: unknown, fallback?: string) => string",
+          "doc": "Sanitize an untrusted backend error for server logs."
+        },
+        {
           "name": "redactForIngestion",
           "kind": "function",
           "signature": "(value: unknown, options?: RedactForIngestionOptions) => unknown",
@@ -13579,7 +13622,7 @@
         {
           "name": "runAtomicSqliteStatements",
           "kind": "function",
-          "signature": "(db: AtomicSqliteDatabase, statements: [unknown, ...unknown[]]) => Promise<unknown[]>",
+          "signature": "(db: AtomicSqliteDatabase, statements: [SqliteLazyStatement<unknown>, ...SqliteLazyStatement<unknown>[]]) => Promise<un…",
           "doc": "Execute related SQLite statements atomically."
         },
         {
@@ -13589,10 +13632,28 @@
           "doc": "Execute related SQLite statements in one transactional driver batch when supported, or sequentially in the same order for portable local drivers."
         },
         {
+          "name": "SqliteAtomicConnection",
+          "kind": "interface",
+          "signature": "interface SqliteAtomicConnection",
+          "doc": "The single connection exposed inside a native transaction callback."
+        },
+        {
           "name": "SqliteBatchDatabase",
           "kind": "interface",
           "signature": "interface SqliteBatchDatabase",
           "doc": "A database driver that can execute related SQLite statements as one batch."
+        },
+        {
+          "name": "SqliteLazyStatement",
+          "kind": "type",
+          "signature": "type SqliteLazyStatement",
+          "doc": "A statement that has not started before the transaction opens."
+        },
+        {
+          "name": "SqliteManualTransactionConnection",
+          "kind": "interface",
+          "signature": "interface SqliteManualTransactionConnection",
+          "doc": "A manually controlled connection owns both transaction commands and queries."
         },
         {
           "name": "SqliteTransactionCommand",

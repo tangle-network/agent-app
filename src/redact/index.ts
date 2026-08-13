@@ -108,6 +108,22 @@ export function maskSpans(
   return out
 }
 
+const ERROR_SECRET_PATTERNS: readonly RedactionPattern[] = [
+  { kind: 'bearer', pattern: /Bearer\s+[^\s]+/i },
+  { kind: 'credential', pattern: /\b(?:sk|pk|tc|ghp|xoxb)[_-][A-Za-z0-9_-]{8,}\b/i },
+  { kind: 'credential', pattern: /\b(?:api[_-]?key|token|secret|password|signature|sig)\s*[:=]\s*[^\s,;&]+/i },
+]
+
+/** Sanitize an untrusted backend error for server logs. This is deliberately
+ * separate from public response text: callers should return an opaque message
+ * and log this bounded, redacted value for operators. */
+export function redactErrorMessage(input: unknown, fallback = 'unknown error'): string {
+  const raw = input instanceof Error ? input.message : String(input)
+  const message = raw.trim() || fallback
+  const redacted = maskSpans(message, ERROR_SECRET_PATTERNS).trim()
+  return redacted.length > 240 ? `${redacted.slice(0, 240)}…` : redacted
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (value === null || typeof value !== 'object') return false
   const proto = Object.getPrototypeOf(value)

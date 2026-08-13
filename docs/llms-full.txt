@@ -1435,7 +1435,15 @@ interface EntryComposerProps
 
 ## `./chat-routes`
 
-Source: `src/chat-routes/index.ts` · depends on `chat-store`, `interactions`, `model-resolution`, `plans`, `sandbox`, `stream`, `web`
+Source: `src/chat-routes/index.ts` · depends on `chat-store`, `interactions`, `model-resolution`, `plans`, `redact`, `sandbox`, `stream`, `web`
+
+### `AbortAttachmentWriteFn`
+
+`type` — Clean up a write whose function threw after the store may have committed.
+
+```ts
+type AbortAttachmentWriteFn
+```
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
@@ -1517,6 +1525,14 @@ interface AssistantRowValues
 10
 ```
 
+### `ATTACHMENT_STORAGE_FAILURE_MESSAGE`
+
+`const` — Public-safe outcome for a storage outage.
+
+```ts
+"Attachment storage is temporarily unavailable. Please try again."
+```
+
 ### `AttachmentPathArgs`
 
 `interface` — Arguments handed to a {@link PromoteAgentFilePartOptions.buildAttachmentPath} override — everything needed to place the file deterministically.
@@ -1573,9 +1589,33 @@ type AttachmentTypeCheckResult
 type AttachmentUploadAuthorization
 ```
 
+### `AttachmentUploadLogger`
+
+`type` — The logger receives only sanitized backend details.
+
+```ts
+type AttachmentUploadLogger
+```
+
+### `AttachmentWriteOptions`
+
+`interface` — Options passed to a writer.
+
+```ts
+interface AttachmentWriteOptions
+```
+
+### `AttachmentWriteOwnership`
+
+`interface` — The ownership identity for one attempted write.
+
+```ts
+interface AttachmentWriteOwnership
+```
+
 ### `AttachmentWriteReceipt`
 
-`interface` — Compensation for a successful attachment write.
+`interface` — Compensation for one attachment write.
 
 ```ts
 interface AttachmentWriteReceipt
@@ -2203,6 +2243,14 @@ type FilePartPromotionOutcome
 
 ```ts
 (bytes: number) => string
+```
+
+### `immutableAttachmentPath`
+
+`function` — Add an ownership id to a logical path and return an immutable store key.
+
+```ts
+(logicalPath: string, ownershipId: string) => string
 ```
 
 ### `INLINE_PARTS_MAX_BYTES`
@@ -12096,6 +12144,14 @@ type RedactedDocSegment
 interface RedactedDocument
 ```
 
+### `redactErrorMessage`
+
+`function` — Sanitize an untrusted backend error for server logs.
+
+```ts
+(input: unknown, fallback?: string) => string
+```
+
 ### `redactForIngestion`
 
 `function` — One-way PII scrub for telemetry/ingestion.
@@ -17575,7 +17631,7 @@ interface KVStore
 `function` — Execute related SQLite statements atomically.
 
 ```ts
-(db: AtomicSqliteDatabase, statements: [unknown, ...unknown[]]) => Promise<unknown[]>
+(db: AtomicSqliteDatabase, statements: [SqliteLazyStatement<unknown>, ...SqliteLazyStatement<unknown>[]]) => Promise<un…
 ```
 
 ### `runSqliteStatements`
@@ -17586,12 +17642,36 @@ interface KVStore
 (db: SqliteBatchDatabase, statements: [unknown, ...unknown[]]) => Promise<unknown[]>
 ```
 
+### `SqliteAtomicConnection`
+
+`interface` — The single connection exposed inside a native transaction callback.
+
+```ts
+interface SqliteAtomicConnection
+```
+
 ### `SqliteBatchDatabase`
 
 `interface` — A database driver that can execute related SQLite statements as one batch.
 
 ```ts
 interface SqliteBatchDatabase
+```
+
+### `SqliteLazyStatement`
+
+`type` — A statement that has not started before the transaction opens.
+
+```ts
+type SqliteLazyStatement
+```
+
+### `SqliteManualTransactionConnection`
+
+`interface` — A manually controlled connection owns both transaction commands and queries.
+
+```ts
+interface SqliteManualTransactionConnection
 ```
 
 ### `SqliteTransactionCommand`

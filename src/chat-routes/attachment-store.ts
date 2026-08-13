@@ -48,32 +48,67 @@ export type AttachmentReadResult =
  */
 export type ReadAttachmentFn = (scopeId: string, path: string) => Promise<AttachmentReadResult>
 
-/**
- * Compensation for a successful attachment write.
- *
- * The route calls receipts in reverse write order when a later write fails.
- * A synchronous function is accepted so simple stores do not need an async
- * wrapper; remote and object stores can return a promise.
- */
+/** The ownership identity for one attempted write. The upload and promotion
+ * routes create a unique path for each attempt, and the product adapter stores
+ * this id with it. */
+export interface AttachmentWriteOwnership {
+  id: string
+  path: string
+}
+
+/** Public-safe outcome for a storage outage. Backend details belong in logs. */
+export const ATTACHMENT_STORAGE_FAILURE_MESSAGE = 'Attachment storage is temporarily unavailable. Please try again.'
+
+/** Add an ownership id to a logical path and return an immutable store key.
+ * Ownership ids are path-safe because the key is also returned to clients. */
+export function immutableAttachmentPath(logicalPath: string, ownershipId: string): string {
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(ownershipId)) {
+    throw new Error('attachment ownership id must be a path-safe identifier')
+  }
+  return `${logicalPath}--${ownershipId}`
+}
+
+/** Compensation for one attachment write. The adapter MUST compare the stored
+ * ownership id before deleting, so an older rollback cannot delete a newer
+ * overwrite. */
 export interface AttachmentWriteReceipt {
   rollback(): void | Promise<void>
+  ownership: AttachmentWriteOwnership
 }
 
 /** Outcome of persisting one attachment. Mirrors `AttachmentReadResult`'s
  *  `ok`/`reason` shape and `upload.ts`'s `{ ok }` convention. The upload route
- *  compensates earlier receipt-backed writes when a later write fails. Existing
- *  writers remain valid because `receipt` is optional. */
+ *  requires a receipt on BOTH outcomes: a store may commit before reporting a
+ *  failure, so the caller must always have an ownership-safe cleanup path. */
 export type AttachmentWriteResult =
-  | { ok: true; receipt?: AttachmentWriteReceipt }
-  | { ok: false; reason: string }
+  | { ok: true; receipt: AttachmentWriteReceipt }
+  | { ok: false; reason: string; receipt: AttachmentWriteReceipt }
+
+/** Clean up a write whose function threw after the store may have committed.
+ * The adapter must delete only the supplied ownership, never the logical path
+ * unconditionally. */
+export type AbortAttachmentWriteFn = (
+  scopeId: string,
+  ownership: AttachmentWriteOwnership,
+) => void | Promise<void>
+
+/** Options passed to a writer. `ownership` is the route-created identity the
+ * adapter must bind to the stored object. */
+export interface AttachmentWriteOptions {
+  mediaType?: string
+  name?: string
+  originalName?: string
+  size?: number
+  ownership: AttachmentWriteOwnership
+}
 
 /**
  * Persist `content` for `scopeId` at `path`. `content` is either raw `bytes`
  * or a base64 `string` — a string argument is ALWAYS base64 (never utf8), so
  * a store that speaks base64 (gtm's vault) writes it verbatim and one that
  * speaks bytes decodes once. Like the reader, failures resolve to
- * `{ ok: false, reason }` rather than throwing. The upload route also catches
- * a thrown write and compensates earlier receipt-backed writes.
+ * `{ ok: false, reason }` rather than throwing. If a backend does throw after
+ * starting a write, the route invokes its ownership-safe abort seam.
  *
  * `opts` mirrors the vault frontmatter gtm's `writeAttachmentVaultFile`
  * persists alongside the body (promote-file-parts.ts:181-190), so a product
@@ -94,5 +129,5 @@ export type WriteAttachmentFn = (
   scopeId: string,
   path: string,
   content: Uint8Array | string,
-  opts: { mediaType?: string; name?: string; originalName?: string; size?: number },
+  opts: AttachmentWriteOptions,
 ) => Promise<AttachmentWriteResult>

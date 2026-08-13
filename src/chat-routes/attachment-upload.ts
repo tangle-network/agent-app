@@ -1,8 +1,7 @@
 /**
  * `createAttachmentUploadRoute` — the fleet-primitive durable-store upload
  * route: a two-phase batch (every file is validated before any file is written,
- * and optional write receipts compensate prior writes when a later write
- * fails), a content-sniffed type gate
+ * and every write carries an ownership-safe receipt), a content-sniffed type gate
  * (`checkAttachmentType` over `sniffBinary`'s magic-byte read, not the
  * extension or the browser-reported MIME), binary/text caps with optional
  * per-sniffed-mime overrides, an aggregate byte cap, and sanitized filenames.
@@ -29,7 +28,15 @@
 
 import type { ChatAttachmentInput, ChatAttachmentKind } from './wire'
 import { attachmentKindForMime } from '../chat-store/parts'
-import type { AttachmentWriteReceipt, WriteAttachmentFn } from './attachment-store'
+import { redactErrorMessage } from '../redact'
+import {
+  ATTACHMENT_STORAGE_FAILURE_MESSAGE,
+  immutableAttachmentPath,
+  type AbortAttachmentWriteFn,
+  type AttachmentWriteOwnership,
+  type AttachmentWriteReceipt,
+  type WriteAttachmentFn,
+} from './attachment-store'
 import {
   ALLOWED_ATTACHMENT_SNIFFED_MIMES,
   ATTACHMENT_MAX_COUNT,
@@ -52,8 +59,29 @@ import { sniffMimeFromName } from './promote-file-part'
  *  store (e.g. routing per-tenant), defaulting to `options.writeAttachment`
  *  when absent. */
 export type AttachmentUploadAuthorization =
-  | { ok: true; scopeId: string; writeAttachment?: WriteAttachmentFn }
+  | {
+      ok: true
+      scopeId: string
+      abortAttachment: AbortAttachmentWriteFn
+      writeAttachment?: WriteAttachmentFn
+    }
   | { ok: false; response: Response }
+
+/** The logger receives only sanitized backend details. The client receives the
+ * opaque message below, regardless of the store's failure text. */
+export type AttachmentUploadLogger = Pick<Console, 'error'>
+
+function logAttachmentUploadError(
+  logger: AttachmentUploadLogger,
+  message: string,
+  fields: Record<string, unknown>,
+): void {
+  try {
+    logger.error(message, fields)
+  } catch {
+    // Logging must not turn a typed storage failure into a thrown response.
+  }
+}
 
 /** Define options to authorize, write, and limit attachment uploads in a route */
 export interface CreateAttachmentUploadRouteOptions {
@@ -86,15 +114,19 @@ export interface CreateAttachmentUploadRouteOptions {
    *  shipped case:
    *  `new Set([...ALLOWED_ATTACHMENT_SNIFFED_MIMES, ...MACRO_ENABLED_OOXML_SNIFFED_MIMES])`. */
   allowedSniffedMimes?: ReadonlySet<string>
-  /** Sanitized-name → store path. Default identity (the sanitized name IS
-   *  the path); gtm passes `vaultFolderForFileName`, a tenant product a
-   *  scope prefix. */
+  /** Sanitized-name → logical store path. The route appends a unique ownership
+   *  suffix before writing, so the returned path cannot overwrite another file.
+   */
   pathFor?: (name: string) => string
   /** Store-path validator. Default {@link defaultValidateAttachmentPath}. */
   validatePath?: (path: string) => AttachmentPathCheck
   /** Last-resort media-type hook for text content the sniffer can't type.
    *  Default {@link sniffMimeFromName}. */
   sniffMime?: (name: string) => string
+  /** Unique id source for tests or a product's id service. */
+  createWriteId?: () => string
+  /** Server-side error sink. Backend text is sanitized before it is logged. */
+  logger?: AttachmentUploadLogger
 }
 
 function attachmentUploadError(status: number, code: string, message: string, path?: string): Response {
@@ -104,48 +136,57 @@ function attachmentUploadError(status: number, code: string, message: string, pa
   )
 }
 
-/** Strip common credential-shaped fragments before a store error reaches a
- *  response. Store errors are untrusted implementation detail, not API data. */
-function safeStoreMessage(input: unknown): string {
-  const message = input instanceof Error ? input.message : String(input)
-  const redacted = message
-    .replace(/Bearer\s+[^\s]+/gi, 'Bearer [redacted]')
-    .replace(/\b(?:sk|pk|tc)[_-][A-Za-z0-9_-]{8,}\b/g, '[redacted-key]')
-    .replace(/\b(api[_-]?key|token|secret|password)\s*[:=]\s*[^\s,;]+/gi, '$1=[redacted]')
-    .trim()
-  if (!redacted) return 'attachment store rejected the write'
-  return redacted.length > 240 ? `${redacted.slice(0, 240)}…` : redacted
-}
-
 interface SuccessfulAttachmentWrite {
   path: string
-  receipt?: AttachmentWriteReceipt
+  ownership: AttachmentWriteOwnership
+  receipt: AttachmentWriteReceipt
 }
 
-/** Run every available compensation, from the newest write to the oldest.
- * Errors are sanitized before aggregation so a later response can expose only
- * the failure count, never raw store or credential details. */
+/** Run every available compensation, from the newest write to the oldest. The
+ * receipt owns the compare-and-delete operation; this route never deletes a
+ * logical path itself. */
 async function rollbackSuccessfulWrites(
   writes: readonly SuccessfulAttachmentWrite[],
-): Promise<AggregateError | undefined> {
-  const failures: Error[] = []
+  logger: AttachmentUploadLogger,
+): Promise<number> {
+  let failures = 0
   for (let index = writes.length - 1; index >= 0; index -= 1) {
     const write = writes[index]!
-    if (!write.receipt) continue
     try {
       await write.receipt.rollback()
     } catch (error) {
-      failures.push(new Error(`attachment cleanup failed for ${write.path}: ${safeStoreMessage(error)}`))
+      failures += 1
+      logAttachmentUploadError(logger, '[attachment-upload] cleanup failed', {
+        path: write.path,
+        ownershipId: write.ownership.id,
+        error: redactErrorMessage(error),
+      })
     }
   }
-  return failures.length > 0 ? new AggregateError(failures, 'attachment cleanup failed') : undefined
+  return failures
 }
 
-function writeFailureMessage(reason: unknown, rollbackError: AggregateError | undefined): string {
-  const message = safeStoreMessage(reason)
-  if (!rollbackError) return message
-  const count = rollbackError.errors.length
-  return `${message}; cleanup failed for ${count} previously written attachment${count === 1 ? '' : 's'}`
+function ownsReceipt(receipt: AttachmentWriteReceipt, ownership: AttachmentWriteOwnership): boolean {
+  return receipt.ownership.id === ownership.id && receipt.ownership.path === ownership.path
+}
+
+async function abortOwnership(
+  abort: AbortAttachmentWriteFn,
+  scopeId: string,
+  ownership: AttachmentWriteOwnership,
+  logger: AttachmentUploadLogger,
+): Promise<number> {
+  try {
+    await abort(scopeId, ownership)
+    return 0
+  } catch (error) {
+    logAttachmentUploadError(logger, '[attachment-upload] ambiguous write cleanup failed', {
+      path: ownership.path,
+      ownershipId: ownership.id,
+      error: redactErrorMessage(error),
+    })
+    return 1
+  }
 }
 
 /** Resolve an attachment upload route handler with customizable limits and validation options */
@@ -162,11 +203,22 @@ export function createAttachmentUploadRoute(
   const pathFor = options.pathFor ?? ((name: string) => name)
   const validatePath = options.validatePath ?? defaultValidateAttachmentPath
   const sniffMime = options.sniffMime ?? sniffMimeFromName
+  const createWriteId = options.createWriteId ?? (() => {
+    if (typeof crypto === 'undefined' || typeof crypto.randomUUID !== 'function') {
+      throw new Error('attachment upload requires crypto.randomUUID')
+    }
+    return crypto.randomUUID()
+  })
+  const logger = options.logger ?? console
 
   return async function attachmentUpload(request: Request): Promise<Response> {
     const auth = await options.authorize({ request })
     if (!auth.ok) return auth.response
     const write = auth.writeAttachment ?? options.writeAttachment
+    const abort = auth.abortAttachment
+    if (typeof abort !== 'function') {
+      return attachmentUploadError(503, 'attachment_store_unavailable', ATTACHMENT_STORAGE_FAILURE_MESSAGE)
+    }
 
     let form: FormData
     try {
@@ -207,6 +259,7 @@ export function createAttachmentUploadRoute(
 
     interface PreparedWrite {
       path: string
+      ownershipId: string
       name: string
       bytes: Uint8Array
       originalName: string
@@ -220,7 +273,7 @@ export function createAttachmentUploadRoute(
     // error must reject the whole request before an earlier file in the
     // same batch is persisted.
     const prepared: PreparedWrite[] = []
-    const seenPaths = new Set<string>()
+    const seenLogicalPaths = new Set<string>()
     let totalBytes = 0
 
     for (const file of files) {
@@ -262,7 +315,9 @@ export function createAttachmentUploadRoute(
         )
       }
 
-      const path = pathFor(name)
+      const logicalPath = pathFor(name)
+      const writeId = createWriteId()
+      const path = immutableAttachmentPath(logicalPath, writeId)
       const pathCheck = validatePath(path)
       if (!pathCheck.succeeded) {
         return attachmentUploadError(400, 'invalid_attachment_path', pathCheck.error, path)
@@ -270,15 +325,15 @@ export function createAttachmentUploadRoute(
       // Small hardening over gtm: a batch whose sanitized names collide onto
       // the same store path (e.g. two variously-cased "Report.PDF" uploads)
       // would otherwise silently overwrite one with the other in phase 2.
-      if (seenPaths.has(path)) {
+      if (seenLogicalPaths.has(logicalPath)) {
         return attachmentUploadError(
           400,
           'attachment_duplicate_path',
-          `attachments must not repeat a path within one upload: ${path}`,
+          `attachments must not repeat a path within one upload: ${logicalPath}`,
           path,
         )
       }
-      seenPaths.add(path)
+      seenLogicalPaths.add(logicalPath)
 
       // Authoritative aggregate check, against the actual decoded byte
       // length rather than the client-reported `file.size` checked above.
@@ -292,13 +347,14 @@ export function createAttachmentUploadRoute(
       }
 
       const mediaType = sniff.mime ?? sniffMime(name)
-      prepared.push({ path, name, bytes, originalName: file.name, size: bytes.length, mediaType, kind })
+      prepared.push({ path, ownershipId: writeId, name, bytes, originalName: file.name, size: bytes.length, mediaType, kind })
     }
 
     // Phase 2: every file in the batch passed validation — write them all.
     const uploaded: ChatAttachmentInput[] = []
     const successfulWrites: SuccessfulAttachmentWrite[] = []
     for (const input of prepared) {
+      const ownership: AttachmentWriteOwnership = { id: input.ownershipId, path: input.path }
       let written: Awaited<ReturnType<WriteAttachmentFn>>
       try {
         written = await write(auth.scopeId, input.path, input.bytes, {
@@ -306,26 +362,52 @@ export function createAttachmentUploadRoute(
           name: input.name,
           originalName: input.originalName,
           size: input.size,
+          ownership,
         })
       } catch (error) {
-        const rollbackError = await rollbackSuccessfulWrites(successfulWrites)
+        const cleanupFailures = (await abortOwnership(abort, auth.scopeId, ownership, logger)) +
+          await rollbackSuccessfulWrites(successfulWrites, logger)
+        logAttachmentUploadError(logger, '[attachment-upload] write failed', {
+          path: input.path,
+          ownershipId: ownership.id,
+          cleanupFailures,
+          error: redactErrorMessage(error),
+        })
         return attachmentUploadError(
-          413,
-          'attachment_write_failed',
-          writeFailureMessage(error, rollbackError),
+          503,
+          'attachment_store_unavailable',
+          ATTACHMENT_STORAGE_FAILURE_MESSAGE,
           input.path,
         )
+      }
+      if (!written || !written.receipt || !ownsReceipt(written.receipt, ownership)) {
+        const cleanupFailures = (await abortOwnership(abort, auth.scopeId, ownership, logger)) +
+          await rollbackSuccessfulWrites(successfulWrites, logger)
+        logAttachmentUploadError(logger, '[attachment-upload] writer returned a mismatched ownership receipt', {
+          path: input.path,
+          ownershipId: ownership.id,
+          cleanupFailures,
+        })
+        return attachmentUploadError(503, 'attachment_store_unavailable', ATTACHMENT_STORAGE_FAILURE_MESSAGE, input.path)
       }
       if (!written.ok) {
-        const rollbackError = await rollbackSuccessfulWrites(successfulWrites)
+        const cleanupFailures = (await rollbackSuccessfulWrites([
+          { path: input.path, ownership, receipt: written.receipt },
+        ], logger)) + await rollbackSuccessfulWrites(successfulWrites, logger)
+        logAttachmentUploadError(logger, '[attachment-upload] write rejected', {
+          path: input.path,
+          ownershipId: ownership.id,
+          cleanupFailures,
+          error: redactErrorMessage(written.reason),
+        })
         return attachmentUploadError(
-          413,
-          'attachment_write_failed',
-          writeFailureMessage(written.reason, rollbackError),
+          503,
+          'attachment_store_unavailable',
+          ATTACHMENT_STORAGE_FAILURE_MESSAGE,
           input.path,
         )
       }
-      successfulWrites.push({ path: input.path, receipt: written.receipt })
+      successfulWrites.push({ path: input.path, ownership, receipt: written.receipt })
       uploaded.push({
         path: input.path,
         name: input.name,

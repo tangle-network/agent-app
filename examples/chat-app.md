@@ -214,7 +214,12 @@ client-reported one. Storage is REQUIRED injection — `ReadAttachmentFn` /
 import {
   resolveChatAttachments, buildDispatchParts, promoteAgentFilePart, createSandboxChatProducer,
 } from '@tangle-network/agent-app/chat-routes'
-import type { ReadAttachmentFn, WriteAttachmentFn } from '@tangle-network/agent-app/chat-routes'
+import type {
+  AbortAttachmentWriteFn,
+  AttachmentWriteReceipt,
+  ReadAttachmentFn,
+  WriteAttachmentFn,
+} from '@tangle-network/agent-app/chat-routes'
 import { createR2ObjectStore } from '@tangle-network/agent-app/object-store' // or a fleet's own vault adapter
 
 const store = createR2ObjectStore({ bucket: env.ATTACHMENTS })
@@ -226,10 +231,20 @@ const readAttachment: ReadAttachmentFn = async (scopeId, path) => {
   return { ok: true, size: obj.size, bytes, mediaType: obj.contentType }
 }
 
-const writeAttachment: WriteAttachmentFn = async (scopeId, path, content, { mediaType }) => {
+const abortAttachment: AbortAttachmentWriteFn = async (scopeId, ownership) => {
+  // Upload and promotion paths contain a fresh ownership suffix, so each key is
+  // immutable. If a product reuses keys, replace this with compare-and-delete.
+  await store.delete(`${scopeId}/${ownership.path}`)
+}
+
+const writeAttachment: WriteAttachmentFn = async (scopeId, path, content, { mediaType, ownership }) => {
   const bytes = typeof content === 'string' ? Uint8Array.from(atob(content), (c) => c.charCodeAt(0)) : content
   await store.put(`${scopeId}/${path}`, bytes, { contentType: mediaType })
-  return { ok: true }
+  const receipt: AttachmentWriteReceipt = {
+    ownership,
+    rollback: () => abortAttachment(scopeId, ownership),
+  }
+  return { ok: true, receipt }
 }
 
 // In the turn route, before dispatch: validate the wire `attachments` field
@@ -249,7 +264,7 @@ if (!dispatch.succeeded) return Response.json({ error: dispatch.error }, { statu
 createSandboxChatProducer({
   events,
   promoteFilePart: (raw) => promoteAgentFilePart({
-    raw, box, scopeId: identity.tenantId, sessionId: identity.sessionId, writeAttachment,
+    raw, box, scopeId: identity.tenantId, sessionId: identity.sessionId, writeAttachment, abortAttachment,
   }),
 })
 ```
@@ -275,7 +290,7 @@ const uploadAttachment = createAttachmentUploadRoute({
   authorize: async ({ request }) => {
     const auth = await authorize({ request }) // same seam as the turn route: auth + rate-limit + scope
     if (!auth.ok) return auth
-    return { ok: true as const, scopeId: auth.tenantId }
+    return { ok: true as const, scopeId: auth.tenantId, abortAttachment }
   },
   writeAttachment, // the same #224 writeAttachment defined above
 })

@@ -44,17 +44,35 @@ export interface SqliteBatchDatabase {
 /** The three raw SQL control statements used by the explicit atomic path. */
 export type SqliteTransactionCommand = 'BEGIN IMMEDIATE' | 'COMMIT' | 'ROLLBACK'
 
+/** A statement that has not started before the transaction opens. The callback
+ * receives the transaction connection, never a detached query promise. */
+export type SqliteLazyStatement<T = unknown> = (connection: SqliteAtomicConnection) => T | Promise<T>
+
+/** The single connection exposed inside a native transaction callback. */
+export interface SqliteAtomicConnection {
+  /** Execute one lazy operation on this transaction's connection. */
+  execute(statement: SqliteLazyStatement): unknown | Promise<unknown>
+}
+
+/** A manually controlled connection owns both transaction commands and queries.
+ * Keeping them on one value prevents a transaction from spanning two handles. */
+export interface SqliteManualTransactionConnection extends SqliteAtomicConnection {
+  exec(command: SqliteTransactionCommand): unknown | Promise<unknown>
+}
+
 /**
  * A SQLite driver that can execute a group of statements atomically.
  *
- * `batch` is preferred because D1 and libsql expose it as their atomic
- * primitive. A driver without `batch` must expose `exec` for raw transaction
- * control; the helper then issues `BEGIN IMMEDIATE`, awaits each statement,
- * and commits or rolls back as one unit. A database with neither capability is
- * rejected instead of falling back to the non-atomic helper.
+ * Drivers should expose `transaction`; its callback receives the one connection
+ * that owns the transaction. A portable driver may instead expose one
+ * `fallbackConnection` containing both `exec` and `execute`. The fallback uses
+ * lazy operations, so no query can start before `BEGIN IMMEDIATE`.
  */
-export interface AtomicSqliteDatabase extends SqliteBatchDatabase {
-  exec?: (command: SqliteTransactionCommand) => unknown | Promise<unknown>
+export interface AtomicSqliteDatabase {
+  transaction?: (
+    callback: (connection: SqliteAtomicConnection) => unknown[] | Promise<unknown[]>,
+  ) => unknown[] | Promise<unknown[]>
+  fallbackConnection?: SqliteManualTransactionConnection
 }
 
 /** Execute related SQLite statements in one transactional driver batch when
@@ -80,27 +98,42 @@ export async function runSqliteStatements(
  */
 export async function runAtomicSqliteStatements(
   db: AtomicSqliteDatabase,
-  statements: [unknown, ...unknown[]],
+  statements: [SqliteLazyStatement, ...SqliteLazyStatement[]],
 ): Promise<unknown[]> {
-  if (typeof db.batch === 'function') {
-    return await db.batch(statements)
-  }
-
-  if (typeof db.exec !== 'function') {
-    throw new Error(
-      'runAtomicSqliteStatements: the injected driver exposes neither batch() nor exec() — atomic execution is unavailable',
+  if (statements.some((statement) => typeof statement !== 'function')) {
+    throw new TypeError(
+      'runAtomicSqliteStatements: every statement must be a lazy function that receives the transaction connection',
     )
   }
 
-  await db.exec('BEGIN IMMEDIATE')
+  if (typeof db.transaction === 'function') {
+    return await db.transaction(async (connection) => {
+      const results: unknown[] = []
+      for (const statement of statements) results.push(await connection.execute(statement))
+      return results
+    })
+  }
+
+  const connection = db.fallbackConnection
+  if (
+    !connection ||
+    typeof connection.exec !== 'function' ||
+    typeof connection.execute !== 'function'
+  ) {
+    throw new Error(
+      'runAtomicSqliteStatements: the injected driver must expose transaction() or one fallbackConnection with exec() and execute()',
+    )
+  }
+
+  await connection.exec('BEGIN IMMEDIATE')
   try {
     const results: unknown[] = []
-    for (const statement of statements) results.push(await statement)
-    await db.exec('COMMIT')
+    for (const statement of statements) results.push(await connection.execute(statement))
+    await connection.exec('COMMIT')
     return results
   } catch (error) {
     try {
-      await db.exec('ROLLBACK')
+      await connection.exec('ROLLBACK')
     } catch (rollbackError) {
       throw new AggregateError(
         [error, rollbackError],

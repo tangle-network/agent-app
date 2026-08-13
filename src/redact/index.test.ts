@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   redactForIngestion,
+  redactErrorMessage,
   detectSpans,
   maskSpans,
   buildRedactedDocument,
@@ -108,6 +109,20 @@ describe('maskSpans (standalone substring masking)', () => {
     expect(maskSpans('card 4111 1111 1111 1111 ok', [LUHN_CARD])).toBe('card [REDACTED:cc]ok')
     // Luhn-invalid → not matched → untouched.
     expect(maskSpans('order 1234567890123456 ok', [LUHN_CARD])).toBe('order 1234567890123456 ok')
+  })
+})
+
+describe('redactErrorMessage', () => {
+  it('sanitizes credential-shaped backend text and bounds the result', () => {
+    const message = 'R2 failed X-Amz-Signature=super-secret-signature Bearer upstream-token'
+    const redacted = redactErrorMessage(message)
+
+    expect(redacted).not.toContain('super-secret-signature')
+    expect(redacted).not.toContain('upstream-token')
+    expect(redacted).toContain('[REDACTED:credential]')
+    expect(redacted).toContain('[REDACTED:bearer]')
+    expect(redactErrorMessage('')).toBe('unknown error')
+    expect(redactErrorMessage('x'.repeat(300))).toHaveLength(241)
   })
 })
 

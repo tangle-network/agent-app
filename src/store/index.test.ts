@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
+import Database from 'better-sqlite3'
 import {
   createDatabaseProvider,
   createInMemoryKV,
   runAtomicSqliteStatements,
   runSqliteStatements,
+  type SqliteAtomicConnection,
+  type SqliteLazyStatement,
+  type SqliteManualTransactionConnection,
 } from './index'
 
 describe('runSqliteStatements', () => {
@@ -36,51 +40,88 @@ describe('runSqliteStatements', () => {
 })
 
 describe('runAtomicSqliteStatements', () => {
-  it('uses the driver batch and does not issue raw transaction commands', async () => {
-    const statements = [{ id: 1 }, { id: 2 }] as [unknown, ...unknown[]]
-    const batch = vi.fn(async () => ['first', 'second'])
-    const exec = vi.fn()
-
-    await expect(runAtomicSqliteStatements({ batch, exec }, statements)).resolves.toEqual([
+  it('uses the native transaction callback and its one connection', async () => {
+    const order: string[] = []
+    const connections: SqliteAtomicConnection[] = []
+    let transactionConnection!: SqliteAtomicConnection
+    const execute = vi.fn(async <T>(statement: SqliteLazyStatement<T>) => {
+      order.push('execute')
+      connections.push(transactionConnection)
+      return await statement(transactionConnection)
+    })
+    const transaction = vi.fn(async (callback: (connection: SqliteAtomicConnection) => unknown[] | Promise<unknown[]>) => {
+      order.push('transaction')
+      transactionConnection = { execute }
+      return callback(transactionConnection)
+    })
+    const statements: [SqliteLazyStatement, ...SqliteLazyStatement[]] = [
+      async () => {
+        order.push('first')
+        return 'first'
+      },
+      async () => {
+        order.push('second')
+        return 'second'
+      },
+    ]
+    await expect(runAtomicSqliteStatements({ transaction }, statements)).resolves.toEqual([
       'first',
       'second',
     ])
-    expect(batch).toHaveBeenCalledOnce()
-    expect(batch).toHaveBeenCalledWith(statements)
-    expect(exec).not.toHaveBeenCalled()
+    expect(transaction).toHaveBeenCalledOnce()
+    expect(execute).toHaveBeenCalledTimes(2)
+    expect(order).toEqual(['transaction', 'execute', 'first', 'execute', 'second'])
+    expect(connections).toHaveLength(2)
+    expect(connections[0]).toBe(connections[1])
   })
 
-  it('fails closed before awaiting a statement when no atomic capability exists', async () => {
+  it('fails closed before invoking a lazy statement when no atomic capability exists', async () => {
     let awaited = false
-    const statement = {
-      then(resolve: (value: string) => void) {
-        awaited = true
-        resolve('should not run')
-      },
+    const statement: SqliteLazyStatement = () => {
+      awaited = true
+      return 'should not run'
     }
 
     await expect(runAtomicSqliteStatements({}, [statement])).rejects.toThrow(
-      'neither batch() nor exec()',
+      'transaction() or one fallbackConnection with exec() and execute()',
     )
     expect(awaited).toBe(false)
   })
 
-  it('wraps sequential statements in BEGIN IMMEDIATE and COMMIT', async () => {
+  it('rejects a prestarted promise before opening a transaction', async () => {
+    const exec = vi.fn()
+    const prestarted = Promise.resolve('already started') as unknown as SqliteLazyStatement
+
+    await expect(runAtomicSqliteStatements({ fallbackConnection: {
+      exec,
+      execute: async (statement) => statement({ execute: async () => undefined }),
+    } }, [prestarted])).rejects.toThrow('every statement must be a lazy function')
+    expect(exec).not.toHaveBeenCalled()
+  })
+
+  it('wraps lazy operations in BEGIN IMMEDIATE and COMMIT on one connection', async () => {
     const commands: string[] = []
     const exec = vi.fn(async (command: 'BEGIN IMMEDIATE' | 'COMMIT' | 'ROLLBACK') => {
       commands.push(command)
     })
     const order: number[] = []
-    const statement = (value: number) => ({
-      then(resolve: (result: number) => void) {
-        order.push(value)
-        resolve(value)
-      },
-    })
+    const connections: SqliteAtomicConnection[] = []
+    let connection!: SqliteManualTransactionConnection
+    const execute = vi.fn(async <T>(statement: SqliteLazyStatement<T>) =>
+      statement(connection),
+    )
+    connection = { execute, exec }
+    const statement = (value: number): SqliteLazyStatement => (currentConnection) => {
+      connections.push(currentConnection)
+      order.push(value)
+      return value
+    }
 
-    await expect(runAtomicSqliteStatements({ exec }, [statement(1), statement(2)])).resolves.toEqual([1, 2])
+    await expect(runAtomicSqliteStatements({ fallbackConnection: connection }, [statement(1), statement(2)])).resolves.toEqual([1, 2])
     expect(commands).toEqual(['BEGIN IMMEDIATE', 'COMMIT'])
     expect(order).toEqual([1, 2])
+    expect(execute).toHaveBeenCalledTimes(2)
+    expect(connections[0]).toBe(connections[1])
   })
 
   it('rolls back when a statement rejects and preserves the original failure', async () => {
@@ -90,9 +131,15 @@ describe('runAtomicSqliteStatements', () => {
     })
     const failure = new Error('statement failed')
 
-    await expect(
-      runAtomicSqliteStatements({ exec }, [Promise.resolve('first'), Promise.reject(failure)]),
-    ).rejects.toBe(failure)
+    let connection!: SqliteManualTransactionConnection
+    const execute = vi.fn(async <T>(statement: SqliteLazyStatement<T>) =>
+      statement(connection),
+    )
+    connection = { execute, exec }
+    await expect(runAtomicSqliteStatements({ fallbackConnection: connection }, [
+      () => 'first',
+      () => Promise.reject(failure),
+    ])).rejects.toBe(failure)
     expect(commands).toEqual(['BEGIN IMMEDIATE', 'ROLLBACK'])
   })
 
@@ -103,8 +150,13 @@ describe('runAtomicSqliteStatements', () => {
       commands.push(command)
       if (command === 'COMMIT') throw commitFailure
     })
+    let connection!: SqliteManualTransactionConnection
+    const execute = vi.fn(async <T>(statement: SqliteLazyStatement<T>) =>
+      statement(connection),
+    )
+    connection = { execute, exec }
 
-    await expect(runAtomicSqliteStatements({ exec }, [Promise.resolve('done')])).rejects.toBe(commitFailure)
+    await expect(runAtomicSqliteStatements({ fallbackConnection: connection }, [() => 'done'])).rejects.toBe(commitFailure)
     expect(commands).toEqual(['BEGIN IMMEDIATE', 'COMMIT', 'ROLLBACK'])
   })
 
@@ -114,8 +166,13 @@ describe('runAtomicSqliteStatements', () => {
     const exec = vi.fn(async (command: 'BEGIN IMMEDIATE' | 'COMMIT' | 'ROLLBACK') => {
       if (command === 'ROLLBACK') throw rollbackFailure
     })
+    let connection!: SqliteManualTransactionConnection
+    const execute = vi.fn(async <T>(statement: SqliteLazyStatement<T>) =>
+      statement(connection),
+    )
+    connection = { execute, exec }
 
-    const result = runAtomicSqliteStatements({ exec }, [Promise.reject(statementFailure)])
+    const result = runAtomicSqliteStatements({ fallbackConnection: connection }, [() => Promise.reject(statementFailure)])
     await expect(result).rejects.toMatchObject({
       name: 'AggregateError',
       message: 'runAtomicSqliteStatements: statement execution and rollback both failed',
@@ -124,6 +181,55 @@ describe('runAtomicSqliteStatements', () => {
       expect(error).toBeInstanceOf(AggregateError)
       expect((error as AggregateError).errors).toEqual([statementFailure, rollbackFailure])
     })
+  })
+
+  it('commits two writes on a real SQLite connection', async () => {
+    const sqlite = new Database(':memory:')
+    sqlite.exec('CREATE TABLE item (id INTEGER PRIMARY KEY, value TEXT NOT NULL)')
+    let connection!: SqliteManualTransactionConnection
+    connection = {
+      exec: (command) => sqlite.exec(command),
+      execute: (statement) => statement(connection),
+    }
+    const db = {
+      fallbackConnection: connection,
+    }
+
+    try {
+      await expect(runAtomicSqliteStatements(db, [
+        () => sqlite.prepare('INSERT INTO item (value) VALUES (?)').run('first'),
+        () => sqlite.prepare('INSERT INTO item (value) VALUES (?)').run('second'),
+      ])).resolves.toHaveLength(2)
+      expect(sqlite.prepare('SELECT value FROM item ORDER BY id').all()).toEqual([
+        { value: 'first' },
+        { value: 'second' },
+      ])
+    } finally {
+      sqlite.close()
+    }
+  })
+
+  it('rolls back a real SQLite write when the next write fails', async () => {
+    const sqlite = new Database(':memory:')
+    sqlite.exec('CREATE TABLE item (id INTEGER PRIMARY KEY, value TEXT NOT NULL UNIQUE)')
+    let connection!: SqliteManualTransactionConnection
+    connection = {
+      exec: (command) => sqlite.exec(command),
+      execute: (statement) => statement(connection),
+    }
+    const db = {
+      fallbackConnection: connection,
+    }
+
+    try {
+      await expect(runAtomicSqliteStatements(db, [
+        () => sqlite.prepare('INSERT INTO item (value) VALUES (?)').run('same'),
+        () => sqlite.prepare('INSERT INTO item (value) VALUES (?)').run('same'),
+      ])).rejects.toThrow('UNIQUE constraint failed')
+      expect(sqlite.prepare('SELECT count(*) AS count FROM item').get()).toEqual({ count: 0 })
+    } finally {
+      sqlite.close()
+    }
   })
 })
 

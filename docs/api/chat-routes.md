@@ -4,7 +4,15 @@
 
 Source: `src/chat-routes/index.ts`
 
-176 exports.
+182 exports.
+
+### `AbortAttachmentWriteFn`
+
+`type` — Clean up a write whose function threw after the store may have committed.
+
+```ts
+type AbortAttachmentWriteFn
+```
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
@@ -86,6 +94,14 @@ interface AssistantRowValues
 10
 ```
 
+### `ATTACHMENT_STORAGE_FAILURE_MESSAGE`
+
+`const` — Public-safe outcome for a storage outage.
+
+```ts
+"Attachment storage is temporarily unavailable. Please try again."
+```
+
 ### `AttachmentPathArgs`
 
 `interface` — Arguments handed to a {@link PromoteAgentFilePartOptions.buildAttachmentPath} override — everything needed to place the file deterministically.
@@ -142,9 +158,33 @@ type AttachmentTypeCheckResult
 type AttachmentUploadAuthorization
 ```
 
+### `AttachmentUploadLogger`
+
+`type` — The logger receives only sanitized backend details.
+
+```ts
+type AttachmentUploadLogger
+```
+
+### `AttachmentWriteOptions`
+
+`interface` — Options passed to a writer.
+
+```ts
+interface AttachmentWriteOptions
+```
+
+### `AttachmentWriteOwnership`
+
+`interface` — The ownership identity for one attempted write.
+
+```ts
+interface AttachmentWriteOwnership
+```
+
 ### `AttachmentWriteReceipt`
 
-`interface` — Compensation for a successful attachment write.
+`interface` — Compensation for one attachment write.
 
 ```ts
 interface AttachmentWriteReceipt
@@ -772,6 +812,14 @@ type FilePartPromotionOutcome
 
 ```ts
 (bytes: number) => string
+```
+
+### `immutableAttachmentPath`
+
+`function` — Add an ownership id to a logical path and return an immutable store key.
+
+```ts
+(logicalPath: string, ownershipId: string) => string
 ```
 
 ### `INLINE_PARTS_MAX_BYTES`

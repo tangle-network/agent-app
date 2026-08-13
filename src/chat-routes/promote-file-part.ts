@@ -14,9 +14,9 @@
  * {@link WriteAttachmentFn} (gtm hard-wired its vault writer), the path strategy
  * is the injected `buildAttachmentPath` (neutral `uploads/agent/<date>/` default,
  * no domain bucket taxonomy baked), the MIME map is an injectable hook, and the
- * date segment reads an injectable clock. The idempotent `hash8(id ?? url ??
- * filename)` naming is preserved so re-promoting the same source part resolves
- * to the same path.
+ * date segment reads an injectable clock. The logical `hash8(id ?? url ??
+ * filename)` naming is preserved, while every physical key receives a fresh
+ * ownership suffix so an ambiguous write cannot overwrite an older object.
  */
 
 import {
@@ -25,7 +25,14 @@ import {
   type SandboxExecChannel,
 } from '../sandbox/binary-read'
 import { attachmentKindForMime, type ChatAttachmentKind, type ChatAttachmentPart } from '../chat-store/parts'
-import type { WriteAttachmentFn } from './attachment-store'
+import { redactErrorMessage } from '../redact'
+import {
+  ATTACHMENT_STORAGE_FAILURE_MESSAGE,
+  immutableAttachmentPath,
+  type AbortAttachmentWriteFn,
+  type AttachmentWriteOwnership,
+  type WriteAttachmentFn,
+} from './attachment-store'
 import { sanitizeAttachmentFileName } from './attachment-validation'
 import { formatBytes } from './wire'
 
@@ -251,6 +258,20 @@ function defaultBuildAttachmentPath(args: AttachmentPathArgs): string {
   return `uploads/agent/${args.date}/${base}-${args.hash8}${extension}`
 }
 
+type PromoteFilePartLogger = Pick<Console, 'error'>
+
+function logPromotionStorageError(
+  logger: PromoteFilePartLogger,
+  message: string,
+  fields: Record<string, unknown>,
+): void {
+  try {
+    logger.error(message, fields)
+  } catch {
+    // Logging must not turn a typed storage failure into a thrown response.
+  }
+}
+
 /** Define options for promoting a part of an agent file within a specific session and scope */
 export interface PromoteAgentFilePartOptions {
   raw: RawAgentFilePart
@@ -263,6 +284,8 @@ export interface PromoteAgentFilePartOptions {
   sessionId: string
   /** REQUIRED store writer — no default (the product owns its store). */
   writeAttachment: WriteAttachmentFn
+  /** Required ownership-safe cleanup for a writer that throws after committing. */
+  abortAttachment: AbortAttachmentWriteFn
   /** Store-path strategy. Default {@link defaultBuildAttachmentPath}. */
   buildAttachmentPath?: (args: AttachmentPathArgs) => string
   /** Raw-byte ceiling. Default {@link PROMOTE_MAX_FILE_BYTES}. */
@@ -271,6 +294,10 @@ export interface PromoteAgentFilePartOptions {
   sniffMime?: (filename: string) => string
   /** Clock for the date path segment. Default `() => new Date()`. */
   now?: () => Date
+  /** Unique id source for tests or a product's id service. */
+  createWriteId?: () => string
+  /** Server-side sink for redacted storage details. */
+  logger?: PromoteFilePartLogger
 }
 
 /** Promote a part of an agent file with optional byte limits and MIME type detection */
@@ -279,6 +306,13 @@ export async function promoteAgentFilePart(options: PromoteAgentFilePartOptions)
   const sniffMime = options.sniffMime ?? sniffMimeFromName
   const buildAttachmentPath = options.buildAttachmentPath ?? defaultBuildAttachmentPath
   const now = options.now ?? (() => new Date())
+  const logger = options.logger ?? console
+  const createWriteId = options.createWriteId ?? (() => {
+    if (typeof crypto === 'undefined' || typeof crypto.randomUUID !== 'function') {
+      throw new Error('attachment promotion requires crypto.randomUUID')
+    }
+    return crypto.randomUUID()
+  })
 
   const filename = sanitizeAttachmentFileName(
     options.raw.filename ?? basenameFromUrl(options.raw.url) ?? 'agent-file',
@@ -297,7 +331,10 @@ export async function promoteAgentFilePart(options: PromoteAgentFilePartOptions)
   const kind = attachmentKindForMime(mediaType)
   const digest = await hash8(options.raw.id ?? options.raw.url ?? filename)
   const date = now().toISOString().split('T')[0] ?? ''
-  const path = buildAttachmentPath({ filename, hash8: digest, date, mediaType, kind })
+  const logicalPath = buildAttachmentPath({ filename, hash8: digest, date, mediaType, kind })
+  const ownershipId = createWriteId()
+  const path = immutableAttachmentPath(logicalPath, ownershipId)
+  const ownership: AttachmentWriteOwnership = { id: ownershipId, path }
 
   // `name` is the sanitized filename already computed above; `originalName`
   // is the pre-sanitization source name (gtm's frontmatter `originalName`) —
@@ -309,11 +346,52 @@ export async function promoteAgentFilePart(options: PromoteAgentFilePartOptions)
       name: filename,
       originalName: options.raw.filename ?? filename,
       size: resolved.bytes.byteLength,
+      ownership,
     })
   } catch (err) {
-    return { succeeded: false, filename, reason: err instanceof Error ? err.message : String(err) }
+    let abortError: unknown
+    try {
+      await options.abortAttachment(options.scopeId, ownership)
+    } catch (error) {
+      abortError = error
+    }
+    logPromotionStorageError(logger, '[promote-file-part] write failed', {
+      path,
+      ownershipId: ownership.id,
+      error: redactErrorMessage(err),
+      ...(abortError === undefined ? {} : { abortError: redactErrorMessage(abortError) }),
+    })
+    return { succeeded: false, filename, reason: ATTACHMENT_STORAGE_FAILURE_MESSAGE }
   }
-  if (!written.ok) return { succeeded: false, filename, reason: written.reason }
+  if (!written || !written.receipt || written.receipt.ownership.id !== ownership.id || written.receipt.ownership.path !== ownership.path) {
+    let abortError: unknown
+    try {
+      await options.abortAttachment(options.scopeId, ownership)
+    } catch (error) {
+      abortError = error
+    }
+    logPromotionStorageError(logger, '[promote-file-part] writer returned a mismatched ownership receipt', {
+      path,
+      ownershipId: ownership.id,
+      ...(abortError === undefined ? {} : { abortError: redactErrorMessage(abortError) }),
+    })
+    return { succeeded: false, filename, reason: ATTACHMENT_STORAGE_FAILURE_MESSAGE }
+  }
+  if (!written.ok) {
+    let rollbackError: unknown
+    try {
+      await written.receipt.rollback()
+    } catch (error) {
+      rollbackError = error
+    }
+    logPromotionStorageError(logger, '[promote-file-part] write rejected', {
+      path,
+      ownershipId: ownership.id,
+      error: redactErrorMessage(written.reason),
+      ...(rollbackError === undefined ? {} : { rollbackError: redactErrorMessage(rollbackError) }),
+    })
+    return { succeeded: false, filename, reason: ATTACHMENT_STORAGE_FAILURE_MESSAGE }
+  }
 
   return {
     succeeded: true,
