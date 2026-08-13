@@ -22,7 +22,7 @@ export function StudioSheet({
       <Dialog.Portal>
         <Dialog.Overlay className="studio-sheet-overlay fixed inset-0 z-50 bg-black/50" />
         <Dialog.Content
-          className="studio-sheet-content fixed inset-y-0 right-0 z-50 flex w-[min(92vw,30rem)] flex-col border-l border-card-edge bg-popover shadow-overlay focus:outline-none"
+          className="studio-sheet-content fixed inset-y-0 right-0 z-50 flex w-[min(92vw,30rem)] flex-col border-l border-card-edge bg-popover shadow-[var(--shadow-overlay)] focus:outline-none"
           aria-describedby={undefined}
         >
           <Dialog.Title className="sr-only">{title}</Dialog.Title>
