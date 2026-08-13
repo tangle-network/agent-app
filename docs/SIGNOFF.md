@@ -50,7 +50,7 @@ Four things it does that CI does not:
 
 `--ignore-scripts=false` is on the install command because a developer machine can carry `ignore-scripts=true` in `~/.npmrc` and a CI runner cannot. Without it `better-sqlite3` links with no compiled binding and 210 tests go red here that CI passes — the gate verifying a different dependency tree than the one that ships. It does not widen what may build; `allowBuilds` in `pnpm-workspace.yaml` still decides that.
 
-`NODE_OPTIONS=--max-old-space-size=12288` is config-level rather than per-step because `prepare` runs `tsup` during the install: the d.ts worker needs the heap before any step exists.
+`NODE_OPTIONS=--max-old-space-size=4096` is config-level rather than per-step because `prepare` runs the build during the install, before any step exists. It also pins the ceiling: V8 derives its default old-space limit from system RAM, so an unpinned gate is a different gate on a different host.
 
 ## What it cannot prove
 

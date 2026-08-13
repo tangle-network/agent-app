@@ -127,14 +127,14 @@ It has to be: the three fleet workflows do not share a shape.
 Only real artifact dependencies are declared, so everything else overlaps — and an omitted edge is a correctness bug the YAML's serial order was hiding.
 agent-app is the measured proof: `tests/create-agent-app.test.ts` and `tests/create-agent-app-chat.test.ts` `cpSync` the whole `dist/` tree into a generated project, `tsup` is configured `clean: true`, and running the suite alongside the build fails as `dist/ not built — run pnpm build` on one seed and passes on the next.
 The suite therefore declares `needs: ['build']`. It costs the overlap between the two longest steps, and the alternative is a gate that intermittently reports a defect it invented.
-Fail-fast kills in-flight work through the **process group** — steps run via `sh -c`, so killing the shell alone orphans vitest's forks and tsup's dts worker.
+Fail-fast kills in-flight work through the **process group** — steps run via `sh -c`, so killing the shell alone orphans vitest's forks and the build's `tsc` child.
 `--keep-going` runs everything and reports a step whose dependency failed as `blocked`: never as passed, never silently omitted.
 A failed install marks every step unjudged rather than reporting zero failures.
 
 ### agent-app (`.github/workflows/ci.yml`)
 
 Lives at the repo root as [`signoff.config.mjs`](../signoff.config.mjs).
-`NODE_OPTIONS` is config-level because `prepare` runs `tsup` during install: the dts worker needs the heap before any step exists.
+`NODE_OPTIONS` is config-level because `prepare` runs the build during install, before any step exists, and it pins the heap ceiling so the gate does not vary with host RAM.
 
 ### legal-agent (`.github/workflows/deploy.yml`, job `ci`)
 

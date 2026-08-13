@@ -184,7 +184,7 @@ pnpm install
 pnpm typecheck && pnpm test && pnpm build
 ```
 
-Build is [tsup](https://tsup.egoist.dev) (ESM + `.d.ts`), tests are [vitest](https://vitest.dev). A change keeps the suite green and follows the layering rule above — anything engine-general is contributed down to the substrate, not duplicated here. See [AGENTS.md](./AGENTS.md) for the full contributor contract.
+Build is [tsup](https://tsup.egoist.dev) for the ESM output plus `tsc` for the `.d.ts`, tests are [vitest](https://vitest.dev). A change keeps the suite green and follows the layering rule above — anything engine-general is contributed down to the substrate, not duplicated here. See [AGENTS.md](./AGENTS.md) for the full contributor contract.
 
 ## License
 
