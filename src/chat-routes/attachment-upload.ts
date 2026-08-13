@@ -1,7 +1,8 @@
 /**
  * `createAttachmentUploadRoute` — the fleet-primitive durable-store upload
- * route: a two-phase atomic batch (every file is validated before any file is
- * written — a batch never partially lands), a content-sniffed type gate
+ * route: a two-phase batch (every file is validated before any file is written,
+ * and optional write receipts compensate prior writes when a later write
+ * fails), a content-sniffed type gate
  * (`checkAttachmentType` over `sniffBinary`'s magic-byte read, not the
  * extension or the browser-reported MIME), binary/text caps with optional
  * per-sniffed-mime overrides, an aggregate byte cap, and sanitized filenames.
@@ -28,7 +29,7 @@
 
 import type { ChatAttachmentInput, ChatAttachmentKind } from './wire'
 import { attachmentKindForMime } from '../chat-store/parts'
-import type { WriteAttachmentFn } from './attachment-store'
+import type { AttachmentWriteReceipt, WriteAttachmentFn } from './attachment-store'
 import {
   ALLOWED_ATTACHMENT_SNIFFED_MIMES,
   ATTACHMENT_MAX_COUNT,
@@ -101,6 +102,50 @@ function attachmentUploadError(status: number, code: string, message: string, pa
     { error: path === undefined ? { code, message } : { code, message, path } },
     { status },
   )
+}
+
+/** Strip common credential-shaped fragments before a store error reaches a
+ *  response. Store errors are untrusted implementation detail, not API data. */
+function safeStoreMessage(input: unknown): string {
+  const message = input instanceof Error ? input.message : String(input)
+  const redacted = message
+    .replace(/Bearer\s+[^\s]+/gi, 'Bearer [redacted]')
+    .replace(/\b(?:sk|pk|tc)[_-][A-Za-z0-9_-]{8,}\b/g, '[redacted-key]')
+    .replace(/\b(api[_-]?key|token|secret|password)\s*[:=]\s*[^\s,;]+/gi, '$1=[redacted]')
+    .trim()
+  if (!redacted) return 'attachment store rejected the write'
+  return redacted.length > 240 ? `${redacted.slice(0, 240)}…` : redacted
+}
+
+interface SuccessfulAttachmentWrite {
+  path: string
+  receipt?: AttachmentWriteReceipt
+}
+
+/** Run every available compensation, from the newest write to the oldest.
+ * Errors are sanitized before aggregation so a later response can expose only
+ * the failure count, never raw store or credential details. */
+async function rollbackSuccessfulWrites(
+  writes: readonly SuccessfulAttachmentWrite[],
+): Promise<AggregateError | undefined> {
+  const failures: Error[] = []
+  for (let index = writes.length - 1; index >= 0; index -= 1) {
+    const write = writes[index]!
+    if (!write.receipt) continue
+    try {
+      await write.receipt.rollback()
+    } catch (error) {
+      failures.push(new Error(`attachment cleanup failed for ${write.path}: ${safeStoreMessage(error)}`))
+    }
+  }
+  return failures.length > 0 ? new AggregateError(failures, 'attachment cleanup failed') : undefined
+}
+
+function writeFailureMessage(reason: unknown, rollbackError: AggregateError | undefined): string {
+  const message = safeStoreMessage(reason)
+  if (!rollbackError) return message
+  const count = rollbackError.errors.length
+  return `${message}; cleanup failed for ${count} previously written attachment${count === 1 ? '' : 's'}`
 }
 
 /** Resolve an attachment upload route handler with customizable limits and validation options */
@@ -252,16 +297,35 @@ export function createAttachmentUploadRoute(
 
     // Phase 2: every file in the batch passed validation — write them all.
     const uploaded: ChatAttachmentInput[] = []
+    const successfulWrites: SuccessfulAttachmentWrite[] = []
     for (const input of prepared) {
-      const written = await write(auth.scopeId, input.path, input.bytes, {
-        mediaType: input.mediaType,
-        name: input.name,
-        originalName: input.originalName,
-        size: input.size,
-      })
-      if (!written.ok) {
-        return attachmentUploadError(413, 'attachment_write_failed', written.reason, input.path)
+      let written: Awaited<ReturnType<WriteAttachmentFn>>
+      try {
+        written = await write(auth.scopeId, input.path, input.bytes, {
+          mediaType: input.mediaType,
+          name: input.name,
+          originalName: input.originalName,
+          size: input.size,
+        })
+      } catch (error) {
+        const rollbackError = await rollbackSuccessfulWrites(successfulWrites)
+        return attachmentUploadError(
+          413,
+          'attachment_write_failed',
+          writeFailureMessage(error, rollbackError),
+          input.path,
+        )
       }
+      if (!written.ok) {
+        const rollbackError = await rollbackSuccessfulWrites(successfulWrites)
+        return attachmentUploadError(
+          413,
+          'attachment_write_failed',
+          writeFailureMessage(written.reason, rollbackError),
+          input.path,
+        )
+      }
+      successfulWrites.push({ path: input.path, receipt: written.receipt })
       uploaded.push({
         path: input.path,
         name: input.name,

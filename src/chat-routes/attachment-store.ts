@@ -48,16 +48,32 @@ export type AttachmentReadResult =
  */
 export type ReadAttachmentFn = (scopeId: string, path: string) => Promise<AttachmentReadResult>
 
+/**
+ * Compensation for a successful attachment write.
+ *
+ * The route calls receipts in reverse write order when a later write fails.
+ * A synchronous function is accepted so simple stores do not need an async
+ * wrapper; remote and object stores can return a promise.
+ */
+export interface AttachmentWriteReceipt {
+  rollback(): void | Promise<void>
+}
+
 /** Outcome of persisting one attachment. Mirrors `AttachmentReadResult`'s
- *  `ok`/`reason` shape and `upload.ts`'s `{ ok }` convention. */
-export type AttachmentWriteResult = { ok: true } | { ok: false; reason: string }
+ *  `ok`/`reason` shape and `upload.ts`'s `{ ok }` convention. The upload route
+ *  compensates earlier receipt-backed writes when a later write fails. Existing
+ *  writers remain valid because `receipt` is optional. */
+export type AttachmentWriteResult =
+  | { ok: true; receipt?: AttachmentWriteReceipt }
+  | { ok: false; reason: string }
 
 /**
  * Persist `content` for `scopeId` at `path`. `content` is either raw `bytes`
  * or a base64 `string` — a string argument is ALWAYS base64 (never utf8), so
  * a store that speaks base64 (gtm's vault) writes it verbatim and one that
  * speaks bytes decodes once. Like the reader, failures resolve to
- * `{ ok: false, reason }` rather than throwing.
+ * `{ ok: false, reason }` rather than throwing. The upload route also catches
+ * a thrown write and compensates earlier receipt-backed writes.
  *
  * `opts` mirrors the vault frontmatter gtm's `writeAttachmentVaultFile`
  * persists alongside the body (promote-file-parts.ts:181-190), so a product

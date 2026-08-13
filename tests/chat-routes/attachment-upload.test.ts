@@ -13,7 +13,7 @@
  * replaced by the `authorize` seam cases (a 429 rides `{ok:false, response}`
  * verbatim — this factory has no rate-limit opinion of its own).
  */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   createAttachmentUploadRoute,
@@ -598,6 +598,106 @@ describe('createAttachmentUploadRoute', () => {
       const body = await json(res)
       expect(body.error?.code).toBe('attachment_write_failed')
       expect(body.error?.message).toBe('store quota exceeded')
+    })
+
+    it('compensates successful writes in reverse order after a later partial failure', async () => {
+      const rollbackOrder: string[] = []
+      const write: WriteAttachmentFn = async (_scopeId, path) => {
+        if (path === 'notes.txt') return { ok: false, reason: 'store quota exceeded' }
+        return {
+          ok: true,
+          receipt: {
+            rollback: () => {
+              rollbackOrder.push(path)
+            },
+          },
+        }
+      }
+      const route = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
+
+      const res = await route(uploadRequest([
+        fileOf(pngBytes(), 'photo.png', 'image/png'),
+        fileOf(pdfBytes(), 'brief.pdf', 'application/pdf'),
+        fileOf('notes', 'notes.txt', 'text/plain'),
+      ]))
+
+      expect(res.status).toBe(413)
+      expect((await json(res)).error?.message).toBe('store quota exceeded')
+      expect(rollbackOrder).toEqual(['brief.pdf', 'photo.png'])
+    })
+
+    it('compensates when a later write throws and redacts its credential-shaped message', async () => {
+      const rollbackOrder: string[] = []
+      const write: WriteAttachmentFn = async (_scopeId, path) => {
+        if (path === 'brief.pdf') throw new Error('upstream rejected Bearer super-secret-token')
+        return {
+          ok: true,
+          receipt: {
+            rollback: () => {
+              rollbackOrder.push(path)
+            },
+          },
+        }
+      }
+      const route = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
+
+      const res = await route(uploadRequest([
+        fileOf(pngBytes(), 'photo.png', 'image/png'),
+        fileOf(pdfBytes(), 'brief.pdf', 'application/pdf'),
+      ]))
+
+      expect(res.status).toBe(413)
+      const message = (await json(res)).error?.message ?? ''
+      expect(message).toContain('Bearer [redacted]')
+      expect(message).not.toContain('super-secret-token')
+      expect(rollbackOrder).toEqual(['photo.png'])
+    })
+
+    it('aggregates all rollback failures, exposes only their count, and redacts their messages', async () => {
+      const rollbackOrder: string[] = []
+      const write: WriteAttachmentFn = async (_scopeId, path) => {
+        if (path === 'notes.txt') return { ok: false, reason: 'secret=primary-token' }
+        return {
+          ok: true,
+          receipt: {
+            rollback: () => {
+              rollbackOrder.push(path)
+              throw new Error(path === 'brief.pdf' ? 'apiKey=rollback-pdf-token' : 'Bearer rollback-png-token')
+            },
+          },
+        }
+      }
+      const route = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
+
+      const res = await route(uploadRequest([
+        fileOf(pngBytes(), 'photo.png', 'image/png'),
+        fileOf(pdfBytes(), 'brief.pdf', 'application/pdf'),
+        fileOf('notes', 'notes.txt', 'text/plain'),
+      ]))
+
+      expect(res.status).toBe(413)
+      const message = (await json(res)).error?.message ?? ''
+      expect(message).toContain('secret=[redacted]')
+      expect(message).toContain('cleanup failed for 2 previously written attachments')
+      expect(message).not.toContain('primary-token')
+      expect(message).not.toContain('rollback-pdf-token')
+      expect(message).not.toContain('rollback-png-token')
+      expect(rollbackOrder).toEqual(['brief.pdf', 'photo.png'])
+    })
+
+    it('does not compensate a successful batch', async () => {
+      const rollback = vi.fn()
+      const write: WriteAttachmentFn = async () => ({ ok: true, receipt: { rollback } })
+      const route = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
+
+      const res = await route(uploadRequest([
+        fileOf(pngBytes(), 'photo.png', 'image/png'),
+        fileOf(pdfBytes(), 'brief.pdf', 'application/pdf'),
+      ]))
+
+      expect(res.status).toBe(200)
+      expect(rollback).not.toHaveBeenCalled()
+      expect((await res.json() as { files: ChatAttachmentInput[] }).files).toHaveLength(2)
     })
   })
 

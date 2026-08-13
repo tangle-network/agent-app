@@ -1242,6 +1242,12 @@
           "doc": "Outcome of the injected `authorize` seam: auth + rate limiting + scope resolution, all in one place so a 429 rides `{ok:false, response}` exactly like a 401 does — this factory has no rate-limit opin…"
         },
         {
+          "name": "AttachmentWriteReceipt",
+          "kind": "interface",
+          "signature": "interface AttachmentWriteReceipt",
+          "doc": "Compensation for a successful attachment write."
+        },
+        {
           "name": "AttachmentWriteResult",
           "kind": "type",
           "signature": "type AttachmentWriteResult",
@@ -13517,6 +13523,12 @@
       "error": null,
       "exports": [
         {
+          "name": "AtomicSqliteDatabase",
+          "kind": "interface",
+          "signature": "interface AtomicSqliteDatabase",
+          "doc": "A SQLite driver that can execute a group of statements atomically."
+        },
+        {
           "name": "createDatabaseProvider",
           "kind": "function",
           "signature": "<DB extends object>(options?: DatabaseProviderOptions) => DatabaseProvider<DB>",
@@ -13565,6 +13577,12 @@
           "doc": "Define a key-value store interface for asynchronous data retrieval, storage, deletion, and listing"
         },
         {
+          "name": "runAtomicSqliteStatements",
+          "kind": "function",
+          "signature": "(db: AtomicSqliteDatabase, statements: [unknown, ...unknown[]]) => Promise<unknown[]>",
+          "doc": "Execute related SQLite statements atomically."
+        },
+        {
           "name": "runSqliteStatements",
           "kind": "function",
           "signature": "(db: SqliteBatchDatabase, statements: [unknown, ...unknown[]]) => Promise<unknown[]>",
@@ -13575,6 +13593,12 @@
           "kind": "interface",
           "signature": "interface SqliteBatchDatabase",
           "doc": "A database driver that can execute related SQLite statements as one batch."
+        },
+        {
+          "name": "SqliteTransactionCommand",
+          "kind": "type",
+          "signature": "type SqliteTransactionCommand",
+          "doc": "The three raw SQL control statements used by the explicit atomic path."
         }
       ]
     },

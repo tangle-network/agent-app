@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   createDatabaseProvider,
   createInMemoryKV,
+  runAtomicSqliteStatements,
   runSqliteStatements,
 } from './index'
 
@@ -31,6 +32,98 @@ describe('runSqliteStatements', () => {
       runSqliteStatements({}, [statement(1), statement(2)]),
     ).resolves.toEqual([1, 2])
     expect(order).toEqual([1, 2])
+  })
+})
+
+describe('runAtomicSqliteStatements', () => {
+  it('uses the driver batch and does not issue raw transaction commands', async () => {
+    const statements = [{ id: 1 }, { id: 2 }] as [unknown, ...unknown[]]
+    const batch = vi.fn(async () => ['first', 'second'])
+    const exec = vi.fn()
+
+    await expect(runAtomicSqliteStatements({ batch, exec }, statements)).resolves.toEqual([
+      'first',
+      'second',
+    ])
+    expect(batch).toHaveBeenCalledOnce()
+    expect(batch).toHaveBeenCalledWith(statements)
+    expect(exec).not.toHaveBeenCalled()
+  })
+
+  it('fails closed before awaiting a statement when no atomic capability exists', async () => {
+    let awaited = false
+    const statement = {
+      then(resolve: (value: string) => void) {
+        awaited = true
+        resolve('should not run')
+      },
+    }
+
+    await expect(runAtomicSqliteStatements({}, [statement])).rejects.toThrow(
+      'neither batch() nor exec()',
+    )
+    expect(awaited).toBe(false)
+  })
+
+  it('wraps sequential statements in BEGIN IMMEDIATE and COMMIT', async () => {
+    const commands: string[] = []
+    const exec = vi.fn(async (command: 'BEGIN IMMEDIATE' | 'COMMIT' | 'ROLLBACK') => {
+      commands.push(command)
+    })
+    const order: number[] = []
+    const statement = (value: number) => ({
+      then(resolve: (result: number) => void) {
+        order.push(value)
+        resolve(value)
+      },
+    })
+
+    await expect(runAtomicSqliteStatements({ exec }, [statement(1), statement(2)])).resolves.toEqual([1, 2])
+    expect(commands).toEqual(['BEGIN IMMEDIATE', 'COMMIT'])
+    expect(order).toEqual([1, 2])
+  })
+
+  it('rolls back when a statement rejects and preserves the original failure', async () => {
+    const commands: string[] = []
+    const exec = vi.fn(async (command: 'BEGIN IMMEDIATE' | 'COMMIT' | 'ROLLBACK') => {
+      commands.push(command)
+    })
+    const failure = new Error('statement failed')
+
+    await expect(
+      runAtomicSqliteStatements({ exec }, [Promise.resolve('first'), Promise.reject(failure)]),
+    ).rejects.toBe(failure)
+    expect(commands).toEqual(['BEGIN IMMEDIATE', 'ROLLBACK'])
+  })
+
+  it('rolls back when COMMIT rejects', async () => {
+    const commands: string[] = []
+    const commitFailure = new Error('commit failed')
+    const exec = vi.fn(async (command: 'BEGIN IMMEDIATE' | 'COMMIT' | 'ROLLBACK') => {
+      commands.push(command)
+      if (command === 'COMMIT') throw commitFailure
+    })
+
+    await expect(runAtomicSqliteStatements({ exec }, [Promise.resolve('done')])).rejects.toBe(commitFailure)
+    expect(commands).toEqual(['BEGIN IMMEDIATE', 'COMMIT', 'ROLLBACK'])
+  })
+
+  it('aggregates a rollback failure without discarding the statement failure', async () => {
+    const statementFailure = new Error('statement failed')
+    const rollbackFailure = new Error('rollback failed')
+    const exec = vi.fn(async (command: 'BEGIN IMMEDIATE' | 'COMMIT' | 'ROLLBACK') => {
+      if (command === 'ROLLBACK') throw rollbackFailure
+    })
+
+    const result = runAtomicSqliteStatements({ exec }, [Promise.reject(statementFailure)])
+    await expect(result).rejects.toMatchObject({
+      name: 'AggregateError',
+      message: 'runAtomicSqliteStatements: statement execution and rollback both failed',
+    })
+    await result.catch((error: unknown) => {
+      expect(error).toBeInstanceOf(AggregateError)
+      expect((error as AggregateError).errors).toEqual([statementFailure, rollbackFailure])
+    })
   })
 })
 

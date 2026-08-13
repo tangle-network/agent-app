@@ -41,6 +41,22 @@ export interface SqliteBatchDatabase {
   batch?: (statements: [unknown, ...unknown[]]) => Promise<unknown[]>
 }
 
+/** The three raw SQL control statements used by the explicit atomic path. */
+export type SqliteTransactionCommand = 'BEGIN IMMEDIATE' | 'COMMIT' | 'ROLLBACK'
+
+/**
+ * A SQLite driver that can execute a group of statements atomically.
+ *
+ * `batch` is preferred because D1 and libsql expose it as their atomic
+ * primitive. A driver without `batch` must expose `exec` for raw transaction
+ * control; the helper then issues `BEGIN IMMEDIATE`, awaits each statement,
+ * and commits or rolls back as one unit. A database with neither capability is
+ * rejected instead of falling back to the non-atomic helper.
+ */
+export interface AtomicSqliteDatabase extends SqliteBatchDatabase {
+  exec?: (command: SqliteTransactionCommand) => unknown | Promise<unknown>
+}
+
 /** Execute related SQLite statements in one transactional driver batch when
  * supported, or sequentially in the same order for portable local drivers. */
 export async function runSqliteStatements(
@@ -53,6 +69,46 @@ export async function runSqliteStatements(
   const results: unknown[] = []
   for (const statement of statements) results.push(await statement)
   return results
+}
+
+/**
+ * Execute related SQLite statements atomically.
+ *
+ * This helper is intentionally separate from {@link runSqliteStatements}.
+ * The older helper preserves its portable sequential fallback; this helper
+ * fails closed when the injected driver cannot prove atomicity.
+ */
+export async function runAtomicSqliteStatements(
+  db: AtomicSqliteDatabase,
+  statements: [unknown, ...unknown[]],
+): Promise<unknown[]> {
+  if (typeof db.batch === 'function') {
+    return await db.batch(statements)
+  }
+
+  if (typeof db.exec !== 'function') {
+    throw new Error(
+      'runAtomicSqliteStatements: the injected driver exposes neither batch() nor exec() — atomic execution is unavailable',
+    )
+  }
+
+  await db.exec('BEGIN IMMEDIATE')
+  try {
+    const results: unknown[] = []
+    for (const statement of statements) results.push(await statement)
+    await db.exec('COMMIT')
+    return results
+  } catch (error) {
+    try {
+      await db.exec('ROLLBACK')
+    } catch (rollbackError) {
+      throw new AggregateError(
+        [error, rollbackError],
+        'runAtomicSqliteStatements: statement execution and rollback both failed',
+      )
+    }
+    throw error
+  }
 }
 
 /**

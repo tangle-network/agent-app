@@ -4,7 +4,15 @@
 
 Source: `src/store/index.ts`
 
-10 exports.
+13 exports.
+
+### `AtomicSqliteDatabase`
+
+`interface` — A SQLite driver that can execute a group of statements atomically.
+
+```ts
+interface AtomicSqliteDatabase
+```
 
 ### `createDatabaseProvider`
 
@@ -70,6 +78,14 @@ interface KVPutOptions
 interface KVStore
 ```
 
+### `runAtomicSqliteStatements`
+
+`function` — Execute related SQLite statements atomically.
+
+```ts
+(db: AtomicSqliteDatabase, statements: [unknown, ...unknown[]]) => Promise<unknown[]>
+```
+
 ### `runSqliteStatements`
 
 `function` — Execute related SQLite statements in one transactional driver batch when supported, or sequentially in the same order for portable local drivers.
@@ -84,4 +100,12 @@ interface KVStore
 
 ```ts
 interface SqliteBatchDatabase
+```
+
+### `SqliteTransactionCommand`
+
+`type` — The three raw SQL control statements used by the explicit atomic path.
+
+```ts
+type SqliteTransactionCommand
 ```

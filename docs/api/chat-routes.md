@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-175 exports.
+176 exports.
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
@@ -140,6 +140,14 @@ type AttachmentTypeCheckResult
 
 ```ts
 type AttachmentUploadAuthorization
+```
+
+### `AttachmentWriteReceipt`
+
+`interface` — Compensation for a successful attachment write.
+
+```ts
+interface AttachmentWriteReceipt
 ```
 
 ### `AttachmentWriteResult`

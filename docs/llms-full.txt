@@ -1573,6 +1573,14 @@ type AttachmentTypeCheckResult
 type AttachmentUploadAuthorization
 ```
 
+### `AttachmentWriteReceipt`
+
+`interface` — Compensation for a successful attachment write.
+
+```ts
+interface AttachmentWriteReceipt
+```
+
 ### `AttachmentWriteResult`
 
 `type` — Outcome of persisting one attachment.
@@ -17490,6 +17498,14 @@ _No public exports._
 
 Source: `src/store/index.ts`
 
+### `AtomicSqliteDatabase`
+
+`interface` — A SQLite driver that can execute a group of statements atomically.
+
+```ts
+interface AtomicSqliteDatabase
+```
+
 ### `createDatabaseProvider`
 
 `function` — Create a swappable database provider.
@@ -17554,6 +17570,14 @@ interface KVPutOptions
 interface KVStore
 ```
 
+### `runAtomicSqliteStatements`
+
+`function` — Execute related SQLite statements atomically.
+
+```ts
+(db: AtomicSqliteDatabase, statements: [unknown, ...unknown[]]) => Promise<unknown[]>
+```
+
 ### `runSqliteStatements`
 
 `function` — Execute related SQLite statements in one transactional driver batch when supported, or sequentially in the same order for portable local drivers.
@@ -17568,6 +17592,14 @@ interface KVStore
 
 ```ts
 interface SqliteBatchDatabase
+```
+
+### `SqliteTransactionCommand`
+
+`type` — The three raw SQL control statements used by the explicit atomic path.
+
+```ts
+type SqliteTransactionCommand
 ```
 
 
