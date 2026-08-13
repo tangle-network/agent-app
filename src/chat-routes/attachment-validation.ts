@@ -114,7 +114,7 @@ export const ALLOWED_ATTACHMENT_SNIFFED_MIMES: ReadonlySet<string> = new Set([
  *  that names what the file actually is. Sniffing answers what format the
  *  bytes CLAIM to be, not whether they are a readable document — see
  *  `sniffOoxml`'s note on what a reader with no inflater can and cannot prove.
- *  The macro-enabled extensions are listed for the same reason
+ *  The macro-enabled and EBML-video extensions are listed for the same reason
  *  even though the default allow-list refuses them — a product that widens
  *  the allow-list gets the renamed-file check with it. */
 const EXTENSION_IMPLIES_SNIFFED_MIME: Readonly<Record<string, string>> = {
@@ -135,6 +135,8 @@ const EXTENSION_IMPLIES_SNIFFED_MIME: Readonly<Record<string, string>> = {
   docm: OOXML_WORD_MACRO_ENABLED_MIME,
   xlsm: OOXML_SPREADSHEET_MACRO_ENABLED_MIME,
   pptm: OOXML_PRESENTATION_MACRO_ENABLED_MIME,
+  webm: 'video/webm',
+  mkv: 'video/x-matroska',
 }
 
 /** Represent the result of checking an attachment's type with success or specific failure details */

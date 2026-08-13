@@ -105,6 +105,12 @@ function avifBytes(): Uint8Array {
   return new Uint8Array([0, 0, 0, 0x1c, ...'ftyp'.split('').map((c) => c.charCodeAt(0)), ...'avif'.split('').map((c) => c.charCodeAt(0))])
 }
 
+function mp4BytesOfSize(totalBytes: number): Uint8Array {
+  const bytes = new Uint8Array(totalBytes)
+  bytes.set([0, 0, 0, 0x18, ...'ftyp'.split('').map((c) => c.charCodeAt(0)), ...'isom'.split('').map((c) => c.charCodeAt(0))], 0)
+  return bytes
+}
+
 describe('createAttachmentUploadRoute', () => {
   it('writes raw PNG bytes with the correct opts (mediaType/name/originalName/size)', async () => {
     const { write, writes } = recordingWriteAttachment()
@@ -412,6 +418,37 @@ describe('createAttachmentUploadRoute', () => {
     expect(body.error?.code).toBe('attachment_too_large')
     expect(body.error?.message).toContain('huge.png')
     expect(writes).toHaveLength(0)
+  })
+
+  it('applies a sniffed-mime size override while retaining the binary fallback cap', async () => {
+    const fiftyMiB = 50 * 1024 * 1024
+    const tenMiB = 10 * 1024 * 1024
+    const { write, writes } = recordingWriteAttachment()
+    const route = createAttachmentUploadRoute({
+      authorize: okAuthorize(),
+      writeAttachment: write,
+      allowedSniffedMimes: new Set([...ALLOWED_ATTACHMENT_SNIFFED_MIMES, 'video/mp4']),
+      limits: {
+        maxBinaryBytes: tenMiB,
+        maxBytesBySniffedMime: new Map([['video/mp4', 100 * 1024 * 1024]]),
+        maxTotalBytes: 100 * 1024 * 1024,
+      },
+    })
+
+    const video = await route(uploadRequest([fileOf(mp4BytesOfSize(fiftyMiB), 'clip.mp4', 'video/mp4')]))
+    expect(video.status).toBe(200)
+    expect(writes).toHaveLength(1)
+    expect(writes[0]!.opts.mediaType).toBe('video/mp4')
+
+    const image = await route(uploadRequest([fileOf(pngBytesOfSize(fiftyMiB), 'still.png', 'image/png')]))
+    expect(image.status).toBe(413)
+    expect(await json(image)).toEqual({
+      error: {
+        code: 'attachment_too_large',
+        message: 'still.png is 50MB; attachments are limited to 10MB',
+      },
+    })
+    expect(writes).toHaveLength(1)
   })
 
   describe('allowedKinds override', () => {

@@ -3,8 +3,9 @@
  * route: a two-phase atomic batch (every file is validated before any file is
  * written — a batch never partially lands), a content-sniffed type gate
  * (`checkAttachmentType` over `sniffBinary`'s magic-byte read, not the
- * extension or the browser-reported MIME), per-kind + aggregate byte caps,
- * and sanitized filenames. Storage is fully seamed through the injected
+ * extension or the browser-reported MIME), binary/text caps with optional
+ * per-sniffed-mime overrides, an aggregate byte cap, and sanitized filenames.
+ * Storage is fully seamed through the injected
  * `WriteAttachmentFn` (`./attachment-store`) — no default store, the product
  * owns where bytes actually live (vault, object store, …) — and auth/rate
  * limiting is entirely the injected `authorize` seam's job: this factory
@@ -66,6 +67,10 @@ export interface CreateAttachmentUploadRouteOptions {
     maxCount?: number
     /** Ceiling on a binary file's raw size. Default {@link MAX_BINARY_ATTACHMENT_BYTES}. */
     maxBinaryBytes?: number
+    /** Optional binary-file ceilings keyed by the content-sniffed mime. A
+     *  missing mime falls back to `maxBinaryBytes`; text files continue to use
+     *  `maxTextBytes`. */
+    maxBytesBySniffedMime?: ReadonlyMap<string, number>
     /** Ceiling on a text file's raw size. Default {@link MAX_TEXT_ATTACHMENT_BYTES}. */
     maxTextBytes?: number
     /** Aggregate raw-byte ceiling across the batch. Default {@link MAX_ATTACHMENT_TOTAL_BYTES}. */
@@ -104,6 +109,7 @@ export function createAttachmentUploadRoute(
 ): (request: Request) => Promise<Response> {
   const maxCount = options.limits?.maxCount ?? ATTACHMENT_MAX_COUNT
   const maxBinaryBytes = options.limits?.maxBinaryBytes ?? MAX_BINARY_ATTACHMENT_BYTES
+  const maxBytesBySniffedMime = options.limits?.maxBytesBySniffedMime
   const maxTextBytes = options.limits?.maxTextBytes ?? MAX_TEXT_ATTACHMENT_BYTES
   const maxTotalBytes = options.limits?.maxTotalBytes ?? MAX_ATTACHMENT_TOTAL_BYTES
   const allowedKinds: ChatAttachmentKind[] = options.allowedKinds ?? ['image', 'file']
@@ -197,7 +203,12 @@ export function createAttachmentUploadRoute(
         )
       }
 
-      const limit = sniff.binary ? maxBinaryBytes : maxTextBytes
+      let limit = maxTextBytes
+      if (sniff.binary) {
+        limit = sniff.mime === null
+          ? maxBinaryBytes
+          : maxBytesBySniffedMime?.get(sniff.mime) ?? maxBinaryBytes
+      }
       if (bytes.length > limit) {
         return attachmentUploadError(
           413,

@@ -32,6 +32,14 @@ function ascii(text: string, extra: number[] = []): Uint8Array {
   return new Uint8Array([...Array.from(text, (c) => c.charCodeAt(0)), ...extra])
 }
 
+/** Minimal EBML header with a version element before DocType, matching the
+ *  structure real WebM/Matroska files put at the start of the container. */
+function ebmlBytes(docType: string): Uint8Array {
+  const docTypeBytes = Array.from(docType, (character) => character.charCodeAt(0))
+  const payload = [0x42, 0x86, 0x81, 0x01, 0x42, 0x82, 0x80 | docTypeBytes.length, ...docTypeBytes]
+  return bytes([0x1a, 0x45, 0xdf, 0xa3, 0x80 | payload.length, ...payload])
+}
+
 describe('sniffBinary', () => {
   it('detects PNG', () => {
     expect(sniffBinary(bytes([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]))).toEqual({
@@ -244,6 +252,30 @@ describe('sniffBinary', () => {
 
   it('detects OGG', () => {
     expect(sniffBinary(ascii('OggS', [0, 0]))).toEqual({ binary: true, mime: 'audio/ogg' })
+  })
+
+  describe('EBML containers', () => {
+    it('detects WebM from the EBML DocType', () => {
+      expect(sniffBinary(ebmlBytes('webm'))).toEqual({ binary: true, mime: 'video/webm' })
+    })
+
+    it('reports Matroska under a distinct mime', () => {
+      expect(sniffBinary(ebmlBytes('matroska'))).toEqual({ binary: true, mime: 'video/x-matroska' })
+    })
+
+    it('does not call an EBML container WebM when its DocType is different', () => {
+      expect(sniffBinary(ebmlBytes('not-webm'))).toEqual({ binary: true, mime: null })
+    })
+
+    it('does not call MP4 bytes WebM merely because a caller renamed the file', () => {
+      const renamedMp4 = new Uint8Array([0, 0, 0, 0x18, ...ascii('ftyp'), ...ascii('isom')])
+      expect(sniffBinary(renamedMp4)).toEqual({ binary: true, mime: 'video/mp4' })
+    })
+
+    it('does not scan a truncated or unknown-sized EBML header', () => {
+      expect(sniffBinary(bytes([0x1a, 0x45, 0xdf, 0xa3, 0x8b, 0x42, 0x82, 0x84, ...ascii('webm')]))).toEqual({ binary: true, mime: null })
+      expect(sniffBinary(bytes([0x1a, 0x45, 0xdf, 0xa3, 0xff, 0x42, 0x82, 0x84, ...ascii('webm')]))).toEqual({ binary: true, mime: null })
+    })
   })
 
   it('detects MP4 via ftyp box', () => {

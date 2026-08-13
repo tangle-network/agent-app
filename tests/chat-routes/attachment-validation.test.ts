@@ -53,6 +53,12 @@ function avifBytes(): Uint8Array {
   return new Uint8Array([0, 0, 0, 0x1c, ...ascii('ftyp'), ...ascii('avif')])
 }
 
+function ebmlBytes(docType: string): Uint8Array {
+  const value = ascii(docType)
+  const payload = [0x42, 0x82, 0x80 | value.length, ...value]
+  return new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0x80 | payload.length, ...payload])
+}
+
 describe('checkAttachmentType', () => {
   describe('matching extension and content', () => {
     const cases: Array<[string, string]> = [
@@ -172,6 +178,30 @@ describe('checkAttachmentType', () => {
       expect(result.succeeded).toBe(false)
       if (result.succeeded) throw new Error('unreachable')
       expect(result.code).toBe('attachment_type_not_allowed')
+    })
+  })
+
+  describe('EBML video formats', () => {
+    it('keeps WebM and Matroska out of the default allow-list', () => {
+      for (const [name, bytes, mime] of [
+        ['clip.webm', ebmlBytes('webm'), 'video/webm'],
+        ['clip.mkv', ebmlBytes('matroska'), 'video/x-matroska'],
+      ] as const) {
+        const result = checkAttachmentType(name, sniffBinary(bytes))
+        expect(result.succeeded).toBe(false)
+        if (result.succeeded) throw new Error('unreachable')
+        expect(result.code).toBe('attachment_type_not_allowed')
+        expect(result.message).toContain(mime)
+        expect(ALLOWED_ATTACHMENT_SNIFFED_MIMES.has(mime)).toBe(false)
+      }
+    })
+
+    it('rejects MP4 content renamed .webm even when the route admits both video mimes', () => {
+      const allowed = new Set([...ALLOWED_ATTACHMENT_SNIFFED_MIMES, 'video/webm', 'video/mp4'])
+      const result = checkAttachmentType('clip.webm', sniff(true, 'video/mp4'), allowed)
+      expect(result.succeeded).toBe(false)
+      if (result.succeeded) throw new Error('unreachable')
+      expect(result.code).toBe('attachment_type_mismatch')
     })
   })
 
