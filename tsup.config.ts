@@ -101,7 +101,19 @@ export default defineConfig({
     'studio-react/index': 'src/studio-react/index.tsx',
   },
   format: ['esm'],
-  dts: true,
+  // Declarations come from `tsc -p tsconfig.build.json`, not tsup's `dts`.
+  // tsup builds every entry above in ONE rollup-plugin-dts pass inside a single
+  // worker thread, and that worker's peak heap scales with the entry count
+  // (~150 MB per entry, measured on this repo). The list is long enough that the
+  // pass exceeds V8's default old-space limit, and raising the limit only moves
+  // the ceiling. A single `tsc` program emits one `.d.ts` per source file for
+  // the whole of `src` in ~1 GB, and `dist/<entry>.d.ts` still answers every
+  // `types` path in `exports`.
+  //
+  // Emitted relative specifiers carry no file extension, so a consumer must
+  // resolve types with `moduleResolution: bundler`. Both scaffold templates and
+  // every product consuming this package already do.
+  dts: false,
   sourcemap: true,
   clean: true,
   target: 'es2022',

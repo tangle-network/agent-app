@@ -496,9 +496,10 @@
     }
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsc -p tsconfig.build.json",
     "dev": "tsup --watch",
-    "prepare": "tsup",
+    "dev:types": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "prepare": "pnpm run build",
     "test": "vitest run",
     "test:generated": "node .github/scripts/test-generated-projects.mjs",
     "test:gates": "vitest run src/sandbox/index.test.ts src/profile/index.test.ts tests/chat-stream.test.ts tests/browser-safe-subpaths.test.ts tests/test-quality.test.ts tests/knip-entries-fresh.test.ts tests/web-react/popover-escapes-host.test.tsx tests/web-react/popover-canon-source.test.ts",
