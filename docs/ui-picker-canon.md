@@ -18,6 +18,15 @@ path for any product still holding the old nested selection shape.
   chrome primitives.
 - **agent-app owns composed, seam-driven app-shell surfaces** — transcript,
   composer controls, pickers, assistant.
+- **`@tangle-network/ui` owns the run-row grammar** — `RunRowShell`,
+  `InlineToolItem`, `InlineThinkingItem` (tool calls, reasoning, status rows).
+  Compose it; never re-fork a row type locally. agent-app's `ChatMessages`
+  renders the agent-chat WIRE surface (proposals, approvals, missions,
+  interactions, quiet chrome) — a different data model from ui's
+  session-transcript (`MessageList`/`AgentTimeline`), so the transcript shell
+  stays here while every row IN it defers to the ui grammar. If the shell
+  can't carry a behavior, extend it upstream (`title` is `ReactNode` and the
+  shell itself is exported for this reason).
 
 If you are about to add a picker/menu/control to sandbox-ui, stop — it belongs
 in agent-app. Note the one deliberate asymmetry: the assistant dock composer

@@ -711,9 +711,12 @@ describe('the Tailwind preset', () => {
   })
 
   it('every token the preset names is defined in tokens.css', () => {
+    // Radix sets these on the element at runtime (measured content size); they
+    // are provably provided by the component, not by the token sheet.
+    const RUNTIME_PROVIDED = new Set(['--radix-collapsible-content-height', '--radix-collapsible-content-width'])
     const defined = new Set(rootDefs().keys())
     const referenced = [...JSON.stringify(agentAppPreset).matchAll(/var\(\s*(--[a-z0-9-]+)/g)].map((m) => m[1]!)
-    const dangling = [...new Set(referenced)].filter((name) => !defined.has(name))
+    const dangling = [...new Set(referenced)].filter((name) => !defined.has(name) && !RUNTIME_PROVIDED.has(name))
     expect(dangling, `The preset maps utilities onto tokens tokens.css never defines:\n${dangling.join('\n')}`).toEqual([])
   })
 })

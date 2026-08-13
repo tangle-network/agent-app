@@ -124,6 +124,25 @@ const agentAppPreset = {
         entrance: 'var(--ease-entrance)',
         exit: 'var(--ease-exit)',
       },
+      // Radix-collapsible row reveals, used by @tangle-network/ui's RunRowShell
+      // (the shared run-row grammar this package composes). Named exactly as the
+      // shell references them (`animate-slideDown`/`animate-slideUp`); height
+      // animates against Radix's measured --radix-collapsible-content-height,
+      // not a max-height guess.
+      keyframes: {
+        slideDown: {
+          from: { height: '0' },
+          to: { height: 'var(--radix-collapsible-content-height)' },
+        },
+        slideUp: {
+          from: { height: 'var(--radix-collapsible-content-height)' },
+          to: { height: '0' },
+        },
+      },
+      animation: {
+        slideDown: 'slideDown var(--duration-base) var(--ease-entrance)',
+        slideUp: 'slideUp var(--duration-fast) var(--ease-exit)',
+      },
     },
   },
 }
