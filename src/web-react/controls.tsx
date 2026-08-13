@@ -321,12 +321,20 @@ export const POPOVER_OPTION_FOCUS = 'focus-visible:[outline-offset:-2px]'
 
 /**
  * The one overlay elevation for floating surfaces — picker menus, popovers,
- * drawers, modals. Reads the theme's `--shadow-overlay` token through the
- * preset's `shadow-overlay` utility (dark doubles the alpha at the token), so
- * every overlay lifts with the same shadow and re-themes from one source. The
- * floating composer uses the quieter `shadow-raised` rung instead.
+ * drawers, modals. Reads the theme's `--shadow-overlay` token, so every overlay
+ * lifts with the same shadow and re-themes from one source. The floating
+ * composer uses the quieter `shadow-raised` rung instead.
+ *
+ * Written as an arbitrary value rather than the preset's `shadow-overlay`
+ * utility, because that utility only exists where the preset is part of the
+ * Tailwind build. A host that gets its tokens through a precompiled bundle —
+ * `@tangle-network/sandbox-ui` inlines brand's, with no `@theme` block
+ * surviving the compile — receives `--shadow-overlay` as a plain custom
+ * property, from which no `shadow-overlay` utility can be generated, and these
+ * surfaces render flat. The arbitrary form emits from the class alone and works
+ * either way.
  */
-export const OVERLAY_SHADOW = 'shadow-overlay'
+export const OVERLAY_SHADOW = 'shadow-[var(--shadow-overlay)]'
 
 /**
  * Root geometry for a picker — the box that holds the trigger — in one place

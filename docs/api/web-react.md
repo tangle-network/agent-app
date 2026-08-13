@@ -1739,7 +1739,7 @@ type NoticePersistedPart
 `const` — The one overlay elevation for floating surfaces — picker menus, popovers, drawers, modals.
 
 ```ts
-"shadow-overlay"
+"shadow-[var(--shadow-overlay)]"
 ```
 
 ### `parseInteractionAnswers`
