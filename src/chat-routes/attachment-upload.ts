@@ -1,14 +1,16 @@
 /**
  * `createAttachmentUploadRoute` — the fleet-primitive durable-store upload
- * route: a two-phase batch (every file is validated before any file is written,
- * and every write carries an ownership-safe receipt), a content-sniffed type gate
+ * route: a two-phase batch (every file is validated before any file is written),
+ * with a stable legacy lane and an ownership-safe receipt lane for new callers,
+ * a content-sniffed type gate
  * (`checkAttachmentType` over `sniffBinary`'s magic-byte read, not the
  * extension or the browser-reported MIME), binary/text caps with optional
  * per-sniffed-mime overrides, an aggregate byte cap, and sanitized filenames.
  * Storage is fully seamed through the injected
- * `WriteAttachmentFn` (`./attachment-store`) — no default store, the product
- * owns where bytes actually live (vault, object store, …) — and auth/rate
- * limiting is entirely the injected `authorize` seam's job: this factory
+ * `WriteAttachmentFn` or `AtomicAttachmentWriter` (`./attachment-store`) — no
+ * default store, the product owns where bytes actually live (vault, object
+ * store, …), and auth/rate limiting is entirely the injected `authorize`
+ * seam's job: this factory
  * never invents a 401 or 429 response, it only returns `auth.response`
  * verbatim on failure.
  *
@@ -31,6 +33,7 @@ import { attachmentKindForMime } from '../chat-store/parts'
 import { redactErrorMessage } from '../redact'
 import {
   ATTACHMENT_STORAGE_FAILURE_MESSAGE,
+  type AtomicAttachmentWriter,
   immutableAttachmentPath,
   type AbortAttachmentWriteFn,
   type AttachmentWriteOwnership,
@@ -52,18 +55,21 @@ import { sniffBinary } from './binary-sniff'
 import { defaultValidateAttachmentPath, type AttachmentPathCheck } from './resolve-attachments'
 import { sniffMimeFromName } from './promote-file-part'
 
-/** Outcome of the injected `authorize` seam: auth + rate limiting +
- *  scope resolution, all in one place so a 429 rides `{ok:false, response}`
- *  exactly like a 401 does — this factory has no rate-limit opinion of its
- *  own. `writeAttachment` lets a single request override the option-level
- *  store (e.g. routing per-tenant), defaulting to `options.writeAttachment`
- *  when absent. */
+/** Stable authorization result for the original writer contract. */
 export type AttachmentUploadAuthorization =
   | {
       ok: true
       scopeId: string
-      abortAttachment: AbortAttachmentWriteFn
       writeAttachment?: WriteAttachmentFn
+    }
+  | { ok: false; response: Response }
+
+/** Authorization result for an ownership-safe attachment writer. */
+export type AtomicAttachmentUploadAuthorization =
+  | {
+      ok: true
+      scopeId: string
+      attachmentWriter?: AtomicAttachmentWriter
     }
   | { ok: false; response: Response }
 
@@ -83,51 +89,56 @@ function logAttachmentUploadError(
   }
 }
 
-/** Define options to authorize, write, and limit attachment uploads in a route */
-export interface CreateAttachmentUploadRouteOptions {
-  /** Authenticate the caller, rate-limit, and resolve the store scope
-   *  (workspace/tenant id) — never a query param. */
-  authorize(args: { request: Request }): Promise<AttachmentUploadAuthorization>
-  /** Default store writer. `authorize` may override it per-request. */
-  writeAttachment: WriteAttachmentFn
+interface AttachmentUploadRouteCommonOptions {
   /** Overridable caps. Defaults come from `./attachment-validation`. */
   limits?: {
     /** Most files one request may carry. Default {@link ATTACHMENT_MAX_COUNT}. */
     maxCount?: number
     /** Ceiling on a binary file's raw size. Default {@link MAX_BINARY_ATTACHMENT_BYTES}. */
     maxBinaryBytes?: number
-    /** Optional binary-file ceilings keyed by the content-sniffed mime. A
-     *  missing mime falls back to `maxBinaryBytes`; text files continue to use
-     *  `maxTextBytes`. */
+    /** Optional binary-file ceilings keyed by the content-sniffed mime. */
     maxBytesBySniffedMime?: ReadonlyMap<string, number>
     /** Ceiling on a text file's raw size. Default {@link MAX_TEXT_ATTACHMENT_BYTES}. */
     maxTextBytes?: number
-    /** Aggregate raw-byte ceiling across the batch. Default {@link MAX_ATTACHMENT_TOTAL_BYTES}. */
+    /** Aggregate raw-byte ceiling. Default {@link MAX_ATTACHMENT_TOTAL_BYTES}. */
     maxTotalBytes?: number
   }
   /** Attachment kinds this route accepts. Default `['image', 'file']`. */
   allowedKinds?: ChatAttachmentKind[]
-  /** Sniffed-mime allowlist fed to `checkAttachmentType`. Default
-   *  {@link ALLOWED_ATTACHMENT_SNIFFED_MIMES}. Narrow it to accept less than
-   *  the default (`new Set(['application/pdf'])`), or widen it to accept a
-   *  format the default refuses — macro-enabled Office packages are the
-   *  shipped case:
-   *  `new Set([...ALLOWED_ATTACHMENT_SNIFFED_MIMES, ...MACRO_ENABLED_OOXML_SNIFFED_MIMES])`. */
+  /** Sniffed-mime allowlist fed to `checkAttachmentType`. */
   allowedSniffedMimes?: ReadonlySet<string>
-  /** Sanitized-name → logical store path. The route appends a unique ownership
-   *  suffix before writing, so the returned path cannot overwrite another file.
-   */
+  /** Sanitized-name → logical store path. */
   pathFor?: (name: string) => string
   /** Store-path validator. Default {@link defaultValidateAttachmentPath}. */
   validatePath?: (path: string) => AttachmentPathCheck
-  /** Last-resort media-type hook for text content the sniffer can't type.
-   *  Default {@link sniffMimeFromName}. */
+  /** Last-resort media-type hook for text content the sniffer cannot type. */
   sniffMime?: (name: string) => string
-  /** Unique id source for tests or a product's id service. */
+  /** Unique id source for atomic ownership keys. */
   createWriteId?: () => string
   /** Server-side error sink. Backend text is sanitized before it is logged. */
   logger?: AttachmentUploadLogger
 }
+
+/** Stable route options for products using the original writer contract. */
+export interface CreateLegacyAttachmentUploadRouteOptions extends AttachmentUploadRouteCommonOptions {
+  /** Authenticate the caller, rate-limit, and resolve the store scope
+   *  (workspace/tenant id) — never a query param. */
+  authorize(args: { request: Request }): Promise<AttachmentUploadAuthorization>
+  /** Stable writer. `authorize` may override it per-request. */
+  writeAttachment: WriteAttachmentFn
+}
+
+/** Ownership-safe route options for new products. */
+export interface CreateAtomicAttachmentUploadRouteOptions extends AttachmentUploadRouteCommonOptions {
+  /** Authenticate the caller, rate-limit, and resolve the store scope. */
+  authorize(args: { request: Request }): Promise<AtomicAttachmentUploadAuthorization>
+  /** Complete writer + ambiguous-write cleanup adapter. */
+  attachmentWriter: AtomicAttachmentWriter
+}
+
+export type CreateAttachmentUploadRouteOptions =
+  | CreateLegacyAttachmentUploadRouteOptions
+  | CreateAtomicAttachmentUploadRouteOptions
 
 function attachmentUploadError(status: number, code: string, message: string, path?: string): Response {
   return Response.json(
@@ -189,10 +200,17 @@ async function abortOwnership(
   }
 }
 
-/** Resolve an attachment upload route handler with customizable limits and validation options */
+function isAtomicRouteOptions(
+  options: CreateAttachmentUploadRouteOptions,
+): options is CreateAtomicAttachmentUploadRouteOptions {
+  return 'attachmentWriter' in options
+}
+
+/** Resolve an attachment upload route handler with customizable limits and validation options. */
 export function createAttachmentUploadRoute(
   options: CreateAttachmentUploadRouteOptions,
 ): (request: Request) => Promise<Response> {
+  const atomic = isAtomicRouteOptions(options)
   const maxCount = options.limits?.maxCount ?? ATTACHMENT_MAX_COUNT
   const maxBinaryBytes = options.limits?.maxBinaryBytes ?? MAX_BINARY_ATTACHMENT_BYTES
   const maxBytesBySniffedMime = options.limits?.maxBytesBySniffedMime
@@ -203,20 +221,26 @@ export function createAttachmentUploadRoute(
   const pathFor = options.pathFor ?? ((name: string) => name)
   const validatePath = options.validatePath ?? defaultValidateAttachmentPath
   const sniffMime = options.sniffMime ?? sniffMimeFromName
-  const createWriteId = options.createWriteId ?? (() => {
-    if (typeof crypto === 'undefined' || typeof crypto.randomUUID !== 'function') {
-      throw new Error('attachment upload requires crypto.randomUUID')
-    }
-    return crypto.randomUUID()
-  })
+  const createWriteId = atomic
+    ? options.createWriteId ?? (() => {
+        if (typeof crypto === 'undefined' || typeof crypto.randomUUID !== 'function') {
+          throw new Error('attachment upload requires crypto.randomUUID')
+        }
+        return crypto.randomUUID()
+      })
+    : undefined
   const logger = options.logger ?? console
 
   return async function attachmentUpload(request: Request): Promise<Response> {
     const auth = await options.authorize({ request })
     if (!auth.ok) return auth.response
-    const write = auth.writeAttachment ?? options.writeAttachment
-    const abort = auth.abortAttachment
-    if (typeof abort !== 'function') {
+    const atomicWriter = atomic
+      ? (auth as Extract<AtomicAttachmentUploadAuthorization, { ok: true }>).attachmentWriter ?? options.attachmentWriter
+      : undefined
+    const legacyWriter = atomic
+      ? undefined
+      : (auth as Extract<AttachmentUploadAuthorization, { ok: true }>).writeAttachment ?? options.writeAttachment
+    if (atomic && !atomicWriter) {
       return attachmentUploadError(503, 'attachment_store_unavailable', ATTACHMENT_STORAGE_FAILURE_MESSAGE)
     }
 
@@ -259,7 +283,7 @@ export function createAttachmentUploadRoute(
 
     interface PreparedWrite {
       path: string
-      ownershipId: string
+      ownershipId?: string
       name: string
       bytes: Uint8Array
       originalName: string
@@ -316,8 +340,8 @@ export function createAttachmentUploadRoute(
       }
 
       const logicalPath = pathFor(name)
-      const writeId = createWriteId()
-      const path = immutableAttachmentPath(logicalPath, writeId)
+      const ownershipId = atomic ? createWriteId!() : undefined
+      const path = ownershipId ? immutableAttachmentPath(logicalPath, ownershipId) : logicalPath
       const pathCheck = validatePath(path)
       if (!pathCheck.succeeded) {
         return attachmentUploadError(400, 'invalid_attachment_path', pathCheck.error, path)
@@ -325,15 +349,16 @@ export function createAttachmentUploadRoute(
       // Small hardening over gtm: a batch whose sanitized names collide onto
       // the same store path (e.g. two variously-cased "Report.PDF" uploads)
       // would otherwise silently overwrite one with the other in phase 2.
-      if (seenLogicalPaths.has(logicalPath)) {
+      const duplicatePath = atomic ? logicalPath : path
+      if (seenLogicalPaths.has(duplicatePath)) {
         return attachmentUploadError(
           400,
           'attachment_duplicate_path',
-          `attachments must not repeat a path within one upload: ${logicalPath}`,
+          `attachments must not repeat a path within one upload: ${duplicatePath}`,
           path,
         )
       }
-      seenLogicalPaths.add(logicalPath)
+      seenLogicalPaths.add(duplicatePath)
 
       // Authoritative aggregate check, against the actual decoded byte
       // length rather than the client-reported `file.size` checked above.
@@ -347,17 +372,41 @@ export function createAttachmentUploadRoute(
       }
 
       const mediaType = sniff.mime ?? sniffMime(name)
-      prepared.push({ path, ownershipId: writeId, name, bytes, originalName: file.name, size: bytes.length, mediaType, kind })
+      prepared.push({ path, ownershipId, name, bytes, originalName: file.name, size: bytes.length, mediaType, kind })
     }
 
     // Phase 2: every file in the batch passed validation — write them all.
     const uploaded: ChatAttachmentInput[] = []
     const successfulWrites: SuccessfulAttachmentWrite[] = []
     for (const input of prepared) {
-      const ownership: AttachmentWriteOwnership = { id: input.ownershipId, path: input.path }
-      let written: Awaited<ReturnType<WriteAttachmentFn>>
+      if (!atomic) {
+        const written = await legacyWriter!(auth.scopeId, input.path, input.bytes, {
+          mediaType: input.mediaType,
+          name: input.name,
+          originalName: input.originalName,
+          size: input.size,
+        })
+        if (!written.ok) {
+          return attachmentUploadError(413, 'attachment_write_failed', written.reason, input.path)
+        }
+        uploaded.push({
+          path: input.path,
+          name: input.name,
+          size: input.size,
+          mediaType: input.mediaType,
+          kind: input.kind,
+        })
+        continue
+      }
+
+      const ownershipId = input.ownershipId
+      if (!ownershipId) {
+        return attachmentUploadError(503, 'attachment_store_unavailable', ATTACHMENT_STORAGE_FAILURE_MESSAGE, input.path)
+      }
+      const ownership: AttachmentWriteOwnership = { id: ownershipId, path: input.path }
+      let written: Awaited<ReturnType<AtomicAttachmentWriter['write']>>
       try {
-        written = await write(auth.scopeId, input.path, input.bytes, {
+        written = await atomicWriter!.write(auth.scopeId, input.path, input.bytes, {
           mediaType: input.mediaType,
           name: input.name,
           originalName: input.originalName,
@@ -365,7 +414,7 @@ export function createAttachmentUploadRoute(
           ownership,
         })
       } catch (error) {
-        const cleanupFailures = (await abortOwnership(abort, auth.scopeId, ownership, logger)) +
+        const cleanupFailures = (await abortOwnership(atomicWriter!.abort, auth.scopeId, ownership, logger)) +
           await rollbackSuccessfulWrites(successfulWrites, logger)
         logAttachmentUploadError(logger, '[attachment-upload] write failed', {
           path: input.path,
@@ -381,7 +430,7 @@ export function createAttachmentUploadRoute(
         )
       }
       if (!written || !written.receipt || !ownsReceipt(written.receipt, ownership)) {
-        const cleanupFailures = (await abortOwnership(abort, auth.scopeId, ownership, logger)) +
+        const cleanupFailures = (await abortOwnership(atomicWriter!.abort, auth.scopeId, ownership, logger)) +
           await rollbackSuccessfulWrites(successfulWrites, logger)
         logAttachmentUploadError(logger, '[attachment-upload] writer returned a mismatched ownership receipt', {
           path: input.path,

@@ -208,17 +208,22 @@ An attachment is a file the product already saved to its own store (vault /
 carries bytes) and from a `@`-mention (a path the sandbox already holds). Every
 path is re-validated and every size re-derived from the STORED body, never the
 client-reported one. Storage is REQUIRED injection — `ReadAttachmentFn` /
-`WriteAttachmentFn` (`./attachment-store`) — there is no default store.
+`AtomicAttachmentWriter` (`./attachment-store`) — there is no default store.
+
+`WriteAttachmentFn` and its original `{ ok: true }` result remain available for
+existing products. That legacy lane does not promise batch rollback. New code
+should use the atomic writer adapter below, which keeps the write and its
+ownership-safe cleanup together.
 
 ```ts
 import {
-  resolveChatAttachments, buildDispatchParts, promoteAgentFilePart, createSandboxChatProducer,
+  resolveChatAttachments, buildDispatchParts, promoteAgentFilePart,
+  createAtomicAttachmentWriter, createSandboxChatProducer,
 } from '@tangle-network/agent-app/chat-routes'
 import type {
-  AbortAttachmentWriteFn,
-  AttachmentWriteReceipt,
+  AtomicAttachmentWriter,
+  AttachmentWriteOwnership,
   ReadAttachmentFn,
-  WriteAttachmentFn,
 } from '@tangle-network/agent-app/chat-routes'
 import { createR2ObjectStore } from '@tangle-network/agent-app/object-store' // or a fleet's own vault adapter
 
@@ -231,21 +236,29 @@ const readAttachment: ReadAttachmentFn = async (scopeId, path) => {
   return { ok: true, size: obj.size, bytes, mediaType: obj.contentType }
 }
 
-const abortAttachment: AbortAttachmentWriteFn = async (scopeId, ownership) => {
+const abortAttachment: AtomicAttachmentWriter['abort'] = async (
+  scopeId: string,
+  ownership: AttachmentWriteOwnership,
+) => {
   // Upload and promotion paths contain a fresh ownership suffix, so each key is
   // immutable. If a product reuses keys, replace this with compare-and-delete.
   await store.delete(`${scopeId}/${ownership.path}`)
 }
 
-const writeAttachment: WriteAttachmentFn = async (scopeId, path, content, { mediaType, ownership }) => {
-  const bytes = typeof content === 'string' ? Uint8Array.from(atob(content), (c) => c.charCodeAt(0)) : content
-  await store.put(`${scopeId}/${path}`, bytes, { contentType: mediaType })
-  const receipt: AttachmentWriteReceipt = {
-    ownership,
-    rollback: () => abortAttachment(scopeId, ownership),
-  }
-  return { ok: true, receipt }
-}
+const attachmentWriter: AtomicAttachmentWriter = createAtomicAttachmentWriter({
+  abort: abortAttachment,
+  write: async (scopeId, path, content, { mediaType, ownership }) => {
+    const bytes = typeof content === 'string' ? Uint8Array.from(atob(content), (c) => c.charCodeAt(0)) : content
+    await store.put(`${scopeId}/${path}`, bytes, { contentType: mediaType })
+    return {
+      ok: true,
+      receipt: {
+        ownership,
+        rollback: () => abortAttachment(scopeId, ownership),
+      },
+    }
+  },
+})
 
 // In the turn route, before dispatch: validate the wire `attachments` field
 // and re-derive size, then fold it into the dispatched prompt parts.
@@ -264,14 +277,14 @@ if (!dispatch.succeeded) return Response.json({ error: dispatch.error }, { statu
 createSandboxChatProducer({
   events,
   promoteFilePart: (raw) => promoteAgentFilePart({
-    raw, box, scopeId: identity.tenantId, sessionId: identity.sessionId, writeAttachment, abortAttachment,
+    raw, box, scopeId: identity.tenantId, sessionId: identity.sessionId, attachmentWriter,
   }),
 })
 ```
 
 `/object-store` is a ready-made backend for both seams when a product has no
 vault of its own; fleet apps that already have one (gtm's KV vault) inject
-their own `ReadAttachmentFn`/`WriteAttachmentFn` instead of this module — the
+their own `ReadAttachmentFn`/`AtomicAttachmentWriter` instead of this module — the
 seams are storage-agnostic by design.
 
 ## Attachment upload + composer + transcript (#234)
@@ -290,9 +303,9 @@ const uploadAttachment = createAttachmentUploadRoute({
   authorize: async ({ request }) => {
     const auth = await authorize({ request }) // same seam as the turn route: auth + rate-limit + scope
     if (!auth.ok) return auth
-    return { ok: true as const, scopeId: auth.tenantId, abortAttachment }
+    return { ok: true as const, scopeId: auth.tenantId }
   },
-  writeAttachment, // the same #224 writeAttachment defined above
+  attachmentWriter, // the same #224 adapter defined above
 })
 ```
 

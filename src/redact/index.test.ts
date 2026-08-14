@@ -124,6 +124,34 @@ describe('redactErrorMessage', () => {
     expect(redactErrorMessage('')).toBe('unknown error')
     expect(redactErrorMessage('x'.repeat(300))).toHaveLength(241)
   })
+
+  it('is total for throwing message getters and toString methods', () => {
+    const value = Object.defineProperty(
+      { toString: () => { throw new Error('toString failed') } },
+      'message',
+      { get: () => { throw new Error('message failed') } },
+    )
+
+    expect(() => redactErrorMessage(value)).not.toThrow()
+    expect(redactErrorMessage(value)).toBe('unknown error')
+  })
+
+  it('is total for hostile proxies and hostile fallback values', () => {
+    const hostile = new Proxy(Object.create(null), {
+      get() {
+        throw new Error('get trap failed')
+      },
+      getPrototypeOf() {
+        throw new Error('prototype trap failed')
+      },
+      getOwnPropertyDescriptor() {
+        throw new Error('descriptor trap failed')
+      },
+    })
+
+    expect(() => redactErrorMessage(hostile, hostile as unknown as string)).not.toThrow()
+    expect(redactErrorMessage(hostile, hostile as unknown as string)).toBe('unknown error')
+  })
 })
 
 describe('detectSpans', () => {

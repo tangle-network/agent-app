@@ -117,11 +117,37 @@ const ERROR_SECRET_PATTERNS: readonly RedactionPattern[] = [
 /** Sanitize an untrusted backend error for server logs. This is deliberately
  * separate from public response text: callers should return an opaque message
  * and log this bounded, redacted value for operators. */
+function safeString(value: unknown): string | undefined {
+  try {
+    return typeof value === 'string' ? value : String(value)
+  } catch {
+    return undefined
+  }
+}
+
+function safeErrorText(input: unknown): string {
+  if (input !== null && (typeof input === 'object' || typeof input === 'function')) {
+    try {
+      const message = Reflect.get(input, 'message')
+      const messageText = safeString(message)
+      if (messageText !== undefined) return messageText
+    } catch {
+      // Hostile getters and proxies are still untrusted error values.
+    }
+  }
+  return safeString(input) ?? ''
+}
+
 export function redactErrorMessage(input: unknown, fallback = 'unknown error'): string {
-  const raw = input instanceof Error ? input.message : String(input)
-  const message = raw.trim() || fallback
-  const redacted = maskSpans(message, ERROR_SECRET_PATTERNS).trim()
-  return redacted.length > 240 ? `${redacted.slice(0, 240)}…` : redacted
+  const fallbackText = safeString(fallback)?.trim() || 'unknown error'
+  const raw = safeErrorText(input)
+  const message = raw.trim() || fallbackText
+  try {
+    const redacted = maskSpans(message, ERROR_SECRET_PATTERNS).trim()
+    return redacted.length > 240 ? `${redacted.slice(0, 240)}…` : redacted || fallbackText
+  } catch {
+    return fallbackText
+  }
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

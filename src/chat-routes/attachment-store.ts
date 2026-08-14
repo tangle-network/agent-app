@@ -76,14 +76,6 @@ export interface AttachmentWriteReceipt {
   ownership: AttachmentWriteOwnership
 }
 
-/** Outcome of persisting one attachment. Mirrors `AttachmentReadResult`'s
- *  `ok`/`reason` shape and `upload.ts`'s `{ ok }` convention. The upload route
- *  requires a receipt on BOTH outcomes: a store may commit before reporting a
- *  failure, so the caller must always have an ownership-safe cleanup path. */
-export type AttachmentWriteResult =
-  | { ok: true; receipt: AttachmentWriteReceipt }
-  | { ok: false; reason: string; receipt: AttachmentWriteReceipt }
-
 /** Clean up a write whose function threw after the store may have committed.
  * The adapter must delete only the supplied ownership, never the logical path
  * unconditionally. */
@@ -92,38 +84,27 @@ export type AbortAttachmentWriteFn = (
   ownership: AttachmentWriteOwnership,
 ) => void | Promise<void>
 
-/** Options passed to a writer. `ownership` is the route-created identity the
- * adapter must bind to the stored object. */
+/**
+ * The stable writer result from the original attachment-store contract.
+ * Existing products may return this shape and keep using the legacy writer
+ * lane. New products should use {@link AtomicAttachmentWriteResult}.
+ */
+export type AttachmentWriteResult = { ok: true } | { ok: false; reason: string }
+
+/** Options from the stable attachment-store contract. */
 export interface AttachmentWriteOptions {
   mediaType?: string
   name?: string
   originalName?: string
   size?: number
-  ownership: AttachmentWriteOwnership
 }
 
 /**
- * Persist `content` for `scopeId` at `path`. `content` is either raw `bytes`
- * or a base64 `string` — a string argument is ALWAYS base64 (never utf8), so
- * a store that speaks base64 (gtm's vault) writes it verbatim and one that
- * speaks bytes decodes once. Like the reader, failures resolve to
- * `{ ok: false, reason }` rather than throwing. If a backend does throw after
- * starting a write, the route invokes its ownership-safe abort seam.
+ * The stable writer port. It is intentionally unchanged so products released
+ * before the ownership receipt contract continue to compile.
  *
- * `opts` mirrors the vault frontmatter gtm's `writeAttachmentVaultFile`
- * persists alongside the body (promote-file-parts.ts:181-190), so a product
- * reimplementing that vault writer through this seam can reproduce it
- * exactly:
- * - `mediaType` — the resolved MIME type; gtm's frontmatter key `mime`.
- * - `name` — the sanitized (store-path-safe) display filename; gtm passes
- *   this only to shape its oversize message, not into frontmatter.
- * - `originalName` — the filename as the harness/browser reported it, BEFORE
- *   sanitization (`raw.filename ?? filename` — falls back to the sanitized
- *   name when the source carried none); gtm's frontmatter key `originalName`.
- *   This is the one field with no other recovery path once sanitization has
- *   run, so it must ride the write, not be re-derived after the fact.
- * - `size` — the authoritative decoded byte length being written; gtm's
- *   frontmatter key `size`.
+ * The legacy lane does not promise batch rollback. Use
+ * {@link createAtomicAttachmentWriter} for ownership-safe writes.
  */
 export type WriteAttachmentFn = (
   scopeId: string,
@@ -131,3 +112,37 @@ export type WriteAttachmentFn = (
   content: Uint8Array | string,
   opts: AttachmentWriteOptions,
 ) => Promise<AttachmentWriteResult>
+
+/** Options for an ownership-safe writer. */
+export interface AtomicAttachmentWriteOptions extends AttachmentWriteOptions {
+  ownership: AttachmentWriteOwnership
+}
+
+/** Result for an ownership-safe writer. A receipt is required on both paths. */
+export type AtomicAttachmentWriteResult =
+  | { ok: true; receipt: AttachmentWriteReceipt }
+  | { ok: false; reason: string; receipt: AttachmentWriteReceipt }
+
+/** Ownership-safe writer port used by the atomic upload and promotion lanes. */
+export type AtomicWriteAttachmentFn = (
+  scopeId: string,
+  path: string,
+  content: Uint8Array | string,
+  opts: AtomicAttachmentWriteOptions,
+) => Promise<AtomicAttachmentWriteResult>
+
+/** A complete ownership-safe attachment store adapter. */
+export interface AtomicAttachmentWriter {
+  write: AtomicWriteAttachmentFn
+  abort: AbortAttachmentWriteFn
+}
+
+/**
+ * Build the explicit atomic adapter used by new routes.
+ *
+ * Keeping the write and abort functions together prevents a caller from
+ * enabling ownership paths while forgetting the ambiguous-write cleanup.
+ */
+export function createAtomicAttachmentWriter(input: AtomicAttachmentWriter): AtomicAttachmentWriter {
+  return { write: input.write, abort: input.abort }
+}

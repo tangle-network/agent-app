@@ -1195,6 +1195,42 @@
           "doc": "Values written to the assistant row — the intersection of the append and patch shapes, so one snapshot serves both."
         },
         {
+          "name": "AtomicAttachmentUploadAuthorization",
+          "kind": "type",
+          "signature": "type AtomicAttachmentUploadAuthorization",
+          "doc": "Authorization result for an ownership-safe attachment writer."
+        },
+        {
+          "name": "AtomicAttachmentWriteOptions",
+          "kind": "interface",
+          "signature": "interface AtomicAttachmentWriteOptions",
+          "doc": "Options for an ownership-safe writer."
+        },
+        {
+          "name": "AtomicAttachmentWriter",
+          "kind": "interface",
+          "signature": "interface AtomicAttachmentWriter",
+          "doc": "A complete ownership-safe attachment store adapter."
+        },
+        {
+          "name": "AtomicAttachmentWriteResult",
+          "kind": "type",
+          "signature": "type AtomicAttachmentWriteResult",
+          "doc": "Result for an ownership-safe writer."
+        },
+        {
+          "name": "AtomicPromoteAgentFilePartOptions",
+          "kind": "interface",
+          "signature": "interface AtomicPromoteAgentFilePartOptions",
+          "doc": "Ownership-safe promotion options for new products."
+        },
+        {
+          "name": "AtomicWriteAttachmentFn",
+          "kind": "type",
+          "signature": "type AtomicWriteAttachmentFn",
+          "doc": "Ownership-safe writer port used by the atomic upload and promotion lanes."
+        },
+        {
           "name": "ATTACHMENT_ACCEPT",
           "kind": "const",
           "signature": "\"image/*,.pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,.json,.yaml,.yml,.html\"",
@@ -1252,7 +1288,7 @@
           "name": "AttachmentUploadAuthorization",
           "kind": "type",
           "signature": "type AttachmentUploadAuthorization",
-          "doc": "Outcome of the injected `authorize` seam: auth + rate limiting + scope resolution, all in one place so a 429 rides `{ok:false, response}` exactly like a 401 does — this factory has no rate-limit opin…"
+          "doc": "Stable authorization result for the original writer contract."
         },
         {
           "name": "AttachmentUploadLogger",
@@ -1264,7 +1300,7 @@
           "name": "AttachmentWriteOptions",
           "kind": "interface",
           "signature": "interface AttachmentWriteOptions",
-          "doc": "Options passed to a writer."
+          "doc": "Options from the stable attachment-store contract."
         },
         {
           "name": "AttachmentWriteOwnership",
@@ -1282,7 +1318,7 @@
           "name": "AttachmentWriteResult",
           "kind": "type",
           "signature": "type AttachmentWriteResult",
-          "doc": "Outcome of persisting one attachment."
+          "doc": "The stable writer result from the original attachment-store contract."
         },
         {
           "name": "base64WireLen",
@@ -1531,16 +1567,28 @@
           "doc": "Build the coalescing draft writer for one turn."
         },
         {
+          "name": "CreateAtomicAttachmentUploadRouteOptions",
+          "kind": "interface",
+          "signature": "interface CreateAtomicAttachmentUploadRouteOptions",
+          "doc": "Ownership-safe route options for new products."
+        },
+        {
+          "name": "createAtomicAttachmentWriter",
+          "kind": "function",
+          "signature": "(input: AtomicAttachmentWriter) => AtomicAttachmentWriter",
+          "doc": "Build the explicit atomic adapter used by new routes."
+        },
+        {
           "name": "createAttachmentUploadRoute",
           "kind": "function",
           "signature": "(options: CreateAttachmentUploadRouteOptions) => (request: Request) => Promise<Response>",
-          "doc": "Resolve an attachment upload route handler with customizable limits and validation options"
+          "doc": "Resolve an attachment upload route handler with customizable limits and validation options."
         },
         {
           "name": "CreateAttachmentUploadRouteOptions",
-          "kind": "interface",
-          "signature": "interface CreateAttachmentUploadRouteOptions",
-          "doc": "Define options to authorize, write, and limit attachment uploads in a route"
+          "kind": "type",
+          "signature": "type CreateAttachmentUploadRouteOptions",
+          "doc": null
         },
         {
           "name": "createChatTurnRoutes",
@@ -1553,6 +1601,12 @@
           "kind": "interface",
           "signature": "interface CreateChatTurnRoutesOptions",
           "doc": "Define options to configure chat turn routes including authorization, storage, and event buffering"
+        },
+        {
+          "name": "CreateLegacyAttachmentUploadRouteOptions",
+          "kind": "interface",
+          "signature": "interface CreateLegacyAttachmentUploadRouteOptions",
+          "doc": "Stable route options for products using the original writer contract."
         },
         {
           "name": "createSandboxChatProducer",
@@ -1983,14 +2037,14 @@
         {
           "name": "promoteAgentFilePart",
           "kind": "function",
-          "signature": "(options: PromoteAgentFilePartOptions) => Promise<PromoteFilePartResult>",
-          "doc": "Promote a part of an agent file with optional byte limits and MIME type detection"
+          "signature": "{ (options: PromoteAgentFilePartOptions): Promise<PromoteFilePartResult>; (options: AtomicPromoteAgentFilePartOptions):…",
+          "doc": "Promote a part using the stable writer contract."
         },
         {
           "name": "PromoteAgentFilePartOptions",
           "kind": "interface",
           "signature": "interface PromoteAgentFilePartOptions",
-          "doc": "Define options for promoting a part of an agent file within a specific session and scope"
+          "doc": "Stable promotion options from the original writer contract."
         },
         {
           "name": "PromoteFilePartResult",
@@ -2230,7 +2284,7 @@
           "name": "WriteAttachmentFn",
           "kind": "type",
           "signature": "type WriteAttachmentFn",
-          "doc": "Persist `content` for `scopeId` at `path`."
+          "doc": "The stable writer port."
         }
       ]
     },
@@ -9422,7 +9476,7 @@
           "name": "redactErrorMessage",
           "kind": "function",
           "signature": "(input: unknown, fallback?: string) => string",
-          "doc": "Sanitize an untrusted backend error for server logs."
+          "doc": null
         },
         {
           "name": "redactForIngestion",

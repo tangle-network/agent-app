@@ -64,7 +64,7 @@ interface RedactedDocument
 
 ### `redactErrorMessage`
 
-`function` — Sanitize an untrusted backend error for server logs.
+`function`
 
 ```ts
 (input: unknown, fallback?: string) => string

@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-182 exports.
+191 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -76,6 +76,54 @@ interface AssistantDraftWriterOptions
 
 ```ts
 interface AssistantRowValues
+```
+
+### `AtomicAttachmentUploadAuthorization`
+
+`type` — Authorization result for an ownership-safe attachment writer.
+
+```ts
+type AtomicAttachmentUploadAuthorization
+```
+
+### `AtomicAttachmentWriteOptions`
+
+`interface` — Options for an ownership-safe writer.
+
+```ts
+interface AtomicAttachmentWriteOptions
+```
+
+### `AtomicAttachmentWriter`
+
+`interface` — A complete ownership-safe attachment store adapter.
+
+```ts
+interface AtomicAttachmentWriter
+```
+
+### `AtomicAttachmentWriteResult`
+
+`type` — Result for an ownership-safe writer.
+
+```ts
+type AtomicAttachmentWriteResult
+```
+
+### `AtomicPromoteAgentFilePartOptions`
+
+`interface` — Ownership-safe promotion options for new products.
+
+```ts
+interface AtomicPromoteAgentFilePartOptions
+```
+
+### `AtomicWriteAttachmentFn`
+
+`type` — Ownership-safe writer port used by the atomic upload and promotion lanes.
+
+```ts
+type AtomicWriteAttachmentFn
 ```
 
 ### `ATTACHMENT_ACCEPT`
@@ -152,7 +200,7 @@ type AttachmentTypeCheckResult
 
 ### `AttachmentUploadAuthorization`
 
-`type` — Outcome of the injected `authorize` seam: auth + rate limiting + scope resolution, all in one place so a 429 rides `{ok:false, response}` exactly like a 401 does — this factory has no rate-limit opin…
+`type` — Stable authorization result for the original writer contract.
 
 ```ts
 type AttachmentUploadAuthorization
@@ -168,7 +216,7 @@ type AttachmentUploadLogger
 
 ### `AttachmentWriteOptions`
 
-`interface` — Options passed to a writer.
+`interface` — Options from the stable attachment-store contract.
 
 ```ts
 interface AttachmentWriteOptions
@@ -192,7 +240,7 @@ interface AttachmentWriteReceipt
 
 ### `AttachmentWriteResult`
 
-`type` — Outcome of persisting one attachment.
+`type` — The stable writer result from the original attachment-store contract.
 
 ```ts
 type AttachmentWriteResult
@@ -526,9 +574,25 @@ type CompletedSandboxTurnSource
 (options: AssistantDraftWriterOptions) => AssistantDraftWriter
 ```
 
+### `CreateAtomicAttachmentUploadRouteOptions`
+
+`interface` — Ownership-safe route options for new products.
+
+```ts
+interface CreateAtomicAttachmentUploadRouteOptions
+```
+
+### `createAtomicAttachmentWriter`
+
+`function` — Build the explicit atomic adapter used by new routes.
+
+```ts
+(input: AtomicAttachmentWriter) => AtomicAttachmentWriter
+```
+
 ### `createAttachmentUploadRoute`
 
-`function` — Resolve an attachment upload route handler with customizable limits and validation options
+`function` — Resolve an attachment upload route handler with customizable limits and validation options.
 
 ```ts
 (options: CreateAttachmentUploadRouteOptions) => (request: Request) => Promise<Response>
@@ -536,10 +600,10 @@ type CompletedSandboxTurnSource
 
 ### `CreateAttachmentUploadRouteOptions`
 
-`interface` — Define options to authorize, write, and limit attachment uploads in a route
+`type`
 
 ```ts
-interface CreateAttachmentUploadRouteOptions
+type CreateAttachmentUploadRouteOptions
 ```
 
 ### `createChatTurnRoutes`
@@ -556,6 +620,14 @@ interface CreateAttachmentUploadRouteOptions
 
 ```ts
 interface CreateChatTurnRoutesOptions
+```
+
+### `CreateLegacyAttachmentUploadRouteOptions`
+
+`interface` — Stable route options for products using the original writer contract.
+
+```ts
+interface CreateLegacyAttachmentUploadRouteOptions
 ```
 
 ### `createSandboxChatProducer`
@@ -1128,15 +1200,15 @@ number
 
 ### `promoteAgentFilePart`
 
-`function` — Promote a part of an agent file with optional byte limits and MIME type detection
+`function` — Promote a part using the stable writer contract.
 
 ```ts
-(options: PromoteAgentFilePartOptions) => Promise<PromoteFilePartResult>
+{ (options: PromoteAgentFilePartOptions): Promise<PromoteFilePartResult>; (options: AtomicPromoteAgentFilePartOptions):…
 ```
 
 ### `PromoteAgentFilePartOptions`
 
-`interface` — Define options for promoting a part of an agent file within a specific session and scope
+`interface` — Stable promotion options from the original writer contract.
 
 ```ts
 interface PromoteAgentFilePartOptions
@@ -1456,7 +1528,7 @@ interface UploadedChatFile
 
 ### `WriteAttachmentFn`
 
-`type` — Persist `content` for `scopeId` at `path`.
+`type` — The stable writer port.
 
 ```ts
 type WriteAttachmentFn

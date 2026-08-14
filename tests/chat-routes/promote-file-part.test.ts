@@ -2,10 +2,17 @@ import { describe, expect, it } from 'vitest'
 import {
   promoteAgentFilePart as runPromoteAgentFilePart,
   PROMOTE_MAX_FILE_BYTES,
+  type AtomicPromoteAgentFilePartOptions,
   type PromoteAgentFilePartOptions,
   type RawAgentFilePart,
 } from '../../src/chat-routes/promote-file-part'
-import type { AttachmentWriteReceipt, WriteAttachmentFn } from '../../src/chat-routes/attachment-store'
+import {
+  createAtomicAttachmentWriter,
+  type AbortAttachmentWriteFn,
+  type AtomicWriteAttachmentFn,
+  type AttachmentWriteReceipt,
+  type WriteAttachmentFn,
+} from '../../src/chat-routes/attachment-store'
 import type { SandboxExecChannel } from '../../src/sandbox/binary-read'
 
 // Written from scratch (gtm had no promote test): the harness hands back a
@@ -24,11 +31,15 @@ const FIXED_CLOCK = () => new Date('2026-07-23T12:00:00.000Z')
 const abortAttachment = async () => undefined
 
 function promoteAgentFilePart(
-  options: Omit<PromoteAgentFilePartOptions, 'abortAttachment'>,
+  options: Omit<AtomicPromoteAgentFilePartOptions, 'attachmentWriter'> & {
+    writeAttachment: AtomicWriteAttachmentFn
+    abortAttachment?: AbortAttachmentWriteFn
+  },
 ) {
+  const { writeAttachment, abortAttachment: abort, ...rest } = options
   return runPromoteAgentFilePart({
-    ...options,
-    abortAttachment,
+    ...rest,
+    attachmentWriter: createAtomicAttachmentWriter({ write: writeAttachment, abort: abort ?? abortAttachment }),
     createWriteId: options.createWriteId ?? (() => 'test-1'),
     logger: options.logger ?? { error: () => undefined },
   })
@@ -36,7 +47,7 @@ function promoteAgentFilePart(
 
 /** Records every write and answers `ok` (or a fixed failure). */
 function recordingWriter(fail?: string): {
-  fn: WriteAttachmentFn
+  fn: AtomicWriteAttachmentFn
   writes: Array<{
     scopeId: string
     path: string
@@ -56,7 +67,7 @@ function recordingWriter(fail?: string): {
     originalName?: string
     size?: number
   }> = []
-  const fn: WriteAttachmentFn = async (scopeId, path, content, opts) => {
+  const fn: AtomicWriteAttachmentFn = async (scopeId, path, content, opts) => {
     writes.push({
       scopeId,
       path,
@@ -145,6 +156,27 @@ describe('promoteAgentFilePart — data URI', () => {
     if (!result.succeeded) return
     expect(result.part.mediaType).toBe('text/markdown')
     expect(result.part.type).toBe('file')
+  })
+
+  it('keeps the legacy promotion writer result contract available', async () => {
+    const writes: string[] = []
+    const options: PromoteAgentFilePartOptions = {
+      raw: { type: 'file', filename: 'legacy.txt', url: `data:text/plain;base64,${HELLO_B64}` },
+      scopeId: 'ws',
+      sessionId: 't1',
+      writeAttachment: async (_scopeId, path, _content, opts) => {
+        writes.push(path)
+        expect(opts).not.toHaveProperty('ownership')
+        return { ok: true }
+      },
+      now: FIXED_CLOCK,
+    }
+    const result = await runPromoteAgentFilePart(options)
+
+    expect(result.succeeded).toBe(true)
+    if (!result.succeeded) return
+    expect(result.part.path).not.toContain('--')
+    expect(writes).toEqual([result.part.path])
   })
 })
 
@@ -256,7 +288,7 @@ describe('promoteAgentFilePart — failure modes', () => {
 
   it('never throws when the writer throws — folds it into the outcome', async () => {
     const logs: unknown[] = []
-    const fn: WriteAttachmentFn = async () => {
+    const fn: AtomicWriteAttachmentFn = async () => {
       throw new Error('coordinator down X-Amz-Signature=super-secret-signature')
     }
     const raw: RawAgentFilePart = { type: 'file', filename: 'photo.png', url: `data:image/png;base64,${HELLO_B64}` }
@@ -274,6 +306,40 @@ describe('promoteAgentFilePart — failure modes', () => {
     expect(JSON.stringify(result)).not.toContain('super-secret-signature')
     expect(JSON.stringify(logs)).not.toContain('super-secret-signature')
     expect(JSON.stringify(logs)).toContain('[REDACTED:credential]')
+  })
+
+  it('returns a typed failure when a hostile thrown value defeats getters and string conversion', async () => {
+    const logs: unknown[] = []
+    const hostile = new Proxy(Object.create(null), {
+      get() {
+        throw new Error('message getter failed')
+      },
+      getPrototypeOf() {
+        throw new Error('prototype trap failed')
+      },
+      getOwnPropertyDescriptor() {
+        throw new Error('descriptor trap failed')
+      },
+    })
+    const fn: AtomicWriteAttachmentFn = async () => {
+      throw hostile
+    }
+    const raw: RawAgentFilePart = { type: 'file', filename: 'photo.png', url: `data:image/png;base64,${HELLO_B64}` }
+    const result = await promoteAgentFilePart({
+      raw,
+      scopeId: 'ws',
+      sessionId: 't1',
+      writeAttachment: fn,
+      logger: { error: (...args: unknown[]) => logs.push(args) },
+      now: FIXED_CLOCK,
+    })
+
+    expect(result).toEqual({
+      succeeded: false,
+      filename: 'photo.png',
+      reason: 'Attachment storage is temporarily unavailable. Please try again.',
+    })
+    expect(JSON.stringify(logs)).toContain('unknown error')
   })
 })
 

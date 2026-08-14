@@ -17,8 +17,6 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   createAttachmentUploadRoute as buildAttachmentUploadRoute,
-  type AttachmentUploadAuthorization,
-  type CreateAttachmentUploadRouteOptions,
 } from '../../src/chat-routes/attachment-upload'
 import {
   ALLOWED_ATTACHMENT_SNIFFED_MIMES,
@@ -33,6 +31,8 @@ import {
   OOXML_WORD_MIME,
 } from '../../src/chat-routes/binary-sniff'
 import type {
+  AbortAttachmentWriteFn,
+  AtomicWriteAttachmentFn,
   AttachmentWriteOwnership,
   AttachmentWriteReceipt,
   WriteAttachmentFn,
@@ -42,8 +42,17 @@ import { docxBytes, plainZipBytes, realWorldOoxmlBytes } from './ooxml-fixtures'
 
 const SCOPE = 'ws-1'
 
-function okAuthorize(overrides: Partial<Extract<AttachmentUploadAuthorization, { ok: true }>> = {}) {
-  return async (): Promise<AttachmentUploadAuthorization> => ({
+type TestAuthorization =
+  | {
+      ok: true
+      scopeId: string
+      writeAttachment?: AtomicWriteAttachmentFn
+      abortAttachment?: AbortAttachmentWriteFn
+    }
+  | { ok: false; response: Response }
+
+function okAuthorize(overrides: Partial<Extract<TestAuthorization, { ok: true }>> = {}) {
+  return async (): Promise<TestAuthorization> => ({
     ok: true,
     scopeId: SCOPE,
     abortAttachment,
@@ -75,7 +84,7 @@ function recordingWriteAttachment(result: RecordingWriteResult = { ok: true }) {
       ownership: AttachmentWriteOwnership
     }
   }> = []
-  const write: WriteAttachmentFn = async (scopeId, path, content, opts) => {
+  const write: AtomicWriteAttachmentFn = async (scopeId, path, content, opts) => {
     writes.push({ scopeId, path, content, opts })
     const receipt = result.receipt ?? ownershipReceipt(opts.ownership)
     return result.ok ? { ok: true, receipt } : { ok: false, reason: result.reason, receipt }
@@ -85,10 +94,43 @@ function recordingWriteAttachment(result: RecordingWriteResult = { ok: true }) {
 
 const abortAttachment = async () => undefined
 
-function createAttachmentUploadRoute(options: CreateAttachmentUploadRouteOptions) {
+type TestRouteOptions = {
+  authorize(args: { request: Request }): Promise<TestAuthorization>
+  writeAttachment: AtomicWriteAttachmentFn
+  limits?: {
+    maxCount?: number
+    maxBinaryBytes?: number
+    maxBytesBySniffedMime?: ReadonlyMap<string, number>
+    maxTextBytes?: number
+    maxTotalBytes?: number
+  }
+  allowedKinds?: ChatAttachmentKind[]
+  allowedSniffedMimes?: ReadonlySet<string>
+  pathFor?: (name: string) => string
+  validatePath?: (path: string) => { succeeded: true } | { succeeded: false; error: string }
+  sniffMime?: (name: string) => string
+  createWriteId?: () => string
+  logger?: { error(...args: unknown[]): void }
+}
+
+function createAttachmentUploadRoute(options: TestRouteOptions) {
   let nextId = 0
+  const { authorize, writeAttachment, ...routeOptions } = options
   return buildAttachmentUploadRoute({
-    ...options,
+    ...routeOptions,
+    attachmentWriter: { write: writeAttachment, abort: abortAttachment },
+    authorize: async (args) => {
+      const auth = await authorize(args)
+      if (!auth.ok) return auth
+      return {
+        ok: true,
+        scopeId: auth.scopeId,
+        attachmentWriter: {
+          write: auth.writeAttachment ?? writeAttachment,
+          abort: auth.abortAttachment ?? abortAttachment,
+        },
+      }
+    },
     createWriteId: options.createWriteId ?? (() => `test-${++nextId}`),
   })
 }
@@ -545,18 +587,21 @@ describe('createAttachmentUploadRoute', () => {
   })
 
   describe('authorize seam', () => {
-    it('fails closed when a runtime caller omits the ownership abort seam', async () => {
-      const { write, writes } = recordingWriteAttachment()
-      const route = createAttachmentUploadRoute({
-        authorize: async () => ({ ok: true as const, scopeId: SCOPE } as AttachmentUploadAuthorization),
+    it('preserves the legacy writer contract without an ownership abort seam', async () => {
+      const writes: string[] = []
+      const write: WriteAttachmentFn = async (_scopeId, path) => {
+        writes.push(path)
+        return { ok: true }
+      }
+      const route = buildAttachmentUploadRoute({
+        authorize: async () => ({ ok: true as const, scopeId: SCOPE }),
         writeAttachment: write,
       })
 
       const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
 
-      expect(res.status).toBe(503)
-      expect((await json(res)).error?.message).toBe('Attachment storage is temporarily unavailable. Please try again.')
-      expect(writes).toHaveLength(0)
+      expect(res.status).toBe(200)
+      expect(writes).toEqual(['photo.png'])
     })
 
     it('returns a 401 auth.response verbatim', async () => {
@@ -662,7 +707,7 @@ describe('createAttachmentUploadRoute', () => {
 
     it('compensates successful writes in reverse order after a later partial failure', async () => {
       const rollbackOrder: string[] = []
-      const write: WriteAttachmentFn = async (_scopeId, path, _content, opts) => {
+      const write: AtomicWriteAttachmentFn = async (_scopeId, path, _content, opts) => {
         const receipt = ownershipReceipt(opts.ownership, () => {
           rollbackOrder.push(path.split('--')[0]!)
         })
@@ -687,7 +732,7 @@ describe('createAttachmentUploadRoute', () => {
 
     it('compensates when a later write throws and redacts its credential-shaped message', async () => {
       const rollbackOrder: string[] = []
-      const write: WriteAttachmentFn = async (_scopeId, path, _content, opts) => {
+      const write: AtomicWriteAttachmentFn = async (_scopeId, path, _content, opts) => {
         if (path.startsWith('brief.pdf--')) throw new Error('upstream rejected Bearer super-secret-token')
         return {
           ok: true,
@@ -710,9 +755,44 @@ describe('createAttachmentUploadRoute', () => {
       expect(rollbackOrder).toEqual(['photo.png'])
     })
 
+    it('returns 503 when a writer throws a hostile value', async () => {
+      const logs: unknown[] = []
+      const hostile = new Proxy(Object.create(null), {
+        get() {
+          throw new Error('message getter failed')
+        },
+        getPrototypeOf() {
+          throw new Error('prototype trap failed')
+        },
+        getOwnPropertyDescriptor() {
+          throw new Error('descriptor trap failed')
+        },
+      })
+      const write: AtomicWriteAttachmentFn = async () => {
+        throw hostile
+      }
+      const route = createAttachmentUploadRoute({
+        authorize: okAuthorize(),
+        writeAttachment: write,
+        logger: { error: (...args: unknown[]) => logs.push(args) },
+      })
+
+      const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
+
+      expect(res.status).toBe(503)
+      expect(await json(res)).toEqual({
+        error: {
+          code: 'attachment_store_unavailable',
+          message: 'Attachment storage is temporarily unavailable. Please try again.',
+          path: 'photo.png--test-1',
+        },
+      })
+      expect(JSON.stringify(logs)).toContain('unknown error')
+    })
+
     it('fails closed when a writer returns a receipt for a different owner', async () => {
       let aborted: AttachmentWriteOwnership | undefined
-      const write: WriteAttachmentFn = async (_scopeId, path, _content, opts) => {
+      const write: AtomicWriteAttachmentFn = async (_scopeId, path, _content, opts) => {
         const wrongOwnership: AttachmentWriteOwnership = { id: 'wrong-owner', path: 'wrong-path' }
         const receipt: AttachmentWriteReceipt = {
           ownership: wrongOwnership,
@@ -742,7 +822,7 @@ describe('createAttachmentUploadRoute', () => {
     it('cleans the current ambiguous object and prior objects with a stateful object-store adapter', async () => {
       const objects = new Map<string, { owner: string; bytes: Uint8Array }>()
       const logs: unknown[] = []
-      const write: WriteAttachmentFn = async (_scopeId, path, content, opts) => {
+      const write: AtomicWriteAttachmentFn = async (_scopeId, path, content, opts) => {
         objects.set(path, { owner: opts.ownership.id, bytes: content as Uint8Array })
         const receipt = ownershipReceipt(opts.ownership, () => {
           const current = objects.get(path)
@@ -751,7 +831,7 @@ describe('createAttachmentUploadRoute', () => {
         if (path.startsWith('brief.pdf--')) throw new Error('R2 failed X-Amz-Signature=super-secret-signature')
         return { ok: true, receipt }
       }
-      const abort: NonNullable<Extract<AttachmentUploadAuthorization, { ok: true }>['abortAttachment']> = async (_scopeId, ownership) => {
+      const abort: AbortAttachmentWriteFn = async (_scopeId, ownership) => {
         const current = objects.get(ownership.path)
         if (current?.owner === ownership.id) objects.delete(ownership.path)
       }
@@ -805,7 +885,7 @@ describe('createAttachmentUploadRoute', () => {
 
     it('aggregates all rollback failures, exposes only their count, and redacts their messages', async () => {
       const rollbackOrder: string[] = []
-      const write: WriteAttachmentFn = async (_scopeId, path, _content, opts) => {
+      const write: AtomicWriteAttachmentFn = async (_scopeId, path, _content, opts) => {
         if (path.startsWith('notes.txt--')) {
           return {
             ok: false,
@@ -840,7 +920,7 @@ describe('createAttachmentUploadRoute', () => {
 
     it('does not compensate a successful batch', async () => {
       const rollback = vi.fn()
-      const write: WriteAttachmentFn = async (_scopeId, _path, _content, opts) => ({
+      const write: AtomicWriteAttachmentFn = async (_scopeId, _path, _content, opts) => ({
         ok: true,
         receipt: ownershipReceipt(opts.ownership, rollback),
       })
