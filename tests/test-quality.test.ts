@@ -54,7 +54,25 @@ function testBodies(src: string): Array<{ title: string; body: string; index: nu
     const title = m[2] ?? ''
     // `it.todo('…')` has no body; the opener regex requires a trailing comma so
     // those never reach here.
-    const braceStart = src.indexOf('{', m.index + m[0].length)
+    let cursor = m.index + m[0].length
+    // An options object (`it('…', { timeout: 30_000 }, async () => …)`) sits
+    // between title and callback — brace-skip it, or the extractor reads the
+    // OPTIONS as the body and reports a real test as assertion-free.
+    if (src.slice(cursor).trimStart().startsWith('{')) {
+      const optStart = src.indexOf('{', cursor)
+      let optDepth = 0
+      for (let i = optStart; i < src.length; i += 1) {
+        if (src[i] === '{') optDepth += 1
+        else if (src[i] === '}') {
+          optDepth -= 1
+          if (optDepth === 0) {
+            cursor = i + 1
+            break
+          }
+        }
+      }
+    }
+    const braceStart = src.indexOf('{', cursor)
     if (braceStart === -1) continue
     let depth = 0
     let end = -1
@@ -156,6 +174,11 @@ describe('test-quality gate: every test can fail', () => {
     expect(found?.body).toContain('expect(1).toBe(2)')
     // A brace-counting bug that stopped at the first `}` would miss the tail.
     expect(found?.body.endsWith('}')).toBe(true)
+    // And the vitest options object is not mistaken for the body.
+    const withTimeout = `it('slow', { timeout: 30_000 }, async () => { expect(1).toBe(1) })`
+    const [slow] = testBodies(withTimeout)
+    expect(slow?.title).toBe('slow')
+    expect(slow?.body).toContain('expect(1).toBe(1)')
   })
 
   it('no test body is assertion-free', () => {
