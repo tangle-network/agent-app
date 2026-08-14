@@ -123,6 +123,18 @@ describe('promoteAgentFilePart — data URI', () => {
     expect(writes[0]!.size).toBe(5)
   })
 
+  it('normalizes case-insensitive data URI MIME values before classifying the part', async () => {
+    const { fn, writes } = recordingWriter()
+    const raw: RawAgentFilePart = { type: 'file', filename: 'photo.png', url: `DATA:IMAGE/PNG;BASE64,${HELLO_B64}` }
+    const result = await promoteAgentFilePart({ raw, scopeId: 'ws', sessionId: 't1', writeAttachment: fn, now: FIXED_CLOCK })
+
+    expect(result.succeeded).toBe(true)
+    if (!result.succeeded) return
+    expect(result.part.type).toBe('image')
+    expect(result.part.mediaType).toBe('image/png')
+    expect(writes[0]!.mediaType).toBe('image/png')
+  })
+
   it('passes the pre-sanitization filename as originalName, distinct from the sanitized name', async () => {
     const { fn, writes } = recordingWriter()
     const raw: RawAgentFilePart = {

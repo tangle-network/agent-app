@@ -1816,7 +1816,7 @@
           "name": "immutableAttachmentPath",
           "kind": "function",
           "signature": "(logicalPath: string, ownershipId: string) => string",
-          "doc": "Add an ownership id to a logical path and return an immutable store key."
+          "doc": "Add a path-safe ownership id to a logical path and return an immutable store key."
         },
         {
           "name": "INLINE_PARTS_MAX_BYTES",

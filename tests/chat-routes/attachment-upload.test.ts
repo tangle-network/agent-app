@@ -45,12 +45,14 @@ import { docxBytes, plainZipBytes, realWorldOoxmlBytes } from './ooxml-fixtures'
 const SCOPE = 'ws-1'
 
 describe('immutableAttachmentPath', () => {
-  it('keeps the ownership separator unambiguous', () => {
+  it('accepts the complete path-safe ownership-id contract', () => {
     expect(immutableAttachmentPath('report--job', '42')).toBe('report--job--42')
-    expect(() => immutableAttachmentPath('report', 'job--42')).toThrow('path-safe identifier')
-    expect(() => immutableAttachmentPath('report', '-job')).toThrow('path-safe identifier')
-    expect(() => immutableAttachmentPath('report', 'job-')).toThrow('path-safe identifier')
+    expect(immutableAttachmentPath('report', 'job--42')).toBe('report--job--42')
+    expect(immutableAttachmentPath('report', '-job')).toBe('report---job')
+    expect(immutableAttachmentPath('report', 'job-')).toBe('report--job-')
     expect(immutableAttachmentPath('report', 'test-1')).toBe('report--test-1')
+    expect(() => immutableAttachmentPath('report', 'job/42')).toThrow('path-safe identifier')
+    expect(() => immutableAttachmentPath('report', '')).toThrow('path-safe identifier')
   })
 })
 

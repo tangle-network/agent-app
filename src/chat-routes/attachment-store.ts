@@ -65,11 +65,9 @@ export const ATTACHMENT_ROLLBACK_FAILURE_CODE = 'rollback_failed'
 /** Public-safe outcome when compensating cleanup did not complete. */
 export const ATTACHMENT_ROLLBACK_FAILURE_MESSAGE = 'Attachment cleanup failed. Please try again.'
 
-/** Add an ownership id to a logical path and return an immutable store key.
- * The suffix cannot start/end with `-` or contain `--`, so the separator stays
- * unambiguous even when a logical path contains dashes. */
+/** Add a path-safe ownership id to a logical path and return an immutable store key. */
 export function immutableAttachmentPath(logicalPath: string, ownershipId: string): string {
-  if (!/^(?!.*--)[A-Za-z0-9_](?:[A-Za-z0-9_-]{0,126}[A-Za-z0-9_])?$/.test(ownershipId)) {
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(ownershipId)) {
     throw new Error('attachment ownership id must be a path-safe identifier')
   }
   return `${logicalPath}--${ownershipId}`

@@ -393,7 +393,7 @@ export async function promoteAgentFilePart(
   let kind: ChatAttachmentKind
   let logicalPath: string
   try {
-    mediaType = options.raw.mediaType ?? options.raw.mime ?? dataUrlMime(options.raw.url) ?? sniffMime(filename)
+    mediaType = (options.raw.mediaType ?? options.raw.mime ?? dataUrlMime(options.raw.url) ?? sniffMime(filename)).toLowerCase()
     kind = attachmentKindForMime(mediaType)
     const digest = await hash8(options.raw.id ?? options.raw.url ?? filename)
     const date = now().toISOString().split('T')[0] ?? ''

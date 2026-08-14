@@ -904,7 +904,7 @@ type FilePartPromotionOutcome
 
 ### `immutableAttachmentPath`
 
-`function` — Add an ownership id to a logical path and return an immutable store key.
+`function` — Add a path-safe ownership id to a logical path and return an immutable store key.
 
 ```ts
 (logicalPath: string, ownershipId: string) => string
