@@ -74,7 +74,10 @@ export interface RedactForIngestionOptions {
 function redactString(value: string, patterns: readonly RedactionPattern[]): string {
   for (const { kind, pattern, validate } of patterns) {
     if (!validate) {
-      if (pattern.test(value)) return `[REDACTED:${kind}]`
+      const testPattern = /[gy]/.test(pattern.flags)
+        ? new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, ''))
+        : pattern
+      if (testPattern.test(value)) return `[REDACTED:${kind}]`
       continue
     }
     const g = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`)
@@ -108,13 +111,23 @@ export function maskSpans(
   return out
 }
 
+const ERROR_SECRET_KEY = String.raw`(?:access[_-]?key[_-]?id|secret[_-]?access[_-]?key|session[_-]?token|security[_-]?token|x-amz-(?:credential|signature|security-token)|aws[_-]?access[_-]?key[_-]?id|aws[_-]?secret[_-]?access[_-]?key|aws[_-]?session[_-]?token|api[_-]?key|client[_-]?secret|credential|token|secret|password|signature|sig|authorization)`
+
 const ERROR_SECRET_PATTERNS: readonly RedactionPattern[] = [
   ...DEFAULT_REDACTION_PATTERNS,
+  { kind: 'email', pattern: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i },
   { kind: 'bearer', pattern: /Bearer\s+[^\s]+/i },
   { kind: 'credential', pattern: /\b(?:sk|pk|tc|ghp|xoxb)[_-][A-Za-z0-9_-]{8,}\b/i },
   {
     kind: 'credential',
-    pattern: /\b(?:access[_-]?key[_-]?id|secret[_-]?access[_-]?key|session[_-]?token|security[_-]?token|x-amz-(?:credential|signature|security-token)|aws[_-]?access[_-]?key[_-]?id|aws[_-]?secret[_-]?access[_-]?key|aws[_-]?session[_-]?token|api[_-]?key|client[_-]?secret|credential|token|secret|password|signature|sig|authorization)\s*[:=]\s*[^\s,;&]+/i,
+    pattern: /["']?\b(?:cookie|set-cookie)\b["']?\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\r\n}]*)/i,
+  },
+  {
+    kind: 'credential',
+    pattern: new RegExp(
+      String.raw`["']?\b${ERROR_SECRET_KEY}\b["']?\s*[:=]\s*(?:"[^"]*"|'[^']*'|(?:Bearer|Basic)\s+[^\s,;&}"']+|[^\r\n,;&}]+?)(?=\s+(?:["']?\b[A-Za-z][A-Za-z0-9_-]*["']?\s*[:=]|(?:Bearer|Basic)\b)|\s*,\s*["']?\b[A-Za-z][A-Za-z0-9_-]*["']?\s*[:=]|\s*[,;&}]|\s*[\r\n]|$)`,
+      'i',
+    ),
   },
 ]
 

@@ -52,17 +52,24 @@ export type ReadAttachmentFn = (scopeId: string, path: string) => Promise<Attach
  * routes create a unique path for each attempt, and the product adapter stores
  * this id with it. */
 export interface AttachmentWriteOwnership {
-  id: string
-  path: string
+  readonly id: string
+  readonly path: string
 }
 
 /** Public-safe outcome for a storage outage. Backend details belong in logs. */
 export const ATTACHMENT_STORAGE_FAILURE_MESSAGE = 'Attachment storage is temporarily unavailable. Please try again.'
 
+/** Stable client error code when compensating cleanup did not complete. */
+export const ATTACHMENT_ROLLBACK_FAILURE_CODE = 'rollback_failed'
+
+/** Public-safe outcome when compensating cleanup did not complete. */
+export const ATTACHMENT_ROLLBACK_FAILURE_MESSAGE = 'Attachment cleanup failed. Please try again.'
+
 /** Add an ownership id to a logical path and return an immutable store key.
- * Ownership ids are path-safe because the key is also returned to clients. */
+ * The suffix cannot start/end with `-` or contain `--`, so the separator stays
+ * unambiguous even when a logical path contains dashes. */
 export function immutableAttachmentPath(logicalPath: string, ownershipId: string): string {
-  if (!/^[A-Za-z0-9_-]{1,128}$/.test(ownershipId)) {
+  if (!/^(?!.*--)[A-Za-z0-9_](?:[A-Za-z0-9_-]{0,126}[A-Za-z0-9_])?$/.test(ownershipId)) {
     throw new Error('attachment ownership id must be a path-safe identifier')
   }
   return `${logicalPath}--${ownershipId}`
