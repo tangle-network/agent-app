@@ -60,6 +60,14 @@ function StopGlyph({ className }: { className?: string }) {
   )
 }
 
+function ArrowUpGlyph({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 19V5M5 12l7-7 7 7" />
+    </svg>
+  )
+}
+
 function PaperclipGlyph({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -253,6 +261,11 @@ export interface ChatComposerProps {
   floating?: boolean
   /** Send button label. Default "Send". */
   sendLabel?: string
+  /** Send control shape. `pill` (default) is the labeled button; `icon` is the
+   *  34px circular inverted arrow (streaming: circular outlined stop) — the
+   *  grammar sandbox-ui's legacy AgentComposer used and the current agent-app
+   *  canon for new surfaces. */
+  sendVariant?: 'pill' | 'icon'
   className?: string
 }
 
@@ -319,6 +332,7 @@ export function ChatComposer({
   focusShortcut = true,
   floating = false,
   sendLabel = 'Send',
+  sendVariant = 'pill',
   className,
 }: ChatComposerProps) {
   const isControlled = value !== undefined
@@ -765,14 +779,37 @@ export function ChatComposer({
           </div>
 
           {isStreaming ? (
+            sendVariant === 'icon' ? (
+              <button
+                type="button"
+                onClick={onCancel}
+                aria-label="Stop response"
+                title="Stop"
+                className="inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border border-border bg-transparent text-foreground transition hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <StopGlyph className="h-3 w-3" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onCancel}
+                aria-label="Stop response"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-destructive/15 px-3.5 py-2 text-sm font-medium text-destructive transition hover:bg-destructive/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
+              >
+                <StopGlyph className="h-3.5 w-3.5" />
+                <span>Stop</span>
+              </button>
+            )
+          ) : sendVariant === 'icon' ? (
             <button
               type="button"
-              onClick={onCancel}
-              aria-label="Stop response"
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-destructive/15 px-3.5 py-2 text-sm font-medium text-destructive transition hover:bg-destructive/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
+              onClick={send}
+              disabled={!canSend}
+              aria-label={sendLabel}
+              title={sendLabel}
+              className="inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-foreground text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card"
             >
-              <StopGlyph className="h-3.5 w-3.5" />
-              <span>Stop</span>
+              <ArrowUpGlyph className="h-4 w-4" />
             </button>
           ) : (
             <button
