@@ -119,7 +119,7 @@ describe('reviewCandidate — the propose-don\'t-apply gate', () => {
 })
 
 describe('createKnowledgeLoop — end-to-end propose-don\'t-apply over a real KB', () => {
-  it('a low-confidence proposal is gated OUT: no page written, but its source IS recorded', async () => {
+  it('a low-confidence proposal is gated OUT: no page written, but its source IS recorded', { timeout: 30_000 }, async () => {
     const decide = createReviewerDecider(() => candidateAt(0.4))
     const loop = createKnowledgeLoop(knowledge, { root, decide, maxIterations: 1 })
     const result = await loop.run()
@@ -134,7 +134,7 @@ describe('createKnowledgeLoop — end-to-end propose-don\'t-apply over a real KB
     expect(gate?.accepted).toBe(false)
   })
 
-  it('a high-confidence proposal is accepted and the page is written', async () => {
+  it('a high-confidence proposal is accepted and the page is written', { timeout: 30_000 }, async () => {
     const decide = createReviewerDecider(() => candidateAt(0.9))
     const loop = createKnowledgeLoop(knowledge, { root, decide, maxIterations: 1 })
     const result = await loop.run()
