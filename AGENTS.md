@@ -233,6 +233,10 @@ pnpm typecheck && pnpm test && pnpm build
 
 `pnpm build` runs two legs: `tsup` emits the ESM JS, then `tsc -p tsconfig.build.json` emits the declarations. Watch mode splits the same way — `pnpm dev` rebuilds JS only. Run `pnpm dev:types` beside it when you need `dist/**/*.d.ts` to keep up, which is the case when another checkout consumes this package through a link. Editors read `src` through the language service, so a plain `pnpm dev` is enough for work inside this repo.
 
+### Visual evidence in PRs (default expectation)
+
+A PR that changes anything RENDERED ships with visual proof in the body or a comment: before/after screenshots for state changes, a GIF (or video) for interactions (expand/collapse, drag, streaming, hover reveals). Storybook is the stage — add or update a story first, then record from it. Cheap recipe that works today: playwright frames against the storybook iframe + `ffmpeg -framerate 5 -i f%03d.png -vf "scale=780:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=bayer" demo.gif`, uploaded to litterbox (`curl -F reqtype=fileupload -F time=72h -F fileToUpload=@demo.gif https://litterbox.catbox.moe/resources/internals/api.php`). A UI PR without evidence is incomplete the way a test that can't fail is — the reviewer cannot see what you changed.
+
 ### Storybook
 
 `pnpm storybook` (port 6006) / `pnpm build-storybook`. Stories live in `src/stories/<area>/` — CSF3, `Area/Component` titles, shared fixtures in `src/stories/fixtures/`, one story per component state plus side-by-side composites. `.storybook/` holds the config; a toolbar decorator flips `data-theme`/`.dark` on `<html>` (stories never set theme themselves). Stories are typechecked (tsconfig includes `src`) and knip-gated via the `src/**/*.stories.{ts,tsx}` entry glob — keep both green. Import components from package source via relative paths, never the package name (that resolves to the built dist).
