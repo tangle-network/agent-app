@@ -38,10 +38,23 @@ import type {
   AttachmentWriteReceipt,
   WriteAttachmentFn,
 } from '../../src/chat-routes/attachment-store'
+import { immutableAttachmentPath } from '../../src/chat-routes/attachment-store'
 import type { ChatAttachmentInput, ChatAttachmentKind } from '../../src/chat-routes/wire'
 import { docxBytes, plainZipBytes, realWorldOoxmlBytes } from './ooxml-fixtures'
 
 const SCOPE = 'ws-1'
+
+describe('immutableAttachmentPath', () => {
+  it('accepts the complete path-safe ownership-id contract', () => {
+    expect(immutableAttachmentPath('report--job', '42')).toBe('report--job--42')
+    expect(immutableAttachmentPath('report', 'job--42')).toBe('report--job--42')
+    expect(immutableAttachmentPath('report', '-job')).toBe('report---job')
+    expect(immutableAttachmentPath('report', 'job-')).toBe('report--job-')
+    expect(immutableAttachmentPath('report', 'test-1')).toBe('report--test-1')
+    expect(() => immutableAttachmentPath('report', 'job/42')).toThrow('path-safe identifier')
+    expect(() => immutableAttachmentPath('report', '')).toThrow('path-safe identifier')
+  })
+})
 
 interface ExtendedRouteOptions extends CreateAttachmentUploadRouteOptions {
   auditTag: string
@@ -721,6 +734,23 @@ describe('createAttachmentUploadRoute', () => {
       expect(JSON.stringify(logs)).not.toContain('legacy-upload-secret')
     })
 
+    it('redacts PII-shaped attachment paths in server logs', async () => {
+      const logs: unknown[] = []
+      const route = buildAttachmentUploadRoute({
+        authorize: async () => ({ ok: true as const, scopeId: SCOPE }),
+        writeAttachment: async () => {
+          throw new Error('store failed')
+        },
+        logger: { error: (...args: unknown[]) => logs.push(args) },
+      })
+
+      const res = await route(uploadRequest([fileOf(pngBytes(), '123-45-6789.txt', 'image/png')]))
+
+      expect(res.status).toBe(503)
+      expect(JSON.stringify(logs)).not.toContain('123-45-6789')
+      expect(JSON.stringify(logs)).toContain('[REDACTED:ssn]')
+    })
+
     it('redacts a legacy writer rejection while preserving its typed status', async () => {
       const route = buildAttachmentUploadRoute({
         authorize: async () => ({ ok: true as const, scopeId: SCOPE }),
@@ -796,10 +826,54 @@ describe('createAttachmentUploadRoute', () => {
       ]))
 
       expect(res.status).toBe(503)
-      const message = (await json(res)).error?.message ?? ''
+      const body = await json(res)
+      const message = body.error?.message ?? ''
+      expect(body.error?.code).toBe('attachment_store_unavailable')
       expect(message).toBe('Attachment storage is temporarily unavailable. Please try again.')
       expect(message).not.toContain('super-secret-token')
       expect(rollbackOrder).toEqual(['photo.png'])
+    })
+
+    it('returns rollback_failed when the second write throws after the first write succeeds', async () => {
+      const objects = new Set<string>()
+      const rollbackOrder: string[] = []
+      const logs: unknown[] = []
+      const abort = vi.fn(async (_scopeId: string, ownership: AttachmentWriteOwnership) => {
+        objects.delete(ownership.path)
+      })
+      const write: AtomicWriteAttachmentFn = async (_scopeId, path, _content, opts) => {
+        objects.add(path)
+        const receipt = ownershipReceipt(opts.ownership, () => {
+          rollbackOrder.push(path.split('--')[0]!)
+          if (path.startsWith('photo.png--')) throw new Error('R2 delete failed apiKey=rollback-token')
+          objects.delete(path)
+        })
+        if (path.startsWith('brief.pdf--')) throw new Error('R2 put failed Bearer write-token')
+        return { ok: true, receipt }
+      }
+      const route = createAttachmentUploadRoute({
+        authorize: okAuthorize({ abortAttachment: abort }),
+        writeAttachment: write,
+        logger: { error: (...args: unknown[]) => logs.push(args) },
+      })
+
+      const res = await route(uploadRequest([
+        fileOf(pngBytes(), 'photo.png', 'image/png'),
+        fileOf(pdfBytes(), 'brief.pdf', 'application/pdf'),
+      ]))
+
+      expect(res.status).toBe(503)
+      expect(await json(res)).toEqual({
+        error: {
+          code: 'rollback_failed',
+          message: 'Attachment cleanup failed. Please try again.',
+          path: 'brief.pdf--test-2',
+        },
+      })
+      expect(rollbackOrder).toEqual(['photo.png'])
+      expect(objects).toEqual(new Set())
+      expect(JSON.stringify(logs)).not.toContain('rollback-token')
+      expect(JSON.stringify(logs)).not.toContain('write-token')
     })
 
     it('returns 503 when a writer throws a hostile value', async () => {
@@ -835,6 +909,33 @@ describe('createAttachmentUploadRoute', () => {
         },
       })
       expect(JSON.stringify(logs)).toContain('unknown error')
+    })
+
+    it('keeps the cleanup owner immutable when a writer mutates its input', async () => {
+      const objects = new Set<string>()
+      const abort = vi.fn(async (_scopeId: string, ownership: AttachmentWriteOwnership) => {
+        objects.delete(ownership.path)
+      })
+      const write: AtomicWriteAttachmentFn = async (_scopeId, path, _content, opts) => {
+        objects.add(path)
+        try {
+          const mutableOwnership = opts.ownership as unknown as { path: string }
+          mutableOwnership.path = 'mutated-path'
+        } catch {
+          // Frozen ownership is the expected protection.
+        }
+        throw new Error('writer failed after commit')
+      }
+      const route = createAttachmentUploadRoute({
+        authorize: okAuthorize({ abortAttachment: abort }),
+        writeAttachment: write,
+      })
+
+      const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
+
+      expect(res.status).toBe(503)
+      expect(objects).toEqual(new Set())
+      expect(abort).toHaveBeenCalledWith(SCOPE, { id: 'test-1', path: 'photo.png--test-1' })
     })
 
     it('fails closed when a writer returns a receipt for a different owner', async () => {
@@ -922,9 +1023,9 @@ describe('createAttachmentUploadRoute', () => {
 
       const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
 
-    expect(res.status).toBe(503)
-    expect(abort).toHaveBeenCalledWith(SCOPE, { id: 'test-1', path: 'photo.png--test-1' })
-  })
+      expect(res.status).toBe(503)
+      expect(abort).toHaveBeenCalledWith(SCOPE, { id: 'test-1', path: 'photo.png--test-1' })
+    })
 
     it('folds an abort getter failure into the opaque storage response', async () => {
       const logs: unknown[] = []
@@ -950,8 +1051,8 @@ describe('createAttachmentUploadRoute', () => {
       expect(res.status).toBe(503)
       expect(await res.json()).toEqual({
         error: {
-          code: 'attachment_store_unavailable',
-          message: 'Attachment storage is temporarily unavailable. Please try again.',
+          code: 'rollback_failed',
+          message: 'Attachment cleanup failed. Please try again.',
           path: 'photo.png--abort-getter',
         },
       })
@@ -1022,7 +1123,7 @@ describe('createAttachmentUploadRoute', () => {
       expect(objects.get('shared')).toEqual({ owner: 'newer' })
     })
 
-    it('aggregates all rollback failures, exposes only their count, and redacts their messages', async () => {
+    it('returns a typed rollback failure and redacts cleanup messages', async () => {
       const rollbackOrder: string[] = []
       const write: AtomicWriteAttachmentFn = async (_scopeId, path, _content, opts) => {
         if (path.startsWith('notes.txt--')) {
@@ -1049,8 +1150,10 @@ describe('createAttachmentUploadRoute', () => {
       ]))
 
       expect(res.status).toBe(503)
-      const message = (await json(res)).error?.message ?? ''
-      expect(message).toBe('Attachment storage is temporarily unavailable. Please try again.')
+      const body = await json(res)
+      const message = body.error?.message ?? ''
+      expect(body.error?.code).toBe('rollback_failed')
+      expect(message).toBe('Attachment cleanup failed. Please try again.')
       expect(message).not.toContain('primary-token')
       expect(message).not.toContain('rollback-pdf-token')
       expect(message).not.toContain('rollback-png-token')

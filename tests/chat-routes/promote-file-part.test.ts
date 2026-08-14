@@ -123,6 +123,18 @@ describe('promoteAgentFilePart — data URI', () => {
     expect(writes[0]!.size).toBe(5)
   })
 
+  it('normalizes case-insensitive data URI MIME values before classifying the part', async () => {
+    const { fn, writes } = recordingWriter()
+    const raw: RawAgentFilePart = { type: 'file', filename: 'photo.png', url: `DATA:IMAGE/PNG;BASE64,${HELLO_B64}` }
+    const result = await promoteAgentFilePart({ raw, scopeId: 'ws', sessionId: 't1', writeAttachment: fn, now: FIXED_CLOCK })
+
+    expect(result.succeeded).toBe(true)
+    if (!result.succeeded) return
+    expect(result.part.type).toBe('image')
+    expect(result.part.mediaType).toBe('image/png')
+    expect(writes[0]!.mediaType).toBe('image/png')
+  })
+
   it('passes the pre-sanitization filename as originalName, distinct from the sanitized name', async () => {
     const { fn, writes } = recordingWriter()
     const raw: RawAgentFilePart = {
@@ -202,6 +214,29 @@ describe('promoteAgentFilePart — data URI', () => {
     expect(result.reason).not.toContain('legacy-promotion-secret')
     expect(result.reason).not.toContain('123-45-6789')
   })
+
+  it('redacts PII-shaped attachment paths in server logs', async () => {
+    const logs: unknown[] = []
+    const raw: RawAgentFilePart = {
+      type: 'file',
+      filename: '123-45-6789.txt',
+      url: `data:text/plain;base64,${HELLO_B64}`,
+    }
+    const result = await promoteAgentFilePart({
+      raw,
+      scopeId: 'ws',
+      sessionId: 't1',
+      writeAttachment: async () => {
+        throw new Error('store failed')
+      },
+      logger: { error: (...args: unknown[]) => logs.push(args) },
+      now: FIXED_CLOCK,
+    })
+
+    expect(result.succeeded).toBe(false)
+    expect(JSON.stringify(logs)).not.toContain('123-45-6789')
+    expect(JSON.stringify(logs)).toContain('[REDACTED:ssn]')
+  })
 })
 
 describe('promoteAgentFilePart — sandbox path', () => {
@@ -237,11 +272,34 @@ describe('promoteAgentFilePart — sandbox path', () => {
 
   it('rejects an unsupported URL scheme', async () => {
     const { fn } = recordingWriter()
-    const raw: RawAgentFilePart = { type: 'file', url: 'https://example.com/x.png' }
+    const raw: RawAgentFilePart = { type: 'file', url: 'https://example.com/x.png?api_key=super-secret' }
     const result = await promoteAgentFilePart({ raw, box: fakeBox(HELLO), scopeId: 'ws', sessionId: 't1', writeAttachment: fn })
     expect(result.succeeded).toBe(false)
     if (result.succeeded) return
     expect(result.reason).toContain('unsupported file URL scheme')
+    expect(result.reason).toContain('https')
+    expect(result.reason).not.toContain('example.com')
+    expect(result.reason).not.toContain('super-secret')
+  })
+
+  it('redacts sandbox execution errors before returning them', async () => {
+    const { fn } = recordingWriter()
+    const box: SandboxExecChannel = {
+      async exec() {
+        return { stdout: '', stderr: 'R2 failed X-Amz-Signature=super-secret', exitCode: 1 }
+      },
+    }
+    const result = await promoteAgentFilePart({
+      raw: { type: 'file', url: '/home/agent/out/report.pdf' },
+      box,
+      scopeId: 'ws',
+      sessionId: 't1',
+      writeAttachment: fn,
+    })
+    expect(result.succeeded).toBe(false)
+    if (result.succeeded) return
+    expect(result.reason).toContain('[REDACTED:credential]')
+    expect(result.reason).not.toContain('super-secret')
   })
 })
 

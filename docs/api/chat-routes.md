@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-191 exports.
+193 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -140,6 +140,22 @@ type AtomicWriteAttachmentFn
 
 ```ts
 10
+```
+
+### `ATTACHMENT_ROLLBACK_FAILURE_CODE`
+
+`const` — Stable client error code when compensating cleanup did not complete.
+
+```ts
+"rollback_failed"
+```
+
+### `ATTACHMENT_ROLLBACK_FAILURE_MESSAGE`
+
+`const` — Public-safe outcome when compensating cleanup did not complete.
+
+```ts
+"Attachment cleanup failed. Please try again."
 ```
 
 ### `ATTACHMENT_STORAGE_FAILURE_MESSAGE`
@@ -888,7 +904,7 @@ type FilePartPromotionOutcome
 
 ### `immutableAttachmentPath`
 
-`function` — Add an ownership id to a logical path and return an immutable store key.
+`function` — Add a path-safe ownership id to a logical path and return an immutable store key.
 
 ```ts
 (logicalPath: string, ownershipId: string) => string

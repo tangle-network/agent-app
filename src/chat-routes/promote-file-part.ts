@@ -134,7 +134,7 @@ function base64ToBytes(base64: string): Uint8Array {
 }
 
 function parseDataUrl(url: string): { base64: boolean; data: string } | null {
-  const match = /^data:[^,]*,([\s\S]*)$/.exec(url)
+  const match = /^data:[^,]*,([\s\S]*)$/i.exec(url)
   if (!match) return null
   return { base64: /;base64,/i.test(url), data: match[1] ?? '' }
 }
@@ -143,12 +143,12 @@ function parseDataUrl(url: string): { base64: boolean; data: string } | null {
  *  signal when the part itself carries no mediaType/mime field. */
 function dataUrlMime(url: string | undefined): string | undefined {
   if (!url) return undefined
-  const match = /^data:([^;,]+)[;,]/.exec(url)
+  const match = /^data:([^;,]+)[;,]/i.exec(url)
   return match ? match[1] : undefined
 }
 
 function basenameFromUrl(url: string | undefined): string | undefined {
-  if (!url || url.startsWith('data:')) return undefined
+  if (!url || /^data:/i.test(url)) return undefined
   const withoutQuery = url.split(/[?#]/)[0] ?? url
   const segments = withoutQuery.split('/').filter(Boolean)
   return segments[segments.length - 1] || undefined
@@ -158,11 +158,11 @@ function basenameFromUrl(url: string | undefined): string | undefined {
  *  unchanged. The remainder is percent-decoded — sidecar file URLs encode
  *  spaces and other reserved characters. */
 function resolveFileUrlPath(url: string): { succeeded: true; path: string } | { succeeded: false; reason: string } {
-  const withoutScheme = url.startsWith('file://') ? url.slice('file://'.length) : url
+  const withoutScheme = /^file:\/\//i.test(url) ? url.slice('file://'.length) : url
   try {
     return { succeeded: true, path: decodeURIComponent(withoutScheme) }
   } catch (err) {
-    return { succeeded: false, reason: `malformed file path: ${err instanceof Error ? err.message : String(err)}` }
+    return { succeeded: false, reason: `malformed file path: ${redactErrorMessage(err)}` }
   }
 }
 
@@ -181,7 +181,7 @@ function resolveDataUrlBytes(url: string, filename: string, maxBytes: number): B
   try {
     bytes = parsed.base64 ? base64ToBytes(parsed.data) : new TextEncoder().encode(decodeURIComponent(parsed.data))
   } catch (err) {
-    return { succeeded: false, reason: `failed to decode data URI: ${err instanceof Error ? err.message : String(err)}` }
+    return { succeeded: false, reason: `failed to decode data URI: ${redactErrorMessage(err)}` }
   }
   if (bytes.byteLength > maxBytes) {
     return { succeeded: false, reason: oversizeReason(filename, bytes.byteLength, maxBytes) }
@@ -201,7 +201,7 @@ async function resolveSandboxFileBytes(input: {
   // outcome like a nonzero exit code does.
   const stat = await statSandboxFileSize(input.box, input.path, { sessionId: input.sessionId })
   if (!stat.succeeded) {
-    return { succeeded: false, reason: `could not stat agent file: ${stat.error}` }
+    return { succeeded: false, reason: `could not stat agent file: ${redactErrorMessage(stat.error)}` }
   }
   // Rejected before the bytes are ever pulled — a base64 exec of an oversize
   // file would waste a full sandbox round trip only to be discarded.
@@ -211,7 +211,7 @@ async function resolveSandboxFileBytes(input: {
 
   const read = await readSandboxBinaryBytes(input.box, input.path, stat.value, { sessionId: input.sessionId })
   if (!read.succeeded) {
-    return { succeeded: false, reason: `could not read agent file: ${read.error}` }
+    return { succeeded: false, reason: `could not read agent file: ${redactErrorMessage(read.error)}` }
   }
   return { succeeded: true, bytes: read.value.bytes }
 }
@@ -226,10 +226,13 @@ async function resolveBytes(input: {
   const url = input.raw.url
   if (!url) return { succeeded: false, reason: 'the file part carries no url' }
 
-  if (url.startsWith('data:')) return resolveDataUrlBytes(url, input.filename, input.maxBytes)
+  if (/^data:/i.test(url)) return resolveDataUrlBytes(url, input.filename, input.maxBytes)
 
-  const isSandboxPath = url.startsWith('file://') || url.startsWith('/')
-  if (!isSandboxPath) return { succeeded: false, reason: `unsupported file URL scheme: ${url}` }
+  const isSandboxPath = /^file:\/\//i.test(url) || url.startsWith('/')
+  if (!isSandboxPath) {
+    const scheme = /^([A-Za-z][A-Za-z0-9+.-]*):/.exec(url)?.[1]?.toLowerCase() ?? 'unknown'
+    return { succeeded: false, reason: `unsupported file URL scheme: ${scheme}` }
+  }
   if (!input.box) return { succeeded: false, reason: 'no sandbox to read agent file' }
 
   const resolvedPath = resolveFileUrlPath(url)
@@ -271,7 +274,13 @@ function logPromotionStorageError(
   fields: Record<string, unknown>,
 ): void {
   try {
-    logger.error(message, fields)
+    const safeFields = Object.fromEntries(
+      Object.entries(fields).map(([key, value]) => [
+        key,
+        typeof value === 'string' ? redactErrorMessage(value) : value,
+      ]),
+    )
+    logger.error(message, safeFields)
   } catch {
     // Logging must not turn a typed storage failure into a thrown response.
   }
@@ -343,6 +352,11 @@ export function promoteAgentFilePart(options: PromoteAgentFilePartOptions): Prom
 /** Promote a part using an ownership-safe writer and cleanup adapter. */
 export function promoteAgentFilePart(options: AtomicPromoteAgentFilePartOptions): Promise<PromoteFilePartResult>
 
+/** Promote a part when the caller selects the writer contract at runtime. */
+export function promoteAgentFilePart(
+  options: PromoteAgentFilePartOptions | AtomicPromoteAgentFilePartOptions,
+): Promise<PromoteFilePartResult>
+
 /** Promote a part of an agent file with optional byte limits and MIME type detection. */
 export async function promoteAgentFilePart(
   options: PromoteAgentFilePartOptions | AtomicPromoteAgentFilePartOptions,
@@ -375,11 +389,21 @@ export async function promoteAgentFilePart(
   })
   if (!resolved.succeeded) return { succeeded: false, filename, reason: resolved.reason }
 
-  const mediaType = options.raw.mediaType ?? options.raw.mime ?? dataUrlMime(options.raw.url) ?? sniffMime(filename)
-  const kind = attachmentKindForMime(mediaType)
-  const digest = await hash8(options.raw.id ?? options.raw.url ?? filename)
-  const date = now().toISOString().split('T')[0] ?? ''
-  const logicalPath = buildAttachmentPath({ filename, hash8: digest, date, mediaType, kind })
+  let mediaType: string
+  let kind: ChatAttachmentKind
+  let logicalPath: string
+  try {
+    mediaType = (options.raw.mediaType ?? options.raw.mime ?? dataUrlMime(options.raw.url) ?? sniffMime(filename)).toLowerCase()
+    kind = attachmentKindForMime(mediaType)
+    const digest = await hash8(options.raw.id ?? options.raw.url ?? filename)
+    const date = now().toISOString().split('T')[0] ?? ''
+    logicalPath = buildAttachmentPath({ filename, hash8: digest, date, mediaType, kind })
+  } catch (error) {
+    logPromotionStorageError(logger, '[promote-file-part] path planning failed', {
+      error: redactErrorMessage(error),
+    })
+    return { succeeded: false, filename, reason: ATTACHMENT_STORAGE_FAILURE_MESSAGE }
+  }
 
   if (!atomic) {
     let written: unknown
@@ -438,7 +462,7 @@ export async function promoteAgentFilePart(
     })
     return { succeeded: false, filename, reason: ATTACHMENT_STORAGE_FAILURE_MESSAGE }
   }
-  const ownership: AttachmentWriteOwnership = { id: ownershipId, path }
+  const ownership: AttachmentWriteOwnership = Object.freeze({ id: ownershipId, path })
 
   // `name` is the sanitized filename already computed above; `originalName`
   // is the pre-sanitization source name (gtm's frontmatter `originalName`) —

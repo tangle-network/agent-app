@@ -32,6 +32,8 @@ import type { ChatAttachmentInput, ChatAttachmentKind } from './wire'
 import { attachmentKindForMime } from '../chat-store/parts'
 import { redactErrorMessage } from '../redact'
 import {
+  ATTACHMENT_ROLLBACK_FAILURE_CODE,
+  ATTACHMENT_ROLLBACK_FAILURE_MESSAGE,
   ATTACHMENT_STORAGE_FAILURE_MESSAGE,
   type AtomicAttachmentWriter,
   immutableAttachmentPath,
@@ -86,7 +88,13 @@ function logAttachmentUploadError(
   fields: Record<string, unknown>,
 ): void {
   try {
-    logger.error(message, fields)
+    const safeFields = Object.fromEntries(
+      Object.entries(fields).map(([key, value]) => [
+        key,
+        typeof value === 'string' ? redactErrorMessage(value) : value,
+      ]),
+    )
+    logger.error(message, safeFields)
   } catch {
     // Logging must not turn a typed storage failure into a thrown response.
   }
@@ -149,6 +157,15 @@ function attachmentUploadError(status: number, code: string, message: string, pa
   return Response.json(
     { error: path === undefined ? { code, message } : { code, message, path } },
     { status },
+  )
+}
+
+function atomicAttachmentFailure(path: string, cleanupFailures = 0): Response {
+  return attachmentUploadError(
+    503,
+    cleanupFailures > 0 ? ATTACHMENT_ROLLBACK_FAILURE_CODE : 'attachment_store_unavailable',
+    cleanupFailures > 0 ? ATTACHMENT_ROLLBACK_FAILURE_MESSAGE : ATTACHMENT_STORAGE_FAILURE_MESSAGE,
+    path,
   )
 }
 
@@ -455,7 +472,7 @@ export function createAttachmentUploadRoute(
       if (!ownershipId) {
         return attachmentUploadError(503, 'attachment_store_unavailable', ATTACHMENT_STORAGE_FAILURE_MESSAGE, input.path)
       }
-      const ownership: AttachmentWriteOwnership = { id: ownershipId, path: input.path }
+      const ownership: AttachmentWriteOwnership = Object.freeze({ id: ownershipId, path: input.path })
       let written: Awaited<ReturnType<AtomicAttachmentWriter['write']>>
       try {
         written = await atomicWriter!.write(auth.scopeId, input.path, input.bytes, {
@@ -474,12 +491,7 @@ export function createAttachmentUploadRoute(
           cleanupFailures,
           error: redactErrorMessage(error),
         })
-        return attachmentUploadError(
-          503,
-          'attachment_store_unavailable',
-          ATTACHMENT_STORAGE_FAILURE_MESSAGE,
-          input.path,
-        )
+        return atomicAttachmentFailure(input.path, cleanupFailures)
       }
       const result = inspectAtomicAttachmentWriteResult(written, ownership)
       if (!result) {
@@ -490,7 +502,7 @@ export function createAttachmentUploadRoute(
           ownershipId: ownership.id,
           cleanupFailures,
         })
-        return attachmentUploadError(503, 'attachment_store_unavailable', ATTACHMENT_STORAGE_FAILURE_MESSAGE, input.path)
+        return atomicAttachmentFailure(input.path, cleanupFailures)
       }
       if (!result.ok) {
         const cleanupFailures = (await rollbackSuccessfulWrites([
@@ -507,12 +519,7 @@ export function createAttachmentUploadRoute(
           cleanupFailures,
           error: redactErrorMessage(result.reason),
         })
-        return attachmentUploadError(
-          503,
-          'attachment_store_unavailable',
-          ATTACHMENT_STORAGE_FAILURE_MESSAGE,
-          input.path,
-        )
+        return atomicAttachmentFailure(input.path, cleanupFailures)
       }
       successfulWrites.push({ path: input.path, ownership, receipt: result.receipt })
       uploaded.push({
