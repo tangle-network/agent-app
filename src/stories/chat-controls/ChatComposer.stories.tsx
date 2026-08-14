@@ -187,6 +187,49 @@ export const FlatVsFloating: Story = {
   },
 }
 
+/** The canon send shape: 34px circular inverted arrow (stop: circular outlined
+ *  square), the grammar the legacy sandbox-ui AgentComposer shipped. */
+export const IconSend: Story = {
+  name: 'Icon send (canon)',
+  render: () => (
+    <ChatComposer
+      onSend={(message) => console.log('send', message)}
+      placeholder="Message the agent…"
+      controls={useModelPill()}
+      sendVariant="icon"
+      floating
+    />
+  ),
+}
+
+/** Pill vs icon send, both states (rest + typed) — the canon decision surface. */
+export const PillVsIconSend: Story = {
+  name: 'Pill vs icon send',
+  decorators: [
+    (Story) => (
+      <div className="w-[640px] max-w-full p-4">
+        <Story />
+      </div>
+    ),
+  ],
+  render: () => {
+    const pill = useModelPill()
+    return (
+      <div className="space-y-7">
+        <Demo title="pill send (current default)">
+          <ChatComposer onSend={() => {}} placeholder="Message the agent…" controls={pill} />
+        </Demo>
+        <Demo title="icon send (canon)">
+          <ChatComposer onSend={() => {}} placeholder="Message the agent…" controls={pill} sendVariant="icon" />
+        </Demo>
+        <Demo title="icon send, typed + floating">
+          <ChatComposer onSend={() => {}} initialValue="Ship the weekly report every Monday." controls={pill} sendVariant="icon" floating />
+        </Demo>
+      </div>
+    )
+  },
+}
+
 /** Every ComposerRoute state side by side — the spacing/polish audit. */
 export const AllStates: Story = {
   name: 'All states',

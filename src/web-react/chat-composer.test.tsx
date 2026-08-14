@@ -682,4 +682,30 @@ describe('ChatComposer seed', () => {
     expect(elevated).toContain('rounded-2xl')
     expect(elevated).toContain('focus-within:ring-2')
   })
+
+  it('ships the labeled pill send by default and the circular icon send on sendVariant="icon"', () => {
+    const { rerender } = render(<ChatComposer onSend={vi.fn()} />)
+    const pill = screen.getByRole('button', { name: 'Send' })
+    expect(pill.className).toContain('rounded-full')
+    expect(pill.className).toContain('bg-primary')
+    expect(pill.textContent).toBe('Send')
+
+    rerender(<ChatComposer onSend={vi.fn()} sendVariant="icon" />)
+    const icon = screen.getByRole('button', { name: 'Send' })
+    expect(icon.className).toContain('h-[34px]')
+    expect(icon.className).toContain('w-[34px]')
+    // Inverted fg/bg, not the brand fill — the canon circular grammar.
+    expect(icon.className).toContain('bg-foreground')
+    expect(icon.className).toContain('text-background')
+    expect(icon.textContent).toBe('')
+  })
+
+  it('keeps a circular outlined stop while streaming in the icon variant', () => {
+    render(<ChatComposer onSend={vi.fn()} onCancel={vi.fn()} isStreaming sendVariant="icon" />)
+    const stop = screen.getByRole('button', { name: 'Stop response' })
+    expect(stop.className).toContain('h-[34px]')
+    expect(stop.className).toContain('rounded-full')
+    expect(stop.className).toContain('border-border')
+    expect(stop.textContent).toBe('')
+  })
 })
