@@ -115,6 +115,14 @@ export function formatModelCost(msg: ChatMessageMetrics, models: CatalogModel[])
   return cost < 0.01 ? `$${cost.toFixed(4)}` : `$${cost.toFixed(2)}`
 }
 
+/** One-line preview of a reasoning trace for the collapsed row's description
+ *  slot: whitespace collapsed, hard-truncated with an ellipsis. */
+function reasoningPreview(reasoning: string): string | undefined {
+  const flat = reasoning.replace(/\s+/g, ' ').trim()
+  if (!flat) return undefined
+  return flat.length > 120 ? `${flat.slice(0, 119)}…` : flat
+}
+
 /** "38 tok/s" from completion tokens over first-token→end duration; null when unknown. */
 export function formatTokensPerSecond(msg: ChatMessageMetrics): string | null {
   if (msg.completionTokens == null || !msg.durationMs) return null
@@ -1315,18 +1323,24 @@ function AssistantMessageImpl({
                 Thinking{thinkingSeconds >= 1 ? ` · ${thinkingSeconds}s` : '…'}
               </span>
             ) : thinkMsRef.current != null ? (
-              `Thought for ${Math.max(1, Math.round(thinkMsRef.current / 1000))}s`
+              // Words, not the abbreviated unit — "Thought for 4 seconds" reads
+              // like a sentence; "4s" reads like a log line.
+              `Thought for ${(() => { const s = Math.max(1, Math.round(thinkMsRef.current! / 1000)); return `${s} second${s === 1 ? '' : 's'}` })()}`
             ) : (
               'Thought process'
             )
           }
+          // A collapsed trace previews its own first line (the inline truncated
+          // description slot), so the closed row tells you what was considered,
+          // not just that thinking happened.
+          description={hasAnswerText ? reasoningPreview(reasoning) : undefined}
           status={hasAnswerText ? 'idle' : 'running'}
           open={reasoningOpen}
           onOpenChange={(next) => setReasoningToggled(next)}
         >
           <div
             ref={reasoningScrollRef}
-            className="max-h-48 overflow-y-auto whitespace-pre-wrap px-3 py-2.5 text-xs leading-relaxed text-muted-foreground"
+            className="max-h-48 overflow-y-auto whitespace-pre-wrap px-3 py-2.5 text-sm leading-relaxed text-muted-foreground"
           >
             {reasoning}
           </div>
