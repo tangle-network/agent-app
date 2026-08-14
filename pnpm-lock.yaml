@@ -62,10 +62,10 @@ importers:
         version: 0.21.1
       '@tangle-network/sandbox-ui':
         specifier: 0.100.1
-        version: 0.100.1(46626a0a16535efeb18e59c5c30cac31)
+        version: 0.100.1(f9a9b83bb58ed7ab28bacfd4ca86d74a)
       '@tangle-network/ui':
-        specifier: ^11.2.2
-        version: 11.2.2(@hocuspocus/provider@4.5.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@tangle-network/brand@1.4.0(react@19.2.8))(@tiptap/core@3.29.1(@tiptap/pm@3.29.1))(@tiptap/react@3.29.1(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.1(@tiptap/pm@3.29.1))(@tiptap/pm@3.29.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.29.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(nanostores@1.4.1)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)
+        specifier: ^11.5.0
+        version: 11.5.0(@hocuspocus/provider@4.5.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@tangle-network/brand@1.4.0(react@19.2.8))(@tiptap/core@3.29.1(@tiptap/pm@3.29.1))(@tiptap/react@3.29.1(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.1(@tiptap/pm@3.29.1))(@tiptap/pm@3.29.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.29.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(nanostores@1.4.1)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)
       '@testing-library/dom':
         specifier: ^10.4.1
         version: 10.4.1
@@ -1968,12 +1968,12 @@ packages:
       viem:
         optional: true
 
-  '@tangle-network/ui@11.2.2':
-    resolution: {integrity: sha512-dlPU2ywO1WLGzWeGODdhHwEroPGDj6Hj18GpCgEIqa4X+K8Gm4KDtbfzu/LMhgNsW7AQHszANynQt0DJIMBBZA==}
+  '@tangle-network/ui@11.5.0':
+    resolution: {integrity: sha512-WMg/7p2WTZVVSiHpARt8yAkSNgkcpQvc8HoXMK/jq1bLuPgu7Aei9nWTwYyeJaSYf7YThfx6r2X2FtGlbN9HZQ==}
     peerDependencies:
       '@hocuspocus/provider': '>=2.15.0 <5.0.0'
       '@nanostores/react': '>=0.8.4 <2.0.0'
-      '@tangle-network/brand': ^1.1.0
+      '@tangle-network/brand': ^1.5.0
       '@tiptap/core': '>=3.20.4 <4.0.0'
       '@tiptap/extension-collaboration': '>=3.20.4 <4.0.0'
       '@tiptap/extension-collaboration-caret': '>=3.7.0 <4.0.0'
@@ -6307,7 +6307,7 @@ snapshots:
     optionalDependencies:
       react: 19.2.8
 
-  '@tangle-network/sandbox-ui@0.100.1(46626a0a16535efeb18e59c5c30cac31)':
+  '@tangle-network/sandbox-ui@0.100.1(f9a9b83bb58ed7ab28bacfd4ca86d74a)':
     dependencies:
       '@lobehub/icons-static-svg': 1.94.0
       '@pierre/diffs': 1.2.12(@shikijs/themes@4.3.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -6315,7 +6315,7 @@ snapshots:
       '@radix-ui/react-select': 2.3.7(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@tangle-network/agent-interface': 0.47.0
       '@tangle-network/brand': 1.4.0(react@19.2.8)
-      '@tangle-network/ui': 11.2.2(@hocuspocus/provider@4.5.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@tangle-network/brand@1.4.0(react@19.2.8))(@tiptap/core@3.29.1(@tiptap/pm@3.29.1))(@tiptap/react@3.29.1(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.1(@tiptap/pm@3.29.1))(@tiptap/pm@3.29.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.29.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(nanostores@1.4.1)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)
+      '@tangle-network/ui': 11.5.0(@hocuspocus/provider@4.5.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@tangle-network/brand@1.4.0(react@19.2.8))(@tiptap/core@3.29.1(@tiptap/pm@3.29.1))(@tiptap/react@3.29.1(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.1(@tiptap/pm@3.29.1))(@tiptap/pm@3.29.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.29.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(nanostores@1.4.1)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)
       '@tiptap/core': 3.29.1(@tiptap/pm@3.29.1)
       '@tiptap/extension-mention': 3.29.1(@tiptap/core@3.29.1(@tiptap/pm@3.29.1))(@tiptap/pm@3.29.1)(@tiptap/suggestion@3.29.1(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.1(@tiptap/pm@3.29.1))(@tiptap/pm@3.29.1))
       '@tiptap/react': 3.29.1(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.1(@tiptap/pm@3.29.1))(@tiptap/pm@3.29.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -6349,7 +6349,7 @@ snapshots:
       '@tangle-network/agent-interface': 0.47.0
       zod: 4.4.3
 
-  '@tangle-network/ui@11.2.2(@hocuspocus/provider@4.5.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@tangle-network/brand@1.4.0(react@19.2.8))(@tiptap/core@3.29.1(@tiptap/pm@3.29.1))(@tiptap/react@3.29.1(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.1(@tiptap/pm@3.29.1))(@tiptap/pm@3.29.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.29.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(nanostores@1.4.1)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)':
+  '@tangle-network/ui@11.5.0(@hocuspocus/provider@4.5.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@tangle-network/brand@1.4.0(react@19.2.8))(@tiptap/core@3.29.1(@tiptap/pm@3.29.1))(@tiptap/react@3.29.1(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.1(@tiptap/pm@3.29.1))(@tiptap/pm@3.29.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.29.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(nanostores@1.4.1)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)':
     dependencies:
       '@pierre/trees': 1.0.0-beta.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@radix-ui/react-avatar': 1.2.6(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

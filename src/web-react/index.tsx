@@ -24,12 +24,11 @@
  */
 
 import { useEffect, useId, useMemo, useRef, useState, memo, type ReactNode } from 'react'
-import { InlineToolItem } from '@tangle-network/ui/run'
+import { InlineToolItem, RunRowShell } from '@tangle-network/ui/run'
 import type { ToolPart } from '@tangle-network/ui/types'
 import { useSmoothText } from './smooth-text'
-import { inertProps } from './inert'
 import { useArrivalStyle } from './motion'
-import { ChevronDown, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, usePending } from './controls'
+import { BrainGlyph, ChevronDown, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, usePending } from './controls'
 import { BrandMark } from './brand-mark'
 import { DurableChatCards, type DurableChatCardsProps } from './durable-chat-cards'
 import { attachmentPartsFromMessageParts, type ChatAttachmentPart } from './chat-attachments'
@@ -1279,7 +1278,6 @@ function AssistantMessageImpl({
   const thinkingSeconds = useThinkingSeconds(
     streaming && !!reasoning && !hasAnswerText,
   )
-  const reasoningId = useId()
   // Open while the model is still thinking, closed once the answer starts —
   // and a click outranks that default from then on. `<details open={…}>` could
   // not express the second half: React re-asserts the attribute on every
@@ -1300,48 +1298,19 @@ function AssistantMessageImpl({
         </div>
       )}
       {reasoning && (
-        // A button + `.agent-disclose` rather than `<details>`: a native
-        // disclosure has no transition to give, so the trace SNAPPED to full
-        // height the moment the answer arrived — the single largest layout jump
-        // in a turn, at the exact moment the reader is trying to start reading.
-        // The grid row animates the content's REAL height (0fr → 1fr), which a
-        // max-height guess cannot do without either clipping a long trace or
-        // easing toward a number it never reaches. The keyboard contract
-        // `<details>` supplied for free is restated explicitly: a real
-        // `<button>` (Enter/Space, focusable, in the tab order) carrying
-        // `aria-expanded` and `aria-controls` — which also announces the state
-        // that a `<summary>` leaves to the browser.
-        <div className="mb-2 rounded-lg border-l-2 border-border bg-secondary px-3 py-2">
-          <button
-            type="button"
-            onClick={() => setReasoningToggled(!reasoningOpen)}
-            aria-expanded={reasoningOpen}
-            aria-controls={reasoningId}
-            // `transition-colors`/`transition-transform` carry TAILWIND's
-            // duration and curve (150ms, its own cubic-bezier), not this
-            // package's — a component that writes its own timing is the defect
-            // `docs/product-surfaces.md` Pattern 4 rejects. The label reads
-            // `--motion-control` (the token for a colour change) and the chevron
-            // reads `--motion-surface`, the SAME pair `.agent-disclose` runs its
-            // grid row on, so the arrow and the panel it points at travel
-            // together instead of on two clocks.
-            className="flex w-full select-none items-center gap-1.5 text-left text-xs font-medium text-muted-foreground [transition:color_var(--motion-control)] hover:text-foreground"
-          >
-            <ChevronDown className={`h-3 w-3 shrink-0 [transition:transform_var(--motion-surface)] ${reasoningOpen ? '' : '-rotate-90'}`} />
-            {!hasAnswerText ? (
-              // A pulse dims the whole word on a loop, which is the same cue a
-              // skeleton placeholder uses — it reads as "nothing here yet". A
-              // sweep travels THROUGH the glyphs, which reads as work in
-              // flight, and the elapsed seconds say how much. `essential`
-              // because it is the only signal separating a working agent from
-              // a stuck one — and `essential` is an exemption from the blanket
-              // floor, never a licence to sweep forever at someone who asked
-              // for less motion: under `prefers-reduced-motion` tokens.css
-              // stops this animation and leaves a dotted rule under the word
-              // that the settled label ("Thought for 12s") does not carry. The
-              // rule is the only difference — measured in Chromium, both labels
-              // compute this button's own `text-muted-foreground`, so tone
-              // separates neither.
+        // The canonical run-row grammar (RunRowShell — the same shell the tool
+        // rows compose): one family of rows instead of a bespoke disclosure per
+        // kind. The shimmer title is a NODE (ui widened `title` to ReactNode for
+        // exactly this): the sweep through the glyphs is the working-vs-stuck
+        // signal. Open while thinking, auto-collapse on the first answer token,
+        // and a click outranks the default from then on — the contract the old
+        // hand-rolled disclosure had, now enforced through the shell's
+        // controlled `open`.
+        <RunRowShell
+          className="mb-2"
+          icon={<BrainGlyph className="h-3.5 w-3.5" />}
+          title={
+            !hasAnswerText ? (
               <span className="agent-shimmer" data-motion="essential">
                 Thinking{thinkingSeconds >= 1 ? ` · ${thinkingSeconds}s` : '…'}
               </span>
@@ -1349,35 +1318,19 @@ function AssistantMessageImpl({
               `Thought for ${Math.max(1, Math.round(thinkMsRef.current / 1000))}s`
             ) : (
               'Thought process'
-            )}
-          </button>
-          <div className="agent-disclose" data-open={reasoningOpen ? 'true' : 'false'}>
-            {/* The single child `.agent-disclose` clips. The scroller is its
-                child rather than itself, so `overflow-hidden` from the grid rule
-                and `overflow-y-auto` from the trace's own cap never contend for
-                the same element. `inert` restores the last thing `<details>`
-                gave for free: a collapsed trace is genuinely gone — not read by
-                a screen reader, not hit by find-in-page — rather than merely
-                clipped to nothing.
-
-                The attribute is emitted only when it must be ON, and its
-                spelling is branched on the running React. `inert={!open}` is
-                correct on React 19 and half-broken on React 18, which this
-                package's peer range admits: React 18 DROPS a boolean `inert`
-                (with a warning), so the COLLAPSED panel would stay focusable
-                and screen-reader readable — 18 wants `inert=""`, which React 19
-                in turn drops. Measured on both majors in `./inert`. */}
-            <div {...inertProps(!reasoningOpen)}>
-              <div
-                id={reasoningId}
-                ref={reasoningScrollRef}
-                className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground"
-              >
-                {reasoning}
-              </div>
-            </div>
+            )
+          }
+          status={hasAnswerText ? 'idle' : 'running'}
+          open={reasoningOpen}
+          onOpenChange={(next) => setReasoningToggled(next)}
+        >
+          <div
+            ref={reasoningScrollRef}
+            className="max-h-48 overflow-y-auto whitespace-pre-wrap px-3 py-2.5 text-xs leading-relaxed text-muted-foreground"
+          >
+            {reasoning}
           </div>
-        </div>
+        </RunRowShell>
       )}
       {segments && segments.length > 0 ? (
         <SegmentedBody

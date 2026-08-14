@@ -56,7 +56,7 @@ function SparkleGlyph({ className }: { className?: string }) {
 /** lucide `brain` (v1.27) inlined — `/web-react` ships no icon-library
  *  dependency, so the thinking glyph follows the same pattern as the rest of
  *  this set. */
-function BrainGlyph({ className }: { className?: string }) {
+export function BrainGlyph({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M12 18V5" />

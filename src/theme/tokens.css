@@ -538,28 +538,6 @@
   animation: agent-shimmer 1.4s linear infinite;
 }
 
-/* Height-auto disclosure without measuring anything in JavaScript. The row
-   animates between 0fr and 1fr; the child needs `min-height: 0` and
-   `overflow: hidden` to be clipped while it travels. A max-height guess is the
-   usual alternative and it either clips tall content or eases against a number
-   the content never reaches. */
-.agent-disclose {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows var(--motion-surface), opacity var(--motion-control);
-  opacity: 0;
-}
-
-.agent-disclose > * {
-  min-height: 0;
-  overflow: hidden;
-}
-
-.agent-disclose[data-open='true'] {
-  grid-template-rows: 1fr;
-  opacity: 1;
-}
-
 /**
  * Reduced motion, at the token layer and at the floor.
  *
