@@ -17,6 +17,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   createAttachmentUploadRoute as buildAttachmentUploadRoute,
+  type CreateAttachmentUploadRouteOptions,
 } from '../../src/chat-routes/attachment-upload'
 import {
   ALLOWED_ATTACHMENT_SNIFFED_MIMES,
@@ -41,6 +42,10 @@ import type { ChatAttachmentInput, ChatAttachmentKind } from '../../src/chat-rou
 import { docxBytes, plainZipBytes, realWorldOoxmlBytes } from './ooxml-fixtures'
 
 const SCOPE = 'ws-1'
+
+interface ExtendedRouteOptions extends CreateAttachmentUploadRouteOptions {
+  auditTag: string
+}
 
 type TestAuthorization =
   | {
@@ -693,6 +698,48 @@ describe('createAttachmentUploadRoute', () => {
   })
 
   describe('write failure', () => {
+    it('folds a thrown legacy writer into an opaque response', async () => {
+      const logs: unknown[] = []
+      const route = buildAttachmentUploadRoute({
+        authorize: async () => ({ ok: true as const, scopeId: SCOPE }),
+        writeAttachment: async () => {
+          throw new Error('R2 X-Amz-Credential=legacy-upload-secret')
+        },
+        logger: { error: (...args: unknown[]) => logs.push(args) },
+      })
+
+      const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
+
+      expect(res.status).toBe(503)
+      expect(await json(res)).toEqual({
+        error: {
+          code: 'attachment_store_unavailable',
+          message: 'Attachment storage is temporarily unavailable. Please try again.',
+          path: 'photo.png',
+        },
+      })
+      expect(JSON.stringify(logs)).not.toContain('legacy-upload-secret')
+    })
+
+    it('redacts a legacy writer rejection while preserving its typed status', async () => {
+      const route = buildAttachmentUploadRoute({
+        authorize: async () => ({ ok: true as const, scopeId: SCOPE }),
+        writeAttachment: async () => ({
+          ok: false as const,
+          reason: 'R2 secretAccessKey=legacy-upload-secret SSN=123-45-6789',
+        }),
+      })
+
+      const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
+      const body = await json(res)
+
+      expect(res.status).toBe(413)
+      expect(body.error?.message).toContain('[REDACTED:credential]')
+      expect(body.error?.message).toContain('[REDACTED:ssn]')
+      expect(body.error?.message).not.toContain('legacy-upload-secret')
+      expect(body.error?.message).not.toContain('123-45-6789')
+    })
+
     it('returns an opaque 503 for a storage rejection', async () => {
       const { write } = recordingWriteAttachment({ ok: false, reason: 'store quota exceeded' })
       const route = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
@@ -817,6 +864,98 @@ describe('createAttachmentUploadRoute', () => {
       expect(res.status).toBe(503)
       expect((await json(res)).error?.message).toBe('Attachment storage is temporarily unavailable. Please try again.')
       expect(aborted).toEqual({ id: 'test-1', path: 'photo.png--test-1' })
+    })
+
+    it('fails closed when a receipt getter is hostile and aborts the attempted owner', async () => {
+      let aborted: AttachmentWriteOwnership | undefined
+      const hostileReceipt = new Proxy(Object.create(null), {
+        get() {
+          throw new Error('receipt getter failed')
+        },
+      }) as AttachmentWriteReceipt
+      const write: AtomicWriteAttachmentFn = async () => ({ ok: true, receipt: hostileReceipt })
+      const route = createAttachmentUploadRoute({
+        authorize: okAuthorize({
+          abortAttachment: async (_scopeId, ownership) => {
+            aborted = ownership
+          },
+        }),
+        writeAttachment: write,
+      })
+
+      const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
+
+      expect(res.status).toBe(503)
+      expect(aborted).toEqual({ id: 'test-1', path: 'photo.png--test-1' })
+    })
+
+    it('fails closed for a truthy non-boolean writer result', async () => {
+      const abort = vi.fn(async () => undefined)
+      const write: AtomicWriteAttachmentFn = async (_scopeId, _path, _content, opts) => ({
+        ok: 'false' as unknown as true,
+        receipt: ownershipReceipt(opts.ownership),
+      })
+      const route = createAttachmentUploadRoute({
+        authorize: okAuthorize({ abortAttachment: abort }),
+        writeAttachment: write,
+      })
+
+      const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
+
+      expect(res.status).toBe(503)
+      expect(abort).toHaveBeenCalledOnce()
+    })
+
+    it('uses the ownership abort as a cleanup fallback when rollback fails', async () => {
+      const abort = vi.fn(async () => undefined)
+      const write: AtomicWriteAttachmentFn = async (_scopeId, _path, _content, opts) => ({
+        ok: false,
+        reason: 'store rejected after commit',
+        receipt: ownershipReceipt(opts.ownership, () => {
+          throw new Error('delete timed out')
+        }),
+      })
+      const route = createAttachmentUploadRoute({
+        authorize: okAuthorize({ abortAttachment: abort }),
+        writeAttachment: write,
+      })
+
+      const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
+
+    expect(res.status).toBe(503)
+    expect(abort).toHaveBeenCalledWith(SCOPE, { id: 'test-1', path: 'photo.png--test-1' })
+  })
+
+    it('folds an abort getter failure into the opaque storage response', async () => {
+      const logs: unknown[] = []
+      const writer = new Proxy({
+        write: async () => {
+          throw new Error('write failed')
+        },
+      }, {
+        get(target, property, receiver) {
+          if (property === 'abort') throw new Error('abort getter failed')
+          return Reflect.get(target, property, receiver)
+        },
+      })
+      const route = buildAttachmentUploadRoute({
+        authorize: okAuthorize(),
+        attachmentWriter: writer as unknown as { write: AtomicWriteAttachmentFn; abort: AbortAttachmentWriteFn },
+        createWriteId: () => 'abort-getter',
+        logger: { error: (...args: unknown[]) => logs.push(args) },
+      })
+
+      const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
+
+      expect(res.status).toBe(503)
+      expect(await res.json()).toEqual({
+        error: {
+          code: 'attachment_store_unavailable',
+          message: 'Attachment storage is temporarily unavailable. Please try again.',
+          path: 'photo.png--abort-getter',
+        },
+      })
+      expect(JSON.stringify(logs)).toContain('abort getter failed')
     })
 
     it('cleans the current ambiguous object and prior objects with a stateful object-store adapter', async () => {

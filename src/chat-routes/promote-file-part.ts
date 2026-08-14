@@ -31,8 +31,13 @@ import {
   immutableAttachmentPath,
   type AtomicAttachmentWriter,
   type AttachmentWriteOwnership,
+  type AttachmentWriteReceipt,
   type WriteAttachmentFn,
 } from './attachment-store'
+import {
+  inspectAtomicAttachmentWriteResult,
+  inspectLegacyAttachmentWriteResult,
+} from './attachment-write-safety'
 import { sanitizeAttachmentFileName } from './attachment-validation'
 import { formatBytes } from './wire'
 
@@ -272,6 +277,25 @@ function logPromotionStorageError(
   }
 }
 
+async function compensatePromotionWrite(
+  writer: AtomicAttachmentWriter,
+  scopeId: string,
+  ownership: AttachmentWriteOwnership,
+  receipt: AttachmentWriteReceipt,
+): Promise<{ rollbackError?: unknown; abortError?: unknown }> {
+  try {
+    await receipt.rollback()
+    return {}
+  } catch (rollbackError) {
+    try {
+      await writer.abort(scopeId, ownership)
+      return { rollbackError }
+    } catch (abortError) {
+      return { rollbackError, abortError }
+    }
+  }
+}
+
 interface PromoteFilePartCommonOptions {
   raw: RawAgentFilePart
   /** The turn's box — required only to promote a sandbox-path part; a `data:`
@@ -358,7 +382,7 @@ export async function promoteAgentFilePart(
   const logicalPath = buildAttachmentPath({ filename, hash8: digest, date, mediaType, kind })
 
   if (!atomic) {
-    let written: Awaited<ReturnType<WriteAttachmentFn>>
+    let written: unknown
     try {
       written = await options.writeAttachment(options.scopeId, logicalPath, resolved.bytes, {
         mediaType,
@@ -374,7 +398,21 @@ export async function promoteAgentFilePart(
       })
       return { succeeded: false, filename, reason }
     }
-    if (!written.ok) return { succeeded: false, filename, reason: written.reason }
+    const result = inspectLegacyAttachmentWriteResult(written)
+    if (!result) {
+      logPromotionStorageError(logger, '[promote-file-part] legacy writer returned an invalid result', {
+        path: logicalPath,
+      })
+      return { succeeded: false, filename, reason: ATTACHMENT_STORAGE_FAILURE_MESSAGE }
+    }
+    if (!result.ok) {
+      const reason = redactErrorMessage(result.reason)
+      logPromotionStorageError(logger, '[promote-file-part] legacy write rejected', {
+        path: logicalPath,
+        error: reason,
+      })
+      return { succeeded: false, filename, reason }
+    }
 
     return {
       succeeded: true,
@@ -388,8 +426,18 @@ export async function promoteAgentFilePart(
     }
   }
 
-  const ownershipId = createWriteId!()
-  const path = immutableAttachmentPath(logicalPath, ownershipId)
+  let ownershipId: string
+  let path: string
+  try {
+    ownershipId = createWriteId!()
+    path = immutableAttachmentPath(logicalPath, ownershipId)
+  } catch (error) {
+    logPromotionStorageError(logger, '[promote-file-part] could not allocate ownership key', {
+      path: logicalPath,
+      error: redactErrorMessage(error),
+    })
+    return { succeeded: false, filename, reason: ATTACHMENT_STORAGE_FAILURE_MESSAGE }
+  }
   const ownership: AttachmentWriteOwnership = { id: ownershipId, path }
 
   // `name` is the sanitized filename already computed above; `originalName`
@@ -419,7 +467,8 @@ export async function promoteAgentFilePart(
     })
     return { succeeded: false, filename, reason: ATTACHMENT_STORAGE_FAILURE_MESSAGE }
   }
-  if (!written || !written.receipt || written.receipt.ownership.id !== ownership.id || written.receipt.ownership.path !== ownership.path) {
+  const result = inspectAtomicAttachmentWriteResult(written, ownership)
+  if (!result) {
     let abortError: unknown
     try {
       await options.attachmentWriter.abort(options.scopeId, ownership)
@@ -433,18 +482,23 @@ export async function promoteAgentFilePart(
     })
     return { succeeded: false, filename, reason: ATTACHMENT_STORAGE_FAILURE_MESSAGE }
   }
-  if (!written.ok) {
-    let rollbackError: unknown
-    try {
-      await written.receipt.rollback()
-    } catch (error) {
-      rollbackError = error
-    }
+  if (!result.ok) {
+    const compensation = await compensatePromotionWrite(
+      options.attachmentWriter,
+      options.scopeId,
+      ownership,
+      result.receipt,
+    )
     logPromotionStorageError(logger, '[promote-file-part] write rejected', {
       path,
       ownershipId: ownership.id,
-      error: redactErrorMessage(written.reason),
-      ...(rollbackError === undefined ? {} : { rollbackError: redactErrorMessage(rollbackError) }),
+      error: redactErrorMessage(result.reason),
+      ...(compensation.rollbackError === undefined
+        ? {}
+        : { rollbackError: redactErrorMessage(compensation.rollbackError) }),
+      ...(compensation.abortError === undefined
+        ? {}
+        : { abortError: redactErrorMessage(compensation.abortError) }),
     })
     return { succeeded: false, filename, reason: ATTACHMENT_STORAGE_FAILURE_MESSAGE }
   }

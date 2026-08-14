@@ -1581,14 +1581,14 @@
         {
           "name": "createAttachmentUploadRoute",
           "kind": "function",
-          "signature": "(options: CreateAttachmentUploadRouteOptions) => (request: Request) => Promise<Response>",
+          "signature": "(options: CreateAttachmentUploadRouteOptions | CreateAtomicAttachmentUploadRouteOptions) => (request: Request) => Promi…",
           "doc": "Resolve an attachment upload route handler with customizable limits and validation options."
         },
         {
           "name": "CreateAttachmentUploadRouteOptions",
-          "kind": "type",
-          "signature": "type CreateAttachmentUploadRouteOptions",
-          "doc": null
+          "kind": "interface",
+          "signature": "interface CreateAttachmentUploadRouteOptions",
+          "doc": "The original public route-options interface remains available for consumers that extend it."
         },
         {
           "name": "createChatTurnRoutes",

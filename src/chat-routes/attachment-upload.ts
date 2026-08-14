@@ -35,11 +35,14 @@ import {
   ATTACHMENT_STORAGE_FAILURE_MESSAGE,
   type AtomicAttachmentWriter,
   immutableAttachmentPath,
-  type AbortAttachmentWriteFn,
   type AttachmentWriteOwnership,
   type AttachmentWriteReceipt,
   type WriteAttachmentFn,
 } from './attachment-store'
+import {
+  inspectAtomicAttachmentWriteResult,
+  inspectLegacyAttachmentWriteResult,
+} from './attachment-write-safety'
 import {
   ALLOWED_ATTACHMENT_SNIFFED_MIMES,
   ATTACHMENT_MAX_COUNT,
@@ -128,6 +131,12 @@ export interface CreateLegacyAttachmentUploadRouteOptions extends AttachmentUplo
   writeAttachment: WriteAttachmentFn
 }
 
+/**
+ * The original public route-options interface remains available for consumers
+ * that extend it. Ownership-safe callers use the atomic interface below.
+ */
+export interface CreateAttachmentUploadRouteOptions extends CreateLegacyAttachmentUploadRouteOptions {}
+
 /** Ownership-safe route options for new products. */
 export interface CreateAtomicAttachmentUploadRouteOptions extends AttachmentUploadRouteCommonOptions {
   /** Authenticate the caller, rate-limit, and resolve the store scope. */
@@ -135,10 +144,6 @@ export interface CreateAtomicAttachmentUploadRouteOptions extends AttachmentUplo
   /** Complete writer + ambiguous-write cleanup adapter. */
   attachmentWriter: AtomicAttachmentWriter
 }
-
-export type CreateAttachmentUploadRouteOptions =
-  | CreateLegacyAttachmentUploadRouteOptions
-  | CreateAtomicAttachmentUploadRouteOptions
 
 function attachmentUploadError(status: number, code: string, message: string, path?: string): Response {
   return Response.json(
@@ -158,6 +163,8 @@ interface SuccessfulAttachmentWrite {
  * logical path itself. */
 async function rollbackSuccessfulWrites(
   writes: readonly SuccessfulAttachmentWrite[],
+  scopeId: string,
+  writer: AtomicAttachmentWriter,
   logger: AttachmentUploadLogger,
 ): Promise<number> {
   let failures = 0
@@ -172,23 +179,20 @@ async function rollbackSuccessfulWrites(
         ownershipId: write.ownership.id,
         error: redactErrorMessage(error),
       })
+      failures += await abortOwnership(writer, scopeId, write.ownership, logger)
     }
   }
   return failures
 }
 
-function ownsReceipt(receipt: AttachmentWriteReceipt, ownership: AttachmentWriteOwnership): boolean {
-  return receipt.ownership.id === ownership.id && receipt.ownership.path === ownership.path
-}
-
 async function abortOwnership(
-  abort: AbortAttachmentWriteFn,
+  writer: AtomicAttachmentWriter,
   scopeId: string,
   ownership: AttachmentWriteOwnership,
   logger: AttachmentUploadLogger,
 ): Promise<number> {
   try {
-    await abort(scopeId, ownership)
+    await writer.abort(scopeId, ownership)
     return 0
   } catch (error) {
     logAttachmentUploadError(logger, '[attachment-upload] ambiguous write cleanup failed', {
@@ -201,14 +205,14 @@ async function abortOwnership(
 }
 
 function isAtomicRouteOptions(
-  options: CreateAttachmentUploadRouteOptions,
+  options: CreateAttachmentUploadRouteOptions | CreateAtomicAttachmentUploadRouteOptions,
 ): options is CreateAtomicAttachmentUploadRouteOptions {
   return 'attachmentWriter' in options
 }
 
 /** Resolve an attachment upload route handler with customizable limits and validation options. */
 export function createAttachmentUploadRoute(
-  options: CreateAttachmentUploadRouteOptions,
+  options: CreateAttachmentUploadRouteOptions | CreateAtomicAttachmentUploadRouteOptions,
 ): (request: Request) => Promise<Response> {
   const atomic = isAtomicRouteOptions(options)
   const maxCount = options.limits?.maxCount ?? ATTACHMENT_MAX_COUNT
@@ -340,8 +344,25 @@ export function createAttachmentUploadRoute(
       }
 
       const logicalPath = pathFor(name)
-      const ownershipId = atomic ? createWriteId!() : undefined
-      const path = ownershipId ? immutableAttachmentPath(logicalPath, ownershipId) : logicalPath
+      let ownershipId: string | undefined
+      let path = logicalPath
+      if (atomic) {
+        try {
+          ownershipId = createWriteId!()
+          path = immutableAttachmentPath(logicalPath, ownershipId)
+        } catch (error) {
+          logAttachmentUploadError(logger, '[attachment-upload] could not allocate ownership key', {
+            path: logicalPath,
+            error: redactErrorMessage(error),
+          })
+          return attachmentUploadError(
+            503,
+            'attachment_store_unavailable',
+            ATTACHMENT_STORAGE_FAILURE_MESSAGE,
+            logicalPath,
+          )
+        }
+      }
       const pathCheck = validatePath(path)
       if (!pathCheck.succeeded) {
         return attachmentUploadError(400, 'invalid_attachment_path', pathCheck.error, path)
@@ -380,14 +401,45 @@ export function createAttachmentUploadRoute(
     const successfulWrites: SuccessfulAttachmentWrite[] = []
     for (const input of prepared) {
       if (!atomic) {
-        const written = await legacyWriter!(auth.scopeId, input.path, input.bytes, {
-          mediaType: input.mediaType,
-          name: input.name,
-          originalName: input.originalName,
-          size: input.size,
-        })
-        if (!written.ok) {
-          return attachmentUploadError(413, 'attachment_write_failed', written.reason, input.path)
+        let written: unknown
+        try {
+          written = await legacyWriter!(auth.scopeId, input.path, input.bytes, {
+            mediaType: input.mediaType,
+            name: input.name,
+            originalName: input.originalName,
+            size: input.size,
+          })
+        } catch (error) {
+          logAttachmentUploadError(logger, '[attachment-upload] legacy writer failed', {
+            path: input.path,
+            error: redactErrorMessage(error),
+          })
+          return attachmentUploadError(
+            503,
+            'attachment_store_unavailable',
+            ATTACHMENT_STORAGE_FAILURE_MESSAGE,
+            input.path,
+          )
+        }
+        const result = inspectLegacyAttachmentWriteResult(written)
+        if (!result) {
+          logAttachmentUploadError(logger, '[attachment-upload] legacy writer returned an invalid result', {
+            path: input.path,
+          })
+          return attachmentUploadError(
+            503,
+            'attachment_store_unavailable',
+            ATTACHMENT_STORAGE_FAILURE_MESSAGE,
+            input.path,
+          )
+        }
+        if (!result.ok) {
+          const reason = redactErrorMessage(result.reason)
+          logAttachmentUploadError(logger, '[attachment-upload] legacy write rejected', {
+            path: input.path,
+            error: reason,
+          })
+          return attachmentUploadError(413, 'attachment_write_failed', reason, input.path)
         }
         uploaded.push({
           path: input.path,
@@ -414,8 +466,8 @@ export function createAttachmentUploadRoute(
           ownership,
         })
       } catch (error) {
-        const cleanupFailures = (await abortOwnership(atomicWriter!.abort, auth.scopeId, ownership, logger)) +
-          await rollbackSuccessfulWrites(successfulWrites, logger)
+        const cleanupFailures = (await abortOwnership(atomicWriter!, auth.scopeId, ownership, logger)) +
+          await rollbackSuccessfulWrites(successfulWrites, auth.scopeId, atomicWriter!, logger)
         logAttachmentUploadError(logger, '[attachment-upload] write failed', {
           path: input.path,
           ownershipId: ownership.id,
@@ -429,9 +481,10 @@ export function createAttachmentUploadRoute(
           input.path,
         )
       }
-      if (!written || !written.receipt || !ownsReceipt(written.receipt, ownership)) {
-        const cleanupFailures = (await abortOwnership(atomicWriter!.abort, auth.scopeId, ownership, logger)) +
-          await rollbackSuccessfulWrites(successfulWrites, logger)
+      const result = inspectAtomicAttachmentWriteResult(written, ownership)
+      if (!result) {
+        const cleanupFailures = (await abortOwnership(atomicWriter!, auth.scopeId, ownership, logger)) +
+          await rollbackSuccessfulWrites(successfulWrites, auth.scopeId, atomicWriter!, logger)
         logAttachmentUploadError(logger, '[attachment-upload] writer returned a mismatched ownership receipt', {
           path: input.path,
           ownershipId: ownership.id,
@@ -439,15 +492,20 @@ export function createAttachmentUploadRoute(
         })
         return attachmentUploadError(503, 'attachment_store_unavailable', ATTACHMENT_STORAGE_FAILURE_MESSAGE, input.path)
       }
-      if (!written.ok) {
+      if (!result.ok) {
         const cleanupFailures = (await rollbackSuccessfulWrites([
-          { path: input.path, ownership, receipt: written.receipt },
-        ], logger)) + await rollbackSuccessfulWrites(successfulWrites, logger)
+          { path: input.path, ownership, receipt: result.receipt },
+        ], auth.scopeId, atomicWriter!, logger)) + await rollbackSuccessfulWrites(
+          successfulWrites,
+          auth.scopeId,
+          atomicWriter!,
+          logger,
+        )
         logAttachmentUploadError(logger, '[attachment-upload] write rejected', {
           path: input.path,
           ownershipId: ownership.id,
           cleanupFailures,
-          error: redactErrorMessage(written.reason),
+          error: redactErrorMessage(result.reason),
         })
         return attachmentUploadError(
           503,
@@ -456,7 +514,7 @@ export function createAttachmentUploadRoute(
           input.path,
         )
       }
-      successfulWrites.push({ path: input.path, ownership, receipt: written.receipt })
+      successfulWrites.push({ path: input.path, ownership, receipt: result.receipt })
       uploaded.push({
         path: input.path,
         name: input.name,

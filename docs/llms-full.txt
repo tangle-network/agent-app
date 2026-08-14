@@ -2026,15 +2026,15 @@ interface CreateAtomicAttachmentUploadRouteOptions
 `function` — Resolve an attachment upload route handler with customizable limits and validation options.
 
 ```ts
-(options: CreateAttachmentUploadRouteOptions) => (request: Request) => Promise<Response>
+(options: CreateAttachmentUploadRouteOptions | CreateAtomicAttachmentUploadRouteOptions) => (request: Request) => Promi…
 ```
 
 ### `CreateAttachmentUploadRouteOptions`
 
-`type`
+`interface` — The original public route-options interface remains available for consumers that extend it.
 
 ```ts
-type CreateAttachmentUploadRouteOptions
+interface CreateAttachmentUploadRouteOptions
 ```
 
 ### `createChatTurnRoutes`

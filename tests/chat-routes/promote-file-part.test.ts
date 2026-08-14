@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   promoteAgentFilePart as runPromoteAgentFilePart,
   PROMOTE_MAX_FILE_BYTES,
@@ -178,6 +178,30 @@ describe('promoteAgentFilePart — data URI', () => {
     expect(result.part.path).not.toContain('--')
     expect(writes).toEqual([result.part.path])
   })
+
+  it('redacts a legacy writer rejection reason', async () => {
+    const options: PromoteAgentFilePartOptions = {
+      raw: { type: 'file', filename: 'legacy.txt', url: `data:text/plain;base64,${HELLO_B64}` },
+      scopeId: 'ws',
+      sessionId: 't1',
+      writeAttachment: async () => ({
+        ok: false as const,
+        reason: 'R2 secretAccessKey=legacy-promotion-secret SSN=123-45-6789',
+      }),
+      now: FIXED_CLOCK,
+    }
+    const result = await runPromoteAgentFilePart(options)
+
+    expect(result).toEqual({
+      succeeded: false,
+      filename: 'legacy.txt',
+      reason: expect.stringContaining('[REDACTED:credential]'),
+    })
+    if (result.succeeded) return
+    expect(result.reason).toContain('[REDACTED:ssn]')
+    expect(result.reason).not.toContain('legacy-promotion-secret')
+    expect(result.reason).not.toContain('123-45-6789')
+  })
 })
 
 describe('promoteAgentFilePart — sandbox path', () => {
@@ -340,6 +364,56 @@ describe('promoteAgentFilePart — failure modes', () => {
       reason: 'Attachment storage is temporarily unavailable. Please try again.',
     })
     expect(JSON.stringify(logs)).toContain('unknown error')
+  })
+
+  it('fails closed when a receipt getter is hostile and aborts the attempted owner', async () => {
+    const abort = vi.fn(async () => undefined)
+    const hostileReceipt = new Proxy(Object.create(null), {
+      get() {
+        throw new Error('receipt getter failed')
+      },
+    }) as AttachmentWriteReceipt
+    const raw: RawAgentFilePart = { type: 'file', filename: 'photo.png', url: `data:image/png;base64,${HELLO_B64}` }
+    const result = await promoteAgentFilePart({
+      raw,
+      scopeId: 'ws',
+      sessionId: 't1',
+      writeAttachment: async () => ({ ok: true, receipt: hostileReceipt }),
+      abortAttachment: abort,
+      now: FIXED_CLOCK,
+    })
+
+    expect(result).toEqual({
+      succeeded: false,
+      filename: 'photo.png',
+      reason: 'Attachment storage is temporarily unavailable. Please try again.',
+    })
+    expect(abort).toHaveBeenCalledOnce()
+  })
+
+  it('uses the ownership abort as a cleanup fallback when rollback fails', async () => {
+    const abort = vi.fn(async () => undefined)
+    const raw: RawAgentFilePart = { type: 'file', filename: 'photo.png', url: `data:image/png;base64,${HELLO_B64}` }
+    const result = await promoteAgentFilePart({
+      raw,
+      scopeId: 'ws',
+      sessionId: 't1',
+      writeAttachment: async (_scopeId, _path, _content, opts) => ({
+        ok: false,
+        reason: 'store rejected after commit',
+        receipt: {
+          ownership: opts.ownership,
+          rollback: () => {
+            throw new Error('delete timed out')
+          },
+        },
+      }),
+      abortAttachment: abort,
+      now: FIXED_CLOCK,
+    })
+
+    expect(result.succeeded).toBe(false)
+    expect(abort).toHaveBeenCalledOnce()
   })
 })
 

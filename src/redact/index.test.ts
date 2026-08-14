@@ -125,6 +125,21 @@ describe('redactErrorMessage', () => {
     expect(redactErrorMessage('x'.repeat(300))).toHaveLength(241)
   })
 
+  it('sanitizes PII and Cloudflare/S3 credential fields in backend text', () => {
+    const redacted = redactErrorMessage(
+      'R2 failed AWSAccessKeyId=access-value secretAccessKey=secret-value X-Amz-Credential=credential-value SSN=123-45-6789 EIN=12-3456789',
+    )
+
+    expect(redacted).not.toContain('access-value')
+    expect(redacted).not.toContain('secret-value')
+    expect(redacted).not.toContain('credential-value')
+    expect(redacted).not.toContain('123-45-6789')
+    expect(redacted).not.toContain('12-3456789')
+    expect(redacted).toContain('[REDACTED:credential]')
+    expect(redacted).toContain('[REDACTED:ssn]')
+    expect(redacted).toContain('[REDACTED:ein]')
+  })
+
   it('is total for throwing message getters and toString methods', () => {
     const value = Object.defineProperty(
       { toString: () => { throw new Error('toString failed') } },

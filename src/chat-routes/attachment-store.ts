@@ -144,5 +144,8 @@ export interface AtomicAttachmentWriter {
  * enabling ownership paths while forgetting the ambiguous-write cleanup.
  */
 export function createAtomicAttachmentWriter(input: AtomicAttachmentWriter): AtomicAttachmentWriter {
-  return { write: input.write, abort: input.abort }
+  return {
+    write: input.write.bind(input),
+    abort: input.abort.bind(input),
+  }
 }

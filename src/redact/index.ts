@@ -109,9 +109,13 @@ export function maskSpans(
 }
 
 const ERROR_SECRET_PATTERNS: readonly RedactionPattern[] = [
+  ...DEFAULT_REDACTION_PATTERNS,
   { kind: 'bearer', pattern: /Bearer\s+[^\s]+/i },
   { kind: 'credential', pattern: /\b(?:sk|pk|tc|ghp|xoxb)[_-][A-Za-z0-9_-]{8,}\b/i },
-  { kind: 'credential', pattern: /\b(?:api[_-]?key|token|secret|password|signature|sig)\s*[:=]\s*[^\s,;&]+/i },
+  {
+    kind: 'credential',
+    pattern: /\b(?:access[_-]?key[_-]?id|secret[_-]?access[_-]?key|session[_-]?token|security[_-]?token|x-amz-(?:credential|signature|security-token)|aws[_-]?access[_-]?key[_-]?id|aws[_-]?secret[_-]?access[_-]?key|aws[_-]?session[_-]?token|api[_-]?key|client[_-]?secret|credential|token|secret|password|signature|sig|authorization)\s*[:=]\s*[^\s,;&]+/i,
+  },
 ]
 
 /** Sanitize an untrusted backend error for server logs. This is deliberately
