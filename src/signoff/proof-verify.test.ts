@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createTempRepo, passingSteps, type TempRepo } from './proof-fixture'
 import { attachSignoffProof } from './proof-attach'
 import { gitIsAncestor, readCommitFacts } from './proof-git'
@@ -10,6 +10,10 @@ import { formatSignoffVerification, requiredStepsFor, SIGNOFF_REQUIRED_STEPS, ve
 const KEY = new Uint8Array(32).fill(7)
 const OTHER_KEY = new Uint8Array(32).fill(9)
 const AGENT_APP_STEPS = SIGNOFF_REQUIRED_STEPS['agent-app'] as readonly string[]
+
+// These cases create and mutate temporary Git repositories. Allow cold Git
+// startup on shared CI hosts without weakening the verification assertions.
+vi.setConfig({ testTimeout: 30_000 })
 
 let repos: TempRepo[] = []
 function repo(): TempRepo {

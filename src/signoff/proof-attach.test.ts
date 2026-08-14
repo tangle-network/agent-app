@@ -1,7 +1,11 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createTempRepo, passingSteps, type TempRepo } from './proof-fixture'
 import { attachSignoffProof, listSignoffProofs, readSignoffProofNote, resolveSignoffProof, SIGNOFF_NOTES_REF } from './proof-attach'
 import { buildSignoffProof } from './proof-record'
+
+// These cases create and mutate temporary Git repositories. Allow cold Git
+// startup on shared CI hosts without weakening the attachment assertions.
+vi.setConfig({ testTimeout: 30_000 })
 
 let repos: TempRepo[] = []
 function repo(): TempRepo {
