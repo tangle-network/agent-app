@@ -4,7 +4,15 @@
 
 Source: `src/store/index.ts`
 
-10 exports.
+16 exports.
+
+### `AtomicSqliteDatabase`
+
+`interface` — A SQLite driver that can execute a group of statements atomically.
+
+```ts
+interface AtomicSqliteDatabase
+```
 
 ### `createDatabaseProvider`
 
@@ -70,6 +78,14 @@ interface KVPutOptions
 interface KVStore
 ```
 
+### `runAtomicSqliteStatements`
+
+`function` — Execute related SQLite statements atomically.
+
+```ts
+(db: AtomicSqliteDatabase, statements: [SqliteLazyStatement<unknown>, ...SqliteLazyStatement<unknown>[]]) => Promise<un…
+```
+
 ### `runSqliteStatements`
 
 `function` — Execute related SQLite statements in one transactional driver batch when supported, or sequentially in the same order for portable local drivers.
@@ -78,10 +94,42 @@ interface KVStore
 (db: SqliteBatchDatabase, statements: [unknown, ...unknown[]]) => Promise<unknown[]>
 ```
 
+### `SqliteAtomicConnection`
+
+`interface` — The single connection exposed inside a native transaction callback.
+
+```ts
+interface SqliteAtomicConnection
+```
+
 ### `SqliteBatchDatabase`
 
 `interface` — A database driver that can execute related SQLite statements as one batch.
 
 ```ts
 interface SqliteBatchDatabase
+```
+
+### `SqliteLazyStatement`
+
+`type` — A statement that has not started before the transaction opens.
+
+```ts
+type SqliteLazyStatement
+```
+
+### `SqliteManualTransactionConnection`
+
+`interface` — A manually controlled connection owns both transaction commands and queries.
+
+```ts
+interface SqliteManualTransactionConnection
+```
+
+### `SqliteTransactionCommand`
+
+`type` — The three raw SQL control statements used by the explicit atomic path.
+
+```ts
+type SqliteTransactionCommand
 ```

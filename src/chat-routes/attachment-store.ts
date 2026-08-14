@@ -48,35 +48,104 @@ export type AttachmentReadResult =
  */
 export type ReadAttachmentFn = (scopeId: string, path: string) => Promise<AttachmentReadResult>
 
-/** Outcome of persisting one attachment. Mirrors `AttachmentReadResult`'s
- *  `ok`/`reason` shape and `upload.ts`'s `{ ok }` convention. */
-export type AttachmentWriteResult = { ok: true } | { ok: false; reason: string }
+/** The ownership identity for one attempted write. The upload and promotion
+ * routes create a unique path for each attempt, and the product adapter stores
+ * this id with it. */
+export interface AttachmentWriteOwnership {
+  id: string
+  path: string
+}
+
+/** Public-safe outcome for a storage outage. Backend details belong in logs. */
+export const ATTACHMENT_STORAGE_FAILURE_MESSAGE = 'Attachment storage is temporarily unavailable. Please try again.'
+
+/** Add an ownership id to a logical path and return an immutable store key.
+ * Ownership ids are path-safe because the key is also returned to clients. */
+export function immutableAttachmentPath(logicalPath: string, ownershipId: string): string {
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(ownershipId)) {
+    throw new Error('attachment ownership id must be a path-safe identifier')
+  }
+  return `${logicalPath}--${ownershipId}`
+}
+
+/** Compensation for one attachment write. The adapter MUST compare the stored
+ * ownership id before deleting, so an older rollback cannot delete a newer
+ * overwrite. */
+export interface AttachmentWriteReceipt {
+  rollback(): void | Promise<void>
+  ownership: AttachmentWriteOwnership
+}
+
+/** Clean up a write whose function threw after the store may have committed.
+ * The adapter must delete only the supplied ownership, never the logical path
+ * unconditionally. */
+export type AbortAttachmentWriteFn = (
+  scopeId: string,
+  ownership: AttachmentWriteOwnership,
+) => void | Promise<void>
 
 /**
- * Persist `content` for `scopeId` at `path`. `content` is either raw `bytes`
- * or a base64 `string` — a string argument is ALWAYS base64 (never utf8), so
- * a store that speaks base64 (gtm's vault) writes it verbatim and one that
- * speaks bytes decodes once. Like the reader, failures resolve to
- * `{ ok: false, reason }` rather than throwing.
+ * The stable writer result from the original attachment-store contract.
+ * Existing products may return this shape and keep using the legacy writer
+ * lane. New products should use {@link AtomicAttachmentWriteResult}.
+ */
+export type AttachmentWriteResult = { ok: true } | { ok: false; reason: string }
+
+/** Options from the stable attachment-store contract. */
+export interface AttachmentWriteOptions {
+  mediaType?: string
+  name?: string
+  originalName?: string
+  size?: number
+}
+
+/**
+ * The stable writer port. It is intentionally unchanged so products released
+ * before the ownership receipt contract continue to compile.
  *
- * `opts` mirrors the vault frontmatter gtm's `writeAttachmentVaultFile`
- * persists alongside the body (promote-file-parts.ts:181-190), so a product
- * reimplementing that vault writer through this seam can reproduce it
- * exactly:
- * - `mediaType` — the resolved MIME type; gtm's frontmatter key `mime`.
- * - `name` — the sanitized (store-path-safe) display filename; gtm passes
- *   this only to shape its oversize message, not into frontmatter.
- * - `originalName` — the filename as the harness/browser reported it, BEFORE
- *   sanitization (`raw.filename ?? filename` — falls back to the sanitized
- *   name when the source carried none); gtm's frontmatter key `originalName`.
- *   This is the one field with no other recovery path once sanitization has
- *   run, so it must ride the write, not be re-derived after the fact.
- * - `size` — the authoritative decoded byte length being written; gtm's
- *   frontmatter key `size`.
+ * The legacy lane does not promise batch rollback. Use
+ * {@link createAtomicAttachmentWriter} for ownership-safe writes.
  */
 export type WriteAttachmentFn = (
   scopeId: string,
   path: string,
   content: Uint8Array | string,
-  opts: { mediaType?: string; name?: string; originalName?: string; size?: number },
+  opts: AttachmentWriteOptions,
 ) => Promise<AttachmentWriteResult>
+
+/** Options for an ownership-safe writer. */
+export interface AtomicAttachmentWriteOptions extends AttachmentWriteOptions {
+  ownership: AttachmentWriteOwnership
+}
+
+/** Result for an ownership-safe writer. A receipt is required on both paths. */
+export type AtomicAttachmentWriteResult =
+  | { ok: true; receipt: AttachmentWriteReceipt }
+  | { ok: false; reason: string; receipt: AttachmentWriteReceipt }
+
+/** Ownership-safe writer port used by the atomic upload and promotion lanes. */
+export type AtomicWriteAttachmentFn = (
+  scopeId: string,
+  path: string,
+  content: Uint8Array | string,
+  opts: AtomicAttachmentWriteOptions,
+) => Promise<AtomicAttachmentWriteResult>
+
+/** A complete ownership-safe attachment store adapter. */
+export interface AtomicAttachmentWriter {
+  write: AtomicWriteAttachmentFn
+  abort: AbortAttachmentWriteFn
+}
+
+/**
+ * Build the explicit atomic adapter used by new routes.
+ *
+ * Keeping the write and abort functions together prevents a caller from
+ * enabling ownership paths while forgetting the ambiguous-write cleanup.
+ */
+export function createAtomicAttachmentWriter(input: AtomicAttachmentWriter): AtomicAttachmentWriter {
+  return {
+    write: input.write.bind(input),
+    abort: input.abort.bind(input),
+  }
+}

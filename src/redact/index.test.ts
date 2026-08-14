@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   redactForIngestion,
+  redactErrorMessage,
   detectSpans,
   maskSpans,
   buildRedactedDocument,
@@ -108,6 +109,63 @@ describe('maskSpans (standalone substring masking)', () => {
     expect(maskSpans('card 4111 1111 1111 1111 ok', [LUHN_CARD])).toBe('card [REDACTED:cc]ok')
     // Luhn-invalid → not matched → untouched.
     expect(maskSpans('order 1234567890123456 ok', [LUHN_CARD])).toBe('order 1234567890123456 ok')
+  })
+})
+
+describe('redactErrorMessage', () => {
+  it('sanitizes credential-shaped backend text and bounds the result', () => {
+    const message = 'R2 failed X-Amz-Signature=super-secret-signature Bearer upstream-token'
+    const redacted = redactErrorMessage(message)
+
+    expect(redacted).not.toContain('super-secret-signature')
+    expect(redacted).not.toContain('upstream-token')
+    expect(redacted).toContain('[REDACTED:credential]')
+    expect(redacted).toContain('[REDACTED:bearer]')
+    expect(redactErrorMessage('')).toBe('unknown error')
+    expect(redactErrorMessage('x'.repeat(300))).toHaveLength(241)
+  })
+
+  it('sanitizes PII and Cloudflare/S3 credential fields in backend text', () => {
+    const redacted = redactErrorMessage(
+      'R2 failed AWSAccessKeyId=access-value secretAccessKey=secret-value X-Amz-Credential=credential-value SSN=123-45-6789 EIN=12-3456789',
+    )
+
+    expect(redacted).not.toContain('access-value')
+    expect(redacted).not.toContain('secret-value')
+    expect(redacted).not.toContain('credential-value')
+    expect(redacted).not.toContain('123-45-6789')
+    expect(redacted).not.toContain('12-3456789')
+    expect(redacted).toContain('[REDACTED:credential]')
+    expect(redacted).toContain('[REDACTED:ssn]')
+    expect(redacted).toContain('[REDACTED:ein]')
+  })
+
+  it('is total for throwing message getters and toString methods', () => {
+    const value = Object.defineProperty(
+      { toString: () => { throw new Error('toString failed') } },
+      'message',
+      { get: () => { throw new Error('message failed') } },
+    )
+
+    expect(() => redactErrorMessage(value)).not.toThrow()
+    expect(redactErrorMessage(value)).toBe('unknown error')
+  })
+
+  it('is total for hostile proxies and hostile fallback values', () => {
+    const hostile = new Proxy(Object.create(null), {
+      get() {
+        throw new Error('get trap failed')
+      },
+      getPrototypeOf() {
+        throw new Error('prototype trap failed')
+      },
+      getOwnPropertyDescriptor() {
+        throw new Error('descriptor trap failed')
+      },
+    })
+
+    expect(() => redactErrorMessage(hostile, hostile as unknown as string)).not.toThrow()
+    expect(redactErrorMessage(hostile, hostile as unknown as string)).toBe('unknown error')
   })
 })
 

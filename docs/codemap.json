@@ -1133,12 +1133,19 @@
         "interactions",
         "model-resolution",
         "plans",
+        "redact",
         "sandbox",
         "stream",
         "web"
       ],
       "error": null,
       "exports": [
+        {
+          "name": "AbortAttachmentWriteFn",
+          "kind": "type",
+          "signature": "type AbortAttachmentWriteFn",
+          "doc": "Clean up a write whose function threw after the store may have committed."
+        },
         {
           "name": "ALLOWED_ATTACHMENT_SNIFFED_MIMES",
           "kind": "const",
@@ -1188,6 +1195,42 @@
           "doc": "Values written to the assistant row — the intersection of the append and patch shapes, so one snapshot serves both."
         },
         {
+          "name": "AtomicAttachmentUploadAuthorization",
+          "kind": "type",
+          "signature": "type AtomicAttachmentUploadAuthorization",
+          "doc": "Authorization result for an ownership-safe attachment writer."
+        },
+        {
+          "name": "AtomicAttachmentWriteOptions",
+          "kind": "interface",
+          "signature": "interface AtomicAttachmentWriteOptions",
+          "doc": "Options for an ownership-safe writer."
+        },
+        {
+          "name": "AtomicAttachmentWriter",
+          "kind": "interface",
+          "signature": "interface AtomicAttachmentWriter",
+          "doc": "A complete ownership-safe attachment store adapter."
+        },
+        {
+          "name": "AtomicAttachmentWriteResult",
+          "kind": "type",
+          "signature": "type AtomicAttachmentWriteResult",
+          "doc": "Result for an ownership-safe writer."
+        },
+        {
+          "name": "AtomicPromoteAgentFilePartOptions",
+          "kind": "interface",
+          "signature": "interface AtomicPromoteAgentFilePartOptions",
+          "doc": "Ownership-safe promotion options for new products."
+        },
+        {
+          "name": "AtomicWriteAttachmentFn",
+          "kind": "type",
+          "signature": "type AtomicWriteAttachmentFn",
+          "doc": "Ownership-safe writer port used by the atomic upload and promotion lanes."
+        },
+        {
           "name": "ATTACHMENT_ACCEPT",
           "kind": "const",
           "signature": "\"image/*,.pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,.json,.yaml,.yml,.html\"",
@@ -1198,6 +1241,12 @@
           "kind": "const",
           "signature": "10",
           "doc": "Most files a single request may carry: the composer staging cap, the upload route's per-request cap, and the chat body's `attachments` cap."
+        },
+        {
+          "name": "ATTACHMENT_STORAGE_FAILURE_MESSAGE",
+          "kind": "const",
+          "signature": "\"Attachment storage is temporarily unavailable. Please try again.\"",
+          "doc": "Public-safe outcome for a storage outage."
         },
         {
           "name": "AttachmentPathArgs",
@@ -1239,13 +1288,37 @@
           "name": "AttachmentUploadAuthorization",
           "kind": "type",
           "signature": "type AttachmentUploadAuthorization",
-          "doc": "Outcome of the injected `authorize` seam: auth + rate limiting + scope resolution, all in one place so a 429 rides `{ok:false, response}` exactly like a 401 does — this factory has no rate-limit opin…"
+          "doc": "Stable authorization result for the original writer contract."
+        },
+        {
+          "name": "AttachmentUploadLogger",
+          "kind": "type",
+          "signature": "type AttachmentUploadLogger",
+          "doc": "The logger receives only sanitized backend details."
+        },
+        {
+          "name": "AttachmentWriteOptions",
+          "kind": "interface",
+          "signature": "interface AttachmentWriteOptions",
+          "doc": "Options from the stable attachment-store contract."
+        },
+        {
+          "name": "AttachmentWriteOwnership",
+          "kind": "interface",
+          "signature": "interface AttachmentWriteOwnership",
+          "doc": "The ownership identity for one attempted write."
+        },
+        {
+          "name": "AttachmentWriteReceipt",
+          "kind": "interface",
+          "signature": "interface AttachmentWriteReceipt",
+          "doc": "Compensation for one attachment write."
         },
         {
           "name": "AttachmentWriteResult",
           "kind": "type",
           "signature": "type AttachmentWriteResult",
-          "doc": "Outcome of persisting one attachment."
+          "doc": "The stable writer result from the original attachment-store contract."
         },
         {
           "name": "base64WireLen",
@@ -1494,16 +1567,28 @@
           "doc": "Build the coalescing draft writer for one turn."
         },
         {
+          "name": "CreateAtomicAttachmentUploadRouteOptions",
+          "kind": "interface",
+          "signature": "interface CreateAtomicAttachmentUploadRouteOptions",
+          "doc": "Ownership-safe route options for new products."
+        },
+        {
+          "name": "createAtomicAttachmentWriter",
+          "kind": "function",
+          "signature": "(input: AtomicAttachmentWriter) => AtomicAttachmentWriter",
+          "doc": "Build the explicit atomic adapter used by new routes."
+        },
+        {
           "name": "createAttachmentUploadRoute",
           "kind": "function",
-          "signature": "(options: CreateAttachmentUploadRouteOptions) => (request: Request) => Promise<Response>",
-          "doc": "Resolve an attachment upload route handler with customizable limits and validation options"
+          "signature": "(options: CreateAttachmentUploadRouteOptions | CreateAtomicAttachmentUploadRouteOptions) => (request: Request) => Promi…",
+          "doc": "Resolve an attachment upload route handler with customizable limits and validation options."
         },
         {
           "name": "CreateAttachmentUploadRouteOptions",
           "kind": "interface",
           "signature": "interface CreateAttachmentUploadRouteOptions",
-          "doc": "Define options to authorize, write, and limit attachment uploads in a route"
+          "doc": "The original public route-options interface remains available for consumers that extend it."
         },
         {
           "name": "createChatTurnRoutes",
@@ -1516,6 +1601,12 @@
           "kind": "interface",
           "signature": "interface CreateChatTurnRoutesOptions",
           "doc": "Define options to configure chat turn routes including authorization, storage, and event buffering"
+        },
+        {
+          "name": "CreateLegacyAttachmentUploadRouteOptions",
+          "kind": "interface",
+          "signature": "interface CreateLegacyAttachmentUploadRouteOptions",
+          "doc": "Stable route options for products using the original writer contract."
         },
         {
           "name": "createSandboxChatProducer",
@@ -1708,6 +1799,12 @@
           "kind": "function",
           "signature": "(bytes: number) => string",
           "doc": "Render a raw byte count as a human-readable size (`512B`, `3KB`, `12MB 500KB`)."
+        },
+        {
+          "name": "immutableAttachmentPath",
+          "kind": "function",
+          "signature": "(logicalPath: string, ownershipId: string) => string",
+          "doc": "Add an ownership id to a logical path and return an immutable store key."
         },
         {
           "name": "INLINE_PARTS_MAX_BYTES",
@@ -1940,14 +2037,14 @@
         {
           "name": "promoteAgentFilePart",
           "kind": "function",
-          "signature": "(options: PromoteAgentFilePartOptions) => Promise<PromoteFilePartResult>",
-          "doc": "Promote a part of an agent file with optional byte limits and MIME type detection"
+          "signature": "{ (options: PromoteAgentFilePartOptions): Promise<PromoteFilePartResult>; (options: AtomicPromoteAgentFilePartOptions):…",
+          "doc": "Promote a part using the stable writer contract."
         },
         {
           "name": "PromoteAgentFilePartOptions",
           "kind": "interface",
           "signature": "interface PromoteAgentFilePartOptions",
-          "doc": "Define options for promoting a part of an agent file within a specific session and scope"
+          "doc": "Stable promotion options from the original writer contract."
         },
         {
           "name": "PromoteFilePartResult",
@@ -2187,7 +2284,7 @@
           "name": "WriteAttachmentFn",
           "kind": "type",
           "signature": "type WriteAttachmentFn",
-          "doc": "Persist `content` for `scopeId` at `path`."
+          "doc": "The stable writer port."
         }
       ]
     },
@@ -9376,6 +9473,12 @@
           "doc": "Define a document composed of multiple redacted content segments"
         },
         {
+          "name": "redactErrorMessage",
+          "kind": "function",
+          "signature": "(input: unknown, fallback?: string) => string",
+          "doc": null
+        },
+        {
           "name": "redactForIngestion",
           "kind": "function",
           "signature": "(value: unknown, options?: RedactForIngestionOptions) => unknown",
@@ -13517,6 +13620,12 @@
       "error": null,
       "exports": [
         {
+          "name": "AtomicSqliteDatabase",
+          "kind": "interface",
+          "signature": "interface AtomicSqliteDatabase",
+          "doc": "A SQLite driver that can execute a group of statements atomically."
+        },
+        {
           "name": "createDatabaseProvider",
           "kind": "function",
           "signature": "<DB extends object>(options?: DatabaseProviderOptions) => DatabaseProvider<DB>",
@@ -13565,16 +13674,46 @@
           "doc": "Define a key-value store interface for asynchronous data retrieval, storage, deletion, and listing"
         },
         {
+          "name": "runAtomicSqliteStatements",
+          "kind": "function",
+          "signature": "(db: AtomicSqliteDatabase, statements: [SqliteLazyStatement<unknown>, ...SqliteLazyStatement<unknown>[]]) => Promise<un…",
+          "doc": "Execute related SQLite statements atomically."
+        },
+        {
           "name": "runSqliteStatements",
           "kind": "function",
           "signature": "(db: SqliteBatchDatabase, statements: [unknown, ...unknown[]]) => Promise<unknown[]>",
           "doc": "Execute related SQLite statements in one transactional driver batch when supported, or sequentially in the same order for portable local drivers."
         },
         {
+          "name": "SqliteAtomicConnection",
+          "kind": "interface",
+          "signature": "interface SqliteAtomicConnection",
+          "doc": "The single connection exposed inside a native transaction callback."
+        },
+        {
           "name": "SqliteBatchDatabase",
           "kind": "interface",
           "signature": "interface SqliteBatchDatabase",
           "doc": "A database driver that can execute related SQLite statements as one batch."
+        },
+        {
+          "name": "SqliteLazyStatement",
+          "kind": "type",
+          "signature": "type SqliteLazyStatement",
+          "doc": "A statement that has not started before the transaction opens."
+        },
+        {
+          "name": "SqliteManualTransactionConnection",
+          "kind": "interface",
+          "signature": "interface SqliteManualTransactionConnection",
+          "doc": "A manually controlled connection owns both transaction commands and queries."
+        },
+        {
+          "name": "SqliteTransactionCommand",
+          "kind": "type",
+          "signature": "type SqliteTransactionCommand",
+          "doc": "The three raw SQL control statements used by the explicit atomic path."
         }
       ]
     },

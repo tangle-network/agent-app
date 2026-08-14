@@ -35,6 +35,10 @@ const tsc = join(repoRoot, 'node_modules', '.bin', 'tsc')
 const workdir = mkdtempSync(join(tmpdir(), 'composer-send-compat-'))
 afterAll(() => rmSync(workdir, { recursive: true, force: true }))
 
+// Each case starts a fresh TypeScript process. Allow cold compiler startup on
+// shared CI hosts without weakening the compile assertions.
+const COMPILE_TEST_TIMEOUT_MS = 30_000
+
 /** Compile `source` against the real component types; return tsc's diagnostics. */
 function compile(name: string, source: string): { ok: boolean; output: string } {
   const file = join(workdir, `${name}.ts`)
@@ -82,28 +86,40 @@ describe('ChatComposer send handlers stay assignable from pre-outcome shapes', (
   ]
 
   for (const [label, body] of legacy) {
-    it(`accepts ${label}`, () => {
-      const { ok, output } = compile(label.replace(/\W+/g, '-'), `${preamble}${body}\nexport { h }\n`)
-      expect(output).not.toMatch(/TS2322/)
-      expect(ok).toBe(true)
-    })
+    it(
+      `accepts ${label}`,
+      () => {
+        const { ok, output } = compile(label.replace(/\W+/g, '-'), `${preamble}${body}\nexport { h }\n`)
+        expect(output).not.toMatch(/TS2322/)
+        expect(ok).toBe(true)
+      },
+      COMPILE_TEST_TIMEOUT_MS,
+    )
   }
 
-  it('still accepts a handler that reports a rejection', () => {
-    const { ok, output } = compile(
-      'rejection',
-      `${preamble}const h: ChatComposerProps["onSend"] = (m: string) => ({ ok: false as const, error: m })\nexport { h }\n`,
-    )
-    expect(output).toBe('')
-    expect(ok).toBe(true)
-  })
+  it(
+    'still accepts a handler that reports a rejection',
+    () => {
+      const { ok, output } = compile(
+        'rejection',
+        `${preamble}const h: ChatComposerProps["onSend"] = (m: string) => ({ ok: false as const, error: m })\nexport { h }\n`,
+      )
+      expect(output).toBe('')
+      expect(ok).toBe(true)
+    },
+    COMPILE_TEST_TIMEOUT_MS,
+  )
 
-  it('fails the compile when the fixture itself is wrong, so a green run means something', () => {
-    const { ok, output } = compile(
-      'negative-control',
-      `${preamble}const h: ChatComposerProps["onSend"] = (m: number) => { console.log(m) }\nexport { h }\n`,
-    )
-    expect(ok).toBe(false)
-    expect(output).toMatch(/TS2322/)
-  })
+  it(
+    'fails the compile when the fixture itself is wrong, so a green run means something',
+    () => {
+      const { ok, output } = compile(
+        'negative-control',
+        `${preamble}const h: ChatComposerProps["onSend"] = (m: number) => { console.log(m) }\nexport { h }\n`,
+      )
+      expect(ok).toBe(false)
+      expect(output).toMatch(/TS2322/)
+    },
+    COMPILE_TEST_TIMEOUT_MS,
+  )
 })

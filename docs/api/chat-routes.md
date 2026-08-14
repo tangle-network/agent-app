@@ -4,7 +4,15 @@
 
 Source: `src/chat-routes/index.ts`
 
-175 exports.
+191 exports.
+
+### `AbortAttachmentWriteFn`
+
+`type` — Clean up a write whose function threw after the store may have committed.
+
+```ts
+type AbortAttachmentWriteFn
+```
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
@@ -70,6 +78,54 @@ interface AssistantDraftWriterOptions
 interface AssistantRowValues
 ```
 
+### `AtomicAttachmentUploadAuthorization`
+
+`type` — Authorization result for an ownership-safe attachment writer.
+
+```ts
+type AtomicAttachmentUploadAuthorization
+```
+
+### `AtomicAttachmentWriteOptions`
+
+`interface` — Options for an ownership-safe writer.
+
+```ts
+interface AtomicAttachmentWriteOptions
+```
+
+### `AtomicAttachmentWriter`
+
+`interface` — A complete ownership-safe attachment store adapter.
+
+```ts
+interface AtomicAttachmentWriter
+```
+
+### `AtomicAttachmentWriteResult`
+
+`type` — Result for an ownership-safe writer.
+
+```ts
+type AtomicAttachmentWriteResult
+```
+
+### `AtomicPromoteAgentFilePartOptions`
+
+`interface` — Ownership-safe promotion options for new products.
+
+```ts
+interface AtomicPromoteAgentFilePartOptions
+```
+
+### `AtomicWriteAttachmentFn`
+
+`type` — Ownership-safe writer port used by the atomic upload and promotion lanes.
+
+```ts
+type AtomicWriteAttachmentFn
+```
+
 ### `ATTACHMENT_ACCEPT`
 
 `const` — Accept list for the composer file picker + type validation, same grammar as the native `<input accept>` attribute.
@@ -84,6 +140,14 @@ interface AssistantRowValues
 
 ```ts
 10
+```
+
+### `ATTACHMENT_STORAGE_FAILURE_MESSAGE`
+
+`const` — Public-safe outcome for a storage outage.
+
+```ts
+"Attachment storage is temporarily unavailable. Please try again."
 ```
 
 ### `AttachmentPathArgs`
@@ -136,15 +200,47 @@ type AttachmentTypeCheckResult
 
 ### `AttachmentUploadAuthorization`
 
-`type` — Outcome of the injected `authorize` seam: auth + rate limiting + scope resolution, all in one place so a 429 rides `{ok:false, response}` exactly like a 401 does — this factory has no rate-limit opin…
+`type` — Stable authorization result for the original writer contract.
 
 ```ts
 type AttachmentUploadAuthorization
 ```
 
+### `AttachmentUploadLogger`
+
+`type` — The logger receives only sanitized backend details.
+
+```ts
+type AttachmentUploadLogger
+```
+
+### `AttachmentWriteOptions`
+
+`interface` — Options from the stable attachment-store contract.
+
+```ts
+interface AttachmentWriteOptions
+```
+
+### `AttachmentWriteOwnership`
+
+`interface` — The ownership identity for one attempted write.
+
+```ts
+interface AttachmentWriteOwnership
+```
+
+### `AttachmentWriteReceipt`
+
+`interface` — Compensation for one attachment write.
+
+```ts
+interface AttachmentWriteReceipt
+```
+
 ### `AttachmentWriteResult`
 
-`type` — Outcome of persisting one attachment.
+`type` — The stable writer result from the original attachment-store contract.
 
 ```ts
 type AttachmentWriteResult
@@ -478,17 +574,33 @@ type CompletedSandboxTurnSource
 (options: AssistantDraftWriterOptions) => AssistantDraftWriter
 ```
 
-### `createAttachmentUploadRoute`
+### `CreateAtomicAttachmentUploadRouteOptions`
 
-`function` — Resolve an attachment upload route handler with customizable limits and validation options
+`interface` — Ownership-safe route options for new products.
 
 ```ts
-(options: CreateAttachmentUploadRouteOptions) => (request: Request) => Promise<Response>
+interface CreateAtomicAttachmentUploadRouteOptions
+```
+
+### `createAtomicAttachmentWriter`
+
+`function` — Build the explicit atomic adapter used by new routes.
+
+```ts
+(input: AtomicAttachmentWriter) => AtomicAttachmentWriter
+```
+
+### `createAttachmentUploadRoute`
+
+`function` — Resolve an attachment upload route handler with customizable limits and validation options.
+
+```ts
+(options: CreateAttachmentUploadRouteOptions | CreateAtomicAttachmentUploadRouteOptions) => (request: Request) => Promi…
 ```
 
 ### `CreateAttachmentUploadRouteOptions`
 
-`interface` — Define options to authorize, write, and limit attachment uploads in a route
+`interface` — The original public route-options interface remains available for consumers that extend it.
 
 ```ts
 interface CreateAttachmentUploadRouteOptions
@@ -508,6 +620,14 @@ interface CreateAttachmentUploadRouteOptions
 
 ```ts
 interface CreateChatTurnRoutesOptions
+```
+
+### `CreateLegacyAttachmentUploadRouteOptions`
+
+`interface` — Stable route options for products using the original writer contract.
+
+```ts
+interface CreateLegacyAttachmentUploadRouteOptions
 ```
 
 ### `createSandboxChatProducer`
@@ -764,6 +884,14 @@ type FilePartPromotionOutcome
 
 ```ts
 (bytes: number) => string
+```
+
+### `immutableAttachmentPath`
+
+`function` — Add an ownership id to a logical path and return an immutable store key.
+
+```ts
+(logicalPath: string, ownershipId: string) => string
 ```
 
 ### `INLINE_PARTS_MAX_BYTES`
@@ -1072,15 +1200,15 @@ number
 
 ### `promoteAgentFilePart`
 
-`function` — Promote a part of an agent file with optional byte limits and MIME type detection
+`function` — Promote a part using the stable writer contract.
 
 ```ts
-(options: PromoteAgentFilePartOptions) => Promise<PromoteFilePartResult>
+{ (options: PromoteAgentFilePartOptions): Promise<PromoteFilePartResult>; (options: AtomicPromoteAgentFilePartOptions):…
 ```
 
 ### `PromoteAgentFilePartOptions`
 
-`interface` — Define options for promoting a part of an agent file within a specific session and scope
+`interface` — Stable promotion options from the original writer contract.
 
 ```ts
 interface PromoteAgentFilePartOptions
@@ -1400,7 +1528,7 @@ interface UploadedChatFile
 
 ### `WriteAttachmentFn`
 
-`type` — Persist `content` for `scopeId` at `path`.
+`type` — The stable writer port.
 
 ```ts
 type WriteAttachmentFn

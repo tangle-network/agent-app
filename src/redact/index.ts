@@ -108,6 +108,52 @@ export function maskSpans(
   return out
 }
 
+const ERROR_SECRET_PATTERNS: readonly RedactionPattern[] = [
+  ...DEFAULT_REDACTION_PATTERNS,
+  { kind: 'bearer', pattern: /Bearer\s+[^\s]+/i },
+  { kind: 'credential', pattern: /\b(?:sk|pk|tc|ghp|xoxb)[_-][A-Za-z0-9_-]{8,}\b/i },
+  {
+    kind: 'credential',
+    pattern: /\b(?:access[_-]?key[_-]?id|secret[_-]?access[_-]?key|session[_-]?token|security[_-]?token|x-amz-(?:credential|signature|security-token)|aws[_-]?access[_-]?key[_-]?id|aws[_-]?secret[_-]?access[_-]?key|aws[_-]?session[_-]?token|api[_-]?key|client[_-]?secret|credential|token|secret|password|signature|sig|authorization)\s*[:=]\s*[^\s,;&]+/i,
+  },
+]
+
+/** Sanitize an untrusted backend error for server logs. This is deliberately
+ * separate from public response text: callers should return an opaque message
+ * and log this bounded, redacted value for operators. */
+function safeString(value: unknown): string | undefined {
+  try {
+    return typeof value === 'string' ? value : String(value)
+  } catch {
+    return undefined
+  }
+}
+
+function safeErrorText(input: unknown): string {
+  if (input !== null && (typeof input === 'object' || typeof input === 'function')) {
+    try {
+      const message = Reflect.get(input, 'message')
+      const messageText = safeString(message)
+      if (messageText !== undefined) return messageText
+    } catch {
+      // Hostile getters and proxies are still untrusted error values.
+    }
+  }
+  return safeString(input) ?? ''
+}
+
+export function redactErrorMessage(input: unknown, fallback = 'unknown error'): string {
+  const fallbackText = safeString(fallback)?.trim() || 'unknown error'
+  const raw = safeErrorText(input)
+  const message = raw.trim() || fallbackText
+  try {
+    const redacted = maskSpans(message, ERROR_SECRET_PATTERNS).trim()
+    return redacted.length > 240 ? `${redacted.slice(0, 240)}…` : redacted || fallbackText
+  } catch {
+    return fallbackText
+  }
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (value === null || typeof value !== 'object') return false
   const proto = Object.getPrototypeOf(value)
