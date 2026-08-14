@@ -175,10 +175,10 @@ describe('test-quality gate: every test can fail', () => {
     // A brace-counting bug that stopped at the first `}` would miss the tail.
     expect(found?.body.endsWith('}')).toBe(true)
     // And the vitest options object is not mistaken for the body.
-    const withTimeout = `it('slow', { timeout: 30_000 }, async () => { expect(1).toBe(1) })`
+    const withTimeout = `it('slow', { timeout: 30_000 }, async () => { expect(1).toBe(2) })`
     const [slow] = testBodies(withTimeout)
     expect(slow?.title).toBe('slow')
-    expect(slow?.body).toContain('expect(1).toBe(1)')
+    expect(slow?.body).toContain('expect(1).toBe(2)')
   })
 
   it('no test body is assertion-free', () => {
