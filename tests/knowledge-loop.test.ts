@@ -118,7 +118,11 @@ describe('reviewCandidate — the propose-don\'t-apply gate', () => {
   })
 })
 
-describe('createKnowledgeLoop — end-to-end propose-don\'t-apply over a real KB', () => {
+// These cases drive the real agent-knowledge loop against a KB on disk, so a
+// case costs ~0.7-1.0s idle. Vitest's 5s default is a UNIT budget: it leaves too
+// little headroom, and the cases time out only when the machine is loaded. The
+// explicit budget keeps the gate a signal about the loop, not about host load.
+describe('createKnowledgeLoop — end-to-end propose-don\'t-apply over a real KB', { timeout: 30_000 }, () => {
   it('a low-confidence proposal is gated OUT: no page written, but its source IS recorded', async () => {
     const decide = createReviewerDecider(() => candidateAt(0.4))
     const loop = createKnowledgeLoop(knowledge, { root, decide, maxIterations: 1 })
