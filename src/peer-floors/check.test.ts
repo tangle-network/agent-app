@@ -113,10 +113,14 @@ describe('this package audits itself', () => {
     ) as { peerDependencies?: Record<string, string> }
     const range = own.peerDependencies?.['@tangle-network/agent-interface']
 
+    // Interface 1.0.0 states that a minor is additive and only a major removes
+    // or narrows, so the line this shell supports is the 1.x major: every later
+    // additive minor is admitted, and the next major is not.
     expect(range).toBeDefined()
-    expect(satisfiesRange('0.52.0', range!)).toBe(false)
-    expect(satisfiesRange('0.53.0', range!)).toBe(true)
-    expect(satisfiesRange('0.54.0', range!)).toBe(false)
+    expect(satisfiesRange('0.56.0', range!)).toBe(false)
+    expect(satisfiesRange('1.0.0', range!)).toBe(true)
+    expect(satisfiesRange('1.4.0', range!)).toBe(true)
+    expect(satisfiesRange('2.0.0', range!)).toBe(false)
   })
 
   // The floors this shell PUBLISHES must be satisfiable by the tree it is
