@@ -40,6 +40,7 @@ import {
 
 import { filterCommandPaletteItems, type CommandPaletteItem } from '../session-shell/index'
 import { OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, PopoverSurface } from './controls'
+import { formatDictationElapsed, useDictation, type DictationAudio } from './use-dictation'
 
 // ── glyphs (no icon-library dependency) ───────────────────────────────────
 
@@ -102,6 +103,15 @@ function UploadGlyph({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+    </svg>
+  )
+}
+
+function MicGlyph({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="9" y="2" width="6" height="12" rx="3" />
+      <path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4" />
     </svg>
   )
 }
@@ -277,6 +287,17 @@ export interface ChatComposerProps {
   /** `/` commands offered when the draft is exactly a leading slash token.
    *  Omit (or pass []) and `/` types as ordinary text. */
   slashCommands?: SlashCommand[]
+  /** Dictation is opt-in: pass `onDictate` and the action row gains a mic
+   *  button (browsers without `MediaRecorder`/`getUserMedia` render none).
+   *  Click starts the capture; the button flips to a stop control with the
+   *  running elapsed seconds; stop hands the recorded audio blob here. The
+   *  composer owns capture only — turning the audio into text (e.g. the
+   *  Whisper provider from `sequences-react`) is the host's. */
+  onDictate?: (audio: DictationAudio) => void
+  /** Capture failures (a denied mic prompt, no device), after the composer has
+   *  shown its own dismissible notice. For hosts that log or track. */
+  onDictateError?: (message: string) => void
+
   /** Cmd/Ctrl+L focuses the input and shows the hint. Default true. */
   focusShortcut?: boolean
   /** Float the card on a soft two-layer foreground-tinted shadow (opt-in).
@@ -353,6 +374,9 @@ export function ChatComposer({
   dropTitle = 'Drop files to add context',
   dropDescription = 'They attach to your next message.',
   slashCommands,
+  onDictate,
+  onDictateError,
+
   focusShortcut = true,
   floating = false,
   sendLabel = 'Send',
@@ -380,6 +404,26 @@ export function ChatComposer({
     },
     [isControlled, onValueChange],
   )
+
+  // Dictation: capture only. The hook reports every failure in words; the
+  // composer shows them in its own dismissible notice (the same shape as a
+  // rejected send) AND forwards them for hosts that log.
+  const [dictateError, setDictateError] = useState<string | null>(null)
+  const handleDictated = useCallback(
+    (audio: DictationAudio) => {
+      setDictateError(null)
+      onDictate?.(audio)
+    },
+    [onDictate],
+  )
+  const handleDictateError = useCallback(
+    (message: string) => {
+      setDictateError(message)
+      onDictateError?.(message)
+    },
+    [onDictateError],
+  )
+  const dictation = useDictation({ onDictate: handleDictated, onError: handleDictateError })
 
   // Keep the textarea height in sync with the content for BOTH typed and
   // external (controlled) value changes — one effect covers both paths.
@@ -732,6 +776,24 @@ export function ChatComposer({
 
       {showAbove && <div className="mb-1.5 flex flex-wrap items-center gap-1.5 px-1">{controls}</div>}
 
+      {dictateError && (
+        <div
+          role="alert"
+          data-testid="composer-dictate-error"
+          className="mb-2 flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+        >
+          <span className="min-w-0 flex-1">{dictateError}</span>
+          <button
+            type="button"
+            aria-label="Dismiss dictation error"
+            onClick={() => setDictateError(null)}
+            className="shrink-0 font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {failedSend && (
         <div
           role="alert"
@@ -894,6 +956,50 @@ export function ChatComposer({
           >
             {showInline && controls}
           </div>
+
+          {/* Dictation sits beside Send: it produces input, like typing. The
+              button renders only when the host takes audio AND the browser can
+              record — a dead mic is worse than no mic. While recording, the
+              elapsed seconds (not the pulsing dot, which reduced motion
+              collapses) are the signal, and the stop control is never
+              disabled: a `disabled` flip mid-capture must not strand the mic. */}
+          {onDictate && dictation.supported ? (
+            dictation.recording ? (
+              <div className="flex shrink-0 items-center gap-1.5">
+                <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-destructive" />
+                <span
+                  aria-hidden="true"
+                  data-testid="composer-dictate-elapsed"
+                  className="text-xs tabular-nums text-muted-foreground"
+                >
+                  {formatDictationElapsed(dictation.elapsedSeconds)}
+                </span>
+                <span role="status" className="sr-only">
+                  Recording
+                </span>
+                <button
+                  type="button"
+                  onClick={dictation.stop}
+                  aria-label="Stop dictation"
+                  title="Stop dictation"
+                  className="shrink-0 rounded-lg p-2 text-destructive transition hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <StopGlyph className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={dictation.start}
+                disabled={disabled}
+                aria-label="Dictate message"
+                title="Dictate message"
+                className="shrink-0 rounded-lg p-2 text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <MicGlyph className="h-4 w-4" />
+              </button>
+            )
+          ) : null}
 
           {isStreaming ? (
             sendVariant === 'icon' ? (
