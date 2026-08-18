@@ -62,8 +62,8 @@ importers:
         specifier: 0.27.2
         version: 0.27.2
       '@tangle-network/sandbox-ui':
-        specifier: 0.104.1
-        version: 0.104.1(dfe637ed632f36173a8ad7166fa39910)
+        specifier: 0.105.0
+        version: 0.105.0(dfe637ed632f36173a8ad7166fa39910)
       '@tangle-network/ui':
         specifier: ^11.5.0
         version: 11.5.0(@hocuspocus/provider@4.5.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@tangle-network/brand@1.5.0(react@19.2.8))(@tiptap/core@3.29.1(@tiptap/pm@3.29.1))(@tiptap/react@3.29.1(@floating-ui/dom@1.8.0)(@tiptap/core@3.29.1(@tiptap/pm@3.29.1))(@tiptap/pm@3.29.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.29.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(nanostores@1.4.1)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)
@@ -1911,8 +1911,8 @@ packages:
       react:
         optional: true
 
-  '@tangle-network/sandbox-ui@0.104.1':
-    resolution: {integrity: sha512-knh+Med+Patnz/pa05ZQIEGUpwi/csDbwTtcWBF9oWiOtlaltEB4aiMKBGai9dHLKblzqjwPL/fALIYXFYJ1yw==}
+  '@tangle-network/sandbox-ui@0.105.0':
+    resolution: {integrity: sha512-XD0WMhnkNgOD/rFqqPg/QzuCZ2h+GGr1XzmjMwtERkOgqmY+RUEpu/ZSdhhiJBUxzXoGmJXXxWAdo3oNaCHXuQ==}
     peerDependencies:
       '@hocuspocus/provider': '>=2.15.0 <5.0.0'
       '@nanostores/react': '>=0.8.4 <2.0.0'
@@ -6323,7 +6323,7 @@ snapshots:
     optionalDependencies:
       react: 19.2.8
 
-  '@tangle-network/sandbox-ui@0.104.1(dfe637ed632f36173a8ad7166fa39910)':
+  '@tangle-network/sandbox-ui@0.105.0(dfe637ed632f36173a8ad7166fa39910)':
     dependencies:
       '@lobehub/icons-static-svg': 1.94.0
       '@pierre/diffs': 1.2.12(@shikijs/themes@4.3.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
