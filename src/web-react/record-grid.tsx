@@ -17,6 +17,13 @@
  *  - **Provenance per cell.** An optional quote + link + basis, so a
  *    record-backed grid shows where a value came from without the product
  *    building a second surface for it.
+ *  - **Review of a proposed change set.** Hand the grid a `proposed` patch
+ *    (`./record-grid-model`'s `diffRecordGridProposal`) and it becomes the
+ *    red/green row-diff surface a tax/legal review needs: changed cells render
+ *    the struck live value against the proposed one, added/removed rows are
+ *    marked, and every diffed row carries accept/reject — per row and for the
+ *    whole set. What accepting MEANS stays the caller's (a record-store review
+ *    write); the grid reports decisions, it does not persist them.
  *  - **Three distinct data states, on `web-react/async`'s own contract.**
  *    `state: AsyncResourceState<Row[]>` and `empty: AsyncEmptySpec` are the
  *    same types every other screen fetches through — loading, error-with-
@@ -51,6 +58,7 @@ import { type AsyncEmptyAction, type AsyncEmptySpec, type AsyncResourceState } f
 import { OVERLAY_SHADOW, PopoverSurface, usePopover } from './controls'
 import {
   EMPTY_RECORD_GRID_OVERLAY,
+  diffRecordGridProposal,
   formatRecordGridValue,
   isRecordGridCellApplicable,
   projectRecordGridRows,
@@ -67,10 +75,13 @@ import {
   withoutRecordGridCreated,
   withoutRecordGridRemoved,
   withoutRecordGridUpdate,
+  type RecordGridCellDiff,
   type RecordGridCellSource,
   type RecordGridColumn,
   type RecordGridOverlay,
+  type RecordGridProposal,
   type RecordGridRow,
+  type RecordGridRowDiff,
   type RecordGridSourceBasis,
   type RecordGridValue,
 } from './record-grid-model'
@@ -123,6 +134,25 @@ export interface RecordGridProps {
   onUpdate?: (change: RecordGridCellChange) => Promise<RecordGridWriteOutcome>
   /** Delete one row. Absent → no delete affordance. */
   onDelete?: (row: RecordGridRow) => Promise<RecordGridWriteOutcome>
+  /** A proposed change set to review against the live rows (see
+   *  `diffRecordGridProposal`). While a non-empty diff is on the table the grid
+   *  is a REVIEW surface, not an editor: cell editing, row add, and row delete
+   *  are inert; changed cells render the struck live value against the
+   *  proposed one; added/removed rows are marked; each diffed row carries
+   *  accept/reject controls. A proposal that diffs to nothing renders the grid
+   *  unchanged — there is nothing to review. */
+  proposed?: RecordGridProposal
+  /** Accept one diffed row — write its proposed values, adopt the addition, or
+   *  confirm the removal. The caller owns what accepting MEANS (a record-store
+   *  review write); the grid reports the decision and the caller moves the row
+   *  out of `proposed`. */
+  onAcceptRow?: (rowId: string) => void
+  /** Reject one diffed row — the live row stands. */
+  onRejectRow?: (rowId: string) => void
+  /** Accept every remaining diffed row at once. */
+  onAcceptAll?: () => void
+  /** Reject every remaining diffed row at once. */
+  onRejectAll?: () => void
   /** Starting values for the add form. */
   newRowDefaults?: Readonly<Record<string, RecordGridValue>>
   /** Label of the add control and of the add form. Defaults to `Add row`. */
@@ -207,6 +237,11 @@ export function RecordGrid({
   onCreate,
   onUpdate,
   onDelete,
+  proposed,
+  onAcceptRow,
+  onRejectRow,
+  onAcceptAll,
+  onRejectAll,
   newRowDefaults,
   addLabel = 'Add row',
   locale,
@@ -253,6 +288,26 @@ export function RecordGrid({
   }, [callerRows])
 
   const visibleRows = useMemo(() => projectRecordGridRows(callerRows, overlay), [callerRows, overlay])
+
+  // The diff is computed against the rows ON SCREEN, so a struck "before"
+  // value is always the value the reader sees the proposal replace.
+  const diffs = useMemo(
+    () => (proposed === undefined ? null : diffRecordGridProposal(visibleRows, proposed)),
+    [proposed, visibleRows],
+  )
+  const reviewing = diffs !== null && diffs.length > 0
+  const diffByRow = useMemo(() => new Map((diffs ?? []).map((diff) => [diff.rowId, diff])), [diffs])
+  const diffCellByKey = useMemo(() => {
+    const map = new Map<string, RecordGridCellDiff>()
+    for (const diff of diffs ?? []) {
+      for (const cell of diff.cells) map.set(cellKey(diff.rowId, cell.columnId), cell)
+    }
+    return map
+  }, [diffs])
+  const addedRows = useMemo(
+    () => (diffs ?? []).filter((diff) => diff.kind === 'added').map((diff) => diff.row),
+    [diffs],
+  )
 
   const activeFocus = useMemo(() => {
     if (focus === null) return null
@@ -468,7 +523,7 @@ export function RecordGrid({
         const row = visibleRows[rowIndex]
         const column = columns[columnIndex]
         if (!row || !column) return
-        if (!onUpdate || column.editable === false || row.readOnly === true) return
+        if (reviewing || !onUpdate || column.editable === false || row.readOnly === true) return
         if (column.kind === 'boolean') return
         if (!isRecordGridCellApplicable(column, row.values)) return
         event.preventDefault()
@@ -492,7 +547,7 @@ export function RecordGrid({
       if (!destinationRow || !destinationColumn) return
       focusCell(destinationRow.id, destinationColumn.id)
     },
-    [beginEdit, columns, editing, focusCell, onUpdate, visibleRows],
+    [beginEdit, columns, editing, focusCell, onUpdate, reviewing, visibleRows],
   )
 
   // `idle` and `loading` render the same busy block — from the reader's
@@ -536,7 +591,7 @@ export function RecordGrid({
   }
 
   const addForm =
-    adding && onCreate ? (
+    adding && onCreate && !reviewing ? (
       <AddRecordForm
         columns={columns}
         draft={draft}
@@ -554,7 +609,9 @@ export function RecordGrid({
       />
     ) : null
 
-  if (visibleRows.length === 0) {
+  // A review whose only diff is additions has no live rows — the empty state
+  // would hide the very rows up for review, so the table renders instead.
+  if (visibleRows.length === 0 && !reviewing) {
     return (
       <div className={`space-y-3 ${className ?? ''}`}>
         {toolbar}
@@ -594,11 +651,63 @@ export function RecordGrid({
   }
 
   const hasFooter = columns.some((column) => column.footerValue !== undefined)
-  const columnSpan = columns.length + (onDelete ? 1 : 0)
+  const showActionsColumn = reviewing || onDelete !== undefined
+  const columnSpan = columns.length + (showActionsColumn ? 1 : 0)
+
+  const changedCount = (diffs ?? []).filter((diff) => diff.kind === 'changed').length
+  const addedCount = addedRows.length
+  const removedCount = (diffs ?? []).filter((diff) => diff.kind === 'removed').length
+  const changedCellCount = (diffs ?? []).reduce((total, diff) => total + diff.cells.length, 0)
+  const reviewSummary = [
+    changedCount > 0 ? `${changedCount} changed (${changedCellCount} ${changedCellCount === 1 ? 'cell' : 'cells'})` : null,
+    addedCount > 0 ? `${addedCount} added` : null,
+    removedCount > 0 ? `${removedCount} removed` : null,
+  ]
+    .filter((part) => part !== null)
+    .join(' · ')
+
+  const reviewBar = reviewing ? (
+    <div
+      data-record-grid-review=""
+      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-card-edge bg-card px-4 py-2.5"
+    >
+      <div className="min-w-0">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+          Proposed changes
+        </p>
+        <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">{reviewSummary}</p>
+      </div>
+      {(onAcceptAll || onRejectAll) && (
+        <div className="flex items-center gap-2">
+          {onRejectAll && (
+            <button
+              type="button"
+              aria-label={`Reject all proposed changes to ${caption}`}
+              onClick={onRejectAll}
+              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-accent"
+            >
+              Reject all
+            </button>
+          )}
+          {onAcceptAll && (
+            <button
+              type="button"
+              aria-label={`Accept all proposed changes to ${caption}`}
+              onClick={onAcceptAll}
+              className="rounded-md bg-success/10 px-3 py-1.5 text-xs font-medium text-success transition hover:bg-success/20"
+            >
+              Accept all
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  ) : null
 
   return (
     <div className={`space-y-3 ${className ?? ''}`}>
       {toolbar}
+      {reviewBar}
       <div className="overflow-x-auto rounded-xl border border-card-edge bg-card">
         <table
           role="grid"
@@ -618,9 +727,9 @@ export function RecordGrid({
                   {column.header}
                 </th>
               ))}
-              {onDelete && (
+              {showActionsColumn && (
                 <th role="columnheader" scope="col" className="w-px px-3 py-2 font-medium">
-                  <span className="sr-only">Row actions</span>
+                  <span className="sr-only">{reviewing ? 'Review' : 'Row actions'}</span>
                 </th>
               )}
             </tr>
@@ -630,14 +739,25 @@ export function RecordGrid({
               const rowLabel = recordGridRowLabel(columns, row)
               const pending = row.id in pendingRows
               const rowError = rowErrors[row.id]
+              const rowDiff = reviewing ? diffByRow.get(row.id) : undefined
+              const removedRow = rowDiff?.kind === 'removed'
               return (
                 <Fragment key={row.id}>
-                  <tr role="row" aria-busy={pending} className={`border-b border-border ${pending ? 'opacity-60' : ''}`}>
+                  <tr
+                    role="row"
+                    aria-busy={pending}
+                    data-record-grid-diff={rowDiff?.kind}
+                    className={`border-b border-border ${pending ? 'opacity-60' : ''} ${removedRow ? 'bg-destructive/[0.06]' : ''}`}
+                  >
                     {columns.map((column) => {
                       const key = cellKey(row.id, column.id)
                       const applicable = isRecordGridCellApplicable(column, row.values)
                       const editable =
-                        onUpdate !== undefined && column.editable !== false && row.readOnly !== true && applicable
+                        !reviewing &&
+                        onUpdate !== undefined &&
+                        column.editable !== false &&
+                        row.readOnly !== true &&
+                        applicable
                       const value = row.values[column.id] ?? null
                       const isEditing = editing?.rowId === row.id && editing.columnId === column.id
                       const cellError = cellErrors[key]
@@ -647,6 +767,7 @@ export function RecordGrid({
                           : activeFocus.rowId === row.id && activeFocus.columnId === column.id
                       const source = row.sources?.[column.id]
                       const errorId = `${fieldPrefix}-cell-error-${row.id}-${column.id}`
+                      const cellDiff = rowDiff?.kind === 'changed' ? diffCellByKey.get(key) : undefined
 
                       if (isEditing && editable) {
                         return (
@@ -712,9 +833,36 @@ export function RecordGrid({
                           )} ${editable ? 'cursor-text' : ''}`}
                         >
                           <span className="inline-flex max-w-full items-center gap-1.5">
-                            <span className={display === '' ? 'text-muted-foreground' : 'truncate text-foreground'}>
-                              {display === '' ? (applicable ? '—' : 'n/a') : display}
-                            </span>
+                            {column.id === columns[0]?.id && removedRow && (
+                              <span className="inline-flex shrink-0 rounded border border-destructive/60 px-1 py-px text-[11px] font-semibold uppercase tracking-[0.05em] text-destructive">
+                                Remove
+                              </span>
+                            )}
+                            {cellDiff ? (
+                              <span className="inline-flex max-w-full flex-wrap items-baseline gap-x-1.5">
+                                <span className="tabular-nums text-destructive line-through decoration-destructive/60">
+                                  {formatRecordGridValue(column, cellDiff.before, locale) || '—'}
+                                </span>
+                                <span aria-hidden="true" className="text-muted-foreground">
+                                  →
+                                </span>
+                                <span className="tabular-nums font-medium text-success">
+                                  {formatRecordGridValue(column, cellDiff.after, locale) || '—'}
+                                </span>
+                              </span>
+                            ) : (
+                              <span
+                                className={
+                                  removedRow
+                                    ? 'truncate text-destructive line-through decoration-destructive/60'
+                                    : display === ''
+                                      ? 'text-muted-foreground'
+                                      : 'truncate text-foreground'
+                                }
+                              >
+                                {display === '' ? (applicable ? '—' : 'n/a') : display}
+                              </span>
+                            )}
                             {source && (
                               <SourceMarker
                                 panelId={`${fieldPrefix}-source-${row.id}-${column.id}`}
@@ -729,9 +877,19 @@ export function RecordGrid({
                         </td>
                       )
                     })}
-                    {onDelete && (
+                    {showActionsColumn && (
                       <td role="gridcell" className="px-3 py-2 text-right">
-                        {row.readOnly === true ? null : confirmDelete === row.id ? (
+                        {reviewing ? (
+                          rowDiff && (
+                            <ReviewActions
+                              rowId={row.id}
+                              kind={rowDiff.kind}
+                              rowLabel={rowLabel}
+                              onAccept={onAcceptRow}
+                              onReject={onRejectRow}
+                            />
+                          )
+                        ) : row.readOnly === true ? null : confirmDelete === row.id ? (
                           <span className="inline-flex items-center gap-1.5">
                             <button
                               type="button"
@@ -787,6 +945,49 @@ export function RecordGrid({
                 </Fragment>
               )
             })}
+            {reviewing &&
+              addedRows.map((row) => {
+                const rowLabel = recordGridRowLabel(columns, row)
+                return (
+                  <tr
+                    key={row.id}
+                    role="row"
+                    data-record-grid-diff="added"
+                    className="border-b border-border bg-success/[0.06]"
+                  >
+                    {columns.map((column, columnIndex) => {
+                      const applicable = isRecordGridCellApplicable(column, row.values)
+                      const value = row.values[column.id] ?? null
+                      const display = applicable ? formatRecordGridValue(column, value, locale) : ''
+                      return (
+                        <td key={column.id} role="gridcell" className={`px-3 py-2 ${alignmentClass(column)}`}>
+                          <span className="inline-flex max-w-full items-center gap-1.5">
+                            {columnIndex === 0 && (
+                              <span className="inline-flex shrink-0 rounded border border-success/60 px-1 py-px text-[11px] font-semibold uppercase tracking-[0.05em] text-success">
+                                New
+                              </span>
+                            )}
+                            <span
+                              className={`tabular-nums ${display === '' ? 'text-muted-foreground' : 'truncate text-foreground'}`}
+                            >
+                              {display === '' ? (applicable ? '—' : 'n/a') : display}
+                            </span>
+                          </span>
+                        </td>
+                      )
+                    })}
+                    <td role="gridcell" className="px-3 py-2 text-right">
+                      <ReviewActions
+                        rowId={row.id}
+                        kind="added"
+                        rowLabel={rowLabel}
+                        onAccept={onAcceptRow}
+                        onReject={onRejectRow}
+                      />
+                    </td>
+                  </tr>
+                )
+              })}
           </tbody>
           {hasFooter && (
             <tfoot>
@@ -800,7 +1001,7 @@ export function RecordGrid({
                     {column.footerValue ? formatRecordGridValue(column, column.footerValue(visibleRows), locale) : ''}
                   </td>
                 ))}
-                {onDelete && <td role="gridcell" />}
+                {showActionsColumn && <td role="gridcell" />}
               </tr>
             </tfoot>
           )}
@@ -808,6 +1009,7 @@ export function RecordGrid({
       </div>
 
       {onCreate &&
+        !reviewing &&
         (addForm ?? (
           <button
             type="button"
@@ -831,6 +1033,45 @@ export function RecordGrid({
           </button>
         ))}
     </div>
+  )
+}
+
+interface ReviewActionsProps {
+  rowId: string
+  kind: RecordGridRowDiff['kind']
+  rowLabel: string
+  onAccept?: (rowId: string) => void
+  onReject?: (rowId: string) => void
+}
+
+/** Per-row accept/reject in review mode. The verbs name what accepting DOES:
+ *  a changed row is written, an added row is adopted, a removed row is
+ *  deleted. */
+function ReviewActions({ rowId, kind, rowLabel, onAccept, onReject }: ReviewActionsProps) {
+  const noun = kind === 'changed' ? `proposed change to ${rowLabel}` : kind === 'added' ? `new row ${rowLabel}` : `removal of ${rowLabel}`
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {onReject && (
+        <button
+          type="button"
+          aria-label={`Reject ${noun}`}
+          onClick={() => onReject(rowId)}
+          className="rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition hover:bg-accent"
+        >
+          Reject
+        </button>
+      )}
+      {onAccept && (
+        <button
+          type="button"
+          aria-label={`Accept ${noun}`}
+          onClick={() => onAccept(rowId)}
+          className="rounded-md bg-success/10 px-2 py-1 text-xs font-medium text-success transition hover:bg-success/20"
+        >
+          Accept
+        </button>
+      )}
+    </span>
   )
 }
 

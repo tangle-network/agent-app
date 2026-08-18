@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   EMPTY_RECORD_GRID_OVERLAY,
+  diffRecordGridProposal,
   formatRecordGridValue,
   isRecordGridCellApplicable,
   parseRecordGridInput,
@@ -293,5 +294,66 @@ describe('optimistic overlay', () => {
     const rolledBack = withoutRecordGridCreated(overlay, 'draft-1')
     expect(rolledBack.updates).toEqual({})
     expect(projectRecordGridRows(rows, rolledBack).map((entry) => entry.id)).toEqual(['a', 'b'])
+  })
+})
+
+describe('diffRecordGridProposal', () => {
+  const rows = [
+    row('a', { holder: 'Jane', shares: 100 }),
+    row('b', { holder: 'Sam', shares: 200 }),
+    row('c', { holder: 'Pat', shares: 300 }),
+  ]
+
+  it('diffs only the cells that actually change, in live-row order', () => {
+    const diffs = diffRecordGridProposal(rows, {
+      updates: {
+        b: { shares: 250, holder: 'Sam' }, // holder restates the live value — not a change
+        a: { shares: 125 },
+      },
+    })
+    expect(diffs.map((diff) => [diff.rowId, diff.kind])).toEqual([
+      ['a', 'changed'],
+      ['b', 'changed'],
+    ])
+    expect(diffs[0]?.cells).toEqual([{ columnId: 'shares', before: 100, after: 125 }])
+    expect(diffs[1]?.cells).toEqual([{ columnId: 'shares', before: 200, after: 250 }])
+  })
+
+  it('treats an absent key and an explicit null as the same value, never as a change', () => {
+    const withMissing = [row('a', { holder: 'Jane' })]
+    expect(diffRecordGridProposal(withMissing, { updates: { a: { shares: null } } })).toEqual([])
+  })
+
+  it('marks removals and keeps them out of the changed list when both name the row', () => {
+    const diffs = diffRecordGridProposal(rows, {
+      updates: { c: { shares: 350 } },
+      removals: ['c'],
+    })
+    expect(diffs).toHaveLength(1)
+    expect(diffs[0]?.kind).toBe('removed')
+    expect(diffs[0]?.row.id).toBe('c')
+    expect(diffs[0]?.cells).toEqual([])
+  })
+
+  it('appends additions after the row diffs, ignoring an addition that re-uses a live id', () => {
+    const diffs = diffRecordGridProposal(rows, {
+      updates: { a: { shares: 125 } },
+      additions: [row('a', { holder: 'Duplicate' }), row('d', { holder: 'New', shares: 50 })],
+    })
+    expect(diffs.map((diff) => [diff.rowId, diff.kind])).toEqual([
+      ['a', 'changed'],
+      ['d', 'added'],
+    ])
+  })
+
+  it('ignores updates and removals that name no live row', () => {
+    expect(
+      diffRecordGridProposal(rows, { updates: { ghost: { shares: 1 } }, removals: ['ghost'] }),
+    ).toEqual([])
+  })
+
+  it('diffs to nothing for an empty proposal, so there is nothing to review', () => {
+    expect(diffRecordGridProposal(rows, {})).toEqual([])
+    expect(diffRecordGridProposal(rows, { updates: {}, additions: [], removals: [] })).toEqual([])
   })
 })
