@@ -28,6 +28,8 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
+  useId,
   useRef,
   useState,
   type ChangeEvent,
@@ -35,6 +37,9 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from 'react'
+
+import { filterCommandPaletteItems, type CommandPaletteItem } from '../session-shell/index'
+import { OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, PopoverSurface } from './controls'
 
 // ── glyphs (no icon-library dependency) ───────────────────────────────────
 
@@ -192,6 +197,21 @@ export interface ComposerSendFailure {
   restored: boolean
 }
 
+/**
+ * One `/` command the composer offers. Typing `/` at position 0 opens the
+ * command menu; the rest of the token filters it (the same prefix > substring
+ * > token-order ranking as the command palette). Picking a command CLEARS the
+ * token from the draft and calls `run` — what the command does (a route, a
+ * dialog, a draft transformation) is the product's business.
+ */
+export interface SlashCommand {
+  /** Command name without the leading slash: `model`, `clear`. */
+  name: string
+  /** One line of what it does, rendered beside the name. */
+  description: string
+  run: () => void
+}
+
 export interface ChatComposerProps {
   /** Send the trimmed, non-empty message. Attached files travel separately via
    *  `onAttach` + `pendingFiles` (the host consumes and clears them on send).
@@ -254,6 +274,9 @@ export interface ChatComposerProps {
   dropTitle?: string
   dropDescription?: string
 
+  /** `/` commands offered when the draft is exactly a leading slash token.
+   *  Omit (or pass []) and `/` types as ordinary text. */
+  slashCommands?: SlashCommand[]
   /** Cmd/Ctrl+L focuses the input and shows the hint. Default true. */
   focusShortcut?: boolean
   /** Float the card on a soft two-layer foreground-tinted shadow (opt-in).
@@ -329,6 +352,7 @@ export function ChatComposer({
   accept,
   dropTitle = 'Drop files to add context',
   dropDescription = 'They attach to your next message.',
+  slashCommands,
   focusShortcut = true,
   floating = false,
   sendLabel = 'Send',
@@ -530,9 +554,101 @@ export function ChatComposer({
     dispatchSend(failure.text, failure.trimmed, failure.parts, caret)
   }, [failedSend, isStreaming, disabled, dispatchSend])
 
+  // ── '/' commands ─────────────────────────────────────────────────────────
+  // The menu exists only while the WHOLE draft is one leading slash token
+  // (`/`, `/mod`). The first space ends it — arguments are ordinary text. Esc
+  // or an outside click dismisses for the CURRENT token only, so continued
+  // typing reopens the menu instead of leaving it permanently suppressed.
+  const slashPanelRef = useRef<HTMLDivElement>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
+  const slashListId = useId()
+  const [slashActive, setSlashActive] = useState(0)
+  const [slashDismissedFor, setSlashDismissedFor] = useState<string | null>(null)
+  const slashToken =
+    slashCommands && slashCommands.length > 0 ? /^\/(\S*)$/.exec(text)?.[1] : undefined
+  const slashOpen = slashToken !== undefined && text !== slashDismissedFor
+  const slashItems = useMemo<CommandPaletteItem[]>(
+    () =>
+      (slashCommands ?? []).map((command) => ({
+        id: command.name,
+        group: 'Commands',
+        label: `/${command.name}`,
+        description: command.description,
+        keywords: [command.name, command.description],
+      })),
+    [slashCommands],
+  )
+  const slashFiltered = useMemo(
+    () => (slashToken === undefined ? [] : filterCommandPaletteItems(slashItems, slashToken)),
+    [slashItems, slashToken],
+  )
+  const slashActiveIndex = slashFiltered.length === 0 ? 0 : Math.min(slashActive, slashFiltered.length - 1)
+
+  useEffect(() => {
+    setSlashActive(0)
+  }, [slashToken])
+
+  useEffect(() => {
+    if (!slashOpen) return
+    document
+      .getElementById(`${slashListId}-${slashActiveIndex}`)
+      ?.scrollIntoView?.({ block: 'nearest' })
+  }, [slashOpen, slashActiveIndex, slashListId])
+
+  useEffect(() => {
+    if (!slashOpen) return
+    function onMouseDown(e: MouseEvent) {
+      const target = e.target as Node
+      if (cardRef.current?.contains(target)) return
+      if (slashPanelRef.current?.contains(target)) return
+      setSlashDismissedFor(textRef.current)
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    return () => document.removeEventListener('mousedown', onMouseDown)
+  }, [slashOpen])
+
+  const pickSlash = useCallback(
+    (name: string) => {
+      const command = slashCommands?.find((c) => c.name === name)
+      // The draft IS the slash token (the menu only opens while it is), so the
+      // pick consumes it: clear the box, then run.
+      setText('')
+      setSlashDismissedFor(null)
+      command?.run()
+    },
+    [slashCommands, setText],
+  )
+
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // Respect IME composition — Enter commits the candidate, it doesn't send.
     if (e.nativeEvent.isComposing) return
+    if (slashOpen) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        if (slashFiltered.length > 0) setSlashActive((slashActiveIndex + 1) % slashFiltered.length)
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        if (slashFiltered.length > 0)
+          setSlashActive((slashActiveIndex - 1 + slashFiltered.length) % slashFiltered.length)
+        return
+      }
+      if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
+        const item = slashFiltered[slashActiveIndex]
+        if (item) {
+          e.preventDefault()
+          pickSlash(item.id)
+          return
+        }
+        // No command matched — fall through and let Enter send the raw text.
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setSlashDismissedFor(text)
+        return
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       send()
@@ -696,6 +812,7 @@ export function ChatComposer({
           line with the buttons, which is what squeezed the input and pushed the
           controls out of the card in the first place. */}
       <div
+        ref={cardRef}
         data-testid="composer-card"
         className={`flex flex-col gap-1.5 rounded-2xl border border-card-edge bg-card px-3 py-2.5 transition focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15 ${
           floating ? 'shadow-raised' : ''
@@ -825,6 +942,42 @@ export function ChatComposer({
           )}
         </div>
       </div>
+
+      {/* The slash menu ports through PopoverSurface like every canonical
+          popover: the composer docks inside horizontally scrolling rails, and
+          an in-place panel there is a panel the host clips away. It anchors
+          to the textarea and opens above. Focus never leaves the input —
+          rows are mousedown-swallowed so a click can't blur it. */}
+      <PopoverSurface
+        open={slashOpen}
+        id={slashListId}
+        role="listbox"
+        triggerRef={textareaRef}
+        panelRef={slashPanelRef}
+        className={`w-80 overflow-y-auto rounded-xl border border-card-edge bg-popover p-1 ${OVERLAY_SHADOW}`}
+      >
+        {slashFiltered.length === 0 && (
+          <div className="px-3 py-4 text-center text-sm text-muted-foreground">No matching commands</div>
+        )}
+        {slashFiltered.map((item, index) => (
+          <button
+            key={item.id}
+            type="button"
+            role="option"
+            aria-selected={index === slashActiveIndex}
+            id={`${slashListId}-${index}`}
+            onMouseDown={(e) => e.preventDefault()}
+            onMouseMove={() => setSlashActive(index)}
+            onClick={() => pickSlash(item.id)}
+            className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
+              index === slashActiveIndex ? 'bg-accent' : 'hover:bg-accent'
+            }`}
+          >
+            <span className="shrink-0 font-medium text-foreground">{item.label}</span>
+            <span className="truncate text-xs text-muted-foreground">{item.description}</span>
+          </button>
+        ))}
+      </PopoverSurface>
 
       {focusShortcut && (
         <div className="mt-1.5 flex justify-end px-1">
