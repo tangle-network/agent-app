@@ -4,7 +4,7 @@
 
 Source: `src/studio/index.ts`
 
-43 exports.
+35 exports.
 
 ### `buildGenerationRequestBody`
 
@@ -12,30 +12,6 @@ Source: `src/studio/index.ts`
 
 ```ts
 (fields: GenerationRequestFields) => Record<string, unknown>
-```
-
-### `buildPublishPackage`
-
-`function` — Build a PublishPackage object from caption, description, mentions, cadence, and destinations inputs
-
-```ts
-({ caption, postDescription, mentions, cadence, destinations, }: { caption: string; postDescription: string; mentions:…
-```
-
-### `CADENCES`
-
-`const` — Provide an array of predefined cadence options for scheduling or approval processes
-
-```ts
-string[]
-```
-
-### `DESTINATIONS`
-
-`const` — List available social media platforms with their publishing fields and provider identifiers
-
-```ts
-PublishDestination[]
 ```
 
 ### `failedOptimisticGeneration`
@@ -142,14 +118,6 @@ readonly ["low", "medium", "high", "auto"]
 string
 ```
 
-### `isDestinationConnected`
-
-`function` — Determine if a destination has any active connections in the given list of studio integration connections
-
-```ts
-(destination: PublishDestination, connections: StudioIntegrationConnection[]) => boolean
-```
-
 ### `isGenerationType`
 
 `function` — Resolve whether a string value matches a valid GenerationType
@@ -164,14 +132,6 @@ string
 
 ```ts
 (generation: Generation) => boolean
-```
-
-### `isPublishPackage`
-
-`function` — Determine if a value conforms to the PublishPackage structure with optional metadata fields
-
-```ts
-(value: unknown) => value is { caption?: string | undefined; description?: string | undefined; mentions?: string[] | un…
 ```
 
 ### `latestBatchOf`
@@ -278,22 +238,6 @@ type MediaModelStatus
 (type: GenerationType, catalog: MediaModelCatalogResponse | null) => string | undefined
 ```
 
-### `PublishDestination`
-
-`interface` — Define a destination for publishing content with identifiers, label, provider IDs, and fields
-
-```ts
-interface PublishDestination
-```
-
-### `PublishPackage`
-
-`interface` — Define the structure for configuring package publishing details and evaluation criteria
-
-```ts
-interface PublishPackage
-```
-
 ### `relativeTime`
 
 `function` — Resolve a human-readable relative time string from a given date or return an empty string if null
@@ -308,14 +252,6 @@ interface PublishPackage
 
 ```ts
 (current: Partial<Record<GenerationType, string>>, catalog: MediaModelCatalogResponse) => Partial<Record<GenerationType…
-```
-
-### `StudioIntegrationConnection`
-
-`interface` — Define the structure for a studio integration connection with status and provider identifiers
-
-```ts
-interface StudioIntegrationConnection
 ```
 
 ### `userSafeGenerationMessage`
