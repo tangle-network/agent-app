@@ -1,9 +1,8 @@
 /**
  * `@tangle-network/agent-app/studio-react` — the media-generation studio
- * surface: a prompt composer over the five generation types (image / video /
- * avatar / speech / transcription) with a model picker and a publish-package
- * staging form, a result canvas, and a right-side asset-library drawer with
- * card + detail views. `StudioWorkspace` is the ready-to-mount shell (header +
+ * surface: a prompt composer over three generation types (image / video /
+ * speech) with a model picker, a result canvas, and a right-side asset-library
+ * drawer with card + detail views. `StudioWorkspace` is the ready-to-mount shell (header +
  * composer + canvas + drawer + the merge/poll/revalidate orchestrator); the
  * leaf components are exported so a product can compose its own shell.
  *
@@ -26,7 +25,6 @@ export * from './generation-grid'
 export * from './generation-card'
 export * from './generation-detail'
 export * from './generation-detail-modal'
-export * from './publish-package-composer'
 export * from './type-config'
 export * from './image-composer'
 export * from './video-composer'

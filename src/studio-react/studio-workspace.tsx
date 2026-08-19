@@ -20,8 +20,6 @@ export interface StudioWorkspaceProps {
   generationsEndpoint?: string
   /** Build a vault link, optionally to a specific file. Defaults to `/app/<workspaceId>/vault`. */
   vaultHref?: (filePath?: string | null) => string
-  /** Integrations page href for the publish-package "Connect" link. Defaults to `/app/<workspaceId>/integrations`. */
-  integrationsHref?: string
 }
 
 /**
@@ -30,7 +28,7 @@ export interface StudioWorkspaceProps {
  * route owns the loader (auth, RBAC, the generation query) and the server
  * endpoints (`/api/generate`, `/api/media-models`, `/api/generations`); this
  * shell renders that data and drives the live UI. Role gates the composer
- * (viewers get a read-only library) and the integration-management affordances.
+ * (viewers get a read-only library).
  */
 export function StudioWorkspace({
   generations,
@@ -39,7 +37,6 @@ export function StudioWorkspace({
   role,
   generationsEndpoint,
   vaultHref,
-  integrationsHref,
 }: StudioWorkspaceProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const typeFilter = searchParams.get('type')
@@ -47,16 +44,13 @@ export function StudioWorkspace({
   const [selected, setSelected] = useState<Generation | null>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const canGenerate = role !== 'viewer'
-  const canManageIntegrations = role === 'owner' || role === 'admin'
-  // Default the navigation hrefs to the conventional /app/<workspaceId>/… routes;
-  // a host on a different route scheme passes its own builders.
+  // Default vault navigation to the conventional /app/<workspaceId>/… route;
+  // a host on a different route scheme passes its own builder.
   const resolvedVaultHref = vaultHref ?? (workspaceId
     ? (filePath?: string | null) => (filePath
       ? `/app/${workspaceId}/vault?file=${encodeURIComponent(filePath)}`
       : `/app/${workspaceId}/vault`)
     : undefined)
-  const resolvedIntegrationsHref = integrationsHref
-    ?? (workspaceId ? `/app/${workspaceId}/integrations` : undefined)
 
   const { mergedGenerations, latestBatch, onGenerated } = useStudioGenerations(generations, {
     workspaceId,
@@ -91,8 +85,6 @@ export function StudioWorkspace({
           <>
             <ComposerHero
               workspaceId={workspaceId}
-              integrationsHref={resolvedIntegrationsHref}
-              canManageIntegrations={canManageIntegrations}
               onGenerated={(generation) => {
                 onGenerated(generation)
                 requestAnimationFrame(() => {

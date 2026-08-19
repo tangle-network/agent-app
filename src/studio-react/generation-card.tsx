@@ -1,11 +1,8 @@
 import { Card, CardContent, Badge } from '@tangle-network/sandbox-ui/primitives'
-import { Send } from 'lucide-react'
 import {
   type Generation,
-  DESTINATIONS,
   generationError,
   generationStatus,
-  isPublishPackage,
   relativeTime,
 } from '../studio'
 import { typeConfigFor } from './type-config'
@@ -20,7 +17,6 @@ export function GenerationCard({
   const cfg = typeConfigFor(generation.type)
   const Icon = cfg.icon
   const status = generationStatus(generation)
-  const publishPackage = generation.metadata?.publishPackage
   return (
     <button type="button" onClick={() => onSelect(generation)} className="group text-left animate-row-in">
       <Card className="overflow-hidden transition-all group-hover:border-primary/50 group-hover:shadow-md">
@@ -68,19 +64,6 @@ export function GenerationCard({
               <span className="text-xs text-muted-foreground">{relativeTime(generation.createdAt)}</span>
             </div>
           </div>
-          {isPublishPackage(publishPackage) && (
-            <div className="mt-3 rounded-md border border-border bg-secondary p-2">
-              <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-foreground">
-                <Send className="h-3 w-3" />
-                {(publishPackage.destinations ?? [])
-                  .map((id) => DESTINATIONS.find((destination) => destination.id === id)?.label ?? id)
-                  .join(', ') || 'Publish package'}
-              </div>
-              <p className="line-clamp-2 text-xs text-muted-foreground">
-                {publishPackage.caption || 'Caption pending'}
-              </p>
-            </div>
-          )}
         </CardContent>
       </Card>
     </button>
