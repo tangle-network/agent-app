@@ -14107,10 +14107,22 @@
           "doc": "Build the request body object for a generation operation from provided fields"
         },
         {
+          "name": "curateComposerModels",
+          "kind": "function",
+          "signature": "(type: GenerationType, models: MediaModelOption[]) => MediaModelOption[]",
+          "doc": "Curate catalog models for the issue #449 composer lanes."
+        },
+        {
           "name": "failedOptimisticGeneration",
           "kind": "function",
           "signature": "(generation: Generation) => Generation",
           "doc": "Mark a generation as failed with updated status and error information"
+        },
+        {
+          "name": "FALLBACK_VIDEO_MODEL_OPTIONS",
+          "kind": "const",
+          "signature": "Readonly<Record<string, Readonly<Record<string, ModelOptionMetadata>>>>",
+          "doc": "Fallback video options matching tangle-router's wire-exact metadata."
         },
         {
           "name": "Generation",
@@ -14167,22 +14179,22 @@
           "doc": "Resolve the vault path string from a Generation object or return null if unavailable"
         },
         {
-          "name": "IMAGE_QUALITIES",
+          "name": "GPT_IMAGE_2_CUSTOM_SIZE",
           "kind": "const",
-          "signature": "readonly [\"low\", \"medium\", \"high\", \"auto\"]",
-          "doc": "Provide the valid image quality values for generation requests"
+          "signature": "{ readonly multipleOf: 16; readonly maxLongEdge: 3840; readonly maxRatio: 3; }",
+          "doc": "UI constraints for a custom gpt-image-2 size."
         },
         {
-          "name": "IMAGE_SIZE_HINT",
+          "name": "IMAGE_TO_VIDEO_SIBLINGS",
           "kind": "const",
-          "signature": "\"1024x1024, 1536x1024, 1024x1536, or auto\"",
-          "doc": "Provide a placeholder hint listing the accepted image size values"
+          "signature": "Readonly<Record<string, string>>",
+          "doc": "Map verified text-to-video model ids to their image-to-video siblings."
         },
         {
-          "name": "IMAGE_SIZE_PATTERN",
-          "kind": "const",
-          "signature": "string",
-          "doc": "Provide a validation pattern for the free-form image size field (WxH or auto)"
+          "name": "imageToVideoSibling",
+          "kind": "function",
+          "signature": "(modelId: string) => string | undefined",
+          "doc": "Resolve a verified image-to-video sibling for a text-to-video model."
         },
         {
           "name": "isGenerationType",
@@ -14205,7 +14217,7 @@
         {
           "name": "MAX_IMAGE_COUNT",
           "kind": "const",
-          "signature": "4",
+          "signature": "8",
           "doc": "Define the maximum number of images allowed for upload or display"
         },
         {
@@ -14218,7 +14230,7 @@
           "name": "MediaModelOption",
           "kind": "interface",
           "signature": "interface MediaModelOption",
-          "doc": "Describe media model option properties including id, name, type, status, and optional provider and reason"
+          "doc": "Describe a catalog media model and its optional wire-level option metadata."
         },
         {
           "name": "MediaModelStatus",
@@ -14251,6 +14263,24 @@
           "doc": "Resolve the appropriate status message for a media model based on loading state and availability"
         },
         {
+          "name": "ModelOptionMetadata",
+          "kind": "interface",
+          "signature": "interface ModelOptionMetadata",
+          "doc": "Per-parameter option metadata, structurally identical to tangle-router's `ModelOptionMetadata` (lib/model-options.ts, shipped in router PR #429)."
+        },
+        {
+          "name": "ModelOptionsMetadata",
+          "kind": "type",
+          "signature": "type ModelOptionsMetadata",
+          "doc": "Per-parameter model option metadata keyed by the provider's wire field."
+        },
+        {
+          "name": "ModelOptionValue",
+          "kind": "type",
+          "signature": "type ModelOptionValue",
+          "doc": "A wire-typed value accepted by a model option."
+        },
+        {
           "name": "normalizeImageCount",
           "kind": "function",
           "signature": "(value: unknown) => number",
@@ -14261,6 +14291,18 @@
           "kind": "function",
           "signature": "({ type, prompt, model, clientRequestId, outputIndex, outputCount, }: { type: GenerationType; prompt: string; model?: s…",
           "doc": "Generate content optimistically based on input parameters and optional model and output details"
+        },
+        {
+          "name": "optionChoices",
+          "kind": "function",
+          "signature": "(meta: ModelOptionMetadata) => readonly ModelOptionValue[]",
+          "doc": "Return exact enum choices or an inclusive integer range."
+        },
+        {
+          "name": "optionDefault",
+          "kind": "function",
+          "signature": "(meta: ModelOptionMetadata) => ModelOptionValue | undefined",
+          "doc": "Resolve an option default from its default, values, or lower bound."
         },
         {
           "name": "outputPathFor",
@@ -14275,10 +14317,22 @@
           "doc": "Resolve the preferred model ID for a given generation type from the media model catalog"
         },
         {
+          "name": "reconcileOptionValues",
+          "kind": "function",
+          "signature": "(options: Readonly<Record<string, ModelOptionMetadata>> | undefined, current: Readonly<Record<string, ModelOptionValue>…",
+          "doc": "Reconcile selections against supported options and their wire-typed defaults."
+        },
+        {
           "name": "relativeTime",
           "kind": "function",
           "signature": "(date: Date | null) => string",
           "doc": "Resolve a human-readable relative time string from a given date or return an empty string if null"
+        },
+        {
+          "name": "resolveComposerOptions",
+          "kind": "function",
+          "signature": "(input: { type: \"image\" | \"video\" | \"speech\"; modelId: string; provider?: string | undefined; catalogOptions?: Readonly…",
+          "doc": "Resolve live catalog options first, then exact or safe single-prefix fallbacks."
         },
         {
           "name": "selectedModelsWithDefaults",
@@ -14287,28 +14341,28 @@
           "doc": "Resolve selected models by applying defaults for missing or unavailable entries in the catalog"
         },
         {
+          "name": "supportsCustomImageSize",
+          "kind": "function",
+          "signature": "(modelId: string) => boolean",
+          "doc": "Return whether a model supports the gpt-image-2 custom-size rule."
+        },
+        {
+          "name": "textToVideoSibling",
+          "kind": "function",
+          "signature": "(modelId: string) => string | undefined",
+          "doc": "Resolve the verified text-to-video sibling for an image-to-video model."
+        },
+        {
           "name": "userSafeGenerationMessage",
           "kind": "function",
           "signature": "(message?: string | undefined) => string",
           "doc": "Resolve a user-safe generation message by filtering sensitive or error-related content"
         },
         {
-          "name": "VIDEO_ASPECT_RATIOS",
-          "kind": "const",
-          "signature": "readonly [\"16:9\", \"9:16\", \"1:1\"]",
-          "doc": "Provide the valid video aspect ratio values for generation requests"
-        },
-        {
-          "name": "VIDEO_DURATIONS",
-          "kind": "const",
-          "signature": "readonly [\"4\", \"6\", \"8\", \"10\", \"12\"]",
-          "doc": "Provide the valid video duration values (seconds) for generation requests"
-        },
-        {
-          "name": "VIDEO_RESOLUTIONS",
-          "kind": "const",
-          "signature": "readonly [\"720p\", \"1080p\"]",
-          "doc": "Provide the valid video resolution values for generation requests"
+          "name": "validateCustomImageSize",
+          "kind": "function",
+          "signature": "(width: number, height: number) => { ok: true; } | { ok: false; reason: string; }",
+          "doc": "Validate a custom gpt-image-2 size against its published UI constraints."
         }
       ]
     },
@@ -14322,28 +14376,10 @@
       "error": null,
       "exports": [
         {
-          "name": "AvatarComposer",
-          "kind": "function",
-          "signature": "({ audioUrl, imageUrl, avatarId, onAudioUrlChange, onImageUrlChange, onAvatarIdChange, }: { audioUrl: string; imageUrl:…",
-          "doc": null
-        },
-        {
-          "name": "ComposerDisclosure",
-          "kind": "function",
-          "signature": "({ summary, children }: { summary: ReactNode; children: ReactNode; }) => Element",
-          "doc": null
-        },
-        {
-          "name": "ComposerHero",
-          "kind": "function",
-          "signature": "({ workspaceId, align, surfaceClassName, onGenerated, }: { workspaceId?: string | undefined; align?: \"center\" | \"start\"…",
-          "doc": null
-        },
-        {
-          "name": "Field",
-          "kind": "function",
-          "signature": "({ label, htmlFor, className, children, }: { label: string; htmlFor?: string | undefined; className?: string | undefine…",
-          "doc": null
+          "name": "ComposerType",
+          "kind": "type",
+          "signature": "type ComposerType",
+          "doc": "The lanes the composer offers."
         },
         {
           "name": "filterGenerations",
@@ -14376,15 +14412,15 @@
           "doc": "Chrome-less asset grid — the `GenerationCard` grid plus its empty state, with no surrounding tabs/stats/sheet chrome."
         },
         {
+          "name": "GenerationNoticeChip",
+          "kind": "function",
+          "signature": "({ className }: { className?: string | undefined; }) => Element",
+          "doc": "The one thing a chat-shaped generator has to say about itself: each prompt is a fresh generation, and nothing carries over from the last one."
+        },
+        {
           "name": "GenerationStatusBadge",
           "kind": "function",
           "signature": "({ generation, inline, }: { generation: Generation; inline?: boolean | undefined; }) => Element | null",
-          "doc": null
-        },
-        {
-          "name": "ImageComposer",
-          "kind": "function",
-          "signature": "({ size, quality, imageCount, onSizeChange, onQualityChange, onImageCountChange, }: { size: string; quality: string; im…",
           "doc": null
         },
         {
@@ -14400,27 +14436,21 @@
           "doc": "Inline asset gallery — the same filter + stats + card grid as the library drawer's list view, but with no sheet chrome so it can sit on the page beside the composer."
         },
         {
-          "name": "NativeSelect",
-          "kind": "function",
-          "signature": "(props: SelectHTMLAttributes<HTMLSelectElement>) => Element",
-          "doc": null
-        },
-        {
           "name": "ResultCanvas",
           "kind": "function",
           "signature": "({ batch, onOpenLibrary, onSelect, }: { batch: Generation[]; onOpenLibrary: () => void; onSelect: (generation: Generati…",
           "doc": null
         },
         {
-          "name": "SpeechComposer",
+          "name": "StudioComposer",
           "kind": "function",
-          "signature": "({ voice, onVoiceChange, }: { voice: string; onVoiceChange: (value: string) => void; }) => Element",
-          "doc": null
+          "signature": "({ workspaceId, onGenerated, variant, pickReferenceImage, className, }: StudioComposerProps) => Element",
+          "doc": "The composer card."
         },
         {
-          "name": "Stepper",
-          "kind": "function",
-          "signature": "({ value, min, max, onChange, }: { value: number; min: number; max: number; onChange: (value: number) => void; }) => El…",
+          "name": "StudioComposerProps",
+          "kind": "interface",
+          "signature": "interface StudioComposerProps",
           "doc": null
         },
         {
@@ -14454,18 +14484,6 @@
           "doc": null
         },
         {
-          "name": "TranscriptionComposer",
-          "kind": "function",
-          "signature": "({ audioUrl, language, onAudioUrlChange, onLanguageChange, }: { audioUrl: string; language: string; onAudioUrlChange: (…",
-          "doc": null
-        },
-        {
-          "name": "TranscriptionOptions",
-          "kind": "function",
-          "signature": "({ responseFormat, temperature, onResponseFormatChange, onTemperatureChange, }: { responseFormat: string; temperature:…",
-          "doc": null
-        },
-        {
           "name": "TYPE_CONFIG",
           "kind": "const",
           "signature": "Record<string, TypeConfig>",
@@ -14488,12 +14506,6 @@
           "kind": "function",
           "signature": "(loaderGenerations: Generation[], options?: { workspaceId?: string | undefined; generationsEndpoint?: string | undefine…",
           "doc": "The generation orchestrator behind a studio surface: it merges the loader's rows with in-flight live generations, computes the latest batch for the canvas, polls running generations until they settle…"
-        },
-        {
-          "name": "VideoComposer",
-          "kind": "function",
-          "signature": "({ duration, resolution, aspectRatio, referenceImageUrl, onDurationChange, onResolutionChange, onAspectRatioChange, onR…",
-          "doc": null
         }
       ]
     },

@@ -9,3 +9,4 @@
  * `StudioWorkspace` shell) lives in `@tangle-network/agent-app/studio-react`.
  */
 export * from './generation'
+export * from './model-options'

@@ -261,9 +261,14 @@ describe('docs/product-surfaces.md — measured counts still match the source', 
     expect(countUsages('animate-spin').total).toBe(expected)
   })
 
-  it('the component Pattern 4 blames for its own timing still hardcodes it', () => {
-    const composer = join(repoRoot, 'src', 'studio-react', 'composer-hero.tsx')
-    expect(existsSync(composer), 'the cited composer-hero.tsx is gone').toBe(true)
-    expect(readFileSync(composer, 'utf8')).toContain('duration-300')
+  it('the timing Pattern 4 blames the studio composer for is still gone', () => {
+    // The blamed file was deleted by the composer rework, so the claim the doc
+    // now makes is the one that has to hold: no studio surface writes its own
+    // Tailwind duration, where the reduced-motion collapse cannot reach it.
+    const studioDir = join(repoRoot, 'src', 'studio-react')
+    const offenders = readdirSync(studioDir)
+      .filter((name) => /\.(tsx?|css)$/.test(name))
+      .filter((name) => /(^|[\s'"`:])duration-\d/.test(readFileSync(join(studioDir, name), 'utf8')))
+    expect(offenders, 'these hardcode a Tailwind duration Pattern 4 says the studio no longer carries').toEqual([])
   })
 })

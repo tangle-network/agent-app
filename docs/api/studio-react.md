@@ -4,38 +4,14 @@
 
 Source: `src/studio-react/index.tsx`
 
-29 exports.
+22 exports.
 
-### `AvatarComposer`
+### `ComposerType`
 
-`function`
-
-```ts
-({ audioUrl, imageUrl, avatarId, onAudioUrlChange, onImageUrlChange, onAvatarIdChange, }: { audioUrl: string; imageUrl:…
-```
-
-### `ComposerDisclosure`
-
-`function`
+`type` — The lanes the composer offers.
 
 ```ts
-({ summary, children }: { summary: ReactNode; children: ReactNode; }) => Element
-```
-
-### `ComposerHero`
-
-`function`
-
-```ts
-({ workspaceId, align, surfaceClassName, onGenerated, }: { workspaceId?: string | undefined; align?: "center" | "start"…
-```
-
-### `Field`
-
-`function`
-
-```ts
-({ label, htmlFor, className, children, }: { label: string; htmlFor?: string | undefined; className?: string | undefine…
+type ComposerType
 ```
 
 ### `filterGenerations`
@@ -78,20 +54,20 @@ Source: `src/studio-react/index.tsx`
 ({ generations, typeFilter, onSelect, }: { generations: Generation[]; typeFilter: string | null; onSelect: (generation:…
 ```
 
+### `GenerationNoticeChip`
+
+`function` — The one thing a chat-shaped generator has to say about itself: each prompt is a fresh generation, and nothing carries over from the last one.
+
+```ts
+({ className }: { className?: string | undefined; }) => Element
+```
+
 ### `GenerationStatusBadge`
 
 `function`
 
 ```ts
 ({ generation, inline, }: { generation: Generation; inline?: boolean | undefined; }) => Element | null
-```
-
-### `ImageComposer`
-
-`function`
-
-```ts
-({ size, quality, imageCount, onSizeChange, onQualityChange, onImageCountChange, }: { size: string; quality: string; im…
 ```
 
 ### `LibraryDrawer`
@@ -110,14 +86,6 @@ Source: `src/studio-react/index.tsx`
 ({ generations, totalCost, typeFilter, onFilterChange, onSelect, }: { generations: Generation[]; totalCost: number; typ…
 ```
 
-### `NativeSelect`
-
-`function`
-
-```ts
-(props: SelectHTMLAttributes<HTMLSelectElement>) => Element
-```
-
 ### `ResultCanvas`
 
 `function`
@@ -126,20 +94,20 @@ Source: `src/studio-react/index.tsx`
 ({ batch, onOpenLibrary, onSelect, }: { batch: Generation[]; onOpenLibrary: () => void; onSelect: (generation: Generati…
 ```
 
-### `SpeechComposer`
+### `StudioComposer`
 
-`function`
+`function` — The composer card.
 
 ```ts
-({ voice, onVoiceChange, }: { voice: string; onVoiceChange: (value: string) => void; }) => Element
+({ workspaceId, onGenerated, variant, pickReferenceImage, className, }: StudioComposerProps) => Element
 ```
 
-### `Stepper`
+### `StudioComposerProps`
 
-`function`
+`interface`
 
 ```ts
-({ value, min, max, onChange, }: { value: number; min: number; max: number; onChange: (value: number) => void; }) => El…
+interface StudioComposerProps
 ```
 
 ### `StudioHeader`
@@ -182,22 +150,6 @@ type StudioRole
 interface StudioWorkspaceProps
 ```
 
-### `TranscriptionComposer`
-
-`function`
-
-```ts
-({ audioUrl, language, onAudioUrlChange, onLanguageChange, }: { audioUrl: string; language: string; onAudioUrlChange: (…
-```
-
-### `TranscriptionOptions`
-
-`function`
-
-```ts
-({ responseFormat, temperature, onResponseFormatChange, onTemperatureChange, }: { responseFormat: string; temperature:…
-```
-
 ### `TYPE_CONFIG`
 
 `const` — Map type keys to their corresponding configuration objects including labels, icons, and colors
@@ -228,12 +180,4 @@ interface TypeConfig
 
 ```ts
 (loaderGenerations: Generation[], options?: { workspaceId?: string | undefined; generationsEndpoint?: string | undefine…
-```
-
-### `VideoComposer`
-
-`function`
-
-```ts
-({ duration, resolution, aspectRatio, referenceImageUrl, onDurationChange, onResolutionChange, onAspectRatioChange, onR…
 ```
