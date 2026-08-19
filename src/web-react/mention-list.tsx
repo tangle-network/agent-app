@@ -139,12 +139,15 @@ export const MentionList = forwardRef<MentionListHandle, MentionListProps>(
                 ref={(el) => {
                   if (active) el?.scrollIntoView?.({ block: 'nearest' })
                 }}
-                // Pointer down (not click) so selecting never blurs the editor
-                // first, which would tear down the suggestion mid-select.
+                // Pointer down only PREVENTS the focus steal (a blur would
+                // tear down the suggestion mid-select); selection happens on
+                // click so mouse, touch, keyboard, and assistive-technology
+                // synthesized activations all share the native path — and a
+                // secondary-button press never inserts a mention.
                 onMouseDown={(event) => {
                   event.preventDefault()
-                  onSelect(item)
                 }}
+                onClick={() => onSelect(item)}
                 // Routes through the same path arrows use so the imperative
                 // Enter/Tab handler (which reads `selectedRef`, not `selected`)
                 // agrees with the row the pointer is over.

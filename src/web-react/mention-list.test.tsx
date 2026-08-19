@@ -165,6 +165,22 @@ describe('MentionList', () => {
     expect(onSelect).not.toHaveBeenCalled()
   })
 
+  it('selects on click (the native activation path), never on mousedown alone', () => {
+    const onSelect = vi.fn()
+    render(
+      <MentionList items={ITEMS} loading={false} error={false} onSelect={onSelect} />,
+    )
+    const options = screen.getAllByRole('option')
+
+    // Mousedown only guards the editor's focus — assistive technologies
+    // activate by dispatching `click`, which must be the selecting event.
+    fireEvent.mouseDown(options[1]!)
+    expect(onSelect).not.toHaveBeenCalled()
+
+    fireEvent.click(options[1]!)
+    expect(onSelect).toHaveBeenCalledWith(ITEMS[1])
+  })
+
   it('does not consume unrelated keys', () => {
     const ref = createRef<MentionListHandle>()
     render(

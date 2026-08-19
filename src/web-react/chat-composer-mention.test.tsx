@@ -354,7 +354,7 @@ describe('ChatComposer — mention path', () => {
     for (let i = 0; i < spacey.length; i++) {
       await user.type(editor, '@x')
       const options = await screen.findAllByRole('option')
-      fireEvent.mouseDown(options[i]!)
+      fireEvent.click(options[i]!)
       await waitFor(() => expect(onMentionsChange).toHaveBeenCalled())
     }
 
