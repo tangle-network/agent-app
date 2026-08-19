@@ -12,18 +12,27 @@ import {
   type Generation,
   type GenerationRequestFields,
   type MediaModelCatalogResponse,
+  aspectRatioFromOptions,
   buildGenerationRequestBody,
+  defaultVaultPathFor,
   failedOptimisticGeneration,
+  generationAspectRatio,
+  generationAssetId,
+  generationBatchKey,
   generationError,
   generationMergeKey,
+  generationSpecSegments,
   generationStatus,
   generationVaultPath,
+  generationsInBatch,
   isGenerationType,
   isLocalGeneration,
   latestBatchOf,
+  mergeGenerationPages,
   mergeLiveGeneration,
   mergeLoaderAndLive,
   normalizeImageCount,
+  normalizeVaultPath,
   optimisticGeneration,
   outputPathFor,
   preferredModelId,
@@ -165,10 +174,133 @@ describe('optimisticGeneration / failedOptimisticGeneration', () => {
     expect(g.metadata?.batchId).toBeUndefined()
   })
 
+  it('preserves the prior row shape when no aspect ratio is passed', () => {
+    const g = optimisticGeneration({
+      type: 'video',
+      prompt: 'p',
+      model: 'video-model',
+      clientRequestId: 'r1',
+    })
+    expect(g).toEqual({
+      id: 'local-r1',
+      type: 'video',
+      prompt: 'p',
+      result: null,
+      model: 'video-model',
+      cost: null,
+      createdAt: g.createdAt,
+      metadata: {
+        generationStatus: 'pending',
+        provider: 'video',
+        clientRequestId: 'r1',
+        batchId: undefined,
+        outputIndex: undefined,
+        outputCount: undefined,
+      },
+    })
+    expect(g.metadata).not.toHaveProperty('aspectRatio')
+  })
+
+  it('stores a finite positive optimistic aspect ratio', () => {
+    const g = optimisticGeneration({ type: 'video', prompt: 'p', clientRequestId: 'r1' }, 16 / 9)
+    expect(g.metadata?.aspectRatio).toBe(16 / 9)
+  })
+
   it('marks an optimistic row failed', () => {
     const g = failedOptimisticGeneration(optimisticGeneration({ type: 'image', prompt: 'p', clientRequestId: 'r1' }))
     expect(generationStatus(g)).toBe('failed')
     expect(generationError(g)).toBe('Generation failed')
+  })
+})
+
+describe('studio library generation helpers', () => {
+  it('resolves batch keys by batchId, clientRequestId, then id and skips empty strings', () => {
+    expect(generationBatchKey(gen({ id: 'a', metadata: { batchId: 'batch', clientRequestId: 'request' } }))).toBe('batch')
+    expect(generationBatchKey(gen({ id: 'b', metadata: { batchId: ' ', clientRequestId: 'request' } }))).toBe('request')
+    expect(generationBatchKey(gen({ id: 'c', metadata: { batchId: '', clientRequestId: '' } }))).toBe('c')
+  })
+
+  it('filters batch rows and orders output indexes before stable missing-index rows', () => {
+    const rows = generationsInBatch([
+      gen({ id: 'missing-a', metadata: { batchId: 'batch' } }),
+      gen({ id: 'other', metadata: { batchId: 'other', outputIndex: 0 } }),
+      gen({ id: 'two', metadata: { batchId: 'batch', outputIndex: 2 } }),
+      gen({ id: 'zero', metadata: { batchId: 'batch', outputIndex: 0 } }),
+      gen({ id: 'missing-b', metadata: { batchId: 'batch' } }),
+    ], 'batch')
+    expect(rows.map((row) => row.id)).toEqual(['zero', 'two', 'missing-a', 'missing-b'])
+  })
+
+  it('reads only a non-empty string asset id', () => {
+    expect(generationAssetId(gen({ id: 'a', metadata: { assetId: 'asset-1' } }))).toBe('asset-1')
+    expect(generationAssetId(gen({ id: 'b', metadata: { assetId: '' } }))).toBeNull()
+    expect(generationAssetId(gen({ id: 'c', metadata: { assetId: 42 } }))).toBeNull()
+    expect(generationAssetId(gen({ id: 'd' }))).toBeNull()
+  })
+
+  it('resolves numeric, size, unicode-size, and string aspect ratios before lane defaults', () => {
+    expect(generationAspectRatio(gen({ id: 'numeric', metadata: { aspectRatio: 1.234567 } }))).toBe(1.2346)
+    expect(generationAspectRatio(gen({ id: 'ascii', metadata: { size: '1536x1024' } }))).toBe(1.5)
+    expect(generationAspectRatio(gen({ id: 'unicode', metadata: { size: '1536×1024' } }))).toBe(1.5)
+    expect(generationAspectRatio(gen({ id: 'portrait', metadata: { aspectRatio: '9:16' } }))).toBe(0.5625)
+    expect(generationAspectRatio(gen({ id: 'image', type: 'image' }))).toBe(1)
+    expect(generationAspectRatio(gen({ id: 'video', type: 'video' }))).toBe(1.7778)
+    expect(generationAspectRatio(gen({ id: 'speech', type: 'speech' }))).toBe(3.2)
+    expect(generationAspectRatio(gen({ id: 'audio', type: 'audio' }))).toBe(3.2)
+    expect(generationAspectRatio(gen({ id: 'unknown', type: 'unknown' }))).toBe(1)
+  })
+
+  it('derives aspect ratios from lane options', () => {
+    expect(aspectRatioFromOptions('image', { size: '1536x1024' })).toBe(1.5)
+    expect(aspectRatioFromOptions('image', { size: '1536×1024' })).toBe(1.5)
+    expect(aspectRatioFromOptions('video', { aspectRatio: '9:16' })).toBe(0.5625)
+    expect(aspectRatioFromOptions('speech', {})).toBe(3.2)
+    expect(aspectRatioFromOptions('image', { size: 'large' })).toBeUndefined()
+    expect(aspectRatioFromOptions('video', { aspectRatio: 'wide' })).toBeUndefined()
+    expect(aspectRatioFromOptions('avatar', {})).toBeUndefined()
+  })
+
+  it('chooses a type-specific vault path only for one known type', () => {
+    expect(defaultVaultPathFor([gen({ id: 'a', type: 'image' }), gen({ id: 'b', type: 'image' })])).toBe('generated/images')
+    expect(defaultVaultPathFor([gen({ id: 'a', type: 'image' }), gen({ id: 'b', type: 'video' })])).toBe('generated/media')
+    expect(defaultVaultPathFor([gen({ id: 'a', type: 'unknown' })])).toBe('generated/media')
+    expect(defaultVaultPathFor([])).toBe('generated/media')
+  })
+
+  it('normalizes safe vault paths and rejects traversal, backslashes, and empty paths', () => {
+    expect(normalizeVaultPath(' /generated//images/ ')).toBe('generated/images')
+    expect(normalizeVaultPath('generated/../images')).toBeNull()
+    expect(normalizeVaultPath('generated/./images')).toBeNull()
+    expect(normalizeVaultPath('generated\\images')).toBeNull()
+    expect(normalizeVaultPath(' /// ')).toBeNull()
+  })
+
+  it('appends pages while preserving the first row for each id', () => {
+    const first = gen({ id: 'first', prompt: 'original' })
+    const previous = [first]
+    const merged = mergeGenerationPages(
+      previous,
+      [gen({ id: 'first', prompt: 'duplicate' }), gen({ id: 'second' }), gen({ id: 'second', prompt: 'duplicate' })],
+    )
+    expect(merged.map((row) => row.id)).toEqual(['first', 'second'])
+    expect(merged[0]).toBe(first)
+    expect(merged[1]?.prompt).toBe('')
+    expect(merged).not.toBe(previous)
+  })
+
+  it('returns only carried human-readable generation specification segments', () => {
+    expect(generationSpecSegments(gen({
+      id: 'full',
+      metadata: {
+        size: '1536x1024',
+        resolution: '1080p',
+        aspectRatio: '3:2',
+        durationSeconds: 61,
+        voice: 'alloy',
+      },
+    }))).toEqual(['1536×1024', '1080p', '3:2', '1:01', 'alloy'])
+    expect(generationSpecSegments(gen({ id: 'duration', metadata: { duration: '8s', durationSeconds: 61 } }))).toEqual(['8s'])
+    expect(generationSpecSegments(gen({ id: 'empty' }))).toEqual([])
   })
 })
 

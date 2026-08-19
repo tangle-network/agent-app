@@ -21,6 +21,7 @@ import {
   type ModelOptionMetadata,
   type ModelOptionValue,
   type ModelOptionsMetadata,
+  aspectRatioFromOptions,
   buildGenerationRequestBody,
   curateComposerModels,
   failedOptimisticGeneration,
@@ -307,14 +308,20 @@ export function StudioComposer({
 
     const clientRequestId = crypto.randomUUID()
     const imageCount = type === 'image' ? normalizeImageCount(values.n ?? 1) : 1
-    const localGenerations = Array.from({ length: imageCount }, (_, outputIndex) => optimisticGeneration({
-      type,
-      prompt: promptText,
-      model: modelId,
-      clientRequestId,
-      outputIndex: type === 'image' ? outputIndex : undefined,
-      outputCount: type === 'image' ? imageCount : undefined,
-    }))
+    const localGenerations = Array.from({ length: imageCount }, (_, outputIndex) => optimisticGeneration(
+      {
+        type,
+        prompt: promptText,
+        model: modelId,
+        clientRequestId,
+        outputIndex: type === 'image' ? outputIndex : undefined,
+        outputCount: type === 'image' ? imageCount : undefined,
+      },
+      aspectRatioFromOptions(type, {
+        size: asText(values.size),
+        aspectRatio: asText(values.aspect_ratio),
+      }),
+    ))
     localGenerations.slice().reverse().forEach(onGenerated)
     setPrompt('')
 
