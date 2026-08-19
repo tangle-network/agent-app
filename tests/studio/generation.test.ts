@@ -30,6 +30,7 @@ import {
   selectedModelsWithDefaults,
   userSafeGenerationMessage,
 } from '../../src/studio/generation'
+import { FALLBACK_VIDEO_MODEL_OPTIONS } from '../../src/studio/model-options'
 
 function gen(partial: Partial<Generation> & { id: string }): Generation {
   return {
@@ -51,8 +52,6 @@ function reqFields(partial: Partial<GenerationRequestFields> = {}): GenerationRe
     type: 'image',
     model: 'm',
     prompt: ' hello ',
-    negativePrompt: '',
-    outputPath: '',
     image: { size: '1024x1024', quality: 'high', count: 1 },
     video: { duration: '6', resolution: '720p', aspectRatio: '16:9', referenceImageUrl: '' },
     speech: { voice: 'alloy' },
@@ -174,9 +173,9 @@ describe('optimisticGeneration / failedOptimisticGeneration', () => {
 })
 
 describe('normalizeImageCount', () => {
-  it('clamps to [1, 4] and floors non-integers / non-numbers', () => {
+  it('clamps to [1, 8] and floors non-integers / non-numbers', () => {
     expect(normalizeImageCount(0)).toBe(1)
-    expect(normalizeImageCount(9)).toBe(4)
+    expect(normalizeImageCount(9)).toBe(8)
     expect(normalizeImageCount(2.7)).toBe(2)
     expect(normalizeImageCount('not-a-number')).toBe(1)
   })
@@ -219,12 +218,39 @@ describe('buildGenerationRequestBody', () => {
     expect(body).toMatchObject({ type: 'image', size: '1024x1024', quality: 'high', n: 1 })
   })
 
-  it('coerces numeric video/transcription fields and omits NaN instead of serializing null', () => {
-    const ok = buildGenerationRequestBody(reqFields({ type: 'video', video: { duration: '6', resolution: '720p', aspectRatio: '', referenceImageUrl: '' } }))
-    expect(ok.duration).toBe(6)
-    const bad = buildGenerationRequestBody(reqFields({ type: 'video', video: { duration: 'abc', resolution: '720p', aspectRatio: '', referenceImageUrl: '' } }))
-    expect(bad.duration).toBeUndefined()
-    expect(JSON.parse(JSON.stringify(bad))).not.toHaveProperty('duration')
+  it('preserves wire-typed video durations and includes only supported optional fields', () => {
+    const seedanceDuration = FALLBACK_VIDEO_MODEL_OPTIONS['bytedance/seedance-2.0/text-to-video']?.duration?.values?.[1]
+    const seedance = buildGenerationRequestBody(reqFields({
+      type: 'video',
+      video: { duration: seedanceDuration as string, audio: false, mode: 'pro' },
+    }))
+    expect(seedance.duration).toBe('4')
+    expect(seedance).toMatchObject({ audio: false, mode: 'pro' })
+    expect(seedance).not.toHaveProperty('resolution')
+    expect(seedance).not.toHaveProperty('aspectRatio')
+    expect(seedance).not.toHaveProperty('referenceImageUrl')
+
+    const klingDuration = FALLBACK_VIDEO_MODEL_OPTIONS['kling/kling-v1-6']?.duration?.default
+    const kling = buildGenerationRequestBody(reqFields({
+      type: 'video',
+      video: { duration: klingDuration as number, resolution: '720p', aspectRatio: '16:9' },
+    }))
+    expect(kling.duration).toBe(5)
+    expect(kling).toMatchObject({ resolution: '720p', aspectRatio: '16:9' })
+  })
+
+  it('omits removed composer fields and optional speech fields when absent', () => {
+    const speech = buildGenerationRequestBody(reqFields({ type: 'speech', speech: {} }))
+    expect(speech).not.toHaveProperty('negativePrompt')
+    expect(speech).not.toHaveProperty('outputPath')
+    expect(speech).not.toHaveProperty('voice')
+    expect(speech).not.toHaveProperty('speed')
+
+    const configured = buildGenerationRequestBody(reqFields({ type: 'speech', speech: { voice: 'alloy', speed: 1.25 } }))
+    expect(configured).toMatchObject({ voice: 'alloy', speed: 1.25 })
+  })
+
+  it('omits invalid transcription temperature instead of serializing null', () => {
 
     const badTemp = buildGenerationRequestBody(reqFields({ type: 'transcription', transcription: { audioUrl: 'https://x/a.mp3', language: '', responseFormat: 'json', temperature: 'oops' } }))
     expect(badTemp.temperature).toBeUndefined()

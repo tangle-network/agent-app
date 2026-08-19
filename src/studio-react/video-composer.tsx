@@ -1,6 +1,9 @@
 import { Input } from '@tangle-network/sandbox-ui/primitives'
-import { VIDEO_ASPECT_RATIOS, VIDEO_DURATIONS, VIDEO_RESOLUTIONS } from '../studio'
 import { Field, NativeSelect } from './composer-shell'
+
+const VIDEO_DURATIONS = ['4', '6', '8', '10', '12'] as const
+const VIDEO_RESOLUTIONS = ['720p', '1080p'] as const
+const VIDEO_ASPECT_RATIOS = ['16:9', '9:16', '1:1'] as const
 
 export function VideoComposer({
   duration,

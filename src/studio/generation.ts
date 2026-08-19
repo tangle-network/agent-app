@@ -1,3 +1,5 @@
+import type { ModelOptionsMetadata } from './model-options'
+
 /** Define generation categories for media including image, video, speech, avatar, and transcription */
 export type GenerationType = 'image' | 'video' | 'speech' | 'avatar' | 'transcription'
 
@@ -19,7 +21,7 @@ export interface Generation {
   metadata: Record<string, unknown> | null
 }
 
-/** Describe media model option properties including id, name, type, status, and optional provider and reason */
+/** Describe a catalog media model and its optional wire-level option metadata. */
 export interface MediaModelOption {
   id: string
   name: string
@@ -27,6 +29,7 @@ export interface MediaModelOption {
   type: GenerationType
   status: MediaModelStatus
   reason?: string
+  options?: ModelOptionsMetadata
 }
 
 /** Represent media model catalog with default values, model options, and optional error message */
@@ -47,26 +50,10 @@ export function isGenerationType(value: string): value is GenerationType {
   return (GENERATION_TYPES as readonly string[]).includes(value)
 }
 
-// Enumerated generation options — the values the tangle media models (OpenAI-shaped
-// image/video APIs) actually accept. Composers render these as selects so an
-// enumerated field can never carry free text the provider would reject.
-/** Provide the valid image quality values for generation requests */
-export const IMAGE_QUALITIES = ['low', 'medium', 'high', 'auto'] as const
-/** Provide a placeholder hint listing the accepted image size values */
-export const IMAGE_SIZE_HINT = '1024x1024, 1536x1024, 1024x1536, or auto'
-/** Provide a validation pattern for the free-form image size field (WxH or auto) */
-export const IMAGE_SIZE_PATTERN = String.raw`(\d{3,4}x\d{3,4}|auto)`
-/** Provide the valid video duration values (seconds) for generation requests */
-export const VIDEO_DURATIONS = ['4', '6', '8', '10', '12'] as const
-/** Provide the valid video resolution values for generation requests */
-export const VIDEO_RESOLUTIONS = ['720p', '1080p'] as const
-/** Provide the valid video aspect ratio values for generation requests */
-export const VIDEO_ASPECT_RATIOS = ['16:9', '9:16', '1:1'] as const
-
 /** Define the minimum number of images required for processing or validation */
 export const MIN_IMAGE_COUNT = 1
 /** Define the maximum number of images allowed for upload or display */
-export const MAX_IMAGE_COUNT = 4
+export const MAX_IMAGE_COUNT = 8
 
 /** Resolve a human-readable relative time string from a given date or return an empty string if null */
 export function relativeTime(date: Date | null): string {
@@ -144,11 +131,16 @@ export interface GenerationRequestFields {
   type: GenerationType
   model: string
   prompt: string
-  negativePrompt: string
-  outputPath: string
   image: { size: string; quality: string; count: number }
-  video: { duration: string; resolution: string; aspectRatio: string; referenceImageUrl: string }
-  speech: { voice: string }
+  video: {
+    duration: string | number
+    resolution?: string
+    aspectRatio?: string
+    referenceImageUrl?: string
+    audio?: boolean
+    mode?: string
+  }
+  speech: { voice?: string; speed?: number }
   // Optional while the composer lanes are disabled (#451); the server capability stays.
   avatar?: { audioUrl: string; imageUrl: string; avatarId: string }
   transcription?: { audioUrl: string; language: string; responseFormat: string; temperature: string }
@@ -163,8 +155,6 @@ export function buildGenerationRequestBody(fields: GenerationRequestFields): Rec
     type: fields.type,
     model: fields.model,
     prompt: fields.prompt.trim(),
-    negativePrompt: fields.negativePrompt.trim() || undefined,
-    outputPath: fields.outputPath.trim() || undefined,
   }
   if (fields.type === 'image') Object.assign(body, {
     size: fields.image.size,
@@ -172,16 +162,17 @@ export function buildGenerationRequestBody(fields: GenerationRequestFields): Rec
     n: fields.image.count,
   })
   if (fields.type === 'video') {
-    const duration = Number(fields.video.duration)
-    Object.assign(body, {
-      // omit (let the API default) rather than serialize NaN → null on bad input
-      duration: Number.isFinite(duration) ? duration : undefined,
-      resolution: fields.video.resolution,
-      aspectRatio: fields.video.aspectRatio.trim() || undefined,
-      referenceImageUrl: fields.video.referenceImageUrl.trim() || undefined,
-    })
+    body.duration = fields.video.duration
+    if (fields.video.resolution) body.resolution = fields.video.resolution
+    if (fields.video.aspectRatio) body.aspectRatio = fields.video.aspectRatio
+    if (fields.video.referenceImageUrl) body.referenceImageUrl = fields.video.referenceImageUrl
+    if (fields.video.audio !== undefined) body.audio = fields.video.audio
+    if (fields.video.mode) body.mode = fields.video.mode
   }
-  if (fields.type === 'speech') Object.assign(body, { voice: fields.speech.voice })
+  if (fields.type === 'speech') {
+    if (fields.speech.voice) body.voice = fields.speech.voice
+    if (fields.speech.speed !== undefined) body.speed = fields.speech.speed
+  }
   if (fields.type === 'avatar' && fields.avatar) Object.assign(body, {
     audioUrl: fields.avatar.audioUrl.trim(),
     imageUrl: fields.avatar.imageUrl.trim() || undefined,

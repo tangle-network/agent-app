@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  Button, Input, Label, Textarea,
+  Button, Label,
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@tangle-network/sandbox-ui/primitives'
 import { Sparkles } from 'lucide-react'
@@ -13,14 +13,13 @@ import {
   modelMessage,
   normalizeImageCount,
   optimisticGeneration,
-  outputPathFor,
   preferredModelId,
   selectedModelsWithDefaults,
   userSafeGenerationMessage,
 } from '../studio'
 import { typeConfigFor } from './type-config'
 import { ProviderLogo } from '../web-react/provider-logo'
-import { ComposerDisclosure, Field } from './composer-shell'
+import { Field } from './composer-shell'
 import { ImageComposer } from './image-composer'
 import { VideoComposer } from './video-composer'
 import { SpeechComposer } from './speech-composer'
@@ -64,8 +63,6 @@ export function ComposerHero({
 }) {
   const [type, setType] = useState<GenerationType>('image')
   const [prompt, setPrompt] = useState('')
-  const [negativePrompt, setNegativePrompt] = useState('')
-  const [outputPath, setOutputPath] = useState(outputPathFor('image'))
   const [size, setSize] = useState('1536x1024')
   const [quality, setQuality] = useState('high')
   const [imageCount, setImageCount] = useState(1)
@@ -129,7 +126,6 @@ export function ComposerHero({
 
   function changeType(next: GenerationType) {
     setType(next)
-    setOutputPath(outputPathFor(next))
   }
 
   async function generate() {
@@ -167,8 +163,6 @@ export function ComposerHero({
         type,
         model: selectedModel,
         prompt,
-        negativePrompt,
-        outputPath,
         image: { size, quality, count: requestedImageCount },
         video: { duration, resolution, aspectRatio, referenceImageUrl },
         speech: { voice },
@@ -351,25 +345,6 @@ export function ComposerHero({
         {type === 'speech' && (
           <SpeechComposer voice={voice} onVoiceChange={setVoice} />
         )}
-      </div>
-
-      <div className="mt-4 space-y-2">
-        <ComposerDisclosure summary="Advanced options">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Negative prompt">
-              <Textarea
-                value={negativePrompt}
-                onChange={(event) => setNegativePrompt(event.target.value)}
-                rows={2}
-                placeholder="Avoid artifacts, off-style composition..."
-                className="bg-background"
-              />
-            </Field>
-            <Field label="Save to">
-              <Input value={outputPath} onChange={(event) => setOutputPath(event.target.value)} className="bg-background" />
-            </Field>
-          </div>
-        </ComposerDisclosure>
       </div>
 
       {error && (

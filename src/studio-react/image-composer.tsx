@@ -1,13 +1,10 @@
 import { Input } from '@tangle-network/sandbox-ui/primitives'
-import {
-  IMAGE_QUALITIES,
-  IMAGE_SIZE_HINT,
-  IMAGE_SIZE_PATTERN,
-  MIN_IMAGE_COUNT,
-  MAX_IMAGE_COUNT,
-  normalizeImageCount,
-} from '../studio'
+import { MIN_IMAGE_COUNT, MAX_IMAGE_COUNT, normalizeImageCount } from '../studio'
 import { Field, NativeSelect, Stepper } from './composer-shell'
+
+const IMAGE_QUALITIES = ['low', 'medium', 'high', 'auto'] as const
+const IMAGE_SIZE_HINT = '1024x1024, 1536x1024, 1024x1536, or auto'
+const IMAGE_SIZE_PATTERN = String.raw`(\d{3,4}x\d{3,4}|auto)`
 
 export function ImageComposer({
   size,

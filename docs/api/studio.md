@@ -4,7 +4,7 @@
 
 Source: `src/studio/index.ts`
 
-35 exports.
+44 exports.
 
 ### `buildGenerationRequestBody`
 
@@ -14,12 +14,28 @@ Source: `src/studio/index.ts`
 (fields: GenerationRequestFields) => Record<string, unknown>
 ```
 
+### `curateComposerModels`
+
+`function` — Curate catalog models for the issue #449 composer lanes.
+
+```ts
+(type: GenerationType, models: MediaModelOption[]) => MediaModelOption[]
+```
+
 ### `failedOptimisticGeneration`
 
 `function` — Mark a generation as failed with updated status and error information
 
 ```ts
 (generation: Generation) => Generation
+```
+
+### `FALLBACK_VIDEO_MODEL_OPTIONS`
+
+`const` — Fallback video options matching tangle-router's wire-exact metadata.
+
+```ts
+Readonly<Record<string, Readonly<Record<string, ModelOptionMetadata>>>>
 ```
 
 ### `Generation`
@@ -94,28 +110,28 @@ type GenerationType
 (generation: Generation) => string | null
 ```
 
-### `IMAGE_QUALITIES`
+### `GPT_IMAGE_2_CUSTOM_SIZE`
 
-`const` — Provide the valid image quality values for generation requests
+`const` — UI constraints for a custom gpt-image-2 size.
 
 ```ts
-readonly ["low", "medium", "high", "auto"]
+{ readonly multipleOf: 16; readonly maxLongEdge: 3840; readonly maxRatio: 3; }
 ```
 
-### `IMAGE_SIZE_HINT`
+### `IMAGE_TO_VIDEO_SIBLINGS`
 
-`const` — Provide a placeholder hint listing the accepted image size values
+`const` — Map verified text-to-video model ids to their image-to-video siblings.
 
 ```ts
-"1024x1024, 1536x1024, 1024x1536, or auto"
+Readonly<Record<string, string>>
 ```
 
-### `IMAGE_SIZE_PATTERN`
+### `imageToVideoSibling`
 
-`const` — Provide a validation pattern for the free-form image size field (WxH or auto)
+`function` — Resolve a verified image-to-video sibling for a text-to-video model.
 
 ```ts
-string
+(modelId: string) => string | undefined
 ```
 
 ### `isGenerationType`
@@ -147,7 +163,7 @@ string
 `const` — Define the maximum number of images allowed for upload or display
 
 ```ts
-4
+8
 ```
 
 ### `MediaModelCatalogResponse`
@@ -160,7 +176,7 @@ interface MediaModelCatalogResponse
 
 ### `MediaModelOption`
 
-`interface` — Describe media model option properties including id, name, type, status, and optional provider and reason
+`interface` — Describe a catalog media model and its optional wire-level option metadata.
 
 ```ts
 interface MediaModelOption
@@ -206,6 +222,30 @@ type MediaModelStatus
 (model: MediaModelOption | undefined, loading: boolean, count: number) => string | null
 ```
 
+### `ModelOptionMetadata`
+
+`interface` — Per-parameter option metadata, structurally identical to tangle-router's `ModelOptionMetadata` (lib/model-options.ts, shipped in router PR #429).
+
+```ts
+interface ModelOptionMetadata
+```
+
+### `ModelOptionsMetadata`
+
+`type` — Per-parameter model option metadata keyed by the provider's wire field.
+
+```ts
+type ModelOptionsMetadata
+```
+
+### `ModelOptionValue`
+
+`type` — A wire-typed value accepted by a model option.
+
+```ts
+type ModelOptionValue
+```
+
 ### `normalizeImageCount`
 
 `function` — Normalize a value to a finite integer within the allowed image count range
@@ -220,6 +260,22 @@ type MediaModelStatus
 
 ```ts
 ({ type, prompt, model, clientRequestId, outputIndex, outputCount, }: { type: GenerationType; prompt: string; model?: s…
+```
+
+### `optionChoices`
+
+`function` — Return exact enum choices or an inclusive integer range.
+
+```ts
+(meta: ModelOptionMetadata) => readonly ModelOptionValue[]
+```
+
+### `optionDefault`
+
+`function` — Resolve an option default from its default, values, or lower bound.
+
+```ts
+(meta: ModelOptionMetadata) => ModelOptionValue | undefined
 ```
 
 ### `outputPathFor`
@@ -238,12 +294,28 @@ type MediaModelStatus
 (type: GenerationType, catalog: MediaModelCatalogResponse | null) => string | undefined
 ```
 
+### `reconcileOptionValues`
+
+`function` — Reconcile selections against supported options and their wire-typed defaults.
+
+```ts
+(options: Readonly<Record<string, ModelOptionMetadata>> | undefined, current: Readonly<Record<string, ModelOptionValue>…
+```
+
 ### `relativeTime`
 
 `function` — Resolve a human-readable relative time string from a given date or return an empty string if null
 
 ```ts
 (date: Date | null) => string
+```
+
+### `resolveComposerOptions`
+
+`function` — Resolve live catalog options first, then exact or safe single-prefix fallbacks.
+
+```ts
+(input: { type: "image" | "video" | "speech"; modelId: string; provider?: string | undefined; catalogOptions?: Readonly…
 ```
 
 ### `selectedModelsWithDefaults`
@@ -254,6 +326,22 @@ type MediaModelStatus
 (current: Partial<Record<GenerationType, string>>, catalog: MediaModelCatalogResponse) => Partial<Record<GenerationType…
 ```
 
+### `supportsCustomImageSize`
+
+`function` — Return whether a model supports the gpt-image-2 custom-size rule.
+
+```ts
+(modelId: string) => boolean
+```
+
+### `textToVideoSibling`
+
+`function` — Resolve the verified text-to-video sibling for an image-to-video model.
+
+```ts
+(modelId: string) => string | undefined
+```
+
 ### `userSafeGenerationMessage`
 
 `function` — Resolve a user-safe generation message by filtering sensitive or error-related content
@@ -262,26 +350,10 @@ type MediaModelStatus
 (message?: string | undefined) => string
 ```
 
-### `VIDEO_ASPECT_RATIOS`
+### `validateCustomImageSize`
 
-`const` — Provide the valid video aspect ratio values for generation requests
-
-```ts
-readonly ["16:9", "9:16", "1:1"]
-```
-
-### `VIDEO_DURATIONS`
-
-`const` — Provide the valid video duration values (seconds) for generation requests
+`function` — Validate a custom gpt-image-2 size against its published UI constraints.
 
 ```ts
-readonly ["4", "6", "8", "10", "12"]
-```
-
-### `VIDEO_RESOLUTIONS`
-
-`const` — Provide the valid video resolution values for generation requests
-
-```ts
-readonly ["720p", "1080p"]
+(width: number, height: number) => { ok: true; } | { ok: false; reason: string; }
 ```
