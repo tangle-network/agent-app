@@ -125,6 +125,17 @@ describe('EntryComposer', () => {
     expect(box.value).toBe('')
   })
 
+  it('renders the icon send control and no focus-shortcut hint', () => {
+    // Two deliberate parity choices with the AgentComposer this replaced: the
+    // send control is the circular icon (its label lives in aria-label, never
+    // as text), and the hero surface autofocuses, so the Cmd/Ctrl+L hint is
+    // suppressed.
+    render(<EntryComposer onSubmit={() => {}} />)
+    const send = screen.getByLabelText('Send')
+    expect(send.textContent).toBe('')
+    expect(document.body.textContent).not.toContain('to focus')
+  })
+
   it('blocks submit until the model selection has resolved', () => {
     const onSubmit = vi.fn()
     render(<EntryComposer onSubmit={onSubmit} ready={false} />)
