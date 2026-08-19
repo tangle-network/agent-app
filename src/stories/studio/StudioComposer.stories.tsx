@@ -82,7 +82,7 @@ function installFetchStub() {
   }) as typeof window.fetch
 }
 
-function withCatalog(catalog: MediaModelCatalogResponse, width = 'w-[820px]') {
+function withCatalog(catalog: MediaModelCatalogResponse, width = 'w-full max-w-[820px]') {
   return function CatalogDecorator(Story: () => ReactNode) {
     servedCatalog = catalog
     installFetchStub()
