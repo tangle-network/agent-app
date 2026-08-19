@@ -748,9 +748,18 @@ export function ChatComposer({
     if (!focusShortcut || disabled) return
     function onKeyDown(e: globalThis.KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'l') {
-        e.preventDefault()
-        if (mentionEnabled) richFocusRef.current?.()
-        else textareaRef.current?.focus()
+        if (mentionEnabled) {
+          // No live editor yet (still loading, or failed): leave the
+          // browser's own shortcut alone rather than swallowing it for
+          // nothing.
+          const focus = richFocusRef.current
+          if (!focus) return
+          e.preventDefault()
+          focus()
+        } else {
+          e.preventDefault()
+          textareaRef.current?.focus()
+        }
       }
     }
     document.addEventListener('keydown', onKeyDown)
