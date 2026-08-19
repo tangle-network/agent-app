@@ -19,6 +19,7 @@ import {
   useEffect,
   useId,
   useState,
+  type JSX,
   type ReactNode,
   type RefObject,
 } from 'react'
@@ -203,6 +204,88 @@ export interface OptionChoice {
   label: string
 }
 
+function MenuRows<T extends ModelOptionValue>({
+  value,
+  choices,
+  onSelect,
+}: {
+  value: T | undefined
+  choices: readonly { value: T; label: string }[]
+  onSelect: (value: T) => void
+}) {
+  return choices.map((choice) => (
+    <button
+      key={String(choice.value)}
+      type="button"
+      role="menuitemradio"
+      aria-checked={choice.value === value}
+      onClick={() => onSelect(choice.value)}
+      className={menuRowClass(choice.value === value)}
+    >
+      <span className="truncate">{choice.label}</span>
+      {choice.value === value && (
+        <CheckGlyph className="ml-auto h-3.5 w-3.5 shrink-0 text-primary" />
+      )}
+    </button>
+  ))
+}
+
+/** A standalone enum picker using the studio composer's pill and menu grammar. */
+export function MenuPill<T extends string>({
+  label,
+  value,
+  choices,
+  onSelect,
+  className,
+}: {
+  label: string
+  value: T
+  choices: readonly { value: T; label: string }[]
+  onSelect: (value: T) => void
+  className?: string
+}): JSX.Element {
+  const [open, setOpen] = useState(false)
+  const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
+  const panelId = useId()
+  const selected = choices.find((choice) => choice.value === value)
+
+  return (
+    <div ref={containerRef} className="relative inline-flex flex-none">
+      <button
+        type="button"
+        {...triggerProps}
+        aria-controls={open ? panelId : undefined}
+        title={label}
+        aria-label={label}
+        onClick={() => setOpen(!open)}
+        className={`${PILL} ${className ?? ''}`}
+      >
+        <span>{selected?.label ?? '—'}</span>
+        <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+      </button>
+
+      <PopoverSurface
+        open={open}
+        id={panelId}
+        role="menu"
+        triggerRef={triggerRef}
+        panelRef={panelRef}
+        className={MENU_PANEL}
+      >
+        <div className={MENU_HEADER}>{label}</div>
+        <MenuRows
+          value={value}
+          choices={choices}
+          onSelect={(next) => {
+            onSelect(next)
+            setOpen(false)
+          }}
+        />
+      </PopoverSurface>
+    </div>
+  )
+}
+
 /**
  * A value pill and the menu it opens.
  *
@@ -274,24 +357,14 @@ export function OptionPill({
           ? custom.render({ close })
           : (
             <>
-              {choices.map((choice) => (
-                <button
-                  key={String(choice.value)}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={choice.value === value}
-                  onClick={() => {
-                    onSelect(choice.value)
-                    close()
-                  }}
-                  className={menuRowClass(choice.value === value)}
-                >
-                  <span className="truncate">{choice.label}</span>
-                  {choice.value === value && (
-                    <CheckGlyph className="ml-auto h-3.5 w-3.5 shrink-0 text-primary" />
-                  )}
-                </button>
-              ))}
+              <MenuRows
+                value={value}
+                choices={choices}
+                onSelect={(next) => {
+                  onSelect(next)
+                  close()
+                }}
+              />
               {custom && (
                 <button
                   type="button"
