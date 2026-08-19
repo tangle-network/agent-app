@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-419 exports.
+421 exports.
 
 ### `acceptRejectionReason`
 
@@ -180,6 +180,22 @@ type AttachmentFileResult
 
 ```ts
 interface CatalogModel
+```
+
+### `charAt`
+
+`function` — The full character (code point) starting at `index`, or undefined past the end — same surrogate rationale as {@link charBefore}.
+
+```ts
+(text: string, index: number) => string | undefined
+```
+
+### `charBefore`
+
+`function` — The full character (code point) ENDING just before `index`, or undefined at the start.
+
+```ts
+(text: string, index: number) => string | undefined
 ```
 
 ### `ChatAttachmentInput`

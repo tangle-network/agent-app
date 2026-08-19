@@ -17277,6 +17277,18 @@
           "doc": "Define the structure and capabilities of a catalog item with optional pricing and feature flags"
         },
         {
+          "name": "charAt",
+          "kind": "function",
+          "signature": "(text: string, index: number) => string | undefined",
+          "doc": "The full character (code point) starting at `index`, or undefined past the end — same surrogate rationale as {@link charBefore}."
+        },
+        {
+          "name": "charBefore",
+          "kind": "function",
+          "signature": "(text: string, index: number) => string | undefined",
+          "doc": "The full character (code point) ENDING just before `index`, or undefined at the start."
+        },
+        {
           "name": "ChatAttachmentInput",
           "kind": "interface",
           "signature": "interface ChatAttachmentInput",
