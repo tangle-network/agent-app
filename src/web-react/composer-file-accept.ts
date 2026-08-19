@@ -77,14 +77,24 @@ export function filterAcceptedFiles(
   return { accepted, rejected }
 }
 
-const IMAGE_EXTENSION_BY_MIME: Record<string, string> = {
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/jpg': 'jpg',
-  'image/gif': 'gif',
-  'image/webp': 'webp',
-  'image/bmp': 'bmp',
-  'image/svg+xml': 'svg',
+/**
+ * Extensions that truthfully name each image type, most canonical first. A type
+ * with more than one is the reason this is a LIST and not a single name: `.jpeg`
+ * and `.jpg` are the same claim, so a rename that swapped one for the other
+ * would make a paste fail an `accept=".jpeg"` list that the very same file
+ * passes through the picker.
+ *
+ * A type absent from here derives its single extension from the MIME subtype.
+ */
+const IMAGE_EXTENSIONS_BY_MIME: Record<string, readonly string[]> = {
+  'image/png': ['png'],
+  'image/jpeg': ['jpg', 'jpeg', 'jpe'],
+  'image/jpg': ['jpg', 'jpeg'],
+  'image/gif': ['gif'],
+  'image/webp': ['webp'],
+  'image/bmp': ['bmp'],
+  'image/svg+xml': ['svg'],
+  'image/tiff': ['tiff', 'tif'],
 }
 
 /**
@@ -105,24 +115,36 @@ function isGenericImageName(name: string): boolean {
  * `accept=".png"` list a file satisfying it by its new name alone turns the
  * rename into a way around the very gate it is filtered by.
  *
- * So the DECLARED TYPE decides, and the filename never overrides it: the mapped
- * MIME type first, then the MIME subtype itself (`image/heic` → `heic`). A
- * clipboard file can carry a name whose extension contradicts its type — a
- * bitmap named `image.png` that is really `image/heic` — and taking the name
- * there would reopen exactly the hole this order exists to close. The filename
- * is consulted only when the type names no subtype at all, where it is the one
- * signal left; when nothing yields an extension, the caller skips the rename
- * rather than guessing.
+ * So the DECLARED TYPE decides which extensions are truthful, and the filename
+ * may only pick among those. A clipboard file can carry a name whose extension
+ * contradicts its type — a bitmap named `image.png` that is really `image/heic`
+ * — and letting the name win there is exactly the hole this order closes. But
+ * when the name's extension is one the type itself allows, it is kept: an
+ * `image.jpeg` of type `image/jpeg` stays `.jpeg`, because rewriting it to the
+ * canonical `.jpg` would make the paste fail an `accept=".jpeg"` list that the
+ * same file passes through the picker.
+ *
+ * The filename is consulted on its own ONLY when the type names no subtype at
+ * all (`image/`). That is not an exception to the rule above: the only named
+ * files this function ever sees are `image.<ext>` (see
+ * {@link isGenericImageName}), so the fallback can only ever preserve an
+ * extension the name already carried — it cannot manufacture one, and an
+ * accept list therefore decides the same way it would have without the rename.
+ * When nothing yields an extension, the caller skips the rename rather than
+ * guessing.
  */
 function imageExtension(file: File): string | null {
   const type = file.type.toLowerCase()
-  const fromMime = IMAGE_EXTENSION_BY_MIME[type]
-  if (fromMime) return fromMime
+  const fromName = /\.([a-z0-9]+)$/i.exec(file.name)?.[1]?.toLowerCase()
+
+  const mapped = IMAGE_EXTENSIONS_BY_MIME[type]
   const subtype = type.startsWith('image/') ? type.slice('image/'.length) : ''
   const fromSubtype = (subtype.split('+')[0] ?? '').replace(/[^a-z0-9]/g, '')
-  if (fromSubtype.length > 0) return fromSubtype
-  const fromName = /\.([a-z0-9]+)$/i.exec(file.name)?.[1]
-  return fromName?.toLowerCase() ?? null
+  const truthful = mapped ?? (fromSubtype.length > 0 ? [fromSubtype] : [])
+
+  if (truthful.length === 0) return fromName ?? null
+  if (fromName !== undefined && truthful.includes(fromName)) return fromName
+  return truthful[0] ?? null
 }
 
 /**
@@ -138,7 +160,10 @@ export function pastedImageStartIndex(stagedNames: Iterable<string>, current: nu
     const index = /^pasted-image-(\d+)(?:\.[a-z0-9]+)?$/i.exec(name.trim())?.[1]
     if (index === undefined) continue
     const parsed = Number.parseInt(index, 10)
-    if (Number.isFinite(parsed) && parsed > highest) highest = parsed
+    // Only a SAFE integer counts. Past 2^53 an increment is a no-op, so a name
+    // carrying such a number would seed a counter that hands the next paste
+    // that very name back.
+    if (Number.isSafeInteger(parsed) && parsed > highest) highest = parsed
   }
   return highest
 }

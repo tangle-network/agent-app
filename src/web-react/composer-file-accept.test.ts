@@ -104,8 +104,37 @@ describe('renamePastedImages', () => {
     expect(renamePastedImages([file('image.avif', 'image/heic')], 0).files[0]!.name).toBe('pasted-image-1.heic')
   })
 
+  it('keeps an extension the declared type itself allows, rather than canonicalising it', () => {
+    // `.jpeg` and `.jpg` are the same claim. Rewriting one to the other would
+    // make a paste fail an `accept=".jpeg"` list that the picker admits.
+    expect(renamePastedImages([file('image.jpeg', 'image/jpeg')], 0).files[0]!.name).toBe('pasted-image-1.jpeg')
+    expect(renamePastedImages([file('image.jpg', 'image/jpeg')], 0).files[0]!.name).toBe('pasted-image-1.jpg')
+    expect(renamePastedImages([file('image.tif', 'image/tiff')], 0).files[0]!.name).toBe('pasted-image-1.tif')
+
+    const jpeg = file('image.jpeg', 'image/jpeg')
+    const renamed = renamePastedImages([jpeg], 0).files
+    expect(filterAcceptedFiles([jpeg], '.jpeg').accepted).toHaveLength(1)
+    expect(filterAcceptedFiles(renamed, '.jpeg').accepted).toHaveLength(1)
+  })
+
   it('falls back to the filename only when the type names no subtype', () => {
     expect(renamePastedImages([file('image.jpeg', 'image/')], 0).files[0]!.name).toBe('pasted-image-1.jpeg')
+  })
+
+  it('cannot manufacture an extension through the subtype-less fallback', () => {
+    // The fallback only ever sees `image.<ext>` (the sole generic form that
+    // carries an extension), so it can only PRESERVE what the name already
+    // claimed — an accept list decides the same way it would have with no
+    // rename at all. That is why the fallback is not a hole in the rule above.
+    const named = file('image.png', 'image/')
+    expect(renamePastedImages([named], 0).files[0]!.name).toBe('pasted-image-1.png')
+    expect(filterAcceptedFiles([named], '.png').accepted).toHaveLength(1)
+
+    // The forms with no extension get no rename at all, not an invented one.
+    for (const name of ['', 'image']) {
+      const bare = file(name, 'image/')
+      expect(renamePastedImages([bare], 0).files[0], name).toBe(bare)
+    }
   })
 
   it('never renames an image to a format it is not, so accept still refuses it', () => {
@@ -193,6 +222,13 @@ describe('pastedImageStartIndex', () => {
 
   it('reads a bare pasted-image-<n> with no extension', () => {
     expect(pastedImageStartIndex(['pasted-image-3'], 0)).toBe(3)
+  })
+
+  it('ignores a number too large to increment', () => {
+    // Past 2^53 an increment is a no-op, so seeding from such a name would hand
+    // the next paste that same name back.
+    expect(pastedImageStartIndex(['pasted-image-9007199254740992.png'], 3)).toBe(3)
+    expect(pastedImageStartIndex(['pasted-image-9007199254740991.png'], 3)).toBe(9007199254740991)
   })
 
   it('returns the counter unchanged for an empty queue', () => {

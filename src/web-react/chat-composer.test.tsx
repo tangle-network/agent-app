@@ -784,7 +784,7 @@ describe('ChatComposer file ingress', () => {
     fireEvent.drop(root, { dataTransfer: { files, types: ['Files'] } })
 
     // Identity, not just equal contents: an unfiltered batch is never rebuilt.
-    expect(onAttach).toHaveBeenCalledWith(files)
+    expect(onAttach.mock.calls[0]![0]).toBe(files)
     expect(onRejectFiles).not.toHaveBeenCalled()
   })
 

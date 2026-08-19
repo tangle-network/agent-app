@@ -24,9 +24,15 @@ afterEach(() => {
 // read it as evidence about a real FileList's behavior.
 if (!globalThis.DataTransfer) {
   class TestDataTransferItemList {
-    constructor(private readonly files: File[]) {}
+    constructor(
+      private readonly files: File[],
+      private readonly invalidate: () => void,
+    ) {}
     add(file: File) {
       this.files.push(file)
+      // The parent caches its FileList view; adding after a read must not
+      // leave that view reporting the old contents.
+      this.invalidate()
     }
     get length() {
       return this.files.length
@@ -37,9 +43,17 @@ if (!globalThis.DataTransfer) {
     types: string[] = []
     private readonly _files: File[] = []
     private readonly data: Record<string, string> = {}
-    items = new TestDataTransferItemList(this._files)
+    private view: FileList | null = null
+    items = new TestDataTransferItemList(this._files, () => {
+      this.view = null
+    })
 
+    // Built once and kept, because a real `DataTransfer` hands back the same
+    // FileList on every read. A getter that minted a fresh object would make
+    // `transfer.files !== transfer.files`, so any test about a composer
+    // forwarding the SAME list would pass or fail on the stub, not the code.
     get files(): FileList {
+      if (this.view) return this.view
       const files = this._files
       const list: Record<number | string, unknown> = {
         length: files.length,
@@ -48,7 +62,8 @@ if (!globalThis.DataTransfer) {
       files.forEach((file, index) => {
         list[index] = file
       })
-      return list as unknown as FileList
+      this.view = list as unknown as FileList
+      return this.view
     }
 
     setData(format: string, value: string) {
