@@ -43,7 +43,7 @@ export interface TiptapModules {
 }
 
 const PEERS_MISSING_MESSAGE =
-  'ChatComposer `mention` needs the @tiptap/* optional peers — install @tiptap/core, @tiptap/extension-mention, @tiptap/react, @tiptap/starter-kit and @tiptap/suggestion (>=3.28.0 <4.0.0)'
+  'ChatComposer `mention` needs the @tiptap/* optional peers — install @tiptap/core, @tiptap/extension-mention, @tiptap/pm, @tiptap/react, @tiptap/starter-kit and @tiptap/suggestion (>=3.28.0 <4.0.0; @tiptap/suggestion also peers on @floating-ui/dom)'
 
 /** Resolve the five optional peers, or throw naming every one of them. */
 export async function loadTiptapModules(): Promise<TiptapModules> {

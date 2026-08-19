@@ -533,6 +533,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@tiptap/core": "^3.28.0",
     "@tiptap/extension-mention": "^3.28.0",
+    "@tiptap/pm": "^3.28.0",
     "@tiptap/react": "^3.28.0",
     "@tiptap/starter-kit": "^3.28.0",
     "@tiptap/suggestion": "^3.28.0",
@@ -587,6 +588,7 @@
     "@tangle-network/ui": ">=11.5.0",
     "@tiptap/core": ">=3.28.0 <4.0.0",
     "@tiptap/extension-mention": ">=3.28.0 <4.0.0",
+    "@tiptap/pm": ">=3.28.0 <4.0.0",
     "@tiptap/react": ">=3.28.0 <4.0.0",
     "@tiptap/starter-kit": ">=3.28.0 <4.0.0",
     "@tiptap/suggestion": ">=3.28.0 <4.0.0",
@@ -649,6 +651,9 @@
       "optional": true
     },
     "@tiptap/extension-mention": {
+      "optional": true
+    },
+    "@tiptap/pm": {
       "optional": true
     },
     "@tiptap/react": {
