@@ -17277,18 +17277,6 @@
           "doc": "Define the structure and capabilities of a catalog item with optional pricing and feature flags"
         },
         {
-          "name": "charAt",
-          "kind": "function",
-          "signature": "(text: string, index: number) => string | undefined",
-          "doc": "The full character (code point) starting at `index`, or undefined past the end — same surrogate rationale as {@link charBefore}."
-        },
-        {
-          "name": "charBefore",
-          "kind": "function",
-          "signature": "(text: string, index: number) => string | undefined",
-          "doc": "The full character (code point) ENDING just before `index`, or undefined at the start."
-        },
-        {
           "name": "ChatAttachmentInput",
           "kind": "interface",
           "signature": "interface ChatAttachmentInput",
@@ -18585,12 +18573,6 @@
           "doc": "Re-validate one JSON-boundary row into a queue item; null for junk."
         },
         {
-          "name": "PATH_CONTINUATION_CHAR",
-          "kind": "const",
-          "signature": "RegExp",
-          "doc": "A character that could plausibly continue the SAME path/filename past a matched token."
-        },
-        {
           "name": "pendingApprovalOf",
           "kind": "function",
           "signature": "(call: ChatToolCallInfo) => { proposalId: string; } | null",
@@ -19639,12 +19621,6 @@
           "kind": "function",
           "signature": "(overlay: RecordGridOverlay, rowId: string, columnId: string, value: RecordGridValue) => RecordGridOverlay",
           "doc": "Record one optimistic cell edit."
-        },
-        {
-          "name": "WORD_CHAR",
-          "kind": "const",
-          "signature": "RegExp",
-          "doc": "A character that, immediately BEFORE an `@`, means the `@` is part of a longer token (an email local part, a handle) rather than a mention start."
         },
         {
           "name": "WorkProductCard",
