@@ -20,7 +20,7 @@ import type * as TiptapExtensionMention from '@tiptap/extension-mention'
 import type * as TiptapReact from '@tiptap/react'
 import type * as TiptapStarterKit from '@tiptap/starter-kit'
 import type * as TiptapSuggestion from '@tiptap/suggestion'
-import { useEffect, useRef, useState, type ComponentType } from 'react'
+import { useEffect, useId, useRef, useState, type ComponentType } from 'react'
 
 import { PopoverSurface } from './controls'
 import { MENTION_PILL_CLASS } from './mention-pill'
@@ -223,6 +223,11 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
     const [items, setItems] = useState<MentionItem[]>([])
     const [loading, setLoading] = useState(false)
     const [errored, setErrored] = useState(false)
+    // Mirror of the list's highlight, for `aria-activedescendant` — keyboard
+    // focus never leaves the editor, so the highlighted row must be announced
+    // through the editable element itself.
+    const [activeIndex, setActiveIndex] = useState(0)
+    const listboxId = useId()
 
     // The input box PopoverSurface anchors to, and the portaled panel itself.
     const anchorRef = useRef<HTMLDivElement>(null)
@@ -270,6 +275,7 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
             role: 'textbox',
             'aria-multiline': 'true',
             'aria-label': 'Message input',
+            'aria-haspopup': 'listbox',
           },
           handleKeyDown: (_view, event) => {
             if (event.key !== 'Enter' || event.shiftKey) return false
@@ -430,6 +436,21 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
       editor?.setEditable(!disabled)
     }, [editor, disabled])
 
+    // Announce the popover through the editable element: focus stays in the
+    // editor while ↑/↓ move the listbox highlight, so without
+    // `aria-activedescendant` a screen reader hears nothing change. Set
+    // imperatively — `editorProps.attributes` is fixed at editor creation.
+    useEffect(() => {
+      if (!editor) return
+      const dom = editor.view.dom
+      dom.setAttribute('aria-expanded', open ? 'true' : 'false')
+      if (open) dom.setAttribute('aria-controls', listboxId)
+      else dom.removeAttribute('aria-controls')
+      const hasRows = open && !loading && !errored && items.length > 0
+      if (hasRows) dom.setAttribute('aria-activedescendant', `${listboxId}-opt-${activeIndex}`)
+      else dom.removeAttribute('aria-activedescendant')
+    }, [editor, open, loading, errored, items.length, activeIndex, listboxId])
+
     useEffect(() => {
       if (!editor || !registerFocus) return
       registerFocus(() => editor.commands.focus())
@@ -461,12 +482,14 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
         >
           <MentionList
             ref={listRef}
+            id={listboxId}
             items={items}
             loading={loading}
             error={errored}
             emptyText={mention.emptyText}
             renderItem={mention.renderItem}
             onSelect={(item) => commandRef.current?.(item)}
+            onActiveChange={setActiveIndex}
             className={mention.popoverClassName}
           />
         </PopoverSurface>

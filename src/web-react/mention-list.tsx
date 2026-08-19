@@ -18,6 +18,13 @@ export interface MentionListProps {
   emptyText?: string
   renderItem?: (item: MentionItem) => ReactNode
   onSelect: (item: MentionItem) => void
+  /** Root `role="listbox"` element id; option rows derive stable ids from it
+   *  (`<id>-opt-<index>`) so the editor can point `aria-activedescendant` at
+   *  the highlighted row. */
+  id?: string
+  /** Fired whenever the highlight moves (keys, hover, or a result-set
+   *  re-home) — what keeps the editor's `aria-activedescendant` current. */
+  onActiveChange?: (index: number) => void
   /** Extra classes merged onto the panel's root element, applied last so
    *  they win over the component's own. */
   className?: string
@@ -33,16 +40,19 @@ export interface MentionListProps {
  */
 export const MentionList = forwardRef<MentionListHandle, MentionListProps>(
   function MentionList(
-    { items, loading, error, emptyText = 'No matches', renderItem, onSelect, className },
+    { items, loading, error, emptyText = 'No matches', renderItem, onSelect, id, onActiveChange, className },
     ref,
   ) {
     const [selected, setSelected] = useState(0)
     // Mirrors `selected` so the key handler reads the live index even when keys
     // arrive faster than React commits (e.g. synchronous test-driven calls).
     const selectedRef = useRef(0)
+    const onActiveChangeRef = useRef(onActiveChange)
+    onActiveChangeRef.current = onActiveChange
     const move = (next: number) => {
       selectedRef.current = next
       setSelected(next)
+      onActiveChangeRef.current?.(next)
     }
 
     // A new result set re-homes the highlight to the top.
@@ -84,6 +94,7 @@ export const MentionList = forwardRef<MentionListHandle, MentionListProps>(
     return (
       <div
         role="listbox"
+        id={id}
         aria-label="File mentions"
         className={joinClasses(
           'max-h-64 min-w-[16rem] max-w-sm overflow-y-auto rounded-xl border border-border',
@@ -114,6 +125,7 @@ export const MentionList = forwardRef<MentionListHandle, MentionListProps>(
               <button
                 type="button"
                 key={item.id}
+                id={id ? `${id}-opt-${index}` : undefined}
                 role="option"
                 aria-selected={active}
                 // Keyboard navigation must keep the highlight visible inside
