@@ -115,6 +115,8 @@ if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
 }
 if (typeof Range !== 'undefined' && !Range.prototype.getClientRects) {
   Range.prototype.getClientRects = () => [] as unknown as DOMRectList
+}
+if (typeof Range !== 'undefined' && !Range.prototype.getBoundingClientRect) {
   Range.prototype.getBoundingClientRect = () => new DOMRect()
 }
 if (!globalThis.ResizeObserver) {

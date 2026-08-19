@@ -65,10 +65,11 @@ import type { ComposerMentionProp } from './use-file-mentions'
 /**
  * The TipTap editor is a lazy chunk: only consumers that pass `mention` pull
  * the editor stack into their bundle, and only when the mention path renders.
- * The five `@tiptap/*` packages behind it are OPTIONAL peers reached only
+ * The `@tiptap/*` packages behind it are OPTIONAL peers reached only
  * through `loadMentionEditor`'s dynamic imports — a bundler replaces a missing
  * one with a runtime-throwing stub, so a consumer without them still builds
- * and fails loudly only if the editor actually loads (see mention-editor.tsx).
+ * and fails loudly only if the editor actually loads (see mention-editor.tsx,
+ * whose loader error names the complete install set).
  *
  * Built per retry rather than once at module scope: `lazy` caches a rejected
  * load forever, so recovering from a transient chunk-fetch failure needs a
@@ -478,8 +479,9 @@ export interface ChatComposerProps {
    * loaded TipTap rich input that renders mentions as atomic pills and
    * serializes them to `@<id>` in the value; absent ⇒ exactly the plain
    * textarea, with no TipTap in the bundle. Wire `useFileMentions().mention`
-   * straight in. The five `@tiptap/*` packages are OPTIONAL peers — a
-   * consumer installs them to use this prop.
+   * straight in. The six `@tiptap/*` packages (core, extension-mention, pm,
+   * react, starter-kit, suggestion) are OPTIONAL peers — a consumer installs
+   * them to use this prop.
    *
    * The rich input owns its own keyboard surface, so `slashCommands` is
    * disabled while `mention` is set rather than left half-armed with a menu
