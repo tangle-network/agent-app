@@ -28,6 +28,21 @@ describe('web-react Router entrypoint', () => {
     }
   })
 
+  it('keeps the entry-composer assembly free of sandbox-ui and lucide (moved from /chat-react)', () => {
+    // These two came from the subpath whose whole purpose was importing
+    // sandbox-ui, and one carried a lucide icon. In /web-react a static
+    // import of either optional peer is a build-time requirement for every
+    // consumer of the default surface.
+    for (const file of [
+      'src/web-react/entry-composer.tsx',
+      'src/web-react/composer-mode-controls.tsx',
+    ]) {
+      const source = read(file)
+      expect(source).not.toContain('@tangle-network/sandbox-ui')
+      expect(source).not.toContain('lucide-react')
+    }
+  })
+
   it('reaches the @tiptap optional peers only through type-only or dynamic imports', () => {
     // A missing optional peer resolves to a bundler stub with no named
     // exports, so ONE static `import { x } from '@tiptap/…'` anywhere in the
