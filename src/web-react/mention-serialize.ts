@@ -67,7 +67,12 @@ export function collectMentions(doc: MentionDocNode): MentionItem[] {
 /**
  * Parse a controlled `value` string back into an editor document. `@<id>`
  * runs that match a currently-known mention restore as atomic mention nodes;
- * every other `@…` stays literal text. Each line becomes a paragraph.
+ * every other `@…` stays literal text. Each line becomes a paragraph — a
+ * deliberate asymmetry with `serializeMentionDoc`, which also flattens an
+ * in-paragraph `hardBreak` to `\n`: the string round-trips byte-identically,
+ * but a restored Shift+Enter comes back as a paragraph break. The two render
+ * identically under the composer's styling (no paragraph margins), so the
+ * plain-text `value` contract stays the source of truth.
  */
 export function parseMentionValue(
   value: string,

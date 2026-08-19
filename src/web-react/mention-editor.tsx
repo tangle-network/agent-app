@@ -173,9 +173,11 @@ const EDITOR_CLASS =
 const FETCH_DEBOUNCE_MS = 100
 
 /** Stable key for a mention set — order- and id-sensitive, ignores label/kind
- * so cosmetic re-fetches of the same id don't read as a change. */
+ * so cosmetic re-fetches of the same id don't read as a change. JSON-encoded:
+ * ids are workspace paths that may contain spaces, so a plain join would make
+ * `["a b","c"]` and `["a","b c"]` collide and suppress a real change. */
 function mentionsKey(mentions: MentionItem[]): string {
-  return mentions.map((item) => item.id).join(' ')
+  return JSON.stringify(mentions.map((item) => item.id))
 }
 
 /** `React.lazy` payload: resolve the peers, then build the component. */
@@ -232,14 +234,19 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
     const openRef = useRef(false)
     const commandRef = useRef<((item: MentionItem) => void) | null>(null)
     const listRef = useRef<MentionListHandle | null>(null)
-    // Grows for the component's lifetime — one entry per distinct id ever
-    // seen (fetched, inserted, or restored). Uncapped; fine for a chat
-    // composer's lifetime, worth an LRU only if this outlives that.
+    // Grows for the component's lifetime — one entry per distinct id the user
+    // actually PICKED (or that arrived in the document as a mention node).
+    // Deliberately never fed from fetch results: restore-eligibility must
+    // track selection, not visibility. Uncapped; fine for a chat composer's
+    // lifetime, worth an LRU only if this outlives that.
     const knownRef = useRef<Map<string, MentionItem>>(new Map())
     const requestIdRef = useRef(0)
     // Last mention-id set reported via `onMentionsChange`, so a programmatic
     // restore that lands on the same mentions doesn't re-fire the callback.
-    const lastMentionsKeyRef = useRef('')
+    // Seeded with the EMPTY-set key (not ''): the initial document can never
+    // hold pills (`knownRef` starts empty), so the first computed key is the
+    // empty set's — starting anywhere else fires a spurious `[]` callback.
+    const lastMentionsKeyRef = useRef(mentionsKey([]))
     const onSubmitRef = useRef(onSubmit)
     onSubmitRef.current = onSubmit
     const onChangeRef = useRef(onChange)
@@ -373,7 +380,11 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
           .then(() => fetchItemsRef.current(query))
           .then((results) => {
             if (requestId !== requestIdRef.current) return
-            for (const item of results) knownRef.current.set(item.id, item)
+            // Results are NOT written into `knownRef`: merely appearing in a
+            // suggestion list must not make an id restore-eligible, or a
+            // later restore would promote prose the user typed (never picked)
+            // into a structured mention. Only a pick (`command`) or a mention
+            // already in the document teaches the restore path an id.
             setItems(results)
             setLoading(false)
           })

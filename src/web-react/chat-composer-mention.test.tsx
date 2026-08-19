@@ -249,18 +249,21 @@ describe('ChatComposer — mention path', () => {
       return node
     })
 
-    // Open the popover so the editor learns "src/app.tsx" from the fetch
-    // response, then back out without inserting — no mention has been
-    // reported to `onMentionsChange` yet.
+    // PICK the mention so the editor learns "src/app.tsx" as a selected id,
+    // then clear the draft — restore-eligibility tracks selection, never mere
+    // visibility in a suggestion list.
     editor.focus()
     await user.type(editor, '@a')
     await waitFor(() => expect(fetchItems).toHaveBeenCalled())
     await screen.findAllByRole('option')
-    await user.keyboard('{Escape}')
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(onMentionsChange).toHaveBeenCalled())
+    act(() => setValueExternal(''))
+    await waitFor(() => expect(editor.textContent ?? '').not.toContain('app.tsx'))
     onMentionsChange.mockClear()
 
     // A programmatic restore (set from outside, not typed) containing the
-    // now-known id must still surface it.
+    // picked id must surface it again.
     act(() => setValueExternal('intro @src/app.tsx outro'))
     await waitFor(() =>
       expect(onMentionsChange).toHaveBeenCalledWith([
@@ -274,6 +277,104 @@ describe('ChatComposer — mention path', () => {
     act(() => setValueExternal('other @src/app.tsx wrapper'))
     await waitFor(() => expect(editor.textContent).toContain('wrapper'))
     expect(onMentionsChange).toHaveBeenCalledTimes(1)
+  })
+
+  it('never promotes a fetched-but-unpicked id to a mention on restore', async () => {
+    // Appearing in a suggestion list is visibility, not selection. If listing
+    // alone made an id restore-eligible, a restore would promote prose the
+    // user typed (never picked) into a structured attachment.
+    const user = userEvent.setup()
+    const onMentionsChange = vi.fn()
+    let setValueExternal: (value: string) => void = () => {}
+    const Wrapper = () => {
+      const [value, setValue] = useState('')
+      setValueExternal = setValue
+      return (
+        <ChatComposer
+          value={value}
+          onValueChange={setValue}
+          onSend={() => {}}
+          mention={mentionProp({ onMentionsChange })}
+        />
+      )
+    }
+    const { container } = render(<Wrapper />)
+    const editor = await waitFor(() => {
+      const node = container.querySelector<HTMLElement>('[contenteditable="true"]')
+      if (!node) throw new Error('editor not mounted')
+      return node
+    })
+
+    // Open the list (fetch resolves with src/app.tsx) and back out unpicked.
+    editor.focus()
+    await user.type(editor, '@a')
+    await screen.findAllByRole('option')
+    await user.keyboard('{Escape}')
+    act(() => setValueExternal(''))
+    onMentionsChange.mockClear()
+
+    act(() => setValueExternal('see @src/app.tsx here'))
+    await waitFor(() => expect(editor.textContent).toContain('see @src/app.tsx here'))
+    expect(container.querySelector('[data-id]')).toBeNull()
+    expect(onMentionsChange).not.toHaveBeenCalled()
+  })
+
+  it('reports a mention-set change whose ids only differ by space grouping', async () => {
+    // Ids are workspace paths that may contain spaces: ["my file.ts"] and
+    // ["my", "file.ts"] are different sets and must both be reported.
+    const user = userEvent.setup()
+    const onMentionsChange = vi.fn()
+    const spacey: MentionItem[] = [
+      { id: 'my file.ts', label: 'my file.ts' },
+      { id: 'my', label: 'my' },
+      { id: 'file.ts', label: 'file.ts' },
+    ]
+    let setValueExternal: (value: string) => void = () => {}
+    const Wrapper = () => {
+      const [value, setValue] = useState('')
+      setValueExternal = setValue
+      return (
+        <ChatComposer
+          value={value}
+          onValueChange={setValue}
+          onSend={() => {}}
+          mention={{ fetchItems: async () => spacey, onMentionsChange }}
+        />
+      )
+    }
+    render(<Wrapper />)
+    const editor = await waitFor(() => {
+      const node = document.querySelector<HTMLElement>('[contenteditable="true"]')
+      if (!node) throw new Error('editor not mounted')
+      return node
+    })
+
+    // Pick all three so each id is restore-eligible.
+    editor.focus()
+    for (let i = 0; i < spacey.length; i++) {
+      await user.type(editor, '@x')
+      const options = await screen.findAllByRole('option')
+      fireEvent.mouseDown(options[i]!)
+      await waitFor(() => expect(onMentionsChange).toHaveBeenCalled())
+    }
+
+    act(() => setValueExternal('@my file.ts'))
+    await waitFor(() =>
+      expect(onMentionsChange).toHaveBeenLastCalledWith([
+        { id: 'my file.ts', label: 'my file.ts', kind: undefined },
+      ]),
+    )
+    onMentionsChange.mockClear()
+
+    // A naive space-joined key would collide with the previous set and
+    // silently swallow this change.
+    act(() => setValueExternal('@my @file.ts'))
+    await waitFor(() =>
+      expect(onMentionsChange).toHaveBeenCalledWith([
+        { id: 'my', label: 'my', kind: undefined },
+        { id: 'file.ts', label: 'file.ts', kind: undefined },
+      ]),
+    )
   })
 
   it('Cmd/Ctrl+L reaches the rich editor', async () => {
