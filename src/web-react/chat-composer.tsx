@@ -36,6 +36,7 @@
  */
 
 import {
+  Component,
   lazy,
   Suspense,
   useCallback,
@@ -70,6 +71,40 @@ import type { ComposerMentionProp } from './use-file-mentions'
  * and fails loudly only if the editor actually loads (see mention-editor.tsx).
  */
 const MentionEditor = lazy(() => import('./mention-editor').then((m) => m.loadMentionEditor()))
+
+/**
+ * Contains a mention-editor failure to the input area. A rejected lazy chunk
+ * (most likely the named missing-`@tiptap/*` error from `loadTiptapModules`)
+ * would otherwise unwind past the composer and unmount the host's whole
+ * region. This is containment, not a silent fallback: the error renders as a
+ * visible alert naming the cause where the input would be — a misconfigured
+ * consumer cannot mistake it for a working composer.
+ */
+class MentionEditorBoundary extends Component<
+  { children: ReactNode },
+  { error: unknown | null }
+> {
+  state: { error: unknown | null } = { error: null }
+
+  static getDerivedStateFromError(error: unknown) {
+    return { error }
+  }
+
+  render() {
+    if (this.state.error === null) return this.props.children
+    const message =
+      this.state.error instanceof Error ? this.state.error.message : String(this.state.error)
+    return (
+      <div
+        role="alert"
+        data-testid="composer-mention-editor-error"
+        className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+      >
+        The mention input failed to load: {message}
+      </div>
+    )
+  }
+}
 
 // ── glyphs (no icon-library dependency) ───────────────────────────────────
 
@@ -541,11 +576,12 @@ export function ChatComposer({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   // Set by the mention editor so autofocus-independent focus paths (the
   // Cmd/Ctrl+L shortcut) reach it in the rich path, where `textareaRef` stays
-  // null.
+  // null. The editor registers `null` on unmount, so the shortcut can never
+  // call into a destroyed editor.
   const richFocusRef = useRef<(() => void) | null>(null)
   // Stable identity so the mention editor's registration effect only reruns
   // when the editor instance itself changes, not on every parent render.
-  const registerRichFocus = useCallback((focus: () => void) => {
+  const registerRichFocus = useCallback((focus: (() => void) | null) => {
     richFocusRef.current = focus
   }, [])
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -1194,35 +1230,39 @@ export function ChatComposer({
         {mention ? (
           // The editor arrives as a lazy chunk; until it lands, a read-only
           // textarea with the same metrics holds the layout so the card
-          // doesn't jump.
-          <Suspense
-            fallback={
-              <textarea
-                rows={minRows}
+          // doesn't jump. The boundary contains a failed load (e.g. the
+          // missing-peer error) to the input area instead of unmounting the
+          // host's region.
+          <MentionEditorBoundary>
+            <Suspense
+              fallback={
+                <textarea
+                  rows={minRows}
+                  value={text}
+                  readOnly
+                  disabled
+                  placeholder={placeholder}
+                  aria-label="Message input"
+                  style={{ minHeight: inputMinHeight, maxHeight }}
+                  className="w-full resize-none bg-transparent px-1.5 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
+                />
+              }
+            >
+              <MentionEditor
                 value={text}
-                readOnly
-                disabled
+                onChange={setText}
+                onSubmit={send}
                 placeholder={placeholder}
-                aria-label="Message input"
-                style={{ minHeight: inputMinHeight, maxHeight }}
-                className="w-full resize-none bg-transparent px-1.5 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
+                disabled={disabled}
+                autoFocus={autoFocus}
+                minHeight={inputMinHeight}
+                maxHeight={maxHeight}
+                mention={mention}
+                registerFocus={registerRichFocus}
+                onPasteFiles={onAttach ? ingestPastedFiles : undefined}
               />
-            }
-          >
-            <MentionEditor
-              value={text}
-              onChange={setText}
-              onSubmit={send}
-              placeholder={placeholder}
-              disabled={disabled}
-              autoFocus={autoFocus}
-              minHeight={inputMinHeight}
-              maxHeight={maxHeight}
-              mention={mention}
-              registerFocus={registerRichFocus}
-              onPasteFiles={onAttach ? ingestPastedFiles : undefined}
-            />
-          </Suspense>
+            </Suspense>
+          </MentionEditorBoundary>
         ) : (
           // Focus: `outline-none` is safe because the card above draws the
           // keyboard indicator through `focus-within:` — one ring for
