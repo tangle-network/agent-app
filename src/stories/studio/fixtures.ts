@@ -1,4 +1,4 @@
-import type { Generation } from '../../studio'
+import type { FetchGenerationsPage, Generation, GenerationPage } from '../../studio'
 
 /**
  * Studio fixtures. Generations are plain loader rows — `metadata.generationStatus`
@@ -12,6 +12,23 @@ import type { Generation } from '../../studio'
 function svgTile(from: string, to: string, label: string): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs><rect width="640" height="360" fill="url(#g)"/><text x="32" y="330" font-family="monospace" font-size="22" fill="rgba(255,255,255,0.85)">${label}</text></svg>`
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+}
+
+/** Tiny browser-native silent WAV used by stories that exercise real playback. */
+export function silentWavDataUri(seconds: number): string {
+  const sampleRate = 8_000
+  const sampleCount = Math.max(0, Math.floor(seconds * sampleRate))
+  const bytes = new Uint8Array(44 + sampleCount)
+  const view = new DataView(bytes.buffer)
+  const text = (offset: number, value: string) => [...value].forEach((char, index) => { bytes[offset + index] = char.charCodeAt(0) })
+  text(0, 'RIFF'); view.setUint32(4, 36 + sampleCount, true); text(8, 'WAVEfmt ')
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true)
+  view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate, true)
+  view.setUint16(32, 1, true); view.setUint16(34, 8, true); text(36, 'data')
+  view.setUint32(40, sampleCount, true); bytes.fill(128, 44)
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return `data:audio/wav;base64,${btoa(binary)}`
 }
 
 const POSTER_TILE = svgTile('#7c3aed', '#1d4ed8', 'launch-poster.png')
@@ -84,7 +101,11 @@ export const videoGeneration = makeGeneration({
   model: 'tangle-video-hd',
   cost: 0.42,
   createdAt: new Date('2026-08-02T11:24:00Z'),
-  metadata: { generationStatus: 'succeeded', vaultPath: 'generated/videos/launch-teaser.mp4' },
+  metadata: {
+    generationStatus: 'succeeded',
+    vaultPath: 'generated/videos/launch-teaser.mp4',
+    aspectRatio: '16:9',
+  },
 })
 
 // Avatar generations genuinely carry an empty prompt — the composer hides the
@@ -109,6 +130,21 @@ export const speechGeneration = makeGeneration({
   cost: 0.004,
   createdAt: new Date('2026-08-01T10:15:00Z'),
   metadata: { generationStatus: 'succeeded', vaultPath: 'generated/audio/scratch-voiceover.mp3' },
+})
+
+export const speechGenerationPlayable = makeGeneration({
+  id: 'gen-speech-playable',
+  type: 'speech',
+  prompt: 'A calm six-second product introduction with a warm, confident delivery.',
+  result: silentWavDataUri(6),
+  model: 'tangle-tts-1',
+  cost: 0.003,
+  createdAt: new Date('2026-08-03T08:20:00Z'),
+  metadata: {
+    generationStatus: 'succeeded',
+    durationSeconds: 6,
+    voice: 'alloy',
+  },
 })
 
 const TRANSCRIPT_TEXT = [
@@ -219,6 +255,126 @@ export const libraryGenerations: Generation[] = [
 ]
 
 export const libraryTotalCost = 1.87
+
+const HISTORY_PALETTES = [
+  ['#2563eb', '#172554'],
+  ['#f97316', '#7c2d12'],
+  ['#14b8a6', '#134e4a'],
+  ['#d946ef', '#581c87'],
+  ['#84cc16', '#365314'],
+  ['#f43f5e', '#881337'],
+] as const
+
+const historyImages: Generation[] = Array.from({ length: 16 }, (_, index) => {
+  const number = index + 1
+  const colors = HISTORY_PALETTES[index % HISTORY_PALETTES.length]!
+  return makeGeneration({
+    id: `history-image-${number}`,
+    prompt: [
+      'Editorial product portrait with translucent glass and cobalt light',
+      'Playful campaign still with paper shapes and a warm sunrise palette',
+      'Architectural concept frame for a quiet futuristic workspace',
+      'Macro photograph of recycled material textures for the launch deck',
+    ][index % 4] + ` — variation ${number}`,
+    result: svgTile(colors[0], colors[1], `history-image-${number}.png`),
+    model: index % 3 === 0 ? 'tangle-image-standard' : 'tangle-image-large',
+    cost: 0.008 + (index % 3) * 0.002,
+    createdAt: new Date(Date.UTC(2026, 7, 18 - index, 9 + (index % 7), 12)),
+    metadata: {
+      generationStatus: 'succeeded',
+      aspectRatio: index % 3 === 0 ? '16:9' : index % 3 === 1 ? '1:1' : '9:16',
+      ...(index % 4 === 0 ? { vaultPath: `generated/images/history-image-${number}.png` } : {}),
+    },
+  })
+})
+
+const historyVideos: Generation[] = Array.from({ length: 4 }, (_, index) => makeGeneration({
+  id: `history-video-${index + 1}`,
+  type: 'video',
+  prompt: [
+    'Slow cinematic orbit around a translucent launch object',
+    'Handheld street sequence for the summer campaign',
+    'Wide studio reveal with drifting haze and a light sweep',
+    'Graphic logo animation built from folding paper planes',
+  ][index]!,
+  result: `/fixtures/history-video-${index + 1}.mp4`,
+  model: 'tangle-video-hd',
+  cost: 0.28 + index * 0.04,
+  createdAt: new Date(Date.UTC(2026, 7, 15 - index * 2, 14, 30)),
+  metadata: {
+    generationStatus: 'succeeded',
+    aspectRatio: index % 2 === 0 ? '16:9' : '9:16',
+    ...(index === 1 ? { vaultPath: 'generated/videos/summer-street.mp4' } : {}),
+  },
+}))
+
+const historySpeech: Generation[] = [
+  speechGenerationPlayable,
+  ...Array.from({ length: 3 }, (_, index) => makeGeneration({
+    id: `history-speech-${index + 1}`,
+    type: 'speech',
+    prompt: [
+      'Bright ten-second voiceover for the summer campaign opener',
+      'Measured narration for an architectural concept walkthrough',
+      'Friendly closing line asking viewers to join the product waitlist',
+    ][index]!,
+    result: silentWavDataUri(2 + index),
+    model: 'tangle-tts-1',
+    cost: 0.003,
+    createdAt: new Date(Date.UTC(2026, 7, 12 - index * 3, 10, 5)),
+    metadata: {
+      generationStatus: 'succeeded',
+      durationSeconds: 2 + index,
+      voice: ['nova', 'echo', 'shimmer'][index],
+      ...(index === 2 ? { vaultPath: 'generated/audio/waitlist-close.wav' } : {}),
+    },
+  })),
+]
+
+/** Large enough to exercise search, filtering, and a second cursor page. */
+export const historyGenerations: Generation[] = [
+  ...historyImages.slice(0, 5),
+  historyVideos[0]!,
+  ...historyImages.slice(5, 9),
+  historySpeech[0]!,
+  historyVideos[1]!,
+  ...historyImages.slice(9, 13),
+  historySpeech[1]!,
+  historyVideos[2]!,
+  ...historyImages.slice(13),
+  historySpeech[2]!,
+  historyVideos[3]!,
+  historySpeech[3]!,
+]
+
+export function makeGenerationPage(items: Generation[], nextCursor?: string): GenerationPage {
+  return nextCursor ? { items, nextCursor } : { items }
+}
+
+/** In-memory version of the history endpoint, including abortable latency. */
+export function fakeFetchGenerationsPage(all: Generation[]): FetchGenerationsPage {
+  return async ({ q, type, cursor, signal }) => {
+    await new Promise<void>((resolve, reject) => {
+      const timer = window.setTimeout(resolve, 250)
+      signal.addEventListener('abort', () => {
+        window.clearTimeout(timer)
+        reject(new DOMException('The request was aborted.', 'AbortError'))
+      }, { once: true })
+    })
+    const query = q.trim().toLocaleLowerCase()
+    const filtered = all.filter((generation) => (
+      (type === 'all' || generation.type === type)
+      && (!query || generation.prompt.toLocaleLowerCase().includes(query))
+    ))
+    const offset = cursor?.startsWith('studio-history:')
+      ? Number.parseInt(cursor.slice('studio-history:'.length), 10)
+      : 0
+    const start = Number.isFinite(offset) && offset >= 0 ? offset : 0
+    const items = filtered.slice(start, start + 12)
+    const next = start + items.length
+    return makeGenerationPage(items, next < filtered.length ? `studio-history:${next}` : undefined)
+  }
+}
 
 /** Demo story route for opening a persisted generation in the vault. */
 export const demoVaultHref = (filePath?: string | null) =>
