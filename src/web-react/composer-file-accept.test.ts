@@ -38,6 +38,15 @@ describe('isAcceptedFileType', () => {
     expect(isAcceptedFileType(file('a', 'imagex/png'), 'image/*')).toBe(false)
   })
 
+  it('requires a real subtype behind a wildcard', () => {
+    // A `File.type` can carry a malformed string, and neither of these names a
+    // type the wildcard should admit.
+    expect(isAcceptedFileType(file('a', 'image/'), 'image/*')).toBe(false)
+    expect(isAcceptedFileType(file('a', 'image//png'), 'image/*')).toBe(false)
+    // A compound subtype is still one subtype.
+    expect(isAcceptedFileType(file('a', 'image/svg+xml'), 'image/*')).toBe(true)
+  })
+
   it('is whitespace-tolerant across a comma-separated list', () => {
     expect(isAcceptedFileType(file('a.pdf', 'application/pdf'), ' image/* , .pdf ')).toBe(true)
   })
@@ -194,6 +203,25 @@ describe('renamePastedImages', () => {
     expect(renamePastedImages([dotfile], 0).files[0]).toBe(dotfile)
   })
 
+  it('numbers a generic clipboard name even when the file declares no type', () => {
+    // Some clipboards hand over an `image.png` with an empty MIME type; it
+    // collides across pastes exactly as a typed one does.
+    const first = renamePastedImages([file('image.png', '')], 0)
+    expect(first.files[0]!.name).toBe('pasted-image-1.png')
+    expect(renamePastedImages([file('image.png', '')], first.nextIndex).files[0]!.name).toBe(
+      'pasted-image-2.png',
+    )
+    // Its extension comes from its own name, so accept decides as before.
+    expect(filterAcceptedFiles(first.files, '.png').accepted).toHaveLength(1)
+  })
+
+  it('leaves a typeless file alone when its name carries no extension either', () => {
+    // Nothing here says "image", so numbering it as one would assert what the
+    // file never claimed.
+    const bare = file('image', '')
+    expect(renamePastedImages([bare], 0).files[0]).toBe(bare)
+  })
+
   it('leaves a real filename and a non-image alone, and does not spend a counter on them', () => {
     const named = file('screenshot-of-the-bug.png', 'image/png')
     const pdf = file('image.pdf', 'application/pdf')
@@ -257,6 +285,14 @@ describe('pastedImageStartIndex', () => {
     // the next paste that same name back.
     expect(pastedImageStartIndex(['pasted-image-9007199254740992.png'], 3)).toBe(3)
     expect(pastedImageStartIndex(['pasted-image-9007199254740991.png'], 3)).toBe(9007199254740991)
+  })
+
+  it('starts from zero when handed a counter it cannot count from', () => {
+    for (const bad of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 2]) {
+      expect(pastedImageStartIndex([], bad), String(bad)).toBe(0)
+    }
+    // A usable staged name still wins over the discarded counter.
+    expect(pastedImageStartIndex(['pasted-image-4.png'], -1)).toBe(4)
   })
 
   it('returns the counter unchanged for an empty queue', () => {

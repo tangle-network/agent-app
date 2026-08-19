@@ -995,14 +995,82 @@ describe('ChatComposer context items', () => {
 describe('ChatComposer send gates', () => {
   const uploading = [{ id: 'f1', name: 'big.png', kind: 'file' as const, status: 'uploading' as const }]
 
-  it('canSubmitAttachmentsOnly sends an empty message while an upload is in flight', () => {
+  it('canSubmitAttachmentsOnly keeps the control live but refuses an unfinished upload', () => {
+    // The flag exists so the control is not dead while a file uploads. It does
+    // NOT make the file sendable: dispatching here would deliver an empty turn
+    // and lose the attachment, so the composer refuses and names the reason
+    // rather than handing every host the same check to re-derive.
     const onSend = vi.fn()
     render(
       <ChatComposer onSend={onSend} onAttach={() => {}} pendingFiles={uploading} canSubmitAttachmentsOnly />,
     )
     expect((screen.getByLabelText('Send') as HTMLButtonElement).disabled).toBe(false)
     fireEvent.keyDown(screen.getByLabelText('Message input'), { key: 'Enter' })
+
+    expect(onSend).not.toHaveBeenCalled()
+    expect(screen.getByTestId('composer-send-error').textContent).toContain('finish uploading')
+  })
+
+  it('names the failure instead of the upload when the staged file has errored', () => {
+    const onSend = vi.fn()
+    render(
+      <ChatComposer
+        onSend={onSend}
+        onAttach={() => {}}
+        pendingFiles={[
+          { id: 'f1', name: 'big.png', kind: 'file', status: 'error', errorMessage: 'Upload failed (413)' },
+        ]}
+        canSubmitAttachmentsOnly
+      />,
+    )
+    fireEvent.keyDown(screen.getByLabelText('Message input'), { key: 'Enter' })
+
+    expect(onSend).not.toHaveBeenCalled()
+    expect(screen.getByTestId('composer-send-error').textContent).toContain('failed attachment')
+  })
+
+  it('takes the host copy for a refused attachment-only send', () => {
+    render(
+      <ChatComposer
+        onSend={() => {}}
+        onAttach={() => {}}
+        pendingFiles={uploading}
+        canSubmitAttachmentsOnly
+        attachmentsNotReadyMessage="Hang on — still saving your screenshot."
+      />,
+    )
+    fireEvent.keyDown(screen.getByLabelText('Message input'), { key: 'Enter' })
+    expect(screen.getByTestId('composer-send-error').textContent).toContain('still saving your screenshot')
+  })
+
+  it('sends the moment the same queue reaches ready', () => {
+    const onSend = vi.fn()
+    const { rerender } = render(
+      <ChatComposer onSend={onSend} onAttach={() => {}} pendingFiles={uploading} canSubmitAttachmentsOnly />,
+    )
+    rerender(
+      <ChatComposer
+        onSend={onSend}
+        onAttach={() => {}}
+        pendingFiles={[{ id: 'f1', name: 'big.png', kind: 'file', status: 'ready' }]}
+        canSubmitAttachmentsOnly
+      />,
+    )
+    fireEvent.keyDown(screen.getByLabelText('Message input'), { key: 'Enter' })
     expect(onSend).toHaveBeenCalledWith('')
+  })
+
+  it('still sends typed text alongside an unfinished upload', () => {
+    // Text IS content the turn can carry, so the refusal above is scoped to a
+    // message that would otherwise be empty.
+    const onSend = vi.fn()
+    render(
+      <ChatComposer onSend={onSend} onAttach={() => {}} pendingFiles={uploading} canSubmitAttachmentsOnly />,
+    )
+    const input = screen.getByLabelText('Message input')
+    type(input, 'look at this')
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onSend).toHaveBeenCalledWith('look at this')
   })
 
   it('without the flag the same in-flight upload cannot send an empty message', () => {
@@ -1019,26 +1087,6 @@ describe('ChatComposer send gates', () => {
         onSend={onSend}
         onAttach={() => {}}
         pendingFiles={[{ id: 'f1', name: 'a.png', kind: 'file', status: 'ready' }]}
-      />,
-    )
-    fireEvent.keyDown(screen.getByLabelText('Message input'), { key: 'Enter' })
-    expect(onSend).toHaveBeenCalledWith('')
-  })
-
-  it('hands an errored-only queue to the send handler rather than deadening Enter', () => {
-    // `canSubmitAttachmentsOnly` counts a staged file of ANY status on purpose.
-    // The host owns what a non-deliverable file means — `EntryComposer` blocks
-    // on `hasError` and names the reason — and a composer that silently refused
-    // the keystroke would leave it no place to say so.
-    const onSend = vi.fn()
-    render(
-      <ChatComposer
-        onSend={onSend}
-        onAttach={() => {}}
-        pendingFiles={[
-          { id: 'f1', name: 'big.png', kind: 'file', status: 'error', errorMessage: 'Upload failed (413)' },
-        ]}
-        canSubmitAttachmentsOnly
       />,
     )
     fireEvent.keyDown(screen.getByLabelText('Message input'), { key: 'Enter' })

@@ -319,16 +319,23 @@ export interface ChatComposerProps {
   contextItems?: ReadonlyArray<ComposerContextItem>
 
   /**
-   * Let an empty message send while any file is staged, whatever its upload
-   * status. Default false, which sends an empty message only once a file is
-   * `ready` — the rule that makes a store-backed attachment sendable the moment
-   * its upload lands.
+   * Let a staged file stand in for message text, so the send control stays live
+   * while an upload is in flight instead of going dead with nothing to explain
+   * it. Default false, where an empty message needs a `ready` file.
    *
-   * Set it for a surface that must stay operable while an upload is in flight:
-   * the send handler then owns the policy (block, queue, or explain), where it
-   * can say why. Gating on `ready` alone leaves Enter silently dead instead.
+   * It does NOT make an unfinished file sendable. A turn whose only content is a
+   * file that is still uploading or has failed never reaches the send handler —
+   * it would arrive empty and the attachment would be lost. The composer
+   * refuses it and names the reason in its notice
+   * ({@link attachmentsNotReadyMessage}). So the flag decides whether the
+   * control is live, and the composer keeps the integrity gate rather than
+   * leaving each host to re-derive it.
    */
   canSubmitAttachmentsOnly?: boolean
+  /** Notice copy when a send is refused because no staged file is ready yet.
+   *  Defaults to wording chosen from whether a file failed or is still
+   *  uploading. */
+  attachmentsNotReadyMessage?: string
   /**
    * Let Enter and Send keep firing while `isStreaming`, for a surface that
    * queues the next turn rather than blocking on the current one. Default
@@ -434,6 +441,7 @@ export function ChatComposer({
   dropDescription = 'They attach to your next message.',
   contextItems = [],
   canSubmitAttachmentsOnly = false,
+  attachmentsNotReadyMessage,
   canSubmitWhileBusy = false,
   autoFocus,
   minRows = 2,
@@ -631,6 +639,20 @@ export function ChatComposer({
     const readyFiles = pendingFiles.filter((f) => f.status === 'ready')
     const sendable = canSubmitAttachmentsOnly ? pendingFiles : readyFiles
     if (!trimmed && sendable.length === 0) return
+    // `canSubmitAttachmentsOnly` keeps the control live while a file is staged,
+    // but a turn carrying no text and no file the host can deliver must not go
+    // out: it would arrive empty and the attachment would be lost. Refuse it
+    // here and say why, rather than dispatching and trusting every host to
+    // re-derive the same check.
+    if (!trimmed && readyFiles.length === 0) {
+      const message =
+        attachmentsNotReadyMessage ??
+        (pendingFiles.some((f) => f.status === 'error')
+          ? 'Retry or remove the failed attachment before sending.'
+          : 'Wait for the attachment to finish uploading.')
+      setFailedSend({ message, text: '', trimmed: '', parts: [], restored: true })
+      return
+    }
     // Only a parts-aware send carries parts; `onSend`'s files travel through the
     // host's own `pendingFiles`, so its failure payload names none. Parts come
     // from READY files whatever `canSubmitAttachmentsOnly` says — an unfinished
@@ -649,6 +671,7 @@ export function ChatComposer({
     sendBlockedByStream,
     disabled,
     canSubmitAttachmentsOnly,
+    attachmentsNotReadyMessage,
     onSendParts,
     pendingFiles,
     setText,

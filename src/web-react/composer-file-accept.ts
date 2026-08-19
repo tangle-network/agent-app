@@ -54,8 +54,15 @@ export function isAcceptedFileType(file: File, accept?: string): boolean {
   return patterns.some((pattern) => {
     const lower = pattern.toLowerCase()
     if (lower.startsWith('.')) return name.endsWith(lower)
-    // Keep the trailing "/" so `image/*` cannot match `imagex/png`.
-    if (lower.endsWith('/*')) return type.startsWith(lower.slice(0, -1))
+    if (lower.endsWith('/*')) {
+      // Keep the trailing "/" so `image/*` cannot match `imagex/png`, and
+      // require a real subtype after it: `image/` and `image//png` are
+      // malformed types, and a `File.type` can carry either.
+      const prefix = lower.slice(0, -1)
+      if (!type.startsWith(prefix)) return false
+      const subtype = type.slice(prefix.length)
+      return subtype.length > 0 && !subtype.includes('/')
+    }
     return type === lower
   })
 }
@@ -173,7 +180,10 @@ function imageExtension(file: File): string | null {
  * rename exists to prevent.
  */
 export function pastedImageStartIndex(stagedNames: Iterable<string>, current: number): number {
-  let highest = current
+  // A caller's counter is only usable if it can be counted from. Anything else
+  // — a negative, a fraction, NaN, a number past the safe ceiling — starts at
+  // zero rather than producing `pasted-image-0` or disabling renaming outright.
+  let highest = Number.isSafeInteger(current) && current >= 0 ? current : 0
   for (const name of stagedNames) {
     const index = /^pasted-image-(\d+)(?:\.[a-z0-9]+)?$/i.exec(name.trim())?.[1]
     if (index === undefined) continue
@@ -213,7 +223,12 @@ export function renamePastedImages(
     startIndex,
   )
   const renamed = files.map((file) => {
-    if (!file.type.startsWith('image/') || !isGenericImageName(file.name)) return file
+    // A clipboard file can arrive with no MIME type at all, and one named
+    // `image.png` still collides across pastes exactly as a typed one does.
+    // Its extension then comes from its own name, which cannot manufacture a
+    // claim it did not already carry.
+    if (!isGenericImageName(file.name)) return file
+    if (file.type !== '' && !file.type.startsWith('image/')) return file
     const extension = imageExtension(file)
     if (extension === null) return file
     // Past the safe-integer ceiling an increment stops moving the number, which
