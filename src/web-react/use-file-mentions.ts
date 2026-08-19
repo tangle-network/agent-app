@@ -1,7 +1,7 @@
 /**
- * `useFileMentions` — the glue a host passes straight into `AgentComposer`'s
- * `mention` prop (`@tangle-network/sandbox-ui#184`) to wire up `@`-file
- * mentions against `createSandboxFileIndexRoute` (`/chat-routes`).
+ * `useFileMentions` — the glue a host passes straight into `ChatComposer`'s
+ * `mention` prop to wire up `@`-file mentions against
+ * `createSandboxFileIndexRoute` (`/chat-routes`).
  *
  * Fetches the index once per session from `indexUrl`, refreshes it in the
  * background whenever the popover opens (a `fetchItems` call) if the cached
@@ -10,9 +10,11 @@
  * `refresh()` lets a caller force a re-fetch immediately instead of waiting
  * on `refreshAfterMs` — e.g. right after the agent creates a file mid-session.
  *
- * `MentionItem`/the `mention` prop shape mirror the FROZEN contract from
- * sandbox-ui#184 structurally (no import: `/web-react` stays dependency-free
- * beyond React, and `@tangle-network/sandbox-ui` is an optional peer).
+ * `MentionItem` and `ComposerMentionProp` are the mention contract this
+ * package defines and `mention-editor.tsx` renders. The shape stays
+ * structurally identical to sandbox-ui#184's `AgentComposerProps['mention']`,
+ * so the same value drives sandbox-ui's `AgentComposer` during migration
+ * (tangle-network/agent-dev-container#5934) without an import either way.
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react'
@@ -20,11 +22,11 @@ import type { ReactNode } from 'react'
 import type { FileIndexResponse, FileIndexReadyResponse } from '../chat-routes/file-index'
 import type { FileMention } from '../chat-routes/wire'
 
-/** Mirrors sandbox-ui#184's `MentionItem` — the atomic pill's payload. For a
- *  file mention, `id` is the workspace-relative path (the pill's stable
- *  identity and the `@<id>` serialization sandbox-ui uses to round-trip
- *  `value`), `label` is the display name, and `detail` carries the full path
- *  for the popover row's secondary line. */
+/** The atomic pill's payload. For a file mention, `id` is the
+ *  workspace-relative path (the pill's stable identity and the `@<id>`
+ *  serialization the editor uses to round-trip `value`), `label` is the
+ *  display name, and `detail` carries the full path for the popover row's
+ *  secondary line. */
 export interface MentionItem {
   id: string
   label: string
@@ -32,14 +34,25 @@ export interface MentionItem {
   kind?: string
 }
 
-/** Mirrors sandbox-ui#184's `AgentComposerProps['mention']` shape — plug the
- *  hook's `mention` return value straight into that prop. */
+/** `ChatComposer`'s `mention` prop shape — plug the hook's `mention` return
+ *  value straight into it. Structurally identical to sandbox-ui#184's
+ *  `AgentComposerProps['mention']`, so it also drives `AgentComposer`. */
 export interface ComposerMentionProp {
+  /** The character that opens the popover. Default "@". */
   trigger?: string
+  /** Async provider called with the query typed after the trigger. */
   fetchItems(query: string): Promise<MentionItem[]>
+  /** Fired with the mentions currently in the document whenever they change. */
   onMentionsChange?(mentions: MentionItem[]): void
+  /** Custom row renderer for a popover item. */
   renderItem?(item: MentionItem): ReactNode
+  /** Shown when a fetch resolves to zero items. Default "No matches". */
   emptyText?: string
+  /** Extra classes merged onto the suggestion panel's root element
+   *  (`role="listbox"`), applied last so they win over the component's own —
+   *  the supported way to retheme the popover instead of targeting it by its
+   *  ARIA attributes. */
+  popoverClassName?: string
 }
 
 const FILE_MENTION_KIND = 'file'
@@ -138,7 +151,7 @@ export interface UseFileMentionsOptions {
 
 /** Provide properties and methods to manage and refresh file mentions in a composer interface */
 export interface UseFileMentionsResult {
-  /** Spread straight into `AgentComposer`'s `mention` prop. */
+  /** Spread straight into `ChatComposer`'s `mention` prop. */
   mention: ComposerMentionProp
   /** The files currently referenced by mentions in the composer's value —
    *  the send-body list (map through `fileMentionsToParts`). */
