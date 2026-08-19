@@ -502,7 +502,7 @@
     "prepare": "pnpm run build",
     "test": "vitest run",
     "test:generated": "node .github/scripts/test-generated-projects.mjs",
-    "test:gates": "vitest run src/sandbox/index.test.ts src/profile/index.test.ts tests/chat-stream.test.ts tests/browser-safe-subpaths.test.ts tests/test-quality.test.ts tests/knip-entries-fresh.test.ts tests/web-react/popover-escapes-host.test.tsx tests/web-react/popover-canon-source.test.ts",
+    "test:gates": "vitest run src/sandbox/index.test.ts src/profile/index.test.ts tests/chat-stream.test.ts tests/browser-safe-subpaths.test.ts tests/test-quality.test.ts tests/knip-entries-fresh.test.ts tests/web-react/popover-escapes-host.test.tsx tests/web-react/popover-canon-source.test.ts tests/studio/layer-order.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "docs:gen": "agent-docs",

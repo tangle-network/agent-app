@@ -51,3 +51,139 @@
 @media (prefers-reduced-motion: reduce) {
   .studio-pill-in { animation: none; }
 }
+
+/* ── Layer ladder ─────────────────────────────────────────────────────
+   PopoverSurface hardcodes z-[1000] (src/web-react/controls.tsx) and a
+   className cannot override it (equal specificity → stylesheet order wins).
+   The ladder is built AROUND 1000: the viewer sits below it so the
+   save-to-vault popover is clickable from inside the viewer; the delete
+   confirm sits above the popover; toasts above everything.
+   Pinned by tests/studio/layer-order.test.ts. */
+.studio-layer-viewer  { z-index: 900; }
+.studio-layer-confirm { z-index: 1100; }
+.studio-layer-toasts  { z-index: 1200; }
+
+/* ── Grids ── 3px gaps, square corners, no tile border: at a 3px gap a 1px
+   border reads as a hairline seam and the grid stops reading as one sheet. */
+.studio-grid { display: grid; gap: 3px; }
+.studio-grid-library { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+@media (max-width: 640px) {
+  .studio-grid-library { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+}
+
+/* ── Tile ── the scrim/chip/tooltip colors are theme-INVARIANT literals:
+   they sit on generated media and stay dark in both themes. */
+.studio-tile { position: relative; isolation: isolate; border-radius: 0; }
+.studio-tile-scrim {
+  background: linear-gradient(to top,
+    rgba(10,10,20,.74) 0%, rgba(10,10,20,.34) 46%,
+    rgba(10,10,20,.30) 66%, rgba(10,10,20,.62) 100%);
+  opacity: 0; transition: opacity .18s ease; pointer-events: none;
+}
+.studio-tile:hover .studio-tile-scrim,
+.studio-tile:focus-within .studio-tile-scrim,
+.studio-tile[data-selected='true'] .studio-tile-scrim { opacity: 1; }
+.studio-tile-actions {
+  opacity: 0; transform: translateY(-3px);
+  transition: opacity .18s ease, transform .18s ease;
+}
+.studio-tile:hover .studio-tile-actions,
+.studio-tile:focus-within .studio-tile-actions { opacity: 1; transform: none; }
+.studio-tile-prompt {
+  opacity: 0; transform: translateY(3px);
+  transition: opacity .18s ease, transform .18s ease;
+  text-shadow: 0 1px 2px rgba(0,0,0,.35);
+}
+.studio-tile:hover .studio-tile-prompt,
+.studio-tile:focus-within .studio-tile-prompt { opacity: 1; transform: none; }
+.studio-tile.studio-has-player .studio-tile-prompt { left: 36px; }
+.studio-ibtn {
+  background: rgba(12,13,26,.55); color: #fff;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  transition: background .12s ease, color .12s ease;
+}
+.studio-ibtn:hover { background: rgba(12,13,26,.78); }
+.studio-ibtn-danger:hover { color: #ff8095; }
+.studio-ibtn::after {
+  content: attr(data-tip); position: absolute; top: calc(100% + 6px); right: 0;
+  background: rgba(12,13,26,.92); color: #fff;
+  font-size: 11px; line-height: 1; padding: 5px 7px; border-radius: 6px;
+  white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .12s ease;
+}
+.studio-ibtn:hover::after, .studio-ibtn:focus-visible::after { opacity: 1; }
+.studio-chip-dark {
+  background: rgba(12,13,26,.55); color: #fff;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.studio-tile-badges > * { transition: opacity .18s ease; }
+.studio-tile:hover .studio-tile-badges > :not(.studio-play-btn),
+.studio-tile:focus-within .studio-tile-badges > :not(.studio-play-btn) { opacity: 0; }
+.studio-tile-sel { display: none; border: 1.5px solid rgba(255,255,255,.9); }
+.studio-tile[data-selectable='true']:hover .studio-tile-sel,
+.studio-tile[data-selectable='true']:focus-within .studio-tile-sel,
+.studio-selectmode .studio-tile-sel { display: grid; }
+.studio-selectmode .studio-tile-actions,
+.studio-selectmode .studio-play-btn { display: none; }
+
+/* ── Audio waveform ── two identical bar layers; the played layer revealed
+   by clip-path from a --pos custom property written per animation frame.
+   No CSS animation, so a pause freezes exactly and reduced-motion has
+   nothing to strip. */
+.studio-wave {
+  position: absolute; inset: 0; display: flex; align-items: center;
+  justify-content: center; gap: 2px; padding: 0 8%;
+}
+.studio-wave i {
+  flex: 1 1 0; min-width: 2px; max-width: 8px;
+  border-radius: 4px; background: currentColor;
+}
+.studio-wave-layers { position: absolute; inset: 0; }
+.studio-wave-play { clip-path: inset(0 calc((1 - var(--pos, 0)) * 100%) 0 0); }
+.studio-wave-layers[data-active='true'] .studio-wave-base { opacity: .3; }
+
+/* ── Skeleton ── sweep while running; reduced motion gets a gentle pulse,
+   NOT nothing — the surface must still read as busy. */
+.studio-skeleton {
+  position: relative; overflow: hidden; border-radius: 0;
+  background: hsl(var(--accent)); aspect-ratio: var(--r, 1.5);
+}
+.studio-skeleton::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 18%, hsl(var(--foreground) / .07) 50%, transparent 82%);
+  transform: translateX(-100%);
+  animation: studio-sweep 1.4s ease-in-out infinite;
+}
+@keyframes studio-sweep { to { transform: translateX(100%); } }
+@keyframes studio-softpulse { 0%, 100% { opacity: .25; } 50% { opacity: .7; } }
+
+/* ── Motion ── */
+.studio-rise { animation: studio-rise .34s cubic-bezier(.2,.7,.3,1) both; }
+@keyframes studio-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.studio-toast-in { animation: studio-toast-in .22s cubic-bezier(.2,.7,.3,1) both; }
+.studio-toast-out { animation: studio-toast-out .18s ease both; }
+@keyframes studio-toast-in { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes studio-toast-out { to { opacity: 0; transform: translateY(6px); } }
+
+/* ── Viewer backdrop / dock ── */
+.studio-backdrop {
+  background: rgba(12,13,26,.46);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+:root[data-theme='dark'] .studio-backdrop,
+.dark .studio-backdrop { background: rgba(6,6,12,.62); }
+.studio-dock::before {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 100%;
+  height: 28px; pointer-events: none;
+  background: linear-gradient(to top, hsl(var(--background)), transparent);
+}
+.studio-seek:focus-visible {
+  outline: 2px solid hsl(var(--primary)); outline-offset: 3px; border-radius: 999px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-rise, .studio-toast-in, .studio-toast-out { animation: none; }
+  .studio-skeleton::after {
+    transform: none; background: hsl(var(--foreground) / .07);
+    animation: studio-softpulse 1.8s ease-in-out infinite;
+  }
+}
