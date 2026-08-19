@@ -100,3 +100,29 @@ if (!globalThis.DataTransfer) {
   // @ts-expect-error — test-only stand-in, not a spec-complete DataTransfer.
   globalThis.DataTransfer = TestDataTransfer
 }
+
+// jsdom has no layout engine, so ProseMirror's coordinate lookups
+// (posAtCoords → elementFromPoint, coordsAtPos → Range.getClientRects) have
+// nothing to hit, and its selection bookkeeping calls scrollIntoView on every
+// transaction. Null/no-op/zero-rect shims let the mention editor process
+// events under test without throwing. Guarded on the prototypes existing so
+// node-environment files sharing this setup are untouched.
+if (typeof Document !== 'undefined' && !Document.prototype.elementFromPoint) {
+  Document.prototype.elementFromPoint = () => null
+}
+if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {}
+}
+if (typeof Range !== 'undefined' && !Range.prototype.getClientRects) {
+  Range.prototype.getClientRects = () => [] as unknown as DOMRectList
+}
+if (typeof Range !== 'undefined' && !Range.prototype.getBoundingClientRect) {
+  Range.prototype.getBoundingClientRect = () => new DOMRect()
+}
+if (!globalThis.ResizeObserver) {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+}

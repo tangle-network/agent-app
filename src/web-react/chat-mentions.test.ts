@@ -64,6 +64,28 @@ describe('segmentMentionContent', () => {
     expect(matched.size).toBe(0)
   })
 
+  it('does not let a known path swallow a decomposed filename mid-combining-mark', () => {
+    // 'a' + U+0301 is a decomposed 'á' — the combining mark continues the
+    // filename, so the shorter known path must not match before it.
+    const part = mentionPart('a', 'a')
+    const { segments, matched } = segmentMentionContent('see @a\u0301.txt here', [part])
+    expect(segments).toEqual([{ type: 'text', text: 'see @a\u0301.txt here' }])
+    expect(matched.size).toBe(0)
+  })
+
+  it('reads token boundaries as full characters, not UTF-16 code units', () => {
+    // 𝐀/𝐁 are astral letters — a code-unit read hands the boundary classes a
+    // lone surrogate, which fails `\p{L}` and flips both verdicts.
+    const part = mentionPart('a/b.md', 'b.md')
+    const before = segmentMentionContent('𝐀@a/b.md bar', [part])
+    expect(before.segments).toEqual([{ type: 'text', text: '𝐀@a/b.md bar' }])
+    expect(before.matched.size).toBe(0)
+
+    const after = segmentMentionContent('see @a/b.md𝐁 bar', [part])
+    expect(after.segments).toEqual([{ type: 'text', text: 'see @a/b.md𝐁 bar' }])
+    expect(after.matched.size).toBe(0)
+  })
+
   // `validateSandboxMentionPath` deliberately accepts non-ASCII paths, so the
   // segmenter's token boundaries have to agree with it or it mangles input the
   // wire just ratified.

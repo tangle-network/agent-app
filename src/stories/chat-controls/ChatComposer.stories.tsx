@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import { useState, type ReactNode } from 'react'
 
-import { ChatComposer, ModelPicker } from '../../web-react'
+import { ChatComposer, ModelPicker, type MentionItem } from '../../web-react'
 import {
   catalogModels,
   DEFAULT_MODEL_ID,
@@ -145,6 +145,37 @@ export const WithImageAttachments: Story = {
       canSubmitAttachmentsOnly
       pendingFiles={pendingComposerImageFiles}
       trailing={<span className="text-xs text-muted-foreground">4.2k</span>}
+    />
+  ),
+}
+
+const MENTION_FILES: MentionItem[] = [
+  { id: 'src/web-react/chat-composer.tsx', label: 'chat-composer.tsx', detail: 'src/web-react/chat-composer.tsx', kind: 'file' },
+  { id: 'src/web-react/mention-editor.tsx', label: 'mention-editor.tsx', detail: 'src/web-react/mention-editor.tsx', kind: 'file' },
+  { id: 'docs/api/web-react.md', label: 'web-react.md', detail: 'docs/api/web-react.md', kind: 'file' },
+  { id: 'README.md', label: 'README.md', detail: 'README.md', kind: 'file' },
+]
+
+/** Mention mode — type `@` to open the file popover (the TipTap editor loads
+ *  lazily on this story's first render). Picking a row inserts an atomic pill
+ *  that serializes to `@<path>`; the suggestion panel portals through
+ *  PopoverSurface, so no host box can clip it. */
+export const WithMentions: Story = {
+  name: 'With mentions',
+  render: () => (
+    <ChatComposer
+      onSend={(message) => console.log('send', message)}
+      placeholder="Type @ to mention a workspace file…"
+      controls={useModelPill()}
+      mention={{
+        fetchItems: async (query) => {
+          const q = query.toLowerCase()
+          return MENTION_FILES.filter(
+            (file) => file.label.toLowerCase().includes(q) || file.id.toLowerCase().includes(q),
+          )
+        },
+        onMentionsChange: (mentions) => console.log('mentions', mentions.map((m) => m.id)),
+      }}
     />
   ),
 }

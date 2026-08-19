@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-416 exports.
+417 exports.
 
 ### `acceptRejectionReason`
 
@@ -504,7 +504,7 @@ interface ComposerFileRejection
 
 ### `ComposerMentionProp`
 
-`interface` — Mirrors sandbox-ui#184's `AgentComposerProps['mention']` shape — plug the hook's `mention` return value straight into that prop.
+`interface` — `ChatComposer`'s `mention` prop shape — plug the hook's `mention` return value straight into it.
 
 ```ts
 interface ComposerMentionProp
@@ -1694,6 +1694,14 @@ interface LinkLikeProps
 (path: string) => string | undefined
 ```
 
+### `MENTION_PILL_CLASS`
+
+`const` — Visual contract for a rendered mention pill.
+
+```ts
+"rounded-md bg-primary/10 px-1 py-0.5 font-medium text-primary"
+```
+
 ### `mentionInputToPart`
 
 `function` — A validated wire mention (`parseFileMentions` in `/chat-routes`) as the part the turn route persists.
@@ -1704,7 +1712,7 @@ interface LinkLikeProps
 
 ### `MentionItem`
 
-`interface` — Mirrors sandbox-ui#184's `MentionItem` — the atomic pill's payload.
+`interface` — The atomic pill's payload.
 
 ```ts
 interface MentionItem

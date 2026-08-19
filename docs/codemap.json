@@ -17520,7 +17520,7 @@
           "name": "ComposerMentionProp",
           "kind": "interface",
           "signature": "interface ComposerMentionProp",
-          "doc": "Mirrors sandbox-ui#184's `AgentComposerProps['mention']` shape — plug the hook's `mention` return value straight into that prop."
+          "doc": "`ChatComposer`'s `mention` prop shape — plug the hook's `mention` return value straight into it."
         },
         {
           "name": "ComposerSendFailure",
@@ -18411,6 +18411,12 @@
           "doc": "The `image/*` mime for a mention path by extension, or `undefined` for anything not in the known image set (dispatched as `type: 'file'`)."
         },
         {
+          "name": "MENTION_PILL_CLASS",
+          "kind": "const",
+          "signature": "\"rounded-md bg-primary/10 px-1 py-0.5 font-medium text-primary\"",
+          "doc": "Visual contract for a rendered mention pill."
+        },
+        {
           "name": "mentionInputToPart",
           "kind": "function",
           "signature": "(input: FileMention) => ChatMentionPart",
@@ -18420,7 +18426,7 @@
           "name": "MentionItem",
           "kind": "interface",
           "signature": "interface MentionItem",
-          "doc": "Mirrors sandbox-ui#184's `MentionItem` — the atomic pill's payload."
+          "doc": "The atomic pill's payload."
         },
         {
           "name": "mentionKindForPath",

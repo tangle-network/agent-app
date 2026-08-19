@@ -2,8 +2,10 @@
  * ChatComposer — the shared message input every agent app used to hand-roll:
  * an auto-resizing textarea (Enter sends, Shift+Enter inserts a newline), an
  * opt-in attach + drag-and-drop + clipboard-paste surface with pending-file
- * chips, a streaming Stop/Send toggle, a slot for inline controls (model
- * picker, reasoning effort), and a Cmd/Ctrl+L focus shortcut.
+ * chips, an opt-in `@`-mention mode (`mention`) that swaps the textarea for a
+ * lazily loaded rich input with atomic mention pills, a streaming Stop/Send
+ * toggle, a slot for inline controls (model picker, reasoning effort), and a
+ * Cmd/Ctrl+L focus shortcut.
  *
  * Files arrive by three routes — the picker dialog, a drop, and a paste — and
  * all three funnel through `accept` (`./composer-file-accept`) before they
@@ -34,6 +36,9 @@
  */
 
 import {
+  Component,
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -55,6 +60,92 @@ import {
 import { filterCommandPaletteItems, type CommandPaletteItem } from '../session-shell/index'
 import { OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, PopoverSurface } from './controls'
 import { formatDictationElapsed, useDictation, type DictationAudio } from './use-dictation'
+import type { ComposerMentionProp } from './use-file-mentions'
+
+/**
+ * The TipTap editor is a lazy chunk: only consumers that pass `mention` pull
+ * the editor stack into their bundle, and only when the mention path renders.
+ * The `@tiptap/*` packages behind it are OPTIONAL peers reached only
+ * through `loadMentionEditor`'s dynamic imports — a bundler replaces a missing
+ * one with a runtime-throwing stub, so a consumer without them still builds
+ * and fails loudly only if the editor actually loads (see mention-editor.tsx,
+ * whose loader error names the complete install set).
+ *
+ * Built per retry rather than once at module scope: `lazy` caches a rejected
+ * load forever, so recovering from a transient chunk-fetch failure needs a
+ * fresh `lazy` identity (see `MentionEditorBoundary`).
+ */
+function createLazyMentionEditor() {
+  return lazy(() => import('./mention-editor').then((m) => m.loadMentionEditor()))
+}
+
+/**
+ * Contains a mention-editor failure to the input area. A rejected lazy chunk
+ * (most likely the named missing-`@tiptap/*` error from `loadTiptapModules`)
+ * would otherwise unwind past the composer and unmount the host's whole
+ * region. This is containment, not a silent fallback: the error renders as a
+ * visible alert naming the cause where the input would be — a misconfigured
+ * consumer cannot mistake it for a working composer. Retry re-imports through
+ * a fresh `lazy` identity — it recovers a transient fetch failure (a deploy
+ * that invalidated chunk hashes, a network blip), while a missing peer just
+ * fails loudly again.
+ */
+class MentionEditorBoundary extends Component<
+  {
+    onRetry: () => void
+    /** Reported once per failure so the composer can gate Send — a draft the
+     *  user can no longer see or edit must not stay dispatchable. */
+    onFailed: () => void
+    /** The current draft, shown read-only in the error state so its content
+     *  is never invisible while it exists. */
+    draft: string
+    children: ReactNode
+  },
+  { error: unknown | null }
+> {
+  state: { error: unknown | null } = { error: null }
+
+  static getDerivedStateFromError(error: unknown) {
+    return { error }
+  }
+
+  componentDidCatch() {
+    this.props.onFailed()
+  }
+
+  render() {
+    if (this.state.error === null) return this.props.children
+    const message =
+      this.state.error instanceof Error ? this.state.error.message : String(this.state.error)
+    return (
+      <div
+        role="alert"
+        data-testid="composer-mention-editor-error"
+        className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+      >
+        <div className="flex items-start gap-2">
+          <span className="min-w-0 flex-1">The mention input failed to load: {message}</span>
+          <button
+            type="button"
+            aria-label="Retry loading the mention input"
+            onClick={this.props.onRetry}
+            className="shrink-0 font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
+          >
+            Retry
+          </button>
+        </div>
+        {this.props.draft.trim() !== '' && (
+          <p
+            data-testid="composer-error-held-draft"
+            className="mt-1.5 max-h-20 overflow-y-auto whitespace-pre-wrap rounded-lg border border-destructive/30 bg-card px-2 py-1 text-foreground"
+          >
+            {this.props.draft}
+          </p>
+        )}
+      </div>
+    )
+  }
+}
 
 // ── glyphs (no icon-library dependency) ───────────────────────────────────
 
@@ -383,8 +474,25 @@ export interface ChatComposerProps {
    *  status line. It sits outside the controls slot and never shrinks, so a
    *  wrapping picker set cannot push it away. */
   trailing?: ReactNode
+  /**
+   * Opt-in `@`-mentions. Present ⇒ the textarea is swapped for a lazily
+   * loaded TipTap rich input that renders mentions as atomic pills and
+   * serializes them to `@<id>` in the value; absent ⇒ exactly the plain
+   * textarea, with no TipTap in the bundle. Wire `useFileMentions().mention`
+   * straight in. The six `@tiptap/*` packages (core, extension-mention, pm,
+   * react, starter-kit, suggestion) are OPTIONAL peers — a consumer installs
+   * them to use this prop.
+   *
+   * The rich input owns its own keyboard surface, so `slashCommands` is
+   * disabled while `mention` is set rather than left half-armed with a menu
+   * no key can reach; no shipped surface combines the two. Seed and
+   * failed-send drafts still apply in mention mode, but caret placement (a
+   * textarea affordance) degrades to content-only.
+   */
+  mention?: ComposerMentionProp
   /** `/` commands offered when the draft is exactly a leading slash token.
-   *  Omit (or pass []) and `/` types as ordinary text. */
+   *  Omit (or pass []) and `/` types as ordinary text. Inert while `mention`
+   *  is set — see {@link mention}. */
   slashCommands?: SlashCommand[]
   /** Dictation is opt-in: pass `onDictate` and the action row gains a mic
    *  button (browsers without `MediaRecorder`/`getUserMedia` render none).
@@ -488,6 +596,7 @@ export function ChatComposer({
   minRows = 2,
   maxHeight = DEFAULT_MAX_HEIGHT,
   trailing,
+  mention,
   slashCommands,
   onDictate,
   onDictateError,
@@ -507,6 +616,25 @@ export function ChatComposer({
   textRef.current = text
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  // Set by the mention editor so autofocus-independent focus paths (the
+  // Cmd/Ctrl+L shortcut) reach it in the rich path, where `textareaRef` stays
+  // null. The editor registers `null` on unmount, so the shortcut can never
+  // call into a destroyed editor.
+  const richFocusRef = useRef<(() => void) | null>(null)
+  // Stable identity so the mention editor's registration effect only reruns
+  // when the editor instance itself changes, not on every parent render.
+  const registerRichFocus = useCallback((focus: (() => void) | null) => {
+    richFocusRef.current = focus
+  }, [])
+  // Bumped by the boundary's Retry: a new epoch mints a fresh `lazy` identity
+  // (a rejected lazy caches its failure forever) and re-keys the boundary so
+  // its error state clears.
+  const [editorEpoch, setEditorEpoch] = useState(0)
+  const MentionEditor = useMemo(createLazyMentionEditor, [editorEpoch])
+  // While the mention editor is failed, the draft is visible only in the
+  // boundary's read-only block — Send must not dispatch what the user cannot
+  // edit.
+  const [editorFailed, setEditorFailed] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -615,17 +743,30 @@ export function ChatComposer({
 
   // Cmd/Ctrl+L focuses the composer from anywhere — the shortcut the hint
   // advertises. Scoped to when the shortcut is enabled and not disabled.
+  // Depends on mention PRESENCE, not identity: hosts build the prop object
+  // inline per render, and only the mode switch changes which input to focus.
+  const mentionEnabled = mention != null
   useEffect(() => {
     if (!focusShortcut || disabled) return
     function onKeyDown(e: globalThis.KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'l') {
-        e.preventDefault()
-        textareaRef.current?.focus()
+        if (mentionEnabled) {
+          // No live editor yet (still loading, or failed): leave the
+          // browser's own shortcut alone rather than swallowing it for
+          // nothing.
+          const focus = richFocusRef.current
+          if (!focus) return
+          e.preventDefault()
+          focus()
+        } else {
+          e.preventDefault()
+          textareaRef.current?.focus()
+        }
       }
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [focusShortcut, disabled])
+  }, [focusShortcut, disabled, mentionEnabled])
 
   // A ready file counts as sendable content even without a `part`: store-backed
   // attachments (`useComposerAttachments`) carry no prompt part — their
@@ -641,7 +782,8 @@ export function ChatComposer({
   // shows Stop while streaming, so `canSubmitWhileBusy` opens Enter, not a
   // second visible control.
   const sendBlockedByStream = isStreaming && !canSubmitWhileBusy
-  const canSend = hasSendable && !sendBlockedByStream && !disabled
+  const editorInputLost = mention != null && editorFailed
+  const canSend = hasSendable && !sendBlockedByStream && !disabled && !editorInputLost
 
   const [failedSend, setFailedSend] = useState<FailedSend | null>(null)
 
@@ -700,7 +842,7 @@ export function ChatComposer({
 
   const send = useCallback(() => {
     const trimmed = text.trim()
-    if (sendBlockedByStream || disabled) return
+    if (sendBlockedByStream || disabled || editorInputLost) return
     const readyFiles = pendingFiles.filter((f) => f.status === 'ready')
     const sendable = canSubmitAttachmentsOnly ? pendingFiles : readyFiles
     if (!trimmed && sendable.length === 0) return
@@ -735,6 +877,7 @@ export function ChatComposer({
     text,
     sendBlockedByStream,
     disabled,
+    editorInputLost,
     canSubmitAttachmentsOnly,
     attachmentsNotReadyMessage,
     onSendParts,
@@ -764,8 +907,11 @@ export function ChatComposer({
   const slashListId = useId()
   const [slashActive, setSlashActive] = useState(0)
   const [slashDismissedFor, setSlashDismissedFor] = useState<string | null>(null)
+  // `mention` disables the slash menu outright: its keydown/anchor wiring is
+  // the textarea's, so a token match in the rich path would arm a menu no key
+  // or click can reach. See the `mention` prop doc.
   const slashToken =
-    slashCommands && slashCommands.length > 0 ? /^\/(\S*)$/.exec(text)?.[1] : undefined
+    !mention && slashCommands && slashCommands.length > 0 ? /^\/(\S*)$/.exec(text)?.[1] : undefined
   const slashOpen = slashToken !== undefined && text !== slashDismissedFor
   const slashItems = useMemo<CommandPaletteItem[]>(
     () =>
@@ -886,16 +1032,14 @@ export function ChatComposer({
     e.target.value = ''
   }
 
-  const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
-    if (!onAttach) return
-    const clipboardFiles = e.clipboardData?.files
-    if (!clipboardFiles || clipboardFiles.length === 0) return
-    // Files are the payload, so suppress the default text paste even when every
-    // one of them is refused — a rejection must not half-paste stray text.
-    e.preventDefault()
-    // The staged names go in alongside the count: the queue is the host's and
-    // can outlive this mount, so the count alone could hand the next paste a
-    // name the queue already holds.
+  // One paste core for both input modes. Returns true when files were the
+  // payload — the caller then suppresses the default text paste even when
+  // every file is refused, so a rejection never half-pastes stray text.
+  // The staged names go in alongside the count: the queue is the host's and
+  // can outlive this mount, so the count alone could hand the next paste a
+  // name the queue already holds.
+  const ingestPastedFiles = (clipboardFiles: FileList): boolean => {
+    if (!onAttach || clipboardFiles.length === 0) return false
     const { files, nextIndex } = renamePastedImages(
       Array.from(clipboardFiles),
       pastedImageCount.current,
@@ -903,6 +1047,13 @@ export function ChatComposer({
     )
     pastedImageCount.current = nextIndex
     deliverFiles(files, clipboardFiles)
+    return true
+  }
+
+  const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const clipboardFiles = e.clipboardData?.files
+    if (!clipboardFiles || clipboardFiles.length === 0) return
+    if (ingestPastedFiles(clipboardFiles)) e.preventDefault()
   }
 
   const handleFolderChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -954,6 +1105,10 @@ export function ChatComposer({
   // silently is the one outcome with no recovery for the reader.
   const showAbove = controls != null && controlsPlacement === 'above'
   const showInline = controls != null && !showAbove
+
+  // One floor for both input modes, so the mention editor and the textarea
+  // cannot disagree about the empty-composer height.
+  const inputMinHeight = minRows * LINE_HEIGHT + TEXTAREA_PADDING_Y
 
   return (
     <div
@@ -1134,30 +1289,79 @@ export function ChatComposer({
           floating ? 'shadow-raised' : ''
         }`}
       >
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onPaste={onAttach ? handlePaste : undefined}
-          placeholder={placeholder}
-          disabled={disabled}
-          autoFocus={autoFocus}
-          // `minRows` lines before it grows. `rows` is what actually holds the
-          // floor: the autosize measures `scrollHeight` against `height: auto`,
-          // which a textarea resolves through `rows`, so the measurement cannot
-          // come back shorter. The paired `minHeight` is those same lines in CSS
-          // (`box-sizing: border-box` puts the padding inside it), computed from
-          // the same row count so the two cannot disagree. It sits exactly AT
-          // the natural height on purpose: a floor is meant to be inert until
-          // something tries to go under it, which here means an inline height
-          // arriving from anywhere but the autosize. Setting it higher would buy
-          // no protection and cost permanent dead space under the caret.
-          rows={minRows}
-          style={{ minHeight: minRows * LINE_HEIGHT + TEXTAREA_PADDING_Y, maxHeight }}
-          aria-label="Message input"
-          className="w-full resize-none bg-transparent px-1.5 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
-        />
+        {mention ? (
+          // The editor arrives as a lazy chunk; until it lands, a read-only
+          // textarea with the same metrics holds the layout so the card
+          // doesn't jump. The boundary contains a failed load (e.g. the
+          // missing-peer error) to the input area instead of unmounting the
+          // host's region.
+          <MentionEditorBoundary
+            key={editorEpoch}
+            onRetry={() => {
+              setEditorFailed(false)
+              setEditorEpoch((epoch) => epoch + 1)
+            }}
+            onFailed={() => setEditorFailed(true)}
+            draft={text}
+          >
+            <Suspense
+              fallback={
+                <textarea
+                  rows={minRows}
+                  value={text}
+                  readOnly
+                  disabled
+                  placeholder={placeholder}
+                  aria-label="Message input"
+                  style={{ minHeight: inputMinHeight, maxHeight }}
+                  className="w-full resize-none bg-transparent px-1.5 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
+                />
+              }
+            >
+              <MentionEditor
+                value={text}
+                onChange={setText}
+                onSubmit={send}
+                placeholder={placeholder}
+                disabled={disabled}
+                autoFocus={autoFocus}
+                minHeight={inputMinHeight}
+                maxHeight={maxHeight}
+                mention={mention}
+                registerFocus={registerRichFocus}
+                onPasteFiles={onAttach ? ingestPastedFiles : undefined}
+              />
+            </Suspense>
+          </MentionEditorBoundary>
+        ) : (
+          // Focus: `outline-none` is safe because the card above draws the
+          // keyboard indicator through `focus-within:` — one ring for
+          // whichever input mode is mounted.
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onPaste={onAttach ? handlePaste : undefined}
+            placeholder={placeholder}
+            disabled={disabled}
+            autoFocus={autoFocus}
+            // `minRows` lines before it grows. `rows` is what actually holds the
+            // floor: the autosize measures `scrollHeight` against `height: auto`,
+            // which a textarea resolves through `rows`, so the measurement cannot
+            // come back shorter. The paired `minHeight` is those same lines in CSS
+            // (`box-sizing: border-box` puts the padding inside it), computed from
+            // the same row count so the two cannot disagree. It sits exactly AT
+            // the natural height on purpose: a floor is meant to be inert until
+            // something tries to go under it, which here means an inline height
+            // arriving from anywhere but the autosize. Setting it higher would buy
+            // no protection and cost permanent dead space under the caret.
+            rows={minRows}
+            style={{ minHeight: inputMinHeight, maxHeight }}
+            aria-label="Message input"
+            className="w-full resize-none bg-transparent px-1.5 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
+          />
+        )}
 
         <div className="flex items-end gap-2">
           {onAttach && (

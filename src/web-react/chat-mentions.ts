@@ -17,6 +17,11 @@
  */
 
 import { mentionInputToPart, mentionPartsFromMessageParts, type ChatMentionKind, type ChatMentionPart } from '../chat-store/parts'
+// The `@<path>` token grammar (boundary classes + code-point readers) lives
+// in `mention-boundaries.ts`, shared with the editor's pill restore and kept
+// out of the public barrel — this module is barrel-exported wholesale, and
+// the grammar's internals are not API.
+import { charAt, charBefore, PATH_CONTINUATION_CHAR, WORD_CHAR } from './mention-boundaries'
 
 export type { ChatMentionKind, ChatMentionPart }
 export { mentionInputToPart, mentionPartsFromMessageParts }
@@ -30,19 +35,6 @@ export interface MentionTextSegment {
   text: string
   part?: ChatMentionPart
 }
-
-/** A character that could plausibly continue the SAME path/filename past a
- *  matched token. Without this lookahead a mention of `@a/b.md` would match
- *  inside the unrelated `@a/b.md.bak` and split it mid-filename.
- *
- *  Unicode-aware because the wire validator (`validateSandboxMentionPath`)
- *  deliberately ALLOWS non-ASCII paths — in-box filenames are arbitrary. An
- *  ASCII-only class here would accept input the segmenter then mangles. */
-const PATH_CONTINUATION_CHAR = /[\p{L}\p{N}._\-/]/u
-/** A character that, immediately BEFORE an `@`, means the `@` is part of a
- *  longer token (an email local part, a handle) rather than a mention start.
- *  Unicode-aware for the same reason. */
-const WORD_CHAR = /[\p{L}\p{N}]/u
 
 /**
  * Split a message's text into plain-text and mention segments by matching
@@ -79,7 +71,7 @@ export function segmentMentionContent(
       cursor += 1
       continue
     }
-    const prevChar = cursor > 0 ? content[cursor - 1] : undefined
+    const prevChar = charBefore(content, cursor)
     if (prevChar && WORD_CHAR.test(prevChar)) {
       cursor += 1
       continue
@@ -90,7 +82,7 @@ export function segmentMentionContent(
       continue
     }
     const endIdx = cursor + candidate.token.length
-    const nextChar = endIdx < content.length ? content[endIdx] : undefined
+    const nextChar = charAt(content, endIdx)
     if (nextChar && PATH_CONTINUATION_CHAR.test(nextChar)) {
       cursor += 1
       continue
