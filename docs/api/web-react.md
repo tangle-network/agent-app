@@ -4,7 +4,15 @@
 
 Source: `src/web-react/index.tsx`
 
-394 exports.
+400 exports.
+
+### `acceptRejectionReason`
+
+`function` — The reason an `accept` list refused a file.
+
+```ts
+(file: File, accept: string) => string
+```
 
 ### `activityTone`
 
@@ -438,6 +446,14 @@ interface ChatUiMessage
 interface ComposerAnswerDelivery
 ```
 
+### `ComposerContextItem`
+
+`interface` — A piece of context the agent will see beside the next message — an open file, a selected record, a pinned document.
+
+```ts
+interface ComposerContextItem
+```
+
 ### `ComposerFile`
 
 `interface`
@@ -452,6 +468,14 @@ interface ComposerFile
 
 ```ts
 interface ComposerFilePart
+```
+
+### `ComposerFileRejection`
+
+`interface` — A file the `accept` list refused, with the reason to show for it.
+
+```ts
+interface ComposerFileRejection
 ```
 
 ### `ComposerMentionProp`
@@ -1014,6 +1038,14 @@ interface FileMention
 (mentions: readonly FileMention[], opts?: FileMentionsToPartsOptions) => ChatTurnFilePartInput[]
 ```
 
+### `filterAcceptedFiles`
+
+`function` — Splits a batch into what the `accept` list admits and what it refuses.
+
+```ts
+(files: File[] | FileList, accept?: string | undefined) => { accepted: File[]; rejected: ComposerFileRejection[]; }
+```
+
 ### `FlowWaterfall`
 
 `function` — Compact proportional waterfall over a FlowTrace — span name, bar, duration per row; total + cost in the footer.
@@ -1492,6 +1524,14 @@ type InteractionSubmitResult
 
 ```ts
 (request: InteractionRequest, status: ChatInteractionStatus, cancelReason?: string | undefined, answers?: InteractionAn…
+```
+
+### `isAcceptedFileType`
+
+`function` — Checks one file against a comma-separated `accept` list, using the grammar of the native `<input accept>` attribute: extensions (`.png`), exact MIME types (`image/png`), and MIME wildcards (`image/*`…
+
+```ts
+(file: File, accept?: string | undefined) => boolean
 ```
 
 ### `isChatAttachmentPart`
@@ -2404,6 +2444,14 @@ type RecordGridValue
 
 ```ts
 type RecordGridWriteOutcome
+```
+
+### `renamePastedImages`
+
+`function` — Gives every generically-named clipboard image a distinct `pasted-image-<n>.<ext>` name, counting up from `startIndex`.
+
+```ts
+(files: File[], startIndex: number) => { files: File[]; nextIndex: number; }
 ```
 
 ### `resolveChatInteraction`
