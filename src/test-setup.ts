@@ -10,12 +10,18 @@ afterEach(() => {
   if (typeof document !== "undefined") cleanup()
 })
 
-// jsdom does not implement DataTransfer (jsdom#1568). `ChatComposer` builds one
-// to hand `onAttach` a FileList after its accept filter removed or renamed a
-// file, and a drop/paste test has to build one to fire the event, so both sides
-// need a stand-in here. Real browsers have had the constructor since 2018 — this
-// covers the test environment only, and is deliberately minimal so nothing
-// mistakes it for a spec-complete implementation.
+// jsdom does not implement DataTransfer (jsdom#1568), and neither does Node.
+// `ChatComposer` builds one to hand `onAttach` a FileList after its accept
+// filter removed or renamed a file, and a drop/paste test has to build one to
+// fire the event, so both sides need a stand-in here. It is installed for every
+// environment on purpose: `composer-file-accept` is DOM-free and its FileList
+// handling is covered under the node environment, which would otherwise have to
+// pay for jsdom to construct one input.
+//
+// Real browsers have had the constructor since 2018. This is deliberately
+// minimal, and its `files` is a DUCK-TYPED object cast to FileList — it answers
+// `length`, indexed access and `item()`, and nothing else — so no test should
+// read it as evidence about a real FileList's behavior.
 if (!globalThis.DataTransfer) {
   class TestDataTransferItemList {
     constructor(private readonly files: File[]) {}

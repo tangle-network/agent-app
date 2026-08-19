@@ -134,12 +134,34 @@ describe('renamePastedImages', () => {
     expect(result.nextIndex).toBe(0)
   })
 
-  it('preserves the bytes and the MIME type of a renamed file', async () => {
-    const original = new File([new Uint8Array([1, 2, 3])], 'image.png', { type: 'image/png' })
+  it('preserves the bytes, the MIME type and the modification time of a renamed file', async () => {
+    // Only the name changes. A reset `lastModified` would make the pasted file
+    // look new to any downstream fingerprint or dedupe that reads it.
+    const original = new File([new Uint8Array([1, 2, 3])], 'image.png', {
+      type: 'image/png',
+      lastModified: 1_000_000_000_000,
+    })
     const renamed = renamePastedImages([original], 0).files[0]!
 
     expect(renamed.type).toBe('image/png')
+    expect(renamed.lastModified).toBe(1_000_000_000_000)
     expect(new Uint8Array(await renamed.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]))
+  })
+
+  it('numbers past a pasted-image name carried in the SAME batch', () => {
+    // One paste can hold a file already named `pasted-image-1.png` beside a raw
+    // bitmap; numbering the bitmap blindly would duplicate its batch-mate.
+    const preNamed = file('pasted-image-1.png', 'image/png')
+    const bitmap = file('image.png', 'image/png')
+    const result = renamePastedImages([preNamed, bitmap], 0)
+
+    expect(result.files.map((f) => f.name)).toEqual(['pasted-image-1.png', 'pasted-image-2.png'])
+    expect(result.nextIndex).toBe(2)
+    // Order does not matter: the batch is scanned before any renaming starts.
+    expect(renamePastedImages([bitmap, preNamed], 0).files.map((f) => f.name)).toEqual([
+      'pasted-image-2.png',
+      'pasted-image-1.png',
+    ])
   })
 })
 

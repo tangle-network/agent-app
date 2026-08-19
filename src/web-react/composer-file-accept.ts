@@ -147,19 +147,32 @@ export function pastedImageStartIndex(stagedNames: Iterable<string>, current: nu
  * Files that already carry a real name pass through untouched, so a copied
  * `report.pdf` keeps being `report.pdf`. So does an image whose extension
  * cannot be derived from what it declares — a renamed file must never claim a
- * format it is not. `nextIndex` is the counter to hand the next paste.
+ * format it is not. Only the name changes: the bytes, the type and the
+ * modification time travel with it, so downstream fingerprinting still sees
+ * the file the user pasted. `nextIndex` is the counter to hand the next paste.
+ *
+ * The batch counts against itself as well as against `startIndex`. One paste
+ * can carry a file already NAMED `pasted-image-1.png` beside a generic bitmap,
+ * and numbering the bitmap without looking would hand it the name its own
+ * batch-mate already holds.
  */
 export function renamePastedImages(
   files: File[],
   startIndex: number,
 ): { files: File[]; nextIndex: number } {
-  let nextIndex = startIndex
+  let nextIndex = pastedImageStartIndex(
+    files.map((file) => file.name),
+    startIndex,
+  )
   const renamed = files.map((file) => {
     if (!file.type.startsWith('image/') || !isGenericImageName(file.name)) return file
     const extension = imageExtension(file)
     if (extension === null) return file
     nextIndex += 1
-    return new File([file], `pasted-image-${nextIndex}.${extension}`, { type: file.type })
+    return new File([file], `pasted-image-${nextIndex}.${extension}`, {
+      type: file.type,
+      lastModified: file.lastModified,
+    })
   })
   return { files: renamed, nextIndex }
 }
