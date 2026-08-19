@@ -13,6 +13,9 @@ const firstPage = makeGenerationPage(historyGenerations.slice(0, 12), 'studio-hi
 
 const meta: Meta<typeof StudioHistoryScreen> = {
   title: 'Studio/StudioHistoryScreen',
+  // A full-viewport screen: the global `centered` layout shrink-wraps it to
+  // content width, which misrepresents the top bar + full-bleed grid.
+  parameters: { layout: 'fullscreen' },
   component: StudioHistoryScreen,
   decorators: [
     (Story) => <StudioProviders><div className="min-h-screen"><Story /></div></StudioProviders>,

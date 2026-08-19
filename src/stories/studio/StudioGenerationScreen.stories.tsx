@@ -38,6 +38,9 @@ const singleWideResult: Generation = {
 
 const meta: Meta<typeof StudioGenerationScreen> = {
   title: 'Studio/StudioGenerationScreen',
+  // A full-viewport screen: the global `centered` layout shrink-wraps it to
+  // content width, which misrepresents the centered results column + dock.
+  parameters: { layout: 'fullscreen' },
   component: StudioGenerationScreen,
   decorators: [
     (Story) => {
