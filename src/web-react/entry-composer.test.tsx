@@ -139,6 +139,49 @@ describe('EntryComposer', () => {
     expect(box.value).toBe('')
   })
 
+  it('sends an attachments-only turn once the upload is ready', async () => {
+    // `canSubmitAttachmentsOnly` is passed through, so an empty message with a
+    // READY attachment must reach `onSubmit` with the server references —
+    // `submit`'s empty gate requires text AND references to both be absent.
+    const serverRef = { path: 'uploads/shot.png', name: 'shot.png' }
+    const onSubmit = vi.fn()
+    const originalFetch = globalThis.fetch
+    const originalCreate = globalThis.URL.createObjectURL
+    const originalRevoke = globalThis.URL.revokeObjectURL
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ files: [serverRef] }),
+    })) as unknown as typeof fetch
+    globalThis.URL.createObjectURL = vi.fn(() => 'blob:1')
+    globalThis.URL.revokeObjectURL = vi.fn()
+
+    try {
+      render(<EntryComposer onSubmit={onSubmit} uploadUrl="/api/vault/upload" />)
+      const fileInput = document.querySelector('input[type=file]') as HTMLInputElement
+      // PNG signature so the shared type sniffer accepts it.
+      const bytes = new Uint8Array(64)
+      bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0)
+      const png = new File([bytes], 'shot.png', { type: 'image/png' })
+      fireEvent.change(fileInput, { target: { files: [png] } })
+
+      // Staged chip appears, then the upload settles (spinner gone = ready).
+      await screen.findByText('shot.png')
+      await vi.waitFor(() => {
+        expect(document.querySelector('.animate-spin')).toBeNull()
+      })
+
+      const box = document.querySelector('textarea') as HTMLTextAreaElement
+      fireEvent.keyDown(box, { key: 'Enter' })
+      expect(onSubmit).toHaveBeenCalledTimes(1)
+      expect(onSubmit.mock.calls[0]).toEqual(['', [serverRef], []])
+    } finally {
+      globalThis.fetch = originalFetch
+      globalThis.URL.createObjectURL = originalCreate
+      globalThis.URL.revokeObjectURL = originalRevoke
+    }
+  })
+
   it('renders the icon send control and no focus-shortcut hint', () => {
     // Two deliberate parity choices with the AgentComposer this replaced: the
     // send control is the circular icon (its label lives in aria-label, never
