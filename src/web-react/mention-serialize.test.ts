@@ -91,6 +91,27 @@ describe('mention serialization', () => {
     expect(serializeMentionDoc(doc)).toBe('mail user@src/app.tsx today')
   })
 
+  it('reads boundaries as full characters, not UTF-16 code units', () => {
+    // 𝐀/𝐁 are astral letters — a code-unit read hands the classes a lone
+    // surrogate, which fails `\p{L}` and flips both boundary verdicts.
+    const before = parseMentionValue('𝐀@src/app.tsx', known(FILE))
+    expect(collectMentions(before)).toHaveLength(0)
+
+    const after = parseMentionValue('@src/app.tsx𝐁', known(FILE))
+    expect(collectMentions(after)).toHaveLength(0)
+  })
+
+  it('resolves space-grouping ambiguity by the longest known id — the documented rule', () => {
+    // `@my file.ts` cannot distinguish a `my` mention followed by prose from
+    // a `my file.ts` mention; the plain-text contract resolves to the
+    // longest known id, the same rule the transcript segmenter applies.
+    const doc = parseMentionValue(
+      '@my file.ts',
+      known({ id: 'my', label: 'my' }, { id: 'my file.ts', label: 'my file.ts' }),
+    )
+    expect(collectMentions(doc).map((m) => m.id)).toEqual(['my file.ts'])
+  })
+
   it('prefers the longest known id and respects a whitespace boundary', () => {
     const shorter: MentionItem = { id: 'src/app', label: 'app' }
     const longer: MentionItem = { id: 'src/app.tsx', label: 'app.tsx' }

@@ -8,7 +8,7 @@
  * is unit-testable on its own and never pulls the editor chunk into a bundle.
  */
 
-import { PATH_CONTINUATION_CHAR, WORD_CHAR } from './chat-mentions'
+import { charAt, charBefore, PATH_CONTINUATION_CHAR, WORD_CHAR } from './chat-mentions'
 import type { MentionItem } from './use-file-mentions'
 
 /**
@@ -104,7 +104,10 @@ function parseLine(line: string, known: Map<string, MentionItem>): MentionDocNod
     // A word character right before the `@` means it is part of a longer
     // token (an email local part, a handle), never a mention start — the
     // same rule the transcript segmenter applies to persisted messages.
-    const partOfLongerToken = i > 0 && WORD_CHAR.test(line[i - 1]!)
+    // Read as a full code point: an astral letter's low surrogate would
+    // fail WORD_CHAR and let an embedded `@` start a mention.
+    const before = charBefore(line, i)
+    const partOfLongerToken = before !== undefined && WORD_CHAR.test(before)
     if (line[i] === '@' && !partOfLongerToken) {
       const id = matchKnownId(line, i + 1, known)
       if (id) {
@@ -131,9 +134,12 @@ function parseLine(line: string, known: Map<string, MentionItem>): MentionDocNod
 
 /**
  * The longest known id that starts at `pos` and ends on a boundary: end of
- * line, or any character that could not continue the same path — the
- * transcript segmenter's rule, so `@a.tsx,` restores its pill while
- * `@a.tsx.bak` never matches the shorter `a.tsx` mid-filename.
+ * line, or any full character (never a lone surrogate) that could not
+ * continue the same path — the transcript segmenter's rule, so `@a.tsx,`
+ * restores its pill while `@a.tsx.bak` never matches the shorter `a.tsx`
+ * mid-filename. The scan is linear in `known.size` per `@` run on purpose:
+ * `known` holds only the ids PICKED this session (a handful), never the
+ * file index, so an index structure would buy nothing.
  */
 function matchKnownId(
   line: string,
@@ -145,8 +151,8 @@ function matchKnownId(
     if (id.length === 0) continue
     if (best !== null && id.length <= best.length) continue
     if (!line.startsWith(id, pos)) continue
-    const after = pos + id.length
-    if (after < line.length && PATH_CONTINUATION_CHAR.test(line[after]!)) continue
+    const next = charAt(line, pos + id.length)
+    if (next !== undefined && PATH_CONTINUATION_CHAR.test(next)) continue
     best = id
   }
   return best

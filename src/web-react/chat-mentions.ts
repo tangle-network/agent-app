@@ -49,6 +49,23 @@ export const PATH_CONTINUATION_CHAR = /[\p{L}\p{N}._\-/]/u
  *  see {@link PATH_CONTINUATION_CHAR}. */
 export const WORD_CHAR = /[\p{L}\p{N}]/u
 
+/** The full character (code point) ENDING just before `index`, or undefined
+ *  at the start. Indexing `text[index - 1]` hands a lone UTF-16 surrogate to
+ *  the Unicode-aware classes above, which then misread every astral letter —
+ *  boundary checks must see whole characters. */
+export function charBefore(text: string, index: number): string | undefined {
+  if (index <= 0) return undefined
+  return Array.from(text.slice(Math.max(0, index - 2), index)).pop()
+}
+
+/** The full character (code point) starting at `index`, or undefined past the
+ *  end — same surrogate rationale as {@link charBefore}. */
+export function charAt(text: string, index: number): string | undefined {
+  if (index >= text.length) return undefined
+  const codePoint = text.codePointAt(index)
+  return codePoint === undefined ? undefined : String.fromCodePoint(codePoint)
+}
+
 /**
  * Split a message's text into plain-text and mention segments by matching
  * `@<path>` runs against that message's own mention parts.
@@ -84,7 +101,7 @@ export function segmentMentionContent(
       cursor += 1
       continue
     }
-    const prevChar = cursor > 0 ? content[cursor - 1] : undefined
+    const prevChar = charBefore(content, cursor)
     if (prevChar && WORD_CHAR.test(prevChar)) {
       cursor += 1
       continue
@@ -95,7 +112,7 @@ export function segmentMentionContent(
       continue
     }
     const endIdx = cursor + candidate.token.length
-    const nextChar = endIdx < content.length ? content[endIdx] : undefined
+    const nextChar = charAt(content, endIdx)
     if (nextChar && PATH_CONTINUATION_CHAR.test(nextChar)) {
       cursor += 1
       continue
