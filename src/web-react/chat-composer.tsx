@@ -69,8 +69,14 @@ import type { ComposerMentionProp } from './use-file-mentions'
  * through `loadMentionEditor`'s dynamic imports — a bundler replaces a missing
  * one with a runtime-throwing stub, so a consumer without them still builds
  * and fails loudly only if the editor actually loads (see mention-editor.tsx).
+ *
+ * Built per retry rather than once at module scope: `lazy` caches a rejected
+ * load forever, so recovering from a transient chunk-fetch failure needs a
+ * fresh `lazy` identity (see `MentionEditorBoundary`).
  */
-const MentionEditor = lazy(() => import('./mention-editor').then((m) => m.loadMentionEditor()))
+function createLazyMentionEditor() {
+  return lazy(() => import('./mention-editor').then((m) => m.loadMentionEditor()))
+}
 
 /**
  * Contains a mention-editor failure to the input area. A rejected lazy chunk
@@ -78,10 +84,13 @@ const MentionEditor = lazy(() => import('./mention-editor').then((m) => m.loadMe
  * would otherwise unwind past the composer and unmount the host's whole
  * region. This is containment, not a silent fallback: the error renders as a
  * visible alert naming the cause where the input would be — a misconfigured
- * consumer cannot mistake it for a working composer.
+ * consumer cannot mistake it for a working composer. Retry re-imports through
+ * a fresh `lazy` identity — it recovers a transient fetch failure (a deploy
+ * that invalidated chunk hashes, a network blip), while a missing peer just
+ * fails loudly again.
  */
 class MentionEditorBoundary extends Component<
-  { children: ReactNode },
+  { onRetry: () => void; children: ReactNode },
   { error: unknown | null }
 > {
   state: { error: unknown | null } = { error: null }
@@ -98,9 +107,17 @@ class MentionEditorBoundary extends Component<
       <div
         role="alert"
         data-testid="composer-mention-editor-error"
-        className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+        className="flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
       >
-        The mention input failed to load: {message}
+        <span className="min-w-0 flex-1">The mention input failed to load: {message}</span>
+        <button
+          type="button"
+          aria-label="Retry loading the mention input"
+          onClick={this.props.onRetry}
+          className="shrink-0 font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
+        >
+          Retry
+        </button>
       </div>
     )
   }
@@ -584,6 +601,11 @@ export function ChatComposer({
   const registerRichFocus = useCallback((focus: (() => void) | null) => {
     richFocusRef.current = focus
   }, [])
+  // Bumped by the boundary's Retry: a new epoch mints a fresh `lazy` identity
+  // (a rejected lazy caches its failure forever) and re-keys the boundary so
+  // its error state clears.
+  const [editorEpoch, setEditorEpoch] = useState(0)
+  const MentionEditor = useMemo(createLazyMentionEditor, [editorEpoch])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -1233,7 +1255,10 @@ export function ChatComposer({
           // doesn't jump. The boundary contains a failed load (e.g. the
           // missing-peer error) to the input area instead of unmounting the
           // host's region.
-          <MentionEditorBoundary>
+          <MentionEditorBoundary
+            key={editorEpoch}
+            onRetry={() => setEditorEpoch((epoch) => epoch + 1)}
+          >
             <Suspense
               fallback={
                 <textarea
