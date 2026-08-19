@@ -101,10 +101,31 @@ export const pendingComposerFiles: ComposerFile[] = [
   { id: 'f2', name: 'design-assets', kind: 'folder', fileCount: 12, status: 'uploading' },
 ]
 
-/** Adds an errored chip so the destructive tone is covered too. */
+/** Adds an errored chip so the destructive tone and its reason are covered. */
 export const pendingComposerFilesWithError: ComposerFile[] = [
   ...pendingComposerFiles,
-  { id: 'f3', name: 'brand-guide.pdf', kind: 'file', status: 'error' },
+  {
+    id: 'f3',
+    name: 'brand-guide.pdf',
+    kind: 'file',
+    status: 'error',
+    errorMessage: 'Upload failed (413)',
+  },
+]
+
+/** A staged image whose thumbnail identifies it — the shape a pasted
+ *  screenshot arrives in, where the auto-generated name says nothing. A data
+ *  URL keeps the story free of an object URL nobody would revoke. */
+export const pendingComposerImageFiles: ComposerFile[] = [
+  {
+    id: 'i1',
+    name: 'pasted-image-1.png',
+    kind: 'file',
+    status: 'ready',
+    previewUrl:
+      'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="%236366f1"/><circle cx="32" cy="26" r="12" fill="%23fbbf24"/></svg>',
+  },
+  { id: 'i2', name: 'pasted-image-2.png', kind: 'file', status: 'uploading' },
 ]
 
 // ── message attachments ─────────────────────────────────────────────────────

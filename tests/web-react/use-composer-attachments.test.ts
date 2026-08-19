@@ -110,6 +110,24 @@ describe('useComposerAttachments', () => {
     expect(result.current.blockReason).toBeNull()
   })
 
+  it('carries the thumbnail URL and the failure reason onto the chip model', async () => {
+    // The hook is the only place that knows either one — it mints the object
+    // URL and holds the upload's error text — so a chip model without them
+    // leaves the composer with no thumbnail and a red chip that names nothing.
+    const { result } = renderHook(() => useComposerAttachments({ uploadUrl: '/upload' }))
+    await act(async () => {
+      await result.current.addFiles([png('shot.png'), png('doc.png')])
+    })
+    expect(result.current.composerFiles.map((f) => f.previewUrl)).toEqual(['blob:1', 'blob:2'])
+    expect(result.current.composerFiles[0]!.errorMessage).toBeUndefined()
+
+    calls[0]!.resolve(fail(413, 'File "shot.png" exceeds the limit'))
+    await waitFor(() => expect(result.current.composerFiles[0]!.status).toBe('error'))
+    expect(result.current.composerFiles[0]!.errorMessage).toBe('File "shot.png" exceeds the limit')
+    // The preview survives the failure, so a retryable chip still shows what it is.
+    expect(result.current.composerFiles[0]!.previewUrl).toBe('blob:1')
+  })
+
   it('marks a file error from a {error: string} response body and calls onError', async () => {
     const onError = vi.fn()
     const { result } = renderHook(() => useComposerAttachments({ uploadUrl: '/upload', onError }))

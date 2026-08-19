@@ -709,3 +709,359 @@ describe('ChatComposer seed', () => {
     expect(stop.textContent).toBe('')
   })
 })
+
+// ── attachment lifecycle ───────────────────────────────────────────────────
+
+function makeFile(name: string, type: string): File {
+  return new File(['x'], name, { type })
+}
+
+function fileList(...files: File[]): FileList {
+  const transfer = new DataTransfer()
+  for (const file of files) transfer.items.add(file)
+  return transfer.files
+}
+
+/** The composer's hidden file input — the picker route. It carries no label of
+ *  its own (the visible button does), so it is reached through the DOM. */
+function pickerInput(container: HTMLElement): HTMLInputElement {
+  return container.querySelector('input[type="file"]:not([webkitdirectory])') as HTMLInputElement
+}
+
+describe('ChatComposer file ingress', () => {
+  it('re-filters the picker, because a dialog lets the user override accept', () => {
+    const onAttach = vi.fn()
+    const onRejectFiles = vi.fn()
+    const { container } = render(
+      <ChatComposer onSend={() => {}} onAttach={onAttach} onRejectFiles={onRejectFiles} accept="image/*" />,
+    )
+    const input = pickerInput(container)
+    expect(input.getAttribute('accept')).toBe('image/*')
+
+    const png = makeFile('a.png', 'image/png')
+    const mp3 = makeFile('b.mp3', 'audio/mpeg')
+    fireEvent.change(input, { target: { files: fileList(png, mp3) } })
+
+    expect(Array.from(onAttach.mock.calls[0]![0] as FileList).map((f) => f.name)).toEqual(['a.png'])
+    expect(onRejectFiles.mock.calls[0]![0].map((r: { file: File }) => r.file.name)).toEqual(['b.mp3'])
+  })
+
+  it('applies accept to a drop, delivering only the matching files', () => {
+    const onAttach = vi.fn()
+    const onRejectFiles = vi.fn()
+    const { container } = render(
+      <ChatComposer onSend={() => {}} onAttach={onAttach} onRejectFiles={onRejectFiles} accept=".pdf" />,
+    )
+    const root = container.firstElementChild as HTMLElement
+    const pdf = makeFile('spec.pdf', 'application/pdf')
+    fireEvent.drop(root, { dataTransfer: { files: fileList(pdf, makeFile('a.png', 'image/png')), types: ['Files'] } })
+
+    expect(Array.from(onAttach.mock.calls[0]![0] as FileList).map((f) => f.name)).toEqual(['spec.pdf'])
+    expect(onRejectFiles).toHaveBeenCalledTimes(1)
+  })
+
+  it('never calls onAttach when accept refuses the whole batch', () => {
+    const onAttach = vi.fn()
+    const onRejectFiles = vi.fn()
+    const { container } = render(
+      <ChatComposer onSend={() => {}} onAttach={onAttach} onRejectFiles={onRejectFiles} accept="image/*" />,
+    )
+    const root = container.firstElementChild as HTMLElement
+    fireEvent.drop(root, { dataTransfer: { files: fileList(makeFile('b.mp3', 'audio/mpeg')), types: ['Files'] } })
+
+    expect(onAttach).not.toHaveBeenCalled()
+    expect(onRejectFiles).toHaveBeenCalledTimes(1)
+  })
+
+  it('forwards the browser FileList untouched when nothing is filtered out', () => {
+    const onAttach = vi.fn()
+    const onRejectFiles = vi.fn()
+    const { container } = render(
+      <ChatComposer onSend={() => {}} onAttach={onAttach} onRejectFiles={onRejectFiles} />,
+    )
+    const root = container.firstElementChild as HTMLElement
+    const files = fileList(makeFile('a.png', 'image/png'), makeFile('b.mp3', 'audio/mpeg'))
+    fireEvent.drop(root, { dataTransfer: { files, types: ['Files'] } })
+
+    // Identity, not just equal contents: an unfiltered batch is never rebuilt.
+    expect(onAttach).toHaveBeenCalledWith(files)
+    expect(onRejectFiles).not.toHaveBeenCalled()
+  })
+
+  it('renames a generic clipboard bitmap and keeps counting across pastes', () => {
+    const onAttach = vi.fn()
+    render(<ChatComposer onSend={() => {}} onAttach={onAttach} />)
+    const input = screen.getByLabelText('Message input')
+
+    fireEvent.paste(input, { clipboardData: { files: fileList(makeFile('image.png', 'image/png')) } })
+    fireEvent.paste(input, { clipboardData: { files: fileList(makeFile('image.png', 'image/png')) } })
+
+    expect(Array.from(onAttach.mock.calls[0]![0] as FileList)[0]!.name).toBe('pasted-image-1.png')
+    expect(Array.from(onAttach.mock.calls[1]![0] as FileList)[0]!.name).toBe('pasted-image-2.png')
+  })
+
+  it('routes a pasted file accept refuses to onRejectFiles, never to onAttach', () => {
+    const onAttach = vi.fn()
+    const onRejectFiles = vi.fn()
+    render(<ChatComposer onSend={() => {}} onAttach={onAttach} onRejectFiles={onRejectFiles} accept="image/*" />)
+
+    fireEvent.paste(screen.getByLabelText('Message input'), {
+      clipboardData: { files: fileList(makeFile('notes.pdf', 'application/pdf')) },
+    })
+
+    expect(onAttach).not.toHaveBeenCalled()
+    expect(onRejectFiles).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves a text-only paste to the textarea and attaches nothing', () => {
+    const onAttach = vi.fn()
+    render(<ChatComposer onSend={() => {}} onAttach={onAttach} />)
+
+    const event = new Event('paste', { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'clipboardData', { value: { files: fileList() } })
+    fireEvent(screen.getByLabelText('Message input'), event)
+
+    expect(onAttach).not.toHaveBeenCalled()
+    // Not prevented, so the browser's own text paste still lands in the input.
+    expect(event.defaultPrevented).toBe(false)
+  })
+
+  it('ignores a paste entirely when attachments are not wired', () => {
+    render(<ChatComposer onSend={() => {}} />)
+    const event = new Event('paste', { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'clipboardData', {
+      value: { files: fileList(makeFile('image.png', 'image/png')) },
+    })
+    fireEvent(screen.getByLabelText('Message input'), event)
+
+    expect(event.defaultPrevented).toBe(false)
+  })
+})
+
+describe('ChatComposer attachment chips', () => {
+  const errored = {
+    id: 'f1',
+    name: 'report.pdf',
+    kind: 'file' as const,
+    status: 'error' as const,
+    errorMessage: 'Upload failed (413)',
+  }
+
+  it('shows a thumbnail on the chip of a file that carries a preview URL', () => {
+    const { container, rerender } = render(
+      <ChatComposer
+        onSend={() => {}}
+        onAttach={() => {}}
+        pendingFiles={[{ id: 'f1', name: 'shot.png', kind: 'file', status: 'ready', previewUrl: 'blob:preview' }]}
+      />,
+    )
+    // The chip is the span wrapping the truncating filename span.
+    const chip = screen.getByText('shot.png').parentElement as HTMLElement
+    const img = chip.querySelector('img') as HTMLImageElement
+    expect(img).not.toBeNull()
+    expect(img.getAttribute('src')).toBe('blob:preview')
+    // Decorative: the filename beside it already names the file.
+    expect(img.getAttribute('alt')).toBe('')
+
+    rerender(
+      <ChatComposer
+        onSend={() => {}}
+        onAttach={() => {}}
+        pendingFiles={[{ id: 'f1', name: 'shot.png', kind: 'file', status: 'ready' }]}
+      />,
+    )
+    expect(container.querySelector('img')).toBeNull()
+  })
+
+  it('never puts a thumbnail on a folder chip', () => {
+    const { container } = render(
+      <ChatComposer
+        onSend={() => {}}
+        onAttach={() => {}}
+        pendingFiles={[
+          { id: 'd1', name: 'assets', kind: 'folder', fileCount: 3, status: 'ready', previewUrl: 'blob:preview' },
+        ]}
+      />,
+    )
+    expect(container.querySelector('img')).toBeNull()
+  })
+
+  it('names the reason on a failed chip, in text and on hover', () => {
+    render(<ChatComposer onSend={() => {}} onAttach={() => {}} pendingFiles={[errored]} />)
+    expect(screen.getByText('Upload failed (413)')).toBeTruthy()
+    expect(screen.getByText('report.pdf').closest('span[title]')?.getAttribute('title')).toBe(
+      'Upload failed (413)',
+    )
+  })
+
+  it('offers retry only on a failed chip, and only when onRetryFile is wired', () => {
+    const onRetryFile = vi.fn()
+    const { rerender } = render(
+      <ChatComposer onSend={() => {}} onAttach={() => {}} pendingFiles={[errored]} onRetryFile={onRetryFile} />,
+    )
+    fireEvent.click(screen.getByLabelText('Retry upload report.pdf'))
+    expect(onRetryFile).toHaveBeenCalledWith('f1')
+
+    rerender(<ChatComposer onSend={() => {}} onAttach={() => {}} pendingFiles={[errored]} />)
+    expect(screen.queryByLabelText('Retry upload report.pdf')).toBeNull()
+
+    rerender(
+      <ChatComposer
+        onSend={() => {}}
+        onAttach={() => {}}
+        pendingFiles={[{ ...errored, status: 'ready', errorMessage: undefined }]}
+        onRetryFile={onRetryFile}
+      />,
+    )
+    expect(screen.queryByLabelText('Retry upload report.pdf')).toBeNull()
+  })
+})
+
+describe('ChatComposer context items', () => {
+  it('renders context chips in their own row, apart from attachment chips', () => {
+    render(
+      <ChatComposer
+        onSend={() => {}}
+        onAttach={() => {}}
+        contextItems={[{ id: 'c1', label: 'src/server.ts' }]}
+        pendingFiles={[{ id: 'f1', name: 'report.pdf', kind: 'file', status: 'ready' }]}
+      />,
+    )
+    const contextRow = screen.getByLabelText('Message context')
+    expect(contextRow.textContent).toContain('src/server.ts')
+    expect(contextRow.textContent).not.toContain('report.pdf')
+  })
+
+  it('calls the matching item onRemove, and omits the affordance without one', () => {
+    const onRemove = vi.fn()
+    render(
+      <ChatComposer
+        onSend={() => {}}
+        contextItems={[
+          { id: 'c1', label: 'removable', onRemove },
+          { id: 'c2', label: 'pinned' },
+        ]}
+      />,
+    )
+    expect(screen.queryByLabelText('Remove context pinned')).toBeNull()
+    fireEvent.click(screen.getByLabelText('Remove context removable'))
+    expect(onRemove).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders no context row when there are none', () => {
+    render(<ChatComposer onSend={() => {}} />)
+    expect(screen.queryByLabelText('Message context')).toBeNull()
+  })
+})
+
+describe('ChatComposer send gates', () => {
+  const uploading = [{ id: 'f1', name: 'big.png', kind: 'file' as const, status: 'uploading' as const }]
+
+  it('canSubmitAttachmentsOnly sends an empty message while an upload is in flight', () => {
+    const onSend = vi.fn()
+    render(
+      <ChatComposer onSend={onSend} onAttach={() => {}} pendingFiles={uploading} canSubmitAttachmentsOnly />,
+    )
+    expect((screen.getByLabelText('Send') as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.keyDown(screen.getByLabelText('Message input'), { key: 'Enter' })
+    expect(onSend).toHaveBeenCalledWith('')
+  })
+
+  it('without the flag the same in-flight upload cannot send an empty message', () => {
+    const onSend = vi.fn()
+    render(<ChatComposer onSend={onSend} onAttach={() => {}} pendingFiles={uploading} />)
+    fireEvent.keyDown(screen.getByLabelText('Message input'), { key: 'Enter' })
+    expect(onSend).not.toHaveBeenCalled()
+  })
+
+  it('keeps sending a ready file with no text even without the flag', () => {
+    const onSend = vi.fn()
+    render(
+      <ChatComposer
+        onSend={onSend}
+        onAttach={() => {}}
+        pendingFiles={[{ id: 'f1', name: 'a.png', kind: 'file', status: 'ready' }]}
+      />,
+    )
+    fireEvent.keyDown(screen.getByLabelText('Message input'), { key: 'Enter' })
+    expect(onSend).toHaveBeenCalledWith('')
+  })
+
+  it('canSubmitWhileBusy lets Enter queue the next turn mid-stream', () => {
+    const onSend = vi.fn()
+    render(<ChatComposer onSend={onSend} isStreaming canSubmitWhileBusy />)
+    const input = screen.getByLabelText('Message input')
+    type(input, 'next turn')
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onSend).toHaveBeenCalledWith('next turn')
+    // The button is still the interrupt — the flag opens the keyboard, not a
+    // second visible control.
+    expect(screen.getByLabelText('Stop response')).toBeTruthy()
+    expect(screen.queryByLabelText('Send')).toBeNull()
+  })
+
+  it('without the flag Enter is inert while streaming', () => {
+    const onSend = vi.fn()
+    render(<ChatComposer onSend={onSend} isStreaming />)
+    const input = screen.getByLabelText('Message input')
+    type(input, 'next turn')
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onSend).not.toHaveBeenCalled()
+  })
+})
+
+describe('ChatComposer input sizing and trailing slot', () => {
+  it('takes minRows and maxHeight, keeping the CSS floor on the same row count', () => {
+    render(<ChatComposer onSend={() => {}} minRows={4} maxHeight={320} />)
+    const input = screen.getByLabelText('Message input') as HTMLTextAreaElement
+    expect(input.getAttribute('rows')).toBe('4')
+    // 4 lines of `leading-6` plus the input's own `py-1`.
+    expect(input.style.minHeight).toBe('104px')
+    expect(input.style.maxHeight).toBe('320px')
+  })
+
+  it('defaults to two rows and the 168px ceiling', () => {
+    render(<ChatComposer onSend={() => {}} />)
+    const input = screen.getByLabelText('Message input') as HTMLTextAreaElement
+    expect(input.style.minHeight).toBe('56px')
+    expect(input.style.maxHeight).toBe('168px')
+  })
+
+  it('focuses the input on mount only when autoFocus is set', () => {
+    const { unmount } = render(<ChatComposer onSend={() => {}} />)
+    expect(document.activeElement).not.toBe(screen.getByLabelText('Message input'))
+    unmount()
+
+    render(<ChatComposer onSend={() => {}} autoFocus />)
+    expect(document.activeElement).toBe(screen.getByLabelText('Message input'))
+  })
+
+  it('keeps trailing content out of the wrapping controls slot and out of any overflow box', () => {
+    const { container } = render(
+      <ChatComposer
+        onSend={() => {}}
+        controls={<button type="button">Model</button>}
+        trailing={<span>4.2k tokens</span>}
+      />,
+    )
+    const slot = screen.getByTestId('composer-controls')
+    const trailing = screen.getByTestId('composer-trailing')
+    const send = screen.getByLabelText('Send')
+
+    expect(slot.contains(trailing)).toBe(false)
+    expect(trailing.parentElement).toBe(slot.parentElement)
+    expect(trailing.className).toContain('shrink-0')
+    // A trailing slot holds pickers in real surfaces, so an overflow box above
+    // it would clip their popovers exactly as one over the controls slot does.
+    const root = container.firstElementChild as HTMLElement
+    for (let el: HTMLElement | null = trailing; el && root.contains(el); el = el.parentElement) {
+      expect(el.className).not.toMatch(/overflow(-[xy])?-(auto|scroll|hidden|clip)/)
+    }
+    expect(send.parentElement).toBe(slot.parentElement)
+  })
+
+  it('renders no trailing slot when nothing is passed', () => {
+    render(<ChatComposer onSend={() => {}} />)
+    expect(screen.queryByTestId('composer-trailing')).toBeNull()
+  })
+})

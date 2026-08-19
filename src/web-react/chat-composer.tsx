@@ -1,9 +1,17 @@
 /**
  * ChatComposer — the shared message input every agent app used to hand-roll:
  * an auto-resizing textarea (Enter sends, Shift+Enter inserts a newline), an
- * opt-in attach + drag-and-drop surface with pending-file chips, a streaming
- * Stop/Send toggle, a slot for inline controls (model picker, reasoning
- * effort), and a Cmd/Ctrl+L focus shortcut.
+ * opt-in attach + drag-and-drop + clipboard-paste surface with pending-file
+ * chips, a streaming Stop/Send toggle, a slot for inline controls (model
+ * picker, reasoning effort), and a Cmd/Ctrl+L focus shortcut.
+ *
+ * Files arrive by three routes — the picker dialog, a drop, and a paste — and
+ * all three funnel through `accept` (`./composer-file-accept`) before they
+ * reach `onAttach`, so a type the picker will not offer cannot get in by
+ * another route. What `accept` refuses goes to `onRejectFiles` with a reason;
+ * without that prop a refusal is silent, which is what the native picker also
+ * does. Size and count limits stay the host's job — `useComposerAttachments`
+ * owns them, because they depend on what is already staged.
  *
  * A REJECTED send never destroys the draft. The input clears optimistically —
  * the composer stays editable while a turn streams precisely so the next
@@ -31,10 +39,17 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type ClipboardEvent,
   type DragEvent,
   type KeyboardEvent,
   type ReactNode,
 } from 'react'
+
+import {
+  filterAcceptedFiles,
+  renamePastedImages,
+  type ComposerFileRejection,
+} from './composer-file-accept'
 
 // ── glyphs (no icon-library dependency) ───────────────────────────────────
 
@@ -93,6 +108,15 @@ function CloseGlyph({ className }: { className?: string }) {
   )
 }
 
+function RetryGlyph({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+    </svg>
+  )
+}
+
 function UploadGlyph({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -126,6 +150,26 @@ export interface ComposerFile {
   /** Uploaded part descriptor; set once the upload route returns. Only
    *  `status: 'ready'` files with a part travel on a parts-aware send. */
   part?: ComposerFilePart
+  /** Object URL for an image thumbnail on the chip. The host owns the URL's
+   *  whole life — `URL.createObjectURL` when the file is staged,
+   *  `URL.revokeObjectURL` when it leaves — and the composer only reads it.
+   *  `useComposerAttachments` already does both. */
+  previewUrl?: string
+  /** Why this file failed, shown on the chip while `status: 'error'`. Without
+   *  it an error chip is red and mute, which tells the user nothing. */
+  errorMessage?: string
+}
+
+/** A piece of context the agent will see beside the next message — an open
+ *  file, a selected record, a pinned document. Rendered as its own chip row,
+ *  separate from staged attachments: context is what the turn already carries,
+ *  an attachment is what the user is adding to it. */
+export interface ComposerContextItem {
+  id: string
+  label: string
+  icon?: ReactNode
+  /** Omit for a chip the user cannot dismiss. */
+  onRemove?: () => void
 }
 
 /** A send the host refused. `error` is shown verbatim in the composer's notice;
@@ -245,14 +289,64 @@ export interface ChatComposerProps {
   controlsPlacement?: 'above' | 'inline'
 
   /** Attachments are opt-in: pass `onAttach` to show the attach button, accept
-   *  drag-and-drop onto the input, and render `pendingFiles` chips. */
+   *  drag-and-drop and clipboard paste onto the input, and render
+   *  `pendingFiles` chips. */
   onAttach?: (files: FileList) => void
   onAttachFolder?: (files: FileList) => void
   pendingFiles?: ComposerFile[]
   onRemoveFile?: (id: string) => void
+  /** Pass it and a chip with `status: 'error'` gains a retry button. */
+  onRetryFile?: (id: string) => void
+  /**
+   * File types the composer takes, in the native `<input accept>` grammar.
+   * Enforced on every ingress route — the picker dialog (which the user can
+   * override with "All Files"), drag-and-drop, and clipboard paste — so a type
+   * the picker will not offer cannot arrive by another route. A non-matching
+   * file goes to `onRejectFiles` and never reaches `onAttach`. Folder attach is
+   * exempt: directory selection has no native accept semantics.
+   */
   accept?: string
+  /** Called with the files `accept` removed from a pick, drop, or paste, each
+   *  with a reason. Without it a refusal is silent — the same feedback the
+   *  native picker gives for a type it will not offer. */
+  onRejectFiles?: (rejections: ComposerFileRejection[]) => void
   dropTitle?: string
   dropDescription?: string
+
+  /** Context the agent will see beside the next message, as its own chip row
+   *  above the input. */
+  contextItems?: ReadonlyArray<ComposerContextItem>
+
+  /**
+   * Let an empty message send while any file is staged, whatever its upload
+   * status. Default false, which sends an empty message only once a file is
+   * `ready` — the rule that makes a store-backed attachment sendable the moment
+   * its upload lands.
+   *
+   * Set it for a surface that must stay operable while an upload is in flight:
+   * the send handler then owns the policy (block, queue, or explain), where it
+   * can say why. Gating on `ready` alone leaves Enter silently dead instead.
+   */
+  canSubmitAttachmentsOnly?: boolean
+  /**
+   * Let Enter and Send keep firing while `isStreaming`, for a surface that
+   * queues the next turn rather than blocking on the current one. Default
+   * false. The button still flips to Stop while a turn streams, so this opens
+   * the keyboard path, not a second button.
+   */
+  canSubmitWhileBusy?: boolean
+
+  /** Focus the input on mount — for a surface whose whole job is the input
+   *  (an entry/hero composer), never for one docked under a transcript. */
+  autoFocus?: boolean
+  /** Rows the input shows before it grows. Default 2. */
+  minRows?: number
+  /** Pixel height the input grows to before it scrolls. Default 168. */
+  maxHeight?: number
+  /** Content between the controls slot and Send — a token meter, a cost, a
+   *  status line. It sits outside the controls slot and never shrinks, so a
+   *  wrapping picker set cannot push it away. */
+  trailing?: ReactNode
 
   /** Cmd/Ctrl+L focuses the input and shows the hint. Default true. */
   focusShortcut?: boolean
@@ -269,7 +363,13 @@ export interface ChatComposerProps {
   className?: string
 }
 
-const MAX_HEIGHT = 168
+const DEFAULT_MAX_HEIGHT = 168
+
+/** The input's own `leading-6` line box and its `py-1` padding, in pixels. The
+ *  `minRows` floor is computed from them so the CSS floor and the `rows`
+ *  attribute cannot drift apart at a row count other than the default. */
+const LINE_HEIGHT = 24
+const TEXTAREA_PADDING_Y = 8
 
 const DEFAULT_SEND_FAILURE = "Message not sent. Your draft is still here — try again."
 
@@ -326,9 +426,18 @@ export function ChatComposer({
   onAttachFolder,
   pendingFiles = [],
   onRemoveFile,
+  onRetryFile,
   accept,
+  onRejectFiles,
   dropTitle = 'Drop files to add context',
   dropDescription = 'They attach to your next message.',
+  contextItems = [],
+  canSubmitAttachmentsOnly = false,
+  canSubmitWhileBusy = false,
+  autoFocus,
+  minRows = 2,
+  maxHeight = DEFAULT_MAX_HEIGHT,
+  trailing,
   focusShortcut = true,
   floating = false,
   sendLabel = 'Send',
@@ -348,6 +457,9 @@ export function ChatComposer({
   const folderInputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
   const dragDepth = useRef(0)
+  // Counts every clipboard image this composer has renamed, so two pastes of
+  // the same bitmap do not both arrive as `image.png`.
+  const pastedImageCount = useRef(0)
 
   const setText = useCallback(
     (next: string) => {
@@ -363,8 +475,8 @@ export function ChatComposer({
     const el = textareaRef.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT)}px`
-  }, [text])
+    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`
+  }, [text, maxHeight])
 
   // Adopt a one-shot seed. Applies only when the `seed` PROP transitions to a
   // new string (host sets it → consumed here → host clears it via
@@ -441,10 +553,18 @@ export function ChatComposer({
   // A ready file counts as sendable content even without a `part`: store-backed
   // attachments (`useComposerAttachments`) carry no prompt part — their
   // references ride the turn body's `attachments` field — but a file-only
-  // message must still be sendable.
-  const readyFileCount = pendingFiles.filter((f) => f.status === 'ready').length
-  const hasSendable = text.trim().length > 0 || readyFileCount > 0
-  const canSend = hasSendable && !isStreaming && !disabled
+  // message must still be sendable. `canSubmitAttachmentsOnly` widens that to a
+  // file of ANY status, so an in-flight upload leaves the control live and the
+  // host's handler decides what to do about it.
+  const sendableFiles = canSubmitAttachmentsOnly
+    ? pendingFiles
+    : pendingFiles.filter((f) => f.status === 'ready')
+  const hasSendable = text.trim().length > 0 || sendableFiles.length > 0
+  // Streaming blocks a send unless the host queues turns. The button still
+  // shows Stop while streaming, so `canSubmitWhileBusy` opens Enter, not a
+  // second visible control.
+  const sendBlockedByStream = isStreaming && !canSubmitWhileBusy
+  const canSend = hasSendable && !sendBlockedByStream && !disabled
 
   const [failedSend, setFailedSend] = useState<FailedSend | null>(null)
 
@@ -503,11 +623,14 @@ export function ChatComposer({
 
   const send = useCallback(() => {
     const trimmed = text.trim()
-    if (isStreaming || disabled) return
+    if (sendBlockedByStream || disabled) return
     const readyFiles = pendingFiles.filter((f) => f.status === 'ready')
-    if (!trimmed && readyFiles.length === 0) return
+    const sendable = canSubmitAttachmentsOnly ? pendingFiles : readyFiles
+    if (!trimmed && sendable.length === 0) return
     // Only a parts-aware send carries parts; `onSend`'s files travel through the
-    // host's own `pendingFiles`, so its failure payload names none.
+    // host's own `pendingFiles`, so its failure payload names none. Parts come
+    // from READY files whatever `canSubmitAttachmentsOnly` says — an unfinished
+    // upload has no part to send.
     const parts = onSendParts
       ? readyFiles.filter((f) => f.part).map((f) => f.part as ComposerFilePart)
       : []
@@ -517,18 +640,27 @@ export function ChatComposer({
     setText('')
     textRef.current = ''
     dispatchSend(text, trimmed, parts, caret)
-  }, [text, isStreaming, disabled, onSendParts, pendingFiles, setText, dispatchSend])
+  }, [
+    text,
+    sendBlockedByStream,
+    disabled,
+    canSubmitAttachmentsOnly,
+    onSendParts,
+    pendingFiles,
+    setText,
+    dispatchSend,
+  ])
 
   // Re-send the message the notice is holding. Reached only when the draft was
   // NOT restored (the restored path leaves the text in the box, where Send is
   // the affordance), so it never competes with the primary control.
   const retryFailedSend = useCallback(() => {
     const failure = failedSend
-    if (!failure || isStreaming || disabled) return
+    if (!failure || sendBlockedByStream || disabled) return
     setFailedSend(null)
     const caret = { start: failure.text.length, end: failure.text.length }
     dispatchSend(failure.text, failure.trimmed, failure.parts, caret)
-  }, [failedSend, isStreaming, disabled, dispatchSend])
+  }, [failedSend, sendBlockedByStream, disabled, dispatchSend])
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // Respect IME composition — Enter commits the candidate, it doesn't send.
@@ -539,9 +671,47 @@ export function ChatComposer({
     }
   }
 
+  // Every route a file can arrive by ends here: apply `accept`, report what it
+  // removed, and hand `onAttach` only what passed. A batch the filter left
+  // untouched is forwarded as the browser's own `FileList`; one it changed is
+  // rebuilt, since `onAttach` takes a `FileList` and only a `DataTransfer` can
+  // produce one.
+  const deliverFiles = useCallback(
+    (files: File[], original: FileList) => {
+      if (!onAttach || files.length === 0) return
+      const { accepted, rejected } = filterAcceptedFiles(files, accept)
+      if (rejected.length > 0) onRejectFiles?.(rejected)
+      if (accepted.length === 0) return
+      const unchanged =
+        accepted.length === original.length && accepted.every((file, i) => file === original[i])
+      if (unchanged) {
+        onAttach(original)
+        return
+      }
+      const transfer = new DataTransfer()
+      for (const file of accepted) transfer.items.add(file)
+      onAttach(transfer.files)
+    },
+    [onAttach, onRejectFiles, accept],
+  )
+
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.length) onAttach?.(e.target.files)
+    // Re-filter: a picker dialog lets the user override `accept` with
+    // "All Files", so the attribute alone does not hold the gate.
+    if (e.target.files?.length) deliverFiles(Array.from(e.target.files), e.target.files)
     e.target.value = ''
+  }
+
+  const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    if (!onAttach) return
+    const clipboardFiles = e.clipboardData?.files
+    if (!clipboardFiles || clipboardFiles.length === 0) return
+    // Files are the payload, so suppress the default text paste even when every
+    // one of them is refused — a rejection must not half-paste stray text.
+    e.preventDefault()
+    const { files, nextIndex } = renamePastedImages(Array.from(clipboardFiles), pastedImageCount.current)
+    pastedImageCount.current = nextIndex
+    deliverFiles(files, clipboardFiles)
   }
 
   const handleFolderChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -579,9 +749,9 @@ export function ChatComposer({
       dragDepth.current = 0
       setDragOver(false)
       const files = e.dataTransfer?.files
-      if (files?.length) onAttach?.(files)
+      if (files?.length) deliverFiles(Array.from(files), files)
     },
-    [onAttach],
+    [deliverFiles],
   )
 
   const folderChips = pendingFiles.filter((f) => f.kind === 'folder')
@@ -648,7 +818,7 @@ export function ChatComposer({
                 type="button"
                 aria-label="Retry sending the unsent message"
                 onClick={retryFailedSend}
-                disabled={isStreaming || disabled}
+                disabled={sendBlockedByStream || disabled}
                 className="mt-1.5 font-medium underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
               >
                 Retry
@@ -658,35 +828,88 @@ export function ChatComposer({
         </div>
       )}
 
-      {pendingFiles.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {[...folderChips, ...fileChips].map((f) => (
+      {contextItems.length > 0 && (
+        <div aria-label="Message context" className="mb-2 flex min-w-0 flex-wrap gap-1.5">
+          {contextItems.map((item) => (
             <span
-              key={f.id}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${
-                f.status === 'error'
-                  ? 'border-destructive/40 text-destructive'
-                  : 'border-border bg-secondary text-foreground'
-              }`}
+              key={item.id}
+              className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-primary"
             >
-              {f.kind === 'folder' ? <FolderGlyph className="h-3 w-3 shrink-0" /> : <PaperclipGlyph className="h-3 w-3 shrink-0" />}
-              <span className="max-w-[150px] truncate">{f.name}</span>
-              {f.fileCount !== undefined && <span className="text-muted-foreground">({f.fileCount})</span>}
-              {f.status === 'uploading' && (
-                <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              {item.icon && (
+                <span className="shrink-0" aria-hidden>
+                  {item.icon}
+                </span>
               )}
-              {onRemoveFile && (
+              <span className="min-w-0 truncate">{item.label}</span>
+              {item.onRemove && (
                 <button
                   type="button"
-                  aria-label={`Remove ${f.name}`}
-                  onClick={() => onRemoveFile(f.id)}
-                  className="rounded p-0.5 text-muted-foreground transition hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={`Remove context ${item.label}`}
+                  onClick={item.onRemove}
+                  className="shrink-0 rounded p-0.5 text-primary/70 transition hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <CloseGlyph className="h-3 w-3" />
                 </button>
               )}
             </span>
           ))}
+        </div>
+      )}
+
+      {pendingFiles.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {[...folderChips, ...fileChips].map((f) => {
+            const isError = f.status === 'error'
+            return (
+              <span
+                key={f.id}
+                title={isError ? f.errorMessage : undefined}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${
+                  isError
+                    ? 'border-destructive/40 text-destructive'
+                    : 'border-border bg-secondary text-foreground'
+                } ${f.status === 'pending' ? 'opacity-60' : ''}`}
+              >
+                {/* A thumbnail identifies a pasted screenshot that the
+                    auto-generated name cannot. Folders never have one. */}
+                {f.kind !== 'folder' && f.previewUrl ? (
+                  <img src={f.previewUrl} alt="" className="h-8 w-8 shrink-0 rounded object-cover" />
+                ) : f.kind === 'folder' ? (
+                  <FolderGlyph className="h-3 w-3 shrink-0" />
+                ) : (
+                  <PaperclipGlyph className="h-3 w-3 shrink-0" />
+                )}
+                <span className="max-w-[150px] truncate">{f.name}</span>
+                {f.fileCount !== undefined && <span className="text-muted-foreground">({f.fileCount})</span>}
+                {f.status === 'uploading' && (
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                )}
+                {isError && f.errorMessage && (
+                  <span className="max-w-[150px] truncate text-destructive/80">{f.errorMessage}</span>
+                )}
+                {isError && onRetryFile && (
+                  <button
+                    type="button"
+                    aria-label={`Retry upload ${f.name}`}
+                    onClick={() => onRetryFile(f.id)}
+                    className="rounded p-0.5 text-muted-foreground transition hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <RetryGlyph className="h-3 w-3" />
+                  </button>
+                )}
+                {onRemoveFile && (
+                  <button
+                    type="button"
+                    aria-label={`Remove ${f.name}`}
+                    onClick={() => onRemoveFile(f.id)}
+                    className="rounded p-0.5 text-muted-foreground transition hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <CloseGlyph className="h-3 w-3" />
+                  </button>
+                )}
+              </span>
+            )
+          })}
         </div>
       )}
 
@@ -706,21 +929,24 @@ export function ChatComposer({
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={onAttach ? handlePaste : undefined}
           placeholder={placeholder}
           disabled={disabled}
-          // Two lines before it grows. `rows` is what actually holds the floor:
-          // the autosize measures `scrollHeight` against `height: auto`, which a
-          // textarea resolves through `rows`, so the measurement cannot come back
-          // shorter. The paired `min-h-[56px]` is those same two lines in CSS
-          // (2 x 24px `leading-6` + 8px `py-1`, and `box-sizing: border-box` puts
-          // the padding inside the 56). It sits exactly AT the natural height on
-          // purpose: a floor is meant to be inert until something tries to go
-          // under it, which here means an inline height arriving from anywhere
-          // but the autosize. Setting it higher would buy no protection and cost
-          // permanent dead space under the caret.
-          rows={2}
+          autoFocus={autoFocus}
+          // `minRows` lines before it grows. `rows` is what actually holds the
+          // floor: the autosize measures `scrollHeight` against `height: auto`,
+          // which a textarea resolves through `rows`, so the measurement cannot
+          // come back shorter. The paired `minHeight` is those same lines in CSS
+          // (`box-sizing: border-box` puts the padding inside it), computed from
+          // the same row count so the two cannot disagree. It sits exactly AT
+          // the natural height on purpose: a floor is meant to be inert until
+          // something tries to go under it, which here means an inline height
+          // arriving from anywhere but the autosize. Setting it higher would buy
+          // no protection and cost permanent dead space under the caret.
+          rows={minRows}
+          style={{ minHeight: minRows * LINE_HEIGHT + TEXTAREA_PADDING_Y, maxHeight }}
           aria-label="Message input"
-          className="max-h-[168px] min-h-[56px] w-full resize-none bg-transparent px-1.5 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
+          className="w-full resize-none bg-transparent px-1.5 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
         />
 
         <div className="flex items-end gap-2">
@@ -777,6 +1003,16 @@ export function ChatComposer({
           >
             {showInline && controls}
           </div>
+
+          {/* Trailing content is the controls slot's SIBLING, not its content:
+              the slot is where a picker set is allowed to wrap and shrink, and
+              a meter or a status line put inside it would be pushed onto the
+              second line by the very pickers it reports on. */}
+          {trailing && (
+            <div data-testid="composer-trailing" className="flex shrink-0 items-center gap-1.5">
+              {trailing}
+            </div>
+          )}
 
           {isStreaming ? (
             sendVariant === 'icon' ? (
