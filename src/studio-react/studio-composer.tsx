@@ -197,7 +197,20 @@ export function StudioComposer({
 
   const laneModels = useMemo(() => catalog?.models[type] ?? [], [catalog, type])
   const curatedModels = useMemo(() => curateComposerModels(type, laneModels), [laneModels, type])
-  const modelId = selectedModels[type] ?? defaultModelId(type, catalog, curatedModels)
+  // A retained pick survives only while the CURRENT catalog can honour it: with
+  // no catalog yet keep it; an intentionally-uncurated i2v sibling stays (it is
+  // reached by attaching a reference, never listed); anything else must be
+  // present and available in the curated list, or the lane falls back to its
+  // default. The deleted ComposerHero defended this via selectedModelsWithDefaults;
+  // that helper resolves over the FULL catalog and would resurrect
+  // curation-removed defaults, so the guard is re-derived here over curatedModels.
+  const retained = selectedModels[type]
+  const retainedUsable = retained !== undefined && (
+    !catalog
+    || Boolean(textToVideoSibling(retained))
+    || curatedModels.some((model) => model.id === retained && model.status !== 'unavailable')
+  )
+  const modelId = retainedUsable ? retained : defaultModelId(type, catalog, curatedModels)
   // The image-to-video sibling is deliberately absent from the curated menu (it
   // is reached by attaching a reference image), so the row backing the pill is
   // looked up in the FULL lane list and may still be missing — a sibling the
@@ -250,6 +263,18 @@ export function StudioComposer({
 
   function selectModel(id: string) {
     setSelectedModels((current) => ({ ...current, [type]: id }))
+  }
+
+  /** The model MENU's handler. While a reference is attached the selection must
+   *  keep the attachment ⇒ image-to-video invariant: a reference-capable pick is
+   *  re-mapped to its i2v sibling, and a pick with no sibling drops the
+   *  attachment explicitly rather than hiding it to reappear later. */
+  function chooseModel(id: string) {
+    if (!referenceImageUrl || type !== 'video') return selectModel(id)
+    const sibling = imageToVideoSibling(id)
+    if (sibling) return selectModel(sibling)
+    if (!textToVideoSibling(id)) setReferenceImageUrl(null)
+    return selectModel(id)
   }
 
   function setOption(param: string, value: ModelOptionValue) {
@@ -379,7 +404,7 @@ export function StudioComposer({
             value={modelId}
             displayName={modelOption?.name || modelId || 'Select a model'}
             provider={modelOption?.provider}
-            onSelect={selectModel}
+            onSelect={chooseModel}
             bandRef={bandRef}
           />
 

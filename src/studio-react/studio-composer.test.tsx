@@ -9,7 +9,12 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import type { GenerationType, MediaModelCatalogResponse, MediaModelOption } from '../studio'
+import type {
+  GenerationType,
+  MediaModelCatalogResponse,
+  MediaModelOption,
+  ModelOptionsMetadata,
+} from '../studio'
 import { StudioComposer } from './studio-composer'
 
 function model(id: string, type: GenerationType, extra: Partial<MediaModelOption> = {}): MediaModelOption {
@@ -30,14 +35,34 @@ function catalog(
   }
 }
 
+/** Publish the declared options plus a sentinel for any future PILL_ORDER key.
+ *  That makes the wire-coverage test below render a newly added pill even before
+ *  this fixture knows its name, so a missing request-body mapping fails loudly. */
+function allPillOptions(options: ModelOptionsMetadata): ModelOptionsMetadata {
+  return new Proxy(options, {
+    get(target, property, receiver) {
+      if (property === 'audio') return Reflect.get(target, property, receiver)
+      if (typeof property === 'string' && !(property in target)) {
+        return { values: ['wire-sentinel'], default: 'wire-sentinel' }
+      }
+      return Reflect.get(target, property, receiver)
+    },
+  })
+}
+
 /** The two endpoints the composer talks to. Returns the bodies POSTed to
  *  `/api/generate`, so a test can assert the exact wire payload. */
-function mountWith(response: MediaModelCatalogResponse, props: Record<string, unknown> = {}) {
+function mountWith(
+  response: MediaModelCatalogResponse | ((workspaceId: string) => MediaModelCatalogResponse),
+  props: Record<string, unknown> = {},
+) {
   const posted: Array<Record<string, unknown>> = []
   const fetchMock = vi.fn(async (input: unknown, init?: { body?: string }) => {
     const url = String(input)
     if (url.startsWith('/api/media-models')) {
-      return { ok: true, json: async () => response } as unknown as Response
+      const workspaceId = new URL(url, 'https://studio.test').searchParams.get('workspaceId') ?? ''
+      const body = typeof response === 'function' ? response(workspaceId) : response
+      return { ok: true, json: async () => body } as unknown as Response
     }
     if (url === '/api/generate') {
       posted.push(JSON.parse(init?.body ?? '{}'))
@@ -50,8 +75,8 @@ function mountWith(response: MediaModelCatalogResponse, props: Record<string, un
   })
   vi.stubGlobal('fetch', fetchMock)
   const onGenerated = vi.fn()
-  render(<StudioComposer workspaceId="ws-1" onGenerated={onGenerated} {...props} />)
-  return { posted, onGenerated }
+  const view = render(<StudioComposer workspaceId="ws-1" onGenerated={onGenerated} {...props} />)
+  return { posted, onGenerated, ...view }
 }
 
 const modelPill = () => screen.getByRole('button', { name: /^Model:/ })
@@ -71,6 +96,12 @@ async function submit(prompt: string) {
   const textarea = screen.getByLabelText('Prompt')
   fireEvent.change(textarea, { target: { value: prompt } })
   fireEvent.keyDown(textarea, { key: 'Enter' })
+}
+
+async function attachReference(url = 'https://example.com/ref.png') {
+  fireEvent.click(screen.getByRole('button', { name: 'Reference image' }))
+  fireEvent.change(await screen.findByLabelText('Reference image URL'), { target: { value: url } })
+  fireEvent.click(screen.getByRole('button', { name: 'Attach' }))
 }
 
 const SEEDANCE = 'bytedance/seedance-2.0/text-to-video'
@@ -160,11 +191,7 @@ describe('StudioComposer — the reference image swaps the model', () => {
     expect(within(menu).queryByRole('menuitemradio', { name: new RegExp(SEEDANCE_I2V) })).toBeNull()
     fireEvent.keyDown(document, { key: 'Escape' })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reference image' }))
-    fireEvent.change(await screen.findByLabelText('Reference image URL'), {
-      target: { value: 'https://example.com/ref.png' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Attach' }))
+    await attachReference()
 
     await screen.findByRole('button', { name: `Model: ${SEEDANCE_I2V}` })
     await submit('a slow orbit')
@@ -180,6 +207,90 @@ describe('StudioComposer — the reference image swaps the model', () => {
     await waitFor(() => expect(posted).toHaveLength(2))
     expect(posted[1]).toMatchObject({ model: SEEDANCE })
     expect(posted[1]).not.toHaveProperty('referenceImageUrl')
+  })
+
+  it('keeps an attached reference paired when Seedance is picked from the model menu', async () => {
+    const { posted } = mountWith(catalog({
+      video: [model(SEEDANCE, 'video'), model(SEEDANCE_I2V, 'video')],
+    }, { video: SEEDANCE }))
+    fireEvent.click(screen.getByRole('button', { name: 'Video' }))
+    await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
+    await attachReference()
+    await screen.findByRole('button', { name: `Model: ${SEEDANCE_I2V}` })
+
+    await chooseModel(SEEDANCE)
+    expect(screen.getByRole('button', { name: `Model: ${SEEDANCE_I2V}` })).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Remove reference image' })).not.toBeNull()
+
+    await submit('an attached orbit')
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0]).toMatchObject({
+      model: SEEDANCE_I2V,
+      referenceImageUrl: 'https://example.com/ref.png',
+    })
+  })
+
+  it('drops an attached reference when a model without an i2v sibling is picked', async () => {
+    const kling = 'kling/kling-v2-master'
+    const { posted } = mountWith(catalog({
+      video: [model(SEEDANCE, 'video'), model(SEEDANCE_I2V, 'video'), model(kling, 'video')],
+    }, { video: SEEDANCE }))
+    fireEvent.click(screen.getByRole('button', { name: 'Video' }))
+    await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
+    await attachReference()
+
+    await chooseModel(kling)
+    expect(screen.queryByRole('button', { name: 'Remove reference image' })).toBeNull()
+    expect(screen.queryByText('Reference')).toBeNull()
+    await submit('an unattached orbit')
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0]).toMatchObject({ model: kling })
+    expect(posted[0]).not.toHaveProperty('referenceImageUrl')
+
+    await chooseModel(SEEDANCE)
+    expect(screen.getByRole('button', { name: 'Reference image' })).not.toBeNull()
+    expect(screen.queryByRole('button', { name: 'Remove reference image' })).toBeNull()
+  })
+})
+
+describe('StudioComposer — retained model selection', () => {
+  it('falls back when a workspace catalog omits the retained model', async () => {
+    const alternate = 'fal-ai/veo3.1'
+    const first = catalog({ video: [model(SEEDANCE, 'video'), model(alternate, 'video')] }, { video: SEEDANCE })
+    const second = catalog({ video: [model(SEEDANCE, 'video')] }, { video: SEEDANCE })
+    const { posted, onGenerated, rerender } = mountWith((workspaceId) => workspaceId === 'ws-2' ? second : first)
+    fireEvent.click(screen.getByRole('button', { name: 'Video' }))
+    await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
+    await chooseModel(alternate)
+    await screen.findByRole('button', { name: `Model: ${alternate}` })
+
+    rerender(<StudioComposer workspaceId="ws-2" onGenerated={onGenerated} />)
+    await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
+    fireEvent.change(screen.getByLabelText('Prompt'), { target: { value: 'new workspace default' } })
+    expect(screen.getByRole('button', { name: 'Generate' }).hasAttribute('disabled')).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Generate' }))
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0]).toMatchObject({ model: SEEDANCE })
+  })
+
+  it('falls back when the retained model becomes unavailable', async () => {
+    const alternate = 'fal-ai/veo3.1'
+    const first = catalog({ video: [model(SEEDANCE, 'video'), model(alternate, 'video')] }, { video: SEEDANCE })
+    const second = catalog({
+      video: [model(SEEDANCE, 'video'), model(alternate, 'video', { status: 'unavailable' })],
+    }, { video: SEEDANCE })
+    const { posted, onGenerated, rerender } = mountWith((workspaceId) => workspaceId === 'ws-2' ? second : first)
+    fireEvent.click(screen.getByRole('button', { name: 'Video' }))
+    await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
+    await chooseModel(alternate)
+
+    rerender(<StudioComposer workspaceId="ws-2" onGenerated={onGenerated} />)
+    await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
+    fireEvent.change(screen.getByLabelText('Prompt'), { target: { value: 'available fallback' } })
+    expect(screen.getByRole('button', { name: 'Generate' }).hasAttribute('disabled')).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Generate' }))
+    await waitFor(() => expect(posted).toHaveLength(1))
+    expect(posted[0]).toMatchObject({ model: SEEDANCE })
   })
 })
 
@@ -285,5 +396,66 @@ describe('StudioComposer — submitting', () => {
     // The prompt is the only free-text field on the card: a voice is picked
     // from the model's published list, never typed.
     expect(screen.getAllByRole('textbox')).toHaveLength(1)
+  })
+
+  it('puts every PILL_ORDER parameter rendered for every lane onto the wire', async () => {
+    const image = model('gpt-image-2', 'image', {
+      options: allPillOptions({
+        size: { values: ['1024x1024'], default: '1024x1024' },
+        quality: { values: ['high'], default: 'high' },
+        n: { values: [2], default: 2 },
+      }),
+    })
+    const video = model('all-params-video', 'video', {
+      options: allPillOptions({
+        duration: { values: ['5'], default: '5' },
+        resolution: { values: ['1080p'], default: '1080p' },
+        aspect_ratio: { values: ['16:9'], default: '16:9' },
+        mode: { values: ['pro'], default: 'pro' },
+      }),
+    })
+    const speech = model('all-params-speech', 'speech', {
+      options: allPillOptions({
+        voice: { values: ['alloy'], default: 'alloy' },
+        speed: { values: [1.25], default: 1.25 },
+      }),
+    })
+    const { posted } = mountWith(catalog(
+      { image: [image], video: [video], speech: [speech] },
+      { image: image.id, video: video.id, speech: speech.id },
+    ))
+    const wireFieldByPill: Record<string, string> = {
+      Size: 'size',
+      Quality: 'quality',
+      Count: 'n',
+      Duration: 'duration',
+      Resolution: 'resolution',
+      Aspect: 'aspectRatio',
+      Mode: 'mode',
+      Voice: 'voice',
+      Speed: 'speed',
+    }
+
+    for (const [lane, modelId] of [
+      ['Image', image.id],
+      ['Video', video.id],
+      ['Audio', speech.id],
+    ] as const) {
+      if (lane !== 'Image') fireEvent.click(screen.getByRole('button', { name: lane }))
+      await screen.findByRole('button', { name: `Model: ${modelId}` })
+      await submit(`all ${lane.toLowerCase()} parameters`)
+      await waitFor(() => expect(posted).toHaveLength(lane === 'Image' ? 1 : lane === 'Video' ? 2 : 3))
+
+      const optionPills = Array.from(document.querySelectorAll<HTMLButtonElement>(
+        '.studio-band button[title]:not([title="Model"]):not([title="Audio"])',
+      ))
+      const body = posted.at(-1) ?? {}
+      for (const optionPill of optionPills) {
+        const label = optionPill.title
+        const wireField = wireFieldByPill[label]
+        if (!wireField) throw new Error(`${label} has no request-body mapping`)
+        expect(body, `${label} did not reach ${wireField}`).toHaveProperty(wireField)
+      }
+    }
   })
 })
