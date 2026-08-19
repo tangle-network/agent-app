@@ -5,6 +5,7 @@ import { TimelineRoute } from './routes/TimelineRoute'
 import { ChatRoute } from './routes/ChatRoute'
 import { ComposerRoute } from './routes/ComposerRoute'
 import { RecordsRoute } from './routes/RecordsRoute'
+import { StudioRoute } from './routes/StudioRoute'
 import { WorkspaceRoute } from './routes/WorkspaceRoute'
 
 type ThemeName = 'light' | 'dark'
@@ -15,8 +16,15 @@ const ROUTES = [
   { path: '/chat', label: 'Agent' },
   { path: '/composer', label: 'Composer' },
   { path: '/records', label: 'Records' },
+  { path: '/studio', label: 'Studio' },
   { path: '/workspace', label: 'Workspace' },
 ] as const
+
+/** Reachable by URL but deliberately not in the nav: a state a browser audit
+ *  needs on load, which the audit itself cannot reach by interacting first.
+ *  `/studio/viewer` opens the media viewer so the popover hit test can probe
+ *  the save-to-vault popover INSIDE it (see `StudioRoute`). */
+const AUDIT_PATHS: readonly string[] = ['/studio/viewer']
 
 function applyTheme(theme: ThemeName) {
   const root = document.documentElement
@@ -38,7 +46,7 @@ function initialTheme(): ThemeName {
 
 function currentPath(): string {
   const path = window.location.pathname
-  return ROUTES.some((r) => r.path === path) ? path : '/canvas'
+  return ROUTES.some((r) => r.path === path) || AUDIT_PATHS.includes(path) ? path : '/canvas'
 }
 
 export function App() {
@@ -97,6 +105,7 @@ export function App() {
             {path === '/chat' && <ChatRoute />}
             {path === '/composer' && <ComposerRoute />}
             {path === '/records' && <RecordsRoute />}
+            {path.startsWith('/studio') && <StudioRoute viewerOpen={path === '/studio/viewer'} />}
           </main>
         </>
       )}

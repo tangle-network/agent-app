@@ -10,3 +10,5 @@
  */
 export * from './generation'
 export * from './model-options'
+export * from './ports'
+export * from './audio-preview'

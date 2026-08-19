@@ -25,7 +25,11 @@ row-actions kebab and `RecordGrid`'s per-cell source popover, each mounted in a
 short clipping host — the popover hit-test below covers this route too),
 **`/workspace`** (the default `AgentWorkspaceLayout` +
 `EntryComposer` composition with the shared profile, backend, model, thinking,
-and plan controls).
+and plan controls), **`/studio`** (the #450 studio surface — `MediaTile` grid
+with save-to-vault popovers, `MenuPill` filter, viewer, confirm, undo toasts;
+its nav-hidden sibling **`/studio/viewer`** renders only the open
+`MediaViewerModal` so the hit-test can probe the save popover from INSIDE the
+viewer, the z-ladder's one browser-only case).
 
 The workspace demo intentionally omits file uploads and `@` mentions because it
 has no real upload endpoint or file index.
@@ -53,6 +57,8 @@ this for visual QA.
 npm run dev                                        # in one shell
 SHOT_DIR=/tmp/popover node scripts/popover-hit-test.mjs                    # /composer × light/dark
 SHOT_DIR=/tmp/popover ROUTE=/records node scripts/popover-hit-test.mjs     # /records × light/dark
+SHOT_DIR=/tmp/popover ROUTE=/studio node scripts/popover-hit-test.mjs          # /studio × light/dark
+SHOT_DIR=/tmp/popover ROUTE=/studio/viewer node scripts/popover-hit-test.mjs   # save popover inside the open viewer
 ```
 
 Opens every canonical picker mounted in `/composer`'s **host scroll rail** (or,

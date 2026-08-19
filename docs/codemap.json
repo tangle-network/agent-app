@@ -14101,6 +14101,12 @@
       "error": null,
       "exports": [
         {
+          "name": "aspectRatioFromOptions",
+          "kind": "function",
+          "signature": "(type: GenerationType, options: { size?: string | undefined; aspectRatio?: string | undefined; }) => number | undefined",
+          "doc": "Resolve a requested lane's aspect ratio from its selected options."
+        },
+        {
           "name": "buildGenerationRequestBody",
           "kind": "function",
           "signature": "(fields: GenerationRequestFields) => Record<string, unknown>",
@@ -14111,6 +14117,24 @@
           "kind": "function",
           "signature": "(type: GenerationType, models: MediaModelOption[]) => MediaModelOption[]",
           "doc": "Curate catalog models for the issue #449 composer lanes."
+        },
+        {
+          "name": "defaultVaultPathFor",
+          "kind": "function",
+          "signature": "(generations: readonly Generation[]) => string",
+          "doc": "Choose the default vault folder shared by a homogeneous media selection."
+        },
+        {
+          "name": "DeleteGenerations",
+          "kind": "type",
+          "signature": "type DeleteGenerations",
+          "doc": "The shell may invoke this during page teardown (the `pagehide`/unmount flush of a deferred delete)."
+        },
+        {
+          "name": "DownloadGenerations",
+          "kind": "type",
+          "signature": "type DownloadGenerations",
+          "doc": null
         },
         {
           "name": "failedOptimisticGeneration",
@@ -14125,6 +14149,12 @@
           "doc": "Fallback video options matching tangle-router's wire-exact metadata."
         },
         {
+          "name": "FetchGenerationsPage",
+          "kind": "type",
+          "signature": "type FetchGenerationsPage",
+          "doc": null
+        },
+        {
           "name": "Generation",
           "kind": "interface",
           "signature": "interface Generation",
@@ -14135,6 +14165,24 @@
           "kind": "const",
           "signature": "readonly GenerationType[]",
           "doc": "Provide an array of supported generation types for media and content processing"
+        },
+        {
+          "name": "generationAspectRatio",
+          "kind": "function",
+          "signature": "(generation: Generation) => number",
+          "doc": "Resolve the best available aspect ratio for a generation row."
+        },
+        {
+          "name": "generationAssetId",
+          "kind": "function",
+          "signature": "(generation: Generation) => string | null",
+          "doc": "Resolve the stored media asset id, when present."
+        },
+        {
+          "name": "generationBatchKey",
+          "kind": "function",
+          "signature": "(generation: Generation) => string",
+          "doc": "Resolve a generation's batch identity, preferring the server batch id."
         },
         {
           "name": "generationError",
@@ -14149,10 +14197,34 @@
           "doc": "Resolve a unique merge key from a generation using batch slot or client request ID"
         },
         {
+          "name": "GenerationPage",
+          "kind": "interface",
+          "signature": "interface GenerationPage",
+          "doc": null
+        },
+        {
+          "name": "GenerationPageQuery",
+          "kind": "interface",
+          "signature": "interface GenerationPageQuery",
+          "doc": null
+        },
+        {
           "name": "GenerationRequestFields",
           "kind": "interface",
           "signature": "interface GenerationRequestFields",
           "doc": "Define fields required to configure and request various types of media generation"
+        },
+        {
+          "name": "generationsInBatch",
+          "kind": "function",
+          "signature": "(generations: readonly Generation[], batchKey: string) => Generation[]",
+          "doc": "Select and order all outputs belonging to a generation batch."
+        },
+        {
+          "name": "generationSpecSegments",
+          "kind": "function",
+          "signature": "(generation: Generation) => string[]",
+          "doc": "Resolve only the human-readable media specification fields a row carries."
         },
         {
           "name": "generationStatus",
@@ -14183,6 +14255,18 @@
           "kind": "const",
           "signature": "{ readonly multipleOf: 16; readonly maxLongEdge: 3840; readonly maxRatio: 3; }",
           "doc": "UI constraints for a custom gpt-image-2 size."
+        },
+        {
+          "name": "GRID_WAVEFORM_BARS",
+          "kind": "const",
+          "signature": "26",
+          "doc": null
+        },
+        {
+          "name": "hashSeed",
+          "kind": "function",
+          "signature": "(value: string) => number",
+          "doc": "Hash a string with FNV-1a into an unsigned 32-bit seed."
         },
         {
           "name": "IMAGE_TO_VIDEO_SIBLINGS",
@@ -14221,6 +14305,12 @@
           "doc": "Define the maximum number of images allowed for upload or display"
         },
         {
+          "name": "MEDIA_TYPE_FILTERS",
+          "kind": "const",
+          "signature": "readonly { value: MediaTypeFilter; label: string; }[]",
+          "doc": null
+        },
+        {
           "name": "MediaModelCatalogResponse",
           "kind": "interface",
           "signature": "interface MediaModelCatalogResponse",
@@ -14237,6 +14327,18 @@
           "kind": "type",
           "signature": "type MediaModelStatus",
           "doc": "Define possible status values for a media model's availability and accessibility"
+        },
+        {
+          "name": "MediaTypeFilter",
+          "kind": "type",
+          "signature": "type MediaTypeFilter",
+          "doc": null
+        },
+        {
+          "name": "mergeGenerationPages",
+          "kind": "function",
+          "signature": "(prev: readonly Generation[], next: readonly Generation[]) => Generation[]",
+          "doc": "Append a page while preserving the first row seen for each id."
         },
         {
           "name": "mergeLiveGeneration",
@@ -14287,6 +14389,12 @@
           "doc": "Normalize a value to a finite integer within the allowed image count range"
         },
         {
+          "name": "normalizeVaultPath",
+          "kind": "function",
+          "signature": "(input: string) => string | null",
+          "doc": "Normalize a user-entered relative vault folder or reject an unsafe path."
+        },
+        {
           "name": "optimisticGeneration",
           "kind": "function",
           "signature": "({ type, prompt, model, clientRequestId, outputIndex, outputCount, }: { type: GenerationType; prompt: string; model?: s…",
@@ -14317,6 +14425,12 @@
           "doc": "Resolve the preferred model ID for a given generation type from the media model catalog"
         },
         {
+          "name": "previewWaveformBars",
+          "kind": "function",
+          "signature": "(seed: string, count: number) => readonly WaveformBar[]",
+          "doc": "Build stable pseudo-waveform bars for a media preview."
+        },
+        {
           "name": "reconcileOptionValues",
           "kind": "function",
           "signature": "(options: Readonly<Record<string, ModelOptionMetadata>> | undefined, current: Readonly<Record<string, ModelOptionValue>…",
@@ -14335,10 +14449,22 @@
           "doc": "Resolve live catalog options first, then exact or safe single-prefix fallbacks."
         },
         {
+          "name": "SaveGenerationsToVault",
+          "kind": "type",
+          "signature": "type SaveGenerationsToVault",
+          "doc": null
+        },
+        {
           "name": "selectedModelsWithDefaults",
           "kind": "function",
           "signature": "(current: Partial<Record<GenerationType, string>>, catalog: MediaModelCatalogResponse) => Partial<Record<GenerationType…",
           "doc": "Resolve selected models by applying defaults for missing or unavailable entries in the catalog"
+        },
+        {
+          "name": "StudioMediaActions",
+          "kind": "interface",
+          "signature": "interface StudioMediaActions",
+          "doc": "Every media action a tile / viewer / batch bar can offer."
         },
         {
           "name": "supportsCustomImageSize",
@@ -14363,6 +14489,24 @@
           "kind": "function",
           "signature": "(width: number, height: number) => { ok: true; } | { ok: false; reason: string; }",
           "doc": "Validate a custom gpt-image-2 size against its published UI constraints."
+        },
+        {
+          "name": "VaultSaveResult",
+          "kind": "interface",
+          "signature": "interface VaultSaveResult",
+          "doc": null
+        },
+        {
+          "name": "WaveformBar",
+          "kind": "interface",
+          "signature": "interface WaveformBar",
+          "doc": "A deterministic waveform bar used when decoded audio is unavailable."
+        },
+        {
+          "name": "WIDE_WAVEFORM_BARS",
+          "kind": "const",
+          "signature": "72",
+          "doc": null
         }
       ]
     },
@@ -14376,40 +14520,52 @@
       "error": null,
       "exports": [
         {
+          "name": "AudioTogglePill",
+          "kind": "function",
+          "signature": "({ on, onToggle }: { on: boolean; onToggle: (on: boolean) => void; }) => Element",
+          "doc": "The audio switch."
+        },
+        {
+          "name": "ComposerBand",
+          "kind": "function",
+          "signature": "({ bandRef, resetKey, children, }: { bandRef: RefObject<HTMLDivElement | null>; resetKey: string; children: ReactNode;…",
+          "doc": "The middle scroller."
+        },
+        {
           "name": "ComposerType",
           "kind": "type",
           "signature": "type ComposerType",
           "doc": "The lanes the composer offers."
         },
         {
-          "name": "filterGenerations",
+          "name": "CustomSizeForm",
           "kind": "function",
-          "signature": "(generations: Generation[], typeFilter: string | null) => Generation[]",
-          "doc": "The visible set for the active type tab (all generations when unfiltered)."
+          "signature": "({ initial, onApply, onCancel, }: { initial?: string | undefined; onApply: (size: string) => void; onCancel: () => void…",
+          "doc": "The custom-size form the Size menu swaps to."
         },
         {
-          "name": "GenerationCard",
-          "kind": "function",
-          "signature": "({ generation, onSelect, }: { generation: Generation; onSelect: (generation: Generation) => void; }) => Element",
+          "name": "DeferredDelete",
+          "kind": "interface",
+          "signature": "interface DeferredDelete",
           "doc": null
         },
         {
-          "name": "GenerationDetail",
+          "name": "downloadGenerationsViaAnchor",
           "kind": "function",
-          "signature": "({ generation, vaultHref, onNavigate, }: { generation: Generation; vaultHref?: ((filePath?: string | null | undefined)…",
+          "signature": "DownloadGenerations",
+          "doc": "Same-origin anchor download, staggered so the browser does not swallow every request after the first."
+        },
+        {
+          "name": "formatClock",
+          "kind": "function",
+          "signature": "(seconds: number) => string",
           "doc": null
         },
         {
-          "name": "GenerationDetailModal",
-          "kind": "function",
-          "signature": "({ generation, vaultHref, onClose, }: { generation: Generation | null; vaultHref?: ((filePath?: string | null | undefin…",
-          "doc": "Centered detail view for a single generation."
-        },
-        {
-          "name": "GenerationGrid",
-          "kind": "function",
-          "signature": "({ generations, typeFilter, onSelect, }: { generations: Generation[]; typeFilter: string | null; onSelect: (generation:…",
-          "doc": "Chrome-less asset grid — the `GenerationCard` grid plus its empty state, with no surrounding tabs/stats/sheet chrome."
+          "name": "GenerationHistoryState",
+          "kind": "interface",
+          "signature": "interface GenerationHistoryState",
+          "doc": null
         },
         {
           "name": "GenerationNoticeChip",
@@ -14418,27 +14574,81 @@
           "doc": "The one thing a chat-shaped generator has to say about itself: each prompt is a fresh generation, and nothing carries over from the last one."
         },
         {
-          "name": "GenerationStatusBadge",
+          "name": "MediaTile",
           "kind": "function",
-          "signature": "({ generation, inline, }: { generation: Generation; inline?: boolean | undefined; }) => Element | null",
+          "signature": "({ generation, context, onOpen, actions, aspectRatio, waveformBars, selectMode, selected, onToggleSelect, onRequestDele…",
           "doc": null
         },
         {
-          "name": "LibraryDrawer",
-          "kind": "function",
-          "signature": "({ open, onOpenChange, generations, totalCost, typeFilter, onFilterChange, vaultHref, selected, onSelect, }: { open: bo…",
+          "name": "MediaTileProps",
+          "kind": "interface",
+          "signature": "interface MediaTileProps",
           "doc": null
         },
         {
-          "name": "LibraryPanel",
-          "kind": "function",
-          "signature": "({ generations, totalCost, typeFilter, onFilterChange, onSelect, }: { generations: Generation[]; totalCost: number; typ…",
-          "doc": "Inline asset gallery — the same filter + stats + card grid as the library drawer's list view, but with no sheet chrome so it can sit on the page beside the composer."
+          "name": "MediaTypeSegment",
+          "kind": "interface",
+          "signature": "interface MediaTypeSegment",
+          "doc": "One media lane's segment: the icon it shows collapsed, the word it shows when active."
         },
         {
-          "name": "ResultCanvas",
+          "name": "MediaTypeSegments",
           "kind": "function",
-          "signature": "({ batch, onOpenLibrary, onSelect, }: { batch: Generation[]; onOpenLibrary: () => void; onSelect: (generation: Generati…",
+          "signature": "<T extends string>({ value, segments, onChange, }: { value: T; segments: readonly MediaTypeSegment<T>[]; onChange: (typ…",
+          "doc": "The pinned-left media-type group: a track holding one filled pill (the active lane, icon + word) and icon-only siblings."
+        },
+        {
+          "name": "MediaViewerModal",
+          "kind": "function",
+          "signature": "({ generation, onClose, actions, onRequestDelete, onSaved, }: MediaViewerModalProps) => Element | null",
+          "doc": null
+        },
+        {
+          "name": "MediaViewerModalProps",
+          "kind": "interface",
+          "signature": "interface MediaViewerModalProps",
+          "doc": null
+        },
+        {
+          "name": "MenuPill",
+          "kind": "function",
+          "signature": "<T extends string>({ label, value, choices, onSelect, className, }: { label: string; value: T; choices: readonly { valu…",
+          "doc": "A standalone enum picker using the studio composer's pill and menu grammar."
+        },
+        {
+          "name": "ModelPill",
+          "kind": "function",
+          "signature": "({ models, value, displayName, provider, onSelect, bandRef, }: { models: readonly MediaModelOption[]; value: string; di…",
+          "doc": "The model pill — first in the band on every lane, and the only pill that is always there."
+        },
+        {
+          "name": "OptionChoice",
+          "kind": "interface",
+          "signature": "interface OptionChoice",
+          "doc": "One renderable value: the wire value, untouched, and how it reads."
+        },
+        {
+          "name": "OptionPill",
+          "kind": "function",
+          "signature": "({ label, value, choices, onSelect, bandRef, custom, }: { label: string; value: ModelOptionValue | undefined; choices:…",
+          "doc": "A value pill and the menu it opens."
+        },
+        {
+          "name": "optionValueLabel",
+          "kind": "function",
+          "signature": "(param: string, value: ModelOptionValue) => string",
+          "doc": "How a wire value reads, with the wire value itself untouched underneath."
+        },
+        {
+          "name": "ReferencePill",
+          "kind": "function",
+          "signature": "({ url, onAttach, onRemove, pick, bandRef, }: { url: string | null; onAttach: (url: string) => void; onRemove: () => vo…",
+          "doc": "The reference-image pill: the only control that changes which MODEL runs, so the swap to the image-to-video sibling is the caller's (`onAttach`/`onRemove`) and the pill only reports what is attached."
+        },
+        {
+          "name": "StudioAudioElementLike",
+          "kind": "interface",
+          "signature": "interface StudioAudioElementLike",
           "doc": null
         },
         {
@@ -14454,58 +14664,142 @@
           "doc": null
         },
         {
-          "name": "StudioHeader",
+          "name": "StudioConfirmDialog",
           "kind": "function",
-          "signature": "({ count, onOpenLibrary, canGenerate, }: { count: number; onOpenLibrary: () => void; canGenerate: boolean; }) => Element",
+          "signature": "({ open, count, onConfirm, onCancel, }: StudioConfirmDialogProps) => Element | null",
           "doc": null
         },
         {
-          "name": "StudioRole",
-          "kind": "type",
-          "signature": "type StudioRole",
-          "doc": null
-        },
-        {
-          "name": "StudioSheet",
-          "kind": "function",
-          "signature": "({ open, onOpenChange, title, children, }: { open: boolean; onOpenChange: (open: boolean) => void; title: string; child…",
-          "doc": "Right-side overlay sheet built on Radix Dialog — gives focus-trap, scroll-lock, and Escape-to-close for free."
-        },
-        {
-          "name": "StudioWorkspace",
-          "kind": "function",
-          "signature": "({ generations, totalCost, workspaceId, role, generationsEndpoint, vaultHref, }: StudioWorkspaceProps) => Element",
-          "doc": "The full studio surface: header + composer + result canvas + library drawer, with the generation orchestrator (merge/poll/revalidate) wired in."
-        },
-        {
-          "name": "StudioWorkspaceProps",
+          "name": "StudioConfirmDialogProps",
           "kind": "interface",
-          "signature": "interface StudioWorkspaceProps",
+          "signature": "interface StudioConfirmDialogProps",
           "doc": null
         },
         {
-          "name": "TYPE_CONFIG",
-          "kind": "const",
-          "signature": "Record<string, TypeConfig>",
-          "doc": "Map type keys to their corresponding configuration objects including labels, icons, and colors"
-        },
-        {
-          "name": "TypeConfig",
-          "kind": "interface",
-          "signature": "interface TypeConfig",
-          "doc": "Define configuration options for a type including label, icon, and color properties"
-        },
-        {
-          "name": "typeConfigFor",
+          "name": "StudioGenerationScreen",
           "kind": "function",
-          "signature": "(type: string) => TypeConfig",
-          "doc": "Resolve the configuration object for a given type or return the default image configuration"
+          "signature": "({ generations, batchKey, onGenerated, onOpenGeneration, onBack, workspaceId, pickReferenceImage, actions, className, }…",
+          "doc": null
+        },
+        {
+          "name": "StudioGenerationScreenProps",
+          "kind": "interface",
+          "signature": "interface StudioGenerationScreenProps",
+          "doc": null
+        },
+        {
+          "name": "StudioHistoryScreen",
+          "kind": "function",
+          "signature": "({ fetchPage, initialPage, onBack, actions, searchDebounceMs, className, }: StudioHistoryScreenProps) => Element",
+          "doc": null
+        },
+        {
+          "name": "StudioHistoryScreenProps",
+          "kind": "interface",
+          "signature": "interface StudioHistoryScreenProps",
+          "doc": null
+        },
+        {
+          "name": "StudioHomeScreen",
+          "kind": "function",
+          "signature": "({ generations, onGenerated, onOpenGeneration, onOpenHistory, workspaceId, pickReferenceImage, actions, recentLimit, cl…",
+          "doc": "Studio's create-and-recent-media landing screen."
+        },
+        {
+          "name": "StudioHomeScreenProps",
+          "kind": "interface",
+          "signature": "interface StudioHomeScreenProps",
+          "doc": null
+        },
+        {
+          "name": "StudioPlayback",
+          "kind": "interface",
+          "signature": "interface StudioPlayback",
+          "doc": null
+        },
+        {
+          "name": "StudioPlaybackProvider",
+          "kind": "function",
+          "signature": "(props: { children: ReactNode; createAudioElement?: (() => StudioAudioElementLike) | undefined; }) => Element",
+          "doc": null
+        },
+        {
+          "name": "StudioToastInput",
+          "kind": "interface",
+          "signature": "interface StudioToastInput",
+          "doc": null
+        },
+        {
+          "name": "StudioToastProvider",
+          "kind": "function",
+          "signature": "({ children }: { children: ReactNode; }) => Element",
+          "doc": null
+        },
+        {
+          "name": "useBatchNavigation",
+          "kind": "function",
+          "signature": "({ seed, currentBatchKey, onOpenGeneration, }: UseBatchNavigationOptions) => (generation: Generation) => void",
+          "doc": "Returns a callback the screens wrap around `onGenerated`: the first row of a batch not seen before navigates via `onOpenGeneration`, exactly once per batch — a four-image batch arrives as four rows s…"
+        },
+        {
+          "name": "UseBatchNavigationOptions",
+          "kind": "interface",
+          "signature": "interface UseBatchNavigationOptions",
+          "doc": null
+        },
+        {
+          "name": "useDeferredDelete",
+          "kind": "function",
+          "signature": "(options: UseDeferredDeleteOptions) => DeferredDelete",
+          "doc": null
+        },
+        {
+          "name": "UseDeferredDeleteOptions",
+          "kind": "interface",
+          "signature": "interface UseDeferredDeleteOptions",
+          "doc": null
+        },
+        {
+          "name": "useGenerationHistory",
+          "kind": "function",
+          "signature": "({ fetchPage, q, type, initialPage, }: UseGenerationHistoryOptions) => GenerationHistoryState",
+          "doc": "Cursor-paged generation history over the product-supplied data port."
+        },
+        {
+          "name": "UseGenerationHistoryOptions",
+          "kind": "interface",
+          "signature": "interface UseGenerationHistoryOptions",
+          "doc": null
         },
         {
           "name": "useStudioGenerations",
           "kind": "function",
           "signature": "(loaderGenerations: Generation[], options?: { workspaceId?: string | undefined; generationsEndpoint?: string | undefine…",
           "doc": "The generation orchestrator behind a studio surface: it merges the loader's rows with in-flight live generations, computes the latest batch for the canvas, polls running generations until they settle…"
+        },
+        {
+          "name": "useStudioPlayback",
+          "kind": "function",
+          "signature": "() => StudioPlayback",
+          "doc": null
+        },
+        {
+          "name": "useStudioToast",
+          "kind": "function",
+          "signature": "() => StudioToastContextValue",
+          "doc": null
+        },
+        {
+          "name": "VaultPathPopover",
+          "kind": "function",
+          "signature": "({ open, triggerRef, panelRef, generations, onSubmit, onCancel, pending, }: VaultPathPopoverProps) => Element | null",
+          "doc": null
+        },
+        {
+          "name": "VaultPathPopoverProps",
+          "kind": "interface",
+          "signature": "interface VaultPathPopoverProps",
+          "doc": null
         }
       ]
     },

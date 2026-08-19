@@ -18252,6 +18252,14 @@ type TurnStatus
 
 Source: `src/studio/index.ts`
 
+### `aspectRatioFromOptions`
+
+`function` — Resolve a requested lane's aspect ratio from its selected options.
+
+```ts
+(type: GenerationType, options: { size?: string | undefined; aspectRatio?: string | undefined; }) => number | undefined
+```
+
 ### `buildGenerationRequestBody`
 
 `function` — Build the request body object for a generation operation from provided fields
@@ -18266,6 +18274,30 @@ Source: `src/studio/index.ts`
 
 ```ts
 (type: GenerationType, models: MediaModelOption[]) => MediaModelOption[]
+```
+
+### `defaultVaultPathFor`
+
+`function` — Choose the default vault folder shared by a homogeneous media selection.
+
+```ts
+(generations: readonly Generation[]) => string
+```
+
+### `DeleteGenerations`
+
+`type` — The shell may invoke this during page teardown (the `pagehide`/unmount flush of a deferred delete).
+
+```ts
+type DeleteGenerations
+```
+
+### `DownloadGenerations`
+
+`type`
+
+```ts
+type DownloadGenerations
 ```
 
 ### `failedOptimisticGeneration`
@@ -18284,6 +18316,14 @@ Source: `src/studio/index.ts`
 Readonly<Record<string, Readonly<Record<string, ModelOptionMetadata>>>>
 ```
 
+### `FetchGenerationsPage`
+
+`type`
+
+```ts
+type FetchGenerationsPage
+```
+
 ### `Generation`
 
 `interface` — Define the structure for a generation entity including its metadata and creation details
@@ -18298,6 +18338,30 @@ interface Generation
 
 ```ts
 readonly GenerationType[]
+```
+
+### `generationAspectRatio`
+
+`function` — Resolve the best available aspect ratio for a generation row.
+
+```ts
+(generation: Generation) => number
+```
+
+### `generationAssetId`
+
+`function` — Resolve the stored media asset id, when present.
+
+```ts
+(generation: Generation) => string | null
+```
+
+### `generationBatchKey`
+
+`function` — Resolve a generation's batch identity, preferring the server batch id.
+
+```ts
+(generation: Generation) => string
 ```
 
 ### `generationError`
@@ -18316,12 +18380,44 @@ readonly GenerationType[]
 (generation: Generation) => string | null
 ```
 
+### `GenerationPage`
+
+`interface`
+
+```ts
+interface GenerationPage
+```
+
+### `GenerationPageQuery`
+
+`interface`
+
+```ts
+interface GenerationPageQuery
+```
+
 ### `GenerationRequestFields`
 
 `interface` — Define fields required to configure and request various types of media generation
 
 ```ts
 interface GenerationRequestFields
+```
+
+### `generationsInBatch`
+
+`function` — Select and order all outputs belonging to a generation batch.
+
+```ts
+(generations: readonly Generation[], batchKey: string) => Generation[]
+```
+
+### `generationSpecSegments`
+
+`function` — Resolve only the human-readable media specification fields a row carries.
+
+```ts
+(generation: Generation) => string[]
 ```
 
 ### `generationStatus`
@@ -18362,6 +18458,22 @@ type GenerationType
 
 ```ts
 { readonly multipleOf: 16; readonly maxLongEdge: 3840; readonly maxRatio: 3; }
+```
+
+### `GRID_WAVEFORM_BARS`
+
+`const`
+
+```ts
+26
+```
+
+### `hashSeed`
+
+`function` — Hash a string with FNV-1a into an unsigned 32-bit seed.
+
+```ts
+(value: string) => number
 ```
 
 ### `IMAGE_TO_VIDEO_SIBLINGS`
@@ -18412,6 +18524,14 @@ Readonly<Record<string, string>>
 8
 ```
 
+### `MEDIA_TYPE_FILTERS`
+
+`const`
+
+```ts
+readonly { value: MediaTypeFilter; label: string; }[]
+```
+
 ### `MediaModelCatalogResponse`
 
 `interface` — Represent media model catalog with default values, model options, and optional error message
@@ -18434,6 +18554,22 @@ interface MediaModelOption
 
 ```ts
 type MediaModelStatus
+```
+
+### `MediaTypeFilter`
+
+`type`
+
+```ts
+type MediaTypeFilter
+```
+
+### `mergeGenerationPages`
+
+`function` — Append a page while preserving the first row seen for each id.
+
+```ts
+(prev: readonly Generation[], next: readonly Generation[]) => Generation[]
 ```
 
 ### `mergeLiveGeneration`
@@ -18500,6 +18636,14 @@ type ModelOptionValue
 (value: unknown) => number
 ```
 
+### `normalizeVaultPath`
+
+`function` — Normalize a user-entered relative vault folder or reject an unsafe path.
+
+```ts
+(input: string) => string | null
+```
+
 ### `optimisticGeneration`
 
 `function` — Generate content optimistically based on input parameters and optional model and output details
@@ -18540,6 +18684,14 @@ type ModelOptionValue
 (type: GenerationType, catalog: MediaModelCatalogResponse | null) => string | undefined
 ```
 
+### `previewWaveformBars`
+
+`function` — Build stable pseudo-waveform bars for a media preview.
+
+```ts
+(seed: string, count: number) => readonly WaveformBar[]
+```
+
 ### `reconcileOptionValues`
 
 `function` — Reconcile selections against supported options and their wire-typed defaults.
@@ -18564,12 +18716,28 @@ type ModelOptionValue
 (input: { type: "image" | "video" | "speech"; modelId: string; provider?: string | undefined; catalogOptions?: Readonly…
 ```
 
+### `SaveGenerationsToVault`
+
+`type`
+
+```ts
+type SaveGenerationsToVault
+```
+
 ### `selectedModelsWithDefaults`
 
 `function` — Resolve selected models by applying defaults for missing or unavailable entries in the catalog
 
 ```ts
 (current: Partial<Record<GenerationType, string>>, catalog: MediaModelCatalogResponse) => Partial<Record<GenerationType…
+```
+
+### `StudioMediaActions`
+
+`interface` — Every media action a tile / viewer / batch bar can offer.
+
+```ts
+interface StudioMediaActions
 ```
 
 ### `supportsCustomImageSize`
@@ -18604,10 +18772,50 @@ type ModelOptionValue
 (width: number, height: number) => { ok: true; } | { ok: false; reason: string; }
 ```
 
+### `VaultSaveResult`
+
+`interface`
+
+```ts
+interface VaultSaveResult
+```
+
+### `WaveformBar`
+
+`interface` — A deterministic waveform bar used when decoded audio is unavailable.
+
+```ts
+interface WaveformBar
+```
+
+### `WIDE_WAVEFORM_BARS`
+
+`const`
+
+```ts
+72
+```
+
 
 ## `./studio-react`
 
 Source: `src/studio-react/index.tsx` · depends on `studio`, `web-react`
+
+### `AudioTogglePill`
+
+`function` — The audio switch.
+
+```ts
+({ on, onToggle }: { on: boolean; onToggle: (on: boolean) => void; }) => Element
+```
+
+### `ComposerBand`
+
+`function` — The middle scroller.
+
+```ts
+({ bandRef, resetKey, children, }: { bandRef: RefObject<HTMLDivElement | null>; resetKey: string; children: ReactNode;…
+```
 
 ### `ComposerType`
 
@@ -18617,44 +18825,44 @@ Source: `src/studio-react/index.tsx` · depends on `studio`, `web-react`
 type ComposerType
 ```
 
-### `filterGenerations`
+### `CustomSizeForm`
 
-`function` — The visible set for the active type tab (all generations when unfiltered).
+`function` — The custom-size form the Size menu swaps to.
 
 ```ts
-(generations: Generation[], typeFilter: string | null) => Generation[]
+({ initial, onApply, onCancel, }: { initial?: string | undefined; onApply: (size: string) => void; onCancel: () => void…
 ```
 
-### `GenerationCard`
+### `DeferredDelete`
+
+`interface`
+
+```ts
+interface DeferredDelete
+```
+
+### `downloadGenerationsViaAnchor`
+
+`function` — Same-origin anchor download, staggered so the browser does not swallow every request after the first.
+
+```ts
+DownloadGenerations
+```
+
+### `formatClock`
 
 `function`
 
 ```ts
-({ generation, onSelect, }: { generation: Generation; onSelect: (generation: Generation) => void; }) => Element
+(seconds: number) => string
 ```
 
-### `GenerationDetail`
+### `GenerationHistoryState`
 
-`function`
-
-```ts
-({ generation, vaultHref, onNavigate, }: { generation: Generation; vaultHref?: ((filePath?: string | null | undefined)…
-```
-
-### `GenerationDetailModal`
-
-`function` — Centered detail view for a single generation.
+`interface`
 
 ```ts
-({ generation, vaultHref, onClose, }: { generation: Generation | null; vaultHref?: ((filePath?: string | null | undefin…
-```
-
-### `GenerationGrid`
-
-`function` — Chrome-less asset grid — the `GenerationCard` grid plus its empty state, with no surrounding tabs/stats/sheet chrome.
-
-```ts
-({ generations, typeFilter, onSelect, }: { generations: Generation[]; typeFilter: string | null; onSelect: (generation:…
+interface GenerationHistoryState
 ```
 
 ### `GenerationNoticeChip`
@@ -18665,36 +18873,108 @@ type ComposerType
 ({ className }: { className?: string | undefined; }) => Element
 ```
 
-### `GenerationStatusBadge`
+### `MediaTile`
 
 `function`
 
 ```ts
-({ generation, inline, }: { generation: Generation; inline?: boolean | undefined; }) => Element | null
+({ generation, context, onOpen, actions, aspectRatio, waveformBars, selectMode, selected, onToggleSelect, onRequestDele…
 ```
 
-### `LibraryDrawer`
+### `MediaTileProps`
+
+`interface`
+
+```ts
+interface MediaTileProps
+```
+
+### `MediaTypeSegment`
+
+`interface` — One media lane's segment: the icon it shows collapsed, the word it shows when active.
+
+```ts
+interface MediaTypeSegment
+```
+
+### `MediaTypeSegments`
+
+`function` — The pinned-left media-type group: a track holding one filled pill (the active lane, icon + word) and icon-only siblings.
+
+```ts
+<T extends string>({ value, segments, onChange, }: { value: T; segments: readonly MediaTypeSegment<T>[]; onChange: (typ…
+```
+
+### `MediaViewerModal`
 
 `function`
 
 ```ts
-({ open, onOpenChange, generations, totalCost, typeFilter, onFilterChange, vaultHref, selected, onSelect, }: { open: bo…
+({ generation, onClose, actions, onRequestDelete, onSaved, }: MediaViewerModalProps) => Element | null
 ```
 
-### `LibraryPanel`
+### `MediaViewerModalProps`
 
-`function` — Inline asset gallery — the same filter + stats + card grid as the library drawer's list view, but with no sheet chrome so it can sit on the page beside the composer.
+`interface`
 
 ```ts
-({ generations, totalCost, typeFilter, onFilterChange, onSelect, }: { generations: Generation[]; totalCost: number; typ…
+interface MediaViewerModalProps
 ```
 
-### `ResultCanvas`
+### `MenuPill`
 
-`function`
+`function` — A standalone enum picker using the studio composer's pill and menu grammar.
 
 ```ts
-({ batch, onOpenLibrary, onSelect, }: { batch: Generation[]; onOpenLibrary: () => void; onSelect: (generation: Generati…
+<T extends string>({ label, value, choices, onSelect, className, }: { label: string; value: T; choices: readonly { valu…
+```
+
+### `ModelPill`
+
+`function` — The model pill — first in the band on every lane, and the only pill that is always there.
+
+```ts
+({ models, value, displayName, provider, onSelect, bandRef, }: { models: readonly MediaModelOption[]; value: string; di…
+```
+
+### `OptionChoice`
+
+`interface` — One renderable value: the wire value, untouched, and how it reads.
+
+```ts
+interface OptionChoice
+```
+
+### `OptionPill`
+
+`function` — A value pill and the menu it opens.
+
+```ts
+({ label, value, choices, onSelect, bandRef, custom, }: { label: string; value: ModelOptionValue | undefined; choices:…
+```
+
+### `optionValueLabel`
+
+`function` — How a wire value reads, with the wire value itself untouched underneath.
+
+```ts
+(param: string, value: ModelOptionValue) => string
+```
+
+### `ReferencePill`
+
+`function` — The reference-image pill: the only control that changes which MODEL runs, so the swap to the image-to-video sibling is the caller's (`onAttach`/`onRemove`) and the pill only reports what is attached.
+
+```ts
+({ url, onAttach, onRemove, pick, bandRef, }: { url: string | null; onAttach: (url: string) => void; onRemove: () => vo…
+```
+
+### `StudioAudioElementLike`
+
+`interface`
+
+```ts
+interface StudioAudioElementLike
 ```
 
 ### `StudioComposer`
@@ -18713,68 +18993,148 @@ type ComposerType
 interface StudioComposerProps
 ```
 
-### `StudioHeader`
+### `StudioConfirmDialog`
 
 `function`
 
 ```ts
-({ count, onOpenLibrary, canGenerate, }: { count: number; onOpenLibrary: () => void; canGenerate: boolean; }) => Element
+({ open, count, onConfirm, onCancel, }: StudioConfirmDialogProps) => Element | null
 ```
 
-### `StudioRole`
-
-`type`
-
-```ts
-type StudioRole
-```
-
-### `StudioSheet`
-
-`function` — Right-side overlay sheet built on Radix Dialog — gives focus-trap, scroll-lock, and Escape-to-close for free.
-
-```ts
-({ open, onOpenChange, title, children, }: { open: boolean; onOpenChange: (open: boolean) => void; title: string; child…
-```
-
-### `StudioWorkspace`
-
-`function` — The full studio surface: header + composer + result canvas + library drawer, with the generation orchestrator (merge/poll/revalidate) wired in.
-
-```ts
-({ generations, totalCost, workspaceId, role, generationsEndpoint, vaultHref, }: StudioWorkspaceProps) => Element
-```
-
-### `StudioWorkspaceProps`
+### `StudioConfirmDialogProps`
 
 `interface`
 
 ```ts
-interface StudioWorkspaceProps
+interface StudioConfirmDialogProps
 ```
 
-### `TYPE_CONFIG`
+### `StudioGenerationScreen`
 
-`const` — Map type keys to their corresponding configuration objects including labels, icons, and colors
+`function`
 
 ```ts
-Record<string, TypeConfig>
+({ generations, batchKey, onGenerated, onOpenGeneration, onBack, workspaceId, pickReferenceImage, actions, className, }…
 ```
 
-### `TypeConfig`
+### `StudioGenerationScreenProps`
 
-`interface` — Define configuration options for a type including label, icon, and color properties
+`interface`
 
 ```ts
-interface TypeConfig
+interface StudioGenerationScreenProps
 ```
 
-### `typeConfigFor`
+### `StudioHistoryScreen`
 
-`function` — Resolve the configuration object for a given type or return the default image configuration
+`function`
 
 ```ts
-(type: string) => TypeConfig
+({ fetchPage, initialPage, onBack, actions, searchDebounceMs, className, }: StudioHistoryScreenProps) => Element
+```
+
+### `StudioHistoryScreenProps`
+
+`interface`
+
+```ts
+interface StudioHistoryScreenProps
+```
+
+### `StudioHomeScreen`
+
+`function` — Studio's create-and-recent-media landing screen.
+
+```ts
+({ generations, onGenerated, onOpenGeneration, onOpenHistory, workspaceId, pickReferenceImage, actions, recentLimit, cl…
+```
+
+### `StudioHomeScreenProps`
+
+`interface`
+
+```ts
+interface StudioHomeScreenProps
+```
+
+### `StudioPlayback`
+
+`interface`
+
+```ts
+interface StudioPlayback
+```
+
+### `StudioPlaybackProvider`
+
+`function`
+
+```ts
+(props: { children: ReactNode; createAudioElement?: (() => StudioAudioElementLike) | undefined; }) => Element
+```
+
+### `StudioToastInput`
+
+`interface`
+
+```ts
+interface StudioToastInput
+```
+
+### `StudioToastProvider`
+
+`function`
+
+```ts
+({ children }: { children: ReactNode; }) => Element
+```
+
+### `useBatchNavigation`
+
+`function` — Returns a callback the screens wrap around `onGenerated`: the first row of a batch not seen before navigates via `onOpenGeneration`, exactly once per batch — a four-image batch arrives as four rows s…
+
+```ts
+({ seed, currentBatchKey, onOpenGeneration, }: UseBatchNavigationOptions) => (generation: Generation) => void
+```
+
+### `UseBatchNavigationOptions`
+
+`interface`
+
+```ts
+interface UseBatchNavigationOptions
+```
+
+### `useDeferredDelete`
+
+`function`
+
+```ts
+(options: UseDeferredDeleteOptions) => DeferredDelete
+```
+
+### `UseDeferredDeleteOptions`
+
+`interface`
+
+```ts
+interface UseDeferredDeleteOptions
+```
+
+### `useGenerationHistory`
+
+`function` — Cursor-paged generation history over the product-supplied data port.
+
+```ts
+({ fetchPage, q, type, initialPage, }: UseGenerationHistoryOptions) => GenerationHistoryState
+```
+
+### `UseGenerationHistoryOptions`
+
+`interface`
+
+```ts
+interface UseGenerationHistoryOptions
 ```
 
 ### `useStudioGenerations`
@@ -18783,6 +19143,38 @@ interface TypeConfig
 
 ```ts
 (loaderGenerations: Generation[], options?: { workspaceId?: string | undefined; generationsEndpoint?: string | undefine…
+```
+
+### `useStudioPlayback`
+
+`function`
+
+```ts
+() => StudioPlayback
+```
+
+### `useStudioToast`
+
+`function`
+
+```ts
+() => StudioToastContextValue
+```
+
+### `VaultPathPopover`
+
+`function`
+
+```ts
+({ open, triggerRef, panelRef, generations, onSubmit, onCancel, pending, }: VaultPathPopoverProps) => Element | null
+```
+
+### `VaultPathPopoverProps`
+
+`interface`
+
+```ts
+interface VaultPathPopoverProps
 ```
 
 

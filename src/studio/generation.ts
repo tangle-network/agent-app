@@ -328,8 +328,11 @@ export function optimisticGeneration({
   clientRequestId: string
   outputIndex?: number
   outputCount?: number
-}): Generation {
+}, aspectRatio?: number): Generation {
   const batchId = outputIndex == null ? undefined : clientRequestId
+  const aspectRatioMetadata = Number.isFinite(aspectRatio) && (aspectRatio ?? 0) > 0
+    ? { aspectRatio }
+    : {}
   return {
     id: outputIndex == null ? `local-${clientRequestId}` : `local-${clientRequestId}-${outputIndex}`,
     type,
@@ -345,6 +348,7 @@ export function optimisticGeneration({
       batchId,
       outputIndex,
       outputCount,
+      ...aspectRatioMetadata,
     },
   }
 }
@@ -366,4 +370,131 @@ export function normalizeImageCount(value: unknown): number {
   const numeric = typeof value === 'number' ? value : Number(value)
   if (!Number.isFinite(numeric)) return MIN_IMAGE_COUNT
   return Math.min(Math.max(Math.trunc(numeric), MIN_IMAGE_COUNT), MAX_IMAGE_COUNT)
+}
+
+/** Resolve a generation's batch identity, preferring the server batch id. */
+export function generationBatchKey(generation: Generation): string {
+  const metadata = generation.metadata ?? {}
+  if (typeof metadata.batchId === 'string' && metadata.batchId.trim()) return metadata.batchId
+  if (typeof metadata.clientRequestId === 'string' && metadata.clientRequestId.trim()) return metadata.clientRequestId
+  return generation.id
+}
+
+/** Resolve the stored media asset id, when present. */
+export function generationAssetId(generation: Generation): string | null {
+  const value = generation.metadata?.assetId
+  return typeof value === 'string' && value.trim() ? value : null
+}
+
+/** Select and order all outputs belonging to a generation batch. */
+export function generationsInBatch(generations: readonly Generation[], batchKey: string): Generation[] {
+  return generations
+    .map((generation, inputIndex) => ({ generation, inputIndex }))
+    .filter(({ generation }) => generationBatchKey(generation) === batchKey)
+    .sort((left, right) => {
+      const leftIndex = left.generation.metadata?.outputIndex
+      const rightIndex = right.generation.metadata?.outputIndex
+      const leftOrder = typeof leftIndex === 'number' && Number.isFinite(leftIndex) ? leftIndex : Infinity
+      const rightOrder = typeof rightIndex === 'number' && Number.isFinite(rightIndex) ? rightIndex : Infinity
+      return leftOrder - rightOrder || left.inputIndex - right.inputIndex
+    })
+    .map(({ generation }) => generation)
+}
+
+function ratioFromDimensions(value: string, separator: 'size' | 'aspect'): number | undefined {
+  const match = separator === 'size'
+    ? /^(\d+)[x×](\d+)$/.exec(value)
+    : /^(\d+):(\d+)$/.exec(value)
+  if (!match) return undefined
+  const width = Number(match[1])
+  const height = Number(match[2])
+  return width > 0 && height > 0 ? width / height : undefined
+}
+
+function roundedRatio(value: number): number {
+  return +value.toFixed(4)
+}
+
+/** Resolve the best available aspect ratio for a generation row. */
+export function generationAspectRatio(generation: Generation): number {
+  const metadata = generation.metadata ?? {}
+  if (typeof metadata.aspectRatio === 'number'
+    && Number.isFinite(metadata.aspectRatio)
+    && metadata.aspectRatio > 0) {
+    return roundedRatio(metadata.aspectRatio)
+  }
+  if (typeof metadata.size === 'string') {
+    const ratio = ratioFromDimensions(metadata.size, 'size')
+    if (ratio !== undefined) return roundedRatio(ratio)
+  }
+  if (typeof metadata.aspectRatio === 'string') {
+    const ratio = ratioFromDimensions(metadata.aspectRatio, 'aspect')
+    if (ratio !== undefined) return roundedRatio(ratio)
+  }
+  if (generation.type === 'video') return roundedRatio(16 / 9)
+  if (generation.type === 'speech' || generation.type === 'audio') return 3.2
+  return 1
+}
+
+/** Resolve a requested lane's aspect ratio from its selected options. */
+export function aspectRatioFromOptions(
+  type: GenerationType,
+  options: { size?: string; aspectRatio?: string },
+): number | undefined {
+  if (type === 'speech') return 3.2
+  const ratio = type === 'image'
+    ? options.size ? ratioFromDimensions(options.size, 'size') : undefined
+    : type === 'video'
+      ? options.aspectRatio ? ratioFromDimensions(options.aspectRatio, 'aspect') : undefined
+      : undefined
+  return ratio === undefined ? undefined : roundedRatio(ratio)
+}
+
+/** Choose the default vault folder shared by a homogeneous media selection. */
+export function defaultVaultPathFor(generations: readonly Generation[]): string {
+  const types = new Set(generations.map((generation) => generation.type))
+  if (types.size !== 1) return 'generated/media'
+  const [type] = types
+  return type !== undefined && isGenerationType(type) ? outputPathFor(type) : 'generated/media'
+}
+
+/** Normalize a user-entered relative vault folder or reject an unsafe path. */
+export function normalizeVaultPath(input: string): string | null {
+  const path = input.trim().replace(/^\/+|\/+$/g, '').replace(/\/{2,}/g, '/')
+  if (!path) return null
+  const segments = path.split('/')
+  return segments.some((segment) => segment === '.' || segment === '..' || segment.includes('\\'))
+    ? null
+    : path
+}
+
+/** Append a page while preserving the first row seen for each id. */
+export function mergeGenerationPages(prev: readonly Generation[], next: readonly Generation[]): Generation[] {
+  const seen = new Set(prev.map((generation) => generation.id))
+  const merged = [...prev]
+  for (const generation of next) {
+    if (seen.has(generation.id)) continue
+    seen.add(generation.id)
+    merged.push(generation)
+  }
+  return merged
+}
+
+/** Resolve only the human-readable media specification fields a row carries. */
+export function generationSpecSegments(generation: Generation): string[] {
+  const metadata = generation.metadata ?? {}
+  const segments: string[] = []
+  if (typeof metadata.size === 'string') segments.push(metadata.size.replace(/x/g, '×'))
+  if (typeof metadata.resolution === 'string') segments.push(metadata.resolution)
+  if (typeof metadata.aspectRatio === 'string' && /^(\d+):(\d+)$/.test(metadata.aspectRatio)) {
+    segments.push(metadata.aspectRatio)
+  }
+  if (typeof metadata.duration === 'string') {
+    segments.push(metadata.duration)
+  } else if (typeof metadata.durationSeconds === 'number' && Number.isFinite(metadata.durationSeconds)) {
+    const seconds = Math.max(0, Math.floor(metadata.durationSeconds))
+    segments.push(`${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`)
+  }
+  if (typeof metadata.voice === 'string') segments.push(metadata.voice)
+  return segments
 }
