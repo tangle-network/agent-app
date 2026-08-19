@@ -12463,6 +12463,18 @@
           "doc": "Fail unless every nav href resolves to a registered route."
         },
         {
+          "name": "buildCommandPaletteItems",
+          "kind": "function",
+          "signature": "({ sessions, actions, sessionsLabel, actionsLabel, untitledLabel, }: BuildCommandPaletteItemsOptions) => CommandPalette…",
+          "doc": "Flatten sessions + actions into palette items, sessions group first (the jump-back-in list), actions after."
+        },
+        {
+          "name": "BuildCommandPaletteItemsOptions",
+          "kind": "interface",
+          "signature": "interface BuildCommandPaletteItemsOptions",
+          "doc": null
+        },
+        {
           "name": "buildSessionNavItem",
           "kind": "function",
           "signature": "<TIcon = unknown>({ id, label, icon, href, activeSessionId, emptyLabel, defaultOpen, ...subItemOptions }: BuildSessionN…",
@@ -12493,6 +12505,36 @@
           "doc": "Check every nav href against the product's route table."
         },
         {
+          "name": "COMMAND_PALETTE_ACTIONS_GROUP",
+          "kind": "const",
+          "signature": "\"Actions\"",
+          "doc": null
+        },
+        {
+          "name": "COMMAND_PALETTE_SESSIONS_GROUP",
+          "kind": "const",
+          "signature": "\"Sessions\"",
+          "doc": null
+        },
+        {
+          "name": "CommandPaletteAction",
+          "kind": "interface",
+          "signature": "interface CommandPaletteAction",
+          "doc": "A product-supplied palette action."
+        },
+        {
+          "name": "CommandPaletteGroup",
+          "kind": "interface",
+          "signature": "interface CommandPaletteGroup",
+          "doc": "One rendered section: a header plus its rows, in first-seen group order."
+        },
+        {
+          "name": "CommandPaletteItem",
+          "kind": "interface",
+          "signature": "interface CommandPaletteItem",
+          "doc": "One selectable row."
+        },
+        {
           "name": "ComposedSidebarSessions",
           "kind": "interface",
           "signature": "interface ComposedSidebarSessions",
@@ -12517,10 +12559,22 @@
           "doc": null
         },
         {
+          "name": "filterCommandPaletteItems",
+          "kind": "function",
+          "signature": "(items: readonly CommandPaletteItem[], query: string) => CommandPaletteItem[]",
+          "doc": "Filter + rank: an empty query returns the items untouched (build order is the recency order); a real query drops non-matches and sorts by score, then recency, then original position — stable and dete…"
+        },
+        {
           "name": "flattenRouteTable",
           "kind": "function",
           "signature": "(table: NavRouteTable) => string[]",
           "doc": "Every path pattern the table registers, rooted and de-duplicated."
+        },
+        {
+          "name": "groupCommandPaletteItems",
+          "kind": "function",
+          "signature": "(items: readonly CommandPaletteItem[]) => CommandPaletteGroup[]",
+          "doc": "Fold a flat (already ordered) item list into renderable sections."
         },
         {
           "name": "mergeSessionPages",
@@ -12671,6 +12725,12 @@
           "kind": "interface",
           "signature": "interface ResolveSessionUnreadOptions",
           "doc": null
+        },
+        {
+          "name": "scoreCommandPaletteItem",
+          "kind": "function",
+          "signature": "(item: CommandPaletteItem, query: string) => number | null",
+          "doc": "Score an item: the best label score, or the best keyword score a fixed step below."
         },
         {
           "name": "sessionLabel",
@@ -17139,6 +17199,24 @@
           "doc": "Describe the structure and properties of a chat message with roles, content, and optional metadata"
         },
         {
+          "name": "CommandPalette",
+          "kind": "function",
+          "signature": "({ items, onSelect, open: controlledOpen, onOpenChange, hotkey, loading, initialQuery, placeholder, emptyMessage, label…",
+          "doc": null
+        },
+        {
+          "name": "CommandPaletteItem",
+          "kind": "interface",
+          "signature": "interface CommandPaletteItem",
+          "doc": "One selectable row."
+        },
+        {
+          "name": "CommandPaletteProps",
+          "kind": "interface",
+          "signature": "interface CommandPaletteProps",
+          "doc": null
+        },
+        {
           "name": "composerAnswerData",
           "kind": "function",
           "signature": "(field: { type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…",
@@ -17329,6 +17407,30 @@
           "kind": "function",
           "signature": "(source: ProvenanceSource) => string | null",
           "doc": "The sentence for a source that is not `ready`, or `null` when it is."
+        },
+        {
+          "name": "DictationAudio",
+          "kind": "interface",
+          "signature": "interface DictationAudio",
+          "doc": "The audio a finished recording hands to the host."
+        },
+        {
+          "name": "DictationControls",
+          "kind": "interface",
+          "signature": "interface DictationControls",
+          "doc": null
+        },
+        {
+          "name": "dictationErrorMessage",
+          "kind": "function",
+          "signature": "(error: unknown) => string",
+          "doc": "The failure as a sentence."
+        },
+        {
+          "name": "diffRecordGridProposal",
+          "kind": "function",
+          "signature": "(rows: readonly RecordGridRow[], proposal: RecordGridProposal) => RecordGridRowDiff[]",
+          "doc": "Diff a proposal against the live rows."
         },
         {
           "name": "DISPATCH_MAX_MEDIA_PARTS",
@@ -17613,6 +17715,12 @@
           "doc": "\"8s\" / \"2m 05s\" / \"1h 12m\"; null when unknown."
         },
         {
+          "name": "formatDictationElapsed",
+          "kind": "function",
+          "signature": "(totalSeconds: number) => string",
+          "doc": "`0:00`, `0:09`, `1:05`, `60:00` — minutes unbounded, seconds always two digits."
+        },
+        {
           "name": "formatInsightDelta",
           "kind": "function",
           "signature": "(delta: InsightDelta, format?: (value: number) => string) => string",
@@ -17693,7 +17801,7 @@
         {
           "name": "InsightCard",
           "kind": "function",
-          "signature": "({ title, value, unit, previous, polarity, format, series, seriesLabel, description, action, live, liveLabel, className…",
+          "signature": "({ eyebrow, title, value, unit, previous, polarity, format, series, seriesLabel, description, action, live, liveLabel,…",
           "doc": null
         },
         {
@@ -18189,6 +18297,12 @@
           "doc": "Reads a persisted/streamed `interaction` part back into a `ChatInteraction`."
         },
         {
+          "name": "pickDictationMimeType",
+          "kind": "function",
+          "signature": "() => string | undefined",
+          "doc": "The mime to ask the recorder for, or `undefined` to take the UA default."
+        },
+        {
           "name": "POPOVER_SURFACE_ATTR",
           "kind": "const",
           "signature": "\"data-agent-app-popover\"",
@@ -18479,7 +18593,7 @@
         {
           "name": "RecordGrid",
           "kind": "function",
-          "signature": "({ columns, caption, state, empty, onCreate, onUpdate, onDelete, newRowDefaults, addLabel, locale, toolbar, loadingRowC…",
+          "signature": "({ columns, caption, state, empty, onCreate, onUpdate, onDelete, proposed, onAcceptRow, onRejectRow, onAcceptAll, onRej…",
           "doc": "The shared editable record table."
         },
         {
@@ -18493,6 +18607,12 @@
           "kind": "interface",
           "signature": "interface RecordGridCellChange",
           "doc": "One committed cell edit, handed to `onUpdate`."
+        },
+        {
+          "name": "RecordGridCellDiff",
+          "kind": "interface",
+          "signature": "interface RecordGridCellDiff",
+          "doc": "One cell whose proposed value differs from the live one."
         },
         {
           "name": "RecordGridCellOutcome",
@@ -18573,6 +18693,12 @@
           "doc": "Edits the grid has applied locally but the caller's `rows` prop has not yet caught up with."
         },
         {
+          "name": "RecordGridProposal",
+          "kind": "interface",
+          "signature": "interface RecordGridProposal",
+          "doc": "A proposed change set, diffed against the live rows by {@link diffRecordGridProposal}."
+        },
+        {
           "name": "RecordGridProps",
           "kind": "interface",
           "signature": "interface RecordGridProps",
@@ -18583,6 +18709,18 @@
           "kind": "interface",
           "signature": "interface RecordGridRow",
           "doc": "One row: an id, a flat value bag keyed by column id, and optional per-cell provenance."
+        },
+        {
+          "name": "RecordGridRowDiff",
+          "kind": "interface",
+          "signature": "interface RecordGridRowDiff",
+          "doc": "One row's verdict: what the proposal does to it."
+        },
+        {
+          "name": "RecordGridRowDiffKind",
+          "kind": "type",
+          "signature": "type RecordGridRowDiffKind",
+          "doc": null
         },
         {
           "name": "recordGridRowLabel",
@@ -18807,6 +18945,12 @@
           "doc": "Runs a host-supplied submitter under the CARD's own deadline, and always resolves."
         },
         {
+          "name": "SlashCommand",
+          "kind": "interface",
+          "signature": "interface SlashCommand",
+          "doc": "One `/` command the composer offers."
+        },
+        {
           "name": "SmoothRevealOptions",
           "kind": "interface",
           "signature": "interface SmoothRevealOptions",
@@ -18991,6 +19135,18 @@
           "kind": "interface",
           "signature": "interface UseComposerAttachmentsResult",
           "doc": "Provide staged file chips, ready attachments, and methods to add, retry, or drop composer files"
+        },
+        {
+          "name": "useDictation",
+          "kind": "function",
+          "signature": "({ onDictate, onError }: UseDictationOptions) => DictationControls",
+          "doc": null
+        },
+        {
+          "name": "UseDictationOptions",
+          "kind": "interface",
+          "signature": "interface UseDictationOptions",
+          "doc": null
         },
         {
           "name": "useDurablePlanFlow",

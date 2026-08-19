@@ -210,6 +210,87 @@ export function sameRecordGridValue(a: RecordGridValue | undefined, b: RecordGri
   return Object.is(a ?? null, b ?? null)
 }
 
+// ── proposed changes (row diff) ────────────────────────────────────────────
+
+/**
+ * A proposed change set, diffed against the live rows by
+ * {@link diffRecordGridProposal}. The grid's review mode renders exactly what
+ * this shape declares — it owns no opinion about where the proposal came from
+ * (an agent's `submit_proposal` call, a record store's pending entries).
+ */
+export interface RecordGridProposal {
+  /** Proposed new cell values for EXISTING rows: row id → column id → value.
+   *  Only cells that differ from the live value diff; an update that restates
+   *  the current value is not a change. An id with no live row is ignored —
+   *  adding a row is `additions`' job. */
+  updates?: Readonly<Record<string, Readonly<Record<string, RecordGridValue>>>>
+  /** Proposed new rows. An addition whose id already names a live row is
+   *  ignored — changing an existing row is `updates`' job. */
+  additions?: readonly RecordGridRow[]
+  /** Live row ids proposed for removal. Unknown ids are ignored. */
+  removals?: readonly string[]
+}
+
+/** One cell whose proposed value differs from the live one. */
+export interface RecordGridCellDiff {
+  columnId: string
+  /** The live value — what rejecting keeps. */
+  before: RecordGridValue
+  /** The proposed value — what accepting writes. */
+  after: RecordGridValue
+}
+
+export type RecordGridRowDiffKind = 'changed' | 'added' | 'removed'
+
+/** One row's verdict: what the proposal does to it. */
+export interface RecordGridRowDiff {
+  rowId: string
+  kind: RecordGridRowDiffKind
+  /** The differing cells. Empty for `added`/`removed` — every cell of those is
+   *  part of the change by definition. */
+  cells: readonly RecordGridCellDiff[]
+  /** The live row for `changed`/`removed`, the proposed row for `added`. */
+  row: RecordGridRow
+}
+
+/**
+ * Diff a proposal against the live rows. Pure and deterministic: input order
+ * in, diff order out — updates follow `rows` order, removals follow `rows`
+ * order, additions follow the proposal's order. A row whose update bag diffs
+ * to nothing produces no entry, so a no-op proposal yields an empty diff and
+ * the grid has nothing to review.
+ */
+export function diffRecordGridProposal(
+  rows: readonly RecordGridRow[],
+  proposal: RecordGridProposal,
+): RecordGridRowDiff[] {
+  const updates = proposal.updates ?? {}
+  const removals = new Set(proposal.removals ?? [])
+  const additions = proposal.additions ?? []
+  const liveIds = new Set(rows.map((row) => row.id))
+
+  const diffs: RecordGridRowDiff[] = []
+  for (const row of rows) {
+    if (removals.has(row.id)) {
+      diffs.push({ rowId: row.id, kind: 'removed', cells: [], row })
+      continue
+    }
+    const patch = updates[row.id]
+    if (patch === undefined) continue
+    const cells: RecordGridCellDiff[] = []
+    for (const [columnId, after] of Object.entries(patch)) {
+      const before = row.values[columnId] ?? null
+      if (!sameRecordGridValue(before, after)) cells.push({ columnId, before, after })
+    }
+    if (cells.length > 0) diffs.push({ rowId: row.id, kind: 'changed', cells, row })
+  }
+  for (const row of additions) {
+    if (liveIds.has(row.id)) continue
+    diffs.push({ rowId: row.id, kind: 'added', cells: [], row })
+  }
+  return diffs
+}
+
 // ── parsing ───────────────────────────────────────────────────────────────
 
 const NUMERIC = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/

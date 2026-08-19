@@ -18,6 +18,7 @@
 import { isUnderPrefix, normalizePath, stripSlashes, stripTrailingSlashes } from './path'
 
 export * from './nav-guard'
+export * from './command-palette'
 
 /** One session as the shell needs to see it. Products map their own row
  *  (thread / session / matter) onto this before handing it over. */

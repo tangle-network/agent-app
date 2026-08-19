@@ -537,3 +537,136 @@ describe('RecordGrid read-only rendering', () => {
     expect(screen.getByText('300')).toBeTruthy()
   })
 })
+
+describe('RecordGrid proposed review mode', () => {
+  const PROPOSED = {
+    updates: { r1: { shares: 1250 } },
+    additions: [{ id: 'r3', values: { holder: 'Alex', shares: 50 } }],
+    removals: ['r2'],
+  }
+
+  it('renders a changed cell as the struck live value against the proposed one', () => {
+    render(
+      <RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} proposed={PROPOSED} />,
+    )
+    const cell = screen.getByRole('gridcell', { name: /100/ })
+    const struck = cell.querySelector('span.line-through')
+    expect(struck?.textContent).toBe('100')
+    const proposedValue = cell.querySelector('span.text-success')
+    expect(proposedValue?.textContent).toBe('1,250')
+    // The summary bar names the shape of the change set.
+    expect(screen.getByText('Proposed changes')).toBeTruthy()
+    expect(screen.getByText('1 changed (1 cell) · 1 added · 1 removed')).toBeTruthy()
+  })
+
+  it('marks added and removed rows', () => {
+    render(
+      <RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} proposed={PROPOSED} />,
+    )
+    expect(screen.getByText('New')).toBeTruthy()
+    expect(screen.getByText('Remove')).toBeTruthy()
+    const removedRow = screen.getByRole('row', { name: /Sam/ })
+    expect(removedRow.getAttribute('data-record-grid-diff')).toBe('removed')
+    const removedCell = screen.getByRole('gridcell', { name: /Sam/ })
+    expect(removedCell.querySelector('span.line-through')?.textContent).toContain('Sam')
+    const addedRow = screen.getByRole('row', { name: /Alex/ })
+    expect(addedRow.getAttribute('data-record-grid-diff')).toBe('added')
+  })
+
+  it('reports per-row accept and reject decisions with the row id', () => {
+    const onAcceptRow = vi.fn()
+    const onRejectRow = vi.fn()
+    render(
+      <RecordGrid
+        columns={COLUMNS}
+        state={readyState(ROWS)}
+        caption="Cap table"
+        empty={EMPTY}
+        proposed={PROPOSED}
+        onAcceptRow={onAcceptRow}
+        onRejectRow={onRejectRow}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Accept proposed change to Jane' }))
+    expect(onAcceptRow).toHaveBeenCalledWith('r1')
+    fireEvent.click(screen.getByRole('button', { name: 'Reject removal of Sam' }))
+    expect(onRejectRow).toHaveBeenCalledWith('r2')
+    fireEvent.click(screen.getByRole('button', { name: 'Accept new row Alex' }))
+    expect(onAcceptRow).toHaveBeenCalledWith('r3')
+  })
+
+  it('reports accept-all and reject-all decisions', () => {
+    const onAcceptAll = vi.fn()
+    const onRejectAll = vi.fn()
+    render(
+      <RecordGrid
+        columns={COLUMNS}
+        state={readyState(ROWS)}
+        caption="Cap table"
+        empty={EMPTY}
+        proposed={PROPOSED}
+        onAcceptAll={onAcceptAll}
+        onRejectAll={onRejectAll}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Accept all proposed changes to Cap table' }))
+    expect(onAcceptAll).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Reject all proposed changes to Cap table' }))
+    expect(onRejectAll).toHaveBeenCalledTimes(1)
+  })
+
+  it('makes editing, adding, and deleting inert while a diff is on the table', async () => {
+    const onUpdate = vi.fn(async (_change: RecordGridCellChange): Promise<RecordGridWriteOutcome> => ({ succeeded: true }))
+    const onDelete = vi.fn(async (): Promise<RecordGridWriteOutcome> => ({ succeeded: true }))
+    render(
+      <RecordGrid
+        columns={COLUMNS}
+        state={readyState(ROWS)}
+        caption="Cap table"
+        empty={EMPTY}
+        proposed={PROPOSED}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+        onCreate={async () => ({ succeeded: true, value: { id: 'x', values: {} } })}
+      />,
+    )
+    fireEvent.click(screen.getByRole('gridcell', { name: /Jane/ }))
+    await flush()
+    expect(screen.queryByLabelText('Holder, Jane')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Add row' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Delete Jane' })).toBeNull()
+    expect(onUpdate).not.toHaveBeenCalled()
+  })
+
+  it('renders the ordinary editable grid when the proposal diffs to nothing', () => {
+    const onUpdate = vi.fn(async (_change: RecordGridCellChange): Promise<RecordGridWriteOutcome> => ({ succeeded: true }))
+    render(
+      <RecordGrid
+        columns={COLUMNS}
+        state={readyState(ROWS)}
+        caption="Cap table"
+        empty={EMPTY}
+        proposed={{ updates: { r1: { shares: 100 } } }}
+        onUpdate={onUpdate}
+      />,
+    )
+    expect(screen.queryByText('Proposed changes')).toBeNull()
+    fireEvent.click(screen.getByRole('gridcell', { name: '100' }))
+    expect(screen.getByLabelText('Shares, Jane')).toBeTruthy()
+  })
+
+  it('still renders the review table when the only diff is additions to an empty grid', () => {
+    render(
+      <RecordGrid
+        columns={COLUMNS}
+        state={emptyState()}
+        caption="Cap table"
+        empty={EMPTY}
+        proposed={{ additions: [{ id: 'r3', values: { holder: 'Alex', shares: 50 } }] }}
+      />,
+    )
+    expect(screen.getByRole('grid')).toBeTruthy()
+    expect(screen.getByText('New')).toBeTruthy()
+    expect(screen.queryByText('No holders yet')).toBeNull()
+  })
+})
