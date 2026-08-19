@@ -35,6 +35,13 @@ import { attachmentPartsFromMessageParts, type ChatAttachmentPart } from './chat
 import { MessageAttachments } from './message-attachments'
 import { WorkProductCard, workProductPartsFromMessageParts } from './work-product'
 import type { WorkProductPersistedPart } from '../work-product/types'
+import { SelectionActionsScope, type ChatSelectionAction } from './selection-actions'
+import {
+  MessageFollowUps,
+  MessageSources,
+  type ChatMessageFollowUp,
+  type ChatMessageSource,
+} from './message-sources'
 
 export * from './chat-stream'
 export * from './chat-interactions'
@@ -51,6 +58,8 @@ export * from './use-file-mentions'
 export * from './chat-mentions'
 export * from './chat-attachments'
 export * from './message-attachments'
+export * from './message-sources'
+export { SelectionActionsScope, type ChatSelectionAction } from './selection-actions'
 export * from './use-composer-attachments'
 export * from './provider-logo'
 export * from './harness-glyphs'
@@ -261,6 +270,15 @@ export interface ChatUiMessage extends ChatMessageMetrics {
   /** Persisted assistant parts. When `ChatMessages.durableCards` is supplied,
    * shared plan/question cards render directly from these projections. */
   parts?: Array<Record<string, unknown>>
+  /** Sources the answer is grounded in, rendered as inline chips after the
+   *  answer — the inline form of the lineage products already hold, so the
+   *  provenance reads where the answer reads. Assistant messages only, once
+   *  the turn settles. */
+  sources?: ChatMessageSource[]
+  /** Suggested next prompts, rendered as rounded-full chips under the settled
+   *  answer. Rendered only when `ChatMessages.onFollowUpSelect` is wired — a
+   *  suggestion with nowhere to go is a dead control. */
+  followUps?: ChatMessageFollowUp[]
 }
 
 /** Define properties for rendering chat messages with optional models, markdown, extras, and durable cards */
@@ -328,6 +346,24 @@ export interface ChatMessagesProps {
    *  surface for review. `onOpen` opens the product's queue/detail surface.
    *  Absent → today's rendering, byte-identical (no card row). */
   workProductCards?: { onOpen?: (part: WorkProductPersistedPart) => void }
+  /** The actions offered when the reader selects a passage in the transcript
+   *  (e.g. "Ask about this"). Opens a small surface next to the selection;
+   *  choosing an action hands the quoted text to `onSelectionAction`. Renders
+   *  only when BOTH props are wired — absent → byte-identical transcript. */
+  selectionActions?: ChatSelectionAction[]
+  /** Receives the quoted passage and the chosen action; the host decides what
+   *  it means (seed the composer, ask, rewrite). */
+  onSelectionAction?: (text: string, action: ChatSelectionAction) => void
+  /** Select handler for a message's `followUps` chips — seed the composer or
+   *  send, the host decides. Omitted → the chips do not render (a suggestion
+   *  with nowhere to go is a dead control). */
+  onFollowUpSelect?: (followUp: ChatMessageFollowUp, message: ChatUiMessage) => void
+  /** Server-reported age of the in-flight turn in milliseconds — e.g. the
+   *  `/chat-routes` heartbeat's `elapsedMs`. The pending row counts from it
+   *  and keeps ticking, so a viewer who attached mid-turn reads the turn's
+   *  real age instead of time-since-attach, and a silent wait never reads as
+   *  dead. Absent → the row counts from mount, as before. */
+  loadingElapsedMs?: number
 }
 
 /** One starting "door" in the chat first-run state — a concrete, labeled action
@@ -1222,6 +1258,7 @@ function AssistantMessageImpl({
   durableCards,
   resolveAttachmentUrl,
   workProductCards,
+  onFollowUpSelect,
   messageClassName,
   chrome,
 }: {
@@ -1237,6 +1274,7 @@ function AssistantMessageImpl({
   durableCards?: Omit<DurableChatCardsProps, 'parts' | 'renderMarkdown'>
   resolveAttachmentUrl?: (part: ChatAttachmentPart) => string
   workProductCards?: { onOpen?: (part: WorkProductPersistedPart) => void }
+  onFollowUpSelect?: (followUp: ChatMessageFollowUp, message: ChatUiMessage) => void
   messageClassName: string
   chrome: 'labeled' | 'quiet'
 }) {
@@ -1380,6 +1418,9 @@ function AssistantMessageImpl({
           )}
         </>
       )}
+      {!streaming && msg.sources && msg.sources.length > 0 && (
+        <MessageSources sources={msg.sources} className="mt-3" />
+      )}
       {durableCards && msg.parts && (
         <DurableChatCards
           {...durableCards}
@@ -1406,6 +1447,13 @@ function AssistantMessageImpl({
             justify="start"
           />
         </div>
+      )}
+      {!streaming && onFollowUpSelect && msg.followUps && msg.followUps.length > 0 && (
+        <MessageFollowUps
+          followUps={msg.followUps}
+          onSelect={(followUp) => onFollowUpSelect(followUp, msg)}
+          className="mt-3"
+        />
       )}
       {quiet && (
         <div data-testid="message-meta-lane" className={QUIET_META_LANE_CLASS}>
@@ -1445,8 +1493,29 @@ export function useThinkingSeconds(active: boolean): number {
   return seconds
 }
 
-function ThinkingRow({ agentLabel, chrome = 'labeled' }: { agentLabel: string; chrome?: 'labeled' | 'quiet' }) {
-  const seconds = useThinkingSeconds(true)
+/** Whole seconds elapsed for a PENDING turn, ticking once a second. Unlike
+ *  {@link useThinkingSeconds} it can start from a server-reported age
+ *  (`elapsedMs`, e.g. the `/chat-routes` heartbeat's): the display re-anchors
+ *  to the latest reading and ticks forward from there, so a viewer who
+ *  attached mid-turn reads the turn's real age and a fresh reading never
+ *  double-counts the ticks since the last one. */
+export function usePendingElapsedSeconds(active: boolean, elapsedMs?: number): number {
+  const [seconds, setSeconds] = useState(() => Math.floor(Math.max(0, elapsedMs ?? 0) / 1000))
+  useEffect(() => {
+    if (!active) return
+    const anchorMs = Math.max(0, elapsedMs ?? 0)
+    const anchorAt = Date.now()
+    setSeconds(Math.floor(anchorMs / 1000))
+    const id = setInterval(() => {
+      setSeconds(Math.floor((anchorMs + (Date.now() - anchorAt)) / 1000))
+    }, 1000)
+    return () => clearInterval(id)
+  }, [active, elapsedMs])
+  return seconds
+}
+
+function ThinkingRow({ agentLabel, chrome = 'labeled', elapsedMs }: { agentLabel: string; chrome?: 'labeled' | 'quiet'; elapsedMs?: number }) {
+  const seconds = usePendingElapsedSeconds(true, elapsedMs)
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-3">
       {chrome !== 'quiet' && (
@@ -1456,7 +1525,10 @@ function ThinkingRow({ agentLabel, chrome = 'labeled' }: { agentLabel: string; c
         <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
           <path d="M21 12a9 9 0 1 1-6.219-8.56" strokeLinecap="round" />
         </svg>
-        Thinking{seconds >= 3 ? ` · ${seconds}s` : '...'}
+        <span>
+          Thinking{seconds >= 3 ? ' · ' : '...'}
+          {seconds >= 3 && <span className="tabular-nums">{seconds}s</span>}
+        </span>
       </div>
     </div>
   )
@@ -1515,6 +1587,10 @@ export function ChatMessages({
   header,
   resolveAttachmentUrl,
   workProductCards,
+  selectionActions,
+  onSelectionAction,
+  onFollowUpSelect,
+  loadingElapsedMs,
 }: ChatMessagesProps) {
   const messageClassName =
     messageSize === 'large'
@@ -1541,7 +1617,7 @@ export function ChatMessages({
       </>
     )
   }
-  return (
+  const thread = (
     <>
       {header}
       {messages.map((msg) =>
@@ -1593,13 +1669,24 @@ export function ChatMessages({
             durableCards={durableCards}
             resolveAttachmentUrl={resolveAttachmentUrl}
             workProductCards={workProductCards}
+            onFollowUpSelect={onFollowUpSelect}
             messageClassName={messageClassName}
             chrome={chrome}
           />
         ),
       )}
-      {loading && lastIsUser && <ThinkingRow agentLabel={agentLabel} chrome={chrome} />}
+      {loading && lastIsUser && <ThinkingRow agentLabel={agentLabel} chrome={chrome} elapsedMs={loadingElapsedMs} />}
       {error && !loading && <StreamErrorRow message={error} onRetry={onRetry} />}
     </>
   )
+  // Selection actions need both seams wired; without them the transcript
+  // renders exactly as before (no scope wrapper, no listeners).
+  if (onSelectionAction && selectionActions && selectionActions.length > 0) {
+    return (
+      <SelectionActionsScope actions={selectionActions} onAction={onSelectionAction}>
+        {thread}
+      </SelectionActionsScope>
+    )
+  }
+  return thread
 }

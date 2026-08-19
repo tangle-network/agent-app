@@ -10,6 +10,7 @@ import {
   reasoningToolThread,
   shortThread,
   streamingAssistantMessage,
+  transcriptExtensionsThread,
   usageReportMessage,
 } from './fixtures'
 import { renderMarkdown } from './markdown'
@@ -314,4 +315,76 @@ export const BeforeAfter: Story = {
       ))}
     </div>
   ),
+}
+
+// ── Transcript extensions (#420) ─────────────────────────────────────────────
+
+/** Selection actions: highlight any passage in the transcript and the action
+ *  surface opens next to it, quoting the passage back. The actions and their
+ *  destination are the host's — here they log to the console. */
+export const SelectionActions: Story = {
+  name: 'Selection Actions',
+  args: {
+    messages: transcriptExtensionsThread,
+    selectionActions: [
+      { id: 'ask', label: 'Ask about this' },
+      { id: 'rewrite', label: 'Rewrite this' },
+      { id: 'quote', label: 'Quote in composer' },
+    ],
+    onSelectionAction: (text, action) => console.log('selection action', action.id, text),
+  },
+  render: (args: ChatMessagesProps) => (
+    <>
+      <p className="mx-auto w-full max-w-3xl px-6 pb-1 pt-3 text-xs text-muted-foreground">
+        Select a passage in the answer below — the action surface opens beside it.
+      </p>
+      <ChatMessages {...args} />
+    </>
+  ),
+}
+
+/** Inline sources + follow-up chips: the answer carries its provenance inline
+ *  (favicon, title, domain — one source has no favicon and falls back to the
+ *  link glyph) and offers the next prompts as rounded-full chips. */
+export const SourcesAndFollowUps: Story = {
+  name: 'Sources + Follow-ups',
+  args: {
+    messages: transcriptExtensionsThread,
+    onFollowUpSelect: (followUp, message) =>
+      console.log('follow-up selected', followUp.label, 'on', message.id),
+  },
+}
+
+/** The pending surface fed by the server's elapsed reading: this viewer
+ *  attached 47s into the turn, so the row opens at "Thinking · 47s" and keeps
+ *  ticking — a silent wait never reads as dead. */
+export const PendingElapsed: Story = {
+  name: 'Pending Row · Server Elapsed',
+  args: {
+    messages: [{ id: 'pe-u1', role: 'user', content: 'Reconcile the March ledger.' }],
+    loading: true,
+    loadingElapsedMs: 47_000,
+  },
+}
+
+/** All three transcript extensions on one thread: select a passage for the
+ *  action surface, sources + follow-ups under the settled answer, and a live
+ *  elapsed pending row at the end. */
+export const TranscriptExtensions: Story = {
+  name: 'Transcript Extensions (combined)',
+  args: {
+    messages: [
+      ...transcriptExtensionsThread,
+      { id: 'tx-u2', role: 'user', content: 'Break that down by region' },
+    ],
+    loading: true,
+    loadingElapsedMs: 12_000,
+    selectionActions: [
+      { id: 'ask', label: 'Ask about this' },
+      { id: 'rewrite', label: 'Rewrite this' },
+    ],
+    onSelectionAction: (text, action) => console.log('selection action', action.id, text),
+    onFollowUpSelect: (followUp, message) =>
+      console.log('follow-up selected', followUp.label, 'on', message.id),
+  },
 }

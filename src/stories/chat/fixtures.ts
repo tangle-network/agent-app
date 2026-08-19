@@ -469,3 +469,51 @@ export const reasoningToolThread: ChatUiMessage[] = [
     ],
   },
 ]
+
+// ── Transcript extensions (#420): inline sources, follow-ups, selection ─────
+
+const blueFavicon =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%232563eb'/%3E%3C/svg%3E"
+const amberFavicon =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23d97706'/%3E%3C/svg%3E"
+
+/**
+ * An assistant answer grounded in named sources with follow-up suggestions —
+ * the two inline slots: provenance chips under the answer, rounded-full
+ * next-prompt chips under those. The third source has no favicon (glyph
+ * fallback) and derives its domain from the url.
+ */
+const sourcedAnswerMessage: ChatUiMessage = {
+  id: 'm-sourced',
+  role: 'assistant',
+  content:
+    'Revenue grew 14% quarter over quarter, driven almost entirely by the platform tier. The enterprise segment added 38 logos, and net revenue retention held at 121%. The one soft spot is self-serve: it contracted 3% as usage-based downgrades outpaced new signups, concentrated in accounts under 10 seats.',
+  modelUsed: 'anthropic/claude-opus-4',
+  promptTokens: 3120,
+  completionTokens: 412,
+  durationMs: 5300,
+  sources: [
+    {
+      title: 'Q3 revenue report',
+      url: 'https://reports.example.com/q3-revenue',
+      faviconUrl: blueFavicon,
+    },
+    {
+      title: 'Platform tier deep-dive',
+      url: 'https://metrics.example.com/tiers/platform',
+      faviconUrl: amberFavicon,
+    },
+    { title: 'Billing ledger export 9182', url: 'https://ledger.example.com/exports/9182' },
+  ],
+  followUps: [
+    { id: 'fu-region', label: 'Break that down by region' },
+    { id: 'fu-board', label: 'Draft the board summary' },
+    { id: 'fu-selfserve', label: 'Why is self-serve contracting?' },
+  ],
+}
+
+/** The two-message thread the transcript-extension stories render. */
+export const transcriptExtensionsThread: ChatUiMessage[] = [
+  { id: 'tx-u1', role: 'user', content: 'How did revenue move last quarter?' },
+  sourcedAnswerMessage,
+]

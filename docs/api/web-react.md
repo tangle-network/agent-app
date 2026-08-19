@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-394 exports.
+402 exports.
 
 ### `activityTone`
 
@@ -294,6 +294,14 @@ type ChatMentionKind
 interface ChatMentionPart
 ```
 
+### `ChatMessageFollowUp`
+
+`interface` — One suggested next prompt under an answer.
+
+```ts
+interface ChatMessageFollowUp
+```
+
 ### `ChatMessageMetrics`
 
 `interface` — Describe metrics related to a chat message including model, token counts, and duration
@@ -318,6 +326,14 @@ interface ChatMessageMetrics
 type ChatMessageSegment
 ```
 
+### `ChatMessageSource`
+
+`interface` — One source an assistant answer is grounded in.
+
+```ts
+interface ChatMessageSource
+```
+
 ### `ChatMessagesProps`
 
 `interface` — Define properties for rendering chat messages with optional models, markdown, extras, and durable cards
@@ -332,6 +348,14 @@ interface ChatMessagesProps
 
 ```ts
 type ChatSelectField
+```
+
+### `ChatSelectionAction`
+
+`interface` — One action offered on a selected passage.
+
+```ts
+interface ChatSelectionAction
 ```
 
 ### `ChatStreamCallbacks`
@@ -1662,6 +1686,22 @@ interface MentionTextSegment
 interface MessageAttachmentsProps
 ```
 
+### `MessageFollowUps`
+
+`function` — The follow-up suggestion chips under an answer.
+
+```ts
+({ followUps, onSelect, className, }: { followUps: ChatMessageFollowUp[]; onSelect: (followUp: ChatMessageFollowUp) =>…
+```
+
+### `MessageSources`
+
+`function` — The inline source chips under an answer.
+
+```ts
+({ sources, className, }: { sources: ChatMessageSource[]; className?: string | undefined; }) => Element | null
+```
+
 ### `MissionActivityLane`
 
 `function` — Collapsed sub-rows under a mission step — one row per delegated run — expanding to the step's waterfall.
@@ -2566,6 +2606,14 @@ interface SeatPaywallProps
 (content: string, parts: readonly ChatMentionPart[]) => { segments: MentionTextSegment[]; matched: Set<ChatMentionPart>…
 ```
 
+### `SelectionActionsScope`
+
+`function` — Wraps the transcript when selection actions are enabled: establishes the relative positioning scope + the selection tracking, and renders the panel for the current capture.
+
+```ts
+({ actions, onAction, children, }: { actions: readonly ChatSelectionAction[]; onAction: (text: string, action: ChatSele…
+```
+
 ### `SessionActionLabels`
 
 `interface`
@@ -2644,6 +2692,14 @@ interface SessionPageQuery
 
 ```ts
 interface SmoothRevealOptions
+```
+
+### `sourceDomain`
+
+`function` — The display domain for a source: the url's hostname minus a `www.` prefix, null when the url does not parse (the chip then shows title only).
+
+```ts
+(source: ChatMessageSource) => string | null
 ```
 
 ### `Sparkline`
@@ -2956,6 +3012,14 @@ interface UseInfiniteScrollOptions
 
 ```ts
 () => { pending: boolean; run: (action: () => void | Promise<void>) => void; }
+```
+
+### `usePendingElapsedSeconds`
+
+`function` — Whole seconds elapsed for a PENDING turn, ticking once a second.
+
+```ts
+(active: boolean, elapsedMs?: number | undefined) => number
 ```
 
 ### `usePopover`

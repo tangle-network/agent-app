@@ -17049,6 +17049,12 @@
           "doc": "A file the user `@`-mentioned on this turn: a workspace-relative path into the sandbox, never bytes."
         },
         {
+          "name": "ChatMessageFollowUp",
+          "kind": "interface",
+          "signature": "interface ChatMessageFollowUp",
+          "doc": "One suggested next prompt under an answer."
+        },
+        {
           "name": "ChatMessageMetrics",
           "kind": "interface",
           "signature": "interface ChatMessageMetrics",
@@ -17067,6 +17073,12 @@
           "doc": "One ordered piece of an assistant turn: a run of answer text, or a tool call, in the sequence the agent emitted them."
         },
         {
+          "name": "ChatMessageSource",
+          "kind": "interface",
+          "signature": "interface ChatMessageSource",
+          "doc": "One source an assistant answer is grounded in."
+        },
+        {
           "name": "ChatMessagesProps",
           "kind": "interface",
           "signature": "interface ChatMessagesProps",
@@ -17077,6 +17089,12 @@
           "kind": "type",
           "signature": "type ChatSelectField",
           "doc": "Extract select-type interaction fields and optionally allow custom values"
+        },
+        {
+          "name": "ChatSelectionAction",
+          "kind": "interface",
+          "signature": "interface ChatSelectionAction",
+          "doc": "One action offered on a selected passage."
         },
         {
           "name": "ChatStreamCallbacks",
@@ -18075,6 +18093,18 @@
           "doc": null
         },
         {
+          "name": "MessageFollowUps",
+          "kind": "function",
+          "signature": "({ followUps, onSelect, className, }: { followUps: ChatMessageFollowUp[]; onSelect: (followUp: ChatMessageFollowUp) =>…",
+          "doc": "The follow-up suggestion chips under an answer."
+        },
+        {
+          "name": "MessageSources",
+          "kind": "function",
+          "signature": "({ sources, className, }: { sources: ChatMessageSource[]; className?: string | undefined; }) => Element | null",
+          "doc": "The inline source chips under an answer."
+        },
+        {
           "name": "MissionActivityLane",
           "kind": "function",
           "signature": "({ activity, startedAt, nowMs }: MissionActivityLaneProps) => Element | null",
@@ -18753,6 +18783,12 @@
           "doc": "Split a message's text into plain-text and mention segments by matching `@<path>` runs against that message's own mention parts."
         },
         {
+          "name": "SelectionActionsScope",
+          "kind": "function",
+          "signature": "({ actions, onAction, children, }: { actions: readonly ChatSelectionAction[]; onAction: (text: string, action: ChatSele…",
+          "doc": "Wraps the transcript when selection actions are enabled: establishes the relative positioning scope + the selection tracking, and renders the panel for the current capture."
+        },
+        {
           "name": "SessionActionLabels",
           "kind": "interface",
           "signature": "interface SessionActionLabels",
@@ -18811,6 +18847,12 @@
           "kind": "interface",
           "signature": "interface SmoothRevealOptions",
           "doc": "Define configuration options for controlling smooth text reveal animation rates"
+        },
+        {
+          "name": "sourceDomain",
+          "kind": "function",
+          "signature": "(source: ChatMessageSource) => string | null",
+          "doc": "The display domain for a source: the url's hostname minus a `www.` prefix, null when the url does not parse (the chip then shows title only)."
         },
         {
           "name": "Sparkline",
@@ -19045,6 +19087,12 @@
           "kind": "function",
           "signature": "() => { pending: boolean; run: (action: () => void | Promise<void>) => void; }",
           "doc": "Guard an async action against double-submit."
+        },
+        {
+          "name": "usePendingElapsedSeconds",
+          "kind": "function",
+          "signature": "(active: boolean, elapsedMs?: number | undefined) => number",
+          "doc": "Whole seconds elapsed for a PENDING turn, ticking once a second."
         },
         {
           "name": "usePopover",
