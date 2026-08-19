@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-417 exports.
+419 exports.
 
 ### `acceptRejectionReason`
 
@@ -1910,6 +1910,14 @@ type ParseInteractionResult
 (raw: unknown) => ReviewQueueItem | null
 ```
 
+### `PATH_CONTINUATION_CHAR`
+
+`const` — A character that could plausibly continue the SAME path/filename past a matched token.
+
+```ts
+RegExp
+```
+
 ### `pendingApprovalOf`
 
 `function` — Extract `{proposalId, status}` from a tool outcome when it is a proposal awaiting human approval; null otherwise.
@@ -3308,6 +3316,14 @@ interface WaterfallRow
 
 ```ts
 (overlay: RecordGridOverlay, rowId: string, columnId: string, value: RecordGridValue) => RecordGridOverlay
+```
+
+### `WORD_CHAR`
+
+`const` — A character that, immediately BEFORE an `@`, means the `@` is part of a longer token (an email local part, a handle) rather than a mention start.
+
+```ts
+RegExp
 ```
 
 ### `WorkProductCard`
