@@ -67,6 +67,37 @@ describe('MediaTile', () => {
     expect(view.container.querySelector('img')).toBeNull()
   })
 
+  it('renders a failed generation error without a skeleton', () => {
+    const view = setup({
+      generation: generation({
+        result: null,
+        metadata: { generationStatus: 'failed', providerError: 'Provider rejected the request' },
+      }),
+    })
+    expect(screen.getByText('Provider rejected the request')).toBeTruthy()
+    expect(view.container.querySelector('.studio-skeleton')).toBeNull()
+  })
+
+  it('renders avatar art as video and transcription art as a document placeholder', () => {
+    const view = setup({
+      generation: generation({ type: 'avatar', result: 'https://media.test/avatar.mp4' }),
+    })
+    expect(view.container.querySelector('video')?.getAttribute('src')).toBe('https://media.test/avatar.mp4')
+    expect(view.container.querySelector('img')).toBeNull()
+
+    view.rerender(
+      <StudioPlaybackProvider createAudioElement={() => view.audio}>
+        <MediaTile
+          generation={generation({ type: 'transcription', result: 'Transcript content' })}
+          context="home"
+          onOpen={view.onOpen}
+        />
+      </StudioPlaybackProvider>,
+    )
+    expect(view.container.querySelector('svg.lucide-file-text')).toBeTruthy()
+    expect(view.container.querySelector('img')).toBeNull()
+  })
+
   it('renders available actions, choosing Save or View without showing both', () => {
     const actions: StudioMediaActions = {
       download: vi.fn(),
@@ -97,9 +128,16 @@ describe('MediaTile', () => {
   })
 
   it('keeps Download via the anchor fallback but hides Delete without a request callback', () => {
-    setup({ actions: { save: vi.fn().mockResolvedValue([]), remove: vi.fn().mockResolvedValue(undefined) } })
+    const view = setup({ actions: { save: vi.fn().mockResolvedValue([]), remove: vi.fn().mockResolvedValue(undefined) } })
     expect(screen.getByLabelText('Download')).toBeTruthy()
     expect(screen.queryByLabelText('Delete')).toBeNull()
+
+    view.rerender(
+      <StudioPlaybackProvider createAudioElement={() => view.audio}>
+        <MediaTile generation={generation()} context="home" onOpen={view.onOpen} />
+      </StudioPlaybackProvider>,
+    )
+    expect(screen.getByLabelText('Download')).toBeTruthy()
   })
 
   it('shows the persistent vault chip only for saved rows', () => {

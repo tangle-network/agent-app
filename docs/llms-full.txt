@@ -18286,7 +18286,7 @@ Source: `src/studio/index.ts`
 
 ### `DeleteGenerations`
 
-`type`
+`type` — The shell may invoke this during page teardown (the `pagehide`/unmount flush of a deferred delete).
 
 ```ts
 type DeleteGenerations

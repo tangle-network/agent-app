@@ -14128,7 +14128,7 @@
           "name": "DeleteGenerations",
           "kind": "type",
           "signature": "type DeleteGenerations",
-          "doc": null
+          "doc": "The shell may invoke this during page teardown (the `pagehide`/unmount flush of a deferred delete)."
         },
         {
           "name": "DownloadGenerations",

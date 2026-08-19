@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Generation, StudioMediaActions } from '../studio'
 import { MediaViewerModal, type MediaViewerModalProps } from './media-viewer'
+import { StudioConfirmDialog } from './studio-confirm'
 import {
   type StudioAudioElementLike,
   StudioPlaybackProvider,
@@ -154,6 +155,62 @@ describe('MediaViewerModal', () => {
 
     fireEvent.keyDown(document, { key: 'Escape', code: 'Escape' })
     expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('leaves the viewer open when a composed confirm dialog handles Escape', () => {
+    const onCancel = vi.fn()
+    const onClose = vi.fn()
+    render(
+      <StudioPlaybackProvider createAudioElement={() => new FakeAudio()}>
+        <MediaViewerModal generation={generation()} onClose={onClose} />
+        <StudioConfirmDialog open count={1} onConfirm={() => {}} onCancel={onCancel} />
+      </StudioPlaybackProvider>,
+    )
+
+    fireEvent.keyDown(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }), {
+      key: 'Escape',
+      code: 'Escape',
+    })
+
+    expect(onCancel).toHaveBeenCalledOnce()
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: 'Media detail' })).toBeTruthy()
+  })
+
+  it('renders a failed generation error without a skeleton or speech transport', () => {
+    const view = render(
+      <Viewer
+        generation={generation({
+          type: 'speech',
+          result: null,
+          metadata: { generationStatus: 'failed', storageError: 'Output could not be stored' },
+        })}
+        onClose={() => {}}
+      />,
+    )
+    expect(screen.getByText('Output could not be stored')).toBeTruthy()
+    expect(view.container.querySelector('.studio-skeleton')).toBeNull()
+    expect(screen.queryByRole('slider', { name: 'Seek' })).toBeNull()
+  })
+
+  it('renders avatar video and transcription text with their legacy labels', () => {
+    const view = render(
+      <Viewer
+        generation={generation({ type: 'avatar', result: 'https://media.test/avatar.mp4' })}
+        onClose={() => {}}
+      />,
+    )
+    expect(screen.getByText('Avatar')).toBeTruthy()
+    expect(document.querySelector('video')?.getAttribute('src')).toBe('https://media.test/avatar.mp4')
+
+    view.rerender(
+      <Viewer
+        generation={generation({ type: 'transcription', result: 'The legacy transcript body' })}
+        onClose={() => {}}
+      />,
+    )
+    expect(screen.getByText('Transcript')).toBeTruthy()
+    expect(screen.getByText('The legacy transcript body')).toBeTruthy()
   })
 
   it('joins only present metadata segments with separators', () => {

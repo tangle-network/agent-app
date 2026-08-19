@@ -15,7 +15,9 @@ import { Download, FolderOpen, FolderPlus, Pause, Play, Trash2, X } from 'lucide
 
 import {
   generationAspectRatio,
+  generationError,
   generationSpecSegments,
+  generationStatus,
   generationVaultPath,
   hashSeed,
   previewWaveformBars,
@@ -44,6 +46,8 @@ const TYPE_LABELS: Record<string, string> = {
   image: 'Image',
   video: 'Video',
   speech: 'Audio',
+  avatar: 'Avatar',
+  transcription: 'Transcript',
 }
 
 const FOCUSABLE_SELECTOR = [
@@ -242,7 +246,7 @@ export function MediaViewerModal({
   useEffect(() => {
     if (!open) return
     function onDocumentKeyDown(event: globalThis.KeyboardEvent) {
-      if (event.key !== 'Escape' || hasOpenPopover()) return
+      if (event.key !== 'Escape' || event.defaultPrevented || hasOpenPopover()) return
       event.preventDefault()
       close()
     }
@@ -253,6 +257,7 @@ export function MediaViewerModal({
   if (!generation || typeof document === 'undefined') return null
 
   const ratio = generationAspectRatio(generation)
+  const status = generationStatus(generation)
   const vaultPath = generationVaultPath(generation)
   const metaSegments = [
     TYPE_LABELS[generation.type] ?? generation.type,
@@ -296,10 +301,12 @@ export function MediaViewerModal({
     actions.onOpenVault(generation)
   }
 
-  const mediaStyle: CSSProperties = {
-    width: `min(100%, calc(70vh * ${ratio}))`,
-    aspectRatio: ratio,
-  }
+  const mediaStyle: CSSProperties = generation.type === 'transcription'
+    ? { width: '100%' }
+    : {
+      width: `min(100%, calc(70vh * ${ratio}))`,
+      aspectRatio: ratio,
+    }
   const vaultHref = vaultPath && actions?.vaultHref ? actions.vaultHref(vaultPath) : null
   const viewControl = vaultPath && (vaultHref || actions?.onOpenVault)
   const modal = (
@@ -327,19 +334,29 @@ export function MediaViewerModal({
 
         <div className="flex justify-center">
           <div className="relative overflow-hidden rounded-xl border border-border bg-accent" style={mediaStyle}>
-            {!generation.result ? (
+            {status === 'pending' || status === 'running' ? (
+              <div className="studio-skeleton absolute inset-0" />
+            ) : status === 'failed' ? (
+              <div className="grid h-full w-full place-items-center bg-accent p-3 text-center text-[12px] text-destructive">
+                {generationError(generation) ?? 'Generation failed'}
+              </div>
+            ) : generation.result === null ? (
               <div className="studio-skeleton absolute inset-0" />
             ) : generation.type === 'image' ? (
               <img src={generation.result} className="h-full w-full object-cover" alt={generation.prompt} />
-            ) : generation.type === 'video' ? (
+            ) : generation.type === 'video' || generation.type === 'avatar' ? (
               <video src={generation.result} controls playsInline className="h-full w-full object-cover" />
+            ) : generation.type === 'transcription' ? (
+              <div className="max-h-[60vh] overflow-auto whitespace-pre-wrap p-4 text-[13.5px] leading-relaxed">
+                {generation.result ?? ''}
+              </div>
             ) : generation.type === 'speech' ? (
               <Waveform generation={generation} />
             ) : null}
           </div>
         </div>
 
-        {generation.type === 'speech' && <AudioTransport generation={generation} />}
+        {status !== 'failed' && generation.type === 'speech' && <AudioTransport generation={generation} />}
 
         <p className="mx-0.5 mb-1.5 mt-4 max-w-[62ch] text-[15px] leading-normal">{generation.prompt}</p>
         <div className="mx-0.5 flex flex-wrap items-center gap-1.5 text-[12.5px] text-muted-foreground">

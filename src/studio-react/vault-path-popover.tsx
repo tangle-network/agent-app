@@ -34,7 +34,7 @@ export function VaultPathPopover({
 
   if (!open) return null
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault()
     const normalized = normalizeVaultPath(inputRef.current?.value ?? '')
     if (!normalized) {
@@ -42,7 +42,11 @@ export function VaultPathPopover({
       return
     }
     setError(null)
-    void onSubmit(normalized)
+    try {
+      await onSubmit(normalized)
+    } catch {
+      setError('Could not save to vault. Try again.')
+    }
   }
 
   const count = generations.length

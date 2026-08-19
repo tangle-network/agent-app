@@ -1,7 +1,11 @@
 /**
  * Product seams for the studio media library. A product such as gtm-agent
  * implements these against its `/api/generations`, `/api/media/save`, and
- * `/api/generations/bulk-delete` routes; the shell itself never fetches.
+ * `/api/generations/bulk-delete` routes. The ports themselves are never fetched
+ * by the shell; note the assembled screens ALSO require the host to serve
+ * `StudioComposer`'s `/api/generate` and `/api/media-models` (see
+ * `../studio-react/index.tsx`), and `useStudioGenerations` polls its
+ * `generationsEndpoint` (default `/api/generations`).
  */
 
 import type { Generation } from './generation'
@@ -42,6 +46,10 @@ export type SaveGenerationsToVault = (input: {
   signal?: AbortSignal
 }) => Promise<readonly VaultSaveResult[]>
 
+/** The shell may invoke this during page teardown (the `pagehide`/unmount flush
+ *  of a deferred delete). Implementations must use unload-survivable transport
+ *  such as `fetch(..., { keepalive: true })` or `navigator.sendBeacon`, and keep
+ *  the payload within the keepalive transport's approximately 64 KB bound. */
 export type DeleteGenerations = (ids: readonly string[]) => Promise<void>
 export type DownloadGenerations = (generations: readonly Generation[]) => void | Promise<void>
 

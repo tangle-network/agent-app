@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useRef, useState } from 'react'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { Generation } from '../studio'
 import { MenuPill } from './composer-option-controls'
@@ -45,6 +45,21 @@ describe('VaultPathPopover', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(screen.getByText('Enter a folder path inside the vault.')).toBeTruthy()
     expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('shows an inline error and allows retry when saving rejects', async () => {
+    const onSubmit = vi.fn().mockRejectedValue(new Error('offline'))
+    render(<PopoverHarness open generations={[generation('1', 'image')]} onSubmit={onSubmit} onCancel={() => {}} />)
+    const input = screen.getByLabelText('Save 1 item to') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'projects/art' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('Could not save to vault. Try again.')).toBeTruthy()
+    expect(screen.getByText('Save 1 item to')).toBeTruthy()
+    expect(input.value).toBe('projects/art')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2))
   })
 
   it('submits with Enter and cancels from the button', () => {

@@ -42,7 +42,7 @@ pnpm add @tangle-network/agent-eval @tangle-network/agent-integrations
 | `@tangle-network/sandbox` | `/sandbox` | `>=0.29.0 <0.30.0` |
 | `@tangle-network/agent-knowledge` | `/knowledge-loop` | `^8.0.10` |
 | `@tangle-network/agent-profile-materialize` | `/skills-placement` | `>=0.16.0` |
-| `@tangle-network/sandbox-ui` | `/brand`, `/studio-react`, `/work-product-react`, `/workspace-react` | `>=0.105.0` |
+| `@tangle-network/sandbox-ui` | `/brand`, `/work-product-react`, `/workspace-react` | `>=0.105.0` |
 
 All of these except `agent-eval`, `agent-integrations`, and `agent-interface` are declared **optional** peers, so a product that never imports the subpath installs nothing.
 

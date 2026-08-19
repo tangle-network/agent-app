@@ -96,7 +96,8 @@ export function StudioHistoryScreen({
   searchDebounceMs = 250,
   className,
 }: StudioHistoryScreenProps): JSX.Element {
-  const { stop } = useStudioPlayback()
+  const playback = useStudioPlayback()
+  const { stop } = playback
   const { toast } = useStudioToast()
 
   const [query, setQuery] = useState('')
@@ -130,6 +131,12 @@ export function StudioHistoryScreen({
     [history.items, pendingIds],
   )
   const selectedRows = useMemo(() => rows.filter((row) => selected.has(row.id)), [rows, selected])
+
+  useEffect(() => {
+    if (history.isLoadingFirst || history.isLoadingMore || !playback.activeId) return
+    if (rows.some((row) => row.id === playback.activeId) || viewer?.id === playback.activeId) return
+    playback.stop()
+  }, [history.isLoadingFirst, history.isLoadingMore, playback, rows, viewer])
 
   const sentinelRef = useInfiniteScroll(history.loadMore, {
     enabled: history.hasMore && !history.isLoadingMore && !history.isLoadingFirst && !history.isError,
@@ -337,7 +344,7 @@ export function StudioHistoryScreen({
         </div>
       )}
 
-      {history.isError ? (
+      {history.isError && rows.length === 0 ? (
         <div className="flex flex-col items-center gap-3 px-6 py-16 text-center max-[900px]:px-4">
           <p className="text-[14px] text-foreground">Could not load media.</p>
           <button type="button" onClick={history.retry} className={OUTLINE_PILL}>Retry</button>
@@ -373,6 +380,13 @@ export function StudioHistoryScreen({
             ))}
             {history.isLoadingMore && skeletonCells(MORE_SKELETONS, 'more')}
           </div>
+        </div>
+      )}
+
+      {history.isError && rows.length > 0 && (
+        <div className="flex items-center justify-center gap-3 px-6 py-4 text-[13px] text-muted-foreground max-[900px]:px-4">
+          <span>Could not load more media.</span>
+          <button type="button" onClick={history.retry} className={OUTLINE_PILL}>Retry</button>
         </div>
       )}
 

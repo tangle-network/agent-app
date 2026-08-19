@@ -1,6 +1,7 @@
 import {
   Check,
   Download,
+  FileText,
   FolderOpen,
   FolderPlus,
   Pause,
@@ -17,7 +18,12 @@ import {
 } from 'react'
 
 import { hashSeed, previewWaveformBars } from '../studio/audio-preview'
-import { generationVaultPath, type Generation } from '../studio/generation'
+import {
+  generationError,
+  generationStatus,
+  generationVaultPath,
+  type Generation,
+} from '../studio/generation'
 import type { StudioMediaActions, VaultSaveResult } from '../studio/ports'
 import { usePopover } from '../web-react/controls'
 import { VaultPathPopover } from './vault-path-popover'
@@ -69,6 +75,7 @@ export function MediaTile({
   const [saving, setSaving] = useState(false)
   const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(saveOpen, setSaveOpen)
   const vaultPath = generationVaultPath(generation)
+  const status = generationStatus(generation)
   const isSpeech = generation.type === 'speech'
   const isPlaying = isSpeech && playback.activeId === generation.id && playback.playing
 
@@ -131,9 +138,15 @@ export function MediaTile({
       onKeyDown={onKeyDown}
     >
       <div className="absolute inset-0">
-        {generation.result === null ? (
+        {status === 'pending' || status === 'running' ? (
           <div className="studio-skeleton absolute inset-0" />
-        ) : generation.type === 'image' || generation.type === 'avatar' ? (
+        ) : status === 'failed' ? (
+          <div className="grid h-full w-full place-items-center bg-accent p-3 text-center text-[12px] text-destructive">
+            {generationError(generation) ?? 'Generation failed'}
+          </div>
+        ) : generation.result === null ? (
+          <div className="studio-skeleton absolute inset-0" />
+        ) : generation.type === 'image' ? (
           <img
             src={generation.result}
             alt=""
@@ -141,7 +154,7 @@ export function MediaTile({
             loading="lazy"
             draggable={false}
           />
-        ) : generation.type === 'video' ? (
+        ) : generation.type === 'video' || generation.type === 'avatar' ? (
           <video
             src={generation.result}
             muted
@@ -149,6 +162,10 @@ export function MediaTile({
             preload="metadata"
             className="h-full w-full object-cover"
           />
+        ) : generation.type === 'transcription' ? (
+          <div className="grid h-full w-full place-items-center bg-muted text-muted-foreground">
+            <FileText size={20} strokeWidth={1.5} />
+          </div>
         ) : isSpeech ? (
           <div
             className="absolute inset-0"
@@ -177,20 +194,18 @@ export function MediaTile({
       <div className="studio-tile-scrim absolute inset-0" />
 
       <div className="studio-tile-actions absolute right-2 top-2 flex gap-[5px]">
-        {actions && (
-          <button
-            type="button"
-            className="studio-ibtn relative grid h-[30px] w-[30px] place-items-center rounded-full"
-            data-tip="Download"
-            aria-label="Download"
-            onClick={(event) => {
-              stop(event)
-              void (actions.download ?? downloadGenerationsViaAnchor)([generation])
-            }}
-          >
-            <Download size={15} strokeWidth={1.5} />
-          </button>
-        )}
+        <button
+          type="button"
+          className="studio-ibtn relative grid h-[30px] w-[30px] place-items-center rounded-full"
+          data-tip="Download"
+          aria-label="Download"
+          onClick={(event) => {
+            stop(event)
+            void (actions?.download ?? downloadGenerationsViaAnchor)([generation])
+          }}
+        >
+          <Download size={15} strokeWidth={1.5} />
+        </button>
 
         {!vaultPath && actions?.save && (
           <div ref={containerRef}>
@@ -268,7 +283,7 @@ export function MediaTile({
       </div>
 
       <div className="studio-tile-badges absolute bottom-2 left-2 flex items-center gap-1.5">
-        {generation.type === 'video' && (
+        {(generation.type === 'video' || generation.type === 'avatar') && (
           <span className="studio-chip-dark grid h-[22px] w-[22px] place-items-center rounded-full" aria-hidden="true">
             <Play size={11} strokeWidth={1.5} fill="currentColor" />
           </span>

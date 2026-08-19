@@ -85,10 +85,10 @@ function controlledFetch() {
   return { fetchPage, calls }
 }
 
-function wrap(node: ReactElement) {
+function wrap(node: ReactElement, audio = new FakeAudio()) {
   return (
     <StudioToastProvider>
-      <StudioPlaybackProvider createAudioElement={() => new FakeAudio()}>
+      <StudioPlaybackProvider createAudioElement={() => audio}>
         {node}
       </StudioPlaybackProvider>
     </StudioToastProvider>
@@ -98,10 +98,12 @@ function wrap(node: ReactElement) {
 function setup(props: Partial<StudioHistoryScreenProps> = {}) {
   const { fetchPage, calls } = controlledFetch()
   const onBack = vi.fn()
+  const audio = new FakeAudio()
   const view = render(wrap(
     <StudioHistoryScreen fetchPage={props.fetchPage ?? fetchPage} onBack={onBack} {...props} />,
+    audio,
   ))
-  return { ...view, calls, fetchPage: props.fetchPage ?? fetchPage, onBack }
+  return { ...view, audio, calls, fetchPage: props.fetchPage ?? fetchPage, onBack }
 }
 
 /** Resolve the pending fetch at `index` and let React commit the result. */
@@ -301,5 +303,38 @@ describe('StudioHistoryScreen', () => {
 
     await resolvePage(calls, 1, { items: [generation('b')] })
     expect(tileTitles()).toEqual(['prompt a — open', 'prompt b — open'])
+  })
+
+  it('keeps loaded rows visible and offers inline Retry when load more fails', async () => {
+    const { calls } = setup()
+    await resolvePage(calls, 0, { items: [generation('a')], nextCursor: 'page-2' })
+    act(() => FakeIntersectionObserver.instances.at(-1)!.intersect())
+
+    await act(async () => {
+      calls[1]!.result.reject(new Error('offline'))
+      await calls[1]!.result.promise.catch(() => {})
+    })
+
+    expect(tileTitles()).toEqual(['prompt a — open'])
+    expect(screen.getByText('Could not load more media.')).toBeTruthy()
+    expect(screen.queryByText('Could not load media.')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(calls).toHaveLength(3)
+    expect(calls[2]!.query.cursor).toBe('page-2')
+  })
+
+  it('stops playback after a settled filter removes the playing row', async () => {
+    const { audio, calls } = setup()
+    await resolvePage(calls, 0, {
+      items: [generation('speech-a', { type: 'speech', result: 'https://media.test/speech-a.mp3' })],
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Play prompt speech-a' }))
+    expect(audio.play).toHaveBeenCalledOnce()
+
+    chooseMediaType('Images')
+    await resolvePage(calls, 1, { items: [] })
+
+    expect(audio.pause).toHaveBeenCalled()
   })
 })
