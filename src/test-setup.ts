@@ -37,6 +37,14 @@ if (!globalThis.DataTransfer) {
     get length() {
       return this.files.length
     }
+    // Not modelled. They throw rather than no-op so a test that comes to depend
+    // on them fails on the spot instead of passing on stub behaviour.
+    remove(): never {
+      throw new Error("DataTransferItemList.remove is not modelled by the test stand-in")
+    }
+    clear(): never {
+      throw new Error("DataTransferItemList.clear is not modelled by the test stand-in")
+    }
   }
 
   class TestDataTransfer {
@@ -73,6 +81,14 @@ if (!globalThis.DataTransfer) {
 
     getData(format: string): string {
       return this.data[format] ?? ""
+    }
+
+    clearData(): never {
+      throw new Error("DataTransfer.clearData is not modelled by the test stand-in")
+    }
+
+    setDragImage(): never {
+      throw new Error("DataTransfer.setDragImage is not modelled by the test stand-in")
     }
   }
 

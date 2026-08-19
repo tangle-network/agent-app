@@ -117,8 +117,24 @@ describe('renamePastedImages', () => {
     expect(filterAcceptedFiles(renamed, '.jpeg').accepted).toHaveLength(1)
   })
 
-  it('falls back to the filename only when the type names no subtype', () => {
+  it('falls back to the filename when the type names nothing usable', () => {
+    // No subtype at all, and a compound subtype that is not extension-shaped:
+    // in both the type says nothing an extension can be built from.
     expect(renamePastedImages([file('image.jpeg', 'image/')], 0).files[0]!.name).toBe('pasted-image-1.jpeg')
+    expect(renamePastedImages([file('image.ico', 'image/vnd.acme.thing')], 0).files[0]!.name).toBe(
+      'pasted-image-1.ico',
+    )
+  })
+
+  it('never squeezes a compound MIME subtype into an extension nobody accepts', () => {
+    // `vndmicrosofticon` is a name no accept list will ever match, so a good
+    // `.ico` would sail through the picker and be refused on paste.
+    const ico = file('image.ico', 'image/vnd.microsoft.icon')
+    expect(renamePastedImages([ico], 0).files[0]!.name).toBe('pasted-image-1.ico')
+    expect(renamePastedImages([file('image.ico', 'image/x-icon')], 0).files[0]!.name).toBe(
+      'pasted-image-1.ico',
+    )
+    expect(filterAcceptedFiles(renamePastedImages([ico], 0).files, '.ico').accepted).toHaveLength(1)
   })
 
   it('cannot manufacture an extension through the subtype-less fallback', () => {
@@ -152,6 +168,18 @@ describe('renamePastedImages', () => {
       // The same blob still passes a list that genuinely admits it.
       expect(filterAcceptedFiles(files, 'image/*').accepted, name).toHaveLength(1)
     }
+  })
+
+  it('renames nothing once the counter can no longer produce a distinct number', () => {
+    // At the safe-integer ceiling `+ 1` stops moving, so a second rename in the
+    // batch would repeat the first name. Not renaming beats colliding.
+    const result = renamePastedImages(
+      [file('image.png', 'image/png'), file('image.png', 'image/png')],
+      Number.MAX_SAFE_INTEGER - 1,
+    )
+    const names = result.files.map((f) => f.name)
+    expect(new Set(names).size).toBe(names.length)
+    expect(names).toEqual(['pasted-image-9007199254740991.png', 'image.png'])
   })
 
   it('leaves an image alone when no extension can be derived truthfully', () => {

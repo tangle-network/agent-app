@@ -8,6 +8,15 @@
  * {@link filterAcceptedFiles}, so a type the picker will not offer cannot arrive
  * by another route instead.
  *
+ * One route can still reach a different verdict, and it does so deliberately.
+ * Paste is the only route that RENAMES, and {@link renamePastedImages} names a
+ * file after the type it declares. So a clipboard bitmap called `image.png` that
+ * declares `image/heic` is judged as `.heic` on paste, while the picker and a
+ * drop judge the name they were handed and admit it under `accept=".png"`. The
+ * filter is the same on all three; what differs is the name it is given, and
+ * paste is stricter precisely because a rename that kept the contradicting name
+ * would let the composer manufacture its own way past the filter.
+ *
  * ONE accept matcher serves the package: `ChatComposer` gates its ingress on it
  * and `useComposerAttachments` gates `addFiles` on it. A second implementation
  * of the `accept` grammar is how the two ends of the same staging path start
@@ -95,6 +104,8 @@ const IMAGE_EXTENSIONS_BY_MIME: Record<string, readonly string[]> = {
   'image/bmp': ['bmp'],
   'image/svg+xml': ['svg'],
   'image/tiff': ['tiff', 'tif'],
+  'image/x-icon': ['ico'],
+  'image/vnd.microsoft.icon': ['ico'],
 }
 
 /**
@@ -124,14 +135,21 @@ function isGenericImageName(name: string): boolean {
  * canonical `.jpg` would make the paste fail an `accept=".jpeg"` list that the
  * same file passes through the picker.
  *
- * The filename is consulted on its own ONLY when the type names no subtype at
- * all (`image/`). That is not an exception to the rule above: the only named
- * files this function ever sees are `image.<ext>` (see
- * {@link isGenericImageName}), so the fallback can only ever preserve an
- * extension the name already carried — it cannot manufacture one, and an
- * accept list therefore decides the same way it would have without the rename.
- * When nothing yields an extension, the caller skips the rename rather than
- * guessing.
+ * A subtype only stands in for an extension when it is already shaped like one.
+ * `image/heic` is; `image/vnd.microsoft.icon` is not, and squeezing the
+ * punctuation out of it would yield `vndmicrosofticon` — a name no accept list
+ * will ever match, so a perfectly good `.ico` would be admitted through the
+ * picker and refused on paste. An unrecognised compound type therefore names
+ * nothing, and the filename is consulted instead.
+ *
+ * The filename is consulted on its own ONLY when the type names nothing usable
+ * — either no subtype at all (`image/`) or a compound one. That is not an
+ * exception to the rule above: the only named files this function ever sees are
+ * `image.<ext>` (see {@link isGenericImageName}), so the fallback can only ever
+ * preserve an extension the name already carried — it cannot manufacture one,
+ * and an accept list therefore decides the same way it would have without the
+ * rename. When nothing yields an extension, the caller skips the rename rather
+ * than guessing.
  */
 function imageExtension(file: File): string | null {
   const type = file.type.toLowerCase()
@@ -139,8 +157,8 @@ function imageExtension(file: File): string | null {
 
   const mapped = IMAGE_EXTENSIONS_BY_MIME[type]
   const subtype = type.startsWith('image/') ? type.slice('image/'.length) : ''
-  const fromSubtype = (subtype.split('+')[0] ?? '').replace(/[^a-z0-9]/g, '')
-  const truthful = mapped ?? (fromSubtype.length > 0 ? [fromSubtype] : [])
+  const bare = subtype.split('+')[0] ?? ''
+  const truthful = mapped ?? (/^[a-z0-9]+$/.test(bare) ? [bare] : [])
 
   if (truthful.length === 0) return fromName ?? null
   if (fromName !== undefined && truthful.includes(fromName)) return fromName
@@ -198,6 +216,10 @@ export function renamePastedImages(
     if (!file.type.startsWith('image/') || !isGenericImageName(file.name)) return file
     const extension = imageExtension(file)
     if (extension === null) return file
+    // Past the safe-integer ceiling an increment stops moving the number, which
+    // would hand two files in this batch the same name. A distinct name is the
+    // whole point, so a counter that can no longer produce one renames nothing.
+    if (!Number.isSafeInteger(nextIndex + 1)) return file
     nextIndex += 1
     return new File([file], `pasted-image-${nextIndex}.${extension}`, {
       type: file.type,
