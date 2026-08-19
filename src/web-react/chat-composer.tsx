@@ -47,6 +47,7 @@ import {
 
 import {
   filterAcceptedFiles,
+  pastedImageStartIndex,
   renamePastedImages,
   type ComposerFileRejection,
 } from './composer-file-accept'
@@ -470,13 +471,16 @@ export function ChatComposer({
   )
 
   // Keep the textarea height in sync with the content for BOTH typed and
-  // external (controlled) value changes — one effect covers both paths.
+  // external (controlled) value changes — one effect covers both paths. It also
+  // reruns when the bounds move: `rows` is what `scrollHeight` resolves the
+  // measurement against, so a changed `minRows` that did not re-measure would
+  // strand the previous inline height.
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
     el.style.height = 'auto'
     el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`
-  }, [text, maxHeight])
+  }, [text, maxHeight, minRows])
 
   // Adopt a one-shot seed. Applies only when the `seed` PROP transitions to a
   // new string (host sets it → consumed here → host clears it via
@@ -709,7 +713,14 @@ export function ChatComposer({
     // Files are the payload, so suppress the default text paste even when every
     // one of them is refused — a rejection must not half-paste stray text.
     e.preventDefault()
-    const { files, nextIndex } = renamePastedImages(Array.from(clipboardFiles), pastedImageCount.current)
+    // Seed the counter from what is already staged, not from the ref alone: the
+    // queue is the host's and can outlive this mount, so a fresh ref would hand
+    // the next paste a name the queue already holds.
+    const startIndex = pastedImageStartIndex(
+      pendingFiles.map((f) => f.name),
+      pastedImageCount.current,
+    )
+    const { files, nextIndex } = renamePastedImages(Array.from(clipboardFiles), startIndex)
     pastedImageCount.current = nextIndex
     deliverFiles(files, clipboardFiles)
   }

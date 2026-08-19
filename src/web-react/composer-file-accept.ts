@@ -87,17 +87,55 @@ const IMAGE_EXTENSION_BY_MIME: Record<string, string> = {
   'image/svg+xml': 'svg',
 }
 
-/** Matches the generic names browsers give a clipboard bitmap (`image`,
- *  `image.png`, or an empty name) — the names that collide across pastes. */
+/**
+ * Matches EXACTLY the generic names browsers give a clipboard bitmap: an empty
+ * name, `image`, or `image.<ext>`. Those are the names that collide across
+ * pastes. A name that is only an extension (`.png`) is a real, if unusual,
+ * filename and is left alone.
+ */
 function isGenericImageName(name: string): boolean {
-  return /^(image)?(\.[a-z0-9]+)?$/i.test(name.trim())
+  return /^(?:image(?:\.[a-z0-9]+)?)?$/i.test(name.trim())
 }
 
-function imageExtension(file: File): string {
-  const fromMime = IMAGE_EXTENSION_BY_MIME[file.type.toLowerCase()]
+/**
+ * The extension a renamed clipboard image should carry, or null when none can
+ * be derived truthfully.
+ *
+ * It must never name a format the bytes are not. A rename that invents `.png`
+ * for an unrecognised image type hands an `accept=".png"` list a file that
+ * satisfies it by its new name alone, which turns the rename into a way around
+ * the very gate it is filtered by. So the extension comes from the mapped MIME
+ * type, then the file's own name, then the MIME subtype itself
+ * (`image/heic` → `heic`) — and when none of those yields anything, the caller
+ * skips the rename rather than guessing.
+ */
+function imageExtension(file: File): string | null {
+  const type = file.type.toLowerCase()
+  const fromMime = IMAGE_EXTENSION_BY_MIME[type]
   if (fromMime) return fromMime
   const fromName = /\.([a-z0-9]+)$/i.exec(file.name)?.[1]
-  return fromName?.toLowerCase() ?? 'png'
+  if (fromName) return fromName.toLowerCase()
+  const subtype = type.startsWith('image/') ? type.slice('image/'.length) : ''
+  const derived = (subtype.split('+')[0] ?? '').replace(/[^a-z0-9]/g, '')
+  return derived.length > 0 ? derived : null
+}
+
+/**
+ * The counter a paste should start from, given the names already staged. The
+ * ref alone counts only this mount's pastes, so a queue the host still holds
+ * across a remount — or one it seeded with `pasted-image-<n>` names of its own
+ * — would have its names reused by the next paste, which is the collision the
+ * rename exists to prevent.
+ */
+export function pastedImageStartIndex(stagedNames: Iterable<string>, current: number): number {
+  let highest = current
+  for (const name of stagedNames) {
+    const index = /^pasted-image-(\d+)(?:\.[a-z0-9]+)?$/i.exec(name.trim())?.[1]
+    if (index === undefined) continue
+    const parsed = Number.parseInt(index, 10)
+    if (Number.isFinite(parsed) && parsed > highest) highest = parsed
+  }
+  return highest
 }
 
 /**
@@ -107,8 +145,9 @@ function imageExtension(file: File): string {
  * that keys on the name treats the second as a duplicate of the first.
  *
  * Files that already carry a real name pass through untouched, so a copied
- * `report.pdf` keeps being `report.pdf`. `nextIndex` is the counter to hand the
- * next paste.
+ * `report.pdf` keeps being `report.pdf`. So does an image whose extension
+ * cannot be derived from what it declares — a renamed file must never claim a
+ * format it is not. `nextIndex` is the counter to hand the next paste.
  */
 export function renamePastedImages(
   files: File[],
@@ -117,10 +156,10 @@ export function renamePastedImages(
   let nextIndex = startIndex
   const renamed = files.map((file) => {
     if (!file.type.startsWith('image/') || !isGenericImageName(file.name)) return file
+    const extension = imageExtension(file)
+    if (extension === null) return file
     nextIndex += 1
-    return new File([file], `pasted-image-${nextIndex}.${imageExtension(file)}`, {
-      type: file.type,
-    })
+    return new File([file], `pasted-image-${nextIndex}.${extension}`, { type: file.type })
   })
   return { files: renamed, nextIndex }
 }

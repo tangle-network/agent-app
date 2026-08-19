@@ -800,6 +800,42 @@ describe('ChatComposer file ingress', () => {
     expect(Array.from(onAttach.mock.calls[1]![0] as FileList)[0]!.name).toBe('pasted-image-2.png')
   })
 
+  it('numbers a paste past the pasted images the queue already holds', () => {
+    // The queue is the host's and survives a remount, so a counter that only
+    // knew this mount's pastes would hand back a name already staged.
+    const onAttach = vi.fn()
+    render(
+      <ChatComposer
+        onSend={() => {}}
+        onAttach={onAttach}
+        pendingFiles={[
+          { id: 'p1', name: 'pasted-image-1.png', kind: 'file', status: 'ready' },
+          { id: 'p2', name: 'pasted-image-2.png', kind: 'file', status: 'uploading' },
+        ]}
+      />,
+    )
+    fireEvent.paste(screen.getByLabelText('Message input'), {
+      clipboardData: { files: fileList(makeFile('image.png', 'image/png')) },
+    })
+
+    expect(Array.from(onAttach.mock.calls[0]![0] as FileList)[0]!.name).toBe('pasted-image-3.png')
+  })
+
+  it('refuses a clipboard image whose type the accept list does not admit', () => {
+    // The rename must not manufacture an extension that satisfies `accept` —
+    // an unmapped image type keeps its own subtype and is judged on it.
+    const onAttach = vi.fn()
+    const onRejectFiles = vi.fn()
+    render(<ChatComposer onSend={() => {}} onAttach={onAttach} onRejectFiles={onRejectFiles} accept=".png" />)
+
+    fireEvent.paste(screen.getByLabelText('Message input'), {
+      clipboardData: { files: fileList(makeFile('image', 'image/heic')) },
+    })
+
+    expect(onAttach).not.toHaveBeenCalled()
+    expect(onRejectFiles.mock.calls[0]![0][0].file.name).toBe('pasted-image-1.heic')
+  })
+
   it('routes a pasted file accept refuses to onRejectFiles, never to onAttach', () => {
     const onAttach = vi.fn()
     const onRejectFiles = vi.fn()
@@ -987,6 +1023,26 @@ describe('ChatComposer send gates', () => {
     expect(onSend).toHaveBeenCalledWith('')
   })
 
+  it('hands an errored-only queue to the send handler rather than deadening Enter', () => {
+    // `canSubmitAttachmentsOnly` counts a staged file of ANY status on purpose.
+    // The host owns what a non-deliverable file means — `EntryComposer` blocks
+    // on `hasError` and names the reason — and a composer that silently refused
+    // the keystroke would leave it no place to say so.
+    const onSend = vi.fn()
+    render(
+      <ChatComposer
+        onSend={onSend}
+        onAttach={() => {}}
+        pendingFiles={[
+          { id: 'f1', name: 'big.png', kind: 'file', status: 'error', errorMessage: 'Upload failed (413)' },
+        ]}
+        canSubmitAttachmentsOnly
+      />,
+    )
+    fireEvent.keyDown(screen.getByLabelText('Message input'), { key: 'Enter' })
+    expect(onSend).toHaveBeenCalledWith('')
+  })
+
   it('canSubmitWhileBusy lets Enter queue the next turn mid-stream', () => {
     const onSend = vi.fn()
     render(<ChatComposer onSend={onSend} isStreaming canSubmitWhileBusy />)
@@ -1025,6 +1081,28 @@ describe('ChatComposer input sizing and trailing slot', () => {
     const input = screen.getByLabelText('Message input') as HTMLTextAreaElement
     expect(input.style.minHeight).toBe('56px')
     expect(input.style.maxHeight).toBe('168px')
+  })
+
+  it('re-measures the input when minRows changes, in both directions', () => {
+    // `rows` is what the autosize measures `scrollHeight` against, so a changed
+    // row count that did not re-measure would strand the previous height.
+    const { rerender } = render(<ChatComposer onSend={() => {}} minRows={2} />)
+    const input = screen.getByLabelText('Message input') as HTMLTextAreaElement
+
+    // A real length, so the assignment sticks: the autosize writes `0px` under
+    // jsdom (no layout), and overwriting this is the only observable proof the
+    // effect ran again.
+    input.style.height = '999px'
+    rerender(<ChatComposer onSend={() => {}} minRows={5} />)
+    expect(input.getAttribute('rows')).toBe('5')
+    expect(input.style.minHeight).toBe('128px')
+    expect(input.style.height).toBe('0px')
+
+    input.style.height = '999px'
+    rerender(<ChatComposer onSend={() => {}} minRows={2} />)
+    expect(input.getAttribute('rows')).toBe('2')
+    expect(input.style.minHeight).toBe('56px')
+    expect(input.style.height).toBe('0px')
   })
 
   it('focuses the input on mount only when autoFocus is set', () => {

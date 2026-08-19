@@ -4,6 +4,7 @@ import {
   acceptRejectionReason,
   filterAcceptedFiles,
   isAcceptedFileType,
+  pastedImageStartIndex,
   renamePastedImages,
 } from './composer-file-accept'
 
@@ -88,10 +89,39 @@ describe('renamePastedImages', () => {
     expect(second.nextIndex).toBe(2)
   })
 
-  it('takes the extension from the MIME type, and falls back to png for an unknown one', () => {
+  it('takes the extension from the MIME type, the name, or the subtype — never a guess', () => {
     expect(renamePastedImages([file('image', 'image/jpeg')], 0).files[0]!.name).toBe('pasted-image-1.jpg')
     expect(renamePastedImages([file('', 'image/webp')], 0).files[0]!.name).toBe('pasted-image-1.webp')
-    expect(renamePastedImages([file('image', 'image/heic')], 0).files[0]!.name).toBe('pasted-image-1.png')
+    // Unmapped type: the subtype is the truth, so the name says heic, not png.
+    expect(renamePastedImages([file('image', 'image/heic')], 0).files[0]!.name).toBe('pasted-image-1.heic')
+    // An extension on the original name outranks the subtype.
+    expect(renamePastedImages([file('image.avif', 'image/heic')], 0).files[0]!.name).toBe('pasted-image-1.avif')
+  })
+
+  it('never renames an image to a format it is not, so accept still refuses it', () => {
+    // A renamed file that claimed `.png` for HEIC bytes satisfied an
+    // `accept=".png"` list by its new name alone, which made the rename a way
+    // around the gate it is filtered by.
+    const heic = file('image', 'image/heic')
+    const { files } = renamePastedImages([heic], 0)
+    const { accepted, rejected } = filterAcceptedFiles(files, '.png')
+
+    expect(accepted).toEqual([])
+    expect(rejected).toHaveLength(1)
+    // The same blob still passes a list that genuinely admits it.
+    expect(filterAcceptedFiles(files, 'image/*').accepted).toHaveLength(1)
+  })
+
+  it('leaves an image alone when no extension can be derived truthfully', () => {
+    const nameless = file('', 'image/')
+    const result = renamePastedImages([nameless], 0)
+    expect(result.files[0]).toBe(nameless)
+    expect(result.nextIndex).toBe(0)
+  })
+
+  it('leaves a name that is only an extension alone — a dotfile is a real name', () => {
+    const dotfile = file('.png', 'image/png')
+    expect(renamePastedImages([dotfile], 0).files[0]).toBe(dotfile)
   })
 
   it('leaves a real filename and a non-image alone, and does not spend a counter on them', () => {
@@ -110,5 +140,27 @@ describe('renamePastedImages', () => {
 
     expect(renamed.type).toBe('image/png')
     expect(new Uint8Array(await renamed.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]))
+  })
+})
+
+describe('pastedImageStartIndex', () => {
+  it('takes the highest already-staged pasted-image number when it beats the counter', () => {
+    expect(pastedImageStartIndex(['pasted-image-1.png', 'pasted-image-4.jpg'], 0)).toBe(4)
+  })
+
+  it('keeps the counter when it is already ahead of the staged names', () => {
+    expect(pastedImageStartIndex(['pasted-image-1.png'], 7)).toBe(7)
+  })
+
+  it('ignores names that are not pasted images', () => {
+    expect(pastedImageStartIndex(['report.pdf', 'pasted-image-x.png', 'my-pasted-image-9.png'], 2)).toBe(2)
+  })
+
+  it('reads a bare pasted-image-<n> with no extension', () => {
+    expect(pastedImageStartIndex(['pasted-image-3'], 0)).toBe(3)
+  })
+
+  it('returns the counter unchanged for an empty queue', () => {
+    expect(pastedImageStartIndex([], 5)).toBe(5)
   })
 })

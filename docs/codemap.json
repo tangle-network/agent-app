@@ -18207,6 +18207,12 @@
           "doc": "Re-validate one JSON-boundary row into a queue item; null for junk."
         },
         {
+          "name": "pastedImageStartIndex",
+          "kind": "function",
+          "signature": "(stagedNames: Iterable<string>, current: number) => number",
+          "doc": "The counter a paste should start from, given the names already staged."
+        },
+        {
           "name": "pendingApprovalOf",
           "kind": "function",
           "signature": "(call: ChatToolCallInfo) => { proposalId: string; } | null",

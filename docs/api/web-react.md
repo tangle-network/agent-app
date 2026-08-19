@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-400 exports.
+401 exports.
 
 ### `acceptRejectionReason`
 
@@ -1836,6 +1836,14 @@ type ParseInteractionResult
 
 ```ts
 (raw: unknown) => ReviewQueueItem | null
+```
+
+### `pastedImageStartIndex`
+
+`function` — The counter a paste should start from, given the names already staged.
+
+```ts
+(stagedNames: Iterable<string>, current: number) => number
 ```
 
 ### `pendingApprovalOf`
