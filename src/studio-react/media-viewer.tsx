@@ -188,12 +188,9 @@ function AudioTransport({ generation }: { generation: Generation }): JSX.Element
         onKeyDown={onKeyDown}
       >
         <div ref={trackRef} className="relative h-1 w-full overflow-hidden rounded-full bg-accent">
-          <div className="absolute inset-y-0 left-0 bg-primary" style={{ width: 'calc(var(--pos, 0) * 100%)' }} />
+          <div className="studio-seek-fill absolute inset-y-0 left-0 bg-primary" />
         </div>
-        <div
-          className="absolute h-[13px] w-[13px] -translate-x-1/2 rounded-full bg-primary ring-2 ring-card"
-          style={{ left: 'calc(var(--pos, 0) * 100%)' }}
-        />
+        <div className="studio-seek-thumb absolute h-[13px] w-[13px] -translate-x-1/2 rounded-full bg-primary ring-2 ring-card" />
       </div>
       <span className="text-[12px] text-muted-foreground tabular-nums">
         {duration > 0 ? formatClock(duration) : '--:--'}

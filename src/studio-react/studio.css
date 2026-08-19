@@ -176,6 +176,11 @@
   height: 28px; pointer-events: none;
   background: linear-gradient(to top, hsl(var(--background)), transparent);
 }
+/* --pos is written per animation frame by the shared playback state; the
+   fill/thumb consume it here so component TSX carries no var() reference
+   (the tokens-contract gate treats TSX var() refs as theme tokens). */
+.studio-seek-fill { width: calc(var(--pos, 0) * 100%); }
+.studio-seek-thumb { left: calc(var(--pos, 0) * 100%); }
 .studio-seek:focus-visible {
   outline: 2px solid hsl(var(--primary)); outline-offset: 3px; border-radius: 999px;
 }
