@@ -283,6 +283,23 @@ describe('renamePastedImages — index selection', () => {
     expect(new Set(names).size).toBe(2)
   }, 2000)
 
+  it('stays inside the safe range for a batch walked up to the ceiling', () => {
+    // The walk starts one below the ceiling and the staged name takes the last
+    // safe number, so a second file has nowhere left to go upward. Every index
+    // it hands back must still be a distinct safe integer.
+    for (const start of [Number.MAX_SAFE_INTEGER - 1, Number.MAX_SAFE_INTEGER - 2]) {
+      const result = renamePastedImages(
+        [file('image.png', 'image/png'), file('image.png', 'image/png')],
+        start,
+        ['pasted-image-9007199254740991.png'],
+      )
+      const numbers = result.files.map((f) => Number(/pasted-image-(\d+)\./.exec(f.name)?.[1]))
+      expect(new Set(numbers).size, String(start)).toBe(2)
+      for (const n of numbers) expect(Number.isSafeInteger(n), `${start} -> ${n}`).toBe(true)
+      expect(Number.isSafeInteger(result.nextIndex), String(start)).toBe(true)
+    }
+  }, 2000)
+
   it('starts over when handed a count it cannot count from', () => {
     for (const bad of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
       const result = renamePastedImages([file('image.png', 'image/png')], bad)

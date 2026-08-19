@@ -188,17 +188,28 @@ function takenPastedImageIndexes(names: Iterable<string>): Set<number> {
  * The lowest number above `after` that no name has claimed.
  *
  * Searching upward from the caller's own count — rather than from the highest
- * number any staged name happens to carry — is what keeps this bounded. A queue
- * may hold `pasted-image-9007199254740991.png`, and counting from THAT would
- * strand the next paste at a ceiling where incrementing stops working. Staged
- * numbers are avoided, never followed, so the loop advances at most once per
- * number already claimed and always terminates. `after` is normalised by the
- * caller to a value it can still count from, which is what keeps `+ 1` moving.
+ * number any staged name happens to carry — is what keeps the usual case cheap:
+ * staged numbers are avoided, never followed, so the walk advances at most once
+ * per number already claimed.
+ *
+ * Termination does not rest on that, though, because `after` can be pushed near
+ * the safe-integer ceiling and `+ 1` stops moving there — a walk that only
+ * tested membership would spin on one value forever. The upward walk therefore
+ * ends the moment a candidate leaves the safe range, and the search restarts
+ * from the bottom, where a free number is guaranteed: `taken` is finite, so one
+ * of the first `taken.size + 1` positive integers is always free. Every number
+ * this returns is a safe integer, which is also what keeps an unsafe staged
+ * name — invisible to {@link takenPastedImageIndexes} — impossible to collide
+ * with.
  */
 function nextFreeIndex(taken: Set<number>, after: number): number {
-  let candidate = after + 1
-  while (taken.has(candidate)) candidate += 1
-  return candidate
+  const start = Number.isSafeInteger(after) && after >= 0 ? after + 1 : 1
+  for (let candidate = start; Number.isSafeInteger(candidate); candidate += 1) {
+    if (!taken.has(candidate)) return candidate
+  }
+  for (let candidate = 1; ; candidate += 1) {
+    if (!taken.has(candidate)) return candidate
+  }
 }
 
 /**
@@ -227,14 +238,10 @@ export function renamePastedImages(
   stagedNames: Iterable<string> = [],
 ): { files: File[]; nextIndex: number } {
   const taken = takenPastedImageIndexes([...stagedNames, ...files.map((file) => file.name)])
-  // A count that cannot be counted from starts over. That means a negative, a
-  // fraction or NaN, and it also means a count sitting AT the safe ceiling: one
-  // more than that is not representable, so the search would try to step and
-  // never move. `startIndex + 1` is the thing the search actually needs, so it
-  // is the thing tested here.
-  const usable =
-    Number.isSafeInteger(startIndex) && startIndex >= 0 && Number.isSafeInteger(startIndex + 1)
-  let nextIndex = usable ? startIndex : 0
+  // Whatever the caller's count is — a negative, a fraction, NaN, or a value at
+  // the ceiling — `nextFreeIndex` normalises it and always answers with a safe
+  // integer, so nothing here has to pre-screen it.
+  let nextIndex = startIndex
   const renamed = files.map((file) => {
     const typed = file.type.startsWith('image/')
     // A clipboard file can arrive with no MIME type at all, and one named
