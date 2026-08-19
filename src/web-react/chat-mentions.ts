@@ -37,12 +37,17 @@ export interface MentionTextSegment {
  *
  *  Unicode-aware because the wire validator (`validateSandboxMentionPath`)
  *  deliberately ALLOWS non-ASCII paths — in-box filenames are arbitrary. An
- *  ASCII-only class here would accept input the segmenter then mangles. */
-const PATH_CONTINUATION_CHAR = /[\p{L}\p{N}._\-/]/u
+ *  ASCII-only class here would accept input the segmenter then mangles.
+ *
+ *  Exported: `mention-serialize.ts` restores editor pills from the same
+ *  `@<path>` grammar, and the two inverse readings must share one boundary
+ *  vocabulary or a token one accepts the other mangles. */
+export const PATH_CONTINUATION_CHAR = /[\p{L}\p{N}._\-/]/u
 /** A character that, immediately BEFORE an `@`, means the `@` is part of a
  *  longer token (an email local part, a handle) rather than a mention start.
- *  Unicode-aware for the same reason. */
-const WORD_CHAR = /[\p{L}\p{N}]/u
+ *  Unicode-aware for the same reason. Exported for `mention-serialize.ts` —
+ *  see {@link PATH_CONTINUATION_CHAR}. */
+export const WORD_CHAR = /[\p{L}\p{N}]/u
 
 /**
  * Split a message's text into plain-text and mention segments by matching

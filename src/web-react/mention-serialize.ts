@@ -8,6 +8,7 @@
  * is unit-testable on its own and never pulls the editor chunk into a bundle.
  */
 
+import { PATH_CONTINUATION_CHAR, WORD_CHAR } from './chat-mentions'
 import type { MentionItem } from './use-file-mentions'
 
 /**
@@ -100,7 +101,11 @@ function parseLine(line: string, known: Map<string, MentionItem>): MentionDocNod
 
   let i = 0
   while (i < line.length) {
-    if (line[i] === '@') {
+    // A word character right before the `@` means it is part of a longer
+    // token (an email local part, a handle), never a mention start — the
+    // same rule the transcript segmenter applies to persisted messages.
+    const partOfLongerToken = i > 0 && WORD_CHAR.test(line[i - 1]!)
+    if (line[i] === '@' && !partOfLongerToken) {
       const id = matchKnownId(line, i + 1, known)
       if (id) {
         const item = known.get(id)!
@@ -125,9 +130,10 @@ function parseLine(line: string, known: Map<string, MentionItem>): MentionDocNod
 }
 
 /**
- * The longest known id that starts at `pos` and ends on a boundary (end of
- * line or whitespace) — mentions serialize with a trailing space, so a bare
- * prefix of a longer path never matches by accident.
+ * The longest known id that starts at `pos` and ends on a boundary: end of
+ * line, or any character that could not continue the same path — the
+ * transcript segmenter's rule, so `@a.tsx,` restores its pill while
+ * `@a.tsx.bak` never matches the shorter `a.tsx` mid-filename.
  */
 function matchKnownId(
   line: string,
@@ -140,7 +146,7 @@ function matchKnownId(
     if (best !== null && id.length <= best.length) continue
     if (!line.startsWith(id, pos)) continue
     const after = pos + id.length
-    if (after < line.length && !/\s/.test(line[after]!)) continue
+    if (after < line.length && PATH_CONTINUATION_CHAR.test(line[after]!)) continue
     best = id
   }
   return best

@@ -67,6 +67,30 @@ describe('mention serialization', () => {
     expect(serializeMentionDoc(doc)).toBe(value)
   })
 
+  it('restores a pill when ordinary punctuation follows the id', () => {
+    // Same boundary vocabulary as the transcript segmenter: any character
+    // that could not continue a path ends the token.
+    for (const value of ['see @src/app.tsx, please', '(@src/app.tsx)', 'ok @src/app.tsx?']) {
+      const doc = parseMentionValue(value, known(FILE))
+      expect(collectMentions(doc).map((m) => m.id), value).toEqual(['src/app.tsx'])
+      expect(serializeMentionDoc(doc)).toBe(value)
+    }
+  })
+
+  it('keeps a trailing period literal — a dot continues filenames', () => {
+    // `.` is a path-continuation character (`app.tsx.bak`), so a sentence
+    // ending right at the id cannot be told apart from a longer filename.
+    const doc = parseMentionValue('see @src/app.tsx.', known(FILE))
+    expect(collectMentions(doc)).toHaveLength(0)
+    expect(serializeMentionDoc(doc)).toBe('see @src/app.tsx.')
+  })
+
+  it('never starts a mention inside a longer token (email local parts)', () => {
+    const doc = parseMentionValue('mail user@src/app.tsx today', known(FILE))
+    expect(collectMentions(doc)).toHaveLength(0)
+    expect(serializeMentionDoc(doc)).toBe('mail user@src/app.tsx today')
+  })
+
   it('prefers the longest known id and respects a whitespace boundary', () => {
     const shorter: MentionItem = { id: 'src/app', label: 'app' }
     const longer: MentionItem = { id: 'src/app.tsx', label: 'app.tsx' }
