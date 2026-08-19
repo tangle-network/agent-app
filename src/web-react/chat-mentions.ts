@@ -17,6 +17,11 @@
  */
 
 import { mentionInputToPart, mentionPartsFromMessageParts, type ChatMentionKind, type ChatMentionPart } from '../chat-store/parts'
+// The `@<path>` token grammar (boundary classes + code-point readers) lives
+// in `mention-boundaries.ts`, shared with the editor's pill restore and kept
+// out of the public barrel — this module is barrel-exported wholesale, and
+// the grammar's internals are not API.
+import { charAt, charBefore, PATH_CONTINUATION_CHAR, WORD_CHAR } from './mention-boundaries'
 
 export type { ChatMentionKind, ChatMentionPart }
 export { mentionInputToPart, mentionPartsFromMessageParts }
@@ -29,41 +34,6 @@ export interface MentionTextSegment {
   type: 'text' | 'mention'
   text: string
   part?: ChatMentionPart
-}
-
-/** A character that could plausibly continue the SAME path/filename past a
- *  matched token. Without this lookahead a mention of `@a/b.md` would match
- *  inside the unrelated `@a/b.md.bak` and split it mid-filename.
- *
- *  Unicode-aware because the wire validator (`validateSandboxMentionPath`)
- *  deliberately ALLOWS non-ASCII paths — in-box filenames are arbitrary. An
- *  ASCII-only class here would accept input the segmenter then mangles.
- *
- *  Exported: `mention-serialize.ts` restores editor pills from the same
- *  `@<path>` grammar, and the two inverse readings must share one boundary
- *  vocabulary or a token one accepts the other mangles. */
-export const PATH_CONTINUATION_CHAR = /[\p{L}\p{N}._\-/]/u
-/** A character that, immediately BEFORE an `@`, means the `@` is part of a
- *  longer token (an email local part, a handle) rather than a mention start.
- *  Unicode-aware for the same reason. Exported for `mention-serialize.ts` —
- *  see {@link PATH_CONTINUATION_CHAR}. */
-export const WORD_CHAR = /[\p{L}\p{N}]/u
-
-/** The full character (code point) ENDING just before `index`, or undefined
- *  at the start. Indexing `text[index - 1]` hands a lone UTF-16 surrogate to
- *  the Unicode-aware classes above, which then misread every astral letter —
- *  boundary checks must see whole characters. */
-export function charBefore(text: string, index: number): string | undefined {
-  if (index <= 0) return undefined
-  return Array.from(text.slice(Math.max(0, index - 2), index)).pop()
-}
-
-/** The full character (code point) starting at `index`, or undefined past the
- *  end — same surrogate rationale as {@link charBefore}. */
-export function charAt(text: string, index: number): string | undefined {
-  if (index >= text.length) return undefined
-  const codePoint = text.codePointAt(index)
-  return codePoint === undefined ? undefined : String.fromCodePoint(codePoint)
 }
 
 /**

@@ -8,7 +8,7 @@
  * is unit-testable on its own and never pulls the editor chunk into a bundle.
  */
 
-import { charAt, charBefore, PATH_CONTINUATION_CHAR, WORD_CHAR } from './chat-mentions'
+import { charAt, charBefore, PATH_CONTINUATION_CHAR, WORD_CHAR } from './mention-boundaries'
 import type { MentionItem } from './use-file-mentions'
 
 /**
