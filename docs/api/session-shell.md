@@ -4,7 +4,7 @@
 
 Source: `src/session-shell/index.ts`
 
-48 exports.
+58 exports.
 
 ### `activeSessionIdFromPath`
 
@@ -28,6 +28,22 @@ interface ActiveSessionIdOptions
 
 ```ts
 (items: readonly NavHrefItem[], routes: NavRouteTable, options?: NavHrefCheckOptions) => void
+```
+
+### `buildCommandPaletteItems`
+
+`function` — Flatten sessions + actions into palette items, sessions group first (the jump-back-in list), actions after.
+
+```ts
+({ sessions, actions, sessionsLabel, actionsLabel, untitledLabel, }: BuildCommandPaletteItemsOptions) => CommandPalette…
+```
+
+### `BuildCommandPaletteItemsOptions`
+
+`interface`
+
+```ts
+interface BuildCommandPaletteItemsOptions
 ```
 
 ### `buildSessionNavItem`
@@ -70,6 +86,46 @@ interface BuildSessionSubItemsOptions
 (items: readonly NavHrefItem[], routes: NavRouteTable, options?: NavHrefCheckOptions) => NavHrefReport
 ```
 
+### `COMMAND_PALETTE_ACTIONS_GROUP`
+
+`const`
+
+```ts
+"Actions"
+```
+
+### `COMMAND_PALETTE_SESSIONS_GROUP`
+
+`const`
+
+```ts
+"Sessions"
+```
+
+### `CommandPaletteAction`
+
+`interface` — A product-supplied palette action.
+
+```ts
+interface CommandPaletteAction
+```
+
+### `CommandPaletteGroup`
+
+`interface` — One rendered section: a header plus its rows, in first-seen group order.
+
+```ts
+interface CommandPaletteGroup
+```
+
+### `CommandPaletteItem`
+
+`interface` — One selectable row.
+
+```ts
+interface CommandPaletteItem
+```
+
 ### `ComposedSidebarSessions`
 
 `interface`
@@ -102,12 +158,28 @@ interface ComposeSidebarSessionsOptions
 "agent-sidebar-rail-collapsed"
 ```
 
+### `filterCommandPaletteItems`
+
+`function` — Filter + rank: an empty query returns the items untouched (build order is the recency order); a real query drops non-matches and sorts by score, then recency, then original position — stable and dete…
+
+```ts
+(items: readonly CommandPaletteItem[], query: string) => CommandPaletteItem[]
+```
+
 ### `flattenRouteTable`
 
 `function` — Every path pattern the table registers, rooted and de-duplicated.
 
 ```ts
 (table: NavRouteTable) => string[]
+```
+
+### `groupCommandPaletteItems`
+
+`function` — Fold a flat (already ordered) item list into renderable sections.
+
+```ts
+(items: readonly CommandPaletteItem[]) => CommandPaletteGroup[]
 ```
 
 ### `mergeSessionPages`
@@ -308,6 +380,14 @@ interface ResolveScopedActiveNavIdOptions
 
 ```ts
 interface ResolveSessionUnreadOptions
+```
+
+### `scoreCommandPaletteItem`
+
+`function` — Score an item: the best label score, or the best keyword score a fixed step below.
+
+```ts
+(item: CommandPaletteItem, query: string) => number | null
 ```
 
 ### `sessionLabel`
