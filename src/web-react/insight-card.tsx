@@ -153,6 +153,10 @@ export interface InsightAction {
 }
 
 export interface InsightCardProps {
+  /** The lane the metric belongs to ("Spend", "Missions"), set small above the
+   *  title. A deck of cards from different surfaces needs the grouping word
+   *  before the metric's own name, not after it. */
+  eyebrow?: string
   /** What was measured, in the reader's words ("Spend today"). */
   title: string
   /** The number that moved. A `string` renders verbatim — a total the caller
@@ -187,6 +191,7 @@ export interface InsightCardProps {
 }
 
 export function InsightCard({
+  eyebrow,
   title,
   value,
   unit,
@@ -219,6 +224,11 @@ export function InsightCard({
       className={joinClasses('agent-arrive flex h-full flex-col rounded-xl border border-card-edge bg-card p-4', className)}
       style={style}
     >
+      {eyebrow ? (
+        <p data-insight-eyebrow="" className="mb-0.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+          {eyebrow}
+        </p>
+      ) : null}
       <div className="flex items-baseline justify-between gap-2">
         <h3 className="text-[13px] font-medium text-muted-foreground">{title}</h3>
         {live ? (

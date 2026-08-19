@@ -267,6 +267,22 @@ describe('<InsightCard>', () => {
     expect(screen.getByRole('img', { name: /Spend today/ })).toBeTruthy()
   })
 
+  it('renders the eyebrow above the title when the metric has a lane', () => {
+    const { container } = render(<InsightCard eyebrow="Spend" title="Spend today" value={41.2} unit="USD" />)
+    const eyebrow = container.querySelector('[data-insight-eyebrow]')
+    expect(eyebrow?.textContent).toBe('Spend')
+    // Order is the point: the lane names the group BEFORE the card's own title,
+    // so it has to precede the h3 in the tree.
+    const title = container.querySelector('h3')
+    expect(title).not.toBeNull()
+    expect(eyebrow && title ? eyebrow.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING : 0).toBeTruthy()
+  })
+
+  it('renders no eyebrow element when none was supplied', () => {
+    const { container } = render(<InsightCard title="Spend today" value={41.2} />)
+    expect(container.querySelector('[data-insight-eyebrow]')).toBeNull()
+  })
+
   it('builds its class attribute without a stray separator', () => {
     const { container } = render(<InsightCard title="Runs" value={3} />)
     const attribute = container.querySelector('[data-insight-card]')?.getAttribute('class') ?? ''

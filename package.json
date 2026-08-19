@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.45.63",
+  "version": "0.45.64",
   "packageManager": "pnpm@11.17.0",
   "description": "Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.",
   "keywords": [
@@ -524,7 +524,7 @@
     "@tangle-network/agent-interface": "1.0.1",
     "@tangle-network/agent-knowledge": "8.0.8",
     "@tangle-network/agent-profile-materialize": "0.16.0",
-    "@tangle-network/agent-runtime": "0.140.0",
+    "@tangle-network/agent-runtime": "0.141.1",
     "@tangle-network/brand": "1.5.0",
     "@tangle-network/sandbox": "0.27.2",
     "@tangle-network/sandbox-ui": "0.105.0",
@@ -576,7 +576,7 @@
     "@tangle-network/agent-interface": "^1.0.0",
     "@tangle-network/agent-knowledge": ">=8.0.8",
     "@tangle-network/agent-profile-materialize": ">=0.16.0",
-    "@tangle-network/agent-runtime": ">=0.140.0",
+    "@tangle-network/agent-runtime": ">=0.141.1",
     "@tangle-network/brand": ">=1.5.0",
     "@tangle-network/sandbox": ">=0.27.2",
     "@tangle-network/sandbox-ui": ">=0.105.0",

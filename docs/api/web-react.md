@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-400 exports.
+416 exports.
 
 ### `acceptRejectionReason`
 
@@ -422,6 +422,30 @@ interface ChatTurnRequestPayload
 interface ChatUiMessage
 ```
 
+### `CommandPalette`
+
+`function`
+
+```ts
+({ items, onSelect, open: controlledOpen, onOpenChange, hotkey, loading, initialQuery, placeholder, emptyMessage, label…
+```
+
+### `CommandPaletteItem`
+
+`interface` — One selectable row.
+
+```ts
+interface CommandPaletteItem
+```
+
+### `CommandPaletteProps`
+
+`interface`
+
+```ts
+interface CommandPaletteProps
+```
+
 ### `composerAnswerData`
 
 `function` — Shapes composer text into the respond payload for the routed field (select answers are string arrays on the wire; text answers are strings).
@@ -692,6 +716,38 @@ ProvenanceConfidencePolicy
 
 ```ts
 (source: ProvenanceSource) => string | null
+```
+
+### `DictationAudio`
+
+`interface` — The audio a finished recording hands to the host.
+
+```ts
+interface DictationAudio
+```
+
+### `DictationControls`
+
+`interface`
+
+```ts
+interface DictationControls
+```
+
+### `dictationErrorMessage`
+
+`function` — The failure as a sentence.
+
+```ts
+(error: unknown) => string
+```
+
+### `diffRecordGridProposal`
+
+`function` — Diff a proposal against the live rows.
+
+```ts
+(rows: readonly RecordGridRow[], proposal: RecordGridProposal) => RecordGridRowDiff[]
 ```
 
 ### `DISPATCH_MAX_MEDIA_PARTS`
@@ -1078,6 +1134,14 @@ interface FlowWaterfallProps
 (durationMs?: number | undefined) => string | null
 ```
 
+### `formatDictationElapsed`
+
+`function` — `0:00`, `0:09`, `1:05`, `60:00` — minutes unbounded, seconds always two digits.
+
+```ts
+(totalSeconds: number) => string
+```
+
 ### `formatInsightDelta`
 
 `function` — The delta as words: direction, magnitude, and the baseline it is measured against.
@@ -1187,7 +1251,7 @@ interface InsightAction
 `function`
 
 ```ts
-({ title, value, unit, previous, polarity, format, series, seriesLabel, description, action, live, liveLabel, className…
+({ eyebrow, title, value, unit, previous, polarity, format, series, seriesLabel, description, action, live, liveLabel,…
 ```
 
 ### `InsightCardProps`
@@ -1854,6 +1918,14 @@ type ParseInteractionResult
 (part: Record<string, unknown>) => ChatInteraction | null
 ```
 
+### `pickDictationMimeType`
+
+`function` — The mime to ask the recorder for, or `undefined` to take the UA default.
+
+```ts
+() => string | undefined
+```
+
 ### `POPOVER_SURFACE_ATTR`
 
 `const` — Marks the portaled panel in the DOM.
@@ -2243,7 +2315,7 @@ interface QuestionOptionListProps
 `function` — The shared editable record table.
 
 ```ts
-({ columns, caption, state, empty, onCreate, onUpdate, onDelete, newRowDefaults, addLabel, locale, toolbar, loadingRowC…
+({ columns, caption, state, empty, onCreate, onUpdate, onDelete, proposed, onAcceptRow, onRejectRow, onAcceptAll, onRej…
 ```
 
 ### `RecordGridBooleanColumn`
@@ -2260,6 +2332,14 @@ interface RecordGridBooleanColumn
 
 ```ts
 interface RecordGridCellChange
+```
+
+### `RecordGridCellDiff`
+
+`interface` — One cell whose proposed value differs from the live one.
+
+```ts
+interface RecordGridCellDiff
 ```
 
 ### `RecordGridCellOutcome`
@@ -2366,6 +2446,14 @@ interface RecordGridNumberColumn
 interface RecordGridOverlay
 ```
 
+### `RecordGridProposal`
+
+`interface` — A proposed change set, diffed against the live rows by {@link diffRecordGridProposal}.
+
+```ts
+interface RecordGridProposal
+```
+
 ### `RecordGridProps`
 
 `interface` — Properties for the editable, provenance-aware record grid.
@@ -2380,6 +2468,22 @@ interface RecordGridProps
 
 ```ts
 interface RecordGridRow
+```
+
+### `RecordGridRowDiff`
+
+`interface` — One row's verdict: what the proposal does to it.
+
+```ts
+interface RecordGridRowDiff
+```
+
+### `RecordGridRowDiffKind`
+
+`type`
+
+```ts
+type RecordGridRowDiffKind
 ```
 
 ### `recordGridRowLabel`
@@ -2686,6 +2790,14 @@ interface SessionPageQuery
 (run: () => Promise<InteractionSubmitResult>, timeoutMs?: number) => Promise<InteractionSubmitResult>
 ```
 
+### `SlashCommand`
+
+`interface` — One `/` command the composer offers.
+
+```ts
+interface SlashCommand
+```
+
 ### `SmoothRevealOptions`
 
 `interface` — Define configuration options for controlling smooth text reveal animation rates
@@ -2932,6 +3044,22 @@ interface UseComposerAttachmentsOptions
 
 ```ts
 interface UseComposerAttachmentsResult
+```
+
+### `useDictation`
+
+`function`
+
+```ts
+({ onDictate, onError }: UseDictationOptions) => DictationControls
+```
+
+### `UseDictationOptions`
+
+`interface`
+
+```ts
+interface UseDictationOptions
 ```
 
 ### `useDurablePlanFlow`

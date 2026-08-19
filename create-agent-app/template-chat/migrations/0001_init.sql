@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE TABLE IF NOT EXISTS accounts (
   id TEXT PRIMARY KEY,
+  -- better-auth 1.7's drizzle adapter requires this column (1.6 predates it).
+  issuer TEXT,
   account_id TEXT NOT NULL,
   provider_id TEXT NOT NULL,
   user_id TEXT NOT NULL,

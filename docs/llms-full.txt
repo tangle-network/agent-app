@@ -16139,6 +16139,22 @@ interface ActiveSessionIdOptions
 (items: readonly NavHrefItem[], routes: NavRouteTable, options?: NavHrefCheckOptions) => void
 ```
 
+### `buildCommandPaletteItems`
+
+`function` — Flatten sessions + actions into palette items, sessions group first (the jump-back-in list), actions after.
+
+```ts
+({ sessions, actions, sessionsLabel, actionsLabel, untitledLabel, }: BuildCommandPaletteItemsOptions) => CommandPalette…
+```
+
+### `BuildCommandPaletteItemsOptions`
+
+`interface`
+
+```ts
+interface BuildCommandPaletteItemsOptions
+```
+
 ### `buildSessionNavItem`
 
 `function` — The rail's session entry: one expandable nav row whose sub-items are the recent sessions.
@@ -16179,6 +16195,46 @@ interface BuildSessionSubItemsOptions
 (items: readonly NavHrefItem[], routes: NavRouteTable, options?: NavHrefCheckOptions) => NavHrefReport
 ```
 
+### `COMMAND_PALETTE_ACTIONS_GROUP`
+
+`const`
+
+```ts
+"Actions"
+```
+
+### `COMMAND_PALETTE_SESSIONS_GROUP`
+
+`const`
+
+```ts
+"Sessions"
+```
+
+### `CommandPaletteAction`
+
+`interface` — A product-supplied palette action.
+
+```ts
+interface CommandPaletteAction
+```
+
+### `CommandPaletteGroup`
+
+`interface` — One rendered section: a header plus its rows, in first-seen group order.
+
+```ts
+interface CommandPaletteGroup
+```
+
+### `CommandPaletteItem`
+
+`interface` — One selectable row.
+
+```ts
+interface CommandPaletteItem
+```
+
 ### `ComposedSidebarSessions`
 
 `interface`
@@ -16211,12 +16267,28 @@ interface ComposeSidebarSessionsOptions
 "agent-sidebar-rail-collapsed"
 ```
 
+### `filterCommandPaletteItems`
+
+`function` — Filter + rank: an empty query returns the items untouched (build order is the recency order); a real query drops non-matches and sorts by score, then recency, then original position — stable and dete…
+
+```ts
+(items: readonly CommandPaletteItem[], query: string) => CommandPaletteItem[]
+```
+
 ### `flattenRouteTable`
 
 `function` — Every path pattern the table registers, rooted and de-duplicated.
 
 ```ts
 (table: NavRouteTable) => string[]
+```
+
+### `groupCommandPaletteItems`
+
+`function` — Fold a flat (already ordered) item list into renderable sections.
+
+```ts
+(items: readonly CommandPaletteItem[]) => CommandPaletteGroup[]
 ```
 
 ### `mergeSessionPages`
@@ -16417,6 +16489,14 @@ interface ResolveScopedActiveNavIdOptions
 
 ```ts
 interface ResolveSessionUnreadOptions
+```
+
+### `scoreCommandPaletteItem`
+
+`function` — Score an item: the best label score, or the best keyword score a fixed step below.
+
+```ts
+(item: CommandPaletteItem, query: string) => number | null
 ```
 
 ### `sessionLabel`
@@ -22139,6 +22219,30 @@ interface ChatTurnRequestPayload
 interface ChatUiMessage
 ```
 
+### `CommandPalette`
+
+`function`
+
+```ts
+({ items, onSelect, open: controlledOpen, onOpenChange, hotkey, loading, initialQuery, placeholder, emptyMessage, label…
+```
+
+### `CommandPaletteItem`
+
+`interface` — One selectable row.
+
+```ts
+interface CommandPaletteItem
+```
+
+### `CommandPaletteProps`
+
+`interface`
+
+```ts
+interface CommandPaletteProps
+```
+
 ### `composerAnswerData`
 
 `function` — Shapes composer text into the respond payload for the routed field (select answers are string arrays on the wire; text answers are strings).
@@ -22409,6 +22513,38 @@ ProvenanceConfidencePolicy
 
 ```ts
 (source: ProvenanceSource) => string | null
+```
+
+### `DictationAudio`
+
+`interface` — The audio a finished recording hands to the host.
+
+```ts
+interface DictationAudio
+```
+
+### `DictationControls`
+
+`interface`
+
+```ts
+interface DictationControls
+```
+
+### `dictationErrorMessage`
+
+`function` — The failure as a sentence.
+
+```ts
+(error: unknown) => string
+```
+
+### `diffRecordGridProposal`
+
+`function` — Diff a proposal against the live rows.
+
+```ts
+(rows: readonly RecordGridRow[], proposal: RecordGridProposal) => RecordGridRowDiff[]
 ```
 
 ### `DISPATCH_MAX_MEDIA_PARTS`
@@ -22795,6 +22931,14 @@ interface FlowWaterfallProps
 (durationMs?: number | undefined) => string | null
 ```
 
+### `formatDictationElapsed`
+
+`function` — `0:00`, `0:09`, `1:05`, `60:00` — minutes unbounded, seconds always two digits.
+
+```ts
+(totalSeconds: number) => string
+```
+
 ### `formatInsightDelta`
 
 `function` — The delta as words: direction, magnitude, and the baseline it is measured against.
@@ -22904,7 +23048,7 @@ interface InsightAction
 `function`
 
 ```ts
-({ title, value, unit, previous, polarity, format, series, seriesLabel, description, action, live, liveLabel, className…
+({ eyebrow, title, value, unit, previous, polarity, format, series, seriesLabel, description, action, live, liveLabel,…
 ```
 
 ### `InsightCardProps`
@@ -23571,6 +23715,14 @@ type ParseInteractionResult
 (part: Record<string, unknown>) => ChatInteraction | null
 ```
 
+### `pickDictationMimeType`
+
+`function` — The mime to ask the recorder for, or `undefined` to take the UA default.
+
+```ts
+() => string | undefined
+```
+
 ### `POPOVER_SURFACE_ATTR`
 
 `const` — Marks the portaled panel in the DOM.
@@ -23960,7 +24112,7 @@ interface QuestionOptionListProps
 `function` — The shared editable record table.
 
 ```ts
-({ columns, caption, state, empty, onCreate, onUpdate, onDelete, newRowDefaults, addLabel, locale, toolbar, loadingRowC…
+({ columns, caption, state, empty, onCreate, onUpdate, onDelete, proposed, onAcceptRow, onRejectRow, onAcceptAll, onRej…
 ```
 
 ### `RecordGridBooleanColumn`
@@ -23977,6 +24129,14 @@ interface RecordGridBooleanColumn
 
 ```ts
 interface RecordGridCellChange
+```
+
+### `RecordGridCellDiff`
+
+`interface` — One cell whose proposed value differs from the live one.
+
+```ts
+interface RecordGridCellDiff
 ```
 
 ### `RecordGridCellOutcome`
@@ -24083,6 +24243,14 @@ interface RecordGridNumberColumn
 interface RecordGridOverlay
 ```
 
+### `RecordGridProposal`
+
+`interface` — A proposed change set, diffed against the live rows by {@link diffRecordGridProposal}.
+
+```ts
+interface RecordGridProposal
+```
+
 ### `RecordGridProps`
 
 `interface` — Properties for the editable, provenance-aware record grid.
@@ -24097,6 +24265,22 @@ interface RecordGridProps
 
 ```ts
 interface RecordGridRow
+```
+
+### `RecordGridRowDiff`
+
+`interface` — One row's verdict: what the proposal does to it.
+
+```ts
+interface RecordGridRowDiff
+```
+
+### `RecordGridRowDiffKind`
+
+`type`
+
+```ts
+type RecordGridRowDiffKind
 ```
 
 ### `recordGridRowLabel`
@@ -24403,6 +24587,14 @@ interface SessionPageQuery
 (run: () => Promise<InteractionSubmitResult>, timeoutMs?: number) => Promise<InteractionSubmitResult>
 ```
 
+### `SlashCommand`
+
+`interface` — One `/` command the composer offers.
+
+```ts
+interface SlashCommand
+```
+
 ### `SmoothRevealOptions`
 
 `interface` — Define configuration options for controlling smooth text reveal animation rates
@@ -24649,6 +24841,22 @@ interface UseComposerAttachmentsOptions
 
 ```ts
 interface UseComposerAttachmentsResult
+```
+
+### `useDictation`
+
+`function`
+
+```ts
+({ onDictate, onError }: UseDictationOptions) => DictationControls
+```
+
+### `UseDictationOptions`
+
+`interface`
+
+```ts
+interface UseDictationOptions
 ```
 
 ### `useDurablePlanFlow`

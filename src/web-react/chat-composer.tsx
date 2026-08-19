@@ -36,6 +36,8 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
+  useId,
   useRef,
   useState,
   type ChangeEvent,
@@ -50,6 +52,9 @@ import {
   renamePastedImages,
   type ComposerFileRejection,
 } from './composer-file-accept'
+import { filterCommandPaletteItems, type CommandPaletteItem } from '../session-shell/index'
+import { OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, PopoverSurface } from './controls'
+import { formatDictationElapsed, useDictation, type DictationAudio } from './use-dictation'
 
 // ── glyphs (no icon-library dependency) ───────────────────────────────────
 
@@ -121,6 +126,15 @@ function UploadGlyph({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+    </svg>
+  )
+}
+
+function MicGlyph({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="9" y="2" width="6" height="12" rx="3" />
+      <path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4" />
     </svg>
   )
 }
@@ -234,6 +248,21 @@ export interface ComposerSendFailure {
    *  False means the user had typed a replacement, so the unsent text is held in
    *  the notice instead. */
   restored: boolean
+}
+
+/**
+ * One `/` command the composer offers. Typing `/` at position 0 opens the
+ * command menu; the rest of the token filters it (the same prefix > substring
+ * > token-order ranking as the command palette). Picking a command CLEARS the
+ * token from the draft and calls `run` — what the command does (a route, a
+ * dialog, a draft transformation) is the product's business.
+ */
+export interface SlashCommand {
+  /** Command name without the leading slash: `model`, `clear`. */
+  name: string
+  /** One line of what it does, rendered beside the name. */
+  description: string
+  run: () => void
 }
 
 export interface ChatComposerProps {
@@ -354,6 +383,19 @@ export interface ChatComposerProps {
    *  status line. It sits outside the controls slot and never shrinks, so a
    *  wrapping picker set cannot push it away. */
   trailing?: ReactNode
+  /** `/` commands offered when the draft is exactly a leading slash token.
+   *  Omit (or pass []) and `/` types as ordinary text. */
+  slashCommands?: SlashCommand[]
+  /** Dictation is opt-in: pass `onDictate` and the action row gains a mic
+   *  button (browsers without `MediaRecorder`/`getUserMedia` render none).
+   *  Click starts the capture; the button flips to a stop control with the
+   *  running elapsed seconds; stop hands the recorded audio blob here. The
+   *  composer owns capture only — turning the audio into text (e.g. the
+   *  Whisper provider from `sequences-react`) is the host's. */
+  onDictate?: (audio: DictationAudio) => void
+  /** Capture failures (a denied mic prompt, no device), after the composer has
+   *  shown its own dismissible notice. For hosts that log or track. */
+  onDictateError?: (message: string) => void
 
   /** Cmd/Ctrl+L focuses the input and shows the hint. Default true. */
   focusShortcut?: boolean
@@ -446,6 +488,10 @@ export function ChatComposer({
   minRows = 2,
   maxHeight = DEFAULT_MAX_HEIGHT,
   trailing,
+  slashCommands,
+  onDictate,
+  onDictateError,
+
   focusShortcut = true,
   floating = false,
   sendLabel = 'Send',
@@ -476,6 +522,26 @@ export function ChatComposer({
     },
     [isControlled, onValueChange],
   )
+
+  // Dictation: capture only. The hook reports every failure in words; the
+  // composer shows them in its own dismissible notice (the same shape as a
+  // rejected send) AND forwards them for hosts that log.
+  const [dictateError, setDictateError] = useState<string | null>(null)
+  const handleDictated = useCallback(
+    (audio: DictationAudio) => {
+      setDictateError(null)
+      onDictate?.(audio)
+    },
+    [onDictate],
+  )
+  const handleDictateError = useCallback(
+    (message: string) => {
+      setDictateError(message)
+      onDictateError?.(message)
+    },
+    [onDictateError],
+  )
+  const dictation = useDictation({ onDictate: handleDictated, onError: handleDictateError })
 
   // Keep the textarea height in sync with the content for BOTH typed and
   // external (controlled) value changes — one effect covers both paths. It also
@@ -688,9 +754,101 @@ export function ChatComposer({
     dispatchSend(failure.text, failure.trimmed, failure.parts, caret)
   }, [failedSend, sendBlockedByStream, disabled, dispatchSend])
 
+  // ── '/' commands ─────────────────────────────────────────────────────────
+  // The menu exists only while the WHOLE draft is one leading slash token
+  // (`/`, `/mod`). The first space ends it — arguments are ordinary text. Esc
+  // or an outside click dismisses for the CURRENT token only, so continued
+  // typing reopens the menu instead of leaving it permanently suppressed.
+  const slashPanelRef = useRef<HTMLDivElement>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
+  const slashListId = useId()
+  const [slashActive, setSlashActive] = useState(0)
+  const [slashDismissedFor, setSlashDismissedFor] = useState<string | null>(null)
+  const slashToken =
+    slashCommands && slashCommands.length > 0 ? /^\/(\S*)$/.exec(text)?.[1] : undefined
+  const slashOpen = slashToken !== undefined && text !== slashDismissedFor
+  const slashItems = useMemo<CommandPaletteItem[]>(
+    () =>
+      (slashCommands ?? []).map((command) => ({
+        id: command.name,
+        group: 'Commands',
+        label: `/${command.name}`,
+        description: command.description,
+        keywords: [command.name, command.description],
+      })),
+    [slashCommands],
+  )
+  const slashFiltered = useMemo(
+    () => (slashToken === undefined ? [] : filterCommandPaletteItems(slashItems, slashToken)),
+    [slashItems, slashToken],
+  )
+  const slashActiveIndex = slashFiltered.length === 0 ? 0 : Math.min(slashActive, slashFiltered.length - 1)
+
+  useEffect(() => {
+    setSlashActive(0)
+  }, [slashToken])
+
+  useEffect(() => {
+    if (!slashOpen) return
+    document
+      .getElementById(`${slashListId}-${slashActiveIndex}`)
+      ?.scrollIntoView?.({ block: 'nearest' })
+  }, [slashOpen, slashActiveIndex, slashListId])
+
+  useEffect(() => {
+    if (!slashOpen) return
+    function onMouseDown(e: MouseEvent) {
+      const target = e.target as Node
+      if (cardRef.current?.contains(target)) return
+      if (slashPanelRef.current?.contains(target)) return
+      setSlashDismissedFor(textRef.current)
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    return () => document.removeEventListener('mousedown', onMouseDown)
+  }, [slashOpen])
+
+  const pickSlash = useCallback(
+    (name: string) => {
+      const command = slashCommands?.find((c) => c.name === name)
+      // The draft IS the slash token (the menu only opens while it is), so the
+      // pick consumes it: clear the box, then run.
+      setText('')
+      setSlashDismissedFor(null)
+      command?.run()
+    },
+    [slashCommands, setText],
+  )
+
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // Respect IME composition — Enter commits the candidate, it doesn't send.
     if (e.nativeEvent.isComposing) return
+    if (slashOpen) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        if (slashFiltered.length > 0) setSlashActive((slashActiveIndex + 1) % slashFiltered.length)
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        if (slashFiltered.length > 0)
+          setSlashActive((slashActiveIndex - 1 + slashFiltered.length) % slashFiltered.length)
+        return
+      }
+      if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
+        const item = slashFiltered[slashActiveIndex]
+        if (item) {
+          e.preventDefault()
+          pickSlash(item.id)
+          return
+        }
+        // No command matched — fall through and let Enter send the raw text.
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setSlashDismissedFor(text)
+        return
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       send()
@@ -818,6 +976,24 @@ export function ChatComposer({
       )}
 
       {showAbove && <div className="mb-1.5 flex flex-wrap items-center gap-1.5 px-1">{controls}</div>}
+
+      {dictateError && (
+        <div
+          role="alert"
+          data-testid="composer-dictate-error"
+          className="mb-2 flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+        >
+          <span className="min-w-0 flex-1">{dictateError}</span>
+          <button
+            type="button"
+            aria-label="Dismiss dictation error"
+            onClick={() => setDictateError(null)}
+            className="shrink-0 font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {failedSend && (
         <div
@@ -952,6 +1128,7 @@ export function ChatComposer({
           line with the buttons, which is what squeezed the input and pushed the
           controls out of the card in the first place. */}
       <div
+        ref={cardRef}
         data-testid="composer-card"
         className={`flex flex-col gap-1.5 rounded-2xl border border-card-edge bg-card px-3 py-2.5 transition focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15 ${
           floating ? 'shadow-raised' : ''
@@ -1046,6 +1223,49 @@ export function ChatComposer({
               {trailing}
             </div>
           )}
+          {/* Dictation sits beside Send: it produces input, like typing. The
+              button renders only when the host takes audio AND the browser can
+              record — a dead mic is worse than no mic. While recording, the
+              elapsed seconds (not the pulsing dot, which reduced motion
+              collapses) are the signal, and the stop control is never
+              disabled: a `disabled` flip mid-capture must not strand the mic. */}
+          {onDictate && dictation.supported ? (
+            dictation.recording ? (
+              <div className="flex shrink-0 items-center gap-1.5">
+                <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-destructive" />
+                <span
+                  aria-hidden="true"
+                  data-testid="composer-dictate-elapsed"
+                  className="text-xs tabular-nums text-muted-foreground"
+                >
+                  {formatDictationElapsed(dictation.elapsedSeconds)}
+                </span>
+                <span role="status" className="sr-only">
+                  Recording
+                </span>
+                <button
+                  type="button"
+                  onClick={dictation.stop}
+                  aria-label="Stop dictation"
+                  title="Stop dictation"
+                  className="shrink-0 rounded-lg p-2 text-destructive transition hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <StopGlyph className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={dictation.start}
+                disabled={disabled}
+                aria-label="Dictate message"
+                title="Dictate message"
+                className="shrink-0 rounded-lg p-2 text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <MicGlyph className="h-4 w-4" />
+              </button>
+            )
+          ) : null}
 
           {isStreaming ? (
             sendVariant === 'icon' ? (
@@ -1094,6 +1314,42 @@ export function ChatComposer({
           )}
         </div>
       </div>
+
+      {/* The slash menu ports through PopoverSurface like every canonical
+          popover: the composer docks inside horizontally scrolling rails, and
+          an in-place panel there is a panel the host clips away. It anchors
+          to the textarea and opens above. Focus never leaves the input —
+          rows are mousedown-swallowed so a click can't blur it. */}
+      <PopoverSurface
+        open={slashOpen}
+        id={slashListId}
+        role="listbox"
+        triggerRef={textareaRef}
+        panelRef={slashPanelRef}
+        className={`w-80 overflow-y-auto rounded-xl border border-card-edge bg-popover p-1 ${OVERLAY_SHADOW}`}
+      >
+        {slashFiltered.length === 0 && (
+          <div className="px-3 py-4 text-center text-sm text-muted-foreground">No matching commands</div>
+        )}
+        {slashFiltered.map((item, index) => (
+          <button
+            key={item.id}
+            type="button"
+            role="option"
+            aria-selected={index === slashActiveIndex}
+            id={`${slashListId}-${index}`}
+            onMouseDown={(e) => e.preventDefault()}
+            onMouseMove={() => setSlashActive(index)}
+            onClick={() => pickSlash(item.id)}
+            className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
+              index === slashActiveIndex ? 'bg-accent' : 'hover:bg-accent'
+            }`}
+          >
+            <span className="shrink-0 font-medium text-foreground">{item.label}</span>
+            <span className="truncate text-xs text-muted-foreground">{item.description}</span>
+          </button>
+        ))}
+      </PopoverSurface>
 
       {focusShortcut && (
         <div className="mt-1.5 flex justify-end px-1">
