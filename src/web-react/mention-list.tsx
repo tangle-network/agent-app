@@ -49,11 +49,21 @@ export const MentionList = forwardRef<MentionListHandle, MentionListProps>(
     const selectedRef = useRef(0)
     const onActiveChangeRef = useRef(onActiveChange)
     onActiveChangeRef.current = onActiveChange
+    // One entry per rendered row, so the highlight can be scrolled into view
+    // from an effect (once per highlight move) instead of a ref callback
+    // (which re-fires on every re-render of the row).
+    const optionRefs = useRef<Array<HTMLButtonElement | null>>([])
     const move = (next: number) => {
       selectedRef.current = next
       setSelected(next)
       onActiveChangeRef.current?.(next)
     }
+
+    // Keyboard navigation must keep the highlight visible inside the panel's
+    // own scroll (`max-h-64 overflow-y-auto`).
+    useEffect(() => {
+      optionRefs.current[selected]?.scrollIntoView({ block: 'nearest' })
+    }, [selected, items])
 
     // A new result set re-homes the highlight to the top.
     useEffect(() => {
@@ -134,10 +144,8 @@ export const MentionList = forwardRef<MentionListHandle, MentionListProps>(
                 id={id ? `${id}-opt-${index}` : undefined}
                 role="option"
                 aria-selected={active}
-                // Keyboard navigation must keep the highlight visible inside
-                // the panel's own scroll (`max-h-64 overflow-y-auto`).
                 ref={(el) => {
-                  if (active) el?.scrollIntoView?.({ block: 'nearest' })
+                  optionRefs.current[index] = el
                 }}
                 // Pointer down only PREVENTS the focus steal (a blur would
                 // tear down the suggestion mid-select); selection happens on
