@@ -45,8 +45,16 @@ export interface TiptapModules {
 const PEERS_MISSING_MESSAGE =
   'ChatComposer `mention` needs the @tiptap/* optional peers — install @tiptap/core, @tiptap/extension-mention, @tiptap/pm, @tiptap/react, @tiptap/starter-kit and @tiptap/suggestion (>=3.28.0 <4.0.0; @tiptap/suggestion also peers on @floating-ui/dom)'
 
-/** Resolve the five optional peers, or throw naming every one of them. */
+/** The rejection shapes bundlers produce for an UNINSTALLED module. Only
+ *  these get enriched with the install-set message — a transient chunk-fetch
+ *  failure must surface its own cause, or Retry sits next to a misleading
+ *  "install the peers" diagnosis. An unmatched resolution error still fails
+ *  loud with its raw message, so the classifier can only under-enrich. */
+const RESOLUTION_FAILURE = /could not resolve|cannot find module|failed to resolve/i
+
+/** Resolve the optional peers, or throw naming every one of them. */
 export async function loadTiptapModules(): Promise<TiptapModules> {
+  let modules: TiptapModules
   try {
     const [core, extensionMention, react, starterKit, suggestion] = await Promise.all([
       import('@tiptap/core'),
@@ -55,10 +63,28 @@ export async function loadTiptapModules(): Promise<TiptapModules> {
       import('@tiptap/starter-kit'),
       import('@tiptap/suggestion'),
     ])
-    return { core, extensionMention, react, starterKit, suggestion }
+    modules = { core, extensionMention, react, starterKit, suggestion }
   } catch (error) {
-    throw new Error(PEERS_MISSING_MESSAGE, { cause: error })
+    if (error instanceof Error && RESOLUTION_FAILURE.test(error.message)) {
+      throw new Error(PEERS_MISSING_MESSAGE, { cause: error })
+    }
+    throw error
   }
+  // A CommonJS-in-production bundler stubs a missing optional peer as a
+  // SILENT empty namespace rather than a throwing module. Validate the
+  // members the editor actually calls, so that shape still fails loud with
+  // the peers named instead of as an undefined-property crash mid-render.
+  if (
+    typeof modules.core.mergeAttributes !== 'function' ||
+    typeof modules.react.useEditor !== 'function' ||
+    modules.react.EditorContent === undefined ||
+    modules.extensionMention.default === undefined ||
+    modules.starterKit.default === undefined ||
+    typeof modules.suggestion.exitSuggestion !== 'function'
+  ) {
+    throw new Error(PEERS_MISSING_MESSAGE)
+  }
+  return modules
 }
 
 export interface MentionEditorProps {
