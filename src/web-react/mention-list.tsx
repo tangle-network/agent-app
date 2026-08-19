@@ -65,8 +65,10 @@ export const MentionList = forwardRef<MentionListHandle, MentionListProps>(
             case 'Enter':
             case 'Tab':
               // Consume regardless of results so the message never submits
-              // while the popover is open.
-              if (count > 0) onSelect(items[selectedRef.current]!)
+              // while the popover is open. Clamp the index: a shrunken result
+              // set re-homes the highlight in an effect, and a key can arrive
+              // before that effect commits.
+              if (count > 0) onSelect(items[Math.min(selectedRef.current, count - 1)]!)
               return true
             default:
               return false

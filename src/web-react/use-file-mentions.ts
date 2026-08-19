@@ -38,7 +38,8 @@ export interface MentionItem {
  *  value straight into it. Structurally identical to sandbox-ui#184's
  *  `AgentComposerProps['mention']`, so it also drives `AgentComposer`. */
 export interface ComposerMentionProp {
-  /** The character that opens the popover. Default "@". */
+  /** The character that opens the popover. Default "@". Read once when the
+   *  editor mounts — a runtime change does not re-key the editor. */
   trigger?: string
   /** Async provider called with the query typed after the trigger. */
   fetchItems(query: string): Promise<MentionItem[]>
