@@ -4,6 +4,7 @@
     "src/**/*.stories.{ts,tsx}",
     "src/**/*.test.{ts,tsx}",
     "src/stories/fixtures/**/*.ts",
+    "src/stories/studio/fixtures.ts",
     "src/app-auth/index.ts",
     "src/assets/index.ts",
     "src/assistant/index.ts",

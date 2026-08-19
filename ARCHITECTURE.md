@@ -74,8 +74,8 @@ The only layers that pull React and heavy UI libs. `web-react` →
 harness/missions/runtime/trace *(chat shell + observability; `react`)* ·
 `design-canvas-react` → design-canvas/theme *(`konva`, `react-konva`)* ·
 `sequences-react` → sequences *(`react`; lazy `@huggingface/transformers` for
-transcription)* · `studio-react` → studio *(`lucide-react`, `react-router`,
-`@radix-ui/react-dialog`, `sandbox-ui`)* · `intakes-react` · `teams-react` ·
+transcription)* · `studio-react` → studio *(`react`, `lucide-react`,
+`react-router`)* · `intakes-react` · `teams-react` ·
 `openui-react` → openui *(`react` only — the renderer stays the product's own
 import, so this forces no UI peer)* ·
 `vault` · `theme`/`styles`/`tailwind-preset` *(design tokens — the single source
@@ -83,8 +83,8 @@ every surface reads)*.
 
 **Heavy libs are localized** (and declared `optional` in peers, so a backend
 consumer of L0/L1 installs none of them): `konva`/`react-konva` → only
-`design-canvas-react`; `react-router`/`lucide-react`/`react-dialog` → only
-`studio-react`; `drizzle-orm` → only the L2 data modules + `preset-cloudflare`.
+`design-canvas-react`; `react-router`/`lucide-react` → only `studio-react`;
+`drizzle-orm` → only the L2 data modules + `preset-cloudflare`.
 
 ## Where do I add X?
 

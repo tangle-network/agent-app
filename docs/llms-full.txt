@@ -18617,84 +18617,12 @@ Source: `src/studio-react/index.tsx` · depends on `studio`, `web-react`
 type ComposerType
 ```
 
-### `filterGenerations`
-
-`function` — The visible set for the active type tab (all generations when unfiltered).
-
-```ts
-(generations: Generation[], typeFilter: string | null) => Generation[]
-```
-
-### `GenerationCard`
-
-`function`
-
-```ts
-({ generation, onSelect, }: { generation: Generation; onSelect: (generation: Generation) => void; }) => Element
-```
-
-### `GenerationDetail`
-
-`function`
-
-```ts
-({ generation, vaultHref, onNavigate, }: { generation: Generation; vaultHref?: ((filePath?: string | null | undefined)…
-```
-
-### `GenerationDetailModal`
-
-`function` — Centered detail view for a single generation.
-
-```ts
-({ generation, vaultHref, onClose, }: { generation: Generation | null; vaultHref?: ((filePath?: string | null | undefin…
-```
-
-### `GenerationGrid`
-
-`function` — Chrome-less asset grid — the `GenerationCard` grid plus its empty state, with no surrounding tabs/stats/sheet chrome.
-
-```ts
-({ generations, typeFilter, onSelect, }: { generations: Generation[]; typeFilter: string | null; onSelect: (generation:…
-```
-
 ### `GenerationNoticeChip`
 
 `function` — The one thing a chat-shaped generator has to say about itself: each prompt is a fresh generation, and nothing carries over from the last one.
 
 ```ts
 ({ className }: { className?: string | undefined; }) => Element
-```
-
-### `GenerationStatusBadge`
-
-`function`
-
-```ts
-({ generation, inline, }: { generation: Generation; inline?: boolean | undefined; }) => Element | null
-```
-
-### `LibraryDrawer`
-
-`function`
-
-```ts
-({ open, onOpenChange, generations, totalCost, typeFilter, onFilterChange, vaultHref, selected, onSelect, }: { open: bo…
-```
-
-### `LibraryPanel`
-
-`function` — Inline asset gallery — the same filter + stats + card grid as the library drawer's list view, but with no sheet chrome so it can sit on the page beside the composer.
-
-```ts
-({ generations, totalCost, typeFilter, onFilterChange, onSelect, }: { generations: Generation[]; totalCost: number; typ…
-```
-
-### `ResultCanvas`
-
-`function`
-
-```ts
-({ batch, onOpenLibrary, onSelect, }: { batch: Generation[]; onOpenLibrary: () => void; onSelect: (generation: Generati…
 ```
 
 ### `StudioComposer`
@@ -18711,70 +18639,6 @@ type ComposerType
 
 ```ts
 interface StudioComposerProps
-```
-
-### `StudioHeader`
-
-`function`
-
-```ts
-({ count, onOpenLibrary, canGenerate, }: { count: number; onOpenLibrary: () => void; canGenerate: boolean; }) => Element
-```
-
-### `StudioRole`
-
-`type`
-
-```ts
-type StudioRole
-```
-
-### `StudioSheet`
-
-`function` — Right-side overlay sheet built on Radix Dialog — gives focus-trap, scroll-lock, and Escape-to-close for free.
-
-```ts
-({ open, onOpenChange, title, children, }: { open: boolean; onOpenChange: (open: boolean) => void; title: string; child…
-```
-
-### `StudioWorkspace`
-
-`function` — The full studio surface: header + composer + result canvas + library drawer, with the generation orchestrator (merge/poll/revalidate) wired in.
-
-```ts
-({ generations, totalCost, workspaceId, role, generationsEndpoint, vaultHref, }: StudioWorkspaceProps) => Element
-```
-
-### `StudioWorkspaceProps`
-
-`interface`
-
-```ts
-interface StudioWorkspaceProps
-```
-
-### `TYPE_CONFIG`
-
-`const` — Map type keys to their corresponding configuration objects including labels, icons, and colors
-
-```ts
-Record<string, TypeConfig>
-```
-
-### `TypeConfig`
-
-`interface` — Define configuration options for a type including label, icon, and color properties
-
-```ts
-interface TypeConfig
-```
-
-### `typeConfigFor`
-
-`function` — Resolve the configuration object for a given type or return the default image configuration
-
-```ts
-(type: string) => TypeConfig
 ```
 
 ### `useStudioGenerations`

@@ -21,8 +21,7 @@ const TEASER_TILE_B = svgTile('#10b981', '#064e3b', 'teaser-b.png')
 const TEASER_TILE_C = svgTile('#ec4899', '#831843', 'teaser-c.png')
 const TEASER_TILE_D = svgTile('#8b5cf6', '#312e81', 'teaser-d.png')
 
-/** Base row: a succeeded image that persisted to the vault. Mirrors the
- *  `makeGeneration` factory in studio-react/generation-detail.test.tsx. */
+/** Base row: a succeeded image that persisted to the vault. */
 function makeGeneration(overrides: Partial<Generation> = {}): Generation {
   return {
     id: 'gen-poster',
@@ -221,6 +220,6 @@ export const libraryGenerations: Generation[] = [
 
 export const libraryTotalCost = 1.87
 
-/** Mirrors StudioWorkspace's default vaultHref (see generation-detail.test.tsx). */
+/** Demo story route for opening a persisted generation in the vault. */
 export const demoVaultHref = (filePath?: string | null) =>
   filePath ? `/app/ws-demo/vault?file=${encodeURIComponent(filePath)}` : '/app/ws-demo/vault'

@@ -730,7 +730,6 @@ describe('no status-palette literals outside the allowlist', () => {
   const ALLOW = [
     'sequences-react/components/TimelineClipChip.tsx', // video/audio/agent kind-coding
     'design-canvas-react/components/BleedTrimOverlay.tsx', // print bleed (red convention)
-    'studio-react/type-config.ts', // media-type kind-coding (image/video/avatar/speech/transcription)
   ]
   const PALETTE = /(text|bg|border|ring|fill|stroke)-(rose|amber|emerald|green|red|yellow|lime|orange)-[0-9]/
 
