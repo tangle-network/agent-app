@@ -91,8 +91,9 @@ That second row is why autonomous and detached runs were invisible to a browser.
 New conversational products use `@tangle-network/agent-app/workspace-react` for
 the outer workspace and expandable session rail.
 
-They pair it with `EntryComposer` from `/chat-react` for the new-session route
-and `SessionHistoryPanel` from `/web-react` for the full history route.
+They pair it with `EntryComposer` from `/web-react` (also re-exported from
+`/chat-react` for compatibility) for the new-session route and
+`SessionHistoryPanel` from `/web-react` for the full history route.
 
 `EntryComposer` is the capability-driven default: pass the real backend,
 model, and thinking selections through `agent` (the canonical

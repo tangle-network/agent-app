@@ -1087,8 +1087,6 @@
       "id": "./chat-react",
       "source": "src/chat-react/index.tsx",
       "dependsOn": [
-        "chat-routes",
-        "runtime",
         "web-react"
       ],
       "error": null,
@@ -17523,6 +17521,24 @@
           "doc": "`ChatComposer`'s `mention` prop shape — plug the hook's `mention` return value straight into it."
         },
         {
+          "name": "ComposerModeControls",
+          "kind": "function",
+          "signature": "({ planMode }: ComposerModeControlsProps) => Element | null",
+          "doc": "The shared plan-mode toggle for the left side of an agent composer."
+        },
+        {
+          "name": "ComposerModeControlsProps",
+          "kind": "interface",
+          "signature": "interface ComposerModeControlsProps",
+          "doc": null
+        },
+        {
+          "name": "ComposerPlanModeSelection",
+          "kind": "interface",
+          "signature": "interface ComposerPlanModeSelection",
+          "doc": "The plan-mode toggle state an entry surface docks beside the composer."
+        },
+        {
           "name": "ComposerSendFailure",
           "kind": "interface",
           "signature": "interface ComposerSendFailure",
@@ -17875,6 +17891,18 @@
           "kind": "const",
           "signature": "RecordGridOverlay",
           "doc": "An overlay holding nothing."
+        },
+        {
+          "name": "EntryComposer",
+          "kind": "function",
+          "signature": "({ heading, subheading, placeholder, initialValue, sendLabel, disabled, agent, modes, planMode, uploadUrl, accept, onAt…",
+          "doc": "`EntryComposer` — the centered \"what do you want to work on?\" surface a product shows before a conversation exists (a new thread, an empty session, a workspace overview)."
+        },
+        {
+          "name": "EntryComposerProps",
+          "kind": "interface",
+          "signature": "interface EntryComposerProps",
+          "doc": null
         },
         {
           "name": "EvidenceLineageTable",

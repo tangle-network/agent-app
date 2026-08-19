@@ -10,8 +10,8 @@ Staff architecture doc. Status: proposal. Owner: agent-app maintainers. Consumer
 
 For the browser surface, the same rule now applies to the chat-first workspace:
 use `@tangle-network/agent-app/workspace-react` for the outer layout and session
-rail, `@tangle-network/agent-app/chat-react` for the new-session composer, and
-`@tangle-network/agent-app/web-react` for the full history view.
+rail, `EntryComposer` from `@tangle-network/agent-app/web-react` for the
+new-session composer, and the same subpath for the full history view.
 Products keep their navigation taxonomy, routes, storage, and domain content.
 Workflow-first and queue-first products may omit the session rail when it would
 conflict with the product's primary job.
