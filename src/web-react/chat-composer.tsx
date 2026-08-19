@@ -90,13 +90,26 @@ function createLazyMentionEditor() {
  * fails loudly again.
  */
 class MentionEditorBoundary extends Component<
-  { onRetry: () => void; children: ReactNode },
+  {
+    onRetry: () => void
+    /** Reported once per failure so the composer can gate Send — a draft the
+     *  user can no longer see or edit must not stay dispatchable. */
+    onFailed: () => void
+    /** The current draft, shown read-only in the error state so its content
+     *  is never invisible while it exists. */
+    draft: string
+    children: ReactNode
+  },
   { error: unknown | null }
 > {
   state: { error: unknown | null } = { error: null }
 
   static getDerivedStateFromError(error: unknown) {
     return { error }
+  }
+
+  componentDidCatch() {
+    this.props.onFailed()
   }
 
   render() {
@@ -107,17 +120,27 @@ class MentionEditorBoundary extends Component<
       <div
         role="alert"
         data-testid="composer-mention-editor-error"
-        className="flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+        className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
       >
-        <span className="min-w-0 flex-1">The mention input failed to load: {message}</span>
-        <button
-          type="button"
-          aria-label="Retry loading the mention input"
-          onClick={this.props.onRetry}
-          className="shrink-0 font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
-        >
-          Retry
-        </button>
+        <div className="flex items-start gap-2">
+          <span className="min-w-0 flex-1">The mention input failed to load: {message}</span>
+          <button
+            type="button"
+            aria-label="Retry loading the mention input"
+            onClick={this.props.onRetry}
+            className="shrink-0 font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
+          >
+            Retry
+          </button>
+        </div>
+        {this.props.draft.trim() !== '' && (
+          <p
+            data-testid="composer-error-held-draft"
+            className="mt-1.5 max-h-20 overflow-y-auto whitespace-pre-wrap rounded-lg border border-destructive/30 bg-card px-2 py-1 text-foreground"
+          >
+            {this.props.draft}
+          </p>
+        )}
       </div>
     )
   }
@@ -606,6 +629,10 @@ export function ChatComposer({
   // its error state clears.
   const [editorEpoch, setEditorEpoch] = useState(0)
   const MentionEditor = useMemo(createLazyMentionEditor, [editorEpoch])
+  // While the mention editor is failed, the draft is visible only in the
+  // boundary's read-only block — Send must not dispatch what the user cannot
+  // edit.
+  const [editorFailed, setEditorFailed] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -744,7 +771,8 @@ export function ChatComposer({
   // shows Stop while streaming, so `canSubmitWhileBusy` opens Enter, not a
   // second visible control.
   const sendBlockedByStream = isStreaming && !canSubmitWhileBusy
-  const canSend = hasSendable && !sendBlockedByStream && !disabled
+  const editorInputLost = mention != null && editorFailed
+  const canSend = hasSendable && !sendBlockedByStream && !disabled && !editorInputLost
 
   const [failedSend, setFailedSend] = useState<FailedSend | null>(null)
 
@@ -803,7 +831,7 @@ export function ChatComposer({
 
   const send = useCallback(() => {
     const trimmed = text.trim()
-    if (sendBlockedByStream || disabled) return
+    if (sendBlockedByStream || disabled || editorInputLost) return
     const readyFiles = pendingFiles.filter((f) => f.status === 'ready')
     const sendable = canSubmitAttachmentsOnly ? pendingFiles : readyFiles
     if (!trimmed && sendable.length === 0) return
@@ -838,6 +866,7 @@ export function ChatComposer({
     text,
     sendBlockedByStream,
     disabled,
+    editorInputLost,
     canSubmitAttachmentsOnly,
     attachmentsNotReadyMessage,
     onSendParts,
@@ -1257,7 +1286,12 @@ export function ChatComposer({
           // host's region.
           <MentionEditorBoundary
             key={editorEpoch}
-            onRetry={() => setEditorEpoch((epoch) => epoch + 1)}
+            onRetry={() => {
+              setEditorFailed(false)
+              setEditorEpoch((epoch) => epoch + 1)
+            }}
+            onFailed={() => setEditorFailed(true)}
+            draft={text}
           >
             <Suspense
               fallback={
