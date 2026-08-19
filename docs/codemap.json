@@ -14107,24 +14107,6 @@
           "doc": "Build the request body object for a generation operation from provided fields"
         },
         {
-          "name": "buildPublishPackage",
-          "kind": "function",
-          "signature": "({ caption, postDescription, mentions, cadence, destinations, }: { caption: string; postDescription: string; mentions:…",
-          "doc": "Build a PublishPackage object from caption, description, mentions, cadence, and destinations inputs"
-        },
-        {
-          "name": "CADENCES",
-          "kind": "const",
-          "signature": "string[]",
-          "doc": "Provide an array of predefined cadence options for scheduling or approval processes"
-        },
-        {
-          "name": "DESTINATIONS",
-          "kind": "const",
-          "signature": "PublishDestination[]",
-          "doc": "List available social media platforms with their publishing fields and provider identifiers"
-        },
-        {
           "name": "failedOptimisticGeneration",
           "kind": "function",
           "signature": "(generation: Generation) => Generation",
@@ -14203,12 +14185,6 @@
           "doc": "Provide a validation pattern for the free-form image size field (WxH or auto)"
         },
         {
-          "name": "isDestinationConnected",
-          "kind": "function",
-          "signature": "(destination: PublishDestination, connections: StudioIntegrationConnection[]) => boolean",
-          "doc": "Determine if a destination has any active connections in the given list of studio integration connections"
-        },
-        {
           "name": "isGenerationType",
           "kind": "function",
           "signature": "(value: string) => value is GenerationType",
@@ -14219,12 +14195,6 @@
           "kind": "function",
           "signature": "(generation: Generation) => boolean",
           "doc": "Determine if a generation ID indicates a local generation"
-        },
-        {
-          "name": "isPublishPackage",
-          "kind": "function",
-          "signature": "(value: unknown) => value is { caption?: string | undefined; description?: string | undefined; mentions?: string[] | un…",
-          "doc": "Determine if a value conforms to the PublishPackage structure with optional metadata fields"
         },
         {
           "name": "latestBatchOf",
@@ -14305,18 +14275,6 @@
           "doc": "Resolve the preferred model ID for a given generation type from the media model catalog"
         },
         {
-          "name": "PublishDestination",
-          "kind": "interface",
-          "signature": "interface PublishDestination",
-          "doc": "Define a destination for publishing content with identifiers, label, provider IDs, and fields"
-        },
-        {
-          "name": "PublishPackage",
-          "kind": "interface",
-          "signature": "interface PublishPackage",
-          "doc": "Define the structure for configuring package publishing details and evaluation criteria"
-        },
-        {
           "name": "relativeTime",
           "kind": "function",
           "signature": "(date: Date | null) => string",
@@ -14327,12 +14285,6 @@
           "kind": "function",
           "signature": "(current: Partial<Record<GenerationType, string>>, catalog: MediaModelCatalogResponse) => Partial<Record<GenerationType…",
           "doc": "Resolve selected models by applying defaults for missing or unavailable entries in the catalog"
-        },
-        {
-          "name": "StudioIntegrationConnection",
-          "kind": "interface",
-          "signature": "interface StudioIntegrationConnection",
-          "doc": "Define the structure for a studio integration connection with status and provider identifiers"
         },
         {
           "name": "userSafeGenerationMessage",
@@ -14384,7 +14336,7 @@
         {
           "name": "ComposerHero",
           "kind": "function",
-          "signature": "({ workspaceId, integrationsHref, canManageIntegrations, align, surfaceClassName, onGenerated, }: { workspaceId?: strin…",
+          "signature": "({ workspaceId, align, surfaceClassName, onGenerated, }: { workspaceId?: string | undefined; align?: \"center\" | \"start\"…",
           "doc": null
         },
         {
@@ -14454,12 +14406,6 @@
           "doc": null
         },
         {
-          "name": "PublishPackageComposer",
-          "kind": "function",
-          "signature": "({ caption, postDescription, mentions, cadence, selectedDestinations, connections, connectionError, connectionsLoading,…",
-          "doc": null
-        },
-        {
           "name": "ResultCanvas",
           "kind": "function",
           "signature": "({ batch, onOpenLibrary, onSelect, }: { batch: Generation[]; onOpenLibrary: () => void; onSelect: (generation: Generati…",
@@ -14498,7 +14444,7 @@
         {
           "name": "StudioWorkspace",
           "kind": "function",
-          "signature": "({ generations, totalCost, workspaceId, role, generationsEndpoint, vaultHref, integrationsHref, }: StudioWorkspaceProps…",
+          "signature": "({ generations, totalCost, workspaceId, role, generationsEndpoint, vaultHref, }: StudioWorkspaceProps) => Element",
           "doc": "The full studio surface: header + composer + result canvas + library drawer, with the generation orchestrator (merge/poll/revalidate) wired in."
         },
         {

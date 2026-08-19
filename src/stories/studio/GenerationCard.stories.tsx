@@ -3,7 +3,6 @@ import { GenerationCard } from '../../studio-react'
 import {
   avatarGeneration,
   failedGeneration,
-  publishPackageGeneration,
   queuedGeneration,
   runningGeneration,
   speechGeneration,
@@ -48,12 +47,6 @@ export const Failed: Story = {
   args: { generation: failedGeneration },
 }
 
-/** A staged publish package renders the destinations + caption box. */
-export const WithPublishPackage: Story = {
-  name: 'With publish package',
-  args: { generation: publishPackageGeneration },
-}
-
 /** Every media tile variant and status side by side. */
 export const AllStates: Story = {
   name: 'All types & statuses',
@@ -78,7 +71,6 @@ export const AllStates: Story = {
         queuedGeneration,
         runningGeneration,
         failedGeneration,
-        publishPackageGeneration,
       ].map((generation) => (
         <GenerationCard
           key={generation.id}

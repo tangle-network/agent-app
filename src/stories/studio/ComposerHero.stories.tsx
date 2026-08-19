@@ -19,7 +19,6 @@ const meta: Meta<typeof ComposerHero> = {
     ),
   ],
   args: {
-    canManageIntegrations: true,
     onGenerated: (generation) => console.log('onGenerated', generation.id),
   },
 }

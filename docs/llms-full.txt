@@ -18260,30 +18260,6 @@ Source: `src/studio/index.ts`
 (fields: GenerationRequestFields) => Record<string, unknown>
 ```
 
-### `buildPublishPackage`
-
-`function` — Build a PublishPackage object from caption, description, mentions, cadence, and destinations inputs
-
-```ts
-({ caption, postDescription, mentions, cadence, destinations, }: { caption: string; postDescription: string; mentions:…
-```
-
-### `CADENCES`
-
-`const` — Provide an array of predefined cadence options for scheduling or approval processes
-
-```ts
-string[]
-```
-
-### `DESTINATIONS`
-
-`const` — List available social media platforms with their publishing fields and provider identifiers
-
-```ts
-PublishDestination[]
-```
-
 ### `failedOptimisticGeneration`
 
 `function` — Mark a generation as failed with updated status and error information
@@ -18388,14 +18364,6 @@ readonly ["low", "medium", "high", "auto"]
 string
 ```
 
-### `isDestinationConnected`
-
-`function` — Determine if a destination has any active connections in the given list of studio integration connections
-
-```ts
-(destination: PublishDestination, connections: StudioIntegrationConnection[]) => boolean
-```
-
 ### `isGenerationType`
 
 `function` — Resolve whether a string value matches a valid GenerationType
@@ -18410,14 +18378,6 @@ string
 
 ```ts
 (generation: Generation) => boolean
-```
-
-### `isPublishPackage`
-
-`function` — Determine if a value conforms to the PublishPackage structure with optional metadata fields
-
-```ts
-(value: unknown) => value is { caption?: string | undefined; description?: string | undefined; mentions?: string[] | un…
 ```
 
 ### `latestBatchOf`
@@ -18524,22 +18484,6 @@ type MediaModelStatus
 (type: GenerationType, catalog: MediaModelCatalogResponse | null) => string | undefined
 ```
 
-### `PublishDestination`
-
-`interface` — Define a destination for publishing content with identifiers, label, provider IDs, and fields
-
-```ts
-interface PublishDestination
-```
-
-### `PublishPackage`
-
-`interface` — Define the structure for configuring package publishing details and evaluation criteria
-
-```ts
-interface PublishPackage
-```
-
 ### `relativeTime`
 
 `function` — Resolve a human-readable relative time string from a given date or return an empty string if null
@@ -18554,14 +18498,6 @@ interface PublishPackage
 
 ```ts
 (current: Partial<Record<GenerationType, string>>, catalog: MediaModelCatalogResponse) => Partial<Record<GenerationType…
-```
-
-### `StudioIntegrationConnection`
-
-`interface` — Define the structure for a studio integration connection with status and provider identifiers
-
-```ts
-interface StudioIntegrationConnection
 ```
 
 ### `userSafeGenerationMessage`
@@ -18622,7 +18558,7 @@ Source: `src/studio-react/index.tsx` · depends on `studio`, `web-react`
 `function`
 
 ```ts
-({ workspaceId, integrationsHref, canManageIntegrations, align, surfaceClassName, onGenerated, }: { workspaceId?: strin…
+({ workspaceId, align, surfaceClassName, onGenerated, }: { workspaceId?: string | undefined; align?: "center" | "start"…
 ```
 
 ### `Field`
@@ -18713,14 +18649,6 @@ Source: `src/studio-react/index.tsx` · depends on `studio`, `web-react`
 (props: SelectHTMLAttributes<HTMLSelectElement>) => Element
 ```
 
-### `PublishPackageComposer`
-
-`function`
-
-```ts
-({ caption, postDescription, mentions, cadence, selectedDestinations, connections, connectionError, connectionsLoading,…
-```
-
 ### `ResultCanvas`
 
 `function`
@@ -18774,7 +18702,7 @@ type StudioRole
 `function` — The full studio surface: header + composer + result canvas + library drawer, with the generation orchestrator (merge/poll/revalidate) wired in.
 
 ```ts
-({ generations, totalCost, workspaceId, role, generationsEndpoint, vaultHref, integrationsHref, }: StudioWorkspaceProps…
+({ generations, totalCost, workspaceId, role, generationsEndpoint, vaultHref, }: StudioWorkspaceProps) => Element
 ```
 
 ### `StudioWorkspaceProps`

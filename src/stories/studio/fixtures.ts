@@ -1,4 +1,3 @@
-import type { IntegrationConnection } from '@tangle-network/sandbox-ui/integrations'
 import type { Generation } from '../../studio'
 
 /**
@@ -179,29 +178,6 @@ export const storageFailedGeneration = makeGeneration({
   },
 })
 
-export const publishPackageGeneration = makeGeneration({
-  id: 'gen-publish-package',
-  prompt: 'Square launch-day card: product mark over a sunrise gradient, bold sans headline.',
-  result: TEASER_TILE_C,
-  createdAt: new Date('2026-08-02T08:20:00Z'),
-  metadata: {
-    generationStatus: 'succeeded',
-    vaultPath: 'generated/images/launch-day-card.png',
-    publishPackage: {
-      caption: 'Launch day. Meet the new Tangle studio — prompt to published in one pass.',
-      description: 'Launch note + approval instruction: hold for social sign-off.',
-      mentions: ['@tangle'],
-      destinations: ['instagram', 'x'],
-      cadence: 'Publish now',
-      workflowDraft: true,
-      evalContract: {
-        artifactType: 'publish_package',
-        deterministicChecks: ['has_asset', 'has_destination', 'has_caption_or_description', 'has_cadence'],
-      },
-    },
-  },
-})
-
 /** The four-image batch a single "Images: 4" run produces. */
 export const teaserBatch: Generation[] = [
   makeGeneration({
@@ -236,7 +212,6 @@ export const libraryGenerations: Generation[] = [
   teaserB,
   videoGeneration,
   runningGeneration,
-  publishPackageGeneration,
   avatarGeneration,
   speechGeneration,
   storyboardGeneration,
@@ -249,9 +224,3 @@ export const libraryTotalCost = 1.87
 /** Mirrors StudioWorkspace's default vaultHref (see generation-detail.test.tsx). */
 export const demoVaultHref = (filePath?: string | null) =>
   filePath ? `/app/ws-demo/vault?file=${encodeURIComponent(filePath)}` : '/app/ws-demo/vault'
-
-/** Connected destinations for the publish-package composer (instagram + X). */
-export const demoConnections: IntegrationConnection[] = [
-  { id: 'conn-ig', providerId: 'instagram', status: 'connected', accountDisplay: '@tangle' },
-  { id: 'conn-x', providerId: 'twitter', status: 'connected', accountDisplay: '@tangle' },
-]

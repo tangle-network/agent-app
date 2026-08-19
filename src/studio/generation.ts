@@ -1,16 +1,3 @@
-// Minimal structural view of a connected integration — `isDestinationConnected`
-// only reads the connection status and the provider/connector identifiers, so
-// the logic layer declares its own shape instead of depending on the
-// design-system package. A sandbox-ui `IntegrationConnection` is assignable to
-// this; `connectorId` is optional because the engine type leaves it undefined
-// for connections established without a named connector.
-/** Define the structure for a studio integration connection with status and provider identifiers */
-export interface StudioIntegrationConnection {
-  status: string
-  providerId: string
-  connectorId?: string
-}
-
 /** Define generation categories for media including image, video, speech, avatar, and transcription */
 export type GenerationType = 'image' | 'video' | 'speech' | 'avatar' | 'transcription'
 
@@ -49,29 +36,9 @@ export interface MediaModelCatalogResponse {
   error?: string
 }
 
-/** Define the structure for configuring package publishing details and evaluation criteria */
-export interface PublishPackage {
-  caption: string
-  description: string
-  mentions: string[]
-  destinations: string[]
-  cadence: string
-  workflowDraft: boolean
-  evalContract: {
-    artifactType: string
-    deterministicChecks: string[]
-  }
-}
-
-/** Define a destination for publishing content with identifiers, label, provider IDs, and fields */
-export interface PublishDestination {
-  id: string
-  label: string
-  providerIds: string[]
-  fields: string
-}
-
-// Order drives the type filter tabs and the composer segmented control
+// Order drives the library type filter tabs. The composer offers its own
+// subset (`COMPOSER_TYPES` in studio-react) while avatar/transcription are
+// disabled (#451).
 /** Provide an array of supported generation types for media and content processing */
 export const GENERATION_TYPES: readonly GenerationType[] = ['image', 'video', 'avatar', 'speech', 'transcription']
 
@@ -79,18 +46,6 @@ export const GENERATION_TYPES: readonly GenerationType[] = ['image', 'video', 'a
 export function isGenerationType(value: string): value is GenerationType {
   return (GENERATION_TYPES as readonly string[]).includes(value)
 }
-
-/** List available social media platforms with their publishing fields and provider identifiers */
-export const DESTINATIONS: PublishDestination[] = [
-  { id: 'instagram', label: 'Instagram', providerIds: ['instagram'], fields: 'Caption, hashtags, crop' },
-  { id: 'tiktok', label: 'TikTok', providerIds: ['tiktok'], fields: 'Caption, audio note, vertical video' },
-  { id: 'youtube-shorts', label: 'YouTube Shorts', providerIds: ['youtube'], fields: 'Title, description, vertical video' },
-  { id: 'linkedin', label: 'LinkedIn', providerIds: ['linkedin'], fields: 'Caption, link, creator/company page' },
-  { id: 'x', label: 'X', providerIds: ['twitter'], fields: 'Short copy, mentions, thread option' },
-]
-
-/** Provide an array of predefined cadence options for scheduling or approval processes */
-export const CADENCES = ['Manual approval', 'Publish now', 'Daily creative drop', 'Weekly series']
 
 // Enumerated generation options — the values the tangle media models (OpenAI-shaped
 // image/video APIs) actually accept. Composers render these as selects so an
@@ -143,79 +98,6 @@ export function generationVaultPath(generation: Generation): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null
 }
 
-/** Build a PublishPackage object from caption, description, mentions, cadence, and destinations inputs */
-export function buildPublishPackage({
-  caption,
-  postDescription,
-  mentions,
-  cadence,
-  destinations,
-}: {
-  caption: string
-  postDescription: string
-  mentions: string
-  cadence: string
-  destinations: string[]
-}): PublishPackage | null {
-  const trimmedCaption = caption.trim()
-  const trimmedDescription = postDescription.trim()
-  const parsedMentions = mentions.split(',').map((item) => item.trim()).filter(Boolean)
-  const selectedDestinations = destinations.filter(Boolean)
-  const trimmedCadence = cadence.trim() || 'Manual approval'
-  const hasPublishContent = Boolean(
-    trimmedCaption
-    || trimmedDescription
-    || parsedMentions.length > 0
-    || selectedDestinations.length > 0
-    || trimmedCadence !== 'Manual approval',
-  )
-  if (!hasPublishContent) return null
-
-  return {
-    caption: trimmedCaption,
-    description: trimmedDescription,
-    mentions: parsedMentions,
-    destinations: selectedDestinations,
-    cadence: trimmedCadence,
-    workflowDraft: trimmedCadence !== 'Manual approval',
-    evalContract: {
-      artifactType: 'publish_package',
-      deterministicChecks: ['has_asset', 'has_destination', 'has_caption_or_description', 'has_cadence'],
-    },
-  }
-}
-
-/** Determine if a value conforms to the PublishPackage structure with optional metadata fields */
-export function isPublishPackage(value: unknown): value is { caption?: string; description?: string; mentions?: string[]; destinations?: string[]; cadence?: string } {
-  if (!value || typeof value !== 'object') return false
-  const publishPackage = value as {
-    caption?: unknown
-    description?: unknown
-    mentions?: unknown
-    destinations?: unknown
-    cadence?: unknown
-  }
-  const destinations = Array.isArray(publishPackage.destinations) ? publishPackage.destinations.filter(Boolean) : []
-  const mentions = Array.isArray(publishPackage.mentions) ? publishPackage.mentions.filter(Boolean) : []
-  return Boolean(
-    destinations.length > 0
-    || mentions.length > 0
-    || (typeof publishPackage.caption === 'string' && publishPackage.caption.trim())
-    || (typeof publishPackage.description === 'string' && publishPackage.description.trim())
-    || (typeof publishPackage.cadence === 'string' && publishPackage.cadence.trim() && publishPackage.cadence.trim() !== 'Manual approval'),
-  )
-}
-
-/** Determine if a destination has any active connections in the given list of studio integration connections */
-export function isDestinationConnected(
-  destination: PublishDestination,
-  connections: StudioIntegrationConnection[],
-): boolean {
-  return connections.some((connection) => connection.status === 'connected'
-    && (destination.providerIds.includes(connection.providerId)
-      || (connection.connectorId !== undefined && destination.providerIds.includes(connection.connectorId))))
-}
-
 /** Resolve selected models by applying defaults for missing or unavailable entries in the catalog */
 export function selectedModelsWithDefaults(
   current: Partial<Record<GenerationType, string>>,
@@ -264,12 +146,12 @@ export interface GenerationRequestFields {
   prompt: string
   negativePrompt: string
   outputPath: string
-  publishPackage: PublishPackage | null
   image: { size: string; quality: string; count: number }
   video: { duration: string; resolution: string; aspectRatio: string; referenceImageUrl: string }
   speech: { voice: string }
-  avatar: { audioUrl: string; imageUrl: string; avatarId: string }
-  transcription: { audioUrl: string; language: string; responseFormat: string; temperature: string }
+  // Optional while the composer lanes are disabled (#451); the server capability stays.
+  avatar?: { audioUrl: string; imageUrl: string; avatarId: string }
+  transcription?: { audioUrl: string; language: string; responseFormat: string; temperature: string }
 }
 
 // image.count must already be normalized — it is also the optimistic-card count on the caller side
@@ -284,7 +166,6 @@ export function buildGenerationRequestBody(fields: GenerationRequestFields): Rec
     negativePrompt: fields.negativePrompt.trim() || undefined,
     outputPath: fields.outputPath.trim() || undefined,
   }
-  if (fields.publishPackage) body.publishPackage = fields.publishPackage
   if (fields.type === 'image') Object.assign(body, {
     size: fields.image.size,
     quality: fields.image.quality,
@@ -301,12 +182,12 @@ export function buildGenerationRequestBody(fields: GenerationRequestFields): Rec
     })
   }
   if (fields.type === 'speech') Object.assign(body, { voice: fields.speech.voice })
-  if (fields.type === 'avatar') Object.assign(body, {
+  if (fields.type === 'avatar' && fields.avatar) Object.assign(body, {
     audioUrl: fields.avatar.audioUrl.trim(),
     imageUrl: fields.avatar.imageUrl.trim() || undefined,
     avatarId: fields.avatar.avatarId.trim() || undefined,
   })
-  if (fields.type === 'transcription') {
+  if (fields.type === 'transcription' && fields.transcription) {
     const temperature = Number(fields.transcription.temperature)
     Object.assign(body, {
       audioUrl: fields.transcription.audioUrl.trim(),

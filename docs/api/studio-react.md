@@ -4,7 +4,7 @@
 
 Source: `src/studio-react/index.tsx`
 
-30 exports.
+29 exports.
 
 ### `AvatarComposer`
 
@@ -27,7 +27,7 @@ Source: `src/studio-react/index.tsx`
 `function`
 
 ```ts
-({ workspaceId, integrationsHref, canManageIntegrations, align, surfaceClassName, onGenerated, }: { workspaceId?: strin…
+({ workspaceId, align, surfaceClassName, onGenerated, }: { workspaceId?: string | undefined; align?: "center" | "start"…
 ```
 
 ### `Field`
@@ -118,14 +118,6 @@ Source: `src/studio-react/index.tsx`
 (props: SelectHTMLAttributes<HTMLSelectElement>) => Element
 ```
 
-### `PublishPackageComposer`
-
-`function`
-
-```ts
-({ caption, postDescription, mentions, cadence, selectedDestinations, connections, connectionError, connectionsLoading,…
-```
-
 ### `ResultCanvas`
 
 `function`
@@ -179,7 +171,7 @@ type StudioRole
 `function` — The full studio surface: header + composer + result canvas + library drawer, with the generation orchestrator (merge/poll/revalidate) wired in.
 
 ```ts
-({ generations, totalCost, workspaceId, role, generationsEndpoint, vaultHref, integrationsHref, }: StudioWorkspaceProps…
+({ generations, totalCost, workspaceId, role, generationsEndpoint, vaultHref, }: StudioWorkspaceProps) => Element
 ```
 
 ### `StudioWorkspaceProps`

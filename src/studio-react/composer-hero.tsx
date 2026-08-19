@@ -1,20 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
-  Badge, Button, Input, Label, Textarea,
+  Button, Input, Label, Textarea,
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@tangle-network/sandbox-ui/primitives'
-import { useIntegrations } from '@tangle-network/sandbox-ui/integrations'
 import { Sparkles } from 'lucide-react'
 import {
   type Generation,
   type GenerationType,
   type MediaModelCatalogResponse,
-  CADENCES,
-  DESTINATIONS,
   buildGenerationRequestBody,
-  buildPublishPackage,
   failedOptimisticGeneration,
-  isDestinationConnected,
   modelMessage,
   normalizeImageCount,
   optimisticGeneration,
@@ -23,17 +18,17 @@ import {
   selectedModelsWithDefaults,
   userSafeGenerationMessage,
 } from '../studio'
-import { TYPE_CONFIG, typeConfigFor } from './type-config'
+import { typeConfigFor } from './type-config'
 import { ProviderLogo } from '../web-react/provider-logo'
 import { ComposerDisclosure, Field } from './composer-shell'
 import { ImageComposer } from './image-composer'
 import { VideoComposer } from './video-composer'
 import { SpeechComposer } from './speech-composer'
-import { AvatarComposer } from './avatar-composer'
-import { TranscriptionComposer, TranscriptionOptions } from './transcription-composer'
-import { PublishPackageComposer } from './publish-package-composer'
 
-const HUB_BASE_URL = '/api/integrations/hub'
+// The lanes the composer currently offers. Avatar and transcription are
+// temporarily disabled as a product decision (#451) — the lane types and
+// the server capability stay intact for re-enable.
+const COMPOSER_TYPES: readonly GenerationType[] = ['image', 'video', 'speech']
 
 const SUGGESTIONS: Array<{ label: string; prompt: string; type: GenerationType }> = [
   {
@@ -51,24 +46,15 @@ const SUGGESTIONS: Array<{ label: string; prompt: string; type: GenerationType }
     type: 'speech',
     prompt: 'A confident 12-second scratch voiceover for a product launch teaser: warm tone, conversational pace.',
   },
-  {
-    label: 'Transcribe dailies',
-    type: 'transcription',
-    prompt: 'Transcribe the latest dailies recording with timestamps, speaker labels, and key story beats highlighted.',
-  },
 ]
 
 export function ComposerHero({
   workspaceId,
-  integrationsHref,
-  canManageIntegrations,
   align = 'start',
   surfaceClassName = 'bg-card',
   onGenerated,
 }: {
   workspaceId?: string
-  integrationsHref?: string
-  canManageIntegrations: boolean
   /** Heading treatment: `center` (focus mode) vs `start` (composer as a left rail). */
   align?: 'center' | 'start'
   /** Background of the composer card. Host apps pass their own surface token so
@@ -80,11 +66,6 @@ export function ComposerHero({
   const [prompt, setPrompt] = useState('')
   const [negativePrompt, setNegativePrompt] = useState('')
   const [outputPath, setOutputPath] = useState(outputPathFor('image'))
-  const [caption, setCaption] = useState('')
-  const [postDescription, setPostDescription] = useState('')
-  const [mentions, setMentions] = useState('')
-  const [cadence, setCadence] = useState(CADENCES[0] ?? 'Manual approval')
-  const [selectedDestinations, setSelectedDestinations] = useState<string[]>([])
   const [size, setSize] = useState('1536x1024')
   const [quality, setQuality] = useState('high')
   const [imageCount, setImageCount] = useState(1)
@@ -93,13 +74,6 @@ export function ComposerHero({
   const [aspectRatio, setAspectRatio] = useState('16:9')
   const [referenceImageUrl, setReferenceImageUrl] = useState('')
   const [voice, setVoice] = useState('alloy')
-  const [avatarAudioUrl, setAvatarAudioUrl] = useState('')
-  const [avatarImageUrl, setAvatarImageUrl] = useState('')
-  const [avatarId, setAvatarId] = useState('')
-  const [transcriptionAudioUrl, setTranscriptionAudioUrl] = useState('')
-  const [transcriptionLanguage, setTranscriptionLanguage] = useState('')
-  const [transcriptionResponseFormat, setTranscriptionResponseFormat] = useState('json')
-  const [transcriptionTemperature, setTranscriptionTemperature] = useState('0')
   const [mediaModels, setMediaModels] = useState<MediaModelCatalogResponse | null>(null)
   const [mediaModelsLoading, setMediaModelsLoading] = useState(false)
   const [mediaModelsError, setMediaModelsError] = useState<string | null>(null)
@@ -114,20 +88,11 @@ export function ComposerHero({
     && selectedModelOption?.status !== 'unavailable'
     && !mediaModelsLoading
     && !mediaModelsError
-  const hasRequiredInput = type === 'transcription'
-    ? Boolean(transcriptionAudioUrl.trim())
-    : type === 'avatar'
-      ? Boolean(avatarAudioUrl.trim())
-      : Boolean(prompt.trim())
+  const hasRequiredInput = Boolean(prompt.trim())
   const canSubmit = Boolean(workspaceId)
     && modelReady
     && hasRequiredInput
     && !isSubmitting
-  const integrations = useIntegrations({ apiBaseUrl: HUB_BASE_URL })
-  const selectedConnectedDestinations = useMemo(() => selectedDestinations.filter((destinationId) => {
-    const destination = DESTINATIONS.find((item) => item.id === destinationId)
-    return Boolean(destination && isDestinationConnected(destination, integrations.connections))
-  }), [integrations.connections, selectedDestinations])
 
   useEffect(() => {
     if (!workspaceId) return
@@ -170,26 +135,12 @@ export function ComposerHero({
   async function generate() {
     if (!workspaceId || submitLockRef.current) return
     const promptText = prompt.trim()
-    const avatarAudioUrlText = avatarAudioUrl.trim()
-    const transcriptionAudioUrlText = transcriptionAudioUrl.trim()
-    if (type !== 'transcription' && type !== 'avatar' && !promptText) {
+    if (!promptText) {
       setError('prompt is required')
-      return
-    }
-    if (type === 'avatar' && !avatarAudioUrlText) {
-      setError('audioUrl is required')
-      return
-    }
-    if (type === 'transcription' && !transcriptionAudioUrlText) {
-      setError('audioUrl is required')
       return
     }
     if (!selectedModelOption || selectedModelOption.status === 'unavailable') {
       setError(`Select an available ${typeConfigFor(type).label} model`)
-      return
-    }
-    if (cadence === 'Publish now' && selectedConnectedDestinations.length === 0) {
-      setError('Select a connected destination to publish now')
       return
     }
     submitLockRef.current = true
@@ -200,9 +151,7 @@ export function ComposerHero({
     if (type === 'image' && requestedImageCount !== imageCount) setImageCount(requestedImageCount)
     const localGenerations = Array.from({ length: requestedImageCount }, (_, outputIndex) => optimisticGeneration({
       type,
-      // avatar hides the prompt field (promptText is stale); transcription's is
-      // an optional vocab hint. Never surface the source audio URL as the prompt.
-      prompt: type === 'avatar' ? '' : promptText,
+      prompt: promptText,
       model: selectedModel,
       clientRequestId,
       outputIndex: type === 'image' ? outputIndex : undefined,
@@ -220,23 +169,9 @@ export function ComposerHero({
         prompt,
         negativePrompt,
         outputPath,
-        publishPackage: buildPublishPackage({
-          caption,
-          postDescription,
-          mentions,
-          cadence,
-          destinations: selectedConnectedDestinations,
-        }),
         image: { size, quality, count: requestedImageCount },
         video: { duration, resolution, aspectRatio, referenceImageUrl },
         speech: { voice },
-        avatar: { audioUrl: avatarAudioUrl, imageUrl: avatarImageUrl, avatarId },
-        transcription: {
-          audioUrl: transcriptionAudioUrl,
-          language: transcriptionLanguage,
-          responseFormat: transcriptionResponseFormat,
-          temperature: transcriptionTemperature,
-        },
       })
 
       const res = await fetch('/api/generate', {
@@ -260,7 +195,7 @@ export function ComposerHero({
     }
   }
 
-  const mediaTypes = Object.entries(TYPE_CONFIG) as Array<[GenerationType, typeof TYPE_CONFIG[string]]>
+  const mediaTypes = COMPOSER_TYPES.map((key) => [key, typeConfigFor(key)] as const)
 
   return (
     <section className={`rounded-2xl border border-border p-5 shadow-sm ${surfaceClassName}`}>
@@ -274,7 +209,7 @@ export function ComposerHero({
         </h2>
       </div>
 
-      <div role="tablist" aria-label="Generation type" className="grid grid-cols-5 gap-1.5">
+      <div role="tablist" aria-label="Generation type" className="grid grid-cols-3 gap-1.5">
         {mediaTypes.map(([key, cfg]) => {
           const Icon = cfg.icon
           const active = type === key
@@ -298,73 +233,45 @@ export function ComposerHero({
         })}
       </div>
 
-      {type !== 'avatar' && (
-        <div className="mt-5">
-          <Label
-            htmlFor="studio-prompt"
-            className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground"
-          >
-            Prompt
-          </Label>
-          <div className="rounded-xl border border-border bg-background transition-colors focus-within:border-primary/30 focus-within:ring-[3px] focus-within:ring-primary/10">
-            <textarea
-              id="studio-prompt"
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-                  event.preventDefault()
-                  void generate()
-                }
-              }}
-              rows={4}
-              placeholder={type === 'transcription'
-                ? 'Optional vocabulary, speaker names, timestamp style, or context...'
-                : 'A vertical hero frame for a product launch teaser, dark cinematic lighting...'}
-              className="block min-h-[96px] w-full resize-none border-0 bg-transparent px-3.5 pb-1.5 pt-3 text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
-            />
-            <div className="flex flex-wrap items-center gap-1.5 px-2.5 pb-2.5">
-              {SUGGESTIONS.map((suggestion) => (
-                <button
-                  key={suggestion.label}
-                  type="button"
-                  onClick={() => {
-                    setPrompt(suggestion.prompt)
-                    changeType(suggestion.type)
-                  }}
-                  className="rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
-                >
-                  {suggestion.label}
-                </button>
-              ))}
-            </div>
+      <div className="mt-5">
+        <Label
+          htmlFor="studio-prompt"
+          className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground"
+        >
+          Prompt
+        </Label>
+        <div className="rounded-xl border border-border bg-background transition-colors focus-within:border-primary/30 focus-within:ring-[3px] focus-within:ring-primary/10">
+          <textarea
+            id="studio-prompt"
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                event.preventDefault()
+                void generate()
+              }
+            }}
+            rows={4}
+            placeholder="A vertical hero frame for a product launch teaser, dark cinematic lighting..."
+            className="block min-h-[96px] w-full resize-none border-0 bg-transparent px-3.5 pb-1.5 pt-3 text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
+          />
+          <div className="flex flex-wrap items-center gap-1.5 px-2.5 pb-2.5">
+            {SUGGESTIONS.map((suggestion) => (
+              <button
+                key={suggestion.label}
+                type="button"
+                onClick={() => {
+                  setPrompt(suggestion.prompt)
+                  changeType(suggestion.type)
+                }}
+                className="rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
+              >
+                {suggestion.label}
+              </button>
+            ))}
           </div>
-          {type === 'transcription' && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              Optional — biases spelling, vocabulary, and speaker names (not an instruction).
-            </p>
-          )}
         </div>
-      )}
-
-      {type === 'avatar' && (
-        <AvatarComposer
-          audioUrl={avatarAudioUrl}
-          imageUrl={avatarImageUrl}
-          avatarId={avatarId}
-          onAudioUrlChange={setAvatarAudioUrl}
-          onImageUrlChange={setAvatarImageUrl}
-          onAvatarIdChange={setAvatarId}
-        />
-      )}
-      {type === 'transcription' && (
-        <TranscriptionComposer
-          audioUrl={transcriptionAudioUrl}
-          language={transcriptionLanguage}
-          onAudioUrlChange={setTranscriptionAudioUrl}
-          onLanguageChange={setTranscriptionLanguage}
-        />
-      )}
+      </div>
 
       <div className="mt-5 space-y-3">
         <div className="space-y-1.5">
@@ -461,52 +368,7 @@ export function ComposerHero({
             <Field label="Save to">
               <Input value={outputPath} onChange={(event) => setOutputPath(event.target.value)} className="bg-background" />
             </Field>
-            {type === 'transcription' && (
-              <TranscriptionOptions
-                responseFormat={transcriptionResponseFormat}
-                temperature={transcriptionTemperature}
-                onResponseFormatChange={setTranscriptionResponseFormat}
-                onTemperatureChange={setTranscriptionTemperature}
-              />
-            )}
           </div>
-        </ComposerDisclosure>
-
-        <ComposerDisclosure
-          summary={(
-            <>
-              Schedule a post
-              {selectedConnectedDestinations.length > 0 && (
-                <Badge variant="outline" className="ml-1 text-xs">
-                  {selectedConnectedDestinations.length}
-                </Badge>
-              )}
-            </>
-          )}
-        >
-          <PublishPackageComposer
-            caption={caption}
-            postDescription={postDescription}
-            mentions={mentions}
-            cadence={cadence}
-            selectedDestinations={selectedDestinations}
-            connections={integrations.connections}
-            connectionError={integrations.error}
-            connectionsLoading={integrations.isLoading}
-            integrationsHref={integrationsHref}
-            canManageIntegrations={canManageIntegrations}
-            onCaptionChange={setCaption}
-            onDescriptionChange={setPostDescription}
-            onMentionsChange={setMentions}
-            onCadenceChange={setCadence}
-            onDestinationToggle={(destination) => {
-              const destinationConfig = DESTINATIONS.find((item) => item.id === destination)
-              if (!destinationConfig || !isDestinationConnected(destinationConfig, integrations.connections)) return
-              setSelectedDestinations((current) => current.includes(destination)
-                ? current.filter((item) => item !== destination)
-                : [...current, destination])
-            }}
-          />
         </ComposerDisclosure>
       </div>
 

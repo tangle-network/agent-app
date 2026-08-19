@@ -2,7 +2,7 @@
  * Unit coverage for the studio generation model — the pure merge/optimistic/
  * batch/model-selection logic the composer and the `useStudioGenerations` hook
  * compose. These are the non-obvious, easy-to-regress pieces (dual-key dedup,
- * batch grouping, NaN guards, the publish-package guard) exercised with fake
+ * batch grouping and NaN guards) exercised with fake
  * Generation fixtures; the React hook layers polling on top of them.
  */
 
@@ -13,16 +13,13 @@ import {
   type GenerationRequestFields,
   type MediaModelCatalogResponse,
   buildGenerationRequestBody,
-  buildPublishPackage,
   failedOptimisticGeneration,
   generationError,
   generationMergeKey,
   generationStatus,
   generationVaultPath,
-  isDestinationConnected,
   isGenerationType,
   isLocalGeneration,
-  isPublishPackage,
   latestBatchOf,
   mergeLiveGeneration,
   mergeLoaderAndLive,
@@ -56,7 +53,6 @@ function reqFields(partial: Partial<GenerationRequestFields> = {}): GenerationRe
     prompt: ' hello ',
     negativePrompt: '',
     outputPath: '',
-    publishPackage: null,
     image: { size: '1024x1024', quality: 'high', count: 1 },
     video: { duration: '6', resolution: '720p', aspectRatio: '16:9', referenceImageUrl: '' },
     speech: { voice: 'alloy' },
@@ -234,50 +230,9 @@ describe('buildGenerationRequestBody', () => {
     expect(badTemp.temperature).toBeUndefined()
   })
 
-  it('includes the publish package only when present', () => {
-    expect(buildGenerationRequestBody(reqFields())).not.toHaveProperty('publishPackage')
-    const pkg = buildPublishPackage({ caption: 'hi', postDescription: '', mentions: '', cadence: 'Manual approval', destinations: ['x'] })
-    expect(buildGenerationRequestBody(reqFields({ publishPackage: pkg }))).toHaveProperty('publishPackage', pkg)
-  })
-})
-
-describe('buildPublishPackage', () => {
-  it('returns null when there is no publish content', () => {
-    expect(buildPublishPackage({ caption: '', postDescription: '', mentions: '', cadence: 'Manual approval', destinations: [] })).toBeNull()
-  })
-
-  it('builds a package and flags workflowDraft on a non-default cadence', () => {
-    const pkg = buildPublishPackage({ caption: 'hi', postDescription: '', mentions: '@a, @b', cadence: 'Publish now', destinations: ['x'] })
-    expect(pkg).toMatchObject({ caption: 'hi', mentions: ['@a', '@b'], destinations: ['x'], cadence: 'Publish now', workflowDraft: true })
-  })
-})
-
-describe('isPublishPackage (sound guard — destinations optional)', () => {
-  it('recognizes a caption-only package without implying destinations exist', () => {
-    const value: unknown = { caption: 'Hello' }
-    expect(isPublishPackage(value)).toBe(true)
-    // the guard must NOT assert destinations is present — the caller defaults it
-    if (isPublishPackage(value)) {
-      expect(() => (value.destinations ?? []).join(', ')).not.toThrow()
-    }
-  })
-
-  it('is true for destinations/mentions and false for empty or default-only', () => {
-    expect(isPublishPackage({ destinations: ['x'] })).toBe(true)
-    expect(isPublishPackage({ cadence: 'Publish now' })).toBe(true)
-    expect(isPublishPackage({})).toBe(false)
-    expect(isPublishPackage({ cadence: 'Manual approval' })).toBe(false)
-    expect(isPublishPackage(null)).toBe(false)
-  })
 })
 
 describe('misc guards', () => {
-  it('isDestinationConnected matches connected provider/connector ids', () => {
-    const x = { id: 'x', label: 'X', providerIds: ['twitter'], fields: '' }
-    expect(isDestinationConnected(x, [{ status: 'connected', providerId: 'twitter', connectorId: 'tw' }])).toBe(true)
-    expect(isDestinationConnected(x, [{ status: 'disconnected', providerId: 'twitter', connectorId: 'tw' }])).toBe(false)
-  })
-
   it('isGenerationType / isLocalGeneration / vault path / output path', () => {
     expect(isGenerationType('image')).toBe(true)
     expect(isGenerationType('nope')).toBe(false)
