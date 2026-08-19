@@ -255,7 +255,7 @@ describe('docs/product-surfaces.md — measured counts still match the source', 
   it('the animate-spin count in Pattern 4 is the count in src', () => {
     const stated = /\b(\w+)\s+`animate-spin` uses/.exec(surfaces)?.[1]
     if (!stated) throw new Error('Pattern 4 no longer states an `animate-spin` count')
-    const words: Record<string, number | undefined> = { Three: 3, Four: 4, Five: 5, Six: 6, Seven: 7, Eight: 8 }
+    const words: Record<string, number | undefined> = { Three: 3, Four: 4, Five: 5, Six: 6, Seven: 7, Eight: 8, Nine: 9 }
     const expected = words[stated] ?? Number(stated)
     expect(Number.isFinite(expected), `unreadable animate-spin count "${stated}"`).toBe(true)
     expect(countUsages('animate-spin').total).toBe(expected)
