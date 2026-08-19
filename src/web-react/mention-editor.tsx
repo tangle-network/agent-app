@@ -75,8 +75,9 @@ export interface MentionEditorProps {
   /** Pixel height the input grows to before it scrolls. */
   maxHeight: number
   mention: ComposerMentionProp
-  /** Registers a focus callback the composer wires to Cmd/Ctrl+L. */
-  registerFocus?: (focus: () => void) => void
+  /** Registers a focus callback the composer wires to Cmd/Ctrl+L; called with
+   *  `null` on unmount so the composer never focuses a destroyed editor. */
+  registerFocus?: (focus: (() => void) | null) => void
   /**
    * Clipboard files pulled off a paste. Returns true when consumed so the
    * editor suppresses its default text paste — the same funnel the textarea
@@ -286,8 +287,13 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
           onChangeRef.current(serializeMentionDoc(json))
           const mentions = collectMentions(json)
           for (const item of mentions) knownRef.current.set(item.id, item)
-          lastMentionsKeyRef.current = mentionsKey(mentions)
-          onMentionsChangeRef.current?.(mentions)
+          // Report only when the mention SET changed — typing prose around an
+          // unchanged pill must not re-fire the callback on every keystroke.
+          const key = mentionsKey(mentions)
+          if (key !== lastMentionsKeyRef.current) {
+            lastMentionsKeyRef.current = key
+            onMentionsChangeRef.current?.(mentions)
+          }
         },
         extensions: [
           buildComposerStarterKit(tiptap),
@@ -360,7 +366,11 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
       setLoading(true)
       setErrored(false)
       const timer = setTimeout(() => {
-        Promise.resolve(fetchItemsRef.current(query))
+        // The provider is called INSIDE the chain so a synchronous throw lands
+        // in the same `.catch` as a rejection — outside it, the exception
+        // escapes the timer callback and the panel is stuck on "Searching…".
+        Promise.resolve()
+          .then(() => fetchItemsRef.current(query))
           .then((results) => {
             if (requestId !== requestIdRef.current) return
             for (const item of results) knownRef.current.set(item.id, item)
@@ -378,11 +388,14 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
 
     // Programmatic `value` changes (queued-turn restore, retry refill)
     // re-parse into the document; `@<id>` runs come back as pills only for
-    // ids already in `knownRef` at parse time — this is runtime state seeded
-    // by prior fetches/inserts/edits, not derived from `value` itself, so an
-    // id that was never fetched or inserted in this session renders as
-    // literal text even on a later restore. Guarded against the
-    // onChange→value feedback loop by comparing the serialized form.
+    // ids already in `knownRef` at parse time. That conservatism is the
+    // contract, not a gap: the serialized form cannot distinguish a PICKED
+    // pill from `@text` the user simply typed (a pick is the only thing that
+    // creates a mention in-session), so resolving unknown runs against the
+    // provider at hydration would fabricate structured attachments from
+    // plain prose. An id never fetched or inserted in this session therefore
+    // stays literal text, exactly as it would have if typed. Guarded against
+    // the onChange→value feedback loop by comparing the serialized form.
     //
     // `setContent` runs with `emitUpdate: false` (this is not a user edit),
     // so `onMentionsChange` — normally wired only off `onUpdate` — is fired
@@ -409,6 +422,9 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
     useEffect(() => {
       if (!editor || !registerFocus) return
       registerFocus(() => editor.commands.focus())
+      // Unregister on unmount so the composer's focus shortcut can never call
+      // into a destroyed editor.
+      return () => registerFocus(null)
     }, [editor, registerFocus])
 
     return (

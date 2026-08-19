@@ -160,6 +160,71 @@ describe('ChatComposer — mention path', () => {
     expect(onSend).toHaveBeenCalledTimes(1)
   })
 
+  it('does not re-fire onMentionsChange while typing prose around an unchanged mention', async () => {
+    const user = userEvent.setup()
+    const onMentionsChange = vi.fn()
+    const Wrapper = () => {
+      const [value, setValue] = useState('')
+      return (
+        <ChatComposer
+          value={value}
+          onValueChange={setValue}
+          onSend={() => {}}
+          mention={mentionProp({ onMentionsChange })}
+        />
+      )
+    }
+    const { container } = render(<Wrapper />)
+    const editor = await waitFor(() => {
+      const node = container.querySelector<HTMLElement>('[contenteditable="true"]')
+      if (!node) throw new Error('editor not mounted')
+      return node
+    })
+
+    editor.focus()
+    await user.type(editor, '@a')
+    await screen.findAllByRole('option')
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(onMentionsChange).toHaveBeenCalledTimes(1))
+
+    // Prose after the pill changes the text on every keystroke but not the
+    // mention set — the callback must stay at one call.
+    await user.type(editor, 'more words')
+    expect(onMentionsChange).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows the error state when fetchItems throws synchronously', async () => {
+    const user = userEvent.setup()
+    const { editor } = await renderMentionComposer({
+      mention: {
+        fetchItems: () => {
+          throw new Error('index exploded')
+        },
+      },
+    })
+    editor.focus()
+    await user.type(editor, '@a')
+    expect(await screen.findByText(/couldn.t load matches/i)).toBeTruthy()
+  })
+
+  it('keeps an unknown @<id> run literal on a fresh mount and reports no mention', async () => {
+    // The serialized form cannot distinguish a picked pill from typed prose,
+    // so a restore never invents a mention from an id this session has not
+    // fetched or inserted — the safe reading of an ambiguous draft.
+    const onMentionsChange = vi.fn()
+    const fetchItems = vi.fn(async () => FILES)
+    const { editor, container } = await renderMentionComposer({
+      value: 'see @src/app.tsx here',
+      mention: mentionProp({ onMentionsChange, fetchItems }),
+    })
+    expect(editor.textContent).toContain('see @src/app.tsx here')
+    expect(container.querySelector('[data-id]')).toBeNull()
+    expect(onMentionsChange).not.toHaveBeenCalled()
+    // No hydration-time provider probe either — resolution happens only on
+    // an explicit trigger.
+    expect(fetchItems).not.toHaveBeenCalled()
+  })
+
   it('fires onMentionsChange for a programmatic value restore, and guards against a duplicate fire', async () => {
     const user = userEvent.setup()
     const onMentionsChange = vi.fn()
