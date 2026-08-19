@@ -377,6 +377,25 @@ describe('ChatComposer — mention path', () => {
     )
   })
 
+  it('exposes the highlighted option through aria-activedescendant on the editor', async () => {
+    const user = userEvent.setup()
+    const { editor } = await renderMentionComposer()
+    editor.focus()
+    await user.type(editor, '@a')
+    const options = await screen.findAllByRole('option')
+
+    await waitFor(() => expect(editor.getAttribute('aria-expanded')).toBe('true'))
+    expect(editor.getAttribute('aria-controls')).toBe(screen.getByRole('listbox').id)
+    await waitFor(() => expect(editor.getAttribute('aria-activedescendant')).toBe(options[0]!.id))
+
+    await user.keyboard('{ArrowDown}')
+    await waitFor(() => expect(editor.getAttribute('aria-activedescendant')).toBe(options[1]!.id))
+
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(editor.getAttribute('aria-expanded')).toBe('false'))
+    expect(editor.getAttribute('aria-activedescendant')).toBeNull()
+  })
+
   it('Cmd/Ctrl+L reaches the rich editor', async () => {
     const { editor } = await renderMentionComposer()
     fireEvent.keyDown(document, { key: 'l', ctrlKey: true })
@@ -418,6 +437,32 @@ describe('mention node', () => {
     expect(node.isAtom).toBe(true)
     expect(node.isInline).toBe(true)
     expect(node.spec.selectable).toBe(false)
+    editor.destroy()
+  })
+
+  it('keeps the schema inside the serializer vocabulary', async () => {
+    // `serializeMentionDoc` silently skips node types it does not know, so a
+    // node admitted into the schema without a serializer update would vanish
+    // from the value. Pinning the set forces the two to move together.
+    const tiptap = await loadTiptapModules()
+    const editor = new Editor({
+      element: document.createElement('div'),
+      extensions: [
+        buildComposerStarterKit(tiptap),
+        buildMentionExtension(tiptap, '@', {
+          char: '@',
+          items: () => [],
+          render: () => ({}),
+        }),
+      ],
+    })
+    expect(Object.keys(editor.schema.nodes).sort()).toEqual([
+      'doc',
+      'hardBreak',
+      'mention',
+      'paragraph',
+      'text',
+    ])
     editor.destroy()
   })
 
