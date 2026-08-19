@@ -42,6 +42,8 @@ export const sessions = sqliteTable('sessions', {
 
 export const accounts = sqliteTable('accounts', {
   id: text('id').primaryKey(),
+  // better-auth 1.7's drizzle adapter requires this column (1.6 predates it).
+  issuer: text('issuer'),
   accountId: text('account_id').notNull(),
   providerId: text('provider_id').notNull(),
   userId: text('user_id').notNull(),
