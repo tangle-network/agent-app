@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-417 exports.
+422 exports.
 
 ### `acceptRejectionReason`
 
@@ -510,6 +510,30 @@ interface ComposerFileRejection
 interface ComposerMentionProp
 ```
 
+### `ComposerModeControls`
+
+`function` — The shared plan-mode toggle for the left side of an agent composer.
+
+```ts
+({ planMode }: ComposerModeControlsProps) => Element | null
+```
+
+### `ComposerModeControlsProps`
+
+`interface`
+
+```ts
+interface ComposerModeControlsProps
+```
+
+### `ComposerPlanModeSelection`
+
+`interface` — The plan-mode toggle state an entry surface docks beside the composer.
+
+```ts
+interface ComposerPlanModeSelection
+```
+
 ### `ComposerSendFailure`
 
 `interface` — The rejected send, handed to `onSendFailed` so the host can undo whatever it cleared optimistically — most importantly the staged attachments, which the composer does not own (`pendingFiles` is a pro…
@@ -980,6 +1004,22 @@ interface EffortPickerProps
 
 ```ts
 RecordGridOverlay
+```
+
+### `EntryComposer`
+
+`function` — `EntryComposer` — the centered "what do you want to work on?" surface a product shows before a conversation exists (a new thread, an empty session, a workspace overview).
+
+```ts
+({ heading, subheading, placeholder, initialValue, sendLabel, disabled, agent, modes, planMode, uploadUrl, accept, onAt…
+```
+
+### `EntryComposerProps`
+
+`interface`
+
+```ts
+interface EntryComposerProps
 ```
 
 ### `EvidenceLineageTable`

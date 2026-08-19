@@ -71,7 +71,7 @@ Discovery: **What does the real surface look like?**
 - [ ] For a chat-first product, use `AgentWorkspaceLayout` from
       `@tangle-network/agent-app/workspace-react` for the outer layout and
       session rail, `EntryComposer` from
-      `@tangle-network/agent-app/chat-react` for the new-session route, and
+      `@tangle-network/agent-app/web-react` for the new-session route, and
       `SessionHistoryPanel` from `@tangle-network/agent-app/web-react` for the
       full history route.
       Pass `agent.profile`, `agent.harness`, `agent.model`, and `agent.effort`
