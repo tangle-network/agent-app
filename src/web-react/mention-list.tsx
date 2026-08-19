@@ -76,12 +76,18 @@ export const MentionList = forwardRef<MentionListHandle, MentionListProps>(
               if (count > 0) move((selectedRef.current - 1 + count) % count)
               return true
             case 'Enter':
-            case 'Tab':
-              // Consume regardless of results so the message never submits
-              // while the popover is open. Clamp the index: a shrunken result
-              // set re-homes the highlight in an effect, and a key can arrive
-              // before that effect commits.
+              // Consume even with nothing to select so the message never
+              // submits while the popover is open. Clamp the index: a
+              // shrunken result set re-homes the highlight in an effect, and
+              // a key can arrive before that effect commits.
               if (count > 0) onSelect(items[Math.min(selectedRef.current, count - 1)]!)
+              return true
+            case 'Tab':
+              // Tab selects only when a row exists; with nothing selectable
+              // (loading, error, empty) it must fall through to normal focus
+              // navigation — consuming it would trap keyboard focus.
+              if (count === 0) return false
+              onSelect(items[Math.min(selectedRef.current, count - 1)]!)
               return true
             default:
               return false

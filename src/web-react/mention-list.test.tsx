@@ -147,6 +147,24 @@ describe('MentionList', () => {
     expect(onSelect).not.toHaveBeenCalled()
   })
 
+  it('releases Tab when nothing is selectable, while Enter stays consumed', () => {
+    const onSelect = vi.fn()
+    const ref = createRef<MentionListHandle>()
+    const { rerender } = render(
+      <MentionList ref={ref} items={ITEMS} loading error={false} onSelect={onSelect} />,
+    )
+    // Loading: Tab must fall through to normal focus navigation — consuming
+    // it with nothing to select traps keyboard focus in the editor.
+    expect(ref.current!.onKeyDown(key('Tab'))).toBe(false)
+
+    rerender(<MentionList ref={ref} items={[]} loading={false} error={false} onSelect={onSelect} />)
+    expect(ref.current!.onKeyDown(key('Tab'))).toBe(false)
+    // Enter is different: it must never submit the message while the popover
+    // is open, so it stays consumed even with nothing to select.
+    expect(ref.current!.onKeyDown(key('Enter'))).toBe(true)
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
   it('does not consume unrelated keys', () => {
     const ref = createRef<MentionListHandle>()
     render(
