@@ -7,6 +7,7 @@ import {
   DEFAULT_MODEL_ID,
   pendingComposerFiles,
   pendingComposerFilesWithError,
+  pendingComposerImageFiles,
   withPopoverHeadroom,
 } from './fixtures'
 
@@ -106,7 +107,9 @@ export const WithAttachments: Story = {
   ),
 }
 
-/** Attachment chip in the error tone, alongside ready + uploading. */
+/** Attachment chip in the error tone, alongside ready + uploading. The chip
+ *  names the reason and offers Retry, so a failed upload is recoverable
+ *  without re-picking the file. */
 export const WithAttachmentError: Story = {
   name: 'With attachment error',
   render: () => (
@@ -116,7 +119,32 @@ export const WithAttachmentError: Story = {
       controls={useModelPill()}
       onAttach={(files) => console.log('attach', files.length)}
       onRemoveFile={(id) => console.log('remove', id)}
+      onRetryFile={(id) => console.log('retry', id)}
       pendingFiles={pendingComposerFilesWithError}
+    />
+  ),
+}
+
+/** Image thumbnails + a context row — the full staging surface. Paste a
+ *  screenshot into the input to watch a `pasted-image-<n>.png` file arrive. */
+export const WithImageAttachments: Story = {
+  name: 'With image attachments',
+  render: () => (
+    <ChatComposer
+      onSend={(message) => console.log('send', message)}
+      placeholder="Paste a screenshot…"
+      controls={useModelPill()}
+      contextItems={[
+        { id: 'c1', label: 'src/web-react/chat-composer.tsx' },
+        { id: 'c2', label: 'Design review thread', onRemove: () => console.log('remove context') },
+      ]}
+      onAttach={(files) => console.log('attach', files.length)}
+      onRejectFiles={(rejections) => console.log('rejected', rejections.map((r) => r.reason))}
+      onRemoveFile={(id) => console.log('remove', id)}
+      accept="image/*"
+      canSubmitAttachmentsOnly
+      pendingFiles={pendingComposerImageFiles}
+      trailing={<span className="text-xs text-muted-foreground">4.2k</span>}
     />
   ),
 }

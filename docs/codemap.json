@@ -16893,6 +16893,12 @@
       "error": null,
       "exports": [
         {
+          "name": "acceptRejectionReason",
+          "kind": "function",
+          "signature": "(file: File, accept: string) => string",
+          "doc": "The reason an `accept` list refused a file."
+        },
+        {
           "name": "activityTone",
           "kind": "function",
           "signature": "(status: string) => ActivityTone",
@@ -17235,6 +17241,12 @@
           "doc": "Define the structure for delivering answers linked to a specific chat interaction and field"
         },
         {
+          "name": "ComposerContextItem",
+          "kind": "interface",
+          "signature": "interface ComposerContextItem",
+          "doc": "A piece of context the agent will see beside the next message — an open file, a selected record, a pinned document."
+        },
+        {
           "name": "ComposerFile",
           "kind": "interface",
           "signature": "interface ComposerFile",
@@ -17245,6 +17257,12 @@
           "kind": "interface",
           "signature": "interface ComposerFilePart",
           "doc": "Prompt-part descriptor an uploaded file carries (the upload route's `UploadedChatFile.part`), echoed back in the turn body on send."
+        },
+        {
+          "name": "ComposerFileRejection",
+          "kind": "interface",
+          "signature": "interface ComposerFileRejection",
+          "doc": "A file the `accept` list refused, with the reason to show for it."
         },
         {
           "name": "ComposerMentionProp",
@@ -17691,6 +17709,12 @@
           "doc": "Maps resolved file mentions to path-only `ChatTurnFilePartInput`s — `image` vs `file` by extension, and always a `path`, never a `url` (the url/path XOR invariant: a mention is a sandbox path referen…"
         },
         {
+          "name": "filterAcceptedFiles",
+          "kind": "function",
+          "signature": "(files: File[] | FileList, accept?: string | undefined) => { accepted: File[]; rejected: ComposerFileRejection[]; }",
+          "doc": "Splits a batch into what the `accept` list admits and what it refuses."
+        },
+        {
           "name": "FlowWaterfall",
           "kind": "function",
           "signature": "({ trace }: FlowWaterfallProps) => Element | null",
@@ -18055,6 +18079,12 @@
           "kind": "function",
           "signature": "(request: InteractionRequest, status: ChatInteractionStatus, cancelReason?: string | undefined, answers?: InteractionAn…",
           "doc": "Builds the persisted/streamed `interaction` part from a wire request."
+        },
+        {
+          "name": "isAcceptedFileType",
+          "kind": "function",
+          "signature": "(file: File, accept?: string | undefined) => boolean",
+          "doc": "Checks one file against a comma-separated `accept` list, using the grammar of the native `<input accept>` attribute: extensions (`.png`), exact MIME types (`image/png`), and MIME wildcards (`image/*`…"
         },
         {
           "name": "isChatAttachmentPart",
@@ -18769,6 +18799,12 @@
           "kind": "type",
           "signature": "type RecordGridWriteOutcome",
           "doc": "Outcome of an update or a delete."
+        },
+        {
+          "name": "renamePastedImages",
+          "kind": "function",
+          "signature": "(files: File[], startIndex: number, stagedNames?: Iterable<string>) => { files: File[]; nextIndex: number; }",
+          "doc": "Gives every generically-named clipboard image a distinct `pasted-image-<n>.<ext>` name."
         },
         {
           "name": "resolveChatInteraction",
