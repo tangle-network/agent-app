@@ -1,6 +1,16 @@
-import { ListChecks } from 'lucide-react'
-import { cn } from '@tangle-network/sandbox-ui/utils'
-import type { ComposerPlanModeSelection } from './types'
+import { joinClasses } from './class-names'
+
+/**
+ * The plan-mode toggle state an entry surface docks beside the composer. The
+ * agent-identity pickers (model / harness / effort) speak the canonical
+ * `AgentSessionControls` vocabulary — see "UI chrome ownership (picker
+ * canon)" in AGENTS.md.
+ */
+export interface ComposerPlanModeSelection {
+  enabled: boolean
+  setEnabled: (next: boolean) => void
+  saving?: boolean
+}
 
 export interface ComposerModeControlsProps {
   /**
@@ -8,6 +18,17 @@ export interface ComposerModeControlsProps {
    * propose a plan and wait for approval; omitted means nothing renders.
    */
   planMode?: ComposerPlanModeSelection
+}
+
+/** Checklist glyph, inline like every `/web-react` glyph — an icon-library
+ *  import here would turn that optional peer into a build-time requirement
+ *  for every consumer of the default surface. */
+function ListChecksGlyph({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="m3 17 2 2 4-4M3 7l2 2 4-4M13 6h8M13 12h8M13 18h8" />
+    </svg>
+  )
 }
 
 /**
@@ -25,7 +46,7 @@ export function ComposerModeControls({ planMode }: ComposerModeControlsProps) {
       disabled={planMode.saving}
       onClick={() => planMode.setEnabled(!planMode.enabled)}
       title="Plan mode: the agent proposes a plan you approve before it executes"
-      className={cn(
+      className={joinClasses(
         // Inset ring: this chip sits in a composer row that clips its overflow,
         // so an outward ring loses three of its four sides. Only the offset is
         // overridden — width and colour stay with the tokens.
@@ -36,7 +57,7 @@ export function ComposerModeControls({ planMode }: ComposerModeControlsProps) {
         planMode.saving && 'opacity-60',
       )}
     >
-      <ListChecks className="h-3.5 w-3.5" />
+      <ListChecksGlyph className="h-3.5 w-3.5" />
       Plan
     </button>
   )

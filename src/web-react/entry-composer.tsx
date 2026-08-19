@@ -1,14 +1,14 @@
 import { useState, type ReactNode } from 'react'
-import { AgentComposer } from '@tangle-network/sandbox-ui/chat'
-import { ATTACHMENT_ACCEPT, useComposerAttachments } from '../web-react/use-composer-attachments'
-import type { UseFileMentionsResult } from '../web-react/use-file-mentions'
+import { ChatComposer } from './chat-composer'
+import { ATTACHMENT_ACCEPT, useComposerAttachments } from './use-composer-attachments'
+import type { ComposerFileRejection } from './composer-file-accept'
+import type { UseFileMentionsResult } from './use-file-mentions'
 import type { ChatAttachmentInput, FileMention } from '../chat-routes/wire'
 import {
   AgentSessionControls,
   type AgentSessionControlsProps,
-} from '../web-react/agent-session-controls'
-import { ComposerModeControls } from './composer-mode-controls'
-import type { ComposerPlanModeSelection } from './types'
+} from './agent-session-controls'
+import { ComposerModeControls, type ComposerPlanModeSelection } from './composer-mode-controls'
 
 export interface EntryComposerProps {
   /** The one line above the input. Domain copy — always a product parameter. */
@@ -50,7 +50,7 @@ export interface EntryComposerProps {
   uploadUrl?: string
   accept?: string
   onAttachmentError?: (reason: string) => void
-  onRejectFiles?: Parameters<typeof AgentComposer>[0]['onRejectFiles']
+  onRejectFiles?: (rejections: ComposerFileRejection[]) => void
   /**
    * `@`-file mentions. The hook itself is shared (`useFileMentions`), but the
    * cold-box policy around it — whether pressing `@` is worth starting a
@@ -96,9 +96,9 @@ export interface EntryComposerProps {
  * `placeholder`, `footer` (suggestion pills, disclaimers) and the selections
  * themselves.
  *
- * The docked in-thread composer is NOT this component — it renders
- * `AgentComposer` directly with the same canonical `AgentSessionControls`,
- * because a docked composer has a transcript above it and no hero layout.
+ * The input is `ChatComposer` — the same component a docked in-thread
+ * composer renders directly; this assembly adds only the hero layout around
+ * it.
  */
 export function EntryComposer({
   heading,
@@ -167,18 +167,24 @@ export function EntryComposer({
         ) : (
           heading ? <div className="mb-7" /> : null
         )}
-        <AgentComposer
+        <ChatComposer
           className={composerClassName ?? 'vt-composer'}
           value={value}
-          onChange={setValue}
-          onSubmit={() => submit(value)}
+          onValueChange={setValue}
+          onSend={(message) => submit(message)}
           placeholder={placeholder}
           sendLabel={sendLabel}
+          // The circular arrow AgentComposer shipped and the agent-app canon
+          // for new surfaces.
+          sendVariant="icon"
           disabled={disabled}
           autoFocus
+          // A hero composer autofocuses on mount, so the Cmd/Ctrl+L hint
+          // would advertise a shortcut to the input the user is already in.
+          focusShortcut={false}
           canSubmitAttachmentsOnly
           accept={accept}
-          attachments={attachments.composerFiles}
+          pendingFiles={attachments.composerFiles}
           onAttach={uploadUrl ? (files) => void attachments.addFiles(files) : undefined}
           onRejectFiles={onRejectFiles}
           onRemoveFile={attachments.removeAttachment}

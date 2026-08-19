@@ -1,32 +1,18 @@
 /**
- * `@tangle-network/agent-app/chat-react` — the chat-composer surfaces that need
- * `@tangle-network/sandbox-ui`.
+ * `@tangle-network/agent-app/chat-react` — a compatibility re-export.
  *
- * Isolated behind its own entry for the OPTIONAL-PEER rule: sandbox-ui is an
- * optional peer of this package, so a subpath that imports it must never be
- * reachable from one that does not. `/web-react` stays sandbox-ui-free; anything
- * that renders sandbox-ui's `AgentComposer` lives here. (Same rule, same shape
- * as `/work-product-react`.)
- *
- * WHY THIS EXISTS. sandbox-ui owns the composer chrome; this subpath owns the
- * app-shell ASSEMBLY over it — which controls an entry surface gets, the
- * submit gate. Three products each re-derived that assembly and each dropped a
- * different control, so the same "shared" components produced three different
- * capability sets. One assembly, three products, domain by parameter.
- *
- * PICKER CANON. The agent-identity controls an `EntryComposer` renders are the
- * canonical ones: its `agent` prop is `AgentSessionControlsProps` and the row
- * is `/web-react`'s `AgentSessionControls`, whose model menu IS the canonical
- * `ModelPicker` — see "UI chrome ownership (picker canon)" in AGENTS.md and
- * `docs/ui-picker-canon.md`. The legacy `ComposerAgentControls` adapter over
- * sandbox-ui's strip was REMOVED (it was deprecated-first); products still on
- * it migrate per the props mapping in that doc.
+ * This subpath used to isolate the one assembly that rendered sandbox-ui's
+ * `AgentComposer`, per the optional-peer rule. `EntryComposer` now renders
+ * this package's own `ChatComposer` (tangle-network/agent-dev-container#5934,
+ * PR 3), so nothing here touches sandbox-ui any more and the components live
+ * in `/web-react` with the rest of the composer surface. The subpath stays as
+ * a re-export because subpaths are additive (see "Additive subpaths" in
+ * AGENTS.md) — existing imports keep working; new code imports `/web-react`.
  */
 
-export { EntryComposer, type EntryComposerProps } from './entry-composer'
+export { EntryComposer, type EntryComposerProps } from '../web-react/entry-composer'
 export {
   ComposerModeControls,
   type ComposerModeControlsProps,
-} from './composer-mode-controls'
-
-export type { ComposerPlanModeSelection } from './types'
+  type ComposerPlanModeSelection,
+} from '../web-react/composer-mode-controls'
