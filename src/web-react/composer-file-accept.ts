@@ -101,23 +101,28 @@ function isGenericImageName(name: string): boolean {
  * The extension a renamed clipboard image should carry, or null when none can
  * be derived truthfully.
  *
- * It must never name a format the bytes are not. A rename that invents `.png`
- * for an unrecognised image type hands an `accept=".png"` list a file that
- * satisfies it by its new name alone, which turns the rename into a way around
- * the very gate it is filtered by. So the extension comes from the mapped MIME
- * type, then the file's own name, then the MIME subtype itself
- * (`image/heic` → `heic`) — and when none of those yields anything, the caller
- * skips the rename rather than guessing.
+ * It must never name a format the bytes are not. A rename that hands an
+ * `accept=".png"` list a file satisfying it by its new name alone turns the
+ * rename into a way around the very gate it is filtered by.
+ *
+ * So the DECLARED TYPE decides, and the filename never overrides it: the mapped
+ * MIME type first, then the MIME subtype itself (`image/heic` → `heic`). A
+ * clipboard file can carry a name whose extension contradicts its type — a
+ * bitmap named `image.png` that is really `image/heic` — and taking the name
+ * there would reopen exactly the hole this order exists to close. The filename
+ * is consulted only when the type names no subtype at all, where it is the one
+ * signal left; when nothing yields an extension, the caller skips the rename
+ * rather than guessing.
  */
 function imageExtension(file: File): string | null {
   const type = file.type.toLowerCase()
   const fromMime = IMAGE_EXTENSION_BY_MIME[type]
   if (fromMime) return fromMime
-  const fromName = /\.([a-z0-9]+)$/i.exec(file.name)?.[1]
-  if (fromName) return fromName.toLowerCase()
   const subtype = type.startsWith('image/') ? type.slice('image/'.length) : ''
-  const derived = (subtype.split('+')[0] ?? '').replace(/[^a-z0-9]/g, '')
-  return derived.length > 0 ? derived : null
+  const fromSubtype = (subtype.split('+')[0] ?? '').replace(/[^a-z0-9]/g, '')
+  if (fromSubtype.length > 0) return fromSubtype
+  const fromName = /\.([a-z0-9]+)$/i.exec(file.name)?.[1]
+  return fromName?.toLowerCase() ?? null
 }
 
 /**

@@ -89,27 +89,40 @@ describe('renamePastedImages', () => {
     expect(second.nextIndex).toBe(2)
   })
 
-  it('takes the extension from the MIME type, the name, or the subtype — never a guess', () => {
+  it('takes the extension from the declared type — the mapped name, else the subtype', () => {
     expect(renamePastedImages([file('image', 'image/jpeg')], 0).files[0]!.name).toBe('pasted-image-1.jpg')
     expect(renamePastedImages([file('', 'image/webp')], 0).files[0]!.name).toBe('pasted-image-1.webp')
     // Unmapped type: the subtype is the truth, so the name says heic, not png.
     expect(renamePastedImages([file('image', 'image/heic')], 0).files[0]!.name).toBe('pasted-image-1.heic')
-    // An extension on the original name outranks the subtype.
-    expect(renamePastedImages([file('image.avif', 'image/heic')], 0).files[0]!.name).toBe('pasted-image-1.avif')
+  })
+
+  it('never lets the original filename overrule the type it contradicts', () => {
+    // A clipboard bitmap is commonly NAMED `image.png` whatever it is. Taking
+    // that extension over the declared type would rebuild the accept bypass:
+    // the file would satisfy `accept=".png"` by a name the rename gave it.
+    expect(renamePastedImages([file('image.png', 'image/heic')], 0).files[0]!.name).toBe('pasted-image-1.heic')
+    expect(renamePastedImages([file('image.avif', 'image/heic')], 0).files[0]!.name).toBe('pasted-image-1.heic')
+  })
+
+  it('falls back to the filename only when the type names no subtype', () => {
+    expect(renamePastedImages([file('image.jpeg', 'image/')], 0).files[0]!.name).toBe('pasted-image-1.jpeg')
   })
 
   it('never renames an image to a format it is not, so accept still refuses it', () => {
     // A renamed file that claimed `.png` for HEIC bytes satisfied an
     // `accept=".png"` list by its new name alone, which made the rename a way
-    // around the gate it is filtered by.
-    const heic = file('image', 'image/heic')
-    const { files } = renamePastedImages([heic], 0)
-    const { accepted, rejected } = filterAcceptedFiles(files, '.png')
+    // around the gate it is filtered by. Both the extensionless clipboard name
+    // and the contradicting one have to stay refused.
+    for (const name of ['image', 'image.png']) {
+      const heic = file(name, 'image/heic')
+      const { files } = renamePastedImages([heic], 0)
+      const { accepted, rejected } = filterAcceptedFiles(files, '.png')
 
-    expect(accepted).toEqual([])
-    expect(rejected).toHaveLength(1)
-    // The same blob still passes a list that genuinely admits it.
-    expect(filterAcceptedFiles(files, 'image/*').accepted).toHaveLength(1)
+      expect(accepted, name).toEqual([])
+      expect(rejected, name).toHaveLength(1)
+      // The same blob still passes a list that genuinely admits it.
+      expect(filterAcceptedFiles(files, 'image/*').accepted, name).toHaveLength(1)
+    }
   })
 
   it('leaves an image alone when no extension can be derived truthfully', () => {

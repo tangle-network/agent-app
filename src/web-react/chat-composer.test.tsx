@@ -829,7 +829,9 @@ describe('ChatComposer file ingress', () => {
     render(<ChatComposer onSend={() => {}} onAttach={onAttach} onRejectFiles={onRejectFiles} accept=".png" />)
 
     fireEvent.paste(screen.getByLabelText('Message input'), {
-      clipboardData: { files: fileList(makeFile('image', 'image/heic')) },
+      // A clipboard bitmap is commonly named `image.png` whatever it is; the
+      // declared type is what the rename has to follow.
+      clipboardData: { files: fileList(makeFile('image.png', 'image/heic')) },
     })
 
     expect(onAttach).not.toHaveBeenCalled()
