@@ -54,7 +54,10 @@ export const MentionList = forwardRef<MentionListHandle, MentionListProps>(
       ref,
       () => ({
         onKeyDown(event) {
-          const count = items.length
+          // The handler must agree with the render: while loading or errored
+          // the rows are not painted, so `items` still holding the PREVIOUS
+          // query's results must not make Enter select an invisible file.
+          const count = loading || error ? 0 : items.length
           switch (event.key) {
             case 'ArrowDown':
               if (count > 0) move((selectedRef.current + 1) % count)
@@ -75,7 +78,7 @@ export const MentionList = forwardRef<MentionListHandle, MentionListProps>(
           }
         },
       }),
-      [items, onSelect],
+      [items, loading, error, onSelect],
     )
 
     return (
@@ -113,6 +116,11 @@ export const MentionList = forwardRef<MentionListHandle, MentionListProps>(
                 key={item.id}
                 role="option"
                 aria-selected={active}
+                // Keyboard navigation must keep the highlight visible inside
+                // the panel's own scroll (`max-h-64 overflow-y-auto`).
+                ref={(el) => {
+                  if (active) el?.scrollIntoView?.({ block: 'nearest' })
+                }}
                 // Pointer down (not click) so selecting never blurs the editor
                 // first, which would tear down the suggestion mid-select.
                 onMouseDown={(event) => {

@@ -123,6 +123,30 @@ describe('MentionList', () => {
     expect(panel.classList.contains('bg-popover')).toBe(true)
   })
 
+  it('never selects an invisible stale result while loading or errored', () => {
+    const onSelect = vi.fn()
+    const ref = createRef<MentionListHandle>()
+    const { rerender } = render(
+      <MentionList ref={ref} items={ITEMS} loading={false} error={false} onSelect={onSelect} />,
+    )
+
+    // A new query starts: rows are hidden behind "Searching…" but the previous
+    // result set is still in `items`. Enter must not select from it.
+    rerender(
+      <MentionList ref={ref} items={ITEMS} loading error={false} onSelect={onSelect} />,
+    )
+    expect(ref.current!.onKeyDown(key('Enter'))).toBe(true)
+    expect(ref.current!.onKeyDown(key('ArrowDown'))).toBe(true)
+    expect(onSelect).not.toHaveBeenCalled()
+
+    // Same for the error state.
+    rerender(
+      <MentionList ref={ref} items={ITEMS} loading={false} error onSelect={onSelect} />,
+    )
+    expect(ref.current!.onKeyDown(key('Enter'))).toBe(true)
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
   it('does not consume unrelated keys', () => {
     const ref = createRef<MentionListHandle>()
     render(
