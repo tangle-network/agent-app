@@ -4,7 +4,15 @@
 
 Source: `src/studio/index.ts`
 
-44 exports.
+68 exports.
+
+### `aspectRatioFromOptions`
+
+`function` — Resolve a requested lane's aspect ratio from its selected options.
+
+```ts
+(type: GenerationType, options: { size?: string | undefined; aspectRatio?: string | undefined; }) => number | undefined
+```
 
 ### `buildGenerationRequestBody`
 
@@ -20,6 +28,30 @@ Source: `src/studio/index.ts`
 
 ```ts
 (type: GenerationType, models: MediaModelOption[]) => MediaModelOption[]
+```
+
+### `defaultVaultPathFor`
+
+`function` — Choose the default vault folder shared by a homogeneous media selection.
+
+```ts
+(generations: readonly Generation[]) => string
+```
+
+### `DeleteGenerations`
+
+`type`
+
+```ts
+type DeleteGenerations
+```
+
+### `DownloadGenerations`
+
+`type`
+
+```ts
+type DownloadGenerations
 ```
 
 ### `failedOptimisticGeneration`
@@ -38,6 +70,14 @@ Source: `src/studio/index.ts`
 Readonly<Record<string, Readonly<Record<string, ModelOptionMetadata>>>>
 ```
 
+### `FetchGenerationsPage`
+
+`type`
+
+```ts
+type FetchGenerationsPage
+```
+
 ### `Generation`
 
 `interface` — Define the structure for a generation entity including its metadata and creation details
@@ -52,6 +92,30 @@ interface Generation
 
 ```ts
 readonly GenerationType[]
+```
+
+### `generationAspectRatio`
+
+`function` — Resolve the best available aspect ratio for a generation row.
+
+```ts
+(generation: Generation) => number
+```
+
+### `generationAssetId`
+
+`function` — Resolve the stored media asset id, when present.
+
+```ts
+(generation: Generation) => string | null
+```
+
+### `generationBatchKey`
+
+`function` — Resolve a generation's batch identity, preferring the server batch id.
+
+```ts
+(generation: Generation) => string
 ```
 
 ### `generationError`
@@ -70,12 +134,44 @@ readonly GenerationType[]
 (generation: Generation) => string | null
 ```
 
+### `GenerationPage`
+
+`interface`
+
+```ts
+interface GenerationPage
+```
+
+### `GenerationPageQuery`
+
+`interface`
+
+```ts
+interface GenerationPageQuery
+```
+
 ### `GenerationRequestFields`
 
 `interface` — Define fields required to configure and request various types of media generation
 
 ```ts
 interface GenerationRequestFields
+```
+
+### `generationsInBatch`
+
+`function` — Select and order all outputs belonging to a generation batch.
+
+```ts
+(generations: readonly Generation[], batchKey: string) => Generation[]
+```
+
+### `generationSpecSegments`
+
+`function` — Resolve only the human-readable media specification fields a row carries.
+
+```ts
+(generation: Generation) => string[]
 ```
 
 ### `generationStatus`
@@ -116,6 +212,22 @@ type GenerationType
 
 ```ts
 { readonly multipleOf: 16; readonly maxLongEdge: 3840; readonly maxRatio: 3; }
+```
+
+### `GRID_WAVEFORM_BARS`
+
+`const`
+
+```ts
+26
+```
+
+### `hashSeed`
+
+`function` — Hash a string with FNV-1a into an unsigned 32-bit seed.
+
+```ts
+(value: string) => number
 ```
 
 ### `IMAGE_TO_VIDEO_SIBLINGS`
@@ -166,6 +278,14 @@ Readonly<Record<string, string>>
 8
 ```
 
+### `MEDIA_TYPE_FILTERS`
+
+`const`
+
+```ts
+readonly { value: MediaTypeFilter; label: string; }[]
+```
+
 ### `MediaModelCatalogResponse`
 
 `interface` — Represent media model catalog with default values, model options, and optional error message
@@ -188,6 +308,22 @@ interface MediaModelOption
 
 ```ts
 type MediaModelStatus
+```
+
+### `MediaTypeFilter`
+
+`type`
+
+```ts
+type MediaTypeFilter
+```
+
+### `mergeGenerationPages`
+
+`function` — Append a page while preserving the first row seen for each id.
+
+```ts
+(prev: readonly Generation[], next: readonly Generation[]) => Generation[]
 ```
 
 ### `mergeLiveGeneration`
@@ -254,6 +390,14 @@ type ModelOptionValue
 (value: unknown) => number
 ```
 
+### `normalizeVaultPath`
+
+`function` — Normalize a user-entered relative vault folder or reject an unsafe path.
+
+```ts
+(input: string) => string | null
+```
+
 ### `optimisticGeneration`
 
 `function` — Generate content optimistically based on input parameters and optional model and output details
@@ -294,6 +438,14 @@ type ModelOptionValue
 (type: GenerationType, catalog: MediaModelCatalogResponse | null) => string | undefined
 ```
 
+### `previewWaveformBars`
+
+`function` — Build stable pseudo-waveform bars for a media preview.
+
+```ts
+(seed: string, count: number) => readonly WaveformBar[]
+```
+
 ### `reconcileOptionValues`
 
 `function` — Reconcile selections against supported options and their wire-typed defaults.
@@ -318,12 +470,28 @@ type ModelOptionValue
 (input: { type: "image" | "video" | "speech"; modelId: string; provider?: string | undefined; catalogOptions?: Readonly…
 ```
 
+### `SaveGenerationsToVault`
+
+`type`
+
+```ts
+type SaveGenerationsToVault
+```
+
 ### `selectedModelsWithDefaults`
 
 `function` — Resolve selected models by applying defaults for missing or unavailable entries in the catalog
 
 ```ts
 (current: Partial<Record<GenerationType, string>>, catalog: MediaModelCatalogResponse) => Partial<Record<GenerationType…
+```
+
+### `StudioMediaActions`
+
+`interface` — Every media action a tile / viewer / batch bar can offer.
+
+```ts
+interface StudioMediaActions
 ```
 
 ### `supportsCustomImageSize`
@@ -356,4 +524,28 @@ type ModelOptionValue
 
 ```ts
 (width: number, height: number) => { ok: true; } | { ok: false; reason: string; }
+```
+
+### `VaultSaveResult`
+
+`interface`
+
+```ts
+interface VaultSaveResult
+```
+
+### `WaveformBar`
+
+`interface` — A deterministic waveform bar used when decoded audio is unavailable.
+
+```ts
+interface WaveformBar
+```
+
+### `WIDE_WAVEFORM_BARS`
+
+`const`
+
+```ts
+72
 ```

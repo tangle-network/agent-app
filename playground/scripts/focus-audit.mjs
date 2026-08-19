@@ -35,7 +35,7 @@
 import { chromium } from 'playwright'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:4321'
-const ROUTES = (process.env.ROUTES ?? '/canvas,/timeline,/chat,/composer,/workspace').split(',')
+const ROUTES = (process.env.ROUTES ?? '/canvas,/timeline,/chat,/composer,/studio,/workspace').split(',')
 const THEMES = [
   { q: '', label: 'light' },
   { q: '?theme=dark', label: 'dark' },

@@ -212,13 +212,37 @@ it a *timeline* must be the first thing you see.
   read as a plain-language outcome ("Researched 3 sources", "Waiting for budget
   approval"), not a status enum.
 
-### Studio composer (`studio-react` — `studio-composer`)
+### Studio (`studio-react`)
 - **Purpose / goal:** compose a generation request (image/video/audio) against
-  one model, with only the parameters that model actually publishes.
+  one model, with only the parameters that model actually publishes — and then
+  live with what came back. Three screens over one library: **home** (the
+  centred composer above a full-bleed "Recent media" grid), the **generation
+  page** for one prompt (its batch, shimmer skeletons at the chosen aspect while
+  it runs, and the composer docked at the bottom so the next take is one edit
+  away), and **history** (server-side search, media-type filter, select mode
+  with batch actions, cursor-paged).
 - **First impression we want:** "Describe what I want, and every control I can
   see is one this model will honour." A control the selected model ignores is
   worse than an absent one — it reports a choice the system never made — so an
   unknown parameter renders nothing rather than a guess or a disabled pill.
+- **One tile, one viewer, all three screens.** `src/studio-react/media-tile.tsx`
+  and its viewer carry the whole media vocabulary — hover actions, the audio
+  badge and shared transport, select circles, the vault chip — so a row means
+  the same thing wherever the user meets it. The screens differ in what they
+  *query*, never in how media reads.
+- **Generated media is not in the vault yet, and the surface has to say so.**
+  A generation lives in Studio until someone saves it: the save popover states
+  it in one line, an unsaved tile offers "Save to vault" and a saved one swaps
+  that for an "In vault" chip plus a link *out* to the file. Never auto-file
+  a generation — most takes are drafts, and a library that silently fills the
+  user's vault with them is the same failure as a dead control: the system
+  making a choice it reports as the user's.
+- **Delete is the only destructive action, it always confirms, and it still
+  waits.** Confirm removes the row from view and opens a real undo window
+  (`src/studio-react/use-deferred-delete.ts`) — the server call fires when that
+  toast leaves, so Undo is genuinely free rather than a second request that
+  might fail. Nothing else on the surface destroys anything, which is what lets
+  every other control stay one click with no dialog.
 
 ### Teams (`teams-react`) & Intakes (`intakes-react`)
 - **Teams purpose:** invite people, set roles, manage the org. Goal: *"give the

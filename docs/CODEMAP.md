@@ -75,8 +75,8 @@ _97 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./spend/cli`](api/spend-cli.md) | 0 | `sandbox` |
 | [`./store`](api/store.md) | 16 | — |
 | [`./stream`](api/stream.md) | 49 | `interactions`, `plans` |
-| [`./studio`](api/studio.md) | 44 | — |
-| [`./studio-react`](api/studio-react.md) | 5 | `studio`, `web-react` |
+| [`./studio`](api/studio.md) | 68 | — |
+| [`./studio-react`](api/studio-react.md) | 47 | `studio`, `web-react` |
 | [`./tangle`](api/tangle.md) | 7 | — |
 | [`./teams`](api/teams.md) | 37 | — |
 | [`./teams-react`](api/teams-react.md) | 10 | `brand`, `teams` |
@@ -730,19 +730,19 @@ Depends on: `interactions`, `plans`
 
 ## `./studio`
 
-Source: `src/studio/index.ts` · 44 exports
+Source: `src/studio/index.ts` · 68 exports
 
-`buildGenerationRequestBody`, `curateComposerModels`, `failedOptimisticGeneration`, `FALLBACK_VIDEO_MODEL_OPTIONS`, `Generation`, `GENERATION_TYPES`, `generationError`, `generationMergeKey`, `GenerationRequestFields`, `generationStatus`, `GenerationStatus`, `GenerationType`, `generationVaultPath`, `GPT_IMAGE_2_CUSTOM_SIZE`, `IMAGE_TO_VIDEO_SIBLINGS`, `imageToVideoSibling`, `isGenerationType`, `isLocalGeneration`, `latestBatchOf`, `MAX_IMAGE_COUNT`, `MediaModelCatalogResponse`, `MediaModelOption`, `MediaModelStatus`, `mergeLiveGeneration`, `mergeLoaderAndLive`, `MIN_IMAGE_COUNT`, `modelMessage`, `ModelOptionMetadata`, `ModelOptionsMetadata`, `ModelOptionValue`, `normalizeImageCount`, `optimisticGeneration`, `optionChoices`, `optionDefault`, `outputPathFor`, `preferredModelId`, `reconcileOptionValues`, `relativeTime`, `resolveComposerOptions`, `selectedModelsWithDefaults`, `supportsCustomImageSize`, `textToVideoSibling`, `userSafeGenerationMessage`, `validateCustomImageSize`
+`aspectRatioFromOptions`, `buildGenerationRequestBody`, `curateComposerModels`, `defaultVaultPathFor`, `DeleteGenerations`, `DownloadGenerations`, `failedOptimisticGeneration`, `FALLBACK_VIDEO_MODEL_OPTIONS`, `FetchGenerationsPage`, `Generation`, `GENERATION_TYPES`, `generationAspectRatio`, `generationAssetId`, `generationBatchKey`, `generationError`, `generationMergeKey`, `GenerationPage`, `GenerationPageQuery`, `GenerationRequestFields`, `generationsInBatch`, `generationSpecSegments`, `generationStatus`, `GenerationStatus`, `GenerationType`, `generationVaultPath`, `GPT_IMAGE_2_CUSTOM_SIZE`, `GRID_WAVEFORM_BARS`, `hashSeed`, `IMAGE_TO_VIDEO_SIBLINGS`, `imageToVideoSibling`, `isGenerationType`, `isLocalGeneration`, `latestBatchOf`, `MAX_IMAGE_COUNT`, `MEDIA_TYPE_FILTERS`, `MediaModelCatalogResponse`, `MediaModelOption`, `MediaModelStatus`, `MediaTypeFilter`, `mergeGenerationPages`, `mergeLiveGeneration`, `mergeLoaderAndLive`, `MIN_IMAGE_COUNT`, `modelMessage`, `ModelOptionMetadata`, `ModelOptionsMetadata`, `ModelOptionValue`, `normalizeImageCount`, `normalizeVaultPath`, `optimisticGeneration`, `optionChoices`, `optionDefault`, `outputPathFor`, `preferredModelId`, `previewWaveformBars`, `reconcileOptionValues`, `relativeTime`, `resolveComposerOptions`, `SaveGenerationsToVault`, `selectedModelsWithDefaults`, `StudioMediaActions`, `supportsCustomImageSize`, `textToVideoSibling`, `userSafeGenerationMessage`, `validateCustomImageSize`, `VaultSaveResult`, `WaveformBar`, `WIDE_WAVEFORM_BARS`
 
 [Full API →](api/studio.md)
 
 ## `./studio-react`
 
-Source: `src/studio-react/index.tsx` · 5 exports
+Source: `src/studio-react/index.tsx` · 47 exports
 
 Depends on: `studio`, `web-react`
 
-`ComposerType`, `GenerationNoticeChip`, `StudioComposer`, `StudioComposerProps`, `useStudioGenerations`
+`AudioTogglePill`, `ComposerBand`, `ComposerType`, `CustomSizeForm`, `DeferredDelete`, `downloadGenerationsViaAnchor`, `formatClock`, `GenerationHistoryState`, `GenerationNoticeChip`, `MediaTile`, `MediaTileProps`, `MediaTypeSegment`, `MediaTypeSegments`, `MediaViewerModal`, `MediaViewerModalProps`, `MenuPill`, `ModelPill`, `OptionChoice`, `OptionPill`, `optionValueLabel`, `ReferencePill`, `StudioAudioElementLike`, `StudioComposer`, `StudioComposerProps`, `StudioConfirmDialog`, `StudioConfirmDialogProps`, `StudioGenerationScreen`, `StudioGenerationScreenProps`, `StudioHistoryScreen`, `StudioHistoryScreenProps`, `StudioHomeScreen`, `StudioHomeScreenProps`, `StudioPlayback`, `StudioPlaybackProvider`, `StudioToastInput`, `StudioToastProvider`, `useBatchNavigation`, `UseBatchNavigationOptions`, `useDeferredDelete`, `UseDeferredDeleteOptions`, `useGenerationHistory`, `UseGenerationHistoryOptions`, `useStudioGenerations`, `useStudioPlayback`, `useStudioToast`, `VaultPathPopover`, `VaultPathPopoverProps`
 
 [Full API →](api/studio-react.md)
 

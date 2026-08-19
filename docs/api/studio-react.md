@@ -4,7 +4,23 @@
 
 Source: `src/studio-react/index.tsx`
 
-5 exports.
+47 exports.
+
+### `AudioTogglePill`
+
+`function` — The audio switch.
+
+```ts
+({ on, onToggle }: { on: boolean; onToggle: (on: boolean) => void; }) => Element
+```
+
+### `ComposerBand`
+
+`function` — The middle scroller.
+
+```ts
+({ bandRef, resetKey, children, }: { bandRef: RefObject<HTMLDivElement | null>; resetKey: string; children: ReactNode;…
+```
 
 ### `ComposerType`
 
@@ -14,12 +30,156 @@ Source: `src/studio-react/index.tsx`
 type ComposerType
 ```
 
+### `CustomSizeForm`
+
+`function` — The custom-size form the Size menu swaps to.
+
+```ts
+({ initial, onApply, onCancel, }: { initial?: string | undefined; onApply: (size: string) => void; onCancel: () => void…
+```
+
+### `DeferredDelete`
+
+`interface`
+
+```ts
+interface DeferredDelete
+```
+
+### `downloadGenerationsViaAnchor`
+
+`function` — Same-origin anchor download, staggered so the browser does not swallow every request after the first.
+
+```ts
+DownloadGenerations
+```
+
+### `formatClock`
+
+`function`
+
+```ts
+(seconds: number) => string
+```
+
+### `GenerationHistoryState`
+
+`interface`
+
+```ts
+interface GenerationHistoryState
+```
+
 ### `GenerationNoticeChip`
 
 `function` — The one thing a chat-shaped generator has to say about itself: each prompt is a fresh generation, and nothing carries over from the last one.
 
 ```ts
 ({ className }: { className?: string | undefined; }) => Element
+```
+
+### `MediaTile`
+
+`function`
+
+```ts
+({ generation, context, onOpen, actions, aspectRatio, waveformBars, selectMode, selected, onToggleSelect, onRequestDele…
+```
+
+### `MediaTileProps`
+
+`interface`
+
+```ts
+interface MediaTileProps
+```
+
+### `MediaTypeSegment`
+
+`interface` — One media lane's segment: the icon it shows collapsed, the word it shows when active.
+
+```ts
+interface MediaTypeSegment
+```
+
+### `MediaTypeSegments`
+
+`function` — The pinned-left media-type group: a track holding one filled pill (the active lane, icon + word) and icon-only siblings.
+
+```ts
+<T extends string>({ value, segments, onChange, }: { value: T; segments: readonly MediaTypeSegment<T>[]; onChange: (typ…
+```
+
+### `MediaViewerModal`
+
+`function`
+
+```ts
+({ generation, onClose, actions, onRequestDelete, onSaved, }: MediaViewerModalProps) => Element | null
+```
+
+### `MediaViewerModalProps`
+
+`interface`
+
+```ts
+interface MediaViewerModalProps
+```
+
+### `MenuPill`
+
+`function` — A standalone enum picker using the studio composer's pill and menu grammar.
+
+```ts
+<T extends string>({ label, value, choices, onSelect, className, }: { label: string; value: T; choices: readonly { valu…
+```
+
+### `ModelPill`
+
+`function` — The model pill — first in the band on every lane, and the only pill that is always there.
+
+```ts
+({ models, value, displayName, provider, onSelect, bandRef, }: { models: readonly MediaModelOption[]; value: string; di…
+```
+
+### `OptionChoice`
+
+`interface` — One renderable value: the wire value, untouched, and how it reads.
+
+```ts
+interface OptionChoice
+```
+
+### `OptionPill`
+
+`function` — A value pill and the menu it opens.
+
+```ts
+({ label, value, choices, onSelect, bandRef, custom, }: { label: string; value: ModelOptionValue | undefined; choices:…
+```
+
+### `optionValueLabel`
+
+`function` — How a wire value reads, with the wire value itself untouched underneath.
+
+```ts
+(param: string, value: ModelOptionValue) => string
+```
+
+### `ReferencePill`
+
+`function` — The reference-image pill: the only control that changes which MODEL runs, so the swap to the image-to-video sibling is the caller's (`onAttach`/`onRemove`) and the pill only reports what is attached.
+
+```ts
+({ url, onAttach, onRemove, pick, bandRef, }: { url: string | null; onAttach: (url: string) => void; onRemove: () => vo…
+```
+
+### `StudioAudioElementLike`
+
+`interface`
+
+```ts
+interface StudioAudioElementLike
 ```
 
 ### `StudioComposer`
@@ -38,10 +198,186 @@ type ComposerType
 interface StudioComposerProps
 ```
 
+### `StudioConfirmDialog`
+
+`function`
+
+```ts
+({ open, count, onConfirm, onCancel, }: StudioConfirmDialogProps) => Element | null
+```
+
+### `StudioConfirmDialogProps`
+
+`interface`
+
+```ts
+interface StudioConfirmDialogProps
+```
+
+### `StudioGenerationScreen`
+
+`function`
+
+```ts
+({ generations, batchKey, onGenerated, onOpenGeneration, onBack, workspaceId, pickReferenceImage, actions, className, }…
+```
+
+### `StudioGenerationScreenProps`
+
+`interface`
+
+```ts
+interface StudioGenerationScreenProps
+```
+
+### `StudioHistoryScreen`
+
+`function`
+
+```ts
+({ fetchPage, initialPage, onBack, actions, searchDebounceMs, className, }: StudioHistoryScreenProps) => Element
+```
+
+### `StudioHistoryScreenProps`
+
+`interface`
+
+```ts
+interface StudioHistoryScreenProps
+```
+
+### `StudioHomeScreen`
+
+`function` — Studio's create-and-recent-media landing screen.
+
+```ts
+({ generations, onGenerated, onOpenGeneration, onOpenHistory, workspaceId, pickReferenceImage, actions, recentLimit, cl…
+```
+
+### `StudioHomeScreenProps`
+
+`interface`
+
+```ts
+interface StudioHomeScreenProps
+```
+
+### `StudioPlayback`
+
+`interface`
+
+```ts
+interface StudioPlayback
+```
+
+### `StudioPlaybackProvider`
+
+`function`
+
+```ts
+(props: { children: ReactNode; createAudioElement?: (() => StudioAudioElementLike) | undefined; }) => Element
+```
+
+### `StudioToastInput`
+
+`interface`
+
+```ts
+interface StudioToastInput
+```
+
+### `StudioToastProvider`
+
+`function`
+
+```ts
+({ children }: { children: ReactNode; }) => Element
+```
+
+### `useBatchNavigation`
+
+`function` — Returns a callback the screens wrap around `onGenerated`: the first row of a batch not seen before navigates via `onOpenGeneration`, exactly once per batch — a four-image batch arrives as four rows s…
+
+```ts
+({ seed, currentBatchKey, onOpenGeneration, }: UseBatchNavigationOptions) => (generation: Generation) => void
+```
+
+### `UseBatchNavigationOptions`
+
+`interface`
+
+```ts
+interface UseBatchNavigationOptions
+```
+
+### `useDeferredDelete`
+
+`function`
+
+```ts
+(options: UseDeferredDeleteOptions) => DeferredDelete
+```
+
+### `UseDeferredDeleteOptions`
+
+`interface`
+
+```ts
+interface UseDeferredDeleteOptions
+```
+
+### `useGenerationHistory`
+
+`function` — Cursor-paged generation history over the product-supplied data port.
+
+```ts
+({ fetchPage, q, type, initialPage, }: UseGenerationHistoryOptions) => GenerationHistoryState
+```
+
+### `UseGenerationHistoryOptions`
+
+`interface`
+
+```ts
+interface UseGenerationHistoryOptions
+```
+
 ### `useStudioGenerations`
 
 `function` — The generation orchestrator behind a studio surface: it merges the loader's rows with in-flight live generations, computes the latest batch for the canvas, polls running generations until they settle…
 
 ```ts
 (loaderGenerations: Generation[], options?: { workspaceId?: string | undefined; generationsEndpoint?: string | undefine…
+```
+
+### `useStudioPlayback`
+
+`function`
+
+```ts
+() => StudioPlayback
+```
+
+### `useStudioToast`
+
+`function`
+
+```ts
+() => StudioToastContextValue
+```
+
+### `VaultPathPopover`
+
+`function`
+
+```ts
+({ open, triggerRef, panelRef, generations, onSubmit, onCancel, pending, }: VaultPathPopoverProps) => Element | null
+```
+
+### `VaultPathPopoverProps`
+
+`interface`
+
+```ts
+interface VaultPathPopoverProps
 ```
