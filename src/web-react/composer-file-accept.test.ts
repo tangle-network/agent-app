@@ -4,7 +4,6 @@ import {
   acceptRejectionReason,
   filterAcceptedFiles,
   isAcceptedFileType,
-  pastedImageStartIndex,
   renamePastedImages,
 } from './composer-file-accept'
 
@@ -179,18 +178,6 @@ describe('renamePastedImages', () => {
     }
   })
 
-  it('renames nothing once the counter can no longer produce a distinct number', () => {
-    // At the safe-integer ceiling `+ 1` stops moving, so a second rename in the
-    // batch would repeat the first name. Not renaming beats colliding.
-    const result = renamePastedImages(
-      [file('image.png', 'image/png'), file('image.png', 'image/png')],
-      Number.MAX_SAFE_INTEGER - 1,
-    )
-    const names = result.files.map((f) => f.name)
-    expect(new Set(names).size).toBe(names.length)
-    expect(names).toEqual(['pasted-image-9007199254740991.png', 'image.png'])
-  })
-
   it('leaves an image alone when no extension can be derived truthfully', () => {
     const nameless = file('', 'image/')
     const result = renamePastedImages([nameless], 0)
@@ -245,57 +232,75 @@ describe('renamePastedImages', () => {
     expect(renamed.lastModified).toBe(1_000_000_000_000)
     expect(new Uint8Array(await renamed.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]))
   })
+})
+
+describe('renamePastedImages — index selection', () => {
+  it('numbers past the pasted images the staged queue already holds', () => {
+    // The queue is the host's and survives a remount, so a count that knew only
+    // this mount's pastes would hand back a name already staged.
+    const result = renamePastedImages([file('image.png', 'image/png')], 0, [
+      'pasted-image-1.png',
+      'pasted-image-2.png',
+    ])
+    expect(result.files[0]!.name).toBe('pasted-image-3.png')
+  })
 
   it('numbers past a pasted-image name carried in the SAME batch', () => {
-    // One paste can hold a file already named `pasted-image-1.png` beside a raw
-    // bitmap; numbering the bitmap blindly would duplicate its batch-mate.
     const preNamed = file('pasted-image-1.png', 'image/png')
     const bitmap = file('image.png', 'image/png')
-    const result = renamePastedImages([preNamed, bitmap], 0)
 
-    expect(result.files.map((f) => f.name)).toEqual(['pasted-image-1.png', 'pasted-image-2.png'])
-    expect(result.nextIndex).toBe(2)
+    expect(renamePastedImages([preNamed, bitmap], 0).files.map((f) => f.name)).toEqual([
+      'pasted-image-1.png',
+      'pasted-image-2.png',
+    ])
     // Order does not matter: the batch is scanned before any renaming starts.
     expect(renamePastedImages([bitmap, preNamed], 0).files.map((f) => f.name)).toEqual([
       'pasted-image-2.png',
       'pasted-image-1.png',
     ])
   })
-})
 
-describe('pastedImageStartIndex', () => {
-  it('takes the highest already-staged pasted-image number when it beats the counter', () => {
-    expect(pastedImageStartIndex(['pasted-image-1.png', 'pasted-image-4.jpg'], 0)).toBe(4)
+  it('fills the lowest free number rather than following the highest staged one', () => {
+    // Following the highest is what let one adversarial staged name strand the
+    // count at a ceiling it could not increment past.
+    const result = renamePastedImages([file('image.png', 'image/png')], 0, [
+      'pasted-image-9007199254740991.png',
+    ])
+    expect(result.files[0]!.name).toBe('pasted-image-1.png')
+    expect(result.nextIndex).toBe(1)
   })
 
-  it('keeps the counter when it is already ahead of the staged names', () => {
-    expect(pastedImageStartIndex(['pasted-image-1.png'], 7)).toBe(7)
+  // Bounded on purpose: a count stuck at the ceiling used to make the free-index
+  // search step without moving, so a regression hangs here rather than failing.
+  it('names every image in a batch distinctly even at the safe-integer ceiling', () => {
+    const result = renamePastedImages(
+      [file('image.png', 'image/png'), file('image.png', 'image/png')],
+      Number.MAX_SAFE_INTEGER,
+      ['pasted-image-9007199254740991.png'],
+    )
+    const names = result.files.map((f) => f.name)
+    expect(names).toEqual(['pasted-image-1.png', 'pasted-image-2.png'])
+    expect(new Set(names).size).toBe(2)
+  }, 2000)
+
+  it('starts over when handed a count it cannot count from', () => {
+    for (const bad of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const result = renamePastedImages([file('image.png', 'image/png')], bad)
+      expect(result.files[0]!.name, String(bad)).toBe('pasted-image-1.png')
+    }
   })
 
-  it('ignores names that are not pasted images', () => {
-    expect(pastedImageStartIndex(['report.pdf', 'pasted-image-x.png', 'my-pasted-image-9.png'], 2)).toBe(2)
+  it('ignores staged names that are not pasted images', () => {
+    const result = renamePastedImages([file('image.png', 'image/png')], 0, [
+      'report.pdf',
+      'pasted-image-x.png',
+      'my-pasted-image-9.png',
+    ])
+    expect(result.files[0]!.name).toBe('pasted-image-1.png')
   })
 
   it('reads a bare pasted-image-<n> with no extension', () => {
-    expect(pastedImageStartIndex(['pasted-image-3'], 0)).toBe(3)
-  })
-
-  it('ignores a number too large to increment', () => {
-    // Past 2^53 an increment is a no-op, so seeding from such a name would hand
-    // the next paste that same name back.
-    expect(pastedImageStartIndex(['pasted-image-9007199254740992.png'], 3)).toBe(3)
-    expect(pastedImageStartIndex(['pasted-image-9007199254740991.png'], 3)).toBe(9007199254740991)
-  })
-
-  it('starts from zero when handed a counter it cannot count from', () => {
-    for (const bad of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 2]) {
-      expect(pastedImageStartIndex([], bad), String(bad)).toBe(0)
-    }
-    // A usable staged name still wins over the discarded counter.
-    expect(pastedImageStartIndex(['pasted-image-4.png'], -1)).toBe(4)
-  })
-
-  it('returns the counter unchanged for an empty queue', () => {
-    expect(pastedImageStartIndex([], 5)).toBe(5)
+    const result = renamePastedImages([file('image.png', 'image/png')], 0, ['pasted-image-1'])
+    expect(result.files[0]!.name).toBe('pasted-image-2.png')
   })
 })

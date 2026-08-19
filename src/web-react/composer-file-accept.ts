@@ -172,70 +172,80 @@ function imageExtension(file: File): string | null {
   return truthful[0] ?? null
 }
 
-/**
- * The counter a paste should start from, given the names already staged. The
- * ref alone counts only this mount's pastes, so a queue the host still holds
- * across a remount — or one it seeded with `pasted-image-<n>` names of its own
- * — would have its names reused by the next paste, which is the collision the
- * rename exists to prevent.
- */
-export function pastedImageStartIndex(stagedNames: Iterable<string>, current: number): number {
-  // A caller's counter is only usable if it can be counted from. Anything else
-  // — a negative, a fraction, NaN, a number past the safe ceiling — starts at
-  // zero rather than producing `pasted-image-0` or disabling renaming outright.
-  let highest = Number.isSafeInteger(current) && current >= 0 ? current : 0
-  for (const name of stagedNames) {
-    const index = /^pasted-image-(\d+)(?:\.[a-z0-9]+)?$/i.exec(name.trim())?.[1]
-    if (index === undefined) continue
-    const parsed = Number.parseInt(index, 10)
-    // Only a SAFE integer counts. Past 2^53 an increment is a no-op, so a name
-    // carrying such a number would seed a counter that hands the next paste
-    // that very name back.
-    if (Number.isSafeInteger(parsed) && parsed > highest) highest = parsed
+/** The `pasted-image-<n>` numbers these names already occupy. */
+function takenPastedImageIndexes(names: Iterable<string>): Set<number> {
+  const taken = new Set<number>()
+  for (const name of names) {
+    const digits = /^pasted-image-(\d+)(?:\.[a-z0-9]+)?$/i.exec(name.trim())?.[1]
+    if (digits === undefined) continue
+    const parsed = Number.parseInt(digits, 10)
+    if (Number.isSafeInteger(parsed)) taken.add(parsed)
   }
-  return highest
+  return taken
+}
+
+/**
+ * The lowest number above `after` that no name has claimed.
+ *
+ * Searching upward from the caller's own count — rather than from the highest
+ * number any staged name happens to carry — is what keeps this bounded. A queue
+ * may hold `pasted-image-9007199254740991.png`, and counting from THAT would
+ * strand the next paste at a ceiling where incrementing stops working. Staged
+ * numbers are avoided, never followed, so the loop advances at most once per
+ * number already claimed and always terminates. `after` is normalised by the
+ * caller to a value it can still count from, which is what keeps `+ 1` moving.
+ */
+function nextFreeIndex(taken: Set<number>, after: number): number {
+  let candidate = after + 1
+  while (taken.has(candidate)) candidate += 1
+  return candidate
 }
 
 /**
  * Gives every generically-named clipboard image a distinct
- * `pasted-image-<n>.<ext>` name, counting up from `startIndex`. Two pastes of
- * the same bitmap otherwise arrive as `image.png` twice, and a staging queue
- * that keys on the name treats the second as a duplicate of the first.
+ * `pasted-image-<n>.<ext>` name. Two pastes of the same bitmap otherwise arrive
+ * as `image.png` twice, and a staging queue that keys on the name treats the
+ * second as a duplicate of the first.
+ *
+ * A number is never reused. The search avoids every `pasted-image-<n>` already
+ * present in `stagedNames` (the queue the host still holds, which outlives this
+ * composer's own count) and in the batch itself (one paste can carry a file
+ * already named that way beside a raw bitmap), so a collision is not reachable
+ * rather than merely unlikely. `startIndex` is the caller's running count, and
+ * `nextIndex` is the count to hand the next paste.
  *
  * Files that already carry a real name pass through untouched, so a copied
  * `report.pdf` keeps being `report.pdf`. So does an image whose extension
  * cannot be derived from what it declares — a renamed file must never claim a
  * format it is not. Only the name changes: the bytes, the type and the
  * modification time travel with it, so downstream fingerprinting still sees
- * the file the user pasted. `nextIndex` is the counter to hand the next paste.
- *
- * The batch counts against itself as well as against `startIndex`. One paste
- * can carry a file already NAMED `pasted-image-1.png` beside a generic bitmap,
- * and numbering the bitmap without looking would hand it the name its own
- * batch-mate already holds.
+ * the file the user pasted.
  */
 export function renamePastedImages(
   files: File[],
   startIndex: number,
+  stagedNames: Iterable<string> = [],
 ): { files: File[]; nextIndex: number } {
-  let nextIndex = pastedImageStartIndex(
-    files.map((file) => file.name),
-    startIndex,
-  )
+  const taken = takenPastedImageIndexes([...stagedNames, ...files.map((file) => file.name)])
+  // A count that cannot be counted from starts over. That means a negative, a
+  // fraction or NaN, and it also means a count sitting AT the safe ceiling: one
+  // more than that is not representable, so the search would try to step and
+  // never move. `startIndex + 1` is the thing the search actually needs, so it
+  // is the thing tested here.
+  const usable =
+    Number.isSafeInteger(startIndex) && startIndex >= 0 && Number.isSafeInteger(startIndex + 1)
+  let nextIndex = usable ? startIndex : 0
   const renamed = files.map((file) => {
+    const typed = file.type.startsWith('image/')
     // A clipboard file can arrive with no MIME type at all, and one named
     // `image.png` still collides across pastes exactly as a typed one does.
     // Its extension then comes from its own name, which cannot manufacture a
     // claim it did not already carry.
-    if (!isGenericImageName(file.name)) return file
-    if (file.type !== '' && !file.type.startsWith('image/')) return file
+    if (!isGenericImageName(file.name) || (!typed && file.type !== '')) return file
     const extension = imageExtension(file)
     if (extension === null) return file
-    // Past the safe-integer ceiling an increment stops moving the number, which
-    // would hand two files in this batch the same name. A distinct name is the
-    // whole point, so a counter that can no longer produce one renames nothing.
-    if (!Number.isSafeInteger(nextIndex + 1)) return file
-    nextIndex += 1
+    nextIndex = nextFreeIndex(taken, nextIndex)
+    taken.add(nextIndex)
     return new File([file], `pasted-image-${nextIndex}.${extension}`, {
       type: file.type,
       lastModified: file.lastModified,

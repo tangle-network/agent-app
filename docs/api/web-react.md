@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-401 exports.
+400 exports.
 
 ### `acceptRejectionReason`
 
@@ -1838,14 +1838,6 @@ type ParseInteractionResult
 (raw: unknown) => ReviewQueueItem | null
 ```
 
-### `pastedImageStartIndex`
-
-`function` — The counter a paste should start from, given the names already staged.
-
-```ts
-(stagedNames: Iterable<string>, current: number) => number
-```
-
 ### `pendingApprovalOf`
 
 `function` — Extract `{proposalId, status}` from a tool outcome when it is a proposal awaiting human approval; null otherwise.
@@ -2456,10 +2448,10 @@ type RecordGridWriteOutcome
 
 ### `renamePastedImages`
 
-`function` — Gives every generically-named clipboard image a distinct `pasted-image-<n>.<ext>` name, counting up from `startIndex`.
+`function` — Gives every generically-named clipboard image a distinct `pasted-image-<n>.<ext>` name.
 
 ```ts
-(files: File[], startIndex: number) => { files: File[]; nextIndex: number; }
+(files: File[], startIndex: number, stagedNames?: Iterable<string>) => { files: File[]; nextIndex: number; }
 ```
 
 ### `resolveChatInteraction`

@@ -47,7 +47,6 @@ import {
 
 import {
   filterAcceptedFiles,
-  pastedImageStartIndex,
   renamePastedImages,
   type ComposerFileRejection,
 } from './composer-file-accept'
@@ -736,14 +735,14 @@ export function ChatComposer({
     // Files are the payload, so suppress the default text paste even when every
     // one of them is refused — a rejection must not half-paste stray text.
     e.preventDefault()
-    // Seed the counter from what is already staged, not from the ref alone: the
-    // queue is the host's and can outlive this mount, so a fresh ref would hand
-    // the next paste a name the queue already holds.
-    const startIndex = pastedImageStartIndex(
-      pendingFiles.map((f) => f.name),
+    // The staged names go in alongside the count: the queue is the host's and
+    // can outlive this mount, so the count alone could hand the next paste a
+    // name the queue already holds.
+    const { files, nextIndex } = renamePastedImages(
+      Array.from(clipboardFiles),
       pastedImageCount.current,
+      pendingFiles.map((f) => f.name),
     )
-    const { files, nextIndex } = renamePastedImages(Array.from(clipboardFiles), startIndex)
     pastedImageCount.current = nextIndex
     deliverFiles(files, clipboardFiles)
   }

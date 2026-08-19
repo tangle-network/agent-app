@@ -63,9 +63,14 @@ if (!globalThis.DataTransfer) {
     get files(): FileList {
       if (this.view) return this.view
       const files = this._files
-      const list: Record<number | string, unknown> = {
+      const list: Record<number | string | symbol, unknown> = {
         length: files.length,
         item: (index: number) => files[index] ?? null,
+        // A real FileList is iterable, so spread and for-of work on it. Without
+        // this the stand-in answers `Array.from` (which takes an array-like)
+        // but throws on `[...files]`, which is a difference no test should have
+        // to know about.
+        [Symbol.iterator]: () => files[Symbol.iterator](),
       }
       files.forEach((file, index) => {
         list[index] = file

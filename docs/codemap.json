@@ -18207,12 +18207,6 @@
           "doc": "Re-validate one JSON-boundary row into a queue item; null for junk."
         },
         {
-          "name": "pastedImageStartIndex",
-          "kind": "function",
-          "signature": "(stagedNames: Iterable<string>, current: number) => number",
-          "doc": "The counter a paste should start from, given the names already staged."
-        },
-        {
           "name": "pendingApprovalOf",
           "kind": "function",
           "signature": "(call: ChatToolCallInfo) => { proposalId: string; } | null",
@@ -18671,8 +18665,8 @@
         {
           "name": "renamePastedImages",
           "kind": "function",
-          "signature": "(files: File[], startIndex: number) => { files: File[]; nextIndex: number; }",
-          "doc": "Gives every generically-named clipboard image a distinct `pasted-image-<n>.<ext>` name, counting up from `startIndex`."
+          "signature": "(files: File[], startIndex: number, stagedNames?: Iterable<string>) => { files: File[]; nextIndex: number; }",
+          "doc": "Gives every generically-named clipboard image a distinct `pasted-image-<n>.<ext>` name."
         },
         {
           "name": "resolveChatInteraction",
