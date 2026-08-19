@@ -101,6 +101,15 @@ describe('mention serialization', () => {
     expect(collectMentions(after)).toHaveLength(0)
   })
 
+  it('keeps decomposed filenames whole — a combining mark continues the token', () => {
+    // 'a' + U+0301 is a decomposed 'á': without \p{M} in the continuation
+    // class, the shorter known id 'a' would match and split the filename
+    // right after its base letter.
+    const doc = parseMentionValue('see @a\u0301.txt here', known({ id: 'a', label: 'a' }))
+    expect(collectMentions(doc)).toHaveLength(0)
+    expect(serializeMentionDoc(doc)).toBe('see @a\u0301.txt here')
+  })
+
   it('resolves space-grouping ambiguity by the longest known id — the documented rule', () => {
     // `@my file.ts` cannot distinguish a `my` mention followed by prose from
     // a `my file.ts` mention; the plain-text contract resolves to the

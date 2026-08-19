@@ -13,13 +13,16 @@
  *
  *  Unicode-aware because the wire validator (`validateSandboxMentionPath`)
  *  deliberately ALLOWS non-ASCII paths — in-box filenames are arbitrary. An
- *  ASCII-only class here would accept input the readers then mangle. */
-export const PATH_CONTINUATION_CHAR = /[\p{L}\p{N}._\-/]/u
+ *  ASCII-only class here would accept input the readers then mangle.
+ *  `\p{M}` keeps DECOMPOSED filenames whole: without it, a combining accent
+ *  (`a` + U+0301) reads as a boundary and splits the name after its base
+ *  letter. */
+export const PATH_CONTINUATION_CHAR = /[\p{L}\p{M}\p{N}._\-/]/u
 
 /** A character that, immediately BEFORE an `@`, means the `@` is part of a
  *  longer token (an email local part, a handle) rather than a mention start.
- *  Unicode-aware for the same reason. */
-export const WORD_CHAR = /[\p{L}\p{N}]/u
+ *  Unicode-aware for the same reasons, combining marks included. */
+export const WORD_CHAR = /[\p{L}\p{M}\p{N}]/u
 
 /** The full character (code point) ENDING just before `index`, or undefined
  *  at the start. Indexing `text[index - 1]` hands a lone UTF-16 surrogate to
