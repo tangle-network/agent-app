@@ -76,7 +76,7 @@ _97 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./store`](api/store.md) | 16 | — |
 | [`./stream`](api/stream.md) | 49 | `interactions`, `plans` |
 | [`./studio`](api/studio.md) | 44 | — |
-| [`./studio-react`](api/studio-react.md) | 29 | `studio`, `web-react` |
+| [`./studio-react`](api/studio-react.md) | 22 | `studio`, `web-react` |
 | [`./tangle`](api/tangle.md) | 7 | — |
 | [`./teams`](api/teams.md) | 37 | — |
 | [`./teams-react`](api/teams-react.md) | 10 | `brand`, `teams` |
@@ -738,11 +738,11 @@ Source: `src/studio/index.ts` · 44 exports
 
 ## `./studio-react`
 
-Source: `src/studio-react/index.tsx` · 29 exports
+Source: `src/studio-react/index.tsx` · 22 exports
 
 Depends on: `studio`, `web-react`
 
-`AvatarComposer`, `ComposerDisclosure`, `ComposerHero`, `Field`, `filterGenerations`, `GenerationCard`, `GenerationDetail`, `GenerationDetailModal`, `GenerationGrid`, `GenerationStatusBadge`, `ImageComposer`, `LibraryDrawer`, `LibraryPanel`, `NativeSelect`, `ResultCanvas`, `SpeechComposer`, `Stepper`, `StudioHeader`, `StudioRole`, `StudioSheet`, `StudioWorkspace`, `StudioWorkspaceProps`, `TranscriptionComposer`, `TranscriptionOptions`, `TYPE_CONFIG`, `TypeConfig`, `typeConfigFor`, `useStudioGenerations`, `VideoComposer`
+`ComposerType`, `filterGenerations`, `GenerationCard`, `GenerationDetail`, `GenerationDetailModal`, `GenerationGrid`, `GenerationNoticeChip`, `GenerationStatusBadge`, `LibraryDrawer`, `LibraryPanel`, `ResultCanvas`, `StudioComposer`, `StudioComposerProps`, `StudioHeader`, `StudioRole`, `StudioSheet`, `StudioWorkspace`, `StudioWorkspaceProps`, `TYPE_CONFIG`, `TypeConfig`, `typeConfigFor`, `useStudioGenerations`
 
 [Full API →](api/studio-react.md)
 

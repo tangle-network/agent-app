@@ -212,12 +212,13 @@ it a *timeline* must be the first thing you see.
   read as a plain-language outcome ("Researched 3 sources", "Waiting for budget
   approval"), not a status enum.
 
-### Studio composer (`studio-react` — `composer-hero`, `publish-package-composer`)
-- **Purpose / goal:** compose a generation request (image/video/speech/avatar)
-  and route the output to connected destinations (X, LinkedIn).
-- **First impression we want:** "Describe what I want, see where it'll go, hit
-  one button." Keep destination connection state obvious (connected vs not) so
-  "Publish" never silently no-ops to a disconnected channel.
+### Studio composer (`studio-react` — `studio-composer`)
+- **Purpose / goal:** compose a generation request (image/video/audio) against
+  one model, with only the parameters that model actually publishes.
+- **First impression we want:** "Describe what I want, and every control I can
+  see is one this model will honour." A control the selected model ignores is
+  worse than an absent one — it reports a choice the system never made — so an
+  unknown parameter renders nothing rather than a guess or a disabled pill.
 
 ### Teams (`teams-react`) & Intakes (`intakes-react`)
 - **Teams purpose:** invite people, set roles, manage the org. Goal: *"give the
@@ -451,7 +452,7 @@ That rule is the whole difference, and colour is not part of it: measured in Chr
 **Rejected** (measured in this package's `src/**`, 2026-08-04):
 
 - **One animation, two meanings.** `animate-pulse` appears **16 times** in this package's shipped source — thirteen of them real usages, three of them comments naming the class a surface deliberately moved off — and those twelve still carry two unrelated signals: a loading skeleton (`src/vault/VaultPane.tsx`, `src/web-react/session-history.tsx`, `src/web-react/message-attachments.tsx`, `src/web-react/record-grid.tsx`) and a live-running status dot (`src/studio-react/result-canvas.tsx`, `src/assistant/AssistantPanel.tsx`, and the dictation capture indicator in `src/web-react/chat-composer.tsx`). A reader cannot learn what pulsing means when it means both "no data yet" and "work in progress" — a 2s ease fade is the cue a placeholder uses, and a placeholder is the one thing a running agent is not. Every surface under `/web-react` is now off the ambiguous side of that: the streaming caret blinks on a hard step (`agent-caret`), and a label that is WAITING sweeps through its own glyphs (`agent-shimmer`) — the chat thinking row, and a delegated run still in flight in `src/web-react/mission-activity.tsx`, whose tone dot keeps the hue and drops the pulse. Inside `/web-react`, pulsing now means "no data yet" and nothing else.
-- **A component inventing its own timing.** `src/studio-react/composer-hero.tsx` hardcodes `duration-300` — a fourth number in a three-number scale, and one that does not move under `prefers-reduced-motion`.
+- **A component inventing its own timing.** The old studio composer hero hardcoded `duration-300` — a fourth number in a three-number scale, and one that did not move under `prefers-reduced-motion`. The composer rework (#449) deleted that component, and its replacement puts its one entrance (the option pills rising when the media type changes) in `src/studio-react/studio.css`, where the stylesheet's own `prefers-reduced-motion` block collapses it with every other studio animation. No file under `src/studio-react/` carries a Tailwind `duration-*` utility any more.
 - **A spinner with nothing to say.** Eight `animate-spin` uses; a spinner without a label naming what is being waited on communicates only "something", which is the one thing the reader already knew.
 
 ---

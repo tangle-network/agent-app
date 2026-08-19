@@ -4,7 +4,7 @@ import { Button } from '@tangle-network/sandbox-ui/primitives'
 import { Images } from 'lucide-react'
 import type { Generation } from '../studio'
 import { useStudioGenerations } from './use-studio-generations'
-import { ComposerHero } from './composer-hero'
+import { StudioComposer } from './studio-composer'
 import { StudioHeader } from './studio-header'
 import { ResultCanvas } from './result-canvas'
 import { LibraryDrawer } from './library-drawer'
@@ -83,7 +83,7 @@ export function StudioWorkspace({
       <div className="mx-auto w-full max-w-3xl space-y-4 px-4 py-6 sm:px-6">
         {canGenerate ? (
           <>
-            <ComposerHero
+            <StudioComposer
               workspaceId={workspaceId}
               onGenerated={(generation) => {
                 onGenerated(generation)

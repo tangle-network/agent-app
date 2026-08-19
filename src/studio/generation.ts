@@ -131,9 +131,15 @@ export interface GenerationRequestFields {
   type: GenerationType
   model: string
   prompt: string
-  image: { size: string; quality: string; count: number }
+  // Every per-lane parameter except the image COUNT is optional, because the
+  // composer only sends what the selected model publishes: a model whose
+  // metadata omits `size` (or marks it `supported: false`) must send no `size`
+  // at all, and a model that publishes nothing — `ltx-video` — sends only the
+  // prompt. `count` stays required: it is the number of optimistic cards the
+  // caller already drew, not a model parameter.
+  image: { size?: string; quality?: string; count: number }
   video: {
-    duration: string | number
+    duration?: string | number
     resolution?: string
     aspectRatio?: string
     referenceImageUrl?: string
@@ -156,13 +162,13 @@ export function buildGenerationRequestBody(fields: GenerationRequestFields): Rec
     model: fields.model,
     prompt: fields.prompt.trim(),
   }
-  if (fields.type === 'image') Object.assign(body, {
-    size: fields.image.size,
-    quality: fields.image.quality,
-    n: fields.image.count,
-  })
+  if (fields.type === 'image') {
+    if (fields.image.size) body.size = fields.image.size
+    if (fields.image.quality) body.quality = fields.image.quality
+    body.n = fields.image.count
+  }
   if (fields.type === 'video') {
-    body.duration = fields.video.duration
+    if (fields.video.duration !== undefined) body.duration = fields.video.duration
     if (fields.video.resolution) body.resolution = fields.video.resolution
     if (fields.video.aspectRatio) body.aspectRatio = fields.video.aspectRatio
     if (fields.video.referenceImageUrl) body.referenceImageUrl = fields.video.referenceImageUrl

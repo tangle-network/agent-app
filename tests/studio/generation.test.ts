@@ -218,6 +218,20 @@ describe('buildGenerationRequestBody', () => {
     expect(body).toMatchObject({ type: 'image', size: '1024x1024', quality: 'high', n: 1 })
   })
 
+  it('omits every lane parameter the model does not publish', () => {
+    // A model with no published metadata (ltx-video) sends the prompt and its
+    // own id, and nothing else — an invented `size` or a defaulted `duration`
+    // is a parameter the caller never chose.
+    const image = buildGenerationRequestBody(reqFields({ type: 'image', image: { count: 2 } }))
+    expect(image).not.toHaveProperty('size')
+    expect(image).not.toHaveProperty('quality')
+    expect(image.n).toBe(2)
+
+    const video = buildGenerationRequestBody(reqFields({ type: 'video', video: {} }))
+    expect(video).not.toHaveProperty('duration')
+    expect(Object.keys(video).sort()).toEqual(['clientRequestId', 'model', 'prompt', 'type', 'workspaceId'])
+  })
+
   it('preserves wire-typed video durations and includes only supported optional fields', () => {
     const seedanceDuration = FALLBACK_VIDEO_MODEL_OPTIONS['bytedance/seedance-2.0/text-to-video']?.duration?.values?.[1]
     const seedance = buildGenerationRequestBody(reqFields({

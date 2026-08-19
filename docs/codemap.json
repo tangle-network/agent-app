@@ -14376,28 +14376,10 @@
       "error": null,
       "exports": [
         {
-          "name": "AvatarComposer",
-          "kind": "function",
-          "signature": "({ audioUrl, imageUrl, avatarId, onAudioUrlChange, onImageUrlChange, onAvatarIdChange, }: { audioUrl: string; imageUrl:…",
-          "doc": null
-        },
-        {
-          "name": "ComposerDisclosure",
-          "kind": "function",
-          "signature": "({ summary, children }: { summary: ReactNode; children: ReactNode; }) => Element",
-          "doc": null
-        },
-        {
-          "name": "ComposerHero",
-          "kind": "function",
-          "signature": "({ workspaceId, align, surfaceClassName, onGenerated, }: { workspaceId?: string | undefined; align?: \"center\" | \"start\"…",
-          "doc": null
-        },
-        {
-          "name": "Field",
-          "kind": "function",
-          "signature": "({ label, htmlFor, className, children, }: { label: string; htmlFor?: string | undefined; className?: string | undefine…",
-          "doc": null
+          "name": "ComposerType",
+          "kind": "type",
+          "signature": "type ComposerType",
+          "doc": "The lanes the composer offers."
         },
         {
           "name": "filterGenerations",
@@ -14430,15 +14412,15 @@
           "doc": "Chrome-less asset grid — the `GenerationCard` grid plus its empty state, with no surrounding tabs/stats/sheet chrome."
         },
         {
+          "name": "GenerationNoticeChip",
+          "kind": "function",
+          "signature": "({ className }: { className?: string | undefined; }) => Element",
+          "doc": "The one thing a chat-shaped generator has to say about itself: each prompt is a fresh generation, and nothing carries over from the last one."
+        },
+        {
           "name": "GenerationStatusBadge",
           "kind": "function",
           "signature": "({ generation, inline, }: { generation: Generation; inline?: boolean | undefined; }) => Element | null",
-          "doc": null
-        },
-        {
-          "name": "ImageComposer",
-          "kind": "function",
-          "signature": "({ size, quality, imageCount, onSizeChange, onQualityChange, onImageCountChange, }: { size: string; quality: string; im…",
           "doc": null
         },
         {
@@ -14454,27 +14436,21 @@
           "doc": "Inline asset gallery — the same filter + stats + card grid as the library drawer's list view, but with no sheet chrome so it can sit on the page beside the composer."
         },
         {
-          "name": "NativeSelect",
-          "kind": "function",
-          "signature": "(props: SelectHTMLAttributes<HTMLSelectElement>) => Element",
-          "doc": null
-        },
-        {
           "name": "ResultCanvas",
           "kind": "function",
           "signature": "({ batch, onOpenLibrary, onSelect, }: { batch: Generation[]; onOpenLibrary: () => void; onSelect: (generation: Generati…",
           "doc": null
         },
         {
-          "name": "SpeechComposer",
+          "name": "StudioComposer",
           "kind": "function",
-          "signature": "({ voice, onVoiceChange, }: { voice: string; onVoiceChange: (value: string) => void; }) => Element",
-          "doc": null
+          "signature": "({ workspaceId, onGenerated, variant, pickReferenceImage, className, }: StudioComposerProps) => Element",
+          "doc": "The composer card."
         },
         {
-          "name": "Stepper",
-          "kind": "function",
-          "signature": "({ value, min, max, onChange, }: { value: number; min: number; max: number; onChange: (value: number) => void; }) => El…",
+          "name": "StudioComposerProps",
+          "kind": "interface",
+          "signature": "interface StudioComposerProps",
           "doc": null
         },
         {
@@ -14508,18 +14484,6 @@
           "doc": null
         },
         {
-          "name": "TranscriptionComposer",
-          "kind": "function",
-          "signature": "({ audioUrl, language, onAudioUrlChange, onLanguageChange, }: { audioUrl: string; language: string; onAudioUrlChange: (…",
-          "doc": null
-        },
-        {
-          "name": "TranscriptionOptions",
-          "kind": "function",
-          "signature": "({ responseFormat, temperature, onResponseFormatChange, onTemperatureChange, }: { responseFormat: string; temperature:…",
-          "doc": null
-        },
-        {
           "name": "TYPE_CONFIG",
           "kind": "const",
           "signature": "Record<string, TypeConfig>",
@@ -14542,12 +14506,6 @@
           "kind": "function",
           "signature": "(loaderGenerations: Generation[], options?: { workspaceId?: string | undefined; generationsEndpoint?: string | undefine…",
           "doc": "The generation orchestrator behind a studio surface: it merges the loader's rows with in-flight live generations, computes the latest batch for the canvas, polls running generations until they settle…"
-        },
-        {
-          "name": "VideoComposer",
-          "kind": "function",
-          "signature": "({ duration, resolution, aspectRatio, referenceImageUrl, onDurationChange, onResolutionChange, onAspectRatioChange, onR…",
-          "doc": null
         }
       ]
     },
