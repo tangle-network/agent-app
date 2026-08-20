@@ -344,7 +344,6 @@
      percentages over a near-black card read as no tint at all. */
   --studio-send-gradient: linear-gradient(135deg, #4f46e5, #5b4ed4);
   --studio-notice-bg: color-mix(in srgb, hsl(var(--primary)) 8%, hsl(var(--card)));
-  --studio-notice-border: color-mix(in srgb, hsl(var(--primary)) 28%, hsl(var(--border)));
 }
 
 /**
@@ -440,7 +439,6 @@
      stronger, because 8% of a tint over a near-black card is not a tint. */
   --studio-send-gradient: linear-gradient(135deg, #4c3fc5, #7c6cf6);
   --studio-notice-bg: color-mix(in srgb, hsl(var(--primary)) 15%, hsl(var(--card)));
-  --studio-notice-border: color-mix(in srgb, hsl(var(--primary)) 40%, hsl(var(--border)));
 }
 
 /**
