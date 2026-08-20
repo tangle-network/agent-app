@@ -119,6 +119,18 @@ describe('StudioComposer — the pills are the model’s own parameters', () => 
     expect(source).toContain('icon={PARAM_ICONS[param] ?? SlidersHorizontal}')
   })
 
+  it('optically centers model and option pill labels', async () => {
+    mountWith(catalog({
+      video: [model(SEEDANCE, 'video')],
+    }, { video: SEEDANCE }))
+    fireEvent.click(screen.getByRole('button', { name: 'Video' }))
+    await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
+
+    const trimClass = '[text-box:trim-both_cap_alphabetic]'
+    expect(within(modelPill()).getByText(SEEDANCE).className).toContain(trimClass)
+    expect(within(screen.getByRole('button', { name: 'Duration: Auto' })).getByText('Auto').className).toContain(trimClass)
+  })
+
   it('renders one pill per published parameter and nothing for an unknown model', async () => {
     mountWith(catalog({
       video: [model(SEEDANCE, 'video'), model('kling/kling-v2-master', 'video'), model('ltx-video', 'video')],

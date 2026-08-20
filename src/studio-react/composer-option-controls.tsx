@@ -37,6 +37,14 @@ import { type MediaModelOption, type ModelOptionValue, validateCustomImageSize }
 
 /** The resting pill: one row height, never wraps, shrink-proof in the band. */
 const PILL = 'inline-flex h-7 flex-none items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-2.5 text-[12.5px] font-medium text-foreground transition hover:bg-accent'
+/**
+ * Optically centers a pill label. Flex `items-center` centers the LINE BOX, but
+ * where the glyphs sit inside it is font-metric-determined — with an
+ * ascent-heavy font the text reads ~1.5px high. Trimming the line box to the
+ * cap→baseline band makes flex centering center the visible text in every
+ * font; unsupported browsers keep the untrimmed (current) behavior.
+ */
+const PILL_LABEL = '[text-box:trim-both_cap_alphabetic]'
 const MENU_PANEL = `flex min-w-[184px] flex-col overflow-y-auto rounded-xl border border-border bg-popover p-1 text-popover-foreground ${OVERLAY_SHADOW}`
 const MENU_HEADER = 'px-2.5 pb-1 pt-1.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground'
 
@@ -272,7 +280,7 @@ export function MenuPill<T extends string>({
           : PILL} ${className ?? ''}`}
       >
         {Icon && <Icon aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />}
-        <span>{selected?.label ?? '—'}</span>
+        <span className={PILL_LABEL}>{selected?.label ?? '—'}</span>
         <ChevronDown className={`h-3 w-3 shrink-0 ${trigger === 'text' ? 'text-primary' : 'text-muted-foreground'}`} />
       </button>
 
@@ -355,7 +363,7 @@ export function OptionPill({
         className={PILL}
       >
         {Icon && <Icon aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />}
-        <span>{selected?.label ?? '—'}</span>
+        <span className={PILL_LABEL}>{selected?.label ?? '—'}</span>
         <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
       </button>
 
@@ -492,7 +500,7 @@ export function AudioTogglePill({ on, onToggle }: { on: boolean; onToggle: (on: 
       {on
         ? <Volume2 className="h-4 w-4 shrink-0" strokeWidth={1.5} />
         : <VolumeX className="h-4 w-4 shrink-0" strokeWidth={1.5} />}
-      <span>{on ? 'Audio on' : 'Audio off'}</span>
+      <span className={PILL_LABEL}>{on ? 'Audio on' : 'Audio off'}</span>
     </button>
   )
 }
@@ -531,7 +539,7 @@ export function ReferencePill({
     return (
       <div className={`${PILL} border-primary bg-primary/10 pr-1.5 text-primary hover:bg-primary/10`}>
         <img src={url} alt="" className="h-[18px] w-[18px] shrink-0 rounded-[5px] object-cover" />
-        <span>Reference</span>
+        <span className={PILL_LABEL}>Reference</span>
         <button
           type="button"
           aria-label="Remove reference image"
@@ -578,7 +586,7 @@ export function ReferencePill({
         className={PILL}
       >
         <ImagePlus className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-        <span>Reference image</span>
+        <span className={PILL_LABEL}>Reference image</span>
       </button>
 
       {!pick && (
@@ -670,7 +678,7 @@ export function ModelPill({
       >
         {unavailable && <TriangleAlert aria-hidden className="h-3.5 w-3.5 shrink-0 text-warning" strokeWidth={2} />}
         {provider && <ProviderLogo provider={provider} size={14} />}
-        <span className="max-w-[168px] truncate">{displayName}</span>
+        <span className={`max-w-[168px] truncate ${PILL_LABEL}`}>{displayName}</span>
         <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
       </button>
 
