@@ -22,6 +22,14 @@
  * lets the host navigate; every row of that batch still flows through
  * `onGenerated` so the host's list stays whole.
  *
+ * The root bakes in `min-h-full` so the sticky composer dock sits at the bottom
+ * of the nearest scroll container. A `min-h-*` utility passed through
+ * `className` will not reliably win: equal specificity lets the later-in-sheet
+ * `.min-h-full` rule take precedence. Do not make this root its own scroll
+ * container through `className`; wrap the screen in a
+ * `min-h-0 flex-1 overflow-y-auto` container and let the root fill it instead
+ * (issue #465, item 5).
+ *
  * Assumes a `StudioToastProvider` and a `StudioPlaybackProvider` above it.
  */
 
