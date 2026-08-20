@@ -23,7 +23,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
-import { ImagePlus, Volume2, VolumeX, X, type LucideIcon } from 'lucide-react'
+import { ImagePlus, TriangleAlert, Volume2, VolumeX, X, type LucideIcon } from 'lucide-react'
 import {
   CheckGlyph,
   ChevronDown,
@@ -622,6 +622,7 @@ export function ModelPill({
   value,
   displayName,
   provider,
+  unavailable,
   onSelect,
   bandRef,
 }: {
@@ -631,6 +632,8 @@ export function ModelPill({
    *  catalog does not list, such as an image-to-video sibling. */
   displayName: string
   provider?: string
+  /** The selected model is listed but not routable — the pill carries the warning instead of any status line. */
+  unavailable?: boolean
   onSelect: (id: string) => void
   bandRef: RefObject<HTMLDivElement | null>
 }) {
@@ -646,10 +649,11 @@ export function ModelPill({
         {...triggerProps}
         aria-controls={open ? panelId : undefined}
         title="Model"
-        aria-label={`Model: ${displayName}`}
+        aria-label={`Model: ${displayName}${unavailable ? ' (unavailable)' : ''}`}
         onClick={() => setOpen(!open)}
-        className={PILL}
+        className={`${PILL}${unavailable ? ' border-warning/50' : ''}`}
       >
+        {unavailable && <TriangleAlert aria-hidden className="h-3.5 w-3.5 shrink-0 text-warning" strokeWidth={2} />}
         {provider && <ProviderLogo provider={provider} size={14} />}
         <span className="max-w-[168px] truncate">{displayName}</span>
         <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
@@ -673,16 +677,26 @@ export function ModelPill({
             type="button"
             role="menuitemradio"
             aria-checked={model.id === value}
-            disabled={model.status === 'unavailable'}
             onClick={() => {
               onSelect(model.id)
               setOpen(false)
             }}
-            className={`${menuRowClass(model.id === value)} disabled:opacity-50`}
+            className={menuRowClass(model.id === value)}
           >
-            {model.provider && <ProviderLogo provider={model.provider} size={14} />}
-            <span className="truncate">{model.name || model.id}</span>
-            {model.status !== 'available' && (
+            {model.provider && (
+              <span className={model.status === 'unavailable' ? 'opacity-45' : undefined}>
+                <ProviderLogo provider={model.provider} size={14} />
+              </span>
+            )}
+            <span className={`truncate${model.status === 'unavailable' ? ' opacity-45' : ''}`}>
+              {model.name || model.id}
+            </span>
+            {model.status === 'unavailable' ? (
+              <>
+                <span className="ml-auto shrink-0 text-[11px] text-warning">Unavailable</span>
+                <TriangleAlert aria-hidden className="h-3.5 w-3.5 shrink-0 text-warning" strokeWidth={2} />
+              </>
+            ) : model.status === 'limited' && (
               <span className="ml-auto shrink-0 text-[11px] capitalize text-muted-foreground">{model.status}</span>
             )}
             {model.id === value && (

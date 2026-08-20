@@ -14291,6 +14291,12 @@
           "doc": "Determine if a generation ID indicates a local generation"
         },
         {
+          "name": "laneUnavailable",
+          "kind": "function",
+          "signature": "(models: readonly MediaModelOption[]) => boolean",
+          "doc": "True when a lane offers nothing sendable: no models, or every model unavailable."
+        },
+        {
           "name": "latestBatchOf",
           "kind": "function",
           "signature": "(generations: Generation[]) => Generation[]",
@@ -14616,7 +14622,7 @@
         {
           "name": "ModelPill",
           "kind": "function",
-          "signature": "({ models, value, displayName, provider, onSelect, bandRef, }: { models: readonly MediaModelOption[]; value: string; di…",
+          "signature": "({ models, value, displayName, provider, unavailable, onSelect, bandRef, }: { models: readonly MediaModelOption[]; valu…",
           "doc": "The model pill — first in the band on every lane, and the only pill that is always there."
         },
         {

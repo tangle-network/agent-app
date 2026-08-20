@@ -18508,6 +18508,14 @@ Readonly<Record<string, string>>
 (generation: Generation) => boolean
 ```
 
+### `laneUnavailable`
+
+`function` — True when a lane offers nothing sendable: no models, or every model unavailable.
+
+```ts
+(models: readonly MediaModelOption[]) => boolean
+```
+
 ### `latestBatchOf`
 
 `function` — Resolve and return the latest batch of generations grouped and sorted by client request ID and output index
@@ -18934,7 +18942,7 @@ interface MediaViewerModalProps
 `function` — The model pill — first in the band on every lane, and the only pill that is always there.
 
 ```ts
-({ models, value, displayName, provider, onSelect, bandRef, }: { models: readonly MediaModelOption[]; value: string; di…
+({ models, value, displayName, provider, unavailable, onSelect, bandRef, }: { models: readonly MediaModelOption[]; valu…
 ```
 
 ### `OptionChoice`

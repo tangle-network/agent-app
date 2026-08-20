@@ -4,7 +4,7 @@
 
 Source: `src/studio/index.ts`
 
-68 exports.
+69 exports.
 
 ### `aspectRatioFromOptions`
 
@@ -260,6 +260,14 @@ Readonly<Record<string, string>>
 
 ```ts
 (generation: Generation) => boolean
+```
+
+### `laneUnavailable`
+
+`function` — True when a lane offers nothing sendable: no models, or every model unavailable.
+
+```ts
+(models: readonly MediaModelOption[]) => boolean
 ```
 
 ### `latestBatchOf`

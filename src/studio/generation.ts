@@ -109,9 +109,14 @@ export function preferredModelId(type: GenerationType, catalog: MediaModelCatalo
   if (!catalog) return undefined
   const models = catalog.models[type] ?? []
   const preferred = catalog.defaults[type]
-  return models.find((model) => model.id === preferred)?.id
+  return models.find((model) => model.id === preferred && model.status !== 'unavailable')?.id
     ?? models.find((model) => model.status !== 'unavailable')?.id
     ?? models[0]?.id
+}
+
+/** True when a lane offers nothing sendable: no models, or every model unavailable. */
+export function laneUnavailable(models: readonly MediaModelOption[]): boolean {
+  return models.length === 0 || models.every((model) => model.status === 'unavailable')
 }
 
 /** Resolve the appropriate status message for a media model based on loading state and availability */

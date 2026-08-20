@@ -27,6 +27,7 @@ import {
   generationsInBatch,
   isGenerationType,
   isLocalGeneration,
+  laneUnavailable,
   latestBatchOf,
   mergeGenerationPages,
   mergeLiveGeneration,
@@ -334,6 +335,33 @@ describe('model selection', () => {
     expect(preferredModelId('video', catalog)).toBe('vid-x')
     expect(preferredModelId('avatar', catalog)).toBeUndefined()
     expect(preferredModelId('image', null)).toBeUndefined()
+  })
+
+  it('preferredModelId skips an unavailable catalog default when another model is routable', () => {
+    const deadDefault = {
+      ...catalog,
+      defaults: { ...catalog.defaults, image: 'img-dead' },
+      models: {
+        ...catalog.models,
+        image: [
+          { id: 'img-dead', name: 'Dead', type: 'image' as const, status: 'unavailable' as const },
+          { id: 'img-live', name: 'Live', type: 'image' as const, status: 'available' as const },
+        ],
+      },
+    }
+
+    expect(preferredModelId('image', deadDefault)).toBe('img-live')
+  })
+
+  it('laneUnavailable identifies empty and wholly unavailable lanes', () => {
+    const unavailable = { id: 'dead', name: 'Dead', type: 'video' as const, status: 'unavailable' as const }
+    const available = { ...unavailable, id: 'live', status: 'available' as const }
+    const limited = { ...unavailable, id: 'limited', status: 'limited' as const }
+
+    expect(laneUnavailable([])).toBe(true)
+    expect(laneUnavailable([unavailable, { ...unavailable, id: 'also-dead' }])).toBe(true)
+    expect(laneUnavailable([unavailable, available])).toBe(false)
+    expect(laneUnavailable([unavailable, limited])).toBe(false)
   })
 
   it('selectedModelsWithDefaults keeps a valid selection and resets missing/unavailable ones', () => {

@@ -139,7 +139,7 @@ interface MediaViewerModalProps
 `function` — The model pill — first in the band on every lane, and the only pill that is always there.
 
 ```ts
-({ models, value, displayName, provider, onSelect, bandRef, }: { models: readonly MediaModelOption[]; value: string; di…
+({ models, value, displayName, provider, unavailable, onSelect, bandRef, }: { models: readonly MediaModelOption[]; valu…
 ```
 
 ### `OptionChoice`
