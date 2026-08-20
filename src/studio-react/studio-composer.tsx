@@ -226,6 +226,12 @@ export function StudioComposer({
     setSelectedModels((current) => {
       const retainedId = current[type]
       if (!retainedId || !catalog) return current
+      // Never prune the image-to-video sibling: it is reached only by attaching a
+      // reference (never menu-listed), and pruning it would fall back to the t2v
+      // parent with the reference still attached — a reference on a text-to-video
+      // request. An unavailable sibling instead keeps the warned pill and the
+      // modelReady send gate, exactly the pre-#463 behavior.
+      if (textToVideoSibling(retainedId)) return current
       const row = (catalog.models[type] ?? []).find((model) => model.id === retainedId)
       if (!row || row.status !== 'unavailable') return current
       const next = { ...current }

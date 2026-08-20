@@ -353,6 +353,13 @@ describe('model selection', () => {
     expect(preferredModelId('image', deadDefault)).toBe('img-live')
   })
 
+  it('preferredModelId keeps a limited catalog default because it remains routable', () => {
+    expect(preferredModelId('image', {
+      ...catalog,
+      defaults: { ...catalog.defaults, image: 'img-b' },
+    })).toBe('img-b')
+  })
+
   it('laneUnavailable identifies empty and wholly unavailable lanes', () => {
     const unavailable = { id: 'dead', name: 'Dead', type: 'video' as const, status: 'unavailable' as const }
     const available = { ...unavailable, id: 'live', status: 'available' as const }
@@ -360,6 +367,7 @@ describe('model selection', () => {
 
     expect(laneUnavailable([])).toBe(true)
     expect(laneUnavailable([unavailable, { ...unavailable, id: 'also-dead' }])).toBe(true)
+    expect(laneUnavailable([limited])).toBe(false)
     expect(laneUnavailable([unavailable, available])).toBe(false)
     expect(laneUnavailable([unavailable, limited])).toBe(false)
   })

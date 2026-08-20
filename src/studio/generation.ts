@@ -85,7 +85,7 @@ export function generationVaultPath(generation: Generation): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null
 }
 
-/** Resolve selected models by applying defaults for missing or unavailable entries in the catalog
+/** DEPRECATED (orphaned since #449 deleted its consumer) — resolve selected models by applying catalog defaults.
  *  @deprecated Orphaned since its consumer (the pre-revamp ComposerHero) was deleted in #449;
  *  the composer re-derives the guard over curated models inline. Kept for external consumers;
  *  removal is a breaking change. */
@@ -117,12 +117,12 @@ export function preferredModelId(type: GenerationType, catalog: MediaModelCatalo
     ?? models[0]?.id
 }
 
-/** True when a lane offers nothing sendable: no models, or every model unavailable. */
+/** True when a model list offers nothing sendable: no models, or every model unavailable. */
 export function laneUnavailable(models: readonly MediaModelOption[]): boolean {
   return models.length === 0 || models.every((model) => model.status === 'unavailable')
 }
 
-/** Resolve the appropriate status message for a media model based on loading state and availability.
+/** DEPRECATED (the composer renders availability in the pill/menu/lane states since #463) — resolve the status message for a media model.
  *  @deprecated The composer no longer renders an availability status line (#463) — availability is
  *  carried by the model pill, the menu rows, and the lane-down notice. Kept only for external
  *  consumers; removal is a breaking change. */

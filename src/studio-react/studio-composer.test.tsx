@@ -254,6 +254,30 @@ describe('StudioComposer — the reference image swaps the model', () => {
 })
 
 describe('StudioComposer — retained model selection', () => {
+  it('keeps an unavailable image-to-video sibling paired with its attached reference', async () => {
+    const first = catalog({
+      video: [model(SEEDANCE, 'video'), model(SEEDANCE_I2V, 'video')],
+    }, { video: SEEDANCE })
+    const second = catalog({
+      video: [model(SEEDANCE, 'video'), model(SEEDANCE_I2V, 'video', { status: 'unavailable' })],
+    }, { video: SEEDANCE })
+    const { posted, onGenerated, rerender } = mountWith((workspaceId) => workspaceId === 'ws-2' ? second : first)
+    fireEvent.click(screen.getByRole('button', { name: 'Video' }))
+    await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
+    await attachReference()
+    await screen.findByRole('button', { name: `Model: ${SEEDANCE_I2V}` })
+
+    rerender(<StudioComposer workspaceId="ws-2" onGenerated={onGenerated} />)
+    await screen.findByRole('button', { name: `Model: ${SEEDANCE_I2V} (unavailable)` })
+    expect(screen.getByRole('button', { name: 'Remove reference image' })).not.toBeNull()
+
+    const textarea = screen.getByLabelText('Prompt')
+    fireEvent.change(textarea, { target: { value: 'keep the attached request safe' } })
+    expect(screen.getByRole('button', { name: 'Generate' }).hasAttribute('disabled')).toBe(true)
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+    expect(posted).toEqual([])
+  })
+
   it('falls back when a workspace catalog omits the retained model', async () => {
     const alternate = 'fal-ai/veo3.1'
     const first = catalog({ video: [model(SEEDANCE, 'video'), model(alternate, 'video')] }, { video: SEEDANCE })
@@ -328,6 +352,24 @@ describe('StudioComposer — model availability', () => {
     expect(screen.getByRole('button', { name: 'Generate' }).hasAttribute('disabled')).toBe(true)
     expect(screen.queryByText(reason)).toBeNull()
     expect(screen.queryByText('This model is not configured.')).toBeNull()
+  })
+
+  it('clears a deliberately picked unavailable model after switching lanes', async () => {
+    const unavailable = model('dead-video', 'video', { status: 'unavailable' })
+    const availableImage = 'openai/gpt-image-2'
+    mountWith(catalog({
+      image: [model(availableImage, 'image')],
+      video: [model('live-video', 'video'), unavailable],
+    }, { image: availableImage, video: 'live-video' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Video' }))
+    await screen.findByRole('button', { name: 'Model: live-video' })
+    await chooseModel(unavailable.id)
+    await screen.findByRole('button', { name: `Model: ${unavailable.id} (unavailable)` })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Image' }))
+    await screen.findByRole('button', { name: `Model: ${availableImage}` })
+    fireEvent.click(screen.getByRole('button', { name: 'Video' }))
+    await screen.findByRole('button', { name: 'Model: live-video' })
   })
 
   it('keeps unavailable and limited menu rows selectable with distinct status treatments', async () => {

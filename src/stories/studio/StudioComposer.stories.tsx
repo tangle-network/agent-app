@@ -152,15 +152,20 @@ function PickUnavailableModel({ children }: { children: ReactNode }) {
   useEffect(() => {
     const deadline = Date.now() + 2_000
     const timer = window.setInterval(() => {
+      if (Date.now() >= deadline) {
+        window.clearInterval(timer)
+        return
+      }
       const pill = host.current?.querySelector<HTMLButtonElement>('button[aria-label^="Model:"]')
       if (!pill) return
       if (pill.getAttribute('aria-expanded') !== 'true') pill.click()
-      const row = Array.from(document.querySelectorAll<HTMLButtonElement>('button[role="menuitemradio"]'))
+      const panelId = pill.getAttribute('aria-controls')
+      const panel = panelId ? document.getElementById(panelId) : null
+      if (!panel) return
+      const row = Array.from(panel.querySelectorAll<HTMLButtonElement>('button[role="menuitemradio"]'))
         .find((item) => item.textContent?.trim().startsWith('Veo 3.1'))
       if (row) {
         row.click()
-        window.clearInterval(timer)
-      } else if (Date.now() >= deadline) {
         window.clearInterval(timer)
       }
     }, 25)
