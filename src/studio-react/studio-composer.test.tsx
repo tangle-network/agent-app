@@ -9,6 +9,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
 import type {
   GenerationType,
   MediaModelCatalogResponse,
@@ -113,6 +114,23 @@ afterEach(() => {
 })
 
 describe('StudioComposer — the pills are the model’s own parameters', () => {
+  it('keeps a fallback trigger icon for future option parameters', () => {
+    const source = readFileSync('src/studio-react/studio-composer.tsx', 'utf8')
+    expect(source).toContain('icon={PARAM_ICONS[param] ?? SlidersHorizontal}')
+  })
+
+  it('optically centers model and option pill labels', async () => {
+    mountWith(catalog({
+      video: [model(SEEDANCE, 'video')],
+    }, { video: SEEDANCE }))
+    fireEvent.click(screen.getByRole('button', { name: 'Video' }))
+    await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
+
+    const trimClass = '[text-box:trim-both_cap_alphabetic]'
+    expect(within(modelPill()).getByText(SEEDANCE).className).toContain(trimClass)
+    expect(within(screen.getByRole('button', { name: 'Duration: Auto' })).getByText('Auto').className).toContain(trimClass)
+  })
+
   it('renders one pill per published parameter and nothing for an unknown model', async () => {
     mountWith(catalog({
       video: [model(SEEDANCE, 'video'), model('kling/kling-v2-master', 'video'), model('ltx-video', 'video')],
@@ -577,12 +595,22 @@ describe('StudioComposer — submitting', () => {
     ] as const) {
       if (lane !== 'Image') fireEvent.click(screen.getByRole('button', { name: lane }))
       await screen.findByRole('button', { name: `Model: ${modelId}` })
-      await submit(`all ${lane.toLowerCase()} parameters`)
-      await waitFor(() => expect(posted).toHaveLength(lane === 'Image' ? 1 : lane === 'Video' ? 2 : 3))
 
       const optionPills = Array.from(document.querySelectorAll<HTMLButtonElement>(
         '.studio-band button[title]:not([title="Model"]):not([title="Audio"])',
       ))
+      for (const optionPill of optionPills) {
+        const svgs = optionPill.querySelectorAll('svg')
+        const label = optionPill.querySelector('span')
+        expect(svgs).toHaveLength(2)
+        const leadingIcon = svgs.item(0)
+        if (!leadingIcon || !label) throw new Error(`${optionPill.title} trigger is missing its icon or label`)
+        expect(leadingIcon.compareDocumentPosition(label) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+      }
+
+      await submit(`all ${lane.toLowerCase()} parameters`)
+      await waitFor(() => expect(posted).toHaveLength(lane === 'Image' ? 1 : lane === 'Video' ? 2 : 3))
+
       const body = posted.at(-1) ?? {}
       for (const optionPill of optionPills) {
         const label = optionPill.title

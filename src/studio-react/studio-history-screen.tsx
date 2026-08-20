@@ -22,7 +22,19 @@ import {
   type CSSProperties,
   type JSX,
 } from 'react'
-import { ArrowLeft, Download, FolderPlus, Search, Trash2, X } from 'lucide-react'
+import {
+  ArrowLeft,
+  AudioLines,
+  Download,
+  FolderPlus,
+  Image,
+  LayoutGrid,
+  Search,
+  Trash2,
+  Video,
+  X,
+  type LucideIcon,
+} from 'lucide-react'
 
 import type { Generation } from '../studio/generation'
 import {
@@ -64,6 +76,17 @@ const MORE_SKELETONS = 4
 const BAR = 'flex min-h-[44px] flex-wrap items-center justify-between gap-3 px-6 pb-[18px] pt-0.5 max-[900px]:px-4'
 const SEARCH_INPUT = 'h-8 w-[260px] max-w-[52vw] rounded-full border border-border bg-card pl-8 pr-3 text-[13px] text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-[3px] focus:ring-ring/30 max-[640px]:w-full max-[640px]:max-w-none'
 const OUTLINE_PILL = 'inline-flex h-8 items-center gap-1.5 rounded-full border border-border px-3 text-[12.5px] font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40'
+
+const FILTER_ICONS: Record<MediaTypeFilter, LucideIcon> = {
+  all: LayoutGrid,
+  image: Image,
+  video: Video,
+  speech: AudioLines,
+}
+const FILTER_CHOICES = MEDIA_TYPE_FILTERS.map((choice) => ({
+  ...choice,
+  icon: FILTER_ICONS[choice.value],
+}))
 
 /** The empty-state plural for a type filter, in the filter's own words. */
 const TYPE_NOUNS: Record<Exclude<MediaTypeFilter, 'all'>, string> = {
@@ -337,8 +360,9 @@ export function StudioHistoryScreen({
             <MenuPill
               label="Filter by media type"
               value={type}
-              choices={MEDIA_TYPE_FILTERS}
+              choices={FILTER_CHOICES}
               onSelect={setType}
+              trigger="text"
             />
           </div>
         </div>

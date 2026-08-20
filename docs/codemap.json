@@ -14616,7 +14616,7 @@
         {
           "name": "MenuPill",
           "kind": "function",
-          "signature": "<T extends string>({ label, value, choices, onSelect, className, }: { label: string; value: T; choices: readonly { valu…",
+          "signature": "<T extends string>({ label, value, choices, onSelect, className, icon: Icon, trigger, }: { label: string; value: T; cho…",
           "doc": "A standalone enum picker using the studio composer's pill and menu grammar."
         },
         {
@@ -14634,7 +14634,7 @@
         {
           "name": "OptionPill",
           "kind": "function",
-          "signature": "({ label, value, choices, onSelect, bandRef, custom, }: { label: string; value: ModelOptionValue | undefined; choices:…",
+          "signature": "({ label, value, choices, onSelect, bandRef, custom, icon: Icon, }: { label: string; value: ModelOptionValue | undefine…",
           "doc": "A value pill and the menu it opens."
         },
         {
