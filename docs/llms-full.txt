@@ -18606,7 +18606,7 @@ type MediaTypeFilter
 
 ### `modelMessage`
 
-`function` — Resolve the appropriate status message for a media model based on loading state and availability
+`function` — Resolve the appropriate status message for a media model based on loading state and availability.
 
 ```ts
 (model: MediaModelOption | undefined, loading: boolean, count: number) => string | null

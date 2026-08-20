@@ -119,7 +119,10 @@ export function laneUnavailable(models: readonly MediaModelOption[]): boolean {
   return models.length === 0 || models.every((model) => model.status === 'unavailable')
 }
 
-/** Resolve the appropriate status message for a media model based on loading state and availability */
+/** Resolve the appropriate status message for a media model based on loading state and availability.
+ *  @deprecated The composer no longer renders an availability status line (#463) — availability is
+ *  carried by the model pill, the menu rows, and the lane-down notice. Kept only for external
+ *  consumers; removal is a breaking change. */
 export function modelMessage(model: MediaModelOption | undefined, loading: boolean, count: number): string | null {
   if (loading) return 'Loading media models...'
   if (count === 0) return 'No models are available for this media type.'

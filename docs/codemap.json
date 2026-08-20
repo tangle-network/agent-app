@@ -14366,7 +14366,7 @@
           "name": "modelMessage",
           "kind": "function",
           "signature": "(model: MediaModelOption | undefined, loading: boolean, count: number) => string | null",
-          "doc": "Resolve the appropriate status message for a media model based on loading state and availability"
+          "doc": "Resolve the appropriate status message for a media model based on loading state and availability."
         },
         {
           "name": "ModelOptionMetadata",
