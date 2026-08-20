@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AudioLines, ArrowUp, Image as ImageIcon, Video } from 'lucide-react'
+import { AudioLines, ArrowUp, Image as ImageIcon, TriangleAlert, Video } from 'lucide-react'
 import {
   type Generation,
   type MediaModelCatalogResponse,
@@ -26,7 +26,7 @@ import {
   curateComposerModels,
   failedOptimisticGeneration,
   imageToVideoSibling,
-  modelMessage,
+  laneUnavailable,
   normalizeImageCount,
   optimisticGeneration,
   optionChoices,
@@ -119,7 +119,7 @@ function defaultModelId(
   curated: readonly MediaModelOption[],
 ): string {
   const preferred = preferredModelId(type, catalog)
-  if (preferred && curated.some((model) => model.id === preferred)) return preferred
+  if (preferred && curated.some((model) => model.id === preferred && model.status !== 'unavailable')) return preferred
   return curated.find((model) => model.status !== 'unavailable')?.id ?? curated[0]?.id ?? ''
 }
 
@@ -201,7 +201,7 @@ export function StudioComposer({
   // A retained pick survives only while the CURRENT catalog can honour it: with
   // no catalog yet keep it; an intentionally-uncurated i2v sibling stays (it is
   // reached by attaching a reference, never listed); anything else must be
-  // present and available in the curated list, or the lane falls back to its
+  // present in the curated list, or the lane falls back to its
   // default. The deleted ComposerHero defended this via selectedModelsWithDefaults;
   // that helper resolves over the FULL catalog and would resurrect
   // curation-removed defaults, so the guard is re-derived here over curatedModels.
@@ -209,7 +209,7 @@ export function StudioComposer({
   const retainedUsable = retained !== undefined && (
     !catalog
     || Boolean(textToVideoSibling(retained))
-    || curatedModels.some((model) => model.id === retained && model.status !== 'unavailable')
+    || curatedModels.some((model) => model.id === retained)
   )
   const modelId = retainedUsable ? retained : defaultModelId(type, catalog, curatedModels)
   // The image-to-video sibling is deliberately absent from the curated menu (it
@@ -217,6 +217,28 @@ export function StudioComposer({
   // looked up in the FULL lane list and may still be missing — a sibling the
   // catalog does not carry is sent by id and displayed as its id.
   const modelOption = laneModels.find((model) => model.id === modelId)
+
+  // A dead selection is honoured only while the user is looking at it: a catalog
+  // (re)load or a lane switch re-resolves to the first available model, so a dead
+  // default never stays selected on its own (#463). A menu pick of an unavailable
+  // model after that still sticks — until the catalog or the lane changes again.
+  useEffect(() => {
+    setSelectedModels((current) => {
+      const retainedId = current[type]
+      if (!retainedId || !catalog) return current
+      // Never prune the image-to-video sibling: it is reached only by attaching a
+      // reference (never menu-listed), and pruning it would fall back to the t2v
+      // parent with the reference still attached — a reference on a text-to-video
+      // request. An unavailable sibling instead keeps the warned pill and the
+      // modelReady send gate, exactly the pre-#463 behavior.
+      if (textToVideoSibling(retainedId)) return current
+      const row = (catalog.models[type] ?? []).find((model) => model.id === retainedId)
+      if (!row || row.status !== 'unavailable') return current
+      const next = { ...current }
+      delete next[type]
+      return next
+    })
+  }, [catalog, type])
 
   const options = useMemo(
     () => (modelId
@@ -260,6 +282,7 @@ export function StudioComposer({
     && modelOption?.status !== 'unavailable'
     && !catalogLoading
     && !catalogError
+  const laneDown = Boolean(catalog) && !catalogLoading && !catalogError && laneUnavailable(curatedModels)
   const canSubmit = Boolean(workspaceId) && modelReady && Boolean(prompt.trim()) && !isSubmitting
 
   function selectModel(id: string) {
@@ -298,10 +321,7 @@ export function StudioComposer({
     if (!workspaceId || submitLockRef.current || isSubmitting) return
     const promptText = prompt.trim()
     if (!promptText) return
-    if (!modelReady) {
-      if (!catalogLoading) setError('Select an available model')
-      return
-    }
+    if (!modelReady) return
     submitLockRef.current = true
     setIsSubmitting(true)
     setError(null)
@@ -377,30 +397,38 @@ export function StudioComposer({
     }
   }
 
-  const statusMessage = unlistedSibling
-    ? null
-    : modelMessage(modelOption, catalogLoading, curatedModels.length)
-  const notice = catalogError ?? error ?? statusMessage
-  const noticeIsProblem = Boolean(catalogError || error || modelOption?.status === 'unavailable')
+  const notice = catalogError ?? error
+  const laneLabel = SEGMENTS.find((segment) => segment.type === type)!.label
+  // An empty curated lane can reflect catalog or curation policy, not an outage.
+  const laneDownMessage = curatedModels.length > 0
+    ? `${laneLabel} models are temporarily unavailable`
+    : `No ${laneLabel.toLowerCase()} models are available`
 
   return (
     <section
       data-variant={variant}
       className={`rounded-[14px] border border-border bg-card px-2.5 pb-[9px] pt-2 shadow-sm transition focus-within:border-primary focus-within:ring-[3px] focus-within:ring-ring/30 ${className ?? ''}`}
     >
-      <textarea
-        value={prompt}
-        onChange={(event) => setPrompt(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key !== 'Enter' || event.shiftKey) return
-          event.preventDefault()
-          void generate()
-        }}
-        rows={3}
-        aria-label="Prompt"
-        placeholder="Describe what you want to generate…"
-        className="block min-h-[66px] w-full resize-none border-0 bg-transparent px-1.5 pb-1 pt-1.5 text-[14.5px] leading-relaxed outline-none placeholder:text-muted-foreground"
-      />
+      {laneDown ? (
+        <p className="flex min-h-0 items-center gap-2 px-1.5 pb-3 pt-1.5 text-[13px] font-medium text-warning">
+          <TriangleAlert aria-hidden className="h-4 w-4 shrink-0" strokeWidth={2} />
+          <span>{laneDownMessage}</span>
+        </p>
+      ) : (
+        <textarea
+          value={prompt}
+          onChange={(event) => setPrompt(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || event.shiftKey) return
+            event.preventDefault()
+            void generate()
+          }}
+          rows={3}
+          aria-label="Prompt"
+          placeholder="Describe what you want to generate…"
+          className="block min-h-[66px] w-full resize-none border-0 bg-transparent px-1.5 pb-1 pt-1.5 text-[14.5px] leading-relaxed outline-none placeholder:text-muted-foreground"
+        />
+      )}
 
       <div className="flex items-center gap-2">
         <MediaTypeSegments value={type} segments={SEGMENTS} onChange={setType} />
@@ -411,6 +439,7 @@ export function StudioComposer({
             value={modelId}
             displayName={modelOption?.name || modelId || 'Select a model'}
             provider={modelOption?.provider}
+            unavailable={modelOption?.status === 'unavailable'}
             onSelect={chooseModel}
             bandRef={bandRef}
           />
@@ -477,7 +506,7 @@ export function StudioComposer({
       </div>
 
       {notice && (
-        <p className={`px-1.5 pt-1.5 text-[12px] ${noticeIsProblem ? 'text-destructive' : 'text-muted-foreground'}`}>
+        <p className="px-1.5 pt-1.5 text-[12px] text-destructive">
           {notice}
         </p>
       )}

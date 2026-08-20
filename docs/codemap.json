@@ -14291,6 +14291,12 @@
           "doc": "Determine if a generation ID indicates a local generation"
         },
         {
+          "name": "laneUnavailable",
+          "kind": "function",
+          "signature": "(models: readonly MediaModelOption[]) => boolean",
+          "doc": "True when a model list offers nothing sendable: no models, or every model unavailable."
+        },
+        {
           "name": "latestBatchOf",
           "kind": "function",
           "signature": "(generations: Generation[]) => Generation[]",
@@ -14360,7 +14366,7 @@
           "name": "modelMessage",
           "kind": "function",
           "signature": "(model: MediaModelOption | undefined, loading: boolean, count: number) => string | null",
-          "doc": "Resolve the appropriate status message for a media model based on loading state and availability"
+          "doc": "DEPRECATED (the composer renders availability in the pill/menu/lane states since #463) — resolve the status message for a media model."
         },
         {
           "name": "ModelOptionMetadata",
@@ -14456,7 +14462,7 @@
           "name": "selectedModelsWithDefaults",
           "kind": "function",
           "signature": "(current: Partial<Record<GenerationType, string>>, catalog: MediaModelCatalogResponse) => Partial<Record<GenerationType…",
-          "doc": "Resolve selected models by applying defaults for missing or unavailable entries in the catalog"
+          "doc": "DEPRECATED (orphaned since #449 deleted its consumer) — resolve selected models by applying catalog defaults."
         },
         {
           "name": "StudioMediaActions",
@@ -14616,7 +14622,7 @@
         {
           "name": "ModelPill",
           "kind": "function",
-          "signature": "({ models, value, displayName, provider, onSelect, bandRef, }: { models: readonly MediaModelOption[]; value: string; di…",
+          "signature": "({ models, value, displayName, provider, unavailable, onSelect, bandRef, }: { models: readonly MediaModelOption[]; valu…",
           "doc": "The model pill — first in the band on every lane, and the only pill that is always there."
         },
         {

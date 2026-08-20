@@ -4,7 +4,7 @@
 
 Source: `src/studio/index.ts`
 
-68 exports.
+69 exports.
 
 ### `aspectRatioFromOptions`
 
@@ -262,6 +262,14 @@ Readonly<Record<string, string>>
 (generation: Generation) => boolean
 ```
 
+### `laneUnavailable`
+
+`function` — True when a model list offers nothing sendable: no models, or every model unavailable.
+
+```ts
+(models: readonly MediaModelOption[]) => boolean
+```
+
 ### `latestBatchOf`
 
 `function` — Resolve and return the latest batch of generations grouped and sorted by client request ID and output index
@@ -352,7 +360,7 @@ type MediaTypeFilter
 
 ### `modelMessage`
 
-`function` — Resolve the appropriate status message for a media model based on loading state and availability
+`function` — DEPRECATED (the composer renders availability in the pill/menu/lane states since #463) — resolve the status message for a media model.
 
 ```ts
 (model: MediaModelOption | undefined, loading: boolean, count: number) => string | null
@@ -480,7 +488,7 @@ type SaveGenerationsToVault
 
 ### `selectedModelsWithDefaults`
 
-`function` — Resolve selected models by applying defaults for missing or unavailable entries in the catalog
+`function` — DEPRECATED (orphaned since #449 deleted its consumer) — resolve selected models by applying catalog defaults.
 
 ```ts
 (current: Partial<Record<GenerationType, string>>, catalog: MediaModelCatalogResponse) => Partial<Record<GenerationType…
