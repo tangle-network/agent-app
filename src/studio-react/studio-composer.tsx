@@ -392,7 +392,11 @@ export function StudioComposer({
   }
 
   const notice = catalogError ?? error
-  const laneDownMessage = `${SEGMENTS.find((segment) => segment.type === type)!.label} models are temporarily unavailable`
+  const laneLabel = SEGMENTS.find((segment) => segment.type === type)!.label
+  // An empty curated lane can reflect catalog or curation policy, not an outage.
+  const laneDownMessage = curatedModels.length > 0
+    ? `${laneLabel} models are temporarily unavailable`
+    : `No ${laneLabel.toLowerCase()} models are available`
 
   return (
     <section

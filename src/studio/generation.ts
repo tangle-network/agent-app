@@ -85,7 +85,10 @@ export function generationVaultPath(generation: Generation): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null
 }
 
-/** Resolve selected models by applying defaults for missing or unavailable entries in the catalog */
+/** Resolve selected models by applying defaults for missing or unavailable entries in the catalog
+ *  @deprecated Orphaned since its consumer (the pre-revamp ComposerHero) was deleted in #449;
+ *  the composer re-derives the guard over curated models inline. Kept for external consumers;
+ *  removal is a breaking change. */
 export function selectedModelsWithDefaults(
   current: Partial<Record<GenerationType, string>>,
   catalog: MediaModelCatalogResponse,

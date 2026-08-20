@@ -231,8 +231,8 @@ export const LaneDown: Story = {
   decorators: [withCatalog(IMAGE_LANE_DOWN_CATALOG)],
 }
 
-/** An empty lane now uses the same compact amber lane-down line; the model pill
- *  reads "Select a model" and Generate stays disabled. */
+/** An empty lane uses the compact amber "No image models are available" line;
+ *  the model pill reads "Select a model" and Generate stays disabled. */
 export const EmptyCatalog: Story = {
   name: 'Empty catalog',
   decorators: [withCatalog(EMPTY_CATALOG)],

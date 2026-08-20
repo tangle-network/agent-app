@@ -371,6 +371,19 @@ describe('StudioComposer — model availability', () => {
     expect(screen.queryByText('Audio models are temporarily unavailable')).toBeNull()
     expect(screen.getByLabelText('Prompt')).not.toBeNull()
   })
+
+  it('describes an empty Audio lane without claiming a temporary outage', async () => {
+    mountWith(catalog({
+      image: [model('gpt-image-2', 'image')],
+      speech: [],
+    }, { image: 'gpt-image-2' }))
+    await screen.findByRole('button', { name: 'Model: gpt-image-2' })
+    fireEvent.click(screen.getByRole('button', { name: 'Audio' }))
+
+    await screen.findByText('No audio models are available')
+    expect(screen.queryByLabelText('Prompt')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Generate' }).hasAttribute('disabled')).toBe(true)
+  })
 })
 
 describe('StudioComposer — image lane', () => {
