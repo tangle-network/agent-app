@@ -202,6 +202,7 @@ function useCloseWhenScrolledOut(
 export interface OptionChoice {
   value: ModelOptionValue
   label: string
+  icon?: LucideIcon
 }
 
 function MenuRows<T extends ModelOptionValue>({
@@ -210,24 +211,28 @@ function MenuRows<T extends ModelOptionValue>({
   onSelect,
 }: {
   value: T | undefined
-  choices: readonly { value: T; label: string }[]
+  choices: readonly { value: T; label: string; icon?: LucideIcon }[]
   onSelect: (value: T) => void
 }) {
-  return choices.map((choice) => (
-    <button
-      key={String(choice.value)}
-      type="button"
-      role="menuitemradio"
-      aria-checked={choice.value === value}
-      onClick={() => onSelect(choice.value)}
-      className={menuRowClass(choice.value === value)}
-    >
-      <span className="truncate">{choice.label}</span>
-      {choice.value === value && (
-        <CheckGlyph className="ml-auto h-3.5 w-3.5 shrink-0 text-primary" />
-      )}
-    </button>
-  ))
+  return choices.map((choice) => {
+    const Icon = choice.icon
+    return (
+      <button
+        key={String(choice.value)}
+        type="button"
+        role="menuitemradio"
+        aria-checked={choice.value === value}
+        onClick={() => onSelect(choice.value)}
+        className={menuRowClass(choice.value === value)}
+      >
+        {Icon && <Icon aria-hidden className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />}
+        <span className="truncate">{choice.label}</span>
+        {choice.value === value && (
+          <CheckGlyph className="ml-auto h-3.5 w-3.5 shrink-0 text-primary" />
+        )}
+      </button>
+    )
+  })
 }
 
 /** A standalone enum picker using the studio composer's pill and menu grammar. */
@@ -237,12 +242,16 @@ export function MenuPill<T extends string>({
   choices,
   onSelect,
   className,
+  icon: Icon,
+  trigger = 'pill',
 }: {
   label: string
   value: T
-  choices: readonly { value: T; label: string }[]
+  choices: readonly { value: T; label: string; icon?: LucideIcon }[]
   onSelect: (value: T) => void
   className?: string
+  icon?: LucideIcon
+  trigger?: 'pill' | 'text'
 }): JSX.Element {
   const [open, setOpen] = useState(false)
   const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
@@ -258,10 +267,13 @@ export function MenuPill<T extends string>({
         title={label}
         aria-label={label}
         onClick={() => setOpen(!open)}
-        className={`${PILL} ${className ?? ''}`}
+        className={`${trigger === 'text'
+          ? 'inline-flex h-7 flex-none items-center gap-1 whitespace-nowrap rounded-full px-2 text-[12.5px] font-medium text-primary transition hover:bg-accent'
+          : PILL} ${className ?? ''}`}
       >
+        {Icon && <Icon aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />}
         <span>{selected?.label ?? '—'}</span>
-        <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+        <ChevronDown className={`h-3 w-3 shrink-0 ${trigger === 'text' ? 'text-primary' : 'text-muted-foreground'}`} />
       </button>
 
       <PopoverSurface
@@ -301,12 +313,14 @@ export function OptionPill({
   onSelect,
   bandRef,
   custom,
+  icon: Icon,
 }: {
   label: string
   value: ModelOptionValue | undefined
   choices: readonly OptionChoice[]
   onSelect: (value: ModelOptionValue) => void
   bandRef: RefObject<HTMLDivElement | null>
+  icon?: LucideIcon
   /** A trailing row that swaps the menu to a form (the gpt-image-2 custom
    *  size). Absent for every parameter whose values are an enum. */
   custom?: {
@@ -340,6 +354,7 @@ export function OptionPill({
         }}
         className={PILL}
       >
+        {Icon && <Icon aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />}
         <span>{selected?.label ?? '—'}</span>
         <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
       </button>
