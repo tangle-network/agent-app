@@ -13,8 +13,14 @@ import type { GenerationType, MediaModelCatalogResponse, MediaModelOption } from
  * story that silently swallowed the POST would look like it worked.
  */
 
-function model(id: string, type: GenerationType, provider: string, name = id): MediaModelOption {
-  return { id, name, provider, type, status: 'available' }
+function model(
+  id: string,
+  type: GenerationType,
+  provider: string,
+  name = id,
+  extra: Partial<MediaModelOption> = {},
+): MediaModelOption {
+  return { id, name, provider, type, status: 'available', ...extra }
 }
 
 const CATALOG: MediaModelCatalogResponse = {
@@ -57,6 +63,36 @@ const CATALOG: MediaModelCatalogResponse = {
 const EMPTY_CATALOG: MediaModelCatalogResponse = {
   defaults: CATALOG.defaults,
   models: { image: [], video: [], speech: [], avatar: [], transcription: [] },
+}
+
+const AVAILABILITY_CATALOG: MediaModelCatalogResponse = {
+  defaults: CATALOG.defaults,
+  models: {
+    image: CATALOG.models.image,
+    video: [
+      model('bytedance/seedance-2.0/text-to-video', 'video', 'bytedance', 'Seedance 2.0'),
+      model('fal-ai/veo3.1', 'video', 'google', 'Veo 3.1', { status: 'unavailable' }),
+      model('kling/kling-v2-master', 'video', 'kling', 'Kling v2 Master', { status: 'unavailable' }),
+      model('ltx-video', 'video', 'fal', 'LTX Video', { status: 'limited' }),
+    ],
+    speech: CATALOG.models.speech,
+    avatar: CATALOG.models.avatar,
+    transcription: CATALOG.models.transcription,
+  },
+}
+
+const IMAGE_LANE_DOWN_CATALOG: MediaModelCatalogResponse = {
+  defaults: CATALOG.defaults,
+  models: {
+    image: [
+      model('gpt-image-2', 'image', 'openai', 'GPT Image 2', { status: 'unavailable' }),
+      model('openai/gpt-image-2', 'image', 'openai', 'GPT Image 2 (OpenAI)', { status: 'unavailable' }),
+    ],
+    video: CATALOG.models.video,
+    speech: CATALOG.models.speech,
+    avatar: CATALOG.models.avatar,
+    transcription: CATALOG.models.transcription,
+  },
 }
 
 let servedCatalog = CATALOG
@@ -109,6 +145,30 @@ function OnLane({ lane, children }: { lane: 'Image' | 'Video' | 'Audio'; childre
   return <div ref={host}>{children}</div>
 }
 
+/** Opens the async-loaded model menu and deliberately picks its unavailable
+ *  Veo row, leaving the composer in the warning state readers need to inspect. */
+function PickUnavailableModel({ children }: { children: ReactNode }) {
+  const host = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const deadline = Date.now() + 2_000
+    const timer = window.setInterval(() => {
+      const pill = host.current?.querySelector<HTMLButtonElement>('button[aria-label^="Model:"]')
+      if (!pill) return
+      if (pill.getAttribute('aria-expanded') !== 'true') pill.click()
+      const row = Array.from(document.querySelectorAll<HTMLButtonElement>('button[role="menuitemradio"]'))
+        .find((item) => item.textContent?.trim().startsWith('Veo 3.1'))
+      if (row) {
+        row.click()
+        window.clearInterval(timer)
+      } else if (Date.now() >= deadline) {
+        window.clearInterval(timer)
+      }
+    }, 25)
+    return () => window.clearInterval(timer)
+  }, [])
+  return <div ref={host}>{children}</div>
+}
+
 const meta: Meta<typeof StudioComposer> = {
   title: 'Studio/StudioComposer',
   component: StudioComposer,
@@ -150,7 +210,29 @@ export const AudioLane: Story = {
   ),
 }
 
-/** No routable models: the model pill says so and Generate stays disabled. */
+/** A deliberate unavailable pick keeps its warned model pill on screen and
+ *  disables Generate; reopen it to inspect the dimmed Unavailable menu row. */
+export const ModelUnavailable: Story = {
+  name: 'Model unavailable (deliberate pick)',
+  decorators: [withCatalog(AVAILABILITY_CATALOG)],
+  render: (args) => (
+    <OnLane lane="Video">
+      <PickUnavailableModel>
+        <StudioComposer {...args} />
+      </PickUnavailableModel>
+    </OnLane>
+  ),
+}
+
+/** Every curated image model is unavailable, so the prompt becomes the compact
+ *  amber lane-down line and Generate stays disabled. */
+export const LaneDown: Story = {
+  name: 'Lane down',
+  decorators: [withCatalog(IMAGE_LANE_DOWN_CATALOG)],
+}
+
+/** An empty lane now uses the same compact amber lane-down line; the model pill
+ *  reads "Select a model" and Generate stays disabled. */
 export const EmptyCatalog: Story = {
   name: 'Empty catalog',
   decorators: [withCatalog(EMPTY_CATALOG)],
