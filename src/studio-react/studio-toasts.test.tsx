@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { act, fireEvent, render, screen } from '@testing-library/react'
+import { hydrateRoot, type Root } from 'react-dom/client'
+import { renderToString } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { StudioToastProvider, useStudioToast, type StudioToastInput } from './studio-toasts'
 
@@ -68,6 +70,33 @@ describe('StudioToastProvider', () => {
     expect(viewport.style.bottom).toBe('200px')
     act(() => api.setDockLift(null))
     expect(viewport.style.bottom).toBe('22px')
+  })
+
+  it('hydrates without a portal mismatch and mounts notifications after effects', async () => {
+    const tree = (
+      <StudioToastProvider>
+        <div>Studio content</div>
+      </StudioToastProvider>
+    )
+    const serverMarkup = renderToString(tree)
+    const container = document.createElement('div')
+    container.innerHTML = serverMarkup
+    document.body.append(container)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    let root: Root | undefined
+
+    await act(async () => {
+      root = hydrateRoot(container, tree)
+    })
+
+    const hydrationErrors = consoleError.mock.calls.filter((call) =>
+      call.some((value) => /hydration|mismatch/i.test(String(value))),
+    )
+    expect(hydrationErrors).toEqual([])
+    expect(document.body.querySelector('[role="region"][aria-label="Notifications"]')).not.toBeNull()
+
+    act(() => root?.unmount())
+    container.remove()
   })
 
   it('throws clearly outside the provider', () => {

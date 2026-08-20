@@ -74,6 +74,7 @@ function StudioToast({ record, leave }: { record: ToastRecord; leave: (id: strin
 export function StudioToastProvider({ children }: { children: ReactNode }): JSX.Element {
   const [toasts, setToasts] = useState<ToastRecord[]>([])
   const [dockLift, setDockLift] = useState<number | null>(null)
+  const [mounted, setMounted] = useState(false)
   const sequence = useRef(0)
   const dismissed = useRef(new Set<string>())
   const records = useRef(new Map<string, ToastRecord>())
@@ -102,10 +103,13 @@ export function StudioToastProvider({ children }: { children: ReactNode }): JSX.
   const dismiss = useCallback((id: string) => leave(id, 'dismissed'), [leave])
   const value = useMemo(() => ({ toast, dismiss, setDockLift }), [dismiss, toast])
 
+  // Match the server and first client render to avoid an SSR hydration mismatch (#465).
+  useEffect(() => setMounted(true), [])
+
   return (
     <StudioToastContext.Provider value={value}>
       {children}
-      {typeof document !== 'undefined' && createPortal(
+      {mounted && createPortal(
         <div
           role="region"
           aria-label="Notifications"
