@@ -18934,7 +18934,7 @@ interface MediaViewerModalProps
 `function` — A standalone enum picker using the studio composer's pill and menu grammar.
 
 ```ts
-<T extends string>({ label, value, choices, onSelect, className, }: { label: string; value: T; choices: readonly { valu…
+<T extends string>({ label, value, choices, onSelect, className, icon: Icon, trigger, }: { label: string; value: T; cho…
 ```
 
 ### `ModelPill`
@@ -18958,7 +18958,7 @@ interface OptionChoice
 `function` — A value pill and the menu it opens.
 
 ```ts
-({ label, value, choices, onSelect, bandRef, custom, }: { label: string; value: ModelOptionValue | undefined; choices:…
+({ label, value, choices, onSelect, bandRef, custom, icon: Icon, }: { label: string; value: ModelOptionValue | undefine…
 ```
 
 ### `optionValueLabel`

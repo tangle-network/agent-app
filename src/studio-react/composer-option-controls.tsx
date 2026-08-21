@@ -37,6 +37,14 @@ import { type MediaModelOption, type ModelOptionValue, validateCustomImageSize }
 
 /** The resting pill: one row height, never wraps, shrink-proof in the band. */
 const PILL = 'inline-flex h-7 flex-none items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-2.5 text-[12.5px] font-medium text-foreground transition hover:bg-accent'
+/**
+ * Optically centers a pill label. Flex `items-center` centers the LINE BOX, but
+ * where the glyphs sit inside it is font-metric-determined — with an
+ * ascent-heavy font the text reads ~1.5px high. Trimming the line box to the
+ * cap→baseline band makes flex centering center the visible text in every
+ * font; unsupported browsers keep the untrimmed (current) behavior.
+ */
+const PILL_LABEL = '[text-box:trim-both_cap_alphabetic]'
 const MENU_PANEL = `flex min-w-[184px] flex-col overflow-y-auto rounded-xl border border-border bg-popover p-1 text-popover-foreground ${OVERLAY_SHADOW}`
 const MENU_HEADER = 'px-2.5 pb-1 pt-1.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground'
 
@@ -202,6 +210,7 @@ function useCloseWhenScrolledOut(
 export interface OptionChoice {
   value: ModelOptionValue
   label: string
+  icon?: LucideIcon
 }
 
 function MenuRows<T extends ModelOptionValue>({
@@ -210,24 +219,28 @@ function MenuRows<T extends ModelOptionValue>({
   onSelect,
 }: {
   value: T | undefined
-  choices: readonly { value: T; label: string }[]
+  choices: readonly { value: T; label: string; icon?: LucideIcon }[]
   onSelect: (value: T) => void
 }) {
-  return choices.map((choice) => (
-    <button
-      key={String(choice.value)}
-      type="button"
-      role="menuitemradio"
-      aria-checked={choice.value === value}
-      onClick={() => onSelect(choice.value)}
-      className={menuRowClass(choice.value === value)}
-    >
-      <span className="truncate">{choice.label}</span>
-      {choice.value === value && (
-        <CheckGlyph className="ml-auto h-3.5 w-3.5 shrink-0 text-primary" />
-      )}
-    </button>
-  ))
+  return choices.map((choice) => {
+    const Icon = choice.icon
+    return (
+      <button
+        key={String(choice.value)}
+        type="button"
+        role="menuitemradio"
+        aria-checked={choice.value === value}
+        onClick={() => onSelect(choice.value)}
+        className={menuRowClass(choice.value === value)}
+      >
+        {Icon && <Icon aria-hidden className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />}
+        <span className="truncate">{choice.label}</span>
+        {choice.value === value && (
+          <CheckGlyph className="ml-auto h-3.5 w-3.5 shrink-0 text-primary" />
+        )}
+      </button>
+    )
+  })
 }
 
 /** A standalone enum picker using the studio composer's pill and menu grammar. */
@@ -237,12 +250,16 @@ export function MenuPill<T extends string>({
   choices,
   onSelect,
   className,
+  icon: Icon,
+  trigger = 'pill',
 }: {
   label: string
   value: T
-  choices: readonly { value: T; label: string }[]
+  choices: readonly { value: T; label: string; icon?: LucideIcon }[]
   onSelect: (value: T) => void
   className?: string
+  icon?: LucideIcon
+  trigger?: 'pill' | 'text'
 }): JSX.Element {
   const [open, setOpen] = useState(false)
   const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
@@ -258,10 +275,13 @@ export function MenuPill<T extends string>({
         title={label}
         aria-label={label}
         onClick={() => setOpen(!open)}
-        className={`${PILL} ${className ?? ''}`}
+        className={`${trigger === 'text'
+          ? 'inline-flex h-7 flex-none items-center gap-1 whitespace-nowrap rounded-full px-2 text-[12.5px] font-medium text-primary transition hover:bg-accent'
+          : PILL} ${className ?? ''}`}
       >
-        <span>{selected?.label ?? '—'}</span>
-        <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+        {Icon && <Icon aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />}
+        <span className={PILL_LABEL}>{selected?.label ?? '—'}</span>
+        <ChevronDown className={`h-3 w-3 shrink-0 ${trigger === 'text' ? 'text-primary' : 'text-muted-foreground'}`} />
       </button>
 
       <PopoverSurface
@@ -301,12 +321,14 @@ export function OptionPill({
   onSelect,
   bandRef,
   custom,
+  icon: Icon,
 }: {
   label: string
   value: ModelOptionValue | undefined
   choices: readonly OptionChoice[]
   onSelect: (value: ModelOptionValue) => void
   bandRef: RefObject<HTMLDivElement | null>
+  icon?: LucideIcon
   /** A trailing row that swaps the menu to a form (the gpt-image-2 custom
    *  size). Absent for every parameter whose values are an enum. */
   custom?: {
@@ -340,7 +362,8 @@ export function OptionPill({
         }}
         className={PILL}
       >
-        <span>{selected?.label ?? '—'}</span>
+        {Icon && <Icon aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />}
+        <span className={PILL_LABEL}>{selected?.label ?? '—'}</span>
         <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
       </button>
 
@@ -477,7 +500,7 @@ export function AudioTogglePill({ on, onToggle }: { on: boolean; onToggle: (on: 
       {on
         ? <Volume2 className="h-4 w-4 shrink-0" strokeWidth={1.5} />
         : <VolumeX className="h-4 w-4 shrink-0" strokeWidth={1.5} />}
-      <span>{on ? 'Audio on' : 'Audio off'}</span>
+      <span className={PILL_LABEL}>{on ? 'Audio on' : 'Audio off'}</span>
     </button>
   )
 }
@@ -516,7 +539,7 @@ export function ReferencePill({
     return (
       <div className={`${PILL} border-primary bg-primary/10 pr-1.5 text-primary hover:bg-primary/10`}>
         <img src={url} alt="" className="h-[18px] w-[18px] shrink-0 rounded-[5px] object-cover" />
-        <span>Reference</span>
+        <span className={PILL_LABEL}>Reference</span>
         <button
           type="button"
           aria-label="Remove reference image"
@@ -563,7 +586,7 @@ export function ReferencePill({
         className={PILL}
       >
         <ImagePlus className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-        <span>Reference image</span>
+        <span className={PILL_LABEL}>Reference image</span>
       </button>
 
       {!pick && (
@@ -655,6 +678,9 @@ export function ModelPill({
       >
         {unavailable && <TriangleAlert aria-hidden className="h-3.5 w-3.5 shrink-0 text-warning" strokeWidth={2} />}
         {provider && <ProviderLogo provider={provider} size={14} />}
+        {/* No PILL_LABEL here: text-box trim ends the box at the alphabetic
+            baseline, and truncate's overflow:hidden then clips descender ink
+            (the g/p tails of "gpt-image-2"). A normal line box keeps them. */}
         <span className="max-w-[168px] truncate leading-normal">{displayName}</span>
         <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
       </button>

@@ -13,7 +13,23 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AudioLines, ArrowUp, Image as ImageIcon, TriangleAlert, Video } from 'lucide-react'
+import {
+  AudioLines,
+  ArrowUp,
+  Clock,
+  Copy,
+  Gauge,
+  Image as ImageIcon,
+  Mic,
+  Monitor,
+  Ratio,
+  Scaling,
+  SlidersHorizontal,
+  Sparkles,
+  TriangleAlert,
+  Video,
+  type LucideIcon,
+} from 'lucide-react'
 import {
   type Generation,
   type MediaModelCatalogResponse,
@@ -78,6 +94,18 @@ const PARAM_LABELS: Record<string, string> = {
   mode: 'Mode',
   voice: 'Voice',
   speed: 'Speed',
+}
+
+const PARAM_ICONS: Record<string, LucideIcon> = {
+  size: Scaling,
+  quality: Sparkles,
+  n: Copy,
+  duration: Clock,
+  resolution: Monitor,
+  aspect_ratio: Ratio,
+  mode: SlidersHorizontal,
+  voice: Mic,
+  speed: Gauge,
 }
 
 /**
@@ -448,6 +476,7 @@ export function StudioComposer({
             <div key={`${type}-${param}`} className="studio-pill-in flex-none">
               <OptionPill
                 label={PARAM_LABELS[param] ?? param}
+                icon={PARAM_ICONS[param] ?? SlidersHorizontal}
                 value={values[param]}
                 choices={choicesForPill(param, options?.[param], values[param])}
                 onSelect={(value) => setOption(param, value)}

@@ -341,7 +341,6 @@
      dark still restates it because the same percentages over a near-black
      card read as no tint at all. */
   --studio-notice-bg: color-mix(in srgb, hsl(var(--primary)) 8%, hsl(var(--card)));
-  --studio-notice-border: color-mix(in srgb, hsl(var(--primary)) 28%, hsl(var(--border)));
 }
 
 /**
@@ -435,7 +434,6 @@
   /* Studio composer — @see :root. The notice chip's mixes are stronger,
      because 8% of a tint over a near-black card is not a tint. */
   --studio-notice-bg: color-mix(in srgb, hsl(var(--primary)) 15%, hsl(var(--card)));
-  --studio-notice-border: color-mix(in srgb, hsl(var(--primary)) 40%, hsl(var(--border)));
 }
 
 /**

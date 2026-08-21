@@ -161,6 +161,25 @@ describe('StudioHistoryScreen', () => {
     expect(typePillLabel()).toContain('All media')
   })
 
+  it('renders a leading icon for every media-type filter choice', () => {
+    setup()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filter by media type' }))
+    const rows = within(screen.getByRole('menu')).getAllByRole('menuitemradio')
+
+    expect(rows).toHaveLength(4)
+    for (const row of rows) expect(row.firstElementChild?.tagName.toLowerCase()).toBe('svg')
+  })
+
+  it('renders the media-type filter as borderless primary text', () => {
+    setup()
+
+    const trigger = screen.getByRole('button', { name: 'Filter by media type' })
+    expect(trigger.className).toContain('text-primary')
+    expect(trigger.className).not.toContain('border-border')
+    expect(trigger.className).not.toContain('bg-card')
+  })
+
   it('debounces the search box into exactly one fetch carrying the final term', async () => {
     vi.useFakeTimers()
     const { calls } = setup({ searchDebounceMs: 250 })
