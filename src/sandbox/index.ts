@@ -784,9 +784,9 @@ export function buildSandboxToolFileMounts(
  *
  * Entries come from {@link sandboxToolBinDir}, so the value can never name a
  * directory the mounts did not use — a caller that hand-writes the literal
- * instead drifts silently the moment a base dir changes. Order is preserved and
- * a repeat collapses. The runtime rejects a relative or empty segment outright,
- * so a malformed value fails the box rather than dropping a tool off PATH.
+ * instead drifts silently the moment a base dir changes. Order is preserved,
+ * and two apps that resolve to one directory collapse to the FIRST position it
+ * appeared in.
  *
  * A `:` in a resolved bin dir throws here. The character separates entries both
  * in this variable and in PATH itself, so such a directory is unrepresentable
@@ -794,6 +794,13 @@ export function buildSandboxToolFileMounts(
  * leading path and a relative remainder, and the runtime rejects a relative
  * segment by failing the whole box. Throwing names the offending directory
  * instead.
+ *
+ * The consuming half lives in agent-dev-container: `resolveSandboxToolBinDirs`
+ * parses this value and every PATH builder appends it at the tail — sidecar
+ * exec and PTY through `packages/shared/src/cache-env.ts`, an SSH session
+ * through `packages/shared/src/ssh-bootstrap.ts`, and a spawned CLI through
+ * `packages/sdk-cli-runner/src/cli-process.ts`, each with its own tests. This
+ * package has no sandbox runtime, so tail placement is pinned there, not here.
  */
 export function buildSandboxToolBinDirsEnv(
   apps: readonly SandboxToolPathOptions[],

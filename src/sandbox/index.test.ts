@@ -3648,6 +3648,18 @@ describe('sandbox tool install helpers', () => {
     expect(buildSandboxToolBinDirsEnv([{ appName: 'gtm-agent', binDir: '/srv/tools/bin' }]))
       .toEqual({ SANDBOX_TOOL_BIN_DIRS: '/srv/tools/bin' })
   })
+
+  it('collapses a repeated bin dir onto its first position', () => {
+    // The repeat arrives under a different option shape than the original, so
+    // this pins first-wins on the resolved directory rather than on the input.
+    expect(buildSandboxToolBinDirsEnv([
+      { appName: 'gtm-agent' },
+      { appName: 'legal-agent' },
+      { appName: 'gtm-agent', baseDir: '/home/agent/tools' },
+    ])).toEqual({
+      SANDBOX_TOOL_BIN_DIRS: '/home/agent/tools/gtm-agent/bin:/home/agent/tools/legal-agent/bin',
+    })
+  })
 })
 
 describe('peekWorkspaceSandbox', () => {
