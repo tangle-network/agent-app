@@ -336,13 +336,10 @@
   --shadow-overlay: 0 2px 6px hsl(var(--foreground) / 0.06), 0 16px 40px hsl(var(--foreground) / 0.1);
 
   /* ── Studio composer ─────────────────────────────────────────────────────
-     The generate button's fill is the one gradient in the system, so it is a
-     token rather than two hex literals inside a component — it is a LITERAL
-     pair and therefore restated in the dark scope. The notice chip's surface
-     is derived (`color-mix` over `--primary`/`--card`/`--border`), so it
-     re-themes through the cascade; dark still restates it because the same
-     percentages over a near-black card read as no tint at all. */
-  --studio-send-gradient: linear-gradient(135deg, #4f46e5, #5b4ed4);
+     The notice chip's surface is derived (`color-mix` over
+     `--primary`/`--card`/`--border`), so it re-themes through the cascade;
+     dark still restates it because the same percentages over a near-black
+     card read as no tint at all. */
   --studio-notice-bg: color-mix(in srgb, hsl(var(--primary)) 8%, hsl(var(--card)));
 }
 
@@ -434,10 +431,8 @@
   --shadow-raised: 0 1px 2px hsl(var(--foreground) / 0.14), 0 12px 28px hsl(var(--foreground) / 0.22);
   --shadow-overlay: 0 2px 6px hsl(var(--foreground) / 0.12), 0 16px 40px hsl(var(--foreground) / 0.2);
 
-  /* Studio composer — @see :root. The gradient lightens (an indigo mixed for a
-     white page goes muddy on a dark one) and the notice chip's mixes are
-     stronger, because 8% of a tint over a near-black card is not a tint. */
-  --studio-send-gradient: linear-gradient(135deg, #4c3fc5, #7c6cf6);
+  /* Studio composer — @see :root. The notice chip's mixes are stronger,
+     because 8% of a tint over a near-black card is not a tint. */
   --studio-notice-bg: color-mix(in srgb, hsl(var(--primary)) 15%, hsl(var(--card)));
 }
 

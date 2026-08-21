@@ -528,7 +528,7 @@ export function StudioComposer({
           title="Generate"
           disabled={!canSubmit}
           onClick={() => void generate()}
-          className="studio-send ml-auto inline-flex h-8 w-8 flex-none items-center justify-center rounded-full text-white transition disabled:opacity-40"
+          className="ml-auto inline-flex h-8 w-8 flex-none items-center justify-center rounded-full bg-foreground text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card"
         >
           <ArrowUp className="h-4 w-4" strokeWidth={2} />
         </button>
