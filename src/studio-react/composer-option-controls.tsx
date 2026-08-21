@@ -655,7 +655,7 @@ export function ModelPill({
       >
         {unavailable && <TriangleAlert aria-hidden className="h-3.5 w-3.5 shrink-0 text-warning" strokeWidth={2} />}
         {provider && <ProviderLogo provider={provider} size={14} />}
-        <span className="max-w-[168px] truncate">{displayName}</span>
+        <span className="max-w-[168px] truncate leading-normal">{displayName}</span>
         <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
       </button>
 
