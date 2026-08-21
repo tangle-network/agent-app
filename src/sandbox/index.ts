@@ -796,12 +796,9 @@ export function buildSandboxToolBinDirsEnv(
       'buildSandboxToolBinDirsEnv: name at least one app whose tool bin dir belongs on PATH.',
     )
   }
-  const binDirs: string[] = []
-  for (const app of apps) {
-    const binDir = sandboxToolBinDir(app)
-    if (!binDirs.includes(binDir)) binDirs.push(binDir)
-  }
-  return { SANDBOX_TOOL_BIN_DIRS: binDirs.join(':') }
+  const binDirs = new Set<string>()
+  for (const app of apps) binDirs.add(sandboxToolBinDir(app))
+  return { SANDBOX_TOOL_BIN_DIRS: [...binDirs].join(':') }
 }
 
 /**
