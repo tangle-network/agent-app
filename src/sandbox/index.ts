@@ -814,11 +814,13 @@ export function buildSandboxToolBinDirScript(options: SandboxToolPathOptions): s
 
 /** Build a shell script that creates the sandbox tool binary directory.
  *
- *  @deprecated Renamed to {@link buildSandboxToolBinDirScript}. The script
- *  creates the bin dir and does not touch PATH, so the old name states a
- *  guarantee it no longer carries. Put the directory on PATH with
- *  {@link buildSandboxToolBinDirsEnv}. Kept as a 1:1 alias for published
- *  consumers; removal is a major.
+ *  @deprecated Renamed to {@link buildSandboxToolBinDirScript}, and the script
+ *  no longer appends the bin dir to PATH in `~/.profile`, `~/.bashrc` and
+ *  `~/.zshrc`. Those edits never reached the contexts that run a tool: an exec
+ *  and a spawned CLI read no rc file, and the SSH shell assigns PATH
+ *  absolutely, which discards an appended entry. Put the directory on PATH with
+ *  {@link buildSandboxToolBinDirsEnv} instead. This name forwards to the new
+ *  one so an existing import keeps resolving; removal is a major.
  */
 export function buildSandboxToolPathSetupScript(options: SandboxToolPathOptions): string {
   return buildSandboxToolBinDirScript(options)
@@ -850,11 +852,13 @@ export async function ensureSandboxToolBinDir(
 
 /** Create the sandbox tool binary directory in a running box.
  *
- *  @deprecated Renamed to {@link ensureSandboxToolBinDir}. The call creates the
- *  bin dir and does not touch PATH, so the old name states a guarantee it no
- *  longer carries. Put the directory on PATH with
- *  {@link buildSandboxToolBinDirsEnv}. Kept as a 1:1 alias for published
- *  consumers; removal is a major.
+ *  @deprecated Renamed to {@link ensureSandboxToolBinDir}, and the call no
+ *  longer appends the bin dir to PATH in `~/.profile`, `~/.bashrc` and
+ *  `~/.zshrc`. Those edits never reached the contexts that run a tool: an exec
+ *  and a spawned CLI read no rc file, and the SSH shell assigns PATH
+ *  absolutely, which discards an appended entry. Put the directory on PATH with
+ *  {@link buildSandboxToolBinDirsEnv} instead. This name forwards to the new
+ *  one so an existing import keeps resolving; removal is a major.
  */
 export async function runSandboxToolPathSetup(
   box: SandboxInstance,
