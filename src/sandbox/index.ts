@@ -787,6 +787,13 @@ export function buildSandboxToolFileMounts(
  * instead drifts silently the moment a base dir changes. Order is preserved and
  * a repeat collapses. The runtime rejects a relative or empty segment outright,
  * so a malformed value fails the box rather than dropping a tool off PATH.
+ *
+ * A `:` in a resolved bin dir throws here. The character separates entries both
+ * in this variable and in PATH itself, so such a directory is unrepresentable
+ * rather than merely awkward: joining it would split one absolute path into a
+ * leading path and a relative remainder, and the runtime rejects a relative
+ * segment by failing the whole box. Throwing names the offending directory
+ * instead.
  */
 export function buildSandboxToolBinDirsEnv(
   apps: readonly SandboxToolPathOptions[],
@@ -797,7 +804,16 @@ export function buildSandboxToolBinDirsEnv(
     )
   }
   const binDirs = new Set<string>()
-  for (const app of apps) binDirs.add(sandboxToolBinDir(app))
+  for (const app of apps) {
+    const binDir = sandboxToolBinDir(app)
+    if (binDir.includes(':')) {
+      throw new Error(
+        `sandbox tool bin dir ${binDir} contains ':', which separates entries in ` +
+          'SANDBOX_TOOL_BIN_DIRS and in PATH. Place the tools under a colon-free directory.',
+      )
+    }
+    binDirs.add(binDir)
+  }
   return { SANDBOX_TOOL_BIN_DIRS: [...binDirs].join(':') }
 }
 

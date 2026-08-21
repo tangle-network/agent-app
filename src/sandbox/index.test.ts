@@ -3632,6 +3632,22 @@ describe('sandbox tool install helpers', () => {
     expect(() => buildSandboxToolBinDirsEnv([{ appName: 'gtm-agent', binDir: 'relative/bin' }]))
       .toThrow(/binDir/)
   })
+
+  it('refuses a bin dir carrying the separator instead of splitting it across entries', () => {
+    // `:` separates entries in this variable and in PATH. Joining a dir that
+    // contains one splits an absolute path into a path plus a RELATIVE
+    // remainder, which the runtime rejects by failing the whole box — so the
+    // caller sees a complaint about the joined value, not about their dir.
+    // Both option shapes that accept a free-form path can carry one.
+    expect(() => buildSandboxToolBinDirsEnv([{ appName: 'gtm-agent', binDir: '/srv/tool:versions/bin' }]))
+      .toThrow(/\/srv\/tool:versions\/bin.*contains ':'/)
+    expect(() => buildSandboxToolBinDirsEnv([{ appName: 'gtm-agent', baseDir: '/opt/a:b' }]))
+      .toThrow(/contains ':'/)
+
+    // A colon-free dir alongside it still serializes to one clean segment.
+    expect(buildSandboxToolBinDirsEnv([{ appName: 'gtm-agent', binDir: '/srv/tools/bin' }]))
+      .toEqual({ SANDBOX_TOOL_BIN_DIRS: '/srv/tools/bin' })
+  })
 })
 
 describe('peekWorkspaceSandbox', () => {
