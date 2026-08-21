@@ -43,11 +43,6 @@
 }
 .studio-pill-in { animation: studio-pill-in 190ms cubic-bezier(0.2, 0.7, 0.3, 1) both; }
 
-/* The one gradient in the system. A Tailwind arbitrary `bg-[var(--…)]` compiles
-   to `background-color`, which drops a gradient silently, so the token is read
-   here instead. */
-.studio-send { background-image: var(--studio-send-gradient); }
-
 @media (prefers-reduced-motion: reduce) {
   .studio-pill-in { animation: none; }
 }
