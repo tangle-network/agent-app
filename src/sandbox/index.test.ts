@@ -68,6 +68,9 @@ import {
   sandboxToolBinDir,
   sandboxToolPath,
   buildSandboxToolFileMounts,
+  buildSandboxToolBinDirsEnv,
+  buildSandboxToolBinDirScript,
+  ensureSandboxToolBinDir,
   buildSandboxToolPathSetupScript,
   runSandboxToolPathSetup,
   buildProductEgressPolicy,
@@ -3542,7 +3545,7 @@ describe('sandbox tool install helpers', () => {
   })
 
   it('builds an idempotent bin-dir setup script that leaves PATH alone', () => {
-    const script = buildSandboxToolPathSetupScript({ appName: 'gtm-agent' })
+    const script = buildSandboxToolBinDirScript({ appName: 'gtm-agent' })
     expect(script).toContain("mkdir -p '/home/agent/tools/gtm-agent/bin'")
     // `SANDBOX_TOOL_BIN_DIRS` is the one mechanism that puts this dir on a
     // sandbox PATH. A shell rc edit here cannot replace it: a non-interactive
@@ -3556,14 +3559,78 @@ describe('sandbox tool install helpers', () => {
 
   it('runs bin-dir setup through box.exec and preserves setup failures', async () => {
     const okExec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
-    await expect(runSandboxToolPathSetup(fakeBox({ exec: okExec }), { appName: 'gtm-agent' }))
+    await expect(ensureSandboxToolBinDir(fakeBox({ exec: okExec }), { appName: 'gtm-agent' }))
       .resolves.toEqual({ succeeded: true, value: undefined })
     expect(okExec.mock.calls[0]![0]).toContain('/home/agent/tools/gtm-agent/bin')
 
     const failExec = vi.fn().mockResolvedValue({ stdout: '', stderr: 'readonly', exitCode: 1 })
-    const outcome = await runSandboxToolPathSetup(fakeBox({ exec: failExec }), { appName: 'gtm-agent' })
+    const outcome = await ensureSandboxToolBinDir(fakeBox({ exec: failExec }), { appName: 'gtm-agent' })
     expect(outcome.succeeded).toBe(false)
     if (!outcome.succeeded) expect(outcome.error.message).toContain('readonly')
+  })
+
+  it('keeps the pre-rename names as 1:1 aliases for published consumers', async () => {
+    expect(buildSandboxToolPathSetupScript({ appName: 'gtm-agent' }))
+      .toBe(buildSandboxToolBinDirScript({ appName: 'gtm-agent' }))
+
+    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
+    await expect(runSandboxToolPathSetup(fakeBox({ exec }), { appName: 'gtm-agent' }))
+      .resolves.toEqual({ succeeded: true, value: undefined })
+    expect(exec.mock.calls[0]![0]).toBe(buildSandboxToolBinDirScript({ appName: 'gtm-agent' }))
+  })
+
+  it('advertises the mounted bin dir through SANDBOX_TOOL_BIN_DIRS', () => {
+    // The env entry and the mounts must name the SAME directory. A caller that
+    // hand-writes the literal is the drift this couples away: assert against
+    // the mount path, not against a second copy of the string.
+    const files = buildSandboxToolFileMounts({
+      appName: 'gtm-agent',
+      tools: [{ name: 'gtm', content: '#!/bin/sh\necho hi' }],
+    })
+    const env = buildSandboxToolBinDirsEnv([{ appName: 'gtm-agent' }])
+
+    expect(env).toEqual({ SANDBOX_TOOL_BIN_DIRS: '/home/agent/tools/gtm-agent/bin' })
+    expect(files[0]!.path.startsWith(`${env.SANDBOX_TOOL_BIN_DIRS}/`)).toBe(true)
+  })
+
+  it('joins several apps in order and collapses a repeat', () => {
+    expect(buildSandboxToolBinDirsEnv([
+      { appName: 'gtm-agent' },
+      { appName: 'legal-agent' },
+      { appName: 'gtm-agent' },
+    ])).toEqual({
+      SANDBOX_TOOL_BIN_DIRS: '/home/agent/tools/gtm-agent/bin:/home/agent/tools/legal-agent/bin',
+    })
+  })
+
+  it('emits only segments the sandbox PATH builders accept', () => {
+    // The runtime parses this value and THROWS on a relative or empty segment,
+    // which fails the whole box. Pin the shape here so a producer change can
+    // never ship a value the consumer refuses.
+    const { SANDBOX_TOOL_BIN_DIRS: value } = buildSandboxToolBinDirsEnv([
+      { appName: 'gtm-agent' },
+      { appName: 'legal-agent', baseDir: '/opt/tools/' },
+      { appName: 'tax-agent', binDir: '/srv/tax/bin' },
+    ])
+    const segments = value.split(':')
+
+    expect(segments).toEqual([
+      '/home/agent/tools/gtm-agent/bin',
+      '/opt/tools/legal-agent/bin',
+      '/srv/tax/bin',
+    ])
+    for (const segment of segments) {
+      expect(segment).not.toBe('')
+      expect(segment.startsWith('/')).toBe(true)
+    }
+    expect(new Set(segments).size).toBe(segments.length)
+  })
+
+  it('refuses an empty app list and an unsafe app name rather than a blank PATH entry', () => {
+    expect(() => buildSandboxToolBinDirsEnv([])).toThrow(/at least one app/)
+    expect(() => buildSandboxToolBinDirsEnv([{ appName: '../gtm' }])).toThrow(/appName/)
+    expect(() => buildSandboxToolBinDirsEnv([{ appName: 'gtm-agent', binDir: 'relative/bin' }]))
+      .toThrow(/binDir/)
   })
 })
 

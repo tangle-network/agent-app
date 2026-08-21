@@ -770,41 +770,100 @@ export function buildSandboxToolFileMounts(
 }
 
 /**
- * Build a shell script that creates the sandbox tool binary directory;
- * `SANDBOX_TOOL_BIN_DIRS`, not this script, puts that directory on a sandbox PATH.
+ * Build the `SANDBOX_TOOL_BIN_DIRS` entry that puts these apps' tool bin dirs on
+ * a sandbox PATH. Declare it in the same box env as the mounts from
+ * {@link buildSandboxToolFileMounts}: the mounts place the executables, this
+ * places the directory that makes a bare tool name resolve.
  *
- * Every sandbox PATH builder appends the `SANDBOX_TOOL_BIN_DIRS` directories at
- * the tail, after the Nix, npm, and image entries. A tool therefore never
- * shadows a platform or system binary of the same name. Set the variable to
- * this directory next to the tool mounts. The `mkdir -p` makes the directory
- * exist before a tool mount lands in it.
+ * Every sandbox PATH builder appends these directories at the TAIL, after the
+ * Nix, npm, and image entries, so a tool never shadows a platform or system
+ * binary of the same name. That placement is identical for a non-interactive
+ * exec, a sidecar-spawned CLI, and an SSH shell, which is why this variable and
+ * not a shell rc file is the mechanism: an exec reads no rc file, and the SSH
+ * shell environment assigns PATH absolutely.
+ *
+ * Entries come from {@link sandboxToolBinDir}, so the value can never name a
+ * directory the mounts did not use — a caller that hand-writes the literal
+ * instead drifts silently the moment a base dir changes. Order is preserved and
+ * a repeat collapses. The runtime rejects a relative or empty segment outright,
+ * so a malformed value fails the box rather than dropping a tool off PATH.
  */
-export function buildSandboxToolPathSetupScript(options: SandboxToolPathOptions): string {
-  return ['set -eu', `mkdir -p ${shellSingleQuote(sandboxToolBinDir(options))}`].join('\n')
+export function buildSandboxToolBinDirsEnv(
+  apps: readonly SandboxToolPathOptions[],
+): { SANDBOX_TOOL_BIN_DIRS: string } {
+  if (apps.length === 0) {
+    throw new Error(
+      'buildSandboxToolBinDirsEnv: name at least one app whose tool bin dir belongs on PATH.',
+    )
+  }
+  const binDirs: string[] = []
+  for (const app of apps) {
+    const binDir = sandboxToolBinDir(app)
+    if (!binDirs.includes(binDir)) binDirs.push(binDir)
+  }
+  return { SANDBOX_TOOL_BIN_DIRS: binDirs.join(':') }
 }
 
 /**
- * Create the sandbox tool binary directory in a running box;
- * `SANDBOX_TOOL_BIN_DIRS`, not this call, puts it on a sandbox PATH.
+ * Build a shell script that creates the sandbox tool binary directory.
+ * {@link buildSandboxToolBinDirsEnv}, not this script, puts that directory on a
+ * sandbox PATH.
+ *
+ * The `mkdir -p` makes the directory exist before a tool mount lands in it.
  */
-export async function runSandboxToolPathSetup(
+export function buildSandboxToolBinDirScript(options: SandboxToolPathOptions): string {
+  return ['set -eu', `mkdir -p ${shellSingleQuote(sandboxToolBinDir(options))}`].join('\n')
+}
+
+/** Build a shell script that creates the sandbox tool binary directory.
+ *
+ *  @deprecated Renamed to {@link buildSandboxToolBinDirScript}. The script
+ *  creates the bin dir and does not touch PATH, so the old name states a
+ *  guarantee it no longer carries. Put the directory on PATH with
+ *  {@link buildSandboxToolBinDirsEnv}. Kept as a 1:1 alias for published
+ *  consumers; removal is a major.
+ */
+export function buildSandboxToolPathSetupScript(options: SandboxToolPathOptions): string {
+  return buildSandboxToolBinDirScript(options)
+}
+
+/**
+ * Create the sandbox tool binary directory in a running box.
+ * {@link buildSandboxToolBinDirsEnv}, not this call, puts it on a sandbox PATH.
+ */
+export async function ensureSandboxToolBinDir(
   box: SandboxInstance,
   options: SandboxToolPathOptions,
 ): Promise<Outcome<void>> {
   try {
-    const res = await box.exec(buildSandboxToolPathSetupScript(options))
+    const res = await box.exec(buildSandboxToolBinDirScript(options))
     if (res.exitCode !== 0) {
       return fail(
         new Error(
-          `runSandboxToolPathSetup: failed to create the tool bin dir ${sandboxToolBinDir(options)} ` +
+          `ensureSandboxToolBinDir: failed to create the tool bin dir ${sandboxToolBinDir(options)} ` +
             `(exit ${res.exitCode}): ${res.stderr.slice(0, 500)}`,
         ),
       )
     }
     return ok(undefined)
   } catch (err) {
-    return fail(new Error('runSandboxToolPathSetup: exec failed', { cause: err }))
+    return fail(new Error('ensureSandboxToolBinDir: exec failed', { cause: err }))
   }
+}
+
+/** Create the sandbox tool binary directory in a running box.
+ *
+ *  @deprecated Renamed to {@link ensureSandboxToolBinDir}. The call creates the
+ *  bin dir and does not touch PATH, so the old name states a guarantee it no
+ *  longer carries. Put the directory on PATH with
+ *  {@link buildSandboxToolBinDirsEnv}. Kept as a 1:1 alias for published
+ *  consumers; removal is a major.
+ */
+export async function runSandboxToolPathSetup(
+  box: SandboxInstance,
+  options: SandboxToolPathOptions,
+): Promise<Outcome<void>> {
+  return ensureSandboxToolBinDir(box, options)
 }
 
 // Build a shell-safe path token that preserves tilde-home semantics. A path

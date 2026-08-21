@@ -10056,6 +10056,18 @@
           "doc": null
         },
         {
+          "name": "buildSandboxToolBinDirScript",
+          "kind": "function",
+          "signature": "(options: SandboxToolPathOptions) => string",
+          "doc": "Build a shell script that creates the sandbox tool binary directory."
+        },
+        {
+          "name": "buildSandboxToolBinDirsEnv",
+          "kind": "function",
+          "signature": "(apps: readonly SandboxToolPathOptions[]) => { SANDBOX_TOOL_BIN_DIRS: string; }",
+          "doc": "Build the `SANDBOX_TOOL_BIN_DIRS` entry that puts these apps' tool bin dirs on a sandbox PATH."
+        },
+        {
           "name": "buildSandboxToolFileMounts",
           "kind": "function",
           "signature": "(options: BuildSandboxToolFileMountsOptions) => AgentProfileFileMount[]",
@@ -10071,7 +10083,7 @@
           "name": "buildSandboxToolPathSetupScript",
           "kind": "function",
           "signature": "(options: SandboxToolPathOptions) => string",
-          "doc": "Build a shell script that creates the sandbox tool binary directory; `SANDBOX_TOOL_BIN_DIRS`, not this script, puts that directory on a sandbox PATH."
+          "doc": "Build a shell script that creates the sandbox tool binary directory."
         },
         {
           "name": "classifySeveredStream",
@@ -10186,6 +10198,12 @@
           "kind": "const",
           "signature": "\"EGRESS_PROXY_RECOVERY_REQUIRED\"",
           "doc": "The box exists and still holds unsnapshotted state, so discarding it is an owner's decision, not the runtime's."
+        },
+        {
+          "name": "ensureSandboxToolBinDir",
+          "kind": "function",
+          "signature": "(box: SandboxInstance, options: SandboxToolPathOptions) => Promise<Outcome<void>>",
+          "doc": "Create the sandbox tool binary directory in a running box."
         },
         {
           "name": "ensureWorkspaceSandbox",
@@ -10515,7 +10533,7 @@
           "name": "runSandboxToolPathSetup",
           "kind": "function",
           "signature": "(box: SandboxInstance, options: SandboxToolPathOptions) => Promise<Outcome<void>>",
-          "doc": "Create the sandbox tool binary directory in a running box; `SANDBOX_TOOL_BIN_DIRS`, not this call, puts it on a sandbox PATH."
+          "doc": "Create the sandbox tool binary directory in a running box."
         },
         {
           "name": "SafeSandboxErrorCause",
