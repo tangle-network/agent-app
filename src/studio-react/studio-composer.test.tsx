@@ -224,7 +224,7 @@ describe('StudioComposer — the pills are the model’s own parameters', () => 
     expect(source).toContain('icon={PARAM_ICONS[param] ?? SlidersHorizontal}')
   })
 
-  it('optically centers option labels without clipping model-name descenders', async () => {
+  it('optically centers option pill labels; the truncating model label keeps a normal line box', async () => {
     mountWith(catalog({
       video: [model(SEEDANCE, 'video')],
     }, { video: SEEDANCE }))
@@ -232,9 +232,17 @@ describe('StudioComposer — the pills are the model’s own parameters', () => 
     await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
 
     const trimClass = '[text-box:trim-both_cap_alphabetic]'
-    expect(within(modelPill()).getByText(SEEDANCE).className).toContain('leading-normal')
-    expect(within(modelPill()).getByText(SEEDANCE).className).not.toContain(trimClass)
     expect(within(screen.getByRole('button', { name: 'Duration: Auto' })).getByText('Auto').className).toContain(trimClass)
+
+    // The model label is the one pill label that truncates, and text-box trim
+    // ends the box at the alphabetic baseline — under truncate's
+    // overflow:hidden that clips descender ink ("gpt-image-2" loses its g/p
+    // tails; measured 18.75px → 9.09px, see #467/#468). So it must carry a
+    // normal line box instead of PILL_LABEL.
+    const modelLabel = within(modelPill()).getByText(SEEDANCE).className
+    expect(modelLabel).not.toContain(trimClass)
+    expect(modelLabel).toContain('truncate')
+    expect(modelLabel).toContain('leading-normal')
   })
 
   it('renders one pill per published parameter and nothing for an unknown model', async () => {
