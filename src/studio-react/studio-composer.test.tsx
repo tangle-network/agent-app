@@ -110,7 +110,112 @@ const SEEDANCE_I2V = 'bytedance/seedance-2.0/image-to-video'
 
 afterEach(() => {
   cleanup()
+  window.localStorage.clear()
   vi.unstubAllGlobals()
+})
+
+describe('StudioComposer — persisted selections', () => {
+  const imageDefault = 'gpt-image-2'
+  const imageAlternate = 'openai/gpt-image-2'
+  const persistenceCatalog = catalog({
+    image: [model(imageDefault, 'image'), model(imageAlternate, 'image')],
+    video: [model(SEEDANCE, 'video')],
+  }, { image: imageDefault, video: SEEDANCE })
+
+  it('restores the lane, model, size, and count after a same-workspace remount', async () => {
+    const first = mountWith(persistenceCatalog)
+    await screen.findByRole('button', { name: `Model: ${imageDefault}` })
+    await chooseModel(imageAlternate)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Size: Auto' }))
+    fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitemradio', { name: '1536×1024' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Count: ×1' }))
+    fireEvent.click(within(await screen.findByRole('menu')).getByRole('menuitemradio', { name: '×4' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Video' }))
+
+    expect(JSON.parse(window.localStorage.getItem('studio-composer:ws-1') ?? '{}')).toMatchObject({
+      type: 'video',
+      selectedModels: { image: imageAlternate },
+      optionsByModel: { [imageAlternate]: { size: '1536x1024', n: 4 } },
+    })
+    first.unmount()
+
+    mountWith(persistenceCatalog)
+    await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
+    expect(screen.getByRole('button', { name: 'Video' }).getAttribute('aria-pressed')).toBe('true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Image' }))
+    await screen.findByRole('button', { name: `Model: ${imageAlternate}` })
+    expect(screen.getByRole('button', { name: 'Size: 1536×1024' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Count: ×4' })).not.toBeNull()
+  })
+
+  it('isolates selections by workspace', async () => {
+    window.localStorage.setItem('studio-composer:ws-1', JSON.stringify({
+      v: 1,
+      type: 'video',
+      selectedModels: { image: imageAlternate, video: SEEDANCE },
+      optionsByModel: { [imageAlternate]: { size: '1536x1024', n: 4 } },
+    }))
+
+    mountWith(persistenceCatalog, { workspaceId: 'ws-2' })
+    await screen.findByRole('button', { name: `Model: ${imageDefault}` })
+    expect(screen.getByRole('button', { name: 'Image' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Size: Auto' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Count: ×1' })).not.toBeNull()
+  })
+
+  it('falls back from a stale model and reconciles stale options to catalog defaults', async () => {
+    const unavailable = model('unavailable-image', 'image', { status: 'unavailable' })
+    const currentCatalog = catalog({
+      image: [model(imageDefault, 'image', {
+        options: {
+          size: { values: ['1024x1024'], default: '1024x1024' },
+          n: { values: [1, 2], default: 1 },
+        },
+      }), unavailable],
+    }, { image: imageDefault })
+    window.localStorage.setItem('studio-composer:ws-1', JSON.stringify({
+      v: 1,
+      type: 'image',
+      selectedModels: { image: unavailable.id },
+      optionsByModel: {
+        [imageDefault]: { size: 'removed-size', n: 99, unpublished: 'drop-me' },
+      },
+    }))
+
+    mountWith(currentCatalog)
+    await screen.findByRole('button', { name: `Model: ${imageDefault}` })
+    expect(screen.getByRole('button', { name: 'Size: 1024×1024' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Count: ×1' })).not.toBeNull()
+    await waitFor(() => {
+      const stored = JSON.parse(window.localStorage.getItem('studio-composer:ws-1') ?? '{}')
+      expect(stored.optionsByModel[imageDefault]).toEqual({ size: '1024x1024', n: 1 })
+    })
+  })
+
+  it('clears the prompt on submit and never restores it with selections', async () => {
+    const first = mountWith(persistenceCatalog)
+    await screen.findByRole('button', { name: `Model: ${imageDefault}` })
+    await chooseModel(imageAlternate)
+    await submit('do not persist this prompt')
+    await waitFor(() => expect(first.posted).toHaveLength(1))
+    expect((screen.getByLabelText('Prompt') as HTMLTextAreaElement).value).toBe('')
+    first.unmount()
+
+    mountWith(persistenceCatalog)
+    await screen.findByRole('button', { name: `Model: ${imageAlternate}` })
+    expect((screen.getByLabelText('Prompt') as HTMLTextAreaElement).value).toBe('')
+  })
+
+  it('renders defaults when the stored JSON is corrupted', async () => {
+    window.localStorage.setItem('studio-composer:ws-1', '{not-json')
+    mountWith(persistenceCatalog)
+
+    await screen.findByRole('button', { name: `Model: ${imageDefault}` })
+    expect(screen.getByRole('button', { name: 'Image' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Size: Auto' })).not.toBeNull()
+  })
 })
 
 describe('StudioComposer — the pills are the model’s own parameters', () => {
@@ -119,7 +224,7 @@ describe('StudioComposer — the pills are the model’s own parameters', () => 
     expect(source).toContain('icon={PARAM_ICONS[param] ?? SlidersHorizontal}')
   })
 
-  it('optically centers model and option pill labels', async () => {
+  it('optically centers option labels without clipping model-name descenders', async () => {
     mountWith(catalog({
       video: [model(SEEDANCE, 'video')],
     }, { video: SEEDANCE }))
@@ -127,7 +232,8 @@ describe('StudioComposer — the pills are the model’s own parameters', () => 
     await screen.findByRole('button', { name: `Model: ${SEEDANCE}` })
 
     const trimClass = '[text-box:trim-both_cap_alphabetic]'
-    expect(within(modelPill()).getByText(SEEDANCE).className).toContain(trimClass)
+    expect(within(modelPill()).getByText(SEEDANCE).className).toContain('leading-normal')
+    expect(within(modelPill()).getByText(SEEDANCE).className).not.toContain(trimClass)
     expect(within(screen.getByRole('button', { name: 'Duration: Auto' })).getByText('Auto').className).toContain(trimClass)
   })
 
