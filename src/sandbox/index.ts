@@ -769,24 +769,24 @@ export function buildSandboxToolFileMounts(
   })
 }
 
-/** Build a shell script that sets up and exports the sandbox tool binary directory in user profiles */
+/**
+ * Build a shell script that creates the sandbox tool binary directory;
+ * `SANDBOX_TOOL_BIN_DIRS`, not this script, puts that directory on a sandbox PATH.
+ *
+ * Every sandbox PATH builder appends the `SANDBOX_TOOL_BIN_DIRS` directories at
+ * the tail, after the Nix, npm, and image entries. A tool therefore never
+ * shadows a platform or system binary of the same name. Set the variable to
+ * this directory next to the tool mounts. The `mkdir -p` makes the directory
+ * exist before a tool mount lands in it.
+ */
 export function buildSandboxToolPathSetupScript(options: SandboxToolPathOptions): string {
-  const binDir = sandboxToolBinDir(options)
-  const exportLine = `export PATH=${binDir}:$PATH`
-  return [
-    'set -eu',
-    `mkdir -p ${shellSingleQuote(binDir)}`,
-    `PATH=${shellSingleQuote(binDir)}:$PATH`,
-    'export PATH',
-    'for profile in "${HOME:-/home/agent}/.profile" "${HOME:-/home/agent}/.bashrc" "${HOME:-/home/agent}/.zshrc"; do',
-    '  mkdir -p "$(dirname "$profile")"',
-    '  touch "$profile"',
-    `  grep -Fqx ${shellSingleQuote(exportLine)} "$profile" || printf '\\n%s\\n' ${shellSingleQuote(exportLine)} >> "$profile"`,
-    'done',
-  ].join('\n')
+  return ['set -eu', `mkdir -p ${shellSingleQuote(sandboxToolBinDir(options))}`].join('\n')
 }
 
-/** Resolve the sandbox environment PATH setup by executing the configuration script with given options */
+/**
+ * Create the sandbox tool binary directory in a running box;
+ * `SANDBOX_TOOL_BIN_DIRS`, not this call, puts it on a sandbox PATH.
+ */
 export async function runSandboxToolPathSetup(
   box: SandboxInstance,
   options: SandboxToolPathOptions,
@@ -796,7 +796,7 @@ export async function runSandboxToolPathSetup(
     if (res.exitCode !== 0) {
       return fail(
         new Error(
-          `runSandboxToolPathSetup: failed to configure PATH for ${sandboxToolBinDir(options)} ` +
+          `runSandboxToolPathSetup: failed to create the tool bin dir ${sandboxToolBinDir(options)} ` +
             `(exit ${res.exitCode}): ${res.stderr.slice(0, 500)}`,
         ),
       )

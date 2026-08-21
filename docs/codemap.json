@@ -10071,7 +10071,7 @@
           "name": "buildSandboxToolPathSetupScript",
           "kind": "function",
           "signature": "(options: SandboxToolPathOptions) => string",
-          "doc": "Build a shell script that sets up and exports the sandbox tool binary directory in user profiles"
+          "doc": "Build a shell script that creates the sandbox tool binary directory; `SANDBOX_TOOL_BIN_DIRS`, not this script, puts that directory on a sandbox PATH."
         },
         {
           "name": "classifySeveredStream",
@@ -10515,7 +10515,7 @@
           "name": "runSandboxToolPathSetup",
           "kind": "function",
           "signature": "(box: SandboxInstance, options: SandboxToolPathOptions) => Promise<Outcome<void>>",
-          "doc": "Resolve the sandbox environment PATH setup by executing the configuration script with given options"
+          "doc": "Create the sandbox tool binary directory in a running box; `SANDBOX_TOOL_BIN_DIRS`, not this call, puts it on a sandbox PATH."
         },
         {
           "name": "SafeSandboxErrorCause",

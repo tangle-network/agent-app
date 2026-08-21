@@ -3541,17 +3541,20 @@ describe('sandbox tool install helpers', () => {
     })).toThrow(/tool name/)
   })
 
-  it('builds an idempotent PATH setup script for shell profiles', () => {
+  it('builds an idempotent bin-dir setup script that leaves PATH alone', () => {
     const script = buildSandboxToolPathSetupScript({ appName: 'gtm-agent' })
     expect(script).toContain("mkdir -p '/home/agent/tools/gtm-agent/bin'")
-    expect(script).toContain("PATH='/home/agent/tools/gtm-agent/bin':$PATH")
-    expect(script).toContain('export PATH=/home/agent/tools/gtm-agent/bin:$PATH')
-    expect(script).toContain('.profile')
-    expect(script).toContain('.bashrc')
-    expect(script).toContain('.zshrc')
+    // `SANDBOX_TOOL_BIN_DIRS` is the one mechanism that puts this dir on a
+    // sandbox PATH. A shell rc edit here cannot replace it: a non-interactive
+    // exec reads no rc file, and the SSH shell environment assigns PATH
+    // absolutely, which discards whatever an rc file appended.
+    expect(script).not.toContain('PATH')
+    expect(script).not.toContain('.profile')
+    expect(script).not.toContain('.bashrc')
+    expect(script).not.toContain('.zshrc')
   })
 
-  it('runs PATH setup through box.exec and preserves setup failures', async () => {
+  it('runs bin-dir setup through box.exec and preserves setup failures', async () => {
     const okExec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
     await expect(runSandboxToolPathSetup(fakeBox({ exec: okExec }), { appName: 'gtm-agent' }))
       .resolves.toEqual({ succeeded: true, value: undefined })
