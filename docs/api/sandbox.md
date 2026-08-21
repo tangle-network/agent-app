@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-166 exports.
+169 exports.
 
 ### `adaptSandboxStream`
 
@@ -78,6 +78,22 @@ interface BuildAppToolMcpServersOptions
 (publicOrigin: string | URL, extraDomains?: readonly string[]) => EgressPolicy
 ```
 
+### `buildSandboxToolBinDirScript`
+
+`function` — Build a shell script that creates the sandbox tool binary directory.
+
+```ts
+(options: SandboxToolPathOptions) => string
+```
+
+### `buildSandboxToolBinDirsEnv`
+
+`function` — Build the `SANDBOX_TOOL_BIN_DIRS` entry that puts these apps' tool bin dirs on a sandbox PATH.
+
+```ts
+(apps: readonly SandboxToolPathOptions[]) => { SANDBOX_TOOL_BIN_DIRS: string; }
+```
+
 ### `buildSandboxToolFileMounts`
 
 `function` — Build file mounts for sandbox tools based on provided options and tool configurations
@@ -96,7 +112,7 @@ interface BuildSandboxToolFileMountsOptions
 
 ### `buildSandboxToolPathSetupScript`
 
-`function` — Build a shell script that sets up and exports the sandbox tool binary directory in user profiles
+`function` — Build a shell script that creates the sandbox tool binary directory.
 
 ```ts
 (options: SandboxToolPathOptions) => string
@@ -252,6 +268,14 @@ interface DriveSandboxTurnOptions
 
 ```ts
 "EGRESS_PROXY_RECOVERY_REQUIRED"
+```
+
+### `ensureSandboxToolBinDir`
+
+`function` — Create the sandbox tool binary directory in a running box.
+
+```ts
+(box: SandboxInstance, options: SandboxToolPathOptions) => Promise<Outcome<void>>
 ```
 
 ### `ensureWorkspaceSandbox`
@@ -688,7 +712,7 @@ interface ResolveSandboxClientCredentialsOptions
 
 ### `runSandboxToolPathSetup`
 
-`function` — Resolve the sandbox environment PATH setup by executing the configuration script with given options
+`function` — Create the sandbox tool binary directory in a running box.
 
 ```ts
 (box: SandboxInstance, options: SandboxToolPathOptions) => Promise<Outcome<void>>

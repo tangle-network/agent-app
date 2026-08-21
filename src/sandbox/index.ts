@@ -769,42 +769,125 @@ export function buildSandboxToolFileMounts(
   })
 }
 
-/** Build a shell script that sets up and exports the sandbox tool binary directory in user profiles */
-export function buildSandboxToolPathSetupScript(options: SandboxToolPathOptions): string {
-  const binDir = sandboxToolBinDir(options)
-  const exportLine = `export PATH=${binDir}:$PATH`
-  return [
-    'set -eu',
-    `mkdir -p ${shellSingleQuote(binDir)}`,
-    `PATH=${shellSingleQuote(binDir)}:$PATH`,
-    'export PATH',
-    'for profile in "${HOME:-/home/agent}/.profile" "${HOME:-/home/agent}/.bashrc" "${HOME:-/home/agent}/.zshrc"; do',
-    '  mkdir -p "$(dirname "$profile")"',
-    '  touch "$profile"',
-    `  grep -Fqx ${shellSingleQuote(exportLine)} "$profile" || printf '\\n%s\\n' ${shellSingleQuote(exportLine)} >> "$profile"`,
-    'done',
-  ].join('\n')
+/**
+ * Build the `SANDBOX_TOOL_BIN_DIRS` entry that puts these apps' tool bin dirs on
+ * a sandbox PATH. Declare it in the same box env as the mounts from
+ * {@link buildSandboxToolFileMounts}: the mounts place the executables, this
+ * places the directory that makes a bare tool name resolve.
+ *
+ * Every sandbox PATH builder appends these directories at the TAIL, after the
+ * Nix, npm, and image entries, so a tool never shadows a platform or system
+ * binary of the same name. That placement is identical for a non-interactive
+ * exec, a sidecar-spawned CLI, and an SSH shell, which is why this variable and
+ * not a shell rc file is the mechanism: an exec reads no rc file, and the SSH
+ * shell environment assigns PATH absolutely.
+ *
+ * Entries come from {@link sandboxToolBinDir}, so the value can never name a
+ * directory the mounts did not use — a caller that hand-writes the literal
+ * instead drifts silently the moment a base dir changes. Order is preserved,
+ * and two apps that resolve to one directory collapse to the FIRST position it
+ * appeared in.
+ *
+ * A `:` in a resolved bin dir throws here. The character separates entries both
+ * in this variable and in PATH itself, so such a directory is unrepresentable
+ * rather than merely awkward: joining it would split one absolute path into a
+ * leading path and a relative remainder, and the runtime rejects a relative
+ * segment by failing the whole box. Throwing names the offending directory
+ * instead.
+ *
+ * The consuming half lives in agent-dev-container: `resolveSandboxToolBinDirs`
+ * parses this value and every PATH builder appends it at the tail — sidecar
+ * exec and PTY through `packages/shared/src/cache-env.ts`, an SSH session
+ * through `packages/shared/src/ssh-bootstrap.ts`, and a spawned CLI through
+ * `packages/sdk-cli-runner/src/cli-process.ts`, each with its own tests. This
+ * package has no sandbox runtime, so tail placement is pinned there, not here.
+ */
+export function buildSandboxToolBinDirsEnv(
+  apps: readonly SandboxToolPathOptions[],
+): { SANDBOX_TOOL_BIN_DIRS: string } {
+  if (apps.length === 0) {
+    throw new Error(
+      'buildSandboxToolBinDirsEnv: name at least one app whose tool bin dir belongs on PATH.',
+    )
+  }
+  const binDirs = new Set<string>()
+  for (const app of apps) {
+    const binDir = sandboxToolBinDir(app)
+    if (binDir.includes(':')) {
+      throw new Error(
+        `sandbox tool bin dir ${binDir} contains ':', which separates entries in ` +
+          'SANDBOX_TOOL_BIN_DIRS and in PATH. Place the tools under a colon-free directory.',
+      )
+    }
+    binDirs.add(binDir)
+  }
+  return { SANDBOX_TOOL_BIN_DIRS: [...binDirs].join(':') }
 }
 
-/** Resolve the sandbox environment PATH setup by executing the configuration script with given options */
-export async function runSandboxToolPathSetup(
+/**
+ * Build a shell script that creates the sandbox tool binary directory.
+ * {@link buildSandboxToolBinDirsEnv}, not this script, puts that directory on a
+ * sandbox PATH.
+ *
+ * The `mkdir -p` makes the directory exist before a tool mount lands in it.
+ */
+export function buildSandboxToolBinDirScript(options: SandboxToolPathOptions): string {
+  return ['set -eu', `mkdir -p ${shellSingleQuote(sandboxToolBinDir(options))}`].join('\n')
+}
+
+/** Build a shell script that creates the sandbox tool binary directory.
+ *
+ *  @deprecated Renamed to {@link buildSandboxToolBinDirScript}, and the script
+ *  no longer appends the bin dir to PATH in `~/.profile`, `~/.bashrc` and
+ *  `~/.zshrc`. Those edits never reached the contexts that run a tool: an exec
+ *  and a spawned CLI read no rc file, and the SSH shell assigns PATH
+ *  absolutely, which discards an appended entry. Put the directory on PATH with
+ *  {@link buildSandboxToolBinDirsEnv} instead. This name forwards to the new
+ *  one so an existing import keeps resolving; removal is a major.
+ */
+export function buildSandboxToolPathSetupScript(options: SandboxToolPathOptions): string {
+  return buildSandboxToolBinDirScript(options)
+}
+
+/**
+ * Create the sandbox tool binary directory in a running box.
+ * {@link buildSandboxToolBinDirsEnv}, not this call, puts it on a sandbox PATH.
+ */
+export async function ensureSandboxToolBinDir(
   box: SandboxInstance,
   options: SandboxToolPathOptions,
 ): Promise<Outcome<void>> {
   try {
-    const res = await box.exec(buildSandboxToolPathSetupScript(options))
+    const res = await box.exec(buildSandboxToolBinDirScript(options))
     if (res.exitCode !== 0) {
       return fail(
         new Error(
-          `runSandboxToolPathSetup: failed to configure PATH for ${sandboxToolBinDir(options)} ` +
+          `ensureSandboxToolBinDir: failed to create the tool bin dir ${sandboxToolBinDir(options)} ` +
             `(exit ${res.exitCode}): ${res.stderr.slice(0, 500)}`,
         ),
       )
     }
     return ok(undefined)
   } catch (err) {
-    return fail(new Error('runSandboxToolPathSetup: exec failed', { cause: err }))
+    return fail(new Error('ensureSandboxToolBinDir: exec failed', { cause: err }))
   }
+}
+
+/** Create the sandbox tool binary directory in a running box.
+ *
+ *  @deprecated Renamed to {@link ensureSandboxToolBinDir}, and the call no
+ *  longer appends the bin dir to PATH in `~/.profile`, `~/.bashrc` and
+ *  `~/.zshrc`. Those edits never reached the contexts that run a tool: an exec
+ *  and a spawned CLI read no rc file, and the SSH shell assigns PATH
+ *  absolutely, which discards an appended entry. Put the directory on PATH with
+ *  {@link buildSandboxToolBinDirsEnv} instead. This name forwards to the new
+ *  one so an existing import keeps resolving; removal is a major.
+ */
+export async function runSandboxToolPathSetup(
+  box: SandboxInstance,
+  options: SandboxToolPathOptions,
+): Promise<Outcome<void>> {
+  return ensureSandboxToolBinDir(box, options)
 }
 
 // Build a shell-safe path token that preserves tilde-home semantics. A path
