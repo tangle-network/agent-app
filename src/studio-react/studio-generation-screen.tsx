@@ -25,7 +25,7 @@
  * Assumes a `StudioToastProvider` and a `StudioPlaybackProvider` above it.
  */
 
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, CircleAlert } from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -223,13 +223,18 @@ export function StudioGenerationScreen({
                 // "still running" and draws a skeleton, which would leave a dead
                 // slot sweeping for ever. The cell states the reason instead.
                 if (generationStatus(row) === 'failed') {
+                  const reason = generationError(row)
                   return (
                     <div
                       key={row.id}
-                      className="grid place-items-center bg-accent p-3 text-center text-[12px] text-destructive"
+                      className="flex flex-col items-center justify-center gap-1.5 bg-accent p-3 text-center"
                       style={{ aspectRatio: ratio }}
                     >
-                      {generationError(row) ?? 'Generation failed'}
+                      <CircleAlert aria-hidden className="h-4 w-4 flex-none text-destructive" strokeWidth={2} />
+                      <p className="text-[13px] font-medium text-foreground">Generation failed</p>
+                      {reason && reason !== 'Generation failed' && (
+                        <p className="line-clamp-3 text-[12px] text-muted-foreground">{reason}</p>
+                      )}
                     </div>
                   )
                 }
