@@ -65,6 +65,11 @@ import {
   type OptionChoice,
   optionValueLabel,
 } from './composer-option-controls'
+import {
+  loadComposerSelections,
+  saveComposerSelections,
+  type PersistedComposerSelections,
+} from './composer-persistence'
 
 /** The lanes the composer offers. Avatar and transcription stay disabled
  *  (#451); "Audio" is the word for the `speech` lane everywhere on screen. */
@@ -189,8 +194,27 @@ export function StudioComposer({
   const [referenceImageUrl, setReferenceImageUrl] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hydratedWorkspaceId, setHydratedWorkspaceId] = useState<string | null>(null)
   const submitLockRef = useRef(false)
   const bandRef = useRef<HTMLDivElement>(null)
+  const hydratedRef = useRef(false)
+  const persistedOptionsRef = useRef<PersistedComposerSelections['optionsByModel']>({})
+
+  useEffect(() => {
+    hydratedRef.current = false
+    setHydratedWorkspaceId(null)
+    if (!workspaceId) return
+    const persisted = loadComposerSelections(workspaceId)
+    if (persisted) {
+      setType(persisted.type)
+      setSelectedModels(persisted.selectedModels)
+      persistedOptionsRef.current = persisted.optionsByModel
+    } else {
+      persistedOptionsRef.current = {}
+    }
+    hydratedRef.current = true
+    setHydratedWorkspaceId(workspaceId)
+  }, [workspaceId])
 
   useEffect(() => {
     if (!workspaceId) return
@@ -285,7 +309,8 @@ export function StudioComposer({
   // parameter it does not publish is dropped rather than carried invisibly.
   useEffect(() => {
     setOptionValues((current) => {
-      const next = reconcileOptionValues(options, current[type], {
+      const seed = { ...persistedOptionsRef.current[modelId], ...current[type] }
+      const next = reconcileOptionValues(options, seed, {
         allowCustomSize: supportsCustomImageSize(modelId),
       })
       const unchanged = Object.keys(next).length === Object.keys(current[type]).length
@@ -293,6 +318,32 @@ export function StudioComposer({
       return unchanged ? current : { ...current, [type]: next }
     })
   }, [modelId, options, type])
+
+  useEffect(() => {
+    if (!workspaceId || !hydratedRef.current || hydratedWorkspaceId !== workspaceId) return
+    // An unknown pre-catalog model has no vocabulary to validate against yet;
+    // keep its stored options intact until the catalog resolves. Known models
+    // can reconcile immediately from their built-in option metadata.
+    if (!catalog && modelId && persistedOptionsRef.current[modelId] !== undefined && !options) return
+    const seed = { ...persistedOptionsRef.current[modelId], ...optionValues[type] }
+    const reconciled = reconcileOptionValues(options, seed, {
+      allowCustomSize: supportsCustomImageSize(modelId),
+    })
+    const reconciledReady = Object.keys(reconciled).length === Object.keys(optionValues[type]).length
+      && Object.entries(reconciled).every(([key, value]) => optionValues[type][key] === value)
+    if (!reconciledReady) return
+    const optionsByModel = {
+      ...persistedOptionsRef.current,
+      ...(modelId ? { [modelId]: optionValues[type] } : {}),
+    }
+    saveComposerSelections(workspaceId, {
+      v: 1,
+      type,
+      selectedModels,
+      optionsByModel,
+    })
+    persistedOptionsRef.current = optionsByModel
+  }, [catalog, hydratedWorkspaceId, modelId, optionValues, options, selectedModels, type, workspaceId])
 
   const values = optionValues[type]
   const params = visibleParams(type, options)
