@@ -19046,7 +19046,7 @@ interface StudioConfirmDialogProps
 `function`
 
 ```ts
-({ generations, batchKey, onGenerated, onOpenGeneration, onBack, workspaceId, pickReferenceImage, actions, className, }…
+({ generations, batchKey, onGenerated, onOpenGeneration, workspaceId, pickReferenceImage, actions, className, }: Studio…
 ```
 
 ### `StudioGenerationScreenProps`

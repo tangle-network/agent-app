@@ -14700,7 +14700,7 @@
         {
           "name": "StudioGenerationScreen",
           "kind": "function",
-          "signature": "({ generations, batchKey, onGenerated, onOpenGeneration, onBack, workspaceId, pickReferenceImage, actions, className, }…",
+          "signature": "({ generations, batchKey, onGenerated, onOpenGeneration, workspaceId, pickReferenceImage, actions, className, }: Studio…",
           "doc": null
         },
         {
