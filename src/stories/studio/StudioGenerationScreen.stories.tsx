@@ -54,7 +54,6 @@ const meta: Meta<typeof StudioGenerationScreen> = {
     workspaceId: 'ws-demo',
     onGenerated: noOpGenerated,
     onOpenGeneration: (batchKey, first) => console.log('open generation', batchKey, first.id),
-    onBack: () => console.log('back'),
     actions: storyMediaActions,
   },
 }
