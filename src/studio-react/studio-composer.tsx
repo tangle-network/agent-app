@@ -486,7 +486,7 @@ export function StudioComposer({
   return (
     <section
       data-variant={variant}
-      className={`rounded-[14px] border border-border bg-card px-2.5 pb-[9px] pt-2 shadow-sm transition focus-within:border-primary focus-within:ring-[3px] focus-within:ring-ring/30 ${className ?? ''}`}
+      className={`studio-composer-card rounded-2xl border border-border bg-surface-container-high p-2.5 shadow-sm transition focus-within:border-primary/60 ${className ?? ''}`}
     >
       {laneDown ? (
         <p className="flex min-h-0 items-center gap-2 px-1.5 pb-3 pt-1.5 text-[13px] font-medium text-warning">
