@@ -33,7 +33,7 @@
  * Assumes a `StudioToastProvider` and a `StudioPlaybackProvider` above it.
  */
 
-import { ArrowLeft, CircleAlert } from 'lucide-react'
+import { CircleAlert } from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -72,7 +72,6 @@ export interface StudioGenerationScreenProps {
   onGenerated: (generation: Generation) => void
   /** A dock submit that starts a NEW batch navigates via the host. */
   onOpenGeneration: (batchKey: string, first: Generation) => void
-  onBack: () => void
   workspaceId?: string
   pickReferenceImage?: () => Promise<string | null>
   actions?: StudioMediaActions
@@ -98,7 +97,6 @@ export function StudioGenerationScreen({
   batchKey,
   onGenerated,
   onOpenGeneration,
-  onBack,
   workspaceId,
   pickReferenceImage,
   actions,
@@ -133,9 +131,13 @@ export function StudioGenerationScreen({
   for (const row of rows) if (!isRunning(row)) settledOrder.set(row.id, settledOrder.size)
 
   const columns = rows.length === 4 ? 2 : Math.min(rows.length, 4) || 1
+  // A lone image is sized like ONE tile of a two-up row (820 less the 3px gap,
+  // halved) so a single picture never dominates the canvas. Video and speech
+  // keep the wider band: a player is watched, not scanned next to siblings.
   const maxWidth = rows.length > 1 || first?.type === 'speech'
     ? 820
-    : ratio < 1 ? 380 : 640
+    : first?.type !== 'image' ? 640
+    : ratio < 1 ? 380 : 408
 
   const viewerGeneration = viewerId ? rows.find((row) => row.id === viewerId) ?? null : null
 
@@ -190,15 +192,7 @@ export function StudioGenerationScreen({
 
   return (
     <div ref={rootRef} className={`flex min-h-full flex-col ${className ?? ''}`}>
-      <header className="studio-gen-head mx-auto flex w-full max-w-[868px] items-center gap-2.5 px-6 pb-4 pt-1 max-[900px]:px-4">
-        <button
-          type="button"
-          aria-label="Back to Studio"
-          onClick={onBack}
-          className="grid h-8 w-8 flex-none place-items-center rounded-full border border-border bg-card shadow-sm hover:bg-accent"
-        >
-          <ArrowLeft size={16} strokeWidth={1.5} />
-        </button>
+      <header className="studio-gen-head mx-auto flex w-full max-w-[868px] justify-end px-6 pb-4 pt-1 max-[900px]:px-4">
         <p
           title={prompt}
           className="min-w-0 max-w-full truncate rounded-full border border-border bg-card px-4 py-2 text-[14px] shadow-sm"

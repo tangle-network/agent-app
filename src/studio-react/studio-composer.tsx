@@ -345,23 +345,28 @@ export function StudioComposer({
     persistedOptionsRef.current = optionsByModel
   }, [catalog, hydratedWorkspaceId, modelId, optionValues, options, selectedModels, type, workspaceId])
 
+  const laneDown = Boolean(catalog) && !catalogLoading && !catalogError && laneUnavailable(curatedModels)
+
   const values = optionValues[type]
-  const params = visibleParams(type, options)
+  // Every parameter belongs to the MODEL. A dead lane has none, so the pills it
+  // would have filled are dropped rather than left standing on a default no
+  // model is offering.
+  const params = laneDown ? [] : visibleParams(type, options)
   const audioMeta = type === 'video' ? options?.audio : undefined
-  const audioSupported = Boolean(audioMeta) && audioMeta?.supported !== false
+  const audioSupported = !laneDown && Boolean(audioMeta) && audioMeta?.supported !== false
   // A model the catalog does not list is normally "not ready" — except for a
   // verified image-to-video sibling, which the composer selected itself by
   // attaching a reference image and must be able to send even when the catalog
   // never listed it.
   const unlistedSibling = !modelOption && Boolean(textToVideoSibling(modelId))
-  const referenceSupported = type === 'video'
+  const referenceSupported = !laneDown
+    && type === 'video'
     && Boolean(imageToVideoSibling(modelId) ?? textToVideoSibling(modelId))
 
   const modelReady = (Boolean(modelOption) || unlistedSibling)
     && modelOption?.status !== 'unavailable'
     && !catalogLoading
     && !catalogError
-  const laneDown = Boolean(catalog) && !catalogLoading && !catalogError && laneUnavailable(curatedModels)
   const canSubmit = Boolean(workspaceId) && modelReady && Boolean(prompt.trim()) && !isSubmitting
 
   function selectModel(id: string) {
@@ -486,7 +491,7 @@ export function StudioComposer({
   return (
     <section
       data-variant={variant}
-      className={`rounded-[14px] border border-border bg-card px-2.5 pb-[9px] pt-2 shadow-sm transition focus-within:border-primary focus-within:ring-[3px] focus-within:ring-ring/30 ${className ?? ''}`}
+      className={`studio-composer-card rounded-2xl border border-border bg-surface-container-high p-2.5 shadow-sm transition focus-within:border-primary/60 ${className ?? ''}`}
     >
       {laneDown ? (
         <p className="flex min-h-0 items-center gap-2 px-1.5 pb-3 pt-1.5 text-[13px] font-medium text-warning">
@@ -515,10 +520,14 @@ export function StudioComposer({
         <ComposerBand bandRef={bandRef} resetKey={type}>
           <ModelPill
             models={curatedModels}
-            value={modelId}
-            displayName={modelOption?.name || modelId || 'Select a model'}
-            provider={modelOption?.provider}
-            unavailable={modelOption?.status === 'unavailable'}
+            // A dead lane has no sendable model, so nothing in the menu is marked
+            // chosen either — the resolved default is a placeholder, not a pick.
+            value={laneDown ? '' : modelId}
+            // The pill names none for the same reason: a model name there reads as a
+            // working choice the user could send.
+            displayName={laneDown ? 'Unavailable' : modelOption?.name || modelId || 'Select a model'}
+            provider={laneDown ? undefined : modelOption?.provider}
+            unavailable={laneDown || modelOption?.status === 'unavailable'}
             onSelect={chooseModel}
             bandRef={bandRef}
           />

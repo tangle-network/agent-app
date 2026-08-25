@@ -87,8 +87,8 @@ export function StudioHomeScreen({
 
   return (
     <main className={className}>
-      <div className="studio-home-top mx-auto w-full max-w-[820px] px-6 pt-[clamp(24px,12vh,124px)] max-[900px]:px-4">
-        <h1 className="mb-5 text-center text-[30px] font-semibold leading-[1.2] tracking-[-0.02em] [text-wrap:balance] max-[640px]:text-[25px]">
+      <div className="studio-home-top mx-auto w-full max-w-[868px] px-6 pt-[clamp(24px,22vh,220px)] max-[900px]:px-4">
+        <h1 className="mb-11 text-center text-[1.75rem] font-medium tracking-tight text-foreground [text-wrap:balance] max-[640px]:text-[1.5rem]">
           What do you want to create?
         </h1>
         <StudioComposer
@@ -101,11 +101,11 @@ export function StudioHomeScreen({
 
       <section className="studio-home-recent pb-[72px]">
         <div className="mb-3 mt-[34px] flex items-center justify-between gap-3 px-6 max-[900px]:px-4">
-          <h2 className="text-[13px] font-medium tracking-[0.02em] text-muted-foreground">Recent media</h2>
+          <h2 className="text-[13px] font-normal tracking-[0.02em] text-muted-foreground">Recent media</h2>
           <button
             type="button"
             onClick={onOpenHistory}
-            className="h-[30px] whitespace-nowrap rounded-full border border-border bg-card px-3 text-[13px] shadow-sm hover:bg-accent"
+            className="h-[30px] whitespace-nowrap rounded-md px-1 text-[13px] font-medium text-primary transition hover:text-primary/80"
           >
             View history
           </button>

@@ -58,7 +58,6 @@ function tree(props: Partial<StudioGenerationScreenProps>) {
           batchKey={props.batchKey ?? 'batch-1'}
           onGenerated={props.onGenerated ?? vi.fn()}
           onOpenGeneration={props.onOpenGeneration ?? vi.fn()}
-          onBack={props.onBack ?? vi.fn()}
           {...props}
         />
       </StudioPlaybackProvider>
@@ -182,12 +181,9 @@ describe('StudioGenerationScreen — the dock', () => {
 })
 
 describe('StudioGenerationScreen — header and deletion', () => {
-  it('goes back and shows the batch prompt in full on the chip', () => {
-    const onBack = vi.fn()
-    renderScreen({ generations: [settled(0)], onBack })
+  it('shows the batch prompt in full on the chip', () => {
+    renderScreen({ generations: [settled(0)] })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Back to Studio' }))
-    expect(onBack).toHaveBeenCalledTimes(1)
     expect(screen.getByTitle(PROMPT).textContent).toBe(PROMPT)
   })
 

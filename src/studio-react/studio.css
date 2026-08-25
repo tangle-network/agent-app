@@ -1,3 +1,9 @@
+/* ── Studio composer: the card surface ──
+   `.studio-composer-card` carries no rules here — it is the hook a host scopes
+   its own surface tokens on, the way it scopes them on its chat composer, so
+   both input cards resolve to the same colour in each theme. The card's own
+   colours come from `bg-surface-container-high` + `border-border`. */
+
 /* ── Studio composer: the option band ──
    The control row's middle section scrolls horizontally and must not show a
    scrollbar (it sits 34px tall inside a chat card, where a bar eats a third of
