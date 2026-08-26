@@ -1925,7 +1925,7 @@ async function resumeStoppedBox(
 ): Promise<Outcome<SandboxInstance>> {
   try {
     livenessVerifiedAt.delete(box.id)
-    await box.resume()
+    await box.resume({ timeoutMs })
     await box.waitFor('running', { timeoutMs, ...(onProgress ? { onProgress } : {}) })
     return ok(box)
   } catch (err) {
@@ -2004,18 +2004,21 @@ async function resolveWorkspaceSandboxClient(
   }
 }
 
-/** What a peek can find. `not-running` carries the platform's own state string
- *  (`stopped`, `starting`, `failed`, …) — narrowing it to a union here would
- *  drop states the platform adds later, and every caller wants it for a log. */
+/** What a peek can find. `warming` means the control plane is running while
+ *  the filesystem incarnation is still transitioning. `not-running` carries
+ *  the platform's own state string (`stopped`, `starting`, `failed`, …) —
+ *  narrowing it to a union here would drop states the platform adds later,
+ *  and every caller wants it for a log. */
 export type PeekWorkspaceSandboxOutcome =
   | { status: 'running'; box: SandboxInstance }
+  | { status: 'warming'; readiness: 'transitioning'; box: SandboxInstance }
   | { status: 'not-running'; state: string; box: SandboxInstance }
   | { status: 'absent' }
 
 /**
  * Read-only twin of {@link ensureWorkspaceSandbox}: report whether a
- * workspace's box exists and is running, WITHOUT provisioning, resuming, or
- * bootstrapping anything.
+ * workspace's box exists and is fully ready, WITHOUT provisioning, resuming,
+ * or bootstrapping anything.
  *
  * This is what a read-mostly path needs — a file-index route's `authorize`
  * seam, a stale-lock reconciliation, a status badge. Calling `ensure` from one
@@ -2053,6 +2056,12 @@ export async function peekWorkspaceSandbox(
   const match = boxes.find((box) => box.name === name) ?? boxes.find((box) => box.name === displayName)
   if (!match) return { status: 'absent' }
   if (match.status !== 'running') return { status: 'not-running', state: match.status, box: match }
+  if (match.filesystemIncarnationReadiness === 'transitioning') {
+    return { status: 'warming', readiness: 'transitioning', box: match }
+  }
+  if (match.filesystemIncarnationReadiness !== 'ready') {
+    throw new Error(`sandbox ${match.id} is running without filesystem incarnation readiness`)
+  }
   return { status: 'running', box: match }
 }
 

@@ -127,6 +127,7 @@ function fakeBox(over: Partial<SandboxInstance> = {}): SandboxInstance {
   return {
     name: 'box-w1',
     id: 'sandbox-1',
+    filesystemIncarnationReadiness: 'ready',
     metadata: { harness: 'opencode' },
     connection: {
       runtimeUrl: 'https://rt',
@@ -1762,10 +1763,11 @@ describe('ensureWorkspaceSandbox — new seams', () => {
 
   it('resumes a stopped box from snapshot instead of creating', async () => {
     const resume = vi.fn().mockResolvedValue(undefined)
+    const waitFor = vi.fn()
     const stopped = fakeBox({
       name: 'box-w1',
       resume,
-      waitFor: vi.fn(),
+      waitFor,
       exec: vi.fn().mockResolvedValue({ stdout: 'alive', exitCode: 0 }),
     })
     listMock.mockImplementation(({ status }: { status: string }) =>
@@ -1777,9 +1779,11 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     )
     const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
       livenessProbe: { sidecarProcessPattern: () => 'opencode' },
+      provisionTimeoutMs: 91_234,
     })
     const box = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
-    expect(resume).toHaveBeenCalledOnce()
+    expect(resume).toHaveBeenCalledWith({ timeoutMs: 91_234 })
+    expect(waitFor).toHaveBeenCalledWith('running', { timeoutMs: 91_234 })
     expect(createMock).not.toHaveBeenCalled()
     expect(box).toBe(stopped)
   })
@@ -3732,6 +3736,30 @@ describe('peekWorkspaceSandbox', () => {
 
     await expect(peekWorkspaceSandbox(peekShell(), { workspaceId: 'w1' }))
       .resolves.toEqual({ status: 'not-running', state: 'stopped', box })
+  })
+
+  it('reports a running box as warming while its filesystem incarnation is transitioning', async () => {
+    const box = fakeBox({
+      name: 'app:workspace:w1',
+      status: 'running',
+      filesystemIncarnationReadiness: 'transitioning',
+    })
+    listMock.mockResolvedValue([box])
+
+    await expect(peekWorkspaceSandbox(peekShell(), { workspaceId: 'w1' }))
+      .resolves.toEqual({ status: 'warming', readiness: 'transitioning', box })
+  })
+
+  it('fails loud when a running box has no filesystem-incarnation readiness', async () => {
+    const box = fakeBox({
+      name: 'app:workspace:w1',
+      status: 'running',
+      filesystemIncarnationReadiness: undefined,
+    })
+    listMock.mockResolvedValue([box])
+
+    await expect(peekWorkspaceSandbox(peekShell(), { workspaceId: 'w1' }))
+      .rejects.toThrow(/filesystem incarnation readiness/)
   })
 
   it('resolves credentials through the same scoped seam as ensure', async () => {
