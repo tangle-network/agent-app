@@ -313,6 +313,7 @@ export function createSandboxPrewarmer(
           userId: scope.userId,
         })
         if (peek.status === 'running') return abandon('already-running')
+        if (peek.status === 'warming') return abandon('already-warming')
         if (peek.status === 'absent' && mode === 'resume-only') {
           return abandon('absent-and-resume-only')
         }
@@ -353,6 +354,7 @@ export function createSandboxPrewarmer(
         userId: scope.userId,
       })
       if (peek.status === 'running') return { status: 'ready', boxId: peek.box.id }
+      if (peek.status === 'warming') return { status: 'warming' }
 
       if (inFlight.has(key)) return { status: 'warming' }
       if (claim?.isHeld) {

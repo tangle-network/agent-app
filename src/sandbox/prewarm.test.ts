@@ -28,6 +28,7 @@ function box(over: Record<string, unknown> = {}) {
     id: 'sandbox-abc',
     name: 'box-w1',
     status: 'running',
+    filesystemIncarnationReadiness: 'ready',
     metadata: { harness: 'opencode' },
     connection: {
       runtimeUrl: 'https://rt.example',
@@ -37,6 +38,7 @@ function box(over: Record<string, unknown> = {}) {
     waitFor: vi.fn().mockResolvedValue(undefined),
     refresh: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
+    resume: vi.fn().mockResolvedValue(undefined),
     exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
     ...over,
   }
@@ -91,6 +93,22 @@ describe('createSandboxPrewarmer — cost posture', () => {
     expect(d.outcome).toBe('already-running')
     expect(d.completion).toBeUndefined()
     expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('does not start another lifecycle operation while the filesystem incarnation is transitioning', async () => {
+    const transitioning = box({ filesystemIncarnationReadiness: 'transitioning' })
+    listMock.mockResolvedValue([transitioning])
+    const claim = memoryClaim()
+    const acquire = vi.spyOn(claim, 'acquire')
+    const p = createSandboxPrewarmer(shell(), { claim })
+
+    const d = await p.prewarm(scope)
+
+    expect(d.outcome).toBe('already-warming')
+    expect(d.completion).toBeUndefined()
+    expect(transitioning.resume).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+    expect(acquire).not.toHaveBeenCalled()
   })
 
   it('resume-only (the DEFAULT) never creates a box that does not exist', async () => {
@@ -280,6 +298,12 @@ describe('createSandboxPrewarmer — readiness for the UI', () => {
     const p = createSandboxPrewarmer(shell(), { claim: 'single-isolate-only' })
     expect(await p.readiness(scope)).toEqual({ status: 'ready', boxId: 'sandbox-abc' })
     expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('reports warming while the box filesystem incarnation is transitioning', async () => {
+    listMock.mockResolvedValue([box({ filesystemIncarnationReadiness: 'transitioning' })])
+    const p = createSandboxPrewarmer(shell(), { claim: 'single-isolate-only' })
+    expect(await p.readiness(scope)).toEqual({ status: 'warming' })
   })
 
   it('reports absent when there is no box — the state that must not render as a spinner', async () => {
