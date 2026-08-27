@@ -1,8 +1,8 @@
 /**
  * The shared 3-pane vault: tree | artifact viewer | optional agent dock. This is
  * pure shell MECHANISM — selection, the dirty-guard + pending-nav state machine,
- * rich/source editor modes, create/delete/refresh, skeletons, an error boundary,
- * and an empty state. It renders NO file tree and NO artifact viewer of its own:
+ * rich/source editor modes, create/delete/refresh, skeletons, and an error
+ * boundary. It renders NO file tree and NO artifact viewer of its own:
  * those arrive through the `renderTree` / `renderArtifact` / `renderDock` seams,
  * so a product wires sandbox-ui's RichFileTree + FileArtifactPane in ~10 lines.
  *
@@ -225,17 +225,6 @@ function EditorSkeleton() {
       <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
       <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
     </SkeletonRegion>
-  )
-}
-
-function EmptyState() {
-  return (
-    <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-      <h3 className="text-sm font-medium text-foreground">Open a vault document</h3>
-      <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-        Select a file from the directory, or create a new one.
-      </p>
-    </div>
   )
 }
 
@@ -882,9 +871,7 @@ export function VaultPane(props: VaultPaneProps) {
                 onRichChange,
                 onSave: () => void saveCurrent(),
               })
-            ) : (
-              <EmptyState />
-            )}
+            ) : null}
           </div>
         </div>
 
