@@ -4,7 +4,7 @@
 
 Source: `src/studio/index.ts`
 
-69 exports.
+70 exports.
 
 ### `aspectRatioFromOptions`
 
@@ -156,6 +156,14 @@ interface GenerationPageQuery
 
 ```ts
 interface GenerationRequestFields
+```
+
+### `generationSavedToVault`
+
+`function` — Whether the product has admitted generated media into its Vault.
+
+```ts
+(generation: Generation) => boolean
 ```
 
 ### `generationsInBatch`

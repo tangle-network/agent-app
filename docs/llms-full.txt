@@ -18428,6 +18428,14 @@ interface GenerationPageQuery
 interface GenerationRequestFields
 ```
 
+### `generationSavedToVault`
+
+`function` — Whether the product has admitted generated media into its Vault.
+
+```ts
+(generation: Generation) => boolean
+```
+
 ### `generationsInBatch`
 
 `function` — Select and order all outputs belonging to a generation batch.

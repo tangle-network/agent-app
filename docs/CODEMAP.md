@@ -75,7 +75,7 @@ _97 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./spend/cli`](api/spend-cli.md) | 0 | `sandbox` |
 | [`./store`](api/store.md) | 16 | — |
 | [`./stream`](api/stream.md) | 49 | `interactions`, `plans` |
-| [`./studio`](api/studio.md) | 69 | — |
+| [`./studio`](api/studio.md) | 70 | — |
 | [`./studio-react`](api/studio-react.md) | 47 | `studio`, `web-react` |
 | [`./tangle`](api/tangle.md) | 7 | — |
 | [`./teams`](api/teams.md) | 37 | — |
@@ -730,9 +730,9 @@ Depends on: `interactions`, `plans`
 
 ## `./studio`
 
-Source: `src/studio/index.ts` · 69 exports
+Source: `src/studio/index.ts` · 70 exports
 
-`aspectRatioFromOptions`, `buildGenerationRequestBody`, `curateComposerModels`, `defaultVaultPathFor`, `DeleteGenerations`, `DownloadGenerations`, `failedOptimisticGeneration`, `FALLBACK_VIDEO_MODEL_OPTIONS`, `FetchGenerationsPage`, `Generation`, `GENERATION_TYPES`, `generationAspectRatio`, `generationAssetId`, `generationBatchKey`, `generationError`, `generationMergeKey`, `GenerationPage`, `GenerationPageQuery`, `GenerationRequestFields`, `generationsInBatch`, `generationSpecSegments`, `generationStatus`, `GenerationStatus`, `GenerationType`, `generationVaultPath`, `GPT_IMAGE_2_CUSTOM_SIZE`, `GRID_WAVEFORM_BARS`, `hashSeed`, `IMAGE_TO_VIDEO_SIBLINGS`, `imageToVideoSibling`, `isGenerationType`, `isLocalGeneration`, `laneUnavailable`, `latestBatchOf`, `MAX_IMAGE_COUNT`, `MEDIA_TYPE_FILTERS`, `MediaModelCatalogResponse`, `MediaModelOption`, `MediaModelStatus`, `MediaTypeFilter`, `mergeGenerationPages`, `mergeLiveGeneration`, `mergeLoaderAndLive`, `MIN_IMAGE_COUNT`, `modelMessage`, `ModelOptionMetadata`, `ModelOptionsMetadata`, `ModelOptionValue`, `normalizeImageCount`, `normalizeVaultPath`, `optimisticGeneration`, `optionChoices`, `optionDefault`, `outputPathFor`, `preferredModelId`, `previewWaveformBars`, `reconcileOptionValues`, `relativeTime`, `resolveComposerOptions`, `SaveGenerationsToVault`, `selectedModelsWithDefaults`, `StudioMediaActions`, `supportsCustomImageSize`, `textToVideoSibling`, `userSafeGenerationMessage`, `validateCustomImageSize`, `VaultSaveResult`, `WaveformBar`, `WIDE_WAVEFORM_BARS`
+`aspectRatioFromOptions`, `buildGenerationRequestBody`, `curateComposerModels`, `defaultVaultPathFor`, `DeleteGenerations`, `DownloadGenerations`, `failedOptimisticGeneration`, `FALLBACK_VIDEO_MODEL_OPTIONS`, `FetchGenerationsPage`, `Generation`, `GENERATION_TYPES`, `generationAspectRatio`, `generationAssetId`, `generationBatchKey`, `generationError`, `generationMergeKey`, `GenerationPage`, `GenerationPageQuery`, `GenerationRequestFields`, `generationSavedToVault`, `generationsInBatch`, `generationSpecSegments`, `generationStatus`, `GenerationStatus`, `GenerationType`, `generationVaultPath`, `GPT_IMAGE_2_CUSTOM_SIZE`, `GRID_WAVEFORM_BARS`, `hashSeed`, `IMAGE_TO_VIDEO_SIBLINGS`, `imageToVideoSibling`, `isGenerationType`, `isLocalGeneration`, `laneUnavailable`, `latestBatchOf`, `MAX_IMAGE_COUNT`, `MEDIA_TYPE_FILTERS`, `MediaModelCatalogResponse`, `MediaModelOption`, `MediaModelStatus`, `MediaTypeFilter`, `mergeGenerationPages`, `mergeLiveGeneration`, `mergeLoaderAndLive`, `MIN_IMAGE_COUNT`, `modelMessage`, `ModelOptionMetadata`, `ModelOptionsMetadata`, `ModelOptionValue`, `normalizeImageCount`, `normalizeVaultPath`, `optimisticGeneration`, `optionChoices`, `optionDefault`, `outputPathFor`, `preferredModelId`, `previewWaveformBars`, `reconcileOptionValues`, `relativeTime`, `resolveComposerOptions`, `SaveGenerationsToVault`, `selectedModelsWithDefaults`, `StudioMediaActions`, `supportsCustomImageSize`, `textToVideoSibling`, `userSafeGenerationMessage`, `validateCustomImageSize`, `VaultSaveResult`, `WaveformBar`, `WIDE_WAVEFORM_BARS`
 
 [Full API →](api/studio.md)
 
