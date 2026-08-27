@@ -187,7 +187,7 @@ interface StudioAudioElementLike
 `function` — The composer card.
 
 ```ts
-({ workspaceId, onGenerated, variant, pickReferenceImage, className, }: StudioComposerProps) => Element
+({ workspaceId, onGenerated, variant, pickReferenceImage, sendTone, className, }: StudioComposerProps) => Element
 ```
 
 ### `StudioComposerProps`
@@ -219,7 +219,7 @@ interface StudioConfirmDialogProps
 `function`
 
 ```ts
-({ generations, batchKey, onGenerated, onOpenGeneration, workspaceId, pickReferenceImage, actions, className, }: Studio…
+({ generations, batchKey, onGenerated, onOpenGeneration, workspaceId, pickReferenceImage, sendTone, actions, className,…
 ```
 
 ### `StudioGenerationScreenProps`
@@ -251,7 +251,7 @@ interface StudioHistoryScreenProps
 `function` — Studio's create-and-recent-media landing screen.
 
 ```ts
-({ generations, onGenerated, onOpenGeneration, onOpenHistory, workspaceId, pickReferenceImage, actions, recentLimit, cl…
+({ generations, onGenerated, onOpenGeneration, onOpenHistory, workspaceId, pickReferenceImage, sendTone, actions, recen…
 ```
 
 ### `StudioHomeScreenProps`

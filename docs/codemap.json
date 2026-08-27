@@ -14676,7 +14676,7 @@
         {
           "name": "StudioComposer",
           "kind": "function",
-          "signature": "({ workspaceId, onGenerated, variant, pickReferenceImage, className, }: StudioComposerProps) => Element",
+          "signature": "({ workspaceId, onGenerated, variant, pickReferenceImage, sendTone, className, }: StudioComposerProps) => Element",
           "doc": "The composer card."
         },
         {
@@ -14700,7 +14700,7 @@
         {
           "name": "StudioGenerationScreen",
           "kind": "function",
-          "signature": "({ generations, batchKey, onGenerated, onOpenGeneration, workspaceId, pickReferenceImage, actions, className, }: Studio…",
+          "signature": "({ generations, batchKey, onGenerated, onOpenGeneration, workspaceId, pickReferenceImage, sendTone, actions, className,…",
           "doc": null
         },
         {
@@ -14724,7 +14724,7 @@
         {
           "name": "StudioHomeScreen",
           "kind": "function",
-          "signature": "({ generations, onGenerated, onOpenGeneration, onOpenHistory, workspaceId, pickReferenceImage, actions, recentLimit, cl…",
+          "signature": "({ generations, onGenerated, onOpenGeneration, onOpenHistory, workspaceId, pickReferenceImage, sendTone, actions, recen…",
           "doc": "Studio's create-and-recent-media landing screen."
         },
         {
