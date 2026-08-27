@@ -261,9 +261,9 @@ export const IconSend: Story = {
   ),
 }
 
-/** Pill vs icon send, both states (rest + typed) — the canon decision surface. */
+/** Pill vs both icon tones — the canon shape and the opt-in brand surface. */
 export const PillVsIconSend: Story = {
-  name: 'Pill vs icon send',
+  name: 'Pill vs icon send tones',
   decorators: [
     (Story) => (
       <div className="w-[640px] max-w-full p-4">
@@ -278,11 +278,17 @@ export const PillVsIconSend: Story = {
         <Demo title="pill send (current default)">
           <ChatComposer onSend={() => {}} placeholder="Message the agent…" controls={pill} />
         </Demo>
-        <Demo title="icon send (canon)">
+        <Demo title="icon send — contrast (default)">
           <ChatComposer onSend={() => {}} placeholder="Message the agent…" controls={pill} sendVariant="icon" />
         </Demo>
-        <Demo title="icon send, typed + floating">
+        <Demo title="icon send — primary">
+          <ChatComposer onSend={() => {}} placeholder="Message the agent…" controls={pill} sendVariant="icon" sendTone="primary" />
+        </Demo>
+        <Demo title="icon send — contrast, typed + floating">
           <ChatComposer onSend={() => {}} initialValue="Ship the weekly report every Monday." controls={pill} sendVariant="icon" floating />
+        </Demo>
+        <Demo title="icon send — primary, typed + floating">
+          <ChatComposer onSend={() => {}} initialValue="Ship the weekly report every Monday." controls={pill} sendVariant="icon" sendTone="primary" floating />
         </Demo>
       </div>
     )

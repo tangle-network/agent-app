@@ -517,6 +517,10 @@ export interface ChatComposerProps {
    *  grammar sandbox-ui's legacy AgentComposer used and the current agent-app
    *  canon for new surfaces. */
   sendVariant?: 'pill' | 'icon'
+  /** Circular icon send colour. `contrast` (default) preserves the inverted
+   *  foreground/background canon; `primary` opts into the host brand tokens.
+   *  The labeled pill already uses primary and is unchanged. */
+  sendTone?: 'contrast' | 'primary'
   className?: string
 }
 
@@ -605,6 +609,7 @@ export function ChatComposer({
   floating = false,
   sendLabel = 'Send',
   sendVariant = 'pill',
+  sendTone = 'contrast',
   className,
 }: ChatComposerProps) {
   const isControlled = value !== undefined
@@ -1500,7 +1505,7 @@ export function ChatComposer({
               disabled={!canSend}
               aria-label={sendLabel}
               title={sendLabel}
-              className="inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-foreground text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card"
+              className={`inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full ${sendTone === 'primary' ? 'bg-primary text-primary-foreground' : 'bg-foreground text-background'} transition ${sendTone === 'primary' ? 'hover:bg-primary/90' : 'hover:opacity-90'} disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card`}
             >
               <ArrowUpGlyph className="h-4 w-4" />
             </button>
