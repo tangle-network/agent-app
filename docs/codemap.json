@@ -14231,6 +14231,12 @@
           "doc": "Define fields required to configure and request various types of media generation"
         },
         {
+          "name": "generationSavedToVault",
+          "kind": "function",
+          "signature": "(generation: Generation) => boolean",
+          "doc": "Whether the product has admitted generated media into its Vault."
+        },
+        {
           "name": "generationsInBatch",
           "kind": "function",
           "signature": "(generations: readonly Generation[], batchKey: string) => Generation[]",

@@ -16,9 +16,11 @@ import { Download, FolderOpen, FolderPlus, Pause, Play, Trash2, X } from 'lucide
 import {
   generationAspectRatio,
   generationError,
+  generationSavedToVault,
   generationSpecSegments,
   generationStatus,
   generationVaultPath,
+  isLocalGeneration,
   hashSeed,
   previewWaveformBars,
   relativeTime,
@@ -259,12 +261,14 @@ export function MediaViewerModal({
   const ratio = generationAspectRatio(generation)
   const status = generationStatus(generation)
   const vaultPath = generationVaultPath(generation)
+  const savedToVault = generationSavedToVault(generation)
+  const canSaveToVault = status === 'succeeded' && !isLocalGeneration(generation)
   const metaSegments = [
     TYPE_LABELS[generation.type] ?? generation.type,
     generation.model,
     ...generationSpecSegments(generation),
     generation.createdAt ? relativeTime(generation.createdAt) : null,
-    vaultPath,
+    savedToVault ? vaultPath : null,
   ].filter((segment): segment is string => typeof segment === 'string' && segment.length > 0)
 
   function onPanelKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -307,8 +311,8 @@ export function MediaViewerModal({
       width: `min(100%, calc(70vh * ${ratio}))`,
       aspectRatio: ratio,
     }
-  const vaultHref = vaultPath && actions?.vaultHref ? actions.vaultHref(vaultPath) : null
-  const viewControl = vaultPath && (vaultHref || actions?.onOpenVault)
+  const vaultHref = savedToVault && vaultPath && actions?.vaultHref ? actions.vaultHref(vaultPath) : null
+  const viewControl = savedToVault && vaultPath && (vaultHref || actions?.onOpenVault)
   const modal = (
     <div
       className="studio-layer-viewer studio-backdrop fixed inset-0 grid place-items-center p-6"
@@ -372,7 +376,7 @@ export function MediaViewerModal({
             <Download size={15} strokeWidth={1.5} /> Download
           </button>
 
-          {!vaultPath && actions?.save && (
+          {canSaveToVault && !savedToVault && actions?.save && (
             <div ref={popover.containerRef}>
               <button
                 {...popover.triggerProps}

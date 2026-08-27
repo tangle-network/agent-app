@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, renderHook, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 
@@ -110,6 +110,27 @@ describe('StudioHomeScreen', () => {
     const dialog = screen.getByRole('dialog', { name: 'Media detail' })
     expect(dialog).toBeTruthy()
     expect(within(dialog).getByText('Prompt viewer-row')).toBeTruthy()
+  })
+
+  it('switches an unsaved tile from Save to View after the save port succeeds', async () => {
+    const save = vi.fn().mockResolvedValue([
+      { generationId: 'save-row', vaultPath: 'campaigns/launch/save-row.png' },
+    ])
+    mount({
+      generations: [generation('save-row', {
+        vaultPath: 'generated/images/save-row.png',
+        savedToVaultAt: null,
+      })],
+      actions: { save, vaultHref: (path) => `/vault/${path}` },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save to vault' }))
+    fireEvent.change(screen.getByLabelText('Save 1 item to'), { target: { value: 'campaigns/launch' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(save).toHaveBeenCalledOnce())
+    await waitFor(() => expect(screen.getAllByRole('link', { name: 'View in vault' }).length).toBeGreaterThan(0))
+    expect(screen.queryByRole('button', { name: 'Save to vault' })).toBeNull()
   })
 
   it('confirms tile deletion, hides the row immediately, and offers Undo', () => {

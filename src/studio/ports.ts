@@ -38,6 +38,9 @@ export type FetchGenerationsPage = (query: GenerationPageQuery) => Promise<Gener
 export interface VaultSaveResult {
   generationId: string
   vaultPath: string
+  /** Host persistence timestamp when available. A successful result without it
+   *  still proves the generation was saved for this mounted screen. */
+  savedToVaultAt?: string | number | Date
 }
 
 export type SaveGenerationsToVault = (input: {

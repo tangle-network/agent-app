@@ -115,7 +115,27 @@ describe('MediaTile', () => {
     view.rerender(
       <StudioPlaybackProvider createAudioElement={() => view.audio}>
         <MediaTile
-          generation={generation({ metadata: { vaultPath: 'generated/images/output.png' } })}
+          generation={generation({ metadata: {
+            vaultPath: 'generated/images/output.png',
+            savedToVaultAt: null,
+          } })}
+          context="home"
+          onOpen={view.onOpen}
+          actions={actions}
+          onRequestDelete={onRequestDelete}
+        />
+      </StudioPlaybackProvider>,
+    )
+    expect(screen.getByRole('button', { name: 'Save to vault' })).toBeTruthy()
+    expect(screen.queryByLabelText('View in vault')).toBeNull()
+
+    view.rerender(
+      <StudioPlaybackProvider createAudioElement={() => view.audio}>
+        <MediaTile
+          generation={generation({ metadata: {
+            vaultPath: 'generated/images/output.png',
+            savedToVaultAt: '2026-08-27T00:00:00.000Z',
+          } })}
           context="home"
           onOpen={view.onOpen}
           actions={actions}
@@ -125,6 +145,24 @@ describe('MediaTile', () => {
     )
     expect(screen.queryByLabelText('Save to vault')).toBeNull()
     expect(screen.getByRole('link', { name: 'View in vault' })).toBeTruthy()
+
+    view.rerender(
+      <StudioPlaybackProvider createAudioElement={() => view.audio}>
+        <MediaTile
+          generation={generation({
+            id: 'local-pending',
+            result: null,
+            metadata: { generationStatus: 'pending' },
+          })}
+          context="home"
+          onOpen={view.onOpen}
+          actions={actions}
+          onRequestDelete={onRequestDelete}
+        />
+      </StudioPlaybackProvider>,
+    )
+    expect(screen.queryByLabelText('Save to vault')).toBeNull()
+    expect(screen.queryByLabelText('View in vault')).toBeNull()
   })
 
   it('keeps Download via the anchor fallback but hides Delete without a request callback', () => {
@@ -146,7 +184,10 @@ describe('MediaTile', () => {
     view.rerender(
       <StudioPlaybackProvider createAudioElement={() => view.audio}>
         <MediaTile
-          generation={generation({ metadata: { vaultPath: 'generated/images/output.png' } })}
+          generation={generation({ metadata: {
+            vaultPath: 'generated/images/output.png',
+            savedToVaultAt: '2026-08-27T00:00:00.000Z',
+          } })}
           context="home"
           onOpen={view.onOpen}
         />

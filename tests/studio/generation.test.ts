@@ -21,6 +21,7 @@ import {
   generationBatchKey,
   generationError,
   generationMergeKey,
+  generationSavedToVault,
   generationSpecSegments,
   generationStatus,
   generationVaultPath,
@@ -447,6 +448,8 @@ describe('misc guards', () => {
     expect(isLocalGeneration(gen({ id: 'local-1' }))).toBe(true)
     expect(isLocalGeneration(gen({ id: 'srv' }))).toBe(false)
     expect(generationVaultPath(gen({ id: 'a', metadata: { vaultPath: ' generated/images/x.png ' } }))).toBe('generated/images/x.png')
+    expect(generationSavedToVault(gen({ id: 'legacy', metadata: { vaultPath: 'generated/images/x.png' } }))).toBe(true)
+    expect(generationSavedToVault(gen({ id: 'explicit', metadata: { vaultPath: 'generated/images/x.png', savedToVaultAt: null } }))).toBe(false)
     expect(outputPathFor('speech')).toBe('generated/audio')
   })
 })
