@@ -16,6 +16,7 @@ import { useStudioPlayback } from './studio-playback'
 import { useStudioToast } from './studio-toasts'
 import { useBatchNavigation } from './use-batch-navigation'
 import { useDeferredDelete } from './use-deferred-delete'
+import { useVaultSaveState } from './use-vault-save-state'
 
 export interface StudioHomeScreenProps {
   /** Newest first, from the host loader (host runs useStudioGenerations). */
@@ -49,10 +50,11 @@ export function StudioHomeScreen({
   const [confirmTargets, setConfirmTargets] = useState<Generation[] | null>(null)
   const playback = useStudioPlayback()
   const { toast } = useStudioToast()
+  const { generations: savedGenerations, applySaveResults } = useVaultSaveState(generations)
   const deferredDelete = useDeferredDelete({
     remove: actions?.remove ?? (async () => {}),
   })
-  const navigateNewBatch = useBatchNavigation({ seed: generations, onOpenGeneration })
+  const navigateNewBatch = useBatchNavigation({ seed: savedGenerations, onOpenGeneration })
 
   const wrappedOnGenerated = useCallback((generation: Generation) => {
     onGenerated(generation)
@@ -60,20 +62,21 @@ export function StudioHomeScreen({
   }, [navigateNewBatch, onGenerated])
 
   const visible = useMemo(
-    () => generations.filter((generation) => !deferredDelete.pendingIds.has(generation.id)),
-    [deferredDelete.pendingIds, generations],
+    () => savedGenerations.filter((generation) => !deferredDelete.pendingIds.has(generation.id)),
+    [deferredDelete.pendingIds, savedGenerations],
   )
   const renderedViewer = viewer
-    ? generations.find((generation) => generation.id === viewer.id) ?? viewer
+    ? savedGenerations.find((generation) => generation.id === viewer.id) ?? viewer
     : null
   const requestDelete = actions?.remove
     ? (generation: Generation) => setConfirmTargets([generation])
     : undefined
 
   const onSaved = useCallback((results: readonly VaultSaveResult[]) => {
+    applySaveResults(results)
     const first = results[0]
     if (first) toast({ message: `Saved to vault · ${first.vaultPath}` })
-  }, [toast])
+  }, [applySaveResults, toast])
 
   useEffect(() => playback.stop, [playback.stop])
 

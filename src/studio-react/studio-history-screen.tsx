@@ -56,6 +56,7 @@ import { useStudioPlayback } from './studio-playback'
 import { useStudioToast } from './studio-toasts'
 import { useDeferredDelete } from './use-deferred-delete'
 import { useGenerationHistory } from './use-generation-history'
+import { useVaultSaveState } from './use-vault-save-state'
 import { VaultPathPopover } from './vault-path-popover'
 
 export interface StudioHistoryScreenProps {
@@ -143,6 +144,7 @@ export function StudioHistoryScreen({
   }, [debouncedQuery, query, searchDebounceMs])
 
   const history = useGenerationHistory({ fetchPage, q: debouncedQuery, type, initialPage })
+  const { generations: savedGenerations, applySaveResults } = useVaultSaveState(history.items)
   const deferredDelete = useDeferredDelete({
     remove: actions?.remove ?? (async () => {}),
     // Nothing to reload: `pendingIds` already hides the rows and the server has
@@ -150,8 +152,8 @@ export function StudioHistoryScreen({
   })
   const { pendingIds } = deferredDelete
   const rows = useMemo(
-    () => history.items.filter((item) => !pendingIds.has(item.id)),
-    [history.items, pendingIds],
+    () => savedGenerations.filter((item) => !pendingIds.has(item.id)),
+    [pendingIds, savedGenerations],
   )
   const selectedRows = useMemo(() => rows.filter((row) => selected.has(row.id)), [rows, selected])
 
@@ -213,6 +215,7 @@ export function StudioHistoryScreen({
   }, [])
 
   const onSaved = useCallback((results: readonly VaultSaveResult[]) => {
+    applySaveResults(results)
     const path = results[0]?.vaultPath
     if (!path) return
     toast({
@@ -220,7 +223,7 @@ export function StudioHistoryScreen({
         ? `Saved ${results.length} items to vault · ${path}`
         : `Saved to vault · ${path}`,
     })
-  }, [toast])
+  }, [applySaveResults, toast])
 
   function batchDownload() {
     void (actions?.download ?? downloadGenerationsViaAnchor)(selectedRows)

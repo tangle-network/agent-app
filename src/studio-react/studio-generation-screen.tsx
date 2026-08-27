@@ -64,6 +64,7 @@ import { useStudioPlayback } from './studio-playback'
 import { useStudioToast } from './studio-toasts'
 import { useBatchNavigation } from './use-batch-navigation'
 import { useDeferredDelete } from './use-deferred-delete'
+import { useVaultSaveState } from './use-vault-save-state'
 
 export interface StudioGenerationScreenProps {
   /** Full merged list from the host (`useStudioGenerations`). */
@@ -112,13 +113,14 @@ export function StudioGenerationScreen({
   const [dockHeight, setDockHeight] = useState(FALLBACK_DOCK_HEIGHT)
   const [viewerId, setViewerId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Generation | null>(null)
+  const { generations: savedGenerations, applySaveResults } = useVaultSaveState(generations)
 
   const remove = actions?.remove
   const { pendingIds, request } = useDeferredDelete({ remove: remove ?? noRemove })
 
   const rows = useMemo(
-    () => generationsInBatch(generations, batchKey).filter((row) => !pendingIds.has(row.id)),
-    [batchKey, generations, pendingIds],
+    () => generationsInBatch(savedGenerations, batchKey).filter((row) => !pendingIds.has(row.id)),
+    [batchKey, pendingIds, savedGenerations],
   )
   const first = rows[0]
   const prompt = first?.prompt ?? ''
@@ -142,9 +144,10 @@ export function StudioGenerationScreen({
   const viewerGeneration = viewerId ? rows.find((row) => row.id === viewerId) ?? null : null
 
   const onSaved = useCallback((results: readonly VaultSaveResult[]) => {
+    applySaveResults(results)
     const saved = results[0]
     if (saved) toast({ message: `Saved to vault · ${saved.vaultPath}` })
-  }, [toast])
+  }, [applySaveResults, toast])
 
   const navigateNewBatch = useBatchNavigation({ seed: [], currentBatchKey: batchKey, onOpenGeneration })
   const handleGenerated = useCallback((generation: Generation) => {

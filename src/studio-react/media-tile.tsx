@@ -20,6 +20,7 @@ import {
 import { hashSeed, previewWaveformBars } from '../studio/audio-preview'
 import {
   generationError,
+  generationSavedToVault,
   generationStatus,
   generationVaultPath,
   type Generation,
@@ -75,6 +76,7 @@ export function MediaTile({
   const [saving, setSaving] = useState(false)
   const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(saveOpen, setSaveOpen)
   const vaultPath = generationVaultPath(generation)
+  const savedToVault = generationSavedToVault(generation)
   const status = generationStatus(generation)
   const isSpeech = generation.type === 'speech'
   const isPlaying = isSpeech && playback.activeId === generation.id && playback.playing
@@ -207,7 +209,7 @@ export function MediaTile({
           <Download size={15} strokeWidth={1.5} />
         </button>
 
-        {!vaultPath && actions?.save && (
+        {!savedToVault && actions?.save && (
           <div ref={containerRef}>
             <button
               {...triggerProps}
@@ -234,7 +236,7 @@ export function MediaTile({
           </div>
         )}
 
-        {vaultPath && actions?.vaultHref && (
+        {savedToVault && vaultPath && actions?.vaultHref && (
           <a
             href={actions.vaultHref(vaultPath)}
             className="studio-ibtn relative grid h-[30px] w-[30px] place-items-center rounded-full"
@@ -251,7 +253,7 @@ export function MediaTile({
             <FolderOpen size={15} strokeWidth={1.5} />
           </a>
         )}
-        {vaultPath && !actions?.vaultHref && actions?.onOpenVault && (
+        {savedToVault && vaultPath && !actions?.vaultHref && actions?.onOpenVault && (
           <button
             type="button"
             className="studio-ibtn relative grid h-[30px] w-[30px] place-items-center rounded-full"
@@ -303,7 +305,7 @@ export function MediaTile({
               : <Play size={11} strokeWidth={1.5} fill="currentColor" />}
           </button>
         )}
-        {vaultPath && (
+        {savedToVault && vaultPath && (
           <span className="studio-chip-dark inline-flex h-5 items-center gap-1 rounded-full pl-1.5 pr-2 text-[11px]">
             <FolderOpen size={12} strokeWidth={1.5} />
             In vault

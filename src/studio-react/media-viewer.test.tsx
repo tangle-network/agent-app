@@ -248,7 +248,23 @@ describe('MediaViewerModal', () => {
 
     view.rerender(
       <Viewer
-        generation={generation({ metadata: { vaultPath: 'generated/images/city.png' } })}
+        generation={generation({ metadata: {
+          vaultPath: 'generated/images/city.png',
+          savedToVaultAt: null,
+        } })}
+        onClose={() => {}}
+        actions={actions}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Save to vault' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'View in vault' })).toBeNull()
+
+    view.rerender(
+      <Viewer
+        generation={generation({ metadata: {
+          vaultPath: 'generated/images/city.png',
+          savedToVaultAt: '2026-08-27T00:00:00.000Z',
+        } })}
         onClose={() => {}}
         actions={actions}
       />,

@@ -251,6 +251,33 @@ describe('StudioHistoryScreen', () => {
     expect(screen.getByLabelText('Search prompts')).toBeTruthy()
   })
 
+  it('updates every selected row to View after a batch save succeeds', async () => {
+    const save = vi.fn().mockResolvedValue([
+      { generationId: 'a', vaultPath: 'campaigns/launch/a.png' },
+      { generationId: 'b', vaultPath: 'campaigns/launch/b.png' },
+    ])
+    const { calls } = setup({ actions: { save, vaultHref: (path) => `/vault/${path}` } })
+    await resolvePage(calls, 0, {
+      items: [
+        generation('a', { metadata: { vaultPath: 'generated/images/a.png', savedToVaultAt: null } }),
+        generation('b', { metadata: { vaultPath: 'generated/images/b.png', savedToVaultAt: null } }),
+      ],
+    })
+
+    expect(screen.getAllByRole('button', { name: 'Save to vault' })).toHaveLength(2)
+    expect(screen.queryByRole('link', { name: 'View in vault' })).toBeNull()
+
+    fireEvent.click(selectCircles()[0]!)
+    fireEvent.click(selectCircles()[1]!)
+    fireEvent.click(batchButton('Save to vault'))
+    fireEvent.change(screen.getByLabelText('Save 2 items to'), { target: { value: 'campaigns/launch' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(save).toHaveBeenCalledOnce())
+    await waitFor(() => expect(screen.getAllByRole('link', { name: 'View in vault' })).toHaveLength(2))
+    expect(screen.queryByText(/selected$/)).toBeNull()
+  })
+
   it('confirms a batch delete, hides the rows, offers Undo and leaves select mode', async () => {
     const remove = vi.fn(async () => {})
     const { calls } = setup({ actions: { remove } })
