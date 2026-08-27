@@ -166,6 +166,9 @@ export interface StudioComposerProps {
    *  Without it the Reference pill takes a URL instead, which is the most a host
    *  with no upload endpoint can honestly offer. */
   pickReferenceImage?: () => Promise<string | null>
+  /** Circular Generate button colour. `contrast` (default) preserves the
+   *  inverted foreground/background canon; `primary` uses host brand tokens. */
+  sendTone?: 'contrast' | 'primary'
   className?: string
 }
 
@@ -178,6 +181,7 @@ export function StudioComposer({
   onGenerated,
   variant = 'home',
   pickReferenceImage,
+  sendTone = 'contrast',
   className,
 }: StudioComposerProps) {
   const [type, setType] = useState<ComposerType>('image')
@@ -588,7 +592,7 @@ export function StudioComposer({
           title="Generate"
           disabled={!canSubmit}
           onClick={() => void generate()}
-          className="ml-auto inline-flex h-8 w-8 flex-none items-center justify-center rounded-full bg-foreground text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card"
+          className={`ml-auto inline-flex h-8 w-8 flex-none items-center justify-center rounded-full ${sendTone === 'primary' ? 'bg-primary text-primary-foreground' : 'bg-foreground text-background'} transition ${sendTone === 'primary' ? 'hover:bg-primary/90' : 'hover:opacity-90'} disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card`}
         >
           <ArrowUp className="h-4 w-4" strokeWidth={2} />
         </button>

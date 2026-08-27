@@ -10,7 +10,7 @@ import type { Generation } from '../studio/generation'
 import type { StudioMediaActions, VaultSaveResult } from '../studio/ports'
 import { MediaTile } from './media-tile'
 import { MediaViewerModal } from './media-viewer'
-import { StudioComposer } from './studio-composer'
+import { StudioComposer, type StudioComposerProps } from './studio-composer'
 import { StudioConfirmDialog } from './studio-confirm'
 import { useStudioPlayback } from './studio-playback'
 import { useStudioToast } from './studio-toasts'
@@ -25,6 +25,7 @@ export interface StudioHomeScreenProps {
   onOpenHistory: () => void
   workspaceId?: string
   pickReferenceImage?: () => Promise<string | null>
+  sendTone?: StudioComposerProps['sendTone']
   actions?: StudioMediaActions
   recentLimit?: number
   className?: string
@@ -41,6 +42,7 @@ export function StudioHomeScreen({
   onOpenHistory,
   workspaceId,
   pickReferenceImage,
+  sendTone,
   actions,
   recentLimit = 20,
   className,
@@ -95,6 +97,7 @@ export function StudioHomeScreen({
           variant="home"
           workspaceId={workspaceId}
           pickReferenceImage={pickReferenceImage}
+          sendTone={sendTone}
           onGenerated={wrappedOnGenerated}
         />
       </div>

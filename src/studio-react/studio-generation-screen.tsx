@@ -58,7 +58,7 @@ import {
 import { GenerationNoticeChip } from './generation-notice'
 import { MediaTile } from './media-tile'
 import { MediaViewerModal } from './media-viewer'
-import { StudioComposer } from './studio-composer'
+import { StudioComposer, type StudioComposerProps } from './studio-composer'
 import { StudioConfirmDialog } from './studio-confirm'
 import { useStudioPlayback } from './studio-playback'
 import { useStudioToast } from './studio-toasts'
@@ -74,6 +74,7 @@ export interface StudioGenerationScreenProps {
   onOpenGeneration: (batchKey: string, first: Generation) => void
   workspaceId?: string
   pickReferenceImage?: () => Promise<string | null>
+  sendTone?: StudioComposerProps['sendTone']
   actions?: StudioMediaActions
   className?: string
 }
@@ -99,6 +100,7 @@ export function StudioGenerationScreen({
   onOpenGeneration,
   workspaceId,
   pickReferenceImage,
+  sendTone,
   actions,
   className,
 }: StudioGenerationScreenProps): JSX.Element {
@@ -281,6 +283,7 @@ export function StudioGenerationScreen({
             variant="docked"
             workspaceId={workspaceId}
             pickReferenceImage={pickReferenceImage}
+            sendTone={sendTone}
             onGenerated={handleGenerated}
           />
         </div>

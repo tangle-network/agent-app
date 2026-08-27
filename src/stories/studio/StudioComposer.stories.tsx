@@ -193,6 +193,12 @@ export const ImageLane: Story = {
   name: 'Image lane',
 }
 
+/** Host-brand opt-in for the circular Generate button. */
+export const PrimarySendTone: Story = {
+  name: 'Primary send tone',
+  args: { sendTone: 'primary' },
+}
+
 /** Video lane on Seedance 2.0 — Duration, Resolution, Aspect, the audio toggle,
  *  and the Reference pill that swaps the model to the image-to-video sibling. */
 export const VideoLane: Story = {

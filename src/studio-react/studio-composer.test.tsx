@@ -114,6 +114,39 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+describe('StudioComposer — send tone', () => {
+  it('keeps contrast as the byte-identical default and changes only tone classes for primary', () => {
+    const { onGenerated, rerender } = mountWith(catalog({}))
+    const defaultClasses = screen.getByRole('button', { name: 'Generate' }).className
+    expect(defaultClasses).toContain('bg-foreground')
+    expect(defaultClasses).toContain('text-background')
+    expect(defaultClasses).toContain('hover:opacity-90')
+
+    rerender(<StudioComposer workspaceId="ws-1" onGenerated={onGenerated} sendTone="contrast" />)
+    expect(screen.getByRole('button', { name: 'Generate' }).className).toBe(defaultClasses)
+
+    rerender(<StudioComposer workspaceId="ws-1" onGenerated={onGenerated} sendTone="primary" />)
+    const primaryClasses = screen.getByRole('button', { name: 'Generate' }).className
+    expect(primaryClasses).toContain('bg-primary')
+    expect(primaryClasses).toContain('text-primary-foreground')
+    expect(primaryClasses).toContain('hover:bg-primary/90')
+    expect(primaryClasses).not.toContain('bg-foreground')
+    expect(primaryClasses).not.toContain('text-background')
+    expect(primaryClasses).not.toContain('hover:opacity-90')
+
+    const toneClasses = new Set([
+      'bg-foreground',
+      'text-background',
+      'hover:opacity-90',
+      'bg-primary',
+      'text-primary-foreground',
+      'hover:bg-primary/90',
+    ])
+    const stableClasses = (className: string) => className.split(' ').filter((name) => !toneClasses.has(name))
+    expect(stableClasses(primaryClasses)).toEqual(stableClasses(defaultClasses))
+  })
+})
+
 describe('StudioComposer — persisted selections', () => {
   const imageDefault = 'gpt-image-2'
   const imageAlternate = 'openai/gpt-image-2'

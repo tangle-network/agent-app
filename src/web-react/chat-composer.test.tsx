@@ -690,6 +690,10 @@ describe('ChatComposer seed', () => {
     expect(pill.className).toContain('bg-primary')
     expect(pill.textContent).toBe('Send')
 
+    const pillClasses = pill.className
+    rerender(<ChatComposer onSend={vi.fn()} sendTone="primary" />)
+    expect(screen.getByRole('button', { name: 'Send' }).className).toBe(pillClasses)
+
     rerender(<ChatComposer onSend={vi.fn()} sendVariant="icon" />)
     const icon = screen.getByRole('button', { name: 'Send' })
     expect(icon.className).toContain('h-[34px]')
@@ -698,6 +702,37 @@ describe('ChatComposer seed', () => {
     expect(icon.className).toContain('bg-foreground')
     expect(icon.className).toContain('text-background')
     expect(icon.textContent).toBe('')
+  })
+
+  it('keeps contrast as the byte-identical icon default and changes only tone classes for primary', () => {
+    const { rerender } = render(<ChatComposer onSend={vi.fn()} sendVariant="icon" />)
+    const defaultClasses = screen.getByRole('button', { name: 'Send' }).className
+    expect(defaultClasses).toContain('bg-foreground')
+    expect(defaultClasses).toContain('text-background')
+    expect(defaultClasses).toContain('hover:opacity-90')
+
+    rerender(<ChatComposer onSend={vi.fn()} sendVariant="icon" sendTone="contrast" />)
+    expect(screen.getByRole('button', { name: 'Send' }).className).toBe(defaultClasses)
+
+    rerender(<ChatComposer onSend={vi.fn()} sendVariant="icon" sendTone="primary" />)
+    const primaryClasses = screen.getByRole('button', { name: 'Send' }).className
+    expect(primaryClasses).toContain('bg-primary')
+    expect(primaryClasses).toContain('text-primary-foreground')
+    expect(primaryClasses).toContain('hover:bg-primary/90')
+    expect(primaryClasses).not.toContain('bg-foreground')
+    expect(primaryClasses).not.toContain('text-background')
+    expect(primaryClasses).not.toContain('hover:opacity-90')
+
+    const toneClasses = new Set([
+      'bg-foreground',
+      'text-background',
+      'hover:opacity-90',
+      'bg-primary',
+      'text-primary-foreground',
+      'hover:bg-primary/90',
+    ])
+    const stableClasses = (className: string) => className.split(' ').filter((name) => !toneClasses.has(name))
+    expect(stableClasses(primaryClasses)).toEqual(stableClasses(defaultClasses))
   })
 
   it('keeps a circular outlined stop while streaming in the icon variant', () => {

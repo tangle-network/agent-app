@@ -96,6 +96,14 @@ describe('StudioHomeScreen', () => {
     expect(onOpenHistory).toHaveBeenCalledOnce()
   })
 
+  it('forwards the primary send tone to the composer', () => {
+    mount({ sendTone: 'primary' })
+
+    const generate = screen.getByRole('button', { name: 'Generate' })
+    expect(generate.className).toContain('bg-primary')
+    expect(generate.className).toContain('text-primary-foreground')
+  })
+
   it('renders both empty-state copy lines when there is no media', () => {
     mount()
 

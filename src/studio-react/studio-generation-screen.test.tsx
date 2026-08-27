@@ -152,6 +152,14 @@ describe('StudioGenerationScreen — a running batch', () => {
 })
 
 describe('StudioGenerationScreen — the dock', () => {
+  it('forwards the primary send tone to the docked composer', () => {
+    renderScreen({ generations: [settled(0)], sendTone: 'primary' })
+
+    const generate = screen.getByRole('button', { name: 'Generate' })
+    expect(generate.className).toContain('bg-primary')
+    expect(generate.className).toContain('text-primary-foreground')
+  })
+
   it('publishes the measured dock height on the screen root', async () => {
     stubResizeObserver(190)
     const view = renderScreen({ generations: [settled(0)] })
