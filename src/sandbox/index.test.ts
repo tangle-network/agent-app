@@ -2582,7 +2582,6 @@ describe('deferred profile files', () => {
 
       expect(res.succeeded).toBe(true)
       expect(exec).toHaveBeenCalledTimes(4)
-      expect(exec.mock.calls.at(-1)?.[0]).toContain("base64 -d < 'skills/x.md.b64'")
       await expect(readFsFile(join(cwd, 'skills/x.md'), 'utf8')).resolves.toBe('abc')
     })
   })

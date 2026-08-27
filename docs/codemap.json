@@ -1112,7 +1112,7 @@
         {
           "name": "EntryComposer",
           "kind": "function",
-          "signature": "({ heading, subheading, placeholder, initialValue, sendLabel, sendTone, disabled, agent, modes, planMode, uploadUrl, ac…",
+          "signature": "({ heading, subheading, placeholder, initialValue, sendLabel, disabled, agent, modes, planMode, uploadUrl, accept, onAt…",
           "doc": "`EntryComposer` — the centered \"what do you want to work on?\" surface a product shows before a conversation exists (a new thread, an empty session, a workspace overview)."
         },
         {
@@ -17919,7 +17919,7 @@
         {
           "name": "EntryComposer",
           "kind": "function",
-          "signature": "({ heading, subheading, placeholder, initialValue, sendLabel, sendTone, disabled, agent, modes, planMode, uploadUrl, ac…",
+          "signature": "({ heading, subheading, placeholder, initialValue, sendLabel, disabled, agent, modes, planMode, uploadUrl, accept, onAt…",
           "doc": "`EntryComposer` — the centered \"what do you want to work on?\" surface a product shows before a conversation exists (a new thread, an empty session, a workspace overview)."
         },
         {
