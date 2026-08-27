@@ -284,6 +284,9 @@ export const PillVsIconSend: Story = {
         <Demo title="icon send — primary">
           <ChatComposer onSend={() => {}} placeholder="Message the agent…" controls={pill} sendVariant="icon" sendTone="primary" />
         </Demo>
+        <Demo title="icon send — contrast, typed + floating">
+          <ChatComposer onSend={() => {}} initialValue="Ship the weekly report every Monday." controls={pill} sendVariant="icon" floating />
+        </Demo>
         <Demo title="icon send — primary, typed + floating">
           <ChatComposer onSend={() => {}} initialValue="Ship the weekly report every Monday." controls={pill} sendVariant="icon" sendTone="primary" floating />
         </Demo>

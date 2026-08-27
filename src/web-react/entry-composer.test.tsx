@@ -187,10 +187,16 @@ describe('EntryComposer', () => {
     // send control is the circular icon (its label lives in aria-label, never
     // as text), and the hero surface autofocuses, so the Cmd/Ctrl+L hint is
     // suppressed.
-    render(<EntryComposer onSubmit={() => {}} />)
+    const { rerender } = render(<EntryComposer onSubmit={() => {}} />)
     const send = screen.getByLabelText('Send')
     expect(send.textContent).toBe('')
+    expect(send.className).toContain('bg-foreground')
     expect(document.body.textContent).not.toContain('to focus')
+
+    rerender(<EntryComposer onSubmit={() => {}} sendTone="primary" />)
+    const primary = screen.getByLabelText('Send')
+    expect(primary.className).toContain('bg-primary')
+    expect(primary.className).toContain('text-primary-foreground')
   })
 
   it('blocks submit until the model selection has resolved', () => {

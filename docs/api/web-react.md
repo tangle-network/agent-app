@@ -1011,7 +1011,7 @@ RecordGridOverlay
 `function` — `EntryComposer` — the centered "what do you want to work on?" surface a product shows before a conversation exists (a new thread, an empty session, a workspace overview).
 
 ```ts
-({ heading, subheading, placeholder, initialValue, sendLabel, disabled, agent, modes, planMode, uploadUrl, accept, onAt…
+({ heading, subheading, placeholder, initialValue, sendLabel, sendTone, disabled, agent, modes, planMode, uploadUrl, ac…
 ```
 
 ### `EntryComposerProps`

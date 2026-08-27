@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { ChatComposer } from './chat-composer'
+import { ChatComposer, type ChatComposerProps } from './chat-composer'
 import { ATTACHMENT_ACCEPT, useComposerAttachments } from './use-composer-attachments'
 import type { ComposerFileRejection } from './composer-file-accept'
 import type { UseFileMentionsResult } from './use-file-mentions'
@@ -18,6 +18,7 @@ export interface EntryComposerProps {
   placeholder?: string
   initialValue?: string
   sendLabel?: string
+  sendTone?: ChatComposerProps['sendTone']
   disabled?: boolean
   /**
    * Agent identity (backend/model/effort). Pass it and the control row renders;
@@ -109,6 +110,7 @@ export function EntryComposer({
   placeholder,
   initialValue = '',
   sendLabel,
+  sendTone,
   disabled,
   agent,
   modes,
@@ -177,6 +179,7 @@ export function EntryComposer({
           onSend={(message) => submit(message)}
           placeholder={placeholder}
           sendLabel={sendLabel}
+          sendTone={sendTone}
           // The circular arrow AgentComposer shipped and the agent-app canon
           // for new surfaces.
           sendVariant="icon"
