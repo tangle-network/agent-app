@@ -4,7 +4,7 @@
 
 Source: `src/stream/index.ts`
 
-49 exports.
+45 exports.
 
 ### `asRecord`
 
@@ -99,7 +99,7 @@ interface BufferedTurnTap
 `function` — Resolve a TurnEventStore that appends and reads turn events using a D1-like database interface
 
 ```ts
-(db: D1LikeForTurns, options?: TurnEventStoreOptions) => TurnEventStore
+(db: D1LikeForTurns) => TurnEventStore
 ```
 
 ### `createMemoryTurnEventStore`
@@ -107,7 +107,7 @@ interface BufferedTurnTap
 `function` — In-memory store for tests and keyless local dev.
 
 ```ts
-(options?: TurnEventStoreOptions) => TurnEventStore
+() => TurnEventStore
 ```
 
 ### `D1LikeForTurns`
@@ -116,22 +116,6 @@ interface BufferedTurnTap
 
 ```ts
 interface D1LikeForTurns
-```
-
-### `DEFAULT_RUNNING_TURN_LEASE_MS`
-
-`const` — A running row is a renewable lease, not permanent truth.
-
-```ts
-number
-```
-
-### `DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS`
-
-`const` — Keep a healthy turn's lease comfortably ahead of expiry without turning per-token streaming into status-write traffic.
-
-```ts
-30000
 ```
 
 ### `draftAssistantParts`
@@ -318,14 +302,6 @@ interface ResolvedChatTurn
 (part: JsonRecord) => string
 ```
 
-### `stampReplaySeq`
-
-`function` — Serialize a replayed row for the wire, stamping the buffer ordinal ONTO the line so a reconnecting client can continue from `?fromSeq=<lastSeq>`.
-
-```ts
-(row: BufferedTurnEvent) => string
-```
-
 ### `StreamEvent`
 
 `interface` — Define an event object carrying a type and optional JSON data payload
@@ -380,14 +356,6 @@ interface StreamEvent
 
 ```ts
 interface TurnEventStore
-```
-
-### `TurnEventStoreOptions`
-
-`interface` — Configure running-turn lease evaluation.
-
-```ts
-interface TurnEventStoreOptions
 ```
 
 ### `TurnStatus`

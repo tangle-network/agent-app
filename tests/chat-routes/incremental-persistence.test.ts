@@ -18,7 +18,6 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  assistantRowIdForTurn,
   createChatTurnRoutes,
   createSandboxChatProducer,
   runDetachedTurn,
@@ -417,55 +416,6 @@ describe('incremental assistant persistence — crash-safe convergence', () => {
     expect(all.filter((row) => row.role === 'assistant')).toHaveLength(2)
   })
 
-  it('an expired running lease cannot swallow a repeated message', async () => {
-    const { store, threadId } = await freshStore()
-    let now = 0
-    const shared = createMemoryTurnEventStore({
-      runningTurnLeaseMs: 100,
-      now: () => now,
-    })
-    await shared.setStatus('abandoned-turn', 'running', threadId)
-    now = 101
-
-    async function run() {
-      const { routes, ctx, settle } = routesOver(
-        store as unknown as ChatTurnMessageStore,
-        () => createSandboxChatProducer({ events: (async function* () { for (const e of TURN_EVENTS) yield e })(), model: 'm' }),
-        { incrementalPersistence: { intervalMs: 0 }, turnStore: shared },
-      )
-      await drain(await routes.turn(turnRequest(threadId, 'same question'), ctx))
-      await settle()
-    }
-    await run()
-    await run()
-
-    const all = await rows(store, threadId)
-    expect(all.filter((row) => row.role === 'user')).toHaveLength(2)
-    expect(all.filter((row) => row.role === 'assistant')).toHaveLength(2)
-  })
-
-  it('a new client turn id remains a new turn while an older lease is still live', async () => {
-    const { store, threadId } = await freshStore()
-    const shared = createMemoryTurnEventStore()
-    await shared.setStatus('abandoned-turn', 'running', threadId)
-
-    async function run(turnId: string) {
-      const { routes, ctx, settle } = routesOver(
-        store as unknown as ChatTurnMessageStore,
-        () => createSandboxChatProducer({ events: (async function* () { for (const e of TURN_EVENTS) yield e })(), model: 'm' }),
-        { incrementalPersistence: { intervalMs: 0 }, turnStore: shared },
-      )
-      await drain(await routes.turn(turnRequest(threadId, 'same question', { turnId }), ctx))
-      await settle()
-    }
-    await run('client-turn-1')
-    await run('client-turn-2')
-
-    const all = await rows(store, threadId)
-    expect(all.filter((row) => row.role === 'user')).toHaveLength(2)
-    expect(all.filter((row) => row.role === 'assistant')).toHaveLength(2)
-  })
-
   it('autonomous lane: runDetachedTurn owns the row, drafts it mid-run, and converges after a crash', async () => {
     const { store, threadId } = await freshStore()
     const turnStore = createMemoryTurnEventStore()
@@ -613,126 +563,5 @@ describe('incremental assistant persistence — additive by construction', () =>
         incrementalPersistence: {},
       }),
     ).toThrow(/updateMessage/)
-  })
-})
-
-// ── 5. the drafted row, named ───────────────────────────────────────────────
-
-describe('incremental assistant persistence — the seam names the drafted row', () => {
-  it('onTurnComplete reports the deterministic draft row id, and it resolves to a real row', async () => {
-    const { store, threadId } = await freshStore()
-    const seen: Array<string | null> = []
-    const { routes, ctx, settle } = routesOver(
-      store as unknown as ChatTurnMessageStore,
-      () => createSandboxChatProducer({ events: (async function* () { for (const e of TURN_EVENTS) yield e })(), model: 'm' }),
-      {
-        incrementalPersistence: { intervalMs: 0 },
-        onTurnComplete: async ({ assistantMessageId }: { assistantMessageId: string | null }) => { seen.push(assistantMessageId) },
-      },
-    )
-    await drain(await routes.turn(turnRequest(threadId, 'find the lease'), ctx))
-    await settle()
-
-    // The id the drafting path reports is the deterministic per-turn id, not
-    // whatever the store would have minted — and it names a row that is there.
-    expect(seen).toEqual([assistantRowIdForTurn(`incremental-test:${threadId}:0`)])
-    expect((await assistantRow(store, threadId))!.id).toBe(seen[0])
-  })
-
-  it('a re-entered turn reports the SAME id twice — one row, named once', async () => {
-    const { store, threadId } = await freshStore()
-    const shared = createMemoryTurnEventStore()
-    const seen: Array<string | null> = []
-    async function run() {
-      const { routes, ctx, settle } = routesOver(
-        store as unknown as ChatTurnMessageStore,
-        () => createSandboxChatProducer({ events: (async function* () { for (const e of TURN_EVENTS) yield e })(), model: 'm' }),
-        {
-          incrementalPersistence: { intervalMs: 0 },
-          turnStore: shared,
-          onTurnComplete: async ({ assistantMessageId }: { assistantMessageId: string | null }) => { seen.push(assistantMessageId) },
-        },
-      )
-      await drain(await routes.turn(turnRequest(threadId, 'find the lease', { turnId: 'turn-abc' }), ctx))
-      await settle()
-    }
-    await run()
-    await run()
-
-    const assistants = (await rows(store, threadId)).filter((row) => row.role === 'assistant')
-    expect(assistants).toHaveLength(1)
-    expect(seen).toEqual([assistants[0]!.id, assistants[0]!.id])
-  })
-
-  it('an empty turn retracts the draft row and reports null', async () => {
-    const { store, threadId } = await freshStore()
-    const seen: Array<string | null> = []
-    const { routes, ctx, settle } = routesOver(
-      store as unknown as ChatTurnMessageStore,
-      () => createSandboxChatProducer({ events: (async function* () { /* nothing at all */ })(), model: 'm' }),
-      {
-        incrementalPersistence: { intervalMs: 0 },
-        onTurnComplete: async ({ assistantMessageId }: { assistantMessageId: string | null }) => { seen.push(assistantMessageId) },
-      },
-    )
-    await drain(await routes.turn(turnRequest(threadId, 'q'), ctx))
-    await settle()
-
-    expect(await assistantRow(store, threadId)).toBeUndefined()
-    expect(seen).toEqual([null])
-  })
-
-  it('an empty turn on a store that cannot DELETE names the row that survives', async () => {
-    // Drafting requires only `updateMessage`, so a store without
-    // `deleteMessage` is a supported wiring — and there `discard()` is a
-    // no-op, leaving the drafted row in place. Reporting `null` here would
-    // hand the product a lie about a row it can still read back.
-    const written = new Map<string, Record<string, unknown>>()
-    const undeletableStore: ChatTurnMessageStore = {
-      async listMessages() {
-        return [...written.values()] as unknown as Awaited<ReturnType<ChatTurnMessageStore['listMessages']>>
-      },
-      async appendMessage(input) {
-        const row = { ...input, id: input.id ?? `m${written.size + 1}` }
-        written.set(row.id, row)
-        return row
-      },
-      async updateMessage(id, patch) {
-        const row = { ...written.get(id), ...patch, id }
-        written.set(id, row)
-        return row
-      },
-      // no deleteMessage — the point of the test
-    }
-
-    // A producer that streams content (so a draft row lands) and then revises
-    // its answer away to nothing, which is what drives `persistAssistantMessage`
-    // down the retract branch.
-    let finalText = 'drafting…'
-    const seen: Array<string | null> = []
-    const { routes, ctx, settle } = routesOver(
-      undeletableStore,
-      () => ({
-        stream: (async function* () {
-          yield { type: 'text', text: 'drafting…' }
-          await new Promise((resolve) => setTimeout(resolve, 5))
-          finalText = ''
-        })(),
-        finalText: () => finalText,
-      }) as unknown as ReturnType<typeof createSandboxChatProducer>,
-      {
-        incrementalPersistence: { intervalMs: 0 },
-        onTurnComplete: async ({ assistantMessageId }: { assistantMessageId: string | null }) => { seen.push(assistantMessageId) },
-      },
-    )
-    await drain(await routes.turn(turnRequest('t-undeletable', 'q'), ctx))
-    await settle()
-
-    const assistantRows = [...written.values()].filter((row) => row.role === 'assistant')
-    expect(assistantRows).toHaveLength(1)
-    // Still the MID-STREAM draft — proof the retract branch ran and left the
-    // row behind, rather than `finalize` writing it.
-    expect(assistantRows[0]!.content).toBe('drafting…')
-    expect(seen).toEqual([assistantRows[0]!.id])
   })
 })

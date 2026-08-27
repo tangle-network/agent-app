@@ -105,12 +105,12 @@ const TRACK_HEADER_PX = 144
 /** Icon-only secondary control (undo, redo, snap): square, quiet, 44px tap
  *  target on touch (h-7 visual + the row's padding clears the guideline). */
 const TRANSPORT_BUTTON =
-  'flex h-7 w-7 items-center justify-center rounded border border-[var(--border-default)] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:cursor-default disabled:opacity-40 disabled:hover:text-[var(--text-secondary)]'
+  'flex h-7 w-7 items-center justify-center rounded border border-[var(--border-default)] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-40 disabled:hover:text-[var(--text-secondary)]'
 
 /** Labeled edit tool (Split here, Add caption): icon + verb, secondary weight,
  *  distinct from transport so the edit cluster reads as its own kind of thing. */
 const EDIT_TOOL_BUTTON =
-  'flex h-7 items-center gap-1.5 rounded border border-[var(--border-default)] px-2 text-xs font-medium text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:cursor-default disabled:opacity-40 disabled:hover:text-[var(--text-secondary)]'
+  'flex h-7 items-center gap-1.5 rounded border border-[var(--border-default)] px-2 text-xs font-medium text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-40 disabled:hover:text-[var(--text-secondary)]'
 
 /** A visible vertical separator between toolbar clusters. */
 const CLUSTER_DIVIDER = 'mx-1 h-5 w-px shrink-0 bg-[var(--border-default)]'
@@ -744,7 +744,7 @@ export function TimelineEditor(props: TimelineEditorProps) {
               type="button"
               aria-label={isPlaying ? 'Pause' : 'Play'}
               onClick={togglePlayback}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--brand-primary)] text-[hsl(var(--primary-foreground))] transition hover:opacity-90"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--brand-primary)] text-[hsl(var(--primary-foreground))] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {isPlaying ? <PauseGlyph className="h-4 w-4" /> : <PlayGlyph className="h-4 w-4" />}
             </button>
@@ -797,7 +797,7 @@ export function TimelineEditor(props: TimelineEditorProps) {
                   type="button"
                   aria-label={labels.createExport}
                   onClick={props.onCreateExport}
-                  className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-[var(--brand-primary)] px-2.5 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[hsl(var(--primary)/0.1)]"
+                  className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-[var(--brand-primary)] px-2.5 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[hsl(var(--primary)/0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <ExportGlyph className="h-3.5 w-3.5 shrink-0" />
                   <span className="hidden md:inline">{labels.createExport}</span>

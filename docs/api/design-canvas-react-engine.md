@@ -4,7 +4,7 @@
 
 Source: `src/design-canvas-react/engine.ts`
 
-77 exports.
+75 exports.
 
 ### `addElementCommand`
 
@@ -366,14 +366,6 @@ interface MarqueeSelectOptions
 interface MultiSetAttrsEntry
 ```
 
-### `NODE_CACHE_PIXEL_RATIO_MAX`
-
-`const` — Hard ceiling for node cache rasterization.
-
-```ts
-4
-```
-
 ### `nudgeDelta`
 
 `function` — Map an arrow key to a document-px delta.
@@ -436,14 +428,6 @@ interface ResolvedExportParams
 
 ```ts
 (page: ScenePage, opts: { format: "png" | "jpeg"; pixelRatio?: number | undefined; includeBleed?: boolean | undefined;…
-```
-
-### `resolveNodeCachePixelRatio`
-
-`function` — Pixel ratio a Konva node bitmap cache should rasterize at so the cached bitmap matches the screen exactly: the node's absolute scale (content-group zoom) × device pixel ratio.
-
-```ts
-(absoluteScale: number, devicePixelRatio: number) => number
 ```
 
 ### `scaleForPreset`

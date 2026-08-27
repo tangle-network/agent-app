@@ -137,7 +137,7 @@ describe("describeProposal", () => {
     expect(v.preview).toBeNull();
     expect(v.fields).toEqual([
       { label: "Name", value: "ci" },
-      { label: "Budget", value: "$5" },
+      { label: "Budget (USD)", value: "5" },
     ]);
   });
 

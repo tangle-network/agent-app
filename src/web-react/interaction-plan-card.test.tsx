@@ -50,26 +50,13 @@ async function flush() {
 }
 
 describe('InteractionPlanCard', () => {
-  it('renders the plan body (plain-text fallback) with a waiting chip and no collapse UI when nothing overflows', () => {
+  it('renders the plan body (plain-text fallback) with a waiting chip and expand control', () => {
     const { container } = mount(PLAN_INTERACTION)
     expect(container.textContent).toContain('Waiting for your approval')
     expect(container.textContent).toContain('Do the thing')
-    // jsdom measures zero height, so nothing overflows — the fade and toggle
-    // exist only when the measured body exceeds the collapsed cap.
-    expect(screen.queryByRole('button', { name: /Show full plan/ })).toBeNull()
-    expect(container.querySelector('.bg-gradient-to-t')).toBeNull()
-  })
-
-  it('gates the collapse toggle on the measured body height and expands on click', () => {
-    const scrollHeight = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(500)
-    try {
-      mount(PLAN_INTERACTION)
-      const toggle = screen.getByRole('button', { name: /Show full plan/ })
-      fireEvent.click(toggle)
-      expect(screen.getByRole('button', { name: /Collapse plan/ })).toBeTruthy()
-    } finally {
-      scrollHeight.mockRestore()
-    }
+    const toggle = screen.getByRole('button', { name: /Show full plan/ })
+    fireEvent.click(toggle)
+    expect(screen.getByRole('button', { name: /Collapse plan/ })).toBeTruthy()
   })
 
   it('renders through the injected markdown renderer', () => {
@@ -201,23 +188,6 @@ describe('InteractionPlanCard', () => {
     mount({ ...PLAN_INTERACTION, status: 'expired' }, { onReRequest: () => true, reRequestLabel: 'Try the plan again' })
     expect(screen.getByRole('button', { name: 'Try the plan again' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Ask agent to re-submit the plan' })).toBeNull()
-  })
-
-  it('arrives at ONE level — the card, never the card and its fields both', () => {
-    const { container } = mount({
-      ...PLAN_INTERACTION,
-      fields: [
-        { type: 'text', name: 'a', label: 'First', required: false },
-        { type: 'text', name: 'b', label: 'Second', required: false },
-      ],
-    })
-    const arriving = Array.from(container.querySelectorAll('.agent-arrive'))
-    // A second entrance nested inside a travelling parent composes two
-    // translations and two opacity ramps over the same pixels: the card lands
-    // while its own contents are still arriving into it. The card is the thing
-    // that was not there a moment ago; its fields came with it.
-    expect(arriving).toEqual([container.firstElementChild])
-    expect(container.querySelectorAll('fieldset')).toHaveLength(2)
   })
 
   it('shows Asking… and disables the button while the re-request is in flight', async () => {

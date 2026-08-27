@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { agentProfileSchema } from '@tangle-network/agent-interface'
 
 const execFileAsync = promisify(execFile)
 
@@ -12,22 +11,17 @@ const createMock = vi.fn()
 const listMock = vi.fn()
 const getMock = vi.fn()
 const sandboxCtor = vi.fn()
-// Mirrors the real `SecretsManager`, which is create/list/delete only — a
-// stored value is never served back. A mock offering `update` or `get` would
-// let `secretStoreFromClient` pass here while throwing against the SDK.
-const secretsCreateMock = vi.fn()
-const secretsListMock = vi.fn()
-const secretsDeleteMock = vi.fn()
 
-vi.mock('@tangle-network/sandbox/core', () => ({
+vi.mock('@tangle-network/sandbox', () => ({
   Sandbox: class {
     list = listMock
     create = createMock
     get = getMock
     secrets = {
-      create: secretsCreateMock,
-      list: secretsListMock,
-      delete: secretsDeleteMock,
+      create: vi.fn(),
+      update: vi.fn(),
+      get: vi.fn(),
+      delete: vi.fn(),
     }
     constructor(opts: { apiKey: string; baseUrl: string }) {
       sandboxCtor(opts)
@@ -45,11 +39,7 @@ import {
   ensureWorkspaceSandbox,
   peekWorkspaceSandbox,
   buildAppToolMcpServers,
-  adaptSandboxStream,
-  type SandboxStreamEvent,
   streamSandboxPrompt,
-  runSandboxPrompt,
-  collectSandboxPromptText,
   resolveModel,
   flattenHistory,
   mergeHistoryIntoParts,
@@ -57,9 +47,11 @@ import {
   attachReasoningEffort,
   syncSandboxMemberAdd,
   storeSecret,
-  secretStoreFromClient,
+  readSecret,
   deleteSecret,
   mintSandboxScopedToken,
+  mintTerminalProxyToken,
+  verifyTerminalProxyToken,
   resolveSandboxClientCredentials,
   classifySeveredStream,
   detectInteractiveQuestion,
@@ -68,12 +60,8 @@ import {
   sandboxToolBinDir,
   sandboxToolPath,
   buildSandboxToolFileMounts,
-  buildSandboxToolBinDirsEnv,
-  buildSandboxToolBinDirScript,
-  ensureSandboxToolBinDir,
   buildSandboxToolPathSetupScript,
   runSandboxToolPathSetup,
-  buildProductEgressPolicy,
   splitDeferredProfileFiles,
   deferredCorpusHash,
   writeProfileFilesToBox,
@@ -82,14 +70,7 @@ import {
   PROVISION_PAYLOAD_MAX_BYTES,
   ENV_VALUE_MAX_BYTES,
   ENV_TOTAL_MAX_BYTES,
-  DEFAULT_SIDECAR_PROCESS_PATTERN,
-  DEFAULT_SANDBOX_RESOURCES,
   SandboxRuntimeAuthRefreshError,
-  SandboxEgressPolicyMismatchError,
-  SandboxRecoveryFailedError,
-  resolveModelSelection,
-  requireTransportableModel,
-  SandboxModelResolutionError,
   type SandboxRuntimeConfig,
   type SecretStore,
   type PromptInputPart,
@@ -99,9 +80,8 @@ import type {
   AgentProfile,
   AgentProfileFileMount,
   AgentProfileMcpServer,
-} from '@tangle-network/agent-interface'
-import type { EgressPolicy } from '@tangle-network/sandbox'
-import type { SandboxInstance } from '@tangle-network/sandbox/core'
+  SandboxInstance,
+} from '@tangle-network/sandbox'
 
 const PROFILE: AgentProfile = { name: 'test' } as AgentProfile
 
@@ -127,7 +107,6 @@ function fakeBox(over: Partial<SandboxInstance> = {}): SandboxInstance {
   return {
     name: 'box-w1',
     id: 'sandbox-1',
-    filesystemIncarnationReadiness: 'ready',
     metadata: { harness: 'opencode' },
     connection: {
       runtimeUrl: 'https://rt',
@@ -137,8 +116,6 @@ function fakeBox(over: Partial<SandboxInstance> = {}): SandboxInstance {
     waitFor: vi.fn().mockResolvedValue(undefined),
     refresh: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
-    stop: vi.fn().mockResolvedValue(undefined),
-    resume: vi.fn().mockResolvedValue(undefined),
     streamPrompt: vi.fn(),
     permissions: {
       add: vi.fn().mockResolvedValue(undefined),
@@ -155,9 +132,6 @@ beforeEach(() => {
   listMock.mockReset()
   getMock.mockReset()
   sandboxCtor.mockReset()
-  secretsCreateMock.mockReset()
-  secretsListMock.mockReset()
-  secretsDeleteMock.mockReset()
 })
 
 describe('getClient credential-fingerprint cache', () => {
@@ -358,239 +332,7 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     expect(createMock.mock.calls[0]![0].webTerminalEnabled).toBe(true)
   })
 
-  it('declares the product egress policy on a newly created sandbox', async () => {
-    listMock.mockResolvedValue([])
-    createMock.mockResolvedValue(fakeBox())
-    const egressPolicy = {
-      mode: 'strict' as const,
-      allowDomains: ['relationships.example.com'],
-    }
-
-    await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
-      egressPolicy,
-    }), { workspaceId: 'w1', harness: 'opencode' })
-
-    expect(createMock.mock.calls[0]![0].egressPolicy).toEqual(egressPolicy)
-  })
-
-  it('rejects a reused sandbox whose matching open policy is only the platform default', async () => {
-    const get = vi.fn().mockResolvedValue({
-      policy: { mode: 'open' },
-      source: 'platform',
-    })
-    const update = vi.fn()
-    const running = fakeBox({
-      name: 'box-w1',
-      metadata: { harness: 'opencode' },
-      egress: { get, update },
-    } as unknown as Partial<SandboxInstance>)
-    listMock.mockResolvedValue([running])
-
-    const rejection = await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
-      egressPolicy: { mode: 'open' },
-    }), { workspaceId: 'w1', harness: 'opencode' }).then(
-      () => null,
-      (error: unknown) => error,
-    )
-
-    expect(rejection).toBeInstanceOf(SandboxEgressPolicyMismatchError)
-    expect(rejection).toMatchObject({
-      stage: 'reused',
-      boxName: 'box-w1',
-      currentPolicy: { mode: 'open' },
-      currentSource: 'platform',
-      desiredPolicy: { mode: 'open' },
-    })
-    expect(get).toHaveBeenCalledOnce()
-    expect(update).not.toHaveBeenCalled()
-    expect(running.delete).not.toHaveBeenCalled()
-    expect(createMock).not.toHaveBeenCalled()
-  })
-
-  it('rejects a strict policy mismatch without updating or deleting the reused sandbox', async () => {
-    const get = vi.fn().mockResolvedValue({
-      policy: { mode: 'open' },
-      source: 'platform',
-    })
-    const update = vi.fn()
-    const running = fakeBox({
-      name: 'box-w1',
-      metadata: { harness: 'opencode' },
-      egress: { get, update },
-    } as unknown as Partial<SandboxInstance>)
-    listMock.mockResolvedValue([running])
-
-    const desiredPolicy = {
-      mode: 'strict' as const,
-      allowDomains: ['relationships.example.com'],
-    }
-
-    const rejection = await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
-      egressPolicy: desiredPolicy,
-    }), { workspaceId: 'w1', harness: 'opencode' }).then(
-      () => null,
-      (error: unknown) => error,
-    )
-
-    expect(rejection).toBeInstanceOf(SandboxEgressPolicyMismatchError)
-    expect(rejection).toMatchObject({
-      stage: 'reused',
-      boxName: 'box-w1',
-      currentPolicy: { mode: 'open' },
-      currentSource: 'platform',
-      desiredPolicy,
-    })
-    expect(String(rejection)).toContain(
-      'egress policy mismatch on reused box box-w1: current open policy from platform',
-    )
-    expect(get).toHaveBeenCalledOnce()
-    expect(update).not.toHaveBeenCalled()
-    expect(running.delete).not.toHaveBeenCalled()
-    expect(createMock).not.toHaveBeenCalled()
-  })
-
-  it('reuses a sandbox whose explicit policy matches the declared policy', async () => {
-    const get = vi.fn().mockResolvedValue({
-      policy: {
-        mode: 'strict',
-        allowDomains: ['b.example.com', 'a.example.com'],
-        includeImplicitDomains: true,
-      },
-      source: 'sandbox',
-    })
-    const update = vi.fn()
-    const running = fakeBox({
-      name: 'box-w1',
-      metadata: { harness: 'opencode' },
-      egress: { get, update },
-    } as unknown as Partial<SandboxInstance>)
-    listMock.mockResolvedValue([running])
-
-    const box = await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
-      egressPolicy: {
-        mode: 'strict',
-        allowDomains: ['a.example.com', 'b.example.com'],
-      },
-    }), { workspaceId: 'w1', harness: 'opencode' })
-
-    expect(box).toBe(running)
-    expect(get).toHaveBeenCalledOnce()
-    expect(update).not.toHaveBeenCalled()
-    expect(createMock).not.toHaveBeenCalled()
-  })
-
-  it('rejects a mismatch in a future strict policy field instead of silently ignoring it', async () => {
-    type FutureEgressPolicy = EgressPolicy & {
-      dnsPolicy: { enforcement: 'audit' | 'enforce' }
-    }
-    const currentPolicy: FutureEgressPolicy = {
-      mode: 'strict',
-      allowDomains: ['relationships.example.com'],
-      dnsPolicy: { enforcement: 'audit' },
-    }
-    const desiredPolicy: FutureEgressPolicy = {
-      mode: 'strict',
-      allowDomains: ['relationships.example.com'],
-      dnsPolicy: { enforcement: 'enforce' },
-    }
-    const update = vi.fn()
-    const running = fakeBox({
-      name: 'box-w1',
-      metadata: { harness: 'opencode' },
-      egress: {
-        get: vi.fn().mockResolvedValue({ policy: currentPolicy, source: 'sandbox' }),
-        update,
-      },
-    } as unknown as Partial<SandboxInstance>)
-    listMock.mockResolvedValue([running])
-
-    await expect(ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
-      egressPolicy: desiredPolicy,
-    }), { workspaceId: 'w1', harness: 'opencode' })).rejects.toMatchObject({
-      name: 'SandboxEgressPolicyMismatchError',
-      currentPolicy,
-      desiredPolicy,
-    })
-
-    expect(update).not.toHaveBeenCalled()
-    expect(running.delete).not.toHaveBeenCalled()
-    expect(createMock).not.toHaveBeenCalled()
-  })
-
-  it('migrates an existing policy only when the shell explicitly enables it', async () => {
-    const desiredPolicy = { mode: 'strict' as const, allowDomains: ['relationships.example.com'] }
-    const get = vi.fn()
-      .mockResolvedValueOnce({ policy: { mode: 'open' }, source: 'platform' })
-      .mockResolvedValueOnce({ policy: desiredPolicy, source: 'sandbox' })
-    const update = vi.fn().mockResolvedValue({ policy: desiredPolicy, source: 'sandbox' })
-    const running = fakeBox({
-      name: 'box-w1',
-      metadata: { harness: 'opencode' },
-      egress: { get, update },
-    } as unknown as Partial<SandboxInstance>)
-    listMock.mockResolvedValue([running])
-
-    const box = await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
-      egressPolicy: desiredPolicy,
-      migrateEgressPolicy: true,
-    }), { workspaceId: 'w1', harness: 'opencode' })
-
-    expect(box).toBe(running)
-    expect(update).toHaveBeenCalledWith(desiredPolicy)
-    expect(get).toHaveBeenCalledTimes(2)
-    expect(running.delete).not.toHaveBeenCalled()
-    expect(createMock).not.toHaveBeenCalled()
-  })
-
-  it('rejects blocked mode when a reused sandbox currently allows egress', async () => {
-    const get = vi.fn().mockResolvedValue({
-      policy: { mode: 'open' },
-      source: 'sandbox',
-    })
-    const update = vi.fn()
-    const running = fakeBox({
-      name: 'box-w1',
-      metadata: { harness: 'opencode' },
-      egress: { get, update },
-    } as unknown as Partial<SandboxInstance>)
-    listMock.mockResolvedValue([running])
-
-    await expect(ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
-      egressPolicy: { mode: 'blocked' },
-    }), { workspaceId: 'w1', harness: 'opencode' })).rejects.toMatchObject({
-      name: 'SandboxEgressPolicyMismatchError',
-      stage: 'reused',
-      currentPolicy: { mode: 'open' },
-      currentSource: 'sandbox',
-      desiredPolicy: { mode: 'blocked' },
-    })
-
-    expect(update).not.toHaveBeenCalled()
-    expect(running.delete).not.toHaveBeenCalled()
-    expect(createMock).not.toHaveBeenCalled()
-  })
-
-  it('identifies a reused sandbox egress read failure', async () => {
-    const get = vi.fn().mockRejectedValue(new Error('control plane unavailable'))
-    const running = fakeBox({
-      name: 'box-w1',
-      metadata: { harness: 'opencode' },
-      egress: { get, update: vi.fn() },
-    } as unknown as Partial<SandboxInstance>)
-    listMock.mockResolvedValue([running])
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
-      egressPolicy: { mode: 'strict', allowDomains: ['relationships.example.com'] },
-    })
-
-    await expect(ensureWorkspaceSandbox(shell, {
-      workspaceId: 'w1',
-      harness: 'opencode',
-    })).rejects.toThrow(
-      /egress policy read failed on reused box box-w1: control plane unavailable/,
-    )
-  })
-
-  it('recovers a reused box whose edge has failed instead of deleting it', async () => {
+  it('recreates a reused box whose edge has failed instead of returning it', async () => {
     const del = vi.fn().mockResolvedValue(undefined)
     const failed = fakeBox({
       name: 'box-w1',
@@ -598,32 +340,25 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
       connection: { runtimeUrl: 'https://rt', edgeStatus: 'failed' } as never,
       delete: del,
     })
-    // The state-preserving restart clears the edge failure.
-    failed.stop = vi.fn().mockImplementation(async () => {
-      ;(failed as { connection: unknown }).connection = { runtimeUrl: 'https://rt' }
-    }) as never
     // running-only: a status-blind mock would re-surface the box on the stopped
     // list and send Stage 2 down a resume() path the fake box can't service.
     listMock.mockImplementation(({ status }: { status: string }) =>
       status === 'running' ? Promise.resolve([failed]) : Promise.resolve([]),
     )
+    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
 
-    const box = await ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
+    await ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
 
-    expect(box).toBe(failed)
-    expect(failed.stop).toHaveBeenCalledOnce()
-    expect(failed.resume).toHaveBeenCalledOnce()
-    expect(del).not.toHaveBeenCalled()
-    expect(createMock).not.toHaveBeenCalled()
+    expect(del).toHaveBeenCalledOnce()
+    expect(createMock).toHaveBeenCalledOnce()
   })
 
-  it('fails loud (workspace intact) on a reused box that never surfaces a runtime connection', async () => {
+  it('recreates a reused box that never surfaces a runtime connection (no silent reuse)', async () => {
     vi.useFakeTimers()
     try {
       const del = vi.fn().mockResolvedValue(undefined)
       // Matches harness but has no connection; refresh + get never populate one,
-      // so refreshRuntimeConnection exhausts its polling window — before AND
-      // after the state-preserving restart.
+      // so refreshRuntimeConnection exhausts its polling window.
       const stuck = fakeBox({
         name: 'box-w1',
         metadata: { harness: 'opencode' },
@@ -634,35 +369,27 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
         status === 'running' ? Promise.resolve([stuck]) : Promise.resolve([]),
       )
       getMock.mockResolvedValue(stuck)
+      createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
 
       const promise = ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
-      const assertion = expect(promise).rejects.toMatchObject({
-        name: 'SandboxRecoveryFailedError',
-        phase: 'probe',
-        stage: 'reused',
-        boxKey: 'box-w1',
-      })
-      // Drive past BOTH 30s readiness windows (pre-recovery + post-restart).
-      await vi.advanceTimersByTimeAsync(62_000)
-      await assertion
+      // Drive past the 30s readiness deadline so the poll loop gives up.
+      await vi.advanceTimersByTimeAsync(31_000)
+      await promise
 
-      expect(stuck.stop).toHaveBeenCalledOnce()
-      expect(stuck.resume).toHaveBeenCalledOnce()
-      expect(del).not.toHaveBeenCalled()
-      expect(createMock).not.toHaveBeenCalled()
+      expect(del).toHaveBeenCalledOnce()
+      expect(createMock).toHaveBeenCalledOnce()
     } finally {
       vi.useRealTimers()
     }
   })
 
-  it('fails loud instead of deleting when refresh/get keep throwing during the readiness poll', async () => {
+  it('recreates instead of hard-failing when refresh/get throw during the readiness poll', async () => {
     vi.useFakeTimers()
     try {
       const del = vi.fn().mockResolvedValue(undefined)
       // A harness-matched running box with no connection whose refresh + get
-      // keep throwing (transient 5xx / network blip). The poll swallows and
-      // retries; a box that never connects goes through recovery and then
-      // surfaces the typed error — the workspace is never deleted.
+      // keep throwing (transient 5xx / network blip). The poll must swallow and
+      // retry, then fall through to recreate — not surface a hard failure.
       const flaky = fakeBox({
         name: 'box-w1',
         metadata: { harness: 'opencode' },
@@ -674,144 +401,17 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
         status === 'running' ? Promise.resolve([flaky]) : Promise.resolve([]),
       )
       getMock.mockRejectedValue(new Error('transient 5xx'))
+      createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
 
       const promise = ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode' })
-      const assertion = expect(promise).rejects.toMatchObject({
-        name: 'SandboxRecoveryFailedError',
-        phase: 'probe',
-      })
-      await vi.advanceTimersByTimeAsync(62_000)
-      await assertion
+      await vi.advanceTimersByTimeAsync(31_000)
 
-      expect(del).not.toHaveBeenCalled()
-      expect(createMock).not.toHaveBeenCalled()
+      await expect(promise).resolves.toBeDefined()
+      expect(del).toHaveBeenCalledOnce()
+      expect(createMock).toHaveBeenCalledOnce()
     } finally {
       vi.useRealTimers()
     }
-  })
-
-  it('restarts (not deletes) a reused box whose liveness probe fails, and returns it once healthy', async () => {
-    let restarted = false
-    const del = vi.fn().mockResolvedValue(undefined)
-    const wedged = fakeBox({
-      name: 'box-w1',
-      metadata: { harness: 'opencode' },
-      delete: del,
-      exec: vi.fn().mockImplementation(async (cmd: string) => {
-        if (!restarted) throw new Error('exec timed out')
-        return { stdout: cmd.startsWith('pgrep') ? '123' : 'alive' }
-      }),
-      stop: vi.fn().mockImplementation(async () => {
-        restarted = true
-      }),
-    } as Partial<SandboxInstance>)
-    listMock.mockImplementation(({ status }: { status: string }) =>
-      status === 'running' ? Promise.resolve([wedged]) : Promise.resolve([]),
-    )
-    const probed = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
-      livenessProbe: { sidecarProcessPattern: () => 'sidecar' },
-    })
-
-    const box = await ensureWorkspaceSandbox(probed, { workspaceId: 'w1', harness: 'opencode' })
-
-    // The regression #299 pins: the same box (same workspace) comes back.
-    expect(box).toBe(wedged)
-    expect(wedged.stop).toHaveBeenCalledOnce()
-    expect(wedged.resume).toHaveBeenCalledOnce()
-    expect(del).not.toHaveBeenCalled()
-    expect(createMock).not.toHaveBeenCalled()
-  })
-
-  it('surfaces a typed error (no delete) when the box is still dead after recovery', async () => {
-    const del = vi.fn().mockResolvedValue(undefined)
-    const dead = fakeBox({
-      name: 'box-w1',
-      metadata: { harness: 'opencode' },
-      delete: del,
-      exec: vi.fn().mockRejectedValue(new Error('exec timed out')),
-    } as Partial<SandboxInstance>)
-    listMock.mockImplementation(({ status }: { status: string }) =>
-      status === 'running' ? Promise.resolve([dead]) : Promise.resolve([]),
-    )
-    const probed = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
-      livenessProbe: { sidecarProcessPattern: () => 'sidecar' },
-    })
-
-    const rejection = await ensureWorkspaceSandbox(probed, { workspaceId: 'w1', harness: 'opencode' })
-      .then(() => null, (err: unknown) => err)
-
-    expect(rejection).toBeInstanceOf(SandboxRecoveryFailedError)
-    expect(rejection).toMatchObject({ phase: 'probe', stage: 'reused', boxKey: 'box-w1' })
-    expect(del).not.toHaveBeenCalled()
-    expect(createMock).not.toHaveBeenCalled()
-  })
-
-  it('surfaces a typed stop-phase error when the driver cannot stop the box (tangle driver)', async () => {
-    const del = vi.fn().mockResolvedValue(undefined)
-    const unsupported = new Error("Suspend is not supported when ORCHESTRATOR_DRIVER is 'tangle'")
-    const dead = fakeBox({
-      name: 'box-w1',
-      metadata: { harness: 'opencode' },
-      delete: del,
-      exec: vi.fn().mockRejectedValue(new Error('exec timed out')),
-      stop: vi.fn().mockRejectedValue(unsupported),
-    } as Partial<SandboxInstance>)
-    listMock.mockImplementation(({ status }: { status: string }) =>
-      status === 'running' ? Promise.resolve([dead]) : Promise.resolve([]),
-    )
-    const probed = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
-      livenessProbe: { sidecarProcessPattern: () => 'sidecar' },
-    })
-
-    const rejection = await ensureWorkspaceSandbox(probed, { workspaceId: 'w1', harness: 'opencode' })
-      .then(() => null, (err: unknown) => err)
-
-    expect(rejection).toBeInstanceOf(SandboxRecoveryFailedError)
-    expect(rejection).toMatchObject({ phase: 'stop', cause: unsupported })
-    expect(dead.resume).not.toHaveBeenCalled()
-    expect(del).not.toHaveBeenCalled()
-    expect(createMock).not.toHaveBeenCalled()
-  })
-
-  it('recovers (not deletes) a stopped box that resumes but fails the probe', async () => {
-    const del = vi.fn().mockResolvedValue(undefined)
-    const stopped = fakeBox({
-      name: 'box-w1',
-      metadata: { harness: 'opencode' },
-      delete: del,
-      exec: vi.fn().mockRejectedValue(new Error('exec timed out')),
-    } as Partial<SandboxInstance>)
-    listMock.mockImplementation(({ status }: { status: string }) =>
-      status === 'stopped' ? Promise.resolve([stopped]) : Promise.resolve([]),
-    )
-    const probed = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
-      livenessProbe: { sidecarProcessPattern: () => 'sidecar' },
-    })
-
-    const rejection = await ensureWorkspaceSandbox(probed, { workspaceId: 'w1', harness: 'opencode' })
-      .then(() => null, (err: unknown) => err)
-
-    expect(rejection).toBeInstanceOf(SandboxRecoveryFailedError)
-    expect(rejection).toMatchObject({ phase: 'probe', stage: 'resumed' })
-    // Stage-2 resume once, recovery stop→resume once more.
-    expect(stopped.stop).toHaveBeenCalledOnce()
-    expect(stopped.resume).toHaveBeenCalledTimes(2)
-    expect(del).not.toHaveBeenCalled()
-    expect(createMock).not.toHaveBeenCalled()
-  })
-
-  it('forceNew still deletes the existing box and creates a replacement', async () => {
-    const del = vi.fn().mockResolvedValue(undefined)
-    const running = fakeBox({ name: 'box-w1', metadata: { harness: 'opencode' }, delete: del })
-    listMock.mockImplementation(({ status }: { status: string }) =>
-      status === 'running' ? Promise.resolve([running]) : Promise.resolve([]),
-    )
-    createMock.mockResolvedValue(fakeBox())
-
-    await ensureWorkspaceSandbox(shell(), { workspaceId: 'w1', harness: 'opencode', forceNew: true })
-
-    expect(del).toHaveBeenCalledOnce()
-    expect(createMock).toHaveBeenCalledOnce()
   })
 })
 
@@ -823,25 +423,12 @@ describe('buildAppToolMcpServers', () => {
         { tool: 'add_citation', key: 'app-cite', description: 'd2' },
       ],
       baseUrl: 'https://app',
-      tokenEnvKey: 'APP_CAPABILITY_TOKEN',
+      token: 'tok',
       ctx: { userId: 'w1', workspaceId: 'w1', threadId: null },
     })
     expect(Object.keys(entries).sort()).toEqual(['app-cite', 'app-propose'])
     expect(entries['app-propose']!.transport).toBe('http')
     expect(entries['app-propose']!.url).toContain('https://app')
-  })
-
-  // The cast this function used to carry (`as AgentProfileMcpServer`) is what
-  // let the pre-0.38.0 plain-string shape ship. Validating the returned map
-  // against the REAL schema is the check that cast defeated.
-  it('returns entries the real agentProfileSchema accepts', () => {
-    const entries = buildAppToolMcpServers({
-      tools: [{ tool: 'submit_proposal', key: 'app-propose', description: 'd1' }],
-      baseUrl: 'https://app.example.com',
-      tokenEnvKey: 'APP_CAPABILITY_TOKEN',
-      ctx: { userId: 'u1', workspaceId: 'w1', threadId: 't1' },
-    })
-    expect(agentProfileSchema.safeParse({ mcp: entries }).success).toBe(true)
   })
 })
 
@@ -859,38 +446,6 @@ describe('streamSandboxPrompt seam', () => {
         profile: () => PROFILE,
       },
     )
-
-  it('adapts raw sandbox events to the gateway event shape', async () => {
-    async function* rawEvents(): AsyncGenerator<unknown> {
-      yield {
-        type: 'message.part.updated',
-        data: {
-          part: { type: 'text', text: 'hello', ignored: true },
-          delta: 'he',
-          ignored: true,
-        },
-        ignored: true,
-      }
-      yield { type: 'result', data: { finalText: 'hello', ignored: true } }
-      yield {
-        type: 'input-required',
-        data: { inputRequired: { prompt: 'Need more', ignored: true } },
-      }
-      yield null
-    }
-
-    const out: SandboxStreamEvent[] = []
-    for await (const event of adaptSandboxStream(rawEvents())) out.push(event)
-
-    expect(out).toEqual([
-      {
-        type: 'message.part.updated',
-        data: { part: { type: 'text', text: 'hello' }, delta: 'he' },
-      },
-      { type: 'result', data: { finalText: 'hello' } },
-      { type: 'input-required', data: { inputRequired: { prompt: 'Need more' } } },
-    ])
-  })
 
   it('flattens history, resolves the model, attaches effort, and forwards to box.streamPrompt', async () => {
     async function* events() {
@@ -920,30 +475,6 @@ describe('streamSandboxPrompt seam', () => {
     })
     expect(opts.backend.profile.extensions.opencode.reasoningEffort).toBe('high')
     expect(opts.requireVisibleAssistantOutput).toBe(true)
-  })
-
-  it('forwards execution replay and dispatch idempotency identities to box.streamPrompt', async () => {
-    async function* events() {
-      yield { type: 'result' }
-    }
-    const box = fakeBox({ streamPrompt: vi.fn().mockReturnValue(events()) })
-
-    for await (const _ of streamSandboxPrompt(shell(), box, 'retry me', {
-      sessionId: 'thread-1',
-      executionId: 'exec-1',
-      turnId: 'turn-1',
-      lastEventId: 'event-8',
-    })) {
-      void _
-    }
-
-    const [, opts] = (box.streamPrompt as ReturnType<typeof vi.fn>).mock.calls[0]!
-    expect(opts).toMatchObject({
-      sessionId: 'thread-1',
-      executionId: 'exec-1',
-      turnId: 'turn-1',
-      lastEventId: 'event-8',
-    })
   })
 
   it('omits the model when provider resolution yields nothing', async () => {
@@ -1004,172 +535,7 @@ describe('streamSandboxPrompt seam', () => {
   })
 })
 
-describe('runSandboxPrompt text aggregation', () => {
-  const shell = () =>
-    shellFor(
-      { apiKey: 'k', baseUrl: 'https://s' },
-      {
-        provider: {
-          apiKey: 'router-key',
-          providerName: 'openai-compat',
-          defaultModel: 'gpt-x',
-          routerBaseUrl: 'https://router',
-        },
-        profile: () => PROFILE,
-      },
-    )
-
-  const boxYielding = (events: unknown[]) => {
-    async function* gen() {
-      for (const e of events) yield e
-    }
-    return fakeBox({ streamPrompt: vi.fn().mockReturnValue(gen()) })
-  }
-
-  const textDelta = (id: string, delta: string) => ({
-    type: 'message.part.updated',
-    data: { part: { id, type: 'text' }, delta },
-  })
-  const textSnapshot = (id: string, text: string) => ({
-    type: 'message.part.updated',
-    data: { part: { id, type: 'text', text } },
-  })
-
-  it('keeps every delta of a delta-streamed answer that carries no result receipt', async () => {
-    // The run/stream lane emits explicit deltas. Dropping the first one silently
-    // truncates the answer's opening token — a wrong-but-plausible string, the
-    // worst failure shape for an unattended cron/judge turn.
-    const box = boxYielding([
-      textDelta('p1', 'Hello'),
-      textDelta('p1', ' brave'),
-      textDelta('p1', ' world'),
-    ])
-    await expect(runSandboxPrompt(shell(), box, 'greet me')).resolves.toBe('Hello brave world')
-  })
-
-  it('drops a harness echo of the dispatched prompt without positional guessing', async () => {
-    // The echo is identified by CONTENT, not by "it arrived first": a lane that
-    // emits the answer before the echo, or emits no echo at all, must still be right.
-    const box = boxYielding([
-      textSnapshot('echo', 'greet me'),
-      textDelta('p1', 'Hello'),
-      textDelta('p1', ' world'),
-    ])
-    await expect(runSandboxPrompt(shell(), box, 'greet me')).resolves.toBe('Hello world')
-  })
-
-  it('drops an echo of the HISTORY-FOLDED prompt, which is what the harness actually received', async () => {
-    // streamSandboxPrompt dispatches flattenHistory(message, history); an echo
-    // replays that folded string, not the raw message.
-    const folded = 'Assistant: prior\n\nUser: greet me'
-    const box = boxYielding([textSnapshot('echo', folded), textDelta('p1', 'Hi there')])
-    await expect(
-      runSandboxPrompt(shell(), box, 'greet me', {
-        history: [{ role: 'assistant', content: 'prior' }],
-      }),
-    ).resolves.toBe('Hi there')
-  })
-
-  it('drops the echo even when it arrives AFTER the answer', async () => {
-    // Ordering is not a contract. A positional "skip the first text part" rule
-    // returns the prompt itself here.
-    const box = boxYielding([
-      textDelta('p1', 'Hello'),
-      textDelta('p1', ' world'),
-      textSnapshot('echo', 'greet me'),
-    ])
-    await expect(runSandboxPrompt(shell(), box, 'greet me')).resolves.toBe('Hello world')
-  })
-
-  it('does not let a later text part clobber an earlier one on the delta lane', async () => {
-    const box = boxYielding([
-      textDelta('p1', 'thinking out loud'),
-      textDelta('p2', 'the answer is 42'),
-    ])
-    await expect(runSandboxPrompt(shell(), box, 'q')).resolves.toBe('the answer is 42')
-  })
-
-  it('prefers the result receipt over accumulated parts', async () => {
-    const box = boxYielding([
-      textDelta('p1', 'partial'),
-      { type: 'result', data: { finalText: 'authoritative answer' } },
-    ])
-    await expect(runSandboxPrompt(shell(), box, 'q')).resolves.toBe('authoritative answer')
-  })
-
-  it('ignores a blank result receipt and falls back to the streamed text', async () => {
-    const box = boxYielding([
-      textDelta('p1', 'streamed answer'),
-      { type: 'result', data: { finalText: '   ' } },
-    ])
-    await expect(runSandboxPrompt(shell(), box, 'q')).resolves.toBe('streamed answer')
-  })
-
-  it('returns empty string when the turn produced only an echo', async () => {
-    const box = boxYielding([textSnapshot('echo', 'q')])
-    await expect(runSandboxPrompt(shell(), box, 'q')).resolves.toBe('')
-  })
-
-  it('accumulates the snapshot lane, where each update re-sends the whole part', async () => {
-    const box = boxYielding([
-      textSnapshot('p1', 'Hel'),
-      textSnapshot('p1', 'Hello wor'),
-      textSnapshot('p1', 'Hello world'),
-    ])
-    await expect(runSandboxPrompt(shell(), box, 'q')).resolves.toBe('Hello world')
-  })
-
-  it('is a thin wrapper over collectSandboxPromptText — same events, same answer', async () => {
-    // The aggregation is reusable on ANY generator; a product that wraps
-    // streamSandboxPrompt to mount per-turn MCP still gets the identical result
-    // without forking this logic. That fork is what shipped the bug three times.
-    const events = [
-      textSnapshot('echo', 'greet me'),
-      textDelta('p1', 'Hello'),
-      textDelta('p1', ' world'),
-    ]
-    async function* standalone() {
-      for (const e of events) yield e
-    }
-    await expect(collectSandboxPromptText(standalone(), 'greet me')).resolves.toBe(
-      await runSandboxPrompt(shell(), boxYielding(events), 'greet me'),
-    )
-  })
-
-  it('collectSandboxPromptText drops an echo of the folded prompt when given the history', async () => {
-    async function* standalone() {
-      yield textSnapshot('echo', 'Assistant: prior\n\nUser: greet me')
-      yield textDelta('p1', 'Hi')
-    }
-    await expect(
-      collectSandboxPromptText(standalone(), 'greet me', [{ role: 'assistant', content: 'prior' }]),
-    ).resolves.toBe('Hi')
-  })
-})
-
 describe('pure seam helpers', () => {
-  it('builds the standard strict product egress policy from a public origin', () => {
-    expect(buildProductEgressPolicy('https://Legal.Tangle.Tools/app', [
-      'www.irs.gov',
-      'WWW.IRS.GOV.',
-    ])).toEqual({
-      mode: 'strict',
-      allowDomains: ['legal.tangle.tools', 'models.dev', 'www.irs.gov'],
-      includeImplicitDomains: false,
-    })
-  })
-
-  it.each([
-    'ftp://legal.tangle.tools',
-    'not a URL',
-  ])('rejects a non-web product origin: %s', (origin) => {
-    expect(() => buildProductEgressPolicy(origin)).toThrow(/http or https|Invalid URL/)
-  })
-
-  it.each(['https://evil.example', '*', 'bar.*.com', 'foo..com'])('rejects malformed extra domains instead of widening the policy: %s', (domain) => {
-    expect(() => buildProductEgressPolicy('https://legal.tangle.tools', [domain])).toThrow('hostname or wildcard')
-  })
-
   it('flattenHistory returns the bare message when no history', () => {
     expect(flattenHistory('x')).toBe('x')
   })
@@ -1184,7 +550,7 @@ describe('pure seam helpers', () => {
     const parts: PromptInputPart[] = [
       { type: 'image', url: 'https://img/1.png' },
       { type: 'text', text: 'describe this' },
-      { type: 'file', filename: 'notes.txt', url: 'data:text/plain;base64,bm90ZXM=' },
+      { type: 'file', filename: 'notes.txt' },
     ]
     const merged = mergeHistoryIntoParts(parts, [
       { role: 'user', content: 'earlier question' },
@@ -1196,7 +562,7 @@ describe('pure seam helpers', () => {
         type: 'text',
         text: 'User: earlier question\n\nAssistant: earlier answer\n\nUser: describe this',
       },
-      { type: 'file', filename: 'notes.txt', url: 'data:text/plain;base64,bm90ZXM=' },
+      { type: 'file', filename: 'notes.txt' },
     ])
   })
 
@@ -1232,16 +598,6 @@ describe('pure seam helpers', () => {
     expect(attachReasoningEffort(PROFILE, 'opencode', 'auto')).toBe(PROFILE)
     expect(attachReasoningEffort(PROFILE, 'opencode', undefined)).toBe(PROFILE)
   })
-
-  it.each(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'ultracode'] as const)(
-    'attachReasoningEffort preserves the canonical %s level',
-    (effort) => {
-      expect(
-        attachReasoningEffort(PROFILE, 'opencode', effort).extensions?.opencode
-          ?.reasoningEffort,
-      ).toBe(effort)
-    },
-  )
 
   it('resolveModel precedence: explicit override beats env defaults', () => {
     const m = resolveModel(
@@ -1314,6 +670,7 @@ describe('secret CRUD typed outcomes', () => {
     return {
       create: vi.fn().mockResolvedValue(undefined),
       update: vi.fn().mockResolvedValue(undefined),
+      get: vi.fn().mockResolvedValue('v'),
       delete: vi.fn().mockResolvedValue(undefined),
       ...over,
     }
@@ -1336,24 +693,9 @@ describe('secret CRUD typed outcomes', () => {
     if (!r.succeeded) expect(r.error.message).toContain('Failed to store sandbox secret N')
   })
 
-  it('storeSecret warns that a failed replacement leaves the secret absent', async () => {
-    const s = store({
-      create: vi.fn().mockRejectedValue(new Error('c')),
-      update: vi.fn().mockRejectedValue(new Error('u')),
-    })
-    const r = await storeSecret(s, 'N', 'v')
-    expect(r.succeeded).toBe(false)
-    if (!r.succeeded) expect(r.error.message).toContain('may now be absent')
-  })
-
-  it('secretStoreFromClient replaces by deleting before creating (no update route)', async () => {
-    const s = secretStoreFromClient(shellFor({ apiKey: 'k1', baseUrl: 'https://s' }))
-    await s.update('N', 'v')
-    expect(secretsDeleteMock).toHaveBeenCalledWith('N')
-    expect(secretsCreateMock).toHaveBeenCalledWith('N', 'v')
-    expect(secretsDeleteMock.mock.invocationCallOrder[0]).toBeLessThan(
-      secretsCreateMock.mock.invocationCallOrder[0]!,
-    )
+  it('readSecret returns the value', async () => {
+    const r = await readSecret(store(), 'N')
+    expect(r.succeeded && r.value).toBe('v')
   })
 
   it('deleteSecret returns a typed failure rather than swallowing', async () => {
@@ -1386,11 +728,7 @@ describe('mintSandboxScopedToken', () => {
     const box = {
       mintScopedToken: vi.fn().mockRejectedValue(new Error('forbidden (403)')),
     } as unknown as SandboxInstance
-    const r = await mintSandboxScopedToken(box, {
-      scope: 'session',
-      sessionId: 'browser-session',
-      runtimeSessionId: 'runtime-session',
-    })
+    const r = await mintSandboxScopedToken(box, { scope: 'session' })
     expect(r.succeeded).toBe(false)
     if (!r.succeeded) expect(r.error.message).toContain('403')
   })
@@ -1480,100 +818,6 @@ describe('provision S-cost gates', () => {
     ).rejects.toThrow(/OPENCODE_CONFIG_CONTENT/)
     expect(createMock).not.toHaveBeenCalled()
   })
-
-  // The prompt budget is a SEPARATE gate from the payload cap, and this is the
-  // arithmetic that proves it has to be: the 122,659-byte prompt behind the
-  // empty-answer incident is half the 240,000-byte payload cap, so the payload
-  // gate is silent on it. `composeAgentProfile` is opt-in — tax-agent has zero
-  // call sites and creative-agent keeps its real prompt on the PER-TURN backend
-  // — so the shell has to run the gate itself.
-  const incidentPrompt = 'x'.repeat(122_659)
-  const bigPromptProfile = { name: 'big-prompt', prompt: { systemPrompt: incidentPrompt } } as AgentProfile
-
-  it('the payload gate alone does NOT catch the incident prompt — the size that produced empty answers is half the payload cap', () => {
-    expect(() =>
-      assertProvisionPayloadWithinCap({ env: {}, secrets: [], backend: { profile: bigPromptProfile } }),
-    ).not.toThrow()
-  })
-
-  it('ensureWorkspaceSandbox rejects an over-budget system prompt BEFORE the create POST', async () => {
-    listMock.mockResolvedValue([])
-    createMock.mockResolvedValue(fakeBox())
-    await expect(
-      ensureWorkspaceSandbox(
-        shellFor({ apiKey: 'k', baseUrl: 'https://s' }, { profile: () => bigPromptProfile }),
-        { workspaceId: 'w1', harness: 'opencode' },
-      ),
-    ).rejects.toThrow(/provision profile systemPrompt for box-w1 is 122659 bytes — over the 40000-byte budget/)
-    expect(createMock).not.toHaveBeenCalled()
-  })
-
-  it('streamSandboxPrompt rejects an over-budget PER-TURN prompt before opening the stream', async () => {
-    const streamPrompt = vi.fn()
-    const box = fakeBox({ streamPrompt })
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, { profile: () => bigPromptProfile })
-    await expect(async () => {
-      for await (const _ of streamSandboxPrompt(shell, box, 'go', { sessionId: 's1' })) void _
-    }).rejects.toThrow(/streamSandboxPrompt profile systemPrompt is 122659 bytes/)
-    expect(streamPrompt).not.toHaveBeenCalled()
-  })
-
-  it('driveSandboxTurn rejects an over-budget prompt before dispatching the autonomous turn', async () => {
-    const driveTurn = vi.fn()
-    const box = fakeBox({ driveTurn })
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, { profile: () => bigPromptProfile })
-    await expect(driveSandboxTurn(shell, box, 'go', { sessionId: 's1' })).rejects.toThrow(
-      /driveSandboxTurn profile systemPrompt is 122659 bytes/,
-    )
-    expect(driveTurn).not.toHaveBeenCalled()
-  })
-
-  it('a product that must ship a big prompt opts out through the shell budget seam, with a written reason', async () => {
-    listMock.mockResolvedValue([])
-    createMock.mockResolvedValue(fakeBox())
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    await ensureWorkspaceSandbox(
-      shellFor(
-        { apiKey: 'k', baseUrl: 'https://s' },
-        {
-          profile: () => bigPromptProfile,
-          promptBudget: { warnOnly: true, overBudgetReason: 'statutory text the agent must obey verbatim' },
-        },
-      ),
-      { workspaceId: 'w1', harness: 'opencode' },
-    )
-    expect(createMock).toHaveBeenCalledTimes(1)
-    expect(warn.mock.calls[0]?.[0]).toMatch(/over the 40000-byte budget/)
-    warn.mockRestore()
-  })
-
-  it('weakening the budget WITHOUT a written reason is itself rejected', async () => {
-    listMock.mockResolvedValue([])
-    createMock.mockResolvedValue(fakeBox())
-    await expect(
-      ensureWorkspaceSandbox(
-        shellFor(
-          { apiKey: 'k', baseUrl: 'https://s' },
-          { profile: () => bigPromptProfile, promptBudget: { warnOnly: true } },
-        ),
-        { workspaceId: 'w1', harness: 'opencode' },
-      ),
-    ).rejects.toThrow(/without an overBudgetReason/)
-    expect(createMock).not.toHaveBeenCalled()
-  })
-
-  it('a normal profile passes every choke point untouched', async () => {
-    listMock.mockResolvedValue([])
-    createMock.mockResolvedValue(fakeBox())
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' })
-    await expect(
-      ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' }),
-    ).resolves.toBeDefined()
-    const box = fakeBox({ driveTurn: vi.fn().mockResolvedValue({ state: 'completed' }) })
-    await expect(driveSandboxTurn(shell, box, 'go', { sessionId: 's1' })).resolves.toMatchObject({
-      succeeded: true,
-    })
-  })
 })
 
 describe('ensureWorkspaceSandbox — new seams', () => {
@@ -1603,171 +847,32 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     expect(createMock).toHaveBeenCalledOnce()
   })
 
-  it('uses the default ERE to match a live harness process when no pattern is supplied (#342)', async () => {
-    const processTable = [
-      '/nix/profile/bin/opencode serve --hostname=127.0.0.1 --port=0',
-      '/usr/local/bin/claude --dangerously-skip-permissions',
-      '/opt/tangle/bin/codex app-server',
-      'node server.js',
-    ]
-    const exec = vi.fn().mockImplementation(async (cmd: string) => {
-      if (cmd === 'echo alive') return { stdout: 'alive', exitCode: 0 }
-      const match = cmd.match(/^pgrep -f '([^']+)' \|\| echo no-sidecar$/)
-      expect(match).not.toBeNull()
-      const pattern = match?.[1] ?? ''
-      const matched = processTable.some((line) => new RegExp(pattern).test(line))
-      return { stdout: matched ? '143\n' : 'no-sidecar\n', exitCode: 0 }
-    })
-    const running = fakeBox({ name: 'box-w1', exec })
-    listMock.mockImplementation(({ status }: { status: string }) =>
-      status === 'running' ? Promise.resolve([running]) : Promise.resolve([]),
-    )
-
-    const box = await ensureWorkspaceSandbox(
-      shellFor({ apiKey: 'k', baseUrl: 'u' }, { livenessProbe: {} }),
-      { workspaceId: 'w1', harness: 'opencode' },
-    )
-
-    expect(DEFAULT_SIDECAR_PROCESS_PATTERN).toBe('opencode|claude|codex')
-    expect(exec).toHaveBeenCalledWith(
-      `pgrep -f '${DEFAULT_SIDECAR_PROCESS_PATTERN}' || echo no-sidecar`,
-    )
-    expect(box).toBe(running)
-    expect(running.stop).not.toHaveBeenCalled()
-    expect(running.resume).not.toHaveBeenCalled()
-  })
-
-  it('reuses a recent liveness verification and probes again after the default TTL', async () => {
-    vi.useFakeTimers({ now: 10_000 })
-    try {
-      const exec = vi.fn().mockImplementation(async (command: string) => ({
-        stdout: command.startsWith('pgrep') ? '123\n' : 'alive\n',
-        exitCode: 0,
-      }))
-      const getEgress = vi.fn().mockResolvedValue({
-        policy: { mode: 'open' },
-        source: 'sandbox',
-      })
-      const bootstrap = vi.fn().mockResolvedValue({ succeeded: true, value: undefined })
-      const running = fakeBox({
-        name: 'box-w1',
-        exec,
-        egress: { get: getEgress, update: vi.fn() },
-      } as unknown as Partial<SandboxInstance>)
-      listMock.mockResolvedValue([running])
-      const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-        livenessProbe: {},
-        egressPolicy: { mode: 'open' },
-        bootstrap,
-      })
-
-      await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
-      await vi.advanceTimersByTimeAsync(4_999)
-      await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
-
-      expect(exec).toHaveBeenCalledTimes(2)
-
-      await vi.advanceTimersByTimeAsync(2)
-      await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
-
-      expect(exec).toHaveBeenCalledTimes(4)
-      expect(getEgress).toHaveBeenCalledTimes(3)
-      expect(bootstrap).toHaveBeenCalledTimes(3)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it('lets dispatch fail loud when a cached box dies without deleting the workspace', async () => {
-    let alive = true
-    const del = vi.fn().mockResolvedValue(undefined)
-    const exec = vi.fn().mockImplementation(async (command: string) => {
-      if (!alive) throw new Error('sandbox is gone')
-      return {
-        stdout: command.startsWith('pgrep') ? '123\n' : 'alive\n',
-        exitCode: 0,
-      }
-    })
-    const streamPrompt = vi.fn(async function* () {
-      throw new Error('dispatch connection refused')
-    })
-    const running = fakeBox({
-      name: 'box-w1',
-      delete: del,
-      exec,
-      streamPrompt,
-    } as unknown as Partial<SandboxInstance>)
-    listMock.mockResolvedValue([running])
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-      livenessProbe: { cacheTtlMs: 60_000 },
-    })
-
-    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
-    alive = false
-    const cached = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
-
-    expect(exec).toHaveBeenCalledTimes(2)
-    await expect(cached.streamPrompt('hello').next()).rejects.toThrow('dispatch connection refused')
-    expect(del).not.toHaveBeenCalled()
-    expect(createMock).not.toHaveBeenCalled()
-  })
-
-  it('rejects a BRE-escaped alternation before probing or restarting the box (#342)', async () => {
-    const running = fakeBox({ name: 'box-w1', exec: vi.fn() })
-    listMock.mockImplementation(({ status }: { status: string }) =>
-      status === 'running' ? Promise.resolve([running]) : Promise.resolve([]),
-    )
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-      livenessProbe: { sidecarProcessPattern: () => 'opencode\\|claude' },
-    })
-
-    await expect(
-      ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' }),
-    ).rejects.toThrow(
-      'Invalid livenessProbe.sidecarProcessPattern: pgrep -f uses extended regular expressions',
-    )
-    expect(running.exec).not.toHaveBeenCalled()
-    expect(running.stop).not.toHaveBeenCalled()
-    expect(running.resume).not.toHaveBeenCalled()
-  })
-
-  it('liveness probe restarts an unresponsive running box in place — never deletes (#299)', async () => {
-    let restarted = false
+  it('liveness probe deletes an unresponsive running box and recreates', async () => {
     const del = vi.fn().mockResolvedValue(undefined)
     const dead = fakeBox({
       name: 'box-w1',
       delete: del,
-      exec: vi.fn().mockImplementation(async (cmd: string) =>
-        restarted
-          ? { stdout: cmd.startsWith('pgrep') ? '123' : 'alive', exitCode: 0 }
-          : { stdout: '', exitCode: 1 },
-      ),
-      stop: vi.fn().mockImplementation(async () => {
-        restarted = true
-      }),
+      exec: vi.fn().mockResolvedValue({ stdout: '', exitCode: 1 }),
     })
     listMock.mockImplementation(({ status }: { status: string }) =>
       status === 'running' ? Promise.resolve([dead]) : Promise.resolve([]),
     )
+    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
     const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-      livenessProbe: {},
+      livenessProbe: { sidecarProcessPattern: () => 'opencode\\|claude' },
     })
-    const box = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
+    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
     expect(dead.exec).toHaveBeenCalledWith('echo alive')
-    expect(dead.stop).toHaveBeenCalledOnce()
-    expect(dead.resume).toHaveBeenCalledOnce()
-    expect(box).toBe(dead)
-    expect(del).not.toHaveBeenCalled()
-    expect(createMock).not.toHaveBeenCalled()
+    expect(del).toHaveBeenCalledOnce()
+    expect(createMock).toHaveBeenCalledOnce()
   })
 
   it('resumes a stopped box from snapshot instead of creating', async () => {
     const resume = vi.fn().mockResolvedValue(undefined)
-    const waitFor = vi.fn()
     const stopped = fakeBox({
       name: 'box-w1',
       resume,
-      waitFor,
+      waitFor: vi.fn(),
       exec: vi.fn().mockResolvedValue({ stdout: 'alive', exitCode: 0 }),
     })
     listMock.mockImplementation(({ status }: { status: string }) =>
@@ -1779,55 +884,11 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     )
     const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
       livenessProbe: { sidecarProcessPattern: () => 'opencode' },
-      provisionTimeoutMs: 91_234,
     })
     const box = await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
-    expect(resume).toHaveBeenCalledWith({ timeoutMs: 91_234 })
-    expect(waitFor).toHaveBeenCalledWith('running', { timeoutMs: 91_234 })
+    expect(resume).toHaveBeenCalledOnce()
     expect(createMock).not.toHaveBeenCalled()
     expect(box).toBe(stopped)
-  })
-
-  it('rejects an egress mismatch after resume without updating or deleting the box', async () => {
-    const get = vi.fn().mockResolvedValue({
-      policy: { mode: 'open' },
-      source: 'platform',
-    })
-    const update = vi.fn()
-    const stopped = fakeBox({
-      name: 'box-w1',
-      egress: { get, update },
-    } as unknown as Partial<SandboxInstance>)
-    listMock.mockImplementation(({ status }: { status: string }) =>
-      Promise.resolve(status === 'stopped' ? [stopped] : []),
-    )
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-      egressPolicy: {
-        mode: 'strict',
-        allowDomains: ['relationships.example.com'],
-      },
-    })
-
-    await expect(ensureWorkspaceSandbox(shell, {
-      workspaceId: 'w1',
-      harness: 'opencode',
-    })).rejects.toMatchObject({
-      name: 'SandboxEgressPolicyMismatchError',
-      stage: 'resumed',
-      boxName: 'box-w1',
-      currentPolicy: { mode: 'open' },
-      currentSource: 'platform',
-      desiredPolicy: {
-        mode: 'strict',
-        allowDomains: ['relationships.example.com'],
-      },
-    })
-
-    expect(stopped.resume).toHaveBeenCalledOnce()
-    expect(get).toHaveBeenCalledOnce()
-    expect(update).not.toHaveBeenCalled()
-    expect(stopped.delete).not.toHaveBeenCalled()
-    expect(createMock).not.toHaveBeenCalled()
   })
 
   it('preserves a typed egress recovery error from a stopped-box resume', async () => {
@@ -1860,77 +921,6 @@ describe('ensureWorkspaceSandbox — new seams', () => {
 
     expect(stopped.delete).not.toHaveBeenCalled()
     expect(createMock).not.toHaveBeenCalled()
-  })
-
-  it('leaves an unbringable box alone by default, because replacing it is a delete', async () => {
-    const stopped = fakeBox({
-      name: 'box-w1',
-      stop: vi.fn().mockRejectedValue(new Error('driver does not support stop')),
-      resume: vi.fn().mockResolvedValue(undefined),
-    })
-    listMock.mockImplementation(({ status }: { status: string }) =>
-      Promise.resolve(status === 'running' ? [stopped] : []),
-    )
-
-    await expect(
-      ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-        livenessProbe: { sidecarProcessPattern: () => 'nothing-matches' },
-      }), { workspaceId: 'w1', harness: 'opencode' }),
-    ).rejects.toMatchObject({ name: 'SandboxRecoveryFailedError' })
-
-    expect(stopped.delete).not.toHaveBeenCalled()
-    expect(createMock).not.toHaveBeenCalled()
-  })
-
-  it('replaces an unbringable box once when the shell says the box is rebuildable', async () => {
-    const stopped = fakeBox({
-      name: 'box-w1',
-      stop: vi.fn().mockRejectedValue(new Error('driver does not support stop')),
-      resume: vi.fn().mockResolvedValue(undefined),
-    })
-    let call = 0
-    listMock.mockImplementation(({ status }: { status: string }) => {
-      call += 1
-      // First provisioning attempt finds the dead box; the forceNew retry
-      // deletes it, so the second attempt finds nothing and creates.
-      return Promise.resolve(status === 'running' && call <= 2 ? [stopped] : [])
-    })
-    const created = fakeBox({ name: 'box-w1' })
-    createMock.mockResolvedValue(created)
-
-    const box = await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-      replaceUnbringableBox: true,
-      livenessProbe: { sidecarProcessPattern: () => 'nothing-matches' },
-    }), { workspaceId: 'w1', harness: 'opencode' })
-
-    expect(stopped.delete).toHaveBeenCalledOnce()
-    expect(createMock).toHaveBeenCalledOnce()
-    expect(box).toBe(created)
-  })
-
-  it('does not replace a second time — the retry runs with forceNew, so it cannot recurse', async () => {
-    const dead = fakeBox({
-      name: 'box-w1',
-      stop: vi.fn().mockRejectedValue(new Error('driver does not support stop')),
-      resume: vi.fn().mockResolvedValue(undefined),
-    })
-    listMock.mockImplementation(({ status }: { status: string }) =>
-      Promise.resolve(status === 'running' ? [dead] : []),
-    )
-    // The one replacement attempt fails outright. Its error must surface as-is:
-    // swallowing it to try again is how a bounded retry becomes a loop.
-    const createFailure = new Error('no capacity anywhere in the fleet')
-    createMock.mockRejectedValue(createFailure)
-
-    await expect(
-      ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-        replaceUnbringableBox: true,
-        livenessProbe: { sidecarProcessPattern: () => 'nothing-matches' },
-      }), { workspaceId: 'w1', harness: 'opencode' }),
-    ).rejects.toBe(createFailure)
-
-    expect(dead.delete).toHaveBeenCalledOnce()
-    expect(createMock).toHaveBeenCalledOnce()
   })
 
   it('preserves a generic stopped-box resume error instead of creating', async () => {
@@ -2228,6 +1218,27 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, { env, resumeStopped: false })
     await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', userId: 'u9', harness: 'opencode' })
     expect(createMock.mock.calls[0]![0].env.BAD_CUSTOMER_ID).toBe('user:u9')
+  })
+})
+
+describe('terminal-proxy HMAC token', () => {
+  const secret = 'test-secret'
+  const id = { userId: 'u1', workspaceId: 'w1', sandboxId: 's1' }
+  it('round-trips mint -> verify', async () => {
+    const minted = await mintTerminalProxyToken(secret, id)
+    expect(minted.succeeded).toBe(true)
+    if (minted.succeeded) expect(await verifyTerminalProxyToken(secret, minted.value.token, id)).toBe(true)
+  })
+  it('rejects wrong identity, wrong secret, and expired token', async () => {
+    const minted = await mintTerminalProxyToken(secret, id)
+    if (!minted.succeeded) throw minted.error
+    expect(await verifyTerminalProxyToken(secret, minted.value.token, { ...id, sandboxId: 's2' })).toBe(false)
+    expect(await verifyTerminalProxyToken('other', minted.value.token, id)).toBe(false)
+    const expired = await mintTerminalProxyToken(secret, id, -1000)
+    if (expired.succeeded) expect(await verifyTerminalProxyToken(secret, expired.value.token, id)).toBe(false)
+  })
+  it('fails loud when secret absent', async () => {
+    expect((await mintTerminalProxyToken('', id)).succeeded).toBe(false)
   })
 })
 
@@ -3548,121 +2559,26 @@ describe('sandbox tool install helpers', () => {
     })).toThrow(/tool name/)
   })
 
-  it('builds an idempotent bin-dir setup script that leaves PATH alone', () => {
-    const script = buildSandboxToolBinDirScript({ appName: 'gtm-agent' })
+  it('builds an idempotent PATH setup script for shell profiles', () => {
+    const script = buildSandboxToolPathSetupScript({ appName: 'gtm-agent' })
     expect(script).toContain("mkdir -p '/home/agent/tools/gtm-agent/bin'")
-    // `SANDBOX_TOOL_BIN_DIRS` is the one mechanism that puts this dir on a
-    // sandbox PATH. A shell rc edit here cannot replace it: a non-interactive
-    // exec reads no rc file, and the SSH shell environment assigns PATH
-    // absolutely, which discards whatever an rc file appended.
-    expect(script).not.toContain('PATH')
-    expect(script).not.toContain('.profile')
-    expect(script).not.toContain('.bashrc')
-    expect(script).not.toContain('.zshrc')
+    expect(script).toContain("PATH='/home/agent/tools/gtm-agent/bin':$PATH")
+    expect(script).toContain('export PATH=/home/agent/tools/gtm-agent/bin:$PATH')
+    expect(script).toContain('.profile')
+    expect(script).toContain('.bashrc')
+    expect(script).toContain('.zshrc')
   })
 
-  it('runs bin-dir setup through box.exec and preserves setup failures', async () => {
+  it('runs PATH setup through box.exec and preserves setup failures', async () => {
     const okExec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
-    await expect(ensureSandboxToolBinDir(fakeBox({ exec: okExec }), { appName: 'gtm-agent' }))
+    await expect(runSandboxToolPathSetup(fakeBox({ exec: okExec }), { appName: 'gtm-agent' }))
       .resolves.toEqual({ succeeded: true, value: undefined })
     expect(okExec.mock.calls[0]![0]).toContain('/home/agent/tools/gtm-agent/bin')
 
     const failExec = vi.fn().mockResolvedValue({ stdout: '', stderr: 'readonly', exitCode: 1 })
-    const outcome = await ensureSandboxToolBinDir(fakeBox({ exec: failExec }), { appName: 'gtm-agent' })
+    const outcome = await runSandboxToolPathSetup(fakeBox({ exec: failExec }), { appName: 'gtm-agent' })
     expect(outcome.succeeded).toBe(false)
     if (!outcome.succeeded) expect(outcome.error.message).toContain('readonly')
-  })
-
-  it('keeps the pre-rename names as 1:1 aliases for published consumers', async () => {
-    expect(buildSandboxToolPathSetupScript({ appName: 'gtm-agent' }))
-      .toBe(buildSandboxToolBinDirScript({ appName: 'gtm-agent' }))
-
-    const exec = vi.fn().mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 })
-    await expect(runSandboxToolPathSetup(fakeBox({ exec }), { appName: 'gtm-agent' }))
-      .resolves.toEqual({ succeeded: true, value: undefined })
-    expect(exec.mock.calls[0]![0]).toBe(buildSandboxToolBinDirScript({ appName: 'gtm-agent' }))
-  })
-
-  it('advertises the mounted bin dir through SANDBOX_TOOL_BIN_DIRS', () => {
-    // The env entry and the mounts must name the SAME directory. A caller that
-    // hand-writes the literal is the drift this couples away: assert against
-    // the mount path, not against a second copy of the string.
-    const files = buildSandboxToolFileMounts({
-      appName: 'gtm-agent',
-      tools: [{ name: 'gtm', content: '#!/bin/sh\necho hi' }],
-    })
-    const env = buildSandboxToolBinDirsEnv([{ appName: 'gtm-agent' }])
-
-    expect(env).toEqual({ SANDBOX_TOOL_BIN_DIRS: '/home/agent/tools/gtm-agent/bin' })
-    expect(files[0]!.path.startsWith(`${env.SANDBOX_TOOL_BIN_DIRS}/`)).toBe(true)
-  })
-
-  it('joins several apps in order and collapses a repeat', () => {
-    expect(buildSandboxToolBinDirsEnv([
-      { appName: 'gtm-agent' },
-      { appName: 'legal-agent' },
-      { appName: 'gtm-agent' },
-    ])).toEqual({
-      SANDBOX_TOOL_BIN_DIRS: '/home/agent/tools/gtm-agent/bin:/home/agent/tools/legal-agent/bin',
-    })
-  })
-
-  it('emits only segments the sandbox PATH builders accept', () => {
-    // The runtime parses this value and THROWS on a relative or empty segment,
-    // which fails the whole box. Pin the shape here so a producer change can
-    // never ship a value the consumer refuses.
-    const { SANDBOX_TOOL_BIN_DIRS: value } = buildSandboxToolBinDirsEnv([
-      { appName: 'gtm-agent' },
-      { appName: 'legal-agent', baseDir: '/opt/tools/' },
-      { appName: 'tax-agent', binDir: '/srv/tax/bin' },
-    ])
-    const segments = value.split(':')
-
-    expect(segments).toEqual([
-      '/home/agent/tools/gtm-agent/bin',
-      '/opt/tools/legal-agent/bin',
-      '/srv/tax/bin',
-    ])
-    for (const segment of segments) {
-      expect(segment).not.toBe('')
-      expect(segment.startsWith('/')).toBe(true)
-    }
-    expect(new Set(segments).size).toBe(segments.length)
-  })
-
-  it('refuses an empty app list and an unsafe app name rather than a blank PATH entry', () => {
-    expect(() => buildSandboxToolBinDirsEnv([])).toThrow(/at least one app/)
-    expect(() => buildSandboxToolBinDirsEnv([{ appName: '../gtm' }])).toThrow(/appName/)
-    expect(() => buildSandboxToolBinDirsEnv([{ appName: 'gtm-agent', binDir: 'relative/bin' }]))
-      .toThrow(/binDir/)
-  })
-
-  it('refuses a bin dir carrying the separator instead of splitting it across entries', () => {
-    // `:` separates entries in this variable and in PATH. Joining a dir that
-    // contains one splits an absolute path into a path plus a RELATIVE
-    // remainder, which the runtime rejects by failing the whole box — so the
-    // caller sees a complaint about the joined value, not about their dir.
-    // Both option shapes that accept a free-form path can carry one.
-    expect(() => buildSandboxToolBinDirsEnv([{ appName: 'gtm-agent', binDir: '/srv/tool:versions/bin' }]))
-      .toThrow(/\/srv\/tool:versions\/bin.*contains ':'/)
-    expect(() => buildSandboxToolBinDirsEnv([{ appName: 'gtm-agent', baseDir: '/opt/a:b' }]))
-      .toThrow(/contains ':'/)
-
-    // A colon-free dir alongside it still serializes to one clean segment.
-    expect(buildSandboxToolBinDirsEnv([{ appName: 'gtm-agent', binDir: '/srv/tools/bin' }]))
-      .toEqual({ SANDBOX_TOOL_BIN_DIRS: '/srv/tools/bin' })
-  })
-
-  it('collapses a repeated bin dir onto its first position', () => {
-    // The repeat arrives under a different option shape than the original, so
-    // this pins first-wins on the resolved directory rather than on the input.
-    expect(buildSandboxToolBinDirsEnv([
-      { appName: 'gtm-agent' },
-      { appName: 'legal-agent' },
-      { appName: 'gtm-agent', baseDir: '/home/agent/tools' },
-    ])).toEqual({
-      SANDBOX_TOOL_BIN_DIRS: '/home/agent/tools/gtm-agent/bin:/home/agent/tools/legal-agent/bin',
-    })
   })
 })
 
@@ -3738,30 +2654,6 @@ describe('peekWorkspaceSandbox', () => {
       .resolves.toEqual({ status: 'not-running', state: 'stopped', box })
   })
 
-  it('reports a running box as warming while its filesystem incarnation is transitioning', async () => {
-    const box = fakeBox({
-      name: 'app:workspace:w1',
-      status: 'running',
-      filesystemIncarnationReadiness: 'transitioning',
-    })
-    listMock.mockResolvedValue([box])
-
-    await expect(peekWorkspaceSandbox(peekShell(), { workspaceId: 'w1' }))
-      .resolves.toEqual({ status: 'warming', readiness: 'transitioning', box })
-  })
-
-  it('fails loud when a running box has no filesystem-incarnation readiness', async () => {
-    const box = fakeBox({
-      name: 'app:workspace:w1',
-      status: 'running',
-      filesystemIncarnationReadiness: undefined,
-    })
-    listMock.mockResolvedValue([box])
-
-    await expect(peekWorkspaceSandbox(peekShell(), { workspaceId: 'w1' }))
-      .rejects.toThrow(/filesystem incarnation readiness/)
-  })
-
   it('resolves credentials through the same scoped seam as ensure', async () => {
     const credentials = vi.fn().mockResolvedValue({ apiKey: 'k', baseUrl: 'https://s' })
     listMock.mockResolvedValue([])
@@ -3780,485 +2672,5 @@ describe('peekWorkspaceSandbox', () => {
         workspaceId: 'w1',
       }),
     ).rejects.toThrow(/credentials are required/)
-  })
-})
-
-// #302 — resolveModel conflated model identity with credential resolution: a
-// credential miss destroyed an explicit model id (gtm-agent#665), and `??`
-// treated `''` as a present value. resolveModelSelection fixes both via a
-// typed three-state outcome; resolveModel stays a thin wrapper for back-compat.
-describe('resolveModelSelection', () => {
-  it('override with no derivable provider fails no_provider (and the legacy resolveModel wrapper still collapses to undefined — the gtm-agent#665 regression)', () => {
-    const args: [Parameters<typeof resolveModelSelection>[0], Parameters<typeof resolveModelSelection>[1]] = [
-      {},
-      { model: 'user-picked-model' },
-    ]
-    const selection = resolveModelSelection(...args)
-    expect(selection).toEqual({
-      succeeded: false,
-      error: 'no_provider',
-      model: 'user-picked-model',
-      source: 'override',
-    })
-    expect(resolveModel(...args)).toBeUndefined()
-  })
-
-  it('config-sourced no_api_key failure carries the resolved provider', () => {
-    const selection = resolveModelSelection({ providerName: 'openai-compat', modelName: 'm' })
-    expect(selection).toEqual({
-      succeeded: false,
-      error: 'no_api_key',
-      model: 'm',
-      provider: 'openai-compat',
-      source: 'config',
-    })
-  })
-
-  it('a stale provider.defaultModel with no key fails no_api_key with source:default', () => {
-    const selection = resolveModelSelection({ providerName: 'openai-compat', defaultModel: 'd' })
-    expect(selection).toEqual({
-      succeeded: false,
-      error: 'no_api_key',
-      model: 'd',
-      provider: 'openai-compat',
-      source: 'default',
-    })
-  })
-
-  it('nothing derivable resolves to succeeded:true, value:undefined — not an error', () => {
-    expect(resolveModelSelection({})).toEqual({ succeeded: true, value: undefined })
-  })
-
-  it('provider+key with no model name resolves to succeeded:true, value:undefined', () => {
-    expect(resolveModelSelection({ providerName: 'openai-compat', apiKey: 'k' })).toEqual({
-      succeeded: true,
-      value: undefined,
-    })
-  })
-
-  it('keyless success carries a value under allowKeylessModel', () => {
-    expect(
-      resolveModelSelection({ providerName: 'openai-compat', modelName: 'm', allowKeylessModel: true }),
-    ).toEqual({ succeeded: true, value: { model: 'm', provider: 'openai-compat' } })
-  })
-
-  it('keyless without an explicit providerName still fails no_provider (inference cannot fire keyless)', () => {
-    expect(resolveModelSelection({ modelName: 'm', allowKeylessModel: true })).toEqual({
-      succeeded: false,
-      error: 'no_provider',
-      model: 'm',
-      source: 'config',
-    })
-  })
-})
-
-describe('resolveModelSelection empty-string equivalence', () => {
-  // The `??` precedence chain used to treat '' as present, poisoning
-  // derivation. Every listed string field must behave as if omitted when ''.
-  const base: Record<string, unknown> = {
-    routerBaseUrl: 'https://router',
-    apiKey: 'router-key',
-    providerName: 'openai-compat',
-    modelName: 'gpt-x',
-    defaultModel: 'gpt-default',
-    openaiApiKey: 'oa-key',
-  }
-  const overrideBase = { model: 'override-model', modelApiKey: 'override-key' }
-
-  const configFields = [
-    'routerBaseUrl',
-    'apiKey',
-    'providerName',
-    'modelName',
-    'defaultModel',
-    'openaiApiKey',
-  ] as const
-
-  it.each(configFields)('config.%s: "" behaves identically to omitted', (field) => {
-    const withEmpty = { ...base, [field]: '' }
-    const omitted = { ...base }
-    delete omitted[field]
-    expect(resolveModelSelection(withEmpty, overrideBase)).toEqual(
-      resolveModelSelection(omitted, overrideBase),
-    )
-  })
-
-  it('override.model: "" behaves identically to omitted', () => {
-    const withEmpty = { model: '', modelApiKey: 'override-key' }
-    const omitted = { modelApiKey: 'override-key' }
-    expect(resolveModelSelection(base, withEmpty)).toEqual(resolveModelSelection(base, omitted))
-  })
-
-  it('override.modelApiKey: "" behaves identically to omitted', () => {
-    const withEmpty = { model: 'override-model', modelApiKey: '' }
-    const omitted = { model: 'override-model' }
-    expect(resolveModelSelection(base, withEmpty)).toEqual(resolveModelSelection(base, omitted))
-  })
-
-  // Pinned outcomes so the equivalence above isn't vacuous — each row asserts
-  // the ACTUAL derived value, not just "both sides match".
-  it('{apiKey:"", openaiApiKey:"sk", defaultModel:"gpt"} now resolves via the openai fallback (today\'s resolveModel returns undefined)', () => {
-    expect(resolveModelSelection({ apiKey: '', openaiApiKey: 'sk', defaultModel: 'gpt' })).toEqual({
-      succeeded: true,
-      value: { model: 'gpt', provider: 'openai', apiKey: 'sk' },
-    })
-  })
-
-  it('providerName:"" with apiKey+modelName still infers openai-compat from the key', () => {
-    expect(resolveModelSelection({ providerName: '', apiKey: 'k', modelName: 'm' })).toEqual({
-      succeeded: true,
-      value: { model: 'm', provider: 'openai-compat', apiKey: 'k' },
-    })
-  })
-
-  it('override.model:"" falls back to config.modelName', () => {
-    expect(
-      resolveModelSelection(
-        { providerName: 'openai-compat', apiKey: 'k', modelName: 'config-model' },
-        { model: '' },
-      ),
-    ).toEqual({ succeeded: true, value: { model: 'config-model', provider: 'openai-compat', apiKey: 'k' } })
-  })
-
-  it('override.modelApiKey:"" falls back to config.apiKey', () => {
-    expect(
-      resolveModelSelection(
-        { providerName: 'openai-compat', apiKey: 'config-key', modelName: 'm' },
-        { modelApiKey: '' },
-      ),
-    ).toEqual({ succeeded: true, value: { model: 'm', provider: 'openai-compat', apiKey: 'config-key' } })
-  })
-
-  it('trims whitespace around a model name', () => {
-    expect(
-      resolveModelSelection({ providerName: 'openai-compat', apiKey: 'k', modelName: '  m  ' }),
-    ).toEqual({ succeeded: true, value: { model: 'm', provider: 'openai-compat', apiKey: 'k' } })
-  })
-})
-
-describe('requireTransportableModel + SandboxModelResolutionError callers', () => {
-  it('streamSandboxPrompt rejects with SandboxModelResolutionError when an explicit options.model is untransportable, and never calls box.streamPrompt', async () => {
-    const streamPrompt = vi.fn()
-    const box = fakeBox({ streamPrompt })
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' })
-    let caught: unknown
-    try {
-      for await (const _ of streamSandboxPrompt(shell, box, 'go', { model: 'user-picked' })) void _
-    } catch (err) {
-      caught = err
-    }
-    expect(caught).toBeInstanceOf(SandboxModelResolutionError)
-    const err = caught as SandboxModelResolutionError
-    expect(err.code).toBe('no_provider')
-    expect(err.model).toBe('user-picked')
-    expect(err.source).toBe('override')
-    expect(streamPrompt).not.toHaveBeenCalled()
-  })
-
-  it('streamSandboxPrompt with no override and no provider config still streams, backend.model undefined', async () => {
-    async function* events() {
-      yield { type: 'result' }
-    }
-    const box = fakeBox({ streamPrompt: vi.fn().mockReturnValue(events()) })
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' })
-    for await (const _ of streamSandboxPrompt(shell, box, 'go')) void _
-    const [, opts] = (box.streamPrompt as ReturnType<typeof vi.fn>).mock.calls[0]!
-    expect(opts.backend.model).toBeUndefined()
-  })
-
-  it('driveSandboxTurn REJECTS (not a fail() Outcome) when an explicit model is untransportable, and never calls box.driveTurn', async () => {
-    const driveTurn = vi.fn()
-    const box = fakeBox({ driveTurn })
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' })
-    await expect(
-      driveSandboxTurn(shell, box, 'go', { sessionId: 's1', model: 'user-picked' }),
-    ).rejects.toBeInstanceOf(SandboxModelResolutionError)
-    expect(driveTurn).not.toHaveBeenCalled()
-  })
-
-  it('ensureWorkspaceSandbox keyless configured model keeps the pre-#302 create contract (tax-agent): creation succeeds, model not baked, drop is logged', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    try {
-      listMock.mockResolvedValue([])
-      createMock.mockResolvedValue(
-        fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }),
-      )
-      const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-        backendModelAtCreate: true,
-        resumeStopped: false,
-        provider: { providerName: 'openai-compat', modelName: 'm' },
-      })
-      await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
-      expect(createMock).toHaveBeenCalledOnce()
-      expect(createMock.mock.calls[0]![0].backend.model).toBeUndefined()
-      expect(errorSpy).toHaveBeenCalled()
-      const [message] = errorSpy.mock.calls[0]!
-      expect(String(message)).toContain('m')
-      expect(String(message)).toContain('allowKeylessModel')
-    } finally {
-      errorSpy.mockRestore()
-    }
-  })
-
-  it('ensureWorkspaceSandbox + backendModelAtCreate with NO provider config creates normally, backend.model undefined', async () => {
-    listMock.mockResolvedValue([])
-    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-      backendModelAtCreate: true,
-      resumeStopped: false,
-    })
-    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
-    expect(createMock).toHaveBeenCalledOnce()
-    expect(createMock.mock.calls[0]![0].backend.model).toBeUndefined()
-  })
-
-  it('streamSandboxPrompt keyless configured model (tax-agent shape), no options.model: streams normally, backend.model undefined, drop logged', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    try {
-      async function* events() {
-        yield { type: 'result' }
-      }
-      const box = fakeBox({ streamPrompt: vi.fn().mockReturnValue(events()) })
-      const shell = shellFor(
-        { apiKey: 'k', baseUrl: 'https://s' },
-        { provider: { providerName: 'openai-compat', modelName: 'm' } },
-      )
-      for await (const _ of streamSandboxPrompt(shell, box, 'go')) void _
-      const [, opts] = (box.streamPrompt as ReturnType<typeof vi.fn>).mock.calls[0]!
-      expect(opts.backend.model).toBeUndefined()
-      expect(errorSpy).toHaveBeenCalled()
-    } finally {
-      errorSpy.mockRestore()
-    }
-  })
-
-  it('a source:default failure (stale provider.defaultModel, no key) is skipped silently: does not throw, backend.model undefined, logs via console.error', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    try {
-      async function* events() {
-        yield { type: 'result' }
-      }
-      const box = fakeBox({ streamPrompt: vi.fn().mockReturnValue(events()) })
-      const shell = shellFor(
-        { apiKey: 'k', baseUrl: 'https://s' },
-        { provider: { providerName: 'openai-compat', defaultModel: 'd' } },
-      )
-      for await (const _ of streamSandboxPrompt(shell, box, 'go')) void _
-      const [, opts] = (box.streamPrompt as ReturnType<typeof vi.fn>).mock.calls[0]!
-      expect(opts.backend.model).toBeUndefined()
-      expect(errorSpy).toHaveBeenCalled()
-    } finally {
-      errorSpy.mockRestore()
-    }
-  })
-})
-
-/**
- * The spend seam is additive: a caller that does not wire it must see byte-identical
- * behavior, and a caller that does must get a GATE whose throw stops provisioning
- * and an OBSERVER whose throw cannot.
- */
-describe('ensureWorkspaceSandbox — the spend seam', () => {
-  beforeEach(() => {
-    resetClientCache()
-    listMock.mockReset()
-    createMock.mockReset()
-    getMock.mockReset()
-    sandboxCtor.mockReset()
-  })
-
-  it('reports the provisioned box with the lifecycle numbers a ceiling needs', async () => {
-    listMock.mockResolvedValue([])
-    createMock.mockResolvedValue(fakeBox())
-    const onProvisioned = vi.fn()
-
-    await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }), {
-      workspaceId: 'w1',
-      userId: 'u1',
-      harness: 'opencode',
-      spend: { onProvisioned },
-    })
-
-    expect(onProvisioned).toHaveBeenCalledOnce()
-    expect(onProvisioned.mock.calls[0]![0]).toMatchObject({
-      workspaceId: 'w1',
-      userId: 'u1',
-      sandboxId: 'sandbox-1',
-      boxKey: 'box-w1',
-      // The values the box was actually asked to run with — the two bounds the
-      // expectation ceiling is built from. Asserted against the shell defaults
-      // rather than literals, so the seam is pinned to what a box really gets.
-      idleTimeoutSeconds: DEFAULT_SANDBOX_RESOURCES.idleTimeoutSeconds,
-      maxLifetimeSeconds: DEFAULT_SANDBOX_RESOURCES.maxLifetimeSeconds,
-    })
-  })
-
-  it('forwards the shell\'s own resource numbers, not the defaults', async () => {
-    listMock.mockResolvedValue([])
-    createMock.mockResolvedValue(fakeBox())
-    const onProvisioned = vi.fn()
-
-    await ensureWorkspaceSandbox(
-      shellFor(
-        { apiKey: 'k', baseUrl: 'u' },
-        {
-          resources: {
-            image: 'universal',
-            cpuCores: 1,
-            memoryMB: 1024,
-            diskGB: 5,
-            maxLifetimeSeconds: 7200,
-            idleTimeoutSeconds: 600,
-          },
-        },
-      ),
-      { workspaceId: 'w1', harness: 'opencode', spend: { onProvisioned } },
-    )
-
-    expect(onProvisioned.mock.calls[0]![0]).toMatchObject({
-      idleTimeoutSeconds: 600,
-      maxLifetimeSeconds: 7200,
-    })
-  })
-
-  it('reports a REUSED box too — reuse is the platform charging for it again', async () => {
-    const running = fakeBox({ name: 'box-w1', metadata: { harness: 'opencode' } })
-    listMock.mockResolvedValue([running])
-    const onProvisioned = vi.fn()
-    await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }), {
-      workspaceId: 'w1',
-      harness: 'opencode',
-      spend: { onProvisioned },
-    })
-    expect(createMock).not.toHaveBeenCalled()
-    expect(onProvisioned).toHaveBeenCalledOnce()
-  })
-
-  it('refuses to provision when the gate throws, before anything is created', async () => {
-    listMock.mockResolvedValue([])
-    createMock.mockResolvedValue(fakeBox())
-    const onProvisioned = vi.fn()
-
-    await expect(
-      ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }), {
-        workspaceId: 'w1',
-        harness: 'opencode',
-        spend: {
-          beforeProvision: () => {
-            throw new Error('Compute budget exceeded for workspace w1')
-          },
-          onProvisioned,
-        },
-      }),
-    ).rejects.toThrow(/Compute budget exceeded/)
-
-    // Nothing was created, nothing was listed, and nothing was recorded.
-    expect(createMock).not.toHaveBeenCalled()
-    expect(listMock).not.toHaveBeenCalled()
-    expect(onProvisioned).not.toHaveBeenCalled()
-  })
-
-  it('receives the workspace the gate must decide about', async () => {
-    listMock.mockResolvedValue([])
-    createMock.mockResolvedValue(fakeBox())
-    const beforeProvision = vi.fn()
-    await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }), {
-      workspaceId: 'w1',
-      userId: 'u1',
-      harness: 'opencode',
-      spend: { beforeProvision },
-    })
-    expect(beforeProvision).toHaveBeenCalledWith({ workspaceId: 'w1', userId: 'u1' })
-  })
-
-  it('does not fail a provision because the observer failed', async () => {
-    listMock.mockResolvedValue([])
-    const box = fakeBox()
-    createMock.mockResolvedValue(box)
-
-    await expect(
-      ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }), {
-        workspaceId: 'w1',
-        harness: 'opencode',
-        spend: {
-          onProvisioned: () => {
-            throw new Error('the expectation store is down')
-          },
-        },
-      }),
-    ).resolves.toBe(box)
-  })
-
-  it('taps turn activity on the streaming lane, at start and again when it settles', async () => {
-    const onActivity = vi.fn()
-    const box = fakeBox({
-      streamPrompt: vi.fn().mockReturnValue(
-        (async function* () {
-          yield { type: 'message.part.updated' }
-        })(),
-      ),
-    })
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' })
-    for await (const _ of streamSandboxPrompt(shell, box, 'go', { spend: { onActivity } })) void _
-    expect(onActivity).toHaveBeenCalledTimes(2)
-    expect(onActivity.mock.calls[0]![0].sandboxId).toBe('sandbox-1')
-  })
-
-  it('still reports the box as working when the turn throws mid-stream', async () => {
-    const onActivity = vi.fn()
-    const box = fakeBox({
-      streamPrompt: vi.fn().mockReturnValue(
-        (async function* () {
-          yield { type: 'message.part.updated' }
-          throw new Error('upstream died')
-        })(),
-      ),
-    })
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' })
-    await expect(
-      (async () => {
-        for await (const _ of streamSandboxPrompt(shell, box, 'go', { spend: { onActivity } })) void _
-      })(),
-    ).rejects.toThrow(/upstream died/)
-    // A turn that died still burned box time up to the moment it died.
-    expect(onActivity).toHaveBeenCalledTimes(2)
-  })
-
-  it('taps the autonomous lane, where nobody is watching the box burn', async () => {
-    const onActivity = vi.fn()
-    const box = fakeBox({ driveTurn: vi.fn().mockResolvedValue({ state: 'running' }) })
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' })
-    await expect(
-      driveSandboxTurn(shell, box, 'go', { sessionId: 's1', spend: { onActivity } }),
-    ).resolves.toMatchObject({ succeeded: true })
-    expect(onActivity).toHaveBeenCalledOnce()
-  })
-
-  it('does not fail a turn because the activity tap threw', async () => {
-    const box = fakeBox({ driveTurn: vi.fn().mockResolvedValue({ state: 'completed' }) })
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' })
-    await expect(
-      driveSandboxTurn(shell, box, 'go', {
-        sessionId: 's1',
-        spend: {
-          onActivity: () => {
-            throw new Error('the expectation store is down')
-          },
-        },
-      }),
-    ).resolves.toMatchObject({ succeeded: true })
-  })
-
-  it('changes nothing for a caller that does not wire it', async () => {
-    listMock.mockResolvedValue([])
-    const box = fakeBox()
-    createMock.mockResolvedValue(box)
-    await expect(
-      ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }), {
-        workspaceId: 'w1',
-        harness: 'opencode',
-      }),
-    ).resolves.toBe(box)
-    expect(createMock).toHaveBeenCalledOnce()
   })
 })

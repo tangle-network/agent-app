@@ -17,8 +17,8 @@ import {
   useEffect,
   useRef,
 } from "react";
-import { type ToolDetailRenderers } from "../web-react";
-import { AssistantPanel, type AssistantPanelProps } from "./AssistantPanel";
+import type { ToolDetailRenderers } from "../web-react";
+import { AssistantPanel } from "./AssistantPanel";
 import { useAssistantLauncher } from "./launcher";
 import { ResizeHandle } from "./ResizeHandle";
 import type {
@@ -66,11 +66,6 @@ export interface AssistantDockProps {
    *  {@link AssistantPanelProps.renderTranscript}); the dock chrome, composer,
    *  transport, and proposal flow stay owned by the panel. */
   renderTranscript?: (view: AssistantTranscriptView) => ReactNode;
-  /** Opt-in attachment surface for the dock's composer — forwarded to
-   *  {@link AssistantPanelProps.composerAttachments}. */
-  composerAttachments?: AssistantPanelProps["composerAttachments"];
-  /** Forwarded to {@link AssistantPanelProps.onComposerSend}. */
-  onComposerSend?: AssistantPanelProps["onComposerSend"];
 }
 
 /** Visible, focusable descendants of a container, in tab order. Visibility is
@@ -97,8 +92,6 @@ export function AssistantDock({
   toolRenderers,
   renderConfirmedResult,
   renderTranscript,
-  composerAttachments,
-  onComposerSend,
 }: AssistantDockProps) {
   const { open, openAssistant, closeAssistant, seed, clearSeed } =
     useAssistantLauncher();
@@ -116,25 +109,11 @@ export function AssistantDock({
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const wasOpenRef = useRef(false);
 
-  // Close on Escape — except when a popover inside the dialog is open (the
-  // composer's model picker, …): that Escape belongs to the popover's own
-  // close handling (`usePopover`), and closing the whole drawer under it would
-  // drop the user's place in the conversation. A `usePopover` trigger carries
-  // BOTH aria-haspopup and aria-expanded, which distinguishes it from the
-  // transcript's expandable tool-card toggles (aria-expanded only) — those
-  // must not suppress the drawer's own Escape-to-close.
+  // Close on Escape.
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (
-        dialogRef.current?.querySelector(
-          '[aria-haspopup="true"][aria-expanded="true"]',
-        )
-      ) {
-        return;
-      }
-      closeAssistant();
+      if (e.key === "Escape") closeAssistant();
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
@@ -171,7 +150,7 @@ export function AssistantDock({
         type="button"
         onClick={openDialog}
         aria-label="Open assistant"
-        className="fixed right-4 bottom-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[var(--shadow-overlay)] transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring"
+        className="fixed right-4 bottom-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-colors hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-ring"
       >
         <MessageSquare className="h-6 w-6" />
       </button>
@@ -209,7 +188,7 @@ export function AssistantDock({
     <>
       <div
         aria-hidden="true"
-        className="fixed inset-0 z-40 bg-black/50"
+        className="fixed inset-0 z-40 bg-black/40"
         onClick={() => closeAssistant()}
       />
       <div
@@ -220,7 +199,7 @@ export function AssistantDock({
         tabIndex={-1}
         onKeyDown={trapTab}
         style={isDesktop ? { width: `${width}px` } : undefined}
-        className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-card-edge border-l shadow-[var(--shadow-overlay)] focus:outline-none"
+        className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-border border-l shadow-xl focus:outline-none"
       >
         <AssistantPanel
           key={userId ?? "anon"}
@@ -238,8 +217,6 @@ export function AssistantDock({
           renderTranscript={renderTranscript}
           composerSeed={seed}
           onComposerSeedApplied={clearSeed}
-          composerAttachments={composerAttachments}
-          onComposerSend={onComposerSend}
         />
         {isDesktop && (
           <ResizeHandle

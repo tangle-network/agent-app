@@ -70,12 +70,6 @@ export interface ToolResultEventData {
  *  event source for a GitHub trigger), connected via the App install flow. */
 export type ConnectionRequirementKind = "integration" | "github_app";
 
-/** Names one requirement in the same list, by its (provider, kind) identity. */
-export interface ConnectionRequirementRef {
-  provider: string;
-  kind: ConnectionRequirementKind;
-}
-
 /** A connection a proposed workflow references, and whether the user has it
  *  connected right now. Surfaced on an authoring proposal so the card can show
  *  what must be connected — and WHERE — before the workflow can be created. */
@@ -90,17 +84,6 @@ export interface ConnectionRequirement {
    *  there's no link to offer (e.g. a github_app requirement on a deploy with no
    *  app slug); the card then shows the requirement without a connect link. */
   connectUrl?: string | null;
-  /**
-   * Another requirement in the SAME list that must be satisfied before this one
-   * can be, supplied by the server. A GitHub App installation is claimed
-   * through the user's own GitHub OAuth token, so the install is refused while
-   * that connection is missing — the card withholds a connect that could only
-   * end that way, and names the step that comes first instead.
-   *
-   * The server lists a prerequisite BEFORE the requirement naming it. Absent on
-   * proposals predating the field, and on a requirement nothing blocks.
-   */
-  prerequisite?: ConnectionRequirementRef | null;
 }
 
 /**

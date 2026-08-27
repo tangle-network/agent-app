@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildInteractionRequest } from '../test-utils/interaction-request'
 
-import { runDetachedTurn, type AssistantDraftStore } from '../../src/chat-routes/index'
+import { runDetachedTurn } from '../../src/chat-routes/index'
 import { createMemoryTurnEventStore } from '../../src/stream/index'
 
 function partUpdated(part: Record<string, unknown>, delta?: string): Record<string, unknown> {
@@ -34,69 +33,6 @@ describe('runDetachedTurn', () => {
     expect(await store.getStatus('t1')).toBe('complete')
     const buffered = await store.read('t1', 0)
     expect(buffered.length).toBeGreaterThan(0)
-  })
-
-  it('returns and persists requested-versus-served model attribution', async () => {
-    const store = createMemoryTurnEventStore()
-    const rows: Array<Record<string, unknown> & {
-      id: string
-      role: 'user' | 'assistant' | 'system' | 'tool'
-      content: string
-    }> = []
-    const persistStore: AssistantDraftStore = {
-      async listMessages() {
-        return rows
-      },
-      async appendMessage(input) {
-        const row = { ...input, id: input.id ?? 'assistant-row' }
-        rows.push(row)
-        return row
-      },
-      async updateMessage(id, patch) {
-        const row = rows.find((candidate) => candidate.id === id)
-        if (row) Object.assign(row, patch)
-        return row ?? null
-      },
-      async deleteMessage(id) {
-        const index = rows.findIndex((candidate) => candidate.id === id)
-        if (index >= 0) rows.splice(index, 1)
-      },
-    }
-    async function* events(): AsyncGenerator<unknown> {
-      yield {
-        type: 'session.updated',
-        data: {
-          effectiveBackend: {
-            provider: 'openrouter',
-            model: 'anthropic/claude-sonnet-4',
-            source: 'profile',
-          },
-        },
-      }
-      yield partUpdated({ type: 'text', id: 'x1', text: 'Hello' }, 'Hello')
-      yield { type: 'result', data: { finalText: 'Hello' } }
-    }
-
-    const result = await runDetachedTurn({
-      store,
-      turnId: 't-attribution',
-      scopeId: 'thread-1',
-      model: 'openai/gpt-5',
-      events: events(),
-      persist: { store: persistStore, threadId: 'thread-1' },
-    })
-
-    const attribution = {
-      model: 'anthropic/claude-sonnet-4',
-      requestedModel: 'openai/gpt-5',
-      servedModel: 'anthropic/claude-sonnet-4',
-      servedProvider: 'openrouter',
-      servedSource: 'profile',
-    }
-    expect(result).toMatchObject(attribution)
-    expect(rows).toHaveLength(1)
-    expect(rows[0]).toMatchObject(attribution)
-    expect(result.messageId).toBe(rows[0]!.id)
   })
 
   it('surfaces the structured assistantParts projection, not just flat text', async () => {
@@ -140,77 +76,6 @@ describe('runDetachedTurn', () => {
     })
     expect(iterated).toBe(false)
     expect(await store.read('t1', 0)).toHaveLength(0)
-  })
-
-  it('preserves the persisted body and served attribution when a completed turn is reconciled without a producer', async () => {
-    const store = createMemoryTurnEventStore()
-    await store.setStatus('t-cached-attribution', 'complete', 'thread-1')
-    const rows: Array<Record<string, unknown> & {
-      id: string
-      role: 'user' | 'assistant' | 'system' | 'tool'
-      content: string
-    }> = [{
-      id: 'assistant:t-cached-attribution',
-      role: 'assistant',
-      content: 'cached',
-      parts: [
-        {
-          type: 'tool',
-          id: 'call-1',
-          tool: 'workspace_status',
-          state: { status: 'completed', output: { relationships: 0 } },
-        },
-        { type: 'text', text: 'cached' },
-      ],
-      model: 'served-model',
-      requestedModel: 'requested-model',
-      servedModel: 'served-model',
-      servedProvider: 'served-provider',
-      servedSource: 'profile',
-    }]
-    const persistStore: AssistantDraftStore = {
-      async listMessages() {
-        return rows
-      },
-      async appendMessage(input) {
-        const row = { ...input, id: input.id ?? 'assistant-row' }
-        rows.push(row)
-        return row
-      },
-      async updateMessage(id, patch) {
-        const row = rows.find((candidate) => candidate.id === id)
-        if (row) Object.assign(row, patch)
-        return row ?? null
-      },
-    }
-
-    const result = await runDetachedTurn({
-      store,
-      turnId: 't-cached-attribution',
-      scopeId: 'thread-1',
-      model: 'requested-model',
-      events: (async function* () {})(),
-      completedResult: async () => ({
-        text: 'cached',
-      }),
-      persist: { store: persistStore, threadId: 'thread-1' },
-    })
-
-    const attribution = {
-      model: 'served-model',
-      requestedModel: 'requested-model',
-      servedModel: 'served-model',
-      servedProvider: 'served-provider',
-      servedSource: 'profile',
-    }
-    expect(result).toMatchObject({ ...attribution, cached: true })
-    expect(result.parts).toEqual(rows[0]!.parts)
-    expect(rows[0]).toMatchObject(attribution)
-    expect(rows[0]!.parts).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ type: 'tool', id: 'call-1' }),
-      ]),
-    )
   })
 
   it('crash-retry: a running turn that finished server-side returns the completed result, not a re-stream', async () => {
@@ -339,41 +204,6 @@ describe('runDetachedTurn', () => {
     expect(res.parts).toEqual([{ type: 'text', text: 'authoritative body' }])
   })
 
-  it('recovers completed parts when a fast stream carried text and usage but no message parts', async () => {
-    const store = createMemoryTurnEventStore()
-    async function* events(): AsyncGenerator<unknown> {
-      yield { type: 'usage', usage: { promptTokens: 12, completionTokens: 3 } }
-      yield { type: 'result', data: { finalText: '3 relationships' } }
-    }
-
-    const res = await runDetachedTurn({
-      store,
-      turnId: 't-fast',
-      scopeId: 'thread-1',
-      events: events(),
-      completedResult: async () => ({
-        text: '3 relationships',
-        usage: { inputTokens: 12, outputTokens: 3 },
-        parts: [
-          {
-            type: 'tool',
-            id: 'call-1',
-            tool: 'workspace_status',
-            state: { status: 'completed', output: { relationships: 3 } },
-          },
-          { type: 'text', text: '3 relationships' },
-        ],
-      }),
-    })
-
-    expect(res.state).toBe('completed')
-    expect(res.parts).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ type: 'tool', id: 'call-1' }),
-      ]),
-    )
-  })
-
   it('forwards the interaction/decline seams to the producer so unattended asks are declined', async () => {
     const store = createMemoryTurnEventStore()
     const declineInteraction = vi.fn(async (_id: string) => {})
@@ -382,9 +212,7 @@ describe('runDetachedTurn', () => {
       // resolves it so an unattended autonomous run cannot deadlock.
       yield {
         type: 'interaction',
-        data: {
-          request: buildInteractionRequest({ id: 'ask-1', kind: 'shell_permission', title: 'ok?', answerSpec: { fields: [] } }),
-        },
+        data: { request: { id: 'ask-1', kind: 'shell_permission', title: 'ok?', answerSpec: { fields: [] } } },
       }
       yield { type: 'result', data: { finalText: 'done' } }
     }

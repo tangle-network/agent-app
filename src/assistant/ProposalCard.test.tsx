@@ -175,7 +175,7 @@ describe("ProposalCard", () => {
   );
 
   it("shows the provider's brand icon next to a requirement", () => {
-    const { container } = render(
+    render(
       <ProposalCard
         proposal={withReq({
           provider: "github",
@@ -187,104 +187,11 @@ describe("ProposalCard", () => {
         onCancel={noop}
       />,
     );
-    // The shared sandbox-ui ProviderIcon resolves the provider's real mark
-    // (an <img> walking the brand-candidate chain — jsdom never fires its
-    // load/error events, so the first candidate is what renders).
-    expect(
-      container.querySelector('img[src="https://cdn.activepieces.com/pieces/github.png"]'),
-    ).not.toBeNull();
+    // The shared ProviderLogo renders the provider mark as an inline SVG.
+    expect(screen.getByRole("img", { name: "github" })).toBeTruthy();
     // The label + status still render alongside the icon.
     expect(screen.getByText("GitHub App")).toBeTruthy();
     expect(screen.getByText("installed")).toBeTruthy();
-  });
-
-  /** Both GitHub grants unmet, as the server reports them: the connection first,
-   *  then the App install that is claimed through it. Named individually so a
-   *  test can vary one without indexing the pair. */
-  const GITHUB_OAUTH_UNMET: ConnectionRequirement = {
-    provider: "github",
-    kind: "integration",
-    connected: false,
-    connectUrl: "/app/integrations",
-  };
-  const GITHUB_APP_UNMET: ConnectionRequirement = {
-    provider: "github",
-    kind: "github_app",
-    connected: false,
-    connectUrl: "https://github.example/install",
-    prerequisite: { provider: "github", kind: "integration" },
-  };
-  const GITHUB_BOTH_UNMET: ConnectionRequirement[] = [
-    GITHUB_OAUTH_UNMET,
-    GITHUB_APP_UNMET,
-  ];
-
-  it("withholds a connect whose prerequisite is still unmet", () => {
-    // Installing the App is claimed through the GitHub connection, so the setup
-    // callback refuses an install attempted first. Offering it here only sends
-    // the user to GitHub for a claim that cannot succeed.
-    const onConnect = vi.fn(() => Promise.resolve());
-    render(
-      <ProposalCard
-        proposal={proposal({ requirements: GITHUB_BOTH_UNMET })}
-        confirming={false}
-        onConfirm={noop}
-        onCancel={noop}
-        onConnect={onConnect}
-      />,
-    );
-
-    // The connection is offered; the install is not, and says what comes first.
-    expect(screen.getByRole("button", { name: "Connect" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Install" })).toBeNull();
-    expect(screen.getByText("Connect GitHub first")).toBeTruthy();
-    // The App's own status is still stated — withheld, not hidden.
-    expect(screen.getByText("GitHub App")).toBeTruthy();
-    expect(screen.getByText("not installed")).toBeTruthy();
-  });
-
-  it("offers the install as soon as its prerequisite is connected", () => {
-    // The parent flips the prerequisite after an in-place connect; the card
-    // recomputes from the same list, so the install appears without a reload.
-    const requirements: ConnectionRequirement[] = [
-      { ...GITHUB_OAUTH_UNMET, connected: true },
-      GITHUB_APP_UNMET,
-    ];
-    render(
-      <ProposalCard
-        proposal={proposal({ requirements })}
-        confirming={false}
-        onConfirm={noop}
-        onCancel={noop}
-        onConnect={vi.fn(() => Promise.resolve())}
-      />,
-    );
-
-    expect(screen.getByRole("button", { name: "Install" })).toBeTruthy();
-    expect(screen.queryByText("Connect GitHub first")).toBeNull();
-  });
-
-  it("ignores a prerequisite naming a requirement the proposal does not carry", () => {
-    // A satisfied prerequisite is dropped from a filtered list; nothing is left
-    // to wait for, so the requirement stays actionable rather than stranded.
-    render(
-      <ProposalCard
-        proposal={withReq({
-          provider: "github",
-          kind: "github_app",
-          connected: false,
-          connectUrl: "https://github.example/install",
-          prerequisite: { provider: "github", kind: "integration" },
-        })}
-        confirming={false}
-        onConfirm={noop}
-        onCancel={noop}
-        onConnect={vi.fn(() => Promise.resolve())}
-      />,
-    );
-
-    expect(screen.getByRole("button", { name: "Install" })).toBeTruthy();
-    expect(screen.queryByText(/first/)).toBeNull();
   });
 
   it("calls the in-place connect handler instead of navigating when onConnect is set", () => {
@@ -424,7 +331,7 @@ describe("ProposalCard", () => {
   });
 
   it("renders the host-supplied provider icon when renderProviderIcon is wired", () => {
-    const { container } = render(
+    render(
       <ProposalCard
         proposal={withReq({ provider: "slack", connected: false })}
         confirming={false}
@@ -435,14 +342,14 @@ describe("ProposalCard", () => {
         )}
       />,
     );
-    // The host mark shows, and the shared ProviderIcon fallback (an <img>
-    // walking the provider's brand candidates) is not rendered.
+    // The host mark shows, and the built-in ProviderLogo fallback (an <svg
+    // role="img"> labelled with the provider) is not rendered.
     expect(screen.getByTestId("host-icon").textContent).toBe("slack-brand");
-    expect(container.querySelector('img[src*="slack"]')).toBeNull();
+    expect(screen.queryByRole("img", { name: "slack" })).toBeNull();
   });
 
-  it("falls back to the shared ProviderIcon mark when renderProviderIcon is absent or returns nothing", () => {
-    const { container, rerender } = render(
+  it("falls back to the built-in provider mark when renderProviderIcon is absent or returns nothing", () => {
+    const { rerender } = render(
       <ProposalCard
         proposal={withReq({ provider: "slack", connected: false })}
         confirming={false}
@@ -450,11 +357,8 @@ describe("ProposalCard", () => {
         onCancel={noop}
       />,
     );
-    // No handler → the shared ProviderIcon renders (slack's first candidate is
-    // the full-color vector mark).
-    expect(
-      container.querySelector('img[src="https://svgl.app/library/slack.svg"]'),
-    ).not.toBeNull();
+    // No handler → the built-in ProviderLogo renders.
+    expect(screen.getByRole("img", { name: "slack" })).toBeTruthy();
 
     // A handler that returns null for a provider it doesn't recognize also
     // falls back rather than rendering an empty icon slot.
@@ -467,14 +371,12 @@ describe("ProposalCard", () => {
         renderProviderIcon={() => null}
       />,
     );
-    expect(
-      container.querySelector('img[src="https://svgl.app/library/slack.svg"]'),
-    ).not.toBeNull();
+    expect(screen.getByRole("img", { name: "slack" })).toBeTruthy();
   });
 
-  it("falls back to the shared mark (no crash) when renderProviderIcon throws", () => {
+  it("falls back to the built-in mark (no crash) when renderProviderIcon throws", () => {
     // An untrusted host callback that throws for an unrecognized provider must
-    // not take down the row — it degrades to the shared ProviderIcon.
+    // not take down the row — it degrades to the built-in ProviderLogo.
     expect(() =>
       render(
         <ProposalCard
@@ -488,8 +390,6 @@ describe("ProposalCard", () => {
         />,
       ),
     ).not.toThrow();
-    expect(
-      document.querySelector('img[src="https://svgl.app/library/slack.svg"]'),
-    ).not.toBeNull();
+    expect(screen.getByRole("img", { name: "slack" })).toBeTruthy();
   });
 });

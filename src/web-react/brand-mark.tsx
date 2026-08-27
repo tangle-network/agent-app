@@ -1,18 +1,25 @@
 /**
- * Load the canonical Tangle knot only when a web surface renders it.
- * `/brand` imports the optional `@tangle-network/brand` peer, so a failed load
- * renders a fixed-size spacer instead of crashing the chat shell.
+ * Lazy boundary around the Tangle knot from `../brand`.
+ *
+ * `/brand` re-exports the mark from `@tangle-network/sandbox-ui`, an OPT-IN
+ * peer. Static-importing it here would pull that peer into the eagerly-evaluated
+ * `web-react` graph — breaking the dependency-light contract this module relies
+ * on (it must import cleanly in environments, and tests, that haven't installed
+ * the peer). Code-splitting keeps the peer out of the static graph: the knot
+ * streams in only when a branded surface actually renders, and a missing peer
+ * degrades to reserved space rather than crashing the chat shell.
  */
 
 import { lazy, Suspense } from 'react'
 import type { ComponentType } from 'react'
 
-interface BrandMarkProps {
+export interface BrandMarkProps {
   size?: number
   className?: string
 }
 
-/** Preserve the mark's footprint while its optional package loads or is absent. */
+/** Reserve the mark's footprint so its async arrival doesn't shift layout, and
+ *  serve as the graceful fallback when the opt-in peer isn't installed. */
 function MarkSpacer({ size = 24, className }: BrandMarkProps) {
   return <span aria-hidden style={{ display: 'inline-block', width: size, height: size }} className={className} />
 }

@@ -174,18 +174,3 @@ export function catalogIdsForModel(model: ModelInfo): string[] {
   }
   return [...ids]
 }
-
-// Reactive failover for the case validation cannot catch: a model that IS in the
-// catalog but whose upstream is down. Catalog membership is not liveness.
-export {
-  isUpstreamUnavailable,
-  readHttpStatusHint,
-  runWithModelFailover,
-  buildModelChain,
-  ModelFailoverExhaustedError,
-  UPSTREAM_UNAVAILABLE_CODES,
-  UPSTREAM_UNAVAILABLE_STATUSES,
-  type ModelFailoverAttempt,
-  type ModelFailoverResult,
-  type RunWithModelFailoverInput,
-} from './failover'

@@ -81,14 +81,8 @@ export function createZoomPanMath(config: ZoomPanConfig): ZoomPanMath {
         throw new Error(`fitPage: paddingPx must be a non-negative finite number, got ${paddingPx}`)
       }
 
-      // Cap padding at 20% of the limiting viewport dimension. On tiny real
-      // containers (composite mini-editor cells, thumbnail embeds) a fixed
-      // 48px margin eats the canvas — a 135px slot would leave 39px and clamp
-      // the fit at minZoom, rendering the page as a speck. Large viewports are
-      // unaffected (cap ≥ 48 keeps the historical padding byte-identical).
-      const pad = Math.min(paddingPx, Math.min(viewport.width, viewport.height) * 0.2)
-      const availW = viewport.width - pad * 2
-      const availH = viewport.height - pad * 2
+      const availW = viewport.width - paddingPx * 2
+      const availH = viewport.height - paddingPx * 2
       const zoom = Math.min(maxZoom, Math.max(minZoom, Math.min(availW / page.width, availH / page.height)))
 
       // Center the page in the viewport

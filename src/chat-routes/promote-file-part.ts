@@ -10,13 +10,13 @@
  * instead of losing the file silently.
  *
  * Storage-parameterized port of gtm-agent's `promote-file-parts.ts` with the
- * refactor gtm never made: persistence goes through an injected stable writer
- * or ownership-safe adapter, the path strategy is the injected
- * `buildAttachmentPath` (neutral `uploads/agent/<date>/` default, no domain
- * bucket taxonomy baked), the MIME map is an injectable hook, and the date
- * segment reads an injectable clock. The logical `hash8(id ?? url ?? filename)`
- * naming is preserved. Atomic callers also receive a fresh ownership suffix so
- * an ambiguous write cannot overwrite an older object.
+ * refactor gtm never made: persistence goes through the injected
+ * {@link WriteAttachmentFn} (gtm hard-wired its vault writer), the path strategy
+ * is the injected `buildAttachmentPath` (neutral `uploads/agent/<date>/` default,
+ * no domain bucket taxonomy baked), the MIME map is an injectable hook, and the
+ * date segment reads an injectable clock. The idempotent `hash8(id ?? url ??
+ * filename)` naming is preserved so re-promoting the same source part resolves
+ * to the same path.
  */
 
 import {
@@ -25,19 +25,7 @@ import {
   type SandboxExecChannel,
 } from '../sandbox/binary-read'
 import { attachmentKindForMime, type ChatAttachmentKind, type ChatAttachmentPart } from '../chat-store/parts'
-import { redactErrorMessage } from '../redact'
-import {
-  ATTACHMENT_STORAGE_FAILURE_MESSAGE,
-  immutableAttachmentPath,
-  type AtomicAttachmentWriter,
-  type AttachmentWriteOwnership,
-  type AttachmentWriteReceipt,
-  type WriteAttachmentFn,
-} from './attachment-store'
-import {
-  inspectAtomicAttachmentWriteResult,
-  inspectLegacyAttachmentWriteResult,
-} from './attachment-write-safety'
+import type { WriteAttachmentFn } from './attachment-store'
 import { sanitizeAttachmentFileName } from './attachment-validation'
 import { formatBytes } from './wire'
 
@@ -134,7 +122,7 @@ function base64ToBytes(base64: string): Uint8Array {
 }
 
 function parseDataUrl(url: string): { base64: boolean; data: string } | null {
-  const match = /^data:[^,]*,([\s\S]*)$/i.exec(url)
+  const match = /^data:[^,]*,([\s\S]*)$/.exec(url)
   if (!match) return null
   return { base64: /;base64,/i.test(url), data: match[1] ?? '' }
 }
@@ -143,12 +131,12 @@ function parseDataUrl(url: string): { base64: boolean; data: string } | null {
  *  signal when the part itself carries no mediaType/mime field. */
 function dataUrlMime(url: string | undefined): string | undefined {
   if (!url) return undefined
-  const match = /^data:([^;,]+)[;,]/i.exec(url)
+  const match = /^data:([^;,]+)[;,]/.exec(url)
   return match ? match[1] : undefined
 }
 
 function basenameFromUrl(url: string | undefined): string | undefined {
-  if (!url || /^data:/i.test(url)) return undefined
+  if (!url || url.startsWith('data:')) return undefined
   const withoutQuery = url.split(/[?#]/)[0] ?? url
   const segments = withoutQuery.split('/').filter(Boolean)
   return segments[segments.length - 1] || undefined
@@ -158,11 +146,11 @@ function basenameFromUrl(url: string | undefined): string | undefined {
  *  unchanged. The remainder is percent-decoded — sidecar file URLs encode
  *  spaces and other reserved characters. */
 function resolveFileUrlPath(url: string): { succeeded: true; path: string } | { succeeded: false; reason: string } {
-  const withoutScheme = /^file:\/\//i.test(url) ? url.slice('file://'.length) : url
+  const withoutScheme = url.startsWith('file://') ? url.slice('file://'.length) : url
   try {
     return { succeeded: true, path: decodeURIComponent(withoutScheme) }
   } catch (err) {
-    return { succeeded: false, reason: `malformed file path: ${redactErrorMessage(err)}` }
+    return { succeeded: false, reason: `malformed file path: ${err instanceof Error ? err.message : String(err)}` }
   }
 }
 
@@ -181,7 +169,7 @@ function resolveDataUrlBytes(url: string, filename: string, maxBytes: number): B
   try {
     bytes = parsed.base64 ? base64ToBytes(parsed.data) : new TextEncoder().encode(decodeURIComponent(parsed.data))
   } catch (err) {
-    return { succeeded: false, reason: `failed to decode data URI: ${redactErrorMessage(err)}` }
+    return { succeeded: false, reason: `failed to decode data URI: ${err instanceof Error ? err.message : String(err)}` }
   }
   if (bytes.byteLength > maxBytes) {
     return { succeeded: false, reason: oversizeReason(filename, bytes.byteLength, maxBytes) }
@@ -201,7 +189,7 @@ async function resolveSandboxFileBytes(input: {
   // outcome like a nonzero exit code does.
   const stat = await statSandboxFileSize(input.box, input.path, { sessionId: input.sessionId })
   if (!stat.succeeded) {
-    return { succeeded: false, reason: `could not stat agent file: ${redactErrorMessage(stat.error)}` }
+    return { succeeded: false, reason: `could not stat agent file: ${stat.error}` }
   }
   // Rejected before the bytes are ever pulled — a base64 exec of an oversize
   // file would waste a full sandbox round trip only to be discarded.
@@ -211,7 +199,7 @@ async function resolveSandboxFileBytes(input: {
 
   const read = await readSandboxBinaryBytes(input.box, input.path, stat.value, { sessionId: input.sessionId })
   if (!read.succeeded) {
-    return { succeeded: false, reason: `could not read agent file: ${redactErrorMessage(read.error)}` }
+    return { succeeded: false, reason: `could not read agent file: ${read.error}` }
   }
   return { succeeded: true, bytes: read.value.bytes }
 }
@@ -226,13 +214,10 @@ async function resolveBytes(input: {
   const url = input.raw.url
   if (!url) return { succeeded: false, reason: 'the file part carries no url' }
 
-  if (/^data:/i.test(url)) return resolveDataUrlBytes(url, input.filename, input.maxBytes)
+  if (url.startsWith('data:')) return resolveDataUrlBytes(url, input.filename, input.maxBytes)
 
-  const isSandboxPath = /^file:\/\//i.test(url) || url.startsWith('/')
-  if (!isSandboxPath) {
-    const scheme = /^([A-Za-z][A-Za-z0-9+.-]*):/.exec(url)?.[1]?.toLowerCase() ?? 'unknown'
-    return { succeeded: false, reason: `unsupported file URL scheme: ${scheme}` }
-  }
+  const isSandboxPath = url.startsWith('file://') || url.startsWith('/')
+  if (!isSandboxPath) return { succeeded: false, reason: `unsupported file URL scheme: ${url}` }
   if (!input.box) return { succeeded: false, reason: 'no sandbox to read agent file' }
 
   const resolvedPath = resolveFileUrlPath(url)
@@ -266,46 +251,8 @@ function defaultBuildAttachmentPath(args: AttachmentPathArgs): string {
   return `uploads/agent/${args.date}/${base}-${args.hash8}${extension}`
 }
 
-type PromoteFilePartLogger = Pick<Console, 'error'>
-
-function logPromotionStorageError(
-  logger: PromoteFilePartLogger,
-  message: string,
-  fields: Record<string, unknown>,
-): void {
-  try {
-    const safeFields = Object.fromEntries(
-      Object.entries(fields).map(([key, value]) => [
-        key,
-        typeof value === 'string' ? redactErrorMessage(value) : value,
-      ]),
-    )
-    logger.error(message, safeFields)
-  } catch {
-    // Logging must not turn a typed storage failure into a thrown response.
-  }
-}
-
-async function compensatePromotionWrite(
-  writer: AtomicAttachmentWriter,
-  scopeId: string,
-  ownership: AttachmentWriteOwnership,
-  receipt: AttachmentWriteReceipt,
-): Promise<{ rollbackError?: unknown; abortError?: unknown }> {
-  try {
-    await receipt.rollback()
-    return {}
-  } catch (rollbackError) {
-    try {
-      await writer.abort(scopeId, ownership)
-      return { rollbackError }
-    } catch (abortError) {
-      return { rollbackError, abortError }
-    }
-  }
-}
-
-interface PromoteFilePartCommonOptions {
+/** Define options for promoting a part of an agent file within a specific session and scope */
+export interface PromoteAgentFilePartOptions {
   raw: RawAgentFilePart
   /** The turn's box — required only to promote a sandbox-path part; a `data:`
    *  URI needs none. */
@@ -314,6 +261,8 @@ interface PromoteFilePartCommonOptions {
   scopeId: string
   /** The turn's session id, used for the sandbox stat/read exec calls. */
   sessionId: string
+  /** REQUIRED store writer — no default (the product owns its store). */
+  writeAttachment: WriteAttachmentFn
   /** Store-path strategy. Default {@link defaultBuildAttachmentPath}. */
   buildAttachmentPath?: (args: AttachmentPathArgs) => string
   /** Raw-byte ceiling. Default {@link PROMOTE_MAX_FILE_BYTES}. */
@@ -322,59 +271,14 @@ interface PromoteFilePartCommonOptions {
   sniffMime?: (filename: string) => string
   /** Clock for the date path segment. Default `() => new Date()`. */
   now?: () => Date
-  /** Unique id source for tests or a product's id service. */
-  createWriteId?: () => string
-  /** Server-side sink for redacted storage details. */
-  logger?: PromoteFilePartLogger
 }
 
-/** Stable promotion options from the original writer contract. */
-export interface PromoteAgentFilePartOptions extends PromoteFilePartCommonOptions {
-  /** REQUIRED store writer — no default (the product owns its store). */
-  writeAttachment: WriteAttachmentFn
-}
-
-/** Ownership-safe promotion options for new products. */
-export interface AtomicPromoteAgentFilePartOptions extends PromoteFilePartCommonOptions {
-  /** Complete writer + ambiguous-write cleanup adapter. */
-  attachmentWriter: AtomicAttachmentWriter
-}
-
-function isAtomicPromotionOptions(
-  options: PromoteAgentFilePartOptions | AtomicPromoteAgentFilePartOptions,
-): options is AtomicPromoteAgentFilePartOptions {
-  return 'attachmentWriter' in options
-}
-
-/** Promote a part using the stable writer contract. */
-export function promoteAgentFilePart(options: PromoteAgentFilePartOptions): Promise<PromoteFilePartResult>
-
-/** Promote a part using an ownership-safe writer and cleanup adapter. */
-export function promoteAgentFilePart(options: AtomicPromoteAgentFilePartOptions): Promise<PromoteFilePartResult>
-
-/** Promote a part when the caller selects the writer contract at runtime. */
-export function promoteAgentFilePart(
-  options: PromoteAgentFilePartOptions | AtomicPromoteAgentFilePartOptions,
-): Promise<PromoteFilePartResult>
-
-/** Promote a part of an agent file with optional byte limits and MIME type detection. */
-export async function promoteAgentFilePart(
-  options: PromoteAgentFilePartOptions | AtomicPromoteAgentFilePartOptions,
-): Promise<PromoteFilePartResult> {
-  const atomic = isAtomicPromotionOptions(options)
+/** Promote a part of an agent file with optional byte limits and MIME type detection */
+export async function promoteAgentFilePart(options: PromoteAgentFilePartOptions): Promise<PromoteFilePartResult> {
   const maxBytes = options.maxBytes ?? PROMOTE_MAX_FILE_BYTES
   const sniffMime = options.sniffMime ?? sniffMimeFromName
   const buildAttachmentPath = options.buildAttachmentPath ?? defaultBuildAttachmentPath
   const now = options.now ?? (() => new Date())
-  const logger = options.logger ?? console
-  const createWriteId = atomic
-    ? options.createWriteId ?? (() => {
-        if (typeof crypto === 'undefined' || typeof crypto.randomUUID !== 'function') {
-          throw new Error('attachment promotion requires crypto.randomUUID')
-        }
-        return crypto.randomUUID()
-      })
-    : undefined
 
   const filename = sanitizeAttachmentFileName(
     options.raw.filename ?? basenameFromUrl(options.raw.url) ?? 'agent-file',
@@ -389,143 +293,27 @@ export async function promoteAgentFilePart(
   })
   if (!resolved.succeeded) return { succeeded: false, filename, reason: resolved.reason }
 
-  let mediaType: string
-  let kind: ChatAttachmentKind
-  let logicalPath: string
-  try {
-    mediaType = (options.raw.mediaType ?? options.raw.mime ?? dataUrlMime(options.raw.url) ?? sniffMime(filename)).toLowerCase()
-    kind = attachmentKindForMime(mediaType)
-    const digest = await hash8(options.raw.id ?? options.raw.url ?? filename)
-    const date = now().toISOString().split('T')[0] ?? ''
-    logicalPath = buildAttachmentPath({ filename, hash8: digest, date, mediaType, kind })
-  } catch (error) {
-    logPromotionStorageError(logger, '[promote-file-part] path planning failed', {
-      error: redactErrorMessage(error),
-    })
-    return { succeeded: false, filename, reason: ATTACHMENT_STORAGE_FAILURE_MESSAGE }
-  }
-
-  if (!atomic) {
-    let written: unknown
-    try {
-      written = await options.writeAttachment(options.scopeId, logicalPath, resolved.bytes, {
-        mediaType,
-        name: filename,
-        originalName: options.raw.filename ?? filename,
-        size: resolved.bytes.byteLength,
-      })
-    } catch (error) {
-      const reason = redactErrorMessage(error)
-      logPromotionStorageError(logger, '[promote-file-part] legacy writer failed', {
-        path: logicalPath,
-        error: reason,
-      })
-      return { succeeded: false, filename, reason }
-    }
-    const result = inspectLegacyAttachmentWriteResult(written)
-    if (!result) {
-      logPromotionStorageError(logger, '[promote-file-part] legacy writer returned an invalid result', {
-        path: logicalPath,
-      })
-      return { succeeded: false, filename, reason: ATTACHMENT_STORAGE_FAILURE_MESSAGE }
-    }
-    if (!result.ok) {
-      const reason = redactErrorMessage(result.reason)
-      logPromotionStorageError(logger, '[promote-file-part] legacy write rejected', {
-        path: logicalPath,
-        error: reason,
-      })
-      return { succeeded: false, filename, reason }
-    }
-
-    return {
-      succeeded: true,
-      part: {
-        type: kind,
-        path: logicalPath,
-        name: filename,
-        size: resolved.bytes.byteLength,
-        mediaType,
-      },
-    }
-  }
-
-  let ownershipId: string
-  let path: string
-  try {
-    ownershipId = createWriteId!()
-    path = immutableAttachmentPath(logicalPath, ownershipId)
-  } catch (error) {
-    logPromotionStorageError(logger, '[promote-file-part] could not allocate ownership key', {
-      path: logicalPath,
-      error: redactErrorMessage(error),
-    })
-    return { succeeded: false, filename, reason: ATTACHMENT_STORAGE_FAILURE_MESSAGE }
-  }
-  const ownership: AttachmentWriteOwnership = Object.freeze({ id: ownershipId, path })
+  const mediaType = options.raw.mediaType ?? options.raw.mime ?? dataUrlMime(options.raw.url) ?? sniffMime(filename)
+  const kind = attachmentKindForMime(mediaType)
+  const digest = await hash8(options.raw.id ?? options.raw.url ?? filename)
+  const date = now().toISOString().split('T')[0] ?? ''
+  const path = buildAttachmentPath({ filename, hash8: digest, date, mediaType, kind })
 
   // `name` is the sanitized filename already computed above; `originalName`
   // is the pre-sanitization source name (gtm's frontmatter `originalName`) —
   // the one field sanitization would otherwise destroy with no way back.
-  let written: Awaited<ReturnType<AtomicAttachmentWriter['write']>>
+  let written: Awaited<ReturnType<WriteAttachmentFn>>
   try {
-    written = await options.attachmentWriter.write(options.scopeId, path, resolved.bytes, {
+    written = await options.writeAttachment(options.scopeId, path, resolved.bytes, {
       mediaType,
       name: filename,
       originalName: options.raw.filename ?? filename,
       size: resolved.bytes.byteLength,
-      ownership,
     })
   } catch (err) {
-    let abortError: unknown
-    try {
-      await options.attachmentWriter.abort(options.scopeId, ownership)
-    } catch (error) {
-      abortError = error
-    }
-    logPromotionStorageError(logger, '[promote-file-part] write failed', {
-      path,
-      ownershipId: ownership.id,
-      error: redactErrorMessage(err),
-      ...(abortError === undefined ? {} : { abortError: redactErrorMessage(abortError) }),
-    })
-    return { succeeded: false, filename, reason: ATTACHMENT_STORAGE_FAILURE_MESSAGE }
+    return { succeeded: false, filename, reason: err instanceof Error ? err.message : String(err) }
   }
-  const result = inspectAtomicAttachmentWriteResult(written, ownership)
-  if (!result) {
-    let abortError: unknown
-    try {
-      await options.attachmentWriter.abort(options.scopeId, ownership)
-    } catch (error) {
-      abortError = error
-    }
-    logPromotionStorageError(logger, '[promote-file-part] writer returned a mismatched ownership receipt', {
-      path,
-      ownershipId: ownership.id,
-      ...(abortError === undefined ? {} : { abortError: redactErrorMessage(abortError) }),
-    })
-    return { succeeded: false, filename, reason: ATTACHMENT_STORAGE_FAILURE_MESSAGE }
-  }
-  if (!result.ok) {
-    const compensation = await compensatePromotionWrite(
-      options.attachmentWriter,
-      options.scopeId,
-      ownership,
-      result.receipt,
-    )
-    logPromotionStorageError(logger, '[promote-file-part] write rejected', {
-      path,
-      ownershipId: ownership.id,
-      error: redactErrorMessage(result.reason),
-      ...(compensation.rollbackError === undefined
-        ? {}
-        : { rollbackError: redactErrorMessage(compensation.rollbackError) }),
-      ...(compensation.abortError === undefined
-        ? {}
-        : { abortError: redactErrorMessage(compensation.abortError) }),
-    })
-    return { succeeded: false, filename, reason: ATTACHMENT_STORAGE_FAILURE_MESSAGE }
-  }
+  if (!written.ok) return { succeeded: false, filename, reason: written.reason }
 
   return {
     succeeded: true,

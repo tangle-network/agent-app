@@ -25,7 +25,6 @@ import { describe, expect, it } from 'vitest'
 
 import {
   createSandboxChatProducer,
-  normalizeChatPromptForSandbox,
   type ChatTurnRouteProducer,
 } from '@tangle-network/agent-app/chat-routes'
 import type { ChatDatabase } from '@tangle-network/agent-app/chat-store'
@@ -144,28 +143,6 @@ function eventsOf(lines: Array<Record<string, unknown>>): Array<Record<string, u
 // ── the gate ────────────────────────────────────────────────────────────────
 
 describe('e2e: fake sandbox producer → streamed turn → persisted transcript', () => {
-  it('normalizes path-backed generic files for the sandbox prompt API', () => {
-    expect(
-      normalizeChatPromptForSandbox([
-        { type: 'text', text: 'Read this' },
-        {
-          type: 'file',
-          filename: 'lease terms.pdf',
-          mediaType: 'application/pdf',
-          path: '/workspace/uploads/lease terms.pdf',
-        },
-      ]),
-    ).toEqual([
-      { type: 'text', text: 'Read this' },
-      {
-        type: 'file',
-        filename: 'lease terms.pdf',
-        mediaType: 'application/pdf',
-        url: 'file:///workspace/uploads/lease%20terms.pdf',
-      },
-    ])
-  })
-
   it('runs the full multimodal vertical: upload, turn, stream, rows, replay', async () => {
     const { app, cookie, settle } = await createHarness()
 
@@ -234,10 +211,6 @@ describe('e2e: fake sandbox producer → streamed turn → persisted transcript'
     const assistant = messages[1]!
     expect(assistant.content).toBe('Filed the summary.')
     expect(assistant.model).toBe(MODEL)
-    expect(assistant.requestedModel).toBe(MODEL)
-    expect(assistant.servedModel).toBeNull()
-    expect(assistant.servedProvider).toBeNull()
-    expect(assistant.servedSource).toBeNull()
     expect(assistant.inputTokens).toBe(40)
     expect(assistant.outputTokens).toBe(20)
     expect(assistant.reasoningTokens).toBe(5)

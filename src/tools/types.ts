@@ -53,17 +53,6 @@ export interface BuildAppToolsOptions {
   /** Product-registered tools to advertise to the model alongside the four
    *  built-ins (appended in order, after the built-ins). */
   customTools?: readonly import('./registry').AppToolDefinition[]
-  /**
-   * Teach the model the interactive page vocabulary (forms, inputs, sliders)
-   * by appending {@link import('../openui/index').OPENUI_INTERACTIVE_AUTHORING_GUIDE}
-   * to `render_ui`'s description.
-   *
-   * Off by default, and it must stay off until the product's renderer knows the
-   * input nodes AND the host passes an action handler — otherwise the agent
-   * authors forms the page silently drops. A `descriptions.render_ui` override
-   * replaces the default prose; the guide is still appended after it.
-   */
-  interactiveUi?: boolean
 }
 
 /** Define the arguments required to submit a proposal including type, title, description, and approval status */

@@ -10,7 +10,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createElement } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { AgentSessionControls } from '../../src/web-react/agent-session-controls'
-import { effortLevelsFromIds } from '../../src/web-react/controls'
 import type { CatalogModel } from '../../src/runtime/model-catalog'
 
 afterEach(cleanup)
@@ -24,7 +23,7 @@ function setup(overrides: Partial<Parameters<typeof AgentSessionControls>[0]> = 
   const onModelChange = vi.fn()
   const onHarnessChange = vi.fn()
   const onEffortChange = vi.fn()
-  const view = render(
+  render(
     createElement(AgentSessionControls, {
       models: MODELS,
       model: 'anthropic/claude-opus-4-6',
@@ -36,7 +35,7 @@ function setup(overrides: Partial<Parameters<typeof AgentSessionControls>[0]> = 
       ...overrides,
     }),
   )
-  return { onModelChange, onHarnessChange, onEffortChange, unmount: view.unmount }
+  return { onModelChange, onHarnessChange, onEffortChange }
 }
 
 describe('layout', () => {
@@ -83,77 +82,9 @@ describe('harness↔model coherence', () => {
 
 describe('effort visibility', () => {
   it('hides the effort picker when the selected model lacks reasoning support', () => {
-    const reasoning = setup({ effort: 'medium' })
-    // The default vocabulary is Off/Quick/Standard/Extended — assert against a
-    // label the picker actually renders, or the check passes on any tree.
-    expect(screen.getByText('Standard')).toBeTruthy()
-    reasoning.unmount()
-
     const noReason: CatalogModel[] = [{ ...MODELS[0]!, supportsReasoning: false }]
-    setup({ models: noReason, model: noReason[0]!.id, effort: 'medium' })
-    expect(screen.queryByText('Standard')).toBeNull()
-  })
-})
-
-describe('effort levels', () => {
-  // A product whose backend applies only a subset of the levels for the
-  // selected harness/model must be able to say so. Without this the strip
-  // offers every level and the backend silently ignores the ones it does not
-  // apply — a control reporting a choice the system never made.
-  it('offers only the levels the product declares, in both layouts', () => {
-    const levels = [
-      { id: 'low', label: 'Low' },
-      { id: 'high', label: 'High' },
-    ] as const
-
-    setup({ effort: 'low', effortLevels: levels })
-    fireEvent.click(screen.getByText('Low'))
-
-    expect(screen.getByText('High')).toBeTruthy()
-    expect(screen.queryByText('Standard')).toBeNull()
-
-    cleanup()
-
-    setup({ effort: 'low', effortLevels: levels, layout: 'compact' })
-    fireEvent.click(screen.getByTitle(/Model settings/))
-    fireEvent.click(screen.getByText('Low'))
-    expect(screen.queryByText('Standard')).toBeNull()
-  })
-
-  it('falls back to the default vocabulary when the product declares none', () => {
-    setup({ effort: 'medium' })
-    expect(screen.getByText('Standard')).toBeTruthy()
-  })
-
-  // The migration defect, end to end. The shape `effortLevels` replaced — the
-  // removed `ComposerAgentControls`' `reasoning.available` — excluded the `auto`
-  // sentinel because that picker injected it itself. A product mapping its old
-  // list straight across therefore omits `auto` while its sessions still RUN on
-  // auto, and the strip used to answer that with the middle entry: "Thinking:
-  // Extended" on a session doing no such thing. A control must never report a
-  // depth the system is not using — which is the whole reason `effortLevels`
-  // exists, so its own migration path may not reintroduce it.
-  it('reports a running value the declared list omits, never another level', () => {
-    const available = ['low', 'medium', 'high']
-    const levels = effortLevelsFromIds(available)
-
-    setup({ effort: 'auto', effortLevels: levels })
-    expect(screen.getByText('Auto')).toBeTruthy()
-    expect(screen.queryByText('Extended')).toBeNull()
-    expect(screen.queryByText('Standard')).toBeNull()
-
-    cleanup()
-
-    setup({ effort: 'auto', effortLevels: levels, layout: 'compact' })
-    fireEvent.click(screen.getByTitle(/Model settings/))
-    expect(screen.getByText('Auto')).toBeTruthy()
-    expect(screen.queryByText('Extended')).toBeNull()
-  })
-
-  it('still lets the user switch to a declared level from the reconciled value', () => {
-    const { onEffortChange } = setup({ effort: 'auto', effortLevels: effortLevelsFromIds(['low', 'high']) })
-    fireEvent.click(screen.getByText('Auto'))
-    fireEvent.click(screen.getByText('Extended'))
-    expect(onEffortChange).toHaveBeenCalledWith('high')
+    setup({ models: noReason, model: noReason[0]!.id })
+    // "Medium" is the effort pill's default label; absent when effort is hidden
+    expect(screen.queryByText('Medium')).toBeNull()
   })
 })

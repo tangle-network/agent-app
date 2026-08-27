@@ -114,7 +114,6 @@ export const BoldGlyph = glyph(<path d="M6 4h8a4 4 0 0 1 0 8H6zM6 12h9a4 4 0 0 1
 export const ItalicGlyph = glyph(<path d="M11 4h6M7 20h6M14 4 8 20" />)
 
 export const PlusGlyph = glyph(<path d="M12 5v14M5 12h14" />)
-export const MinusGlyph = glyph(<path d="M5 12h14" />)
 export const ChevronDownGlyph = glyph(<path d="m6 9 6 6 6-6" />)
 
 export const RectGlyph = glyph(<rect x="3" y="3" width="18" height="18" rx="2" />)
@@ -135,12 +134,10 @@ export const VideoGlyph = glyph(
   </>,
 )
 
-/** A slot binding point: a socket plate with a keyhole notch — the outlet an
- *  `apply_data` payload plugs into. Reads at h-3 where the old sunburst did not. */
 export const SlotGlyph = glyph(
   <>
-    <path d="M3 4h6.5l2.5 3.5L14.5 4H21v16H3z" />
-    <circle cx="12" cy="14" r="2" />
+    <circle cx="12" cy="12" r="3" />
+    <path d="M12 1v4M12 19v4M4.2 4.2l2.8 2.8M17 17l2.8 2.8M1 12h4M19 12h4M4.2 19.8l2.8-2.8M17 7 19.8 4.2" />
   </>,
 )
 

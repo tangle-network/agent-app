@@ -3,8 +3,6 @@ import { describe, expect, it } from 'vitest'
 import {
   bytesToBase64,
   createUploadRoute,
-  normalizeChatPromptForSandbox,
-  parseChatTurnParts,
   sanitizeUploadFilename,
   type SandboxUploadSink,
   type UploadedChatFile,
@@ -65,15 +63,7 @@ describe('createUploadRoute', () => {
     expect(files[0]).toMatchObject({ inline: false, mediaType: 'application/pdf' })
     expect(files[0]!.part.type).toBe('file')
     expect(files[0]!.part.url).toBeUndefined()
-    expect(files[0]!.part.path).toMatch(/^\/workspace\/uploads\/[0-9a-f-]+-report\.pdf$/)
-    expect(normalizeChatPromptForSandbox(parseChatTurnParts([files[0]!.part]))).toEqual([
-      {
-        type: 'file',
-        filename: 'report.pdf',
-        mediaType: 'application/pdf',
-        url: expect.stringMatching(/^file:\/\/\/workspace\/uploads\/[0-9a-f-]+-report\.pdf$/),
-      },
-    ])
+    expect(files[0]!.part.path).toMatch(/^uploads\/[0-9a-f-]+-report\.pdf$/)
 
     expect(writes).toHaveLength(1)
     expect(writes[0]).toMatchObject({
@@ -130,29 +120,10 @@ describe('createUploadRoute', () => {
   it('honors the per-request uploadDir override from authorize', async () => {
     const { sink, writes } = recordingSink()
     const route = createUploadRoute({
-      authorize: async () => ({ ok: true, sink, uploadDir: '/workspaces/ws-1/uploads' }),
+      authorize: async () => ({ ok: true, sink, uploadDir: 'workspaces/ws-1/uploads' }),
       inlineMaxBytes: 1,
     })
     await route(uploadRequest([{ name: 'a.txt', type: 'text/plain', bytes: new Uint8Array(8) }]))
-    expect(writes[0]!.path.startsWith('/workspaces/ws-1/uploads/')).toBe(true)
+    expect(writes[0]!.path.startsWith('workspaces/ws-1/uploads/')).toBe(true)
   })
-
-  it.each(['uploads', '/workspace/../etc', '/workspace//uploads'])(
-    'rejects unsafe uploadDir %j before writing',
-    async (uploadDir) => {
-      const { sink, writes } = recordingSink()
-      const route = createUploadRoute({
-        authorize: async () => ({ ok: true, sink, uploadDir }),
-        inlineMaxBytes: 1,
-      })
-
-      const res = await route(
-        uploadRequest([{ name: 'a.txt', type: 'text/plain', bytes: new Uint8Array(8) }]),
-      )
-
-      expect(res.status).toBe(500)
-      expect((await res.json()) as unknown).toMatchObject({ code: 'INVALID_UPLOAD_DIRECTORY' })
-      expect(writes).toHaveLength(0)
-    },
-  )
 })

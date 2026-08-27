@@ -4,47 +4,7 @@
 
 Source: `src/eval/index.ts`
 
-21 exports.
-
-### `assertGateDiscriminates`
-
-`function` — `calibrateGate`, but throws instead of reporting.
-
-```ts
-<TInput>(name: string, gate: GateFn<TInput>, cases: readonly CalibrationCase<TInput>[]) => Promise<CalibrationReport>
-```
-
-### `calibrateGate`
-
-`function` — Run a gate against cases whose verdicts are known, and report whether it actually discriminates.
-
-```ts
-<TInput>(gate: GateFn<TInput>, cases: readonly CalibrationCase<TInput>[]) => Promise<CalibrationReport>
-```
-
-### `CalibrationCase`
-
-`interface` — A case whose verdict is known in advance, used to calibrate a gate.
-
-```ts
-interface CalibrationCase
-```
-
-### `CalibrationOutcome`
-
-`interface`
-
-```ts
-interface CalibrationOutcome
-```
-
-### `CalibrationReport`
-
-`interface`
-
-```ts
-interface CalibrationReport
-```
+13 exports.
 
 ### `CompletionRequirement`
 
@@ -64,10 +24,10 @@ interface CompletionVerdict
 
 ### `CorrectnessChecker`
 
-`interface` — Decides whether a produced item's content actually fulfils a requirement.
+`type` — Decides whether a produced item's content actually fulfils a requirement.
 
 ```ts
-interface CorrectnessChecker
+type CorrectnessChecker
 ```
 
 ### `createLlmCorrectnessChecker`
@@ -75,7 +35,7 @@ interface CorrectnessChecker
 `function` — Production `CorrectnessChecker` — one LLM call per matched artifact, deterministic (temperature 0), structured JSON out.
 
 ```ts
-(chat: ChatClient, opts?: LlmCorrectnessCheckerOpts | undefined) => CorrectnessChecker
+(tc: TCloud, opts?: LlmCorrectnessCheckerOpts | undefined) => CorrectnessChecker
 ```
 
 ### `createTokenRecallChecker`
@@ -92,30 +52,6 @@ interface CorrectnessChecker
 
 ```ts
 (events: readonly RuntimeEventLike[]) => ProducedState
-```
-
-### `GateFn`
-
-`type` — A gate under calibration.
-
-```ts
-type GateFn
-```
-
-### `measureWithControl`
-
-`function` — Measure something, but only after proving the instrument can register a non-zero — because an absence is a claim about the measurement first.
-
-```ts
-<TValue>(opts: { readonly measure: () => TValue | Promise<TValue>; readonly control: () => TValue | Promise<TValue>; re…
-```
-
-### `ProbeReport`
-
-`interface`
-
-```ts
-interface ProbeReport
 ```
 
 ### `producedFromToolEvents`

@@ -6,7 +6,6 @@
  */
 
 import type { ZoomMath } from '../contracts'
-import { MinusGlyph, PlusGlyph } from './glyphs'
 
 export interface ZoomControlProps {
   zoomMath: ZoomMath
@@ -26,7 +25,7 @@ function zoomPercent(zoom: number, fitZoom: number | undefined): number {
 }
 
 const ZOOM_STEP_BUTTON =
-  'flex h-7 w-7 items-center justify-center rounded border border-[var(--border-default)] text-sm leading-none text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]'
+  'flex h-7 w-7 items-center justify-center rounded border border-[var(--border-default)] text-sm leading-none text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
 export function ZoomControl({ zoomMath, zoom, onZoomChange, fitZoom }: ZoomControlProps) {
   const sliderMin = zoomMath.zoomToSlider(zoomMath.minZoom)
@@ -48,7 +47,7 @@ export function ZoomControl({ zoomMath, zoom, onZoomChange, fitZoom }: ZoomContr
         onClick={() => setSlider(slider - sliderStep * 10)}
         className={ZOOM_STEP_BUTTON}
       >
-        <MinusGlyph className="h-3.5 w-3.5" />
+        −
       </button>
       <input
         type="range"
@@ -67,13 +66,13 @@ export function ZoomControl({ zoomMath, zoom, onZoomChange, fitZoom }: ZoomContr
         onClick={() => setSlider(slider + sliderStep * 10)}
         className={ZOOM_STEP_BUTTON}
       >
-        <PlusGlyph className="h-3.5 w-3.5" />
+        +
       </button>
       <output
         aria-hidden
         title={fitZoom ? 'Zoom (100% = fits the whole sequence)' : 'Zoom'}
         onClick={fitZoom ? () => onZoomChange(fitZoom) : undefined}
-        className={`w-11 select-none text-right font-mono text-xs tabular-nums text-[var(--text-muted)] ${
+        className={`w-11 select-none text-right font-mono text-[11px] tabular-nums text-[var(--text-muted)] ${
           fitZoom ? 'cursor-pointer hover:text-[var(--text-primary)]' : ''
         }`}
       >

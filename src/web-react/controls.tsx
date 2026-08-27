@@ -10,19 +10,7 @@
  * shared design tokens; the glyphs are inline SVGs, no icon-library dependency.
  */
 
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-  type RefObject,
-} from 'react'
-import { createPortal } from 'react-dom'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ProviderLogo } from './provider-logo'
 import type { CatalogModel } from '../runtime/model-catalog'
 
@@ -36,7 +24,7 @@ export function ChevronDown({ className }: { className?: string }) {
   )
 }
 
-function SearchGlyph({ className }: { className?: string }) {
+export function SearchGlyph({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <circle cx="11" cy="11" r="8" />
@@ -45,37 +33,10 @@ function SearchGlyph({ className }: { className?: string }) {
   )
 }
 
-function SparkleGlyph({ className }: { className?: string }) {
+export function SparkleGlyph({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1M7.7 16.3l-2.1 2.1" />
-    </svg>
-  )
-}
-
-/** lucide `brain` (v1.27) inlined — `/web-react` ships no icon-library
- *  dependency, so the thinking glyph follows the same pattern as the rest of
- *  this set. */
-export function BrainGlyph({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M12 18V5" />
-      <path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4" />
-      <path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5" />
-      <path d="M17.997 5.125a4 4 0 0 1 2.526 5.77" />
-      <path d="M18 18a4 4 0 0 0 2-7.464" />
-      <path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517" />
-      <path d="M6 18a4 4 0 0 1-2-7.464" />
-      <path d="M6.003 5.125a4 4 0 0 0-2.526 5.77" />
-    </svg>
-  )
-}
-
-/** lucide `check` — the selected-row mark in the picker menus. */
-export function CheckGlyph({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M20 6 9 17l-5-5" />
     </svg>
   )
 }
@@ -86,34 +47,15 @@ export function CheckGlyph({ className }: { className?: string }) {
  * trigger so keyboard users aren't dropped at the top of the document. The
  * returned `triggerProps` carry the ARIA contract (`aria-haspopup`/
  * `aria-expanded`); spread them onto the trigger button.
- *
- * `panelRef` belongs to the popover panel and MUST be wired when the panel is
- * rendered through {@link PopoverSurface}: a portaled panel is not inside
- * `containerRef`, so a container-only outside test reads every click on the
- * menu's own rows as an outside click and closes before the row's handler runs.
  */
 export function usePopover(open: boolean, setOpen: (open: boolean) => void) {
   const containerRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
     function onMouseDown(e: MouseEvent) {
-      const target = e.target as Node
-      if (containerRef.current?.contains(target)) return
-      const panel = panelRef.current
-      if (panel?.contains(target)) return
-      // A popover opened FROM this one portals as a SIBLING at body level, so
-      // `contains` cannot see it and a click on its rows would read as outside.
-      // Surfaces stamp their ancestor chain, so descendancy survives the portal.
-      const ownPath = panel?.getAttribute(POPOVER_SURFACE_ATTR)
-      const hitPath =
-        target instanceof Element
-          ? target.closest(`[${POPOVER_SURFACE_ATTR}]`)?.getAttribute(POPOVER_SURFACE_ATTR)
-          : null
-      if (ownPath && hitPath && (hitPath === ownPath || hitPath.startsWith(`${ownPath}${POPOVER_PATH_SEPARATOR}`))) return
-      setOpen(false)
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
     }
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
@@ -132,7 +74,6 @@ export function usePopover(open: boolean, setOpen: (open: boolean) => void) {
   return {
     containerRef,
     triggerRef,
-    panelRef,
     triggerProps: {
       ref: triggerRef,
       'aria-haspopup': true as const,
@@ -141,219 +82,10 @@ export function usePopover(open: boolean, setOpen: (open: boolean) => void) {
   }
 }
 
-// ── PopoverSurface ────────────────────────────────────────────────────────
-
-/** Distance between the trigger and the panel it opens. */
-const POPOVER_GAP = 8
-/** Minimum distance the panel keeps from every viewport edge. */
-const POPOVER_VIEWPORT_MARGIN = 16
-/** Floor for the computed max-height, so a cramped side still shows rows
- *  rather than collapsing to a sliver the user cannot read. */
-const POPOVER_MIN_HEIGHT = 120
-
-/**
- * Marks the portaled panel in the DOM. Products and audits (see
- * `playground/scripts/popover-hit-test.mjs`) select on this rather than on a
- * Tailwind class, which is presentation and free to change.
- *
- * Its VALUE is the surface's ancestor path (`outer/inner`), which is what
- * restores "is this click inside my popover" after the portal flattens two
- * nested panels into two siblings of `<body>`.
- */
-export const POPOVER_SURFACE_ATTR = 'data-agent-app-popover'
-const POPOVER_PATH_SEPARATOR = '/'
-
-/**
- * `PopoverSurface` is now mounted (closed) inside every server-rendered
- * composer, so its hooks run on the server once per composer per request.
- * React 18 logs "useLayoutEffect does nothing on the server" for that; React 19
- * does not (measured silent on react-dom 19.2.8). The peer floor is `react >=18`,
- * so bind the synchronous hook only where there is a DOM and the effect hook
- * elsewhere — placement never runs on the server either way.
- */
-const useBrowserLayoutEffect = typeof document !== 'undefined' ? useLayoutEffect : useEffect
-
-export interface PopoverSurfaceProps {
-  open: boolean
-  /** The trigger the panel anchors to — `usePopover`'s `triggerRef`. */
-  triggerRef: RefObject<HTMLElement | null>
-  /** `usePopover`'s `panelRef`; also what the outside-click test consults. */
-  panelRef: RefObject<HTMLDivElement | null>
-  /** Presentation classes. Placement and elevation are owned here — a caller
-   *  must not pass `absolute`/`fixed`/`top-*`/`bottom-*`/`z-*`. */
-  className?: string
-  role?: string
-  id?: string
-  /** Make the panel at least as wide as its trigger. A portaled panel has no
-   *  `w-full` to inherit — the trigger is no longer its offset parent — so a
-   *  menu that used to stretch to a full-width trigger declares it here. */
-  matchTriggerWidth?: boolean
-  children: ReactNode
-}
-
-/**
- * The floating panel every canonical picker opens.
- *
- * It renders through a PORTAL to `document.body` and anchors itself to the
- * trigger in viewport coordinates, because an in-place `absolute` panel's
- * visibility is decided by markup this package does not own. Measured in
- * production: the shipped chat composer docks these controls inside a
- * horizontally scrolling rail (`overflow-x-auto`), and a scroll container
- * clips every positioned descendant whose containing block sits inside it —
- * so a correct 420x457 menu with correct coordinates painted zero pixels and
- * could not be clicked. An ancestor `transform`/`filter`/`contain` would trap
- * it the same way through the stacking context instead of the clip. Leaving
- * the DOM subtree is the only placement a host cannot re-break.
- *
- * Placement prefers ABOVE the trigger (these controls dock at the bottom of a
- * composer), flips below when there is more room there, clamps horizontally
- * into the viewport, and caps its own height to the space on the chosen side.
- * The panel is `visibility: hidden` for the measure pass so it never paints at
- * the pre-placement origin.
- */
-export function PopoverSurface({
-  open,
-  triggerRef,
-  panelRef,
-  className,
-  role,
-  id,
-  matchTriggerWidth,
-  children,
-}: PopoverSurfaceProps) {
-  const surfaceId = useId()
-  const [style, setStyle] = useState<CSSProperties>(() => ({
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    visibility: 'hidden',
-  }))
-
-  const place = useCallback(() => {
-    const trigger = triggerRef.current
-    const panel = panelRef.current
-    if (!trigger || !panel) return
-    const anchor = trigger.getBoundingClientRect()
-    const viewportWidth = window.innerWidth
-    const viewportHeight = window.innerHeight
-
-    // `scrollHeight` is the panel's CONTENT height, so it does not feed back
-    // on the `maxHeight` this function just applied — reading `offsetHeight`
-    // here would measure the previous pass's clamp and ratchet the panel
-    // smaller on every scroll event.
-    const contentHeight = panel.scrollHeight
-    const panelWidth = panel.offsetWidth
-
-    const roomAbove = anchor.top - POPOVER_GAP - POPOVER_VIEWPORT_MARGIN
-    const roomBelow = viewportHeight - anchor.bottom - POPOVER_GAP - POPOVER_VIEWPORT_MARGIN
-    const above = contentHeight <= roomAbove || roomAbove >= roomBelow
-    const maxHeight = Math.max(POPOVER_MIN_HEIGHT, above ? roomAbove : roomBelow)
-    const height = Math.min(contentHeight, maxHeight)
-
-    const top = above ? Math.max(POPOVER_VIEWPORT_MARGIN, anchor.top - POPOVER_GAP - height) : anchor.bottom + POPOVER_GAP
-    const rightBound = Math.max(POPOVER_VIEWPORT_MARGIN, viewportWidth - panelWidth - POPOVER_VIEWPORT_MARGIN)
-    const left = Math.min(Math.max(POPOVER_VIEWPORT_MARGIN, anchor.left), rightBound)
-
-    setStyle({
-      position: 'fixed',
-      top,
-      left,
-      maxHeight,
-      visibility: 'visible',
-      ...(matchTriggerWidth ? { minWidth: anchor.width } : {}),
-    })
-  }, [matchTriggerWidth, panelRef, triggerRef])
-
-  // Layout effect: placement is resolved before the browser paints, so the
-  // panel is never seen at the origin it mounts at.
-  useBrowserLayoutEffect(() => {
-    if (!open) {
-      setStyle({ position: 'fixed', top: 0, left: 0, visibility: 'hidden' })
-      return
-    }
-    place()
-  }, [open, place])
-
-  useEffect(() => {
-    if (!open) return
-    const onViewportChange = () => place()
-    // `capture` so the rail's OWN scroll re-anchors the panel — a scroll inside
-    // an ancestor does not bubble to window.
-    window.addEventListener('scroll', onViewportChange, true)
-    window.addEventListener('resize', onViewportChange)
-    return () => {
-      window.removeEventListener('scroll', onViewportChange, true)
-      window.removeEventListener('resize', onViewportChange)
-    }
-  }, [open, place])
-
-  if (!open || typeof document === 'undefined') return null
-
-  const ownerPath = triggerRef.current?.closest?.(`[${POPOVER_SURFACE_ATTR}]`)?.getAttribute(POPOVER_SURFACE_ATTR)
-  const path = ownerPath ? `${ownerPath}${POPOVER_PATH_SEPARATOR}${surfaceId}` : surfaceId
-
-  return createPortal(
-    <div
-      ref={panelRef}
-      id={id}
-      role={role}
-      style={style}
-      {...{ [POPOVER_SURFACE_ATTR]: path }}
-      className={`z-[1000] ${className ?? ''}`}
-    >
-      {children}
-    </div>,
-    document.body,
-  )
-}
-
-/**
- * Focus treatment for a row inside a popover panel.
- *
- * The ring itself now comes from the `:focus-visible` floor in tokens.css, so
- * this no longer restates a width or a colour. What it still has to say is
- * WHERE the ring is drawn: a popover option is a full-width row inside a panel
- * that clips its own corners (`overflow-hidden rounded-xl`), and an outward
- * ring on the first or last row is clipped away by that panel. Pulling the
- * offset negative draws the same ring just inside the row instead.
- */
-export const POPOVER_OPTION_FOCUS = 'focus-visible:[outline-offset:-2px]'
-
-/**
- * The one overlay elevation for floating surfaces — picker menus, popovers,
- * drawers, modals. Reads the theme's `--shadow-overlay` token, so every overlay
- * lifts with the same shadow and re-themes from one source. The floating
- * composer uses the quieter `shadow-raised` rung instead.
- *
- * Written as an arbitrary value rather than the preset's `shadow-overlay`
- * utility, because that utility only exists where the preset is part of the
- * Tailwind build. A host that gets its tokens through a precompiled bundle —
- * `@tangle-network/sandbox-ui` ships brand's tokens inlined, with no `@theme`
- * block surviving the compile — receives `--shadow-overlay` as a plain custom
- * property, from which no `shadow-overlay` utility can be generated, and these
- * surfaces render flat. The arbitrary form emits from the class alone and works
- * either way.
- */
-export const OVERLAY_SHADOW = 'shadow-[var(--shadow-overlay)]'
-
-/**
- * Root geometry for a picker — the box that holds the trigger — in one place
- * because every picker in this family has to agree on it.
- *
- * Shrink-wrapping (`inline-flex`) is the default: these controls dock on a
- * composer row where an expanding pill shoves its neighbours around. A STACKED
- * panel wants the opposite — the compact `AgentSessionControls` gear popover
- * lays its controls out in a column, and a shrink-wrapped root there makes a
- * trigger's own `w-full` a no-op, since it fills a box the trigger itself
- * sized. That is what left Agent backend short of the panel edge and Thinking
- * narrower still.
- *
- * The panel is portaled ({@link PopoverSurface}), so widening the root widens
- * the TRIGGER only. A menu that should follow it declares `matchTriggerWidth`.
- */
-export function pickerRootClass(fullWidth: boolean): string {
-  return `relative ${fullWidth ? 'flex w-full' : 'inline-flex'}`
-}
+/** Tailwind utilities applied to every popover option so keyboard focus is
+ *  visible (the prior buttons had no focus ring). */
+export const POPOVER_OPTION_FOCUS =
+  'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card'
 
 /**
  * Guard an async action against double-submit. `run` ignores re-entrant calls
@@ -455,13 +187,13 @@ function ModelRow({
       type="button"
       onClick={onSelect}
       className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
-        selected ? 'bg-primary/10 font-medium' : 'hover:bg-accent'
+        selected ? 'bg-primary/10 font-medium' : 'hover:bg-accent/30'
       }`}
     >
       {renderProviderBadge ? renderProviderBadge(model.provider) : <ProviderLogo provider={model.provider} size={16} />}
       <span className="truncate">{model.name}</span>
       {!model.supportsTools && (
-        <span className="shrink-0 rounded bg-secondary px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+        <span className="shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
           no tools
         </span>
       )}
@@ -477,18 +209,12 @@ function ModelRow({
  * Searchable model picker pill + popover: a featured/recommended section
  * first, then per-provider groups in catalogue order (the server already
  * sorts providers by tier).
- *
- * This is the CANONICAL ecosystem model picker (see "UI chrome ownership
- * (picker canon)" in AGENTS.md). sandbox-ui's `dashboard/ModelPicker` is
- * legacy — deprecated, frozen, removed at sandbox-ui's next major; new code
- * belongs here.
  */
 export function ModelPicker({ value, onChange, models, loading, renderProviderBadge, recommendedLabel = 'Recommended', priorityGroup }: ModelPickerProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
+  const { containerRef, triggerProps } = usePopover(open, setOpen)
   const inputRef = useRef<HTMLInputElement>(null)
-  const panelId = useId()
 
   useEffect(() => {
     if (open) inputRef.current?.focus()
@@ -533,24 +259,18 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
       <button
         type="button"
         {...triggerProps}
-        aria-controls={open ? panelId : undefined}
         onClick={() => setOpen(!open)}
-        className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent"
+        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
       >
         {selected ? (renderProviderBadge ? renderProviderBadge(selected.provider) : <ProviderLogo provider={selected.provider} size={16} />) : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}
         <span className="max-w-[160px] truncate">{selected?.name ?? value}</span>
         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
       </button>
 
-      <PopoverSurface
-        open={open}
-        id={panelId}
-        triggerRef={triggerRef}
-        panelRef={panelRef}
-        className={`flex w-[420px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border border-card-edge bg-popover ${OVERLAY_SHADOW}`}
-      >
-          <div className="shrink-0 border-b border-border px-3 py-2">
-            <div className="flex items-center gap-2 rounded-lg border border-strong bg-background px-3 py-2">
+      {open && (
+        <div className="absolute bottom-full left-0 z-50 mb-2 w-[420px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+          <div className="border-b border-border px-3 py-2">
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
               <SearchGlyph className="h-3.5 w-3.5 text-muted-foreground" />
               <input
                 ref={inputRef}
@@ -558,13 +278,11 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search models..."
-                className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground"
+                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
               />
             </div>
           </div>
-          {/* `min-h-0` is what lets the list absorb the surface's computed
-              max-height on a short viewport instead of overflowing the panel. */}
-          <div className="max-h-[400px] min-h-0 overflow-y-auto p-1 pb-2">
+          <div className="max-h-[400px] overflow-y-auto p-1 pb-2">
             {loading && <div className="px-3 py-4 text-center text-sm text-muted-foreground">Loading models...</div>}
             {!loading && filtered && (
               <>
@@ -576,10 +294,7 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
                 ))}
               </>
             )}
-            {!loading && !filtered && models.length === 0 && (
-              <div className="px-3 py-4 text-center text-sm text-muted-foreground">No models available</div>
-            )}
-            {!loading && !filtered && models.length > 0 && (
+            {!loading && !filtered && (
               <>
                 {priorityGroup && sections.priority.length > 0 && (
                   <>
@@ -608,7 +323,8 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
               </>
             )}
           </div>
-      </PopoverSurface>
+        </div>
+      )}
     </div>
   )
 }
@@ -626,223 +342,52 @@ export interface EffortLevel {
   label: string
 }
 
-/**
- * The engine ids this package NAMES, and the word each one reads as.
- *
- * Deliberately WIDER than {@link DEFAULT_EFFORT_LEVELS}: the default list is
- * what a picker OFFERS when a product declares nothing, while this is the
- * vocabulary — the labels a named id keeps wherever it appears. The two are
- * different questions, and folding them together is what made a real engine
- * rung read as its own id: `xhigh` and `ultracode` are rungs claude-code
- * applies above `high`, so a product declaring them got "Xhigh" while every
- * neighbouring rung had a plain English word. Naming them here is what stops
- * each product inventing its own — the drift `effortLevelsFromIds` exists to
- * prevent. They stay OUT of the offered default because most backends do not
- * apply them, and offering a rung the backend ignores is the defect
- * `effortLevels` was added to close.
- */
-const KNOWN_EFFORT_LABELS = {
-  off: 'Off',
-  low: 'Quick',
-  medium: 'Standard',
-  high: 'Extended',
-  xhigh: 'Extra',
-  ultracode: 'Ultra',
-} as const
-
 export const DEFAULT_EFFORT_LEVELS: readonly EffortLevel[] = [
-  { id: 'off', label: KNOWN_EFFORT_LABELS.off },
-  { id: 'low', label: KNOWN_EFFORT_LABELS.low },
-  { id: 'medium', label: KNOWN_EFFORT_LABELS.medium },
-  { id: 'high', label: KNOWN_EFFORT_LABELS.high },
+  { id: 'off', label: 'Off' },
+  { id: 'low', label: 'Quick' },
+  { id: 'medium', label: 'Standard' },
+  { id: 'high', label: 'Extended' },
 ]
-
-/**
- * The user-facing label for an engine level id: the canonical vocabulary when
- * the id is one this package names, otherwise the id itself made readable
- * (`auto` -> "Auto", `ultra-code` -> "Ultra code"). Never invents a depth word,
- * so an id nobody declared a label for still reads as ITSELF and never as some
- * other level.
- */
-export function effortLevelLabel(id: string): string {
-  const known = (KNOWN_EFFORT_LABELS as Record<string, string | undefined>)[id]
-  if (known) return known
-  const words = id.replace(/[-_]+/g, ' ').trim()
-  return words ? words.charAt(0).toUpperCase() + words.slice(1) : id
-}
-
-/**
- * Build a levels list from the engine ids a backend applies — the shape the
- * removed `ComposerAgentControls` took as `reasoning.available`, so a product
- * migrating that list has one call to make instead of a hand-written label map
- * per product (which is how "Quick" and "Low" drift apart across surfaces).
- */
-export function effortLevelsFromIds(ids: readonly string[]): readonly EffortLevel[] {
-  return ids.map((id) => ({ id, label: effortLevelLabel(id) }))
-}
-
-/**
- * The list {@link EffortPicker} RENDERS for `value` — the declared levels, plus
- * `value` itself when the declaration omits it.
- *
- * A picker cannot honestly resolve a selected value it was not given, and the
- * failure it used to take instead — fall back to the middle entry — renders the
- * session's real depth as a DIFFERENT level's name. That is exactly the defect
- * `levels` was added to prevent: the legacy adapter's `available` list excluded
- * the `auto` sentinel because the old picker injected it, so a product mapping
- * that list straight across ships a session running on `auto` labelled
- * "Extended". Admitting the value is not offering a new choice — it is
- * reporting the state the session is already in, and it disappears from the
- * list as soon as the user picks a declared level.
- *
- * A blank value is not admitted (there is no honest label for it); the picker
- * renders no selection instead.
- */
-export function reconcileEffortLevels(
-  value: string,
-  levels: readonly EffortLevel[] = DEFAULT_EFFORT_LEVELS,
-): readonly EffortLevel[] {
-  if (!value || levels.some((l) => l.id === value)) return levels
-  return [{ id: value, label: effortLevelLabel(value) }, ...levels]
-}
-
-// ── effort strength meter ─────────────────────────────────────────────────
-
-/** Segments the meter draws — fixed geometry so the ladder stays tabular
- *  across levels (and across the trigger and its menu rows). */
-export const EFFORT_METER_SEGMENTS = 4
-
-/** Filled-segment opacity ladder: translucent on the left, heavy on the
- *  right — the ramp carries strength even at a glance, the count carries it
- *  exactly. Unfilled segments sit at a fixed ghost opacity. */
-const EFFORT_METER_FILL_OPACITY = [0.25, 0.5, 0.75, 1] as const
-const EFFORT_METER_GHOST_OPACITY = 0.15
-
-/** Level ids that mean "no reasoning" — the meter renders all-ghost. */
-const OFF_LEVEL_IDS: ReadonlySet<string> = new Set(['off', 'none'])
-
-/**
- * Ids that name a POLICY rather than a depth: `auto` means "let the harness and
- * model decide", so it has no position on a strength ladder.
- *
- * Without this it lands wherever the declaration puts it and draws a filled
- * meter — measured on a product that offers `auto` first: every harness read
- * `Auto` at a FULL four bars, including `cli-base`, which has no agent to think
- * at all. A meter is a claim about how hard the run will think, and a sentinel
- * cannot make that claim.
- */
-const UNPLACEABLE_LEVEL_IDS: ReadonlySet<string> = new Set(['auto'])
-
-/**
- * Filled-segment count for a level: 0 for off/none (or an id the levels list
- * does not carry); otherwise the level's position among the non-off choices
- * scaled onto the meter, so the ladder reads low < medium < high and the top
- * level fills the whole scale. The canonical four levels land 0 / 1 / 2 / 4.
- */
-export function effortMeterFill(
-  levelId: string,
-  levels: readonly EffortLevel[] = DEFAULT_EFFORT_LEVELS,
-): number {
-  if (OFF_LEVEL_IDS.has(levelId) || UNPLACEABLE_LEVEL_IDS.has(levelId)) return 0
-  const active = levels.filter((l) => !OFF_LEVEL_IDS.has(l.id) && !UNPLACEABLE_LEVEL_IDS.has(l.id))
-  const index = active.findIndex((l) => l.id === levelId)
-  if (index < 0 || active.length === 0) return 0
-  return Math.max(1, Math.floor(((index + 1) * EFFORT_METER_SEGMENTS) / active.length))
-}
-
-/**
- * The thinking-strength meter: four 12px bars, filled count = level, filled
- * opacity ramping 25→100% left to right (unfilled at a faint ghost). Purely
- * decorative — the level name is always rendered as text beside it, so the
- * meter is `aria-hidden` and adds no second accessible name.
- */
-export function EffortMeter({ fill, className }: { fill: number; className?: string }) {
-  return (
-    <span aria-hidden className={`inline-flex items-center gap-[2px] ${className ?? ''}`}>
-      {Array.from({ length: EFFORT_METER_SEGMENTS }, (_, i) => (
-        <span
-          key={i}
-          className="h-3 w-[3px] rounded-full bg-current"
-          style={{ opacity: i < fill ? EFFORT_METER_FILL_OPACITY[i] : EFFORT_METER_GHOST_OPACITY }}
-        />
-      ))}
-    </span>
-  )
-}
 
 export interface EffortPickerProps {
   value: string
   onChange: (id: string) => void
   /** Selectable levels (engine id + user-facing label). Defaults to the plain
    *  "Thinking" vocabulary; override to relabel without changing the ids the
-   *  runtime receives.
-   *
-   *  A list that omits the current `value` is not a rendering error the picker
-   *  papers over: `value` is reconciled INTO the rendered list under its own
-   *  name (see {@link reconcileEffortLevels}), because a control must report
-   *  the depth the session is running at and never some other list entry. */
+   *  runtime receives. */
   levels?: readonly EffortLevel[]
   /** Prefix shown before the active level on the pill — the "what is this"
    *  context the bare value lacked. Default "Thinking". Pass '' to hide it. */
   label?: string
-  /** Fill the container instead of shrink-wrapping — opt-in, default `false`;
-   *  see {@link pickerRootClass} for when and why. */
-  fullWidth?: boolean
 }
 
 /** Thinking-budget selector pill, styled to match {@link ModelPicker}. Show
  *  it only when the selected model `supportsReasoning`. "Thinking" is the
- *  plain-English name for what was internally called "effort".
- *
- *  The CANONICAL ecosystem effort picker — sandbox-ui's reasoning menu (inside
- *  its `chat/AgentSessionControls`) is legacy and frozen. */
-export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, label = 'Thinking', fullWidth = false }: EffortPickerProps) {
+ *  plain-English name for what was internally called "effort". */
+export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, label = 'Thinking' }: EffortPickerProps) {
   const [open, setOpen] = useState(false)
-  const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
-  const panelId = useId()
-  const rendered = reconcileEffortLevels(value, levels)
-  // The strength ladder is computed over the DECLARED levels only, so admitting
-  // the selected value cannot shift where the declared ones sit on the meter.
-  // A level the declaration does not carry has no position on that ladder, so
-  // it renders with NO meter — an all-ghost meter is what `off` looks like, and
-  // "we cannot place this" is not "no thinking".
-  const isDeclared = (id: string) => levels.some((l) => l.id === id) && !UNPLACEABLE_LEVEL_IDS.has(id)
-  const selected = rendered.find((l) => l.id === value)
+  const { containerRef, triggerProps } = usePopover(open, setOpen)
+  const selected = levels.find((l) => l.id === value) ?? levels[2] ?? levels[0]
 
   return (
-    <div ref={containerRef} className={pickerRootClass(fullWidth)}>
+    <div ref={containerRef} className="relative inline-flex">
       <button
         type="button"
         {...triggerProps}
-        aria-controls={open ? panelId : undefined}
         onClick={() => setOpen(!open)}
         title={label ? `${label} — how hard the agent reasons before answering` : 'Reasoning effort'}
-        className={`inline-flex min-h-[36px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent ${fullWidth ? 'w-full' : ''}`}
+        className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
       >
-        <BrainGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        {/* Full width gives the label the slack, so the meter and chevron park
-            on the trailing edge and the glyph stays against the text. */}
-        <span className={fullWidth ? 'flex-1 truncate text-left' : undefined}>
+        <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />
+        <span>
           {label ? <span className="text-muted-foreground">{label}: </span> : null}
-          {selected ? selected.label : '—'}
+          {selected?.label}
         </span>
-        {selected && isDeclared(selected.id) && (
-          <EffortMeter fill={effortMeterFill(selected.id, levels)} className="shrink-0 text-foreground" />
-        )}
-        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
       </button>
-      <PopoverSurface
-        open={open}
-        id={panelId}
-        role="menu"
-        triggerRef={triggerRef}
-        panelRef={panelRef}
-        // A portaled panel has no `w-full` to inherit, so a full-width trigger
-        // hands its measured width to the panel instead.
-        matchTriggerWidth={fullWidth}
-        className={`w-44 overflow-y-auto rounded-xl border border-card-edge bg-popover p-1 ${OVERLAY_SHADOW}`}
-      >
-          {rendered.map((l) => (
+      {open && (
+        <div role="menu" className="absolute bottom-full left-0 z-50 mb-2 w-40 overflow-hidden rounded-xl border border-border bg-card p-1 shadow-lg">
+          {levels.map((l) => (
             <button
               key={l.id}
               type="button"
@@ -852,21 +397,15 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
                 onChange(l.id)
                 setOpen(false)
               }}
-              className={`flex min-h-[40px] w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
-                l.id === value ? 'bg-primary/10 font-medium' : 'hover:bg-accent'
+              className={`flex min-h-[40px] w-full items-center rounded-md px-3 py-2 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
+                l.id === value ? 'bg-primary/10 font-medium' : 'hover:bg-accent/30'
               }`}
             >
-              <BrainGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <span className="truncate">{l.label}</span>
-              {isDeclared(l.id) && (
-                <EffortMeter fill={effortMeterFill(l.id, levels)} className="ml-auto text-foreground" />
-              )}
-              {l.id === value && (
-                <CheckGlyph className={`${isDeclared(l.id) ? '' : 'ml-auto '}h-3.5 w-3.5 shrink-0 text-primary`} />
-              )}
+              {l.label}
             </button>
           ))}
-      </PopoverSurface>
+        </div>
+      )}
     </div>
   )
 }

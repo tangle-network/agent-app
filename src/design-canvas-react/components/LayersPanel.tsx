@@ -76,14 +76,11 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
 
   return (
     <div className="flex h-full flex-col overflow-hidden text-[var(--text-primary)]">
-      <div className="shrink-0 border-b border-[var(--border-default)] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">
+      <div className="shrink-0 border-b border-[var(--border-default)] px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
         Layers
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {visible.length === 0 ? (
-          <div className="px-3 py-2 text-xs text-[var(--text-muted)]">No layers yet</div>
-        ) : null}
         {visible.map((row) => {
           const { element } = row
           const isSelected = selectedElementIds.includes(element.id)
@@ -122,8 +119,8 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
                 setDragOverIndex(null)
               }}
               className={[
-                'group flex items-center gap-1.5 py-1 pr-2 text-sm transition-colors',
-                isSelected ? 'bg-[color-mix(in_srgb,var(--brand-primary)_15%,transparent)] text-[var(--text-primary)]' : 'hover:bg-[hsl(var(--accent))] text-[var(--text-secondary)]',
+                'group flex items-center gap-1.5 py-1 pr-2 text-[13px] transition-colors',
+                isSelected ? 'bg-[var(--brand-primary)]/15 text-[var(--text-primary)]' : 'hover:bg-[var(--border-default)]/40 text-[var(--text-secondary)]',
                 dragOverIndex === row.ownerIndex ? 'border-t border-[var(--brand-primary)]' : '',
               ].join(' ')}
               style={{ paddingLeft: 8 + row.depth * INDENT_PX }}
@@ -139,7 +136,7 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
                     if (event.key === 'Escape') setRenamingId(null)
                     event.stopPropagation()
                   }}
-                  className="min-w-0 flex-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0 text-sm text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
+                  className="min-w-0 flex-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
                 />
               ) : (
                 // Selection is a real button (sibling of the eye/lock buttons) so
@@ -152,14 +149,10 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
                     if (canWrite) startRename(element)
                   }}
                   title={element.name}
-                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 bg-transparent text-left"
+                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 bg-transparent text-left focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
                 >
                   <KindIcon kind={element.kind} className="h-3.5 w-3.5 shrink-0 opacity-60" />
-                  {element.slot ? (
-                    <span title={`Bound to slot: ${element.slot}`} className="inline-flex shrink-0">
-                      <SlotGlyph className="h-3 w-3 text-[var(--brand-primary)]" />
-                    </span>
-                  ) : null}
+                  {element.slot ? <SlotGlyph className="h-3 w-3 shrink-0 text-[var(--brand-primary)]" /> : null}
                   <span className="min-w-0 flex-1 truncate">{element.name}</span>
                 </button>
               )}
@@ -175,7 +168,7 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
                 }}
                 disabled={!canWrite}
                 className={[
-                  'shrink-0 rounded p-0.5 transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100',
+                  'shrink-0 rounded p-0.5 transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]',
                   element.visible ? 'opacity-0' : 'opacity-100',
                 ].join(' ')}
               >
@@ -195,7 +188,7 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
                 }}
                 disabled={!canWrite}
                 className={[
-                  'shrink-0 rounded p-0.5 transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100',
+                  'shrink-0 rounded p-0.5 transition-opacity group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]',
                   element.locked ? 'opacity-100' : 'opacity-0',
                 ].join(' ')}
               >
@@ -208,7 +201,7 @@ export function LayersPanel({ page, selectedElementIds, canWrite, onSetAttrs, on
         })}
 
         {rows.length > LAYERS_PANEL_ROW_LIMIT ? (
-          <div className="px-3 py-2 text-xs text-[var(--text-muted)]">
+          <div className="px-3 py-2 text-[11px] text-[var(--text-muted)]">
             +{rows.length - LAYERS_PANEL_ROW_LIMIT} more elements — select a group to scope the list
           </div>
         ) : null}

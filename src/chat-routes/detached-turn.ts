@@ -24,7 +24,6 @@
  */
 
 import { toChatMessageParts } from '../chat-store/parts'
-import type { ModelFailoverAttempt } from '../model-resolution/failover'
 import {
   coalesceDeltas,
   createBufferedTurnTap,
@@ -37,7 +36,6 @@ import {
   type AssistantDraftStore,
   type AssistantDraftWriter,
   type AssistantRowValues,
-  type DraftStoredMessage,
   type DraftPersistenceTuning,
 } from './draft-persistence'
 import {
@@ -57,10 +55,9 @@ export type DetachedTurnParts = Array<Record<string, unknown>>
 export interface DetachedTurnFinal {
   text?: string
   usage?: ChatTurnUsage
-  /** The structured parts to persist when this receipt is more complete than
-   *  the live stream (cached, finished server-side, or a fast stream that
-   *  delivered scalar text before its message-part events). Omitted when the
-   *  record only carries a usage receipt. */
+  /** The structured parts to persist when this receipt IS the result (the
+   *  cached / finished-server-side path). Omitted when the record only carries
+   *  a usage receipt. */
   parts?: DetachedTurnParts
 }
 
@@ -74,36 +71,9 @@ export interface DetachedTurnOptions {
   scopeId: string
   /** The raw sandbox event stream for this turn (e.g. `streamSandboxPrompt`).
    *  Ownership of the box, prompt, tooling, and attachments stays with the
-   *  caller — this only projects the stream.
-   *
-   *  An already-open stream is bound to one model and cannot fail over. Prefer
-   *  {@link openEvents}; exactly one of the two is required. */
-  events?: AsyncIterable<unknown>
-  /** Open the raw sandbox stream FOR A GIVEN MODEL — the failover-capable form
-   *  of {@link events}. Wiring it turns failover on with no further flag
-   *  whenever {@link fallbackModels} is non-empty. Requires {@link model}.
-   *
-   *  An autonomous run is the case that most needs this: nobody is watching to
-   *  notice a dead upstream and retry by hand, so without failover the mission
-   *  step or queue job simply fails. Forwarded to the producer. */
-  openEvents?: SandboxChatProducerOptions['openEvents']
-  /** Models to try, in order, when `model`'s upstream is dead. Product config —
-   *  see the producer's note on why a same-family fallback is not automatically
-   *  safe and why every fallback is surfaced. */
-  fallbackModels?: SandboxChatProducerOptions['fallbackModels']
-  /** Opt out of failover while still using {@link openEvents}. */
-  modelFailover?: false
-  /** Maximum time to open/start one model event source through its first event.
-   *  Forwarded to the producer; default 120 seconds. */
-  openTimeoutMs?: SandboxChatProducerOptions['openTimeoutMs']
-  /** Hard deadline after the source's first lifecycle event for the first
-   *  answer-bearing event. Forwarded to the producer; default 60 seconds. */
-  firstResponseTimeoutMs?: SandboxChatProducerOptions['firstResponseTimeoutMs']
-  /** Fired when a model is abandoned mid-chain (telemetry/alerting). */
-  onModelFallback?: SandboxChatProducerOptions['onModelFallback']
-  /** The PREFERRED model. Recorded on the persisted assistant message + usage
-   *  receipt — unless failover moved the turn, in which case the model that
-   *  actually served is recorded instead and surfaced on the result. */
+   *  caller — this only projects the stream. */
+  events: AsyncIterable<unknown>
+  /** Recorded on the persisted assistant message + usage receipt. */
   model?: string
   /** Per-flush buffer coalescer. Default `coalesceDeltas`. */
   coalesce?: (events: unknown[]) => unknown[]
@@ -121,10 +91,8 @@ export interface DetachedTurnOptions {
   /** Authoritative final receipt, consulted whenever a re-invoke finds a prior
    *  buffer: (a) an already-`complete` turn returns it as the cached result,
    *  (b) a `running` turn (crash mid-run) uses it to detect a run that finished
-   *  server-side, and (c) a clean run whose stream carried no usage or only
-   *  scalar text falls back to it. For Sandbox runs, use
-   *  `readCompletedSandboxTurn` so the exact completed session message
-   *  restores tool/file parts as well as text. */
+   *  server-side, and (c) a clean run whose stream carried no usage/text falls
+   *  back to it. Typically `() => box.findCompletedTurn(turnId)`. */
   completedResult?: () => Promise<DetachedTurnFinal | null | undefined>
   /** Clear the prior partial buffer for `turnId` before a genuine re-stream.
    *  A crash mid-run leaves buffered rows at seqs 1..N with status `running`;
@@ -185,23 +153,6 @@ export interface DetachedTurnResult {
    *  `null` when the turn produced nothing and the row was retracted. Absent
    *  when the caller owns persistence (today's behavior). */
   messageId?: string | null
-  /** The model that SERVED the turn — the fallback's id when failover moved it.
-   *  A caller that bills or scores per model must read this, not the model it
-   *  requested. */
-  model?: string
-  /** The caller's explicit model request, before shell failover. */
-  requestedModel?: string
-  /** The effective model echoed by the downstream sandbox. */
-  servedModel?: string
-  /** The effective provider echoed by the downstream sandbox. */
-  servedProvider?: string
-  /** How the downstream sandbox selected the effective model. */
-  servedSource?: 'request' | 'environment' | 'profile'
-  /** True when the preferred model did not serve. Makes an autonomous
-   *  downgrade — which no human watched happen — attributable after the fact. */
-  usedModelFallback?: boolean
-  /** Every model tried, in order, with the reason each was abandoned. */
-  modelAttempts?: ModelFailoverAttempt[]
 }
 
 /** Terminal failure event types a producer may forward verbatim. */
@@ -217,17 +168,11 @@ function hasUsage(usage: ChatTurnUsage): boolean {
   return typeof usage.inputTokens === 'number' && usage.inputTokens > 0
 }
 
-function cachedResultFrom(
-  final: DetachedTurnFinal | null,
-  persisted?: DraftStoredMessage,
-): DetachedTurnResult {
+function cachedResultFrom(final: DetachedTurnFinal | null): DetachedTurnResult {
   return {
     state: 'completed',
-    text: final?.text ?? persisted?.content ?? '',
-    parts:
-      final?.parts ??
-      (persisted?.parts as DetachedTurnParts | null | undefined) ??
-      [],
+    text: final?.text ?? '',
+    parts: final?.parts ?? [],
     usage: final?.usage ?? {},
     cached: true,
   }
@@ -253,21 +198,6 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
   // accumulators; assigned once the idempotency branches decide to re-stream.
   let producer: ReturnType<typeof createSandboxChatProducer> | undefined
 
-  /** The model that actually served. Read LAZILY (never captured up front): on
-   *  a cached/finished-server-side path no producer exists and the preferred
-   *  model is the best available answer, but on a live re-stream failover may
-   *  have moved the turn after the row was first drafted. */
-  const servingModel = (): string | undefined => producer?.model ?? opts.model
-
-  const persistedRow = async (): Promise<DraftStoredMessage | undefined> => {
-    if (!opts.persist) return undefined
-    return (await opts.persist.store.listMessages(opts.persist.threadId)).find(
-      (message) =>
-        message.id ===
-        (opts.persist?.messageId ?? assistantRowIdForTurn(turnId)),
-    )
-  }
-
   // Durable row ownership (opt-in). Built before the idempotency branches so a
   // cached/finished-server-side re-invoke still converges the row instead of
   // leaving whatever partial state a crashed attempt wrote.
@@ -289,7 +219,7 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
             content: producer.finalText?.() ?? '',
             ...(producer.draftParts ? { parts: producer.draftParts() } : {}),
             ...(producer.usage ? { usage: producer.usage() } : {}),
-            ...(servingModel() ? { model: servingModel() } : {}),
+            ...(opts.model ? { model: opts.model } : {}),
           }
         : null),
       ...(transformText ? { transformText } : {}),
@@ -299,37 +229,7 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
 
   /** Settle the durable row with authoritative values (or retract it when the
    *  turn produced nothing), and stamp the id onto the result. */
-  const settleRow = async (
-    base: DetachedTurnResult,
-    cachedPersisted?: DraftStoredMessage,
-  ): Promise<DetachedTurnResult> => {
-    // A cached/reconciled return has no producer to replay the sidecar echo.
-    // Preserve the attribution already written by the prior attempt instead
-    // of replacing its served `model` with today's requested-model fallback.
-    const persisted =
-      cachedPersisted ?? (!producer ? await persistedRow() : undefined)
-    const info = producer?.modelFailover?.()
-    const attribution = producer?.modelAttribution?.()
-    const model = producer?.model ?? persisted?.model ?? opts.model
-    const requestedModel = attribution?.requestedModel ?? persisted?.requestedModel ?? opts.model
-    const servedModel = attribution?.servedModel ?? persisted?.servedModel
-    const servedProvider = attribution?.servedProvider ?? persisted?.servedProvider
-    const servedSource = attribution?.servedSource ?? (
-      persisted?.servedSource === 'request' ||
-      persisted?.servedSource === 'environment' ||
-      persisted?.servedSource === 'profile'
-        ? persisted.servedSource
-        : undefined
-    )
-    const result: DetachedTurnResult = {
-      ...base,
-      ...(model ? { model } : {}),
-      ...(requestedModel ? { requestedModel } : {}),
-      ...(servedModel ? { servedModel } : {}),
-      ...(servedProvider ? { servedProvider } : {}),
-      ...(servedSource ? { servedSource } : {}),
-      ...(info ? { usedModelFallback: info.usedFallback, modelAttempts: info.attempts } : {}),
-    }
+  const settleRow = async (result: DetachedTurnResult): Promise<DetachedTurnResult> => {
     if (!draft) return result
     const transform = opts.persist?.transformText
     const content = transform ? await transform(result.text) : result.text
@@ -350,11 +250,7 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
     const values: AssistantRowValues = {
       content,
       ...(parts.length > 0 ? { parts } : {}),
-      ...(result.model ? { model: result.model } : {}),
-      ...(result.requestedModel ? { requestedModel: result.requestedModel } : {}),
-      ...(result.servedModel ? { servedModel: result.servedModel } : {}),
-      ...(result.servedProvider ? { servedProvider: result.servedProvider } : {}),
-      ...(result.servedSource ? { servedSource: result.servedSource } : {}),
+      ...(opts.model ? { model: opts.model } : {}),
       ...(result.usage.inputTokens !== undefined ? { inputTokens: result.usage.inputTokens } : {}),
       ...(result.usage.outputTokens !== undefined ? { outputTokens: result.usage.outputTokens } : {}),
       ...(result.usage.reasoningTokens !== undefined ? { reasoningTokens: result.usage.reasoningTokens } : {}),
@@ -385,13 +281,7 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
     opts.log?.('[chat-routes] runDetachedTurn getStatus failed; treating as no prior', { turnId, err: String(err) })
   }
 
-  if (prior === 'complete') {
-    const persisted = await persistedRow()
-    return await settleRow(
-      cachedResultFrom(await completed(), persisted),
-      persisted,
-    )
-  }
+  if (prior === 'complete') return await settleRow(cachedResultFrom(await completed()))
 
   if (prior === 'running') {
     // A prior attempt marked the turn running and then this worker crashed. The
@@ -403,8 +293,7 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
       await store.setStatus(turnId, 'complete', scopeId).catch((err) => {
         opts.log?.('[chat-routes] runDetachedTurn failed to settle a completed running turn', { turnId, err: String(err) })
       })
-      const persisted = await persistedRow()
-      return await settleRow(cachedResultFrom(final, persisted), persisted)
+      return await settleRow(cachedResultFrom(final))
     }
     // Genuine re-run: clear the partial buffer first, or the fresh tap's seq
     // (restarting at 0) interleaves with the orphaned rows.
@@ -428,15 +317,8 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
   await tap.onEvent({ type: 'turn', turnId })
 
   producer = createSandboxChatProducer({
-    ...(opts.openEvents ? { openEvents: opts.openEvents } : { events: opts.events }),
+    events: opts.events,
     model: opts.model,
-    ...(opts.fallbackModels ? { fallbackModels: opts.fallbackModels } : {}),
-    ...(opts.modelFailover === false ? { modelFailover: false as const } : {}),
-    ...(opts.openTimeoutMs !== undefined ? { openTimeoutMs: opts.openTimeoutMs } : {}),
-    ...(opts.firstResponseTimeoutMs !== undefined
-      ? { firstResponseTimeoutMs: opts.firstResponseTimeoutMs }
-      : {}),
-    ...(opts.onModelFallback ? { onModelFallback: opts.onModelFallback } : {}),
     isRenderableInteraction: opts.isRenderableInteraction,
     declineInteraction: opts.declineInteraction,
     promoteFilePart: opts.promoteFilePart,
@@ -467,22 +349,12 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
   const parts = producer.assistantParts?.() ?? []
   let usage: ChatTurnUsage = producer.usage?.() ?? {}
 
-  // A terminal result can supply scalar text even when the event subscriber
-  // missed every structured message part. Reconcile that text-only shape with
-  // the durable completion record before final persistence.
-  const onlyTextParts = parts.every((part) =>
-    String((part as { type?: unknown }).type ?? '') === 'text',
-  )
-  if (!runError && (!hasUsage(usage) || !text || onlyTextParts)) {
+  if (!runError && !hasUsage(usage)) {
     const final = await completed()
     if (final?.usage) usage = { ...usage, ...final.usage }
-    return await settleRow({
-      state: 'completed',
-      text: final?.text ?? text,
-      parts: final?.parts?.length ? final.parts : parts,
-      usage,
-      cached: false,
-    })
+    if (!text && final?.text) {
+      return await settleRow({ state: 'completed', text: final.text, parts: final.parts ?? parts, usage, cached: false })
+    }
   }
 
   if (runError) return await settleRow({ state: 'failed', text, parts, usage, error: runError, cached: false })

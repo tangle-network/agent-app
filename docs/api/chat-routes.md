@@ -4,19 +4,11 @@
 
 Source: `src/chat-routes/index.ts`
 
-193 exports.
-
-### `AbortAttachmentWriteFn`
-
-`type` — Clean up a write whose function threw after the store may have committed.
-
-```ts
-type AbortAttachmentWriteFn
-```
+142 exports.
 
 ### `ALLOWED_ATTACHMENT_SNIFFED_MIMES`
 
-`const` — Sniffed-mime counterpart of `ATTACHMENT_ACCEPT`: the binary formats `sniffBinary` can identify from content among the accepted types.
+`const` — Sniffed-mime counterpart of `ATTACHMENT_ACCEPT`: the binary formats `sniffBinary` can identify from magic bytes among the accepted types.
 
 ```ts
 ReadonlySet<string>
@@ -78,60 +70,12 @@ interface AssistantDraftWriterOptions
 interface AssistantRowValues
 ```
 
-### `AtomicAttachmentUploadAuthorization`
-
-`type` — Authorization result for an ownership-safe attachment writer.
-
-```ts
-type AtomicAttachmentUploadAuthorization
-```
-
-### `AtomicAttachmentWriteOptions`
-
-`interface` — Options for an ownership-safe writer.
-
-```ts
-interface AtomicAttachmentWriteOptions
-```
-
-### `AtomicAttachmentWriter`
-
-`interface` — A complete ownership-safe attachment store adapter.
-
-```ts
-interface AtomicAttachmentWriter
-```
-
-### `AtomicAttachmentWriteResult`
-
-`type` — Result for an ownership-safe writer.
-
-```ts
-type AtomicAttachmentWriteResult
-```
-
-### `AtomicPromoteAgentFilePartOptions`
-
-`interface` — Ownership-safe promotion options for new products.
-
-```ts
-interface AtomicPromoteAgentFilePartOptions
-```
-
-### `AtomicWriteAttachmentFn`
-
-`type` — Ownership-safe writer port used by the atomic upload and promotion lanes.
-
-```ts
-type AtomicWriteAttachmentFn
-```
-
 ### `ATTACHMENT_ACCEPT`
 
 `const` — Accept list for the composer file picker + type validation, same grammar as the native `<input accept>` attribute.
 
 ```ts
-"image/*,.pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,.json,.yaml,.yml,.html"
+"image/*,.pdf,.txt,.md,.csv,.json,.yaml,.yml,.html"
 ```
 
 ### `ATTACHMENT_MAX_COUNT`
@@ -140,30 +84,6 @@ type AtomicWriteAttachmentFn
 
 ```ts
 10
-```
-
-### `ATTACHMENT_ROLLBACK_FAILURE_CODE`
-
-`const` — Stable client error code when compensating cleanup did not complete.
-
-```ts
-"rollback_failed"
-```
-
-### `ATTACHMENT_ROLLBACK_FAILURE_MESSAGE`
-
-`const` — Public-safe outcome when compensating cleanup did not complete.
-
-```ts
-"Attachment cleanup failed. Please try again."
-```
-
-### `ATTACHMENT_STORAGE_FAILURE_MESSAGE`
-
-`const` — Public-safe outcome for a storage outage.
-
-```ts
-"Attachment storage is temporarily unavailable. Please try again."
 ```
 
 ### `AttachmentPathArgs`
@@ -216,47 +136,15 @@ type AttachmentTypeCheckResult
 
 ### `AttachmentUploadAuthorization`
 
-`type` — Stable authorization result for the original writer contract.
+`type` — Outcome of the injected `authorize` seam: auth + rate limiting + scope resolution, all in one place so a 429 rides `{ok:false, response}` exactly like a 401 does — this factory has no rate-limit opin…
 
 ```ts
 type AttachmentUploadAuthorization
 ```
 
-### `AttachmentUploadLogger`
-
-`type` — The logger receives only sanitized backend details.
-
-```ts
-type AttachmentUploadLogger
-```
-
-### `AttachmentWriteOptions`
-
-`interface` — Options from the stable attachment-store contract.
-
-```ts
-interface AttachmentWriteOptions
-```
-
-### `AttachmentWriteOwnership`
-
-`interface` — The ownership identity for one attempted write.
-
-```ts
-interface AttachmentWriteOwnership
-```
-
-### `AttachmentWriteReceipt`
-
-`interface` — Compensation for one attachment write.
-
-```ts
-interface AttachmentWriteReceipt
-```
-
 ### `AttachmentWriteResult`
 
-`type` — The stable writer result from the original attachment-store contract.
+`type` — Outcome of persisting one attachment.
 
 ```ts
 type AttachmentWriteResult
@@ -326,14 +214,6 @@ type ChatAttachmentKind
 type ChatMentionKind
 ```
 
-### `ChatReasoningEffort`
-
-`type` — A chat turn's automatic sentinel plus the canonical agent reasoning levels.
-
-```ts
-type ChatReasoningEffort
-```
-
 ### `ChatRouteDurableProjection`
 
 `interface` — Resolve chat route events and materialize their durable state records
@@ -350,14 +230,6 @@ interface ChatRouteDurableProjection
 type ChatRouteDurableProjectionLogger
 ```
 
-### `ChatRouteEvent`
-
-`type` — One event as it crosses the route: the producer's own vocabulary, or an injected keepalive.
-
-```ts
-type ChatRouteEvent
-```
-
 ### `ChatTurnAuthorization`
 
 `type` — Resolve authorization status and context for a chat turn including tenant and user identification
@@ -372,14 +244,6 @@ type ChatTurnAuthorization
 
 ```ts
 interface ChatTurnAuthorizeArgs
-```
-
-### `ChatTurnCompleteInput`
-
-`interface` — What a settled turn reports to `onTurnComplete` — the product's post-processing seam (billing, titles, audit).
-
-```ts
-interface ChatTurnCompleteInput
 ```
 
 ### `ChatTurnFilePartInput`
@@ -478,22 +342,6 @@ type ChatTurnLockResult
 interface ChatTurnMessageStore
 ```
 
-### `ChatTurnModelAttribution`
-
-`interface` — Requested and effective model attribution for one sandbox turn.
-
-```ts
-interface ChatTurnModelAttribution
-```
-
-### `ChatTurnModelFailover`
-
-`interface` — Which model served, and what it took to get there.
-
-```ts
-interface ChatTurnModelFailover
-```
-
 ### `ChatTurnPartInput`
 
 `type` — Resolve input as either a text part or a file part of a chat turn
@@ -566,22 +414,6 @@ interface ChatTurnUsage
 (fileName: string, sniff: SniffResult, allowed?: ReadonlySet<string>) => AttachmentTypeCheckResult
 ```
 
-### `classifyTerminalFailure`
-
-`function` — Classify a terminal failure event.
-
-```ts
-(event: unknown) => TerminalFailure | null
-```
-
-### `CompletedSandboxTurnSource`
-
-`type` — The official Sandbox methods needed for completed-turn recovery.
-
-```ts
-type CompletedSandboxTurnSource
-```
-
 ### `createAssistantDraftWriter`
 
 `function` — Build the coalescing draft writer for one turn.
@@ -590,33 +422,17 @@ type CompletedSandboxTurnSource
 (options: AssistantDraftWriterOptions) => AssistantDraftWriter
 ```
 
-### `CreateAtomicAttachmentUploadRouteOptions`
-
-`interface` — Ownership-safe route options for new products.
-
-```ts
-interface CreateAtomicAttachmentUploadRouteOptions
-```
-
-### `createAtomicAttachmentWriter`
-
-`function` — Build the explicit atomic adapter used by new routes.
-
-```ts
-(input: AtomicAttachmentWriter) => AtomicAttachmentWriter
-```
-
 ### `createAttachmentUploadRoute`
 
-`function` — Resolve an attachment upload route handler with customizable limits and validation options.
+`function` — Resolve an attachment upload route handler with customizable limits and validation options
 
 ```ts
-(options: CreateAttachmentUploadRouteOptions | CreateAtomicAttachmentUploadRouteOptions) => (request: Request) => Promi…
+(options: CreateAttachmentUploadRouteOptions) => (request: Request) => Promise<Response>
 ```
 
 ### `CreateAttachmentUploadRouteOptions`
 
-`interface` — The original public route-options interface remains available for consumers that extend it.
+`interface` — Define options to authorize, write, and limit attachment uploads in a route
 
 ```ts
 interface CreateAttachmentUploadRouteOptions
@@ -636,14 +452,6 @@ interface CreateAttachmentUploadRouteOptions
 
 ```ts
 interface CreateChatTurnRoutesOptions
-```
-
-### `CreateLegacyAttachmentUploadRouteOptions`
-
-`interface` — Stable route options for products using the original writer contract.
-
-```ts
-interface CreateLegacyAttachmentUploadRouteOptions
 ```
 
 ### `createSandboxChatProducer`
@@ -684,22 +492,6 @@ interface CreateSandboxFileIndexRouteOptions
 
 ```ts
 interface CreateUploadRouteOptions
-```
-
-### `DEFAULT_MODEL_FIRST_RESPONSE_TIMEOUT_MS`
-
-`const` — Default ceiling for the first answer-bearing event after the source's first event.
-
-```ts
-60000
-```
-
-### `DEFAULT_MODEL_STREAM_OPEN_TIMEOUT_MS`
-
-`const` — Default ceiling for opening/starting one source through its first event.
-
-```ts
-120000
 ```
 
 ### `DEFAULT_STALE_TURN_LOCK_GRACE_MS`
@@ -814,14 +606,6 @@ interface DraftPersistenceTuning
 interface DraftStoredMessage
 ```
 
-### `EmptyTurnRetryInfo`
-
-`interface` — One same-model re-run of a turn that completed with no assistant text.
-
-```ts
-interface EmptyTurnRetryInfo
-```
-
 ### `FileIndexAuthorization`
 
 `type` — Define authorization details and parameters for indexing a file workspace with optional caching and ignore rules
@@ -902,14 +686,6 @@ type FilePartPromotionOutcome
 (bytes: number) => string
 ```
 
-### `immutableAttachmentPath`
-
-`function` — Add a path-safe ownership id to a logical path and return an immutable store key.
-
-```ts
-(logicalPath: string, ownershipId: string) => string
-```
-
 ### `INLINE_PARTS_MAX_BYTES`
 
 `const` — Define the maximum byte size allowed for inline parts in data processing
@@ -918,28 +694,12 @@ type FilePartPromotionOutcome
 950000
 ```
 
-### `isCommittingSandboxEvent`
-
-`function` — True when `event` puts content in front of the user (or in the persisted transcript), making a restart on another model unsafe.
-
-```ts
-(event: unknown) => boolean
-```
-
 ### `isDraftContentEvent`
 
 `function` — True when this event should arm a draft write.
 
 ```ts
 (event: { type?: unknown; }) => boolean
-```
-
-### `MACRO_ENABLED_OOXML_SNIFFED_MIMES`
-
-`const` — Macro-enabled Office package mimes (`.docm`/`.xlsm`/`.pptm`), reported by `sniffBinary` but deliberately NOT in the default allow-list: a package carrying a VBA project is a different risk decision t…
-
-```ts
-ReadonlySet<string>
 ```
 
 ### `MAX_ATTACHMENT_TOTAL_BYTES`
@@ -956,14 +716,6 @@ number
 
 ```ts
 number
-```
-
-### `MAX_EMPTY_TURN_RETRIES`
-
-`const` — Hard ceiling on same-model re-runs.
-
-```ts
-3
 ```
 
 ### `MAX_TEXT_ATTACHMENT_BYTES`
@@ -996,118 +748,6 @@ number
 
 ```ts
 (path: string) => ChatMentionKind
-```
-
-### `ModelAttemptTimeoutCode`
-
-`type` — Structured timeout codes surfaced by the producer on final exhaustion.
-
-```ts
-type ModelAttemptTimeoutCode
-```
-
-### `ModelFailoverStreamHandle`
-
-`interface` — The failover-wrapped stream plus the attribution every consumer needs.
-
-```ts
-interface ModelFailoverStreamHandle
-```
-
-### `ModelFailoverStreamOptions`
-
-`interface` — Define inputs for streaming a turn across a model failover chain
-
-```ts
-interface ModelFailoverStreamOptions
-```
-
-### `ModelFailoverTimeoutError`
-
-`class` — Every configured model was exhausted and the final one timed out.
-
-```ts
-class ModelFailoverTimeoutError
-```
-
-### `ModelFallbackInfo`
-
-`interface` — Fired when a model is abandoned and the next one is about to be tried.
-
-```ts
-interface ModelFallbackInfo
-```
-
-### `normalizeChatPromptForSandbox`
-
-`function` — Convert the browser-safe chat attachment contract into the current sandbox prompt contract.
-
-```ts
-(prompt: string | readonly ChatTurnPartInput[]) => string | PromptInputPart[]
-```
-
-### `OOXML_PRESENTATION_MACRO_ENABLED_MIME`
-
-`const` — Sniffed mime for a macro-enabled PowerPoint package (`.pptm`).
-
-```ts
-"application/vnd.ms-powerpoint.presentation.macroEnabled.12"
-```
-
-### `OOXML_PRESENTATION_MIME`
-
-`const` — Sniffed mime for a PowerPoint OOXML package (`.pptx`).
-
-```ts
-"application/vnd.openxmlformats-officedocument.presentationml.presentation"
-```
-
-### `OOXML_SNIFFED_MIMES`
-
-`const` — The Office (OOXML) package mimes the default allow-list admits — the formats professionals actually send: Word contracts, Excel workpapers, PowerPoint decks.
-
-```ts
-ReadonlySet<string>
-```
-
-### `OOXML_SPREADSHEET_MACRO_ENABLED_MIME`
-
-`const` — Sniffed mime for a macro-enabled Excel package (`.xlsm`).
-
-```ts
-"application/vnd.ms-excel.sheet.macroEnabled.12"
-```
-
-### `OOXML_SPREADSHEET_MIME`
-
-`const` — Sniffed mime for an Excel OOXML package (`.xlsx`).
-
-```ts
-"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-```
-
-### `OOXML_WORD_MACRO_ENABLED_MIME`
-
-`const` — Sniffed mime for a macro-enabled Word package (`.docm`).
-
-```ts
-"application/vnd.ms-word.document.macroEnabled.12"
-```
-
-### `OOXML_WORD_MIME`
-
-`const` — Sniffed mime for a Word OOXML package (`.docx`).
-
-```ts
-"application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-```
-
-### `OpenModelStream`
-
-`type` — Open the raw turn stream for one specific model.
-
-```ts
-type OpenModelStream
 ```
 
 ### `parseChatTurnParts`
@@ -1216,15 +856,15 @@ number
 
 ### `promoteAgentFilePart`
 
-`function` — Promote a part using the stable writer contract.
+`function` — Promote a part of an agent file with optional byte limits and MIME type detection
 
 ```ts
-{ (options: PromoteAgentFilePartOptions): Promise<PromoteFilePartResult>; (options: AtomicPromoteAgentFilePartOptions):…
+(options: PromoteAgentFilePartOptions) => Promise<PromoteFilePartResult>
 ```
 
 ### `PromoteAgentFilePartOptions`
 
-`interface` — Stable promotion options from the original writer contract.
+`interface` — Define options for promoting a part of an agent file within a specific session and scope
 
 ```ts
 interface PromoteAgentFilePartOptions
@@ -1268,22 +908,6 @@ interface RawAgentFilePart
 
 ```ts
 type ReadAttachmentFn
-```
-
-### `readCompletedSandboxTurn`
-
-`function` — Read the exact completed turn.
-
-```ts
-(box: CompletedSandboxTurnSource, options: ReadCompletedSandboxTurnOptions) => Promise<DetachedTurnFinal | null>
-```
-
-### `ReadCompletedSandboxTurnOptions`
-
-`interface` — Options for resolving one exact detached turn.
-
-```ts
-interface ReadCompletedSandboxTurnOptions
 ```
 
 ### `ReadSandboxMentionFn`
@@ -1340,22 +964,6 @@ interface ResolveChatAttachmentsOptions
 
 ```ts
 type ResolveChatAttachmentsResult
-```
-
-### `resolveEmptyTurnRetries`
-
-`function` — Coerce the caller's budget to a finite, bounded, non-negative integer.
-
-```ts
-(value: number | undefined) => number
-```
-
-### `rowIdOf`
-
-`function` — The row id an `appendMessage` actually returned, or `null` when the store returned nothing usable.
-
-```ts
-(inserted: unknown) => string | null
 ```
 
 ### `runDetachedTurn`
@@ -1478,22 +1086,6 @@ type StaleTurnLockSessionProbeResult
 (store: AssistantDraftStore) => boolean
 ```
 
-### `streamWithModelFailover`
-
-`function` — Wrap `open` in reactive model failover, streaming from the first model in `models` that reaches its commit point.
-
-```ts
-(options: ModelFailoverStreamOptions) => ModelFailoverStreamHandle
-```
-
-### `summarizeFailoverReason`
-
-`function` — Condense an abandoned attempt's raw failure text into something safe to show a customer in the transcript.
-
-```ts
-(reason: string) => string
-```
-
 ### `UPLOAD_INLINE_MAX_BYTES`
 
 `const` — 700 KiB: base64 inflates ~4/3, so an inline part stays comfortably under the ~1 MiB gateway body cap alongside the JSON envelope.
@@ -1544,7 +1136,7 @@ interface UploadedChatFile
 
 ### `WriteAttachmentFn`
 
-`type` — The stable writer port.
+`type` — Persist `content` for `scopeId` at `path`.
 
 ```ts
 type WriteAttachmentFn

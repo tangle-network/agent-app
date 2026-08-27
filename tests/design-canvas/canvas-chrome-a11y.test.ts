@@ -24,26 +24,21 @@ afterEach(cleanup)
 // ---------------------------------------------------------------------------
 
 describe('shared icon-button contract', () => {
-  it('never suppresses the shared focus floor, and never draws a permanent ring', () => {
-    // The keyboard ring is the `:focus-visible` floor in tokens.css, so what
-    // this contract asserts is no longer "carries the ring utility" — it is
-    // "does not take the ring away". Re-stating the ring per component is how
-    // one width and one colour became five spellings; suppressing it is worse,
-    // because `outline-none` matches the floor's specificity and wins on source
-    // order, leaving the button with nothing.
+  it('exposes a keyboard-only (focus-visible) ring on every variant', () => {
     for (const cls of [BTN, BTN_ACTIVE, BTN_SM]) {
-      expect(cls).not.toMatch(/(?:^|\s)(?:[a-z-]+:)?outline-none(?=\s|$)/)
+      expect(cls).toContain('focus-visible:ring-2')
+      expect(cls).toContain('focus-visible:ring-[hsl(var(--ring))]')
       // never a permanent (non focus-visible) ring
       expect(cls).not.toMatch(/(^|\s)ring-2/)
     }
   })
 
-  it('IconButton is a real button that leaves the focus floor intact', () => {
+  it('IconButton renders the focus-visible ring class and is a real button', () => {
     render(createElement(IconButton, { 'aria-label': 'Test action' }))
     const btn = screen.getByLabelText('Test action')
     expect(btn.tagName).toBe('BUTTON')
     expect(btn.getAttribute('type')).toBe('button')
-    expect(btn.className).not.toMatch(/(?:^|\s)(?:[a-z-]+:)?outline-none(?=\s|$)/)
+    expect(btn.className).toContain('focus-visible:ring-2')
   })
 
   it('IconButton active variant uses the brand-colored class', () => {

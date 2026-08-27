@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { ChatPlan } from '../plans/index'
 import type {
   DurablePlanDecision,
@@ -27,10 +27,6 @@ function statusLabel(plan: ChatPlan): string {
   }
 }
 
-/** Body height (px) beyond which the plan collapses behind a "Show full plan"
- *  toggle — same cap as the interaction plan card. */
-const COLLAPSED_MAX_HEIGHT = 320
-
 export function DurablePlanCard({
   plan,
   canWrite,
@@ -48,15 +44,6 @@ export function DurablePlanCard({
   const actionable = plan.status === 'pending'
   const disabled = !canWrite || !actionable || deciding !== null
 
-  // The collapse UI appears only when the body actually overflows the cap —
-  // measured, so a short plan shows neither the fade nor the toggle.
-  const bodyRef = useRef<HTMLDivElement>(null)
-  const [overflows, setOverflows] = useState(false)
-  useLayoutEffect(() => {
-    const el = bodyRef.current
-    if (el) setOverflows(el.scrollHeight > COLLAPSED_MAX_HEIGHT)
-  }, [plan.body, renderMarkdown])
-
   async function submit(decision: DurablePlanDecision) {
     const trimmed = feedback.trim()
     if (decision === 'rejected' && !trimmed) {
@@ -68,7 +55,7 @@ export function DurablePlanCard({
   }
 
   return (
-    <div className={`rounded-xl border border-primary/40 bg-card p-4 ${className ?? ''}`}>
+    <div className={`rounded-xl border border-primary/40 bg-card p-4 shadow-sm ${className ?? ''}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <InteractionBadge variant="outline">Plan decision</InteractionBadge>
@@ -78,25 +65,19 @@ export function DurablePlanCard({
         </div>
         <span className="text-xs text-muted-foreground">Revision {plan.revision}</span>
       </div>
-      {plan.title && <p className="mb-3 text-[15px] font-semibold leading-snug text-foreground">{plan.title}</p>}
+      {plan.title && <p className="mb-3 text-sm font-medium leading-5 text-foreground">{plan.title}</p>}
       <div className="relative">
-        <div
-          ref={bodyRef}
-          className="overflow-hidden text-sm"
-          style={expanded || !overflows ? undefined : { maxHeight: COLLAPSED_MAX_HEIGHT }}
-        >
+        <div className="overflow-hidden text-sm" style={expanded ? undefined : { maxHeight: 320 }}>
           {renderMarkdown ? renderMarkdown(plan.body) : <p className="whitespace-pre-wrap leading-5">{plan.body}</p>}
         </div>
-        {overflows && !expanded && <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-card to-transparent" />}
-        {overflows && (
-          <button
-            type="button"
-            onClick={() => setExpanded((value) => !value)}
-            className="relative z-10 mt-1 text-xs text-muted-foreground hover:text-foreground"
-          >
-            {expanded ? 'Collapse plan' : 'Show full plan'}
-          </button>
-        )}
+        {!expanded && <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-card to-transparent" />}
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          className="mt-1 text-xs text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {expanded ? 'Collapse plan' : 'Show full plan'}
+        </button>
       </div>
       {actionable && (
         <div className="mt-3 space-y-2">
@@ -110,7 +91,7 @@ export function DurablePlanCard({
             onChange={(event) => setFeedback(event.target.value)}
             rows={2}
             placeholder="Describe what you want changed in the plan"
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary disabled:opacity-50"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary disabled:opacity-50"
           />
         </div>
       )}

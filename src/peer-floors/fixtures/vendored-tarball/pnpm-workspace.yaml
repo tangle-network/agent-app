@@ -1,6 +1,0 @@
-packages:
-  - '.'
-
-overrides:
-  '@tangle-network/agent-app': file:./vendor/agent-app/tangle-network-agent-app-0.45.33.tgz
-  '@tangle-network/agent-interface': 0.43.0

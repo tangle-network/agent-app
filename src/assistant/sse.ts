@@ -10,7 +10,7 @@
  * each event's data JSON-parsed (falling back to the raw string).
  */
 
-interface ParsedSSEEvent<T = unknown> {
+export interface ParsedSSEEvent<T = unknown> {
   data: T;
   rawData: string;
   eventId?: string;
@@ -21,7 +21,7 @@ interface ParsedSSEEvent<T = unknown> {
  * Incremental SSE parser. Feed decoded string chunks via `push()`; call
  * `flush()` once the stream closes to emit any final buffered event.
  */
-class SSEChunkParser<T = unknown> {
+export class SSEChunkParser<T = unknown> {
   private buffer = "";
   private current: { id?: string; event?: string; data?: string } = {};
 

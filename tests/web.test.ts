@@ -1,13 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  STANDARD_SECURITY_HEADERS,
-  addSecurityHeaders,
-  checkRateLimit,
-  extractRequestContext,
-  parseJsonObjectBody,
-  requireString,
-  type KvLike,
-} from '../src/web/index'
+import { parseJsonObjectBody, requireString, extractRequestContext, checkRateLimit, addSecurityHeaders, type KvLike } from '../src/web/index'
 import { redactForIngestion } from '../src/redact/index'
 
 function req(body: unknown, headers: Record<string, string> = {}): Request {
@@ -58,21 +50,6 @@ describe('checkRateLimit', () => {
 })
 
 describe('addSecurityHeaders', () => {
-  it('publishes the exact generic policy applied to every response', () => {
-    const response = addSecurityHeaders(new Response('x'))
-
-    expect(STANDARD_SECURITY_HEADERS).toEqual({
-      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
-      'X-Content-Type-Options': 'nosniff',
-      'X-Frame-Options': 'SAMEORIGIN',
-      'Referrer-Policy': 'same-origin',
-      'X-XSS-Protection': '1; mode=block',
-    })
-    for (const [name, value] of Object.entries(STANDARD_SECURITY_HEADERS)) {
-      expect(response.headers.get(name)).toBe(value)
-    }
-  })
-
   it('sets the generic security set + optional disclaimer/retention/extra', () => {
     const r = addSecurityHeaders(new Response('x'), { disclaimer: 'Not legal advice.', retention: '7-years', extra: { 'X-Custom': '1' } })
     expect(r.headers.get('Strict-Transport-Security')).toContain('max-age=31536000')

@@ -122,11 +122,7 @@ describe('createChatStore — messages', () => {
       role: 'assistant',
       content: 'answer',
       parts: [{ type: 'text', text: 'answer' }],
-      model: 'anthropic/claude-sonnet-4',
-      requestedModel: 'openai/gpt-5',
-      servedModel: 'anthropic/claude-sonnet-4',
-      servedProvider: 'openrouter',
-      servedSource: 'profile',
+      model: 'claude-fable-5',
       inputTokens: 10,
       outputTokens: 20,
       reasoningTokens: 3,
@@ -137,31 +133,13 @@ describe('createChatStore — messages', () => {
     expect(message.parts).toEqual([{ type: 'text', text: 'answer' }])
     expect(message).toMatchObject({
       role: 'assistant',
-      model: 'anthropic/claude-sonnet-4',
-      requestedModel: 'openai/gpt-5',
-      servedModel: 'anthropic/claude-sonnet-4',
-      servedProvider: 'openrouter',
-      servedSource: 'profile',
+      model: 'claude-fable-5',
       inputTokens: 10,
       outputTokens: 20,
       reasoningTokens: 3,
       cacheReadTokens: 5,
       cacheWriteTokens: 1,
       costUsd: 0.02,
-    })
-
-    const updated = await store.updateMessage(message.id, {
-      model: 'google/gemini-2.5-pro',
-      servedModel: 'google/gemini-2.5-pro',
-      servedProvider: 'google',
-      servedSource: 'environment',
-    })
-    expect(updated).toMatchObject({
-      requestedModel: 'openai/gpt-5',
-      model: 'google/gemini-2.5-pro',
-      servedModel: 'google/gemini-2.5-pro',
-      servedProvider: 'google',
-      servedSource: 'environment',
     })
 
     const bumped = await store.getThread(thread.id)
@@ -266,42 +244,6 @@ describe('createChatStore — bulkDeleteThreads', () => {
     const assertAccess = vi.fn()
     expect(await store.bulkDeleteThreads({ ids: ['ghost'], assertAccess })).toEqual({ deleted: 0 })
     expect(assertAccess).not.toHaveBeenCalled()
-  })
-
-  it('deletes by updatedAt within one workspace and keeps the access check before the batch', async () => {
-    const { db, store } = await freshStore()
-    const old = await store.createThread({ workspaceId: 'ws1', title: 'old' })
-    const recent = await store.createThread({ workspaceId: 'ws1', title: 'recent' })
-    const otherWorkspace = await store.createThread({ workspaceId: 'ws2', title: 'other' })
-    const oldAt = new Date(1_000_000)
-    const recentAt = new Date(3_000_000)
-    const { eq } = await import('drizzle-orm')
-    await store.appendMessage({ threadId: old.id, role: 'user', content: 'remove me' })
-    await db.update(tables.threads).set({ updatedAt: oldAt }).where(eq(tables.threads.id, old.id))
-    await db.update(tables.threads).set({ updatedAt: recentAt }).where(eq(tables.threads.id, recent.id))
-    await db.update(tables.threads).set({ updatedAt: oldAt }).where(eq(tables.threads.id, otherWorkspace.id))
-
-    const assertAccess = vi.fn()
-    const result = await store.bulkDeleteThreadsByUpdatedAt({
-      workspaceId: 'ws1',
-      updatedBefore: new Date(2_000_000),
-      assertAccess,
-    })
-
-    expect(result).toEqual({ deleted: 1 })
-    expect(assertAccess).toHaveBeenCalledWith('ws1')
-    expect(await store.getThread(old.id)).toBeNull()
-    expect(await store.getThread(recent.id)).not.toBeNull()
-    expect(await store.getThread(otherWorkspace.id)).not.toBeNull()
-    expect(await db.select().from(tables.messages)).toEqual([])
-  })
-
-  it('rejects a date request without a boundary', async () => {
-    const { store } = await freshStore()
-    await expect(store.bulkDeleteThreadsByUpdatedAt({
-      workspaceId: 'ws1',
-      assertAccess: () => {},
-    })).rejects.toBeInstanceOf(ChatStoreInputError)
   })
 })
 

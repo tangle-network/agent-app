@@ -4,7 +4,7 @@
 
 Source: `src/catalog/index.ts`
 
-7 exports.
+6 exports.
 
 ### `buildCatalog`
 
@@ -28,14 +28,6 @@ interface CatalogModel
 
 ```ts
 (cfg: { baseUrl: string; apiKey: string; preferredDefault?: string | undefined; }) => Promise<ModelCatalog>
-```
-
-### `isChatCapableModel`
-
-`function` — Can this router entry serve a text chat turn?
-
-```ts
-(m: RouterModel) => boolean
 ```
 
 ### `ModelCatalog`

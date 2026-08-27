@@ -12,7 +12,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { Sandbox } from '@tangle-network/sandbox'
+import { SandboxClient } from '@tangle-network/sandbox'
 
 import {
   createChatTurnRoutes,
@@ -33,7 +33,7 @@ const tables = createChatTables({ workspaceTable: workspacesTable })
 
 describe.skipIf(!LIVE)('LIVE: incremental persistence against a real sandbox turn', () => {
   it('a real streaming turn is readable from durable storage while it runs, and settles byte-identical to the single-write projection', async () => {
-    const client = new Sandbox({
+    const client = new SandboxClient({
       apiKey: process.env.SANDBOX_API_KEY!,
       baseUrl: process.env.SANDBOX_API_URL ?? 'https://sandbox.tangle.tools',
     })

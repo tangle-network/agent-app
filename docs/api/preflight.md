@@ -4,7 +4,7 @@
 
 Source: `src/preflight/index.ts`
 
-16 exports.
+12 exports.
 
 ### `formatPreflightReport`
 
@@ -62,22 +62,6 @@ interface PreflightProbeVerdict
 interface PreflightReport
 ```
 
-### `requiredValueProbe`
-
-`function` — Require a non-empty string without ever printing its value.
-
-```ts
-(config: RequiredValueProbeConfig) => PreflightProbe
-```
-
-### `RequiredValueProbeConfig`
-
-`interface` — Configuration for a required non-empty production value.
-
-```ts
-interface RequiredValueProbeConfig
-```
-
 ### `routerChatProbe`
 
 `function` — Probe an OpenAI-compatible LLM router with one cheap `POST /chat/completions` (`max_tokens: 1`).
@@ -116,20 +100,4 @@ interface RouterChatProbeConfig
 
 ```ts
 interface SandboxAuthProbeConfig
-```
-
-### `slackAlertProbe`
-
-`function` — Probe that the Slack alerting credential is alive, via `auth.test` — no message is posted.
-
-```ts
-(config: SlackAlertProbeConfig) => PreflightProbe
-```
-
-### `SlackAlertProbeConfig`
-
-`interface` — Define configuration options for probing that the Slack alerting channel is live
-
-```ts
-interface SlackAlertProbeConfig
 ```

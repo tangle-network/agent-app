@@ -47,33 +47,25 @@ export function isSafeInteractionFieldKey(key: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Field types — aliases of the shared Interface contract. The app owns how the
-// fields render, not a second wire shape.
+// Field types
+//
+// `allowCustom` (a select that also accepts a write-in value) is defined by
+// newer agent-interface schemas; older pinned schemas strip unknown keys on
+// parse. The wire/persisted field types below carry the flag so a card can gate
+// its write-in input, and `parseInteractionRequest` returns the RAW payload
+// (schema-validated, not schema-parsed) so the flag survives.
 
 /** Extract select-type interaction fields and optionally allow custom values */
-export type ChatSelectField = Extract<InteractionField, { type: 'select' }>
+export type ChatSelectField = Extract<InteractionField, { type: 'select' }> & {
+  allowCustom?: boolean
+}
+/** Resolve a chat interaction field excluding select types or including chat select fields */
+export type ChatInteractionField = Exclude<InteractionField, { type: 'select' }> | ChatSelectField
 
-/**
- * A field the user types free text into, which may declare the longest answer
- * its answer route will accept — so a card can stop the typing rather than let
- * the route reject it.
- *
- * Both `text` and `secret`, which is why this is not `ChatTextField`: unlike
- * `ChatSelectField`, it does not name a single `type` literal. They render
- * differently (a textarea vs a password input) and are grouped only by the one
- * property that matters here — an answer whose length can run past what the
- * route takes.
- *
- * The request author chooses this value; omission means the shared contract
- * imposes no length limit.
- */
-export type ChatFreeTextField = Extract<InteractionField, { type: 'text' | 'secret' }>
-
-/** The shared field contract under the UI-facing name used by this package. */
-export type ChatInteractionField = InteractionField
-
-/** The shared request contract under the wire-facing name used by this package. */
-export type InteractionRequestWire = InteractionRequest
+/** `InteractionRequest` whose select fields may carry `allowCustom`. */
+export type InteractionRequestWire = Omit<InteractionRequest, 'answerSpec'> & {
+  answerSpec: { fields: ChatInteractionField[] }
+}
 
 // ---------------------------------------------------------------------------
 // Interaction lifecycle
@@ -193,7 +185,9 @@ export type ParseInteractionResult =
   | { succeeded: true; value: InteractionRequestWire }
   | { succeeded: false; error: string }
 
-/** Parses an `interaction` event's data (`{ request }`) with the shared schema. */
+/** Parses an `interaction` event's data (`{ request }`). Validates the shape
+ *  with the agent-interface schema but returns the raw request so a field a
+ *  pinned schema predates (`allowCustom`) survives. */
 export function parseInteractionRequest(data: Record<string, unknown> | undefined): ParseInteractionResult {
   const request = data?.request
   if (!request || typeof request !== 'object') {
@@ -203,7 +197,7 @@ export function parseInteractionRequest(data: Record<string, unknown> | undefine
   if (!validation.success) {
     return { succeeded: false, error: `malformed interaction request: ${validation.error.message}` }
   }
-  return { succeeded: true, value: validation.data }
+  return { succeeded: true, value: request as InteractionRequestWire }
 }
 
 /** Describe data required to cancel an interaction including its identifier and optional reason */

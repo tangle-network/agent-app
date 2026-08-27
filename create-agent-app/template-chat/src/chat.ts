@@ -158,10 +158,7 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
       if (!session.ok) return session
       const { user } = session.value
       const resolveSink = overrides.uploadSink ?? ((scope) => resolveUploadSink(env, scope))
-      return {
-        ok: true,
-        sink: await resolveSink({ workspaceId: user.id, userId: user.id }),
-      }
+      return { ok: true, sink: await resolveSink({ workspaceId: user.id, userId: user.id }) }
     },
   })
 

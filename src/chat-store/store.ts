@@ -16,12 +16,8 @@
  * sequential awaits in the same order.
  */
 
-import { and, asc, desc, eq, gte, inArray, lt, sql, type SQL } from 'drizzle-orm'
+import { asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
-import {
-  runSqliteStatements,
-  type SqliteBatchDatabase,
-} from '../store'
 import { BULK_DELETE_MAX_THREADS, ChatStoreInputError, threadTitleFromMessage } from './core'
 import type { ChatMessagePart } from './parts'
 import type { ChatMessageRow, ChatTables, ChatThreadRow, NewChatMessageRow, NewChatThreadRow } from './schema'
@@ -29,8 +25,9 @@ import type { ChatMessageRow, ChatTables, ChatThreadRow, NewChatMessageRow, NewC
 /** Any SQLite drizzle database — `any` erases the driver-specific run-result
  *  and schema generics so better-sqlite3, D1, and libsql handles all fit.
  *  `batch` is structural: present on D1/libsql drizzle instances. */
-export type ChatDatabase = BaseSQLiteDatabase<'sync' | 'async', any, any> &
-  SqliteBatchDatabase
+export type ChatDatabase = BaseSQLiteDatabase<'sync' | 'async', any, any> & {
+  batch?: (statements: [unknown, ...unknown[]]) => Promise<unknown[]>
+}
 
 /** Product-injected access check. Throw to deny; the store never interprets
  *  users or roles itself. */
@@ -83,10 +80,6 @@ export interface AppendMessageInput {
   parts?: ChatMessagePart[]
   toolName?: string | null
   model?: string | null
-  requestedModel?: string | null
-  servedModel?: string | null
-  servedProvider?: string | null
-  servedSource?: string | null
   inputTokens?: number | null
   outputTokens?: number | null
   reasoningTokens?: number | null
@@ -110,10 +103,6 @@ export interface UpdateMessageInput {
   parts?: ChatMessagePart[]
   toolName?: string | null
   model?: string | null
-  requestedModel?: string | null
-  servedModel?: string | null
-  servedProvider?: string | null
-  servedSource?: string | null
   inputTokens?: number | null
   outputTokens?: number | null
   reasoningTokens?: number | null
@@ -133,26 +122,7 @@ export interface ListMessagesOptions {
 /** Define input for bulk deleting threads with access checks per workspace */
 export interface BulkDeleteThreadsInput {
   ids: string[]
-  /** Optional single-workspace fence for products whose route already resolved
-   *  one active workspace. Omitted preserves the multi-workspace legal route. */
-  workspaceId?: string
   /** Called once per distinct workspace the ids touch, before ANY delete. */
-  assertAccess: WorkspaceAccessCheck
-}
-
-/** Delete threads selected by their last activity time within one workspace.
- *
- * Products can add a lifecycle predicate such as `status = 'active'` through
- * `where`; the store still owns workspace scope, access ordering, and message
- * cleanup for every consumer. */
-export interface BulkDeleteThreadsByUpdatedAtInput {
-  workspaceId: string
-  /** Exclusive upper bound: rows older than this instant. */
-  updatedBefore?: Date
-  /** Inclusive lower bound: rows updated at or after this instant. */
-  updatedAfter?: Date
-  where?: SQL
-  /** Called before any delete for the requested workspace. */
   assertAccess: WorkspaceAccessCheck
 }
 
@@ -168,7 +138,6 @@ export interface ChatStore<TThread = ChatThreadRow, TMessage = ChatMessageRow> {
    *  the delete — single-thread callers usually check access themselves. */
   deleteThread(threadId: string, options?: { assertAccess?: WorkspaceAccessCheck }): Promise<boolean>
   bulkDeleteThreads(input: BulkDeleteThreadsInput): Promise<{ deleted: number }>
-  bulkDeleteThreadsByUpdatedAt(input: BulkDeleteThreadsByUpdatedAtInput): Promise<{ deleted: number }>
   /** Ordered oldest-first: `created_at`, then rowid (insertion order within a
    *  same-second burst — a user+assistant pair lands in one epoch second). */
   listMessages(threadId: string, options?: ListMessagesOptions): Promise<TMessage[]>
@@ -183,6 +152,21 @@ export interface ChatStore<TThread = ChatThreadRow, TMessage = ChatMessageRow> {
    *  incremental persistence to retract a draft row for a turn that ended
    *  producing nothing, so an empty assistant row is never left behind. */
   deleteMessage(id: string): Promise<boolean>
+}
+
+/** One driver round trip when `db.batch` exists; sequential awaits in the
+ *  given order otherwise. Statement order is the caller's integrity contract
+ *  (children before parents). */
+async function runStatements(
+  db: ChatDatabase,
+  statements: [unknown, ...unknown[]],
+): Promise<unknown[]> {
+  if (typeof db.batch === 'function') {
+    return await db.batch(statements)
+  }
+  const results: unknown[] = []
+  for (const statement of statements) results.push(await statement)
+  return results
 }
 
 function clampLimit(limit: number | undefined, fallback: number, max: number): number {
@@ -267,7 +251,7 @@ export function createChatStore<TTables extends ChatTables>(
       if (options?.assertAccess) await options.assertAccess(existing.workspaceId)
       // Messages first so a partial failure never leaves orphaned rows behind
       // a deleted thread.
-      await runSqliteStatements(db, [
+      await runStatements(db, [
         db.delete(messages).where(eq(messages.threadId, threadId)),
         db.delete(threads).where(eq(threads.id, threadId)),
       ])
@@ -275,7 +259,7 @@ export function createChatStore<TTables extends ChatTables>(
     },
 
     async bulkDeleteThreads(input) {
-      const { ids, workspaceId, assertAccess } = input
+      const { ids, assertAccess } = input
       if (typeof assertAccess !== 'function') throw new ChatStoreInputError('Missing assertAccess')
       if (!Array.isArray(ids) || ids.length === 0 || !ids.every((id) => typeof id === 'string' && id.length > 0)) {
         throw new ChatStoreInputError('Missing ids')
@@ -283,16 +267,10 @@ export function createChatStore<TTables extends ChatTables>(
       if (ids.length > BULK_DELETE_MAX_THREADS) {
         throw new ChatStoreInputError(`Too many ids (max ${BULK_DELETE_MAX_THREADS})`)
       }
-      if (workspaceId !== undefined && !workspaceId.trim()) {
-        throw new ChatStoreInputError('Invalid workspaceId')
-      }
 
-      const scope = workspaceId
-        ? and(inArray(threads.id, ids), eq(threads.workspaceId, workspaceId))
-        : inArray(threads.id, ids)
       const rows = await db.select({ id: threads.id, workspaceId: threads.workspaceId })
         .from(threads)
-        .where(scope)
+        .where(inArray(threads.id, ids))
       if (rows.length === 0) return { deleted: 0 }
 
       // Access is verified once per workspace the ids touch. Fail-closed: one
@@ -305,46 +283,11 @@ export function createChatStore<TTables extends ChatTables>(
       }
 
       const foundIds = rows.map((row) => row.id)
-      await runSqliteStatements(db, [
+      await runStatements(db, [
         db.delete(messages).where(inArray(messages.threadId, foundIds)),
         db.delete(threads).where(inArray(threads.id, foundIds)),
       ])
       return { deleted: foundIds.length }
-    },
-
-    async bulkDeleteThreadsByUpdatedAt(input) {
-      const { workspaceId, updatedBefore, updatedAfter, where, assertAccess } = input
-      if (typeof assertAccess !== 'function') throw new ChatStoreInputError('Missing assertAccess')
-      if (!workspaceId.trim()) throw new ChatStoreInputError('Missing workspaceId')
-      if (updatedBefore === undefined && updatedAfter === undefined) {
-        throw new ChatStoreInputError('Missing updatedAt boundary')
-      }
-      for (const boundary of [updatedBefore, updatedAfter]) {
-        if (boundary !== undefined && Number.isNaN(boundary.getTime())) {
-          throw new ChatStoreInputError('Invalid updatedAt boundary')
-        }
-      }
-
-      const conditions = [eq(threads.workspaceId, workspaceId)]
-      if (updatedBefore) conditions.push(lt(threads.updatedAt, updatedBefore))
-      if (updatedAfter) conditions.push(gte(threads.updatedAt, updatedAfter))
-      if (where) conditions.push(where)
-      const scope = and(...conditions)
-      const [countRow] = await db.select({ total: sql<number>`count(*)` })
-        .from(threads)
-        .where(scope)
-      const deleted = Number(countRow?.total ?? 0)
-      if (deleted === 0) return { deleted: 0 }
-
-      await assertAccess(workspaceId)
-      // Keep the age path unbounded without constructing a giant host-parameter
-      // list; the subquery lets SQLite/D1 stream the matching thread ids.
-      const matchingThreads = db.select({ id: threads.id }).from(threads).where(scope)
-      await runSqliteStatements(db, [
-        db.delete(messages).where(inArray(messages.threadId, matchingThreads)),
-        db.delete(threads).where(scope),
-      ])
-      return { deleted }
     },
 
     async listMessages(threadId, options) {
@@ -366,10 +309,6 @@ export function createChatStore<TTables extends ChatTables>(
         ...(input.parts !== undefined ? { parts: input.parts } : {}),
         ...(input.toolName !== undefined ? { toolName: input.toolName } : {}),
         ...(input.model !== undefined ? { model: input.model } : {}),
-        ...(input.requestedModel !== undefined ? { requestedModel: input.requestedModel } : {}),
-        ...(input.servedModel !== undefined ? { servedModel: input.servedModel } : {}),
-        ...(input.servedProvider !== undefined ? { servedProvider: input.servedProvider } : {}),
-        ...(input.servedSource !== undefined ? { servedSource: input.servedSource } : {}),
         ...(input.inputTokens !== undefined ? { inputTokens: input.inputTokens } : {}),
         ...(input.outputTokens !== undefined ? { outputTokens: input.outputTokens } : {}),
         ...(input.reasoningTokens !== undefined ? { reasoningTokens: input.reasoningTokens } : {}),
@@ -378,7 +317,7 @@ export function createChatStore<TTables extends ChatTables>(
         ...(input.costUsd !== undefined ? { costUsd: input.costUsd } : {}),
         ...(input.extras ?? {}),
       } as NewChatMessageRow
-      const [insertResult] = await runSqliteStatements(db, [
+      const [insertResult] = await runStatements(db, [
         db.insert(messages).values(values).returning(),
         db.update(threads).set({ updatedAt: new Date() }).where(eq(threads.id, input.threadId)),
       ])
@@ -393,10 +332,6 @@ export function createChatStore<TTables extends ChatTables>(
         ...(patch.parts !== undefined ? { parts: patch.parts } : {}),
         ...(patch.toolName !== undefined ? { toolName: patch.toolName } : {}),
         ...(patch.model !== undefined ? { model: patch.model } : {}),
-        ...(patch.requestedModel !== undefined ? { requestedModel: patch.requestedModel } : {}),
-        ...(patch.servedModel !== undefined ? { servedModel: patch.servedModel } : {}),
-        ...(patch.servedProvider !== undefined ? { servedProvider: patch.servedProvider } : {}),
-        ...(patch.servedSource !== undefined ? { servedSource: patch.servedSource } : {}),
         ...(patch.inputTokens !== undefined ? { inputTokens: patch.inputTokens } : {}),
         ...(patch.outputTokens !== undefined ? { outputTokens: patch.outputTokens } : {}),
         ...(patch.reasoningTokens !== undefined ? { reasoningTokens: patch.reasoningTokens } : {}),
@@ -412,7 +347,7 @@ export function createChatStore<TTables extends ChatTables>(
       // The thread bump reads the row's own `thread_id` rather than trusting a
       // caller-supplied one: a message never moves thread, so the subquery is
       // the authoritative source and one fewer parameter to get wrong.
-      const [updateResult] = await runSqliteStatements(db, [
+      const [updateResult] = await runStatements(db, [
         db.update(messages).set(values).where(eq(messages.id, id)).returning(),
         db.update(threads).set({ updatedAt: new Date() })
           .where(eq(threads.id, sql`(select ${messages.threadId} from ${messages} where ${messages.id} = ${id})`)),

@@ -35,16 +35,6 @@ export const UPLOAD_INLINE_MAX_BYTES = 700 * 1024
  *  it only with a sink that can take the bigger single write. */
 export const UPLOAD_MAX_FILE_BYTES = 8 * 1024 * 1024
 
-const DEFAULT_UPLOAD_DIRECTORY = '/workspace/uploads'
-
-function normalizeUploadDirectory(value: string): string | null {
-  const withoutTrailingSlash = value.trim().replace(/\/+$/, '')
-  if (!withoutTrailingSlash.startsWith('/') || withoutTrailingSlash.length === 0) return null
-  const segments = withoutTrailingSlash.slice(1).split('/')
-  if (segments.some((segment) => segment.length === 0 || segment === '.' || segment === '..')) return null
-  return `/${segments.join('/')}`
-}
-
 /** Structural match of the sandbox SDK's `box.fs` write surface (v0.10.5+:
  *  `encoding: 'base64'` is the worker-safe binary path). */
 export interface SandboxUploadSink {
@@ -72,8 +62,7 @@ export interface CreateUploadRouteOptions {
   inlineMaxBytes?: number
   /** Hard per-file cap. Default {@link UPLOAD_MAX_FILE_BYTES}. */
   maxFileBytes?: number
-  /** Absolute workspace directory for path-ref files.
-   *  Default `'/workspace/uploads'`. */
+  /** Workspace directory for path-ref files. Default `'uploads'`. */
   uploadDir?: string
 }
 
@@ -120,7 +109,7 @@ export function createUploadRoute(options: CreateUploadRouteOptions): (request: 
     const auth = await options.authorize({ request })
     if (!auth.ok) return auth.response
     const sink = auth.sink ?? null
-    const configuredUploadDir = auth.uploadDir ?? options.uploadDir ?? DEFAULT_UPLOAD_DIRECTORY
+    const uploadDir = (auth.uploadDir ?? options.uploadDir ?? 'uploads').replace(/\/+$/, '')
 
     let form: FormData
     try {
@@ -174,14 +163,6 @@ export function createUploadRoute(options: CreateUploadRouteOptions): (request: 
           413,
           'SANDBOX_REQUIRED',
           `${name} is ${file.size}B, over the ${inlineMaxBytes}B inline cap, and no sandbox is available to hold it`,
-        )
-      }
-      const uploadDir = normalizeUploadDirectory(configuredUploadDir)
-      if (!uploadDir) {
-        return uploadError(
-          500,
-          'INVALID_UPLOAD_DIRECTORY',
-          'uploadDir must be an absolute path without empty, "." or ".." segments',
         )
       }
       const path = `${uploadDir}/${id}-${name}`

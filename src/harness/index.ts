@@ -8,9 +8,9 @@
  * orphan the session's running agent state). Every product otherwise hand-rolls
  * this and hard-codes a single harness; this is the one place the rule lives.
  *
- * Substrate-free: the harness list is derived from `@tangle-network/agent-interface`'s canonical
- * harness enum and mirrors the sandbox SDK's `BackendType` (no sandbox dependency). The consumer
- * owns storage — which harness a workspace defaults to, which one a session locked — and maps the
+ * Substrate-free: the harness list mirrors the sandbox SDK's `BackendType` as a
+ * plain string union (no sandbox dependency). The consumer owns storage — which
+ * harness a workspace defaults to, which one a session locked — and maps the
  * resolved value onto the SDK's `backend.type`.
  *
  * Harness↔model COMPATIBILITY (which models a harness can run, snapping) is NOT defined here — it
@@ -21,7 +21,6 @@
 
 import {
   harnessSupportsModel,
-  harnessTypeSchema,
   modelProvider,
   preferredHarnessForModel,
   snapHarnessToModel as aiSnapHarnessToModel,
@@ -29,29 +28,27 @@ import {
   type HarnessType,
 } from '@tangle-network/agent-interface'
 
-/**
- * Canonical harnesses that are NOT sandbox backends. Each value in `KNOWN_HARNESSES` is dispatched
- * as `backend.type`, so a harness the platform ships no provider adapter for must stay out —
- * offering it would resolve a session onto a runner that cannot start.
- */
-const NON_BACKEND_HARNESSES = ['gemini'] as const satisfies readonly HarnessType[]
+/** The known coding-agent backends. Mirrors `@tangle-network/sandbox`'s
+ *  `BackendType`; kept structural so this module needs no sandbox dependency. */
+export const KNOWN_HARNESSES = [
+  'opencode',
+  'claude-code',
+  'nanoclaw',
+  'kimi-code',
+  'codex',
+  'amp',
+  'factory-droids',
+  'pi',
+  'hermes',
+  'forge',
+  'openclaw',
+  'acp',
+  'cursor',
+  'cli-base',
+] as const
 
-const nonBackendHarnesses = new Set<string>(NON_BACKEND_HARNESSES)
-
-/** A coding-agent backend this shell can dispatch a session onto. */
-export type Harness = Exclude<HarnessType, (typeof NON_BACKEND_HARNESSES)[number]>
-
-/**
- * The known coding-agent backends: the canonical harness set minus what has no provider adapter,
- * Derived from `harnessTypeSchema.options` so a harness added upstream reaches this shell without
- * an edit here, and kept structural so this module still needs no sandbox dependency.
- */
-export const KNOWN_HARNESSES: readonly Harness[] = [
-  ...harnessTypeSchema.options.filter(
-    (harness): harness is Exclude<HarnessType, (typeof NON_BACKEND_HARNESSES)[number]> =>
-      !nonBackendHarnesses.has(harness),
-  ),
-]
+/** Resolve a valid harness identifier from the predefined KNOWN_HARNESSES array */
+export type Harness = (typeof KNOWN_HARNESSES)[number]
 
 /** Define the default harness to use for code execution and testing environments */
 export const DEFAULT_HARNESS: Harness = 'opencode'
@@ -114,9 +111,11 @@ export function resolveSessionHarness(input: ResolveSessionHarnessInput = {}): R
 /**
  * Harness ↔ model compatibility + snapping — delegated to `@tangle-network/agent-interface`.
  *
- * `Harness` is the dispatchable subset of `HarnessType`: this shell drops only canonical harnesses
- * for which the platform has no backend. Compatibility therefore comes entirely from Interface;
- * this package keeps no second harness taxonomy.
+ * agent-app's `Harness` taxonomy is a superset of agent-interface's `HarnessType` (it carries
+ * `forge`/`cursor`, which agent-interface doesn't list). Those extra runners have no provider lock
+ * there, so they resolve as router-backed (any model) — the correct behavior — which makes the
+ * `as HarnessType` casts safe. The snap helpers only ever return a vendor-locked harness or
+ * `opencode`, all of which are valid `Harness` values.
  */
 
 export { modelProvider }
@@ -124,26 +123,20 @@ export { modelProvider }
 /** Provider-less ids (sentinels like "default", or a session's own config) are
  *  compatible everywhere — every harness honors its own configuration. */
 export function isModelCompatibleWithHarness(harness: Harness, modelId: string): boolean {
-  return harnessSupportsModel(harness, modelId)
+  return harnessSupportsModel(harness as HarnessType, modelId)
 }
 
 /** Keep `modelId` when the harness can run it; else the harness's best compatible
  *  catalog id (preferred patterns in order, highest version). When nothing in the
  *  catalog fits, return the original so the caller sees the incompatibility. */
 export function snapModelToHarness(harness: Harness, modelId: string, canonicalIds: readonly string[]): string {
-  return aiSnapModelToHarness(harness, modelId, canonicalIds)
+  return aiSnapModelToHarness(harness as HarnessType, modelId, canonicalIds)
 }
 
 /** Keep the harness when it can run `modelId`; else the model's native harness
  *  (anthropic → claude-code, openai → codex, moonshot → kimi-code), falling back to opencode. */
 export function snapHarnessToModel(harness: Harness, modelId: string): Harness {
-  const snapped = aiSnapHarnessToModel(harness, modelId)
-  if (!isHarness(snapped)) {
-    throw new Error(
-      `Harness "${harness}" snapped to "${snapped}" for model "${modelId}", which this platform has no backend for.`,
-    )
-  }
-  return snapped
+  return aiSnapHarnessToModel(harness as HarnessType, modelId) as Harness
 }
 
 /** Fail-loud server guard: throw when a harness is asked to run a model it can't.

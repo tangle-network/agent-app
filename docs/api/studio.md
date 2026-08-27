@@ -4,15 +4,7 @@
 
 Source: `src/studio/index.ts`
 
-70 exports.
-
-### `aspectRatioFromOptions`
-
-`function` — Resolve a requested lane's aspect ratio from its selected options.
-
-```ts
-(type: GenerationType, options: { size?: string | undefined; aspectRatio?: string | undefined; }) => number | undefined
-```
+37 exports.
 
 ### `buildGenerationRequestBody`
 
@@ -22,36 +14,28 @@ Source: `src/studio/index.ts`
 (fields: GenerationRequestFields) => Record<string, unknown>
 ```
 
-### `curateComposerModels`
+### `buildPublishPackage`
 
-`function` — Curate catalog models for the issue #449 composer lanes.
+`function` — Build a PublishPackage object from caption, description, mentions, cadence, and destinations inputs
 
 ```ts
-(type: GenerationType, models: MediaModelOption[]) => MediaModelOption[]
+({ caption, postDescription, mentions, cadence, destinations, }: { caption: string; postDescription: string; mentions:…
 ```
 
-### `defaultVaultPathFor`
+### `CADENCES`
 
-`function` — Choose the default vault folder shared by a homogeneous media selection.
+`const` — Provide an array of predefined cadence options for scheduling or approval processes
 
 ```ts
-(generations: readonly Generation[]) => string
+string[]
 ```
 
-### `DeleteGenerations`
+### `DESTINATIONS`
 
-`type` — The shell may invoke this during page teardown (the `pagehide`/unmount flush of a deferred delete).
-
-```ts
-type DeleteGenerations
-```
-
-### `DownloadGenerations`
-
-`type`
+`const` — List available social media platforms with their publishing fields and provider identifiers
 
 ```ts
-type DownloadGenerations
+PublishDestination[]
 ```
 
 ### `failedOptimisticGeneration`
@@ -60,22 +44,6 @@ type DownloadGenerations
 
 ```ts
 (generation: Generation) => Generation
-```
-
-### `FALLBACK_VIDEO_MODEL_OPTIONS`
-
-`const` — Fallback video options matching tangle-router's wire-exact metadata.
-
-```ts
-Readonly<Record<string, Readonly<Record<string, ModelOptionMetadata>>>>
-```
-
-### `FetchGenerationsPage`
-
-`type`
-
-```ts
-type FetchGenerationsPage
 ```
 
 ### `Generation`
@@ -94,30 +62,6 @@ interface Generation
 readonly GenerationType[]
 ```
 
-### `generationAspectRatio`
-
-`function` — Resolve the best available aspect ratio for a generation row.
-
-```ts
-(generation: Generation) => number
-```
-
-### `generationAssetId`
-
-`function` — Resolve the stored media asset id, when present.
-
-```ts
-(generation: Generation) => string | null
-```
-
-### `generationBatchKey`
-
-`function` — Resolve a generation's batch identity, preferring the server batch id.
-
-```ts
-(generation: Generation) => string
-```
-
 ### `generationError`
 
 `function` — Resolve and return the first user-safe error message from generation metadata or null if none exist
@@ -134,52 +78,12 @@ readonly GenerationType[]
 (generation: Generation) => string | null
 ```
 
-### `GenerationPage`
-
-`interface`
-
-```ts
-interface GenerationPage
-```
-
-### `GenerationPageQuery`
-
-`interface`
-
-```ts
-interface GenerationPageQuery
-```
-
 ### `GenerationRequestFields`
 
 `interface` — Define fields required to configure and request various types of media generation
 
 ```ts
 interface GenerationRequestFields
-```
-
-### `generationSavedToVault`
-
-`function` — Whether the product has admitted generated media into its Vault.
-
-```ts
-(generation: Generation) => boolean
-```
-
-### `generationsInBatch`
-
-`function` — Select and order all outputs belonging to a generation batch.
-
-```ts
-(generations: readonly Generation[], batchKey: string) => Generation[]
-```
-
-### `generationSpecSegments`
-
-`function` — Resolve only the human-readable media specification fields a row carries.
-
-```ts
-(generation: Generation) => string[]
 ```
 
 ### `generationStatus`
@@ -214,44 +118,12 @@ type GenerationType
 (generation: Generation) => string | null
 ```
 
-### `GPT_IMAGE_2_CUSTOM_SIZE`
+### `isDestinationConnected`
 
-`const` — UI constraints for a custom gpt-image-2 size.
-
-```ts
-{ readonly multipleOf: 16; readonly maxLongEdge: 3840; readonly maxRatio: 3; }
-```
-
-### `GRID_WAVEFORM_BARS`
-
-`const`
+`function` — Determine if a destination has any active connections in the given list of studio integration connections
 
 ```ts
-26
-```
-
-### `hashSeed`
-
-`function` — Hash a string with FNV-1a into an unsigned 32-bit seed.
-
-```ts
-(value: string) => number
-```
-
-### `IMAGE_TO_VIDEO_SIBLINGS`
-
-`const` — Map verified text-to-video model ids to their image-to-video siblings.
-
-```ts
-Readonly<Record<string, string>>
-```
-
-### `imageToVideoSibling`
-
-`function` — Resolve a verified image-to-video sibling for a text-to-video model.
-
-```ts
-(modelId: string) => string | undefined
+(destination: PublishDestination, connections: StudioIntegrationConnection[]) => boolean
 ```
 
 ### `isGenerationType`
@@ -270,12 +142,12 @@ Readonly<Record<string, string>>
 (generation: Generation) => boolean
 ```
 
-### `laneUnavailable`
+### `isPublishPackage`
 
-`function` — True when a model list offers nothing sendable: no models, or every model unavailable.
+`function` — Determine if a value conforms to the PublishPackage structure with optional metadata fields
 
 ```ts
-(models: readonly MediaModelOption[]) => boolean
+(value: unknown) => value is { caption?: string | undefined; description?: string | undefined; mentions?: string[] | un…
 ```
 
 ### `latestBatchOf`
@@ -291,15 +163,7 @@ Readonly<Record<string, string>>
 `const` — Define the maximum number of images allowed for upload or display
 
 ```ts
-8
-```
-
-### `MEDIA_TYPE_FILTERS`
-
-`const`
-
-```ts
-readonly { value: MediaTypeFilter; label: string; }[]
+4
 ```
 
 ### `MediaModelCatalogResponse`
@@ -312,7 +176,7 @@ interface MediaModelCatalogResponse
 
 ### `MediaModelOption`
 
-`interface` — Describe a catalog media model and its optional wire-level option metadata.
+`interface` — Describe media model option properties including id, name, type, status, and optional provider and reason
 
 ```ts
 interface MediaModelOption
@@ -324,22 +188,6 @@ interface MediaModelOption
 
 ```ts
 type MediaModelStatus
-```
-
-### `MediaTypeFilter`
-
-`type`
-
-```ts
-type MediaTypeFilter
-```
-
-### `mergeGenerationPages`
-
-`function` — Append a page while preserving the first row seen for each id.
-
-```ts
-(prev: readonly Generation[], next: readonly Generation[]) => Generation[]
 ```
 
 ### `mergeLiveGeneration`
@@ -368,34 +216,10 @@ type MediaTypeFilter
 
 ### `modelMessage`
 
-`function` — DEPRECATED (the composer renders availability in the pill/menu/lane states since #463) — resolve the status message for a media model.
+`function` — Resolve the appropriate status message for a media model based on loading state and availability
 
 ```ts
 (model: MediaModelOption | undefined, loading: boolean, count: number) => string | null
-```
-
-### `ModelOptionMetadata`
-
-`interface` — Per-parameter option metadata, structurally identical to tangle-router's `ModelOptionMetadata` (lib/model-options.ts, shipped in router PR #429).
-
-```ts
-interface ModelOptionMetadata
-```
-
-### `ModelOptionsMetadata`
-
-`type` — Per-parameter model option metadata keyed by the provider's wire field.
-
-```ts
-type ModelOptionsMetadata
-```
-
-### `ModelOptionValue`
-
-`type` — A wire-typed value accepted by a model option.
-
-```ts
-type ModelOptionValue
 ```
 
 ### `normalizeImageCount`
@@ -406,36 +230,12 @@ type ModelOptionValue
 (value: unknown) => number
 ```
 
-### `normalizeVaultPath`
-
-`function` — Normalize a user-entered relative vault folder or reject an unsafe path.
-
-```ts
-(input: string) => string | null
-```
-
 ### `optimisticGeneration`
 
 `function` — Generate content optimistically based on input parameters and optional model and output details
 
 ```ts
 ({ type, prompt, model, clientRequestId, outputIndex, outputCount, }: { type: GenerationType; prompt: string; model?: s…
-```
-
-### `optionChoices`
-
-`function` — Return exact enum choices or an inclusive integer range.
-
-```ts
-(meta: ModelOptionMetadata) => readonly ModelOptionValue[]
-```
-
-### `optionDefault`
-
-`function` — Resolve an option default from its default, values, or lower bound.
-
-```ts
-(meta: ModelOptionMetadata) => ModelOptionValue | undefined
 ```
 
 ### `outputPathFor`
@@ -454,20 +254,20 @@ type ModelOptionValue
 (type: GenerationType, catalog: MediaModelCatalogResponse | null) => string | undefined
 ```
 
-### `previewWaveformBars`
+### `PublishDestination`
 
-`function` — Build stable pseudo-waveform bars for a media preview.
+`interface` — Define a destination for publishing content with identifiers, label, provider IDs, and fields
 
 ```ts
-(seed: string, count: number) => readonly WaveformBar[]
+interface PublishDestination
 ```
 
-### `reconcileOptionValues`
+### `PublishPackage`
 
-`function` — Reconcile selections against supported options and their wire-typed defaults.
+`interface` — Define the structure for configuring package publishing details and evaluation criteria
 
 ```ts
-(options: Readonly<Record<string, ModelOptionMetadata>> | undefined, current: Readonly<Record<string, ModelOptionValue>…
+interface PublishPackage
 ```
 
 ### `relativeTime`
@@ -478,52 +278,20 @@ type ModelOptionValue
 (date: Date | null) => string
 ```
 
-### `resolveComposerOptions`
-
-`function` — Resolve live catalog options first, then exact or safe single-prefix fallbacks.
-
-```ts
-(input: { type: "image" | "video" | "speech"; modelId: string; provider?: string | undefined; catalogOptions?: Readonly…
-```
-
-### `SaveGenerationsToVault`
-
-`type`
-
-```ts
-type SaveGenerationsToVault
-```
-
 ### `selectedModelsWithDefaults`
 
-`function` — DEPRECATED (orphaned since #449 deleted its consumer) — resolve selected models by applying catalog defaults.
+`function` — Resolve selected models by applying defaults for missing or unavailable entries in the catalog
 
 ```ts
 (current: Partial<Record<GenerationType, string>>, catalog: MediaModelCatalogResponse) => Partial<Record<GenerationType…
 ```
 
-### `StudioMediaActions`
+### `StudioIntegrationConnection`
 
-`interface` — Every media action a tile / viewer / batch bar can offer.
-
-```ts
-interface StudioMediaActions
-```
-
-### `supportsCustomImageSize`
-
-`function` — Return whether a model supports the gpt-image-2 custom-size rule.
+`interface` — Define the structure for a studio integration connection with status and provider identifiers
 
 ```ts
-(modelId: string) => boolean
-```
-
-### `textToVideoSibling`
-
-`function` — Resolve the verified text-to-video sibling for an image-to-video model.
-
-```ts
-(modelId: string) => string | undefined
+interface StudioIntegrationConnection
 ```
 
 ### `userSafeGenerationMessage`
@@ -532,36 +300,4 @@ interface StudioMediaActions
 
 ```ts
 (message?: string | undefined) => string
-```
-
-### `validateCustomImageSize`
-
-`function` — Validate a custom gpt-image-2 size against its published UI constraints.
-
-```ts
-(width: number, height: number) => { ok: true; } | { ok: false; reason: string; }
-```
-
-### `VaultSaveResult`
-
-`interface`
-
-```ts
-interface VaultSaveResult
-```
-
-### `WaveformBar`
-
-`interface` — A deterministic waveform bar used when decoded audio is unavailable.
-
-```ts
-interface WaveformBar
-```
-
-### `WIDE_WAVEFORM_BARS`
-
-`const`
-
-```ts
-72
 ```

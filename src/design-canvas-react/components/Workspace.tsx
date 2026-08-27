@@ -192,14 +192,7 @@ export function WorkspaceView({
 
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 })
-  // Auto-fit stays live until the user takes control of the view (wheel zoom,
-  // pan, zoom controls, explicit fit). While live, every container re-measure
-  // re-fits: the first measurement can be a transient (composite grids and
-  // mounting chrome settle over several frames), and a one-shot fit would lock
-  // the page at the transient size's zoom — the 5% clamp for small cells.
-  const autoFitRef = useRef(true)
-  const lastAutoFitRef = useRef<{ zoom: number; panX: number; panY: number; width: number; height: number } | null>(null)
-  const readyRef = useRef(false)
+  const hasFittedRef = useRef(false)
 
   useLayoutEffect(() => {
     const el = containerRef.current
@@ -209,32 +202,14 @@ export function WorkspaceView({
       if (!entry) return
       const { width, height } = entry.contentRect
       setContainerSize({ width, height })
-      if (width <= 0 || height <= 0) return
-
-      // A view that no longer matches our last auto-fit means the user owns
-      // the view now — never yank their zoom on a later resize.
-      const view = stack.getState()
-      const last = lastAutoFitRef.current
-      if (last && (view.zoom !== last.zoom || view.panX !== last.panX || view.panY !== last.panY)) {
-        autoFitRef.current = false
-      }
-      // Re-fit only when the measured size CHANGED. Effect re-subscriptions
-      // (page switch, document edit) re-fire the observer with the same size;
-      // re-fitting there would clobber the zoom+pan the page switch preserved.
-      if (
-        autoFitRef.current &&
-        fitOnMount &&
-        activePage.width > 0 &&
-        activePage.height > 0 &&
-        (!last || last.width !== width || last.height !== height)
-      ) {
-        const fit = zoomPanMath.fitPage(activePage, { width, height })
-        stack.setView(fit)
-        lastAutoFitRef.current = { ...fit, width, height }
-      }
-      // One-shot ready signal on the first real measurement.
-      if (!readyRef.current) {
-        readyRef.current = true
+      // One-shot fit on the first real measurement. The hasFittedRef guard keeps
+      // it single-fire across the effect's re-subscriptions (page switch must
+      // preserve the user's zoom+pan, not re-fit).
+      if (!hasFittedRef.current && width > 0 && height > 0) {
+        hasFittedRef.current = true
+        if (fitOnMount && activePage.width > 0 && activePage.height > 0) {
+          stack.setView(zoomPanMath.fitPage(activePage, { width, height }))
+        }
         onReady?.()
       }
     })
@@ -908,19 +883,7 @@ export function WorkspaceView({
 
   return (
     <div
-      // h-full w-full: the chrome's workspace slot (DesignCanvas) is a definite-
-      // height flex box, so the root must fill it explicitly. Without it the div
-      // sizes to the Konva stage's current pixel size and the ResizeObserver
-      // below measures that content-sized box — a feedback loop stuck at the
-      // initial 600px that leaves a dead strip (large viewports) or overflows
-      // the canvas over the bottom chrome (small viewports).
-      // The canvas is `tabIndex={0}`, so Tab lands here and the keyboard
-      // shortcuts below only work once it has focus — it must show that it does.
-      // The floor's ring is kept but pulled INSIDE the border box: this element
-      // is full-bleed inside its pane, so an outward ring is clipped by the
-      // ancestor that scrolls it. Only the offset is overridden; width and color
-      // still come from the tokens.
-      className={`design-canvas-workspace relative h-full w-full overflow-hidden bg-[var(--canvas-backdrop,#1a1a1a)] focus-visible:[outline-offset:-2px] ${className ?? ''}`}
+      className={`design-canvas-workspace relative overflow-hidden bg-[var(--canvas-backdrop,#1a1a1a)] outline-none ${className ?? ''}`}
       ref={containerRef}
       tabIndex={0}
       onWheel={handleWheel}
@@ -1040,14 +1003,11 @@ export function WorkspaceView({
         </div>
       )}
 
-      {/* Marquee rect — stroke/fill come from the render palette's selection
-          color (same token the transformer uses) so theming stays coherent. */}
+      {/* Marquee rect */}
       {normalizedMarquee && (
         <div
-          className="pointer-events-none absolute border"
+          className="pointer-events-none absolute border border-blue-400 bg-blue-400/10"
           style={{
-            borderColor: render.selectionStroke,
-            backgroundColor: `color-mix(in srgb, ${render.selectionStroke} 10%, transparent)`,
             left: panX + normalizedMarquee.x * zoom,
             top: panY + normalizedMarquee.y * zoom,
             width: normalizedMarquee.width * zoom,

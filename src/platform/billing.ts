@@ -10,7 +10,6 @@
  */
 
 import type { PlatformBillingClient, PlatformIdentity } from '../billing/index'
-import { resolveTangleExecutionEnvironment } from '../runtime/model'
 
 /** Define available subscription tiers for the TanglePlan service */
 export type TanglePlanTier = 'free' | 'pro' | 'enterprise'
@@ -78,30 +77,17 @@ export interface PlatformUsageProductRow {
  *  the platform persists. 'none' = the user has never held this seat. */
 export type SeatStatus = 'none' | 'active' | 'trialing' | 'past_due' | 'canceled'
 
-/** Price and included shared-wallet credit for one seat billing period. */
-export interface ProductSeatOfferPeriod {
-  priceCents: number
-  includedCreditsCents: number
-}
-
-/** Commercial terms returned by the platform's product catalog. Products use
- * this exact object for display instead of duplicating prices in UI copy. */
-export interface ProductSeatOffer {
-  currency: 'usd'
-  interval: 'month'
-  recurring: ProductSeatOfferPeriod
-  introductory: ProductSeatOfferPeriod | null
-}
-
 /**
  * Per-product entitlement snapshot from the platform — the single read that
  * tells a product whether to show its workspace or the seat paywall. Shape
  * matches `GET /v1/billing/product-entitlement?product=<id>`.
  *
- * `hasSeat` is computed platform-side from the raw seat row.
- * It is true for an active or trialing seat whose period has not lapsed.
- * `onFreeTier` remains in the wire shape for compatibility, but this client
- * always returns false and never uses it for access.
+ * `hasSeat` and `onFreeTier` are computed platform-side from the raw seat row
+ * + cumulative spend so the gate is identical across all five products:
+ * - `hasSeat`     — an active/trialing seat whose period has not lapsed.
+ * - `onFreeTier`  — no active seat AND cumulative spend below the free cap
+ *                   ($2 / 200¢ lifetime). Keys off lifetime spend, not wallet
+ *                   balance, so a router top-up never re-opens free access.
  */
 export interface ProductEntitlement {
   seatStatus: SeatStatus
@@ -111,45 +97,6 @@ export interface ProductEntitlement {
   lifetimeSpentUsd: number
   hasSeat: boolean
   onFreeTier: boolean
-  /** Present when the platform exposes catalog-backed commercial terms. */
-  offer?: ProductSeatOffer
-}
-
-function productSeatOffer(value: unknown): ProductSeatOffer | undefined {
-  if (!value || typeof value !== 'object') return undefined
-  const candidate = value as Record<string, unknown>
-  if (candidate.currency !== 'usd' || candidate.interval !== 'month') return undefined
-
-  const period = (input: unknown, allowZeroPrice: boolean): ProductSeatOfferPeriod | undefined => {
-    if (!input || typeof input !== 'object') return undefined
-    const data = input as Record<string, unknown>
-    const priceCents = data.priceCents
-    const includedCreditsCents = data.includedCreditsCents
-    if (
-      typeof priceCents !== 'number' ||
-      !Number.isSafeInteger(priceCents) ||
-      (allowZeroPrice ? priceCents < 0 : priceCents <= 0) ||
-      typeof includedCreditsCents !== 'number' ||
-      !Number.isSafeInteger(includedCreditsCents) ||
-      includedCreditsCents < 0
-    ) {
-      return undefined
-    }
-    return { priceCents, includedCreditsCents }
-  }
-
-  const recurring = period(candidate.recurring, false)
-  const introductory =
-    candidate.introductory === null
-      ? null
-      : period(candidate.introductory, true)
-  if (!recurring || introductory === undefined) return undefined
-  return {
-    currency: 'usd',
-    interval: 'month',
-    recurring,
-    introductory,
-  }
 }
 
 /** Define methods to interact with platform billing endpoints using user or service authentication */
@@ -172,7 +119,7 @@ export interface PlatformBillingHttp {
   }): Promise<void>
   /** Absolute URL of the platform's billing-management surface. */
   billingUrl(): string
-  /** Absolute URL of the catalog-backed seat checkout for `productId`. */
+  /** Absolute URL of the $100/mo seat checkout for `productId`. */
   seatCheckoutUrl(productId: string): string
 }
 
@@ -253,20 +200,17 @@ export function createPlatformBillingHttp(opts: PlatformBillingHttpOptions): Pla
           lifetimeSpentUsd?: number | null
           hasSeat?: boolean | null
           onFreeTier?: boolean | null
-          offer?: unknown
         }
       }>(userApiKey, `/v1/billing/product-entitlement?product=${slug}`)
       const data = body.data ?? {}
       const hasSeat = data.hasSeat === true
-      const offer = productSeatOffer(data.offer)
       return {
         seatStatus: data.seatStatus ?? 'none',
         currentPeriodEnd: data.currentPeriodEnd ?? null,
         lifetimeSpentUsd: data.lifetimeSpentUsd ?? 0,
         hasSeat,
-        // Product-funded free access is retired. Ignore stale server signals.
-        onFreeTier: false,
-        ...(offer ? { offer } : {}),
+        // Free access only when there is no seat AND the platform says so.
+        onFreeTier: !hasSeat && data.onFreeTier === true,
       }
     },
 
@@ -299,10 +243,10 @@ export function createPlatformBillingHttp(opts: PlatformBillingHttpOptions): Pla
 }
 
 /**
- * Platform Stripe checkout URL for a product's catalog-backed seat. The
- * platform resolves the product-specific price and introductory offer from the
- * `product` query param. Mirrors the `billingUrl()` shape — a deterministic
- * platform-rooted URL with no client-side pricing decisions.
+ * Platform Stripe checkout URL for a product's $100/mo seat. One shared price
+ * carries `metadata.productId`; the platform distinguishes the product from
+ * the `product` query param (not five distinct prices). Mirrors the
+ * `billingUrl()` shape — a deterministic platform-rooted URL, no network call.
  */
 export function seatCheckoutUrl(baseUrl: string, productId: string): string {
   const root = baseUrl.replace(/\/+$/, '')
@@ -369,12 +313,14 @@ export async function readTangleTierState(
 
 // ── Per-product seat entitlement ────────────────────────────────────────────
 
-/** Product-funded free inference spend is disabled. */
-export const FREE_TIER_SPEND_CAP_USD = 0
+/** Lifetime free-tier cap: $2 (200¢) cumulative inference spend, expressed in
+ *  dollars. Free product access ends once cumulative spend crosses this. */
+export const FREE_TIER_SPEND_CAP_USD = 2
 
 /**
- * Default name of the per-app feature flag that controls seat billing.
- * Explicit values override the environment default.
+ * Default name of the per-app feature flag gating seat billing. While OFF the
+ * entitlement read is skipped and access fails OPEN (entitled) so nothing
+ * changes live until a product flips the flag.
  */
 export const DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR = 'SEAT_BILLING_ENABLED'
 
@@ -386,25 +332,26 @@ export interface SeatBillingFlagOptions {
 }
 
 /**
- * An explicit flag controls seat billing in every environment.
- * Without a flag, known development and test environments default to OFF.
- * Deployed and unknown environments default to ON.
+ * Seat billing is OFF unless the flag is explicitly truthy ('true'/'1'/'on'/
+ * 'enabled'). Default OFF — pre-rollout, the paywall never engages. Returns
+ * false when no env is available (browser bundles) so the client stays
+ * fail-open there too.
  */
 export function isSeatBillingEnabled(opts: SeatBillingFlagOptions = {}): boolean {
   const env =
     opts.env ??
     (typeof process !== 'undefined' ? (process.env as Record<string, string | undefined>) : undefined)
-  if (!env) return true
+  if (!env) return false
   const flag = env[opts.flagEnvVar ?? DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR]?.trim().toLowerCase()
-  if (flag) return !['false', '0', 'off', 'disabled', 'no'].includes(flag)
-  const environment = resolveTangleExecutionEnvironment(env)
-  return environment !== 'development' && environment !== 'test'
+  return flag === 'true' || flag === '1' || flag === 'on' || flag === 'enabled'
 }
 
 /**
- * Read a user's entitlement for one product.
- * An absent key or disabled flag returns no access.
- * Transport failures propagate so the product can return a retryable error.
+ * Read a user's entitlement for one product. Fails OPEN: an absent key,
+ * disabled flag, or unreachable seat endpoint all return a permissive snapshot
+ * (`hasSeat: true`) so consumers never break pre-rollout. The platform owns the
+ * `hasSeat`/`onFreeTier` computation; this client only transports + degrades
+ * safely.
  *
  * @param flag — pass {@link isSeatBillingEnabled} (or your own boolean) so the
  *   product owns when the gate engages. When false, no network call is made.
@@ -415,24 +362,30 @@ export async function getProductEntitlement(
   productId: string,
   flag = true,
 ): Promise<ProductEntitlement> {
-  if (!flag) return unavailableEntitlement()
-  if (!userApiKey) return unavailableEntitlement()
-  return http.getProductEntitlement(userApiKey, productId)
+  if (!flag || !userApiKey) return failOpenEntitlement()
+  try {
+    return await http.getProductEntitlement(userApiKey, productId)
+  } catch {
+    // Seat endpoint unavailable (pre-rollout platform, transient 5xx): never
+    // wall a paying or grandfathered user on a transport hiccup.
+    return failOpenEntitlement()
+  }
 }
 
-function unavailableEntitlement(): ProductEntitlement {
+function failOpenEntitlement(): ProductEntitlement {
   return {
-    seatStatus: 'none',
+    seatStatus: 'active',
     currentPeriodEnd: null,
     lifetimeSpentUsd: 0,
-    hasSeat: false,
+    hasSeat: true,
     onFreeTier: false,
   }
 }
 
-/** Product access requires an active paid or trialing seat. */
+/** Entitled = holds an active seat OR is still inside the free tier. The one
+ *  predicate all five products gate on. */
 export function isProductEntitled(ent: ProductEntitlement): boolean {
-  return ent.hasSeat
+  return ent.hasSeat || ent.onFreeTier
 }
 
 // ── Bridge onto the /billing seam ───────────────────────────────────────────

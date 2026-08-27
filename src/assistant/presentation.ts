@@ -9,14 +9,14 @@ import type { PendingProposal } from "./types";
 
 /** USD balance below which the panel surfaces a low-balance warning. Mirrors
  *  the wallet warning threshold on the Billing page. */
-const LOW_BALANCE_THRESHOLD = 1;
+export const LOW_BALANCE_THRESHOLD = 1;
 
-interface ErrorCta {
+export interface ErrorCta {
   label: string;
   to: string;
 }
 
-interface ErrorView {
+export interface ErrorView {
   message: string;
   cta: ErrorCta | null;
 }
@@ -76,19 +76,19 @@ export function presentError(code: string, message: string): ErrorView {
   }
 }
 
-interface ProposalField {
+export interface ProposalField {
   label: string;
   value: string;
 }
 
 /** A new skill minted alongside a workflow, shown as a named line on the card
  *  so the user sees what's being created without the raw skills JSON. */
-interface ProposalSkill {
+export interface ProposalSkill {
   name: string;
   description: string | null;
 }
 
-interface ProposalView {
+export interface ProposalView {
   /** Verb-first heading, e.g. "Create workflow". */
   title: string;
   /** A body preview with its own label — a workflow's YAML (`kind: "workflow"`,
@@ -133,9 +133,29 @@ function parseProposalSkills(v: unknown): ProposalSkill[] | undefined {
 }
 
 /** Humanize an unknown tool name (`set_workflow_enabled` → "Set workflow enabled"). */
-function humanizeToolName(name: string): string {
+export function humanizeToolName(name: string): string {
   const spaced = name.replace(/_/g, " ").trim();
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+/** Present-tense labels for the inline tool-activity chips ("Validating
+ *  workflow…"). Falls back to a humanized tool name for any unmapped tool, so a
+ *  newly added read-only tool still renders a sensible label. */
+const TOOL_ACTIVITY_LABELS: Record<string, string> = {
+  get_workflow_schema: "Reading the workflow format",
+  list_workflows: "Listing workflows",
+  get_workflow: "Reading workflow",
+  validate_workflow: "Validating workflow",
+  list_skills: "Listing skills",
+  get_skill: "Reading skill",
+  list_integrations: "Checking integrations",
+  get_credit_balance: "Checking balance",
+  get_usage: "Checking usage",
+  list_api_keys: "Listing API keys",
+};
+
+export function describeToolActivity(name: string): string {
+  return TOOL_ACTIVITY_LABELS[name] ?? humanizeToolName(name);
 }
 
 /**
@@ -225,8 +245,7 @@ export function describeProposal(proposal: PendingProposal): ProposalView {
       if (args.product != null)
         fields.push({ label: "Product", value: str(args.product) });
       if (args.budgetUsd != null)
-        // Money reads as money: "$25", with the unit off the label.
-        fields.push({ label: "Budget", value: `$${str(args.budgetUsd)}` });
+        fields.push({ label: "Budget (USD)", value: str(args.budgetUsd) });
       return { title: "Create API key", preview: null, fields };
     }
     case "revoke_api_key":
@@ -326,11 +345,11 @@ export function isLowBalance(balanceUsd: number | null): boolean {
 
 /** The outcome of a confirmed tool call, mirroring `ConfirmResult` from the
  *  stream layer without coupling presentation to it. */
-type ConfirmOutcome =
+export type ConfirmOutcome =
   | { ok: true; output: unknown }
   | { ok: false; error: string };
 
-interface ConfirmResolution {
+export interface ConfirmResolution {
   /** Transcript note to append, or null when there's nothing to say. */
   statusText: string | null;
   /** Error banner to surface, or null on a clean success. */

@@ -4,7 +4,7 @@
 
 Source: `src/web-react/terminal.ts`
 
-6 exports.
+10 exports.
 
 ### `SandboxTerminalConnection`
 
@@ -16,7 +16,7 @@ interface SandboxTerminalConnection
 
 ### `SandboxTerminalConnectionResponse`
 
-`interface` — Define the response structure for a sandbox terminal connection including URLs, token, status, and errors The browser-direct scoped-token route (`createSandboxTerminalConnectionRoute`, `src/sandbox/t…
+`interface` — Define the response structure for a sandbox terminal connection including URLs, token, status, and errors
 
 ```ts
 interface SandboxTerminalConnectionResponse
@@ -30,9 +30,25 @@ interface SandboxTerminalConnectionResponse
 (storageKey?: string) => string
 ```
 
+### `TerminalStatusDisplay`
+
+`interface`
+
+```ts
+interface TerminalStatusDisplay
+```
+
+### `TerminalStatusTone`
+
+`type`
+
+```ts
+type TerminalStatusTone
+```
+
 ### `useSandboxTerminalConnection`
 
-`function` — Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling `connectionUrl` is backed by the browser-direct scoped-token route (`createSandboxTerminalConnectio…
+`function` — Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling
 
 ```ts
 (opts: UseSandboxTerminalConnectionOptions) => UseSandboxTerminalConnectionResult
@@ -40,7 +56,7 @@ interface SandboxTerminalConnectionResponse
 
 ### `UseSandboxTerminalConnectionOptions`
 
-`interface` — Define options for configuring a sandbox terminal connection including workspace ID and connection parameters `connectionId`, when set, is passed to `createSandboxTerminalConnectionRoute` as the `con…
+`interface` — Define options for configuring a sandbox terminal connection including workspace ID and connection parameters
 
 ```ts
 interface UseSandboxTerminalConnectionOptions
@@ -52,4 +68,20 @@ interface UseSandboxTerminalConnectionOptions
 
 ```ts
 interface UseSandboxTerminalConnectionResult
+```
+
+### `WorkspaceTerminalPanel`
+
+`function`
+
+```ts
+({ connection, connectionId, title, subtitle, isActive, onRetry, statusDisplay, headerExtra, className, }: WorkspaceTer…
+```
+
+### `WorkspaceTerminalPanelProps`
+
+`interface`
+
+```ts
+interface WorkspaceTerminalPanelProps
 ```

@@ -3,23 +3,17 @@
  * core (`./core`). One class serves every channel family; the instance NAME
  * decides which endpoints a given instance ever sees:
  *
- * - **thread channel** (`${workspaceId}:${threadId}`) — the thread-scope lock
- *   (KEPT), plus the live turn rebroadcast: WebSocket fanout and per-turn
- *   segments with `sync`/`afterSeq` reconnect replay. That rebroadcast is
- *   `@deprecated` for sandbox-backed interactive turns — the sandbox session
- *   gateway already does it, browser-direct, when the turn is driven on the
- *   message lane (`./core`'s header has the production measurement).
+ * - **thread channel** (`${workspaceId}:${threadId}`) — the live chat turn:
+ *   WebSocket fanout, per-turn segments with `sync`/`afterSeq` reconnect
+ *   replay, and the thread-scope lock.
  * - **workspace channel** (`${workspaceId}`) — coarse sidebar signals
  *   (`thread.activity` responding set, durable across eviction;
- *   `thread.created` recent list) and the workspace-scope lock. KEPT: the
- *   gateway is per-session and read-only, so it carries neither.
+ *   `thread.created` recent list) and the workspace-scope lock.
  * - **turn storage** (`turn:${turnId}`) — the durable `TurnEventStore` rows +
  *   status for one buffered turn (replay survives DO eviction — this is what
- *   graduates the vertical's `turnStore` from no-op). KEPT and load-bearing:
- *   a DETACHED run never reaches the gateway, so this is the only way a
- *   browser tails autonomous work.
+ *   graduates the vertical's `turnStore` from no-op).
  * - **scope index** (`scope:${scopeId}`) — the running-turn index backing
- *   `TurnEventStore.listRunning` reconnect discovery. KEPT.
+ *   `TurnEventStore.listRunning` reconnect discovery.
  *
  * The class is a PLAIN class over a structural {@link TurnStreamDOState} —
  * no `cloudflare:workers` import, so this package stays substrate-free and
@@ -43,8 +37,6 @@
  * late-connecting socket). Product storage keys must avoid
  * {@link TURN_STREAM_STORAGE_KEYS}.
  */
-
-import { DEFAULT_RUNNING_TURN_LEASE_MS } from '../stream/turn-buffer'
 
 import {
   ACTIVITY_TTL_MS,
@@ -146,8 +138,6 @@ export interface TurnStreamDOOptions {
   maxSegmentEvents?: number
   /** Override {@link ACTIVITY_TTL_MS}. */
   activityTtlMs?: number
-  /** How long an unrenewed running turn remains discoverable. */
-  runningTurnLeaseMs?: number
 }
 
 /** Manage per-turn segments and track active threads with durable event storage */
@@ -357,11 +347,6 @@ export class TurnStreamDO {
         this.recentCreated = this.recentCreated.slice(-MAX_RECENT_CREATED)
       }
     } else if (typeof data.executionId === 'string') {
-      // Deprecated lane: per-turn rebroadcast. A product on the sandbox
-      // message lane stops sending these and the tab reads the gateway
-      // instead; the lock's cooperative release and the stale-lock
-      // reconciler then own release (this terminal auto-release is a
-      // convenience, not the only path out of a wedge).
       outgoing = appendSegmentEvent(
         this.segments,
         data.executionId,
@@ -582,12 +567,8 @@ export class TurnStreamDO {
   private async handleScopeRunningList(): Promise<Response> {
     const index =
       (await this.state.storage.get<Record<string, ScopeTurnEntry>>(TURN_STREAM_STORAGE_KEYS.turnScope)) ?? {}
-    const cutoff = Date.now() - Math.max(
-      1,
-      this.options.runningTurnLeaseMs ?? DEFAULT_RUNNING_TURN_LEASE_MS,
-    )
     const running = Object.entries(index)
-      .filter(([, entry]) => entry.status === 'running' && entry.updatedAt >= cutoff)
+      .filter(([, entry]) => entry.status === 'running')
       .sort((a, b) => b[1].updatedAt - a[1].updatedAt)
       .map(([turnId]) => turnId)
     return jsonResponse({ running })

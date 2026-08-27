@@ -1,23 +1,16 @@
 import {
   Sandbox,
+  type AgentProfile,
+  type AgentProfileFileMount,
+  type AgentProfileMcpServer,
   type ExecResult,
-} from '@tangle-network/sandbox/core'
-import type {
-  EgressPolicy,
-  MintScopedTokenOptions,
-  SandboxConnection,
-  SandboxInstance,
-  ScopedTokenScope,
-  StorageConfig,
-  TurnDriveResult,
-  ProvisionEvent,
+  type SandboxConnection,
+  type SandboxInstance,
+  type ScopedTokenScope,
+  type StorageConfig,
+  type TurnDriveResult,
+  type ProvisionEvent,
 } from '@tangle-network/sandbox'
-import type {
-  AgentProfile,
-  AgentProfileFileMount,
-  AgentProfileMcpServer,
-  ReasoningEffort,
-} from '@tangle-network/agent-interface'
 import { createHash } from 'node:crypto'
 import {
   buildAppToolMcpServer,
@@ -32,40 +25,9 @@ import {
   type TangleExecutionEnvironment,
 } from '../runtime/model'
 import { ok, fail, type Outcome } from './outcome'
-import { fingerprintAgentProfile, type ProfileFingerprint } from '../profile/fingerprint'
-import {
-  assertProfilePromptWithinBudget,
-  type ComposeProfileBudget,
-} from '../profile/budget'
-import {
-  resolveModel,
-  resolveModelSelection,
-  requireTransportableModel,
-  SandboxModelResolutionError,
-  type ProviderResolutionConfig,
-  type ResolvedModel,
-  type ModelSelection,
-  type ModelSelectionFailure,
-  type ModelSelectionError,
-  type ModelSelectionSource,
-} from './model'
 
 export type { Outcome } from './outcome'
 export * from './binary-read'
-export {
-  resolveModel,
-  resolveModelSelection,
-  requireTransportableModel,
-  SandboxModelResolutionError,
-}
-export type {
-  ProviderResolutionConfig,
-  ResolvedModel,
-  ModelSelection,
-  ModelSelectionFailure,
-  ModelSelectionError,
-  ModelSelectionSource,
-}
 
 /** Define client credentials for accessing the sandbox environment with API key and base URL */
 export interface SandboxClientCredentials {
@@ -229,67 +191,29 @@ export interface SandboxResourceConfig {
   idleTimeoutSeconds: number
 }
 
+/** Define configuration options for resolving a provider and its model with optional API keys and routing details */
+export interface ProviderResolutionConfig {
+  routerBaseUrl?: string
+  apiKey?: string
+  providerName?: string
+  modelName?: string
+  defaultModel?: string
+  openaiApiKey?: string
+  // Opt-in: a resolvable provider+model WITHOUT an api key still yields model
+  // metadata (model/provider/baseUrl, no apiKey) instead of undefined. Keyless
+  // metadata makes the sandbox platform mint its OWN per-user router key at
+  // create (its requiresRouterKey gate), so turns bill the box's billing owner
+  // instead of a product-baked shared key. Requires an explicit providerName —
+  // provider inference from key presence cannot fire keyless. Default false:
+  // a keyless config resolves to undefined exactly as before.
+  allowKeylessModel?: boolean
+}
+
 /** Define the context for building a sandbox including workspace, integrations, and optional user ID */
 export interface SandboxBuildContext {
   workspaceId: string
   connectedIntegrationIds: string[]
   userId?: string
-}
-
-/**
- * Build the standard outbound policy for a product sandbox.
- *
- * Product code supplies its public origin and only the extra product-specific
- * destinations. The model capability registry is named explicitly because a
- * strict product sandbox must not inherit the platform's broad developer list.
- */
-function isWellFormedDomainPattern(pattern: string): boolean {
-  if (!pattern || pattern.startsWith('.') || pattern.includes('..')) return false
-  const labels = pattern.split('.')
-  if (labels.some((label) => label.length === 0)) return false
-
-  for (let index = 1; index < labels.length; index += 1) {
-    if (labels[index]!.includes('*')) return false
-  }
-
-  const head = labels[0]!
-  if (head === '*' || head === '**') return labels.length >= 2
-  return !head.includes('*')
-}
-
-/** Hosts required when a product installs its pinned Python tooling at boot. */
-export const PYPI_EGRESS_DOMAINS = ['pypi.org', 'files.pythonhosted.org', 'pypi.python.org'] as const
-
-export function buildProductEgressPolicy(
-  publicOrigin: string | URL,
-  extraDomains: readonly string[] = [],
-): EgressPolicy {
-  const origin = typeof publicOrigin === 'string' ? new URL(publicOrigin) : publicOrigin
-  if (origin.protocol !== 'http:' && origin.protocol !== 'https:') {
-    throw new Error(`Product egress origin must use http or https: ${origin.protocol}`)
-  }
-  if (!origin.hostname) throw new Error('Product egress origin must include a hostname')
-
-  const domains = new Set<string>([origin.hostname.toLowerCase(), 'models.dev'])
-  for (const value of extraDomains) {
-    const domain = value.trim().toLowerCase().replace(/\.$/, '')
-    if (
-      !domain
-      || domain.includes('://')
-      || domain.includes('/')
-      || domain.includes(':')
-      || !isWellFormedDomainPattern(domain)
-    ) {
-      throw new Error(`Product egress domain must be a hostname or wildcard: ${value}`)
-    }
-    domains.add(domain)
-  }
-
-  return {
-    mode: 'strict',
-    allowDomains: [...domains],
-    includeImplicitDomains: false,
-  }
 }
 
 // SDK-typed snapshot storage config (re-exported for product seam closures).
@@ -326,32 +250,14 @@ export interface StoppedSandboxResumeRecovery {
   restore?: SandboxRestoreSpec | null
 }
 
-/**
- * Default ERE passed to `pgrep -f` when a liveness probe does not override the
- * harness-process matcher. It covers the platform process names used by the
- * fleet's shared OpenCode, Claude Code, and Codex terminal path; products with
- * another harness can override it.
- */
-export const DEFAULT_SIDECAR_PROCESS_PATTERN = 'opencode|claude|codex'
-
-// Reuse health gate + sidecar liveness. The exec+timeout-race is generic; a
-// product with a custom harness can override the default process matcher.
-// Absent livenessProbe => no probe (reuse on metadata.harness match).
+// Reuse health gate + sidecar liveness. The exec+timeout-race is generic; the
+// sidecarProcessPattern is harness-specific (which process is the live sidecar),
+// so it is a closure. Absent => no liveness probe (reuse on metadata.harness match).
 /** Define configuration for liveness probes including sidecar process pattern and optional timeouts */
 export interface LivenessProbeConfig {
-  sidecarProcessPattern?: (harness: Harness) => string
+  sidecarProcessPattern: (harness: Harness) => string
   execTimeoutMs?: number
   psTimeoutMs?: number
-  /**
-   * Reuse a successful liveness result for this many milliseconds for the
-   * same box id. Defaults to 5 seconds; set to 0 to probe on every reuse.
-   *
-   * Only the exec/sidecar probe is cached. Runtime readiness, egress policy,
-   * deferred-file materialization, and bootstrap still run on every reuse.
-   * A box that dies during this window is surfaced by the next dispatch and
-   * is probed again after the TTL; the cache never triggers box deletion.
-   */
-  cacheTtlMs?: number
 }
 
 /** Define options for composing a user profile including prompts, files, servers, and name */
@@ -360,20 +266,6 @@ export interface ProfileComposeOptions {
   extraFiles?: AgentProfileFileMount[]
   extraMcp?: Record<string, AgentProfileMcpServer>
   name?: string
-  /**
-   * The harness this profile is being composed for.
-   *
-   * Where a resource lands is harness-specific — skills resolve to
-   * `.opencode/skills/`, `.claude/skills/`, `.pi/skills/`, and so on
-   * (`skillDirForHarness`), and some harnesses take no cwd skills at all.
-   * Without this, an app composing a profile cannot place a harness-native
-   * resource and is pushed into hardcoding one harness's path, which then
-   * silently disagrees with the path its own prompt cites: the agent is told
-   * to read a directory nothing was written to and its skills are invisible.
-   * Prefer declaring `resources.skills` and letting the platform place them;
-   * use this when composing paths directly.
-   */
-  harness: Harness
 }
 
 /** Define runtime configuration methods for sandbox environments including credentials, metadata, and permissions */
@@ -386,26 +278,6 @@ export interface SandboxRuntimeConfig {
   name: (workspaceId: string) => string
   metadata: (harness: Harness) => Record<string, unknown>
   connectedIntegrationIds: (workspaceId: string) => Promise<string[]>
-  /**
-   * Raw box environment written once at sandbox CREATION — deliberately plain
-   * strings, and the one place a credential value legitimately lives.
-   *
-   * This is the private side of the tagged-config contract, not profile
-   * material: an `AgentProfileMcpServer` may only carry a `secret-ref` naming a
-   * key, and the sandbox resolves that key against THIS map (or against the
-   * platform secret store fed by {@link SandboxRuntimeConfig.secrets}). So a
-   * `tokenEnvKey` passed to `buildAppToolMcpServers` must name a variable this
-   * seam places, or the reference resolves to nothing.
-   *
-   * It is NOT widened to tagged values: the sandbox SDK's create payload types
-   * `env` as `Record<string, string>`, and {@link assertEnvWithinLimits}
-   * measures those bytes against the kernel's per-entry `MAX_ARG_STRLEN`.
-   * Tagging it would make the box env reference itself.
-   *
-   * Values are workspace-wide and fixed for the box's lifetime, so a per-user
-   * or per-resource credential cannot be placed here — see
-   * `unresolvableSurfaceCredential` in `../tools/mcp`.
-   */
   env: (ctx: SandboxBuildContext) => Promise<Record<string, string>>
   files: (ctx: SandboxBuildContext) => Promise<AgentProfileFileMount[]>
   secrets: (workspaceId: string) => Promise<string[]>
@@ -413,21 +285,6 @@ export interface SandboxRuntimeConfig {
   permissionRole?: (workspaceRole: string) => SandboxPermissionLevel
   resources?: SandboxResourceConfig
   provider?: ProviderResolutionConfig
-
-  /**
-   * Product-declared outbound network policy. Applied when a sandbox is
-   * created. A reused or resumed sandbox is returned only when its explicit
-   * policy already matches; existing mismatches are rejected without updating
-   * or deleting the sandbox unless migration is explicitly enabled below.
-   */
-  egressPolicy?: EgressPolicy
-  /**
-   * Update an existing box to {@link egressPolicy} before reuse when its
-   * recorded policy is absent or different. This is an explicit fleet
-   * migration switch: the updated policy is read back and must match before
-   * the box is returned. It never deletes the box.
-   */
-  migrateEgressPolicy?: boolean
 
   // BYOS3/R2 snapshot storage. Returns undefined => key omitted entirely
   // (fail-closed when creds absent). Product owns bucket/endpoint/credentials/prefix.
@@ -448,30 +305,6 @@ export interface SandboxRuntimeConfig {
   webTerminalEnabled?: boolean
   // default true: try stopped-resume before create.
   resumeStopped?: boolean
-  /**
-   * How long to wait for a box to reach `running`, in ms. Default 120_000.
-   *
-   * Raise it when a cold create legitimately takes longer than that — a large
-   * vault restore, a heavy image, a loaded fleet. The failure it prevents is
-   * ugly: every attempt burns the full wait, times out, and the NEXT attempt
-   * starts the same slow create from scratch, so a workspace whose provision
-   * takes 130s never succeeds no matter how many times a user retries.
-   */
-  provisionTimeoutMs?: number
-  // Opt in to replacing a box the platform cannot bring up.
-  //
-  // Default false, and the default is the conservative one on purpose: a
-  // replacement is a delete, and delete DEPROVISIONS the persistent workspace
-  // (#299). An app whose durable state lives in the box's filesystem must not
-  // set this — losing the box loses the user's work.
-  //
-  // Set it when the box is a CACHE of state held elsewhere (a vault, a DB, an
-  // object store) and can be rebuilt. Then a box that cannot be started is
-  // abandoned and re-created once, instead of leaving the workspace unable to
-  // run for as long as the box stays unbringable — which, without this, is
-  // forever: the box key is derived from the workspace, so every later attempt
-  // resumes the same dead box and fails identically.
-  replaceUnbringableBox?: boolean
   // Product-owned retention/recovery policy after a stopped box fails to resume.
   // Return ok(null) to preserve the original resume error. A replacement key is
   // required before this shell creates a new box, so it cannot resolve the
@@ -494,15 +327,6 @@ export interface SandboxRuntimeConfig {
   // create AND resume/reuse paths (idempotent overwrite). Inline files are
   // STRIPPED from `resources.files` before create when this is set.
   deferProfileFiles?: boolean
-  // Byte budget on the system prompt of the profile this shell actually SENDS
-  // (provision + every turn). Defaults to the same 40 KB cap
-  // `composeAgentProfile` applies; set `warnOnly` + `overBudgetReason` to
-  // downgrade it. Wired here because the composer is opt-in: a product may
-  // hand-build its profile, or carry its real prompt only on the PER-TURN
-  // backend, and then the compose-time gate never runs on the bytes the model
-  // sees. An over-budget prompt degrades toward empty answers, which is
-  // indistinguishable from a broken stream — so it fails loud instead.
-  promptBudget?: ComposeProfileBudget
 }
 
 /** Define default resource limits and settings for sandbox environments */
@@ -521,7 +345,6 @@ interface ClientCacheEntry {
 }
 
 let _cached: ClientCacheEntry | null = null
-const livenessVerifiedAt = new Map<string, number>()
 
 function getClientFromCreds(creds: SandboxClientCredentials): Sandbox {
   const fingerprint = `${creds.apiKey} ${creds.baseUrl}`
@@ -545,10 +368,9 @@ export function getClient(shell: SandboxRuntimeConfig): Sandbox {
   return getClientFromCreds(creds as SandboxClientCredentials)
 }
 
-/** Reset the process-local sandbox client and liveness-verification caches. */
+/** Reset the client cache to clear stored data and force fresh retrieval */
 export function resetClientCache(): void {
   _cached = null
-  livenessVerifiedAt.clear()
 }
 
 /** Describe an application tool with its name, unique key, and description */
@@ -562,17 +384,7 @@ export interface AppToolDescriptor {
 export interface BuildAppToolMcpServersOptions {
   tools: AppToolDescriptor[]
   baseUrl: string
-  /**
-   * NAME of the box-environment variable holding the capability token — never
-   * the token itself. Every emitted `Authorization` header is a `secret-ref` to
-   * this key, which the sandbox resolves privately; see
-   * `BuildHttpMcpServerOptions.tokenEnvKey` in `../tools/mcp`.
-   *
-   * The key must name a variable the box carries — placed by
-   * {@link SandboxRuntimeConfig.env} at creation, or injected from the platform
-   * secret store via {@link SandboxRuntimeConfig.secrets}.
-   */
-  tokenEnvKey: string
+  token: string
   ctx: AppToolContext
   headerNames?: ToolHeaderNames
 }
@@ -583,17 +395,14 @@ export function buildAppToolMcpServers(
 ): Record<string, AgentProfileMcpServer> {
   const entries: Record<string, AgentProfileMcpServer> = {}
   for (const { tool, key, description } of options.tools) {
-    // No cast: since the tagged-config contract (agent-interface 0.38.0) the
-    // builder's own return type IS an AgentProfileMcpServer. The cast that used
-    // to sit here is what let the pre-0.38.0 plain-string shape ship.
     entries[key] = buildAppToolMcpServer({
       tool,
       baseUrl: options.baseUrl,
-      tokenEnvKey: options.tokenEnvKey,
+      token: options.token,
       ctx: options.ctx,
       description,
       headerNames: options.headerNames,
-    })
+    }) as AgentProfileMcpServer
   }
   return entries
 }
@@ -604,10 +413,7 @@ export interface EnsureWorkspaceSandboxOptions {
   userId?: string
   harness: Harness
   // When set, both the running-reuse and stopped-resume short-circuits are
-  // skipped and any name-matched box is deleted before create. This is the
-  // ONLY way a liveness-failed box is discarded: a failed probe triggers a
-  // state-preserving stop→resume recovery (or a SandboxRecoveryFailedError),
-  // never a delete — delete deprovisions the persistent workspace (#299).
+  // skipped and any name-matched box is deleted before create.
   forceNew?: boolean
   // Real-time provisioning progress from the SDK's SSE stream, forwarded from
   // the `waitFor('running')` calls on the resume and cold-create paths. Callers
@@ -621,72 +427,6 @@ export interface EnsureWorkspaceSandboxOptions {
   // instead of the service account that authenticated the create. Omitted =>
   // platform default (billing owner = create-auth principal) — unchanged.
   billingOwnerId?: string
-  // Optional consumer-side spend verification. Omitted, nothing here changes:
-  // no extra call, no extra await, no behavior difference. Wired, it is the one
-  // seam where a product both refuses to provision past a compute cap and
-  // records that a box is now billable against it.
-  //
-  // Structural on purpose. `@tangle-network/agent-app/spend` supplies an
-  // implementation (`createSandboxSpendHooks`), but this module takes no
-  // dependency on it — /spend composes /sandbox, and importing back the other
-  // way would invert the layering.
-  spend?: SandboxSpendHooks
-}
-
-/** What `/sandbox` reports once a box is provisioned, reused, or resumed. */
-export interface SandboxProvisionedObservation {
-  readonly workspaceId: string
-  readonly userId?: string
-  /** The platform's sandbox id — the join key to every settlement row. */
-  readonly sandboxId: string
-  /** The deterministic box key this workspace resolves to. */
-  readonly boxKey?: string | undefined
-  /** The idle timeout this box was asked to run with, seconds. */
-  readonly idleTimeoutSeconds: number
-  /** The max lifetime it was asked to run with, seconds, when one was asked for. */
-  readonly maxLifetimeSeconds?: number | undefined
-  readonly at: number
-}
-
-/**
- * Optional spend-verification seam on `ensureWorkspaceSandbox`.
- *
- * The two halves have deliberately opposite failure contracts.
- * `beforeProvision` is a GATE: it runs before anything is created and its throw
- * propagates, because refusing to provision is the whole point of a budget cap.
- * `onProvisioned` is an OBSERVER: its failures are swallowed, because
- * bookkeeping must never take down the provisioning it is bookkeeping.
- */
-export interface SandboxSpendHooks {
-  /** Runs before any create, resume, or reuse. Throw to refuse provisioning. */
-  beforeProvision?(input: { workspaceId: string; userId?: string }): Promise<void> | void
-  /** Runs after a box is available. Throwing here cannot fail the provision. */
-  onProvisioned?(observation: SandboxProvisionedObservation): Promise<void> | void
-  /**
-   * The box is doing work. Fired by the turn primitives at the start of a turn
-   * and again when it settles.
-   *
-   * Deliberately SYNCHRONOUS and unawaited — this sits on the turn path, and a
-   * store write must not add latency to it or hold a stream open. An
-   * implementation that persists should enqueue and return; errors are
-   * swallowed here as they are for `onProvisioned`.
-   *
-   * Wiring it is what keeps the expectation ceiling honest for long turns:
-   * without it, `lastActivityAt` only advances when a box is provisioned, so a
-   * three-hour turn leaves the ceiling three hours too tight and manufactures a
-   * discrepancy out of the product's own silence.
-   */
-  onActivity?(input: { sandboxId: string; at: number }): void
-}
-
-/** Fire an activity tap without letting it affect the turn it reports on. */
-function emitSandboxActivity(spend: SandboxSpendHooks | undefined, box: SandboxInstance): void {
-  if (!spend?.onActivity) return
-  try {
-    spend.onActivity({ sandboxId: box.id, at: Date.now() })
-  } catch {
-    // An observability seam must never take down the turn it reports on.
-  }
 }
 
 // Single-quote a string for safe interpolation into a shell command.
@@ -769,125 +509,42 @@ export function buildSandboxToolFileMounts(
   })
 }
 
-/**
- * Build the `SANDBOX_TOOL_BIN_DIRS` entry that puts these apps' tool bin dirs on
- * a sandbox PATH. Declare it in the same box env as the mounts from
- * {@link buildSandboxToolFileMounts}: the mounts place the executables, this
- * places the directory that makes a bare tool name resolve.
- *
- * Every sandbox PATH builder appends these directories at the TAIL, after the
- * Nix, npm, and image entries, so a tool never shadows a platform or system
- * binary of the same name. That placement is identical for a non-interactive
- * exec, a sidecar-spawned CLI, and an SSH shell, which is why this variable and
- * not a shell rc file is the mechanism: an exec reads no rc file, and the SSH
- * shell environment assigns PATH absolutely.
- *
- * Entries come from {@link sandboxToolBinDir}, so the value can never name a
- * directory the mounts did not use — a caller that hand-writes the literal
- * instead drifts silently the moment a base dir changes. Order is preserved,
- * and two apps that resolve to one directory collapse to the FIRST position it
- * appeared in.
- *
- * A `:` in a resolved bin dir throws here. The character separates entries both
- * in this variable and in PATH itself, so such a directory is unrepresentable
- * rather than merely awkward: joining it would split one absolute path into a
- * leading path and a relative remainder, and the runtime rejects a relative
- * segment by failing the whole box. Throwing names the offending directory
- * instead.
- *
- * The consuming half lives in agent-dev-container: `resolveSandboxToolBinDirs`
- * parses this value and every PATH builder appends it at the tail — sidecar
- * exec and PTY through `packages/shared/src/cache-env.ts`, an SSH session
- * through `packages/shared/src/ssh-bootstrap.ts`, and a spawned CLI through
- * `packages/sdk-cli-runner/src/cli-process.ts`, each with its own tests. This
- * package has no sandbox runtime, so tail placement is pinned there, not here.
- */
-export function buildSandboxToolBinDirsEnv(
-  apps: readonly SandboxToolPathOptions[],
-): { SANDBOX_TOOL_BIN_DIRS: string } {
-  if (apps.length === 0) {
-    throw new Error(
-      'buildSandboxToolBinDirsEnv: name at least one app whose tool bin dir belongs on PATH.',
-    )
-  }
-  const binDirs = new Set<string>()
-  for (const app of apps) {
-    const binDir = sandboxToolBinDir(app)
-    if (binDir.includes(':')) {
-      throw new Error(
-        `sandbox tool bin dir ${binDir} contains ':', which separates entries in ` +
-          'SANDBOX_TOOL_BIN_DIRS and in PATH. Place the tools under a colon-free directory.',
-      )
-    }
-    binDirs.add(binDir)
-  }
-  return { SANDBOX_TOOL_BIN_DIRS: [...binDirs].join(':') }
-}
-
-/**
- * Build a shell script that creates the sandbox tool binary directory.
- * {@link buildSandboxToolBinDirsEnv}, not this script, puts that directory on a
- * sandbox PATH.
- *
- * The `mkdir -p` makes the directory exist before a tool mount lands in it.
- */
-export function buildSandboxToolBinDirScript(options: SandboxToolPathOptions): string {
-  return ['set -eu', `mkdir -p ${shellSingleQuote(sandboxToolBinDir(options))}`].join('\n')
-}
-
-/** Build a shell script that creates the sandbox tool binary directory.
- *
- *  @deprecated Renamed to {@link buildSandboxToolBinDirScript}, and the script
- *  no longer appends the bin dir to PATH in `~/.profile`, `~/.bashrc` and
- *  `~/.zshrc`. Those edits never reached the contexts that run a tool: an exec
- *  and a spawned CLI read no rc file, and the SSH shell assigns PATH
- *  absolutely, which discards an appended entry. Put the directory on PATH with
- *  {@link buildSandboxToolBinDirsEnv} instead. This name forwards to the new
- *  one so an existing import keeps resolving; removal is a major.
- */
+/** Build a shell script that sets up and exports the sandbox tool binary directory in user profiles */
 export function buildSandboxToolPathSetupScript(options: SandboxToolPathOptions): string {
-  return buildSandboxToolBinDirScript(options)
+  const binDir = sandboxToolBinDir(options)
+  const exportLine = `export PATH=${binDir}:$PATH`
+  return [
+    'set -eu',
+    `mkdir -p ${shellSingleQuote(binDir)}`,
+    `PATH=${shellSingleQuote(binDir)}:$PATH`,
+    'export PATH',
+    'for profile in "${HOME:-/home/agent}/.profile" "${HOME:-/home/agent}/.bashrc" "${HOME:-/home/agent}/.zshrc"; do',
+    '  mkdir -p "$(dirname "$profile")"',
+    '  touch "$profile"',
+    `  grep -Fqx ${shellSingleQuote(exportLine)} "$profile" || printf '\\n%s\\n' ${shellSingleQuote(exportLine)} >> "$profile"`,
+    'done',
+  ].join('\n')
 }
 
-/**
- * Create the sandbox tool binary directory in a running box.
- * {@link buildSandboxToolBinDirsEnv}, not this call, puts it on a sandbox PATH.
- */
-export async function ensureSandboxToolBinDir(
+/** Resolve the sandbox environment PATH setup by executing the configuration script with given options */
+export async function runSandboxToolPathSetup(
   box: SandboxInstance,
   options: SandboxToolPathOptions,
 ): Promise<Outcome<void>> {
   try {
-    const res = await box.exec(buildSandboxToolBinDirScript(options))
+    const res = await box.exec(buildSandboxToolPathSetupScript(options))
     if (res.exitCode !== 0) {
       return fail(
         new Error(
-          `ensureSandboxToolBinDir: failed to create the tool bin dir ${sandboxToolBinDir(options)} ` +
+          `runSandboxToolPathSetup: failed to configure PATH for ${sandboxToolBinDir(options)} ` +
             `(exit ${res.exitCode}): ${res.stderr.slice(0, 500)}`,
         ),
       )
     }
     return ok(undefined)
   } catch (err) {
-    return fail(new Error('ensureSandboxToolBinDir: exec failed', { cause: err }))
+    return fail(new Error('runSandboxToolPathSetup: exec failed', { cause: err }))
   }
-}
-
-/** Create the sandbox tool binary directory in a running box.
- *
- *  @deprecated Renamed to {@link ensureSandboxToolBinDir}, and the call no
- *  longer appends the bin dir to PATH in `~/.profile`, `~/.bashrc` and
- *  `~/.zshrc`. Those edits never reached the contexts that run a tool: an exec
- *  and a spawned CLI read no rc file, and the SSH shell assigns PATH
- *  absolutely, which discards an appended entry. Put the directory on PATH with
- *  {@link buildSandboxToolBinDirsEnv} instead. This name forwards to the new
- *  one so an existing import keeps resolving; removal is a major.
- */
-export async function runSandboxToolPathSetup(
-  box: SandboxInstance,
-  options: SandboxToolPathOptions,
-): Promise<Outcome<void>> {
-  return ensureSandboxToolBinDir(box, options)
 }
 
 // Build a shell-safe path token that preserves tilde-home semantics. A path
@@ -1112,106 +769,13 @@ function deferredProfileWriteFailed(stage: 'new' | 'reused' | 'resumed', name: s
   return new Error(`deferred file write failed on ${stage} box ${name}: ${cause.message}`, { cause })
 }
 
-export type SandboxExistingBoxStage = 'reused' | 'resumed'
-
-export type SandboxEgressPolicySource = Awaited<
-  ReturnType<SandboxInstance['egress']['get']>
->['source']
-
-/**
- * Thrown when an existing sandbox cannot be proven to have the requested
- * outbound network policy. The sandbox is preserved and its policy is not
- * changed. The caller explicitly decides whether to preserve, migrate, or
- * replace the sandbox.
- */
-export class SandboxEgressPolicyMismatchError extends Error {
-  readonly stage: SandboxExistingBoxStage
-  readonly boxName: string
-  readonly currentPolicy: EgressPolicy
-  readonly currentSource: SandboxEgressPolicySource
-  readonly desiredPolicy: EgressPolicy
-
-  constructor(
-    stage: SandboxExistingBoxStage,
-    boxName: string,
-    currentPolicy: EgressPolicy,
-    currentSource: SandboxEgressPolicySource,
-    desiredPolicy: EgressPolicy,
-  ) {
-    super(
-      `egress policy mismatch on ${stage} box ${boxName}: ` +
-        `current ${currentPolicy.mode} policy from ${currentSource} does not explicitly match ` +
-        `desired ${desiredPolicy.mode} policy; the existing box was preserved and egress was not updated.`,
-    )
-    this.name = 'SandboxEgressPolicyMismatchError'
-    this.stage = stage
-    this.boxName = boxName
-    this.currentPolicy = currentPolicy
-    this.currentSource = currentSource
-    this.desiredPolicy = desiredPolicy
-  }
-}
-
-import {
-  isSandboxBoxConfigFailure,
-  isSandboxHostCapacityFailure,
-  serializeSandboxProvisioningError,
-} from './diagnostics'
-
-export * from './recovery'
-
-export {
-  serializeSandboxProvisioningError,
-  formatSandboxProvisioningSupportDetails,
-  formatSandboxProvisioningUserMessage,
-  isSandboxAuthFailure,
-  isSandboxApiBearerAuthFailure,
-  isSandboxApiSandboxMissingFailure,
-  isSandboxHostCapacityFailure,
-  type SafeSandboxErrorCause,
-  type SafeSandboxErrorDiagnostics,
-} from './diagnostics'
+type ExistingBoxStage = 'reused' | 'resumed'
 
 /** Represent an error thrown when sandbox runtime authentication refresh fails for a specific stage and name */
 export class SandboxRuntimeAuthRefreshError extends Error {
-  constructor(stage: SandboxExistingBoxStage, name: string, detail: string, cause?: unknown) {
+  constructor(stage: ExistingBoxStage, name: string, detail: string, cause?: unknown) {
     super(`${stage} sandbox auth refresh failed for ${name}: ${detail}`, { cause })
     this.name = 'SandboxRuntimeAuthRefreshError'
-  }
-}
-
-/** Which step of the state-preserving stop→resume recovery failed. `stop` with a
- *  driver-unsupported cause means the platform cannot restart this box (the
- *  `tangle` driver exposes create/delete only); `probe` means the box restarted
- *  but is still unresponsive. */
-export type SandboxRecoveryPhase = 'stop' | 'resume' | 'probe'
-
-/**
- * Thrown when an unresponsive box could not be recovered by a state-preserving
- * restart. Contract: this error is only ever thrown with the workspace intact —
- * recovery never deletes. The caller decides what to do next (retry, surface to
- * the user, or explicitly replace via `forceNew`).
- */
-export class SandboxRecoveryFailedError extends Error {
-  readonly boxKey: string
-  readonly stage: SandboxExistingBoxStage
-  readonly phase: SandboxRecoveryPhase
-  constructor(
-    stage: SandboxExistingBoxStage,
-    boxKey: string,
-    phase: SandboxRecoveryPhase,
-    detail: string,
-    cause?: unknown,
-  ) {
-    super(
-      `${stage} sandbox ${boxKey} failed liveness recovery at ${phase}: ${detail}. ` +
-        `The workspace is preserved; pass forceNew to replace the box.`,
-      { cause },
-    )
-    this.name = 'SandboxRecoveryFailedError'
-    this.boxKey = boxKey
-    this.stage = stage
-    this.phase = phase
   }
 }
 
@@ -1452,11 +1016,10 @@ async function materializeDeferredFilesForExistingBox(
   shell: SandboxRuntimeConfig,
   client: Sandbox,
   box: SandboxInstance,
-  stage: SandboxExistingBoxStage,
+  stage: ExistingBoxStage,
   name: string,
   workspaceId: string,
   userId: string | undefined,
-  harness: Harness,
 ): Promise<Outcome<SandboxInstance>> {
   if (!shell.deferProfileFiles) return ok(box)
   const connectedIntegrationIds = await shell.connectedIntegrationIds(workspaceId)
@@ -1466,7 +1029,7 @@ async function materializeDeferredFilesForExistingBox(
     ...(userId ? { userId } : {}),
   }
   const files = await shell.files(buildCtx)
-  const fullProfile = shell.profile({ extraFiles: files, harness })
+  const fullProfile = shell.profile({ extraFiles: files })
   const { deferredFiles } = splitDeferredProfileFiles(fullProfile)
   if (deferredFiles.length === 0) return ok(box)
   // Skip the whole re-write when the corpus is UNCHANGED since the box was
@@ -1509,7 +1072,6 @@ async function listStopped(
 async function deleteBox(box: SandboxInstance): Promise<Outcome<void>> {
   try {
     await box.delete()
-    livenessVerifiedAt.delete(box.id)
     return ok(undefined)
   } catch (err) {
     return fail(err)
@@ -1530,15 +1092,6 @@ type CreatePayload = Parameters<Sandbox['create']>[0]
 // failing at POST-time with actionable detail beats a platform 4xx (or a box
 // that boots and then E2BIGs on every exec).
 
-/** Appended to a prompt-budget throw from any of this module's three choke
- *  points. A product that already raised the cap at compose time
- *  (`composeAgentProfile(base, channels, overlay, { maxSystemPromptBytes })` —
- *  gtm-agent uses 50_000) has to declare the SAME decision on the shell, or the
- *  shell's default reads as a contradiction instead of a missing declaration. */
-const SHELL_PROMPT_BUDGET_HINT =
-  'If this prompt size is a decision you already made at compose time, mirror it on the shell as ' +
-  '`promptBudget: { maxSystemPromptBytes, overBudgetReason }` — the shell gate is the one that sees the profile actually sent.'
-
 /** Gate on the provision body: the platform orchestrator caps the create
  *  payload at 256 KiB; 240 KB leaves headroom for transport framing. An
  *  over-cap payload fails provisioning 100% of the time (a 282 KB payload
@@ -1549,10 +1102,6 @@ export const PROVISION_PAYLOAD_MAX_BYTES = 240_000
  *  over MAX_ARG_STRLEN (131072 bytes) with E2BIG, killing every exec inside
  *  the box. 120 KB leaves headroom for the name and framing. */
 export const ENV_VALUE_MAX_BYTES = 120_000
-
-/** Default wait for a box to reach `running`. Overridable per shell via
- *  {@link SandboxRuntimeConfig.provisionTimeoutMs}. */
-export const DEFAULT_PROVISION_TIMEOUT_MS = 120_000
 
 /** Total env gate: the whole environment block shares the payload budget with
  *  the profile; past 200 KB the provision body cannot stay under the cap. */
@@ -1635,24 +1184,9 @@ export function assertEnvWithinLimits(env: Record<string, string>): void {
   }
 }
 
-function resolveSidecarProcessPattern(
-  probe: LivenessProbeConfig,
-  harness: Harness,
-): string {
-  const pattern =
-    probe.sidecarProcessPattern?.(harness) ?? DEFAULT_SIDECAR_PROCESS_PATTERN
-  if (pattern.includes('\\|')) {
-    throw new Error(
-      'Invalid livenessProbe.sidecarProcessPattern: pgrep -f uses extended regular expressions; ' +
-        'use a bare "|" for alternation, not "\\|".',
-    )
-  }
-  return pattern
-}
-
 // Generic exec+sidecar liveness probe. Absent probe => always alive (the prior
 // reuse-on-metadata-match behavior). With a probe: the container must answer an
-// `echo alive` exec within execTimeoutMs, and the harness process must be found
+// `echo alive` exec within execTimeoutMs, and the sidecar process must be found
 // by pgrep within psTimeoutMs (an inconclusive pgrep is treated as reusable).
 async function isBoxAlive(
   box: SandboxInstance,
@@ -1662,9 +1196,6 @@ async function isBoxAlive(
   if (!probe) return true
   const execTimeout = probe.execTimeoutMs ?? 5000
   const psTimeout = probe.psTimeoutMs ?? 3000
-  // Resolve and validate configuration before entering the operational catch:
-  // a bad ERE is a caller bug, not evidence that the box needs a restart.
-  const pattern = resolveSidecarProcessPattern(probe, harness)
   const race = <T>(p: Promise<T>, ms: number, label: string): Promise<T> =>
     Promise.race([
       p,
@@ -1673,6 +1204,7 @@ async function isBoxAlive(
   try {
     const alive = await race(box.exec('echo alive'), execTimeout, 'alive check timeout')
     if (!alive.stdout.includes('alive')) return false
+    const pattern = probe.sidecarProcessPattern(harness)
     try {
       const ps = await race(
         box.exec(`pgrep -f ${shellSingleQuote(pattern)} || echo no-sidecar`),
@@ -1687,21 +1219,6 @@ async function isBoxAlive(
   } catch {
     return false
   }
-}
-
-const DEFAULT_LIVENESS_CACHE_TTL_MS = 5_000
-
-function hasRecentLivenessVerification(
-  box: SandboxInstance,
-  probe: LivenessProbeConfig,
-  now = Date.now(),
-): boolean {
-  const ttlMs = probe.cacheTtlMs ?? DEFAULT_LIVENESS_CACHE_TTL_MS
-  if (!Number.isFinite(ttlMs) || ttlMs <= 0) return false
-  const verifiedAt = livenessVerifiedAt.get(box.id)
-  if (verifiedAt !== undefined && now - verifiedAt < ttlMs) return true
-  livenessVerifiedAt.delete(box.id)
-  return false
 }
 
 const RUNTIME_CONNECTION_WAIT_MS = 30_000
@@ -1762,9 +1279,8 @@ async function refreshRuntimeConnection(
     // Tolerate transient refresh/get failures (5xx, network blips) while the
     // orchestrator is still attaching the connection: swallow and retry. A box
     // that never surfaces a runtime URL is returned as-is so the caller's
-    // readiness gate (isReusableBox) sends it into state-preserving recovery
-    // (or fails loud) — rather than this poll throwing a hard provisioning
-    // failure on a recoverable hiccup.
+    // readiness gate (isReusableBox) drops and recreates it — rather than this
+    // poll throwing a hard provisioning failure on a recoverable hiccup.
     try {
       await current.refresh()
       if (sandboxRuntimeUrl(current)) return current
@@ -1785,7 +1301,7 @@ async function refreshRuntimeConnection(
 async function bestEffortRefreshRuntimeExecAuth(
   client: Sandbox,
   box: SandboxInstance,
-  stage: SandboxExistingBoxStage,
+  stage: ExistingBoxStage,
   name: string,
 ): Promise<Outcome<SandboxInstance>> {
   let current = box
@@ -1829,7 +1345,7 @@ async function bestEffortRefreshRuntimeExecAuth(
 async function refreshRuntimeExecAuth(
   client: Sandbox,
   box: SandboxInstance,
-  stage: SandboxExistingBoxStage,
+  stage: ExistingBoxStage,
   name: string,
 ): Promise<Outcome<SandboxInstance>> {
   let current = box
@@ -1861,7 +1377,7 @@ async function writeDeferredFilesWithRuntimeAuthRefresh(
   client: Sandbox,
   box: SandboxInstance,
   files: AgentProfileFileMount[],
-  stage: SandboxExistingBoxStage,
+  stage: ExistingBoxStage,
   name: string,
 ): Promise<Outcome<SandboxInstance>> {
   let writeBox = box
@@ -1895,26 +1411,18 @@ async function writeDeferredFilesWithRuntimeAuthRefresh(
 
 // Decide whether an existing (reused or resumed) box is safe to hand back.
 // `refreshRuntimeConnection` has already polled for the runtime URL, so a box
-// that still has none never became connectable and must not be silently
-// reused — downstream exec/terminal traffic would fail against it. A failed
-// edge is likewise unusable. Only when the connection is present do we spend
-// an exec round-trip on the liveness probe. A box that fails this gate is
-// RECOVERED (stop→resume, workspace intact) or fails loud — never deleted.
+// that still has none never became connectable and must be recreated rather
+// than silently reused — downstream exec/terminal traffic would fail against
+// it. A failed edge is likewise unusable. Only when the connection is present
+// do we spend an exec round-trip on the liveness probe.
 async function isReusableBox(
   box: SandboxInstance,
   harness: Harness,
   probe: LivenessProbeConfig | undefined,
 ): Promise<boolean> {
-  if (sandboxEdgeFailed(box) || !sandboxRuntimeUrl(box)) {
-    livenessVerifiedAt.delete(box.id)
-    return false
-  }
-  if (!probe) return true
-  if (hasRecentLivenessVerification(box, probe)) return true
-  const alive = await isBoxAlive(box, harness, probe)
-  if (alive) livenessVerifiedAt.set(box.id, Date.now())
-  else livenessVerifiedAt.delete(box.id)
-  return alive
+  if (sandboxEdgeFailed(box)) return false
+  if (!sandboxRuntimeUrl(box)) return false
+  return isBoxAlive(box, harness, probe)
 }
 
 // Resume a stopped box and wait for it to reach running.
@@ -1924,66 +1432,12 @@ async function resumeStoppedBox(
   onProgress?: (event: ProvisionEvent) => void,
 ): Promise<Outcome<SandboxInstance>> {
   try {
-    livenessVerifiedAt.delete(box.id)
-    await box.resume({ timeoutMs })
+    await box.resume()
     await box.waitFor('running', { timeoutMs, ...(onProgress ? { onProgress } : {}) })
     return ok(box)
   } catch (err) {
     return fail(err)
   }
-}
-
-// State-preserving recovery for a box that failed the reuse gate: stop (keeps
-// the workspace — the platform's suspend path never scrubs storage), resume,
-// then re-probe. `box.delete()` is DEPROVISIONING — it wipes the persistent
-// workspace (sessions, uncommitted files, everything outside the product's own
-// DB) — so it must never be a recovery action (#299: a single slow exec or a
-// crashed harness process used to destroy a user's workspace). This restarts
-// the container, which also reboots a dead sidecar/harness process. Every
-// failure throws SandboxRecoveryFailedError with the workspace intact —
-// including on the `tangle` driver, where stop is unsupported and the throw
-// carries the platform's rejection as its cause.
-async function recoverUnresponsiveBox(
-  client: Sandbox,
-  box: SandboxInstance,
-  harness: Harness,
-  probe: LivenessProbeConfig | undefined,
-  stage: SandboxExistingBoxStage,
-  name: string,
-  resumeTimeout: number,
-  onProgress?: (event: ProvisionEvent) => void,
-): Promise<SandboxInstance> {
-  try {
-    await box.stop()
-  } catch (err) {
-    throw new SandboxRecoveryFailedError(
-      stage,
-      name,
-      'stop',
-      'the platform could not stop the box for a state-preserving restart',
-      err,
-    )
-  }
-  const resumed = await resumeStoppedBox(box, resumeTimeout, onProgress)
-  if (!resumed.succeeded) {
-    throw new SandboxRecoveryFailedError(
-      stage,
-      name,
-      'resume',
-      'the box did not reach running after a state-preserving restart',
-      resumed.error,
-    )
-  }
-  const recovered = await refreshRuntimeConnection(client, resumed.value)
-  if (!(await isReusableBox(recovered, harness, probe))) {
-    throw new SandboxRecoveryFailedError(
-      stage,
-      name,
-      'probe',
-      'the box is still unresponsive after a state-preserving restart',
-    )
-  }
-  return recovered
 }
 
 /** Scope + the client and box key every workspace-scoped sandbox call needs.
@@ -2004,21 +1458,18 @@ async function resolveWorkspaceSandboxClient(
   }
 }
 
-/** What a peek can find. `warming` means the control plane is running while
- *  the filesystem incarnation is still transitioning. `not-running` carries
- *  the platform's own state string (`stopped`, `starting`, `failed`, …) —
- *  narrowing it to a union here would drop states the platform adds later,
- *  and every caller wants it for a log. */
+/** What a peek can find. `not-running` carries the platform's own state string
+ *  (`stopped`, `starting`, `failed`, …) — narrowing it to a union here would
+ *  drop states the platform adds later, and every caller wants it for a log. */
 export type PeekWorkspaceSandboxOutcome =
   | { status: 'running'; box: SandboxInstance }
-  | { status: 'warming'; readiness: 'transitioning'; box: SandboxInstance }
   | { status: 'not-running'; state: string; box: SandboxInstance }
   | { status: 'absent' }
 
 /**
  * Read-only twin of {@link ensureWorkspaceSandbox}: report whether a
- * workspace's box exists and is fully ready, WITHOUT provisioning, resuming,
- * or bootstrapping anything.
+ * workspace's box exists and is running, WITHOUT provisioning, resuming, or
+ * bootstrapping anything.
  *
  * This is what a read-mostly path needs — a file-index route's `authorize`
  * seam, a stale-lock reconciliation, a status badge. Calling `ensure` from one
@@ -2056,208 +1507,11 @@ export async function peekWorkspaceSandbox(
   const match = boxes.find((box) => box.name === name) ?? boxes.find((box) => box.name === displayName)
   if (!match) return { status: 'absent' }
   if (match.status !== 'running') return { status: 'not-running', state: match.status, box: match }
-  if (match.filesystemIncarnationReadiness === 'transitioning') {
-    return { status: 'warming', readiness: 'transitioning', box: match }
-  }
-  if (match.filesystemIncarnationReadiness !== 'ready') {
-    throw new Error(`sandbox ${match.id} is running without filesystem incarnation readiness`)
-  }
   return { status: 'running', box: match }
-}
-
-// The shared tail for handing back an existing (reused/resumed/recovered) box:
-// materialize deferred profile files, then run the product bootstrap. One
-// implementation so the reuse, resume, and recovery paths cannot drift.
-async function finalizeExistingBox(
-  shell: SandboxRuntimeConfig,
-  client: Sandbox,
-  box: SandboxInstance,
-  stage: SandboxExistingBoxStage,
-  name: string,
-  workspaceId: string,
-  userId: string | undefined,
-  harness: Harness,
-  scope: SandboxScope,
-): Promise<SandboxInstance> {
-  await assertExistingBoxEgress(box, shell.egressPolicy, shell.migrateEgressPolicy, stage, name)
-  const written = await materializeDeferredFilesForExistingBox(
-    shell,
-    client,
-    box,
-    stage,
-    name,
-    workspaceId,
-    userId,
-    harness,
-  )
-  if (!written.succeeded) {
-    throw deferredProfileWriteFailed(stage, name, written.error)
-  }
-  const finalBox = written.value
-  if (shell.bootstrap) {
-    const boot = await shell.bootstrap(finalBox, scope)
-    if (!boot.succeeded) {
-      throw new Error(`bootstrap failed on ${stage} box ${name}`, { cause: boot.error })
-    }
-  }
-  return finalBox
-}
-
-function canonicalizeJson(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalizeJson)
-  if (value === null || typeof value !== 'object') return value
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
-      .map(([key, entry]) => [key, canonicalizeJson(entry)]),
-  )
-}
-
-function normalizedEgressPolicy(policy: EgressPolicy): string {
-  const normalized: Record<string, unknown> = { ...policy }
-  if (policy.mode === 'strict') {
-    normalized.allowDomains = [...new Set(
-      (policy.allowDomains ?? [])
-        .map((domain) => domain.trim().toLowerCase())
-        .filter(Boolean),
-    )].sort()
-    normalized.includeImplicitDomains = policy.includeImplicitDomains !== false
-  }
-  return JSON.stringify(canonicalizeJson(normalized))
-}
-
-async function assertExistingBoxEgress(
-  box: SandboxInstance,
-  desired: EgressPolicy | undefined,
-  migrate: boolean | undefined,
-  stage: SandboxExistingBoxStage,
-  name: string,
-): Promise<void> {
-  if (!desired) return
-  let current: Awaited<ReturnType<SandboxInstance['egress']['get']>>
-  try {
-    current = await box.egress.get()
-  } catch (cause) {
-    const error = cause instanceof Error ? cause : new Error(String(cause))
-    throw new Error(`egress policy read failed on ${stage} box ${name}: ${error.message}`, {
-      cause: error,
-    })
-  }
-  const matchingPolicy = normalizedEgressPolicy(current.policy) === normalizedEgressPolicy(desired)
-  const explicitSource = current.source !== 'platform'
-  if (matchingPolicy && explicitSource) return
-
-  if (migrate) {
-    try {
-      await box.egress.update(desired)
-      const migrated = await box.egress.get()
-      const migratedPolicy = normalizedEgressPolicy(migrated.policy) === normalizedEgressPolicy(desired)
-      if (migratedPolicy && migrated.source !== 'platform') return
-      current = migrated
-    } catch (cause) {
-      const error = cause instanceof Error ? cause : new Error(String(cause))
-      throw new Error(`egress policy migration failed on ${stage} box ${name}: ${error.message}`, {
-        cause: error,
-      })
-    }
-  }
-
-  throw new SandboxEgressPolicyMismatchError(
-    stage,
-    name,
-    current.policy,
-    current.source,
-    desired,
-  )
 }
 
 /** Resolve or create a workspace sandbox instance with optional reuse and progress tracking */
 export async function ensureWorkspaceSandbox(
-  shell: SandboxRuntimeConfig,
-  options: EnsureWorkspaceSandboxOptions,
-): Promise<SandboxInstance> {
-  // A budget refusal must land before any box exists, so it runs ahead of both
-  // the first attempt and the unbringable-box replacement below.
-  await options.spend?.beforeProvision?.({
-    workspaceId: options.workspaceId,
-    ...(options.userId ? { userId: options.userId } : {}),
-  })
-  const box = await bringUpWorkspaceSandbox(shell, options)
-  await observeProvisionedBox(shell, options, box)
-  return box
-}
-
-/**
- * Report a now-billable box to the spend seam.
- *
- * Awaited rather than fired and forgotten: an expectation ledger with holes
- * reports boxes it simply failed to record as `unknown-box`, and an alert that
- * cries wolf is worse than no alert. The cost is one local write on a path that
- * already makes at least one platform round trip, so it is not the term that
- * decides provisioning latency.
- *
- * Errors are swallowed — the box is up, and failing the caller because
- * bookkeeping failed would trade a real capability for a record of it.
- */
-async function observeProvisionedBox(
-  shell: SandboxRuntimeConfig,
-  options: EnsureWorkspaceSandboxOptions,
-  box: SandboxInstance,
-): Promise<void> {
-  if (!options.spend?.onProvisioned) return
-  const resources = shell.resources ?? DEFAULT_SANDBOX_RESOURCES
-  try {
-    await options.spend.onProvisioned({
-      workspaceId: options.workspaceId,
-      ...(options.userId ? { userId: options.userId } : {}),
-      sandboxId: box.id,
-      boxKey: box.name,
-      idleTimeoutSeconds: resources.idleTimeoutSeconds,
-      maxLifetimeSeconds: resources.maxLifetimeSeconds,
-      at: Date.now(),
-    })
-  } catch {
-    // An observability seam must never take down the provision it reports on.
-  }
-}
-
-async function bringUpWorkspaceSandbox(
-  shell: SandboxRuntimeConfig,
-  options: EnsureWorkspaceSandboxOptions,
-): Promise<SandboxInstance> {
-  try {
-    return await provisionWorkspaceSandbox(shell, options)
-  } catch (err) {
-    // A box the platform cannot bring up is not a transient failure: the box
-    // key is derived from the workspace, so every later call resumes the same
-    // dead box and fails the same way. Left alone the workspace never runs
-    // again. Replacing it is a delete, so it happens only where the shell has
-    // declared the box rebuildable — and only once, so a replacement that dies
-    // the same way surfaces the error instead of looping.
-    if (!shell.replaceUnbringableBox) throw err
-    if (options.forceNew) throw err
-    if (!isUnbringableBoxError(err)) throw err
-    return await provisionWorkspaceSandbox(shell, { ...options, forceNew: true })
-  }
-}
-
-/**
- * True when the platform cannot bring this box up where it lives.
- *
- * Two shapes reach here. `SandboxRecoveryFailedError` is the substrate's own
- * verdict after it tried a state-preserving restart and failed. A host-capacity
- * rejection is the same verdict one layer earlier: a box is pinned to a host,
- * and a full host rejects every resume for every box on it until something else
- * there goes away. Neither is transient, and neither is fixed by trying again
- * at the same key.
- */
-function isUnbringableBoxError(error: unknown): boolean {
-  if (error instanceof SandboxRecoveryFailedError) return true
-  const diagnostics = serializeSandboxProvisioningError(error)
-  return isSandboxHostCapacityFailure(diagnostics) || isSandboxBoxConfigFailure(diagnostics)
-}
-
-async function provisionWorkspaceSandbox(
   shell: SandboxRuntimeConfig,
   options: EnsureWorkspaceSandboxOptions,
 ): Promise<SandboxInstance> {
@@ -2267,7 +1521,7 @@ async function provisionWorkspaceSandbox(
   let name = resolved.name
   let recoveryRestore: SandboxRestoreSpec | null | undefined
   const resources = shell.resources ?? DEFAULT_SANDBOX_RESOURCES
-  const resumeTimeout = shell.provisionTimeoutMs ?? DEFAULT_PROVISION_TIMEOUT_MS
+  const resumeTimeout = 120_000
 
   // Stage 1 — running-box reuse (skipped on forceNew).
   const existing = await listRunning(client, name)
@@ -2281,29 +1535,42 @@ async function provisionWorkspaceSandbox(
     } else if (found.metadata?.harness === harness) {
       const ready = await refreshRuntimeConnection(client, found)
       if (await isReusableBox(ready, harness, shell.livenessProbe)) {
-        return finalizeExistingBox(shell, client, ready, 'reused', name, workspaceId, userId, harness, scope)
+        const written = await materializeDeferredFilesForExistingBox(
+          shell,
+          client,
+          ready,
+          'reused',
+          name,
+          workspaceId,
+          userId,
+        )
+        if (!written.succeeded) {
+          throw deferredProfileWriteFailed('reused', name, written.error)
+        }
+        const reusedBox = written.value
+        if (shell.bootstrap) {
+          const boot = await shell.bootstrap(reusedBox, scope)
+          if (!boot.succeeded) {
+            throw new Error(`bootstrap failed on reused box ${name}`, { cause: boot.error })
+          }
+        }
+        return reusedBox
       }
-      // Unresponsive (or never-connectable) box with the RIGHT harness: recover
-      // in place — stop→resume preserves the workspace — and fail loud if the
-      // box is still dead. Deleting here wiped user workspaces (#299); delete
-      // is reachable only via forceNew now.
-      const recovered = await recoverUnresponsiveBox(
-        client,
-        ready,
-        harness,
-        shell.livenessProbe,
-        'reused',
-        name,
-        resumeTimeout,
-        onProgress,
-      )
-      return finalizeExistingBox(shell, client, recovered, 'reused', name, workspaceId, userId, harness, scope)
+      const dropped = await deleteBox(ready)
+      if (!dropped.succeeded) {
+        throw new Error(
+          `sandbox ${name} ` +
+            `(was ${String(found.metadata?.harness ?? 'unknown')}, want ${harness}, or unresponsive) ` +
+            `could not be deleted`,
+          { cause: dropped.error },
+        )
+      }
     } else {
       const dropped = await deleteBox(found)
       if (!dropped.succeeded) {
         throw new Error(
           `sandbox ${name} ` +
-            `(was ${String(found.metadata?.harness ?? 'unknown')}, want ${harness}) ` +
+            `(was ${String(found.metadata?.harness ?? 'unknown')}, want ${harness}, or unresponsive) ` +
             `could not be deleted`,
           { cause: dropped.error },
         )
@@ -2339,22 +1606,36 @@ async function provisionWorkspaceSandbox(
       } else {
         const box = await refreshRuntimeConnection(client, resumed.value)
         if (await isReusableBox(box, harness, shell.livenessProbe)) {
-          return finalizeExistingBox(shell, client, box, 'resumed', name, workspaceId, userId, harness, scope)
+          const written = await materializeDeferredFilesForExistingBox(
+            shell,
+            client,
+            box,
+            'resumed',
+            name,
+            workspaceId,
+            userId,
+          )
+          if (!written.succeeded) {
+            throw deferredProfileWriteFailed('resumed', name, written.error)
+          }
+          const resumedBox = written.value
+          if (shell.bootstrap) {
+            const boot = await shell.bootstrap(resumedBox, scope)
+            if (!boot.succeeded) {
+              throw new Error(`bootstrap failed on resumed box ${name}`, { cause: boot.error })
+            }
+          }
+          return resumedBox
         }
-        // The box resumed but is unresponsive: one full stop→resume cycle is
-        // the state-preserving recovery; still-dead fails loud. Never delete —
-        // that wipes the workspace (#299).
-        const recovered = await recoverUnresponsiveBox(
-          client,
-          box,
-          harness,
-          shell.livenessProbe,
-          'resumed',
-          name,
-          resumeTimeout,
-          onProgress,
-        )
-        return finalizeExistingBox(shell, client, recovered, 'resumed', name, workspaceId, userId, harness, scope)
+        const dropped = await deleteBox(box)
+        if (!dropped.succeeded) {
+          throw new Error(
+            `resumed sandbox ${name} ` +
+              `(was ${String(box.metadata?.harness ?? 'unknown')}, want ${harness}, or unresponsive) ` +
+              `could not be deleted`,
+            { cause: dropped.error },
+          )
+        }
       }
     }
   }
@@ -2371,7 +1652,7 @@ async function provisionWorkspaceSandbox(
     shell.env(buildCtx),
     shell.files(buildCtx),
   ])
-  const fullProfile = shell.profile({ extraFiles: files, harness })
+  const fullProfile = shell.profile({ extraFiles: files })
   // When deferring, strip inline files from the create payload and write them
   // into the box after it reaches running. Keeps the provision body under the
   // orchestrator's 256 KiB cap and lands real files on disk.
@@ -2384,9 +1665,7 @@ async function provisionWorkspaceSandbox(
 
   // Bake the model at create when opted in. childKeyMint overrides the apiKey
   // per-workspace; a typed mint failure falls through to the parent key (logged).
-  let model = shell.backendModelAtCreate
-    ? requireTransportableModel(resolveModelSelection(shell.provider), `backendModelAtCreate for ${name}`)
-    : undefined
+  let model = shell.backendModelAtCreate ? resolveModel(shell.provider) : undefined
   if (model && shell.childKeyMint && model.provider === 'openai-compat') {
     const minted = await shell.childKeyMint(scope)
     if (minted.succeeded) model = { ...model, apiKey: minted.value }
@@ -2420,7 +1699,6 @@ async function provisionWorkspaceSandbox(
     backend: { type: harness, profile, ...(model ? { model } : {}) },
     ...(storage ? { storage } : {}),
     ...(restore ? restore : {}),
-    ...(shell.egressPolicy ? { egressPolicy: shell.egressPolicy } : {}),
     ...(shell.webTerminalEnabled ? { webTerminalEnabled: true } : {}),
     maxLifetimeSeconds: resources.maxLifetimeSeconds,
     idleTimeoutSeconds: resources.idleTimeoutSeconds,
@@ -2431,29 +1709,17 @@ async function provisionWorkspaceSandbox(
     },
   } as CreatePayload
 
-  // S-cost gates: an oversized env entry (E2BIG class), an over-cap provision
-  // body, or a system prompt past the degradation cliff — fail loud here,
-  // before the POST, with the offending section named. The prompt gate is
-  // separate from the payload gate on purpose: the 122,659-byte prompt that
-  // produced empty answers is a THIRD of the 240 KB payload cap, so the
-  // payload gate never sees it.
+  // S-cost gates: an oversized env entry (E2BIG class) or an over-cap
+  // provision body can never produce a working sandbox — fail loud here,
+  // before the POST, with the offending section named.
   assertEnvWithinLimits(env)
-  assertProfilePromptWithinBudget(
-    profile,
-    shell.promptBudget ?? {},
-    `provision profile systemPrompt for ${name}`,
-    SHELL_PROMPT_BUDGET_HINT,
-  )
   // `?? {}` only narrows the SDK parameter's `| undefined`; the literal above
   // is always defined. The structural sections type needs no cast.
   assertProvisionPayloadWithinCap(payload ?? {})
 
   let box = await client.create(payload)
 
-  await box.waitFor('running', {
-    timeoutMs: shell.provisionTimeoutMs ?? DEFAULT_PROVISION_TIMEOUT_MS,
-    ...(onProgress ? { onProgress } : {}),
-  })
+  await box.waitFor('running', { timeoutMs: 120_000, ...(onProgress ? { onProgress } : {}) })
   box = await refreshRuntimeConnection(client, box)
 
   if (deferredFiles.length > 0) {
@@ -2470,6 +1736,41 @@ async function provisionWorkspaceSandbox(
     }
   }
   return box
+}
+
+/** Represent a fully configured model with optional API key and base URL for sandbox platform integration */
+export interface ResolvedModel {
+  model: string
+  provider: string
+  // Omitted only under `allowKeylessModel` — keyless metadata tells the
+  // sandbox platform to mint its own per-user router key for the box.
+  apiKey?: string
+  baseUrl?: string
+}
+
+/** Resolve and return the appropriate model configuration based on provider settings and optional overrides */
+export function resolveModel(
+  config: ProviderResolutionConfig | undefined,
+  override?: { model?: string; modelApiKey?: string },
+): ResolvedModel | undefined {
+  const c = config ?? {}
+  const explicitBaseUrl = c.routerBaseUrl
+  const explicitApiKey = override?.modelApiKey ?? c.apiKey
+  const provider =
+    c.providerName ?? (explicitApiKey ? 'openai-compat' : c.openaiApiKey ? 'openai' : undefined)
+  const modelName =
+    override?.model ??
+    c.modelName ??
+    (provider === 'openai' || provider === 'openai-compat' ? c.defaultModel : undefined)
+  const apiKey = explicitApiKey ?? (provider === 'openai' ? c.openaiApiKey : undefined)
+  if (!provider || !modelName) return undefined
+  if (!apiKey && !c.allowKeylessModel) return undefined
+  return {
+    model: modelName,
+    provider,
+    ...(apiKey ? { apiKey } : {}),
+    ...(explicitBaseUrl ? { baseUrl: explicitBaseUrl } : {}),
+  }
 }
 
 // The SDK's SandboxInstance.streamPrompt/.prompt accept `string | PromptInputPart[]`
@@ -2537,7 +1838,7 @@ export function mergeExtraMcp(
 export function attachReasoningEffort(
   profile: AgentProfile,
   harness: Harness,
-  effort: 'auto' | ReasoningEffort | undefined,
+  effort: 'auto' | 'low' | 'medium' | 'high' | undefined,
 ): AgentProfile {
   if (!effort || effort === 'auto') return profile
   return {
@@ -2556,16 +1857,13 @@ export function attachReasoningEffort(
 export interface StreamSandboxPromptOptions {
   sessionId?: string
   executionId?: string
-  /** Stable idempotency key for one logical dispatch. Reuse it with the same
-   * `sessionId` when a caller may retry the initial request. */
-  turnId?: string
   lastEventId?: string
   systemPrompt?: string
   model?: string
   modelApiKey?: string
   history?: Array<{ role: 'user' | 'assistant'; content: string }>
   harness?: Harness
-  effort?: 'auto' | ReasoningEffort
+  effort?: 'auto' | 'low' | 'medium' | 'high'
   appToolMcp?: Record<string, AgentProfileMcpServer>
   baseProfileMcp?: Record<string, AgentProfileMcpServer>
   extraMcp?: Record<string, AgentProfileMcpServer>
@@ -2589,84 +1887,9 @@ export interface StreamSandboxPromptOptions {
   // streaming live (unlike the fire-and-forget `dispatchPrompt`/`driveTurn` path).
   // Omit for a run where closing the tab should stop burning tokens.
   detach?: boolean
-  // Observe the EXACT profile handed to the sandbox SDK for this turn — after
-  // the system-prompt override, the MCP merge, and reasoning-effort attachment
-  // — as a ProfileFingerprint. This is the seam an eval/backtest uses to PROVE
-  // it executed the shipped profile instead of re-deriving one and asserting
-  // nothing. Invoked once, before the first event is yielded.
-  onProfileResolved?: (fingerprint: ProfileFingerprint) => void
-  // Optional spend-verification activity tap. Omitted, nothing changes. Takes
-  // the SAME object `ensureWorkspaceSandbox` does, so a product builds one and
-  // wires it in both places; only `onActivity` is read here.
-  spend?: SandboxSpendHooks
 }
 
 type StreamPromptOptions = Parameters<SandboxInstance['streamPrompt']>[1]
-
-/**
- * The small event shape consumed by agent-gateway's streaming adapters.
- *
- * Sandbox providers can add fields to their event payloads over time. This
- * adapter deliberately copies only the fields the gateway understands so
- * consumers do not each have to maintain a provider-to-gateway cast.
- */
-export interface SandboxStreamEvent {
-  type?: string
-  data?: {
-    part?: { type?: string; text?: string }
-    delta?: string
-    finalText?: string
-    inputRequired?: { prompt?: string }
-  }
-}
-
-/** Normalize raw sandbox events for shared agent-gateway consumers. */
-export function adaptSandboxStream(
-  events: AsyncIterable<unknown>,
-): AsyncGenerator<SandboxStreamEvent> {
-  return (async function* () {
-    for await (const rawEvent of events) {
-      if (!rawEvent || typeof rawEvent !== 'object' || Array.isArray(rawEvent)) continue
-
-      const event = rawEvent as Record<string, unknown>
-      const rawData = event.data
-      const dataRecord =
-        rawData && typeof rawData === 'object' && !Array.isArray(rawData)
-          ? (rawData as Record<string, unknown>)
-          : null
-      const data: NonNullable<SandboxStreamEvent['data']> = {}
-
-      const rawPart = dataRecord?.part
-      if (rawPart && typeof rawPart === 'object' && !Array.isArray(rawPart)) {
-        const part = rawPart as Record<string, unknown>
-        const normalizedPart: NonNullable<
-          NonNullable<SandboxStreamEvent['data']>['part']
-        > = {}
-        if (typeof part.type === 'string') normalizedPart.type = part.type
-        if (typeof part.text === 'string') normalizedPart.text = part.text
-        if (Object.keys(normalizedPart).length > 0) data.part = normalizedPart
-      }
-
-      if (typeof dataRecord?.delta === 'string') data.delta = dataRecord.delta
-      if (typeof dataRecord?.finalText === 'string') data.finalText = dataRecord.finalText
-
-      const rawInputRequired = dataRecord?.inputRequired
-      if (
-        rawInputRequired &&
-        typeof rawInputRequired === 'object' &&
-        !Array.isArray(rawInputRequired)
-      ) {
-        const prompt = (rawInputRequired as Record<string, unknown>).prompt
-        data.inputRequired = typeof prompt === 'string' ? { prompt } : {}
-      }
-
-      yield {
-        ...(typeof event.type === 'string' ? { type: event.type } : {}),
-        ...(Object.keys(data).length > 0 ? { data } : {}),
-      }
-    }
-  })()
-}
 
 /** Resolve and stream AI-generated responses from a sandboxed environment based on input messages and options */
 export async function* streamSandboxPrompt(
@@ -2676,13 +1899,10 @@ export async function* streamSandboxPrompt(
   options?: StreamSandboxPromptOptions,
 ): AsyncGenerator<unknown> {
   const harness = options?.harness ?? 'opencode'
-  const model = requireTransportableModel(
-    resolveModelSelection(shell.provider, {
-      model: options?.model,
-      modelApiKey: options?.modelApiKey,
-    }),
-    'streamSandboxPrompt',
-  )
+  const model = resolveModel(shell.provider, {
+    model: options?.model,
+    modelApiKey: options?.modelApiKey,
+  })
 
   // Server-side enforcement of the harness↔model policy: a vendor-locked harness
   // (claude-code/codex/kimi-code) must not be sent a foreign-provider model, even
@@ -2697,30 +1917,12 @@ export async function* streamSandboxPrompt(
   const appToolMcp = options?.appToolMcp ?? {}
   const extraMcp = mergeExtraMcp(appToolMcp, options?.baseProfileMcp ?? {}, options?.extraMcp)
 
-  const profile = shell.profile({ systemPrompt: options?.systemPrompt, extraMcp, harness })
+  const profile = shell.profile({ systemPrompt: options?.systemPrompt, extraMcp })
   const profileWithEffort = attachReasoningEffort(profile, harness, options?.effort)
-  // The per-turn backend can carry a system prompt the create-time profile
-  // never had (creative-agent does exactly that), so the budget is re-checked
-  // on the profile this turn actually executes.
-  assertProfilePromptWithinBudget(
-    profileWithEffort,
-    shell.promptBudget ?? {},
-    'streamSandboxPrompt profile systemPrompt',
-    SHELL_PROMPT_BUDGET_HINT,
-  )
-
-  // Fingerprint is taken HERE — the one place the final profile exists — so an
-  // observer proves what was executed rather than re-deriving what should be.
-  if (options?.onProfileResolved) {
-    options.onProfileResolved(
-      await fingerprintAgentProfile(profileWithEffort, { model: model?.model, harness }),
-    )
-  }
 
   const stream = box.streamPrompt(prompt, {
     sessionId: options?.sessionId,
     executionId: options?.executionId,
-    turnId: options?.turnId,
     lastEventId: options?.lastEventId,
     ...(options?.signal ? { signal: options.signal } : {}),
     ...(options?.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
@@ -2736,27 +1938,20 @@ export async function* streamSandboxPrompt(
     },
   } as StreamPromptOptions)
 
-  emitSandboxActivity(options?.spend, box)
   let severedFinishReason: string | null = null
-  try {
-    for await (const event of stream) {
-      const step = classifySeveredStream(event)
-      if (step) severedFinishReason = step.kind === 'step-finish' && step.severed ? step.reason : null
-      if (severedFinishReason && isTerminalPromptEvent(event)) {
-        throw new Error(`sandbox model stream severed mid-turn (reason="${severedFinishReason}")`)
-      }
-      if (options?.disallowQuestions) {
-        const q = detectInteractiveQuestion(event)
-        if (q) {
-          throw new Error(`sandbox agent asked an interactive question during an autonomous run: ${q}`)
-        }
-      }
-      yield event
+  for await (const event of stream) {
+    const step = classifySeveredStream(event)
+    if (step) severedFinishReason = step.kind === 'step-finish' && step.severed ? step.reason : null
+    if (severedFinishReason && isTerminalPromptEvent(event)) {
+      throw new Error(`sandbox model stream severed mid-turn (reason="${severedFinishReason}")`)
     }
-  } finally {
-    // The box was working right up to here, however this turn ended — a throw,
-    // an abandoned generator and a clean finish all bill the same.
-    emitSandboxActivity(options?.spend, box)
+    if (options?.disallowQuestions) {
+      const q = detectInteractiveQuestion(event)
+      if (q) {
+        throw new Error(`sandbox agent asked an interactive question during an autonomous run: ${q}`)
+      }
+    }
+    yield event
   }
   // Reconnect-exhausted path: the stream ended on a severed step without a
   // terminal event. A truncated turn must fail loud, not return silently.
@@ -2765,104 +1960,17 @@ export async function* streamSandboxPrompt(
   }
 }
 
-/**
- * Stable identity for a streamed text part, so deltas of one part accumulate
- * together and two concurrent parts never overwrite each other. Harnesses spell
- * the id differently and some snapshot updates carry none at all.
- *
- * Deliberately NOT `/stream`'s `getPartKey`, despite the overlapping property
- * lookup: that one resolves a key for any persisted part across every type and
- * falls back to the CONSTANT `'current'`, which merges all id-less parts into a
- * single lane. Here an id-less part must stay distinct — merging two of them
- * would silently drop one candidate answer, the exact failure class this
- * function was changed to fix. Sharing three lines of lookup would also couple
- * `/sandbox` to `/stream`, which are independent subpaths today.
- */
-function textPartId(part: Record<string, unknown> | undefined, fallback: string): string {
-  for (const key of ['id', 'partId', 'messagePartId']) {
-    const value = part?.[key]
-    if (typeof value === 'string' && value.trim()) return value
-  }
-  return fallback
-}
-
-/**
- * The prompt text a harness may replay back as an assistant text part before it
- * answers. Both spellings are collected because `streamSandboxPrompt` dispatches
- * the HISTORY-FOLDED prompt, not the raw message — an echo replays what was sent.
- */
-function dispatchedPromptTexts(
+/** Resolve a sandbox prompt by streaming and aggregating message parts into a complete string */
+export async function runSandboxPrompt(
+  shell: SandboxRuntimeConfig,
+  box: SandboxInstance,
   message: string | PromptInputPart[],
-  history: StreamSandboxPromptOptions['history'],
-): string[] {
-  const raw =
-    typeof message === 'string'
-      ? message
-      : ((message.find((part) => part.type === 'text') as { text?: string } | undefined)?.text ?? '')
-  return [...new Set([raw, flattenHistory(raw, history)].map((text) => text.trim()))].filter(Boolean)
-}
-
-/**
- * The last streamed text part that is not a replay of the prompt. Used only when
- * the turn carried no `result` receipt.
- *
- * Two distinct decisions, and only the first is content-based. WHICH parts are
- * eligible is decided by CONTENT — an echo is excluded because it matches the
- * dispatched prompt, at whatever position it arrived. Choosing among the
- * remaining eligible parts is then ordinal, last-wins, because a harness emits
- * reasoning/preamble parts before the answer. That ordering assumption is safe
- * in a way "skip the first part" was not: it can only pick the wrong part when a
- * turn produced several genuine non-echo texts and the final one is not the
- * answer, whereas the positional rule mis-fired on the single-answer case that
- * is overwhelmingly the common one.
- */
-function lastNonPromptTextPart(parts: Map<string, string>, promptTexts: string[]): string {
-  const values = Array.from(parts.values())
-    .map((value) => value.trim())
-    .filter((value) => value && !promptTexts.includes(value))
-  return values.at(-1) ?? ''
-}
-
-/**
- * Aggregate a sandbox prompt event stream down to the turn's one final answer.
- *
- * Exported SEPARATELY from `runSandboxPrompt` because the aggregation is pure —
- * `AsyncIterable<event> -> string` — while the streaming half is not: a product
- * that mounts per-turn MCP servers or resolves its harness per workspace wraps
- * `streamSandboxPrompt` in its own generator. Binding this logic to one stream
- * function is exactly what pushed three products into forking the whole thing,
- * bug and all. Take this over a local copy no matter whose generator you drive.
- *
- * Two rules earn their keep, and both were learned from the naive version:
- *
- * - Text accumulates PER PART ID, never into one running buffer, so two
- *   concurrent text parts cannot overwrite each other.
- * - A prompt echo is identified by CONTENT, never by arrival position. The
- *   "skip whichever text part arrives first" shortcut is wrong on both sandbox
- *   lanes: on the delta lane (`box.streamPrompt`, explicit deltas) the first
- *   part is the answer's opening token, so the answer silently loses it; and
- *   when the echo arrives AFTER the answer, the function returns the caller's
- *   own prompt as the agent's reply. Both failures produce a plausible-looking
- *   string, the worst shape for the unattended cron/judge turns this exists for.
- *
- * A blank-but-present `result.finalText` is ignored in favour of the streamed
- * text rather than overwriting a real answer with whitespace.
- *
- * @param events raw sandbox turn events, in order
- * @param message the prompt as handed to the stream, so an echo of it is dropped
- * @param history folded into the dispatched prompt by `streamSandboxPrompt`;
- *        pass whatever was passed there, since the echo replays the FOLDED text
- */
-export async function collectSandboxPromptText(
-  events: AsyncIterable<unknown>,
-  message: string | PromptInputPart[],
-  history?: StreamSandboxPromptOptions['history'],
+  options?: StreamSandboxPromptOptions,
 ): Promise<string> {
-  let finalText = ''
-  const textParts = new Map<string, string>()
-  let anonymousTextPart = 0
+  let fullText = ''
+  let firstTextSeen = false
 
-  for await (const rawEvent of events) {
+  for await (const rawEvent of streamSandboxPrompt(shell, box, message, options)) {
     const event = rawEvent as { type?: string; data?: Record<string, unknown> }
     if (!event.type) continue
 
@@ -2870,37 +1978,20 @@ export async function collectSandboxPromptText(
       const part = event.data?.part as Record<string, unknown> | undefined
       const delta = typeof event.data?.delta === 'string' ? event.data.delta : null
       if (String(part?.type ?? '') === 'text') {
-        const partId = textPartId(part, delta ? 'delta' : `text-${anonymousTextPart++}`)
-        if (delta) textParts.set(partId, `${textParts.get(partId) ?? ''}${delta}`)
-        else if (typeof part?.text === 'string') textParts.set(partId, part.text)
+        if (!firstTextSeen) {
+          firstTextSeen = true
+          continue
+        }
+        if (delta) fullText += delta
+        else if (typeof part?.text === 'string') fullText = part.text
       }
     } else if (event.type === 'result') {
-      const resultText = typeof event.data?.finalText === 'string' ? event.data.finalText : null
-      if (resultText?.trim()) finalText = resultText
+      const finalText = typeof event.data?.finalText === 'string' ? event.data.finalText : null
+      if (finalText) fullText = finalText
     }
   }
 
-  return finalText || lastNonPromptTextPart(textParts, dispatchedPromptTexts(message, history))
-}
-
-/**
- * Resolve a sandbox prompt by streaming it and aggregating the turn down to one
- * final string. The shell's profile / model / MCP resolution and severed-stream
- * fail-loud come from `streamSandboxPrompt`; the aggregation is
- * `collectSandboxPromptText`, which products driving their own generator should
- * import directly.
- */
-export async function runSandboxPrompt(
-  shell: SandboxRuntimeConfig,
-  box: SandboxInstance,
-  message: string | PromptInputPart[],
-  options?: StreamSandboxPromptOptions,
-): Promise<string> {
-  return collectSandboxPromptText(
-    streamSandboxPrompt(shell, box, message, options),
-    message,
-    options?.history,
-  )
+  return fullText
 }
 
 // Mirrors the SDK's PermissionLevel union (not re-exported by
@@ -2958,17 +2049,11 @@ export async function syncSandboxMemberRole(
   }
 }
 
-/**
- * Write-only secret port: create, replace, and delete a secret by name.
- *
- * There is no read method. The platform's secrets API returns names and
- * timestamps only — a stored value is never served back, it is injected into
- * the sandbox as an environment variable. A `get` here could only ever return
- * a value this process already held, so the port does not offer one.
- */
+/** Define methods to create, update, retrieve, and delete secrets asynchronously */
 export interface SecretStore {
   create: (name: string, value: string) => Promise<void>
   update: (name: string, value: string) => Promise<void>
+  get: (name: string) => Promise<string>
   delete: (name: string) => Promise<void>
 }
 
@@ -2979,22 +2064,17 @@ export function secretStoreFromClient(shell: SandboxRuntimeConfig): SecretStore 
     create: async (name, value) => {
       await client.secrets.create(name, value)
     },
-    // The API has no replace route, so a replacement is a delete followed by a
-    // create. That pair is NOT atomic: if the create fails, the secret is left
-    // deleted rather than at its previous value. `storeSecret` reports that
-    // state instead of reporting a generic write failure, because a caller
-    // retrying a lost secret needs to know it is now absent.
     update: async (name, value) => {
-      await client.secrets.delete(name)
-      await client.secrets.create(name, value)
+      await client.secrets.update(name, value)
     },
+    get: (name) => client.secrets.get(name),
     delete: async (name) => {
       await client.secrets.delete(name)
     },
   }
 }
 
-/** Resolve storing a secret by creating it, or replacing it when it exists */
+/** Resolve storing a secret by creating or updating it in the given SecretStore */
 export async function storeSecret(
   store: SecretStore,
   name: string,
@@ -3008,13 +2088,17 @@ export async function storeSecret(
       await store.update(name, value)
       return ok(undefined)
     } catch (err) {
-      return fail(
-        new Error(
-          `Failed to store sandbox secret ${name}. A replacement deletes before it creates, so ${name} may now be absent rather than holding its previous value.`,
-          { cause: err },
-        ),
-      )
+      return fail(new Error(`Failed to store sandbox secret ${name}`, { cause: err }))
     }
+  }
+}
+
+/** Resolve a secret value from the store by its name and return the outcome asynchronously */
+export async function readSecret(store: SecretStore, name: string): Promise<Outcome<string>> {
+  try {
+    return ok(await store.get(name))
+  } catch (err) {
+    return fail(err)
   }
 }
 
@@ -3042,10 +2126,14 @@ export interface ScopedTokenResult {
  */
 export async function mintSandboxScopedToken(
   box: SandboxInstance,
-  options: MintScopedTokenOptions,
+  options: { scope: ScopedTokenScope; sessionId?: string; ttlMinutes?: number },
 ): Promise<Outcome<ScopedTokenResult>> {
   try {
-    const token = await box.mintScopedToken(options)
+    const token = await box.mintScopedToken({
+      scope: options.scope,
+      ...(options.sessionId ? { sessionId: options.sessionId } : {}),
+      ...(options.ttlMinutes ? { ttlMinutes: options.ttlMinutes } : {}),
+    })
     return ok({ token: token.token, expiresAt: token.expiresAt, scope: token.scope })
   } catch (err) {
     return fail(err)
@@ -3058,6 +2146,9 @@ export interface DriveSandboxTurnOptions extends StreamSandboxPromptOptions {
    * MUST reuse it so a crash + re-drive finds the in-flight session instead of
    * starting a second agent run. */
   sessionId: string
+  /** Turn idempotency key for the platform's completed-turn cache. Defaults to
+   * `sessionId` (correct for the one-turn-per-session shape detached drivers use). */
+  turnId?: string
   /** Wall-clock cap in ms from the session's start. A still-running session past
    * the cap is cancelled and reported `failed` — bounds an unattended run (e.g. a
    * turn that stalled on an interactive question nothing will answer). Omit for no cap. */
@@ -3073,8 +2164,8 @@ export interface DriveSandboxTurnOptions extends StreamSandboxPromptOptions {
 //
 // This is the durable path for cron / mission-step / queue callers: re-invoke on
 // your own schedule (Workflow step, DO alarm, queue tick) with the SAME
-// `sessionId` and `turnId`. Dispatch is idempotent on that pair, so a crash +
-// re-drive is a lookup, not a second agent run.
+// `sessionId`. Dispatch is idempotent on it, so a crash + re-drive is a lookup,
+// not a second agent run.
 //
 // The Outcome boundary separates a retryable transport failure from a settled
 // turn: `fail` means the drive call itself threw (network blip — retry the tick);
@@ -3090,17 +2181,10 @@ export async function driveSandboxTurn(
   options: DriveSandboxTurnOptions,
 ): Promise<Outcome<TurnDriveResult>> {
   const harness = options.harness ?? 'opencode'
-  // Resolved (and, for an explicit override/config model, enforced-transportable)
-  // BEFORE the try below: a misconfigured model is a deterministic config error,
-  // not a retryable transport blip, so it throws here rather than returning
-  // `fail(...)` — a driver re-ticking this session would otherwise retry it forever.
-  const model = requireTransportableModel(
-    resolveModelSelection(shell.provider, {
-      model: options.model,
-      modelApiKey: options.modelApiKey,
-    }),
-    'driveSandboxTurn',
-  )
+  const model = resolveModel(shell.provider, {
+    model: options.model,
+    modelApiKey: options.modelApiKey,
+  })
   if (model?.model) assertHarnessModelCompatible(harness, model.model)
   const prompt =
     typeof message === 'string'
@@ -3109,17 +2193,9 @@ export async function driveSandboxTurn(
   const appToolMcp = options.appToolMcp ?? {}
   const extraMcp = mergeExtraMcp(appToolMcp, options.baseProfileMcp ?? {}, options.extraMcp)
   const profile = attachReasoningEffort(
-    shell.profile({ systemPrompt: options.systemPrompt, extraMcp, harness }),
+    shell.profile({ systemPrompt: options.systemPrompt, extraMcp }),
     harness,
     options.effort,
-  )
-  // Autonomous lane: nobody is watching, so an empty answer from an oversized
-  // prompt would be recorded as a completed turn with no output.
-  assertProfilePromptWithinBudget(
-    profile,
-    shell.promptBudget ?? {},
-    'driveSandboxTurn profile systemPrompt',
-    SHELL_PROMPT_BUDGET_HINT,
   )
   try {
     const drive = await box.driveTurn(prompt, {
@@ -3133,11 +2209,6 @@ export async function driveSandboxTurn(
       // no consumer to answer a question. Interactive Q&A is streaming-path only.
       backend: { type: harness, profile, ...(model ? { model } : {}) },
     } as Parameters<SandboxInstance['driveTurn']>[1])
-    // The autonomous lane needs this most: a detached turn keeps the box
-    // billable with nobody watching, and every tick that reports `running` is
-    // fresh evidence it is still working. Without it the expectation ceiling
-    // rests on whenever the box was last provisioned.
-    emitSandboxActivity(options.spend, box)
     return ok(drive)
   } catch (err) {
     return fail(err)
@@ -3217,14 +2288,7 @@ function firstQuestionText(value: Record<string, unknown> | null): string {
     undefined
   return q ?? 'interactive question'
 }
-// Generic name-keyed workspace sandbox lifecycle manager.
-export * from './workspace-sandbox-manager'
-// Browser-direct scoped-token terminal connection route (#341/#349/#350).
-export * from './terminal-connection'
-// Background box warming on project open: single-flight, non-blocking, and
-// explicit about spend. Imports `ensureWorkspaceSandbox`/`peekWorkspaceSandbox`
-// back out of this module; tsup inlines both files into the one
-// `sandbox/index` chunk, so the cycle exists only in source.
-export * from './prewarm'
-
-export * from './prewarm-claim-d1'
+// Workspace sandbox terminal handlers: WebSocket upgrade proxy, connection
+// + runtime-proxy handlers, and scoped terminal-token mint/verify.
+export * from './terminal-proxy-token'
+export * from './workspace-terminal'

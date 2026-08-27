@@ -9,10 +9,7 @@ import { chromium } from 'playwright'
 import AxeBuilder from '@axe-core/playwright'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:4321'
-// Every route the playground serves. `/composer` was missing while the focus
-// audit next door already covered it, so the ChatComposer's own states were the
-// one surface neither instrument was reading contrast on.
-const ROUTES = ['/canvas', '/timeline', '/chat', '/composer', '/workspace']
+const ROUTES = ['/canvas', '/timeline', '/chat']
 const THEMES = [
   { q: '', label: 'light' },
   { q: '?theme=dark', label: 'dark' },
@@ -49,7 +46,7 @@ for (const route of ROUTES) {
 }
 
 console.log(`\n──────── SUMMARY ────────`)
-console.log(`TOTAL violations across ${ROUTES.length} routes × 2 themes: ${total}`)
+console.log(`TOTAL violations across 3 routes × 2 themes: ${total}`)
 for (const [rule, n] of [...byRule.entries()].sort((a, b) => b[1] - a[1])) {
   console.log(`  ${rule}: ${n} node(s)`)
 }

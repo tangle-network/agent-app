@@ -1,8 +1,8 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.46.15",
-  "packageManager": "pnpm@11.17.0",
-  "description": "Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.",
+  "version": "0.43.63",
+  "packageManager": "pnpm@10.33.4",
+  "description": "Application-shell framework for Tangle agent products: a bounded tool loop, the structured agent→app tool side channel, integration-hub client, per-workspace billing, and crypto — composed over the Tangle agent substrate through typed seams.",
   "keywords": [
     "tangle",
     "ai-agent",
@@ -26,31 +26,21 @@
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "files": [
     "dist",
     "bin",
     ".claude/skills"
   ],
   "bin": {
-    "agent-app-theme-check": "./dist/theme-contract/cli.js",
-    "agent-app-legibility-check": "./dist/legibility/cli.js",
-    "agent-app-preflight": "./dist/preflight/cli.js",
-    "agent-app-peer-check": "./dist/peer-floors/cli.js",
-    "agent-app-spend-check": "./dist/spend/cli.js",
-    "agent-app-signoff": "./dist/signoff/cli.js",
-    "agent-app-verify-proof": "./dist/signoff/proof-cli.js"
+    "agent-app-theme-check": "./dist/theme-contract/cli.js"
   },
   "exports": {
-    "./package.json": "./package.json",
-    "./signoff": {
-      "types": "./dist/signoff/index.d.ts",
-      "import": "./dist/signoff/index.js",
-      "default": "./dist/signoff/index.js"
-    },
-    "./signoff/proof": {
-      "types": "./dist/signoff/proof.d.ts",
-      "import": "./dist/signoff/proof.js",
-      "default": "./dist/signoff/proof.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./tools": {
       "types": "./dist/tools/index.d.ts",
@@ -157,20 +147,10 @@
       "import": "./dist/billing/index.js",
       "default": "./dist/billing/index.js"
     },
-    "./alerting": {
-      "types": "./dist/alerting/index.d.ts",
-      "import": "./dist/alerting/index.js",
-      "default": "./dist/alerting/index.js"
-    },
     "./preflight": {
       "types": "./dist/preflight/index.d.ts",
       "import": "./dist/preflight/index.js",
       "default": "./dist/preflight/index.js"
-    },
-    "./forms": {
-      "types": "./dist/forms/index.d.ts",
-      "import": "./dist/forms/index.js",
-      "default": "./dist/forms/index.js"
     },
     "./object-store": {
       "types": "./dist/object-store/index.d.ts",
@@ -202,11 +182,6 @@
       "import": "./dist/turn-stream/index.js",
       "default": "./dist/turn-stream/index.js"
     },
-    "./turn-health": {
-      "types": "./dist/turn-health/index.d.ts",
-      "import": "./dist/turn-health/index.js",
-      "default": "./dist/turn-health/index.js"
-    },
     "./integrations": {
       "types": "./dist/integrations/index.d.ts",
       "import": "./dist/integrations/index.js",
@@ -222,15 +197,15 @@
       "import": "./dist/plans/index.js",
       "default": "./dist/plans/index.js"
     },
+    "./durable-chat": {
+      "types": "./dist/durable-chat/index.d.ts",
+      "import": "./dist/durable-chat/index.js",
+      "default": "./dist/durable-chat/index.js"
+    },
     "./missions": {
       "types": "./dist/missions/index.d.ts",
       "import": "./dist/missions/index.js",
       "default": "./dist/missions/index.js"
-    },
-    "./session-shell": {
-      "types": "./dist/session-shell/index.d.ts",
-      "import": "./dist/session-shell/index.js",
-      "default": "./dist/session-shell/index.js"
     },
     "./web": {
       "types": "./dist/web/index.d.ts",
@@ -242,35 +217,15 @@
       "import": "./dist/web-react/index.js",
       "default": "./dist/web-react/index.js"
     },
-    "./web-react/async": {
-      "types": "./dist/web-react/async/index.d.ts",
-      "import": "./dist/web-react/async/index.js",
-      "default": "./dist/web-react/async/index.js"
-    },
     "./web-react/terminal": {
       "types": "./dist/web-react/terminal.d.ts",
       "import": "./dist/web-react/terminal.js",
       "default": "./dist/web-react/terminal.js"
     },
-    "./work-product": {
-      "types": "./dist/work-product/index.d.ts",
-      "import": "./dist/work-product/index.js",
-      "default": "./dist/work-product/index.js"
-    },
-    "./work-product-react": {
-      "types": "./dist/work-product-react/index.d.ts",
-      "import": "./dist/work-product-react/index.js",
-      "default": "./dist/work-product-react/index.js"
-    },
-    "./chat-react": {
-      "types": "./dist/chat-react/index.d.ts",
-      "import": "./dist/chat-react/index.js",
-      "default": "./dist/chat-react/index.js"
-    },
-    "./workspace-react": {
-      "types": "./dist/workspace-react/index.d.ts",
-      "import": "./dist/workspace-react/index.js",
-      "default": "./dist/workspace-react/index.js"
+    "./composer": {
+      "types": "./dist/composer/index.d.ts",
+      "import": "./dist/composer/index.js",
+      "default": "./dist/composer/index.js"
     },
     "./assistant": {
       "types": "./dist/assistant/index.d.ts",
@@ -321,26 +276,6 @@
       "types": "./dist/design-canvas/index.d.ts",
       "import": "./dist/design-canvas/index.js",
       "default": "./dist/design-canvas/index.js"
-    },
-    "./documents": {
-      "types": "./dist/documents/index.d.ts",
-      "import": "./dist/documents/index.js",
-      "default": "./dist/documents/index.js"
-    },
-    "./documents/pdf-inspector": {
-      "types": "./dist/documents/pdf-inspector.d.ts",
-      "import": "./dist/documents/pdf-inspector.js",
-      "default": "./dist/documents/pdf-inspector.js"
-    },
-    "./openui": {
-      "types": "./dist/openui/index.d.ts",
-      "import": "./dist/openui/index.js",
-      "default": "./dist/openui/index.js"
-    },
-    "./openui-react": {
-      "types": "./dist/openui-react/index.d.ts",
-      "import": "./dist/openui-react/index.js",
-      "default": "./dist/openui-react/index.js"
     },
     "./design-canvas/drizzle": {
       "types": "./dist/design-canvas/drizzle.d.ts",
@@ -433,16 +368,6 @@
       "import": "./dist/intakes-react/lazy.js",
       "default": "./dist/intakes-react/lazy.js"
     },
-    "./record": {
-      "types": "./dist/record/index.d.ts",
-      "import": "./dist/record/index.js",
-      "default": "./dist/record/index.js"
-    },
-    "./record/drizzle": {
-      "types": "./dist/record/drizzle.d.ts",
-      "import": "./dist/record/drizzle.js",
-      "default": "./dist/record/drizzle.js"
-    },
     "./vault": {
       "types": "./dist/vault/index.d.ts",
       "import": "./dist/vault/index.js",
@@ -452,11 +377,6 @@
       "types": "./dist/vault/lazy.d.ts",
       "import": "./dist/vault/lazy.js",
       "default": "./dist/vault/lazy.js"
-    },
-    "./vault/server": {
-      "types": "./dist/vault/server.d.ts",
-      "import": "./dist/vault/server.js",
-      "default": "./dist/vault/server.js"
     },
     "./brand": {
       "types": "./dist/brand/index.d.ts",
@@ -478,136 +398,78 @@
       "import": "./dist/theme-contract/index.js",
       "default": "./dist/theme-contract/index.js"
     },
-    "./styles": "./dist/theme/tokens.css",
-    "./legibility": {
-      "types": "./dist/legibility/index.d.ts",
-      "import": "./dist/legibility/index.js",
-      "default": "./dist/legibility/index.js"
-    },
-    "./peer-floors": {
-      "types": "./dist/peer-floors/check.d.ts",
-      "import": "./dist/peer-floors/check.js",
-      "default": "./dist/peer-floors/check.js"
-    },
-    "./spend": {
-      "types": "./dist/spend/index.d.ts",
-      "import": "./dist/spend/index.js",
-      "default": "./dist/spend/index.js"
-    }
+    "./styles": "./dist/theme/tokens.css"
   },
   "scripts": {
-    "build": "tsup && tsc -p tsconfig.build.json",
+    "build": "tsup",
     "dev": "tsup --watch",
-    "dev:types": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
-    "prepare": "pnpm run build",
+    "prepare": "tsup",
     "test": "vitest run",
-    "test:generated": "node .github/scripts/test-generated-projects.mjs",
-    "test:gates": "vitest run src/sandbox/index.test.ts src/profile/index.test.ts tests/chat-stream.test.ts tests/browser-safe-subpaths.test.ts tests/test-quality.test.ts tests/knip-entries-fresh.test.ts tests/web-react/popover-escapes-host.test.tsx tests/web-react/popover-canon-source.test.ts tests/studio/layer-order.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "docs:gen": "agent-docs",
-    "knip": "knip",
-    "signoff": "node dist/signoff/cli.js",
-    "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "knip": "knip"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "5.20260722.1",
-    "@firecrawl/pdf-inspector-wasm": "^0.1.3",
-    "@hocuspocus/provider": "^4.4.0",
-    "@storybook/react": "^10.5.5",
-    "@storybook/react-vite": "^10.5.5",
-    "@tangle-network/agent-docs": "0.2.1",
-    "@tangle-network/agent-eval": "0.149.0",
-    "@tangle-network/agent-integrations": "0.53.54",
-    "@tangle-network/agent-interface": "1.1.0",
-    "@tangle-network/agent-knowledge": "8.0.10",
-    "@tangle-network/agent-profile-materialize": "0.16.0",
-    "@tangle-network/agent-runtime": "0.142.0",
-    "@tangle-network/brand": "1.5.0",
-    "@tangle-network/sandbox": "0.29.0",
-    "@tangle-network/sandbox-ui": "0.105.0",
-    "@tangle-network/ui": "^11.5.0",
+    "@cloudflare/workers-types": "^4.20250620.0",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@tangle-network/agent-docs": "0.2.0",
+    "@tangle-network/agent-eval": "^0.100.0",
+    "@tangle-network/agent-integrations": "^0.44.0",
+    "@tangle-network/agent-interface": "^0.15.0",
+    "@tangle-network/agent-knowledge": "^1.7.0",
+    "@tangle-network/agent-profile-materialize": "^0.6.0",
+    "@tangle-network/agent-runtime": "^0.79.3",
+    "@tangle-network/brand": "^1.0.0",
+    "@tangle-network/sandbox": "^0.10.5",
+    "@tangle-network/sandbox-ui": "^0.72.0",
+    "@tangle-network/ui": "^11.0.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
-    "@tiptap/core": "^3.28.0",
-    "@tiptap/extension-mention": "^3.28.0",
-    "@tiptap/pm": "^3.28.0",
-    "@tiptap/react": "^3.28.0",
-    "@tiptap/starter-kit": "^3.28.0",
-    "@tiptap/suggestion": "^3.28.0",
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^22.20.1",
+    "@types/node": "^25.6.0",
     "@types/react": "^19.0.0",
-    "@types/react-dom": "19.2.3",
-    "@types/semver": "^7.7.1",
-    "@xterm/addon-fit": "^0.11.0",
-    "@xterm/addon-web-links": "^0.12.0",
-    "@xterm/addon-webgl": "^0.19.0",
-    "@xterm/xterm": "^6.0.0",
     "@xyflow/react": "^12.0.0",
-    "autoprefixer": "^10.5.4",
     "better-auth": "^1.6.16",
     "better-sqlite3": "^12.10.0",
     "drizzle-orm": "^0.45.2",
-    "fast-check": "^4.9.0",
+    "fast-check": "^3.23.2",
     "jsdom": "^29.1.1",
-    "knip": "^6.29.0",
+    "knip": "^5.46.0",
     "konva": "^10.3.0",
     "lucide-react": "^1.16.0",
-    "npm": "11.18.0",
-    "pdf-lib": "^1.17.1",
-    "postcss": "^8.5.25",
     "react": "^19.0.0",
     "react-dom": "^19.2.7",
     "react-konva": "^19.2.5",
-    "react-router": "^8.3.0",
+    "react-router": "^7.15.1",
     "resend": "^6.12.4",
-    "semver": "^7.8.5",
-    "storybook": "^10.5.5",
-    "tailwindcss": "^3.4.19",
     "tsup": "^8.0.0",
     "typescript": "^5.7.0",
-    "vitest": "^4.1.10",
-    "y-protocols": "^1.0.7",
-    "yjs": "^13.6.31"
+    "vitest": "^3.0.0"
   },
   "peerDependencies": {
-    "@firecrawl/pdf-inspector-wasm": ">=0.1.3",
     "@huggingface/transformers": ">=3",
-    "@tangle-network/agent-eval": ">=0.149.0 <0.150.0",
-    "@tangle-network/agent-integrations": ">=0.52.0",
-    "@tangle-network/agent-interface": "^1.0.0",
-    "@tangle-network/agent-knowledge": "^8.0.10",
-    "@tangle-network/agent-profile-materialize": ">=0.16.0",
-    "@tangle-network/agent-runtime": ">=0.142.0 <0.143.0",
-    "@tangle-network/brand": ">=1.5.0",
-    "@tangle-network/sandbox": ">=0.29.0 <0.30.0",
-    "@tangle-network/sandbox-ui": ">=0.105.0",
-    "@tangle-network/ui": ">=11.5.0",
-    "@tiptap/core": ">=3.28.0 <4.0.0",
-    "@tiptap/extension-mention": ">=3.28.0 <4.0.0",
-    "@tiptap/pm": ">=3.28.0 <4.0.0",
-    "@tiptap/react": ">=3.28.0 <4.0.0",
-    "@tiptap/starter-kit": ">=3.28.0 <4.0.0",
-    "@tiptap/suggestion": ">=3.28.0 <4.0.0",
+    "@radix-ui/react-dialog": ">=1.1",
+    "@tangle-network/agent-eval": ">=0.100.0",
+    "@tangle-network/agent-integrations": ">=0.44.0",
+    "@tangle-network/agent-interface": ">=0.15.0",
+    "@tangle-network/agent-knowledge": ">=1.7.0",
+    "@tangle-network/agent-profile-materialize": ">=0.6.0",
+    "@tangle-network/agent-runtime": ">=0.79.3",
+    "@tangle-network/brand": ">=1.0.0",
+    "@tangle-network/sandbox": ">=0.9.7",
+    "@tangle-network/sandbox-ui": ">=0.72.0",
     "@xyflow/react": ">=12.0.0",
     "better-auth": ">=1.6.16",
     "drizzle-orm": ">=0.36",
     "konva": ">=9",
     "lucide-react": ">=1",
-    "pdf-lib": ">=1.17",
     "react": ">=18",
-    "react-dom": ">=18",
     "react-konva": ">=18",
-    "react-router": ">=8.3.0",
+    "react-router": ">=7",
     "resend": ">=6"
   },
   "peerDependenciesMeta": {
-    "@firecrawl/pdf-inspector-wasm": {
-      "optional": true
-    },
     "@huggingface/transformers": {
       "optional": true
     },
@@ -641,28 +503,7 @@
     "@tangle-network/sandbox-ui": {
       "optional": true
     },
-    "@tangle-network/ui": {
-      "optional": true
-    },
     "@tangle-network/brand": {
-      "optional": true
-    },
-    "@tiptap/core": {
-      "optional": true
-    },
-    "@tiptap/extension-mention": {
-      "optional": true
-    },
-    "@tiptap/pm": {
-      "optional": true
-    },
-    "@tiptap/react": {
-      "optional": true
-    },
-    "@tiptap/starter-kit": {
-      "optional": true
-    },
-    "@tiptap/suggestion": {
       "optional": true
     },
     "@xyflow/react": {
@@ -674,17 +515,19 @@
     "lucide-react": {
       "optional": true
     },
+    "@radix-ui/react-dialog": {
+      "optional": true
+    },
     "resend": {
-      "optional": true
-    },
-    "pdf-lib": {
-      "optional": true
-    },
-    "react-dom": {
       "optional": true
     }
   },
   "dependencies": {
     "zod": "^4.4.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ]
   }
 }

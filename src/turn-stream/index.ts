@@ -22,41 +22,6 @@
  * sandbox/session probes for stale-lock recovery, viewer authorization, and
  * any post-turn machinery that defers a lock release (the DO's protected
  * seams exist for exactly that).
- *
- * ── What is still the right answer here, and what is not ─────────────────
- *
- * A production A/B (4 arms, sandbox.tangle.tools, SDK 0.12.0) showed that a
- * browser attached to the sandbox session gateway sees a turn only when the
- * turn is driven on the session-MESSAGE lane
- * (`box.session(id).sendMessage()` → 297 of 297 frames delivered), never on
- * the run/stream lane (`box.streamPrompt()` → 0 of 71, 0 of 527, 0 of 408
- * across three session-id strategies). `./core`'s header carries the full
- * table.
- *
- * KEPT — no SDK primitive replaces these:
- *   • the dual-scope single-flight TURN LOCK (`createDurableTurnLock`,
- *     `reconcileStaleDurableTurnLock`) — the gateway is a read-only fanout
- *     and ships no admission control;
- *   • the per-workspace SIGNALS (`thread.created`, `thread.activity`, plus
- *     `productSyncEvents`) — the gateway is per-session;
- *   • the durable TURN-EVENT rows + running-turn index
- *     (`createDurableObjectTurnEventStore`) that `runDetachedTurn` streams
- *     into — a detached run (`dispatchPrompt({ detach: true })`,
- *     `driveTurn`) goes through `streamPrompt` internally, so it never
- *     reaches the gateway at all. Autonomous work a browser must tail has
- *     no other path today.
- *
- * DEPRECATED — duplicates the SDK:
- *   • the interactive per-turn REBROADCAST/replay on the thread channel
- *     (`broadcastTurnStreamEvent` + the segment functions in `./core`).
- *     Sandbox products: drive on the message lane and attach the tab with
- *     `box.mintScopedToken({ scope: 'session' })` + `SessionGatewayClient`;
- *     resume a worker-side read with
- *     `box.streamPrompt('', { executionId, lastEventId })`, which replays
- *     strictly after the cursor without re-dispatching.
- *
- * Nothing is removed: these are published exports and unknown consumers may
- * hold them. Removal is a major-version change.
  */
 
 export * from './core'

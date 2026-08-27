@@ -14,13 +14,6 @@ export interface ResolvedChatTurn {
   shouldInsertUserMessage: boolean
   priorMessages: PersistedChatMessageForTurn[]
   userParts: JsonRecord[]
-  /** The id of the user row this turn REUSES (retry dedup), when one was
-   *  found. Absent on the insert path, where no row exists yet.
-   *
-   *  The reused row is deliberately EXCLUDED from `priorMessages` (it is this
-   *  turn's own user message, not prior context), so this field is the only
-   *  way a caller can name it. */
-  reusedUserMessageId?: string
 }
 
 /** Normalize and validate a client turn ID string ensuring it meets format and length requirements */
@@ -82,16 +75,11 @@ export function resolveChatTurn(input: {
     input.hasRunningTurn === true,
   )
   if (reusableIndex >= 0) {
-    // Guarded read: `id` is typed `string`, but these rows come from a product
-    // store the shell does not validate, so an adapter that omits it must
-    // surface as "no id" rather than as the string "undefined".
-    const reusedId = existingMessages[reusableIndex]?.id
     return {
       turnIndex: countUserMessages(existingMessages.slice(0, reusableIndex)),
       shouldInsertUserMessage: false,
       priorMessages: existingMessages.slice(0, reusableIndex),
       userParts: buildUserTextParts(userContent, turnId),
-      ...(typeof reusedId === 'string' && reusedId ? { reusedUserMessageId: reusedId } : {}),
     }
   }
 
@@ -114,11 +102,6 @@ function findReusableUserMessageIndex(
       const message = messages[index]
       if (message?.role === 'user' && messageHasTurnId(message, turnId)) return index
     }
-    // A caller-supplied id is authoritative. A different id with identical
-    // text is a deliberate new turn, while a transport retry reuses the same
-    // id and takes the match above. Falling through to content dedup here lets
-    // an unrelated abandoned running row swallow an intentional repeat.
-    return -1
   }
 
   // Content fallback for a client that sends no turnId. Only the trailing rows

@@ -26,12 +26,6 @@ import type { AppToolProducedEvent } from '../tools/types'
 
 // Re-export the engine so consumers import completion + scoring from one place.
 export { verifyCompletion, extractProducedState, weightedComposite, createLlmCorrectnessChecker } from '@tangle-network/agent-eval'
-
-// Calibration: prove a gate can FAIL before believing it PASSED, and prove a
-// probe can SEE before believing the zero it reported. Domain-free, so it
-// calibrates a citation gate, a form audit, or a benchmark equally.
-export { calibrateGate, assertGateDiscriminates, measureWithControl } from './calibration'
-export type { CalibrationCase, CalibrationOutcome, CalibrationReport, GateFn, ProbeReport } from './calibration'
 export type {
   CompletionRequirement,
   TaskGold,

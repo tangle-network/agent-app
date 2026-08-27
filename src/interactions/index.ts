@@ -10,7 +10,7 @@
  *     `createInteractionAnswerRoute()`, the list/answer endpoint factory that
  *     retires the per-app route forks.
  *
- * The only shared-package peer is `@tangle-network/agent-interface` (schema +
+ * Substrate-free: the only peer is `@tangle-network/agent-interface` (schema
  * types). The sidecar connection is a structural value, never an SDK import.
  */
 

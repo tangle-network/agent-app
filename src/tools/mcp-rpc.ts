@@ -49,8 +49,6 @@ export interface CreateMcpToolHandlerOptions<TEnv = Record<string, never>> {
    *  stateless (or carry state through closure) pass an empty builder:
    *  `() => ({} as TEnv)`. */
   buildEnv(request: Request): TEnv | Promise<TEnv>
-  /** Optional result formatter for callers that need structured tool errors. */
-  formatResult?: (result: unknown, tool: McpToolDefinition<TEnv>) => McpToolCallContent
 }
 
 // ---------------------------------------------------------------------------
@@ -59,7 +57,7 @@ export interface CreateMcpToolHandlerOptions<TEnv = Record<string, never>> {
 
 type JsonRpcId = string | number | null
 
-export interface McpToolCallContent {
+interface ToolCallContent {
   content: Array<{ type: 'text'; text: string }>
   isError?: true
 }
@@ -182,7 +180,7 @@ export function createMcpToolHandler<TEnv = Record<string, never>>(
           env = await opts.buildEnv(request)
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err)
-          const payload: McpToolCallContent = {
+          const payload: ToolCallContent = {
             content: [{ type: 'text', text: `${name} failed to build env: ${message}` }],
             isError: true,
           }
@@ -190,13 +188,11 @@ export function createMcpToolHandler<TEnv = Record<string, never>>(
         }
         try {
           const result = await tool.run(args, env)
-          const payload = opts.formatResult
-            ? opts.formatResult(result, tool)
-            : { content: [{ type: 'text', text: JSON.stringify(result) }] }
+          const payload: ToolCallContent = { content: [{ type: 'text', text: JSON.stringify(result) }] }
           return rpcResult(id, payload)
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err)
-          const payload: McpToolCallContent = {
+          const payload: ToolCallContent = {
             content: [{ type: 'text', text: `${name} failed: ${message}` }],
             isError: true,
           }

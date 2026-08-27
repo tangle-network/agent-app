@@ -13,7 +13,6 @@ export {
   DEFAULT_HEADER_NAMES,
   type ToolHeaderNames,
   type AuthenticateOptions,
-  type CapabilitySubject,
   type ToolAuthResult,
 } from './auth'
 export {
@@ -43,7 +42,6 @@ export {
   buildHttpMcpServer,
   buildAppToolMcpServer,
   buildScopedMcpServerEntry,
-  unresolvableSurfaceCredential,
   DEFAULT_APP_TOOL_PATHS,
   type AppToolMcpServer,
   type BuildHttpMcpServerOptions,
@@ -55,7 +53,6 @@ export {
   MCP_PROTOCOL_VERSIONS,
   type McpProtocolVersion,
   type McpServerInfo,
-  type McpToolCallContent,
   type McpToolDefinition,
   type CreateMcpToolHandlerOptions,
 } from './mcp-rpc'

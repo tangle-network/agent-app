@@ -1,43 +1,12 @@
-import { DatabaseSync } from 'node:sqlite'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import {
   coalesceDeltas,
   coalesceChatStreamEvents,
   pumpBufferedTurn,
   createBufferedTurnTap,
-  createD1TurnEventStore,
   replayTurnEvents,
   createMemoryTurnEventStore,
-  stampReplaySeq,
-  TURN_EVENTS_MIGRATION_SQL,
-  type D1LikeForTurns,
-  type TurnEventStoreOptions,
 } from '../src/stream/turn-buffer'
-
-function d1TurnStore(options: TurnEventStoreOptions = {}) {
-  const sqlite = new DatabaseSync(':memory:')
-  type Prepared = ReturnType<D1LikeForTurns['prepare']>
-  type Bound = ReturnType<Prepared['bind']>
-  const prepared = (query: string, bound: unknown[] = []): Prepared & Bound => ({
-    bind(...values: unknown[]) {
-      return prepared(query, values)
-    },
-    async run() {
-      return sqlite.prepare(query).run(...(bound as never[]))
-    },
-    async all<T = Record<string, unknown>>() {
-      return { results: sqlite.prepare(query).all(...(bound as never[])) as T[] }
-    },
-    async first<T = Record<string, unknown>>() {
-      return (sqlite.prepare(query).get(...(bound as never[])) as T | undefined) ?? null
-    },
-  })
-  sqlite.exec(TURN_EVENTS_MIGRATION_SQL)
-  return {
-    store: createD1TurnEventStore({ prepare: (query) => prepared(query) }, options),
-    close: () => sqlite.close(),
-  }
-}
 
 function text(t: string) {
   return { kind: 'event', event: { type: 'text', text: t } }
@@ -137,36 +106,6 @@ describe('pumpBufferedTurn — pluggable coalesce + scope discovery', () => {
     expect(await store.listRunning!('thread-9')).toEqual(['b', 'a']) // newest first
     await store.setStatus('a', 'complete')
     expect(await store.listRunning!('thread-9')).toEqual(['b'])
-  })
-
-  it('expires an abandoned running lease without hiding a concurrent live turn', async () => {
-    let now = 0
-    const options = { runningTurnLeaseMs: 100, now: () => now }
-    const memory = createMemoryTurnEventStore(options)
-    const d1 = d1TurnStore(options)
-
-    try {
-      const results: Record<string, string[]> = {}
-      for (const [name, store] of [
-        ['memory', memory],
-        ['d1', d1.store],
-      ] as const) {
-        now = 0
-        await store.setStatus('older-live-turn', 'running', 'thread-9')
-        now = 10
-        await store.setStatus('later-turn', 'running', 'thread-9')
-        now = 20
-        await store.setStatus('later-turn', 'complete', 'thread-9')
-        results[name] = await store.listRunning!('thread-9')
-      }
-      expect(results).toEqual({ memory: ['older-live-turn'], d1: ['older-live-turn'] })
-
-      now = 101
-      expect(await memory.listRunning!('thread-9')).toEqual([])
-      expect(await d1.store.listRunning!('thread-9')).toEqual([])
-    } finally {
-      d1.close()
-    }
   })
 
   it('records the pump scopeId so a reloaded client can rediscover the turn', async () => {
@@ -305,57 +244,6 @@ describe('createBufferedTurnTap', () => {
     expect(await store.listRunning!('sess-A')).toEqual([])
   })
 
-  it('renews the running lease until the turn settles', async () => {
-    vi.useFakeTimers()
-    try {
-      const base = createMemoryTurnEventStore()
-      const setStatus = vi.fn(base.setStatus.bind(base))
-      const tap = createBufferedTurnTap({
-        store: { ...base, setStatus },
-        turnId: 'lease-turn',
-        scopeId: 'lease-thread',
-        runningTurnRenewIntervalMs: 50,
-      })
-
-      await tap.onEvent(text('working'))
-      await vi.advanceTimersByTimeAsync(50)
-      expect(setStatus.mock.calls.map((call) => call[1])).toEqual(['running', 'running'])
-
-      await tap.done('complete')
-      await vi.advanceTimersByTimeAsync(100)
-      expect(setStatus.mock.calls.map((call) => call[1])).toEqual(['running', 'running', 'complete'])
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it('renews from a later event when the runtime did not wake the scheduled timer', async () => {
-    vi.useFakeTimers()
-    try {
-      vi.setSystemTime(0)
-      const base = createMemoryTurnEventStore()
-      const setStatus = vi.fn(base.setStatus.bind(base))
-      const tap = createBufferedTurnTap({
-        store: { ...base, setStatus },
-        turnId: 'frozen-timer-turn',
-        scopeId: 'frozen-timer-thread',
-        runningTurnRenewIntervalMs: 50,
-      })
-
-      await tap.onEvent(text('started'))
-      vi.setSystemTime(50)
-      await tap.onEvent({ type: 'keepalive' })
-
-      expect(setStatus.mock.calls.map((call) => call[1])).toEqual([
-        'running',
-        'running',
-      ])
-      await tap.done('complete')
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
   it('done("error") flushes what was produced and marks error', async () => {
     const store = createMemoryTurnEventStore()
     const tap = createBufferedTurnTap({ store, turnId: 'k3', flushIntervalMs: 10_000 })
@@ -374,57 +262,5 @@ describe('createBufferedTurnTap', () => {
     const rows = await store.read('k4', 0)
     expect(rows).toHaveLength(1)
     expect(JSON.parse(rows[0]!.event).data.delta).toBe('Hello')
-  })
-})
-
-describe('stampReplaySeq', () => {
-  it('stamps the buffer ordinal onto a replayed line without disturbing it', () => {
-    const line = JSON.stringify({ kind: 'event', event: { type: 'text', text: 'hi' } })
-    const stamped = stampReplaySeq({ seq: 7, event: line })
-    const parsed = JSON.parse(stamped) as Record<string, unknown>
-    expect(parsed.seq).toBe(7)
-    expect(parsed.kind).toBe('event')
-    expect(parsed.event).toEqual({ type: 'text', text: 'hi' })
-  })
-
-  it('leaves the turn_status sentinel unstamped — it is a terminator, not a cursor', () => {
-    const line = JSON.stringify({ type: 'turn_status', status: 'complete' })
-    expect(stampReplaySeq({ seq: -1, event: line })).toBe(line)
-  })
-
-  it('handles an empty object payload', () => {
-    expect(JSON.parse(stampReplaySeq({ seq: 3, event: '{}' }))).toEqual({ seq: 3 })
-  })
-
-  it('passes a non-object line through verbatim rather than corrupting it', () => {
-    // Fail-soft: a stamping bug must degrade to today's behaviour, never break
-    // a replay.
-    expect(stampReplaySeq({ seq: 4, event: '"just a string"' })).toBe('"just a string"')
-    expect(stampReplaySeq({ seq: 4, event: 'not json' })).toBe('not json')
-  })
-
-  it('round-trips through the real tap + replay path with usable cursors', async () => {
-    const store = createMemoryTurnEventStore()
-    const tap = createBufferedTurnTap({ store, turnId: 'k-seq', flushIntervalMs: 0 })
-    await tap.onEvent(text('a '))
-    await tap.onEvent(text('b'))
-    await tap.done('complete')
-
-    const wire: Array<Record<string, unknown>> = []
-    for await (const row of replayTurnEvents({ store, turnId: 'k-seq' })) {
-      wire.push(JSON.parse(stampReplaySeq(row)) as Record<string, unknown>)
-    }
-    const events = wire.slice(0, -1)
-    expect(events.length).toBeGreaterThan(0)
-    expect(events.every((e) => typeof e.seq === 'number' && (e.seq as number) > 0)).toBe(true)
-    expect(wire.at(-1)).toEqual({ type: 'turn_status', status: 'complete' })
-
-    // Resuming past the last stamped seq yields only the sentinel.
-    const last = events.at(-1)!.seq as number
-    const resumed: unknown[] = []
-    for await (const row of replayTurnEvents({ store, turnId: 'k-seq', fromSeq: last })) {
-      resumed.push(JSON.parse(stampReplaySeq(row)))
-    }
-    expect(resumed).toEqual([{ type: 'turn_status', status: 'complete' }])
   })
 })

@@ -4,7 +4,7 @@
 
 Source: `src/tools/index.ts`
 
-66 exports.
+63 exports.
 
 ### `AddCitationArgs`
 
@@ -56,7 +56,7 @@ interface AppToolHandlers
 
 ### `AppToolMcpServer`
 
-`interface` — The portable MCP server entry the sandbox SDK accepts (transport + url + tagged headers).
+`interface` — The portable MCP server entry the sandbox SDK accepts (transport + url + headers).
 
 ```ts
 interface AppToolMcpServer
@@ -152,7 +152,7 @@ interface BuildAppToolsOptions
 
 ### `BuildHttpMcpServerOptions`
 
-`interface` — Define configuration options for building an HTTP MCP server including path, baseUrl, token env key, context, and description
+`interface` — Define configuration options for building an HTTP MCP server including path, baseUrl, token, context, and description
 
 ```ts
 interface BuildHttpMcpServerOptions
@@ -172,14 +172,6 @@ interface BuildMcpServerOptions
 
 ```ts
 (opts: ScopedMcpServerEntryOptions & { label: string; defaultDescription: string; }) => AppToolMcpServer
-```
-
-### `CapabilitySubject`
-
-`type` — Which identity the bearer is bound to.
-
-```ts
-type CapabilitySubject
 ```
 
 ### `CapabilityTokenOptions`
@@ -342,14 +334,6 @@ type McpProtocolVersion
 interface McpServerInfo
 ```
 
-### `McpToolCallContent`
-
-`interface`
-
-```ts
-interface McpToolCallContent
-```
-
 ### `McpToolDefinition`
 
 `interface` — One tool entry in the registry the handler owns.
@@ -376,7 +360,7 @@ interface OpenAIFunctionTool
 
 ### `readToolArgs`
 
-`function` — Read a tool's argument object from the request body, tolerant of direct aliases (`args` / `arguments`), Streamable HTTP MCP (`params.arguments`), or a bare body.
+`function` — Read a tool's argument object from the request body, tolerant of MCP host aliases (`args` / `arguments`) or a bare body.
 
 ```ts
 <T>(request: Request) => Promise<T | null>
@@ -508,14 +492,6 @@ interface ToolHeaderNames
 
 ```ts
 class ToolInputError
-```
-
-### `unresolvableSurfaceCredential`
-
-`function` — Refuse to mount a surface whose credential is scoped narrower than the box.
-
-```ts
-(surface: string) => never
 ```
 
 ### `verifyCapabilityToken`

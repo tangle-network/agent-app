@@ -4,15 +4,7 @@
 
 Source: `src/interactions/index.ts`
 
-64 exports.
-
-### `abortSession`
-
-`function` — Cancel a running session.
-
-```ts
-(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<SidecarAbortResult>>
-```
+58 exports.
 
 ### `BeforeInteractionAnswerArgs`
 
@@ -38,14 +30,6 @@ interface BeforeInteractionAnswerArgs
 (from: ChatInteractionStatus, to: ChatInteractionStatus) => boolean
 ```
 
-### `ChatFreeTextField`
-
-`type` — A field the user types free text into, which may declare the longest answer its answer route will accept — so a card can stop the typing rather than let the route reject it.
-
-```ts
-type ChatFreeTextField
-```
-
 ### `ChatInteraction`
 
 `interface` — The client/persisted view of one ask.
@@ -56,7 +40,7 @@ interface ChatInteraction
 
 ### `ChatInteractionField`
 
-`type` — The shared field contract under the UI-facing name used by this package.
+`type` — Resolve a chat interaction field excluding select types or including chat select fields
 
 ```ts
 type ChatInteractionField
@@ -83,7 +67,7 @@ type ChatSelectField
 `function` — Shapes composer text into the respond payload for the routed field (select answers are string arrays on the wire; text answers are strings).
 
 ```ts
-(field: { type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…
+(field: ChatInteractionField, text: string) => Record<string, string | number | boolean | string[]>
 ```
 
 ### `composerAnswerDeliveries`
@@ -139,15 +123,7 @@ interface DurableInteractionRoutePersistence
 `function` — Determine if a chat interaction field allows free text input
 
 ```ts
-(field: { type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…
-```
-
-### `getSessionState`
-
-`function` — The session's current lifecycle, for reconnect and resume decisions.
-
-```ts
-(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<SidecarSessionState>>
+(field: ChatInteractionField) => boolean
 ```
 
 ### `INTERACTION_CANCEL_EVENT`
@@ -251,7 +227,7 @@ type InteractionData
 `function` — Reads a wire request into the client's pending `ChatInteraction`.
 
 ```ts
-(request: InteractionRequest) => ChatInteraction
+(request: InteractionRequestWire) => ChatInteraction
 ```
 
 ### `InteractionOutcome`
@@ -280,15 +256,15 @@ type InteractionPersistedPart
 
 ### `InteractionRequest`
 
-`interface`
+`type`
 
 ```ts
-interface InteractionRequest
+type InteractionRequest
 ```
 
 ### `InteractionRequestWire`
 
-`type` — The shared request contract under the wire-facing name used by this package.
+`type` — `InteractionRequest` whose select fields may carry `allowCustom`.
 
 ```ts
 type InteractionRequestWire
@@ -307,7 +283,7 @@ type InteractionRouteLogger
 `function` — Builds the persisted/streamed `interaction` part from a wire request.
 
 ```ts
-(request: InteractionRequest, status: ChatInteractionStatus, cancelReason?: string | undefined, answers?: InteractionAn…
+(request: InteractionRequestWire, status: ChatInteractionStatus, cancelReason?: string | undefined, answers?: Interacti…
 ```
 
 ### `isRenderableInteractionKind`
@@ -334,20 +310,12 @@ type InteractionRouteLogger
 (status: ChatInteractionStatus) => boolean
 ```
 
-### `isTerminalSidecarState`
-
-`function` — Whether a session has finished and will not produce more events.
-
-```ts
-(state: { state?: string | undefined; activeExecutionId?: string | null | undefined; reconnectable?: boolean | undefine…
-```
-
 ### `listSessionInteractions`
 
 `function` — Outstanding (unanswered) interactions for the session — the sidecar's registry is authoritative, so this is the reconnect/reload source of truth.
 
 ```ts
-(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<InteractionRequest[]>>
+(connection: SidecarInteractionsConnection) => Promise<SidecarInteractionsResult<InteractionRequestWire[]>>
 ```
 
 ### `mapInteractionRespondFailure`
@@ -416,7 +384,7 @@ type ParseInteractionAnswersResult
 
 ### `parseInteractionRequest`
 
-`function` — Parses an `interaction` event's data (`{ request }`) with the shared schema.
+`function` — Parses an `interaction` event's data (`{ request }`).
 
 ```ts
 (data: Record<string, unknown> | undefined) => ParseInteractionResult
@@ -462,14 +430,6 @@ interface ResolveInteractionConnectionArgs
 (connection: SidecarInteractionsConnection, response: { id: string; outcome: "declined" | "cancelled" | "accepted"; dat…
 ```
 
-### `SidecarAbortResult`
-
-`interface`
-
-```ts
-interface SidecarAbortResult
-```
-
 ### `SidecarInteractionsConnection`
 
 `interface` — Where and how to reach one session's interaction registry.
@@ -492,14 +452,6 @@ interface SidecarInteractionsError
 
 ```ts
 type SidecarInteractionsResult
-```
-
-### `SidecarSessionState`
-
-`interface` — A sandbox session's lifecycle as the sidecar reports it.
-
-```ts
-interface SidecarSessionState
 ```
 
 ### `stampInteractionAnswers`

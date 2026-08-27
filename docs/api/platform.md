@@ -4,7 +4,7 @@
 
 Source: `src/platform/index.ts`
 
-67 exports.
+65 exports.
 
 ### `AdminGuardOptions`
 
@@ -136,7 +136,7 @@ interface BillableBalanceState
 
 ### `DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR`
 
-`const` — Default name of the per-app feature flag that controls seat billing.
+`const` — Default name of the per-app feature flag gating seat billing.
 
 ```ts
 "SEAT_BILLING_ENABLED"
@@ -152,10 +152,10 @@ Record<TanglePlanTier, TangleTierPolicy>
 
 ### `FREE_TIER_SPEND_CAP_USD`
 
-`const` — Product-funded free inference spend is disabled.
+`const` — Lifetime free-tier cap: $2 (200¢) cumulative inference spend, expressed in dollars.
 
 ```ts
-0
+2
 ```
 
 ### `getProductEntitlement`
@@ -232,7 +232,7 @@ interface HubProxyRoutes
 
 ### `isProductEntitled`
 
-`function` — Product access requires an active paid or trialing seat.
+`function` — Entitled = holds an active seat OR is still inside the free tier.
 
 ```ts
 (ent: ProductEntitlement) => boolean
@@ -240,7 +240,7 @@ interface HubProxyRoutes
 
 ### `isSeatBillingEnabled`
 
-`function` — An explicit flag controls seat billing in every environment.
+`function` — Seat billing is OFF unless the flag is explicitly truthy ('true'/'1'/'on'/ 'enabled').
 
 ```ts
 (opts?: SeatBillingFlagOptions) => boolean
@@ -334,22 +334,6 @@ interface PlatformUsageProductRow
 interface ProductEntitlement
 ```
 
-### `ProductSeatOffer`
-
-`interface` — Commercial terms returned by the platform's product catalog.
-
-```ts
-interface ProductSeatOffer
-```
-
-### `ProductSeatOfferPeriod`
-
-`interface` — Price and included shared-wallet credit for one seat billing period.
-
-```ts
-interface ProductSeatOfferPeriod
-```
-
 ### `readTangleTierState`
 
 `function` — Read subscription + balance and project them onto the tier policy.
@@ -408,7 +392,7 @@ interface SeatBillingFlagOptions
 
 ### `seatCheckoutUrl`
 
-`function` — Platform Stripe checkout URL for a product's catalog-backed seat.
+`function` — Platform Stripe checkout URL for a product's $100/mo seat.
 
 ```ts
 (baseUrl: string, productId: string) => string

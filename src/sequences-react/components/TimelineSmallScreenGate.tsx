@@ -22,7 +22,7 @@ export function TimelineSmallScreenGate({ labels }: TimelineSmallScreenGateProps
       className="flex h-full min-h-0 flex-col items-center justify-center gap-3 bg-[var(--bg-input)] px-8 py-12 text-center text-[var(--text-primary)] sm:hidden"
     >
       <BrandMark size={32} className="shrink-0 opacity-90" />
-      <p className="text-sm font-semibold">{copy.smallScreenTitle}</p>
+      <p className="text-base font-semibold">{copy.smallScreenTitle}</p>
       <p className="max-w-xs text-sm text-[var(--text-muted)]">{copy.smallScreenBody}</p>
     </div>
   )

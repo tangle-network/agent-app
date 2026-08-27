@@ -13,8 +13,6 @@
  *  - `loadGenerations?()` — optional provider for "already generated in this
  *    workspace" images; omit to hide the tab.
  *  - `templates?` — optional template set; defaults to {@link DEFAULT_INSERT_TEMPLATES}.
- *    A host-passed (composed) set labels its tab "Templates"; the built-in
- *    primitives label it "Elements".
  *
  * Insertion goes through `onInsert`, which the host wires to its
  * `onApplyOperations` pipeline (server-validated, undoable) — the same path
@@ -156,13 +154,13 @@ function TemplatePreview({ shape }: { shape: TemplateShape }) {
   if (shape === 'ellipse') {
     return <span className="block h-7 w-7 rounded-full bg-[var(--brand-primary)]" aria-hidden />
   }
-  // Text tiles show a glyph: a semibold "T" for a heading, a paragraph mark
-  // "¶" for body copy.
+  // Text tiles show a glyph: a bold "T" for a heading, a paragraph mark "¶"
+  // for body copy.
   if (shape === 'heading' || shape === 'body') {
     return (
       <span
         className={`block leading-none text-[var(--text-primary)] ${
-          shape === 'heading' ? 'text-2xl font-semibold' : 'text-lg'
+          shape === 'heading' ? 'text-2xl font-bold' : 'text-lg'
         }`}
         aria-hidden
       >
@@ -179,15 +177,11 @@ export function CanvasInsertPanel({
   onInsert,
   onUploadImage,
   loadGenerations,
-  templates,
+  templates = DEFAULT_INSERT_TEMPLATES,
   accept = DEFAULT_ACCEPT,
   className,
 }: CanvasInsertPanelProps) {
-  // Host-passed templates are composed page sections ("Templates"); the
-  // built-in set is single primitives, so its tab reads "Elements".
-  const resolvedTemplates = templates ?? DEFAULT_INSERT_TEMPLATES
-  const templatesLabel = templates !== undefined ? 'Templates' : 'Elements'
-  const [tab, setTab] = useState<Tab>(() => (resolvedTemplates.length > 0 ? 'templates' : 'uploads'))
+  const [tab, setTab] = useState<Tab>(() => (templates.length > 0 ? 'templates' : 'uploads'))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [dragOver, setDragOver] = useState(false)
@@ -197,15 +191,15 @@ export function CanvasInsertPanel({
 
   useEffect(() => {
     if (tab === 'uploads' && !onUploadImage) {
-      setTab(resolvedTemplates.length > 0 ? 'templates' : loadGenerations ? 'generations' : 'uploads')
+      setTab(templates.length > 0 ? 'templates' : loadGenerations ? 'generations' : 'uploads')
     }
-    if (tab === 'templates' && resolvedTemplates.length === 0) {
+    if (tab === 'templates' && templates.length === 0) {
       setTab(onUploadImage ? 'uploads' : loadGenerations ? 'generations' : 'uploads')
     }
     if (tab === 'generations' && !loadGenerations) {
-      setTab(resolvedTemplates.length > 0 ? 'templates' : onUploadImage ? 'uploads' : 'templates')
+      setTab(templates.length > 0 ? 'templates' : onUploadImage ? 'uploads' : 'templates')
     }
-  }, [tab, resolvedTemplates.length, onUploadImage, loadGenerations])
+  }, [tab, templates.length, onUploadImage, loadGenerations])
 
   useEffect(() => {
     if (tab !== 'generations' || generationsLoaded || !loadGenerations) return
@@ -270,7 +264,7 @@ export function CanvasInsertPanel({
 
   const tabs: Array<{ id: Tab; label: string; icon: (p: { className?: string }) => ReactElement; show: boolean }> = [
     { id: 'uploads', label: 'Uploads', icon: ImageGlyph, show: !!onUploadImage },
-    { id: 'templates', label: templatesLabel, icon: ShapesGlyph, show: resolvedTemplates.length > 0 },
+    { id: 'templates', label: 'Templates', icon: ShapesGlyph, show: templates.length > 0 },
     { id: 'generations', label: 'Generations', icon: SparkleGlyph, show: !!loadGenerations },
   ]
   const visibleTabs = tabs.filter((t) => t.show)
@@ -283,12 +277,7 @@ export function CanvasInsertPanel({
             key={id}
             type="button"
             onClick={() => setTab(id)}
-            // These tabs sit flush against the top and side edges of a panel
-            // that clips its overflow, so the floor's outward ring is cut off on
-            // three sides and reads as a stray underline. The negative offset
-            // draws the same ring inside the tab; width and colour still come
-            // from the tokens.
-            className={`flex flex-1 items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-medium transition-colors focus-visible:[outline-offset:-2px] ${
+            className={`flex flex-1 items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-medium transition-colors ${
               tab === id
                 ? 'border-b-2 border-[var(--brand-primary)] text-[var(--text-primary)]'
                 : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -324,8 +313,8 @@ export function CanvasInsertPanel({
                 }}
                 className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-8 text-center transition-colors disabled:opacity-50 ${
                   dragOver
-                    ? 'border-[var(--brand-primary)] bg-[color-mix(in_srgb,var(--brand-primary)_5%,transparent)]'
-                    : 'border-[var(--border-default)] hover:border-[color-mix(in_srgb,var(--brand-primary)_40%,transparent)]'
+                    ? 'border-[var(--brand-primary)] bg-[var(--brand-primary)]/5'
+                    : 'border-[var(--border-default)] hover:border-[var(--brand-primary)]/40'
                 }`}
               >
                 {busy ? (
@@ -354,13 +343,13 @@ export function CanvasInsertPanel({
 
           {tab === 'templates' && (
             <div className="grid grid-cols-2 gap-2">
-              {resolvedTemplates.map((tpl) => (
+              {templates.map((tpl) => (
                 <button
                   key={tpl.id}
                   type="button"
                   disabled={busy}
                   onClick={() => void runInsert(() => tpl.build(page))}
-                  className="flex h-20 flex-col items-center justify-center gap-1.5 rounded-md border border-[var(--border-default)] bg-[var(--bg-input)] text-xs font-medium text-[var(--text-primary)] transition-colors hover:border-[color-mix(in_srgb,var(--brand-primary)_40%,transparent)] disabled:opacity-50"
+                  className="flex h-20 flex-col items-center justify-center gap-1.5 rounded-md border border-[var(--border-default)] bg-[var(--bg-input)] text-xs font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--brand-primary)]/40 disabled:opacity-50"
                 >
                   <span className="flex h-7 items-center justify-center">
                     <TemplatePreview shape={templateShape(tpl)} />

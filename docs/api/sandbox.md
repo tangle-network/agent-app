@@ -4,15 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-169 exports.
-
-### `adaptSandboxStream`
-
-`function` — Normalize raw sandbox events for shared agent-gateway consumers.
-
-```ts
-(events: AsyncIterable<unknown>) => AsyncGenerator<SandboxStreamEvent, any, any>
-```
+114 exports.
 
 ### `AppToolDescriptor`
 
@@ -38,20 +30,36 @@ interface AppToolDescriptor
 (payload: ProvisionPayloadSections) => void
 ```
 
-### `assessWorkspaceSandboxSnapshot`
-
-`function` — Judge a snapshot against the box being replaced.
-
-```ts
-(snapshot: WorkspaceSandboxSnapshot | undefined, sandboxId: string, now?: number) => WorkspaceSandboxSnapshotAssessment
-```
-
 ### `attachReasoningEffort`
 
 `function` — Attach a specified reasoning effort level to an agent profile for a given harness
 
 ```ts
-(profile: AgentProfile, harness: Harness, effort: "auto" | "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "…
+(profile: AgentProfile, harness: "opencode" | "claude-code" | "nanoclaw" | "kimi-code" | "codex" | "amp" | "factory-dro…
+```
+
+### `AuthenticatedSandboxUser`
+
+`interface` — Represent an authenticated user within a sandbox environment with a unique identifier
+
+```ts
+interface AuthenticatedSandboxUser
+```
+
+### `bearerSubprotocolToken`
+
+`function` — Resolve and decode a bearer token from a comma-separated subprotocol string or return null
+
+```ts
+(value: string | null) => string | null
+```
+
+### `bearerToken`
+
+`function` — Extract the token from a bearer authorization string or return null if invalid or missing
+
+```ts
+(value: string | null) => string | null
 ```
 
 ### `buildAppToolMcpServers`
@@ -70,28 +78,12 @@ interface AppToolDescriptor
 interface BuildAppToolMcpServersOptions
 ```
 
-### `buildProductEgressPolicy`
+### `buildSandboxRuntimeProxyHeaders`
 
-`function`
-
-```ts
-(publicOrigin: string | URL, extraDomains?: readonly string[]) => EgressPolicy
-```
-
-### `buildSandboxToolBinDirScript`
-
-`function` — Build a shell script that creates the sandbox tool binary directory.
+`function` — Build proxy headers for sandbox runtime including authorization and forwarded headers
 
 ```ts
-(options: SandboxToolPathOptions) => string
-```
-
-### `buildSandboxToolBinDirsEnv`
-
-`function` — Build the `SANDBOX_TOOL_BIN_DIRS` entry that puts these apps' tool bin dirs on a sandbox PATH.
-
-```ts
-(apps: readonly SandboxToolPathOptions[]) => { SANDBOX_TOOL_BIN_DIRS: string; }
+(source: Headers, sandboxApiKey: string, forwardHeaders?: string[]) => Headers
 ```
 
 ### `buildSandboxToolFileMounts`
@@ -112,7 +104,7 @@ interface BuildSandboxToolFileMountsOptions
 
 ### `buildSandboxToolPathSetupScript`
 
-`function` — Build a shell script that creates the sandbox tool binary directory.
+`function` — Build a shell script that sets up and exports the sandbox tool binary directory in user profiles
 
 ```ts
 (options: SandboxToolPathOptions) => string
@@ -126,76 +118,44 @@ interface BuildSandboxToolFileMountsOptions
 (event: unknown) => SandboxStepTransition | null
 ```
 
-### `collectSandboxPromptText`
+### `createSandboxTerminalToken`
 
-`function` — Aggregate a sandbox prompt event stream down to the turn's one final answer.
+`function` — Generate a sandbox terminal token for a given subject with specified options
 
 ```ts
-(events: AsyncIterable<unknown>, message: string | PromptInputPart[], history?: { role: "user" | "assistant"; content:…
+(subject: TerminalProxyIdentity, opts: SandboxTerminalTokenOptions) => Promise<SandboxTerminalTokenResult>
 ```
 
-### `createD1PrewarmClaimStore`
+### `createWorkspaceSandboxConnectionHandler`
 
-`function` — A `PrewarmClaimStore` backed by one D1 table.
-
-```ts
-(db: PrewarmClaimD1Like, options?: D1PrewarmClaimStoreOptions) => { acquire(key: string, ttlSeconds: number): Promise<b…
-```
-
-### `createSandboxPrewarmer`
-
-`function`
+`function` — Create a handler to resolve workspace sandbox connections with user and access validation
 
 ```ts
-(shell: SandboxRuntimeConfig, options: SandboxPrewarmerOptions) => SandboxPrewarmer
-```
-
-### `createSandboxTerminalConnectionRoute`
-
-`function` — Build the browser-direct terminal connection route: `GET` handler that authenticates, resolves the sandbox, mints a scoped token pinned to `scope: 'session-runtime'` (the ONLY scope the platform gran…
-
-```ts
-<TBox extends TerminalConnectionBoxLike, TUser>(opts: SandboxTerminalConnectionRouteOptions<TBox, TUser>) => (request:…
+<TBox extends WorkspaceSandboxInstanceLike>(opts: WorkspaceSandboxConnectionHandlerOptions<TBox>) => ({ request, params…
 ```
 
 ### `createWorkspaceSandboxManager`
 
-`function` — Create a generic name-keyed sandbox lifecycle manager for products that drive their own SDK or box types.
+`function` — Create a manager to handle workspace sandbox instances with client and options configuration
 
 ```ts
 <TClient, TBox extends WorkspaceSandboxInstanceLike, TEnsureOptions = void>(opts: WorkspaceSandboxManagerOptions<TClien…
 ```
 
-### `createWorkspaceSandboxRecoveryManager`
+### `createWorkspaceSandboxRuntimeProxyHandler`
 
-`function` — Bind the recovery bookkeeping to an app's storage.
+`function` — Create a proxy handler to resolve sandbox runtime requests with user and workspace access validation
 
 ```ts
-(store: WorkspaceSandboxRecoveryStore) => WorkspaceSandboxRecoveryManager
+(opts: WorkspaceSandboxRuntimeProxyHandlerOptions) => ({ request, params }: WorkspaceSandboxRuntimeProxyArgs) => Promis…
 ```
 
-### `D1PrewarmClaimStoreOptions`
+### `createWorkspaceSandboxTerminalUpgradeHandler`
 
-`interface`
-
-```ts
-interface D1PrewarmClaimStoreOptions
-```
-
-### `DEFAULT_PREWARM_CLAIM_TABLE`
-
-`const`
+`function` — Build a Worker-entry handler that proxies a sandbox terminal WebSocket upgrade to the sandbox API runtime proxy.
 
 ```ts
-"sandbox_prewarm_claims"
-```
-
-### `DEFAULT_PROVISION_TIMEOUT_MS`
-
-`const` — Default wait for a box to reach `running`.
-
-```ts
-120000
+(opts: WorkspaceSandboxTerminalUpgradeHandlerOptions) => (request: Request) => Promise<Response | null>
 ```
 
 ### `DEFAULT_SANDBOX_RESOURCES`
@@ -204,14 +164,6 @@ interface D1PrewarmClaimStoreOptions
 
 ```ts
 SandboxResourceConfig
-```
-
-### `DEFAULT_SIDECAR_PROCESS_PATTERN`
-
-`const` — Default ERE passed to `pgrep -f` when a liveness probe does not override the harness-process matcher.
-
-```ts
-"opencode|claude|codex"
 ```
 
 ### `deferredCorpusHash`
@@ -254,28 +206,12 @@ SandboxResourceConfig
 interface DriveSandboxTurnOptions
 ```
 
-### `EGRESS_PROXY_RECOVERY_PHASE`
+### `encodeSandboxRuntimePath`
 
-`const`
-
-```ts
-"egress_proxy_recovery"
-```
-
-### `EGRESS_PROXY_RECOVERY_REQUIRED`
-
-`const` — The box exists and still holds unsnapshotted state, so discarding it is an owner's decision, not the runtime's.
+`function` — Encode a runtime path by URI-encoding each valid segment and returning null for invalid segments
 
 ```ts
-"EGRESS_PROXY_RECOVERY_REQUIRED"
-```
-
-### `ensureSandboxToolBinDir`
-
-`function` — Create the sandbox tool binary directory in a running box.
-
-```ts
-(box: SandboxInstance, options: SandboxToolPathOptions) => Promise<Outcome<void>>
+(runtimePath: string) => string | null
 ```
 
 ### `ensureWorkspaceSandbox`
@@ -318,68 +254,20 @@ interface EnsureWorkspaceSandboxOptions
 (message: string, history?: { role: "user" | "assistant"; content: string; }[] | undefined) => string
 ```
 
-### `formatSandboxProvisioningSupportDetails`
-
-`function`
-
-```ts
-(diagnostics: SafeSandboxErrorDiagnostics) => string
-```
-
-### `formatSandboxProvisioningUserMessage`
-
-`function`
-
-```ts
-(diagnostics: SafeSandboxErrorDiagnostics) => string
-```
-
 ### `getClient`
 
 `function` — Resolve a synchronous sandbox client from provided runtime configuration credentials
 
 ```ts
-(shell: SandboxRuntimeConfig) => Sandbox
+(shell: SandboxRuntimeConfig) => SandboxClient
 ```
 
-### `isEgressProxyRecoveryRequiredError`
+### `isSandboxTerminalWsUpgrade`
 
-`function`
-
-```ts
-(error: unknown) => boolean
-```
-
-### `isSandboxApiBearerAuthFailure`
-
-`function`
+`function` — True when `request` is a WebSocket upgrade for a sandbox terminal path.
 
 ```ts
-(diagnostics: SafeSandboxErrorDiagnostics) => boolean
-```
-
-### `isSandboxApiSandboxMissingFailure`
-
-`function` — True when the sandbox API answered 404 for a specific sandbox resource — the box behind a persisted sandbox id no longer exists.
-
-```ts
-(diagnostics: SafeSandboxErrorDiagnostics) => boolean
-```
-
-### `isSandboxAuthFailure`
-
-`function`
-
-```ts
-(diagnostics: SafeSandboxErrorDiagnostics) => boolean
-```
-
-### `isSandboxHostCapacityFailure`
-
-`function` — True when a resume failed because the host the box is pinned to cannot seat it — the host's slot budget is exhausted, not the box's fault and not something waiting fixes.
-
-```ts
-(diagnostics: SafeSandboxErrorDiagnostics) => boolean
+(request: Request) => boolean
 ```
 
 ### `isTerminalPromptEvent`
@@ -390,44 +278,20 @@ interface EnsureWorkspaceSandboxOptions
 (event: unknown) => boolean
 ```
 
-### `isWorkspaceSandboxRecoveryAction`
-
-`function`
-
-```ts
-(value: unknown) => value is "confirmation_required" | "deletion_declined" | "replacement_authorized" | "snapshot_repla…
-```
-
-### `isWorkspaceSandboxRecoveryCode`
-
-`function`
-
-```ts
-(value: unknown) => value is "EGRESS_PROXY_RECOVERY_REQUIRED" | "WORKSPACE_SANDBOX_MISSING" | "WORKSPACE_SANDBOX_HOST_E…
-```
-
-### `isWorkspaceSandboxRecoveryState`
-
-`function`
-
-```ts
-(value: unknown) => value is WorkspaceSandboxRecoveryState
-```
-
-### `isWorkspaceSandboxSnapshotRestoreError`
-
-`function`
-
-```ts
-(error: unknown) => boolean
-```
-
 ### `LivenessProbeConfig`
 
 `interface` — Define configuration for liveness probes including sidecar process pattern and optional timeouts
 
 ```ts
 interface LivenessProbeConfig
+```
+
+### `matchSandboxTerminalWsPath`
+
+`function` — Parse a same-origin terminal-WS pathname into its parts, or `null` when the path is not a sandbox terminal WebSocket.
+
+```ts
+(pathname: string) => SandboxTerminalWsMatch | null
 ```
 
 ### `MemberSyncSeam`
@@ -459,39 +323,15 @@ interface MemberSyncSeam
 `function` — Mint a scoped token for an already-provisioned box (e.g.
 
 ```ts
-(box: SandboxInstance, options: MintScopedTokenOptions) => Promise<Outcome<ScopedTokenResult>>
+(box: SandboxInstance, options: { scope: ScopedTokenScope; sessionId?: string | undefined; ttlMinutes?: number | undefi…
 ```
 
-### `ModelSelection`
+### `mintTerminalProxyToken`
 
-`type` — The three-state outcome of resolving a model: `{ succeeded: true, value: undefined }` means NOTHING was requested (the legitimate box-default configuration — not an error); `{ succeeded: true, value:…
-
-```ts
-type ModelSelection
-```
-
-### `ModelSelectionError`
-
-`type` — Why a model failed to resolve into something transportable to the sandbox platform.
+`function` — Generate a signed token for TerminalProxyIdentity with an expiration based on TTL milliseconds
 
 ```ts
-type ModelSelectionError
-```
-
-### `ModelSelectionFailure`
-
-`type` — A model id was named (by override, config, or default) but is not transportable to the sandbox platform.
-
-```ts
-type ModelSelectionFailure
-```
-
-### `ModelSelectionSource`
-
-`type` — Which precedence slot supplied the failed/succeeded model id: `override` — the caller's per-turn `{ model }` argument.
-
-```ts
-type ModelSelectionSource
+(secret: string, identity: TerminalProxyIdentity, ttlMs?: number, now?: () => number) => Promise<Outcome<{ token: strin…
 ```
 
 ### `Outcome`
@@ -504,7 +344,7 @@ type Outcome
 
 ### `peekWorkspaceSandbox`
 
-`function` — Read-only twin of {@link ensureWorkspaceSandbox}: report whether a workspace's box exists and is fully ready, WITHOUT provisioning, resuming, or bootstrapping anything.
+`function` — Read-only twin of {@link ensureWorkspaceSandbox}: report whether a workspace's box exists and is running, WITHOUT provisioning, resuming, or bootstrapping anything.
 
 ```ts
 (shell: SandboxRuntimeConfig, options: { workspaceId: string; userId?: string | undefined; }) => Promise<PeekWorkspaceS…
@@ -516,70 +356,6 @@ type Outcome
 
 ```ts
 type PeekWorkspaceSandboxOutcome
-```
-
-### `preferredWorkspaceSandboxRecoveryBoxKey`
-
-`function` — The box key the next provisioning attempt should use, or undefined to keep using the workspace's own key.
-
-```ts
-(recovery: WorkspaceSandboxRecoveryState | undefined) => string | undefined
-```
-
-### `PREWARM_CLAIM_TABLE_DDL`
-
-`const` — Paste into a migration.
-
-```ts
-"CREATE TABLE IF NOT EXISTS sandbox_prewarm_claims (\n key TEXT PRIMARY KEY,\n expires_at INTEGER NOT NULL\n)"
-```
-
-### `PrewarmClaimD1Like`
-
-`interface` — The columns and statements this store uses, and nothing else.
-
-```ts
-interface PrewarmClaimD1Like
-```
-
-### `PrewarmClaimStore`
-
-`interface` — Cross-isolate claim.
-
-```ts
-interface PrewarmClaimStore
-```
-
-### `PrewarmDecision`
-
-`interface`
-
-```ts
-interface PrewarmDecision
-```
-
-### `PrewarmEvent`
-
-`type`
-
-```ts
-type PrewarmEvent
-```
-
-### `PrewarmOutcome`
-
-`type` — What `prewarm()` decided.
-
-```ts
-type PrewarmOutcome
-```
-
-### `PrewarmResult`
-
-`interface` — Terminal result of a warm this caller owns.
-
-```ts
-interface PrewarmResult
 ```
 
 ### `ProfileComposeOptions`
@@ -630,14 +406,6 @@ interface ProvisionPayloadSections
 interface ProvisionProfileSection
 ```
 
-### `PYPI_EGRESS_DOMAINS`
-
-`const` — Hosts required when a product installs its pinned Python tooling at boot.
-
-```ts
-readonly ["pypi.org", "files.pythonhosted.org", "pypi.python.org"]
-```
-
 ### `readSandboxBinaryBytes`
 
 `function` — Reads a sandbox file as base64 and decodes it, verifying the decoded byte length against `expectedSize` (from a prior {@link statSandboxFileSize}).
@@ -646,17 +414,17 @@ readonly ["pypi.org", "files.pythonhosted.org", "pypi.python.org"]
 (box: SandboxExecChannel, absolutePath: string, expectedSize: number, options?: SandboxExecOptions | undefined) => Prom…
 ```
 
-### `requireTransportableModel`
+### `readSecret`
 
-`function` — Shared fail-loud policy for the sandbox platform's three internal model callers (`ensureWorkspaceSandbox`'s `backendModelAtCreate`, `streamSandboxPrompt`, `driveSandboxTurn`): a `ModelSelection` in,…
+`function` — Resolve a secret value from the store by its name and return the outcome asynchronously
 
 ```ts
-(selection: ModelSelection, context: string) => ResolvedModel | undefined
+(store: SecretStore, name: string) => Promise<Outcome<string>>
 ```
 
 ### `resetClientCache`
 
-`function` — Reset the process-local sandbox client and liveness-verification caches.
+`function` — Reset the client cache to clear stored data and force fresh retrieval
 
 ```ts
 () => void
@@ -672,15 +440,7 @@ interface ResolvedModel
 
 ### `resolveModel`
 
-`function` — Resolve and return the appropriate model configuration based on provider settings and optional overrides.
-
-```ts
-(config: ProviderResolutionConfig | undefined, override?: { model?: string | undefined; modelApiKey?: string | undefine…
-```
-
-### `resolveModelSelection`
-
-`function` — Resolve a provider + model configuration into a typed three-state outcome that separates "nothing requested" from "something requested but untransportable" — the distinction {@link resolveModel} coll…
+`function` — Resolve and return the appropriate model configuration based on provider settings and optional overrides
 
 ```ts
 (config: ProviderResolutionConfig | undefined, override?: { model?: string | undefined; modelApiKey?: string | undefine…
@@ -704,7 +464,7 @@ interface ResolveSandboxClientCredentialsOptions
 
 ### `runSandboxPrompt`
 
-`function` — Resolve a sandbox prompt by streaming it and aggregating the turn down to one final string.
+`function` — Resolve a sandbox prompt by streaming and aggregating message parts into a complete string
 
 ```ts
 (shell: SandboxRuntimeConfig, box: SandboxInstance, message: string | PromptInputPart[], options?: StreamSandboxPromptO…
@@ -712,26 +472,18 @@ interface ResolveSandboxClientCredentialsOptions
 
 ### `runSandboxToolPathSetup`
 
-`function` — Create the sandbox tool binary directory in a running box.
+`function` — Resolve the sandbox environment PATH setup by executing the configuration script with given options
 
 ```ts
 (box: SandboxInstance, options: SandboxToolPathOptions) => Promise<Outcome<void>>
 ```
 
-### `SafeSandboxErrorCause`
+### `SandboxApiCredentials`
 
-`interface`
-
-```ts
-interface SafeSandboxErrorCause
-```
-
-### `SafeSandboxErrorDiagnostics`
-
-`interface`
+`interface` — Define credentials required to access the sandbox API environment
 
 ```ts
-interface SafeSandboxErrorDiagnostics
+interface SandboxApiCredentials
 ```
 
 ### `SandboxBuildContext`
@@ -758,22 +510,6 @@ interface SandboxClientCredentials
 type SandboxCredentialEnvironment
 ```
 
-### `SandboxEgressPolicyMismatchError`
-
-`class` — Thrown when an existing sandbox cannot be proven to have the requested outbound network policy.
-
-```ts
-class SandboxEgressPolicyMismatchError
-```
-
-### `SandboxEgressPolicySource`
-
-`type`
-
-```ts
-type SandboxEgressPolicySource
-```
-
 ### `SandboxExecChannel`
 
 `interface` — The `box.exec` surface these helpers use — structural, so a caller can pass the sandbox SDK's `SandboxInstance` directly or a narrower test double.
@@ -788,14 +524,6 @@ interface SandboxExecChannel
 
 ```ts
 interface SandboxExecOptions
-```
-
-### `SandboxExistingBoxStage`
-
-`type`
-
-```ts
-type SandboxExistingBoxStage
 ```
 
 ### `SandboxFileBytesOutcome`
@@ -814,76 +542,12 @@ type SandboxFileBytesOutcome
 type SandboxFileSizeOutcome
 ```
 
-### `SandboxModelResolutionError`
-
-`class` — Thrown by {@link requireTransportableModel} when a model that was EXPLICITLY requested via a per-turn `{ model }` override cannot be transported to the sandbox platform.
-
-```ts
-class SandboxModelResolutionError
-```
-
 ### `SandboxPermissionLevel`
 
 `type` — Define permission levels for sandbox access and control
 
 ```ts
 type SandboxPermissionLevel
-```
-
-### `SandboxPrewarmer`
-
-`interface`
-
-```ts
-interface SandboxPrewarmer
-```
-
-### `SandboxPrewarmerOptions`
-
-`interface`
-
-```ts
-interface SandboxPrewarmerOptions
-```
-
-### `SandboxPrewarmScope`
-
-`interface` — The workspace a warm targets.
-
-```ts
-interface SandboxPrewarmScope
-```
-
-### `SandboxProvisionedObservation`
-
-`interface` — What `/sandbox` reports once a box is provisioned, reused, or resumed.
-
-```ts
-interface SandboxProvisionedObservation
-```
-
-### `SandboxReadiness`
-
-`type` — Readiness for the UI.
-
-```ts
-type SandboxReadiness
-```
-
-### `SandboxRecoveryFailedError`
-
-`class` — Thrown when an unresponsive box could not be recovered by a state-preserving restart.
-
-```ts
-class SandboxRecoveryFailedError
-```
-
-### `SandboxRecoveryPhase`
-
-`type` — Which step of the state-preserving stop→resume recovery failed.
-
-```ts
-type SandboxRecoveryPhase
 ```
 
 ### `SandboxResourceConfig`
@@ -918,20 +582,20 @@ class SandboxRuntimeAuthRefreshError
 interface SandboxRuntimeConfig
 ```
 
+### `SandboxRuntimeConnection`
+
+`interface` — Define a connection configuration for sandbox runtime including URL and optional server-side auth token
+
+```ts
+interface SandboxRuntimeConnection
+```
+
 ### `SandboxScope`
 
 `interface` — Define a scope containing workspace and optional user identifiers for sandbox environments
 
 ```ts
 interface SandboxScope
-```
-
-### `SandboxSpendHooks`
-
-`interface` — Optional spend-verification seam on `ensureWorkspaceSandbox`.
-
-```ts
-interface SandboxSpendHooks
 ```
 
 ### `SandboxStepTransition`
@@ -942,20 +606,36 @@ interface SandboxSpendHooks
 type SandboxStepTransition
 ```
 
-### `SandboxStreamEvent`
+### `SandboxTerminalTokenOptions`
 
-`interface` — The small event shape consumed by agent-gateway's streaming adapters.
+`interface` — Define options for generating a sandbox terminal token including secret and expiration settings
 
 ```ts
-interface SandboxStreamEvent
+interface SandboxTerminalTokenOptions
 ```
 
-### `SandboxTerminalConnectionRouteOptions`
+### `SandboxTerminalTokenResult`
 
-`interface` — Configuration for {@link createSandboxTerminalConnectionRoute}.
+`interface` — Provide token and expiration details for a sandbox terminal session
 
 ```ts
-interface SandboxTerminalConnectionRouteOptions
+interface SandboxTerminalTokenResult
+```
+
+### `SandboxTerminalTokenSubject`
+
+`type` — Resolve the identity type used for sandbox terminal token subjects
+
+```ts
+type SandboxTerminalTokenSubject
+```
+
+### `SandboxTerminalWsMatch`
+
+`interface` — Define the structure for matching a sandbox terminal WebSocket with workspace and path details
+
+```ts
+interface SandboxTerminalWsMatch
 ```
 
 ### `sandboxToolBinDir`
@@ -1008,7 +688,7 @@ interface ScopedTokenResult
 
 ### `SecretStore`
 
-`interface` — Write-only secret port: create, replace, and delete a secret by name.
+`interface` — Define methods to create, update, retrieve, and delete secrets asynchronously
 
 ```ts
 interface SecretStore
@@ -1022,28 +702,12 @@ interface SecretStore
 (shell: SandboxRuntimeConfig) => SecretStore
 ```
 
-### `serializeSandboxProvisioningError`
-
-`function`
-
-```ts
-(error: unknown, options?: { maxDepth?: number | undefined; }) => SafeSandboxErrorDiagnostics
-```
-
 ### `shellQuote`
 
 `function` — Wraps a value in single quotes for `sh`, closing and reopening the quote around each embedded quote (`'` → `'"'"'`).
 
 ```ts
 (value: string) => string
-```
-
-### `shouldRestoreWorkspaceSandboxRecovery`
-
-`function` — Whether the replacement should be restored from the old box's snapshot.
-
-```ts
-(recovery: WorkspaceSandboxRecoveryState | undefined) => boolean
 ```
 
 ### `splitDeferredProfileFiles`
@@ -1088,7 +752,7 @@ interface StorageConfig
 
 ### `storeSecret`
 
-`function` — Resolve storing a secret by creating it, or replacing it when it exists
+`function` — Resolve storing a secret by creating or updating it in the given SecretStore
 
 ```ts
 (store: SecretStore, name: string, value: string) => Promise<Outcome<void>>
@@ -1134,65 +798,57 @@ interface StreamSandboxPromptOptions
 (box: SandboxInstance, seam: MemberSyncSeam, userId: string, role: string) => Promise<Outcome<void>>
 ```
 
-### `TerminalConnectionBoxLike`
+### `TerminalProxyIdentity`
 
-`interface` — The structural surface this route needs from an SDK sandbox box — no `@tangle-network/sandbox` class import (invariant 3).
+`interface` — Define identity details for a terminal proxy including user, workspace, and sandbox identifiers
 
 ```ts
-interface TerminalConnectionBoxLike
+interface TerminalProxyIdentity
 ```
 
-### `WORKSPACE_SANDBOX_HOST_EXHAUSTED`
+### `terminalTokenFromRequest`
 
-`const` — The box exists but its host has no free slot, so it can never be resumed where it is.
+`function` — Resolve the terminal token from request headers using Authorization or Sec-WebSocket-Protocol fields
 
 ```ts
-"WORKSPACE_SANDBOX_HOST_EXHAUSTED"
+(headers: Headers) => string | null
 ```
 
-### `WORKSPACE_SANDBOX_MISSING`
+### `verifySandboxTerminalToken`
 
-`const` — The platform no longer has the box.
+`function` — Verify the validity of a sandbox terminal token against the expected identity and options
 
 ```ts
-"WORKSPACE_SANDBOX_MISSING"
+(token: string, expected: TerminalProxyIdentity, opts: SandboxTerminalTokenOptions) => Promise<boolean>
 ```
 
-### `WORKSPACE_SANDBOX_RECOVERY_ACTIONS`
+### `verifyTerminalProxyToken`
 
-`const` — Every declared action, for exhaustiveness tests in apps and here.
+`function` — Verify the authenticity and validity of a terminal proxy token against expected identity and timestamp
 
 ```ts
-readonly ("confirmation_required" | "deletion_declined" | "replacement_authorized" | "snapshot_replacement_authorized"…
+(secret: string, token: string, expected: TerminalProxyIdentity, now?: () => number) => Promise<boolean>
 ```
 
-### `WORKSPACE_SANDBOX_RECOVERY_CODES`
+### `WorkspaceSandboxConnectionArgs`
 
-`const` — Every declared cause.
+`interface` — Define arguments required to establish a workspace sandbox connection
 
 ```ts
-readonly ("EGRESS_PROXY_RECOVERY_REQUIRED" | "WORKSPACE_SANDBOX_MISSING" | "WORKSPACE_SANDBOX_HOST_EXHAUSTED" | "WORKSP…
+interface WorkspaceSandboxConnectionArgs
 ```
 
-### `WORKSPACE_SANDBOX_SNAPSHOT_MAX_AGE_MS`
+### `WorkspaceSandboxConnectionHandlerOptions`
 
-`const`
-
-```ts
-number
-```
-
-### `WORKSPACE_SANDBOX_UNRECOVERABLE`
-
-`const` — The platform ran its own recovery, failed, and asked for a replacement.
+`interface` — Define options to handle workspace sandbox connections with user authentication and access control
 
 ```ts
-"WORKSPACE_SANDBOX_UNRECOVERABLE"
+interface WorkspaceSandboxConnectionHandlerOptions
 ```
 
 ### `WorkspaceSandboxEnsureContext`
 
-`interface` — Define the context containing workspace and user identifiers for sandbox environment operations.
+`interface` — Define the context containing workspace and user identifiers for sandbox environment operations
 
 ```ts
 interface WorkspaceSandboxEnsureContext
@@ -1200,7 +856,7 @@ interface WorkspaceSandboxEnsureContext
 
 ### `WorkspaceSandboxInstanceLike`
 
-`interface` — Define the shape of a workspace sandbox instance including its connection details and status.
+`interface` — Define the shape of a workspace sandbox instance including its connection details and status
 
 ```ts
 interface WorkspaceSandboxInstanceLike
@@ -1208,7 +864,7 @@ interface WorkspaceSandboxInstanceLike
 
 ### `WorkspaceSandboxManager`
 
-`interface` — Manage workspace sandboxes by ensuring their creation and retrieval for specified users.
+`interface` — Manage workspace sandboxes by ensuring their creation and retrieval for specified users
 
 ```ts
 interface WorkspaceSandboxManager
@@ -1216,130 +872,34 @@ interface WorkspaceSandboxManager
 
 ### `WorkspaceSandboxManagerOptions`
 
-`interface` — Define configuration options for managing workspace sandboxes.
+`interface` — Define configuration options for managing and interacting with workspace sandboxes
 
 ```ts
 interface WorkspaceSandboxManagerOptions
 ```
 
-### `WorkspaceSandboxRecoveryAction`
+### `WorkspaceSandboxRuntimeProxyArgs`
 
-`type`
+`interface` — Define arguments for proxying runtime requests within a workspace sandbox environment
 
 ```ts
-type WorkspaceSandboxRecoveryAction
+interface WorkspaceSandboxRuntimeProxyArgs
 ```
 
-### `WorkspaceSandboxRecoveryCode`
+### `WorkspaceSandboxRuntimeProxyHandlerOptions`
 
-`type`
+`interface` — Define options for handling workspace sandbox runtime proxy including user, access, credentials, and connection retrieval
 
 ```ts
-type WorkspaceSandboxRecoveryCode
+interface WorkspaceSandboxRuntimeProxyHandlerOptions
 ```
 
-### `WorkspaceSandboxRecoveryDecision`
+### `WorkspaceSandboxTerminalUpgradeHandlerOptions`
 
-`type`
-
-```ts
-type WorkspaceSandboxRecoveryDecision
-```
-
-### `workspaceSandboxRecoveryDiagnostic`
-
-`function` — Flat key/value shape for a log line — no nesting, no secrets.
+`interface` — Define options to handle user authentication, workspace access, and sandbox API credential retrieval
 
 ```ts
-(recovery: WorkspaceSandboxRecoveryState) => Record<string, string | undefined>
-```
-
-### `workspaceSandboxRecoveryFromError`
-
-`function`
-
-```ts
-(error: unknown) => WorkspaceSandboxRecoveryState | undefined
-```
-
-### `WorkspaceSandboxRecoveryManager`
-
-`interface`
-
-```ts
-interface WorkspaceSandboxRecoveryManager
-```
-
-### `workspaceSandboxRecoveryMessage`
-
-`function` — What to tell the person waiting.
-
-```ts
-(recovery: WorkspaceSandboxRecoveryState) => string
-```
-
-### `workspaceSandboxRecoveryRecommendedActions`
-
-`function`
-
-```ts
-(recovery: WorkspaceSandboxRecoveryState) => string[]
-```
-
-### `WorkspaceSandboxRecoveryRequiredError`
-
-`class` — Raised when chat cannot continue until an owner decides about the box.
-
-```ts
-class WorkspaceSandboxRecoveryRequiredError
-```
-
-### `WorkspaceSandboxRecoveryState`
-
-`interface`
-
-```ts
-interface WorkspaceSandboxRecoveryState
-```
-
-### `WorkspaceSandboxRecoveryStore`
-
-`interface` — Where an app keeps recovery state.
-
-```ts
-interface WorkspaceSandboxRecoveryStore
-```
-
-### `WorkspaceSandboxSnapshot`
-
-`interface` — A snapshot the app took of a box, addressed by the box it came from.
-
-```ts
-interface WorkspaceSandboxSnapshot
-```
-
-### `WorkspaceSandboxSnapshotAssessment`
-
-`interface`
-
-```ts
-interface WorkspaceSandboxSnapshotAssessment
-```
-
-### `WorkspaceSandboxSnapshotAvailability`
-
-`type`
-
-```ts
-type WorkspaceSandboxSnapshotAvailability
-```
-
-### `WorkspaceSandboxSnapshotFreshness`
-
-`type`
-
-```ts
-type WorkspaceSandboxSnapshotFreshness
+interface WorkspaceSandboxTerminalUpgradeHandlerOptions
 ```
 
 ### `WriteProfileFilesOptions`

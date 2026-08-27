@@ -19,7 +19,7 @@ interface ApprovalEvent
 `const` — Validate approval event data including asset, action, user, timestamp, and optional fields
 
 ```ts
-ZodObject<{ assetId: ZodString; variantId: ZodOptional<ZodString>; action: ZodEnum<{ approved: "approved"; rejected: "r…
+ZodObject<{ assetId: ZodString; variantId: ZodOptional<ZodString>; action: ZodEnum<{ scheduled: "scheduled"; approved:…
 ```
 
 ### `AssetContentMap`

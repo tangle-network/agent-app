@@ -18,9 +18,5 @@ export default {
     // live in sandbox-ui's dist — scan it too so those utilities generate. This
     // is the consumer step the 0.43 migration documents.
     './node_modules/@tangle-network/sandbox-ui/dist/**/*.js',
-    // The optional peer is hoisted to the linked agent-app workspace during
-    // local development, so include that real package path as well.
-    '../node_modules/@tangle-network/sandbox-ui/dist/**/*.js',
-    '../node_modules/@tangle-network/ui/dist/**/*.js',
   ],
 }

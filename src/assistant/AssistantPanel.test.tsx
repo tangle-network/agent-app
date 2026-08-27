@@ -71,24 +71,11 @@ function renderPanel(
 }
 
 describe("AssistantPanel transcript seam", () => {
-  it("renders the built-in transcript (branded empty state) when no renderTranscript is supplied", () => {
+  it("renders the built-in transcript (empty state) when no renderTranscript is supplied", () => {
     renderPanel(makeChat());
     expect(
-      screen.getByText(/Ask the assistant to do something/i),
+      screen.getByText(/Ask me to create a workflow/i),
     ).toBeTruthy();
-    expect(
-      screen.getByText(/pause for approval before anything changes/i),
-    ).toBeTruthy();
-  });
-
-  it("seeds the composer from an empty-state door", () => {
-    renderPanel(makeChat());
-    const input = screen.getByLabelText("Message input") as HTMLTextAreaElement;
-    expect(input.value).toBe("");
-    fireEvent.click(
-      screen.getByRole("button", { name: /^Create a workflow/ }),
-    );
-    expect(input.value).toBe("Create a workflow that ");
   });
 
   it("hands the host renderTranscript the live view and a bound renderProposal that renders the ProposalCard", () => {
@@ -113,7 +100,7 @@ describe("AssistantPanel transcript seam", () => {
 
     // The host renderer ran instead of the built-in timeline.
     expect(screen.getByTestId("host-transcript")).toBeTruthy();
-    expect(screen.queryByText(/Ask the assistant to do something/i)).toBeNull();
+    expect(screen.queryByText(/Ask me to create a workflow/i)).toBeNull();
 
     // The view carries the panel-derived surface the contract promises.
     expect(captured).not.toBeNull();
@@ -786,51 +773,5 @@ describe("AssistantPanel composer seed", () => {
     )) as HTMLTextAreaElement;
     expect(input.value).toBe("Draft this workflow");
     expect(onComposerSeedApplied).toHaveBeenCalledOnce();
-  });
-});
-
-
-describe("AssistantPanel composer attachments", () => {
-  it("wires the composer's attach surface through composerAttachments and reports sends", async () => {
-    const onAttach = vi.fn();
-    const onRemoveFile = vi.fn();
-    const onComposerSend = vi.fn();
-    const chat = makeChat();
-    render(
-      <AssistantClientProvider client={client}>
-        <AssistantPanel
-          chat={chat}
-          userId="u1"
-          onClose={() => {}}
-          composerAttachments={{
-            onAttach,
-            pendingFiles: [
-              { id: "f1", name: "notes.md", kind: "file", status: "ready" },
-            ],
-            onRemoveFile,
-          }}
-          onComposerSend={onComposerSend}
-        />
-      </AssistantClientProvider>,
-    );
-
-    // The attach button and the host-driven staged chip render.
-    expect(screen.getByLabelText("Attach files")).toBeTruthy();
-    expect(screen.getByText("notes.md")).toBeTruthy();
-    fireEvent.click(screen.getByLabelText("Remove notes.md"));
-    expect(onRemoveFile).toHaveBeenCalledExactlyOnceWith("f1");
-
-    // A send reaches the chat AND reports to the host, which clears its
-    // staged attachment set on that signal.
-    const input = screen.getByLabelText("Message input");
-    fireEvent.change(input, { target: { value: "see attached" } });
-    fireEvent.keyDown(input, { key: "Enter" });
-    expect(chat.send).toHaveBeenCalledExactlyOnceWith("see attached");
-    expect(onComposerSend).toHaveBeenCalledExactlyOnceWith("see attached");
-  });
-
-  it("keeps the composer text-only when composerAttachments is omitted", () => {
-    renderPanel(makeChat());
-    expect(screen.queryByLabelText("Attach files")).toBeNull();
   });
 });

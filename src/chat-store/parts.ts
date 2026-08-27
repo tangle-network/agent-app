@@ -24,11 +24,6 @@
  *   and field shapes.
  * - `plan`: the durable-plan projection in `/plans`, derived from the sandbox
  *   SDK's authoritative plan lifecycle.
- * - `work_product`: the persisted work-product anchor card in
- *   `/work-product`'s contract (`workProductToPersistedPart` /
- *   `persistedPartToWorkProduct`) — SYSTEM-authored on the ready transition
- *   and updated on a reviewer verdict; no prompt teaches an agent to author
- *   one.
  * - `mention`: an `@`-picked reference to a file that already lives in the
  *   workspace sandbox (`FileMention` in `/chat-routes`'s wire contract, plus
  *   the image/file discriminant). Neither transport lane produces it — the
@@ -63,10 +58,6 @@ import type {
   NoticePersistedPart,
 } from '../web-react/chat-interactions'
 import { persistedPartToInteraction } from '../interactions/contract'
-import {
-  persistedPartToWorkProduct,
-  type WorkProductPersistedPart,
-} from '../work-product/types'
 import {
   persistedPartToPlan,
   planToPersistedPart,
@@ -211,12 +202,6 @@ export interface ChatInteractionPart {
 /** Resolve a chat plan part by aliasing it to the persisted chat plan part type */
 export type ChatPlanPart = ChatPlanPersistedPart
 
-/** Persisted work-product anchor card — byte-matches
- *  `workProductToPersistedPart` in `/work-product`'s contract. Written by the
- *  PLATFORM on the ready transition (and updated on a verdict); never
- *  authored by a prompt. */
-export type ChatWorkProductPart = WorkProductPersistedPart
-
 /** Persisted one-line transcript notice — byte-matches `noticePart` in
  *  `/web-react`'s chat-interactions contract. */
 export interface ChatNoticePart {
@@ -257,8 +242,6 @@ type _CodecEmitsStorableNoticePart = MutuallyAssignable<NoticePersistedPart, Cha
 type _StoredNoticePartFeedsCodec = MutuallyAssignable<ChatNoticePart, NoticePersistedPart>
 type _CodecEmitsStorablePlanPart = MutuallyAssignable<ChatPlanPersistedPart, ChatPlanPart>
 type _StoredPlanPartFeedsCodec = MutuallyAssignable<ChatPlanPart, ChatPlanPersistedPart>
-type _CodecEmitsStorableWorkProductPart = MutuallyAssignable<WorkProductPersistedPart, ChatWorkProductPart>
-type _StoredWorkProductPartFeedsCodec = MutuallyAssignable<ChatWorkProductPart, WorkProductPersistedPart>
 
 /** Represent parts of a chat message including text, reasoning, tools, files, images, subtasks, steps, interactions, notices, plans, and mentions */
 export type ChatMessagePart =
@@ -273,7 +256,6 @@ export type ChatMessagePart =
   | ChatInteractionPart
   | ChatNoticePart
   | ChatPlanPart
-  | ChatWorkProductPart
   | ChatMentionPart
 
 /** Every canonical harness wire-part kind must be storable — compile-time
@@ -334,10 +316,6 @@ function toChatMessagePart(part: Record<string, unknown>): ChatMessagePart | nul
       const plan = persistedPartToPlan(part)
       return plan ? ({ ...part, ...planToPersistedPart(plan) } as ChatPlanPart) : null
     }
-    case 'work_product':
-      // Validate via the codec but keep the original row (extra fields the
-      // product persisted round-trip, matching the interaction case).
-      return persistedPartToWorkProduct(part) ? (part as unknown as ChatWorkProductPart) : null
     case 'mention':
       return isChatMentionPart(part) ? part : null
     case undefined:
@@ -370,11 +348,6 @@ export function isChatInteractionPart(part: ChatMessagePart): part is ChatIntera
 /** Resolve whether a chat message part is a persisted chat plan part */
 export function isChatPlanPart(part: ChatMessagePart): part is ChatPlanPart {
   return part.type === 'plan'
-}
-
-/** Resolve whether a chat message part is a persisted work-product anchor */
-export function isChatWorkProductPart(part: ChatMessagePart): part is ChatWorkProductPart {
-  return part.type === 'work_product'
 }
 
 /** Determine if a chat message part represents the completion of a chat step */

@@ -25,7 +25,6 @@ import {
   BleedGlyph,
   BoldGlyph,
   BringFrontGlyph,
-  ChevronDownGlyph,
   GridGlyph,
   GroupGlyph,
   ItalicGlyph,
@@ -115,7 +114,7 @@ const FONT_FAMILIES = [
 const SEP = <div className="mx-1 h-5 w-px shrink-0 bg-[var(--border-default)]" />
 
 const POPOVER_PANEL =
-  'absolute top-full left-0 z-50 mt-1 flex flex-col rounded border border-[var(--card-edge)] bg-[hsl(var(--popover))] shadow-[var(--shadow-overlay)]'
+  'absolute top-full left-0 z-50 mt-1 flex flex-col rounded border border-[var(--border-default)] bg-[var(--bg-input)] shadow-lg'
 
 /**
  * Click-outside / Escape-to-close popover anchored under its trigger. The
@@ -160,7 +159,7 @@ function Popover({
   )
 }
 
-const FIELD_LABEL = 'text-xs font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]'
+const FIELD_LABEL = 'text-[9px] uppercase tracking-wide text-[var(--text-muted)]'
 
 function NumberInput({
   label,
@@ -199,7 +198,7 @@ function NumberInput({
           if (event.key === 'Enter') commit((event.target as HTMLInputElement).value)
           if (event.key === 'Escape') setRaw(null)
         }}
-        className={`${className} rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-center text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)]`}
+        className={`${className} rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-center text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]`}
       />
     </label>
   )
@@ -241,10 +240,10 @@ function SelectControl<T extends string>({
             aria-haspopup="listbox"
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
-            className={`${buttonClassName} flex items-center justify-between gap-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-left text-xs text-[var(--text-primary)] hover:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40`}
+            className={`${buttonClassName} flex items-center justify-between gap-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-left text-[12px] text-[var(--text-primary)] outline-none hover:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40`}
           >
             <span className="truncate">{current?.label ?? value}</span>
-            <ChevronDownGlyph className="h-3 w-3 shrink-0 text-[var(--text-muted)]" />
+            <span className="text-[8px] text-[var(--text-muted)]">▾</span>
           </button>
         }
       >
@@ -259,7 +258,7 @@ function SelectControl<T extends string>({
                 onChange(opt.value)
                 setOpen(false)
               }}
-              className={`px-3 py-1 text-left text-xs hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)] ${
+              className={`px-3 py-1 text-left text-[12px] hover:bg-[var(--brand-primary)]/10 ${
                 opt.value === value ? 'text-[var(--brand-primary)]' : 'text-[var(--text-primary)]'
               }`}
             >
@@ -311,11 +310,11 @@ function FontPicker({
             aria-expanded={open}
             aria-label="Font family"
             onClick={() => setOpen((v) => !v)}
-            className="flex w-28 items-center justify-between gap-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-left text-xs text-[var(--text-primary)] hover:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40"
+            className="flex w-28 items-center justify-between gap-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-left text-[12px] text-[var(--text-primary)] outline-none hover:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40"
             style={{ fontFamily: value }}
           >
             <span className="truncate">{value}</span>
-            <ChevronDownGlyph className="h-3 w-3 shrink-0 text-[var(--text-muted)]" />
+            <span className="text-[8px] text-[var(--text-muted)]">▾</span>
           </button>
         }
       >
@@ -326,11 +325,11 @@ function FontPicker({
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search fonts"
             aria-label="Search fonts"
-            className="m-1 rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
+            className="m-1 rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
           />
           <div role="listbox" className="max-h-60 overflow-y-auto py-1">
             {filtered.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-[var(--text-muted)]">No matches</div>
+              <div className="px-3 py-2 text-[11px] text-[var(--text-muted)]">No matches</div>
             ) : (
               filtered.map((family) => (
                 <button
@@ -344,7 +343,7 @@ function FontPicker({
                     setQuery('')
                   }}
                   style={{ fontFamily: family }}
-                  className={`block w-full px-3 py-1 text-left text-sm hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)] ${
+                  className={`block w-full px-3 py-1 text-left text-[13px] hover:bg-[var(--brand-primary)]/10 ${
                     family === value ? 'text-[var(--brand-primary)]' : 'text-[var(--text-primary)]'
                   }`}
                 >
@@ -363,10 +362,8 @@ function FontPicker({
  * Color control: a swatch button (showing the current color) that opens a
  * popover with a native color picker + hex field. Replaces the bare
  * <input type="color"> chrome while keeping the string value/onChange contract.
- * `none` renders the no-color idiom (white swatch with a diagonal slash) for
- * values that are set but not in effect — e.g. a stroke whose width is 0.
  */
-function ColorSwatch({ label, value, onCommit, disabled, none = false }: { label: string; value: string; onCommit(v: string): void; disabled?: boolean; none?: boolean }) {
+function ColorSwatch({ label, value, onCommit, disabled }: { label: string; value: string; onCommit(v: string): void; disabled?: boolean }) {
   const [open, setOpen] = useState(false)
   const normalized = value.startsWith('#') ? value : '#ffffff'
 
@@ -380,18 +377,11 @@ function ColorSwatch({ label, value, onCommit, disabled, none = false }: { label
           <button
             type="button"
             disabled={disabled}
-            aria-label={none ? `${label} color (none)` : `${label} color`}
-            title={none ? 'None' : undefined}
+            aria-label={`${label} color`}
             onClick={() => setOpen((v) => !v)}
-            className="relative h-6 w-10 overflow-hidden rounded border border-[var(--border-default)] disabled:cursor-default disabled:opacity-40"
-            style={{ backgroundColor: none ? '#ffffff' : normalized }}
-          >
-            {none ? (
-              <svg className="absolute inset-0 h-full w-full" viewBox="0 0 40 24" preserveAspectRatio="none" aria-hidden>
-                <line x1="1" y1="23" x2="39" y2="1" stroke="var(--text-danger)" strokeWidth="1.5" />
-              </svg>
-            ) : null}
-          </button>
+            className="h-6 w-10 rounded border border-[var(--border-default)] disabled:cursor-default disabled:opacity-40"
+            style={{ backgroundColor: normalized }}
+          />
         }
       >
         <div className={`${POPOVER_PANEL} w-40 gap-2 p-2`}>
@@ -407,7 +397,7 @@ function ColorSwatch({ label, value, onCommit, disabled, none = false }: { label
             aria-label={`${label} hex value`}
             value={value}
             onChange={(event) => onCommit(event.target.value)}
-            className="rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
+            className="rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
           />
         </div>
       </Popover>
@@ -711,20 +701,20 @@ function SelectionControls({
               value={slotInput}
               onChange={(event) => setSlotInput(event.target.value)}
               placeholder="slot-name"
-              className="rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
+              className="rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
             />
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => { onBindSlot(slotInput.trim() || null); setSlotPopoverOpen(false) }}
-                className="flex-1 rounded border border-[var(--brand-primary)] px-2 py-0.5 text-xs text-[var(--brand-primary)] hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)]"
+                className="flex-1 rounded border border-[var(--brand-primary)] px-2 py-0.5 text-[11px] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/10"
               >
                 {slotInput.trim() ? 'Bind' : 'Unbind'}
               </button>
               <button
                 type="button"
                 onClick={() => setSlotPopoverOpen(false)}
-                className="rounded border border-[var(--border-default)] px-2 py-0.5 text-xs text-[var(--text-secondary)]"
+                className="rounded border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]"
               >
                 Cancel
               </button>
@@ -807,7 +797,7 @@ function ShapeControls({ element, canWrite, onPatch, showCornerRadius }: { eleme
   return (
     <>
       <ColorSwatch label="Fill" value={element.fill} onCommit={(v) => onPatch({ fill: v })} disabled={!canWrite} />
-      <ColorSwatch label="Stroke" value={element.stroke ?? '#000000'} onCommit={(v) => onPatch({ stroke: v })} disabled={!canWrite} none={(element.strokeWidth ?? 0) === 0} />
+      <ColorSwatch label="Stroke" value={element.stroke ?? '#000000'} onCommit={(v) => onPatch({ stroke: v })} disabled={!canWrite} />
       <NumberInput label="Stroke W" value={element.strokeWidth ?? 0} min={0} onCommit={(v) => onPatch({ strokeWidth: v })} className="w-14" />
       {showCornerRadius && 'cornerRadius' in element ? (
         <NumberInput label="Corner R" value={(element as RectElement).cornerRadius ?? 0} min={0} onCommit={(v) => onPatch({ cornerRadius: v })} className="w-14" />
@@ -859,21 +849,21 @@ function ImageControls({ element, canWrite, onPatch }: { element: ImageElement; 
             onChange={(event) => setSwapUrl(event.target.value)}
             placeholder="https://… image URL"
             aria-label="New image URL"
-            className="rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)]"
+            className="rounded border border-[var(--border-default)] bg-transparent px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
           />
           <div className="flex gap-2">
             <button
               type="button"
               disabled={!swapUrl.trim() || swapUrl.trim() === element.src}
               onClick={() => { onPatch({ src: swapUrl.trim() }); setSwapOpen(false) }}
-              className="flex-1 rounded border border-[var(--brand-primary)] px-2 py-0.5 text-xs text-[var(--brand-primary)] hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)] disabled:cursor-default disabled:opacity-40"
+              className="flex-1 rounded border border-[var(--brand-primary)] px-2 py-0.5 text-[11px] text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/10 disabled:cursor-default disabled:opacity-40"
             >
               Replace
             </button>
             <button
               type="button"
               onClick={() => setSwapOpen(false)}
-              className="rounded border border-[var(--border-default)] px-2 py-0.5 text-xs text-[var(--text-secondary)]"
+              className="rounded border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]"
             >
               Cancel
             </button>
@@ -923,7 +913,7 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides, pa
         value={page.name}
         disabled={!canWrite}
         onChange={(event) => onSetPageProps({ name: event.target.value })}
-        className="w-28 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40"
+        className="w-28 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-0.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
       />
 
       {SEP}
@@ -938,9 +928,6 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides, pa
           if (preset) onSetPageProps({ width: preset.width, height: preset.height })
         }}
         options={presetOptions}
-        // Preset labels run long ("US Letter Landscape") — w-24 truncates them
-        // to "Instagram …"; w-44 matches the listbox width and fits them all.
-        buttonClassName="w-44"
       />
 
       {/* Custom W × H */}
@@ -957,7 +944,7 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides, pa
             if (event.key === 'Enter') commitDimension('width', (event.target as HTMLInputElement).value)
             if (event.key === 'Escape') setCustomW(null)
           }}
-          className="w-16 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-center text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40"
+          className="w-16 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-center text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
         />
       </label>
       <span className="text-[var(--text-muted)]">×</span>
@@ -974,7 +961,7 @@ function PagePropsControls({ page, canWrite, onSetPageProps, onSetPageGuides, pa
             if (event.key === 'Enter') commitDimension('height', (event.target as HTMLInputElement).value)
             if (event.key === 'Escape') setCustomH(null)
           }}
-          className="w-16 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-center text-xs text-[var(--text-primary)] focus:border-[var(--brand-primary)] disabled:cursor-default disabled:opacity-40"
+          className="w-16 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-1 py-0.5 text-center text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--brand-primary)]"
         />
       </label>
 

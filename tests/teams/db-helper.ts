@@ -57,7 +57,7 @@ function foreignKeyDdl(fk: ForeignKey): string {
   return clause
 }
 
-function tableDdl(table: AnySQLiteTable): string[] {
+export function tableDdl(table: AnySQLiteTable): string[] {
   const config = getTableConfig(table)
   const definitions = [
     ...config.columns.map(columnDdl),

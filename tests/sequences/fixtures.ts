@@ -52,7 +52,7 @@ export function makeTimeline(input: {
   return { sequence, tracks: input.tracks, clips: input.clips ?? [] }
 }
 
-interface MemorySequenceStore extends SequenceStore {
+export interface MemorySequenceStore extends SequenceStore {
   timeline: SequenceTimeline
   exports: SequenceExportRecord[]
   decisions: SequenceDecision[]

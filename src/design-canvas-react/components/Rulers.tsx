@@ -5,9 +5,6 @@
  * - Supports guide creation by dragging OUT of the ruler: a live preview line
  *   appears while dragging; on drop a `set_page_guides` command is emitted.
  * - Existing guides that are dragged BACK into the ruler are deleted.
- * - Renders saved guides persistently, Figma-style: a marker in the ruler
- *   track at each guide position, plus a thin line spanning the canvas (the
- *   GuidesCanvasOverlay sibling, aligned with the track coordinate space).
  *
  * All interaction math lives in ruler-math.ts and is testable without a DOM.
  * The rulers themselves are pure DOM (no Konva); they sit in a CSS grid slot
@@ -64,9 +61,6 @@ export function Rulers({ pageWidth, pageHeight, zoom, scrollLeft, scrollTop, sho
         guides={guides}
         onGuidesChange={onGuidesChange}
       />
-
-      {/* Saved-guide lines spanning the canvas */}
-      <GuidesCanvasOverlay guides={guides} zoom={zoom} scrollLeft={scrollLeft} scrollTop={scrollTop} />
     </>
   )
 }
@@ -190,23 +184,9 @@ function HorizontalRuler({ pageWidth, zoom, scrollLeft, guides, onGuidesChange }
         )
       })}
 
-      {/* Saved-guide markers (persistent) */}
-      {guides.vertical.map((position, index) => (
-        <div
-          key={`guide-${index}`}
-          data-guide-marker="vertical"
-          aria-hidden
-          className="pointer-events-none absolute top-0 bottom-0 w-px bg-[var(--brand-primary)]"
-          style={{ left: position * zoom - scrollLeft * zoom }}
-        />
-      ))}
-
       {/* Pointer indicator */}
       {pointerX !== null ? (
-        <div
-          className="pointer-events-none absolute top-0 bottom-0 w-px bg-[color-mix(in_srgb,var(--brand-primary)_60%,transparent)]"
-          style={{ left: pointerX }}
-        />
+        <div className="pointer-events-none absolute top-0 bottom-0 w-px bg-[var(--brand-primary)]/60" style={{ left: pointerX }} />
       ) : null}
 
       {/* Live drag-guide preview */}
@@ -332,23 +312,8 @@ function VerticalRuler({ pageHeight, zoom, scrollTop, guides, onGuidesChange }: 
         )
       })}
 
-      {/* Saved-guide markers (persistent) */}
-      {guides.horizontal.map((position, index) => (
-        <div
-          key={`guide-${index}`}
-          data-guide-marker="horizontal"
-          aria-hidden
-          className="pointer-events-none absolute left-0 right-0 h-px bg-[var(--brand-primary)]"
-          style={{ top: position * zoom - scrollTop * zoom }}
-        />
-      ))}
-
-      {/* Pointer indicator */}
       {pointerY !== null ? (
-        <div
-          className="pointer-events-none absolute left-0 right-0 h-px bg-[color-mix(in_srgb,var(--brand-primary)_60%,transparent)]"
-          style={{ top: pointerY }}
-        />
+        <div className="pointer-events-none absolute left-0 right-0 h-px bg-[var(--brand-primary)]/60" style={{ top: pointerY }} />
       ) : null}
 
       {dragGuideY !== null ? (
@@ -357,52 +322,6 @@ function VerticalRuler({ pageHeight, zoom, scrollTop, guides, onGuidesChange }: 
           style={{ top: dragGuideY * zoom - scrollTop * zoom }}
         />
       ) : null}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Saved-guide canvas overlay
-// ---------------------------------------------------------------------------
-
-interface GuidesCanvasOverlayProps {
-  guides: PageGuides
-  zoom: number
-  scrollLeft: number
-  scrollTop: number
-}
-
-/** Thin lines spanning the canvas for every saved guide. The overlay's origin
- *  is offset by RULER_SIZE_PX on both axes so it shares the ruler tracks'
- *  coordinate space — each line uses the exact same screen math as its track
- *  marker and visually continues it across the canvas. pointer-events-none
- *  keeps the canvas below fully interactive; z-10 (with the tracks) paints
- *  the lines above the Konva stage, which sits in-flow beneath this overlay. */
-function GuidesCanvasOverlay({ guides, zoom, scrollLeft, scrollTop }: GuidesCanvasOverlayProps) {
-  if (guides.vertical.length === 0 && guides.horizontal.length === 0) return null
-
-  return (
-    <div
-      aria-hidden
-      className="pointer-events-none absolute right-0 bottom-0 z-10 overflow-hidden"
-      style={{ left: RULER_SIZE_PX, top: RULER_SIZE_PX }}
-    >
-      {guides.vertical.map((position, index) => (
-        <div
-          key={`v-${index}`}
-          data-guide-line="vertical"
-          className="absolute top-0 bottom-0 w-px bg-[var(--brand-primary)]"
-          style={{ left: position * zoom - scrollLeft * zoom }}
-        />
-      ))}
-      {guides.horizontal.map((position, index) => (
-        <div
-          key={`h-${index}`}
-          data-guide-line="horizontal"
-          className="absolute left-0 right-0 h-px bg-[var(--brand-primary)]"
-          style={{ top: position * zoom - scrollTop * zoom }}
-        />
-      ))}
     </div>
   )
 }

@@ -1,7 +1,6 @@
 /**
- * Composition scenario for the turn-lifecycle seams the rest of the vertical
- * suite doesn't exercise (introduced #200, graduated to stable in #227):
- * `turnLock` + `lifecycle` + `contextGate`
+ * Composition scenario for the #200 turn-lifecycle seams the rest of the
+ * vertical suite doesn't exercise: `turnLock` + `lifecycle` + `contextGate`
  * wired together on the assembled `createChatTurnRoutes`, driven through the
  * same fake-producer harness (`createSandboxChatProducer` over scripted sidecar
  * events) the other vertical tests use.
@@ -82,8 +81,8 @@ function turnRequest(cookie: string, threadId: string, content: string): Request
   })
 }
 
-describe('vertical: turnLock + lifecycle + contextGate composition (graduated seams)', () => {
-  it('contextGate reject writes no assistant row and never runs the producer, but IS reported to telemetry', async () => {
+describe('vertical: turnLock + lifecycle + contextGate composition (#200 seams)', () => {
+  it('contextGate reject writes no assistant row and never runs the producer or lifecycle', async () => {
     const app = await createMiniApp()
     await app.createWorkspace('ws1')
     const cookie = await app.signUp('gate@example.com')
@@ -97,12 +96,7 @@ describe('vertical: turnLock + lifecycle + contextGate composition (graduated se
     expect(res.status).toBe(409)
     expect(await res.json()).toEqual({ needContext: true })
     expect(state.produceCount).toBe(0) // gate short-circuits before produce
-    // The gate used to run before `onTurnStart` and therefore emitted NOTHING,
-    // which made a product whose gate answered every turn look idle rather than
-    // broken. A gated turn is still a turn: telemetry sees it (stamped `gated`
-    // so it is not mistaken for a model turn that produced nothing), while the
-    // billing/persistence path still does not — no model ran, no row written.
-    expect(lifecycleEvents).toEqual(['start', 'complete'])
+    expect(lifecycleEvents).toEqual([]) // gate runs before onTurnStart
     const messages = await app.store.listMessages(thread.id)
     expect(messages.filter((m) => m.role === 'assistant')).toHaveLength(0)
   })

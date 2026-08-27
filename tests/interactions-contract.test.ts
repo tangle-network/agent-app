@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
 
-import { interactionRequestDigest, type InteractionRequestMaterial } from '@tangle-network/agent-interface'
-
 import {
   interactionToPersistedPart,
   parseInteractionAnswers,
@@ -10,27 +8,11 @@ import {
   type InteractionRequestWire,
 } from '../src/interactions/index'
 
-// A request carries its own digest, and that digest covers the binding, so the
-// fixture derives it rather than hard-coding a hash that would drift the first
-// time a field above changes.
-const material: InteractionRequestMaterial = {
+const request: InteractionRequestWire = {
   id: 'ask-1',
   kind: 'question',
   title: 'Choose a tone',
   answerSpec: { fields: [] },
-  binding: {
-    runId: 'run-1',
-    provider: 'test-provider',
-    environmentId: 'env-1',
-    sessionId: 'session-1',
-    executionId: 'exec-1',
-    interactionId: 'ask-1',
-  },
-}
-
-const request: InteractionRequestWire = {
-  ...material,
-  requestDigest: interactionRequestDigest(material),
 }
 
 describe('persisted interaction answers', () => {

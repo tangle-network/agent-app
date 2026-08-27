@@ -4,15 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-422 exports.
-
-### `acceptRejectionReason`
-
-`function` — The reason an `accept` list refused a file.
-
-```ts
-(file: File, accept: string) => string
-```
+230 exports.
 
 ### `activityTone`
 
@@ -40,7 +32,7 @@ interface AgentActivityPage
 
 ### `AgentActivityPanel`
 
-`function`
+`function` — The standalone cross-context delegation surface: every agent run the product journaled, mission-spawned or not, with status, cost, drill-in, and a mission link slot for promoted delegations.
 
 ```ts
 ({ fetchActivity, renderMissionRef, title, emptyLabel }: AgentActivityPanelProps) => Element
@@ -83,7 +75,7 @@ interface AgentSessionControlsProps
 `const` — Accept list for the composer file picker + type validation, same grammar as the native `<input accept>` attribute.
 
 ```ts
-"image/*,.pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,.json,.yaml,.yml,.html"
+"image/*,.pdf,.txt,.md,.csv,.json,.yaml,.yml,.html"
 ```
 
 ### `AttachmentFileResult`
@@ -139,7 +131,7 @@ type AttachmentFileResult
 `function` — All required fields answered → the respond payload; else null (not submittable yet).
 
 ```ts
-(fields: ({ type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…
+(fields: ChatInteractionField[], values: FieldValues) => Record<string, string | number | boolean | string[]> | null
 ```
 
 ### `buildMentionPromptBlock`
@@ -211,7 +203,7 @@ interface ChatAttachmentPart
 `function`
 
 ```ts
-({ onSend, onSendParts, onSendFailed, sendFailureMessage, onCancel, isStreaming, disabled, placeholder, value, onValueC…
+({ onSend, onSendParts, onCancel, isStreaming, disabled, placeholder, value, onValueChange, initialValue, seed, onSeedA…
 ```
 
 ### `ChatComposerProps`
@@ -246,14 +238,6 @@ interface ChatEmptyDoor
 interface ChatEmptyStateProps
 ```
 
-### `ChatFreeTextField`
-
-`type` — A field the user types free text into, which may declare the longest answer its answer route will accept — so a card can stop the typing rather than let the route reject it.
-
-```ts
-type ChatFreeTextField
-```
-
 ### `ChatInteraction`
 
 `interface` — The client/persisted view of one ask.
@@ -264,7 +248,7 @@ interface ChatInteraction
 
 ### `ChatInteractionField`
 
-`type` — The shared field contract under the UI-facing name used by this package.
+`type` — Resolve a chat interaction field excluding select types or including chat select fields
 
 ```ts
 type ChatInteractionField
@@ -315,7 +299,7 @@ interface ChatMessageMetrics
 `function` — The message thread: one centered column; user messages are right-aligned bubbles with a User label; agent messages carry an Agent meta line with model id, tokens/sec, and cost, plus a collapsible thi…
 
 ```ts
-({ messages, messageSize, chrome, models, renderMarkdown, renderExtras, durableCards, userLabel, agentLabel, loading, a…
+({ messages, models, renderMarkdown, renderExtras, durableCards, userLabel, agentLabel, loading, approval, onToolCallCl…
 ```
 
 ### `ChatMessageSegment`
@@ -374,14 +358,6 @@ interface ChatStreamToolResult
 interface ChatToolCallInfo
 ```
 
-### `chatToolCallPart`
-
-`function` — Adapt a chat tool call to the canonical `@tangle-network/ui` `ToolPart`, so the row renders through ui's `InlineToolItem` — one run-row grammar shared with every other Tangle run view (the same adapt…
-
-```ts
-(call: ChatToolCallInfo) => ToolPart
-```
-
 ### `ChatTurnFilePartInput`
 
 `interface` — A non-text prompt part the upload route hands back and the client echoes on send.
@@ -422,36 +398,12 @@ interface ChatTurnRequestPayload
 interface ChatUiMessage
 ```
 
-### `CommandPalette`
-
-`function`
-
-```ts
-({ items, onSelect, open: controlledOpen, onOpenChange, hotkey, loading, initialQuery, placeholder, emptyMessage, label…
-```
-
-### `CommandPaletteItem`
-
-`interface` — One selectable row.
-
-```ts
-interface CommandPaletteItem
-```
-
-### `CommandPaletteProps`
-
-`interface`
-
-```ts
-interface CommandPaletteProps
-```
-
 ### `composerAnswerData`
 
 `function` — Shapes composer text into the respond payload for the routed field (select answers are string arrays on the wire; text answers are strings).
 
 ```ts
-(field: { type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…
+(field: ChatInteractionField, text: string) => Record<string, string | number | boolean | string[]>
 ```
 
 ### `composerAnswerDeliveries`
@@ -470,14 +422,6 @@ interface CommandPaletteProps
 interface ComposerAnswerDelivery
 ```
 
-### `ComposerContextItem`
-
-`interface` — A piece of context the agent will see beside the next message — an open file, a selected record, a pinned document.
-
-```ts
-interface ComposerContextItem
-```
-
 ### `ComposerFile`
 
 `interface`
@@ -494,92 +438,12 @@ interface ComposerFile
 interface ComposerFilePart
 ```
 
-### `ComposerFileRejection`
-
-`interface` — A file the `accept` list refused, with the reason to show for it.
-
-```ts
-interface ComposerFileRejection
-```
-
 ### `ComposerMentionProp`
 
-`interface` — `ChatComposer`'s `mention` prop shape — plug the hook's `mention` return value straight into it.
+`interface` — Mirrors sandbox-ui#184's `AgentComposerProps['mention']` shape — plug the hook's `mention` return value straight into that prop.
 
 ```ts
 interface ComposerMentionProp
-```
-
-### `ComposerModeControls`
-
-`function` — The shared plan-mode toggle for the left side of an agent composer.
-
-```ts
-({ planMode }: ComposerModeControlsProps) => Element | null
-```
-
-### `ComposerModeControlsProps`
-
-`interface`
-
-```ts
-interface ComposerModeControlsProps
-```
-
-### `ComposerPlanModeSelection`
-
-`interface` — The plan-mode toggle state an entry surface docks beside the composer.
-
-```ts
-interface ComposerPlanModeSelection
-```
-
-### `ComposerSendFailure`
-
-`interface` — The rejected send, handed to `onSendFailed` so the host can undo whatever it cleared optimistically — most importantly the staged attachments, which the composer does not own (`pendingFiles` is a pro…
-
-```ts
-interface ComposerSendFailure
-```
-
-### `ComposerSendHandler`
-
-`type` — A send handler, typed as a UNION with the legacy `=> void` signature rather than as `(…) => ComposerSendResult` alone.
-
-```ts
-type ComposerSendHandler
-```
-
-### `ComposerSendOutcome`
-
-`type` — What a send handler reports back.
-
-```ts
-type ComposerSendOutcome
-```
-
-### `ComposerSendPartsHandler`
-
-`type`
-
-```ts
-type ComposerSendPartsHandler
-```
-
-### `ComposerSendRejected`
-
-`interface` — A send the host refused.
-
-```ts
-interface ComposerSendRejected
-```
-
-### `ComposerSendResult`
-
-`type`
-
-```ts
-type ComposerSendResult
 ```
 
 ### `consumeChatStream`
@@ -654,14 +518,6 @@ interface ConsumeChatStreamResult
 readonly EffortLevel[]
 ```
 
-### `DEFAULT_INSIGHT_PAGE_SIZE`
-
-`const`
-
-```ts
-3
-```
-
 ### `DEFAULT_MENTION_EMPTY_TEXT`
 
 `const` — Popover empty-state copy for a `ready` index whose query matched nothing.
@@ -676,102 +532,6 @@ readonly EffortLevel[]
 
 ```ts
 20
-```
-
-### `DEFAULT_PROVENANCE_CONFIDENCE_POLICY`
-
-`const` — The starting policy.
-
-```ts
-ProvenanceConfidencePolicy
-```
-
-### `DEFAULT_SPARKLINE_EMPTY_LABEL`
-
-`const`
-
-```ts
-"No history yet"
-```
-
-### `DEFAULT_SPARKLINE_HEIGHT`
-
-`const`
-
-```ts
-24
-```
-
-### `DEFAULT_SPARKLINE_LABEL`
-
-`const` — Only a name, never a metric: it exists so the accessible label is never empty.
-
-```ts
-"Trend"
-```
-
-### `DEFAULT_SPARKLINE_UNAVAILABLE_LABEL`
-
-`const` — Nothing was measurable, which is not the same as nothing was measured yet — and "No history yet" over a series that arrived full of `NaN` reads as the metric being new when the producer is broken.
-
-```ts
-"No readings available"
-```
-
-### `DEFAULT_SPARKLINE_WIDTH`
-
-`const`
-
-```ts
-96
-```
-
-### `describeProvenance`
-
-`function` — One plain sentence naming where the value came from — the panel's first line and part of what a screen reader announces.
-
-```ts
-(record: ProvenanceRecord) => string
-```
-
-### `describeProvenanceSourceStatus`
-
-`function` — The sentence for a source that is not `ready`, or `null` when it is.
-
-```ts
-(source: ProvenanceSource) => string | null
-```
-
-### `DictationAudio`
-
-`interface` — The audio a finished recording hands to the host.
-
-```ts
-interface DictationAudio
-```
-
-### `DictationControls`
-
-`interface`
-
-```ts
-interface DictationControls
-```
-
-### `dictationErrorMessage`
-
-`function` — The failure as a sentence.
-
-```ts
-(error: unknown) => string
-```
-
-### `diffRecordGridProposal`
-
-`function` — Diff a proposal against the live rows.
-
-```ts
-(rows: readonly RecordGridRow[], proposal: RecordGridProposal) => RecordGridRowDiff[]
 ```
 
 ### `DISPATCH_MAX_MEDIA_PARTS`
@@ -934,14 +694,6 @@ interface DurablePlanDecisionResult
 interface DurablePlanFollowUpReceipt
 ```
 
-### `EFFORT_METER_SEGMENTS`
-
-`const` — Segments the meter draws — fixed geometry so the ladder stays tabular across levels (and across the trigger and its menu rows).
-
-```ts
-4
-```
-
 ### `EffortLevel`
 
 `interface` — One reasoning-budget level: the engine `id` is unchanged (the value the product sends to the loop); only the user-facing `label` is renamed to the plainer "how hard should it think" vocabulary from d…
@@ -950,44 +702,12 @@ interface DurablePlanFollowUpReceipt
 interface EffortLevel
 ```
 
-### `effortLevelLabel`
-
-`function` — The user-facing label for an engine level id: the canonical vocabulary when the id is one this package names, otherwise the id itself made readable (`auto` -> "Auto", `ultra-code` -> "Ultra code").
-
-```ts
-(id: string) => string
-```
-
-### `effortLevelsFromIds`
-
-`function` — Build a levels list from the engine ids a backend applies — the shape the removed `ComposerAgentControls` took as `reasoning.available`, so a product migrating that list has one call to make instead…
-
-```ts
-(ids: readonly string[]) => readonly EffortLevel[]
-```
-
-### `EffortMeter`
-
-`function` — The thinking-strength meter: four 12px bars, filled count = level, filled opacity ramping 25→100% left to right (unfilled at a faint ghost).
-
-```ts
-({ fill, className }: { fill: number; className?: string | undefined; }) => Element
-```
-
-### `effortMeterFill`
-
-`function` — Filled-segment count for a level: 0 for off/none (or an id the levels list does not carry); otherwise the level's position among the non-off choices scaled onto the meter, so the ladder reads low < m…
-
-```ts
-(levelId: string, levels?: readonly EffortLevel[]) => number
-```
-
 ### `EffortPicker`
 
 `function` — Thinking-budget selector pill, styled to match {@link ModelPicker}.
 
 ```ts
-({ value, onChange, levels, label, fullWidth }: EffortPickerProps) => Element
+({ value, onChange, levels, label }: EffortPickerProps) => Element
 ```
 
 ### `EffortPickerProps`
@@ -998,76 +718,12 @@ interface EffortLevel
 interface EffortPickerProps
 ```
 
-### `EMPTY_RECORD_GRID_OVERLAY`
-
-`const` — An overlay holding nothing.
-
-```ts
-RecordGridOverlay
-```
-
-### `EntryComposer`
-
-`function` — `EntryComposer` — the centered "what do you want to work on?" surface a product shows before a conversation exists (a new thread, an empty session, a workspace overview).
-
-```ts
-({ heading, subheading, placeholder, initialValue, sendLabel, disabled, agent, modes, planMode, uploadUrl, accept, onAt…
-```
-
-### `EntryComposerProps`
-
-`interface`
-
-```ts
-interface EntryComposerProps
-```
-
-### `EvidenceLineageTable`
-
-`function` — Target → claim → source lineage rows: the "every material value traceable to source evidence" surface.
-
-```ts
-({ evidence, resolveSourceUrl, className }: EvidenceLineageTableProps) => Element
-```
-
-### `EvidenceLineageTableProps`
-
-`interface` — Properties for the evidence lineage table with source click-through
-
-```ts
-interface EvidenceLineageTableProps
-```
-
-### `ExceptionList`
-
-`function` — Severity-badged exception rows with resolution state.
-
-```ts
-({ exceptions, className }: ExceptionListProps) => Element
-```
-
-### `ExceptionListProps`
-
-`interface` — Properties for the severity-badged exception list
-
-```ts
-interface ExceptionListProps
-```
-
-### `FetchSessionPage`
-
-`type` — Data port — one page of sessions for the current view.
-
-```ts
-type FetchSessionPage
-```
-
 ### `fieldAcceptsFreeText`
 
 `function` — Determine if a chat interaction field allows free text input
 
 ```ts
-(field: { type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…
+(field: ChatInteractionField) => boolean
 ```
 
 ### `fieldAnswer`
@@ -1075,7 +731,7 @@ type FetchSessionPage
 `function` — The submitted value for one field, or null when it has no answer yet.
 
 ```ts
-(field: { type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…
+(field: ChatInteractionField, values: FieldValues) => string | number | boolean | string[] | null
 ```
 
 ### `FieldValues`
@@ -1091,7 +747,7 @@ type FieldValues
 `function` — Converts acknowledged, persisted answers back into the local field state consumed by the shared cards.
 
 ```ts
-(fields: ({ type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…
+(fields: ChatInteractionField[], answers: InteractionAnswers | undefined) => FieldValues
 ```
 
 ### `FileIndexReadyResponse`
@@ -1134,14 +790,6 @@ interface FileMention
 (mentions: readonly FileMention[], opts?: FileMentionsToPartsOptions) => ChatTurnFilePartInput[]
 ```
 
-### `filterAcceptedFiles`
-
-`function` — Splits a batch into what the `accept` list admits and what it refuses.
-
-```ts
-(files: File[] | FileList, accept?: string | undefined) => { accepted: File[]; rejected: ComposerFileRejection[]; }
-```
-
 ### `FlowWaterfall`
 
 `function` — Compact proportional waterfall over a FlowTrace — span name, bar, duration per row; total + cost in the footer.
@@ -1174,52 +822,12 @@ interface FlowWaterfallProps
 (durationMs?: number | undefined) => string | null
 ```
 
-### `formatDictationElapsed`
-
-`function` — `0:00`, `0:09`, `1:05`, `60:00` — minutes unbounded, seconds always two digits.
-
-```ts
-(totalSeconds: number) => string
-```
-
-### `formatInsightDelta`
-
-`function` — The delta as words: direction, magnitude, and the baseline it is measured against.
-
-```ts
-(delta: InsightDelta, format?: (value: number) => string) => string
-```
-
 ### `formatModelCost`
 
 `function` — "$0.0042" from token counts × catalogue per-token pricing; null when unknown.
 
 ```ts
 (msg: ChatMessageMetrics, models: CatalogModel[]) => string | null
-```
-
-### `formatRecordGridValue`
-
-`function` — Display text for a cell.
-
-```ts
-(column: RecordGridColumn, value: RecordGridValue, locale?: string | undefined) => string
-```
-
-### `formatSessionTimestamp`
-
-`function` — Compact relative time.
-
-```ts
-(isoDate: string | null) => string
-```
-
-### `formatSparklineValue`
-
-`function` — The package's default number rendering, pinned to `en-US` so a card and its series read the same on every host — a series formatted by the server's locale and a value formatted by the browser's is a…
-
-```ts
-(value: number) => string
 ```
 
 ### `formatTokensPerSecond`
@@ -1230,28 +838,12 @@ interface FlowWaterfallProps
 (msg: ChatMessageMetrics) => string | null
 ```
 
-### `HarnessGlyph`
-
-`function` — Brand mark for a harness — size it from the call site (`className="h-4 w-4"`).
-
-```ts
-({ harness, className }: HarnessGlyphProps) => ReactNode
-```
-
-### `HarnessGlyphProps`
-
-`interface`
-
-```ts
-interface HarnessGlyphProps
-```
-
 ### `hasSecretField`
 
 `function` — Secrets must never leave the sidecar answer channel for the visible chat transcript, so a secret-bearing ask cannot be late-answered.
 
 ```ts
-(fields: ({ type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…
+(fields: ChatInteractionField[]) => boolean
 ```
 
 ### `hydrateChatInteractions`
@@ -1268,126 +860,6 @@ interface HarnessGlyphProps
 
 ```ts
 number
-```
-
-### `Insight`
-
-`interface`
-
-```ts
-interface Insight
-```
-
-### `InsightAction`
-
-`interface`
-
-```ts
-interface InsightAction
-```
-
-### `InsightCard`
-
-`function`
-
-```ts
-({ eyebrow, title, value, unit, previous, polarity, format, series, seriesLabel, description, action, live, liveLabel,…
-```
-
-### `InsightCardProps`
-
-`interface`
-
-```ts
-interface InsightCardProps
-```
-
-### `InsightDeck`
-
-`function` — The paged deck.
-
-```ts
-({ state, empty, label, pageSize, loadingLabel, retryLabel, className, onPageChange, }: InsightDeckProps) => ReactEleme…
-```
-
-### `InsightDeckProps`
-
-`interface`
-
-```ts
-interface InsightDeckProps
-```
-
-### `insightDelta`
-
-`function` — The move, or `null` when there is no honest one to state.
-
-```ts
-(value: unknown, previous: unknown) => InsightDelta | null
-```
-
-### `InsightDelta`
-
-`interface`
-
-```ts
-interface InsightDelta
-```
-
-### `insightDeltaTone`
-
-`function` — Maps a direction onto good/bad news, which only the caller knows.
-
-```ts
-(direction: InsightDirection, polarity?: InsightPolarity) => InsightTone
-```
-
-### `InsightDirection`
-
-`type`
-
-```ts
-type InsightDirection
-```
-
-### `insightPageCount`
-
-`function` — Always at least one page, so "Page 1 of 0" cannot be rendered.
-
-```ts
-(total: number, pageSize?: number) => number
-```
-
-### `insightPageSize`
-
-`function` — The page size — ONE definition, read by the count and by the slice.
-
-```ts
-(pageSize?: number) => number
-```
-
-### `insightPageSlice`
-
-`function` — The items on `page`, with the page clamped into range — a deck whose list shrank under the reader shows the last page that exists, never a blank one.
-
-```ts
-<T>(items: readonly T[], page: number, pageSize?: number) => readonly T[]
-```
-
-### `InsightPolarity`
-
-`type` — Which way is good news for THIS metric.
-
-```ts
-type InsightPolarity
-```
-
-### `InsightTone`
-
-`type`
-
-```ts
-type InsightTone
 ```
 
 ### `INTERACTION_CANCEL_EVENT`
@@ -1515,7 +987,7 @@ type InteractionData
 `function` — Reads a wire request into the client's pending `ChatInteraction`.
 
 ```ts
-(request: InteractionRequest) => ChatInteraction
+(request: InteractionRequestWire) => ChatInteraction
 ```
 
 ### `InteractionOutcome`
@@ -1563,7 +1035,7 @@ interface InteractionPlanCardProps
 `function`
 
 ```ts
-({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, timeoutNote, renderMarkdown, className, }:…
+({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, className, }: InteractionQuestionCardProps) => Element
 ```
 
 ### `InteractionQuestionCardProps`
@@ -1576,15 +1048,15 @@ interface InteractionQuestionCardProps
 
 ### `InteractionRequest`
 
-`interface`
+`type`
 
 ```ts
-interface InteractionRequest
+type InteractionRequest
 ```
 
 ### `InteractionRequestWire`
 
-`type` — The shared request contract under the wire-facing name used by this package.
+`type` — `InteractionRequest` whose select fields may carry `allowCustom`.
 
 ```ts
 type InteractionRequestWire
@@ -1627,15 +1099,7 @@ type InteractionSubmitResult
 `function` — Builds the persisted/streamed `interaction` part from a wire request.
 
 ```ts
-(request: InteractionRequest, status: ChatInteractionStatus, cancelReason?: string | undefined, answers?: InteractionAn…
-```
-
-### `isAcceptedFileType`
-
-`function` — Checks one file against a comma-separated `accept` list, using the grammar of the native `<input accept>` attribute: extensions (`.png`), exact MIME types (`image/png`), and MIME wildcards (`image/*`…
-
-```ts
-(file: File, accept?: string | undefined) => boolean
+(request: InteractionRequestWire, status: ChatInteractionStatus, cancelReason?: string | undefined, answers?: Interacti…
 ```
 
 ### `isChatAttachmentPart`
@@ -1652,14 +1116,6 @@ type InteractionSubmitResult
 
 ```ts
 (status: ChatInteractionStatus) => boolean
-```
-
-### `isRecordGridCellApplicable`
-
-`function` — True when the column's dependency (if any) is satisfied by the row's other values.
-
-```ts
-(column: RecordGridColumn, values: Readonly<Record<string, RecordGridValue>>) => boolean
 ```
 
 ### `isRenderableInteractionKind`
@@ -1691,23 +1147,7 @@ type InteractionSubmitResult
 `function` — Renders the late answer as a self-contained chat message: the original question, its context, and the user's answer(s).
 
 ```ts
-(interaction: ChatInteraction, data: InteractionData) => string
-```
-
-### `LinkLikeComponent`
-
-`type`
-
-```ts
-type LinkLikeComponent
-```
-
-### `LinkLikeProps`
-
-`interface`
-
-```ts
-interface LinkLikeProps
+(interaction: ChatInteraction, data: Record<string, string | number | boolean | string[]>) => string
 ```
 
 ### `loadAttachmentFile`
@@ -1718,28 +1158,12 @@ interface LinkLikeProps
 (url: string, fetchFile?: (url: string) => Promise<Response>) => Promise<AttachmentFileResult>
 ```
 
-### `loadingProvenanceSources`
-
-`function` — The sources still resolving — rendered as their own state, never as an absence.
-
-```ts
-(record: ProvenanceRecord) => ProvenanceSource[]
-```
-
 ### `mediaTypeForMentionPath`
 
 `function` — The `image/*` mime for a mention path by extension, or `undefined` for anything not in the known image set (dispatched as `type: 'file'`).
 
 ```ts
 (path: string) => string | undefined
-```
-
-### `MENTION_PILL_CLASS`
-
-`const` — Visual contract for a rendered mention pill.
-
-```ts
-"rounded-md bg-primary/10 px-1 py-0.5 font-medium text-primary"
 ```
 
 ### `mentionInputToPart`
@@ -1752,7 +1176,7 @@ interface LinkLikeProps
 
 ### `MentionItem`
 
-`interface` — The atomic pill's payload.
+`interface` — Mirrors sandbox-ui#184's `MentionItem` — the atomic pill's payload.
 
 ```ts
 interface MentionItem
@@ -1788,14 +1212,6 @@ interface MentionTextSegment
 
 ```ts
 (existing: AgentActivityRecord[], incoming: AgentActivityRecord[]) => AgentActivityRecord[]
-```
-
-### `mergeReviewQueuePages`
-
-`function` — Merge a fetched page into held rows: dedupe by scopeKey, incoming wins, newest updatedAt first.
-
-```ts
-(existing: ReviewQueueItem[], incoming: ReviewQueueItem[]) => ReviewQueueItem[]
 ```
 
 ### `MessageAttachments`
@@ -1886,14 +1302,6 @@ type NoticeKind
 type NoticePersistedPart
 ```
 
-### `OVERLAY_SHADOW`
-
-`const` — The one overlay elevation for floating surfaces — picker menus, popovers, drawers, modals.
-
-```ts
-"shadow-[var(--shadow-overlay)]"
-```
-
 ### `parseInteractionAnswers`
 
 `function` — Strictly validates and copies persisted answer selections.
@@ -1920,7 +1328,7 @@ type ParseInteractionAnswersResult
 
 ### `parseInteractionRequest`
 
-`function` — Parses an `interaction` event's data (`{ request }`) with the shared schema.
+`function` — Parses an `interaction` event's data (`{ request }`).
 
 ```ts
 (data: Record<string, unknown> | undefined) => ParseInteractionResult
@@ -1932,22 +1340,6 @@ type ParseInteractionAnswersResult
 
 ```ts
 type ParseInteractionResult
-```
-
-### `parseRecordGridInput`
-
-`function` — Turn what an editor control produced into a typed value.
-
-```ts
-(column: RecordGridColumn, raw: string) => RecordGridCellOutcome
-```
-
-### `parseReviewQueueItem`
-
-`function` — Re-validate one JSON-boundary row into a queue item; null for junk.
-
-```ts
-(raw: unknown) => ReviewQueueItem | null
 ```
 
 ### `pendingApprovalOf`
@@ -1964,38 +1356,6 @@ type ParseInteractionResult
 
 ```ts
 (part: Record<string, unknown>) => ChatInteraction | null
-```
-
-### `pickDictationMimeType`
-
-`function` — The mime to ask the recorder for, or `undefined` to take the UA default.
-
-```ts
-() => string | undefined
-```
-
-### `POPOVER_SURFACE_ATTR`
-
-`const` — Marks the portaled panel in the DOM.
-
-```ts
-"data-agent-app-popover"
-```
-
-### `PopoverSurface`
-
-`function` — The floating panel every canonical picker opens.
-
-```ts
-({ open, triggerRef, panelRef, className, role, id, matchTriggerWidth, children, }: PopoverSurfaceProps) => ReactPortal…
-```
-
-### `PopoverSurfaceProps`
-
-`interface`
-
-```ts
-interface PopoverSurfaceProps
 ```
 
 ### `ProducerErrorEvent`
@@ -2078,196 +1438,12 @@ interface ProducerUsageEvent
 type ProducerWireEvent
 ```
 
-### `projectRecordGridRows`
-
-`function` — The rows to render: caller rows minus local deletes, with local cell edits applied, then locally-created rows.
-
-```ts
-(rows: readonly RecordGridRow[], overlay: RecordGridOverlay) => RecordGridRow[]
-```
-
 ### `ProposalApprovalHandlers`
 
 `interface` — Handle approval and rejection actions for proposals with asynchronous support
 
 ```ts
 interface ProposalApprovalHandlers
-```
-
-### `PROVENANCE_BASES`
-
-`const` — Every basis, in the order a legend should list them.
-
-```ts
-readonly ProvenanceBasis[]
-```
-
-### `ProvenanceBasis`
-
-`type` — How a value came to exist.
-
-```ts
-type ProvenanceBasis
-```
-
-### `provenanceBasisMeta`
-
-`function` — Words for one basis.
-
-```ts
-(basis: ProvenanceBasis) => ProvenanceBasisMeta
-```
-
-### `ProvenanceBasisMeta`
-
-`interface` — The words one basis is rendered and announced with.
-
-```ts
-interface ProvenanceBasisMeta
-```
-
-### `ProvenanceConfidencePolicy`
-
-`interface` — Where a product draws its confidence lines.
-
-```ts
-interface ProvenanceConfidencePolicy
-```
-
-### `ProvenanceGap`
-
-`interface` — One stated gap.
-
-```ts
-interface ProvenanceGap
-```
-
-### `ProvenanceGapKind`
-
-`type` — Something missing that the reader has to be TOLD about, because the value renders either way and a bare number reads as a fact.
-
-```ts
-type ProvenanceGapKind
-```
-
-### `provenanceGaps`
-
-`function` — What this record cannot show, at its own level.
-
-```ts
-(record: ProvenanceRecord) => ProvenanceGap[]
-```
-
-### `ProvenanceLegend`
-
-`function` — The marker key for a surface that renders several bases at once — a review pane, a grid, a return.
-
-```ts
-({ bases, className }: ProvenanceLegendProps) => Element | null
-```
-
-### `ProvenanceLegendProps`
-
-`interface` — Properties for the basis legend.
-
-```ts
-interface ProvenanceLegendProps
-```
-
-### `provenanceNextMove`
-
-`function` — The move THIS value's reader can actually make.
-
-```ts
-(record: ProvenanceRecord, standing: ProvenanceStanding, policy?: ProvenanceConfidencePolicy) => string
-```
-
-### `ProvenanceRecord`
-
-`interface` — A value, where it came from, and — when it was computed — the provenanced values it came from.
-
-```ts
-interface ProvenanceRecord
-```
-
-### `ProvenanceSource`
-
-`interface` — One thing a value came from.
-
-```ts
-interface ProvenanceSource
-```
-
-### `ProvenanceSourceStatus`
-
-`type` — Whether a source could be resolved.
-
-```ts
-type ProvenanceSourceStatus
-```
-
-### `ProvenanceStamp`
-
-`function` — The audit line a reviewer approves against: which configuration produced this document, what served it, and how that configuration measured on its backtest.
-
-```ts
-({ provenance, backtest, className }: ProvenanceStampProps) => Element
-```
-
-### `ProvenanceStampProps`
-
-`interface` — Properties for the provenance stamp with the optional backtest slot
-
-```ts
-interface ProvenanceStampProps
-```
-
-### `ProvenanceStanding`
-
-`type` — What the reader should DO about a value — the only form confidence takes on screen.
-
-```ts
-type ProvenanceStanding
-```
-
-### `provenanceStandingMeta`
-
-`function` — Words for one standing.
-
-```ts
-(standing: ProvenanceStanding) => ProvenanceStandingMeta
-```
-
-### `ProvenanceStandingMeta`
-
-`interface` — The words one standing is rendered and announced with.
-
-```ts
-interface ProvenanceStandingMeta
-```
-
-### `provenanceTriggerLabel`
-
-`function` — The accessible name of the disclosure control: the value, how it came to exist, and — unless there is nothing to do — the next move.
-
-```ts
-(record: ProvenanceRecord, standing: ProvenanceStanding) => string
-```
-
-### `ProvenanceValue`
-
-`function` — A value, its origin marker, and the disclosure that shows where it came from.
-
-```ts
-({ record, onOpenSource, onRetrySource, confidencePolicy, maxDepth, defaultOpen, missingValueLabel, className, }: Prove…
-```
-
-### `ProvenanceValueProps`
-
-`interface` — Properties for one provenanced value and its disclosure.
-
-```ts
-interface ProvenanceValueProps
 ```
 
 ### `ProviderLogo`
@@ -2286,30 +1462,6 @@ interface ProvenanceValueProps
 interface ProviderLogoProps
 ```
 
-### `pruneRecordGridOverlay`
-
-`function` — Drop the overlay entries the caller's own rows have caught up with: a cell whose value now matches, a created row now present, a removed row now gone.
-
-```ts
-(rows: readonly RecordGridRow[], overlay: RecordGridOverlay) => RecordGridOverlay
-```
-
-### `QualityCheckList`
-
-`function` — Pass/fail quality-check rows tagged with their source (agent self-report, platform gate, judge ensemble).
-
-```ts
-({ checks, className }: QualityCheckListProps) => Element
-```
-
-### `QualityCheckListProps`
-
-`interface` — Properties for the pass/fail quality check list
-
-```ts
-interface QualityCheckListProps
-```
-
 ### `questionInteractionContentSignature`
 
 `function` — Content identity for duplicate safety nets.
@@ -2323,7 +1475,7 @@ interface QualityCheckListProps
 `function` — The radio/checkbox option rows for a select field.
 
 ```ts
-({ groupName, idPrefix, options, multi, selectedValues, disabled, onToggle, answered, }: QuestionOptionListProps) => El…
+({ groupName, idPrefix, options, multi, selectedValues, disabled, onToggle, }: QuestionOptionListProps) => Element
 ```
 
 ### `QuestionOptionListProps`
@@ -2342,284 +1494,12 @@ interface QuestionOptionListProps
 (files: readonly FileMention[], query: string, limit: number) => FileMention[]
 ```
 
-### `readRecordGridCell`
-
-`function` — Parse editor text and validate it in one step — what a committing cell editor calls.
-
-```ts
-(column: RecordGridColumn, raw: string) => RecordGridCellOutcome
-```
-
-### `reconcileEffortLevels`
-
-`function` — The list {@link EffortPicker} RENDERS for `value` — the declared levels, plus `value` itself when the declaration omits it.
-
-```ts
-(value: string, levels?: readonly EffortLevel[]) => readonly EffortLevel[]
-```
-
-### `RecordGrid`
-
-`function` — The shared editable record table.
-
-```ts
-({ columns, caption, state, empty, onCreate, onUpdate, onDelete, proposed, onAcceptRow, onRejectRow, onAcceptAll, onRej…
-```
-
-### `RecordGridBooleanColumn`
-
-`interface` — A checkbox.
-
-```ts
-interface RecordGridBooleanColumn
-```
-
-### `RecordGridCellChange`
-
-`interface` — One committed cell edit, handed to `onUpdate`.
-
-```ts
-interface RecordGridCellChange
-```
-
-### `RecordGridCellDiff`
-
-`interface` — One cell whose proposed value differs from the live one.
-
-```ts
-interface RecordGridCellDiff
-```
-
-### `RecordGridCellOutcome`
-
-`type` — Typed outcome for one cell.
-
-```ts
-type RecordGridCellOutcome
-```
-
-### `RecordGridCellSource`
-
-`interface` — Where one cell's value came from.
-
-```ts
-interface RecordGridCellSource
-```
-
-### `RecordGridColumn`
-
-`type` — Every column shape the grid renders.
-
-```ts
-type RecordGridColumn
-```
-
-### `RecordGridColumnBase`
-
-`interface` — Fields every column kind carries.
-
-```ts
-interface RecordGridColumnBase
-```
-
-### `RecordGridCreateOutcome`
-
-`type` — Outcome of a create.
-
-```ts
-type RecordGridCreateOutcome
-```
-
-### `RecordGridCurrencyColumn`
-
-`interface` — A money amount.
-
-```ts
-interface RecordGridCurrencyColumn
-```
-
-### `RecordGridDateColumn`
-
-`interface` — A calendar date held as `YYYY-MM-DD`; no time, no zone.
-
-```ts
-interface RecordGridDateColumn
-```
-
-### `RecordGridDependency`
-
-`interface` — A cell is only editable, rendered, and validated when the column it depends on holds `equals`.
-
-```ts
-interface RecordGridDependency
-```
-
-### `recordGridEditorText`
-
-`function` — The text an editor control starts with — the raw value, never the formatted one, so committing an untouched cell is a no-op.
-
-```ts
-(column: RecordGridColumn, value: RecordGridValue) => string
-```
-
-### `recordGridFail`
-
-`function` — Build a cell failure outcome carrying the message shown next to the cell.
-
-```ts
-(error: string) => RecordGridCellOutcome
-```
-
-### `RecordGridNumberColumn`
-
-`interface` — A plain number.
-
-```ts
-interface RecordGridNumberColumn
-```
-
-### `recordGridOk`
-
-`function` — Build a cell success outcome.
-
-```ts
-(value: RecordGridValue) => RecordGridCellOutcome
-```
-
-### `RecordGridOverlay`
-
-`interface` — Edits the grid has applied locally but the caller's `rows` prop has not yet caught up with.
-
-```ts
-interface RecordGridOverlay
-```
-
-### `RecordGridProposal`
-
-`interface` — A proposed change set, diffed against the live rows by {@link diffRecordGridProposal}.
-
-```ts
-interface RecordGridProposal
-```
-
-### `RecordGridProps`
-
-`interface` — Properties for the editable, provenance-aware record grid.
-
-```ts
-interface RecordGridProps
-```
-
-### `RecordGridRow`
-
-`interface` — One row: an id, a flat value bag keyed by column id, and optional per-cell provenance.
-
-```ts
-interface RecordGridRow
-```
-
-### `RecordGridRowDiff`
-
-`interface` — One row's verdict: what the proposal does to it.
-
-```ts
-interface RecordGridRowDiff
-```
-
-### `RecordGridRowDiffKind`
-
-`type`
-
-```ts
-type RecordGridRowDiffKind
-```
-
-### `recordGridRowLabel`
-
-`function` — Accessible name for a row's own controls.
-
-```ts
-(columns: readonly RecordGridColumn[], row: RecordGridRow) => string
-```
-
-### `RecordGridRowOutcome`
-
-`type` — Typed outcome for a whole row of inputs (the add form).
-
-```ts
-type RecordGridRowOutcome
-```
-
-### `RecordGridSelectColumn`
-
-`interface` — One of a closed set of values.
-
-```ts
-interface RecordGridSelectColumn
-```
-
-### `RecordGridSelectOption`
-
-`interface` — One option of a `select` column.
-
-```ts
-interface RecordGridSelectOption
-```
-
-### `RecordGridSourceBasis`
-
-`type` — How a value came to sit in a cell.
-
-```ts
-type RecordGridSourceBasis
-```
-
-### `RecordGridTextColumn`
-
-`interface` — Free text, optionally length- or pattern-constrained.
-
-```ts
-interface RecordGridTextColumn
-```
-
-### `RecordGridValue`
-
-`type` — The value one cell can hold.
-
-```ts
-type RecordGridValue
-```
-
-### `RecordGridWriteOutcome`
-
-`type` — Outcome of an update or a delete.
-
-```ts
-type RecordGridWriteOutcome
-```
-
-### `renamePastedImages`
-
-`function` — Gives every generically-named clipboard image a distinct `pasted-image-<n>.<ext>` name.
-
-```ts
-(files: File[], startIndex: number, stagedNames?: Iterable<string>) => { files: File[]; nextIndex: number; }
-```
-
 ### `resolveChatInteraction`
 
 `function` — Marks one ask resolved locally (the card's `onResolved`).
 
 ```ts
 (list: ChatInteraction[], id: string, status: "answered" | "declined" | "cancelled" | "expired", answers?: InteractionA…
-```
-
-### `resolveProvenanceStanding`
-
-`function` — This record's own standing, ignoring its inputs.
-
-```ts
-(record: ProvenanceRecord, policy?: ProvenanceConfidencePolicy) => ProvenanceStanding
 ```
 
 ### `responseErrorMessage`
@@ -2635,7 +1515,7 @@ type RecordGridWriteOutcome
 `function` — Reload restore from the answer route's GET list.
 
 ```ts
-(list: ChatInteraction[], outstanding: InteractionRequest[], options?: RestoreChatInteractionsOptions) => ChatInteracti…
+(list: ChatInteraction[], outstanding: InteractionRequestWire[], options?: RestoreChatInteractionsOptions) => ChatInter…
 ```
 
 ### `RestoreChatInteractionsOptions`
@@ -2644,62 +1524,6 @@ type RecordGridWriteOutcome
 
 ```ts
 interface RestoreChatInteractionsOptions
-```
-
-### `ReviewQueueItem`
-
-`interface` — One row of the review queue projection for an engagement scope
-
-```ts
-interface ReviewQueueItem
-```
-
-### `ReviewQueuePage`
-
-`interface` — One fetched page of queue items with an optional continuation cursor
-
-```ts
-interface ReviewQueuePage
-```
-
-### `ReviewQueuePanel`
-
-`function` — The workspace review queue — cursor-paged, refreshable, selection via callback.
-
-```ts
-({ fetchQueue, onSelect, title, emptyLabel, className, }: ReviewQueuePanelProps) => Element
-```
-
-### `ReviewQueuePanelProps`
-
-`interface` — Properties for the review queue panel over a fetch data port
-
-```ts
-interface ReviewQueuePanelProps
-```
-
-### `ReviewQueueState`
-
-`type`
-
-```ts
-type ReviewQueueState
-```
-
-### `reviewQueueStateLabel`
-
-`function` — Human label for a queue state.
-
-```ts
-(state: ReviewQueueState) => string
-```
-
-### `rollUpProvenanceStanding`
-
-`function` — The standing a reader should see: this record's own, weakened by every value it was computed from, however deep.
-
-```ts
-(record: ProvenanceRecord, policy?: ProvenanceConfidencePolicy, seen?: Set<ProvenanceRecord>) => ProvenanceStanding
 ```
 
 ### `RunDrillIn`
@@ -2718,14 +1542,6 @@ type ReviewQueueState
 interface RunDrillInProps
 ```
 
-### `sameRecordGridValue`
-
-`function` — Value equality across the grid's value union, treating `undefined` as `null` so an absent key and an explicit null never read as a change.
-
-```ts
-(a: RecordGridValue | undefined, b: RecordGridValue | undefined) => boolean
-```
-
 ### `SandboxTerminalConnection`
 
 `interface` — Define the connection details and status for a sandbox terminal session
@@ -2736,7 +1552,7 @@ interface SandboxTerminalConnection
 
 ### `SandboxTerminalConnectionResponse`
 
-`interface` — Define the response structure for a sandbox terminal connection including URLs, token, status, and errors The browser-direct scoped-token route (`createSandboxTerminalConnectionRoute`, `src/sandbox/t…
+`interface` — Define the response structure for a sandbox terminal connection including URLs, token, status, and errors
 
 ```ts
 interface SandboxTerminalConnectionResponse
@@ -2747,7 +1563,7 @@ interface SandboxTerminalConnectionResponse
 `function` — Centered card paywall.
 
 ```ts
-({ product, onCheckout, priceUsd, includedUsageUsd, offer, tagline, ctaLabel, benefits, footnote, }: SeatPaywallProps)…
+({ product, onCheckout, priceUsd, includedUsageUsd, tagline, ctaLabel, benefits, footnote, }: SeatPaywallProps) => Reac…
 ```
 
 ### `SeatPaywallProps`
@@ -2766,86 +1582,6 @@ interface SeatPaywallProps
 (content: string, parts: readonly ChatMentionPart[]) => { segments: MentionTextSegment[]; matched: Set<ChatMentionPart>…
 ```
 
-### `SessionActionLabels`
-
-`interface`
-
-```ts
-interface SessionActionLabels
-```
-
-### `SessionActions`
-
-`interface`
-
-```ts
-interface SessionActions
-```
-
-### `SessionActionsOptions`
-
-`interface`
-
-```ts
-interface SessionActionsOptions
-```
-
-### `SessionBulkAction`
-
-`type`
-
-```ts
-type SessionBulkAction
-```
-
-### `SessionHistoryPanel`
-
-`function` — The full session history: search, sort, cursor-paged rows with per-row actions, and the states in between (first-run empty, loading, no matches, error + retry).
-
-```ts
-({ history, hasAnySessions, query, onQueryChange, sort, onSortChange, hrefForSession, linkComponent: Link, respondingSe…
-```
-
-### `SessionHistoryPanelProps`
-
-`interface`
-
-```ts
-interface SessionHistoryPanelProps
-```
-
-### `SessionHistoryState`
-
-`interface`
-
-```ts
-interface SessionHistoryState
-```
-
-### `SessionPageQuery`
-
-`interface`
-
-```ts
-interface SessionPageQuery
-```
-
-### `settleInteractionSubmit`
-
-`function` — Runs a host-supplied submitter under the CARD's own deadline, and always resolves.
-
-```ts
-(run: () => Promise<InteractionSubmitResult>, timeoutMs?: number) => Promise<InteractionSubmitResult>
-```
-
-### `SlashCommand`
-
-`interface` — One `/` command the composer offers.
-
-```ts
-interface SlashCommand
-```
-
 ### `SmoothRevealOptions`
 
 `interface` — Define configuration options for controlling smooth text reveal animation rates
@@ -2854,108 +1590,12 @@ interface SlashCommand
 interface SmoothRevealOptions
 ```
 
-### `Sparkline`
-
-`function` — The series glyph.
-
-```ts
-({ values, label, format, width, height, emptyLabel, unavailableLabel, className, }: SparklineProps) => ReactElement<un…
-```
-
-### `SparklineDirection`
-
-`type` — Where a series ended relative to where it started.
-
-```ts
-type SparklineDirection
-```
-
-### `sparklineGeometry`
-
-`function` — Plots the series into the viewBox.
-
-```ts
-(values: readonly number[], { width, height, inset }?: SparklineGeometryOptions) => SparklineGeometry
-```
-
-### `SparklineGeometry`
-
-`interface`
-
-```ts
-interface SparklineGeometry
-```
-
-### `SparklineGeometryOptions`
-
-`interface`
-
-```ts
-interface SparklineGeometryOptions
-```
-
-### `sparklineLabel`
-
-`function` — The accessible name: metric, how many readings, how many are missing, the range, and the direction.
-
-```ts
-(values: readonly number[], { label, format }?: SparklineLabelOptions) => string
-```
-
-### `SparklineLabelOptions`
-
-`interface`
-
-```ts
-interface SparklineLabelOptions
-```
-
-### `SparklinePoint`
-
-`interface`
-
-```ts
-interface SparklinePoint
-```
-
-### `sparklinePointsAttribute`
-
-`function` — `"2,14 48,3 94,21"` — the `points` attribute of the polyline.
-
-```ts
-(points: readonly SparklinePoint[]) => string
-```
-
-### `SparklineProps`
-
-`interface`
-
-```ts
-interface SparklineProps
-```
-
-### `sparklineReadings`
-
-`function` — The readings that can be plotted.
-
-```ts
-(values: readonly number[]) => number[]
-```
-
 ### `stampInteractionAnswers`
 
 `function` — Stamps accepted values onto matching persisted interaction parts without mutating the caller's transcript or answer maps.
 
 ```ts
 (parts: Record<string, unknown>[], answersByInteractionId: Readonly<Record<string, InteractionAnswers>>) => Record<stri…
-```
-
-### `standingFromConfidence`
-
-`function` — The standing a bare confidence maps to under a policy.
-
-```ts
-(confidence: number, policy?: ProvenanceConfidencePolicy) => ProvenanceStanding
 ```
 
 ### `StreamChatOptions`
@@ -2980,14 +1620,6 @@ interface StreamChatOptions
 
 ```ts
 type SubmitInteractionAnswer
-```
-
-### `sumRecordGridColumn`
-
-`function` — Sum a numeric column over the rows that hold a number.
-
-```ts
-(rows: readonly RecordGridRow[], columnId: string) => number
 ```
 
 ### `tabTerminalConnectionId`
@@ -3094,22 +1726,6 @@ interface UseComposerAttachmentsOptions
 interface UseComposerAttachmentsResult
 ```
 
-### `useDictation`
-
-`function`
-
-```ts
-({ onDictate, onError }: UseDictationOptions) => DictationControls
-```
-
-### `UseDictationOptions`
-
-`interface`
-
-```ts
-interface UseDictationOptions
-```
-
 ### `useDurablePlanFlow`
 
 `function` — Shared plan decision controller.
@@ -3158,22 +1774,6 @@ interface UseFileMentionsOptions
 interface UseFileMentionsResult
 ```
 
-### `useInfiniteScroll`
-
-`function` — Fires `onLoadMore` when a sentinel element scrolls into view.
-
-```ts
-(onLoadMore: () => void, { enabled, root, rootMargin }: UseInfiniteScrollOptions) => (node: HTMLElement | null) => void
-```
-
-### `UseInfiniteScrollOptions`
-
-`interface`
-
-```ts
-interface UseInfiniteScrollOptions
-```
-
 ### `usePending`
 
 `function` — Guard an async action against double-submit.
@@ -3192,7 +1792,7 @@ interface UseInfiniteScrollOptions
 
 ### `useSandboxTerminalConnection`
 
-`function` — Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling `connectionUrl` is backed by the browser-direct scoped-token route (`createSandboxTerminalConnectio…
+`function` — Manage and maintain a sandbox terminal connection with automatic polling and token refresh handling
 
 ```ts
 (opts: UseSandboxTerminalConnectionOptions) => UseSandboxTerminalConnectionResult
@@ -3200,7 +1800,7 @@ interface UseInfiniteScrollOptions
 
 ### `UseSandboxTerminalConnectionOptions`
 
-`interface` — Define options for configuring a sandbox terminal connection including workspace ID and connection parameters `connectionId`, when set, is passed to `createSandboxTerminalConnectionRoute` as the `con…
+`interface` — Define options for configuring a sandbox terminal connection including workspace ID and connection parameters
 
 ```ts
 interface UseSandboxTerminalConnectionOptions
@@ -3212,30 +1812,6 @@ interface UseSandboxTerminalConnectionOptions
 
 ```ts
 interface UseSandboxTerminalConnectionResult
-```
-
-### `useSessionActions`
-
-`function` — Rename + delete for one session, shared by the rail kebab and the history row menu so both drive the same dialogs and the same product mutations.
-
-```ts
-({ renameSession, deleteSession, onChanged, onDeletedCurrent, currentSessionId, notify, labels, }: SessionActionsOption…
-```
-
-### `useSessionHistory`
-
-`function` — Infinite-scroll data source for the history view.
-
-```ts
-({ fetchPage, q, sort, initialPage, defaultSort, }: UseSessionHistoryOptions) => SessionHistoryState
-```
-
-### `UseSessionHistoryOptions`
-
-`interface`
-
-```ts
-interface UseSessionHistoryOptions
 ```
 
 ### `useSmoothText`
@@ -3254,22 +1830,6 @@ interface UseSessionHistoryOptions
 (active: boolean) => number
 ```
 
-### `validateRecordGridCell`
-
-`function` — Check one already-typed value against its column.
-
-```ts
-(column: RecordGridColumn, value: RecordGridValue) => RecordGridCellOutcome
-```
-
-### `validateRecordGridRow`
-
-`function` — Validate a whole value bag against the columns.
-
-```ts
-(columns: readonly RecordGridColumn[], values: Readonly<Record<string, RecordGridValue>>) => RecordGridRowOutcome
-```
-
 ### `waterfallLayout`
 
 `function` — Project a FlowTrace into proportional bar geometry for {@link FlowWaterfall}.
@@ -3284,100 +1844,4 @@ interface UseSessionHistoryOptions
 
 ```ts
 interface WaterfallRow
-```
-
-### `weakerProvenanceStanding`
-
-`function` — The weaker of two standings — `confirm` beats `check` beats `settled`.
-
-```ts
-(a: ProvenanceStanding, b: ProvenanceStanding) => ProvenanceStanding
-```
-
-### `withoutRecordGridCreated`
-
-`function` — Take back an optimistic create — the rollback path.
-
-```ts
-(overlay: RecordGridOverlay, rowId: string) => RecordGridOverlay
-```
-
-### `withoutRecordGridRemoved`
-
-`function` — Take back an optimistic delete — the rollback path.
-
-```ts
-(overlay: RecordGridOverlay, rowId: string) => RecordGridOverlay
-```
-
-### `withoutRecordGridUpdate`
-
-`function` — Take back one optimistic cell edit — the rollback path.
-
-```ts
-(overlay: RecordGridOverlay, rowId: string, columnId: string) => RecordGridOverlay
-```
-
-### `withRecordGridCreated`
-
-`function` — Record an optimistic create.
-
-```ts
-(overlay: RecordGridOverlay, row: RecordGridRow) => RecordGridOverlay
-```
-
-### `withRecordGridRemoved`
-
-`function` — Record an optimistic delete.
-
-```ts
-(overlay: RecordGridOverlay, rowId: string) => RecordGridOverlay
-```
-
-### `withRecordGridServerRow`
-
-`function` — Adopt a row the writer returned as canonical: for a locally-created row it replaces the draft; for an existing row it replaces the optimistic cells.
-
-```ts
-(overlay: RecordGridOverlay, draftId: string, row: RecordGridRow) => RecordGridOverlay
-```
-
-### `withRecordGridUpdate`
-
-`function` — Record one optimistic cell edit.
-
-```ts
-(overlay: RecordGridOverlay, rowId: string, columnId: string, value: RecordGridValue) => RecordGridOverlay
-```
-
-### `WorkProductCard`
-
-`function` — The chat transcript anchor card for one work-product version — a compact, system-authored pointer, not a parallel review surface.
-
-```ts
-({ part, onOpen, className }: WorkProductCardProps) => Element
-```
-
-### `WorkProductCardProps`
-
-`interface` — Properties for the transcript anchor card rendered in chat
-
-```ts
-interface WorkProductCardProps
-```
-
-### `workProductPartsFromMessageParts`
-
-`function` — Every persisted work-product anchor on one message, re-validated.
-
-```ts
-(parts: readonly Record<string, unknown>[] | null | undefined) => WorkProductPersistedPart[]
-```
-
-### `workProductStatusLabel`
-
-`function` — Human label for a work-product status.
-
-```ts
-(status: WorkProductStatus) => string
 ```

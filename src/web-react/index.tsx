@@ -2,8 +2,8 @@
  * `@tangle-network/agent-app/web-react` — the shared chat-shell components
  * every agent app's web UI hand-rolls: a model picker over the runtime's
  * model catalogue, a reasoning-effort selector, and a message thread with
- * User/Agent identity, per-message model + cost + tokens/sec metrics,
- * canonical tool rows, and a collapsible thinking section.
+ * User/Agent identity, per-message model + cost + tokens/sec metrics, tool
+ * chips, and a collapsible thinking section.
  *
  * Works for BOTH chat shapes: router-backed copilots (LoopEvents from
  * `runtime/openai-stream`) and sandbox-backed chats — the thread renders
@@ -11,35 +11,22 @@
  *
  * Styling contract: Tailwind classes against the shared design tokens
  * (`bg-card`, `border-border`, `text-muted-foreground`, `bg-primary`, …) that
- * Tangle app shells define. No icon library of its own — the few local glyphs
- * are inline SVGs. Markdown and provider logos are injected (`renderMarkdown`,
- * `renderProviderBadge`).
- *
- * Tool rows compose the canonical run-row grammar from `@tangle-network/ui`
- * (`InlineToolItem` over `RunRowShell`): `chatToolCallPart` adapts each
- * `ChatToolCallInfo` to ui's `ToolPart` (the same adapter pattern ui's own
- * `ToolCallStep` uses), so the chat surface and every other Tangle run view
- * share one row implementation instead of drifting. That makes
- * `@tangle-network/ui` a peer of this subpath.
+ * Tangle app shells define. No icon library — the few glyphs are inline SVGs.
+ * Markdown and provider logos are injected (`renderMarkdown`,
+ * `renderProviderBadge`) so this package stays dependency-free beyond React.
  */
 
-import { useEffect, useId, useMemo, useRef, useState, memo, type ReactNode } from 'react'
-import { InlineToolItem, RunRowShell } from '@tangle-network/ui/run'
-import type { ToolPart } from '@tangle-network/ui/types'
+import { useEffect, useMemo, useRef, useState, memo, type ReactNode } from 'react'
 import { useSmoothText } from './smooth-text'
-import { useArrivalStyle } from './motion'
-import { BrainGlyph, ChevronDown, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, usePending } from './controls'
+import { ChevronDown, POPOVER_OPTION_FOCUS, usePending } from './controls'
 import { BrandMark } from './brand-mark'
 import { DurableChatCards, type DurableChatCardsProps } from './durable-chat-cards'
 import { attachmentPartsFromMessageParts, type ChatAttachmentPart } from './chat-attachments'
 import { MessageAttachments } from './message-attachments'
-import { WorkProductCard, workProductPartsFromMessageParts } from './work-product'
-import type { WorkProductPersistedPart } from '../work-product/types'
 
 export * from './chat-stream'
 export * from './chat-interactions'
 export * from './chat-composer'
-export * from './composer-file-accept'
 export * from './interaction-card-support'
 export * from './interaction-question-card'
 export * from './interaction-plan-card'
@@ -50,45 +37,23 @@ export * from './durable-interaction-submit'
 export * from './use-chat-interactions'
 export * from './use-file-mentions'
 export * from './chat-mentions'
-export * from './mention-pill'
-export * from './entry-composer'
-export * from './composer-mode-controls'
 export * from './chat-attachments'
 export * from './message-attachments'
 export * from './use-composer-attachments'
 export * from './provider-logo'
-export * from './harness-glyphs'
 export * from './smooth-text'
 export * from './mission-activity'
-export * from './work-product'
-export * from './provenance'
 export * from './sandbox-terminal'
 export * from './seat-paywall'
-export * from './session-history'
-export * from './record-grid'
-export * from './command-palette'
-export * from './sparkline'
-export * from './insight-card'
-export * from './use-dictation'
 export {
   usePopover,
   usePending,
-  PopoverSurface,
-  POPOVER_SURFACE_ATTR,
   ModelPicker,
   EffortPicker,
-  EffortMeter,
-  effortMeterFill,
-  effortLevelLabel,
-  effortLevelsFromIds,
-  reconcileEffortLevels,
   DEFAULT_EFFORT_LEVELS,
-  EFFORT_METER_SEGMENTS,
-  OVERLAY_SHADOW,
   type ModelPickerProps,
   type EffortPickerProps,
   type EffortLevel,
-  type PopoverSurfaceProps,
 } from './controls'
 export {
   AgentSessionControls,
@@ -119,14 +84,6 @@ export function formatModelCost(msg: ChatMessageMetrics, models: CatalogModel[])
     (msg.completionTokens ?? 0) * Number(pricing.completion ?? 0)
   if (!isFinite(cost) || cost <= 0) return null
   return cost < 0.01 ? `$${cost.toFixed(4)}` : `$${cost.toFixed(2)}`
-}
-
-/** One-line preview of a reasoning trace for the collapsed row's description
- *  slot: whitespace collapsed, hard-truncated with an ellipsis. */
-function reasoningPreview(reasoning: string): string | undefined {
-  const flat = reasoning.replace(/\s+/g, ' ').trim()
-  if (!flat) return undefined
-  return flat.length > 120 ? `${flat.slice(0, 119)}…` : flat
 }
 
 /** "38 tok/s" from completion tokens over first-token→end duration; null when unknown. */
@@ -169,7 +126,7 @@ export interface RunDrillInProps {
  */
 export function RunDrillIn({ run, onClose }: RunDrillInProps) {
   return (
-    <div className={`fixed inset-y-0 right-0 z-50 flex w-[480px] max-w-full flex-col border-l border-card-edge bg-popover ${OVERLAY_SHADOW}`}>
+    <div className="fixed inset-y-0 right-0 z-50 flex w-[480px] max-w-full flex-col border-l border-border bg-card shadow-xl">
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
         <span
           className={`h-2 w-2 shrink-0 rounded-full ${
@@ -177,14 +134,14 @@ export function RunDrillIn({ run, onClose }: RunDrillInProps) {
           }`}
         />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-semibold">{run.title}</p>
-          <p className="truncate font-mono text-xs text-muted-foreground">{run.toolName}</p>
+          <p className="truncate text-sm font-semibold">{run.title}</p>
+          <p className="truncate font-mono text-[11px] text-muted-foreground">{run.toolName}</p>
         </div>
         <button
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground"
+          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-accent/30 hover:text-foreground"
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
             <path d="M18 6 6 18M6 6l12 12" />
@@ -196,26 +153,26 @@ export function RunDrillIn({ run, onClose }: RunDrillInProps) {
           <p className="text-sm text-muted-foreground">No steps recorded yet.</p>
         )}
         {run.steps.map((step, i) => (
-          <div key={i} className="rounded-lg border border-card-edge bg-card">
-            <div className="flex items-baseline gap-2 border-b border-border px-3 py-1.5">
-              <span className={`font-mono text-xs ${step.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>
+          <div key={i} className="rounded-lg border border-border/60 bg-background">
+            <div className="flex items-baseline gap-2 border-b border-border/40 px-3 py-1.5">
+              <span className={`font-mono text-[11px] ${step.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>
                 {step.status === 'error' ? '✗' : '$'}
               </span>
               <code className="min-w-0 flex-1 truncate font-mono text-xs">{step.label}</code>
-              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                {new Date(step.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              <span className="shrink-0 text-[10px] text-muted-foreground">
+                {new Date(step.at).toLocaleTimeString()}
               </span>
             </div>
             {step.detail && (
-              <pre className="max-h-48 overflow-auto whitespace-pre-wrap px-3 py-2 font-mono text-xs leading-relaxed text-muted-foreground">
+              <pre className="max-h-48 overflow-auto whitespace-pre-wrap px-3 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
                 {step.detail}
               </pre>
             )}
           </div>
         ))}
       </div>
-      <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
-        Read-only transcript — reply in the main chat.
+      <p className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
+        Readonly drill-in. Follow up in the main chat.
       </p>
     </div>
   )
@@ -246,9 +203,9 @@ export function pendingApprovalOf(call: ChatToolCallInfo): { proposalId: string 
 
 /** One ordered piece of an assistant turn: a run of answer text, or a tool
  *  call, in the sequence the agent emitted them. A message carrying `segments`
- *  is rendered in order — interleaving text and tool rows — so the agent's
+ *  is rendered in order — interleaving text and tool chips — so the agent's
  *  pre- and post-tool reasoning reads chronologically instead of as one text
- *  blob with the tool rows collected after it. */
+ *  blob with the tool chips collected after it. */
 export type ChatMessageSegment =
   | { kind: 'text'; content: string }
   | { kind: 'tool'; call: ChatToolCallInfo }
@@ -272,17 +229,6 @@ export interface ChatUiMessage extends ChatMessageMetrics {
 /** Define properties for rendering chat messages with optional models, markdown, extras, and durable cards */
 export interface ChatMessagesProps {
   messages: ChatUiMessage[]
-  /** Shared reading scale for both user and assistant prose. Defaults to 16px
-   *  at a 1.6 line height; `large` uses 17px at the same leading without
-   *  enlarging labels, tool chrome, or metadata. */
-  messageSize?: 'default' | 'large'
-  /** Transcript chrome. `labeled` (default) keeps the always-on role label +
-   *  model/tok-s/cost meta line and the primary-tinted user bubble. `quiet`
-   *  drops the label row into a fixed-height meta lane at each row's bottom
-   *  (copy + the demoted meta, revealed on hover/focus, always visible on
-   *  touch) and renders user bubbles neutral with a symmetric radius.
-   *  Everything else — tool rows, reasoning, streaming — is identical. */
-  chrome?: 'labeled' | 'quiet'
   /** Catalogue models, for per-message cost from pricing. Pass [] to skip cost. */
   models?: CatalogModel[]
   /** Markdown renderer for assistant content; default renders pre-wrapped text. */
@@ -297,12 +243,11 @@ export interface ChatMessagesProps {
   /** Render the trailing "agent is thinking" row. */
   loading?: boolean
   /** Approve/Reject handlers for proposals awaiting approval. When omitted the
-   *  card still shows "awaiting approval" but without action buttons. */
+   *  chip still shows "awaiting approval" but without action buttons. */
   approval?: ProposalApprovalHandlers
-  /** Open a full-transcript view (e.g. {@link RunDrillIn}) from a tool row's
-   *  actions slot. */
+  /** Open a full-transcript view (e.g. {@link RunDrillIn}) from a tool card. */
   onToolCallClick?: (call: ChatToolCallInfo, message: ChatUiMessage) => void
-  /** Per-tool custom detail renderers for the expanded tool row body. */
+  /** Per-tool custom detail renderers for expanded tool cards. */
   toolRenderers?: ToolDetailRenderers
   /** Stream-error affordance: when the turn failed (a thrown transport error or
    *  a loop-level `onErrorEvent`), pass the message here to render an error row.
@@ -329,11 +274,6 @@ export interface ChatMessagesProps {
    *  row next to the bubble — thumbnails for images, download chips for files.
    *  Absent → today's rendering, byte-identical (no attachment row). */
   resolveAttachmentUrl?: (part: ChatAttachmentPart) => string
-  /** Render persisted `type:'work_product'` anchor parts as `WorkProductCard`
-   *  rows under the message body — the chat card that keeps chat the driver
-   *  surface for review. `onOpen` opens the product's queue/detail surface.
-   *  Absent → today's rendering, byte-identical (no card row). */
-  workProductCards?: { onOpen?: (part: WorkProductPersistedPart) => void }
 }
 
 /** One starting "door" in the chat first-run state — a concrete, labeled action
@@ -342,8 +282,6 @@ export interface ChatEmptyDoor {
   label: string
   description?: string
   onSelect: () => void
-  /** Optional glyph rendered left of the label. */
-  icon?: ReactNode
 }
 
 /** Define properties for rendering the chat empty state with customizable text and starting doors */
@@ -369,39 +307,26 @@ export function ChatEmptyState({
   subline = 'Describe the outcome you want. The agent works through it step by step, and pauses for your approval before anything irreversible.',
   doors,
 }: ChatEmptyStateProps) {
-  // Column count follows the doors actually offered: one door centers on a
-  // narrow measure, two split evenly, three take the full row — a lone door
-  // stretched across three tracks read as a mistake, not a choice.
-  const doorCount = Math.min(doors?.length ?? 0, 3)
-  const doorsGridClass =
-    doorCount === 1
-      ? 'mx-auto max-w-sm sm:grid-cols-1'
-      : doorCount === 2
-        ? 'sm:grid-cols-2'
-        : 'sm:grid-cols-3'
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col items-center px-6 py-12 text-center sm:py-20">
       <span className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/15">
         <BrandMark size={32} className="shrink-0" />
       </span>
-      <p className="text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground">{productName}</p>
-      <h2 className="mt-1.5 text-balance text-2xl font-semibold leading-tight text-foreground">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{productName}</p>
+      <h2 className="mt-1.5 text-balance text-2xl font-semibold leading-tight text-foreground sm:text-[28px]">
         {headline}
       </h2>
       {subline && <p className="mt-3 max-w-md text-[15px] leading-relaxed text-muted-foreground">{subline}</p>}
       {doors && doors.length > 0 && (
-        <div className={`mt-7 grid w-full gap-2.5 ${doorsGridClass}`}>
+        <div className="mt-7 grid w-full gap-2.5 sm:grid-cols-3">
           {doors.slice(0, 3).map((door, i) => (
             <button
               key={i}
               type="button"
               onClick={door.onSelect}
-              className="group flex min-h-[44px] flex-col items-start rounded-xl border border-border bg-card px-4 py-3 text-left transition hover:border-primary/40 hover:bg-accent"
+              className="group flex min-h-[44px] flex-col items-start rounded-xl border border-border bg-card px-4 py-3 text-left transition hover:border-primary/40 hover:bg-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
-              <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                {door.icon}
-                {door.label}
-              </span>
+              <span className="text-sm font-semibold text-foreground">{door.label}</span>
               {door.description && (
                 <span className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{door.description}</span>
               )}
@@ -463,37 +388,6 @@ function toolOutcomeOf(call: ChatToolCallInfo): { ok?: boolean; result?: Record<
   return call.result as { ok?: boolean; result?: Record<string, unknown>; message?: string } | undefined
 }
 
-/** A call that failed — by status OR by an `ok:false` outcome envelope. Shared
- *  by the row adapter, the collapse guard, and the card itself so the three can
- *  never disagree about what "failed" means. */
-function toolCallFailed(call: ChatToolCallInfo): boolean {
-  return call.status === 'error' || toolOutcomeOf(call)?.ok === false
-}
-
-/**
- * Adapt a chat tool call to the canonical `@tangle-network/ui` `ToolPart`, so
- * the row renders through ui's `InlineToolItem` — one run-row grammar shared
- * with every other Tangle run view (the same adapter pattern ui's own
- * `ToolCallStep` uses for its flat props). `sandbox_run_command` maps to ui's
- * canonical `bash` name so the row takes the command category (terminal icon);
- * every other tool keeps its real name. agent-app carries no per-call timings,
- * so `state.time` stays unset and the row shows no duration.
- */
-export function chatToolCallPart(call: ChatToolCallInfo): ToolPart {
-  const failed = toolCallFailed(call)
-  return {
-    type: 'tool',
-    id: call.id,
-    tool: call.name === 'sandbox_run_command' ? 'bash' : call.name,
-    state: {
-      status: call.status === 'running' ? 'running' : failed ? 'error' : 'completed',
-      input: call.args,
-      output: call.result,
-      error: failed ? (toolOutcomeOf(call)?.message ?? 'Tool failed') : undefined,
-    },
-  }
-}
-
 /** The four visual kinds a tool call presents as. They are *different kinds of
  *  thing* (audit chat finding #3/#4) and must read differently: a command is a
  *  past-tense action, a proposal is a pending decision, a follow-up is a
@@ -552,11 +446,9 @@ function friendlyToolTitle(call: ChatToolCallInfo): string {
  *  the proposal's real arguments (audit chat finding #2 — "approving a black box
  *  is the fastest way to lose trust"). Domain stays a parameter: we only read
  *  conventional fields (destinations/targets/channels, cost, reach) when present
- *  — nothing here is baked to a specific product's proposal type. When the agent
- *  wrote no summary, the preview is the proposal's TYPE slug rendered mono —
- *  never a "type: title" derivation, which restated the title the card header
- *  already carries. Returns nulls when there's nothing meaningful to preview. */
-function proposalPreview(call: ChatToolCallInfo): { summary: string | null; meta: string[]; typeSlug: string | null } {
+ *  — nothing here is baked to a specific product's proposal type. Returns null
+ *  when there's nothing meaningful to preview. */
+function proposalPreview(call: ChatToolCallInfo): { summary: string | null; meta: string[] } {
   const a = (call.args ?? {}) as Record<string, unknown>
   const asString = (v: unknown): string | null =>
     typeof v === 'string' && v.trim() ? v.trim() : null
@@ -567,8 +459,13 @@ function proposalPreview(call: ChatToolCallInfo): { summary: string | null; meta
         ? [asString(v) as string]
         : []
 
-  // The verb: only a free-form summary the agent actually wrote.
-  const verbPhrase = asString(a.summary) ?? asString(a.description) ?? null
+  // The verb: a free-form summary the agent wrote, else derive from type.
+  const verbPhrase =
+    asString(a.summary) ??
+    asString(a.description) ??
+    (asString(a.type)
+      ? `${String(a.type).replace(/_/g, ' ')}${asString(a.title) ? `: ${asString(a.title)}` : ''}`
+      : null)
 
   const destinations = [
     ...asList(a.destinations),
@@ -578,9 +475,6 @@ function proposalPreview(call: ChatToolCallInfo): { summary: string | null; meta
   ]
   const dest = destinations.length ? ` to ${destinations.join(' and ')}` : ''
   const summary = verbPhrase ? `${verbPhrase}${dest}` : destinations.length ? `Publish to ${destinations.join(' and ')}` : null
-  // No authored summary: the raw type slug (`asset_publish`) says what kind of
-  // action this is without duplicating the header's "Approve: {title}?".
-  const typeSlug = summary === null ? asString(a.type) : null
 
   // Cost / reach: surfaced when the data carries it, formatted lightly.
   const meta: string[] = []
@@ -591,7 +485,7 @@ function proposalPreview(call: ChatToolCallInfo): { summary: string | null; meta
   if (typeof reach === 'number' && reach > 0) meta.push(`reaches ~${reach.toLocaleString()}`)
   else if (asString(reach)) meta.push(asString(reach) as string)
 
-  return { summary, meta, typeSlug }
+  return { summary, meta }
 }
 
 function truncate(v: unknown, max = 240): string {
@@ -611,8 +505,8 @@ function KvRows({ data }: { data: Record<string, unknown> }) {
     <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
       {entries.map(([k, v]) => (
         <div key={k} className="contents">
-          <dt className="font-mono text-xs text-muted-foreground">{k}</dt>
-          <dd className="min-w-0 whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">
+          <dt className="font-mono text-[11px] text-muted-foreground">{k}</dt>
+          <dd className="min-w-0 whitespace-pre-wrap break-words font-mono text-[11px] text-muted-foreground">
             {truncate(v)}
           </dd>
         </div>
@@ -626,7 +520,7 @@ function ShellDetail({ call }: { call: ChatToolCallInfo }) {
   const outcome = toolOutcomeOf(call)
   const r = (outcome?.result ?? {}) as { stdout?: string; stderr?: string; exitCode?: number }
   return (
-    <div className="overflow-hidden rounded-md bg-zinc-900 font-mono text-xs leading-relaxed">
+    <div className="overflow-hidden rounded-md bg-zinc-900 font-mono text-[11px] leading-relaxed">
       <div className="flex items-center gap-2 px-3 pt-2 text-zinc-400">
         <span className="select-none text-zinc-500">$</span>
         <span className="min-w-0 flex-1 truncate text-zinc-200">{String(call.args?.command ?? '')}</span>
@@ -656,13 +550,13 @@ function DefaultToolDetail({ call }: { call: ChatToolCallInfo }) {
     <div className="space-y-2">
       {call.args && Object.keys(call.args).length > 0 && (
         <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Called with</p>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Called with</p>
           <KvRows data={call.args} />
         </div>
       )}
       {envelope ? (
         <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             {envelope.ok === false ? 'Failed' : 'Result'}
           </p>
           {envelope.ok === false ? (
@@ -670,13 +564,13 @@ function DefaultToolDetail({ call }: { call: ChatToolCallInfo }) {
           ) : envelope.result && typeof envelope.result === 'object' ? (
             <KvRows data={envelope.result as Record<string, unknown>} />
           ) : envelope.result != null ? (
-            <p className="font-mono text-xs text-muted-foreground">{truncate(envelope.result)}</p>
+            <p className="font-mono text-[11px] text-muted-foreground">{truncate(envelope.result)}</p>
           ) : null}
         </div>
       ) : result != null ? (
         <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Result</p>
-          <p className="font-mono text-xs text-muted-foreground">{truncate(result)}</p>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Result</p>
+          <p className="font-mono text-[11px] text-muted-foreground">{truncate(result)}</p>
         </div>
       ) : null}
     </div>
@@ -702,7 +596,7 @@ function ProposalCard({
   renderers?: ToolDetailRenderers
 }) {
   const [expanded, setExpanded] = useState(false)
-  const { summary, meta, typeSlug } = proposalPreview(call)
+  const { summary, meta } = proposalPreview(call)
   const custom = renderers?.[call.name]?.(call, message)
   const { pending: deciding, run: decide } = usePending()
 
@@ -713,19 +607,13 @@ function ProposalCard({
           <ToolGlyph name={call.name} className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0 flex-1">
-          {/* Without handlers the card is read-only: the eyebrow reports the
-              state ("Awaiting approval") instead of demanding an action the
-              viewer cannot take, and the footer adds no second note. */}
-          <p className="text-xs font-semibold uppercase tracking-[0.05em] text-warning-strong">
-            {approval ? 'Needs your approval' : 'Awaiting approval'}
-          </p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-warning-foreground">Needs your approval</p>
           <p className="mt-0.5 text-[15px] font-semibold leading-snug text-foreground">{friendlyToolTitle(call)}</p>
-          {summary && <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{summary}</p>}
-          {typeSlug && <p className="mt-1 font-mono text-xs text-muted-foreground">{typeSlug}</p>}
+          {summary && <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{summary}</p>}
           {meta.length > 0 && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {meta.map((m, i) => (
-                <span key={i} className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                <span key={i} className="rounded-full bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                   {m}
                 </span>
               ))}
@@ -734,13 +622,13 @@ function ProposalCard({
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 px-4 pb-3.5 pt-3">
-        {approval && (
+        {approval ? (
           <>
             <button
               type="button"
               disabled={deciding}
               onClick={() => decide(() => approval.onApprove(pending.proposalId, call.id))}
-              className="inline-flex min-h-[40px] flex-1 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:min-w-[160px]"
+              className="inline-flex min-h-[40px] flex-1 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:min-w-[160px]"
             >
               Approve &amp; run
             </button>
@@ -748,17 +636,19 @@ function ProposalCard({
               type="button"
               disabled={deciding}
               onClick={() => decide(() => approval.onReject(pending.proposalId, call.id))}
-              className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-border bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-border bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-accent/30 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:cursor-not-allowed disabled:opacity-60"
             >
               Reject
             </button>
           </>
+        ) : (
+          <span className="text-[12px] font-medium text-muted-foreground">Awaiting approval…</span>
         )}
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
-          className="ml-auto inline-flex items-center gap-1 rounded text-[12px] font-medium text-muted-foreground transition hover:text-foreground"
+          className="ml-auto inline-flex items-center gap-1 rounded text-[12px] font-medium text-muted-foreground transition hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {expanded ? 'Hide details' : 'View details'}
           <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? 'rotate-180' : ''}`} />
@@ -773,76 +663,20 @@ function ProposalCard({
   )
 }
 
-/** "Mon, Jun 22 · 9:00 AM" for an ISO timestamp; anything unparseable renders
- *  as written — a producer's "Tomorrow 9am" is already human copy. The raw
- *  value stays on the row's `title` for the exact instant. */
-function formatFollowupWhen(when: string): string {
-  const date = new Date(when)
-  if (Number.isNaN(date.getTime())) return when
-  const day = date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
-  const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-  return `${day} · ${time}`
-}
-
 /** A scheduled follow-up — a pending, time-based intent, not a decision and not
- *  a completed action (audit finding #5). Re-skinned onto the shared run-row
- *  geometry (full width, 24px icon chip, xs title, `when` in the description
- *  slot) so it reads as a sibling of the canonical tool rows; it is not a tool
- *  invocation, so the row does not expand. It carries the same trailing status
- *  cue its siblings do (spinner while the schedule call is in flight, a settled
- *  dot after), and a FAILED schedule keeps the follow-up identity — the clock —
- *  with the failure reported in place instead of falling back to a generic
- *  tool row. */
+ *  a completed action (audit finding #5). Quiet left-rule card with a clock. */
 function FollowupCard({ call }: { call: ChatToolCallInfo }) {
   const a = (call.args ?? {}) as Record<string, unknown>
   const when = typeof a.when === 'string' ? a.when : typeof a.at === 'string' ? a.at : typeof a.schedule === 'string' ? a.schedule : null
-  const failed = toolCallFailed(call)
-  const errorText = failed ? (toolOutcomeOf(call)?.message ?? 'Scheduling failed') : null
   return (
-    <div className="flex items-start gap-2">
-      <div className="min-w-0 flex-1 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--md3-surface-container)]">
-        <div className="flex w-full items-center gap-2.5 px-3 py-2">
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-border bg-muted text-muted-foreground">
-            <ToolGlyph name={call.name} className="h-3.5 w-3.5" />
-          </span>
-          <span className="shrink-0 whitespace-nowrap text-xs font-medium text-foreground">{friendlyToolTitle(call)}</span>
-          {when && (
-            <span title={when} className="hidden min-w-0 flex-1 truncate font-mono text-xs tabular-nums text-muted-foreground sm:inline">
-              {formatFollowupWhen(when)}
-            </span>
-          )}
-          <span className="ml-auto flex shrink-0 items-center gap-1.5">
-            {call.status === 'running' ? (
-              <svg className="h-3 w-3 shrink-0 animate-spin text-[var(--accent-text)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <path d="M21 12a9 9 0 1 1-6.219-8.56" strokeLinecap="round" />
-              </svg>
-            ) : (
-              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${failed ? 'bg-[var(--surface-danger-text)]' : 'bg-[var(--surface-success-text)]'}`} />
-            )}
-          </span>
-        </div>
-        {errorText && (
-          <div className="border-t border-border px-3 py-2 text-xs text-[var(--surface-danger-text)]">{errorText}</div>
-        )}
+    <div className="w-fit min-w-[260px] max-w-full rounded-lg border border-border/60 border-l-2 border-l-primary/60 bg-muted/20 px-3 py-2 text-sm">
+      <div className="flex items-center gap-2">
+        <ToolGlyph name={call.name} className="h-3.5 w-3.5 shrink-0 text-primary/80" />
+        <span className="min-w-0 flex-1 truncate font-medium text-foreground">{friendlyToolTitle(call)}</span>
       </div>
+      {when && <p className="mt-0.5 pl-[22px] text-[12px] text-muted-foreground">{when}</p>}
     </div>
   )
-}
-
-/** Row title: short and past-tense. A command's text moves to the canonical
- *  mono description slot instead of filling the title. */
-function toolRowTitle(call: ChatToolCallInfo): string {
-  if (call.name === 'sandbox_run_command') return 'Ran command'
-  return friendlyToolTitle(call)
-}
-
-/** The collapsed row's inline description — the canonical row's mono slot. Only
- *  a command has a natural one-liner; every other tool's title already carries
- *  its identifying argument. */
-function toolRowDescription(call: ChatToolCallInfo): string | undefined {
-  if (call.name !== 'sandbox_run_command') return undefined
-  const command = call.args?.command
-  return typeof command === 'string' && command ? command : undefined
 }
 
 function ToolCallCard({
@@ -851,86 +685,98 @@ function ToolCallCard({
   approval,
   onOpenRun,
   renderers,
-  staggerIndex,
 }: {
   call: ChatToolCallInfo
   message: ChatUiMessage
   approval?: ProposalApprovalHandlers
   onOpenRun?: (call: ChatToolCallInfo, message: ChatUiMessage) => void
   renderers?: ToolDetailRenderers
-  /** Position in the surrounding run, so a group of rows arrives as a
-   *  sequence. Frozen at mount by `useArrivalStyle`. */
-  staggerIndex?: number
 }) {
-  const arrival = useArrivalStyle(staggerIndex ?? 0)
+  const [expanded, setExpanded] = useState(false)
   const pending = call.status === 'done' ? pendingApprovalOf(call) : null
   const kind = blockKindOf(call)
+  const failed = call.status === 'error' || toolOutcomeOf(call)?.ok === false
+  const custom = renderers?.[call.name]?.(call, message)
 
-  // One wrapper for all three row shapes, because `InlineToolItem` takes a
-  // `className` but no `style`, and the stagger index has to ride an element
-  // this package controls. The row arrives ONCE: a call going running → done →
-  // failed re-renders this same node (its key is the call id, never its
-  // status), and a CSS animation does not replay on a re-render.
-  const arrive = (row: ReactNode) => (
-    <div className="agent-arrive" style={arrival}>
-      {row}
-    </div>
-  )
-
-  // A proposal awaiting approval is a pending DECISION, not a tool row — it
-  // keeps its own prominent card with primary Approve / quiet Reject.
+  // A proposal awaiting approval is a pending DECISION, not a tool chip — it
+  // gets its own prominent card with primary Approve / quiet Reject.
   if (pending) {
-    return arrive(
+    return (
       <ProposalCard
         call={call}
         message={message}
         pending={pending}
         approval={approval}
         renderers={renderers}
-      />,
+      />
     )
   }
-  // A scheduled follow-up is a time-based intent — its own quiet row, distinct
-  // from a tool invocation. A FAILED schedule keeps the row too (destructive
-  // dot + error subline) rather than falling through to the generic tool row
-  // and losing the clock identity.
-  if (kind === 'followup') {
-    return arrive(<FollowupCard call={call} />)
+  // A scheduled follow-up is a time-based intent — distinct from a tool chip.
+  if (kind === 'followup' && !failed) {
+    return <FollowupCard call={call} />
   }
 
-  // Command and generic tool calls render through the canonical InlineToolItem
-  // row (category icon chip, title, mono description, status, hairline expand).
-  // The expanded body stays agent-app's — the host's custom renderer, the
-  // terminal ShellDetail for commands, or the generic args/result view — via
-  // ui's `renderToolDetail` seam, and `onOpenRun` maps to the row's actions
-  // slot, so no agent-app capability is lost to the shared chrome.
-  const custom = renderers?.[call.name]?.(call, message)
-  return arrive(
-    <InlineToolItem
-      part={chatToolCallPart(call)}
-      title={toolRowTitle(call)}
-      description={toolRowDescription(call)}
-      renderToolDetail={() =>
-        custom ??
-        (call.name === 'sandbox_run_command' ? <ShellDetail call={call} /> : <DefaultToolDetail call={call} />)
-      }
-      actions={
-        onOpenRun && call.name.startsWith('sandbox_') ? (
-          <button
-            type="button"
-            onClick={() => onOpenRun(call, message)}
-            aria-label="Open full transcript"
-            title="Open full transcript"
-            className="rounded-md p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground"
+  // A command chip reads as a past-tense action; its command text is monospace
+  // (audit finding #1 minor). Everything else is a generic tool step. Both share
+  // one card shape so the transcript reads as a worklog, not a flat list.
+  const isCommand = kind === 'command'
+  return (
+    <div
+      className={`w-fit min-w-[280px] max-w-full rounded-lg border text-xs transition ${
+        failed ? 'border-destructive/40 bg-destructive/5' : 'border-border/60 bg-muted/20'
+      }`}
+    >
+      {/* Header is a flex row, NOT a button, so any controls are siblings of the
+          expand toggle rather than nested inside it (axe: nested-interactive). */}
+      <div className="flex w-full items-center gap-2 px-3 py-2">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded text-left focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span
+            className={`h-2 w-2 shrink-0 rounded-full ${
+              call.status === 'running' ? 'animate-pulse bg-warning' : failed ? 'bg-destructive' : 'bg-success'
+            }`}
+          />
+          <ToolGlyph name={call.name} className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span
+            className={`min-w-0 flex-1 truncate ${
+              isCommand ? 'font-mono text-[12px] tracking-tight text-foreground/90' : 'font-medium'
+            }`}
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M7 17 17 7" />
-              <path d="M7 7h10v10" />
-            </svg>
-          </button>
-        ) : undefined
-      }
-    />,
+            {friendlyToolTitle(call)}
+          </span>
+        </button>
+        <span className="shrink-0 text-[11px] text-muted-foreground">
+          {call.status === 'running' ? 'running…' : failed ? 'failed' : 'done'}
+        </span>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-label={expanded ? 'Collapse details' : 'Expand details'}
+          aria-expanded={expanded}
+          className="shrink-0 rounded p-0.5 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+      {expanded && (
+        <div className="border-t border-border/40 px-3 py-2.5">
+          {custom ?? (call.name === 'sandbox_run_command' ? <ShellDetail call={call} /> : <DefaultToolDetail call={call} />)}
+          {onOpenRun && call.name.startsWith('sandbox_') && (
+            <button
+              type="button"
+              onClick={() => onOpenRun(call, message)}
+              className="mt-2 rounded border border-border bg-card px-2 py-1 text-[11px] font-medium transition hover:bg-accent/30"
+            >
+              Open full transcript →
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -940,11 +786,7 @@ function ToolCallCard({
 function StreamingCaret() {
   return (
     <span
-      // `animate-pulse` is a 2s ease-in-out opacity fade — a breathing
-      // placeholder, not a caret. A caret is a hard 1s step blink, which is
-      // what every text surface the user has ever typed into does.
-      className="ml-0.5 inline-block h-[1.1em] w-[3px] translate-y-[2px] animate-[agent-caret_1s_step-end_infinite] rounded-sm bg-foreground/70"
-      data-motion="essential"
+      className="ml-0.5 inline-block h-[1.1em] w-[3px] translate-y-[2px] animate-pulse rounded-sm bg-foreground/70"
       aria-hidden
     />
   )
@@ -959,13 +801,11 @@ function SegmentText({
   streaming,
   showCaret,
   renderBody,
-  messageClassName,
 }: {
   content: string
   streaming: boolean
   showCaret: boolean
   renderBody: (content: string) => ReactNode
-  messageClassName: string
 }) {
   const text = useSmoothText(content, streaming)
   const body = useMemo(() => renderBody(text), [renderBody, text])
@@ -975,12 +815,7 @@ function SegmentText({
   // this stays rules-of-hooks safe.)
   if (!content.trim() && !showCaret) return null
   return (
-    // A settled run arrives from a short blur; the LIVE run does not, because
-    // its text is already being revealed character by character and animating
-    // the container on top of that makes the paragraph shimmer while it types.
-    // The distinction is what separates "the answer materialised" from "the
-    // log was appended to".
-    <div className={`${messageClassName}${streaming ? '' : ' agent-stream-in'}`}>
+    <div className="text-base leading-[1.75]">
       {body}
       {/* Gate on showCaret (not the smoothed `text`, which is '' on the first
           frame) so the caret is steady from the start instead of flickering. */}
@@ -991,19 +826,20 @@ function SegmentText({
 
 /** A settled run of at least this many consecutive tool calls collapses into a
  *  single "Worked through N steps" disclosure so a long multi-step turn does not
- *  flood the transcript. Below it, tool rows render inline as before. */
+ *  flood the transcript. Below it, tool cards render inline as before. */
 const COLLAPSE_TOOL_RUN_AT = 3
 
 /** A tool call the user must not miss even in a settled run — a failure (by
- *  status OR by an `ok:false` outcome, the shared `toolCallFailed` predicate),
+ *  status OR by an `ok:false` outcome, matching `ToolCallCard`'s own predicate),
  *  a card awaiting their approval, or a tool still `running` after the turn has
  *  settled (i.e. stuck / timed out). A run containing one is NEVER collapsed, so
  *  a failed, blocked, or stuck turn can't hide behind a "Worked through N steps"
  *  summary and read as successful. */
 function isImportantTool(call: ChatToolCallInfo): boolean {
   return (
+    call.status === 'error' ||
     call.status === 'running' ||
-    toolCallFailed(call) ||
+    toolOutcomeOf(call)?.ok === false ||
     pendingApprovalOf(call) !== null
   )
 }
@@ -1012,7 +848,7 @@ function isImportantTool(call: ChatToolCallInfo): boolean {
  *  run carries the streaming caret; if the last segment is instead a tool, a
  *  trailing caret keeps the gap before the next run from looking frozen. Any
  *  `toolCalls` not represented in `segments` (a partially-migrated producer that
- *  set both) still render, so a tool row is never silently dropped. A settled
+ *  set both) still render, so a tool chip is never silently dropped. A settled
  *  run of many tool calls collapses into one disclosure — see below. */
 function SegmentedBody({
   segments,
@@ -1022,7 +858,6 @@ function SegmentedBody({
   approval,
   onToolCallClick,
   toolRenderers,
-  messageClassName,
 }: {
   segments: ChatMessageSegment[]
   msg: ChatUiMessage
@@ -1031,7 +866,6 @@ function SegmentedBody({
   approval?: ProposalApprovalHandlers
   onToolCallClick?: (call: ChatToolCallInfo, message: ChatUiMessage) => void
   toolRenderers?: ToolDetailRenderers
-  messageClassName: string
 }) {
   const lastIndex = segments.length - 1
   const segmentToolIds = new Set(
@@ -1040,11 +874,7 @@ function SegmentedBody({
   const leftoverToolCalls = (msg.toolCalls ?? []).filter(
     (tc) => !segmentToolIds.has(tc.id),
   )
-  // `index` is the row's position WITHIN its group, so a run of six steps
-  // cascades once instead of every group in the turn sharing one clock. The
-  // index is stable to take from the map because segments only ever APPEND: a
-  // row already on screen keeps the position it arrived at.
-  const renderToolCard = (call: ChatToolCallInfo, index: number) => (
+  const renderToolCard = (call: ChatToolCallInfo) => (
     <ToolCallCard
       key={`tool-${call.id}`}
       call={call}
@@ -1052,7 +882,6 @@ function SegmentedBody({
       approval={approval}
       onOpenRun={onToolCallClick}
       renderers={toolRenderers}
-      staggerIndex={index}
     />
   )
   // Group consecutive tool segments so a SETTLED run of many tool calls (a
@@ -1077,141 +906,44 @@ function SegmentedBody({
     }
   }
 
-  // ONE flat child list rather than a wrapper element per group, because React
-  // identity is per PARENT: a call the producer reports in `toolCalls` before
-  // the segment carrying it arrives starts life in `leftoverToolCalls` and later
-  // lands in a `tool` segment, and a change of parent is an unmount plus a mount
-  // — the row replays its entrance although the reader has been watching it for
-  // seconds. Flat, every card is a sibling keyed on its call id, so that
-  // migration is a re-order at worst and usually not even that (segments append,
-  // and a leftover sits at the end, which is exactly where its segment lands).
-  // The outer `gap-2` is what the removed per-group wrapper supplied, so the
-  // layout is byte-for-byte what it was.
-  const children: ReactNode[] = []
-  for (const g of groups) {
-    if (g.kind === 'text') {
-      children.push(
-        <SegmentText
-          // Segments only ever append within a turn, so the index is a stable
-          // key — a finalized run keeps its slot as later runs/tools are added,
-          // so its smooth-text state isn't reset.
-          key={`text-${g.index}`}
-          content={g.content}
-          // Only the trailing run of the live turn types out + shows the caret.
-          streaming={streaming && g.index === lastIndex}
-          showCaret={streaming && g.index === lastIndex}
-          renderBody={renderBody}
-          messageClassName={messageClassName}
-        />,
-      )
-      continue
-    }
-    if (
-      !streaming &&
-      g.calls.length >= COLLAPSE_TOOL_RUN_AT &&
-      !g.calls.some(isImportantTool)
-    ) {
-      // The fold is a quiet disclosure line, not a filled box — the canonical
-      // rows inside it carry the row chrome.
-      //
-      // Deliberately still a `<details>` and NOT `.agent-disclose`: a closed
-      // `<details>` gives its children no box at all, so their `.agent-arrive`
-      // has not run yet and the run genuinely cascades on the click that
-      // reveals it. `.agent-disclose` keeps the subtree laid out and merely
-      // clipped, which would spend the arrival behind a zero height and open
-      // onto rows that were already there. The reasoning box is the opposite
-      // case — it is open while the model thinks, so what has to animate there
-      // is the HEIGHT.
-      //
-      // The key names the FOLD, not the group: folded and unfolded are two
-      // different elements for one group, and one key over two element types is
-      // how React is told to tear a subtree down and rebuild it — replaying the
-      // entrance of every row in it.
-      children.push(
-        <details key={`tools-fold-${g.index}`}>
-          {/* No horizontal padding: the fold line hangs on the same left edge
-              as the rows it reveals, so opening it does not shift the column. */}
-          <summary className="cursor-pointer select-none rounded-md py-0.5 text-xs font-medium text-muted-foreground [transition:color_var(--motion-control)] hover:text-foreground">
-            Worked through {g.calls.length} steps
-          </summary>
-          <div className="mt-1.5 flex flex-col gap-1.5">
+  return (
+    <div className="flex flex-col gap-2">
+      {groups.map((g) =>
+        g.kind === 'text' ? (
+          <SegmentText
+            // Segments only ever append within a turn, so the index is a stable
+            // key — a finalized run keeps its slot as later runs/tools are added,
+            // so its smooth-text state isn't reset.
+            key={`text-${g.index}`}
+            content={g.content}
+            // Only the trailing run of the live turn types out + shows the caret.
+            streaming={streaming && g.index === lastIndex}
+            showCaret={streaming && g.index === lastIndex}
+            renderBody={renderBody}
+          />
+        ) : !streaming &&
+          g.calls.length >= COLLAPSE_TOOL_RUN_AT &&
+          !g.calls.some(isImportantTool) ? (
+          <details
+            key={`tools-${g.index}`}
+            className="rounded-lg border-l-2 border-border/70 bg-muted/20 px-3 py-2"
+          >
+            <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
+              Worked through {g.calls.length} steps
+            </summary>
+            <div className="mt-2 flex flex-col gap-2">
+              {g.calls.map(renderToolCard)}
+            </div>
+          </details>
+        ) : (
+          <div key={`tools-${g.index}`} className="flex flex-col gap-2">
             {g.calls.map(renderToolCard)}
           </div>
-        </details>,
-      )
-      continue
-    }
-    g.calls.forEach((call, index) => children.push(renderToolCard(call, index)))
-  }
-  leftoverToolCalls.forEach((call, index) => children.push(renderToolCard(call, index)))
-  if (streaming && segments[lastIndex]?.kind === 'tool') {
-    children.push(<StreamingCaret key="streaming-caret" />)
-  }
-
-  return <div className="flex flex-col gap-2">{children}</div>
-}
-
-// ── Quiet chrome ────────────────────────────────────────────────────────────
-
-/** The quiet chrome's per-row meta lane: a fixed ~18px strip that always
- *  reserves its height (so the reveal is pure opacity — zero layout shift) and
- *  fades in on row hover/focus-within, staying visible on touch via
- *  `@media (hover: none)`. The fade is reduced-motion-guarded. Tabular figures
- *  keep the tok/s and cost columns from jittering as they change; no letter
- *  tracking — a meta lane is data, not an eyebrow. */
-const QUIET_META_LANE_CLASS =
-  'mt-1 flex h-[18px] items-center gap-2 text-xs tabular-nums text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100'
-
-/** The text a copy of the message should carry: the ordered text runs when the
- *  turn is segmented (they render in place of `content`), else `content`. */
-function copyTextOf(msg: ChatUiMessage): string {
-  const textRuns = msg.segments?.filter((s) => s.kind === 'text') ?? []
-  if (textRuns.length > 0) return textRuns.map((s) => s.content).join('\n\n')
-  return msg.content
-}
-
-/** Copies the message's plain text; swaps to a check for a beat on success.
- *  Quiet chrome only — labeled mode's meta line is information, not action. */
-function CopyMessageButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false)
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(
-    () => () => {
-      if (timerRef.current !== null) clearTimeout(timerRef.current)
-    },
-    [],
-  )
-  const copy = () => {
-    const clipboard = navigator.clipboard
-    if (!clipboard) return
-    void clipboard.writeText(text).then(
-      () => {
-        setCopied(true)
-        if (timerRef.current !== null) clearTimeout(timerRef.current)
-        timerRef.current = setTimeout(() => setCopied(false), 1200)
-      },
-      () => {},
-    )
-  }
-  return (
-    <button
-      type="button"
-      onClick={copy}
-      aria-label="Copy message"
-      title="Copy message"
-      className="rounded p-0.5 text-muted-foreground transition hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      {copied ? (
-        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <polyline points="20 6 9 17 4 12" />
-        </svg>
-      ) : (
-        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <rect x="9" y="9" width="13" height="13" rx="2" />
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-        </svg>
+        ),
       )}
-    </button>
+      {leftoverToolCalls.map(renderToolCard)}
+      {streaming && segments[lastIndex]?.kind === 'tool' && <StreamingCaret />}
+    </div>
   )
 }
 
@@ -1227,9 +959,6 @@ function AssistantMessageImpl({
   renderExtras,
   durableCards,
   resolveAttachmentUrl,
-  workProductCards,
-  messageClassName,
-  chrome,
 }: {
   msg: ChatUiMessage
   streaming: boolean
@@ -1242,9 +971,6 @@ function AssistantMessageImpl({
   renderExtras?: (message: ChatUiMessage) => ReactNode
   durableCards?: Omit<DurableChatCardsProps, 'parts' | 'renderMarkdown'>
   resolveAttachmentUrl?: (part: ChatAttachmentPart) => string
-  workProductCards?: { onOpen?: (part: WorkProductPersistedPart) => void }
-  messageClassName: string
-  chrome: 'labeled' | 'quiet'
 }) {
   // Smooth reveal: chunky network slabs (model bursts, flush windows, replay
   // polls) paint as a continuous typewriter. Reasoning often arrives as one
@@ -1292,65 +1018,32 @@ function AssistantMessageImpl({
   const thinkingSeconds = useThinkingSeconds(
     streaming && !!reasoning && !hasAnswerText,
   )
-  // Open while the model is still thinking, closed once the answer starts —
-  // and a click outranks that default from then on. `<details open={…}>` could
-  // not express the second half: React re-asserts the attribute on every
-  // render, so a reader who opened the box mid-stream had it shut again by the
-  // next frame of tokens.
-  const [reasoningToggled, setReasoningToggled] = useState<boolean | null>(null)
-  const reasoningOpen = reasoningToggled ?? !hasAnswerText
 
-  const quiet = chrome === 'quiet'
   return (
-    <div className={`mx-auto w-full max-w-3xl px-6 ${quiet ? 'group pb-1 pt-3' : 'py-3'}`}>
-      {!quiet && (
-        <div className="mb-1 flex items-baseline gap-2 text-xs tabular-nums text-muted-foreground">
-          <span className="font-semibold uppercase tracking-[0.05em]">{agentLabel}</span>
-          {msg.modelUsed && <span className="font-mono normal-case">{msg.modelUsed}</span>}
-          {formatTokensPerSecond(msg) && <span>{formatTokensPerSecond(msg)}</span>}
-          {formatModelCost(msg, models) && <span>{formatModelCost(msg, models)}</span>}
-        </div>
-      )}
+    <div className="mx-auto w-full max-w-3xl px-6 py-3">
+      <div className="mb-1 flex items-baseline gap-2 text-[11px] tracking-wide text-muted-foreground">
+        <span className="font-semibold uppercase">{agentLabel}</span>
+        {msg.modelUsed && <span className="font-mono normal-case">{msg.modelUsed}</span>}
+        {formatTokensPerSecond(msg) && <span>{formatTokensPerSecond(msg)}</span>}
+        {formatModelCost(msg, models) && <span>{formatModelCost(msg, models)}</span>}
+      </div>
       {reasoning && (
-        // The canonical run-row grammar (RunRowShell — the same shell the tool
-        // rows compose): one family of rows instead of a bespoke disclosure per
-        // kind. The shimmer title is a NODE (ui widened `title` to ReactNode for
-        // exactly this): the sweep through the glyphs is the working-vs-stuck
-        // signal. Open while thinking, auto-collapse on the first answer token,
-        // and a click outranks the default from then on — the contract the old
-        // hand-rolled disclosure had, now enforced through the shell's
-        // controlled `open`.
-        <RunRowShell
-          className="mb-2"
-          icon={<BrainGlyph className="h-3.5 w-3.5" />}
-          title={
-            !hasAnswerText ? (
-              <span className="agent-shimmer" data-motion="essential">
-                Thinking{thinkingSeconds >= 1 ? ` · ${thinkingSeconds}s` : '…'}
+        <details className="mb-2 rounded-lg border-l-2 border-border/70 bg-muted/20 px-3 py-2" open={!hasAnswerText}>
+          <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground">
+            {!hasAnswerText ? (
+              <span className="animate-pulse">
+                Thinking{thinkingSeconds >= 3 ? ` · ${thinkingSeconds}s` : '…'}
               </span>
             ) : thinkMsRef.current != null ? (
-              // Words, not the abbreviated unit — "Thought for 4 seconds" reads
-              // like a sentence; "4s" reads like a log line.
-              `Thought for ${(() => { const s = Math.max(1, Math.round(thinkMsRef.current! / 1000)); return `${s} second${s === 1 ? '' : 's'}` })()}`
+              `Thought for ${Math.max(1, Math.round(thinkMsRef.current / 1000))}s`
             ) : (
               'Thought process'
-            )
-          }
-          // A collapsed trace previews its own first line (the inline truncated
-          // description slot), so the closed row tells you what was considered,
-          // not just that thinking happened.
-          description={hasAnswerText ? reasoningPreview(reasoning) : undefined}
-          status={hasAnswerText ? 'idle' : 'running'}
-          open={reasoningOpen}
-          onOpenChange={(next) => setReasoningToggled(next)}
-        >
-          <div
-            ref={reasoningScrollRef}
-            className="max-h-48 overflow-y-auto whitespace-pre-wrap px-3 py-2.5 text-sm leading-relaxed text-muted-foreground"
-          >
+            )}
+          </summary>
+          <div ref={reasoningScrollRef} className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap text-[13px] leading-relaxed text-muted-foreground">
             {reasoning}
           </div>
-        </RunRowShell>
+        </details>
       )}
       {segments && segments.length > 0 ? (
         <SegmentedBody
@@ -1361,17 +1054,16 @@ function AssistantMessageImpl({
           approval={approval}
           onToolCallClick={onToolCallClick}
           toolRenderers={toolRenderers}
-          messageClassName={messageClassName}
         />
       ) : (
         <>
-          <div className={messageClassName}>
+          <div className="text-base leading-[1.75]">
             {body}
             {streaming && content && !msg.toolCalls?.length && <StreamingCaret />}
           </div>
           {msg.toolCalls && msg.toolCalls.length > 0 && (
             <div className="mt-2 flex flex-col gap-1.5">
-              {msg.toolCalls.map((tc, index) => (
+              {msg.toolCalls.map((tc) => (
                 <ToolCallCard
                   key={tc.id}
                   call={tc}
@@ -1379,7 +1071,6 @@ function AssistantMessageImpl({
                   approval={approval}
                   onOpenRun={onToolCallClick}
                   renderers={toolRenderers}
-                  staggerIndex={index}
                 />
               ))}
             </div>
@@ -1394,15 +1085,6 @@ function AssistantMessageImpl({
           className="mt-3"
         />
       )}
-      {workProductCards &&
-        workProductPartsFromMessageParts(msg.parts).map((part) => (
-          <WorkProductCard
-            key={`${part.ref.id}:${part.ref.version}`}
-            part={part}
-            onOpen={workProductCards.onOpen}
-            className="mt-3"
-          />
-        ))}
       {renderExtras?.(msg)}
       {resolveAttachmentUrl && attachmentPartsFromMessageParts(msg.parts).length > 0 && (
         <div className="mt-2">
@@ -1411,14 +1093,6 @@ function AssistantMessageImpl({
             resolveFileUrl={resolveAttachmentUrl}
             justify="start"
           />
-        </div>
-      )}
-      {quiet && (
-        <div data-testid="message-meta-lane" className={QUIET_META_LANE_CLASS}>
-          <CopyMessageButton text={copyTextOf(msg)} />
-          {msg.modelUsed && <span className="font-mono">{msg.modelUsed}</span>}
-          {formatTokensPerSecond(msg) && <span>{formatTokensPerSecond(msg)}</span>}
-          {formatModelCost(msg, models) && <span>{formatModelCost(msg, models)}</span>}
         </div>
       )}
     </div>
@@ -1451,14 +1125,12 @@ export function useThinkingSeconds(active: boolean): number {
   return seconds
 }
 
-function ThinkingRow({ agentLabel, chrome = 'labeled' }: { agentLabel: string; chrome?: 'labeled' | 'quiet' }) {
+function ThinkingRow({ agentLabel }: { agentLabel: string }) {
   const seconds = useThinkingSeconds(true)
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-3">
-      {chrome !== 'quiet' && (
-        <p className="mb-1 text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground">{agentLabel}</p>
-      )}
-      <div className="flex items-center gap-2 text-[15px] text-muted-foreground">
+      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{agentLabel}</p>
+      <div className="flex items-center gap-2 text-base text-muted-foreground">
         <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
           <path d="M21 12a9 9 0 1 1-6.219-8.56" strokeLinecap="round" />
         </svg>
@@ -1483,7 +1155,7 @@ function StreamErrorRow({ message, onRetry }: { message: string; onRetry?: () =>
           <button
             type="button"
             onClick={onRetry}
-            className={`shrink-0 rounded border border-destructive/40 bg-card px-2 py-0.5 text-xs font-medium text-destructive transition hover:bg-destructive/10 ${POPOVER_OPTION_FOCUS}`}
+            className={`shrink-0 rounded border border-destructive/40 bg-card px-2 py-0.5 text-[11px] font-medium text-destructive transition hover:bg-destructive/10 ${POPOVER_OPTION_FOCUS}`}
           >
             Retry
           </button>
@@ -1497,13 +1169,10 @@ function StreamErrorRow({ message, onRetry }: { message: string; onRetry?: () =>
  * The message thread: one centered column; user messages are right-aligned
  * bubbles with a User label; agent messages carry an Agent meta line with
  * model id, tokens/sec, and cost, plus a collapsible thinking section and
- * tool rows. `chrome="quiet"` opts into the label-free variant: the
- * label/meta row becomes a hover-revealed meta lane under each row.
+ * tool-call chips.
  */
 export function ChatMessages({
   messages,
-  messageSize = 'default',
-  chrome = 'labeled',
   models = [],
   renderMarkdown,
   renderExtras,
@@ -1520,12 +1189,7 @@ export function ChatMessages({
   emptyState,
   header,
   resolveAttachmentUrl,
-  workProductCards,
 }: ChatMessagesProps) {
-  const messageClassName =
-    messageSize === 'large'
-      ? 'agent-app-message-copy text-[17px] leading-[1.6]'
-      : 'agent-app-message-copy text-base leading-[1.6]'
   // Stabilize the fallback renderer's identity so it doesn't change every
   // render — otherwise the memoized `AssistantMessage` (and its per-frame body
   // memo) would invalidate on every parent render when no `renderMarkdown` is
@@ -1535,7 +1199,6 @@ export function ChatMessages({
     [renderMarkdown],
   )
   const lastIsUser = messages[messages.length - 1]?.role === 'user'
-  const quiet = chrome === 'quiet'
   if (messages.length === 0 && !loading && !error) {
     // Explicit renderEmpty wins (incl. `() => null` to opt out); otherwise show
     // the branded first-run state instead of a blank thread.
@@ -1552,20 +1215,12 @@ export function ChatMessages({
       {header}
       {messages.map((msg) =>
         msg.role === 'user' ? (
-          <div key={msg.id} className={`mx-auto w-full max-w-3xl px-6 ${quiet ? 'group pb-1 pt-3' : 'py-3'}`}>
-            <div className={`ml-auto w-fit ${quiet ? 'max-w-[72%]' : 'max-w-[85%]'}`}>
-              {!quiet && (
-                <p className="mb-1 text-right text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-                  {userLabel}
-                </p>
-              )}
-              <div
-                className={
-                  quiet
-                    ? `rounded-2xl bg-[color-mix(in_srgb,hsl(var(--secondary))_65%,hsl(var(--background)))] px-4 py-2.5 ${messageClassName}`
-                    : `rounded-2xl rounded-tr-md bg-primary/10 px-4 py-2.5 ${messageClassName}`
-                }
-              >
+          <div key={msg.id} className="mx-auto w-full max-w-3xl px-6 py-3">
+            <div className="ml-auto w-fit max-w-[85%]">
+              <p className="mb-1 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {userLabel}
+              </p>
+              <div className="rounded-2xl rounded-tr-md bg-primary/10 px-4 py-2.5 text-base leading-relaxed">
                 <p className="whitespace-pre-wrap">{msg.content}</p>
               </div>
               {resolveAttachmentUrl && attachmentPartsFromMessageParts(msg.parts).length > 0 && (
@@ -1578,11 +1233,6 @@ export function ChatMessages({
                 </div>
               )}
             </div>
-            {quiet && (
-              <div data-testid="message-meta-lane" className={`${QUIET_META_LANE_CLASS} justify-end`}>
-                <CopyMessageButton text={msg.content} />
-              </div>
-            )}
           </div>
         ) : (
           <AssistantMessage
@@ -1598,13 +1248,10 @@ export function ChatMessages({
             renderExtras={renderExtras}
             durableCards={durableCards}
             resolveAttachmentUrl={resolveAttachmentUrl}
-            workProductCards={workProductCards}
-            messageClassName={messageClassName}
-            chrome={chrome}
           />
         ),
       )}
-      {loading && lastIsUser && <ThinkingRow agentLabel={agentLabel} chrome={chrome} />}
+      {loading && lastIsUser && <ThinkingRow agentLabel={agentLabel} />}
       {error && !loading && <StreamErrorRow message={error} onRetry={onRetry} />}
     </>
   )

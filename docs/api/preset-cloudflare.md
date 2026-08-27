@@ -4,31 +4,7 @@
 
 Source: `src/preset-cloudflare/index.ts`
 
-22 exports.
-
-### `CloudflareHeadersRule`
-
-`interface` — One path rule in Cloudflare's static-asset `_headers` file.
-
-```ts
-interface CloudflareHeadersRule
-```
-
-### `CloudflareWorkflowBindingLike`
-
-`interface` — The structural binding implemented by Cloudflare's `Workflow<TParams>`.
-
-```ts
-interface CloudflareWorkflowBindingLike
-```
-
-### `CloudflareWorkflowInstanceLike`
-
-`interface` — The structural part of a Cloudflare Workflow instance used to prove that a failed create call actually left an addressable durable instance behind.
-
-```ts
-interface CloudflareWorkflowInstanceLike
-```
+16 exports.
 
 ### `createD1KnowledgeStateAccessor`
 
@@ -110,22 +86,6 @@ interface DrizzleColumnLike
 interface DrizzleSqliteCoreLike
 ```
 
-### `ensureCloudflareWorkflowInstance`
-
-`function` — Create one durable Workflow instance, or prove an instance with the same id already exists before accepting a create error as an idempotent retry.
-
-```ts
-<TParams, TStatus, TInstance extends CloudflareWorkflowInstanceLike<TStatus>>(binding: CloudflareWorkflowBindingLike<TP…
-```
-
-### `EnsureCloudflareWorkflowInstanceResult`
-
-`interface`
-
-```ts
-interface EnsureCloudflareWorkflowInstanceResult
-```
-
 ### `PRESET_MIGRATION_SQL`
 
 `const` — Plain DDL for the preset schema — run by a consumer to create the tables with ZERO drizzle (`for (const sql of PRESET_MIGRATION_SQL) await db.prepare(sql).run()`, or paste into a `.sql` migration).
@@ -164,14 +124,6 @@ interface PresetKnowledgeAccessorOptions
 
 ```ts
 interface PresetToolHandlerOptions
-```
-
-### `renderCloudflareHeadersFile`
-
-`function` — Render native Cloudflare static-asset header rules.
-
-```ts
-(rules: readonly CloudflareHeadersRule[]) => string
 ```
 
 ### `VaultKv`

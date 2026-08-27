@@ -86,7 +86,7 @@ describe('usePending — SeatPaywall checkout', () => {
     const d = deferred()
     const onCheckout = vi.fn(() => d.promise)
     render(createElement(SeatPaywall, { product: 'Creative', onCheckout }))
-    const cta = screen.getByRole('button', { name: /Continue to checkout/ })
+    const cta = screen.getByRole('button', { name: /Unlock Creative/ })
     fireEvent.click(cta)
     fireEvent.click(cta)
     expect(onCheckout).toHaveBeenCalledTimes(1)
@@ -95,33 +95,7 @@ describe('usePending — SeatPaywall checkout', () => {
       d.resolve()
       await d.promise
     })
-    await waitFor(() => expect(screen.getByRole('button', { name: /Continue to checkout/ })).toBeTruthy())
-  })
-
-  it('shows the exact introductory and recurring price-to-credit offer', () => {
-    render(
-      createElement(SeatPaywall, {
-        product: 'Relationships',
-        onCheckout: vi.fn(),
-        offer: {
-          currency: 'usd',
-          interval: 'month',
-          recurring: {
-            priceCents: 100_000,
-            includedCreditsCents: 10_000,
-          },
-          introductory: {
-            priceCents: 2_000,
-            includedCreditsCents: 1_000,
-          },
-        },
-      }),
-    )
-
-    expect(screen.getByText('$20')).toBeTruthy()
-    expect(screen.getByText('first month')).toBeTruthy()
-    expect(screen.getByText('Includes $10 of AI usage in your first month')).toBeTruthy()
-    expect(screen.getByText('Then $1,000/mo · includes $100/mo of AI usage')).toBeTruthy()
+    await waitFor(() => expect(screen.getByRole('button', { name: /Unlock Creative/ })).toBeTruthy())
   })
 })
 

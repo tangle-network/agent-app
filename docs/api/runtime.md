@@ -4,7 +4,31 @@
 
 Source: `src/runtime/index.ts`
 
-63 exports.
+66 exports.
+
+### `AgentRuntime`
+
+`interface` — Resolve and stream tool execution loops with final results and intermediate events for agent runtime
+
+```ts
+interface AgentRuntime
+```
+
+### `AgentRuntimeModelConfig`
+
+`interface` — OpenAI-compatible model endpoint (Tangle Router / tcloud / any compat provider).
+
+```ts
+interface AgentRuntimeModelConfig
+```
+
+### `AgentTurnOptions`
+
+`interface` — Define options for configuring a single agent turn including context, prior messages, prompts, and event handlers
+
+```ts
+interface AgentTurnOptions
+```
 
 ### `AnySurfaceKind`
 
@@ -52,6 +76,22 @@ interface CertifiedDelivery
 
 ```ts
 interface CertifiedDeliveryConfig
+```
+
+### `createAgentRuntime`
+
+`function` — Create an in-process agent runtime for one agent.
+
+```ts
+(opts: CreateAgentRuntimeOptions) => AgentRuntime
+```
+
+### `CreateAgentRuntimeOptions`
+
+`interface` — Define options for creating an agent runtime including model config and optional profile transformation
+
+```ts
+interface CreateAgentRuntimeOptions
 ```
 
 ### `createCertifiedDelivery`
@@ -126,14 +166,6 @@ interface CreateTangleRouterModelConfigOptions
 (cfg: { baseUrl: string; apiKey: string; preferredDefault?: string | undefined; }) => Promise<ModelCatalog>
 ```
 
-### `isChatCapableModel`
-
-`function` — Can this router entry serve a text chat turn?
-
-```ts
-(m: RouterModel) => boolean
-```
-
 ### `isTangleBillingEnforcementDisabled`
 
 `function` — Shared policy for agent products that bill through the Tangle Platform.
@@ -176,7 +208,7 @@ type LoopMessage
 
 ### `LoopToolCall`
 
-`interface`
+`interface` — Bounded turn-level tool-dispatch loop.
 
 ```ts
 interface LoopToolCall
@@ -204,14 +236,6 @@ interface ModelCatalog
 
 ```ts
 (id: string) => string
-```
-
-### `OpenAICompatServedModel`
-
-`interface` — Which model actually served one direct-router turn.
-
-```ts
-interface OpenAICompatServedModel
 ```
 
 ### `OpenAICompatStreamTurnOptions`

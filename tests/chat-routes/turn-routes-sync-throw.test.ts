@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest'
 // settles the lifecycle) never runs here, so this proves the route's own
 // `catch` settles it: `onTurnError` fires and the turn lock is released.
 import { vi } from 'vitest'
-vi.mock('@tangle-network/agent-runtime/durable', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@tangle-network/agent-runtime/durable')>()
+vi.mock('@tangle-network/agent-runtime', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tangle-network/agent-runtime')>()
   return {
     ...actual,
     handleChatTurn: () => {

@@ -47,11 +47,6 @@ export interface DraftStoredMessage {
   role: 'user' | 'assistant' | 'system' | 'tool'
   content: string
   parts?: ChatMessagePart[] | null
-  model?: string | null
-  requestedModel?: string | null
-  servedModel?: string | null
-  servedProvider?: string | null
-  servedSource?: string | null
 }
 
 /** Values written to the assistant row — the intersection of the append and
@@ -60,10 +55,6 @@ export interface AssistantRowValues {
   content: string
   parts?: ChatMessagePart[]
   model?: string | null
-  requestedModel?: string | null
-  servedModel?: string | null
-  servedProvider?: string | null
-  servedSource?: string | null
   inputTokens?: number | null
   outputTokens?: number | null
   reasoningTokens?: number | null
@@ -311,11 +302,8 @@ export function createAssistantDraftWriter(options: AssistantDraftWriterOptions)
       role: 'assistant',
       ...values,
     })
-    // The `?? options.messageId` tail is valid HERE and only here: this writer
-    // supplied the id, so a store that returns nothing still wrote that row.
-    // A caller that did not assign an id has no such fallback — which is why
-    // `rowIdOf` deliberately stops at the honest read.
-    rowId = rowIdOf(inserted) ?? options.messageId
+    const insertedId = (inserted as { id?: unknown } | null | undefined)?.id
+    rowId = typeof insertedId === 'string' && insertedId ? insertedId : options.messageId
     writes += 1
   }
 
@@ -401,19 +389,6 @@ export function createAssistantDraftWriter(options: AssistantDraftWriterOptions)
  *  today's exact single-write behavior. */
 export function storeSupportsDraftPersistence(store: AssistantDraftStore): boolean {
   return typeof store.updateMessage === 'function'
-}
-
-/** The row id an `appendMessage` actually returned, or `null` when the store
- *  returned nothing usable. `ChatTurnMessageStore.appendMessage` is typed
- *  `Promise<unknown>` so a product adapter is free to resolve `void`; every
- *  caller that wants to NAME the row it just wrote has to read defensively.
- *
- *  Deliberately no fallback to a caller-assigned id — see `writeOnce`, which
- *  adds its own. A caller that let the store mint the id has nothing to fall
- *  back TO, and guessing one would report a row that may not exist. */
-export function rowIdOf(inserted: unknown): string | null {
-  const id = (inserted as { id?: unknown } | null | undefined)?.id
-  return typeof id === 'string' && id ? id : null
 }
 
 /** The default deterministic assistant-row id for a turn. Readable on purpose

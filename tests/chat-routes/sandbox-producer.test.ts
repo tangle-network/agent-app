@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { createSandboxChatProducer } from '../../src/chat-routes/index'
-import { buildInteractionRequest } from '../test-utils/interaction-request'
 
 function partUpdated(part: Record<string, unknown>, delta?: string): Record<string, unknown> {
   return { type: 'message.part.updated', data: { part, ...(delta !== undefined ? { delta } : {}) } }
@@ -19,16 +18,15 @@ async function* throwingFeed(events: Array<Record<string, unknown>>, error: Erro
 function interaction(id: string, kind: string): Record<string, unknown> {
   return {
     type: 'interaction',
-    data: { request: buildInteractionRequest({ id, kind, title: 'Need input', answerSpec: { fields: [] } }) },
+    data: {
+      request: {
+        id,
+        kind,
+        title: 'Need input',
+        answerSpec: { fields: [] },
+      },
+    },
   }
-}
-
-function effectiveBackend(
-  provider: string,
-  model: string,
-  source: 'request' | 'environment' | 'profile',
-): Record<string, unknown> {
-  return { type: 'session.updated', data: { effectiveBackend: { provider, model, source } } }
 }
 
 async function drain(stream: AsyncGenerator<{ type: string }, void, unknown>) {
@@ -64,166 +62,6 @@ describe('createSandboxChatProducer', () => {
     ])
   })
 
-  it('captures a matching effective backend without emitting a divergence notice', async () => {
-    const producer = createSandboxChatProducer({
-      events: feed([
-        effectiveBackend('openai', 'gpt-5', 'request'),
-        { type: 'result', data: { finalText: 'done' } },
-      ]),
-      model: 'gpt-5',
-    })
-
-    const events = await drain(producer.stream)
-
-    expect(producer.model).toBe('gpt-5')
-    expect(producer.modelAttribution?.()).toEqual({
-      requestedModel: 'gpt-5',
-      servedModel: 'gpt-5',
-      servedProvider: 'openai',
-      servedSource: 'request',
-      echoReceived: true,
-    })
-    expect(events.filter((event) => event.type === 'notice')).toEqual([])
-    expect(producer.assistantParts?.().filter((part) => part.type === 'notice')).toEqual([])
-  })
-
-  it('mirrors a substituted effective model and emits exactly one durable warning for an explicit request', async () => {
-    const producer = createSandboxChatProducer({
-      events: feed([
-        effectiveBackend('openrouter', 'anthropic/claude-sonnet-4', 'profile'),
-        effectiveBackend('openrouter', 'anthropic/claude-sonnet-4', 'profile'),
-        { type: 'result', data: { finalText: 'done' } },
-      ]),
-      model: 'openai/gpt-5',
-    })
-
-    const events = await drain(producer.stream)
-
-    expect(producer.model).toBe('anthropic/claude-sonnet-4')
-    expect(producer.modelAttribution?.()).toEqual({
-      requestedModel: 'openai/gpt-5',
-      servedModel: 'anthropic/claude-sonnet-4',
-      servedProvider: 'openrouter',
-      servedSource: 'profile',
-      echoReceived: true,
-    })
-    const notices = events.filter((event) => event.type === 'notice')
-    expect(notices).toEqual([
-      expect.objectContaining({
-        noticeKind: 'warning',
-        text: expect.stringContaining('Requested openai/gpt-5'),
-      }),
-    ])
-    expect(String(notices[0]?.text)).toContain('anthropic/claude-sonnet-4')
-    expect(producer.assistantParts?.().filter((part) => part.type === 'notice')).toEqual([
-      expect.objectContaining({
-        type: 'notice',
-        noticeKind: 'warning',
-        text: expect.stringContaining('anthropic/claude-sonnet-4'),
-      }),
-    ])
-  })
-
-  it('captures a profile-selected effective model without warning when no model was explicitly requested', async () => {
-    const producer = createSandboxChatProducer({
-      events: feed([
-        effectiveBackend('anthropic', 'claude-opus-4', 'profile'),
-        { type: 'result', data: { finalText: 'done' } },
-      ]),
-    })
-
-    const events = await drain(producer.stream)
-
-    expect(producer.model).toBe('claude-opus-4')
-    expect(producer.modelAttribution?.()).toEqual({
-      servedModel: 'claude-opus-4',
-      servedProvider: 'anthropic',
-      servedSource: 'profile',
-      echoReceived: true,
-    })
-    expect(events.filter((event) => event.type === 'notice')).toEqual([])
-    expect(producer.assistantParts?.().filter((part) => part.type === 'notice')).toEqual([])
-  })
-
-  it('keeps legacy model attribution unchanged when no effective backend echo arrives', async () => {
-    const producer = createSandboxChatProducer({
-      events: feed([{ type: 'result', data: { finalText: 'done' } }]),
-      model: 'anthropic/claude',
-    })
-
-    expect(await drain(producer.stream)).toEqual([])
-    expect(producer.model).toBe('anthropic/claude')
-    expect(producer.modelAttribution?.()).toEqual({
-      requestedModel: 'anthropic/claude',
-      echoReceived: false,
-    })
-  })
-
-  it('composes shell failover with downstream substitution while preserving both notices and the attempt trail', async () => {
-    const producer = createSandboxChatProducer({
-      model: 'dead-model',
-      fallbackModels: ['shell-fallback'],
-      openEvents: ({ model }) => model === 'dead-model'
-        ? feed([{
-            type: 'error',
-            data: {
-              code: 'provider_inference_unavailable',
-              message: 'provider inference is unavailable',
-            },
-          }])
-        : feed([
-            effectiveBackend('downstream', 'downstream-substitute', 'environment'),
-            partUpdated({ type: 'text', id: 't1', text: 'ok' }, 'ok'),
-            { type: 'result', data: { finalText: 'ok' } },
-          ]),
-      log: () => {},
-    })
-
-    const events = await drain(producer.stream)
-
-    expect(producer.model).toBe('downstream-substitute')
-    expect(producer.modelAttribution?.()).toEqual({
-      requestedModel: 'dead-model',
-      servedModel: 'downstream-substitute',
-      servedProvider: 'downstream',
-      servedSource: 'environment',
-      echoReceived: true,
-    })
-    expect(producer.modelFailover?.()).toMatchObject({
-      model: 'shell-fallback',
-      usedFallback: true,
-      attempts: [
-        expect.objectContaining({ model: 'dead-model', ok: false }),
-        { model: 'shell-fallback', ok: true },
-      ],
-    })
-    const notices = events.filter((event) => event.type === 'notice')
-    expect(notices).toHaveLength(2)
-    expect(notices.some((notice) => String(notice.text).includes('shell-fallback'))).toBe(true)
-    expect(notices.some((notice) => String(notice.text).includes('downstream-substitute'))).toBe(true)
-    expect(producer.assistantParts?.().filter((part) => part.type === 'notice')).toHaveLength(2)
-  })
-
-  it('ignores malformed effective-backend echoes', async () => {
-    const producer = createSandboxChatProducer({
-      events: feed([
-        { type: 'status', data: { effectiveBackend: 'gpt-5' } },
-        { type: 'status', data: { effectiveBackend: [] } },
-        { type: 'status', data: { effectiveBackend: { provider: 7, model: false, source: 'unknown' } } },
-        { type: 'result', data: { finalText: 'done' } },
-      ]),
-      model: 'legacy-model',
-    })
-
-    await drain(producer.stream)
-    expect(producer.model).toBe('legacy-model')
-    expect(producer.modelAttribution?.()).toEqual({
-      requestedModel: 'legacy-model',
-      echoReceived: false,
-    })
-    expect(producer.assistantParts?.().filter((part) => part.type === 'notice')).toEqual([])
-  })
-
   it('announces a tool once and settles it once, with the persisted tool part tracking state', async () => {
     const producer = createSandboxChatProducer({
       events: feed([
@@ -246,102 +84,6 @@ describe('createSandboxChatProducer', () => {
     ])
     const parts = producer.assistantParts?.() ?? []
     expect(parts[0]).toMatchObject({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'completed', output: '3 hits' } })
-  })
-
-  it('re-announces a tool once when its input arrives after the pending frame', async () => {
-    const producer = createSandboxChatProducer({
-      events: feed([
-        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'pending' } }),
-        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'running', input: { q: 'x' } } }),
-        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'running', input: { q: 'x' } } }),
-        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'completed', input: { q: 'x' }, output: '3 hits' } }),
-      ]),
-    })
-
-    expect(await drain(producer.stream)).toEqual([
-      { type: 'tool_call', call: { toolCallId: 'call-1', toolName: 'search', args: {} } },
-      { type: 'tool_call', call: { toolCallId: 'call-1', toolName: 'search', args: { q: 'x' } } },
-      {
-        type: 'tool_result',
-        toolCallId: 'call-1',
-        toolName: 'search',
-        outcome: { ok: true, result: '3 hits' },
-      },
-    ])
-  })
-
-  it('re-announces populated input before the result when it first arrives on completion', async () => {
-    const producer = createSandboxChatProducer({
-      events: feed([
-        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'pending' } }),
-        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'completed', input: { q: 'x' }, output: '3 hits' } }),
-      ]),
-    })
-
-    expect(await drain(producer.stream)).toEqual([
-      { type: 'tool_call', call: { toolCallId: 'call-1', toolName: 'search', args: {} } },
-      { type: 'tool_call', call: { toolCallId: 'call-1', toolName: 'search', args: { q: 'x' } } },
-      {
-        type: 'tool_result',
-        toolCallId: 'call-1',
-        toolName: 'search',
-        outcome: { ok: true, result: '3 hits' },
-      },
-    ])
-  })
-
-  it('does not re-announce empty input or updates after settlement', async () => {
-    const producer = createSandboxChatProducer({
-      events: feed([
-        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'pending' } }),
-        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'running', input: {} } }),
-        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'completed', input: {}, output: 'done' } }),
-        // A populated update after tool_result must not reopen the settled row.
-        partUpdated({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'completed', input: { late: true }, output: 'done' } }),
-      ]),
-    })
-
-    expect(await drain(producer.stream)).toEqual([
-      { type: 'tool_call', call: { toolCallId: 'call-1', toolName: 'search', args: {} } },
-      {
-        type: 'tool_result',
-        toolCallId: 'call-1',
-        toolName: 'search',
-        outcome: { ok: true, result: 'done' },
-      },
-    ])
-  })
-
-  it('re-announces each tool in a parallel batch when its input arrives', async () => {
-    const producer = createSandboxChatProducer({
-      events: feed([
-        partUpdated({ type: 'tool', id: 'call-1', tool: 'read', state: { status: 'pending' } }),
-        partUpdated({ type: 'tool', id: 'call-2', tool: 'glob', state: { status: 'pending' } }),
-        partUpdated({ type: 'tool', id: 'call-1', tool: 'read', state: { status: 'running', input: { path: 'a.ts' } } }),
-        partUpdated({ type: 'tool', id: 'call-2', tool: 'glob', state: { status: 'running', input: { pattern: '*.ts' } } }),
-        partUpdated({ type: 'tool', id: 'call-1', tool: 'read', state: { status: 'completed', input: { path: 'a.ts' }, output: 'a' } }),
-        partUpdated({ type: 'tool', id: 'call-2', tool: 'glob', state: { status: 'completed', input: { pattern: '*.ts' }, output: ['a.ts'] } }),
-      ]),
-    })
-
-    expect(await drain(producer.stream)).toEqual([
-      { type: 'tool_call', call: { toolCallId: 'call-1', toolName: 'read', args: {} } },
-      { type: 'tool_call', call: { toolCallId: 'call-2', toolName: 'glob', args: {} } },
-      { type: 'tool_call', call: { toolCallId: 'call-1', toolName: 'read', args: { path: 'a.ts' } } },
-      { type: 'tool_call', call: { toolCallId: 'call-2', toolName: 'glob', args: { pattern: '*.ts' } } },
-      {
-        type: 'tool_result',
-        toolCallId: 'call-1',
-        toolName: 'read',
-        outcome: { ok: true, result: 'a' },
-      },
-      {
-        type: 'tool_result',
-        toolCallId: 'call-2',
-        toolName: 'glob',
-        outcome: { ok: true, result: ['a.ts'] },
-      },
-    ])
   })
 
   it('terminalizes a tool left running when the stream ends abnormally', async () => {
@@ -527,8 +269,7 @@ describe('createSandboxChatProducer', () => {
         text: 'The agent requested permission approval — auto-declined by policy.',
       },
     ])
-    expect(declineInteraction).toHaveBeenCalledTimes(1)
-    expect(declineInteraction).toHaveBeenCalledWith('p-1')
+    expect(declineInteraction).toHaveBeenCalledExactlyOnceWith('p-1')
     expect(producer.assistantParts?.()).toEqual([
       expect.objectContaining({
         type: 'interaction',
@@ -594,8 +335,7 @@ describe('createSandboxChatProducer', () => {
       }),
       interaction('q-2', 'question'),
     ])
-    expect(declineInteraction).toHaveBeenCalledTimes(1)
-    expect(declineInteraction).toHaveBeenCalledWith('plan-1')
+    expect(declineInteraction).toHaveBeenCalledExactlyOnceWith('plan-1')
   })
 
   it('persists an explicit cancel outcome without inferring it from disappearance', async () => {
@@ -603,7 +343,7 @@ describe('createSandboxChatProducer', () => {
       events: feed([
         {
           type: 'interaction',
-          data: { request: buildInteractionRequest({ id: 'q-1', title: 'Need input', answerSpec: { fields: [] } }) },
+          data: { request: { id: 'q-1', kind: 'question', title: 'Need input', answerSpec: { fields: [] } } },
         },
         { type: 'interaction.cancel', data: { id: 'q-1', reason: 'timeout' } },
       ]),
@@ -654,13 +394,9 @@ describe('createSandboxChatProducer', () => {
   })
 
   it('promotes a file part exactly once across duplicate stream events and drops the raw url-bearing part', async () => {
-    // Real `promoteAgentFilePart` contract: `{ type, path, name, size, mediaType }` —
-    // no `id`, no `filename`. `name`/`size` must survive persistence (the #418
-    // regression: normalization used to strip both, leaving blank attachment
-    // chips and an `undefined` download filename).
     const promoteFilePart = vi.fn(async (raw: Record<string, unknown>) => ({
       succeeded: true as const,
-      part: { type: 'file', path: `vault/${raw.filename}`, name: raw.filename, size: 512, mediaType: 'text/csv' },
+      part: { type: 'file', id: raw.id, filename: raw.filename, path: `vault/${raw.filename}` },
       key: `attachment:vault/${raw.filename}`,
     }))
     const producer = createSandboxChatProducer({
@@ -676,7 +412,7 @@ describe('createSandboxChatProducer', () => {
 
     expect(promoteFilePart).toHaveBeenCalledOnce()
     expect(producer.assistantParts?.()).toEqual([
-      { type: 'file', path: 'vault/out.csv', name: 'out.csv', size: 512, mediaType: 'text/csv' },
+      { type: 'file', id: 'f1', filename: 'out.csv', path: 'vault/out.csv' },
     ])
   })
 
@@ -815,7 +551,7 @@ describe('createSandboxChatProducer', () => {
       call += 1
       return {
         succeeded: true as const,
-        part: { type: 'file', name: `mystery-${call}.bin`, path: `vault/mystery-${call}.bin` },
+        part: { type: 'file', filename: `mystery-${call}.bin`, path: `vault/mystery-${call}.bin` },
         key: `attachment:vault/mystery-${call}.bin`,
       }
     })
@@ -834,8 +570,8 @@ describe('createSandboxChatProducer', () => {
     // (here, the outcome's own `key`) rather than one collapsing onto the
     // other's memo entry.
     expect(producer.assistantParts?.()).toEqual([
-      { type: 'file', name: 'mystery-1.bin', path: 'vault/mystery-1.bin' },
-      { type: 'file', name: 'mystery-2.bin', path: 'vault/mystery-2.bin' },
+      { type: 'file', filename: 'mystery-1.bin', path: 'vault/mystery-1.bin' },
+      { type: 'file', filename: 'mystery-2.bin', path: 'vault/mystery-2.bin' },
     ])
   })
 

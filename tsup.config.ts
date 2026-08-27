@@ -2,6 +2,7 @@ import { defineConfig } from 'tsup'
 
 export default defineConfig({
   entry: {
+    index: 'src/index.ts',
     'tools/index': 'src/tools/index.ts',
     'tangle/index': 'src/tangle/index.ts',
     'runtime/index': 'src/runtime/index.ts',
@@ -16,16 +17,11 @@ export default defineConfig({
     'prompt/index': 'src/prompt/index.ts',
     'model-resolution/index': 'src/model-resolution/index.ts',
     'sandbox/index': 'src/sandbox/index.ts',
-    'peer-floors/check': 'src/peer-floors/check.ts',
-    'peer-floors/cli': 'src/peer-floors/cli.ts',
-    'spend/index': 'src/spend/index.ts',
-    'spend/cli': 'src/spend/cli.ts',
     'run/index': 'src/run/index.ts',
     'harness/index': 'src/harness/index.ts',
     'config/index': 'src/config/index.ts',
     'preset-cloudflare/index': 'src/preset-cloudflare/index.ts',
     'billing/index': 'src/billing/index.ts',
-    'alerting/index': 'src/alerting/index.ts',
     'preflight/index': 'src/preflight/index.ts',
     'object-store/index': 'src/object-store/index.ts',
     'chat-store/index': 'src/chat-store/index.ts',
@@ -33,22 +29,17 @@ export default defineConfig({
     'crypto/index': 'src/crypto/index.ts',
     'stream/index': 'src/stream/index.ts',
     'turn-stream/index': 'src/turn-stream/index.ts',
-    'turn-health/index': 'src/turn-health/index.ts',
     'integrations/index': 'src/integrations/index.ts',
     'interactions/index': 'src/interactions/index.ts',
     'plans/index': 'src/plans/index.ts',
+    'durable-chat/index': 'src/durable-chat/index.ts',
     'missions/index': 'src/missions/index.ts',
     'platform/index': 'src/platform/index.ts',
     'app-auth/index': 'src/app-auth/index.ts',
     'web/index': 'src/web/index.ts',
-    'session-shell/index': 'src/session-shell/index.ts',
     'web-react/index': 'src/web-react/index.tsx',
-    'work-product/index': 'src/work-product/index.ts',
-    'work-product-react/index': 'src/work-product-react/index.tsx',
-    'chat-react/index': 'src/chat-react/index.tsx',
-    'workspace-react/index': 'src/workspace-react/index.tsx',
     'web-react/terminal': 'src/web-react/terminal.ts',
-    'web-react/async/index': 'src/web-react/async/index.ts',
+    'composer/index': 'src/composer/index.ts',
     'assistant/index': 'src/assistant/index.ts',
     'brand/index': 'src/brand/index.tsx',
     'redact/index': 'src/redact/index.ts',
@@ -76,48 +67,21 @@ export default defineConfig({
     'intakes/api': 'src/intakes/api.ts',
     'intakes-react/index': 'src/intakes-react/index.ts',
     'intakes-react/lazy': 'src/intakes-react/lazy.tsx',
-    'record/index': 'src/record/index.ts',
-    'record/drizzle': 'src/record/drizzle.ts',
-    'documents/index': 'src/documents/index.ts',
-    'documents/pdf-inspector': 'src/documents/pdf-inspector.ts',
-    'openui/index': 'src/openui/index.ts',
-    'openui-react/index': 'src/openui-react/index.tsx',
     'vault/index': 'src/vault/index.ts',
     'vault/lazy': 'src/vault/lazy.tsx',
-    'vault/server': 'src/vault/server.ts',
     'theme/index': 'src/theme/index.ts',
     'theme/tailwind-preset': 'src/theme/tailwind-preset.ts',
     'theme-contract/index': 'src/theme-contract/index.ts',
     'theme-contract/cli': 'src/theme-contract/cli.ts',
-    'legibility/index': 'src/legibility/index.ts',
-    'legibility/cli': 'src/legibility/cli.ts',
-    'forms/index': 'src/forms/index.ts',
-    'preflight/cli': 'src/preflight/cli.ts',
-    'signoff/index': 'src/signoff/index.ts',
-    'signoff/cli': 'src/signoff/cli.ts',
-    'signoff/proof': 'src/signoff/proof.ts',
-    'signoff/proof-cli': 'src/signoff/proof-cli.ts',
     'studio/index': 'src/studio/index.ts',
     'studio-react/index': 'src/studio-react/index.tsx',
   },
   format: ['esm'],
-  // Declarations come from `tsc -p tsconfig.build.json`, not tsup's `dts`.
-  // tsup builds every entry above in ONE rollup-plugin-dts pass inside a single
-  // worker thread, and that worker's peak heap scales with the entry count
-  // (~150 MB per entry, measured on this repo). The list is long enough that the
-  // pass exceeds V8's default old-space limit, and raising the limit only moves
-  // the ceiling. A single `tsc` program emits one `.d.ts` per source file for
-  // the whole of `src` in ~1 GB, and `dist/<entry>.d.ts` still answers every
-  // `types` path in `exports`.
-  //
-  // Emitted relative specifiers carry no file extension, so a consumer must
-  // resolve types with `moduleResolution: bundler`. Both scaffold templates and
-  // every product consuming this package already do.
-  dts: false,
+  dts: true,
   sourcemap: true,
   clean: true,
   target: 'es2022',
-  external: ['react', 'react/jsx-runtime', 'konva', 'react-konva', '@tiptap/core', '@tiptap/extension-mention', '@tiptap/react', '@tiptap/starter-kit', '@tiptap/suggestion', '@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog', '@tangle-network/agent-eval', '@tangle-network/agent-knowledge', '@tangle-network/agent-profile-materialize', '@tangle-network/agent-runtime', '@tangle-network/sandbox', 'drizzle-orm', 'drizzle-orm/*', '@huggingface/transformers', '@tangle-network/sandbox-ui', '@tangle-network/sandbox-ui/*', '@tangle-network/ui', '@tangle-network/ui/*', 'lucide-react', 'react-router', '@radix-ui/react-dialog', 'resend', 'better-auth', 'better-auth/*', 'pdf-lib', '@firecrawl/pdf-inspector-wasm'],
+  external: ['react', 'react/jsx-runtime', 'konva', 'react-konva', '@tangle-network/agent-integrations', '@tangle-network/agent-integrations/catalog', '@tangle-network/agent-eval', '@tangle-network/agent-knowledge', '@tangle-network/agent-profile-materialize', '@tangle-network/agent-runtime', '@tangle-network/sandbox', 'drizzle-orm', 'drizzle-orm/*', '@huggingface/transformers', '@tangle-network/sandbox-ui', '@tangle-network/sandbox-ui/*', '@tangle-network/ui', '@tangle-network/ui/*', 'lucide-react', 'react-router', '@radix-ui/react-dialog', 'resend', 'better-auth', 'better-auth/*'],
   // tokens.css is shipped raw (the ./styles subpath); copy it next to the
   // built theme entries so `import '@tangle-network/agent-app/styles'` resolves.
   onSuccess: 'cp src/theme/tokens.css dist/theme/tokens.css && cp src/studio-react/studio.css dist/studio-react/studio.css',

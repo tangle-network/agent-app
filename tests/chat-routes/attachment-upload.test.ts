@@ -2,7 +2,7 @@
  * Tests for `createAttachmentUploadRoute`.
  *
  * Classification is content-based (`sniffBinary`), not extension-based: a
- * lying extension (PNG named .txt, an ordinary archive named .docx) must
+ * lying extension (PNG named .txt, or a real .docx which is just a zip) must
  * still be detected and routed to the raw-bytes writer with the sniffed
  * mime. Size guards enforce the raw per-kind limit and the aggregate
  * per-batch limit against the AUTHORITATIVE (decoded) byte length, not the
@@ -13,144 +13,34 @@
  * replaced by the `authorize` seam cases (a 429 rides `{ok:false, response}`
  * verbatim — this factory has no rate-limit opinion of its own).
  */
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import {
-  createAttachmentUploadRoute as buildAttachmentUploadRoute,
-  type CreateAttachmentUploadRouteOptions,
+  createAttachmentUploadRoute,
+  type AttachmentUploadAuthorization,
 } from '../../src/chat-routes/attachment-upload'
-import {
-  ALLOWED_ATTACHMENT_SNIFFED_MIMES,
-  MACRO_ENABLED_OOXML_SNIFFED_MIMES,
-  MAX_ATTACHMENT_TOTAL_BYTES,
-  MAX_BINARY_ATTACHMENT_BYTES,
-} from '../../src/chat-routes/attachment-validation'
-import {
-  OOXML_PRESENTATION_MIME,
-  OOXML_SPREADSHEET_MIME,
-  OOXML_WORD_MACRO_ENABLED_MIME,
-  OOXML_WORD_MIME,
-} from '../../src/chat-routes/binary-sniff'
-import type {
-  AbortAttachmentWriteFn,
-  AtomicWriteAttachmentFn,
-  AttachmentWriteOwnership,
-  AttachmentWriteReceipt,
-  WriteAttachmentFn,
-} from '../../src/chat-routes/attachment-store'
-import { immutableAttachmentPath } from '../../src/chat-routes/attachment-store'
+import { MAX_ATTACHMENT_TOTAL_BYTES, MAX_BINARY_ATTACHMENT_BYTES } from '../../src/chat-routes/attachment-validation'
+import type { AttachmentWriteResult, WriteAttachmentFn } from '../../src/chat-routes/attachment-store'
 import type { ChatAttachmentInput, ChatAttachmentKind } from '../../src/chat-routes/wire'
-import { docxBytes, plainZipBytes, realWorldOoxmlBytes } from './ooxml-fixtures'
 
 const SCOPE = 'ws-1'
 
-describe('immutableAttachmentPath', () => {
-  it('accepts the complete path-safe ownership-id contract', () => {
-    expect(immutableAttachmentPath('report--job', '42')).toBe('report--job--42')
-    expect(immutableAttachmentPath('report', 'job--42')).toBe('report--job--42')
-    expect(immutableAttachmentPath('report', '-job')).toBe('report---job')
-    expect(immutableAttachmentPath('report', 'job-')).toBe('report--job-')
-    expect(immutableAttachmentPath('report', 'test-1')).toBe('report--test-1')
-    expect(() => immutableAttachmentPath('report', 'job/42')).toThrow('path-safe identifier')
-    expect(() => immutableAttachmentPath('report', '')).toThrow('path-safe identifier')
-  })
-})
-
-interface ExtendedRouteOptions extends CreateAttachmentUploadRouteOptions {
-  auditTag: string
+function okAuthorize(overrides: Partial<Extract<AttachmentUploadAuthorization, { ok: true }>> = {}) {
+  return async (): Promise<AttachmentUploadAuthorization> => ({ ok: true, scopeId: SCOPE, ...overrides })
 }
 
-type TestAuthorization =
-  | {
-      ok: true
-      scopeId: string
-      writeAttachment?: AtomicWriteAttachmentFn
-      abortAttachment?: AbortAttachmentWriteFn
-    }
-  | { ok: false; response: Response }
-
-function okAuthorize(overrides: Partial<Extract<TestAuthorization, { ok: true }>> = {}) {
-  return async (): Promise<TestAuthorization> => ({
-    ok: true,
-    scopeId: SCOPE,
-    abortAttachment,
-    ...overrides,
-  })
-}
-
-type RecordingWriteResult =
-  | { ok: true; receipt?: AttachmentWriteReceipt }
-  | { ok: false; reason: string; receipt?: AttachmentWriteReceipt }
-
-function ownershipReceipt(
-  ownership: AttachmentWriteOwnership,
-  rollback: () => void | Promise<void> = () => undefined,
-): AttachmentWriteReceipt {
-  return { ownership, rollback }
-}
-
-function recordingWriteAttachment(result: RecordingWriteResult = { ok: true }) {
+function recordingWriteAttachment(result: AttachmentWriteResult = { ok: true }) {
   const writes: Array<{
     scopeId: string
     path: string
     content: Uint8Array | string
-    opts: {
-      mediaType?: string
-      name?: string
-      originalName?: string
-      size?: number
-      ownership: AttachmentWriteOwnership
-    }
+    opts: { mediaType?: string; name?: string; originalName?: string; size?: number }
   }> = []
-  const write: AtomicWriteAttachmentFn = async (scopeId, path, content, opts) => {
+  const write: WriteAttachmentFn = async (scopeId, path, content, opts) => {
     writes.push({ scopeId, path, content, opts })
-    const receipt = result.receipt ?? ownershipReceipt(opts.ownership)
-    return result.ok ? { ok: true, receipt } : { ok: false, reason: result.reason, receipt }
+    return result
   }
   return { write, writes }
-}
-
-const abortAttachment = async () => undefined
-
-type TestRouteOptions = {
-  authorize(args: { request: Request }): Promise<TestAuthorization>
-  writeAttachment: AtomicWriteAttachmentFn
-  limits?: {
-    maxCount?: number
-    maxBinaryBytes?: number
-    maxBytesBySniffedMime?: ReadonlyMap<string, number>
-    maxTextBytes?: number
-    maxTotalBytes?: number
-  }
-  allowedKinds?: ChatAttachmentKind[]
-  allowedSniffedMimes?: ReadonlySet<string>
-  pathFor?: (name: string) => string
-  validatePath?: (path: string) => { succeeded: true } | { succeeded: false; error: string }
-  sniffMime?: (name: string) => string
-  createWriteId?: () => string
-  logger?: { error(...args: unknown[]): void }
-}
-
-function createAttachmentUploadRoute(options: TestRouteOptions) {
-  let nextId = 0
-  const { authorize, writeAttachment, ...routeOptions } = options
-  return buildAttachmentUploadRoute({
-    ...routeOptions,
-    attachmentWriter: { write: writeAttachment, abort: abortAttachment },
-    authorize: async (args) => {
-      const auth = await authorize(args)
-      if (!auth.ok) return auth
-      return {
-        ok: true,
-        scopeId: auth.scopeId,
-        attachmentWriter: {
-          write: auth.writeAttachment ?? writeAttachment,
-          abort: auth.abortAttachment ?? abortAttachment,
-        },
-      }
-    },
-    createWriteId: options.createWriteId ?? (() => `test-${++nextId}`),
-  })
 }
 
 /** `new File([Uint8Array | string], name, {type})`, cast through `BlobPart` —
@@ -203,12 +93,6 @@ function avifBytes(): Uint8Array {
   return new Uint8Array([0, 0, 0, 0x1c, ...'ftyp'.split('').map((c) => c.charCodeAt(0)), ...'avif'.split('').map((c) => c.charCodeAt(0))])
 }
 
-function mp4BytesOfSize(totalBytes: number): Uint8Array {
-  const bytes = new Uint8Array(totalBytes)
-  bytes.set([0, 0, 0, 0x18, ...'ftyp'.split('').map((c) => c.charCodeAt(0)), ...'isom'.split('').map((c) => c.charCodeAt(0))], 0)
-  return bytes
-}
-
 describe('createAttachmentUploadRoute', () => {
   it('writes raw PNG bytes with the correct opts (mediaType/name/originalName/size)', async () => {
     const { write, writes } = recordingWriteAttachment()
@@ -218,15 +102,14 @@ describe('createAttachmentUploadRoute', () => {
 
     expect(res.status).toBe(200)
     const body = await res.json() as { files: ChatAttachmentInput[] }
-    expect(body.files).toEqual([{ path: 'photo.png--test-1', name: 'photo.png', size: bytes.length, mediaType: 'image/png', kind: 'image' }])
+    expect(body.files).toEqual([{ path: 'photo.png', name: 'photo.png', size: bytes.length, mediaType: 'image/png', kind: 'image' }])
 
     expect(writes).toHaveLength(1)
     expect(writes[0]!.scopeId).toBe(SCOPE)
-    expect(writes[0]!.path).toBe('photo.png--test-1')
+    expect(writes[0]!.path).toBe('photo.png')
     expect(writes[0]!.content).toBeInstanceOf(Uint8Array)
     expect(Array.from(writes[0]!.content as Uint8Array)).toEqual(Array.from(bytes))
-    expect(writes[0]!.opts).toMatchObject({ mediaType: 'image/png', name: 'photo.png', originalName: 'photo.png', size: bytes.length })
-    expect(writes[0]!.opts.ownership).toEqual({ id: 'test-1', path: 'photo.png--test-1' })
+    expect(writes[0]!.opts).toEqual({ mediaType: 'image/png', name: 'photo.png', originalName: 'photo.png', size: bytes.length })
   })
 
   it('writes raw text bytes verbatim with the correct opts', async () => {
@@ -237,11 +120,11 @@ describe('createAttachmentUploadRoute', () => {
 
     expect(res.status).toBe(200)
     const body = await res.json() as { files: ChatAttachmentInput[] }
-    expect(body.files).toEqual([{ path: 'notes.md--test-1', name: 'notes.md', size: text.length, mediaType: 'text/markdown', kind: 'file' }])
+    expect(body.files).toEqual([{ path: 'notes.md', name: 'notes.md', size: text.length, mediaType: 'text/markdown', kind: 'file' }])
 
     expect(writes[0]!.content).toBeInstanceOf(Uint8Array)
     expect(new TextDecoder().decode(writes[0]!.content as Uint8Array)).toBe(text)
-    expect(writes[0]!.opts).toMatchObject({ mediaType: 'text/markdown', name: 'notes.md', originalName: 'notes.md', size: text.length })
+    expect(writes[0]!.opts).toEqual({ mediaType: 'text/markdown', name: 'notes.md', originalName: 'notes.md', size: text.length })
   })
 
   it('sanitizes filenames into the store charset and preserves the original in originalName', async () => {
@@ -253,7 +136,7 @@ describe('createAttachmentUploadRoute', () => {
     expect(res.status).toBe(200)
     const body = await res.json() as { files: ChatAttachmentInput[] }
     expect(body.files).toEqual([{
-      path: 'CleanShot-2026-07-14-at-18.46.28-2x.png--test-1',
+      path: 'CleanShot-2026-07-14-at-18.46.28-2x.png',
       name: 'CleanShot-2026-07-14-at-18.46.28-2x.png',
       size: bytes.length,
       mediaType: 'image/png',
@@ -289,114 +172,16 @@ describe('createAttachmentUploadRoute', () => {
     expect(writes).toHaveLength(0)
   })
 
-  it('rejects a bare zip signature named .docx as a mismatch (400), writing nothing', async () => {
+  it('rejects docx-shaped (zip magic) bytes as an unsupported attachment type (415)', async () => {
     const { write, writes } = recordingWriteAttachment()
     const route = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
-    const file = fileOf(zipBytes(), 'report.docx', OOXML_WORD_MIME)
+    const file = fileOf(zipBytes(), 'report.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
     const res = await route(uploadRequest([file]))
 
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(415)
     const body = await json(res)
-    expect(body.error?.code).toBe('attachment_type_mismatch')
-    expect(body.error?.message).toContain('application/zip')
+    expect(body.error?.code).toBe('attachment_type_not_allowed')
     expect(writes).toHaveLength(0)
-  })
-
-  describe('Office documents', () => {
-    it('accepts a Word package written by a real toolchain, writing the bytes verbatim under the sniffed mime', async () => {
-      const { write, writes } = recordingWriteAttachment()
-      const route = createAttachmentUploadRoute({
-        authorize: okAuthorize(),
-        writeAttachment: write,
-      })
-      const bytes = realWorldOoxmlBytes('real-word.docx')
-      // The browser reports nothing useful for an Office file on many
-      // platforms, so the empty type is the realistic case, not a convenience.
-      const res = await route(uploadRequest([fileOf(bytes, 'Master Services Agreement.docx', '')]))
-
-      expect(res.status).toBe(200)
-      const body = await res.json() as { files: ChatAttachmentInput[] }
-      expect(body.files).toEqual([{
-        path: 'Master-Services-Agreement.docx--test-1',
-        name: 'Master-Services-Agreement.docx',
-        size: bytes.length,
-        mediaType: OOXML_WORD_MIME,
-        kind: 'file',
-      }])
-      expect(Array.from(writes[0]!.content as Uint8Array)).toEqual(Array.from(bytes))
-      expect(writes[0]!.opts.originalName).toBe('Master Services Agreement.docx')
-    })
-
-    it('accepts Excel and PowerPoint packages written by a real toolchain', async () => {
-      const { write } = recordingWriteAttachment()
-      const route = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
-      const res = await route(uploadRequest([
-        fileOf(realWorldOoxmlBytes('real-excel.xlsx'), 'workpapers.xlsx', ''),
-        fileOf(realWorldOoxmlBytes('real-powerpoint.pptx'), 'deck.pptx', ''),
-      ]))
-
-      expect(res.status).toBe(200)
-      const body = await res.json() as { files: ChatAttachmentInput[] }
-      expect(body.files.map((f) => f.mediaType)).toEqual([OOXML_SPREADSHEET_MIME, OOXML_PRESENTATION_MIME])
-      expect(body.files.every((f) => f.kind === 'file')).toBe(true)
-    })
-
-    it('rejects an ordinary archive with 415, writing nothing', async () => {
-      const { write, writes } = recordingWriteAttachment()
-      const route = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
-      const res = await route(uploadRequest([fileOf(plainZipBytes(), 'archive.zip', 'application/zip')]))
-
-      expect(res.status).toBe(415)
-      const body = await json(res)
-      expect(body.error?.code).toBe('attachment_type_not_allowed')
-      expect(writes).toHaveLength(0)
-    })
-
-    it('rejects an ordinary archive renamed .docx with 400, writing nothing', async () => {
-      const { write, writes } = recordingWriteAttachment()
-      const route = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
-      const res = await route(uploadRequest([fileOf(plainZipBytes(), 'contract.docx', OOXML_WORD_MIME)]))
-
-      expect(res.status).toBe(400)
-      const body = await json(res)
-      expect(body.error?.code).toBe('attachment_type_mismatch')
-      expect(writes).toHaveLength(0)
-    })
-
-    it('rejects a macro-enabled package by default and accepts it when the route widens allowedSniffedMimes', async () => {
-      const bytes = docxBytes({ macroEnabled: true })
-      const { write, writes } = recordingWriteAttachment()
-      const strict = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
-      const strictRes = await strict(uploadRequest([fileOf(bytes, 'macro.docm', '')]))
-      expect(strictRes.status).toBe(415)
-      expect((await json(strictRes)).error?.code).toBe('attachment_type_not_allowed')
-      expect(writes).toHaveLength(0)
-
-      const widened = createAttachmentUploadRoute({
-        authorize: okAuthorize(),
-        writeAttachment: write,
-        allowedSniffedMimes: new Set([...ALLOWED_ATTACHMENT_SNIFFED_MIMES, ...MACRO_ENABLED_OOXML_SNIFFED_MIMES]),
-      })
-      const res = await widened(uploadRequest([fileOf(bytes, 'macro.docm', '')]))
-      expect(res.status).toBe(200)
-      const body = await res.json() as { files: ChatAttachmentInput[] }
-      expect(body.files[0]).toMatchObject({ mediaType: OOXML_WORD_MACRO_ENABLED_MIME, kind: 'file' })
-    })
-
-    it('still rejects a Word package when the route narrows allowedSniffedMimes to PDF only', async () => {
-      const { write, writes } = recordingWriteAttachment()
-      const route = createAttachmentUploadRoute({
-        authorize: okAuthorize(),
-        writeAttachment: write,
-        allowedSniffedMimes: new Set(['application/pdf']),
-      })
-      const res = await route(uploadRequest([fileOf(realWorldOoxmlBytes('real-word.docx'), 'contract.docx', '')]))
-
-      expect(res.status).toBe(415)
-      const body = await json(res)
-      expect(body.error?.code).toBe('attachment_type_not_allowed')
-      expect(writes).toHaveLength(0)
-    })
   })
 
   it('rejects ID3/mp3-magic bytes as a disallowed attachment type (415)', async () => {
@@ -522,37 +307,6 @@ describe('createAttachmentUploadRoute', () => {
     expect(writes).toHaveLength(0)
   })
 
-  it('applies a sniffed-mime size override while retaining the binary fallback cap', async () => {
-    const fiftyMiB = 50 * 1024 * 1024
-    const tenMiB = 10 * 1024 * 1024
-    const { write, writes } = recordingWriteAttachment()
-    const route = createAttachmentUploadRoute({
-      authorize: okAuthorize(),
-      writeAttachment: write,
-      allowedSniffedMimes: new Set([...ALLOWED_ATTACHMENT_SNIFFED_MIMES, 'video/mp4']),
-      limits: {
-        maxBinaryBytes: tenMiB,
-        maxBytesBySniffedMime: new Map([['video/mp4', 100 * 1024 * 1024]]),
-        maxTotalBytes: 100 * 1024 * 1024,
-      },
-    })
-
-    const video = await route(uploadRequest([fileOf(mp4BytesOfSize(fiftyMiB), 'clip.mp4', 'video/mp4')]))
-    expect(video.status).toBe(200)
-    expect(writes).toHaveLength(1)
-    expect(writes[0]!.opts.mediaType).toBe('video/mp4')
-
-    const image = await route(uploadRequest([fileOf(pngBytesOfSize(fiftyMiB), 'still.png', 'image/png')]))
-    expect(image.status).toBe(413)
-    expect(await json(image)).toEqual({
-      error: {
-        code: 'attachment_too_large',
-        message: 'still.png is 50MB; attachments are limited to 10MB',
-      },
-    })
-    expect(writes).toHaveLength(1)
-  })
-
   describe('allowedKinds override', () => {
     it("rejects a PNG with 415 attachment_kind_not_allowed when allowedKinds is ['file']", async () => {
       const { write, writes } = recordingWriteAttachment()
@@ -570,10 +324,7 @@ describe('createAttachmentUploadRoute', () => {
   describe('duplicate path within a batch', () => {
     it('rejects two files that sanitize to the same store path with 400 attachment_duplicate_path', async () => {
       const { write, writes } = recordingWriteAttachment()
-      const route = createAttachmentUploadRoute({
-        authorize: okAuthorize(),
-        writeAttachment: write,
-      })
+      const route = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
       const files = [
         fileOf('hello', 'notes.txt', 'text/plain'),
         fileOf('world', 'notes.txt', 'text/plain'),
@@ -583,7 +334,7 @@ describe('createAttachmentUploadRoute', () => {
       expect(res.status).toBe(400)
       const body = await json(res)
       expect(body.error?.code).toBe('attachment_duplicate_path')
-      expect(body.error?.path).toBe('notes.txt--test-2')
+      expect(body.error?.path).toBe('notes.txt')
       expect(writes).toHaveLength(0)
     })
   })
@@ -600,28 +351,11 @@ describe('createAttachmentUploadRoute', () => {
       expect(body.files).toHaveLength(1)
       const file = body.files[0]!
       expect(Object.keys(file).sort()).toEqual(['kind', 'mediaType', 'name', 'path', 'size'].sort())
-      expect(file).toEqual({ path: 'doc.pdf--test-1', name: 'doc.pdf', size: bytes.length, mediaType: 'application/pdf', kind: 'file' })
+      expect(file).toEqual({ path: 'doc.pdf', name: 'doc.pdf', size: bytes.length, mediaType: 'application/pdf', kind: 'file' })
     })
   })
 
   describe('authorize seam', () => {
-    it('preserves the legacy writer contract without an ownership abort seam', async () => {
-      const writes: string[] = []
-      const write: WriteAttachmentFn = async (_scopeId, path) => {
-        writes.push(path)
-        return { ok: true }
-      }
-      const route = buildAttachmentUploadRoute({
-        authorize: async () => ({ ok: true as const, scopeId: SCOPE }),
-        writeAttachment: write,
-      })
-
-      const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
-
-      expect(res.status).toBe(200)
-      expect(writes).toEqual(['photo.png'])
-    })
-
     it('returns a 401 auth.response verbatim', async () => {
       const denied = Response.json({ error: 'unauthorized' }, { status: 401 })
       const { write, writes } = recordingWriteAttachment()
@@ -711,471 +445,15 @@ describe('createAttachmentUploadRoute', () => {
   })
 
   describe('write failure', () => {
-    it('folds a thrown legacy writer into an opaque response', async () => {
-      const logs: unknown[] = []
-      const route = buildAttachmentUploadRoute({
-        authorize: async () => ({ ok: true as const, scopeId: SCOPE }),
-        writeAttachment: async () => {
-          throw new Error('R2 X-Amz-Credential=legacy-upload-secret')
-        },
-        logger: { error: (...args: unknown[]) => logs.push(args) },
-      })
-
-      const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
-
-      expect(res.status).toBe(503)
-      expect(await json(res)).toEqual({
-        error: {
-          code: 'attachment_store_unavailable',
-          message: 'Attachment storage is temporarily unavailable. Please try again.',
-          path: 'photo.png',
-        },
-      })
-      expect(JSON.stringify(logs)).not.toContain('legacy-upload-secret')
-    })
-
-    it('redacts PII-shaped attachment paths in server logs', async () => {
-      const logs: unknown[] = []
-      const route = buildAttachmentUploadRoute({
-        authorize: async () => ({ ok: true as const, scopeId: SCOPE }),
-        writeAttachment: async () => {
-          throw new Error('store failed')
-        },
-        logger: { error: (...args: unknown[]) => logs.push(args) },
-      })
-
-      const res = await route(uploadRequest([fileOf(pngBytes(), '123-45-6789.txt', 'image/png')]))
-
-      expect(res.status).toBe(503)
-      expect(JSON.stringify(logs)).not.toContain('123-45-6789')
-      expect(JSON.stringify(logs)).toContain('[REDACTED:ssn]')
-    })
-
-    it('redacts a legacy writer rejection while preserving its typed status', async () => {
-      const route = buildAttachmentUploadRoute({
-        authorize: async () => ({ ok: true as const, scopeId: SCOPE }),
-        writeAttachment: async () => ({
-          ok: false as const,
-          reason: 'R2 secretAccessKey=legacy-upload-secret SSN=123-45-6789',
-        }),
-      })
-
-      const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
-      const body = await json(res)
-
-      expect(res.status).toBe(413)
-      expect(body.error?.message).toContain('[REDACTED:credential]')
-      expect(body.error?.message).toContain('[REDACTED:ssn]')
-      expect(body.error?.message).not.toContain('legacy-upload-secret')
-      expect(body.error?.message).not.toContain('123-45-6789')
-    })
-
-    it('returns an opaque 503 for a storage rejection', async () => {
+    it('returns 413 attachment_write_failed with the underlying reason', async () => {
       const { write } = recordingWriteAttachment({ ok: false, reason: 'store quota exceeded' })
       const route = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
       const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
 
-      expect(res.status).toBe(503)
+      expect(res.status).toBe(413)
       const body = await json(res)
-      expect(body.error?.code).toBe('attachment_store_unavailable')
-      expect(body.error?.message).toBe('Attachment storage is temporarily unavailable. Please try again.')
-      expect(body.error?.message).not.toContain('store quota')
-    })
-
-    it('compensates successful writes in reverse order after a later partial failure', async () => {
-      const rollbackOrder: string[] = []
-      const write: AtomicWriteAttachmentFn = async (_scopeId, path, _content, opts) => {
-        const receipt = ownershipReceipt(opts.ownership, () => {
-          rollbackOrder.push(path.split('--')[0]!)
-        })
-        if (path.startsWith('notes.txt--')) return { ok: false, reason: 'store quota exceeded', receipt }
-        return {
-          ok: true,
-          receipt,
-        }
-      }
-      const route = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
-
-      const res = await route(uploadRequest([
-        fileOf(pngBytes(), 'photo.png', 'image/png'),
-        fileOf(pdfBytes(), 'brief.pdf', 'application/pdf'),
-        fileOf('notes', 'notes.txt', 'text/plain'),
-      ]))
-
-      expect(res.status).toBe(503)
-      expect((await json(res)).error?.message).toBe('Attachment storage is temporarily unavailable. Please try again.')
-      expect(rollbackOrder).toEqual(['notes.txt', 'brief.pdf', 'photo.png'])
-    })
-
-    it('compensates when a later write throws and redacts its credential-shaped message', async () => {
-      const rollbackOrder: string[] = []
-      const write: AtomicWriteAttachmentFn = async (_scopeId, path, _content, opts) => {
-        if (path.startsWith('brief.pdf--')) throw new Error('upstream rejected Bearer super-secret-token')
-        return {
-          ok: true,
-          receipt: ownershipReceipt(opts.ownership, () => {
-            rollbackOrder.push(path.split('--')[0]!)
-          }),
-        }
-      }
-      const route = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
-
-      const res = await route(uploadRequest([
-        fileOf(pngBytes(), 'photo.png', 'image/png'),
-        fileOf(pdfBytes(), 'brief.pdf', 'application/pdf'),
-      ]))
-
-      expect(res.status).toBe(503)
-      const body = await json(res)
-      const message = body.error?.message ?? ''
-      expect(body.error?.code).toBe('attachment_store_unavailable')
-      expect(message).toBe('Attachment storage is temporarily unavailable. Please try again.')
-      expect(message).not.toContain('super-secret-token')
-      expect(rollbackOrder).toEqual(['photo.png'])
-    })
-
-    it('returns rollback_failed when the second write throws after the first write succeeds', async () => {
-      const objects = new Set<string>()
-      const rollbackOrder: string[] = []
-      const logs: unknown[] = []
-      const abort = vi.fn(async (_scopeId: string, ownership: AttachmentWriteOwnership) => {
-        objects.delete(ownership.path)
-      })
-      const write: AtomicWriteAttachmentFn = async (_scopeId, path, _content, opts) => {
-        objects.add(path)
-        const receipt = ownershipReceipt(opts.ownership, () => {
-          rollbackOrder.push(path.split('--')[0]!)
-          if (path.startsWith('photo.png--')) throw new Error('R2 delete failed apiKey=rollback-token')
-          objects.delete(path)
-        })
-        if (path.startsWith('brief.pdf--')) throw new Error('R2 put failed Bearer write-token')
-        return { ok: true, receipt }
-      }
-      const route = createAttachmentUploadRoute({
-        authorize: okAuthorize({ abortAttachment: abort }),
-        writeAttachment: write,
-        logger: { error: (...args: unknown[]) => logs.push(args) },
-      })
-
-      const res = await route(uploadRequest([
-        fileOf(pngBytes(), 'photo.png', 'image/png'),
-        fileOf(pdfBytes(), 'brief.pdf', 'application/pdf'),
-      ]))
-
-      expect(res.status).toBe(503)
-      expect(await json(res)).toEqual({
-        error: {
-          code: 'rollback_failed',
-          message: 'Attachment cleanup failed. Please try again.',
-          path: 'brief.pdf--test-2',
-        },
-      })
-      expect(rollbackOrder).toEqual(['photo.png'])
-      expect(objects).toEqual(new Set())
-      expect(JSON.stringify(logs)).not.toContain('rollback-token')
-      expect(JSON.stringify(logs)).not.toContain('write-token')
-    })
-
-    it('returns 503 when a writer throws a hostile value', async () => {
-      const logs: unknown[] = []
-      const hostile = new Proxy(Object.create(null), {
-        get() {
-          throw new Error('message getter failed')
-        },
-        getPrototypeOf() {
-          throw new Error('prototype trap failed')
-        },
-        getOwnPropertyDescriptor() {
-          throw new Error('descriptor trap failed')
-        },
-      })
-      const write: AtomicWriteAttachmentFn = async () => {
-        throw hostile
-      }
-      const route = createAttachmentUploadRoute({
-        authorize: okAuthorize(),
-        writeAttachment: write,
-        logger: { error: (...args: unknown[]) => logs.push(args) },
-      })
-
-      const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
-
-      expect(res.status).toBe(503)
-      expect(await json(res)).toEqual({
-        error: {
-          code: 'attachment_store_unavailable',
-          message: 'Attachment storage is temporarily unavailable. Please try again.',
-          path: 'photo.png--test-1',
-        },
-      })
-      expect(JSON.stringify(logs)).toContain('unknown error')
-    })
-
-    it('keeps the cleanup owner immutable when a writer mutates its input', async () => {
-      const objects = new Set<string>()
-      const abort = vi.fn(async (_scopeId: string, ownership: AttachmentWriteOwnership) => {
-        objects.delete(ownership.path)
-      })
-      const write: AtomicWriteAttachmentFn = async (_scopeId, path, _content, opts) => {
-        objects.add(path)
-        try {
-          const mutableOwnership = opts.ownership as unknown as { path: string }
-          mutableOwnership.path = 'mutated-path'
-        } catch {
-          // Frozen ownership is the expected protection.
-        }
-        throw new Error('writer failed after commit')
-      }
-      const route = createAttachmentUploadRoute({
-        authorize: okAuthorize({ abortAttachment: abort }),
-        writeAttachment: write,
-      })
-
-      const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
-
-      expect(res.status).toBe(503)
-      expect(objects).toEqual(new Set())
-      expect(abort).toHaveBeenCalledWith(SCOPE, { id: 'test-1', path: 'photo.png--test-1' })
-    })
-
-    it('fails closed when a writer returns a receipt for a different owner', async () => {
-      let aborted: AttachmentWriteOwnership | undefined
-      const write: AtomicWriteAttachmentFn = async (_scopeId, path, _content, opts) => {
-        const wrongOwnership: AttachmentWriteOwnership = { id: 'wrong-owner', path: 'wrong-path' }
-        const receipt: AttachmentWriteReceipt = {
-          ownership: wrongOwnership,
-          rollback: vi.fn(),
-        }
-        expect(path).toBe(opts.ownership.path)
-        return { ok: true, receipt }
-      }
-      const route = createAttachmentUploadRoute({
-        authorize: async () => ({
-          ok: true as const,
-          scopeId: SCOPE,
-          abortAttachment: async (_scopeId, ownership) => {
-            aborted = ownership
-          },
-        }),
-        writeAttachment: write,
-      })
-
-      const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
-
-      expect(res.status).toBe(503)
-      expect((await json(res)).error?.message).toBe('Attachment storage is temporarily unavailable. Please try again.')
-      expect(aborted).toEqual({ id: 'test-1', path: 'photo.png--test-1' })
-    })
-
-    it('fails closed when a receipt getter is hostile and aborts the attempted owner', async () => {
-      let aborted: AttachmentWriteOwnership | undefined
-      const hostileReceipt = new Proxy(Object.create(null), {
-        get() {
-          throw new Error('receipt getter failed')
-        },
-      }) as AttachmentWriteReceipt
-      const write: AtomicWriteAttachmentFn = async () => ({ ok: true, receipt: hostileReceipt })
-      const route = createAttachmentUploadRoute({
-        authorize: okAuthorize({
-          abortAttachment: async (_scopeId, ownership) => {
-            aborted = ownership
-          },
-        }),
-        writeAttachment: write,
-      })
-
-      const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
-
-      expect(res.status).toBe(503)
-      expect(aborted).toEqual({ id: 'test-1', path: 'photo.png--test-1' })
-    })
-
-    it('fails closed for a truthy non-boolean writer result', async () => {
-      const abort = vi.fn(async () => undefined)
-      const write: AtomicWriteAttachmentFn = async (_scopeId, _path, _content, opts) => ({
-        ok: 'false' as unknown as true,
-        receipt: ownershipReceipt(opts.ownership),
-      })
-      const route = createAttachmentUploadRoute({
-        authorize: okAuthorize({ abortAttachment: abort }),
-        writeAttachment: write,
-      })
-
-      const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
-
-      expect(res.status).toBe(503)
-      expect(abort).toHaveBeenCalledOnce()
-    })
-
-    it('uses the ownership abort as a cleanup fallback when rollback fails', async () => {
-      const abort = vi.fn(async () => undefined)
-      const write: AtomicWriteAttachmentFn = async (_scopeId, _path, _content, opts) => ({
-        ok: false,
-        reason: 'store rejected after commit',
-        receipt: ownershipReceipt(opts.ownership, () => {
-          throw new Error('delete timed out')
-        }),
-      })
-      const route = createAttachmentUploadRoute({
-        authorize: okAuthorize({ abortAttachment: abort }),
-        writeAttachment: write,
-      })
-
-      const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
-
-      expect(res.status).toBe(503)
-      expect(abort).toHaveBeenCalledWith(SCOPE, { id: 'test-1', path: 'photo.png--test-1' })
-    })
-
-    it('folds an abort getter failure into the opaque storage response', async () => {
-      const logs: unknown[] = []
-      const writer = new Proxy({
-        write: async () => {
-          throw new Error('write failed')
-        },
-      }, {
-        get(target, property, receiver) {
-          if (property === 'abort') throw new Error('abort getter failed')
-          return Reflect.get(target, property, receiver)
-        },
-      })
-      const route = buildAttachmentUploadRoute({
-        authorize: okAuthorize(),
-        attachmentWriter: writer as unknown as { write: AtomicWriteAttachmentFn; abort: AbortAttachmentWriteFn },
-        createWriteId: () => 'abort-getter',
-        logger: { error: (...args: unknown[]) => logs.push(args) },
-      })
-
-      const res = await route(uploadRequest([fileOf(pngBytes(), 'photo.png', 'image/png')]))
-
-      expect(res.status).toBe(503)
-      expect(await res.json()).toEqual({
-        error: {
-          code: 'rollback_failed',
-          message: 'Attachment cleanup failed. Please try again.',
-          path: 'photo.png--abort-getter',
-        },
-      })
-      expect(JSON.stringify(logs)).toContain('abort getter failed')
-    })
-
-    it('cleans the current ambiguous object and prior objects with a stateful object-store adapter', async () => {
-      const objects = new Map<string, { owner: string; bytes: Uint8Array }>()
-      const logs: unknown[] = []
-      const write: AtomicWriteAttachmentFn = async (_scopeId, path, content, opts) => {
-        objects.set(path, { owner: opts.ownership.id, bytes: content as Uint8Array })
-        const receipt = ownershipReceipt(opts.ownership, () => {
-          const current = objects.get(path)
-          if (current?.owner === opts.ownership.id) objects.delete(path)
-        })
-        if (path.startsWith('brief.pdf--')) throw new Error('R2 failed X-Amz-Signature=super-secret-signature')
-        return { ok: true, receipt }
-      }
-      const abort: AbortAttachmentWriteFn = async (_scopeId, ownership) => {
-        const current = objects.get(ownership.path)
-        if (current?.owner === ownership.id) objects.delete(ownership.path)
-      }
-      const route = createAttachmentUploadRoute({
-        authorize: async () => ({ ok: true as const, scopeId: SCOPE, abortAttachment: abort }),
-        writeAttachment: write,
-        logger: { error: (...args: unknown[]) => logs.push(args) },
-      })
-
-      const res = await route(uploadRequest([
-        fileOf(pngBytes(), 'photo.png', 'image/png'),
-        fileOf(pdfBytes(), 'brief.pdf', 'application/pdf'),
-      ]))
-
-      // Regression: a backend can commit before throwing; both object keys must
-      // be gone, and the credential must exist only in sanitized server logs.
-      expect(res.status).toBe(503)
-      expect(objects.size).toBe(0)
-      expect(JSON.stringify(logs)).not.toContain('super-secret-signature')
-      expect(JSON.stringify(logs)).toContain('[REDACTED:credential]')
-    })
-
-    it('does not delete a newer overwrite during an older receipt rollback', async () => {
-      const objects = new Map<string, { owner: string }>()
-      const older: AttachmentWriteOwnership = { id: 'older', path: 'shared' }
-      const newer: AttachmentWriteOwnership = { id: 'newer', path: 'shared' }
-      objects.set(older.path, { owner: older.id })
-      let rollbackReady!: () => void
-      let allowRollbackCheck!: () => void
-      const rollbackStarted = new Promise<void>((resolve) => {
-        rollbackReady = resolve
-      })
-      const allowCheck = new Promise<void>((resolve) => {
-        allowRollbackCheck = resolve
-      })
-      const olderReceipt = ownershipReceipt(older, async () => {
-        rollbackReady()
-        await allowCheck
-        if (objects.get(older.path)?.owner === older.id) objects.delete(older.path)
-      })
-
-      const rollback = olderReceipt.rollback()
-      await rollbackStarted
-      objects.set(newer.path, { owner: newer.id })
-      allowRollbackCheck()
-      await rollback
-
-      // Regression: rollback is compare-and-delete, not unconditional delete.
-      expect(objects.get('shared')).toEqual({ owner: 'newer' })
-    })
-
-    it('returns a typed rollback failure and redacts cleanup messages', async () => {
-      const rollbackOrder: string[] = []
-      const write: AtomicWriteAttachmentFn = async (_scopeId, path, _content, opts) => {
-        if (path.startsWith('notes.txt--')) {
-          return {
-            ok: false,
-            reason: 'secret=primary-token',
-            receipt: ownershipReceipt(opts.ownership),
-          }
-        }
-        return {
-          ok: true,
-          receipt: ownershipReceipt(opts.ownership, () => {
-            rollbackOrder.push(path.split('--')[0]!)
-            throw new Error(path.startsWith('brief.pdf--') ? 'apiKey=rollback-pdf-token' : 'Bearer rollback-png-token')
-          }),
-        }
-      }
-      const route = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
-
-      const res = await route(uploadRequest([
-        fileOf(pngBytes(), 'photo.png', 'image/png'),
-        fileOf(pdfBytes(), 'brief.pdf', 'application/pdf'),
-        fileOf('notes', 'notes.txt', 'text/plain'),
-      ]))
-
-      expect(res.status).toBe(503)
-      const body = await json(res)
-      const message = body.error?.message ?? ''
-      expect(body.error?.code).toBe('rollback_failed')
-      expect(message).toBe('Attachment cleanup failed. Please try again.')
-      expect(message).not.toContain('primary-token')
-      expect(message).not.toContain('rollback-pdf-token')
-      expect(message).not.toContain('rollback-png-token')
-      expect(rollbackOrder).toEqual(['brief.pdf', 'photo.png'])
-    })
-
-    it('does not compensate a successful batch', async () => {
-      const rollback = vi.fn()
-      const write: AtomicWriteAttachmentFn = async (_scopeId, _path, _content, opts) => ({
-        ok: true,
-        receipt: ownershipReceipt(opts.ownership, rollback),
-      })
-      const route = createAttachmentUploadRoute({ authorize: okAuthorize(), writeAttachment: write })
-
-      const res = await route(uploadRequest([
-        fileOf(pngBytes(), 'photo.png', 'image/png'),
-        fileOf(pdfBytes(), 'brief.pdf', 'application/pdf'),
-      ]))
-
-      expect(res.status).toBe(200)
-      expect(rollback).not.toHaveBeenCalled()
-      expect((await res.json() as { files: ChatAttachmentInput[] }).files).toHaveLength(2)
+      expect(body.error?.code).toBe('attachment_write_failed')
+      expect(body.error?.message).toBe('store quota exceeded')
     })
   })
 
@@ -1191,8 +469,8 @@ describe('createAttachmentUploadRoute', () => {
 
       expect(res.status).toBe(200)
       const body = await res.json() as { files: ChatAttachmentInput[] }
-      expect(body.files[0]!.path).toBe('tenant-1/photo.png--test-1')
-      expect(writes[0]!.path).toBe('tenant-1/photo.png--test-1')
+      expect(body.files[0]!.path).toBe('tenant-1/photo.png')
+      expect(writes[0]!.path).toBe('tenant-1/photo.png')
     })
 
     it('rejects with 400 invalid_attachment_path using the injected validator\'s message', async () => {

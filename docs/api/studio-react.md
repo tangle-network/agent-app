@@ -4,342 +4,230 @@
 
 Source: `src/studio-react/index.tsx`
 
-47 exports.
+30 exports.
 
-### `AudioTogglePill`
-
-`function` — The audio switch.
-
-```ts
-({ on, onToggle }: { on: boolean; onToggle: (on: boolean) => void; }) => Element
-```
-
-### `ComposerBand`
-
-`function` — The middle scroller.
-
-```ts
-({ bandRef, resetKey, children, }: { bandRef: RefObject<HTMLDivElement | null>; resetKey: string; children: ReactNode;…
-```
-
-### `ComposerType`
-
-`type` — The lanes the composer offers.
-
-```ts
-type ComposerType
-```
-
-### `CustomSizeForm`
-
-`function` — The custom-size form the Size menu swaps to.
-
-```ts
-({ initial, onApply, onCancel, }: { initial?: string | undefined; onApply: (size: string) => void; onCancel: () => void…
-```
-
-### `DeferredDelete`
-
-`interface`
-
-```ts
-interface DeferredDelete
-```
-
-### `downloadGenerationsViaAnchor`
-
-`function` — Same-origin anchor download, staggered so the browser does not swallow every request after the first.
-
-```ts
-DownloadGenerations
-```
-
-### `formatClock`
+### `AvatarComposer`
 
 `function`
 
 ```ts
-(seconds: number) => string
+({ audioUrl, imageUrl, avatarId, onAudioUrlChange, onImageUrlChange, onAvatarIdChange, }: { audioUrl: string; imageUrl:…
 ```
 
-### `GenerationHistoryState`
-
-`interface`
-
-```ts
-interface GenerationHistoryState
-```
-
-### `GenerationNoticeChip`
-
-`function` — The one thing a chat-shaped generator has to say about itself: each prompt is a fresh generation, and nothing carries over from the last one.
-
-```ts
-({ className }: { className?: string | undefined; }) => Element
-```
-
-### `MediaTile`
+### `ComposerDisclosure`
 
 `function`
 
 ```ts
-({ generation, context, onOpen, actions, aspectRatio, waveformBars, selectMode, selected, onToggleSelect, onRequestDele…
+({ summary, children }: { summary: ReactNode; children: ReactNode; }) => Element
 ```
 
-### `MediaTileProps`
-
-`interface`
-
-```ts
-interface MediaTileProps
-```
-
-### `MediaTypeSegment`
-
-`interface` — One media lane's segment: the icon it shows collapsed, the word it shows when active.
-
-```ts
-interface MediaTypeSegment
-```
-
-### `MediaTypeSegments`
-
-`function` — The pinned-left media-type group: a track holding one filled pill (the active lane, icon + word) and icon-only siblings.
-
-```ts
-<T extends string>({ value, segments, onChange, }: { value: T; segments: readonly MediaTypeSegment<T>[]; onChange: (typ…
-```
-
-### `MediaViewerModal`
+### `ComposerHero`
 
 `function`
 
 ```ts
-({ generation, onClose, actions, onRequestDelete, onSaved, }: MediaViewerModalProps) => Element | null
+({ workspaceId, integrationsHref, canManageIntegrations, align, surfaceClassName, onGenerated, }: { workspaceId?: strin…
 ```
 
-### `MediaViewerModalProps`
-
-`interface`
-
-```ts
-interface MediaViewerModalProps
-```
-
-### `MenuPill`
-
-`function` — A standalone enum picker using the studio composer's pill and menu grammar.
-
-```ts
-<T extends string>({ label, value, choices, onSelect, className, icon: Icon, trigger, }: { label: string; value: T; cho…
-```
-
-### `ModelPill`
-
-`function` — The model pill — first in the band on every lane, and the only pill that is always there.
-
-```ts
-({ models, value, displayName, provider, unavailable, onSelect, bandRef, }: { models: readonly MediaModelOption[]; valu…
-```
-
-### `OptionChoice`
-
-`interface` — One renderable value: the wire value, untouched, and how it reads.
-
-```ts
-interface OptionChoice
-```
-
-### `OptionPill`
-
-`function` — A value pill and the menu it opens.
-
-```ts
-({ label, value, choices, onSelect, bandRef, custom, icon: Icon, }: { label: string; value: ModelOptionValue | undefine…
-```
-
-### `optionValueLabel`
-
-`function` — How a wire value reads, with the wire value itself untouched underneath.
-
-```ts
-(param: string, value: ModelOptionValue) => string
-```
-
-### `ReferencePill`
-
-`function` — The reference-image pill: the only control that changes which MODEL runs, so the swap to the image-to-video sibling is the caller's (`onAttach`/`onRemove`) and the pill only reports what is attached.
-
-```ts
-({ url, onAttach, onRemove, pick, bandRef, }: { url: string | null; onAttach: (url: string) => void; onRemove: () => vo…
-```
-
-### `StudioAudioElementLike`
-
-`interface`
-
-```ts
-interface StudioAudioElementLike
-```
-
-### `StudioComposer`
-
-`function` — The composer card.
-
-```ts
-({ workspaceId, onGenerated, variant, pickReferenceImage, sendTone, className, }: StudioComposerProps) => Element
-```
-
-### `StudioComposerProps`
-
-`interface`
-
-```ts
-interface StudioComposerProps
-```
-
-### `StudioConfirmDialog`
+### `Field`
 
 `function`
 
 ```ts
-({ open, count, onConfirm, onCancel, }: StudioConfirmDialogProps) => Element | null
+({ label, htmlFor, className, children, }: { label: string; htmlFor?: string | undefined; className?: string | undefine…
 ```
 
-### `StudioConfirmDialogProps`
+### `filterGenerations`
 
-`interface`
+`function` — The visible set for the active type tab (all generations when unfiltered).
 
 ```ts
-interface StudioConfirmDialogProps
+(generations: Generation[], typeFilter: string | null) => Generation[]
 ```
 
-### `StudioGenerationScreen`
+### `GenerationCard`
 
 `function`
 
 ```ts
-({ generations, batchKey, onGenerated, onOpenGeneration, workspaceId, pickReferenceImage, sendTone, actions, className,…
+({ generation, onSelect, }: { generation: Generation; onSelect: (generation: Generation) => void; }) => Element
 ```
 
-### `StudioGenerationScreenProps`
-
-`interface`
-
-```ts
-interface StudioGenerationScreenProps
-```
-
-### `StudioHistoryScreen`
+### `GenerationDetail`
 
 `function`
 
 ```ts
-({ fetchPage, initialPage, onBack, actions, searchDebounceMs, className, }: StudioHistoryScreenProps) => Element
+({ generation, vaultHref, onNavigate, }: { generation: Generation; vaultHref?: ((filePath?: string | null | undefined)…
 ```
 
-### `StudioHistoryScreenProps`
+### `GenerationDetailModal`
 
-`interface`
+`function` — Centered detail view for a single generation.
 
 ```ts
-interface StudioHistoryScreenProps
+({ generation, vaultHref, onClose, }: { generation: Generation | null; vaultHref?: ((filePath?: string | null | undefin…
 ```
 
-### `StudioHomeScreen`
+### `GenerationGrid`
 
-`function` — Studio's create-and-recent-media landing screen.
+`function` — Chrome-less asset grid — the `GenerationCard` grid plus its empty state, with no surrounding tabs/stats/sheet chrome.
 
 ```ts
-({ generations, onGenerated, onOpenGeneration, onOpenHistory, workspaceId, pickReferenceImage, sendTone, actions, recen…
+({ generations, typeFilter, onSelect, }: { generations: Generation[]; typeFilter: string | null; onSelect: (generation:…
 ```
 
-### `StudioHomeScreenProps`
-
-`interface`
-
-```ts
-interface StudioHomeScreenProps
-```
-
-### `StudioPlayback`
-
-`interface`
-
-```ts
-interface StudioPlayback
-```
-
-### `StudioPlaybackProvider`
+### `GenerationStatusBadge`
 
 `function`
 
 ```ts
-(props: { children: ReactNode; createAudioElement?: (() => StudioAudioElementLike) | undefined; }) => Element
+({ generation, inline, }: { generation: Generation; inline?: boolean | undefined; }) => Element | null
 ```
 
-### `StudioToastInput`
-
-`interface`
-
-```ts
-interface StudioToastInput
-```
-
-### `StudioToastProvider`
+### `ImageComposer`
 
 `function`
 
 ```ts
-({ children }: { children: ReactNode; }) => Element
+({ size, quality, imageCount, onSizeChange, onQualityChange, onImageCountChange, }: { size: string; quality: string; im…
 ```
 
-### `useBatchNavigation`
-
-`function` — Returns a callback the screens wrap around `onGenerated`: the first row of a batch not seen before navigates via `onOpenGeneration`, exactly once per batch — a four-image batch arrives as four rows s…
-
-```ts
-({ seed, currentBatchKey, onOpenGeneration, }: UseBatchNavigationOptions) => (generation: Generation) => void
-```
-
-### `UseBatchNavigationOptions`
-
-`interface`
-
-```ts
-interface UseBatchNavigationOptions
-```
-
-### `useDeferredDelete`
+### `LibraryDrawer`
 
 `function`
 
 ```ts
-(options: UseDeferredDeleteOptions) => DeferredDelete
+({ open, onOpenChange, generations, totalCost, typeFilter, onFilterChange, vaultHref, selected, onSelect, }: { open: bo…
 ```
 
-### `UseDeferredDeleteOptions`
+### `LibraryPanel`
+
+`function` — Inline asset gallery — the same filter + stats + card grid as the library drawer's list view, but with no sheet chrome so it can sit on the page beside the composer.
+
+```ts
+({ generations, totalCost, typeFilter, onFilterChange, onSelect, }: { generations: Generation[]; totalCost: number; typ…
+```
+
+### `NativeSelect`
+
+`function`
+
+```ts
+(props: SelectHTMLAttributes<HTMLSelectElement>) => Element
+```
+
+### `PublishPackageComposer`
+
+`function`
+
+```ts
+({ caption, postDescription, mentions, cadence, selectedDestinations, connections, connectionError, connectionsLoading,…
+```
+
+### `ResultCanvas`
+
+`function`
+
+```ts
+({ batch, onOpenLibrary, onSelect, }: { batch: Generation[]; onOpenLibrary: () => void; onSelect: (generation: Generati…
+```
+
+### `SpeechComposer`
+
+`function`
+
+```ts
+({ voice, onVoiceChange, }: { voice: string; onVoiceChange: (value: string) => void; }) => Element
+```
+
+### `Stepper`
+
+`function`
+
+```ts
+({ value, min, max, onChange, }: { value: number; min: number; max: number; onChange: (value: number) => void; }) => El…
+```
+
+### `StudioHeader`
+
+`function`
+
+```ts
+({ count, onOpenLibrary, canGenerate, }: { count: number; onOpenLibrary: () => void; canGenerate: boolean; }) => Element
+```
+
+### `StudioRole`
+
+`type`
+
+```ts
+type StudioRole
+```
+
+### `StudioSheet`
+
+`function` — Right-side overlay sheet built on Radix Dialog — gives focus-trap, scroll-lock, and Escape-to-close for free.
+
+```ts
+({ open, onOpenChange, title, children, }: { open: boolean; onOpenChange: (open: boolean) => void; title: string; child…
+```
+
+### `StudioWorkspace`
+
+`function` — The full studio surface: header + composer + result canvas + library drawer, with the generation orchestrator (merge/poll/revalidate) wired in.
+
+```ts
+({ generations, totalCost, workspaceId, role, generationsEndpoint, vaultHref, integrationsHref, }: StudioWorkspaceProps…
+```
+
+### `StudioWorkspaceProps`
 
 `interface`
 
 ```ts
-interface UseDeferredDeleteOptions
+interface StudioWorkspaceProps
 ```
 
-### `useGenerationHistory`
+### `TranscriptionComposer`
 
-`function` — Cursor-paged generation history over the product-supplied data port.
+`function`
 
 ```ts
-({ fetchPage, q, type, initialPage, }: UseGenerationHistoryOptions) => GenerationHistoryState
+({ audioUrl, language, onAudioUrlChange, onLanguageChange, }: { audioUrl: string; language: string; onAudioUrlChange: (…
 ```
 
-### `UseGenerationHistoryOptions`
+### `TranscriptionOptions`
 
-`interface`
+`function`
 
 ```ts
-interface UseGenerationHistoryOptions
+({ responseFormat, temperature, onResponseFormatChange, onTemperatureChange, }: { responseFormat: string; temperature:…
+```
+
+### `TYPE_CONFIG`
+
+`const` — Map type keys to their corresponding configuration objects including labels, icons, and colors
+
+```ts
+Record<string, TypeConfig>
+```
+
+### `TypeConfig`
+
+`interface` — Define configuration options for a type including label, icon, and color properties
+
+```ts
+interface TypeConfig
+```
+
+### `typeConfigFor`
+
+`function` — Resolve the configuration object for a given type or return the default image configuration
+
+```ts
+(type: string) => TypeConfig
 ```
 
 ### `useStudioGenerations`
@@ -350,34 +238,10 @@ interface UseGenerationHistoryOptions
 (loaderGenerations: Generation[], options?: { workspaceId?: string | undefined; generationsEndpoint?: string | undefine…
 ```
 
-### `useStudioPlayback`
+### `VideoComposer`
 
 `function`
 
 ```ts
-() => StudioPlayback
-```
-
-### `useStudioToast`
-
-`function`
-
-```ts
-() => StudioToastContextValue
-```
-
-### `VaultPathPopover`
-
-`function`
-
-```ts
-({ open, triggerRef, panelRef, generations, onSubmit, onCancel, pending, }: VaultPathPopoverProps) => Element | null
-```
-
-### `VaultPathPopoverProps`
-
-`interface`
-
-```ts
-interface VaultPathPopoverProps
+({ duration, resolution, aspectRatio, referenceImageUrl, onDurationChange, onResolutionChange, onAspectRatioChange, onR…
 ```

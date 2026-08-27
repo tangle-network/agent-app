@@ -97,14 +97,14 @@ export function CanvasEmptyState({
       role="group"
       aria-label="Start your design"
     >
-      <div className="pointer-events-auto flex w-full max-w-lg flex-col items-center gap-5 rounded-xl border border-[var(--card-edge)] bg-[hsl(var(--popover))] px-6 py-7 text-center shadow-[var(--shadow-overlay)] sm:px-8">
+      <div className="pointer-events-auto flex w-full max-w-lg flex-col items-center gap-5 rounded-xl border border-[var(--border-default)] bg-[var(--bg-input)]/95 px-6 py-7 text-center shadow-xl backdrop-blur sm:px-8">
         <span className="flex items-center gap-2 text-[var(--text-muted)]">
           <BrandKnot size={22} className="shrink-0" />
-          <span className="text-xs font-semibold uppercase tracking-[0.05em]">Tangle Design</span>
+          <span className="text-[11px] font-medium uppercase tracking-[0.14em]">Tangle Design</span>
         </span>
 
         <div className="flex flex-col gap-1.5">
-          <h2 className="text-xl font-semibold text-[var(--text-primary)]">{title}</h2>
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h2>
           <p className="text-sm leading-5 text-[var(--text-secondary)]">{subtitle}</p>
         </div>
 
@@ -114,13 +114,13 @@ export function CanvasEmptyState({
               key={key}
               type="button"
               onClick={onClick}
-              className="group flex min-h-[44px] flex-col items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[hsl(var(--card))] px-3 py-4 text-center transition-colors hover:border-[var(--brand-primary)]"
+              className="group flex min-h-[44px] flex-col items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[hsl(var(--card))] px-3 py-4 text-center transition-colors hover:border-[var(--brand-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--bg-input)]"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)] text-[var(--brand-primary)] transition-colors group-hover:bg-[color-mix(in_srgb,var(--brand-primary)_15%,transparent)]">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] transition-colors group-hover:bg-[var(--brand-primary)]/15">
                 <Icon className="h-4 w-4" />
               </span>
-              <span className="text-sm font-medium text-[var(--text-primary)]">{label}</span>
-              <span className="text-xs leading-4 text-[var(--text-muted)]">{hint}</span>
+              <span className="text-[13px] font-medium text-[var(--text-primary)]">{label}</span>
+              <span className="text-[11px] leading-4 text-[var(--text-muted)]">{hint}</span>
             </button>
           ))}
         </div>

@@ -11,15 +11,9 @@
  */
 
 import { History, MessageSquarePlus, Minus, Plus, X } from "lucide-react";
-import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogModel } from "../runtime/model-catalog";
-import {
-  ChatComposer,
-  ChatEmptyState,
-  type ComposerFile,
-  ModelPicker,
-  type ToolDetailRenderers,
-} from "../web-react";
+import { ChatComposer, ModelPicker, type ToolDetailRenderers } from "../web-react";
 import { AssistantHistory } from "./AssistantHistory";
 import type { AssistantModels } from "./client";
 import { isLowBalance, presentError } from "./presentation";
@@ -70,39 +64,10 @@ export interface AssistantPanelProps {
    *  clears its seed state (consume-once). */
   composerSeed?: string | null;
   onComposerSeedApplied?: () => void;
-  /** Opt-in attachment surface for the composer, mirroring `ChatComposer`'s
-   *  attachment props: pass `onAttach` to show the attach button and accept
-   *  drag-and-drop, and drive the staged-file chips with `pendingFiles` /
-   *  `onRemoveFile` (web-react's `useComposerAttachments` owns that lifecycle).
-   *  Omitted, the composer stays text-only. The assistant wire carries text
-   *  only, so a host that stages files owns getting their content to the model
-   *  (e.g. inlined on the next `chat.send`); `onComposerSend` is the signal to
-   *  consume and clear the staged set. */
-  composerAttachments?: {
-    onAttach: (files: FileList) => void;
-    onAttachFolder?: (files: FileList) => void;
-    pendingFiles?: ComposerFile[];
-    onRemoveFile?: (id: string) => void;
-    accept?: string;
-  };
-  /** Fired when the composer sends (alongside `chat.send`) — the host's signal
-   *  to consume and clear its staged attachments. */
-  onComposerSend?: (message: string) => void;
 }
 
-/**
- * The first-run state's doors — three concrete things the assistant can do.
- * Each seeds the composer (the draft waits for the user to edit/send; nothing
- * is fired off on the door click itself). Labels only: ChatEmptyState lays the
- * doors out by VIEWPORT width (`sm:grid-cols-3`), so on a desktop the dock's
- * narrow panel gets three columns — description text wraps to shreds there,
- * while a short label still reads.
- */
-const EMPTY_DOORS = [
-  { label: "Create a workflow", seed: "Create a workflow that " },
-  { label: "Check usage", seed: "What did my workflows cost this week?" },
-  { label: "Manage API keys", seed: "Create an API key named " },
-];
+const EMPTY_STATE =
+  "Ask me to create a workflow, check your usage, or manage your API keys.";
 
 function defaultFormatMoney(usd: number | null): string {
   if (usd == null) return "—";
@@ -210,16 +175,10 @@ export function AssistantPanel({
   renderTranscript,
   composerSeed = null,
   onComposerSeedApplied,
-  composerAttachments,
-  onComposerSend,
 }: AssistantPanelProps) {
   const models = useAssistantModels();
   const threads = useAssistantThreads(userId);
   const font = useFontScale();
-  // A one-shot composer draft from an empty-state door click — the panel-local
-  // counterpart of the host's `composerSeed`, consumed by the same seed
-  // mechanism (applied once, then cleared).
-  const [doorSeed, setDoorSeed] = useState<string | null>(null);
   // Which surface the conversation area shows: the live chat, or the full-panel
   // history list. The header's history button toggles between them.
   const [view, setView] = useState<"chat" | "history">("chat");
@@ -308,20 +267,12 @@ export function AssistantPanel({
     state.status,
     state.pendingProposals,
   ]);
-  // An empty thread shows the first-run state, which has nothing to follow —
-  // and when it's taller than the panel, pinning to the bottom would open it
-  // with its headline clipped. Disable follow while empty and open at the top;
-  // the first message re-enables it (stuckRef never unstuck while disabled).
-  const emptyThread = state.messages.length === 0 && state.status !== "streaming";
   const { onScroll: handleConversationScroll } = useStickToBottom(logRef, {
-    enabled: view === "chat" && !emptyThread,
+    enabled: view === "chat",
     contentSignature,
     streamingId: state.streamingId,
     threadId: state.threadId,
   });
-  useLayoutEffect(() => {
-    if (emptyThread && logRef.current) logRef.current.scrollTop = 0;
-  }, [emptyThread]);
 
   // Prefer the just-settled turn's balance (from the usage event, immediate)
   // over the injected fetched balance, which may lag a turn behind.
@@ -422,26 +373,22 @@ export function AssistantPanel({
   };
 
   return (
-    <div className="relative flex h-full flex-col bg-card">
+    <div className="relative flex h-full flex-col bg-background">
       {/* Header: identity + active-conversation title, and the conversation-level
           actions (text size, history, new, close). */}
       <div className="border-border border-b">
         <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2.5">
           <div className="flex min-w-0 flex-col">
             <div className="flex items-baseline gap-2">
-              <span className="font-semibold text-[15px] text-foreground">
+              <span className="font-medium text-foreground text-sm">
                 Assistant
               </span>
-              {/* The balance tile renders only with an actual figure — a null
-                  balance used to paint a dangling "Assistant —". */}
-              {effectiveBalance != null && (
-                <span
-                  aria-label="Your credit balance"
-                  className="text-muted-foreground text-xs"
-                >
-                  {formatMoney(effectiveBalance)}
-                </span>
-              )}
+              <span
+                aria-label="Your credit balance"
+                className="text-muted-foreground text-xs"
+              >
+                {formatMoney(effectiveBalance)}
+              </span>
             </div>
             {conversationTitle && (
               <span
@@ -485,7 +432,7 @@ export function AssistantPanel({
               onClick={toggleHistory}
               aria-label="Chat history"
               aria-pressed={view === "history"}
-              className={`rounded-md p-1.5 transition-colors hover:bg-muted hover:text-foreground ${
+              className={`rounded-md p-1.5 transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 view === "history"
                   ? "bg-muted text-foreground"
                   : "text-muted-foreground"
@@ -501,7 +448,7 @@ export function AssistantPanel({
               }}
               aria-label="New chat"
               title="New chat"
-              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <MessageSquarePlus className="h-4 w-4" />
             </button>
@@ -509,7 +456,7 @@ export function AssistantPanel({
               type="button"
               onClick={onClose}
               aria-label="Close assistant"
-              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <X className="h-4 w-4" />
             </button>
@@ -535,8 +482,6 @@ export function AssistantPanel({
           <AssistantHistory
             threads={threads.threads}
             loaded={threads.loaded}
-            error={threads.error}
-            onRetry={threads.refresh}
             activeThreadId={state.threadId}
             activeBusy={state.status !== "idle"}
             canRemove={threads.canRemove}
@@ -563,15 +508,9 @@ export function AssistantPanel({
                 toolRenderers={toolRenderers}
                 renderConfirmedResult={renderConfirmedResult}
                 emptyState={
-                  <ChatEmptyState
-                    productName="Assistant"
-                    headline="Ask the assistant to do something"
-                    subline="Create workflows, check usage, or manage API keys — I'll pause for approval before anything changes."
-                    doors={EMPTY_DOORS.map((door) => ({
-                      label: door.label,
-                      onSelect: () => setDoorSeed(door.seed),
-                    }))}
-                  />
+                  <p className="px-4 py-8 text-center text-muted-foreground text-sm">
+                    {EMPTY_STATE}
+                  </p>
                 }
               />
             )}
@@ -579,45 +518,28 @@ export function AssistantPanel({
         )}
       </div>
 
-      {/* Error / low-balance banners. The error banner follows the transcript's
-          stream-error dialect: alert glyph + destructive message, the CTA as a
-          bordered chip. */}
+      {/* Error / low-balance banners */}
       {errorView && (
         <div
           role="alert"
-          className="mx-4 mb-2 flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2.5 text-destructive text-sm"
+          className="mx-4 mb-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm"
         >
-          <svg
-            className="mt-0.5 h-4 w-4 shrink-0"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 8v4m0 4h.01" />
-          </svg>
-          <div className="min-w-0 flex-1">
-            <p>{errorView.message}</p>
-            {errorView.cta && (
-              <button
-                type="button"
-                onClick={() => navigate?.(errorView.cta?.to ?? "")}
-                className="mt-1.5 rounded border border-destructive/40 bg-card px-2 py-0.5 font-medium text-xs text-destructive transition hover:bg-destructive/10"
-              >
-                {errorView.cta.label}
-              </button>
-            )}
-          </div>
+          <p className="text-foreground">{errorView.message}</p>
+          {errorView.cta && (
+            <button
+              type="button"
+              onClick={() => navigate?.(errorView.cta?.to ?? "")}
+              className="mt-1 text-primary text-xs"
+            >
+              {errorView.cta.label} →
+            </button>
+          )}
         </div>
       )}
       {low && (
         <div
           role="status"
-          className="mx-4 mb-2 rounded-lg border border-border bg-secondary px-3 py-2 text-sm"
+          className="mx-4 mb-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm"
         >
           <p className="text-foreground">Your credit balance is running low.</p>
           <button
@@ -640,10 +562,10 @@ export function AssistantPanel({
         view === "chat" && (
           <div
             role="status"
-            className="mx-4 mb-2 flex items-center gap-3 rounded-lg border border-border bg-secondary px-3 py-2 text-sm"
+            className="mx-4 mb-2 flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm"
           >
             <p className="min-w-0 flex-1 text-foreground">
-              Paused at the step limit.
+              Paused after a lot of steps.
             </p>
             <button
               type="button"
@@ -657,18 +579,16 @@ export function AssistantPanel({
                 // instruction, not a new magic string the backend must decode.)
                 chat.send("continue");
               }}
-              className="shrink-0 rounded-lg bg-primary px-3 py-1.5 font-semibold text-primary-foreground text-xs transition hover:bg-primary/90"
+              className="shrink-0 rounded-lg bg-primary px-3 py-1.5 font-semibold text-primary-foreground text-xs transition hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               Continue
             </button>
           </div>
         )}
 
-      {/* Composer: the model picker sits on the input's own action row, so the
-          model the next turn will use reads as part of the composer. The band
-          is padded rather than flush — at `p-2` the card sat all but against
-          the dock's edges, which is what made the input look cramped. */}
-      <div className="border-border border-t p-3">
+      {/* Composer: the model picker sits directly above the input, so the model
+          the next turn will use reads as part of the composer. */}
+      <div className="border-border border-t p-2">
         {/* Running indicator: while a turn streams, the composer's Send becomes a
             Stop button — on its own an easy-to-miss signal. This animated row makes
             "the assistant is working" unmistakable regardless of the transcript
@@ -682,28 +602,13 @@ export function AssistantPanel({
           onSend={(message) => {
             setView("chat");
             chat.send(message);
-            onComposerSend?.(message);
           }}
           onCancel={chat.stop}
           isStreaming={streaming}
           disabled={chat.restoring || state.status === "awaiting_confirm"}
-          placeholder={
-            state.status === "awaiting_confirm"
-              ? "Confirm or cancel the proposal above to continue"
-              : "Message the assistant…"
-          }
-          // The empty-state doors' seed is panel-local; the host's composerSeed
-          // wins only when no door seed is pending. Both consume once.
-          seed={doorSeed ?? composerSeed}
-          onSeedApplied={() => {
-            setDoorSeed(null);
-            onComposerSeedApplied?.();
-          }}
-          onAttach={composerAttachments?.onAttach}
-          onAttachFolder={composerAttachments?.onAttachFolder}
-          pendingFiles={composerAttachments?.pendingFiles}
-          onRemoveFile={composerAttachments?.onRemoveFile}
-          accept={composerAttachments?.accept}
+          placeholder="Message the assistant…"
+          seed={composerSeed}
+          onSeedApplied={onComposerSeedApplied}
           controls={
             pickerModels.length > 0 ? (
               <ModelPicker

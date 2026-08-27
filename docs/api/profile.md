@@ -4,15 +4,7 @@
 
 Source: `src/profile/index.ts`
 
-45 exports.
-
-### `assertProfilePromptWithinBudget`
-
-`function` — Run {@link assertSystemPromptWithinBudget} over a profile-shaped object's `prompt.systemPrompt`.
-
-```ts
-(profile: { prompt?: { systemPrompt?: unknown; } | undefined; } | undefined, budget?: ComposeProfileBudget, origin?: st…
-```
+37 exports.
 
 ### `assertSkillDeliveryDisjoint`
 
@@ -27,7 +19,7 @@ Source: `src/profile/index.ts`
 `function` — Enforce {@link ComposeProfileBudget} on a composed system prompt: over budget throws (or warns with `warnOnly`) with the actual size and the top-3 largest sections.
 
 ```ts
-(systemPrompt: string, budget?: ComposeProfileBudget, origin?: string) => void
+(systemPrompt: string, budget?: ComposeProfileBudget) => void
 ```
 
 ### `composeAgentProfile`
@@ -110,36 +102,12 @@ interface CorpusLoadResult
 40000
 ```
 
-### `diffProfileFingerprints`
-
-`function` — Channel-by-channel comparison of two fingerprints.
-
-```ts
-(a: ProfileFingerprint, b: ProfileFingerprint) => ProfileDrift
-```
-
 ### `EvolvableSectionInput`
 
 `interface` — Inputs to {@link makeEvolvableSection}.
 
 ```ts
 interface EvolvableSectionInput
-```
-
-### `fingerprintAgentProfile`
-
-`function` — Fingerprint a profile as the SDK would receive it.
-
-```ts
-(profile: AgentProfile, context?: ProfileFingerprintContext | undefined) => Promise<ProfileFingerprint>
-```
-
-### `formatProfileDrift`
-
-`function` — Human-readable drift report; exactly 'profiles identical' when equal.
-
-```ts
-(drift: ProfileDrift) => string
 ```
 
 ### `GlobModules`
@@ -228,38 +196,6 @@ namespace profile
 
 ```ts
 interface ProfileChannels
-```
-
-### `ProfileDrift`
-
-`interface`
-
-```ts
-interface ProfileDrift
-```
-
-### `ProfileDriftEntry`
-
-`interface` — One drifted channel between two fingerprints, rendered as comparable strings.
-
-```ts
-interface ProfileDriftEntry
-```
-
-### `ProfileFingerprint`
-
-`interface` — Channelled identity of one executed (or composed) profile.
-
-```ts
-interface ProfileFingerprint
-```
-
-### `ProfileFingerprintContext`
-
-`interface` — The dispatch context a profile cannot see but a turn's identity includes.
-
-```ts
-interface ProfileFingerprintContext
 ```
 
 ### `ProfileOverlay`

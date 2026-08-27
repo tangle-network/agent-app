@@ -1,8 +1,8 @@
 /**
  * The shared 3-pane vault: tree | artifact viewer | optional agent dock. This is
  * pure shell MECHANISM — selection, the dirty-guard + pending-nav state machine,
- * rich/source editor modes, create/delete/refresh, skeletons, and an error
- * boundary. It renders NO file tree and NO artifact viewer of its own:
+ * rich/source editor modes, create/delete/refresh, skeletons, an error boundary,
+ * and an empty state. It renders NO file tree and NO artifact viewer of its own:
  * those arrive through the `renderTree` / `renderArtifact` / `renderDock` seams,
  * so a product wires sandbox-ui's RichFileTree + FileArtifactPane in ~10 lines.
  *
@@ -23,7 +23,7 @@ import {
   type MouseEvent,
   type ReactNode,
 } from 'react'
-import { Download, Folder, Trash2 } from 'lucide-react'
+import { Download, Trash2 } from 'lucide-react'
 import { ConfirmDialog } from './ConfirmDialog'
 import type {
   VaultEditorMode,
@@ -68,20 +68,10 @@ function treeFailureMessage(failure: VaultOperationFailure): string {
   return `The file was ${completed}, but the Vault couldn't refresh. ${failure.message}`
 }
 
-interface TreePaths {
-  files: Set<string>
-  directories: Set<string>
-}
-
-// Directories are collected alongside files because a click on one has to be
-// RECOGNIZED to be answered — dropping them here is what made a folder row a
-// dead target: the path resolved to nothing and every downstream branch was
-// keyed on a file.
-function collectTreePaths(nodes: VaultTreeNode[], into: TreePaths): TreePaths {
+function collectFilePaths(nodes: VaultTreeNode[], into: Set<string>): Set<string> {
   for (const node of nodes) {
-    if (node.type === 'file') into.files.add(node.path)
-    else into.directories.add(node.path)
-    if (node.children) collectTreePaths(node.children, into)
+    if (node.type === 'file') into.add(node.path)
+    if (node.children) collectFilePaths(node.children, into)
   }
   return into
 }
@@ -92,43 +82,21 @@ function resolveFilePath(rawPath: string, filePaths: Set<string>): string | null
   return filePaths.has(path) ? path : null
 }
 
-function resolveTreePath(rawPath: string, paths: TreePaths): { path: string; type: 'file' | 'directory' } | null {
-  const file = resolveFilePath(rawPath, paths.files)
-  if (file) return { path: file, type: 'file' }
-  if (paths.directories.has(rawPath)) return { path: rawPath, type: 'directory' }
-  const trimmed = rawPath.replace(/^\/+|\/+$/g, '')
-  return paths.directories.has(trimmed) ? { path: trimmed, type: 'directory' } : null
-}
-
-function findDirectory(nodes: VaultTreeNode[], path: string): VaultTreeNode | null {
-  for (const node of nodes) {
-    if (node.type === 'directory' && node.path === path) return node
-    const found = node.children ? findDirectory(node.children, path) : null
-    if (found) return found
-  }
-  return null
-}
-
-/** The clicked tree row, files and directories alike. The type travels with the
- *  path so the caller routes on it instead of discarding everything that is not
- *  a file. */
-function treeClickTarget(event: MouseEvent<HTMLElement>): { path: string; type: string } | null {
-  const read = (el: HTMLElement) => {
-    const path = el.dataset.itemPath
-    return path ? { path, type: el.dataset.itemType ?? '' } : null
-  }
-
+function treeClickPath(event: MouseEvent<HTMLElement>): string | null {
   const path = event.nativeEvent.composedPath?.() ?? []
   for (const item of path) {
     if (!(item instanceof HTMLElement)) continue
     if (item.dataset.type !== 'item') continue
-    return read(item)
+    if (item.dataset.itemType !== 'file') return null
+    return item.dataset.itemPath ?? null
   }
 
   const target = event.target instanceof HTMLElement
     ? event.target.closest('[data-type="item"]')
     : null
-  return target instanceof HTMLElement ? read(target) : null
+  if (!(target instanceof HTMLElement)) return null
+  if (target.dataset.itemType !== 'file') return null
+  return target.dataset.itemPath ?? null
 }
 
 // Case-insensitive name filter over the tree: files survive when their name
@@ -171,7 +139,7 @@ class EditorErrorBoundary extends Component<{ children: ReactNode; onReset?: () 
           <button
             type="button"
             onClick={() => { this.setState({ error: null }); this.props.onReset?.() }}
-            className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+            className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60"
           >
             Try again
           </button>
@@ -182,49 +150,35 @@ class EditorErrorBoundary extends Component<{ children: ReactNode; onReset?: () 
   }
 }
 
-/**
- * A skeleton is a picture of a wait, and a picture is exactly what a screen
- * reader cannot see. `aria-hidden` on the shimmer bars is right — they carry no
- * information — but hiding them without saying anything else is what left the
- * whole load silent. The container announces the wait instead: `aria-busy` for
- * the state, a `status` live region so arrival is reported, and a real text
- * label, since a live region with only decorative children announces nothing.
- */
-function SkeletonRegion({ label, className, children }: { label: string; className: string; children: ReactNode }) {
-  // The live region is a SIBLING of the shimmer, not a wrapper around it: the
-  // shimmer container keeps its exact classes and its exact position in the
-  // parent's layout, so adding the announcement cannot move a pixel. Wrapping
-  // it would put a new box between `space-y-*` and the bars it spaces.
-  return (
-    <>
-      <span role="status" aria-live="polite" aria-busy={true} className="sr-only">
-        {label}
-      </span>
-      <div className={className} aria-hidden="true">
-        {children}
-      </div>
-    </>
-  )
-}
-
 function TreeSkeleton() {
   return (
-    <SkeletonRegion label="Loading files…" className="space-y-2 p-4">
+    <div className="space-y-2 p-4" aria-hidden="true">
       {[32, 48, 40, 52].map((w, i) => (
         <div key={i} className="h-4 animate-pulse rounded bg-muted" style={{ width: `${w * 4}px` }} />
       ))}
-    </SkeletonRegion>
+    </div>
   )
 }
 
 function EditorSkeleton() {
   return (
-    <SkeletonRegion label="Loading file…" className="space-y-3 p-8">
+    <div className="space-y-3 p-8" aria-hidden="true">
       <div className="h-5 w-1/2 animate-pulse rounded bg-muted" />
       <div className="h-4 w-full animate-pulse rounded bg-muted" />
       <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
       <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
-    </SkeletonRegion>
+    </div>
+  )
+}
+
+function EmptyState() {
+  return (
+    <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+      <h3 className="text-sm font-medium text-foreground">Open a vault document</h3>
+      <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+        Select a file from the directory, or create a new one.
+      </p>
+    </div>
   )
 }
 
@@ -238,7 +192,7 @@ function ReadErrorState({ message, onRetry }: { message: string; onRetry: () => 
       <button
         type="button"
         onClick={onRetry}
-        className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+        className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60"
       >
         Retry
       </button>
@@ -256,7 +210,7 @@ function TreeErrorState({ message, onRetry }: { message: string; onRetry: () => 
       <button
         type="button"
         onClick={onRetry}
-        className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+        className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60"
       >
         Retry
       </button>
@@ -348,45 +302,26 @@ export function VaultPane(props: VaultPaneProps) {
   const [dockOpen, setDockOpen] = useState(false)
   const [pendingNav, setPendingNav] = useState<PendingNav>(null)
   const [query, setQuery] = useState('')
-  const [folderPath, setFolderPath] = useState<string | null>(null)
 
   const savedContentRef = useRef('')
   const loadedPathRef = useRef<string | null>(null)
   const onOperationErrorRef = useRef(onOperationError)
   onOperationErrorRef.current = onOperationError
 
-  const treePaths = useMemo(
-    () => collectTreePaths(tree, { files: new Set<string>(), directories: new Set<string>() }),
-    [tree],
-  )
-  const filePaths = treePaths.files
+  const filePaths = useMemo(() => collectFilePaths(tree, new Set<string>()), [tree])
   const resolvedSelectedPath = useMemo(
     () => selectedPath ? resolveFilePath(selectedPath, filePaths) : null,
     [selectedPath, filePaths],
   )
-  // The clicked folder, resolved against the CURRENT tree — a folder that a
-  // refresh removed stops being the active one on its own, so neither the
-  // search scope nor the create target can point at a directory that is gone.
-  const activeFolderNode = useMemo(
-    () => (folderPath ? findDirectory(tree, folderPath) : null),
-    [tree, folderPath],
-  )
-  const activeFolder = activeFolderNode?.path ?? null
   const treeRoot = useMemo<VaultTreeNode>(
     () => ({ name: 'Vault', path: '', type: 'directory', children: tree }),
     [tree],
   )
-  // With no query the whole vault stays on screen: the tree renderer owns
-  // expansion (both sandbox-ui trees keep it internal), so re-rooting on a
-  // plain folder click would fight the expand the click already performs. The
-  // folder scopes the SEARCH, which is where a narrowed list is what the reader
-  // asked for.
   const visibleRoot = useMemo<VaultTreeNode>(() => {
     const q = query.trim().toLowerCase()
     if (!q) return treeRoot
-    const base = activeFolderNode ?? treeRoot
-    return { ...base, children: filterNodes(base.children ?? [], q) }
-  }, [treeRoot, activeFolderNode, query])
+    return { ...treeRoot, children: filterNodes(tree, q) }
+  }, [treeRoot, tree, query])
 
   const commitPath = useCallback(
     (next: string | null) => {
@@ -534,25 +469,16 @@ export function VaultPane(props: VaultPaneProps) {
     [isDirty, selectedPath, commitPath],
   )
 
-  // Clicking a folder makes it the vault's active folder: the search narrows to
-  // it and a new file lands inside it. Clicking it again clears that — the same
-  // row is the way back out, so the gesture is reversible where it was made.
-  const toggleFolder = useCallback((path: string) => {
-    setFolderPath((current) => (current === path ? null : path))
-  }, [])
-
   // Some tree models keep their original selection callback while resetting
   // paths internally. Keep the callable stable, but have it execute the latest
-  // path validation and dirty-guard logic.
+  // file-path validation and dirty-guard logic.
   const selectFileRef = useRef<(path: string) => void>(() => {})
   selectFileRef.current = (rawPath: string) => {
-    const target = resolveTreePath(rawPath, treePaths)
-    if (!target) return
-    if (target.type === 'file') {
-      guardedOpen(target.path)
+    const path = resolveFilePath(rawPath, filePaths)
+    if (path) {
+      guardedOpen(path)
       return
     }
-    toggleFolder(target.path)
   }
   const handleTreeSelect = useCallback((path: string) => selectFileRef.current(path), [])
 
@@ -628,9 +554,7 @@ export function VaultPane(props: VaultPaneProps) {
 
   const handleCreate = useCallback(async () => {
     const trimmed = newPath.trim()
-    // Same rule as the confirm button, enforced here too: the dialog can also be
-    // confirmed by keyboard, and a directory path is not a file to create.
-    if (!trimmed || !(trimmed.split('/').pop()?.trim())) return
+    if (!trimmed) return
     setCreating(true)
     setCreateError(null)
     try {
@@ -670,8 +594,6 @@ export function VaultPane(props: VaultPaneProps) {
     }
   }, [selectedFile, port, refresh, commitPath, reportFailure])
 
-  const createFileName = newPath.trim().split('/').pop()?.trim() ?? ''
-
   let treeContent: ReactNode
   if (treeLoading || (!treeLoaded && !treeError)) {
     treeContent = <TreeSkeleton />
@@ -707,9 +629,9 @@ export function VaultPane(props: VaultPaneProps) {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={activeFolder ? `Search ${activeFolder}…` : 'Search…'}
+                placeholder="Search…"
                 aria-label="Search vault"
-                className="h-8 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground"
+                className="h-8 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-primary/60"
               />
             </div>
             <div className="flex shrink-0 items-center gap-1">
@@ -718,43 +640,27 @@ export function VaultPane(props: VaultPaneProps) {
                 type="button"
                 aria-label="Refresh vault"
                 onClick={() => void refresh()}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60"
               >
                 ↻
               </button>
               {canWrite && (
                 <button
                   type="button"
-                  aria-label={activeFolder ? `New vault file in ${activeFolder}` : 'New vault file'}
-                  onClick={() => { setCreateError(null); setNewPath(activeFolder ? `${activeFolder}/` : ''); setCreateOpen(true) }}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
+                  aria-label="New vault file"
+                  onClick={() => { setCreateError(null); setCreateOpen(true) }}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60"
                 >
                   +
                 </button>
               )}
             </div>
           </div>
-          {activeFolder && (
-            <div className="flex items-center gap-1.5 border-b border-border bg-muted/40 px-4 py-1.5 text-xs">
-              <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <span data-vault-folder className="min-w-0 flex-1 truncate font-medium text-foreground" title={activeFolder}>
-                {activeFolder}
-              </span>
-              <button
-                type="button"
-                aria-label="Clear the active folder"
-                onClick={() => setFolderPath(null)}
- className="shrink-0 rounded px-1 text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
-              >
-                Clear
-              </button>
-            </div>
-          )}
           <div
             className="flex-1 overflow-y-auto"
             onClickCapture={(event) => {
-              const target = treeClickTarget(event)
-              if (target) handleTreeSelect(target.path)
+              const path = treeClickPath(event)
+              if (path) handleTreeSelect(path)
             }}
           >
             {treeContent}
@@ -871,7 +777,9 @@ export function VaultPane(props: VaultPaneProps) {
                 onRichChange,
                 onSave: () => void saveCurrent(),
               })
-            ) : null}
+            ) : (
+              <EmptyState />
+            )}
           </div>
         </div>
 
@@ -884,12 +792,9 @@ export function VaultPane(props: VaultPaneProps) {
         <ConfirmDialog
           open={createOpen}
           title="Create vault file"
-          description={activeFolder ? `Add a new document to ${activeFolder}.` : 'Add a new document to this vault.'}
+          description="Add a new document to this vault."
           confirmLabel={creating ? 'Creating…' : 'Create'}
-          // A prefilled folder is a path with no file name yet, so emptiness is
-          // not the test — `folder/` would otherwise be sent to the port as a
-          // file to create.
-          confirmDisabled={creating || !createFileName}
+          confirmDisabled={creating || !newPath.trim()}
           onConfirm={() => void handleCreate()}
           onCancel={() => { setCreateOpen(false); setNewPath(''); setCreateError(null) }}
         >
@@ -900,7 +805,7 @@ export function VaultPane(props: VaultPaneProps) {
               onChange={(e) => setNewPath(e.target.value)}
               placeholder="e.g. playbooks/new-strategy.md"
               aria-label="New file path"
-              className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground"
+              className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-primary/60"
             />
             {createError && <p role="alert" className="text-xs text-destructive">{createError.message}</p>}
           </div>
@@ -951,7 +856,7 @@ function SourceEditor({
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
       <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
-        <p className="truncate font-mono text-xs text-muted-foreground">{path}</p>
+        <p className="truncate font-mono text-[11px] text-muted-foreground">{path}</p>
         <div className="flex shrink-0 items-center gap-2">
           <span className="rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground">
             {dirty ? 'Unsaved changes' : 'Saved'}
@@ -971,9 +876,7 @@ function SourceEditor({
         onChange={(event) => onChange(event.target.value)}
         spellCheck={false}
         aria-label="Source editor"
-        // Full-bleed editor: keep the floor's ring but draw it inside the border
-        // box, since an outward ring on a `flex-1` pane child is clipped.
-        className="min-h-0 flex-1 resize-none border-0 bg-background p-4 font-mono text-sm leading-6 text-foreground focus-visible:[outline-offset:-2px]"
+        className="min-h-0 flex-1 resize-none border-0 bg-background p-4 font-mono text-sm leading-6 text-foreground outline-none"
       />
     </div>
   )

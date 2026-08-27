@@ -1,1 +1,0 @@
-{ "name": "@tangle-network/agent-app", "version": "0.45.6", "peerDependencies": { "@tangle-network/agent-interface": ">=0.38.0 <0.41.0" } }

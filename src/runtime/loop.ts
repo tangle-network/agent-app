@@ -28,7 +28,7 @@
 export {
   runToolLoop as runAppToolLoop,
   streamToolLoop as streamAppToolLoop,
-} from '@tangle-network/agent-runtime/tool-loop'
+} from '@tangle-network/agent-runtime'
 export type {
   ToolLoopCall as LoopToolCall,
   ToolLoopAssistantToolCall as LoopAssistantToolCall,
@@ -39,7 +39,7 @@ export type {
   RunToolLoopOptions as AppToolLoopOptions,
   StreamToolLoopOptions as StreamAppToolLoopOptions,
   StreamToolLoopYield as StreamLoopYield,
-} from '@tangle-network/agent-runtime/tool-loop'
+} from '@tangle-network/agent-runtime'
 
 /**
  * Events the app's OpenAI-compat stream adapter ({@link toLoopEvents}) yields.
@@ -55,9 +55,6 @@ export type {
 export type LoopEvent =
   | { type: 'text'; text: string }
   | { type: 'reasoning'; text: string }
-  | {
-      type: 'tool_call'
-      call: import('@tangle-network/agent-runtime/tool-loop').ToolLoopCall
-    }
+  | { type: 'tool_call'; call: import('@tangle-network/agent-runtime').ToolLoopCall }
   | { type: 'usage'; usage: { promptTokens: number; completionTokens: number } }
   | { type: 'other'; event: unknown }

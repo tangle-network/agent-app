@@ -16,12 +16,11 @@ Who owns each hop:
 | Body parse, turn identity, routes | `/chat-routes` (`createChatTurnRoutes`) |
 | Turn engine (NDJSON protocol, hook order) | agent-runtime `handleChatTurn` |
 | Sandbox events → client vocabulary + persisted parts | `/chat-routes` (`createSandboxChatProducer`) |
-| Model failover on a dead upstream (attributed, pre-first-byte) | `/chat-routes` (`openEvents` + `fallbackModels` on the producer) |
 | Buffered replay after a drop | `/stream` turn buffer (wired by default) |
 | Upload → `PromptInputPart` descriptors | `/chat-routes` (`createUploadRoute`) |
 | Store-backed attachments (validate, dispatch, promote) | `/chat-routes` (`resolveChatAttachments`, `buildDispatchParts`, `promoteAgentFilePart`) |
 | Ask answering (list/answer, 410 mapping, dedupe) | `/interactions` via `routes.interactions` |
-| Durable plan projection | `/plans` codec + `/chat-routes` `withDurableChatProjection` (structural) |
+| Durable plan/question lifecycle | `/durable-chat` structural store + authority adapters |
 | Composer, stream consumption, cards | `/web-react` |
 
 ## Schema (drizzle + one migration constant)
@@ -84,24 +83,13 @@ export function buildChat(env: Env) {
       const planEnabled = body.enablePlans === true
       return createSandboxChatProducer({
         model: body.model,
-        // Reactive model failover, ON by default: a dead upstream (quota wall,
-        // 502, provider outage) moves the turn to the next model BEFORE any
-        // client-visible byte. Never silent — the persisted row + billing
-        // receipt name the model that served, and the transcript gets a notice.
-        fallbackModels: ['gemini-2.5-flash-lite', 'gpt-5-mini'],
-        // Defaults keep cold source startup (120 s, through the first event)
-        // separate from provider first response (60 s after that event).
-        // Override with `openTimeoutMs` / `firstResponseTimeoutMs` only when a
-        // product has measured requirements that differ.
         // No separate producer planMode option: close over the product's
         // per-turn policy and auto-decline plan asks no card will render.
         isRenderableInteraction: (kind) =>
           kind === 'question' || (kind === 'plan' && planEnabled),
-        openEvents: ({ model, attempt, signal }) => streamSandboxPrompt(shell, box, prompt, {
-          // A failover attempt is a NEW dispatch — its own execution identity.
-          sessionId: identity.sessionId,
-          executionId: attempt === 1 ? executionId : `${executionId}-f${attempt}`,
-          model, effort: body.effort, signal,
+        events: streamSandboxPrompt(shell, box, prompt, {
+          sessionId: identity.sessionId, executionId,
+          model: body.model, effort: body.effort,
           interactions: { question: true, plan: true },
         }),
       })
@@ -208,23 +196,13 @@ An attachment is a file the product already saved to its own store (vault /
 carries bytes) and from a `@`-mention (a path the sandbox already holds). Every
 path is re-validated and every size re-derived from the STORED body, never the
 client-reported one. Storage is REQUIRED injection — `ReadAttachmentFn` /
-`AtomicAttachmentWriter` (`./attachment-store`) — there is no default store.
-
-`WriteAttachmentFn` and its original `{ ok: true }` result remain available for
-existing products. That legacy lane does not promise batch rollback. New code
-should use the atomic writer adapter below, which keeps the write and its
-ownership-safe cleanup together.
+`WriteAttachmentFn` (`./attachment-store`) — there is no default store.
 
 ```ts
 import {
-  resolveChatAttachments, buildDispatchParts, promoteAgentFilePart,
-  createAtomicAttachmentWriter, createSandboxChatProducer,
+  resolveChatAttachments, buildDispatchParts, promoteAgentFilePart, createSandboxChatProducer,
 } from '@tangle-network/agent-app/chat-routes'
-import type {
-  AtomicAttachmentWriter,
-  AttachmentWriteOwnership,
-  ReadAttachmentFn,
-} from '@tangle-network/agent-app/chat-routes'
+import type { ReadAttachmentFn, WriteAttachmentFn } from '@tangle-network/agent-app/chat-routes'
 import { createR2ObjectStore } from '@tangle-network/agent-app/object-store' // or a fleet's own vault adapter
 
 const store = createR2ObjectStore({ bucket: env.ATTACHMENTS })
@@ -236,29 +214,11 @@ const readAttachment: ReadAttachmentFn = async (scopeId, path) => {
   return { ok: true, size: obj.size, bytes, mediaType: obj.contentType }
 }
 
-const abortAttachment: AtomicAttachmentWriter['abort'] = async (
-  scopeId: string,
-  ownership: AttachmentWriteOwnership,
-) => {
-  // Upload and promotion paths contain a fresh ownership suffix, so each key is
-  // immutable. If a product reuses keys, replace this with compare-and-delete.
-  await store.delete(`${scopeId}/${ownership.path}`)
+const writeAttachment: WriteAttachmentFn = async (scopeId, path, content, { mediaType }) => {
+  const bytes = typeof content === 'string' ? Uint8Array.from(atob(content), (c) => c.charCodeAt(0)) : content
+  await store.put(`${scopeId}/${path}`, bytes, { contentType: mediaType })
+  return { ok: true }
 }
-
-const attachmentWriter: AtomicAttachmentWriter = createAtomicAttachmentWriter({
-  abort: abortAttachment,
-  write: async (scopeId, path, content, { mediaType, ownership }) => {
-    const bytes = typeof content === 'string' ? Uint8Array.from(atob(content), (c) => c.charCodeAt(0)) : content
-    await store.put(`${scopeId}/${path}`, bytes, { contentType: mediaType })
-    return {
-      ok: true,
-      receipt: {
-        ownership,
-        rollback: () => abortAttachment(scopeId, ownership),
-      },
-    }
-  },
-})
 
 // In the turn route, before dispatch: validate the wire `attachments` field
 // and re-derive size, then fold it into the dispatched prompt parts.
@@ -277,14 +237,14 @@ if (!dispatch.succeeded) return Response.json({ error: dispatch.error }, { statu
 createSandboxChatProducer({
   events,
   promoteFilePart: (raw) => promoteAgentFilePart({
-    raw, box, scopeId: identity.tenantId, sessionId: identity.sessionId, attachmentWriter,
+    raw, box, scopeId: identity.tenantId, sessionId: identity.sessionId, writeAttachment,
   }),
 })
 ```
 
 `/object-store` is a ready-made backend for both seams when a product has no
 vault of its own; fleet apps that already have one (gtm's KV vault) inject
-their own `ReadAttachmentFn`/`AtomicAttachmentWriter` instead of this module — the
+their own `ReadAttachmentFn`/`WriteAttachmentFn` instead of this module — the
 seams are storage-agnostic by design.
 
 ## Attachment upload + composer + transcript (#234)
@@ -305,7 +265,7 @@ const uploadAttachment = createAttachmentUploadRoute({
     if (!auth.ok) return auth
     return { ok: true as const, scopeId: auth.tenantId }
   },
-  attachmentWriter, // the same #224 adapter defined above
+  writeAttachment, // the same #224 writeAttachment defined above
 })
 ```
 
@@ -363,54 +323,100 @@ that renders attachments outside `ChatMessages`.
 
 ## Durable plan and question workflow
 
-agent-app shipped a `/durable-chat` subpath here — an authorization-scoped
-command/settlement protocol (CAS plan decisions, stable follow-up receipts,
-answer intent/ack/finalize) over a product-supplied store. It was **removed in
-0.44.0**: it exported 60 symbols and, across nine consumer repos on their
-default branches, had exactly zero imports. Three apps that needed a plan
-decision hand-rolled a local one instead, which is the signal that the
-abstraction was not the one they wanted.
+Apps that need decisions and accepted answers to survive reloads bind one
+production `DurableChatStateStore` to the shared route/producer adapters. The
+store is product infrastructure (D1, Postgres, a Durable Object, or equivalent);
+agent-app owns the command/settlement protocol around it. The exported
+`InMemoryDurableChatStateStore` is intentionally only for tests and local demos.
 
-What survives, and what to use:
+```ts
+import {
+  createSandboxChatProducer,
+  withDurableChatProjection,
+} from '@tangle-network/agent-app/chat-routes'
+import {
+  createDurableChatEventProjection,
+  createDurableChatScope,
+  createDurableInteractionRoutePersistence,
+  createDurablePlanRoutes,
+} from '@tangle-network/agent-app/durable-chat'
+import { createInteractionAnswerRoute } from '@tangle-network/agent-app/interactions'
 
-- The durable plan **authority** is the Sandbox SDK's — `SandboxSession.plan()`.
-  Read it there; do not re-implement a plan state machine.
-- `/plans` still owns the browser-safe projection (lifecycle event parsing, the
-  persisted `type:'plan'` codec, revision-aware transcript keys).
-- `/chat-routes` still exports `withDurableChatProjection`, which is fully
-  structural: hand it any `{ observe, materialize }` object and it folds your
-  materialized parts into the producer lane. Your own store, your own protocol.
-- `/interactions`' `createInteractionAnswerRoute` still takes a `durable` seam,
-  so answer persistence stays available without the removed module.
+const scope = createDurableChatScope(`${workspaceId}/${threadId}`) // only after auth
+const producer = withDurableChatProjection(
+  createSandboxChatProducer({ events }),
+  createDurableChatEventProjection({ store: durableStore, scope }),
+)
+
+createInteractionAnswerRoute({
+  resolveConnection,
+  durable: createDurableInteractionRoutePersistence({
+    store: durableStore,
+    guarantee: 'reconciled',
+    scope: async () => scope,
+    reconcileAuthority: ({ intent }) => lookupAnswerAcknowledgement(intent),
+  }),
+})
+
+const planRoutes = createDurablePlanRoutes({
+  store: durableStore,
+  authority: sandboxPlanAuthority,
+  authorize: async ({ request }) => authorizePlanScope(request),
+  afterDecision: ({ receipt, effectKey }) =>
+    applyPlanModePolicyIdempotently(receipt, effectKey),
+})
+```
+
+On the client, `ChatMessages` can render the canonical cards directly from
+persisted `message.parts`. `attachFollowUp` must be idempotent by the receipt id;
+the shared controller deliberately invokes it again after an idempotent POST or
+reload so a lost response cannot strand an already-dispatched execution.
+
+```tsx
+<ChatMessages
+  messages={messages}
+  durableCards={{
+    canWrite,
+    submitInteraction: createDurableInteractionAnswerSubmitter({
+      url: '/api/chat/interactions',
+      attempts: createSessionInteractionAttemptStore(sessionStorage),
+    }),
+    decidePlan: (plan, decision, feedback) =>
+      planControllers.get(plan.planId)!.decide(decision, feedback),
+  }}
+/>
+```
 
 ## Advanced hooks (optional)
 
 A complex product turn-orchestrator does more than stream: it holds a
 single-flight lock, keeps the client alive through long tool calls, gates on
-domain readiness, and books telemetry. `createChatTurnRoutes` exposes optional
-seams for exactly that — **omit any one and the route behaves exactly as
-above.** They compose with `authorize` / `produce` / `store` / `interactions`.
+domain readiness, and books telemetry. `createChatTurnRoutes` exposes six
+optional seams for exactly that — **omit any one and the route behaves exactly
+as above.** They compose with `authorize` / `produce` / `store` / `interactions`.
 
-**Stability** — `turnLock`, `contextGate`, `beforeTurn`, `lifecycle`,
-`heartbeat` and `onRawEvent` are all **stable and safe to depend on**, as is the
-`authorize` result's `insertUserMessage` flag (used above for
-dispatched/synthetic follow-up turns). They graduated in #227, once each had two
-independent product consumers exercising it — the bar this package uses, because
-a single consumer's usage is indistinguishable from that consumer's assumptions.
+**Stability** — two of the six are stable; the other four are `@experimental`:
 
-They stay flat/top-level rather than grouped under a `hooks` object: the
-grouping would break every shipped call for no mechanism gain, and this
-package's exports are additive-only. `onRawEvent` keeps its `(event, context)`
-signature for the same reason. Its event type is exported as `ChatRouteEvent`
-(also the return type of `heartbeat.event`) if you want a standalone handler
-rather than an inline literal.
+| Seam | Stability |
+| --- | --- |
+| `lifecycle` | **stable** — safe to depend on |
+| `heartbeat` | **stable** — safe to depend on |
+| `turnLock` | `@experimental` |
+| `contextGate` | `@experimental` |
+| `beforeTurn` | `@experimental` |
+| `onRawEvent` | `@experimental` |
+
+The `@experimental` seams are single-consumer today (proven by gtm, #200) and
+kept flat/top-level for back-compat; their shape may still change without a
+major bump. (The `authorize` result's `insertUserMessage` flag — used above for
+dispatched/synthetic follow-up turns — is `@experimental` for the same reason.)
 
 ```ts
 const routes = createChatTurnRoutes({
   projectId: 'acme-agent',
   authorize, store, turnStore, produce, // as above
 
-  // 1. Single-flight lock — acquired before any side effect,
+  // 1. [@experimental] Single-flight lock — acquired before any side effect,
   //    released once when the turn settles (drain finish), short-circuit, throw.
   turnLock: {
     acquire: async ({ identity, executionId }) => {
@@ -422,37 +428,35 @@ const routes = createChatTurnRoutes({
     release: (lockId) => releaseLock(lockId as string),
   },
 
-  // 2. Domain-readiness gate — short-circuit BEFORE the producer
+  // 2. [@experimental] Domain-readiness gate — short-circuit BEFORE the producer
   //    runs (the user row is already persisted; return the assistant side).
   contextGate: async ({ identity, prompt }) => {
     const ready = await computeContextSufficiency(identity.tenantId)
     return ready.ok ? { proceed: true } : { proceed: false, response: cannedAskForContext(ready.missing) }
   },
 
-  // 3. Observe + augment the assembled input before the producer runs.
-  //    Return a patch, or return nothing and mutate `context` for `produce` to read.
+  // 3. [@experimental] Observe + augment the assembled input before the producer runs.
   beforeTurn: async ({ prompt, priorMessages, identity }) => {
     const composed = await composeSystemPromptWithCertified(identity.tenantId)
     return { priorMessages: [systemMessage(composed), ...priorMessages] }
   },
 
-  // 4. Deterministic run telemetry — start, then exactly one of complete/error.
+  // 4. [stable] Deterministic run telemetry — start, then exactly one of complete/error.
   lifecycle: {
     onTurnStart: ({ identity, executionId }) => startRun(identity, executionId),
     onTurnComplete: ({ finalText, usage, durationMs }) => endRun({ pass: true, finalText, usage, durationMs }),
     onTurnError: ({ error, durationMs }) => endRun({ pass: false, error, durationMs }),
   },
 
-  // 5. Keepalive while the producer is quiet (provisioning, first-token
+  // 5. [stable] Keepalive while the producer is quiet (provisioning, first-token
   //    wait). Window resets on every real event; a chatty producer never fires one.
   heartbeat: {
     intervalMs: 5_000,
     event: ({ elapsedMs }) => ({ type: 'run-phase', data: { phase: 'working', heartbeat: true, elapsedMs } }),
   },
 
-  // 6. Raw producer events for telemetry, before the engine frames them (distinct
-  //    from `onEvent`, which sees the engine-framed stream incl. lifecycle). Never
-  //    sees an injected keepalive; a throw here is swallowed, never fails the turn.
+  // 6. [@experimental] Raw producer events for telemetry, before the engine frames
+  //    them (distinct from `onEvent`, which sees the engine-framed stream incl. lifecycle).
   onRawEvent: (event) => emitToTrace(event),
 })
 ```

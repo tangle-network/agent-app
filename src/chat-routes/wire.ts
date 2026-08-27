@@ -1,14 +1,12 @@
-import type { ReasoningEffort } from '@tangle-network/agent-interface'
-
 /**
  * Wire contract between the chat client (composer + `streamChatTurn`) and the
- * assembled server vertical (`createChatTurnRoutes`). Runtime-import-free on
- * purpose: `/web-react` re-exports these types into browser bundles, so nothing
- * here may reach a Node builtin or an engine package.
+ * assembled server vertical (`createChatTurnRoutes`). Import-free on purpose:
+ * `/web-react` re-exports these types into browser bundles, so nothing here may
+ * reach a Node builtin or an engine package.
  *
- * The client part shape permits an absolute file path until the server converts
- * it to the URL required by the sandbox SDK. It is derived here, not imported,
- * so the client bundle never touches the SDK.
+ * The part shape mirrors the sandbox SDK's `PromptInputPart` structurally
+ * (text | image | file with filename/mediaType/url/path/content) — derived
+ * here, not imported, so the client bundle never touches the SDK.
  */
 
 export interface ChatTurnTextPartInput {
@@ -26,13 +24,11 @@ export interface ChatTurnFilePartInput {
   mediaType?: string
   url?: string
   path?: string
+  content?: string
 }
 
 /** Resolve input as either a text part or a file part of a chat turn */
 export type ChatTurnPartInput = ChatTurnTextPartInput | ChatTurnFilePartInput
-
-/** A chat turn's automatic sentinel plus the canonical agent reasoning levels. */
-export type ChatReasoningEffort = 'auto' | ReasoningEffort
 
 // ── producer stream vocabulary ───────────────────────────────────────────────
 
@@ -177,7 +173,7 @@ export interface ChatTurnRequestPayload {
    *  uploads still sends store-backed files here. */
   attachments?: ChatAttachmentInput[]
   model?: string
-  effort?: ChatReasoningEffort
+  effort?: 'auto' | 'low' | 'medium' | 'high'
   harness?: string
   /** Client-generated idempotency key for the logical turn (retry-safe). */
   turnId?: string
@@ -280,6 +276,7 @@ function partByteSize(part: ChatTurnPartInput): number {
   let bytes = 0
   if (part.type === 'text') return part.text.length
   if (part.url) bytes += part.url.length
+  if (part.content) bytes += part.content.length
   if (part.path) bytes += part.path.length
   return bytes
 }
@@ -533,33 +530,21 @@ export function parseChatTurnParts(raw: unknown): ChatTurnFilePartInput[] {
     if (part.type !== 'image' && part.type !== 'file') {
       throw new ChatTurnInputError(`parts[${index}].type must be 'image' or 'file'`)
     }
-    for (const key of ['filename', 'mediaType', 'url', 'path'] as const) {
+    for (const key of ['filename', 'mediaType', 'url', 'path', 'content'] as const) {
       if (part[key] !== undefined && typeof part[key] !== 'string') {
         throw new ChatTurnInputError(`parts[${index}].${key} must be a string`)
       }
     }
-    if (part.content !== undefined) {
-      throw new ChatTurnInputError(`parts[${index}].content is not supported; provide a url or path`)
-    }
-
-    const url = typeof part.url === 'string' && part.url.length > 0 ? part.url : undefined
-    const path = typeof part.path === 'string' && part.path.length > 0 ? part.path : undefined
-    if (Boolean(url) === Boolean(path)) {
-      throw new ChatTurnInputError(`parts[${index}] requires exactly one url or path`)
-    }
-    if (path && !path.startsWith('/')) {
-      throw new ChatTurnInputError(`parts[${index}].path must be absolute`)
-    }
-
-    const filename = typeof part.filename === 'string' ? part.filename.trim() : undefined
-    if (part.type === 'file' && !filename) {
-      throw new ChatTurnInputError(`parts[${index}].filename is required for file parts`)
+    if (!part.url && !part.path && !part.content) {
+      throw new ChatTurnInputError(`parts[${index}] needs a url, path, or content`)
     }
     return {
       type: part.type,
-      ...(filename ? { filename } : {}),
+      ...(part.filename !== undefined ? { filename: part.filename as string } : {}),
       ...(part.mediaType !== undefined ? { mediaType: part.mediaType as string } : {}),
-      ...(url ? { url } : { path: path! }),
+      ...(part.url !== undefined ? { url: part.url as string } : {}),
+      ...(part.path !== undefined ? { path: part.path as string } : {}),
+      ...(part.content !== undefined ? { content: part.content as string } : {}),
     }
   })
 }

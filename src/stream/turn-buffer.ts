@@ -18,15 +18,6 @@
 
 export type TurnStatus = 'running' | 'complete' | 'error'
 
-/** A running row is a renewable lease, not permanent truth. If the process
- *  driving a turn dies before writing a terminal status, reconnect discovery
- *  must eventually stop returning that abandoned row. */
-export const DEFAULT_RUNNING_TURN_LEASE_MS = 5 * 60_000
-
-/** Keep a healthy turn's lease comfortably ahead of expiry without turning
- *  per-token streaming into status-write traffic. */
-export const DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS = 30_000
-
 /** Represent a buffered turn event with a sequence number and serialized event data */
 export interface BufferedTurnEvent {
   seq: number
@@ -43,19 +34,10 @@ export interface TurnEventStore {
    *  loses the turnId; stores that don't track scope ignore it. */
   setStatus(turnId: string, status: TurnStatus, scopeId?: string): Promise<void>
   getStatus(turnId: string): Promise<TurnStatus | null>
-  /** Unexpired running turnIds for a scope, newest first — so a reloaded client
-   *  (clientRunId lost) can find and resume the in-flight turn without reviving
-   *  a row abandoned by a dead process. Optional: a store records it only if
-   *  `setStatus` was given a `scopeId`. */
+  /** Running turnIds for a scope, newest first — so a reloaded client (clientRunId
+   *  lost) can find and resume the in-flight turn. Optional: a store records it
+   *  only if `setStatus` was given a `scopeId`. */
   listRunning?(scopeId: string): Promise<string[]>
-}
-
-/** Configure running-turn lease evaluation. The clock is injectable so store
- *  contract tests do not sleep. Keep the default in production unless a
- *  deployment also tunes the buffer's renewal interval. */
-export interface TurnEventStoreOptions {
-  runningTurnLeaseMs?: number
-  now?: () => number
 }
 
 // ── coalescing ────────────────────────────────────────────────────────────
@@ -156,11 +138,6 @@ export interface BufferedTurnOptions {
   /** Optional scope (thread/session id) recorded with the turn status, so
    *  {@link TurnEventStore.listRunning} can find this turn after a reload. */
   scopeId?: string
-  /** How often to renew the running-turn lease while a producer is alive.
-   *  The timer is backed up by event-driven renewal when a runtime freezes
-   *  unreferenced timers during remote I/O. Default
-   *  {@link DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS}. */
-  runningTurnRenewIntervalMs?: number
 }
 
 /** A push-driven buffer for a turn whose producer the caller does NOT own. */
@@ -194,46 +171,6 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
   let pending: unknown[] = []
   let lastFlush = Date.now()
   let started = false
-  let settled = false
-  let renewalTimer: ReturnType<typeof setTimeout> | undefined
-  let renewal: Promise<void> = Promise.resolve()
-  let lastRenewedAt = 0
-  const runningTurnRenewIntervalMs = Math.max(
-    1,
-    opts.runningTurnRenewIntervalMs ?? DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS,
-  )
-
-  function clearRenewalTimer(): void {
-    if (renewalTimer !== undefined) clearTimeout(renewalTimer)
-    renewalTimer = undefined
-  }
-
-  function scheduleRenewal(): void {
-    if (settled || !opts.scopeId) return
-    clearRenewalTimer()
-    const elapsedMs = Math.max(0, Date.now() - lastRenewedAt)
-    const delayMs = Math.max(1, runningTurnRenewIntervalMs - elapsedMs)
-    renewalTimer = setTimeout(() => {
-      renewalTimer = undefined
-      void renewLease()
-    }, delayMs)
-    // A deliberately abandoned tap in a Node test must not keep the process
-    // alive until the production renewal interval elapses.
-    if (typeof renewalTimer === 'object' && 'unref' in renewalTimer) {
-      renewalTimer.unref()
-    }
-  }
-
-  async function renewLease(): Promise<void> {
-    if (settled || !opts.scopeId) return
-    clearRenewalTimer()
-    lastRenewedAt = Date.now()
-    renewal = renewal
-      .then(() => opts.store.setStatus(opts.turnId, 'running', opts.scopeId))
-      .catch(() => {})
-    await renewal
-    scheduleRenewal()
-  }
 
   async function flush(): Promise<void> {
     if (pending.length === 0) return
@@ -248,22 +185,11 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
     if (started) return
     started = true
     await opts.store.setStatus(opts.turnId, 'running', opts.scopeId)
-    lastRenewedAt = Date.now()
-    scheduleRenewal()
   }
 
   return {
     async onEvent(raw) {
       await ensureStarted()
-      // Cloudflare may freeze an unreferenced timer while a producer is
-      // awaiting remote I/O. A real event (including the route heartbeat)
-      // therefore also renews any lease whose interval has elapsed.
-      if (
-        opts.scopeId &&
-        Date.now() - lastRenewedAt >= runningTurnRenewIntervalMs
-      ) {
-        await renewLease()
-      }
       // Stamp ms-since-turn-start so any stored turn is replayable AND traceable
       // (see ../trace) from the same buffered rows.
       const ev = raw && typeof raw === 'object' ? { ...(raw as Record<string, unknown>), _t: Date.now() - startedAt } : raw
@@ -282,9 +208,6 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
     },
     async done(status = 'complete') {
       await ensureStarted()
-      settled = true
-      clearRenewalTimer()
-      await renewal
       if (status === 'error') {
         await flush().catch(() => {})
         await opts.store.setStatus(opts.turnId, 'error', opts.scopeId).catch(() => {})
@@ -367,38 +290,6 @@ export async function* replayTurnEvents(opts: ReplayTurnEventsOptions): AsyncGen
   }
 }
 
-/**
- * Serialize a replayed row for the wire, stamping the buffer ordinal ONTO the
- * line so a reconnecting client can continue from `?fromSeq=<lastSeq>`.
- *
- * The seq lives on the {@link BufferedTurnEvent} row wrapper, not inside the
- * serialized event — `flush()` builds `{seq: ++seq, event: JSON.stringify(ev)}`.
- * A route that enqueues `row.event` alone therefore emits lines with no seq at
- * all, and every client cursor silently pins to 0: each reconnect refetches the
- * whole turn and re-applies every delta onto already-rendered state. This
- * restores the contract `web-react/chat-stream` already documents ("replayed
- * lines carry an extra `seq` — transparently ignored").
- *
- * The `{seq: -1}` `turn_status` sentinel is passed through unstamped: it is a
- * terminator, not a cursor position, and stamping it would move a client's
- * cursor to -1.
- *
- * Fail-soft by construction — a line that is not a JSON object passes through
- * verbatim. A stamping bug must degrade to today's behaviour, never break a
- * replay.
- */
-export function stampReplaySeq(row: BufferedTurnEvent): string {
-  if (row.seq <= 0) return row.event
-  const line = row.event
-  // Cheap splice instead of parse+stringify: these rows are already canonical
-  // JSON objects from `JSON.stringify`, and replay is a hot per-event path.
-  if (line.charCodeAt(0) !== 0x7b /* { */) return line
-  const rest = line.slice(1)
-  return rest.trimStart().startsWith('}')
-    ? `{"seq":${row.seq}${rest}`
-    : `{"seq":${row.seq},${rest}`
-}
-
 // ── D1 store ──────────────────────────────────────────────────────────────
 
 /** Minimal structural D1 contract (Cloudflare `D1Database` satisfies it). */
@@ -435,15 +326,7 @@ CREATE INDEX IF NOT EXISTS idx_turn_status_scope ON turn_status (scopeId, status
 export const TURN_STATUS_SCOPE_MIGRATION_SQL = `ALTER TABLE turn_status ADD COLUMN scopeId TEXT;`
 
 /** Resolve a TurnEventStore that appends and reads turn events using a D1-like database interface */
-export function createD1TurnEventStore(
-  db: D1LikeForTurns,
-  options: TurnEventStoreOptions = {},
-): TurnEventStore {
-  const now = options.now ?? Date.now
-  const runningTurnLeaseMs = Math.max(
-    1,
-    options.runningTurnLeaseMs ?? DEFAULT_RUNNING_TURN_LEASE_MS,
-  )
+export function createD1TurnEventStore(db: D1LikeForTurns): TurnEventStore {
   return {
     async append(turnId, events) {
       if (!events.length) return
@@ -466,7 +349,7 @@ export function createD1TurnEventStore(
         .prepare(
           'INSERT INTO turn_status (turnId, status, scopeId, updatedAt) VALUES (?, ?, ?, ?) ON CONFLICT(turnId) DO UPDATE SET status = excluded.status, scopeId = COALESCE(excluded.scopeId, turn_status.scopeId), updatedAt = excluded.updatedAt',
         )
-        .bind(turnId, status, scopeId ?? null, new Date(now()).toISOString())
+        .bind(turnId, status, scopeId ?? null, new Date().toISOString())
         .run()
     },
     async getStatus(turnId) {
@@ -475,10 +358,8 @@ export function createD1TurnEventStore(
     },
     async listRunning(scopeId) {
       const { results } = await db
-        .prepare(
-          "SELECT turnId FROM turn_status WHERE scopeId = ? AND status = 'running' AND updatedAt >= ? ORDER BY updatedAt DESC, rowid DESC",
-        )
-        .bind(scopeId, new Date(now() - runningTurnLeaseMs).toISOString())
+        .prepare("SELECT turnId FROM turn_status WHERE scopeId = ? AND status = 'running' ORDER BY updatedAt DESC")
+        .bind(scopeId)
         .all<{ turnId: string }>()
       return results.map((r) => r.turnId)
     },
@@ -486,19 +367,11 @@ export function createD1TurnEventStore(
 }
 
 /** In-memory store for tests and keyless local dev. */
-export function createMemoryTurnEventStore(
-  options: TurnEventStoreOptions = {},
-): TurnEventStore {
+export function createMemoryTurnEventStore(): TurnEventStore {
   const events = new Map<string, BufferedTurnEvent[]>()
   const status = new Map<string, TurnStatus>()
   const scopes = new Map<string, string>()
   const order: string[] = []
-  const updatedAt = new Map<string, number>()
-  const now = options.now ?? Date.now
-  const runningTurnLeaseMs = Math.max(
-    1,
-    options.runningTurnLeaseMs ?? DEFAULT_RUNNING_TURN_LEASE_MS,
-  )
   return {
     async append(turnId, rows) {
       const list = events.get(turnId) ?? []
@@ -512,24 +385,13 @@ export function createMemoryTurnEventStore(
       status.set(turnId, s)
       if (scopeId) scopes.set(turnId, scopeId)
       if (!order.includes(turnId)) order.push(turnId)
-      updatedAt.set(turnId, now())
     },
     async getStatus(turnId) {
       return status.get(turnId) ?? null
     },
     async listRunning(scopeId) {
-      const cutoff = now() - runningTurnLeaseMs
-      return order
-        .filter(
-          (turnId) =>
-            status.get(turnId) === 'running' &&
-            scopes.get(turnId) === scopeId &&
-            (updatedAt.get(turnId) ?? Number.NEGATIVE_INFINITY) >= cutoff,
-        )
-        .sort((left, right) => {
-          const updatedDelta = (updatedAt.get(right) ?? 0) - (updatedAt.get(left) ?? 0)
-          return updatedDelta || order.indexOf(right) - order.indexOf(left)
-        })
+      // Newest first, mirroring the D1 store's `ORDER BY updatedAt DESC`.
+      return [...order].reverse().filter((t) => status.get(t) === 'running' && scopes.get(t) === scopeId)
     },
   }
 }

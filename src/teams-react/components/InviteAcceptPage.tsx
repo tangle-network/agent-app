@@ -9,7 +9,6 @@
 
 import { useState } from 'react'
 import type { InviteAcceptPageProps } from '../contracts'
-import { BrandMark } from './BrandMark'
 
 export function InviteAcceptPage({ details, onAccept, onNavigate, onResendVerification }: InviteAcceptPageProps) {
   const [accepting, setAccepting] = useState(false)
@@ -20,7 +19,7 @@ export function InviteAcceptPage({ details, onAccept, onNavigate, onResendVerifi
 
   if (details.status === 'invalid') {
     return (
-      <Shell title="Invalid invitation" body="This link is invalid or already used. Ask the workspace admin to send a new one.">
+      <Shell title="Invalid invite" body="This invite link is invalid.">
         <PrimaryButton onClick={() => onNavigate({ kind: 'sign-in' })}>Go to sign in</PrimaryButton>
       </Shell>
     )
@@ -28,7 +27,7 @@ export function InviteAcceptPage({ details, onAccept, onNavigate, onResendVerifi
 
   if (details.status === 'already-accepted') {
     return (
-      <Shell title="Already accepted" body="This invitation has already been accepted.">
+      <Shell title="Already accepted" body="This invite has already been accepted.">
         <PrimaryButton onClick={() => onNavigate({ kind: 'open-app' })}>Open workspace</PrimaryButton>
       </Shell>
     )
@@ -36,7 +35,7 @@ export function InviteAcceptPage({ details, onAccept, onNavigate, onResendVerifi
 
   if (details.status === 'expired') {
     return (
-      <Shell title="Invitation expired" body="This invitation has expired. Ask the workspace admin to send a new one.">
+      <Shell title="Invite expired" body="This invitation has expired. Ask the workspace admin to send a new one.">
         <PrimaryButton onClick={() => onNavigate({ kind: 'sign-in' })}>Go to sign in</PrimaryButton>
       </Shell>
     )
@@ -44,7 +43,7 @@ export function InviteAcceptPage({ details, onAccept, onNavigate, onResendVerifi
 
   if (details.status === 'revoked') {
     return (
-      <Shell title="Invitation revoked" body="This invitation has been revoked. Ask the workspace admin to send a new one.">
+      <Shell title="Invite revoked" body="This invitation has been revoked. Ask the workspace admin to send a new one.">
         <PrimaryButton onClick={() => onNavigate({ kind: 'sign-in' })}>Go to sign in</PrimaryButton>
       </Shell>
     )
@@ -103,7 +102,7 @@ export function InviteAcceptPage({ details, onAccept, onNavigate, onResendVerifi
         onNavigate({ kind: 'open-app', workspaceId: result.workspaceId })
       }
     } catch (err) {
-      setAcceptError(err instanceof Error ? err.message : 'Failed to accept invitation')
+      setAcceptError(err instanceof Error ? err.message : 'Failed to accept invite')
     } finally {
       setAccepting(false)
     }
@@ -136,7 +135,7 @@ export function InviteAcceptPage({ details, onAccept, onNavigate, onResendVerifi
           role="alert"
           className="mb-4 rounded-md border border-[var(--border-default)] px-4 py-2 text-sm text-[var(--text-warning)]"
         >
-          This invitation was sent to <span className="font-medium">{details.inviteEmail}</span>. Switch to that account to accept it.
+          This invite was sent to <span className="font-medium">{details.inviteEmail}</span>. Switch to that account to accept it.
         </div>
       )}
       {needsVerification && (
@@ -168,7 +167,7 @@ export function InviteAcceptPage({ details, onAccept, onNavigate, onResendVerifi
           )
         ) : (
           <PrimaryButton onClick={() => void handleAccept()} disabled={accepting}>
-            {accepting ? 'Accepting…' : 'Accept invitation'}
+            {accepting ? 'Accepting…' : 'Accept invite'}
           </PrimaryButton>
         )}
         <SecondaryButton onClick={() => onNavigate({ kind: 'open-app' })}>Not now</SecondaryButton>
@@ -180,10 +179,6 @@ export function InviteAcceptPage({ details, onAccept, onNavigate, onResendVerifi
 function Shell({ title, body, children }: { title: string; body?: string; children: React.ReactNode }) {
   return (
     <div className="mx-auto flex w-full max-w-sm flex-col">
-      <span className="mb-4 flex items-center gap-2 text-[var(--text-muted)]">
-        <BrandMark size={22} className="shrink-0" />
-        <span className="text-xs font-semibold uppercase tracking-[0.05em]">Tangle Teams</span>
-      </span>
       <h1 className="mb-1 text-xl font-semibold tracking-tight text-[var(--text-primary)]">{title}</h1>
       {body && <p className="mb-6 text-sm text-[var(--text-secondary)]">{body}</p>}
       {children}
@@ -197,7 +192,7 @@ function PrimaryButton({ children, onClick, disabled }: { children: React.ReactN
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex-1 rounded bg-[var(--brand-primary)] px-4 py-2 text-sm text-[hsl(var(--primary-foreground))] disabled:opacity-50"
+      className="flex-1 rounded bg-[var(--brand-primary)] px-4 py-2 text-sm text-white disabled:opacity-50"
     >
       {children}
     </button>

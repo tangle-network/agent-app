@@ -42,23 +42,7 @@ import {
   type JsonRecord,
   type StreamEvent,
 } from '../stream/index'
-import { buildModelChain, type ModelFailoverAttempt } from '../model-resolution/failover'
-import {
-  ModelFailoverTimeoutError,
-  resolveEmptyTurnRetries,
-  streamWithModelFailover,
-  summarizeFailoverReason,
-  type EmptyTurnRetryInfo,
-  type ModelFallbackInfo,
-  type ModelFailoverStreamHandle,
-  type OpenModelStream,
-} from './model-failover-stream'
-import type {
-  ChatTurnModelAttribution,
-  ChatTurnRouteProducer,
-  ChatTurnUsage,
-} from './turn-routes'
-import { addStepFinishUsage } from './sandbox-turn-usage'
+import type { ChatTurnRouteProducer, ChatTurnUsage } from './turn-routes'
 import type { ProducerWireEvent } from './wire'
 
 /** Outcome of a `promoteFilePart` attempt. `key`, when given, becomes the
@@ -81,66 +65,10 @@ export type FilePartPromotionOutcome =
 
 /** Define options for producing sandbox chat events with rendering and interaction controls */
 export interface SandboxChatProducerOptions {
-  /** The raw sandbox event stream (e.g. `streamSandboxPrompt(...)`).
-   *
-   *  An ALREADY-OPEN stream is bound to one model and cannot be reopened, so
-   *  this form can never fail over. Prefer {@link openEvents}; exactly one of
-   *  the two is required. */
-  events?: AsyncIterable<unknown>
-  /** Open the raw sandbox stream FOR A GIVEN MODEL — the failover-capable form
-   *  of {@link events}. The callback receives the model to run and returns the
-   *  same `AsyncIterable` `events` would have been (typically
-   *  `streamSandboxPrompt(shell, box, prompt, { ...opts, model })`).
-   *
-   *  Wiring this turns failover ON with no further flag: whenever the resolved
-   *  chain (`model` + {@link fallbackModels}) holds more than one entry, a model
-   *  whose upstream is dead is abandoned BEFORE its first client-visible byte
-   *  and the next one is tried. A one-entry chain opens exactly once — no extra
-   *  call, no added latency, byte-identical to today.
-   *
-   *  Requires {@link model}: failover has to know which model it is running. */
-  openEvents?: OpenModelStream
-  /** Recorded on the persisted assistant message. When failover moves the turn
-   *  to another model, the producer's `model` reports the model that ACTUALLY
-   *  served, not this preferred one — see {@link modelFailover}. */
+  /** The raw sandbox event stream (e.g. `streamSandboxPrompt(...)`). */
+  events: AsyncIterable<unknown>
+  /** Recorded on the persisted assistant message. */
   model?: string
-  /** Models to try, in order, when `model`'s upstream is dead. Product config,
-   *  never a shell default: agent-app cannot know which ids are live, and a
-   *  baked list would rot into exactly the stale-liveness bug this guards
-   *  against. Empty/omitted → one attempt, today's behavior.
-   *
-   *  Pick these deliberately. A same-family fallback is NOT automatically safe:
-   *  `gemini-2.5-flash` produced zero persisted deliverables in 2 of 3 measured
-   *  runs on a med-legal filing flow where `gemini-2.5-pro` succeeded. That is
-   *  why every fallback is surfaced (persisted `model`, a transcript notice, and
-   *  `modelFailover()`) instead of being applied silently. */
-  fallbackModels?: readonly string[]
-  /** Opt out of failover while still using {@link openEvents}. `false` collapses
-   *  the chain to `model` alone. */
-  modelFailover?: false
-  /** Maximum time to open/start one model event source through its first event.
-   *  Default 120 seconds. This is separate from provider first-output latency
-   *  so cold sandbox startup is not mislabeled as an inference failure. */
-  openTimeoutMs?: number
-  /** Hard deadline after the source's first lifecycle event for the first
-   *  answer-bearing event. Default 60 seconds. Processing/lifecycle events do
-   *  not extend it. */
-  firstResponseTimeoutMs?: number
-  /** Fired when a model is abandoned mid-chain (telemetry/alerting). The user
-   *  already sees a transcript notice; this is for the operator. */
-  onModelFallback?: (info: ModelFallbackInfo) => void
-  /** Re-run the SAME model this many times when a turn completes with no
-   *  assistant text at all. Default `0` (unchanged behavior). Requires
-   *  {@link openEvents} — there is nothing to re-open on a fixed stream.
-   *
-   *  Distinct from {@link fallbackModels} on purpose: this never changes which
-   *  model answers, so it carries none of the attribution risk a downgrade
-   *  does. Measured on production 2026-07-27 through gtm-agent's profile, a
-   *  completed-but-blank turn is a transient platform flake — 8 hard cases went
-   *  7/8 delivered to 8/8 with one re-run, costing 1 extra turn in 9. */
-  emptyTurnRetries?: number
-  /** Fired when a blank turn is discarded and the same model re-run. */
-  onEmptyTurnRetry?: (info: EmptyTurnRetryInfo) => void
   /** Which ask kinds the product renders a card for. Anything else is
    *  auto-declined (see `declineInteraction`) so the run never hangs in the
    *  broker waiting on a card no client will show. Default: question/plan.
@@ -210,25 +138,25 @@ function textDelta(tracker: TextTracker, key: string, part: JsonRecord, rawDelta
   return snapshot
 }
 
-function parseEffectiveBackend(data: JsonRecord): Omit<
-  ChatTurnModelAttribution,
-  'requestedModel' | 'echoReceived'
-> | undefined {
-  const backend = asRecord(data.effectiveBackend)
-  if (!backend) return undefined
-  const provider = asString(backend.provider)
-  const model = asString(backend.model)
-  const rawSource = asString(backend.source)
-  const source =
-    rawSource === 'request' || rawSource === 'environment' || rawSource === 'profile'
-      ? rawSource
-      : undefined
-  if (!provider && !model && !source) return undefined
-  return {
-    ...(model ? { servedModel: model } : {}),
-    ...(provider ? { servedProvider: provider } : {}),
-    ...(source ? { servedSource: source } : {}),
+function usageFromStepFinish(part: JsonRecord, usage: ChatTurnUsage): void {
+  const tokens = asRecord(part.tokens)
+  if (tokens) {
+    const cache = asRecord(tokens.cache)
+    const add = (current: number | undefined, value: unknown): number | undefined => {
+      const n = Number(value)
+      if (!Number.isFinite(n)) return current
+      return (current ?? 0) + n
+    }
+    usage.inputTokens = add(usage.inputTokens, tokens.input)
+    usage.outputTokens = add(usage.outputTokens, tokens.output)
+    usage.reasoningTokens = add(usage.reasoningTokens, tokens.reasoning)
+    if (cache) {
+      usage.cacheReadTokens = add(usage.cacheReadTokens, cache.read)
+      usage.cacheWriteTokens = add(usage.cacheWriteTokens, cache.write)
+    }
   }
+  const cost = Number(part.cost)
+  if (Number.isFinite(cost)) usage.costUsd = (usage.costUsd ?? 0) + cost
 }
 
 function toFiniteNumber(value: unknown): number | null {
@@ -288,7 +216,6 @@ function toProducerWireEvent(event: JsonRecord): ProducerWireEvent {
 function sandboxStreamFailureDiagnostic(error: unknown): {
   userMessage: string
   failureNote: string
-  code: string
 } {
   const streamMessage = (error as { streamMessage?: unknown })?.streamMessage
   const message = typeof streamMessage === 'string'
@@ -311,10 +238,7 @@ function sandboxStreamFailureDiagnostic(error: unknown): {
   const failureNote = diagnosticText
     ? `sandbox-stream: ${message}; ${diagnosticText}`
     : `sandbox-stream: ${message}`
-  const code = error instanceof ModelFailoverTimeoutError
-    ? error.code
-    : 'sandbox.stream_failed'
-  return { userMessage, failureNote, code }
+  return { userMessage, failureNote }
 }
 
 /** Create a sandbox chat producer that manages chat turn routing with logging and interaction rendering options */
@@ -322,107 +246,13 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
   const log = options.log ?? ((message, meta) => console.error(message, meta ?? ''))
   const renderable = options.isRenderableInteraction ?? isRenderableInteractionKind
 
-  // ── model failover ────────────────────────────────────────────────────────
-  // ON by default whenever the caller can reopen the stream (`openEvents`) and
-  // named more than one model. There is no `enabled` flag on purpose: the class
-  // of failure this fixes was a capability that shipped switched off, and a
-  // second opt-in on top of supplying the chain would reproduce it exactly.
-  if (options.openEvents && !options.model) {
-    throw new Error(
-      'createSandboxChatProducer: `openEvents` requires `model` — failover must know which model it is running',
-    )
-  }
-  if (!options.openEvents && !options.events) {
-    throw new Error('createSandboxChatProducer: pass `openEvents` (failover-capable) or `events`')
-  }
-  // A fixed `events` stream cannot be re-opened, so the retry silently does
-  // nothing. A config that asks for recovery and receives none is the exact
-  // silent-no-op class this seam exists to remove — refuse it at construction
-  // rather than let a product believe blank turns are being retried.
-  if (!options.openEvents && resolveEmptyTurnRetries(options.emptyTurnRetries) > 0) {
-    throw new Error(
-      'createSandboxChatProducer: `emptyTurnRetries` requires `openEvents` — a fixed `events` stream cannot be re-opened',
-    )
-  }
-  const chain = options.model
-    ? buildModelChain(options.model, options.modelFailover === false ? [] : (options.fallbackModels ?? []))
-    : []
-
-  /** Fallback notices waiting to be emitted. `onFallback` fires from inside the
-   *  first pull of the failover stream, where a generator cannot yield, so the
-   *  notice is queued and drained at the top of the next loop iteration —
-   *  landing immediately before the serving model's first event. */
-  const pendingModelNotices: Array<{ id: string; text: string }> = []
-  let modelNoticeCount = 0
-
-  let failover: ModelFailoverStreamHandle | undefined
-  let source: AsyncIterable<unknown>
-  if (options.openEvents) {
-    failover = streamWithModelFailover({
-      models: chain,
-      open: options.openEvents,
-      log,
-      ...(options.openTimeoutMs !== undefined ? { openTimeoutMs: options.openTimeoutMs } : {}),
-      ...(options.firstResponseTimeoutMs !== undefined
-        ? { firstResponseTimeoutMs: options.firstResponseTimeoutMs }
-        : {}),
-      ...(options.emptyTurnRetries !== undefined ? { emptyTurnRetries: options.emptyTurnRetries } : {}),
-      ...(options.onEmptyTurnRetry ? { onEmptyTurnRetry: options.onEmptyTurnRetry } : {}),
-      onFallback: (info) => {
-        modelNoticeCount += 1
-        pendingModelNotices.push({
-          id: `model-fallback-${modelNoticeCount}`,
-          // Named models on both sides: a quality regression after a downgrade
-          // must be attributable to the model that actually answered. The
-          // REASON is condensed — a real edge 5xx arrives as Cloudflare's HTML
-          // error page, and the raw text put `<!DOCTYPE html><!--[if lt IE 7]>…`
-          // into the customer's transcript. The verbatim text is still on
-          // `modelFailover.attempts[].reason` for the operator.
-          text: `${info.from} was unavailable (${summarizeFailoverReason(info.reason)}) — answered with ${info.to} instead.`,
-        })
-        options.onModelFallback?.(info)
-      },
-    })
-    source = failover.events
-  } else {
-    source = options.events!
-  }
-
-  /** The model that ACTUALLY served this turn. Read lazily everywhere (the
-   *  `model` getter, the draft snapshot, the persisted row) so a fallback that
-   *  happens after the row was drafted still lands on the final write. */
-  const servingModel = (): string | undefined => failover?.servingModel() ?? options.model
-  let effectiveBackend: ReturnType<typeof parseEffectiveBackend>
-  let substitutionNoticeQueued = false
-  const servedModel = (): string | undefined => effectiveBackend?.servedModel ?? servingModel()
-
-  const captureEffectiveBackend = (data: JsonRecord | undefined): void => {
-    if (!data) return
-    const parsed = parseEffectiveBackend(data)
-    if (!parsed) return
-    effectiveBackend = parsed
-    const sentModel = servingModel()
-    if (
-      substitutionNoticeQueued ||
-      !options.model ||
-      !sentModel ||
-      !parsed.servedModel ||
-      parsed.servedModel === sentModel
-    ) return
-    substitutionNoticeQueued = true
-    pendingModelNotices.push({
-      id: 'model-substitution-1',
-      text: `Requested ${sentModel} — the sandbox answered with ${parsed.servedModel} instead.`,
-    })
-  }
-
   let fullText = ''
   const partOrder: string[] = []
   const partMap = new Map<string, JsonRecord>()
   const tracker: TextTracker = { seen: new Map() }
   const usage: ChatTurnUsage = {}
-  /** Whether each announced tool_call carried populated arguments. */
-  const announcedToolArgs = new Map<string, boolean>()
+  /** Tool ids already announced as `tool_call` / settled as `tool_result`. */
+  const announcedTools = new Set<string>()
   const settledTools = new Set<string>()
   /** Id-less step boundaries: one occurrence per key, never merged. */
   let stepCounter = 0
@@ -474,26 +304,10 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
     }
   }
 
-  /** Emit any queued fallback notices, persisting each so the downgrade is in
-   *  the durable transcript and not only in the live stream. Uses the existing
-   *  `warning` notice kind deliberately: every shipped client already renders
-   *  it, whereas a bespoke kind would be dropped by `dispatchChatStreamLine`'s
-   *  filter — an attribution nobody sees is not attribution. */
-  function* drainModelNotices(): Generator<ProducerWireEvent, void, unknown> {
-    while (pendingModelNotices.length > 0) {
-      const queued = pendingModelNotices.shift()!
-      const notice = noticePart('warning', queued.id, queued.text)
-      recordPersistedPart(notice, undefined, noticePartKey(notice.id))
-      yield { type: 'notice', id: notice.id, noticeKind: 'warning', text: queued.text }
-    }
-  }
-
   async function* stream(): AsyncGenerator<ProducerWireEvent, void, unknown> {
     try {
-      for await (const raw of source) {
+      for await (const raw of options.events) {
         const record = asRecord(raw)
-        captureEffectiveBackend(asRecord(record?.data))
-        yield* drainModelNotices()
         if (!record || typeof record.type !== 'string') continue
         // Fold bare tool_call/tool_result shapes into the canonical part event;
         // everything else keeps its original record (verbatim forwarding must
@@ -526,18 +340,11 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
             const state = asRecord(persisted?.state)
             const toolId = String(persisted?.id ?? '')
             const toolName = String(persisted?.tool ?? 'tool')
-            const args = asRecord(state?.input) ?? {}
-            const hasPopulatedArgs = Object.keys(args).length > 0
-            const announcedWithPopulatedArgs = announcedToolArgs.get(toolId)
-            if (
-              toolId &&
-              (announcedWithPopulatedArgs === undefined ||
-                (!announcedWithPopulatedArgs && hasPopulatedArgs && !settledTools.has(toolId)))
-            ) {
-              announcedToolArgs.set(toolId, hasPopulatedArgs)
+            if (toolId && !announcedTools.has(toolId)) {
+              announcedTools.add(toolId)
               yield {
                 type: 'tool_call',
-                call: { toolCallId: toolId, toolName, args },
+                call: { toolCallId: toolId, toolName, args: asRecord(state?.input) ?? {} },
               }
             }
             const status = String(state?.status ?? '')
@@ -558,7 +365,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
           }
 
           if (partType === 'step-finish') {
-            addStepFinishUsage(part, usage)
+            usageFromStepFinish(part, usage)
             // Persist the per-step receipt too (unique key per occurrence: the
             // parts have no id and two receipts must never merge into one).
             recordPersistedPart(part, undefined, `step-finish:#${stepCounter++}`)
@@ -773,9 +580,6 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         // unknown types.
         yield toProducerWireEvent(record)
       }
-      // A model that fell over and then produced nothing never entered the loop
-      // body; the downgrade must still be recorded.
-      yield* drainModelNotices()
     } catch (streamErr) {
       const diagnostic = sandboxStreamFailureDiagnostic(streamErr)
       log('[chat-routes] sandbox stream failed', {
@@ -793,7 +597,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         type: 'error',
         data: {
           message: diagnostic.userMessage,
-          code: diagnostic.code,
+          code: 'sandbox.stream_failed',
           details: { failureNote: diagnostic.failureNote },
         },
       }
@@ -814,23 +618,6 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
     // phantom failures the final write then reverses.
     draftParts: () => draftAssistantParts(partOrder, partMap, fullText),
     usage: () => usage,
-    // A GETTER, not a captured value: `turn-routes` reads `producer.model` at
-    // draft-snapshot and persist time, both of which happen after the stream
-    // resolved which model serves. A plain property would freeze the PREFERRED
-    // model into the row and make a downgrade unattributable — the exact
-    // failure mode this work exists to prevent.
-    get model(): string | undefined {
-      return servedModel()
-    },
-    modelFailover: () => ({
-      model: servingModel(),
-      attempts: failover?.attempts() ?? [],
-      usedFallback: failover?.usedFallback() ?? false,
-    }),
-    modelAttribution: () => ({
-      ...(options.model ? { requestedModel: options.model } : {}),
-      ...(effectiveBackend ?? {}),
-      echoReceived: effectiveBackend !== undefined,
-    }),
+    ...(options.model ? { model: options.model } : {}),
   }
 }

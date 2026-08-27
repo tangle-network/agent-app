@@ -14,20 +14,10 @@
  */
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { ProviderIcon } from "@tangle-network/sandbox-ui/integrations";
+import { ProviderLogo } from "../web-react/provider-logo";
 import { describeProposal } from "./presentation";
 import { providerLabel } from "./provider-label";
-import type {
-  ConnectionRequirement,
-  ConnectionRequirementKind,
-  PendingProposal,
-} from "./types";
-
-/** Section labels ("New skills", "Workflow definition", "Integrations") share one
- *  eyebrow recipe — small, capped, tracked, muted — so the card's sections read
- *  as one system instead of three ad-hoc sizes. */
-const EYEBROW_CLASS =
-  "text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground";
+import type { ConnectionRequirement, PendingProposal } from "./types";
 
 export interface ProposalCardProps {
   proposal: PendingProposal;
@@ -49,8 +39,7 @@ export interface ProposalCardProps {
   /** Render the brand icon for an integration requirement's provider. The host
    *  owns the provider→icon mapping (its integrations catalog); when absent, or
    *  when it returns a nullish node for a provider it doesn't recognize, the row
-   *  falls back to the shared sandbox-ui {@link ProviderIcon} mark (the same
-   *  brand resolution the integrations catalog uses). */
+   *  falls back to the built-in {@link ProviderLogo} mark. */
   renderProviderIcon?: (provider: string) => ReactNode;
 }
 
@@ -68,19 +57,19 @@ export function ProposalCard({
   const [tab, setTab] = useState<"graph" | "yaml">("graph");
   const isWorkflow = view.preview?.kind === "workflow";
   const showGraph = isWorkflow && !!renderGraph;
-  // Held once so each row can be told what it waits on: whether a requirement is
-  // blocked is a question about the WHOLE list, which no row can answer alone.
-  const requirements = proposal.requirements ?? [];
 
   return (
     <div className="rounded-lg border border-primary/40 bg-card p-3 text-sm">
-      <p className="font-semibold text-[15px] text-foreground">{view.title}</p>
+      <p className="font-medium text-foreground">{view.title}</p>
+      <p className="text-muted-foreground text-xs">
+        Confirm to run this action on your account.
+      </p>
 
       {view.fields.length > 0 && (
         <dl className="mt-2 space-y-1">
           {view.fields.map((f) => (
-            <div key={f.label} className="grid grid-cols-[auto_1fr] gap-x-3 text-xs">
-              <dt className="text-muted-foreground">{f.label}</dt>
+            <div key={f.label} className="flex gap-2 text-xs">
+              <dt className="shrink-0 text-muted-foreground">{f.label}</dt>
               <dd className="truncate text-foreground" title={f.value}>
                 {f.value}
               </dd>
@@ -91,7 +80,7 @@ export function ProposalCard({
 
       {view.skills && view.skills.length > 0 && (
         <div className="mt-2">
-          <p className={EYEBROW_CLASS}>New skills</p>
+          <p className="text-muted-foreground text-xs">New skills</p>
           <ul className="mt-1 space-y-0.5">
             {view.skills.map((s) => (
               <li key={s.name} className="text-foreground text-xs">
@@ -108,17 +97,14 @@ export function ProposalCard({
       {view.preview && (
         <div className="mt-2">
           <div className="flex items-center justify-between">
-            <p className={EYEBROW_CLASS}>{view.preview.label}</p>
+            <p className="text-muted-foreground text-xs">{view.preview.label}</p>
             {showGraph && (
               <div className="flex gap-2 text-xs">
                 <button
                   type="button"
                   onClick={() => setTab("graph")}
-                  aria-pressed={tab === "graph"}
                   className={
-                    tab === "graph"
-                      ? "font-medium text-foreground underline decoration-primary underline-offset-4"
-                      : "text-muted-foreground hover:text-foreground"
+                    tab === "graph" ? "text-foreground" : "text-muted-foreground"
                   }
                 >
                   Graph
@@ -126,11 +112,8 @@ export function ProposalCard({
                 <button
                   type="button"
                   onClick={() => setTab("yaml")}
-                  aria-pressed={tab === "yaml"}
                   className={
-                    tab === "yaml"
-                      ? "font-medium text-foreground underline decoration-primary underline-offset-4"
-                      : "text-muted-foreground hover:text-foreground"
+                    tab === "yaml" ? "text-foreground" : "text-muted-foreground"
                   }
                 >
                   YAML
@@ -143,25 +126,21 @@ export function ProposalCard({
               {renderGraph?.(view.preview.content)}
             </div>
           ) : (
-            // max-h fits a whole number of lines at text-xs' 16px leading —
-            // 1px border + 8px top padding, 12 lines = 202px — so the scroll
-            // cut lands on a line boundary, never mid-glyph.
-            <pre className="mt-1 max-h-[202px] overflow-auto rounded border border-border bg-secondary p-2 font-mono text-xs tabular-nums">
+            <pre className="mt-1 max-h-48 overflow-auto rounded border border-border bg-muted/50 p-2 text-xs">
               <code>{view.preview.content}</code>
             </pre>
           )}
         </div>
       )}
 
-      {requirements.length > 0 && (
+      {proposal.requirements && proposal.requirements.length > 0 && (
         <div className="mt-3 rounded border border-border p-2">
-          <p className={EYEBROW_CLASS}>Integrations</p>
+          <p className="text-muted-foreground text-xs">Integrations</p>
           <ul className="mt-1 space-y-1">
-            {requirements.map((r) => (
+            {proposal.requirements.map((r) => (
               <RequirementRow
-                key={`${r.provider}-${requirementKind(r)}`}
+                key={`${r.provider}-${r.kind ?? "integration"}`}
                 req={r}
-                blockedBy={blockingPrerequisite(r, requirements)}
                 navigate={navigate}
                 onConnect={onConnect}
                 renderProviderIcon={renderProviderIcon}
@@ -169,7 +148,8 @@ export function ProposalCard({
             ))}
           </ul>
           <p className="mt-1 text-muted-foreground text-xs">
-            Connect the items above, then confirm.
+            Connect the items above, then confirm — your proposal stays here until
+            you do.
           </p>
         </div>
       )}
@@ -185,7 +165,7 @@ export function ProposalCard({
           type="button"
           onClick={onConfirm}
           disabled={confirming || !proposal.proposalId}
-          className="rounded-md bg-primary px-3 py-1.5 font-medium text-primary-foreground text-sm disabled:opacity-50"
+          className="rounded bg-primary px-3 py-1.5 text-primary-foreground text-sm disabled:opacity-50"
         >
           {confirming ? "Confirming…" : "Confirm"}
         </button>
@@ -193,7 +173,7 @@ export function ProposalCard({
           type="button"
           onClick={onCancel}
           disabled={confirming}
-          className="rounded-md border border-border px-3 py-1.5 font-medium text-foreground text-sm disabled:opacity-50"
+          className="rounded border border-border px-3 py-1.5 text-foreground text-sm disabled:opacity-50"
         >
           Cancel
         </button>
@@ -228,51 +208,13 @@ function openConnect(target: string, navigate?: (path: string) => void) {
   }
 }
 
-/** The kind a requirement is rendered as. Absent on proposals predating the
- *  field, which the card has always treated as an integration. */
-function requirementKind(req: ConnectionRequirement): ConnectionRequirementKind {
-  return req.kind ?? "integration";
-}
-
-/**
- * The requirement that must be satisfied before `req` can be, while it is still
- * unsatisfied — so the row can withhold a connect that could only be refused.
- *
- * Undefined when nothing blocks it: no prerequisite, one already connected, or
- * one naming a requirement this proposal does not carry (there is nothing to
- * wait for, and guessing would strand the row).
- */
-function blockingPrerequisite(
-  req: ConnectionRequirement,
-  all: readonly ConnectionRequirement[],
-): ConnectionRequirement | undefined {
-  const ref = req.prerequisite;
-  if (!ref) return undefined;
-  const match = all.find(
-    (r) => r.provider === ref.provider && requirementKind(r) === ref.kind,
-  );
-  return match && !match.connected ? match : undefined;
-}
-
-/** What to say in place of a connect the user cannot use yet — the step that
- *  comes first, in the same words its own row offers. */
-function blockedNote(prerequisite: ConnectionRequirement): string {
-  const label = providerLabel(prerequisite.provider);
-  return requirementKind(prerequisite) === "github_app"
-    ? `Install ${label} App first`
-    : `Connect ${label} first`;
-}
-
 function RequirementRow({
   req,
-  blockedBy,
   navigate,
   onConnect,
   renderProviderIcon,
 }: {
   req: ConnectionRequirement;
-  /** The unmet requirement this one waits on, when there is one. */
-  blockedBy?: ConnectionRequirement;
   navigate?: (path: string) => void;
   onConnect?: (requirement: ConnectionRequirement) => void | Promise<void>;
   renderProviderIcon?: (provider: string) => ReactNode;
@@ -290,7 +232,7 @@ function RequirementRow({
   }, []);
 
   const label = providerLabel(req.provider);
-  const isApp = requirementKind(req) === "github_app";
+  const isApp = req.kind === "github_app";
   const kindLabel = isApp ? `${label} App` : label;
   const statusText = req.connected
     ? isApp
@@ -303,14 +245,8 @@ function RequirementRow({
   // owns the connect experience). Without one, `connectUrl === null` means "no
   // connect target to offer" (e.g. a github_app requirement on a deploy with no
   // app slug) — show the status without a link.
-  //
-  // A blocked requirement is never actionable, whatever the host wired: the
-  // GitHub App install is claimed through the GitHub connection, so offering it
-  // first only sends the user to GitHub for a claim the platform then refuses.
   const canConnect =
-    !req.connected &&
-    !blockedBy &&
-    (Boolean(onConnect) || req.connectUrl !== null);
+    !req.connected && (Boolean(onConnect) || req.connectUrl !== null);
   const target = req.connectUrl ?? "/app/integrations";
 
   // In-place connect when the host wired a handler; otherwise navigate to the
@@ -341,13 +277,11 @@ function RequirementRow({
   };
 
   // Host-supplied brand icon (its integrations catalog knows the real provider
-  // marks); fall back to the shared sandbox-ui ProviderIcon (real integration
-  // marks — Slack, GitHub, … — with a deterministic monogram behind them) when
-  // the host didn't wire one or returns nothing for a provider it doesn't
-  // recognize. `renderProviderIcon` is an untrusted host callback run during
-  // render, so contain a throw (a host that indexes a catalog without guarding
-  // an unknown provider) the same way `onConnect` is contained above — one bad
-  // mark must not crash the card.
+  // marks); fall back to the built-in model mark when the host didn't wire one or
+  // returns nothing for a provider it doesn't recognize. `renderProviderIcon` is
+  // an untrusted host callback run during render, so contain a throw (a host that
+  // indexes a catalog without guarding an unknown provider) the same way
+  // `onConnect` is contained above — one bad mark must not crash the card.
   let providerIcon: ReactNode;
   try {
     providerIcon = renderProviderIcon?.(req.provider) ?? null;
@@ -356,16 +290,10 @@ function RequirementRow({
   }
 
   return (
-    <li className="flex items-center justify-between gap-2 text-sm">
+    <li className="flex items-center justify-between gap-2 text-xs">
       <span className="flex min-w-0 items-center gap-2">
-        {providerIcon ?? (
-          <ProviderIcon
-            id={req.provider}
-            size={16}
-            className="rounded-[4px]"
-          />
-        )}
-        <span className="truncate font-medium text-foreground">{kindLabel}</span>
+        {providerIcon ?? <ProviderLogo provider={req.provider} size={16} />}
+        <span className="truncate text-foreground">{kindLabel}</span>
         <span className="flex shrink-0 items-center gap-1">
           {/* Filled vs outlined dot is a non-color (shape) cue for the
               connected state, so it reads for color-blind users too — the
@@ -383,20 +311,12 @@ function RequirementRow({
           </span>
         </span>
       </span>
-      {blockedBy && !req.connected && (
-        // Named rather than silent: a row with no affordance and no reason reads
-        // as broken. The step it waits on is the row above (the server lists a
-        // prerequisite first), so this points at something already on screen.
-        <span className="shrink-0 text-muted-foreground text-xs">
-          {blockedNote(blockedBy)}
-        </span>
-      )}
       {canConnect && (
         <button
           type="button"
           onClick={handleConnect}
           disabled={connecting}
-          className="shrink-0 rounded border border-primary px-2 py-0.5 font-medium text-primary text-sm transition-colors hover:bg-primary/10 disabled:opacity-50"
+          className="shrink-0 rounded border border-primary px-2 py-0.5 font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
         >
           {connecting
             ? isApp

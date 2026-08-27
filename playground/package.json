@@ -3,33 +3,28 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "engines": {
-    "node": ">=22.13"
-  },
   "description": "Dev-only visual playground for agent-app UI surfaces. Not part of the published package.",
   "scripts": {
     "dev": "vite --port 4321",
-    "typecheck": "tsc --noEmit",
     "build": "vite build",
     "preview": "vite preview --port 4321"
   },
   "dependencies": {
     "@tangle-network/agent-app": "file:..",
-    "konva": "^10.3.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "react-konva": "^19.2.5"
+    "konva": "^9.3.16",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-konva": "^18.2.10"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.12.1",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.4",
-    "autoprefixer": "^10.5.4",
-    "playwright": "^1.62.0",
-    "postcss": "^8.5.24",
-    "tailwindcss": "^3.4.19",
-    "typescript": "^5.9.3",
-    "vite": "^8.1.5"
+    "@axe-core/playwright": "^4.11.3",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "playwright": "^1.61.0",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "vite": "^5.4.11"
   }
 }

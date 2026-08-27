@@ -15,112 +15,32 @@
  *
  * The aliases reference the triples, so redefining only the triples in the dark
  * scope re-themes both vocabularies through the cascade.
- *
- * Neutrals are authored on ONE oklch ramp (`--neutral-*`, below) and the shadcn
- * triples point at it. Structural reference: Cabinet (MIT) — see
- * docs/design-tokens.md for the decisions and what we did differently.
  */
 
 :root {
-  /* ── The neutral ramp ────────────────────────────────────────────────────
-     ONE ladder, both themes: light reads it from the top down, dark from the
-     bottom up. A stop's name is its oklch lightness × 100, rounded to the
-     nearest integer (`--neutral-94` is L 0.945), so the rule stays checkable
-     rather than conventional. Chroma comes in TWO bands, because the two ends
-     of the ladder do different work:
-
-       dark band   L ≤ 0.4 — the dark theme's surface ladder: chroma
-                   0.014–0.018 at hue 280, falling as L rises. The deep
-                   surfaces carry the deliberate cool cast; the border stop
-                   carries least, so a hairline reads as an edge, not a tint.
-                   The lightness steps here are deliberately SMALL — at the
-                   bottom of sRGB, rungs 0.03 apart measure 1.05:1, which is
-                   physically imperceptible, so this band's separation comes
-                   from the whole stack (fill step + border tier + shadow),
-                   not from any single rung.
-       light band  L ≥ 0.8 — chroma 0.004–0.008 at hue 280: the tinted-canvas
-                   values from the elevation audit. The mid stops (49, 70 —
-                   text, not surfaces) keep the legacy 0.004 at hue 286; at
-                   that chroma the 6° hue difference is below what sRGB shows.
-
-     HSL saturation is not chroma, which is why the `-hsl` mirrors wander in
-     S% while the oklch sources hold their bands: the ramp this replaced
-     carried a nominal "S 5–7%" throughout that produced 0.0014 chroma at
-     L 0.976 and 0.0154 at L 0.478 — visibly gaining blue as it darkened.
-
-     The terminal stop is chroma 0 because sRGB admits no chroma at L 1.
-
-     Each stop ships TWICE, and the pair is the whole compatibility story:
-       --neutral-NN       the oklch value — the SOURCE, what new work reads
-       --neutral-NN-hsl   the same colour as an "H S% L%" channel triple
-     A pinned consumer's `hsl(var(--border))` must keep resolving, and CSS
-     cannot convert oklch to a bare channel triple, so the triple is a mirror
-     rather than a derivation. tests/theme/tokens-contract.test.ts converts
-     every oklch stop to HSL and fails if its mirror has drifted, so the two
-     forms cannot disagree without a red test. */
-  /* dark band — the dark theme's surface ladder, bottom up: canvas-backdrop,
-     background, input (recessed), card, secondary/muted/accent, popover,
-     border. The first three RETUNE the stops the light theme's ink also reads;
-     the top four are new rungs. Steps bg→card→secondary→popover measure
-     1.19/1.14/1.09 (card→popover 1.24) — ChatGPT-class steps at brand chroma:
-     visible on real displays, not just on the reference monitor. */
-  --neutral-16: oklch(0.16 0.018 280);
-  --neutral-16-hsl: 234.9 28.5% 6.4%;
-  --neutral-19: oklch(0.19 0.018 280);
-  --neutral-19-hsl: 234.5 21.2% 9%;
-  --neutral-22: oklch(0.215 0.018 280);
-  --neutral-22-hsl: 234.2 17.6% 11.3%;
-  --neutral-26: oklch(0.26 0.017 280);
-  --neutral-26-hsl: 233.8 12.9% 15.4%;
-  --neutral-30: oklch(0.3 0.017 280);
-  --neutral-30-hsl: 233.7 10.7% 19.3%;
-  --neutral-32: oklch(0.32 0.016 280);
-  --neutral-32-hsl: 233.6 9.3% 21.2%;
-  --neutral-36: oklch(0.365 0.014 280);
-  --neutral-36-hsl: 233.4 7% 25.6%;
-  /* mid stops — text, both themes */
-  --neutral-49: oklch(0.49 0.004 286);
-  --neutral-49-hsl: 239.7 1.3% 38.2%;
-  --neutral-70: oklch(0.7 0.004 286);
-  --neutral-70-hsl: 239.6 1.5% 62.5%;
-  /* light band — the light theme's surfaces, bottom up: border/input,
-     canvas-backdrop, background, secondary/muted/accent, terminal white. */
-  --neutral-85: oklch(0.85 0.0079 280);
-  --neutral-85-hsl: 233.1 6.8% 81.4%;
-  --neutral-92: oklch(0.925 0.0069 280);
-  --neutral-92-hsl: 233.1 12.5% 90.9%;
-  --neutral-94: oklch(0.945 0.0059 280);
-  --neutral-94-hsl: 233.2 14.8% 93.4%;
-  --neutral-96: oklch(0.965 0.0049 280);
-  --neutral-96-hsl: 233.2 19.9% 95.9%;
-  --neutral-100: oklch(1 0 0);
-  --neutral-100-hsl: 0 0% 100%;
-
   /* shadcn channel triples — "H S% L%", consumed as hsl(var(--name)).
-     Neutrals point at a ramp stop; the brand hues (primary/destructive/status)
-     keep their measured HSL, because moving them would move agent-app off
-     @tangle-network/brand (Tangle Quiet) and off the status colours that were
-     tuned for AA as TEXT. agent-app keeps its own light-default /
+     Values mirror @tangle-network/brand (Tangle Quiet) so agent-app surfaces
+     match sandbox-ui in the same app. agent-app keeps its own light-default /
      [data-theme="dark"] scope model (brand is dark-default), so /theme stays
      dependency-free — only the values are shared, not the cascade. */
-  --background: var(--neutral-94-hsl);
-  --foreground: var(--neutral-16-hsl);
-  --card: var(--neutral-100-hsl);
-  --card-foreground: var(--neutral-16-hsl);
-  --popover: var(--neutral-100-hsl);
-  --popover-foreground: var(--neutral-16-hsl);
+  --background: 0 0% 100%;
+  --foreground: 0 0% 5%;
+  --card: 240 7% 97%;
+  --card-foreground: 0 0% 5%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 5%;
   --primary: 245 62% 57%;
-  --primary-foreground: var(--neutral-100-hsl);
-  --secondary: var(--neutral-96-hsl);
-  --secondary-foreground: var(--neutral-22-hsl);
-  --muted: var(--neutral-96-hsl);
-  --muted-foreground: var(--neutral-49-hsl);
-  --accent: var(--neutral-96-hsl);
-  --accent-foreground: var(--neutral-22-hsl);
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 6% 93%;
+  --secondary-foreground: 0 0% 10%;
+  --muted: 240 6% 93%;
+  --muted-foreground: 240 5% 38%;
+  --accent: 240 6% 93%;
+  --accent-foreground: 0 0% 10%;
   --destructive: 0 72% 41%;
-  --destructive-foreground: var(--neutral-100-hsl);
-  --border: var(--neutral-85-hsl);
-  --input: var(--neutral-85-hsl);
+  --destructive-foreground: 0 0% 100%;
+  --border: 240 6% 89%;
+  --input: 240 6% 89%;
   --ring: 245 62% 57%;
   /* status colors — brand hues (teal/gold/red), but lightness kept dark enough
      to clear WCAG AA when used AS TEXT on tinted chips. Brand's own status
@@ -129,17 +49,6 @@
   --success-foreground: 0 0% 100%;
   --warning: 41 96% 38%;
   --warning-foreground: 38 92% 12%;
-  /* Warning as TEXT on a warning-TINTED surface (the approval card's
-     `bg-warning/[0.06]`), which is a different surface from the solid gold chip
-     `--warning-foreground` is paired with — and the reason that pairing cannot
-     serve both. Measured on the shipped approval card: no single lightness
-     clears AA in both themes, because the tint tracks the page. On the light
-     page the tint composites to rgb(233,230,227) and the ramp needs L <= 27%
-     (L 28% is 4.43:1); on the dark page rgb(32,29,29) it needs L >= 36%
-     (L 34% is 4.06:1). So this token re-themes where `--warning` and
-     `--warning-foreground` deliberately do not. 27% / 56% are the values with
-     margin either side of those knees: 4.69:1 light, 9.12:1 dark. */
-  --warning-strong: 41 96% 27%;
 
   /* canvas/sequences aliases — full colors, resolve to the triples above */
   --bg-input: hsl(var(--card));
@@ -161,494 +70,48 @@
      utilities are wired separately in the preset. */
   --md3-outline-variant: hsl(var(--border));
   --md3-surface-container-low: hsl(var(--card));
-  /* `--md3-surface-container` (the canonical run-row fill) joins low on `card`:
-     the brand ladder's low/container distinction compresses onto the shadcn
-     ladder here, exactly as the preset's `surface-container*` mapping does. */
-  --md3-surface-container: hsl(var(--card));
   --accent-surface-soft: hsl(var(--accent));
   --accent-text: hsl(var(--accent-foreground));
   --status-error: hsl(var(--destructive));
-  /* Status text on a tint (the run-row status dots + collapsed error line) —
-     full colors via the triples, so the dark scope re-themes them too. */
-  --surface-success-text: hsl(var(--success));
-  --surface-danger-text: hsl(var(--destructive));
+  --radius-md: 0.5rem;
 
   /* canvas-only surfaces (not part of the shadcn vocabulary). Name matches the
-     `--canvas-backdrop` the design-canvas Workspace references (with a #1a1a1a
-     fallback). Two ramp stops BELOW the page, so elevation reads the right way
-     up: canvas under page, white card lifted above both. */
-  --canvas-backdrop: hsl(var(--neutral-92-hsl));
-
-  /* Keyboard focus ring. Resolves through `--ring`, so the dark scope re-themes
-     it by the same cascade every other token here uses. */
-  --focus-ring-width: 2px;
-  --focus-ring-offset: 2px;
-  --focus-ring-color: hsl(var(--ring));
-
-  /* ── Radius ──────────────────────────────────────────────────────────────
-     One root, every step a multiplier of it, so a product re-proportions its
-     whole chrome by changing ONE number. `--radius-md` keeps its shipped
-     0.5rem exactly (0.625 x 0.8), which is what pins the root at 0.625rem:
-     gtm-agent consumes `--radius-md` for its composer send button, and the
-     sandbox-ui MD3 components bridged above read it too.
-
-     The root is `--radius-base`, NOT `--radius`, and that is deliberate. Half
-     the fleet already owns `--radius` (tax-agent sets 0.5rem, legal-agent
-     0.625rem) inside `@layer base`, while this file is linked UNLAYERED — an
-     unlayered declaration beats any layered one, so shipping `--radius` here
-     would silently seize a token products already drive their own scales from.
-     A product that wants its root to drive this ladder opts in with one line:
-     `--radius-base: var(--radius)`. */
-  --radius-base: 0.625rem;
-  --radius-sm: calc(var(--radius-base) * 0.6); /* 0.375rem — 6px  */
-  --radius-md: calc(var(--radius-base) * 0.8); /* 0.5rem   — 8px  */
-  --radius-lg: var(--radius-base); /*             0.625rem — 10px */
-  --radius-xl: calc(var(--radius-base) * 1.4); /* 0.875rem — 14px */
-  --radius-2xl: calc(var(--radius-base) * 1.8); /* 1.125rem — 18px */
-  --radius-3xl: calc(var(--radius-base) * 2.2); /* 1.375rem — 22px */
-
-  /* ── Motion ──────────────────────────────────────────────────────────────
-     Four durations and three curves, paired into the three composites a
-     component actually reaches for. Before these, 64 transitions in this
-     package ran on Tailwind's implicit 150 ms / default curve with no named
-     intent — nothing was WRONG, but nothing was decidable either.
-
-     The durations are a x1.5-ish ladder rather than round numbers, because
-     what a user perceives is the ratio: 90 reads as instant, 150 as a
-     response, 240 as a movement you can follow, 360 as a surface travelling.
-
-       instant  a control acknowledging a pointer (hover/active colour)
-       fast     a state change on a control already on screen
-       base     a surface arriving or leaving (popover, panel, disclosure)
-       slow     a full-height surface travelling (drawer, sheet, sidebar)
-
-     `fast` is 150 ms on purpose: it is what those 64 transitions already run
-     at, so adopting the token is a rename, never a retune.
-
-     Curves: entrances decelerate hard and land softly; state changes
-     decelerate normally; exits ACCELERATE away, because a user who dismissed
-     something is done with it and should not wait for it to glide out. */
-  --duration-instant: 90ms;
-  --duration-fast: 150ms;
-  --duration-base: 240ms;
-  --duration-slow: 360ms;
-  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --ease-entrance: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
-  /* Drop-in duration+easing pairs: `transition: background-color var(--motion-control)`. */
-  --motion-control: var(--duration-fast) var(--ease-standard);
-  --motion-surface: var(--duration-base) var(--ease-entrance);
-  --motion-dismiss: var(--duration-instant) var(--ease-exit);
-
-  /* ── Entrance choreography ───────────────────────────────────────────────
-     The durations above answer "how fast does an existing thing change".
-     These answer "how does a thing that was not there ARRIVE", which is most
-     of what an agent surface does: text streams in, rows appear as work
-     completes, a trace expands, a pending label waits.
-
-     Shipping the ladder without these is why this package had FOUR durations,
-     THREE curves, and ZERO keyframes on `/web-react` — every arrival was a
-     pop, which reads as cheap no matter how correct the colours are.
-
-     `--motion-stream` is longer than `base` on purpose: streamed text arrives
-     continuously, so each chunk overlaps its neighbours and a fast curve makes
-     the paragraph flicker. `--motion-arrive` is the row/card entrance and is
-     meant to be staggered by index (see `--stagger-step`). */
-  --duration-stream: 420ms;
-  --duration-arrive: 600ms;
-  --ease-expo: cubic-bezier(0.23, 1, 0.32, 1);
-  --motion-stream: var(--duration-stream) var(--ease-expo);
-  --motion-arrive: var(--duration-arrive) var(--ease-expo);
-  /* Per-item delay in a staggered group. 5 items = 200ms tail, which stays
-     under the 250ms an interface can add before it reads as latency. */
-  --stagger-step: 50ms;
-  /* Position in a staggered group, overridden PER ELEMENT by the caller. It is
-     declared here with a zero default rather than read through a `var()`
-     fallback so the file never references a token it does not define — an
-     undefined `var()` resolves to nothing and paints silently, which is the
-     failure the token contract exists to catch. */
-  --stagger-index: 0;
-  /* How far an arriving surface travels, and how far a streamed chunk resolves
-     from. Both are small: motion that announces itself is motion you notice
-     twice. */
-  --arrive-distance: 8px;
-  --stream-blur: 4px;
-
-  /* ── Border tiers ────────────────────────────────────────────────────────
-     Three strengths of the SAME border colour, because a divider inside a
-     panel and the edge of a card floated on the page are not the same line,
-     and shipping one strength for both is what makes a UI read boxy.
-
-       --border-soft   dividers and de-emphasised edges — the tier the
-                       `border-border` utility maps to, so all 151 of this
-                       package's usages move together
-       --card-edge     a container that must read as a container
-       hsl(--border)   full strength: form-field edges (`--input`), and any
-                       edge a component deliberately emphasises
-
-     LIGHT is 40% / 60%. A 1px hairline, contrast of the composited line
-     against the surface it sits on, rendered and read back by
-     playground/scripts/token-render.mjs:
-
-       alpha   on background   on card   on muted
-        22%        1.065         1.098     1.081
-        40%        1.125         1.188     1.143
-        60%        1.198         1.309     1.236
-       100%        1.345         1.584     1.428
-
-     40% keeps a divider quiet on `--background` (1.125), where most of this
-     package's dividers sit, while the white card's fill step does the
-     containing; 60% is far enough above it (1.309 vs 1.198) to read as a
-     DIFFERENT decision, short of the 1.584 that reads as a box.
-
-     DARK is 60% / 80% — the tiers no longer collapse there. They used to:
-     the old dark border (L 0.25) was already at the edge of visible at full
-     strength (1.158 on card), so a softened tier was not a quieter line but
-     no line, and dark ran both tiers at 100%. The ladder revision lifted the
-     dark border to L 0.365, and the same measurement now leaves room to
-     spare:
-
-       alpha   on background   on card   on muted
-        60%        1.320         1.265     1.173
-        80%        1.489         1.389     1.253
-       100%        1.716         1.553     1.339
-
-     The soft tier at 60% clears the 1.07 hairline floor on every surface it
-     divides, and the card edge at 80% sits clearly above it — same method,
-     opposite conclusion, because the border colour itself moved. */
-  /* `--border-subtle` is the quietest tier — the resting edge of the canonical
-     run rows (`@tangle-network/ui`'s RunRowShell), which strengthen to
-     `border-border` on hover/open. 22% is the measured hairline row in the
-     table below; the row's fill step does the containing. */
-  --border-subtle: color-mix(in oklch, hsl(var(--border)) 22%, transparent);
-  --border-soft: color-mix(in oklch, hsl(var(--border)) 40%, transparent);
-  --card-edge: color-mix(in oklch, hsl(var(--border)) 60%, transparent);
-
-  /* ── Elevation shadows ───────────────────────────────────────────────────
-     Two foreground-tinted lifts, so elevation is a token rather than an
-     arbitrary value at each call site. `--shadow-raised` promotes the proven
-     floating-composer values (src/web-react/chat-composer.tsx) unchanged;
-     `--shadow-overlay` is the higher lift for popovers and dialogs. Dark
-     doubles the alpha — the same shadow over a near-black surface reads at
-     roughly half its light-theme strength, so the dark theme compensates at
-     the token, not at every component. */
-  --shadow-raised: 0 1px 2px hsl(var(--foreground) / 0.05), 0 12px 28px hsl(var(--foreground) / 0.07);
-  --shadow-overlay: 0 2px 6px hsl(var(--foreground) / 0.06), 0 16px 40px hsl(var(--foreground) / 0.1);
-
-  /* ── Studio composer ─────────────────────────────────────────────────────
-     The notice chip's surface is derived (`color-mix` over
-     `--primary`/`--card`/`--border`), so it re-themes through the cascade;
-     dark still restates it because the same percentages over a near-black
-     card read as no tint at all. */
-  --studio-notice-bg: color-mix(in srgb, hsl(var(--primary)) 8%, hsl(var(--card)));
-}
-
-/**
- * The keyboard-focus floor.
- *
- * Every interactive element is keyboard-visible by DEFAULT, so a component has
- * to opt out on purpose rather than by omission. Before this rule an element
- * that declared no focus style fell back to the browser's own ring — measured
- * `rgb(16, 16, 16)` in BOTH themes, because nothing here sets `color-scheme`,
- * which is 1.03:1 against the dark canvas backdrop `rgb(19, 19, 21)`. Visible in
- * light, effectively absent in dark, on 30 of the 176 focusable elements the
- * playground audit reaches.
- *
- * Specificity is deliberately left at one pseudo-class, and that is the whole
- * contract:
- *
- *   - It applies wherever nothing else declares a focus style — the gap above.
- *   - It LOSES to `.focus\:outline-none:focus` and `.focus-visible\:ring-*`
- *     (two compound selectors), so a component with a deliberate custom ring is
- *     untouched and no consumer gets a doubled ring from upgrading.
- *   - It TIES with a bare `.outline-none` utility, which means source order
- *     decides and the floor cannot be relied on to win. That is not a hole left
- *     open: a bare `outline-none` with no replacement is a defect this package
- *     fixes at the component and `tests/theme/focus-floor.test.ts` keeps fixed.
- *     CSS cannot distinguish a deliberate opt-out from a forgotten one, so the
- *     guard that can is a test, not a stronger selector.
- *
- * An outline, not a `ring-*` box-shadow, because an outline is not painted by
- * the element's own background/shadow stack — it cannot be covered by a sibling
- * and it needs no `ring-offset-color` matched to whatever surface it sits on.
- */
-:focus-visible {
-  outline: var(--focus-ring-width) solid var(--focus-ring-color);
-  outline-offset: var(--focus-ring-offset);
+     `--canvas-backdrop` the design-canvas Workspace references (with a #1a1a1a fallback). */
+  --canvas-backdrop: hsl(240 7% 90%);
 }
 
 [data-theme='dark'],
 .dark {
-  /* The ramp is NOT redefined here — both themes read the same `--neutral-*`
-     ladder and only differ in which stop each role picks.
-     `--warning-foreground` (dark text on a solid gold chip) is theme-invariant
-     and is therefore absent, not omitted: the cascade already carries it. */
-  --background: var(--neutral-19-hsl);
-  --foreground: var(--neutral-94-hsl);
-  --card: var(--neutral-26-hsl);
-  --card-foreground: var(--neutral-94-hsl);
-  --popover: var(--neutral-32-hsl);
-  --popover-foreground: var(--neutral-94-hsl);
+  --background: 240 8% 5%;
+  --foreground: 240 6% 93%;
+  --card: 240 5% 8%;
+  --card-foreground: 240 6% 93%;
+  --popover: 240 4% 13%;
+  --popover-foreground: 240 6% 93%;
   /* 74% L (brand's #818CF8 intent) so primary clears AA as TEXT on a primary/10
-     tint in dark. That lightness is also why the foreground has to INVERT here:
-     the light theme's white-on-indigo is 6.01:1, but the same white on this
-     74%-L lavender rgb(137,137,245) is 3.02:1 — measured failing on the
-     "Approve & run" button. A dark foreground on the same fill is 6.27:1, so
-     the solid button reads in both themes and the tint keeps its AA as text. */
+     tint in dark; the solid primary button pairs it with a light foreground. */
   --primary: 239 84% 74%;
-  --primary-foreground: var(--neutral-16-hsl);
-  --secondary: var(--neutral-30-hsl);
-  --secondary-foreground: var(--neutral-94-hsl);
-  --muted: var(--neutral-30-hsl);
-  --muted-foreground: var(--neutral-70-hsl);
-  --accent: var(--neutral-30-hsl);
-  --accent-foreground: var(--neutral-94-hsl);
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 5% 11%;
+  --secondary-foreground: 240 6% 93%;
+  --muted: 240 5% 11%;
+  --muted-foreground: 240 4% 62%;
+  --accent: 240 5% 11%;
+  --accent-foreground: 240 6% 93%;
   --destructive: 348 90% 68%;
-  --destructive-foreground: var(--neutral-22-hsl);
-  /* @see the :root declaration — this is the tier that re-themes. */
-  --warning-strong: 40 94% 56%;
-  --border: var(--neutral-36-hsl);
-  --input: var(--neutral-22-hsl);
+  --destructive-foreground: 0 0% 12%;
+  --border: 240 3% 13%;
+  --input: 240 5% 11%;
   --ring: 239 84% 74%;
   --success: 160 70% 52%;
   --success-foreground: 160 84% 10%;
   --warning: 40 94% 56%;
+  --warning-foreground: 38 92% 12%;
 
-  --canvas-backdrop: hsl(var(--neutral-16-hsl));
-
-  /* The dark tiers, re-joined. The border is now strong enough (L 0.365) that
-     softening leaves a visible line — see the measurement in the :root block:
-     60% reads 1.265 on the card, where the old border at FULL strength read
-     1.158. Dark runs the same three tiers as light, one step stronger. */
-  /* Dark subtle tier at 40%: interpolating the dark measurement table, it sits
-     above the 1.07 hairline floor yet clearly below soft's 1.320 — the same
-     one-step-down relationship the light tiers keep. */
-  --border-subtle: color-mix(in oklch, hsl(var(--border)) 40%, transparent);
-  --border-soft: color-mix(in oklch, hsl(var(--border)) 60%, transparent);
-  --card-edge: color-mix(in oklch, hsl(var(--border)) 80%, transparent);
-
-  /* Doubled alphas against the near-black surfaces — @see :root. */
-  --shadow-raised: 0 1px 2px hsl(var(--foreground) / 0.14), 0 12px 28px hsl(var(--foreground) / 0.22);
-  --shadow-overlay: 0 2px 6px hsl(var(--foreground) / 0.12), 0 16px 40px hsl(var(--foreground) / 0.2);
-
-  /* Studio composer — @see :root. The notice chip's mixes are stronger,
-     because 8% of a tint over a near-black card is not a tint. */
-  --studio-notice-bg: color-mix(in srgb, hsl(var(--primary)) 15%, hsl(var(--card)));
-}
-
-/**
- * Entrance keyframes and the classes that ride them.
- *
- * They live in this file, not in a component, because a product already
- * imports this stylesheet and because a keyframe defined inside a bundled
- * component is a keyframe a precompiled consumer does not get — the same gap
- * that shipped a picker with no text tier.
- *
- * Every duration below is a TOKEN, which is what makes the reduced-motion
- * block underneath cover them without a second media query.
- */
-
-/* Streamed text: each chunk resolves out of a small blur instead of popping
-   in. This is the single most visible difference between a chat that feels
-   alive and one that feels like a log being appended to. */
-@keyframes agent-stream-in {
-  from {
-    opacity: 0;
-    filter: blur(var(--stream-blur));
-  }
-  to {
-    opacity: 1;
-    filter: blur(0);
-  }
-}
-
-/* A row, card or chip that was not there a moment ago. Travels a short
-   distance so the eye is told WHERE it came from. */
-@keyframes agent-arrive {
-  from {
-    opacity: 0;
-    transform: translateY(var(--arrive-distance));
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* A control appearing in place — a chip, a badge, a menu row. No travel,
-   because it did not come from anywhere. */
-@keyframes agent-pop-in {
-  from {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* The insertion caret at the end of streaming text. A hard step blink, not a
-   fade: a caret that eases is a caret that reads as a loading placeholder. */
-@keyframes agent-caret {
-  0%,
-  49% {
-    opacity: 1;
-  }
-  50%,
-  100% {
-    opacity: 0;
-  }
-}
-
-/* A label that is WAITING. The sweep is what separates "the agent is working"
-   from "the interface is stuck": a static label cannot tell you which. */
-@keyframes agent-shimmer {
-  from {
-    background-position: 150% center;
-  }
-  to {
-    background-position: -50% center;
-  }
-}
-
-.agent-stream-in {
-  animation: agent-stream-in var(--motion-stream) both;
-}
-
-.agent-arrive {
-  animation: agent-arrive var(--motion-arrive) both;
-}
-
-.agent-pop-in {
-  animation: agent-pop-in var(--motion-control) both;
-}
-
-/* Stagger by index: set `--stagger-index` and a group arrives as a sequence
-   rather than as a flash. Capped at 8 so a 200-row list does not open with a
-   10-second cascade — past the cap every row shares the last delay. */
-.agent-arrive {
-  animation-delay: calc(min(var(--stagger-index), 8) * var(--stagger-step));
-}
-
-/* The waiting label. `background-clip: text` over a moving gradient, so the
-   shimmer runs THROUGH the glyphs rather than behind them. Marked essential:
-   it is the only signal that work is still in flight. Its reduced-motion
-   answer is at the bottom of this file, with the floor it opts out of. */
-.agent-shimmer {
-  background: linear-gradient(
-    90deg,
-    hsl(var(--muted-foreground)) 0%,
-    hsl(var(--foreground)) 45%,
-    hsl(var(--muted-foreground)) 60%
-  );
-  background-size: 250% auto;
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  animation: agent-shimmer 1.4s linear infinite;
-}
-
-/**
- * Reduced motion, at the token layer and at the floor.
- *
- * Two rules, because they cover two different populations. Collapsing the
- * duration TOKENS is what makes motion built on this system honour the
- * preference for free — a component that wrote `var(--motion-surface)` needs no
- * media query of its own, and gets no chance to forget one. The universal rule
- * under it is the floor for everything that predates the tokens: 64 transitions
- * in this package run on Tailwind's implicit duration, and a consumer's own
- * components run on theirs. Neither reads a token, so neither would be reached.
- *
- * 1ms rather than 0: a zero-duration transition fires no `transitionend`, and
- * any component that awaits one to unmount or advance a state machine hangs
- * forever. 1ms is imperceptible AND still fires.
- *
- * The floor uses `!important` where the `:focus-visible` floor deliberately did
- * not, and the asymmetry is the point. Focus styling is a design decision a
- * component is entitled to make differently. Reduced motion is not a design
- * decision — it is an explicit request from the person using the product, and a
- * component overriding it is a defect, not a preference. Motion that genuinely
- * carries meaning (a determinate progress indicator, a live-status pulse) opts
- * out by declaring `data-motion="essential"`; the exclusion covers that element
- * and its subtree, and `:where()` keeps the selector at zero specificity so a
- * consumer's own `!important` can still win.
- *
- * `essential` is an exemption from the BLANKET rule, not a licence to keep
- * running. It exists because collapsing a meaning-carrying animation to a 1ms
- * flash destroys the meaning, so the element gets to answer for itself — and it
- * then OWES that answer. An element with no end condition owes it most, which
- * is why `.agent-shimmer` states its own below: the sweep stops, and what it
- * was saying is re-stated as a static difference the reader can still see.
- */
-@media (prefers-reduced-motion: reduce) {
-  :root {
-    --duration-instant: 1ms;
-    --duration-fast: 1ms;
-    --duration-base: 1ms;
-    --duration-slow: 1ms;
-    --duration-stream: 1ms;
-    --duration-arrive: 1ms;
-    /* The stagger is a delay, not a duration, and a collapsed animation with a
-       live delay still arrives as a visible cascade. */
-    --stagger-step: 0ms;
-  }
-
-  *:where(:not([data-motion='essential'], [data-motion='essential'] *)) {
-    animation-duration: 1ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 1ms !important;
-  }
-
-  /* The waiting label's own answer. It is `data-motion="essential"` because the
-     sweep is the ONLY thing separating an agent that is working from one that
-     is stuck, so the floor above must not collapse it — but an INFINITE
-     animation is exactly what someone asking for reduced motion is asking to be
-     rid of, and running it anyway because the element declared itself essential
-     is the override this file calls a defect.
-
-     So the meaning is carried without the motion. The sweep stops and the
-     gradient comes off (it exists only to be moved), which puts the glyphs back
-     under `color` instead of leaving them transparent windows onto it.
-
-     The DOTTED RULE is the discriminator, and it is the only one. Measured in
-     Chromium under `prefers-reduced-motion: reduce`, light and dark: the live
-     label computes `text-decoration: underline dotted` where a settled label
-     beside it computes `none`, and the two resolve to the SAME color and the
-     same weight. That is by construction — `color: inherit` hands the label
-     whatever its context already uses, and the settled label shares that
-     context. In `mission-activity`'s lane both tool names read rgb(12,12,21)
-     light / rgb(236,236,241) dark; in the chat trace toggle "Thinking · 12s"
-     and "Thought for 12s" both read rgb(96,96,99) light / rgb(158,158,160)
-     dark, because that button is `text-muted-foreground`. So the reader tells
-     in-flight from done by the rule under the word, from a still frame — not by
-     tone and not by weight.
-
-     Not `content: '…'` or any other generated text: this element's text is read
-     by a screen reader, and adding pseudo-content changes what is announced. */
-  .agent-shimmer {
-    animation: none;
-    background: none;
-    background-clip: border-box;
-    -webkit-background-clip: border-box;
-    color: inherit;
-    text-decoration: underline dotted currentColor;
-    text-underline-offset: 3px;
-  }
-
-  html {
-    scroll-behavior: auto !important;
-  }
+  --canvas-backdrop: hsl(240 8% 5%);
 }
 
 .agent-app-edit-selection::selection {
   background: var(--editor-selection-background);
   color: var(--editor-selection-foreground);
-}
-
-/* A product-supplied Markdown renderer may carry its own base text utility.
- * Message size is a ChatMessages contract, so the rendered copy must inherit
- * that choice while headings and inline code can still scale with em units. */
-.agent-app-message-copy > * {
-  font-size: inherit;
 }

@@ -21,7 +21,6 @@
  */
 
 import { checkThemeContract } from './index'
-import { invokedAsScript } from '../signoff/invoked-as-script'
 
 interface ParsedArgs {
   srcDirs: string[]
@@ -104,6 +103,4 @@ function main(): void {
   process.exit(1)
 }
 
-/* c8 ignore start — process wiring, exercised by the bin itself */
-if (invokedAsScript(import.meta.url, process.argv[1])) main()
-/* c8 ignore stop */
+main()

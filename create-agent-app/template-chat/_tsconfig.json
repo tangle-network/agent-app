@@ -10,7 +10,7 @@
     "forceConsistentCasingInFileNames": true,
     "noUncheckedIndexedAccess": true,
     "noEmit": true,
-    "types": ["@cloudflare/workers-types", "node"]
+    "types": ["@cloudflare/workers-types/2023-07-01", "node"]
   },
   "include": ["agent.config.ts", "declarations.d.ts", "src", "tests", "vitest.config.ts"]
 }

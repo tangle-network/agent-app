@@ -21,7 +21,6 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import type { StepAgentActivity } from '../missions/agent-activity'
 import type { FlowTrace } from '../trace/index'
 import { stepActivityFlowTrace } from '../trace/mission-flow'
-import { useArrivalStyle } from './motion'
 
 // ── pure helpers ──────────────────────────────────────────────────────────
 
@@ -164,7 +163,7 @@ function TraceIdCopy({ traceId }: { traceId: string }) {
       onClick={copy}
       title="Copy trace id"
       aria-label="Copy trace id"
-      className="inline-flex min-w-0 items-center gap-1.5 rounded text-left font-mono text-muted-foreground transition hover:text-foreground"
+      className="inline-flex min-w-0 items-center gap-1.5 rounded text-left font-mono text-muted-foreground transition hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card"
     >
       <span className="truncate">{traceId}</span>
       <CopyGlyph className="h-3 w-3 shrink-0" />
@@ -173,51 +172,16 @@ function TraceIdCopy({ traceId }: { traceId: string }) {
   )
 }
 
-/**
- * The tone dot. A live run's dot no longer pulses: `animate-pulse` is the same
- * 2s fade a loading skeleton uses, so one animation was carrying two unrelated
- * meanings ("no data yet" and "work in progress") and a reader could not learn
- * either. The dot keeps the tone — hue plus the screen-reader word — and the
- * "in flight" signal moves to the one thing on the row that can say it in the
- * shipped vocabulary: the run's own label, sweeping (see {@link RunLabel}).
- */
 function StatusDot({ tone }: { tone: ActivityTone }) {
   return (
     <span className="inline-flex items-center">
       <span
         aria-hidden
         className={`h-2 w-2 shrink-0 rounded-full ${
-          tone === 'live' ? 'bg-warning' : tone === 'ok' ? 'bg-success' : tone === 'error' ? 'bg-destructive' : 'bg-muted-foreground/40'
+          tone === 'live' ? 'animate-pulse bg-warning' : tone === 'ok' ? 'bg-success' : tone === 'error' ? 'bg-destructive' : 'bg-muted-foreground/40'
         }`}
       />
       <span className="sr-only">{tone}</span>
-    </span>
-  )
-}
-
-/**
- * `tool — detail` for one run. While the run is live the tool name sweeps: the
- * same cue the chat surface's waiting label uses, and the only signal on the
- * row separating an agent that is working from one that is stuck, which is why
- * it declares `data-motion="essential"`. A settled run is plain text — nothing
- * is in flight, so nothing moves.
- *
- * `essential` exempts the label from the blanket reduced-motion collapse; it
- * does NOT keep the sweep running at a reader who asked for less motion. Under
- * `prefers-reduced-motion` tokens.css stops the animation and leaves a dotted
- * rule under the live tool name that its settled siblings on this lane do not
- * carry. That rule is the WHOLE distinction: measured in Chromium, a live and a
- * settled tool name on this lane compute the same color and the same weight
- * (rgb(12,12,21) light / rgb(236,236,241) dark, 500) and differ only in
- * `text-decoration`. The distinction survives; only the movement goes.
- */
-function RunLabel({ tool, detail, live }: { tool: string; detail: string; live: boolean }) {
-  return (
-    <span className="min-w-0 flex-1 truncate">
-      <span className={live ? 'agent-shimmer font-medium' : 'font-medium'} data-motion={live ? 'essential' : undefined}>
-        {tool}
-      </span>
-      <span className="text-muted-foreground"> — {detail}</span>
     </span>
   )
 }
@@ -244,19 +208,19 @@ export function FlowWaterfall({ trace }: FlowWaterfallProps) {
     <div className="space-y-1">
       {rows.map((row, i) => (
         <div key={i} className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto] items-center gap-2">
-          <span className="truncate font-mono text-xs text-muted-foreground" title={row.name}>
+          <span className="truncate font-mono text-[11px] text-muted-foreground" title={row.name}>
             {row.name}
           </span>
-          <div className="relative h-2 rounded-sm bg-secondary">
+          <div className="relative h-2 rounded-sm bg-muted/40">
             <div
               className={`absolute inset-y-0 rounded-sm ${row.ok ? BAR_CLASS[row.kind] : 'bg-destructive/80'} ${row.approx ? 'opacity-70' : ''}`}
               style={{ left: `${row.offsetPct}%`, width: `${row.widthPct}%` }}
             />
           </div>
-          <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground/70">{row.durationLabel}</span>
+          <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground/70">{row.durationLabel}</span>
         </div>
       ))}
-      <p className="pt-0.5 text-right font-mono text-xs tabular-nums text-muted-foreground/60">
+      <p className="pt-0.5 text-right font-mono text-[10px] tabular-nums text-muted-foreground/60">
         {(trace.totalMs / 1000).toFixed(1)}s{cost ? ` · ${cost}` : ''}
       </p>
     </div>
@@ -275,65 +239,51 @@ export interface MissionActivityLaneProps {
 }
 
 /**
- * One delegated run in the lane. A component rather than a `.map` body so the
- * arrival can be frozen at mount — a row that is already on screen and merely
- * changes status must not re-animate, and a stagger index recomputed from a
- * live array is exactly how that happens.
- */
-function LaneRow({ run, staggerIndex }: { run: StepAgentActivity; staggerIndex: number }) {
-  const arrival = useArrivalStyle(staggerIndex)
-  const tone = activityTone(run.status)
-  const cost = formatActivityCost(run.costUsd)
-  const duration = formatActivityDuration(run.durationMs)
-  return (
-    <div className="agent-arrive flex items-center gap-2 py-1 text-xs" style={arrival}>
-      <StatusDot tone={tone} />
-      <RunLabel tool={run.tool} detail={run.detail} live={tone === 'live'} />
-      {tone === 'live' && (run.iteration !== undefined || run.phase !== undefined) && (
-        <span className="shrink-0 rounded-full bg-warning/10 px-1.5 py-0.5 font-mono text-xs text-warning">
-          {[run.iteration !== undefined ? `iter ${run.iteration}` : null, run.phase ?? null]
-            .filter(Boolean)
-            .join(' · ')}
-        </span>
-      )}
-      <span className="flex shrink-0 items-center gap-1.5 font-mono text-xs tabular-nums text-muted-foreground/70">
-        {tone !== 'live' && tone !== 'ok' && <span>{run.status}</span>}
-        {cost && <span>{cost}</span>}
-        {duration && <span>{duration}</span>}
-      </span>
-    </div>
-  )
-}
-
-/**
  * Collapsed sub-rows under a mission step — one row per delegated run —
  * expanding to the step's waterfall. Renders nothing for an empty lane.
- *
- * A sub-row appears because a delegated run STARTED or FINISHED, which is the
- * one kind of list change worth choreographing: it arrives, and the group
- * arrives as a sequence. Keying on `taskId` is what keeps the rest still — the
- * snapshot re-renders every poll, and a row whose status merely advanced holds
- * the DOM node it already had.
  */
 export function MissionActivityLane({ activity, startedAt, nowMs }: MissionActivityLaneProps) {
   const [expanded, setExpanded] = useState(false)
   if (activity.length === 0) return null
 
   return (
-    <div className="mt-1 border-l border-border pl-3">
-      {activity.map((run, index) => (
-        <LaneRow key={run.taskId} run={run} staggerIndex={index} />
-      ))}
+    <div className="mt-1 border-l border-border/50 pl-3">
+      {activity.map((run) => {
+        const tone = activityTone(run.status)
+        const cost = formatActivityCost(run.costUsd)
+        const duration = formatActivityDuration(run.durationMs)
+        return (
+          <div key={run.taskId} className="flex items-center gap-2 py-1 text-xs">
+            <StatusDot tone={tone} />
+            <span className="min-w-0 flex-1 truncate">
+              <span className="font-medium">{run.tool}</span>
+              <span className="text-muted-foreground"> — {run.detail}</span>
+            </span>
+            {tone === 'live' && (run.iteration !== undefined || run.phase !== undefined) && (
+              <span className="shrink-0 rounded-full bg-warning/10 px-1.5 py-0.5 font-mono text-[10px] text-warning">
+                {[run.iteration !== undefined ? `iter ${run.iteration}` : null, run.phase ?? null]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
+            )}
+            <span className="flex shrink-0 items-center gap-1.5 font-mono text-[10px] tabular-nums text-muted-foreground/70">
+              {tone !== 'live' && tone !== 'ok' && <span>{run.status}</span>}
+              {cost && <span>{cost}</span>}
+              {duration && <span>{duration}</span>}
+            </span>
+          </div>
+        )
+      })}
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="flex items-center gap-1 py-0.5 text-xs font-medium text-muted-foreground/70 transition hover:text-foreground"
+        className="flex items-center gap-1 py-0.5 text-[10px] font-medium text-muted-foreground/70 transition hover:text-foreground"
       >
         <ChevronGlyph className={`h-3 w-3 transition-transform ${expanded ? 'rotate-180' : ''}`} />
         timeline
       </button>
       {expanded && (
-        <div className="rounded-md border border-border bg-secondary p-2">
+        <div className="rounded-md border border-border/50 bg-muted/10 p-2">
           <FlowWaterfall
             trace={stepActivityFlowTrace(activity, {
               ...(startedAt !== undefined ? { startedAt } : {}),
@@ -362,55 +312,54 @@ export interface AgentActivityPanelProps {
 function ActivityRow({
   record,
   renderMissionRef,
-  staggerIndex,
 }: {
   record: AgentActivityRecord
   renderMissionRef?: AgentActivityPanelProps['renderMissionRef']
-  /** Position in the page as it was FIRST rendered — see `useArrivalStyle`. */
-  staggerIndex: number
 }) {
-  const arrival = useArrivalStyle(staggerIndex)
   const [open, setOpen] = useState(false)
   const tone = activityTone(record.status)
   const cost = formatActivityCost(record.costUsd)
   const duration = formatActivityDuration(record.durationMs)
 
   return (
-    <div className="agent-arrive rounded-lg border border-card-edge bg-card" style={arrival}>
+    <div className="rounded-lg border border-border/60 bg-card">
       <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm">
         <StatusDot tone={tone} />
-        <RunLabel tool={record.tool} detail={record.detail} live={tone === 'live'} />
+        <span className="min-w-0 flex-1 truncate">
+          <span className="font-medium">{record.tool}</span>
+          <span className="text-muted-foreground"> — {record.detail}</span>
+        </span>
         {tone === 'live' && (record.iteration !== undefined || record.phase !== undefined) && (
-          <span className="shrink-0 rounded-full bg-warning/10 px-2 py-0.5 font-mono text-xs text-warning">
+          <span className="shrink-0 rounded-full bg-warning/10 px-2 py-0.5 font-mono text-[10px] text-warning">
             {[record.iteration !== undefined ? `iter ${record.iteration}` : null, record.phase ?? null]
               .filter(Boolean)
               .join(' · ')}
           </span>
         )}
         <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
             tone === 'ok'
               ? 'bg-success/10 text-success'
               : tone === 'error'
                 ? 'bg-destructive/10 text-destructive'
                 : tone === 'live'
                   ? 'bg-warning/10 text-warning'
-                  : 'bg-secondary text-muted-foreground'
+                  : 'bg-muted/60 text-muted-foreground'
           }`}
         >
           {record.status}
         </span>
-        {cost && <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{cost}</span>}
+        {cost && <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">{cost}</span>}
         <ChevronGlyph className={`h-3 w-3 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="space-y-2.5 border-t border-border px-3 py-2.5">
+        <div className="space-y-2.5 border-t border-border/40 px-3 py-2.5">
           {record.durationMs !== undefined && (
-            <div className="rounded-md border border-border bg-secondary p-2">
+            <div className="rounded-md border border-border/50 bg-muted/10 p-2">
               <FlowWaterfall trace={stepActivityFlowTrace([record])} />
             </div>
           )}
-          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono text-xs">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono text-[11px]">
             <dt className="text-muted-foreground/60">task</dt>
             <dd className="truncate text-muted-foreground">{record.taskId}</dd>
             <dt className="text-muted-foreground/60">started</dt>
@@ -442,35 +391,24 @@ function ActivityRow({
  * product journaled, mission-spawned or not, with status, cost, drill-in, and
  * a mission link slot for promoted delegations.
  */
-/**
- * `loading`/`error` collapsed onto one status rather than two independent
- * booleans, so "loading and errored at once" is unrepresentable instead of
- * merely avoided by careful set-ordering — the same discipline
- * `web-react/async`'s `AsyncResourceState` enforces for a single fetch.
- * `rows`/`cursor` stay separate state because they ACCUMULATE across pages,
- * which a single-resolution status can't express — this is a cursor-paged
- * panel (`useSessionHistory`'s shape), not a one-shot resource.
- */
-type AgentActivityStatus = 'loading' | 'error' | 'ready'
-
 export function AgentActivityPanel({ fetchActivity, renderMissionRef, title = 'Agent activity', emptyLabel = 'No agent runs yet.' }: AgentActivityPanelProps) {
   const [rows, setRows] = useState<AgentActivityRecord[]>([])
   const [cursor, setCursor] = useState<string | undefined>(undefined)
-  const [status, setStatus] = useState<AgentActivityStatus>('loading')
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(
     async (from?: string) => {
-      setStatus('loading')
+      setLoading(true)
       setError(null)
       try {
         const page = await fetchActivity(from)
         setRows((prev) => mergeActivityPages(from === undefined ? [] : prev, page.items))
         setCursor(page.nextCursor)
-        setStatus('ready')
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
-        setStatus('error')
+      } finally {
+        setLoading(false)
       }
     },
     [fetchActivity],
@@ -479,8 +417,6 @@ export function AgentActivityPanel({ fetchActivity, renderMissionRef, title = 'A
   useEffect(() => {
     void load()
   }, [load])
-
-  const loading = status === 'loading'
 
   return (
     <div className="space-y-2">
@@ -491,29 +427,16 @@ export function AgentActivityPanel({ fetchActivity, renderMissionRef, title = 'A
           onClick={() => void load()}
           disabled={loading}
           aria-label="Refresh"
-          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:opacity-50"
+          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-accent/30 hover:text-foreground disabled:opacity-50"
         >
           <RefreshGlyph className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
-      {status === 'error' && (
-        <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-          {error}
-        </p>
-      )}
-      {status === 'ready' && rows.length === 0 && <p className="px-1 text-sm text-muted-foreground">{emptyLabel}</p>}
-      {/* While `loading` the list is empty AND the empty copy is suppressed, so
-          without this the panel is silent to a screen reader from first paint
-          until rows land. The region stays MOUNTED and its text changes, because
-          a live region that is inserted already carrying its message is not
-          reliably announced — and emptying it on arrival is what reports the
-          wait ending. */}
-      <span role="status" aria-live="polite" aria-busy={loading} className="sr-only">
-        {loading ? 'Loading activity…' : ''}
-      </span>
-      <div className="space-y-1.5" aria-busy={loading}>
-        {rows.map((record, index) => (
-          <ActivityRow key={record.taskId} record={record} renderMissionRef={renderMissionRef} staggerIndex={index} />
+      {error && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">{error}</p>}
+      {!error && rows.length === 0 && !loading && <p className="px-1 text-sm text-muted-foreground">{emptyLabel}</p>}
+      <div className="space-y-1.5">
+        {rows.map((record) => (
+          <ActivityRow key={record.taskId} record={record} renderMissionRef={renderMissionRef} />
         ))}
       </div>
       {cursor && (
@@ -521,7 +444,7 @@ export function AgentActivityPanel({ fetchActivity, renderMissionRef, title = 'A
           type="button"
           onClick={() => void load(cursor)}
           disabled={loading}
-          className="w-full rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-accent disabled:opacity-50"
+          className="w-full rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-accent/30 disabled:opacity-50"
         >
           Older runs
         </button>

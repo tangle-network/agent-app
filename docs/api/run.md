@@ -27,7 +27,7 @@ type ExecutionMode
 `function` — True when `harness` names a sandbox backend the SDK knows about.
 
 ```ts
-(harness: ProfileHarness) => harness is Harness
+(harness: ProfileHarness) => harness is "opencode" | "claude-code" | "nanoclaw" | "kimi-code" | "codex" | "amp" | "fact…
 ```
 
 ### `ProfileHarness`

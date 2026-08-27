@@ -19,7 +19,6 @@
 import { config } from '../agent.config'
 import {
   createSandboxChatProducer,
-  normalizeChatPromptForSandbox,
   type ChatTurnProduceArgs,
   type ChatTurnRouteProducer,
   type SandboxUploadSink,
@@ -93,33 +92,21 @@ export function createSandboxProduce(env: AppEnv) {
     const model = body.model ?? env.MODEL_NAME ?? config.model.default
     return createSandboxChatProducer({
       model,
-      // Reactive model failover, ON by default: when `model`'s upstream is
-      // dead (quota wall, 502, provider outage), the turn moves to the next
-      // model in `config.model.fallbacks` BEFORE any client-visible byte.
-      // Never silent: the persisted row and billing receipt name the model
-      // that actually served, and the transcript gets a visible notice.
-      // Opt out with `modelFailover: false` (or empty `fallbacks`).
-      fallbackModels: config.model.fallbacks,
-      openEvents: ({ model: attemptModel, attempt, signal }) =>
-        streamSandboxPrompt(shell, box, normalizeChatPromptForSandbox(prompt), {
-          sessionId: identity.sessionId,
-          // A failover attempt is a NEW dispatch, not a reconnect to the dead
-          // one — it needs its own execution identity or the platform would
-          // resume the failed execution instead of starting a fresh run.
-          executionId: attempt === 1 ? executionId : `${executionId}-f${attempt}`,
-          model: attemptModel,
-          signal,
-          effort: body.effort ?? config.model.effort,
-          harness: config.harness,
-          systemPrompt: config.systemPrompt,
-          // Durable by default: the run keeps executing server-side if the operator
-          // refreshes, closes the tab, or the Worker restarts mid-turn. On reopen
-          // the client re-attaches via GET /api/chat/running → /api/chat/replay, so
-          // nothing is lost. Drop this only for a run that should stop when the tab
-          // closes (e.g. a throwaway preview).
-          detach: true,
-          interactions: config.interactions,
-        }),
+      events: streamSandboxPrompt(shell, box, prompt, {
+        sessionId: identity.sessionId,
+        executionId,
+        model,
+        effort: body.effort ?? config.model.effort,
+        harness: config.harness,
+        systemPrompt: config.systemPrompt,
+        // Durable by default: the run keeps executing server-side if the operator
+        // refreshes, closes the tab, or the Worker restarts mid-turn. On reopen
+        // the client re-attaches via GET /api/chat/running → /api/chat/replay, so
+        // nothing is lost. Drop this only for a run that should stop when the tab
+        // closes (e.g. a throwaway preview).
+        detach: true,
+        interactions: config.interactions,
+      }),
     })
   }
 }

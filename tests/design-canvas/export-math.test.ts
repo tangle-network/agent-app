@@ -13,8 +13,6 @@ import {
   identifyTaintedSrc,
   isCrossOriginSrc,
   documentCropToStageCoords,
-  resolveNodeCachePixelRatio,
-  NODE_CACHE_PIXEL_RATIO_MAX,
 } from '../../src/design-canvas-react/export-math'
 import {
   exportDocumentJson,
@@ -343,20 +341,5 @@ describe('exportDocumentJson', () => {
     expect(parsed.pages[0]!.background).toBe('#ff0000')
     expect(parsed.pages[0]!.width).toBe(800)
     expect(parsed.pages[0]!.height).toBe(600)
-  })
-})
-
-describe('resolveNodeCachePixelRatio', () => {
-  it('rasterizes at absolute scale × devicePixelRatio (screen resolution)', () => {
-    // Fit-page zoom at dpr 1 — below 1 is correct: the screen shows fewer
-    // pixels per document pixel than the document has.
-    expect(resolveNodeCachePixelRatio(0.47, 1)).toBeCloseTo(0.47)
-    expect(resolveNodeCachePixelRatio(1, 2)).toBe(2)
-    expect(resolveNodeCachePixelRatio(1.5, 2)).toBe(3)
-  })
-
-  it('caps at NODE_CACHE_PIXEL_RATIO_MAX so deep retina zooms cannot blow the canvas backing store', () => {
-    expect(resolveNodeCachePixelRatio(32, 2)).toBe(NODE_CACHE_PIXEL_RATIO_MAX)
-    expect(resolveNodeCachePixelRatio(1, 5)).toBe(NODE_CACHE_PIXEL_RATIO_MAX)
   })
 })

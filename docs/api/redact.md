@@ -4,7 +4,7 @@
 
 Source: `src/redact/index.ts`
 
-15 exports.
+14 exports.
 
 ### `buildRedactedDocument`
 
@@ -60,14 +60,6 @@ type RedactedDocSegment
 
 ```ts
 interface RedactedDocument
-```
-
-### `redactErrorMessage`
-
-`function`
-
-```ts
-(input: unknown, fallback?: string) => string
 ```
 
 ### `redactForIngestion`

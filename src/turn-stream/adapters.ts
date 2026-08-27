@@ -12,21 +12,9 @@
  * Live fanout is deliberately NOT a side effect of the turn-event store: the
  * store is keyed by turnId/scopeId while viewer sockets live on the
  * `${workspaceId}:${threadId}` channel, and only the product's per-turn
- * context knows both. Products wire the workspace signal helpers into
- * `createChatTurnRoutes`' `onEvent`.
- *
- * Which adapters are still the right answer (see `./core`'s header for the
- * production measurement behind this split):
- *
- * | adapter                              | status                            |
- * | ------------------------------------ | --------------------------------- |
- * | {@link createDurableTurnLock}        | KEPT — no SDK equivalent          |
- * | {@link reconcileStaleDurableTurnLock}| KEPT — no SDK equivalent          |
- * | {@link createDurableObjectTurnEventStore} | KEPT — the DETACHED lane     |
- * | {@link broadcastWorkspaceActivity}   | KEPT — workspace signal           |
- * | {@link broadcastThreadCreated}       | KEPT — workspace signal           |
- * | {@link createTurnStreamUpgradeHandler} | KEPT for the workspace channel  |
- * | {@link broadcastTurnStreamEvent}     | `@deprecated` for sandbox turns   |
+ * context knows both. Products wire {@link broadcastTurnStreamEvent} (and the
+ * workspace helpers) into `createChatTurnRoutes`' `onEvent` — the same
+ * contract the reference consumer already runs.
  */
 
 import { reconcileStaleTurnLock, type ReconcileStaleTurnLockOptions } from '../chat-routes/stale-turn-lock'
@@ -97,15 +85,6 @@ async function postJsonOk<T>(
  * live channel). Each buffered turn lives on its own `turn:<turnId>` DO
  * instance; `listRunning` reconnect discovery rides a per-scope index
  * instance. Drops in wherever `createD1TurnEventStore(env.DB)` would.
- *
- * KEPT and load-bearing for AUTONOMOUS work. A detached run
- * (`dispatchPrompt({ detach: true })`, `driveTurn`) executes on the sandbox
- * run/stream lane, which publishes nothing to the session event bus — a
- * `SessionGatewayClient` attached to that session sees zero turn events
- * (measured: 0 of 71 / 0 of 527 / 0 of 408 across three session-id
- * strategies). So a browser that must tail a mission step, a queue job, or
- * an inbound-email review has no SDK path; it needs these durable rows plus
- * `runDetachedTurn` (`/chat-routes`). Nothing here is deprecated.
  */
 export function createDurableObjectTurnEventStore(namespace: TurnStreamNamespaceLike): TurnEventStore {
   return {
@@ -390,36 +369,11 @@ export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOp
 // ── broadcast helpers (products wire these into onEvent) ────────────────────
 
 /**
- * DEPRECATED for sandbox-backed interactive turns (drive on the session-message
- * lane + `SessionGatewayClient` instead) — fan a turn event out to the
- * per-thread channel. `executionId` groups events
+ * Fan a turn event out to the per-thread channel. `executionId` groups events
  * into a per-turn segment with a monotonic seq, so a reconnecting client
  * replays only the active turn and resumes from a cursor. Callers MUST await
  * (the DO assigns seq on arrival — emission order matters); failures are
  * swallowed (fanout is best-effort and never breaks chat delivery).
- *
- * @deprecated For a SANDBOX-backed interactive turn this re-broadcasts events
- * the sandbox platform already fans out, at the cost of a worker hop. Drive
- * the turn on the session-MESSAGE lane instead —
- * `box.createSession({ sessionId, backend })` then
- * `box.session(id).sendMessage({ parts: [{ type: 'text', text }] })` — and let
- * the tab attach with `box.mintScopedToken({ scope: 'session', sessionId,
- * runtimeSessionId })` + `SessionGatewayClient`
- * (`@tangle-network/sandbox/session-gateway`). Measured on production
- * (4 arms, SDK 0.12.0): turns driven with `box.streamPrompt()` delivered
- * 0 of 71 / 0 of 527 / 0 of 408 turn events to a gateway client, because
- * `POST /agents/run/stream` publishes nothing to the session event bus;
- * the message lane delivered 297 of 297.
- *
- * Two things this deprecation does NOT cover, both still supported:
- * DETACHED runs (no gateway fanout at all — keep `runDetachedTurn` over the
- * durable turn-event rows) and the per-workspace signals
- * ({@link broadcastWorkspaceActivity} / {@link broadcastThreadCreated}).
- * A SANDBOX-FREE copilot that wants a second viewer should use `/stream`'s
- * `replayTurnEvents` (`GET /chat/stream/:turnId`), which follows a running
- * turn from a cursor without a second broadcast fabric.
- *
- * Kept for back-compat; removal is a major-version change.
  */
 export async function broadcastTurnStreamEvent(
   namespace: TurnStreamNamespaceLike,
@@ -511,14 +465,6 @@ export interface CreateTurnStreamUpgradeHandlerOptions {
  *
  * After the 101, the client sends `{type:'sync', afterSeq}` and receives the
  * replay-then-live stream (see {@link TurnStreamDO.webSocketMessage}).
- *
- * NOT deprecated — the workspace variant (no `threadId`) is the canonical
- * transport for the per-workspace signals, which the session gateway cannot
- * carry (it is per-session and read-only). The THREAD variant is the
- * deprecated half: for a sandbox-backed interactive turn the tab should
- * attach to the session gateway directly instead of to this socket. See
- * {@link broadcastTurnStreamEvent} for the measurement and the replacement
- * wiring.
  */
 export function createTurnStreamUpgradeHandler(
   options: CreateTurnStreamUpgradeHandlerOptions,

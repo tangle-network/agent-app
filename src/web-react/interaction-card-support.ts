@@ -71,16 +71,8 @@ export function fieldValuesFromAnswers(
   return values
 }
 
-/** The submitted value for one field, or null when it has no answer yet.
- *
- *  Returns `InteractionAnswers[string]`, not the wider `InteractionData[string]`:
- *  a card reads its value out of a rendered control, so every branch below
- *  yields a plain scalar or string array. `InteractionData` also admits a
- *  one-use `secret_handle` reference, which no control here can produce and
- *  which `onResolved` must never receive — that path persists into the visible
- *  transcript. Declaring the narrow type keeps the handle out by construction
- *  rather than by review. */
-export function fieldAnswer(field: ChatInteractionField, values: FieldValues): InteractionAnswers[string] | null {
+/** The submitted value for one field, or null when it has no answer yet. */
+export function fieldAnswer(field: ChatInteractionField, values: FieldValues): InteractionData[string] | null {
   const value = values[field.name] ?? {}
   if (field.type === 'select') {
     const custom = (field as ChatSelectField).allowCustom === true ? value.custom?.trim() : undefined
@@ -99,8 +91,8 @@ export function fieldAnswer(field: ChatInteractionField, values: FieldValues): I
 
 /** All required fields answered → the respond payload; else null (not
  *  submittable yet). Optional unanswered fields are omitted. */
-export function buildAnswerData(fields: ChatInteractionField[], values: FieldValues): InteractionAnswers | null {
-  const data: InteractionAnswers = {}
+export function buildAnswerData(fields: ChatInteractionField[], values: FieldValues): InteractionData | null {
+  const data: InteractionData = {}
   for (const field of fields) {
     const answer = fieldAnswer(field, values)
     if (answer === null) {
@@ -216,52 +208,6 @@ export interface InteractionAnswerSubmitterOptions {
   body?: Record<string, unknown> | ((submission: InteractionAnswerSubmission) => Record<string, unknown>)
   timeoutMs?: number
   fetchImpl?: typeof fetch
-}
-
-/**
- * Runs a host-supplied submitter under the CARD's own deadline, and always
- * resolves.
- *
- * `createInteractionAnswerSubmitter` aborts its own fetch, but a product may
- * pass any `SubmitInteractionAnswer` — commonly one wrapping an untimed
- * `fetch`. The deadline cannot live only in the submitter, because what gets
- * stuck is the card: its in-flight guard is cleared by the awaited promise
- * settling, so a submitter that never settles leaves that guard set for the
- * life of the instance — "Submitting…" forever, and no answer can be sent
- * again. A submitter with its own shorter timeout simply wins the race.
- *
- * Rejection is normalized too: a submitter that throws would otherwise escape
- * the click handler as an unhandled rejection, leaving the user with a card
- * that silently did nothing. It becomes a visible, retryable message instead.
- */
-export function settleInteractionSubmit(
-  run: () => Promise<InteractionSubmitResult>,
-  timeoutMs: number = INTERACTION_SUBMIT_TIMEOUT_MS,
-): Promise<InteractionSubmitResult> {
-  return new Promise((resolve) => {
-    const timer = setTimeout(
-      () => resolve({ ok: false, expired: false, message: INTERACTION_SUBMIT_TIMEOUT_MESSAGE }),
-      timeoutMs,
-    )
-    const settle = (result: InteractionSubmitResult) => {
-      clearTimeout(timer)
-      // A late result after the deadline resolves nothing — this promise is
-      // already settled — so the card keeps the timeout it already reported.
-      resolve(result)
-    }
-    // `Promise.resolve().then(run)` so a submitter that throws SYNCHRONOUSLY is
-    // caught here rather than at the call site, where it would bypass this
-    // whole guard.
-    Promise.resolve()
-      .then(run)
-      .then(settle, (err: unknown) =>
-        settle({
-          ok: false,
-          expired: false,
-          message: err instanceof Error ? err.message : 'Failed to submit the answer',
-        }),
-      )
-  })
 }
 
 /**

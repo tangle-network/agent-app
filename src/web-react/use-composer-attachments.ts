@@ -15,9 +15,10 @@
  *     the URL and a `RequestInit` override, e.g. an auth header);
  *   - `sonner` toasts become `onReject` (client pre-validation, never hits the
  *     network) and `onError` (a request that reached the server and failed);
- *   - the `accept`-string gate comes from `./composer-file-accept`, the one
- *     matcher `ChatComposer` also funnels its picker/drop/paste ingress
- *     through, so both ends of the staging path admit the same files;
+ *   - the sandbox-ui `validateComposerFiles` import becomes a small
+ *     accept-list matcher re-implemented locally (`isAcceptedFileType`,
+ *     mirroring its `accept`-string matching byte-for-byte) — this module
+ *     stays free of the sandbox-ui peer;
  *   - the response is expected to be `{ files: ChatAttachmentInput[] }` (full
  *     server-authoritative descriptors — size/mediaType/kind — not gtm's
  *     `{path, name}`), so `references` is a verbatim pass-through with no
@@ -33,7 +34,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChatAttachmentInput, ChatAttachmentKind } from './chat-stream'
 import type { ComposerFile } from './chat-composer'
-import { acceptRejectionReason, isAcceptedFileType } from './composer-file-accept'
 import {
   ATTACHMENT_ACCEPT,
   ATTACHMENT_MAX_COUNT,
@@ -159,6 +159,24 @@ function dedupeName(name: string, taken: Set<string>): string {
  *  dependency. */
 function kindForMime(mime: string): ChatAttachmentKind {
   return mime.startsWith('image/') ? 'image' : 'file'
+}
+
+/** `<input accept>`-style matcher: extension (`.pdf`), wildcard mime
+ *  (`image/*`), or exact mime. Reimplemented locally (NOT imported from
+ *  `@tangle-network/sandbox-ui`'s `validateComposerFiles`/`isAcceptedType`) so
+ *  this module has no sandbox-ui dependency; the matching semantics are kept
+ *  identical so a rejection reads the same either side of the fence. */
+function isAcceptedFileType(file: File, accept: string): boolean {
+  const patterns = accept.split(',').map((p) => p.trim()).filter((p) => p.length > 0)
+  if (patterns.length === 0) return true
+  const name = file.name.toLowerCase()
+  const type = (file.type || '').toLowerCase()
+  return patterns.some((pattern) => {
+    const lower = pattern.toLowerCase()
+    if (lower.startsWith('.')) return name.endsWith(lower)
+    if (lower.endsWith('/*')) return type.startsWith(lower.slice(0, -1))
+    return type === lower
+  })
 }
 
 /** Pull a human-readable message out of the upload endpoint's error body.
@@ -317,13 +335,14 @@ export function useComposerAttachments(
 
       const list = Array.isArray(files) ? files : Array.from(files)
 
-      // Pass 1: accept-list, then count cap — accept first, and the count
-      // checked against what is already staged plus what this batch has taken.
+      // Pass 1: accept-list + count cap, mirroring sandbox-ui's
+      // `validateComposerFiles` semantics (accept checked before count, count
+      // checked against currently-staged + already-accepted-this-batch).
       const currentCount = stagedRef.current.length
       const countAccepted: File[] = []
       for (const file of list) {
         if (!isAcceptedFileType(file, accept)) {
-          opts.onReject?.(acceptRejectionReason(file, accept), file)
+          opts.onReject?.(`"${file.name}" is not an accepted file type (${accept}).`, file)
           continue
         }
         if (currentCount + countAccepted.length >= maxCount) {
@@ -436,11 +455,6 @@ export function useComposerAttachments(
     [],
   )
 
-  // `previewUrl` and `errorMessage` travel with the chip model. This hook is
-  // the only place that knows either one — it mints the object URL and holds
-  // the upload's failure text — so a projection that dropped them left the
-  // composer rendering a red chip with no reason on it and no thumbnail for a
-  // staged image.
   const composerFiles = useMemo<ComposerFile[]>(
     () =>
       staged.map((s) => ({
@@ -449,8 +463,6 @@ export function useComposerAttachments(
         size: s.size,
         kind: 'file' as const,
         status: s.status,
-        previewUrl: s.previewUrl,
-        errorMessage: s.errorMessage,
       })),
     [staged],
   )

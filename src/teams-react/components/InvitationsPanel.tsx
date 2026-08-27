@@ -14,9 +14,14 @@ import { useState } from 'react'
 import type { WorkspaceRole } from '../../teams/roles'
 import { hasWorkspaceRole } from '../../teams/roles'
 import type { InvitationView, InvitationsPanelProps } from '../contracts'
-import { RoleSelect } from './RoleSelect'
 
-const BADGE_BASE = 'inline-flex items-center rounded border px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.05em]'
+const ASSIGNABLE: { value: WorkspaceRole; label: string }[] = [
+  { value: 'viewer', label: 'Viewer' },
+  { value: 'editor', label: 'Editor' },
+  { value: 'admin', label: 'Admin' },
+]
+
+const BADGE_BASE = 'inline-flex items-center rounded border px-2 py-0.5 text-[10px] font-medium uppercase'
 
 // Lifecycle status: green = in, amber = awaiting, red = killed, muted = lapsed.
 const STATUS_BADGE: Record<InvitationView['status'], string> = {
@@ -31,12 +36,6 @@ const EMAIL_BADGE: Record<InvitationView['emailStatus'], string> = {
   sent: 'border-[var(--border-default)] text-[var(--text-muted)]',
   not_sent: 'border-[var(--surface-warning-border)] bg-[var(--surface-warning-bg)] text-[var(--surface-warning-text)]',
   failed: 'border-[var(--surface-danger-border)] bg-[var(--surface-danger-bg)] text-[var(--surface-danger-text)]',
-}
-
-/** Uppercase the role's first letter in JS (not CSS `capitalize`, which would
- *  also hit the lowercase "expires" in the same line). */
-function capitalize(text: string): string {
-  return text.length === 0 ? text : text[0]!.toUpperCase() + text.slice(1)
 }
 
 export function InvitationsPanel({
@@ -123,16 +122,21 @@ export function InvitationsPanel({
               onKeyDown={(event) => { if (event.key === 'Enter') void submitInvite() }}
               className="flex-1 rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
             />
-            <RoleSelect
+            <select
               value={inviteRole}
-              ariaLabel="Invite role"
-              onChange={setInviteRole}
-            />
+              aria-label="Invite role"
+              onChange={(event) => setInviteRole(event.target.value as WorkspaceRole)}
+              className="rounded border border-[var(--border-default)] bg-[var(--bg-input)] px-2 py-1.5 text-xs text-[var(--text-secondary)]"
+            >
+              {ASSIGNABLE.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
             <button
               type="button"
               onClick={() => void submitInvite()}
               disabled={inviting || !inviteEmail.trim()}
-              className="rounded bg-[var(--brand-primary)] px-3 py-1.5 text-sm text-[hsl(var(--primary-foreground))] disabled:opacity-50"
+              className="rounded bg-[var(--brand-primary)] px-3 py-1.5 text-sm text-white disabled:opacity-50"
             >
               {inviting ? 'Inviting…' : 'Invite'}
             </button>
@@ -184,12 +188,12 @@ function InvitationRow({ invitation, canManage, busy, onCopy, onResend, onRevoke
   })
 
   return (
-    <div className="rounded-lg border border-[var(--border-default)] bg-[var(--bg-input)] p-3">
+    <div className="rounded-lg border border-[var(--border-default)] p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-[var(--text-primary)]">{invitation.email}</p>
-          <p className="text-xs text-[var(--text-muted)]">
-            {capitalize(invitation.permissions)} · expires {expiry}
+          <p className="text-xs capitalize text-[var(--text-muted)]">
+            {invitation.permissions} · expires {expiry}
           </p>
           {emailFailed && (
             <p className="mt-1 text-xs text-[var(--surface-danger-text)]">Email was not sent — copy the link to share it.</p>

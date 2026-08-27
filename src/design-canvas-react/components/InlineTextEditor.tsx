@@ -17,7 +17,7 @@ import { useEffect, useRef } from 'react'
 import { computeTextOverlayPosition } from './transform-math'
 import type { TextElement } from '../../design-canvas/model'
 
-interface InlineTextEditorProps {
+export interface InlineTextEditorProps {
   element: TextElement
   zoom: number
   panX: number

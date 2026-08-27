@@ -4,15 +4,7 @@
 
 Source: `src/model-resolution/index.ts`
 
-24 exports.
-
-### `buildModelChain`
-
-`function` — Build a failover chain: the preferred model first, then `fallbacks`, with duplicates removed so a model is never retried twice in one turn.
-
-```ts
-(preferred: string, fallbacks: readonly string[]) => string[]
-```
+14 exports.
 
 ### `catalogIdsForModel`
 
@@ -62,14 +54,6 @@ interface ChatModelValidationSuccess
 (value: unknown) => string | undefined
 ```
 
-### `isUpstreamUnavailable`
-
-`function` — True when `signal` — a thrown error OR a resolved result payload — indicates the model's upstream is unavailable and another model is worth trying.
-
-```ts
-(signal: unknown) => boolean
-```
-
 ### `isWellFormedModelId`
 
 `function` — Validate if a model ID string conforms to length and character format requirements
@@ -86,44 +70,12 @@ interface ChatModelValidationSuccess
 type LoadModels
 ```
 
-### `ModelFailoverAttempt`
-
-`interface` — One model tried, and how it went.
-
-```ts
-interface ModelFailoverAttempt
-```
-
-### `ModelFailoverExhaustedError`
-
-`class` — Every model in the chain failed; carries the trail for logging.
-
-```ts
-class ModelFailoverExhaustedError
-```
-
-### `ModelFailoverResult`
-
-`interface` — The outcome of a failover run: the value plus the full attempt trail.
-
-```ts
-interface ModelFailoverResult
-```
-
 ### `ModelInfo`
 
 `interface` — The router /v1/models entry shape this module reads.
 
 ```ts
 interface ModelInfo
-```
-
-### `readHttpStatusHint`
-
-`function` — The HTTP status a message states in prose, or `undefined` when it states none.
-
-```ts
-(text: string) => number | undefined
 ```
 
 ### `resolveChatModel`
@@ -148,38 +100,6 @@ interface ResolveChatModelInput
 
 ```ts
 interface ResolvedChatModel
-```
-
-### `runWithModelFailover`
-
-`function` — Run `run` against the first model in `models` that does not report an upstream outage, falling through the chain in order.
-
-```ts
-<T>(input: RunWithModelFailoverInput<T>) => Promise<ModelFailoverResult<T>>
-```
-
-### `RunWithModelFailoverInput`
-
-`interface` — Inputs to {@link runWithModelFailover}.
-
-```ts
-interface RunWithModelFailoverInput
-```
-
-### `UPSTREAM_UNAVAILABLE_CODES`
-
-`const` — Error codes that mean "this model's upstream is unavailable — a different model may still work".
-
-```ts
-readonly string[]
-```
-
-### `UPSTREAM_UNAVAILABLE_STATUSES`
-
-`const` — HTTP statuses that indicate an upstream capacity/availability problem.
-
-```ts
-readonly number[]
 ```
 
 ### `validateChatModelId`

@@ -14,7 +14,7 @@ import type {
   UsageInfo,
 } from "./types";
 
-type ChatStatus = "idle" | "streaming" | "awaiting_confirm";
+export type ChatStatus = "idle" | "streaming" | "awaiting_confirm";
 
 /** Cap on in-memory messages. A session can survive route changes and drawer
  *  open/close for a long time, so the transcript is bounded to the most recent
@@ -65,7 +65,7 @@ export interface AssistantState {
   capped: boolean;
 }
 
-type AssistantAction =
+export type AssistantAction =
   | { type: "send"; messageId: string; assistantId: string; text: string }
   | { type: "stream"; event: AssistantStreamEvent }
   | { type: "stream_failed"; error: { code: string; message: string } }
@@ -341,7 +341,7 @@ function applyStreamEvent(
           {
             id: `cap-${event.data.turnId}`,
             role: "status",
-            text: "Paused at the step limit — continue when you're ready and I'll pick up where I left off.",
+            text: "Paused after a lot of steps — continue when you're ready and I'll pick up where I left off.",
           },
         ]);
       }

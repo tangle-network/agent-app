@@ -35,7 +35,7 @@ interface ComposeSkillsForHarnessInput
 `function` — Resolve the cwd-relative skill dir `resources.skills` refs materialize into on `harness` — via the platform's `skillDirForHarness`.
 
 ```ts
-(harness: Harness) => string | null
+(harness: "opencode" | "claude-code" | "nanoclaw" | "kimi-code" | "codex" | "amp" | "factory-droids" | "pi" | "hermes"…
 ```
 
 ### `SkillEntry`
@@ -51,5 +51,5 @@ interface SkillEntry
 `function` — Filter `harnesses` down to those with no mounted skill dir (deduped, first-seen order preserved) — the set that must fall back to `inline` delivery, or that a caller should warn about before offering…
 
 ```ts
-(harnesses: Iterable<Harness>) => Harness[]
+(harnesses: Iterable<"opencode" | "claude-code" | "nanoclaw" | "kimi-code" | "codex" | "amp" | "factory-droids" | "pi"…
 ```

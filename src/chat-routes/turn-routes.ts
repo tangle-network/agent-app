@@ -3,12 +3,12 @@
  * Phase 1). One factory composing the pieces every product re-wired by hand:
  *
  *   body parse/validate      → `/web` `parseJsonObjectBody` + `./wire`
- *   turn identity            → `/stream` `resolveChatTurn` + agent-runtime `/durable`
+ *   turn identity            → `/stream` `resolveChatTurn` + agent-runtime
  *                              `deriveExecutionId`
  *   producer                 → injected seam (sandbox lane via
  *                              `createSandboxChatProducer`; router lane is the
  *                              product's own `ChatTurnProducer`)
- *   turn engine              → agent-runtime `/durable` `handleChatTurn` (verbatim)
+ *   turn engine              → agent-runtime `handleChatTurn` (verbatim)
  *   durability               → `/stream` turn-buffer tap, wired BY DEFAULT
  *                              (tee + drain keeps the turn running after a
  *                              client drop; replay serves the buffered tail)
@@ -20,44 +20,32 @@
  * no router import. Auth/access is one injected `authorize` seam, composable
  * with `/app-auth` guards but not coupled to them.
  *
- * Optional product seams let a complex turn-orchestrator compose the vertical
- * instead of hand-rolling a generator — each omittable to the exact behavior
- * above: `turnLock` (single-flight acquire/release around the turn),
+ * Six optional product seams let a complex turn-orchestrator compose the
+ * vertical instead of hand-rolling a generator — each omittable to the exact
+ * behavior above: `turnLock` (single-flight acquire/release around the turn),
  * `contextGate` (pre-producer domain-readiness short-circuit), `beforeTurn`
  * (observe + augment the producer input), `lifecycle` (deterministic
  * start/complete/error telemetry), `heartbeat` (keepalive during silent
- * producer waits), and `onRawEvent` (the raw producer events, for telemetry) —
- * plus the `authorize` result's `insertUserMessage` flag (suppress the user row
- * for a product-dispatched turn). `handleChatTurn` stays the engine — the seams
- * only wrap its input, its producer stream, and its settle.
+ * producer waits), plus `onRawEvent` (the raw producer events, for telemetry).
+ * `handleChatTurn` stays the engine — the seams only wrap its input, its
+ * producer stream, and its settle.
  *
- * Seam stability: all of the above are STABLE and safe to depend on. They
- * graduated in #227 against the bar this package holds itself to — a seam is
- * provisional until two INDEPENDENT consumers exercise it, because one
- * consumer's shape is indistinguishable from that consumer's assumptions.
- * `turnLock` cleared it with `/turn-stream`'s shared DO adapter (#221);
- * `contextGate`, `beforeTurn`, `onRawEvent` and `insertUserMessage` each
- * cleared it with two product verticals reading them differently — and the
- * review found no leaked assumptions to fix, only `ChatRouteEvent` to export.
- *
- * They stay FLAT top-level options (not grouped under a `hooks` object): that
- * grouping would break every shipped consumer's call for no mechanism gain, and
- * this package's exports are additive-only. For the same reason `onRawEvent`
- * keeps its two-argument `(event, context)` signature rather than being
- * normalized to the single-args shape the other seams take.
+ * Seam stability: `lifecycle`, `heartbeat`, and `turnLock` are generic and
+ * stable (`turnLock` graduated with `/turn-stream`'s shared DO adapter, #221).
+ * `contextGate`, `beforeTurn`, and `onRawEvent` are `@experimental` — proven
+ * by a single consumer (gtm's chat vertical, #200) and may change once a
+ * second consumer exercises them. They stay FLAT top-level options (not
+ * grouped under a `hooks` object): that grouping would break the shipped
+ * consumer's call for no mechanism gain, and this package's exports are
+ * additive-only.
  */
 
-import {
-  deriveExecutionId,
-  handleChatTurn,
-  type ChatTurnIdentity,
-  type ChatTurnProducer,
-} from '@tangle-network/agent-runtime/durable'
+import { deriveExecutionId, handleChatTurn } from '@tangle-network/agent-runtime'
+import type { ChatTurnIdentity, ChatTurnProducer } from '@tangle-network/agent-runtime'
 import { mentionInputToPart, toChatMessageParts, type ChatMessagePart } from '../chat-store/parts'
 import {
   assistantRowIdForTurn,
   createAssistantDraftWriter,
-  rowIdOf,
   storeSupportsDraftPersistence,
   type AssistantDraftStore,
   type AssistantDraftWriter,
@@ -74,11 +62,9 @@ import {
   normalizeClientTurnId,
   replayTurnEvents,
   resolveChatTurn,
-  stampReplaySeq,
   type PersistedChatMessageForTurn,
   type TurnEventStore,
 } from '../stream/index'
-import type { ModelFailoverAttempt } from '../model-resolution/failover'
 import { parseJsonObjectBody } from '../web/index'
 import {
   assertPromptPartsWithinCap,
@@ -124,10 +110,6 @@ export interface ChatTurnMessageStore {
     content: string
     parts?: ChatMessagePart[]
     model?: string | null
-    requestedModel?: string | null
-    servedModel?: string | null
-    servedProvider?: string | null
-    servedSource?: string | null
     inputTokens?: number | null
     outputTokens?: number | null
     reasoningTokens?: number | null
@@ -142,10 +124,6 @@ export interface ChatTurnMessageStore {
     content?: string
     parts?: ChatMessagePart[]
     model?: string | null
-    requestedModel?: string | null
-    servedModel?: string | null
-    servedProvider?: string | null
-    servedSource?: string | null
     inputTokens?: number | null
     outputTokens?: number | null
     reasoningTokens?: number | null
@@ -170,40 +148,7 @@ export interface ChatTurnRouteProducer extends ChatTurnProducer {
    *  parts until the turn completes. */
   draftParts?(): Array<Record<string, unknown>>
   usage?(): ChatTurnUsage
-  /** The model that SERVED the turn. With failover wired this is the model that
-   *  actually answered, which is not necessarily the one the caller preferred —
-   *  read it after the stream drains, never before. */
   model?: string
-  /** Model-failover attribution, when the producer supports it. Reported onto
-   *  the usage/billing receipt so a downgrade is never silent. */
-  modelFailover?(): ChatTurnModelFailover
-  /** Requested-versus-served attribution reported by the sandbox sidecar.
-   *  `echoReceived` distinguishes a missing echo from a partial echo. */
-  modelAttribution?(): ChatTurnModelAttribution
-}
-
-/** Which model served, and what it took to get there. */
-export interface ChatTurnModelFailover {
-  /** The model that served the turn. */
-  model?: string
-  /** Every model tried, in order, with the reason each was abandoned. */
-  attempts: ModelFailoverAttempt[]
-  /** True when the preferred model did not serve. */
-  usedFallback: boolean
-}
-
-/** Requested and effective model attribution for one sandbox turn. */
-export interface ChatTurnModelAttribution {
-  /** The model explicitly requested by the caller, before shell failover. */
-  requestedModel?: string
-  /** The model the downstream sandbox reports actually served the turn. */
-  servedModel?: string
-  /** The provider that served the turn, when echoed by the sandbox. */
-  servedProvider?: string
-  /** How the sandbox selected the served model. */
-  servedSource?: 'request' | 'environment' | 'profile'
-  /** True when a structurally valid effective-backend echo was observed. */
-  echoReceived: boolean
 }
 
 /** Resolve authorization status and context for a chat turn including tenant and user identification */
@@ -219,14 +164,7 @@ export type ChatTurnAuthorization<TContext> =
        *  never overrides — the engine's retry-dedup: `authorize` runs before
        *  turn identity is resolved, so it cannot tell a retry from a fresh turn;
        *  a turn already deduped stays deduped. Omit / `true` → today's behavior.
-       *
-       *  Settled shape (#227). The validated case in both consumers is the same:
-       *  a durable plan-approval follow-up re-entering an execution the decision
-       *  route already enqueued — a decision, not a typed message, so it must
-       *  not surface a user bubble. Suppressing the insert also propagates:
-       *  `ChatTurnProduceArgs.userMessageId` is `null` for the rest of the turn
-       *  when there is no row to reuse, so a seam anchoring to the user row must
-       *  handle that arm rather than assume a string. */
+       *  @experimental Single-consumer; shape may change. */
       insertUserMessage?: boolean
     }
   | { ok: false; response: Response }
@@ -257,30 +195,11 @@ export interface ChatTurnProduceArgs<TContext> {
   /** The turn-buffer id announced to the client for replay. */
   turnStreamId: string
   priorMessages: PersistedChatMessageForTurn[]
-  /** The durable `role:'user'` row this turn is anchored to — the row the
-   *  factory just inserted, or the one retry-dedup REUSED. Products anchor
-   *  optimistic-bubble swaps, retry targeting, and stop-polling to it, and it
-   *  is the only way to name a REUSED row (which `priorMessages` excludes).
-   *
-   *  Three states, all meaningful:
-   *  - `undefined` — not resolved yet. `turnLock.acquire` is the one seam that
-   *    sees this: it runs before any side effect by contract, so the row does
-   *    not exist when it reads the args.
-   *  - `null` — resolved, no row: `authorize` returned `insertUserMessage:
-   *    false` on a turn with nothing to reuse, or the store's `appendMessage`
-   *    resolved without a usable id.
-   *  - a string — the row id, for `contextGate`, `beforeTurn`, and `produce`. */
-  userMessageId?: string | null
 }
 
 /** One event as it crosses the route: the producer's own vocabulary, or an
- *  injected keepalive. Same shape the engine forwards verbatim.
- *
- *  Public because it IS the vocabulary of two seams — `onRawEvent`'s parameter
- *  and `heartbeat.event`'s return. Exported so a product can declare a
- *  standalone handler (`function onRawEvent(e: ChatRouteEvent, ctx: T)`) rather
- *  than depending on contextual typing from an inline object literal. */
-export type ChatRouteEvent = { type: string; data?: Record<string, unknown> }
+ *  injected keepalive. Same shape the engine forwards verbatim. */
+type ChatRouteEvent = { type: string; data?: Record<string, unknown> }
 
 /** Best-effort human-readable cause from a terminal `error` /
  *  `session.run.failed` event's `data`. */
@@ -346,32 +265,6 @@ export interface ChatTurnLifecycleComplete<TContext> extends ChatTurnLifecycleBa
   finalText: string
   usage: ChatTurnUsage
   durationMs: number
-  /** The model that SERVED the turn — the fallback's id when failover moved it.
-   *  `usage` is that model's, so telemetry that splits cost or quality by model
-   *  must key on this and not on the requested one. */
-  model?: string
-  /** Requested-versus-served attribution. A difference is detectable from
-   *  this receipt and from the persisted assistant row independently. */
-  requestedModel?: string
-  servedModel?: string
-  servedProvider?: string
-  servedSource?: 'request' | 'environment' | 'profile'
-  /** Attribution for a downgrade: which models were tried and why each failed.
-   *  `undefined` when the producer reports no failover support. */
-  modelFailover?: ChatTurnModelFailover
-  /** The durable `role:'assistant'` row this turn wrote, or `null` when it
-   *  wrote none (an empty turn leaves no row — a draft started mid-stream is
-   *  retracted). The detached lane surfaces the same id as
-   *  `DetachedTurnResult.messageId`; one contract, two lanes. */
-  assistantMessageId: string | null
-  /** Set when `contextGate` answered this turn and the producer never ran.
-   *
-   *  Present so telemetry can tell "the model produced nothing" apart from "the
-   *  model was never asked" — they look identical here (`finalText: ''`,
-   *  empty `usage`) and mean opposite things. A gated turn writes no assistant
-   *  row, so `assistantMessageId` is `null`, and the billing/persistence
-   *  `onTurnComplete` is deliberately NOT fired for it. */
-  gated?: true
 }
 /** Represent an error occurring during a chat turn lifecycle with context and duration information */
 export interface ChatTurnLifecycleError<TContext> extends ChatTurnLifecycleBase<TContext> {
@@ -389,38 +282,6 @@ export interface ChatTurnLifecycle<TContext> {
   onTurnStart?(info: ChatTurnLifecycleStart<TContext>): void | Promise<void>
   onTurnComplete?(info: ChatTurnLifecycleComplete<TContext>): void | Promise<void>
   onTurnError?(info: ChatTurnLifecycleError<TContext>): void | Promise<void>
-}
-
-/** What a settled turn reports to `onTurnComplete` — the product's
- *  post-processing seam (billing, titles, audit). */
-export interface ChatTurnCompleteInput<TContext> {
-  identity: ChatTurnIdentity
-  finalText: string
-  context: TContext
-  failed: boolean
-  failureReason?: string
-  /** The model that SERVED this turn. With failover wired it may differ from
-   *  the requested one, so a product that bills or scores per model MUST read
-   *  it here rather than assuming the model it asked for. */
-  model?: string
-  /** Requested-versus-served attribution. A difference is detectable from
-   *  this receipt and from the persisted assistant row independently. */
-  requestedModel?: string
-  servedModel?: string
-  servedProvider?: string
-  servedSource?: 'request' | 'environment' | 'profile'
-  /** Present when the producer supports failover: the full attempt trail, and
-   *  `usedFallback` — the flag that makes a silent downgrade impossible. */
-  modelFailover?: ChatTurnModelFailover
-  /** The durable `role:'assistant'` row this turn wrote, or `null` when it
-   *  wrote none (an empty turn leaves no row).
-   *
-   *  Populated even when `failed` is true — a terminal error event still
-   *  persists whatever partial answer arrived, and that pairing is exactly
-   *  what lets a product render an error row against a REAL message instead of
-   *  hunting for the newest row in the thread. The detached lane surfaces the
-   *  same id as `DetachedTurnResult.messageId`. */
-  assistantMessageId: string | null
 }
 
 /** Define options to configure chat turn routes including authorization, storage, and event buffering */
@@ -451,34 +312,11 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
   /** Pre-turn readiness gate that can short-circuit with a product `Response`
    *  before the producer runs (the user row is already persisted). Runs after
    *  `turnLock.acquire`, before `beforeTurn`. Omit → always proceed.
-   *
-   *  Settled shape (#227). What a consumer may depend on:
-   *  - `args.userMessageId` is RESOLVED here — a string, or `null` when the
-   *    insert was suppressed with nothing to reuse. (`turnLock.acquire` is the
-   *    only seam that sees it `undefined`.)
-   *  - `{proceed:false}` releases the lock and returns the product's `Response`
-   *    verbatim: `beforeTurn` and `produce` never run, no assistant row is
-   *    written, and the user row already inserted is KEPT — a real user turn
-   *    whose assistant side is the gate's own response.
-   *  - Always returning `{proceed:true}` is supported, not a misuse: the seam
-   *    doubles as the one place that runs after the user row exists and before
-   *    the producer, which is where per-turn analytics and readiness
-   *    precomputation belong. A gate that never gates is a valid consumer. */
+   *  @experimental Single-consumer (gtm, #200); shape may change. */
   contextGate?(args: ChatTurnProduceArgs<TContext>): ChatTurnGateResult | Promise<ChatTurnGateResult>
   /** Observe the assembled producer input and optionally augment it (rewrite
    *  the prompt / prior messages) before the producer runs. Omit → no change.
-   *
-   *  Settled shape (#227). BOTH return arms are contract:
-   *  - a `ChatTurnInputPatch` shallow-merges over the route-assembled args, so
-   *    an omitted field keeps the route's value;
-   *  - `void` means "no patch" — and mutating `args.context` in place is the
-   *    supported way to thread request-scoped state forward to `produce` /
-   *    `lifecycle` / `onTurnComplete`, which all receive the same object.
-   *
-   *  A throw propagates (the turn fails with the lock released). It runs BEFORE
-   *  `lifecycle.onTurnStart`, so a throw here fires no terminal lifecycle hook —
-   *  the span never opened. Telemetry for a failure in this seam belongs in the
-   *  seam, not in `lifecycle`. */
+   *  @experimental Single-consumer (gtm, #200); shape may change. */
   beforeTurn?(args: ChatTurnProduceArgs<TContext>): ChatTurnInputPatch | void | Promise<ChatTurnInputPatch | void>
   /** Deterministic run telemetry (start / complete / error) with identity and
    *  timing. Omit → no telemetry. */
@@ -489,18 +327,7 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
    *  before any heartbeat injection (the raw sidecar-producer events, for
    *  telemetry). Never alters the stream; errors are swallowed. Distinct from
    *  `onEvent`, which sees the engine-framed stream incl. lifecycle envelopes.
-   *
-   *  Settled shape (#227). What a consumer may depend on:
-   *  - it sees EXACTLY the producer's own events — no engine lifecycle
-   *    envelopes, and no injected keepalives (`heartbeat` wraps the stream
-   *    downstream of this tap, so a synthetic event never reaches a trace);
-   *  - a throw is caught and logged, never surfaced: a broken telemetry sink
-   *    cannot fail a turn or truncate the client's stream;
-   *  - it is an OBSERVER — the return value is ignored, and the event object
-   *    continues downstream. Mutating it mutates the stream; don't.
-   *
-   *  Takes `(event, context)` rather than one args object, matching both
-   *  shipped consumers; see the module header on why it stays that way. */
+   *  @experimental Single-consumer (gtm, #200); shape may change. */
   onRawEvent?(event: ChatRouteEvent, context: TContext): void | Promise<void>
   /** Pre-persist transform of the final text (e.g. `/redact`'s `redactPII`).
    *  Live stream is never altered. */
@@ -536,7 +363,13 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
    *  than billing an empty turn and marking it done. A turn that THROWS never
    *  reaches this hook (the engine skips it on a producer throw). Errors are
    *  swallowed by the engine — they never fail a streamed turn. */
-  onTurnComplete?(input: ChatTurnCompleteInput<TContext>): Promise<void>
+  onTurnComplete?(input: {
+    identity: ChatTurnIdentity
+    finalText: string
+    context: TContext
+    failed: boolean
+    failureReason?: string
+  }): Promise<void>
   /** Per-event side channel (product broadcast). The turn-buffer tap is
    *  already wired; this runs in addition. */
   onEvent?(event: { type: string; data?: Record<string, unknown> }, context: TContext): void | Promise<void>
@@ -602,9 +435,8 @@ function validateTurnBody(body: Record<string, unknown>, maxInlinePartBytes: num
   // A mention is a turn's whole payload often enough to count: "@chart.png"
   // with no prose is a real ask, and the pointer block the mentions produce is
   // prompt content the model reads.
-  const hasAttachments = Array.isArray(body.attachments) && body.attachments.length > 0
-  if (!content && fileParts.length === 0 && mentions.length === 0 && !hasAttachments) {
-    throw new ChatTurnInputError('Missing content (send text, parts, mentions, attachments, or any combination)')
+  if (!content && fileParts.length === 0 && mentions.length === 0) {
+    throw new ChatTurnInputError('Missing content (send text, parts, mentions, or any combination)')
   }
   assertPromptPartsWithinCap(fileParts, maxInlinePartBytes)
   let turnId: string | undefined
@@ -797,11 +629,8 @@ export function createChatTurnRoutes<TContext = void>(
           ? [{ type: 'text', text: content }, ...fileParts]
           : [...fileParts]
 
-    // The producer input every pre-turn seam reads. Replaced — never mutated
-    // in place — as later steps resolve more of it (`userMessageId` after the
-    // insert, `beforeTurn`'s patch after that), so a seam that captured the
-    // object never sees it change underneath. `produce` reads the last
-    // version because the engine defers its first pull.
+    // The producer input every pre-turn seam reads (and `beforeTurn` may
+    // rewrite). Mutated in place before the producer's deferred first pull.
     let produceArgs: ChatTurnProduceArgs<TContext> = {
       request,
       body: payload,
@@ -844,12 +673,6 @@ export function createChatTurnRoutes<TContext = void>(
     // path that runs the terminal hook.
     let producer: ChatTurnRouteProducer | undefined
     let draft: AssistantDraftWriter | undefined
-    // Set once persistence settles; `undefined` means it never ran.
-    let assistantMessageId: string | null | undefined
-    /** The assistant row this turn ended with. Falls back to the draft writer
-     *  so a turn whose producer THREW — skipping `persistAssistantMessage`
-     *  entirely — still names the partial row it left behind. */
-    const assistantRowId = (): string | null => assistantMessageId ?? draft?.rowId() ?? null
     let runFailed = false
     // Data of the event that marked the run failed — handed to `onTurnError`
     // when no drain throw supplies a richer cause.
@@ -857,8 +680,6 @@ export function createChatTurnRoutes<TContext = void>(
     let turnStartedAtMs = 0
     let turnStarted = false
     let lifecycleSettled = false
-    // Set when `contextGate` answered the turn without running the producer.
-    let gatedTurn = false
 
     // Exactly one terminal lifecycle hook, after the turn settles (idempotent).
     // Failure is this route's own verdict (`runFailed` from error/failed
@@ -876,20 +697,10 @@ export function createChatTurnRoutes<TContext = void>(
             error: terminalError ?? lastFailureData ?? new Error('chat turn failed'),
           })
         } else {
-          const failoverInfo = producer?.modelFailover?.()
-          const attribution = producer?.modelAttribution?.()
           await lifecycle.onTurnComplete?.({
             identity, executionId, turnStreamId, context, durationMs,
             finalText: producer?.finalText() ?? '',
             usage: producer?.usage?.() ?? {},
-            assistantMessageId: assistantRowId(),
-            ...(gatedTurn ? { gated: true } : {}),
-            ...(producer?.model ? { model: producer.model } : {}),
-            ...(attribution?.requestedModel ? { requestedModel: attribution.requestedModel } : {}),
-            ...(attribution?.servedModel ? { servedModel: attribution.servedModel } : {}),
-            ...(attribution?.servedProvider ? { servedProvider: attribution.servedProvider } : {}),
-            ...(attribution?.servedSource ? { servedSource: attribution.servedSource } : {}),
-            ...(failoverInfo ? { modelFailover: failoverInfo } : {}),
           })
         }
       } catch (err) {
@@ -905,24 +716,14 @@ export function createChatTurnRoutes<TContext = void>(
       // dispatched/synthetic turn. AND-composition: it can only subtract, never
       // resurrect a turn the engine already deduped as a retry.
       const insertUserMessage = chatTurn.shouldInsertUserMessage && (auth.insertUserMessage ?? true)
-      // Name the row this turn is anchored to. Insert and reuse are mutually
-      // exclusive (`shouldInsertUserMessage` is false exactly when a reusable
-      // row was found), so one source or the other — never both, never a
-      // guess. Products used to re-derive this by decorating the store and
-      // falling back to the newest row, which mis-resolves under sub-second
-      // same-thread turns.
-      let userMessageId: string | null = chatTurn.reusedUserMessageId ?? null
       if (insertUserMessage) {
-        userMessageId = rowIdOf(
-          await options.store.appendMessage({
-            threadId: payload.threadId,
-            role: 'user',
-            content,
-            parts: userPartsWithFiles(chatTurn.userParts, fileParts, mentions),
-          }),
-        )
+        await options.store.appendMessage({
+          threadId: payload.threadId,
+          role: 'user',
+          content,
+          parts: userPartsWithFiles(chatTurn.userParts, fileParts, mentions),
+        })
       }
-      produceArgs = { ...produceArgs, userMessageId }
 
       // Domain-readiness gate: may short-circuit with the product's own
       // response before the producer runs. The user row above is kept (a real
@@ -931,33 +732,6 @@ export function createChatTurnRoutes<TContext = void>(
         const gate = await options.contextGate(produceArgs)
         if (!gate.proceed) {
           await releaseLock()
-          // A gated turn is still a TURN, and until now it was the one answer
-          // path that fired no lifecycle hook at all — `turnStarted` is set
-          // further down, so an early return here left telemetry with no record
-          // that anything happened. A product whose gate answers everything
-          // therefore looks IDLE rather than broken, which is indistinguishable
-          // from healthy on every dashboard.
-          //
-          // Only the LIFECYCLE hooks fire (telemetry, errors swallowed); the
-          // billing/persistence `onTurnComplete` deliberately does not, because
-          // no model ran and no assistant row was written. `gated` marks the
-          // completion so a consumer counts it without mistaking it for a model
-          // turn that produced nothing.
-          gatedTurn = true
-          turnStartedAtMs = Date.now()
-          if (options.lifecycle?.onTurnStart) {
-            try {
-              await options.lifecycle.onTurnStart({
-                identity, executionId, turnStreamId, context, startedAt: turnStartedAtMs,
-              })
-            } catch (err) {
-              log('[chat-routes] lifecycle.onTurnStart failed', {
-                turnId: turnStreamId,
-                error: err instanceof Error ? err.message : String(err),
-              })
-            }
-          }
-          await fireTerminalLifecycle(false, undefined)
           return gate.response
         }
       }
@@ -1079,22 +853,13 @@ export function createChatTurnRoutes<TContext = void>(
               // Empty turn: today this leaves no assistant row at all, so a
               // draft row started earlier is retracted, not left behind.
               await draft?.discard()
-              // Read the writer rather than assuming `null`: `discard` is a
-              // no-op on a store without `deleteMessage` (drafting needs only
-              // `updateMessage`), and there the draft row genuinely survives.
-              assistantMessageId = draft?.rowId() ?? null
               return
             }
             const usage = producer?.usage?.() ?? {}
-            const attribution = producer?.modelAttribution?.()
             const values = {
               content: finalText,
               ...(parts && parts.length > 0 ? { parts } : {}),
               ...(producer?.model ? { model: producer.model } : {}),
-              ...(attribution?.requestedModel ? { requestedModel: attribution.requestedModel } : {}),
-              ...(attribution?.servedModel ? { servedModel: attribution.servedModel } : {}),
-              ...(attribution?.servedProvider ? { servedProvider: attribution.servedProvider } : {}),
-              ...(attribution?.servedSource ? { servedSource: attribution.servedSource } : {}),
               ...(usage.inputTokens !== undefined ? { inputTokens: usage.inputTokens } : {}),
               ...(usage.outputTokens !== undefined ? { outputTokens: usage.outputTokens } : {}),
               ...(usage.reasoningTokens !== undefined ? { reasoningTokens: usage.reasoningTokens } : {}),
@@ -1109,16 +874,13 @@ export function createChatTurnRoutes<TContext = void>(
             // append is untouched.
             if (draft) {
               await draft.finalize(values)
-              assistantMessageId = draft.rowId() ?? null
               return
             }
-            assistantMessageId = rowIdOf(
-              await options.store.appendMessage({
-                threadId: payload.threadId,
-                role: 'assistant',
-                ...values,
-              }),
-            )
+            await options.store.appendMessage({
+              threadId: payload.threadId,
+              role: 'assistant',
+              ...values,
+            })
           },
           ...(options.onTurnComplete
             ? {
@@ -1127,26 +889,14 @@ export function createChatTurnRoutes<TContext = void>(
                 // (not a throw) still lands here — so surface `runFailed` so the
                 // product skips billing an errored turn instead of marking it
                 // complete with empty text.
-                onTurnComplete: ({ identity: turnIdentity, finalText }: { identity: ChatTurnIdentity; finalText: string }) => {
-                  // Read AFTER the drain, so the model reported to billing is
-                  // the one that actually served — a fallback included.
-                  const failoverInfo = producer?.modelFailover?.()
-                  const attribution = producer?.modelAttribution?.()
-                  return options.onTurnComplete!({
+                onTurnComplete: ({ identity: turnIdentity, finalText }: { identity: ChatTurnIdentity; finalText: string }) =>
+                  options.onTurnComplete!({
                     identity: turnIdentity,
                     finalText,
                     context,
                     failed: runFailed,
-                    assistantMessageId: assistantRowId(),
                     ...(runFailed ? { failureReason: failureReasonOf(lastFailureData) } : {}),
-                    ...(producer?.model ? { model: producer.model } : {}),
-                    ...(attribution?.requestedModel ? { requestedModel: attribution.requestedModel } : {}),
-                    ...(attribution?.servedModel ? { servedModel: attribution.servedModel } : {}),
-                    ...(attribution?.servedProvider ? { servedProvider: attribution.servedProvider } : {}),
-                    ...(attribution?.servedSource ? { servedSource: attribution.servedSource } : {}),
-                    ...(failoverInfo ? { modelFailover: failoverInfo } : {}),
-                  })
-                },
+                  }),
               }
             : {}),
           ...(options.traceFlush ? { traceFlush: () => options.traceFlush!(context) } : {}),
@@ -1244,10 +994,7 @@ export function createChatTurnRoutes<TContext = void>(
           controller.close()
           return
         }
-        // Stamp the buffer ordinal so a reconnecting client resumes from
-        // `?fromSeq=<lastSeq>` instead of refetching the turn from 0 and
-        // re-applying every delta onto already-rendered state.
-        controller.enqueue(encoder.encode(`${stampReplaySeq(value)}\n`))
+        controller.enqueue(encoder.encode(`${value.event}\n`))
       },
       cancel() {
         void events.return(undefined)

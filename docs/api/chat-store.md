@@ -4,7 +4,7 @@
 
 Source: `src/chat-store/index.ts`
 
-64 exports.
+60 exports.
 
 ### `AppendMessageInput`
 
@@ -62,14 +62,6 @@ interface AppendMessageInput
 200
 ```
 
-### `BulkDeleteThreadsByUpdatedAtInput`
-
-`interface` — Delete threads selected by their last activity time within one workspace.
-
-```ts
-interface BulkDeleteThreadsByUpdatedAtInput
-```
-
 ### `BulkDeleteThreadsInput`
 
 `interface` — Define input for bulk deleting threads with access checks per workspace
@@ -100,14 +92,6 @@ interface ChatAttachmentPart
 
 ```ts
 type ChatDatabase
-```
-
-### `ChatExtraIndexes`
-
-`type` — Builds product indexes from a table's columns.
-
-```ts
-type ChatExtraIndexes
 ```
 
 ### `ChatFilePart`
@@ -302,14 +286,6 @@ type ChatToolStatus
 interface ChatUsageTokens
 ```
 
-### `ChatWorkProductPart`
-
-`type` — Persisted work-product anchor card — byte-matches `workProductToPersistedPart` in `/work-product`'s contract.
-
-```ts
-type ChatWorkProductPart
-```
-
 ### `createChatStore`
 
 `function` — Create a chat store managing threads and messages based on the provided database and tables
@@ -412,14 +388,6 @@ interface CreateThreadInput
 
 ```ts
 (part: ChatMessagePart) => part is ChatToolPart
-```
-
-### `isChatWorkProductPart`
-
-`function` — Resolve whether a chat message part is a persisted work-product anchor
-
-```ts
-(part: ChatMessagePart) => part is WorkProductPersistedPart
 ```
 
 ### `ListMessagesOptions`

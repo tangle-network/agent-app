@@ -105,21 +105,12 @@ interface GesturePreview {
   moved: boolean
 }
 
-/** Per-kind chip tint, mixed SOLID onto the lane surface (`--bg-input`, the
- *  editor's own fill) so a dragged chip never shows the lanes beneath through
- *  an alpha fill — the hue identity stays, the translucency is gone. The 40%
- *  border is the border-tier equivalent for edges. Hues are the semantic
- *  tokens at matched alpha, not hardcoded sky/emerald/amber/zinc/violet: the
- *  system palette has no blue, so video takes the brand primary as the
- *  program's primary content and agent shares it (agent output is first-class
- *  product output) — kind identity on the timeline comes from the labelled
- *  track, the tint is decoration. */
 const KIND_TONES: Record<SequenceTrackKind, string> = {
-  video: 'border-[hsl(var(--primary)/0.4)] bg-[color-mix(in_srgb,hsl(var(--primary))_15%,var(--bg-input))]',
-  audio: 'border-[hsl(var(--success)/0.4)] bg-[color-mix(in_srgb,hsl(var(--success))_15%,var(--bg-input))]',
-  caption: 'border-[hsl(var(--warning)/0.4)] bg-[color-mix(in_srgb,hsl(var(--warning))_15%,var(--bg-input))]',
-  reference: 'border-[hsl(var(--muted-foreground)/0.4)] bg-[color-mix(in_srgb,hsl(var(--muted-foreground))_15%,var(--bg-input))]',
-  agent: 'border-[hsl(var(--primary)/0.4)] bg-[color-mix(in_srgb,hsl(var(--primary))_15%,var(--bg-input))]',
+  video: 'border-sky-400/40 bg-sky-500/15',
+  audio: 'border-emerald-400/40 bg-emerald-500/15',
+  caption: 'border-amber-400/40 bg-amber-500/15',
+  reference: 'border-zinc-400/40 bg-zinc-500/15',
+  agent: 'border-violet-400/40 bg-violet-500/15',
 }
 
 /** Spec'd cache key is the clip id: a clip's waveform survives re-renders and
@@ -469,12 +460,9 @@ export function TimelineClipChip(props: TimelineClipChipProps) {
       tabIndex={tabbable ? 0 : -1}
       onKeyDown={handleKeyDown}
       title={clip.label}
-      // No `outline-none` here: the chip's `ring-2` is its SELECTED state, not
-      // its focused state, so suppressing the floor would leave an unselected
-      // chip with nothing at all under keyboard focus.
-      className={`group absolute bottom-1 top-1 overflow-hidden rounded border text-left select-none ${KIND_TONES[track.kind]} ${
+      className={`group absolute bottom-1 top-1 overflow-hidden rounded border text-left select-none outline-none ${KIND_TONES[track.kind]} ${
         selected ? 'ring-2 ring-[var(--brand-primary)]' : 'hover:ring-1 hover:ring-[var(--text-muted)]'
-      } ${clip.disabled ? 'opacity-40' : ''} ${dragging ? 'z-30 shadow-lg shadow-black/30' : ''} ${
+      } focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--bg-input)] ${clip.disabled ? 'opacity-40' : ''} ${dragging ? 'z-30 shadow-lg shadow-black/30' : ''} ${
         interactive ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
       }`}
       style={{
@@ -498,13 +486,13 @@ export function TimelineClipChip(props: TimelineClipChipProps) {
 
       <div className="relative flex h-full min-w-0 items-stretch gap-1.5 px-1.5 py-1">
         {isVisualMedia ? (
-          <canvas ref={posterRef} className="h-full w-10 shrink-0 rounded-sm bg-black object-cover" />
+          <canvas ref={posterRef} className="h-full w-10 shrink-0 rounded-sm bg-black/40 object-cover" />
         ) : null}
         <div className="min-w-0 flex-1">
-          <div className="truncate text-xs font-medium leading-4 text-[var(--text-primary)]">
+          <div className="truncate text-[11px] font-medium leading-4 text-[var(--text-primary)]">
             {isCaption && typeof clip.text === 'string' ? clip.text : clip.label}
           </div>
-          <span className="mt-0.5 inline-block rounded bg-[hsl(var(--background))] px-1 font-mono text-[9px] leading-3 text-[var(--text-secondary)]">
+          <span className="mt-0.5 inline-block rounded bg-black/30 px-1 font-mono text-[9px] leading-3 text-[var(--text-secondary)]">
             {formatTimecode(shown.durationFrames, fps)}
           </span>
         </div>
@@ -522,7 +510,7 @@ export function TimelineClipChip(props: TimelineClipChipProps) {
             event.stopPropagation()
           }}
           onBlur={commitText}
-          className="agent-app-edit-selection absolute inset-0 z-10 w-full bg-[hsl(var(--popover))] px-1.5 text-xs text-[var(--text-primary)] ring-1 ring-[var(--brand-primary)]"
+          className="agent-app-edit-selection absolute inset-0 z-10 w-full bg-black/80 px-1.5 text-[11px] text-[var(--text-primary)] outline-none ring-1 ring-[var(--brand-primary)]"
           aria-label="Caption text"
         />
       ) : null}
@@ -531,7 +519,7 @@ export function TimelineClipChip(props: TimelineClipChipProps) {
         <>
           <span
             data-trim-handle="start"
-            className="absolute bottom-0 left-0 top-0 z-10 w-1.5 cursor-ew-resize bg-transparent opacity-0 transition group-hover:opacity-100 group-hover:bg-[var(--brand-primary)]"
+            className="absolute bottom-0 left-0 top-0 z-10 w-1.5 cursor-ew-resize bg-transparent opacity-0 transition group-hover:opacity-100 group-hover:bg-[var(--brand-primary)]/60"
             onPointerDown={(event) => beginGesture(event, 'trim-start')}
             onPointerMove={updateGesture}
             onPointerUp={finishGesture}
@@ -540,7 +528,7 @@ export function TimelineClipChip(props: TimelineClipChipProps) {
           />
           <span
             data-trim-handle="end"
-            className="absolute bottom-0 right-0 top-0 z-10 w-1.5 cursor-ew-resize bg-transparent opacity-0 transition group-hover:opacity-100 group-hover:bg-[var(--brand-primary)]"
+            className="absolute bottom-0 right-0 top-0 z-10 w-1.5 cursor-ew-resize bg-transparent opacity-0 transition group-hover:opacity-100 group-hover:bg-[var(--brand-primary)]/60"
             onPointerDown={(event) => beginGesture(event, 'trim-end')}
             onPointerMove={updateGesture}
             onPointerUp={finishGesture}

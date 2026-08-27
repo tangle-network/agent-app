@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import {
   formatPreflightReport,
   httpHeadProbe,
-  requiredValueProbe,
   routerChatProbe,
   runPreflight,
   sandboxAuthProbe,
@@ -48,36 +47,6 @@ const hangingFetch = ((_url: unknown, init?: RequestInit) =>
   new Promise((_resolve, reject) => {
     init?.signal?.addEventListener('abort', () => reject(init.signal!.reason))
   })) as unknown as typeof fetch
-
-describe('requiredValueProbe', () => {
-  it('passes a non-empty value without exposing it', async () => {
-    const secret = 'should-never-appear'
-    const probe = requiredValueProbe({ name: 'CALLBACK_SECRET', value: secret })
-    const result = await probe.run()
-    expect(probe.name).toBe('required:CALLBACK_SECRET')
-    expect(result).toEqual({ ok: true, detail: undefined })
-    expect(JSON.stringify(result)).not.toContain(secret)
-  })
-
-  it.each([undefined, null, '', '   '])('fails a missing value (%s) with a safe name-only message', async (value) => {
-    const result = await requiredValueProbe({ name: 'CALLBACK_SECRET', value }).run()
-    expect(result).toEqual({ ok: false, detail: 'CALLBACK_SECRET is unset' })
-  })
-
-  it('supports a product-specific missing-value explanation and warning severity', async () => {
-    const probe = requiredValueProbe({
-      name: 'OPTIONAL_URL',
-      value: undefined,
-      critical: false,
-      missingDetail: 'OPTIONAL_URL is needed for outbound delivery',
-    })
-    expect(probe.critical).toBe(false)
-    expect(await probe.run()).toEqual({
-      ok: false,
-      detail: 'OPTIONAL_URL is needed for outbound delivery',
-    })
-  })
-})
 
 describe('routerChatProbe', () => {
   it('maps 200 to ok and issues one cheap POST /chat/completions', async () => {

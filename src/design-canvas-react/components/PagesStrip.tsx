@@ -98,7 +98,7 @@ export function PagesStrip({
       {label ? (
         <div className="flex items-center gap-1.5 px-3 pt-1.5 text-[var(--text-muted)]">
           <PageGlyph className="h-3 w-3" />
-          <span className="text-xs font-semibold uppercase tracking-[0.05em]">{label}</span>
+          <span className="text-[10px] font-medium uppercase tracking-[0.08em]">{label}</span>
         </div>
       ) : null}
       <div
@@ -138,8 +138,8 @@ export function PagesStrip({
               'group relative flex shrink-0 flex-col items-center gap-1 rounded p-1 transition',
               isActive
                 ? 'ring-2 ring-[var(--brand-primary)]'
-                : 'hover:bg-[hsl(var(--accent))]',
-              dragOverIndex === index ? 'ring-1 ring-[color-mix(in_srgb,var(--brand-primary)_60%,transparent)]' : '',
+                : 'hover:bg-[var(--border-default)]/40',
+              dragOverIndex === index ? 'ring-1 ring-[var(--brand-primary)]/60' : '',
             ].join(' ')}
           >
             {/* Selection is a real button so the tile is not an interactive control
@@ -149,7 +149,7 @@ export function PagesStrip({
               aria-label={`Page ${index + 1}: ${page.name}${isActive ? ' (active)' : ''}`}
               aria-pressed={isActive}
               onClick={() => onSelectPage(page.id)}
-              className="flex cursor-pointer flex-col items-center gap-1 rounded"
+              className="flex cursor-pointer flex-col items-center gap-1 rounded focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
             >
             {/* Thumbnail or placeholder */}
             <div
@@ -171,7 +171,7 @@ export function PagesStrip({
             </div>
 
             {/* Page name */}
-            <span className="max-w-[80px] truncate text-xs text-[var(--text-secondary)]">
+            <span className="max-w-[80px] truncate text-[10px] text-[var(--text-secondary)]">
               {page.name}
             </span>
             </button>
@@ -214,10 +214,10 @@ export function PagesStrip({
           type="button"
           aria-label="Add page"
           onClick={onAddPage}
-          className="flex h-[72px] w-[80px] shrink-0 flex-col items-center justify-center gap-1 rounded border border-dashed border-[var(--border-default)] text-[var(--text-muted)] transition hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]"
+          className="flex h-[72px] w-[80px] shrink-0 flex-col items-center justify-center gap-1 rounded border border-dashed border-[var(--border-default)] text-[var(--text-muted)] transition hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
         >
           <PlusGlyph className="h-4 w-4" />
-          <span className="text-xs">Add page</span>
+          <span className="text-[10px]">Add page</span>
         </button>
       ) : null}
       </div>

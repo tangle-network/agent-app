@@ -4,11 +4,11 @@
 
 Source: `src/assistant/index.ts`
 
-56 exports.
+55 exports.
 
 ### `adaptTranscript`
 
-`function` — Fold the transcript view into transcript-order blocks: message runs (web-react `ChatUiMessage[]`) broken by quiet status lines.
+`function` — Fold the transcript view into web-react `ChatUiMessage[]`: each user message is 1:1; the assistant/`tool`/`status` messages between two user turns collapse into one assistant message whose ordered `s…
 
 ```ts
 (view: AssistantTranscriptView) => AdaptedTranscript
@@ -176,7 +176,7 @@ interface AssistantThreadSummary
 
 ### `AssistantTranscript`
 
-`function` — Render the assistant conversation: message runs through web-react's `ChatMessages` (quiet chrome — the label/meta row becomes a hover-revealed lane, which keeps the narrow dock panel uncluttered), st…
+`function` — Render the assistant conversation with web-react's `ChatMessages`.
 
 ```ts
 ({ view, renderMarkdown, toolRenderers, renderConfirmedResult, emptyState, }: AssistantTranscriptProps) => Element
@@ -252,14 +252,6 @@ interface ConnectionRequirement
 
 ```ts
 type ConnectionRequirementKind
-```
-
-### `ConnectionRequirementRef`
-
-`interface` — Names one requirement in the same list, by its (provider, kind) identity.
-
-```ts
-interface ConnectionRequirementRef
 ```
 
 ### `ConnectRequirementResult`

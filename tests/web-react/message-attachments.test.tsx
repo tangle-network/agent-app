@@ -77,14 +77,12 @@ describe('MessageAttachments', () => {
     expect(screen.getByText('a.png')).toBeTruthy()
   })
 
-  it('renders a file chip with name and display-formatted size', () => {
+  it('renders a file chip with name and formatted size', () => {
     const { fetchFile } = fakeFetchFile()
     render(<MessageAttachments parts={[filePart]} resolveFileUrl={resolveFileUrl} fetchFile={fetchFile} />)
     const button = screen.getByRole('button')
     expect(button.textContent).toContain('b.csv')
-    // The chip uses the display formatter ("512 B" / "47 KB" / "1.2 MB"), not
-    // the wire formatter's exact "512B" decomposition.
-    expect(button.textContent).toContain('512 B')
+    expect(button.textContent).toContain('512B')
   })
 
   it('does not fetch a chip on mount', () => {
@@ -177,39 +175,6 @@ describe('MessageAttachments', () => {
     )
     expect(container.firstElementChild?.className).toContain('justify-start')
     expect(container.firstElementChild?.className).not.toContain('justify-end')
-  })
-
-  // Regression coverage for #418: a stored part written before the
-  // normalization fix can carry `path` with no `name` at all — the
-  // structural `isChatAttachmentPart` guard only checks `type`/`path`, so
-  // this shape reaches the renderer typed as a normal ChatAttachmentPart.
-  it('derives a basename label and download filename for a stored path-only part with no name', async () => {
-    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
-    const pathOnlyPart = { type: 'file', path: 'uploads/agent/report.csv' } as ChatAttachmentPart
-    const { fetchFile, calls } = fakeFetchFile()
-    render(<MessageAttachments parts={[pathOnlyPart]} resolveFileUrl={resolveFileUrl} fetchFile={fetchFile} />)
-
-    const button = screen.getByRole('button')
-    expect(button.textContent).toContain('report.csv')
-
-    fireEvent.click(button)
-    await waitFor(() => expect(calls).toHaveLength(1))
-    calls[0]!.resolve(blobResponse(['a,b,c'], { status: 200 }))
-
-    await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1))
-    const anchor = clickSpy.mock.instances[0] as unknown as HTMLAnchorElement
-    expect(anchor.download).toBe('report.csv')
-    clickSpy.mockRestore()
-  })
-
-  it('renders the explicit unavailable state (never clickable) when even the path basename is unusable', () => {
-    const unusablePart = { type: 'file', path: 'uploads/agent/' } as ChatAttachmentPart
-    const { fetchFile } = fakeFetchFile()
-    render(<MessageAttachments parts={[unusablePart]} resolveFileUrl={resolveFileUrl} fetchFile={fetchFile} />)
-
-    expect(screen.getByText('Attachment unavailable')).toBeTruthy()
-    expect(screen.queryByRole('button')).toBeNull()
-    expect(fetchFile).not.toHaveBeenCalled()
   })
 })
 

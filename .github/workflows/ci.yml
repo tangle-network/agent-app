@@ -1,181 +1,27 @@
-# Post-merge safety net. NOT the merge gate.
-#
-# The merge gate is `pnpm signoff`, run locally against the exact commit that
-# will merge; `docs/SIGNOFF.md` states what that proves, what it cannot, and the
-# rule that a merge with no valid proof is a defect. This workflow runs only on
-# `main`, so it can no longer block a person waiting on a pull request. When it
-# fails it files an issue, because the merge already happened and a red tick on
-# a merged commit is nobody's job.
-#
-# The step list here and `signoff.config.mjs` are the same commands on purpose.
-# Adding a step here without adding it there makes the sign-off proof a weaker
-# claim than it reads as.
-#
-# `publish.yml` is untouched and still the release path.
 name: CI
 
 on:
   push:
     branches: [main]
-
-permissions:
-  contents: read
+  pull_request:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # tsup generates .d.ts for 73 entries in a worker thread (the `prepare`
+      # tsup generates .d.ts for ~38 entries in a worker thread (the `prepare`
       # script runs during install, and again in the build step); that worker
-      # needed ~4.7GB and has grown with the subpath count (OOMed at 6144 after the #191/#192 merges). The worker inherits
+      # needed ~4.7GB and has grown with the subpath count (OOMed at 6144 after the #191/#192 merges); 8192 matches the documented local build requirement. The worker inherits
       # NODE_OPTIONS, so set the heap once at the job level.
-      #
-      # Raised 8192 -> 12288 when `AppToolMcpServer.headers` became
-      # `Record<string, AgentProfileConfigValue>`: that type reaches five entry
-      # points (tools, runtime, sandbox, design-canvas, sequences), so rollup-dts
-      # inlines agent-interface's schema graph into each. Measured on this repo:
-      # 8192 ERR_WORKER_OUT_OF_MEMORY, 10240 green at 9.4 GB peak RSS / 38 s.
-      # 12288 keeps headroom on a 16 GB ubuntu-latest runner.
-      NODE_OPTIONS: --max-old-space-size=12288
+      NODE_OPTIONS: --max-old-space-size=8192
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
         with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-      # One pin, one file. The local gate reads `.nvmrc` too, so this workflow
-      # and the merge gate cannot silently verify different runtimes.
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .nvmrc
+          node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
-      # Incident-class gates, run FIRST and named. They are part of `pnpm test`
-      # too, so this step adds no coverage — it buys legibility and speed: a
-      # violation fails in seconds under a step called "gates", instead of
-      # surfacing as one red line inside a 3,300-test run. Each gate guards a
-      # class this repo actually shipped:
-      #   provision payload >240 KiB — no sandbox could ever be created
-      #   env entry >120 KB          — box boots, then E2BIGs on every exec
-      #   systemPrompt >40 KB        — model degrades to empty answers
-      #   unhandled onErrorEvent     — a failed turn renders as a silent blank
-      #   node import in a browser   — client bundle throws on module load
-      #   an in-place picker popover — a host scroll rail clips the model and
-      #                                thinking menus to nothing: right DOM,
-      #                                right coordinates, zero pixels, no click
-      #                                able to land
-      #   a test that cannot fail    — the meta-class behind all of the above
-      - name: Incident-class gates
-        run: pnpm run test:gates
       - run: pnpm run test
       - run: pnpm run build
-      - name: Test clean generated projects
-        run: pnpm run test:generated
-      # Dead-surface gate. Fails on an unused file, an unused internal export, or
-      # an unused dependency — the accumulation this repo had to clean up by hand.
-      # Two blind spots it CANNOT cover, both by construction:
-      #   * unused PUBLIC exports — an entry's exports are API by definition, so
-      #     this is a fleet-grep question, not a CI one;
-      #   * a dep pulled in only TRANSITIVELY by a peer's own import. The four
-      #     @xterm/* devDeps are the live example: nothing in src/ references
-      #     them, but sandbox-ui's terminal chunk does `import
-      #     "@xterm/xterm/css/xterm.css"`, and vitest inlines sandbox-ui, so
-      #     removing them breaks src/work-product-react/pane.test.tsx. They are
-      #     in knip's ignoreDependencies for exactly that reason — do not
-      #     "clean them up".
-      - run: pnpm run knip
-
-  # The safety net's output. A red post-merge run is a real defect on `main` and
-  # somebody has to own it, but nobody is standing in front of it waiting — the
-  # merge already happened. So it files an issue instead of being a red tick on
-  # a pull request nobody can merge past.
-  #
-  # One rolling issue, not one per push: a failing `main` usually fails several
-  # pushes in a row, and a fresh issue each time buries the first one, which is
-  # the one carrying the commit that broke it.
-  #
-  # `gh` rather than a JS action: it ships on `ubuntu-latest`, so this adds no
-  # third-party action to sha-pin and keep current.
-  safety-net-issue:
-    needs: [build]
-    if: always() && needs.build.result == 'failure'
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-    steps:
-      - name: File or append the safety-net failure
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          SHA: ${{ github.sha }}
-          ACTOR: ${{ github.actor }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          title='Post-merge safety net is red on main'
-          body="$(printf '%s\n' \
-            "Commit \`${SHA}\` failed the post-merge safety net." \
-            "" \
-            "- run: ${RUN_URL}" \
-            "- pushed by: @${ACTOR}" \
-            "" \
-            "Reproduce locally with the merge gate:" \
-            "" \
-            '```' \
-            "git fetch origin && git checkout ${SHA}" \
-            "pnpm signoff --source head" \
-            '```' \
-            "" \
-            "If the gate passes here and failed on the runner, that difference is the finding." \
-            "See \`docs/SIGNOFF.md\` for what the local gate cannot prove.")"
-          number="$(gh issue list --state open --limit 100 --json number,title \
-            --jq "map(select(.title == \"${title}\")) | .[0].number // empty")"
-          if [ -n "$number" ]; then
-            gh issue comment "$number" --body "$body"
-            echo "appended to issue #$number"
-          else
-            gh issue create --title "$title" --body "$body"
-          fi
-
-  # The other half of the alarm, and the reason it is here rather than on a
-  # human's list: an alarm that only ever turns ON is an alarm people learn to
-  # ignore. The rolling issue above stayed open through seven consecutive green
-  # runs on `main` because clearing it was nobody's job, so a reader had no way
-  # to tell a live break from a fixed one without opening the Actions tab.
-  #
-  # A green run on `main` makes this issue's title false, so the run that proves
-  # it closes it, with the commit and the run link as the evidence. If `main`
-  # breaks again the job above files a fresh issue carrying the commit that
-  # broke it — which is what "one rolling issue" was always for.
-  #
-  # Not a verification step, so nothing here belongs in `signoff.config.mjs`:
-  # this job reports on the gate, it is not part of it.
-  safety-net-clear:
-    needs: [build]
-    if: always() && needs.build.result == 'success'
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-    steps:
-      - name: Close the safety-net issue once main is green
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          SHA: ${{ github.sha }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          title='Post-merge safety net is red on main'
-          number="$(gh issue list --state open --limit 100 --json number,title \
-            --jq "map(select(.title == \"${title}\")) | .[0].number // empty")"
-          if [ -z "$number" ]; then
-            echo "no open safety-net issue to clear"
-            exit 0
-          fi
-          gh issue close "$number" --reason completed --comment "$(printf '%s\n' \
-            "Green on \`main\` at \`${SHA}\` — closing." \
-            "" \
-            "- run: ${RUN_URL}" \
-            "" \
-            "Closed by the post-merge safety net itself. A later break files a new issue carrying the commit that broke it.")"
-          echo "closed issue #$number"

@@ -8,7 +8,7 @@ Source: `src/brand/index.tsx`
 
 ### `BrandHeader`
 
-`function` — Shared app-shell header with the canonical Tangle mark.
+`function` — Shared app-shell header: icon-only Tangle knot + optional product title on the left, caller-supplied nav/actions on the right.
 
 ```ts
 ({ title, children, className }: BrandHeaderProps) => Element
@@ -16,7 +16,7 @@ Source: `src/brand/index.tsx`
 
 ### `BrandHeaderProps`
 
-`interface` — Define properties for a brand header including optional title, children, and CSS class name.
+`interface` — Define properties for a brand header including optional title, children, and CSS class name
 
 ```ts
 interface BrandHeaderProps
@@ -24,15 +24,15 @@ interface BrandHeaderProps
 
 ### `Logo`
 
-`function` — Render the canonical Tangle lockup through Agent App's existing API.
+`function` — Full Tangle lockup (knot + wordmark) or, with `iconOnly`, just the knot.
 
 ```ts
-({ variant, size, className, iconOnly, }: LogoProps) => Element
+({ variant, size, className, iconOnly }: LogoProps) => Element
 ```
 
 ### `LogoProps`
 
-`interface` — Define properties to customize the logo variant, size, style, and icon display options.
+`interface` — Define properties to customize the logo variant, size, style, and icon display options
 
 ```ts
 interface LogoProps
@@ -40,8 +40,8 @@ interface LogoProps
 
 ### `TangleKnot`
 
-`function`
+`function` — Icon-only Tangle knot, brand gradient, theme-independent.
 
 ```ts
-({ size, className, }: { size?: number | undefined; className?: string | undefined; }) => Element
+({ size, className }: { size?: number | undefined; className?: string | undefined; }) => Element
 ```

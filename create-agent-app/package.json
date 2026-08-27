@@ -1,7 +1,7 @@
 {
   "name": "@tangle-network/create-agent-app",
-  "version": "0.46.15",
-  "description": "Create a tested Tangle agent application with either a tool loop or a complete chat interface.",
+  "version": "0.1.0",
+  "description": "Scaffold a new Tangle agent product on @tangle-network/agent-app: the tool-loop skeleton (default) or, with --chat, the assembled multimodal chat vertical (auth, chat store, streaming turns with replay, uploads, agent asks) with its own end-to-end test — plus the agent-followable breadcrumb docs (AGENTS.md / CUSTOMIZE.md).",
   "keywords": [
     "tangle",
     "ai-agent",
@@ -18,7 +18,7 @@
     "directory": "create-agent-app"
   },
   "bin": {
-    "create-agent-app": "index.mjs"
+    "create-agent-app": "./index.mjs"
   },
   "files": [
     "index.mjs",
@@ -29,6 +29,6 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=22.13"
+    "node": ">=20"
   }
 }

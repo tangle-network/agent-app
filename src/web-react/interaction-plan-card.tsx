@@ -11,13 +11,12 @@
  * callbacks: no fetch inside the component.
  */
 
-import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { ChatInteraction, ChatInteractionField, ChatInteractionStatus, InteractionData } from './chat-interactions'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
+import type { ChatInteraction, ChatInteractionStatus, InteractionData } from './chat-interactions'
 import { fieldAcceptsFreeText, isTerminalInteractionStatus } from './chat-interactions'
 import {
   buildAnswerData,
   fieldAnswer,
-  fieldValuesFromAnswers,
   interactionStatusLabels,
   interactionTerminalNotes,
   isLateAnswerableStatus,
@@ -82,33 +81,6 @@ const DEFAULT_RE_REQUEST_LABEL = 'Ask agent to re-submit the plan'
  *  control so a long plan doesn't dominate the transcript. */
 const COLLAPSED_MAX_HEIGHT = 320
 
-/** The submitted answer for one field as display text (select values resolve
- *  to their option labels), or null when the field went unanswered. Used for
- *  the terminal readout, where the dead disabled inputs used to sit. */
-function submittedFieldText(field: ChatInteractionField, values: FieldValues): string | null {
-  const answer = fieldAnswer(field, values)
-  if (answer === null) return null
-  if (Array.isArray(answer)) {
-    const options = field.type === 'select' ? field.options : undefined
-    return answer.map((value) => options?.find((option) => option.value === value)?.label ?? value).join(', ')
-  }
-  return String(answer)
-}
-
-/** True when the plan body is taller than its collapsed cap. Measured (ref +
- *  scrollHeight) rather than assumed from text length, so a short plan shows
- *  no fade and no toggle — the collapse UI used to paint over every plan,
- *  overflowing or not. */
-function useBodyOverflows(body: string | undefined, renderMarkdown: ((markdown: string) => ReactNode) | undefined) {
-  const bodyRef = useRef<HTMLDivElement>(null)
-  const [overflows, setOverflows] = useState(false)
-  useLayoutEffect(() => {
-    const el = bodyRef.current
-    if (el) setOverflows(el.scrollHeight > COLLAPSED_MAX_HEIGHT)
-  }, [body, renderMarkdown])
-  return { bodyRef, overflows }
-}
-
 export function InteractionPlanCard({
   interaction,
   canWrite,
@@ -128,7 +100,6 @@ export function InteractionPlanCard({
   const [reRequested, setReRequested] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const submitInFlightRef = useRef(false)
-  const { bodyRef, overflows } = useBodyOverflows(interaction.body, renderMarkdown)
 
   const status: ChatInteractionStatus = isTerminalInteractionStatus(interaction.status)
     ? interaction.status
@@ -201,71 +172,48 @@ export function InteractionPlanCard({
 
   const terminalNote = TERMINAL_NOTES[status]
   const approved = status === 'answered'
-  // The terminal readout shows what was actually submitted: persisted answers
-  // win; a card resolved locally this session falls back to its own values.
-  const submittedValues = interaction.answers
-    ? fieldValuesFromAnswers(interaction.fields, interaction.answers)
-    : values
 
   return (
-    // Same arrival as the question card: an approval is the run stopping, and
-    // the card that carries it should land rather than appear. Once on screen
-    // it never re-animates — approving, rejecting or a 410 changes state on the
-    // same DOM node, and a CSS animation does not replay on a re-render.
-    <div className={`agent-arrive rounded-xl border border-card-edge bg-card p-4 ${className ?? ''}`}>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <InteractionBadge variant="outline">Plan</InteractionBadge>
-        <InteractionBadge variant={approved ? 'default' : status === 'expired' || status === 'declined' ? 'destructive' : 'outline'}>
-          {STATUS_LABELS[status]}
-        </InteractionBadge>
+    <div className={`rounded-xl border border-border bg-card p-4 shadow-sm ${className ?? ''}`}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <InteractionBadge variant="outline">Plan</InteractionBadge>
+          <InteractionBadge variant={approved ? 'default' : status === 'expired' || status === 'declined' ? 'destructive' : 'outline'}>
+            {STATUS_LABELS[status]}
+          </InteractionBadge>
+        </div>
+        <span className="text-xs text-muted-foreground">The agent proposed a plan</span>
       </div>
 
       {interaction.title.trim() && (
-        <p className="mb-3 text-[15px] font-semibold leading-snug text-foreground">{interaction.title}</p>
+        <p className="mb-3 text-sm font-medium leading-5 text-foreground">{interaction.title}</p>
       )}
 
       {interaction.body && (
         <div className="relative">
           <div
-            ref={bodyRef}
             className="overflow-hidden text-sm text-foreground"
-            style={expanded || !overflows ? undefined : { maxHeight: COLLAPSED_MAX_HEIGHT }}
+            style={expanded ? undefined : { maxHeight: COLLAPSED_MAX_HEIGHT }}
           >
             {renderMarkdown
               ? renderMarkdown(interaction.body)
               : <p className="whitespace-pre-wrap leading-5">{interaction.body}</p>}
           </div>
-          {overflows && !expanded && (
+          {!expanded && (
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-card to-transparent" />
           )}
-          {overflows && (
-            <button
-              type="button"
-              onClick={() => setExpanded((prev) => !prev)}
-              className="relative z-10 mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground transition hover:text-foreground"
-            >
-              <ChevronDownGlyph className={`h-3 w-3 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-              {expanded ? 'Collapse plan' : 'Show full plan'}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setExpanded((prev) => !prev)}
+            className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground transition hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <ChevronDownGlyph className={`h-3 w-3 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+            {expanded ? 'Collapse plan' : 'Show full plan'}
+          </button>
         </div>
       )}
 
-      {interaction.fields.length > 0 && status === 'pending' && (
-        // The fields do NOT carry their own `.agent-arrive`. One level per
-        // surface: the card is the thing that was not there a moment ago, and a
-        // second entrance nested inside a travelling parent composes two
-        // translations and two opacity ramps over the same pixels — the card
-        // lands while its contents are still arriving into it, which reads as
-        // instability rather than as sequence.
-        //
-        // The card level is the one that survives, because a stagger is a claim
-        // that these appeared one after another and inside a landing card that
-        // claim is false — they all appeared with it. The question card keeps
-        // its option rows staggered for the opposite reason: those are the
-        // CHOICES being offered, and telling the eye there are three of them
-        // before it has read any is information about the decision. A form's
-        // fields carry no such count to announce.
+      {interaction.fields.length > 0 && (
         <div className="mt-3 space-y-4">
           {interaction.fields.map((field) => (
             <fieldset key={field.name} className="space-y-2">
@@ -279,7 +227,7 @@ export function InteractionPlanCard({
                     setValues((prev) => ({ ...prev, [field.name]: { ...prev[field.name], text: event.target.value } }))}
                   rows={2}
                   placeholder={field.type === 'text' ? field.placeholder ?? 'Optional feedback for the agent' : undefined}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary disabled:opacity-50"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary disabled:opacity-50"
                 />
               ) : (
                 <input
@@ -289,26 +237,11 @@ export function InteractionPlanCard({
                   aria-label={field.label}
                   onChange={(event) =>
                     setValues((prev) => ({ ...prev, [field.name]: { ...prev[field.name], text: event.target.value } }))}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary disabled:opacity-50"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary disabled:opacity-50"
                 />
               )}
             </fieldset>
           ))}
-        </div>
-      )}
-
-      {interaction.fields.length > 0 && status !== 'pending' && (
-        <div className="mt-3 space-y-2">
-          {interaction.fields.map((field) => {
-            const text = submittedFieldText(field, submittedValues)
-            if (!text) return null
-            return (
-              <div key={field.name}>
-                <p className="text-xs font-medium text-muted-foreground">{field.label}</p>
-                <p className="mt-0.5 whitespace-pre-wrap text-sm text-foreground">{text}</p>
-              </div>
-            )
-          })}
         </div>
       )}
 

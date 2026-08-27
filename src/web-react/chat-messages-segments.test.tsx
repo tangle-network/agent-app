@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, render } from '@testing-library/react'
 
 // No `../brand` mock: web-react reaches the Tangle mark through `./brand-mark`,
 // a lazy boundary that degrades to reserved space when the opt-in
@@ -19,42 +19,7 @@ function indexIn(container: HTMLElement, needle: string): number {
   return (container.textContent ?? '').indexOf(needle)
 }
 
-/** The reasoning trace's disclosure control — the button that replaced the
- *  `<summary>`, found by the region it declares rather than by its label, which
- *  changes with the turn's phase ("Thinking…" / "Thought for 3s"). */
-function reasoningToggle(container: HTMLElement): HTMLElement {
-  const toggle = container.querySelector('button[data-state][aria-expanded]')
-  if (!toggle) throw new Error('no reasoning disclosure button rendered')
-  return toggle as HTMLElement
-}
-
 describe('ChatMessages segmented turns', () => {
-  it('applies the large reading size to user and assistant messages together', () => {
-    const messages: ChatUiMessage[] = [
-      { id: 'user-1', role: 'user', content: 'User question' },
-      { id: 'assistant-1', role: 'assistant', content: 'Assistant answer' },
-    ]
-    const { getByText } = render(
-      <ChatMessages
-        messages={messages}
-        messageSize="large"
-        renderMarkdown={(content) => (
-          <div className="text-sm">{content}</div>
-        )}
-      />,
-    )
-
-    expect(getByText('User question').parentElement?.className).toContain(
-      'text-[17px]',
-    )
-    expect(getByText('Assistant answer').parentElement?.className).toContain(
-      'text-[17px]',
-    )
-    expect(
-      getByText('Assistant answer').parentElement?.className,
-    ).toContain('agent-app-message-copy')
-  })
-
   it('renders text and tool segments in chronological order', () => {
     const message: ChatUiMessage = {
       id: 'm1',
@@ -196,109 +161,7 @@ describe('ChatMessages segmented turns', () => {
     // The answer exists, so the reasoning box is collapsed and NOT pulsing
     // "Thinking…" — even though `content` is '' and the answer is in a segment.
     expect(container.textContent).not.toContain('Thinking…')
-    // The reasoning trace now runs on the canonical RunRowShell (Radix
-    // Collapsible): the trigger keeps `aria-expanded`, the content region
-    // reports `data-state` and is `hidden` when closed.
-    expect(container.querySelector('details')).toBeNull()
-    const region = container.querySelector('div[data-state]')
-    expect(region?.getAttribute('data-state')).toBe('closed')
-    expect(reasoningToggle(container).getAttribute('aria-expanded')).toBe('false')
-  })
-
-  it('opens the reasoning disclosure while no answer text exists yet', () => {
-    const message: ChatUiMessage = {
-      id: 'm1',
-      role: 'assistant',
-      content: '',
-      reasoning: 'Considering the options.',
-    }
-    const { container } = render(<ChatMessages messages={[message]} />)
-    // Reasoning but no answer — the turn is still thinking, so the trace is
-    // open and its label sweeps rather than sitting static.
-    expect(container.querySelector('div[data-state]')?.getAttribute('data-state')).toBe('open')
-    expect(reasoningToggle(container).getAttribute('aria-expanded')).toBe('true')
-    const waiting = container.querySelector('.agent-shimmer')
-    expect(waiting?.getAttribute('data-motion')).toBe('essential')
-  })
-
-  it('hides the reasoning trace when collapsed', () => {
-    const message: ChatUiMessage = {
-      id: 'm1',
-      role: 'assistant',
-      content: '',
-      reasoning: 'Considering the options.',
-    }
-    const { container } = render(<ChatMessages messages={[message]} />)
-    const region = () => container.querySelector('div[data-state]')!
-    // Open: the region is present and not hidden.
-    expect(region().hasAttribute('hidden')).toBe(false)
-    fireEvent.click(reasoningToggle(container))
-    // Collapsed: genuinely gone — Radix drives the content to
-    // data-state=closed (and hides it from the a11y tree).
-    expect(region().getAttribute('data-state')).toBe('closed')
-  })
-
-  it('keeps a tool row on its own DOM node when it migrates from toolCalls into a segment', () => {
-    const call = { id: 't1', name: 'validate_workflow', status: 'running' as const }
-    const before: ChatUiMessage = {
-      id: 'm1',
-      role: 'assistant',
-      content: '',
-      segments: [{ kind: 'text', content: 'Working.' }],
-      // The producer reported the call before the segment carrying it arrived,
-      // so it renders through the leftover path first.
-      toolCalls: [call],
-    }
-    const { container, rerender } = render(<ChatMessages messages={[before]} loading />)
-    const arrivedRow = () =>
-      Array.from(container.querySelectorAll('.agent-arrive')).find((el) =>
-        (el.textContent ?? '').includes('Validate workflow'))
-    const first = arrivedRow()
-    expect(first).toBeTruthy()
-
-    rerender(
-      <ChatMessages
-        messages={[{
-          ...before,
-          segments: [{ kind: 'text', content: 'Working.' }, { kind: 'tool', call }],
-        }]}
-        loading
-      />,
-    )
-    // The row the reader has been watching must be the SAME element. React
-    // identity is per parent, so a leftover card wrapped in a per-group <div>
-    // once it becomes a segment is an unmount plus a mount, and `.agent-arrive`
-    // plays again on a row that never left the screen.
-    expect(arrivedRow()).toBe(first)
-  })
-
-  it('names the reasoning trace it controls, and keeps a click from being undone by the next frame', () => {
-    const message: ChatUiMessage = {
-      id: 'm1',
-      role: 'assistant',
-      content: '',
-      reasoning: 'Considering the options.',
-    }
-    const { container, rerender } = render(<ChatMessages messages={[message]} />)
-    const toggle = reasoningToggle(container)
-    // The button names the region, which is what `<summary>` got from the
-    // browser and a button has to state.
-    const controlled = toggle.getAttribute('aria-controls')
-    expect(controlled).toBeTruthy()
-    // `getElementById`, not a selector: `useId` mints ids containing characters
-    // a CSS selector would have to escape.
-    expect(document.getElementById(controlled!)?.textContent).toContain('Considering the options.')
-
-    // `<details open={…}>` could not hold this: React re-asserted the attribute
-    // on every render, so a reader who opened the box mid-stream lost it to the
-    // next chunk of tokens. The explicit toggle outranks the default from then
-    // on, across a re-render carrying more reasoning.
-    fireEvent.click(toggle)
-    expect(container.querySelector('div[data-state]')?.getAttribute('data-state')).toBe('closed')
-    rerender(
-      <ChatMessages messages={[{ ...message, reasoning: 'Considering the options. Still going.' }]} />,
-    )
-    expect(container.querySelector('div[data-state]')?.getAttribute('data-state')).toBe('closed')
+    expect(container.querySelector('details')?.open).toBe(false)
   })
 
   it('renders a pending proposal as a primary Approve / quiet Reject decision card with a preview', () => {
@@ -347,34 +210,6 @@ describe('ChatMessages segmented turns', () => {
     const { container } = render(<ChatMessages messages={[message]} />)
     expect(container.textContent).toContain('Scheduled: post launch poster')
     expect(container.textContent).toContain('Tomorrow 9am')
-  })
-
-  it('keeps the clock identity when the schedule FAILS, and still arrives once', () => {
-    // A failed schedule is still a follow-up: it reports the failure in place
-    // rather than falling through to the generic tool row, which would drop the
-    // clock the reader is looking for. The row is `.agent-arrive` like every
-    // other one — the failure changes what the row SAYS, never what it is.
-    const message: ChatUiMessage = {
-      id: 'm1',
-      role: 'assistant',
-      content: '',
-      toolCalls: [
-        {
-          id: 't1',
-          name: 'schedule_followup',
-          status: 'error',
-          args: { title: 'post launch poster', when: 'Tomorrow 9am' },
-          result: { ok: false, message: 'Scheduler rejected the time' },
-        },
-      ],
-    }
-    const { container } = render(<ChatMessages messages={[message]} />)
-    expect(container.textContent).toContain('Scheduled: post launch poster')
-    expect(container.textContent).toContain('Tomorrow 9am')
-    expect(container.textContent).toContain('Scheduler rejected the time')
-    const row = Array.from(container.querySelectorAll('.agent-arrive')).find((el) =>
-      (el.textContent ?? '').includes('post launch poster'))
-    expect(row).toBeTruthy()
   })
 
   it('shows the branded first-run state when there are no messages', () => {
@@ -529,11 +364,10 @@ describe('ChatMessages segmented turns', () => {
     }
     // `loading` + last message → this turn is streaming.
     const { container } = render(<ChatMessages messages={[message]} loading />)
-    // The caret blinks on a hard step, not a pulse: `animate-pulse` is a 2s
-    // ease fade, which is the cue a skeleton placeholder uses. Asserting the
-    // caret animation by name also keeps this from passing on any other
-    // decorative span that happens to pulse.
-    const caret = container.querySelector('span[aria-hidden][class*="agent-caret"]')
-    expect(caret).not.toBeNull()
+    // The decorative caret is the only aria-hidden pulsing span (the tool's own
+    // running dot is not aria-hidden).
+    expect(
+      container.querySelector('span[aria-hidden].animate-pulse'),
+    ).not.toBeNull()
   })
 })
