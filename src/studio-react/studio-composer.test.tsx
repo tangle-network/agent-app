@@ -536,7 +536,8 @@ describe('StudioComposer — model availability', () => {
     await screen.findByRole('button', { name: 'Model: gpt-image-2' })
     fireEvent.click(screen.getByRole('button', { name: 'Audio' }))
 
-    await screen.findByText('Audio models are temporarily unavailable')
+    const laneWarning = await screen.findByText('Audio models are temporarily unavailable')
+    expect(laneWarning.parentElement?.className).toContain('min-h-[calc(70.6875px+0.625rem)]')
     expect(screen.queryByLabelText('Prompt')).toBeNull()
     expect(screen.getByRole('button', { name: 'Generate' }).hasAttribute('disabled')).toBe(true)
 
