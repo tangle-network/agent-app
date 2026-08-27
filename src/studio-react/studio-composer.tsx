@@ -498,7 +498,8 @@ export function StudioComposer({
       className={`studio-composer-card rounded-2xl border border-border bg-surface-container-high p-2.5 shadow-sm transition focus-within:border-primary/60 ${className ?? ''}`}
     >
       {laneDown ? (
-        <p className="flex min-h-0 items-center gap-2 px-1.5 pb-3 pt-1.5 text-[13px] font-medium text-warning">
+        // Match rows={3} at 14.5px/1.625 plus the textarea's vertical padding.
+        <p className="flex min-h-[calc(70.6875px+0.625rem)] items-center gap-2 px-1.5 pb-3 pt-1.5 text-[13px] font-medium text-warning">
           <TriangleAlert aria-hidden className="h-4 w-4 shrink-0" strokeWidth={2} />
           <span>{laneDownMessage}</span>
         </p>
