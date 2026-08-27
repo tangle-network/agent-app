@@ -258,6 +258,7 @@ describe('MediaViewerModal', () => {
     )
     expect(screen.getByRole('button', { name: 'Save to vault' })).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'View in vault' })).toBeNull()
+    expect(screen.getByRole('dialog').textContent).not.toContain('generated/images/city.png')
 
     view.rerender(
       <Viewer
@@ -271,6 +272,20 @@ describe('MediaViewerModal', () => {
     )
     expect(screen.queryByRole('button', { name: 'Save to vault' })).toBeNull()
     expect(screen.getByRole('link', { name: 'View in vault' }).getAttribute('href')).toBe('/vault/generated/images/city.png')
+
+    view.rerender(
+      <Viewer
+        generation={generation({
+          id: 'local-pending',
+          result: null,
+          metadata: { generationStatus: 'pending' },
+        })}
+        onClose={() => {}}
+        actions={actions}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: 'Save to vault' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'View in vault' })).toBeNull()
   })
 
   it('plays and seeks speech, then stops playback when the viewer closes', () => {

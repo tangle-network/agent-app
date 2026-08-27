@@ -23,6 +23,7 @@ import {
   generationSavedToVault,
   generationStatus,
   generationVaultPath,
+  isLocalGeneration,
   type Generation,
 } from '../studio/generation'
 import type { StudioMediaActions, VaultSaveResult } from '../studio/ports'
@@ -78,6 +79,7 @@ export function MediaTile({
   const vaultPath = generationVaultPath(generation)
   const savedToVault = generationSavedToVault(generation)
   const status = generationStatus(generation)
+  const canSaveToVault = status === 'succeeded' && !isLocalGeneration(generation)
   const isSpeech = generation.type === 'speech'
   const isPlaying = isSpeech && playback.activeId === generation.id && playback.playing
 
@@ -209,7 +211,7 @@ export function MediaTile({
           <Download size={15} strokeWidth={1.5} />
         </button>
 
-        {!savedToVault && actions?.save && (
+        {canSaveToVault && !savedToVault && actions?.save && (
           <div ref={containerRef}>
             <button
               {...triggerProps}

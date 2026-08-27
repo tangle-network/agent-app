@@ -20,6 +20,7 @@ import {
   generationSpecSegments,
   generationStatus,
   generationVaultPath,
+  isLocalGeneration,
   hashSeed,
   previewWaveformBars,
   relativeTime,
@@ -261,12 +262,13 @@ export function MediaViewerModal({
   const status = generationStatus(generation)
   const vaultPath = generationVaultPath(generation)
   const savedToVault = generationSavedToVault(generation)
+  const canSaveToVault = status === 'succeeded' && !isLocalGeneration(generation)
   const metaSegments = [
     TYPE_LABELS[generation.type] ?? generation.type,
     generation.model,
     ...generationSpecSegments(generation),
     generation.createdAt ? relativeTime(generation.createdAt) : null,
-    vaultPath,
+    savedToVault ? vaultPath : null,
   ].filter((segment): segment is string => typeof segment === 'string' && segment.length > 0)
 
   function onPanelKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -374,7 +376,7 @@ export function MediaViewerModal({
             <Download size={15} strokeWidth={1.5} /> Download
           </button>
 
-          {!savedToVault && actions?.save && (
+          {canSaveToVault && !savedToVault && actions?.save && (
             <div ref={popover.containerRef}>
               <button
                 {...popover.triggerProps}

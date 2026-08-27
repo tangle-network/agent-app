@@ -145,6 +145,24 @@ describe('MediaTile', () => {
     )
     expect(screen.queryByLabelText('Save to vault')).toBeNull()
     expect(screen.getByRole('link', { name: 'View in vault' })).toBeTruthy()
+
+    view.rerender(
+      <StudioPlaybackProvider createAudioElement={() => view.audio}>
+        <MediaTile
+          generation={generation({
+            id: 'local-pending',
+            result: null,
+            metadata: { generationStatus: 'pending' },
+          })}
+          context="home"
+          onOpen={view.onOpen}
+          actions={actions}
+          onRequestDelete={onRequestDelete}
+        />
+      </StudioPlaybackProvider>,
+    )
+    expect(screen.queryByLabelText('Save to vault')).toBeNull()
+    expect(screen.queryByLabelText('View in vault')).toBeNull()
   })
 
   it('keeps Download via the anchor fallback but hides Delete without a request callback', () => {
