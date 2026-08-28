@@ -1414,7 +1414,7 @@ export async function writeProfileFilesToBox(
       `${chmod}rm -f ${qb64} ${qtmp}; i=0; while [ "$i" -lt ${b64Chunks.length} ]; do rm -f ${qpartPrefix}$i; i=$((i+1)); done; exit 0; fi; ` +
       `: > ${qb64} && ` +
       `i=0; while [ "$i" -lt ${b64Chunks.length} ]; do cat ${qpartPrefix}$i >> ${qb64} || exit 1; i=$((i+1)); done && ` +
-      `base64 -d ${qb64} > ${qtmp} && ` +
+      `base64 -d < ${qb64} > ${qtmp} && ` +
       `[ "$(sha256sum ${qtmp} | awk '{print $1}')" = "$expected" ] || { echo ${checksumMismatch} >&2; exit 1; }; ` +
       `mv ${qtmp} ${q} && ` +
       `${executable ? `chmod +x ${q} && ` : ''}` +
