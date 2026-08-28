@@ -164,6 +164,7 @@ describe('create-agent-app --chat scaffolder', () => {
       '@tangle-network/agent-interface',
       'better-auth',
       'drizzle-orm',
+      'viem',
     ]) {
       expect(gen.dependencies[name], `missing runtime dependency ${name}`).toBeTruthy()
     }
