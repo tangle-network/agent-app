@@ -312,7 +312,7 @@ describe('VaultPane — load + selection', () => {
 
     await waitFor(() => expect(port.listTree).toHaveBeenCalled())
     expect(readFile).not.toHaveBeenCalled()
-    expect(screen.getByText('Open a vault document')).toBeTruthy()
+    expect(screen.queryByTestId('artifact')).toBeNull()
   })
 
   it('clears a controlled selected path that is not a file', async () => {
@@ -361,9 +361,10 @@ describe('VaultPane — load + selection', () => {
     expect(screen.getByTestId('artifact').textContent).toContain('recovered A')
   })
 
-  it('renders the empty state with no selection', async () => {
+  it('leaves the artifact slot empty with no selection', async () => {
     mount()
-    await waitFor(() => expect(screen.getByText('Open a vault document')).toBeTruthy())
+    await waitFor(() => expect(screen.getByTestId('tree')).toBeTruthy())
+    expect(screen.queryByTestId('artifact')).toBeNull()
   })
 })
 
@@ -543,7 +544,7 @@ describe('VaultPane — create / delete call the port', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Delete file' }))
     })
     expect(port.deleteFile).toHaveBeenCalledWith('a.md')
-    await waitFor(() => expect(screen.getByText('Open a vault document')).toBeTruthy())
+    await waitFor(() => expect(screen.queryByTestId('artifact')).toBeNull())
   })
 
   it('keeps the create dialog input after rejection and retries the mutation', async () => {
@@ -614,7 +615,7 @@ describe('VaultPane — create / delete call the port', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete file' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete file?' })).toBeNull())
-    await waitFor(() => expect(screen.getByText('Open a vault document')).toBeTruthy())
+    await waitFor(() => expect(screen.queryByTestId('artifact')).toBeNull())
     expect(deleteFile).toHaveBeenCalledTimes(2)
   })
 
@@ -671,7 +672,7 @@ describe('VaultPane — create / delete call the port', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete file' }))
 
     await waitFor(() => expect(screen.getByText(/The file was deleted, but the Vault couldn't refresh/)).toBeTruthy())
-    expect(screen.getByText('Open a vault document')).toBeTruthy()
+    expect(screen.queryByTestId('artifact')).toBeNull()
     expect(deleteFile).toHaveBeenCalledTimes(1)
     expect(onOperationError).toHaveBeenCalledTimes(1)
     expect(onOperationError).toHaveBeenCalledWith(expect.objectContaining({
