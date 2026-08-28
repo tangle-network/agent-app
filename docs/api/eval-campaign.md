@@ -104,7 +104,7 @@ interface Gate
 
 ### `gepaOptimizationMethod`
 
-`function` — Turn an optional GEPA installation into an `OptimizationMethod`.
+`function`
 
 ```ts
 <TScenario extends Scenario, TArtifact>(config: GepaOptimizationMethodConfig<TScenario, TArtifact>) => OptimizationMeth…

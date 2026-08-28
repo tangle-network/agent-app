@@ -5345,7 +5345,7 @@
           "name": "gepaOptimizationMethod",
           "kind": "function",
           "signature": "<TScenario extends Scenario, TArtifact>(config: GepaOptimizationMethodConfig<TScenario, TArtifact>) => OptimizationMeth…",
-          "doc": "Turn an optional GEPA installation into an `OptimizationMethod`."
+          "doc": null
         },
         {
           "name": "GepaOptimizationMethodConfig",
