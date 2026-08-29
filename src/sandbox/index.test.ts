@@ -2048,6 +2048,8 @@ describe('ensureWorkspaceSandbox — new seams', () => {
       error: expect.objectContaining({
         message: error.message,
         cause: error,
+        name: 'ServerError',
+        code: 'SERVER_ERROR',
         status: 500,
         origin: 'sandbox-api',
         endpoint: '/v1/sandboxes/sandbox-stale/resume',

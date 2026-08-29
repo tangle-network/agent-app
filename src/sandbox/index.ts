@@ -1943,11 +1943,15 @@ function stoppedBoxResumeError(box: SandboxInstance, cause: unknown): unknown {
     ? (cause as { status?: unknown }).status
     : undefined
   if (typeof status !== 'number' && typeof status !== 'string') return cause
+  const code = (error as { code?: unknown }).code
+  const wrapped = new Error(error.message, { cause: error })
+  wrapped.name = error.name
 
-  return Object.assign(new Error(error.message, { cause: error }), {
+  return Object.assign(wrapped, {
     status,
     origin: 'sandbox-api',
     endpoint: `/v1/sandboxes/${encodeURIComponent(box.id)}/resume`,
+    ...(typeof code === 'number' || typeof code === 'string' ? { code } : {}),
   })
 }
 
