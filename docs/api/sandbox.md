@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-169 exports.
+170 exports.
 
 ### `adaptSandboxStream`
 
@@ -460,6 +460,14 @@ interface MemberSyncSeam
 
 ```ts
 (box: SandboxInstance, options: MintScopedTokenOptions) => Promise<Outcome<ScopedTokenResult>>
+```
+
+### `MissingSandboxFailure`
+
+`interface` — Describe a sandbox that disappeared after the platform listed it.
+
+```ts
+interface MissingSandboxFailure
 ```
 
 ### `ModelSelection`

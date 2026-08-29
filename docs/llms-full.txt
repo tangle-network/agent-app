@@ -13351,6 +13351,14 @@ interface MemberSyncSeam
 (box: SandboxInstance, options: MintScopedTokenOptions) => Promise<Outcome<ScopedTokenResult>>
 ```
 
+### `MissingSandboxFailure`
+
+`interface` — Describe a sandbox that disappeared after the platform listed it.
+
+```ts
+interface MissingSandboxFailure
+```
+
 ### `ModelSelection`
 
 `type` — The three-state outcome of resolving a model: `{ succeeded: true, value: undefined }` means NOTHING was requested (the legitimate box-default configuration — not an error); `{ succeeded: true, value:…

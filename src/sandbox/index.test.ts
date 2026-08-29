@@ -542,6 +542,61 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     expect(createMock).not.toHaveBeenCalled()
   })
 
+  it('replaces a reused sandbox that disappears during egress migration', async () => {
+    const desiredPolicy = { mode: 'open' as const }
+    const missing = Object.assign(new Error('Sandbox not found'), {
+      name: 'NotFoundError',
+      code: 'NOT_FOUND',
+      status: 404,
+      endpoint: '/v1/sandboxes/sandbox-gone/egress',
+      origin: 'sandbox-api',
+    })
+    const running = fakeBox({
+      id: 'sandbox-gone',
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      egress: {
+        get: vi.fn().mockResolvedValue({ policy: { mode: 'blocked' }, source: 'sandbox' }),
+        update: vi.fn().mockRejectedValue(missing),
+      },
+    } as unknown as Partial<SandboxInstance>)
+    const replacement = fakeBox({ id: 'sandbox-new', name: 'box-w1:recovered' })
+    const recoverMissingSandbox = vi.fn(async () => ({
+      succeeded: true as const,
+      value: { replacementBoxKey: 'box-w1:recovered', restore: null },
+    }))
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      Promise.resolve(status === 'running' ? [running] : []),
+    )
+    createMock.mockResolvedValue(replacement)
+
+    const box = await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
+      egressPolicy: desiredPolicy,
+      migrateEgressPolicy: true,
+      recoverMissingSandbox,
+    }), { workspaceId: 'w1', userId: 'u1', harness: 'opencode' })
+
+    expect(box).toBe(replacement)
+    expect(recoverMissingSandbox).toHaveBeenCalledWith(expect.objectContaining({
+      box: running,
+      boxKey: 'box-w1',
+      scope: { workspaceId: 'w1', userId: 'u1' },
+      stage: 'reused',
+      error: expect.objectContaining({
+        message: 'egress policy migration failed on reused box box-w1: Sandbox not found',
+        cause: missing,
+      }),
+    }))
+    expect(running.delete).not.toHaveBeenCalled()
+    expect(createMock).toHaveBeenCalledOnce()
+    expect(createMock.mock.calls[0]![0]).toMatchObject({
+      name: 'box-w1:recovered',
+      idempotencyKey: 'box-w1:recovered',
+    })
+    expect(createMock.mock.calls[0]![0].fromSnapshot).toBeUndefined()
+    expect(createMock.mock.calls[0]![0].fromSandboxId).toBeUndefined()
+  })
+
   it('rejects blocked mode when a reused sandbox currently allows egress', async () => {
     const get = vi.fn().mockResolvedValue({
       policy: { mode: 'open' },
@@ -578,8 +633,10 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
       egress: { get, update: vi.fn() },
     } as unknown as Partial<SandboxInstance>)
     listMock.mockResolvedValue([running])
+    const recoverMissingSandbox = vi.fn()
     const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
       egressPolicy: { mode: 'strict', allowDomains: ['relationships.example.com'] },
+      recoverMissingSandbox,
     })
 
     await expect(ensureWorkspaceSandbox(shell, {
@@ -588,6 +645,7 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     })).rejects.toThrow(
       /egress policy read failed on reused box box-w1: control plane unavailable/,
     )
+    expect(recoverMissingSandbox).not.toHaveBeenCalled()
   })
 
   it('recovers a reused box whose edge has failed instead of deleting it', async () => {
