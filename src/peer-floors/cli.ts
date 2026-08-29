@@ -29,7 +29,7 @@
  * the escape hatch for a repo that genuinely carries a tarball as test data.
  * Exits 1 on any violation, 0 otherwise.
  */
-import { checkPeerFloors, formatPeerFloorReport } from './check'
+import { checkAllPeerFloors, formatPeerFloorReport } from './check'
 import { checkDependencySources, formatDependencySourceReport } from './dependency-source'
 import { invokedAsScript } from '../signoff/invoked-as-script'
 
@@ -70,9 +70,9 @@ function main(): void {
   }
 
   try {
-    const report = checkPeerFloors({ appDir })
-    process.stdout.write(`${formatPeerFloorReport(report)}\n`)
-    if (!report.ok) failed = true
+    const reports = checkAllPeerFloors({ appDir })
+    process.stdout.write(`${reports.map((report) => formatPeerFloorReport(report)).join('\n\n')}\n`)
+    if (reports.some((report) => !report.ok)) failed = true
   } catch (err) {
     process.stderr.write(`agent-app-peer-check (peer floors) failed: ${err instanceof Error ? err.message : String(err)}\n`)
     failed = true

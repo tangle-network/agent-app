@@ -22,6 +22,7 @@
   },
   "files": [
     "index.mjs",
+    "template-common",
     "template",
     "template-chat"
   ],

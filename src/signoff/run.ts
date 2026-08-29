@@ -3,7 +3,12 @@ import { existsSync } from 'node:fs'
 import { availableParallelism, homedir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { loadSignoffConfig } from './config'
-import { assertNodeVersion, resolveNodeRequirement, type NodeVersionRequirement } from './node-version'
+import {
+  assertNodeTypesVersion,
+  assertNodeVersion,
+  resolveNodeRequirement,
+  type NodeVersionRequirement,
+} from './node-version'
 import { runCommand, type CommandResult } from './exec'
 import { runGraph, validateGraph, type TaskOutcome } from './schedule'
 import { assertShuffleArgsReachTheRunner, newSeedBase, planAttempts } from './seeds'
@@ -203,6 +208,8 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
         options,
       })
     }
+
+    assertNodeTypesVersion(tree.path, nodeRequirement)
 
     const treeRoot = tree.path
     const outcomes = await runGraph<SignoffStepSpec, readonly SignoffAttempt[]>({

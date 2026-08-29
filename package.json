@@ -527,12 +527,12 @@
     "@tangle-network/agent-docs": "0.2.1",
     "@tangle-network/agent-eval": "0.170.0",
     "@tangle-network/agent-integrations": "0.53.55",
-    "@tangle-network/agent-interface": "1.8.0",
+    "@tangle-network/agent-interface": "1.9.0",
     "@tangle-network/agent-knowledge": "10.8.0",
     "@tangle-network/agent-profile-materialize": "0.17.1",
-    "@tangle-network/agent-runtime": "0.178.0",
+    "@tangle-network/agent-runtime": "0.180.0",
     "@tangle-network/brand": "1.5.0",
-    "@tangle-network/sandbox": "0.34.1",
+    "@tangle-network/sandbox": "0.34.3",
     "@tangle-network/sandbox-ui": "0.111.0",
     "@tangle-network/ui": "^11.6.0",
     "@testing-library/dom": "^10.4.1",
@@ -560,7 +560,7 @@
     "drizzle-orm": "^0.45.2",
     "fast-check": "^4.9.0",
     "jsdom": "^30.0.1",
-    "knip": "^6.32.3",
+    "knip": "^6.33.0",
     "konva": "^10.3.2",
     "lucide-react": "^1.35.0",
     "npm": "12.0.2",
@@ -569,8 +569,8 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-konva": "^19.2.5",
-    "react-router": "^8.3.0",
-    "resend": "^6.24.0",
+    "react-router": "^8.3.1",
+    "resend": "^6.25.0",
     "semver": "^7.8.5",
     "storybook": "^10.5.10",
     "tailwindcss": "^4.3.3",
@@ -589,7 +589,7 @@
     "@tangle-network/agent-interface": "^1.8.0",
     "@tangle-network/agent-knowledge": "^10.8.0",
     "@tangle-network/agent-profile-materialize": ">=0.17.1 <0.18.0",
-    "@tangle-network/agent-runtime": ">=0.178.0 <0.179.0",
+    "@tangle-network/agent-runtime": ">=0.178.0 <0.181.0",
     "@tangle-network/brand": ">=1.5.0",
     "@tangle-network/sandbox": ">=0.34.0 <0.35.0",
     "@tangle-network/sandbox-ui": ">=0.111.0 <0.112.0",
@@ -693,6 +693,6 @@
     }
   },
   "dependencies": {
-    "zod": "^4.4.3"
+    "zod": "^4.5.1"
   }
 }

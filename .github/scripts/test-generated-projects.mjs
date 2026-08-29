@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -23,6 +24,9 @@ const createAgentAppDir = join(repo, 'create-agent-app')
 const require = createRequire(import.meta.url)
 const npmPackagePath = require.resolve('npm/package.json')
 const npmCli = join(dirname(npmPackagePath), 'bin', 'npm-cli.js')
+const dependencyCohort = process.env.AGENT_APP_TEST_COHORT
+  ? JSON.parse(process.env.AGENT_APP_TEST_COHORT)
+  : {}
 
 function commandLabel(command, args) {
   return [command, ...args].map((value) => JSON.stringify(value)).join(' ')
@@ -100,6 +104,30 @@ function writeJson(path, value) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`)
 }
 
+function applyDependencyCohort(manifest, cohort, variant) {
+  for (const [name, version] of Object.entries(cohort)) {
+    let found = false
+    for (const section of ['dependencies', 'devDependencies', 'peerDependencies']) {
+      if (manifest[section]?.[name] !== undefined) {
+        manifest[section][name] = version
+        found = true
+      }
+    }
+    if (!found) throw new Error(`${variant} generated project does not declare cohort package ${name}`)
+  }
+}
+
+function assertGeneratedPeerFloors(project, env) {
+  const source = [
+    "import { checkAllPeerFloors } from '@tangle-network/agent-app/peer-floors'",
+    'const reports = checkAllPeerFloors({ appDir: process.cwd() })',
+    'const violations = reports.flatMap((report) => report.violations)',
+    "if (violations.length > 0) throw new Error(JSON.stringify(violations))",
+    "process.stdout.write(`all ${reports.length} installed Tangle peer contracts satisfied\\n`)",
+  ].join('\n')
+  run(process.execPath, ['--input-type=module', '--eval', source], { cwd: project, env })
+}
+
 function assertToolVersions(env) {
   const npmPackage = JSON.parse(readFileSync(npmPackagePath, 'utf8'))
   assertEqual(npmPackage.version, NPM_VERSION, 'installed npm package version')
@@ -169,8 +197,12 @@ function installAndRunScaffolder({
   run(installedCli, cliArgs, { cwd: runner, env, timeout: PACK_TIMEOUT_MS })
 
   const packagePath = join(project, 'package.json')
+  const renovatePath = join(project, 'renovate.json')
   const workspacePath = join(project, 'pnpm-workspace.yaml')
   const workspaceBeforeInstall = readFileSync(workspacePath, 'utf8')
+  if (!workspaceBeforeInstall.includes('strictPeerDependencies: true')) {
+    throw new Error(`${variant} generated project does not fail installs on incompatible peers`)
+  }
   const generatedPackage = JSON.parse(readFileSync(packagePath, 'utf8'))
   const expectedRange = `^${packedVersion}`
   assertEqual(
@@ -180,11 +212,23 @@ function installAndRunScaffolder({
   )
   assertEqual(generatedPackage.packageManager, `pnpm@${PNPM_VERSION}`, `${variant} package manager`)
   assertEqual(generatedPackage.engines?.node, NODE_RANGE, `${variant} Node range`)
+  assertEqual(generatedPackage.scripts?.['peer-check'], 'agent-app-peer-check', `${variant} peer check`)
+  assertEqual(generatedPackage.scripts?.signoff, 'agent-app-signoff', `${variant} signoff`)
+  assertEqual(readFileSync(join(project, '.nvmrc'), 'utf8').trim(), '22', `${variant} Node pin`)
+  if (!existsSync(renovatePath)) throw new Error(`${variant} generated project is missing renovate.json`)
+  const renovate = JSON.parse(readFileSync(renovatePath, 'utf8'))
+  assertEqual(
+    renovate.extends?.includes('github>tangle-network/agent-app:renovate.json'),
+    true,
+    `${variant} canonical dependency policy`,
+  )
 
+  applyDependencyCohort(generatedPackage, dependencyCohort, variant)
   generatedPackage.dependencies['@tangle-network/agent-app'] = `file:${packedAgentApp}`
   writeJson(packagePath, generatedPackage)
 
   run('pnpm', ['install', '--strict-peer-dependencies', '--store-dir', storeDir], { cwd: project, env })
+  assertGeneratedPeerFloors(project, env)
   run('pnpm', ['typecheck'], { cwd: project, env })
   run('pnpm', ['test'], { cwd: project, env })
   run(
@@ -253,6 +297,8 @@ function main(scratch) {
   const createFiles = assertPaths(createAgentAppPack, [
     'index.mjs',
     'package.json',
+    'template-common/.nvmrc',
+    'template-common/renovate.json',
     'template/_package.json',
     'template/_tsconfig.json',
     'template/pnpm-workspace.yaml',

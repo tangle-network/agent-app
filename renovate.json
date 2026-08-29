@@ -1,0 +1,53 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":semanticCommits", ":dependencyDashboard"],
+  "labels": ["dependencies"],
+  "rangeStrategy": "bump",
+  "prConcurrentLimit": 12,
+  "prHourlyLimit": 4,
+  "schedule": ["before 9am on monday"],
+  "minimumReleaseAge": "3 days",
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "labels": ["security", "dependencies"],
+    "minimumReleaseAge": null
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"]
+  },
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "groupName": "minor & patch"
+    },
+    {
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["breaking"]
+    },
+    {
+      "matchPackageNames": [
+        "@tangle-network/agent-app",
+        "@tangle-network/agent-eval",
+        "@tangle-network/agent-integrations",
+        "@tangle-network/agent-interface",
+        "@tangle-network/agent-knowledge",
+        "@tangle-network/agent-profile-materialize",
+        "@tangle-network/agent-runtime",
+        "@tangle-network/sandbox",
+        "@tangle-network/sandbox-ui"
+      ],
+      "groupName": "agent stack cohort",
+      "schedule": ["at any time"],
+      "minimumReleaseAge": null
+    },
+    {
+      "matchPackageNames": ["typescript", "eslint", "@typescript-eslint/**"],
+      "groupName": "TypeScript toolchain"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions"
+    }
+  ]
+}

@@ -2,7 +2,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { assertNodeVersion, resolveNodeRequirement } from './node-version'
+import {
+  assertNodeTypesVersion,
+  assertNodeVersion,
+  resolveNodeRequirement,
+} from './node-version'
 
 /** The fleet's real merge-gate shape: pull_request trigger, `node-version: 22`. */
 const PR_WORKFLOW = `name: deploy
@@ -130,5 +134,48 @@ describe('assertNodeVersion', () => {
 
   it('does nothing when the repo pins nothing', () => {
     expect(() => assertNodeVersion(null, 'v24.13.0')).not.toThrow()
+  })
+})
+
+describe('assertNodeTypesVersion', () => {
+  const pin = { major: 24, declared: '24', source: '.nvmrc' } as const
+
+  function writeNodeTypes(repo: string, declared: string, installed?: string): void {
+    writeFileSync(join(repo, 'package.json'), JSON.stringify({
+      devDependencies: { '@types/node': declared },
+    }))
+    if (installed !== undefined) {
+      const dir = join(repo, 'node_modules', '@types', 'node')
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(join(dir, 'package.json'), JSON.stringify({
+        name: '@types/node',
+        version: installed,
+      }))
+    }
+  }
+
+  it('rejects a declared Node types major that differs from the shipped runtime', () => {
+    const repo = tempRepo()
+    writeNodeTypes(repo, '^26.0.0', '26.4.0')
+    expect(() => assertNodeTypesVersion(repo, pin)).toThrow(/declares @types\/node \^26\.0\.0/)
+  })
+
+  it('rejects a stale install even when the declared range is aligned', () => {
+    const repo = tempRepo()
+    writeNodeTypes(repo, '^24.13.3', '26.4.0')
+    expect(() => assertNodeTypesVersion(repo, pin)).toThrow(/installed @types\/node@26\.4\.0/)
+  })
+
+  it('accepts the installed types for the shipped runtime', () => {
+    const repo = tempRepo()
+    writeNodeTypes(repo, '^24.13.3', '24.13.3')
+    expect(() => assertNodeTypesVersion(repo, pin)).not.toThrow()
+  })
+
+  it('does nothing when the app does not use Node types or pins no runtime', () => {
+    const repo = tempRepo()
+    writeFileSync(join(repo, 'package.json'), '{}')
+    expect(() => assertNodeTypesVersion(repo, pin)).not.toThrow()
+    expect(() => assertNodeTypesVersion(repo, null)).not.toThrow()
   })
 })

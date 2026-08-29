@@ -83,7 +83,7 @@ type ChatSelectField
 `function` — Shapes composer text into the respond payload for the routed field (select answers are string arrays on the wire; text answers are strings).
 
 ```ts
-(field: { type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…
+(field: { name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined; p…
 ```
 
 ### `composerAnswerDeliveries`
@@ -139,7 +139,7 @@ interface DurableInteractionRoutePersistence
 `function` — Determine if a chat interaction field allows free text input
 
 ```ts
-(field: { type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…
+(field: { name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined; p…
 ```
 
 ### `getSessionState`
