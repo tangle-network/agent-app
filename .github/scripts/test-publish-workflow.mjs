@@ -169,6 +169,7 @@ check(packageJob.includes('source_run_id=$GITHUB_RUN_ID'), 'artifact provenance 
 check(packageJob.includes('sha256sum agent-app.tgz create-agent-app.tgz publish-packages.sh RELEASE_PROVENANCE'), 'artifact files lack internal checksums')
 check(packageJob.includes('artifact-digest: ${{ steps.artifact.outputs.artifact-digest }}'), 'artifact digest is not exported')
 check(packageJob.includes('UPLOAD_ARTIFACT_DIGEST: ${{ steps.upload.outputs.artifact-digest }}'), 'upload digest is discarded')
+check(packageJob.includes('ARTIFACT_DIGEST=sha256:$UPLOAD_ARTIFACT_DIGEST'), 'bare upload digest is not normalized to the API format')
 check(packageJob.includes('^sha256:[0-9a-f]{64}$'), 'artifact digest format is not checked')
 
 for (const name of ['Verify source artifact identity', 'Download source artifact', 'Verify source artifact files']) {
