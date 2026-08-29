@@ -88,8 +88,8 @@ check(
   'tag dispatch lacks immutable source inputs',
 )
 check(
-  packageJob.includes("github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v')"),
-  'manual publication can run from a branch',
+  namedStep(packageJob, 'Lock release identity').includes('[[ "$GITHUB_REF" == refs/tags/v* ]]'),
+  'manual branch dispatch reports success without publishing',
 )
 check(!workflows.some(({ text: workflow }) => /^\s*-\s*cron:/m.test(workflow)), 'a workflow runs on a cron schedule')
 
