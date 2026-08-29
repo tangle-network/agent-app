@@ -17,8 +17,8 @@ import type {
   ChatUiMessage,
   RecordGridColumn,
   RecordGridRow,
-  SessionSummary,
 } from '@tangle-network/agent-app/web-react'
+import type { SessionSummary } from '@tangle-network/agent-app/session-shell'
 
 // ── /canvas — multi-element SceneDocument ─────────────────────────────────────
 

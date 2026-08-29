@@ -37,21 +37,6 @@
  */
 export function inertProps(inert: boolean): { inert?: boolean } {
   if (!inert) return {}
-  // One spelling, no version detection. `inert` is an HTML boolean attribute:
-  // its PRESENCE is what makes an element inert, whatever the value reads.
-  // A non-empty string is therefore inert on both majors, measured:
-  //
-  //   React 18.3.1  inert="1"  ->  <div inert="1">   present, no warning
-  //   React 19.2.8  inert="1"  ->  <div inert="">    present, no warning
-  //
-  // The values that DIFFER are the ones this used to branch on — `true` is
-  // dropped by 18, `''` is dropped by 19 — so branching meant detecting the
-  // major, and detecting the major meant `Number.parseInt(version)`, which
-  // reads 0 out of every `0.0.0-experimental-*` canary and routed React 19
-  // pre-releases to the 18 spelling. Half of all published React versions
-  // carry that shape. A value that needs no detection cannot get the detection
-  // wrong.
-  //
   // The cast is because @types/react 19 declares `inert` a boolean.
   return { inert: '1' } as unknown as { inert?: boolean }
 }

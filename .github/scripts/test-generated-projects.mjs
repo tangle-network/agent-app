@@ -13,8 +13,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const PNPM_VERSION = '11.17.0'
-const NPM_VERSION = '11.18.0'
+const PNPM_VERSION = '11.24.0'
+const NPM_VERSION = '12.0.2'
 const NODE_RANGE = '>=22.13'
 const COMMAND_TIMEOUT_MS = 10 * 60 * 1000
 const PACK_TIMEOUT_MS = 2 * 60 * 1000
@@ -89,9 +89,9 @@ function packPackage(cwd, destination, env) {
     [npmCli, 'pack', '--ignore-scripts', '--json', '--pack-destination', destination],
     { cwd, env, timeout: PACK_TIMEOUT_MS },
   )
-  const packs = JSON.parse(output)
-  if (!Array.isArray(packs) || packs.length !== 1) {
-    throw new Error(`npm pack returned ${Array.isArray(packs) ? packs.length : 'invalid'} results for ${cwd}`)
+  const packs = Object.values(JSON.parse(output))
+  if (packs.length !== 1) {
+    throw new Error(`npm pack returned ${packs.length} results for ${cwd}`)
   }
   return packs[0]
 }
@@ -243,7 +243,13 @@ function main(scratch) {
   assertEqual(createAgentAppPack.name, '@tangle-network/create-agent-app', 'scaffolder tarball package name')
   assertEqual(createAgentAppPack.version, agentAppPack.version, 'packed package versions')
 
-  assertPaths(agentAppPack, ['package.json', 'dist/runtime/index.js', 'dist/runtime/index.d.ts'])
+  assertPaths(agentAppPack, [
+    'package.json',
+    'dist/runtime/index.js',
+    'dist/runtime/index.d.ts',
+    'dist/studio-react/styles.d.ts',
+    'dist/theme/styles.d.ts',
+  ])
   const createFiles = assertPaths(createAgentAppPack, [
     'index.mjs',
     'package.json',

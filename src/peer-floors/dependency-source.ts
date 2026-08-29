@@ -217,7 +217,7 @@ export interface CheckDependencySourcesOptions {
  *  sub-second scan into a minute. */
 const SKIP_DIRS = new Set([
   'node_modules', '.git', 'dist', 'build', 'out', 'coverage',
-  '.wrangler', '.react-router', '.next', '.turbo', '.cache', 'storybook-static',
+  '.wrangler', '.react-router', '.next', '.turbo', '.cache', '.worktrees', 'storybook-static',
 ])
 
 function walkSourceTree(

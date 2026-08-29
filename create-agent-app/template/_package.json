@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=22.13"
   },
-  "packageManager": "pnpm@11.17.0",
+  "packageManager": "pnpm@11.24.0",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
@@ -20,21 +20,21 @@
   },
   "peerDependencies": {
     "@tangle-network/agent-eval": "0.170.0",
-    "@tangle-network/agent-integrations": ">=0.52.0",
-    "@tangle-network/agent-interface": "1.6.0",
-    "@tangle-network/agent-runtime": "0.170.0"
+    "@tangle-network/agent-integrations": ">=0.53.55 <0.54.0",
+    "@tangle-network/agent-interface": "1.8.0",
+    "@tangle-network/agent-runtime": "0.178.0"
   },
   "devDependencies": {
     "@tangle-network/agent-eval": "0.170.0",
-    "@tangle-network/agent-integrations": "0.53.54",
-    "@tangle-network/agent-interface": "1.6.0",
+    "@tangle-network/agent-integrations": "0.53.55",
+    "@tangle-network/agent-interface": "1.8.0",
     "@tangle-network/agent-knowledge": "10.8.0",
-    "@tangle-network/agent-runtime": "0.170.0",
-    "@tangle-network/sandbox": "0.31.0",
+    "@tangle-network/agent-runtime": "0.178.0",
+    "@tangle-network/sandbox": "0.34.1",
     "@types/node": "^22.20.1",
     "typescript": "^7.0.2",
     "viem": "^2.0.0",
-    "vitest": "^4.1.10",
-    "wrangler": "^4.114.0"
+    "vitest": "^4.1.11",
+    "wrangler": "4.126.0"
   }
 }

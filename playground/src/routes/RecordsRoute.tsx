@@ -2,8 +2,8 @@ import { useState } from 'react'
 import {
   RecordGrid,
   SessionHistoryPanel,
-  type SessionSort,
 } from '@tangle-network/agent-app/web-react'
+import type { SessionSort } from '@tangle-network/agent-app/session-shell'
 import { makeSessions, makeRecordGridRows, RECORD_GRID_COLUMNS } from '../fixtures'
 
 /**
