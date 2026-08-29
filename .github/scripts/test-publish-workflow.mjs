@@ -5,6 +5,7 @@ import path from 'node:path'
 import process from 'node:process'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import signoffConfig from '../../signoff.config.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const workflowDirectory = path.join(root, '.github/workflows')
@@ -61,6 +62,16 @@ const namedStep = (block, name) => {
   const next = blockLines.findIndex((line, index) => index > start && /^      - /.test(line))
   return blockLines.slice(start, next >= 0 ? next : undefined).join('\n')
 }
+const stepWithCommand = (block, command) => {
+  const blockLines = block.split('\n')
+  const commandLine = blockLines.findIndex((line) => line.trim() === `run: ${command}`)
+  check(commandLine >= 0, `missing workflow command: ${command}`)
+  let start = commandLine
+  while (start >= 0 && !/^      - /.test(blockLines[start])) start -= 1
+  check(start >= 0, `command has no step: ${command}`)
+  const next = blockLines.findIndex((line, index) => index > start && /^      - /.test(line))
+  return blockLines.slice(start, next >= 0 ? next : undefined).join('\n')
+}
 
 const packageJob = job('package_release')
 const writeJob = job('write_release')
@@ -113,17 +124,9 @@ check(
 check(packageJob.includes('fetch-depth: 0'), 'release history is shallow')
 check(packageJob.includes('persist-credentials: false'), 'package checkout persists credentials')
 check(packageJob.includes('node-version-file: .nvmrc'), 'source verification ignores the Node pin')
-check(packageJob.includes('pnpm install --frozen-lockfile --ignore-scripts=false'), 'install does not match the local sign-off')
 
 const autoSteps = [
-  ['Install dependencies', 'pnpm install --frozen-lockfile --ignore-scripts=false'],
-  ['Typecheck source', 'pnpm run typecheck'],
-  ['Incident-class gates', 'pnpm run test:gates'],
   ['Prepare release manifests', 'write-release.sh prepare'],
-  ['Build release', 'pnpm run build'],
-  ['Test source', 'pnpm run test'],
-  ['Test clean generated projects', 'pnpm run test:generated'],
-  ['Check dead surface', 'pnpm run knip'],
   ['Configure exact artifact pack runtime', 'node-version: 24.18.0'],
   ['Verify artifact pack npm', "$(npm --version) == '11.16.0'"],
   ['Pack and inspect exact tarballs', 'npm pack'],
@@ -134,15 +137,12 @@ for (const [name, command] of autoSteps) {
   check(step.includes("if: steps.release.outputs.mode == 'auto'"), `${name} can execute during tagged publication`)
   check(step.includes(command), `${name} is missing ${command}`)
 }
-for (const command of [
-  'pnpm install --frozen-lockfile --ignore-scripts=false',
-  'pnpm run typecheck',
-  'pnpm run test:gates',
-  'pnpm run build',
-  'pnpm run test',
-  'pnpm run test:generated',
-  'pnpm run knip',
-]) {
+const sourceCommands = [
+  signoffConfig.install.run,
+  ...signoffConfig.steps.map(({ run }) => run),
+]
+for (const command of sourceCommands) {
+  check(stepWithCommand(packageJob, command).includes("if: steps.release.outputs.mode == 'auto'"), `${command} can execute during tagged publication`)
   check(count(text, new RegExp(`^\\s*run: ${escapeRegex(command)}$`, 'gm')) === 1, `${command} does not run exactly once`)
 }
 check(count(text, /npm pack "\$source"/g) === 1, 'npm pack does not run exactly once')
