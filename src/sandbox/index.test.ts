@@ -548,8 +548,6 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
       name: 'NotFoundError',
       code: 'NOT_FOUND',
       status: 404,
-      endpoint: '/v1/sandboxes/sandbox-gone/egress',
-      origin: 'sandbox-api',
     })
     const running = fakeBox({
       id: 'sandbox-gone',
@@ -585,6 +583,9 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
       error: expect.objectContaining({
         message: 'egress policy migration failed on reused box box-w1: Sandbox not found',
         cause: missing,
+        status: 404,
+        origin: 'sandbox-api',
+        endpoint: '/v1/sandboxes/sandbox-gone/egress',
       }),
     }))
     expect(running.delete).not.toHaveBeenCalled()

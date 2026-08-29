@@ -2142,6 +2142,28 @@ function normalizedEgressPolicy(policy: EgressPolicy): string {
   return JSON.stringify(canonicalizeJson(normalized))
 }
 
+function existingBoxEgressError(
+  operation: 'read' | 'migration',
+  box: SandboxInstance,
+  stage: SandboxExistingBoxStage,
+  name: string,
+  cause: unknown,
+): Error {
+  const error = cause instanceof Error ? cause : new Error(String(cause))
+  const status = (error as { status?: unknown }).status
+  const suffix = operation === 'migration' ? '/egress' : ''
+  return Object.assign(
+    new Error(`egress policy ${operation} failed on ${stage} box ${name}: ${error.message}`, {
+      cause: error,
+    }),
+    {
+      origin: 'sandbox-api',
+      endpoint: `/v1/sandboxes/${encodeURIComponent(box.id)}${suffix}`,
+      ...(typeof status === 'number' || typeof status === 'string' ? { status } : {}),
+    },
+  )
+}
+
 async function assertExistingBoxEgress(
   box: SandboxInstance,
   desired: EgressPolicy | undefined,
@@ -2154,10 +2176,7 @@ async function assertExistingBoxEgress(
   try {
     current = await box.egress.get()
   } catch (cause) {
-    const error = cause instanceof Error ? cause : new Error(String(cause))
-    throw new Error(`egress policy read failed on ${stage} box ${name}: ${error.message}`, {
-      cause: error,
-    })
+    throw existingBoxEgressError('read', box, stage, name, cause)
   }
   const matchingPolicy = normalizedEgressPolicy(current.policy) === normalizedEgressPolicy(desired)
   const explicitSource = current.source !== 'platform'
@@ -2171,10 +2190,7 @@ async function assertExistingBoxEgress(
       if (migratedPolicy && migrated.source !== 'platform') return
       current = migrated
     } catch (cause) {
-      const error = cause instanceof Error ? cause : new Error(String(cause))
-      throw new Error(`egress policy migration failed on ${stage} box ${name}: ${error.message}`, {
-        cause: error,
-      })
+      throw existingBoxEgressError('migration', box, stage, name, cause)
     }
   }
 
