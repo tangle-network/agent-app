@@ -10344,6 +10344,12 @@
           "doc": "Mint a scoped token for an already-provisioned box (e.g."
         },
         {
+          "name": "MissingSandboxFailure",
+          "kind": "interface",
+          "signature": "interface MissingSandboxFailure",
+          "doc": "Describe a sandbox that disappeared after the platform listed it."
+        },
+        {
           "name": "ModelSelection",
           "kind": "type",
           "signature": "type ModelSelection",
