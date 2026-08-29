@@ -2013,6 +2013,52 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     expect(createMock).not.toHaveBeenCalled()
   })
 
+  it('preserves request context when a stopped box lost its backing container', async () => {
+    const error = Object.assign(new Error(
+      'Failed to resume project: Failed to start container 0c44dc7e5f62: '
+      + 'Host-agent startContainer failed (404): {"error":"Container not found","code":"NOT_FOUND"}',
+    ), {
+      name: 'ServerError',
+      code: 'SERVER_ERROR',
+      status: 500,
+    })
+    const stopped = fakeBox({
+      id: 'sandbox-stale',
+      name: 'box-w1',
+      resume: vi.fn().mockRejectedValue(error),
+    })
+    const replacement = fakeBox({ id: 'sandbox-new', name: 'box-w1:recovered' })
+    const recoverStoppedSandbox = vi.fn(async () => ({
+      succeeded: true as const,
+      value: { replacementBoxKey: 'box-w1:recovered', restore: null },
+    }))
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      Promise.resolve(status === 'stopped' ? [stopped] : []),
+    )
+    createMock.mockResolvedValue(replacement)
+
+    const box = await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      recoverStoppedSandbox,
+    }), { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(box).toBe(replacement)
+    expect(recoverStoppedSandbox).toHaveBeenCalledWith(expect.objectContaining({
+      box: stopped,
+      boxKey: 'box-w1',
+      error: expect.objectContaining({
+        message: error.message,
+        cause: error,
+        name: 'ServerError',
+        code: 'SERVER_ERROR',
+        status: 500,
+        origin: 'sandbox-api',
+        endpoint: '/v1/sandboxes/sandbox-stale/resume',
+      }),
+    }))
+    expect(stopped.delete).not.toHaveBeenCalled()
+    expect(createMock).toHaveBeenCalledOnce()
+  })
+
   it('lets product recovery choose deletion, restore, and a fresh create identity', async () => {
     const error = new Error('resume unavailable')
     const stopped = fakeBox({

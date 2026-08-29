@@ -360,7 +360,7 @@ interface EnsureWorkspaceSandboxOptions
 
 ### `isSandboxApiSandboxMissingFailure`
 
-`function` — True when the sandbox API answered 404 for a specific sandbox resource — the box behind a persisted sandbox id no longer exists.
+`function` — True when the sandbox API cannot find a sandbox resource or its backing container.
 
 ```ts
 (diagnostics: SafeSandboxErrorDiagnostics) => boolean
