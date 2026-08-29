@@ -139,7 +139,7 @@ type AttachmentFileResult
 `function` — All required fields answered → the respond payload; else null (not submittable yet).
 
 ```ts
-(fields: ({ type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…
+(fields: ({ name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined;…
 ```
 
 ### `buildMentionPromptBlock`
@@ -451,7 +451,7 @@ interface CommandPaletteProps
 `function` — Shapes composer text into the respond payload for the routed field (select answers are string arrays on the wire; text answers are strings).
 
 ```ts
-(field: { type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…
+(field: { name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined; p…
 ```
 
 ### `composerAnswerDeliveries`
@@ -1067,7 +1067,7 @@ type FetchSessionPage
 `function` — Determine if a chat interaction field allows free text input
 
 ```ts
-(field: { type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…
+(field: { name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined; p…
 ```
 
 ### `fieldAnswer`
@@ -1075,7 +1075,7 @@ type FetchSessionPage
 `function` — The submitted value for one field, or null when it has no answer yet.
 
 ```ts
-(field: { type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…
+(field: { name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined; p…
 ```
 
 ### `FieldValues`
@@ -1091,7 +1091,7 @@ type FieldValues
 `function` — Converts acknowledged, persisted answers back into the local field state consumed by the shared cards.
 
 ```ts
-(fields: ({ type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…
+(fields: ({ name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined;…
 ```
 
 ### `FileIndexReadyResponse`
@@ -1251,7 +1251,7 @@ interface HarnessGlyphProps
 `function` — Secrets must never leave the sidecar answer channel for the visible chat transcript, so a secret-bearing ask cannot be late-answered.
 
 ```ts
-(fields: ({ type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…
+(fields: ({ name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined;…
 ```
 
 ### `hydrateChatInteractions`

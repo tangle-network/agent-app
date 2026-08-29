@@ -4,7 +4,23 @@
 
 Source: `src/peer-floors/check.ts`
 
-21 exports.
+23 exports.
+
+### `checkAllPeerFloors`
+
+`function` — Audit every installed package in `scope` that constrains another package in that scope.
+
+```ts
+(options: CheckAllPeerFloorsOptions) => readonly PeerFloorReport[]
+```
+
+### `CheckAllPeerFloorsOptions`
+
+`type`
+
+```ts
+type CheckAllPeerFloorsOptions
+```
 
 ### `checkDependencySources`
 

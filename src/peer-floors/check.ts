@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 /**
@@ -54,6 +54,7 @@ export interface PeerFloorRow {
 }
 
 export interface PeerFloorReport {
+  readonly shell: string
   readonly shellVersion: string
   readonly rows: readonly PeerFloorRow[]
   readonly violations: readonly PeerFloorRow[]
@@ -80,6 +81,33 @@ export interface CheckPeerFloorsOptions {
    *  everywhere, so a fixture using that name could not be committed, and a
    *  calibration proof that is not committed is a proof that stops running. */
   modulesDir?: string
+}
+
+export type CheckAllPeerFloorsOptions = Pick<
+  CheckPeerFloorsOptions,
+  'appDir' | 'modulesDir' | 'scope'
+>
+
+function installedPackageNames(
+  appDir: string,
+  modulesDir: string,
+  scope: string,
+): readonly string[] {
+  const modulesRoot = join(appDir, modulesDir)
+  if (!existsSync(modulesRoot)) return []
+  if (scope !== '') {
+    const scopeDir = join(modulesRoot, scope.slice(0, -1))
+    return existsSync(scopeDir)
+      ? readdirSync(scopeDir).sort().map((name) => `${scope}${name}`)
+      : []
+  }
+
+  return readdirSync(modulesRoot)
+    .filter((name) => !name.startsWith('.'))
+    .flatMap((name) => name.startsWith('@')
+      ? readdirSync(join(modulesRoot, name)).map((child) => `${name}/${child}`)
+      : [name])
+    .sort()
 }
 
 /**
@@ -231,11 +259,41 @@ export function checkPeerFloors(options: CheckPeerFloorsOptions): PeerFloorRepor
 
   const violations = rows.filter((row) => row.verdict === 'below-floor' || row.verdict === 'absent-but-declared')
   return {
+    shell,
     shellVersion: shellManifest.version ?? 'unknown',
     rows,
     violations,
     ok: violations.length === 0,
   }
+}
+
+/** Audit every installed package in `scope` that constrains another package in
+ * that scope. This is the complete stack check the CLI runs for consumers. */
+export function checkAllPeerFloors(options: CheckAllPeerFloorsOptions): readonly PeerFloorReport[] {
+  const {
+    appDir,
+    modulesDir = 'node_modules',
+    scope = '@tangle-network/',
+  } = options
+  const normalizedScope = scope === '' ? '' : scope.endsWith('/') ? scope : `${scope}/`
+  const shells = installedPackageNames(appDir, modulesDir, normalizedScope)
+    .filter((name) => {
+      const manifest = readInstalledManifest(name, appDir, modulesDir)
+      return Object.keys(manifest?.peerDependencies ?? {})
+        .some((peer) => peer.startsWith(normalizedScope))
+    })
+
+  if (shells.length === 0) {
+    const label = normalizedScope || 'package'
+    throw new Error(`no installed ${label} package declares a ${label} peer under ${appDir}`)
+  }
+
+  return shells.map((shell) => checkPeerFloors({
+    appDir,
+    modulesDir,
+    scope: normalizedScope,
+    shell,
+  }))
 }
 
 /** The failure message for one violating row. Split out so a caller can raise
@@ -253,7 +311,7 @@ export function describePeerFloorViolation(row: PeerFloorRow, shellVersion: stri
     + `reporting a pass this guard did not earn.`
 }
 
-export function formatPeerFloorReport(report: PeerFloorReport, shell = '@tangle-network/agent-app'): string {
+export function formatPeerFloorReport(report: PeerFloorReport, shell = report.shell): string {
   const width = Math.max(...report.rows.map((r) => r.name.length), 4)
   const lines = [
     `${shell}@${report.shellVersion} — peer floors`,

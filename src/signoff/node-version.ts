@@ -108,3 +108,43 @@ export function assertNodeVersion(requirement: NodeVersionRequirement | null, ru
       'product really has moved.',
   )
 }
+
+/** Refuse Node declaration files for a different runtime major. */
+export function assertNodeTypesVersion(
+  repoRoot: string,
+  requirement: NodeVersionRequirement | null,
+): void {
+  if (!requirement) return
+  const packagePath = join(repoRoot, 'package.json')
+  if (!existsSync(packagePath)) return
+  const manifest = JSON.parse(readFileSync(packagePath, 'utf8')) as {
+    dependencies?: Record<string, string>
+    devDependencies?: Record<string, string>
+    optionalDependencies?: Record<string, string>
+  }
+  const declared = manifest.devDependencies?.['@types/node']
+    ?? manifest.dependencies?.['@types/node']
+    ?? manifest.optionalDependencies?.['@types/node']
+  if (!declared) return
+
+  const declaredMajor = /^[~^]?v?(\d+)(?:\.|$)/.exec(declared.trim())?.[1]
+  if (declaredMajor !== undefined && Number.parseInt(declaredMajor, 10) !== requirement.major) {
+    throw new Error(
+      `signoff: this repo pins Node ${requirement.declared} but declares @types/node ${declared}. `
+      + `Use the latest @types/node ${requirement.major}.x release.`,
+    )
+  }
+
+  const installedPath = join(repoRoot, 'node_modules', '@types', 'node', 'package.json')
+  if (!existsSync(installedPath)) {
+    throw new Error(`signoff: @types/node is declared but missing after install in ${repoRoot}.`)
+  }
+  const installed = JSON.parse(readFileSync(installedPath, 'utf8')) as { version?: string }
+  const installedMajor = majorOf(installed.version ?? '')
+  if (installedMajor !== requirement.major) {
+    throw new Error(
+      `signoff: this repo pins Node ${requirement.declared} but installed @types/node@${installed.version ?? 'unknown'}. `
+      + `Use the latest @types/node ${requirement.major}.x release.`,
+    )
+  }
+}

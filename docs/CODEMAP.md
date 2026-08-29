@@ -46,7 +46,7 @@ _97 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./object-store`](api/object-store.md) | 15 | `crypto` |
 | [`./openui`](api/openui.md) | 35 | — |
 | [`./openui-react`](api/openui-react.md) | 8 | `openui` |
-| [`./peer-floors/check`](api/peer-floors-check.md) | 21 | `signoff` |
+| [`./peer-floors/check`](api/peer-floors-check.md) | 23 | `signoff` |
 | [`./peer-floors/cli`](api/peer-floors-cli.md) | 1 | `signoff` |
 | [`./plans`](api/plans.md) | 12 | — |
 | [`./platform`](api/platform.md) | 67 | `billing`, `runtime`, `web` |
@@ -468,11 +468,11 @@ Depends on: `openui`
 
 ## `./peer-floors/check`
 
-Source: `src/peer-floors/check.ts` · 21 exports
+Source: `src/peer-floors/check.ts` · 23 exports
 
 Depends on: `signoff`
 
-`checkDependencySources`, `CheckDependencySourcesOptions`, `checkInstalledIntegrity`, `checkPeerFloors`, `CheckPeerFloorsOptions`, `classifyDependencySpecifier`, `DependencySourceCheck`, `DependencySourceFinding`, `DependencySourceProtocol`, `DependencySourceReport`, `describeDependencySourceFinding`, `describePeerFloorViolation`, `formatDependencySourceReport`, `formatPeerFloorReport`, `InstalledIntegrityCoverage`, `LocalPathSource`, `PeerFloorReport`, `PeerFloorRow`, `PeerFloorVerdict`, `resolveLocalPathSource`, `satisfiesRange`
+`checkAllPeerFloors`, `CheckAllPeerFloorsOptions`, `checkDependencySources`, `CheckDependencySourcesOptions`, `checkInstalledIntegrity`, `checkPeerFloors`, `CheckPeerFloorsOptions`, `classifyDependencySpecifier`, `DependencySourceCheck`, `DependencySourceFinding`, `DependencySourceProtocol`, `DependencySourceReport`, `describeDependencySourceFinding`, `describePeerFloorViolation`, `formatDependencySourceReport`, `formatPeerFloorReport`, `InstalledIntegrityCoverage`, `LocalPathSource`, `PeerFloorReport`, `PeerFloorRow`, `PeerFloorVerdict`, `resolveLocalPathSource`, `satisfiesRange`
 
 [Full API →](api/peer-floors-check.md)
 

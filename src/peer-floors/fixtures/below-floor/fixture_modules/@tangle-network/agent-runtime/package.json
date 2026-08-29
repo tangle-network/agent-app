@@ -1,0 +1,7 @@
+{
+  "name": "@tangle-network/agent-runtime",
+  "version": "0.180.0",
+  "peerDependencies": {
+    "@tangle-network/agent-interface": "^1.9.0"
+  }
+}

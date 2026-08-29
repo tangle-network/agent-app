@@ -25,6 +25,7 @@ const TEMPLATES = {
   default: join(HERE, 'template'),
   chat: join(HERE, 'template-chat'),
 }
+const COMMON_TEMPLATE = join(HERE, 'template-common')
 
 const { version: packageVersion } = JSON.parse(await readFile(join(HERE, 'package.json'), 'utf8'))
 const AGENT_APP_RANGE = `^${packageVersion}`
@@ -110,6 +111,28 @@ async function walk(dir, base = dir, out = []) {
   return out
 }
 
+async function materializeTemplate(templateDir, targetDir, tokens) {
+  const files = await walk(templateDir)
+  for (const rel of files) {
+    const src = join(templateDir, rel)
+    const parts = rel.split(/[\\/]/)
+    const baseName = parts[parts.length - 1]
+    const outName = RENAME.get(baseName) ?? baseName
+    parts[parts.length - 1] = outName
+    const dest = join(targetDir, parts.join('/'))
+
+    await mkdir(dirname(dest), { recursive: true })
+
+    const isText = TEXT_EXT.test(baseName) || TEXT_BASENAMES.has(baseName)
+    if (isText) {
+      const raw = await readFile(src, 'utf8')
+      await writeFile(dest, applyTokens(raw, tokens))
+    } else {
+      await cp(src, dest)
+    }
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2))
   if (args.help || (args._.length === 0 && !args.name)) {
@@ -141,26 +164,8 @@ async function main() {
     AGENT_APP_VERSION: agentAppVersion,
   }
 
-  const files = await walk(templateDir)
-  for (const rel of files) {
-    const src = join(templateDir, rel)
-    // Resolve any renamed path segments (only basenames are renamed).
-    const parts = rel.split(/[\\/]/)
-    const baseName = parts[parts.length - 1]
-    const outName = RENAME.get(baseName) ?? baseName
-    parts[parts.length - 1] = outName
-    const dest = join(targetDir, parts.join('/'))
-
-    await mkdir(dirname(dest), { recursive: true })
-
-    const isText = TEXT_EXT.test(baseName) || TEXT_BASENAMES.has(baseName)
-    if (isText) {
-      const raw = await readFile(src, 'utf8')
-      await writeFile(dest, applyTokens(raw, tokens))
-    } else {
-      await cp(src, dest)
-    }
-  }
+  await materializeTemplate(COMMON_TEMPLATE, targetDir, tokens)
+  await materializeTemplate(templateDir, targetDir, tokens)
 
   process.stdout.write(
     [

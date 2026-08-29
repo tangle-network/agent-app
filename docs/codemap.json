@@ -6268,7 +6268,7 @@
         {
           "name": "composerAnswerData",
           "kind": "function",
-          "signature": "(field: { type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…",
+          "signature": "(field: { name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined; p…",
           "doc": "Shapes composer text into the respond payload for the routed field (select answers are string arrays on the wire; text answers are strings)."
         },
         {
@@ -6310,7 +6310,7 @@
         {
           "name": "fieldAcceptsFreeText",
           "kind": "function",
-          "signature": "(field: { type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…",
+          "signature": "(field: { name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined; p…",
           "doc": "Determine if a chat interaction field allows free text input"
         },
         {
@@ -7868,6 +7868,18 @@
       ],
       "error": null,
       "exports": [
+        {
+          "name": "checkAllPeerFloors",
+          "kind": "function",
+          "signature": "(options: CheckAllPeerFloorsOptions) => readonly PeerFloorReport[]",
+          "doc": "Audit every installed package in `scope` that constrains another package in that scope."
+        },
+        {
+          "name": "CheckAllPeerFloorsOptions",
+          "kind": "type",
+          "signature": "type CheckAllPeerFloorsOptions",
+          "doc": null
+        },
         {
           "name": "checkDependencySources",
           "kind": "function",
@@ -17283,7 +17295,7 @@
         {
           "name": "buildAnswerData",
           "kind": "function",
-          "signature": "(fields: ({ type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…",
+          "signature": "(fields: ({ name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined;…",
           "doc": "All required fields answered → the respond payload; else null (not submittable yet)."
         },
         {
@@ -17517,7 +17529,7 @@
         {
           "name": "composerAnswerData",
           "kind": "function",
-          "signature": "(field: { type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…",
+          "signature": "(field: { name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined; p…",
           "doc": "Shapes composer text into the respond payload for the routed field (select answers are string arrays on the wire; text answers are strings)."
         },
         {
@@ -17979,13 +17991,13 @@
         {
           "name": "fieldAcceptsFreeText",
           "kind": "function",
-          "signature": "(field: { type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…",
+          "signature": "(field: { name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined; p…",
           "doc": "Determine if a chat interaction field allows free text input"
         },
         {
           "name": "fieldAnswer",
           "kind": "function",
-          "signature": "(field: { type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…",
+          "signature": "(field: { name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined; p…",
           "doc": "The submitted value for one field, or null when it has no answer yet."
         },
         {
@@ -17997,7 +18009,7 @@
         {
           "name": "fieldValuesFromAnswers",
           "kind": "function",
-          "signature": "(fields: ({ type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…",
+          "signature": "(fields: ({ name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined;…",
           "doc": "Converts acknowledged, persisted answers back into the local field state consumed by the shared cards."
         },
         {
@@ -18117,7 +18129,7 @@
         {
           "name": "hasSecretField",
           "kind": "function",
-          "signature": "(fields: ({ type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…",
+          "signature": "(fields: ({ name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined;…",
           "doc": "Secrets must never leave the sidecar answer channel for the visible chat transcript, so a secret-bearing ask cannot be late-answered."
         },
         {

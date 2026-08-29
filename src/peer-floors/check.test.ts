@@ -3,7 +3,13 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { checkPeerFloors, describePeerFloorViolation, formatPeerFloorReport, satisfiesRange } from './check'
+import {
+  checkAllPeerFloors,
+  checkPeerFloors,
+  describePeerFloorViolation,
+  formatPeerFloorReport,
+  satisfiesRange,
+} from './check'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
@@ -105,6 +111,30 @@ describe('checkPeerFloors', () => {
   })
 })
 
+describe('checkAllPeerFloors', () => {
+  it('audits every installed Tangle package that declares a Tangle peer', () => {
+    const reports = checkAllPeerFloors({ appDir: belowFloor, modulesDir: MODULES })
+
+    expect(reports.map((report) => report.shellVersion)).toEqual(['0.45.6', '0.180.0'])
+    expect(reports.every((report) => !report.ok)).toBe(true)
+    expect(reports.map((report) => formatPeerFloorReport(report)).join('\n'))
+      .toContain('@tangle-network/agent-runtime@0.180.0')
+  })
+
+  it('audits every package scope when the caller passes an empty scope', () => {
+    const reports = checkAllPeerFloors({
+      appDir: belowFloor,
+      modulesDir: MODULES,
+      scope: '',
+    })
+
+    expect(reports.map((report) => report.shell)).toEqual([
+      '@tangle-network/agent-app',
+      '@tangle-network/agent-runtime',
+    ])
+  })
+})
+
 describe('this package audits itself', () => {
   it('declares support for the current Interface line without claiming the next one', async () => {
     const root = join(here, '..', '..')
@@ -121,6 +151,21 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('1.8.0', range!)).toBe(true)
     expect(satisfiesRange('1.9.0', range!)).toBe(true)
     expect(satisfiesRange('2.0.0', range!)).toBe(false)
+  })
+
+  it('supports the verified Runtime lines without claiming the next one', async () => {
+    const root = join(here, '..', '..')
+    const own = JSON.parse(
+      await readFile(join(root, 'package.json'), 'utf8'),
+    ) as { peerDependencies?: Record<string, string> }
+    const range = own.peerDependencies?.['@tangle-network/agent-runtime']
+
+    expect(range).toBeDefined()
+    expect(satisfiesRange('0.177.2', range!)).toBe(false)
+    expect(satisfiesRange('0.178.0', range!)).toBe(true)
+    expect(satisfiesRange('0.179.0', range!)).toBe(true)
+    expect(satisfiesRange('0.180.0', range!)).toBe(true)
+    expect(satisfiesRange('0.181.0', range!)).toBe(false)
   })
 
   // The floors this shell PUBLISHES must be satisfiable by the tree it is
