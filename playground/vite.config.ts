@@ -38,10 +38,10 @@ export default defineConfig({
   resolve: {
     dedupe: ['react', 'react-dom', 'react-konva', 'konva'],
     alias: {
-      '@tangle-network/sandbox-ui/terminal': resolve(__dirname, 'terminal-stub.js'),
-      '@xterm/xterm': resolve(__dirname, 'terminal-stub.js'),
-      '@xterm/addon-fit': resolve(__dirname, 'terminal-stub.js'),
-      '@xterm/addon-web-links': resolve(__dirname, 'terminal-stub.js'),
+      '@tangle-network/sandbox-ui/terminal': resolve(import.meta.dirname, 'terminal-stub.js'),
+      '@xterm/xterm': resolve(import.meta.dirname, 'terminal-stub.js'),
+      '@xterm/addon-fit': resolve(import.meta.dirname, 'terminal-stub.js'),
+      '@xterm/addon-web-links': resolve(import.meta.dirname, 'terminal-stub.js'),
       react: pkgDir('react'),
       'react-dom': pkgDir('react-dom'),
       'react-konva': pkgDir('react-konva'),

@@ -18,13 +18,11 @@
  *
  * **Engine behaviour this wrapper is built around, measured on real fixture
  * PDFs (`tests/documents/pdf.test.ts` re-measures all of it):**
- * - `extractText` PANICS (`RuntimeError: unreachable`, an out-of-bounds index
- *   in the engine's layout table) on any document with a page that has no text
- *   layer — including a `mixed` document whose other pages are fine. The
- *   instance survives the panic, but nothing recovers the text.
- * - `detectPdf` and `processPdf` do NOT panic on those documents; `processPdf`
- *   returns the readable pages' markdown, which is why `extract` uses it for
- *   markdown and for anything partially scanned.
+ * - `extractText` emits an image placeholder for a page with no text layer.
+ *   Classification must run first so a placeholder is not reported as a
+ *   complete extraction.
+ * - `processPdf` returns the readable pages' markdown, which is why `extract`
+ *   uses it for markdown and for anything partially scanned.
  * - `detectPdf` reports OCR pages 1-INDEXED, while `classifyPdf` reports the
  *   same pages 0-indexed. This wrapper uses `detectPdf` (it carries per-page
  *   reasons and layout that `classifyPdf` does not) and publishes 1-indexed.

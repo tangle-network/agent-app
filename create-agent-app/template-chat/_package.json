@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=22.13"
   },
-  "packageManager": "pnpm@11.17.0",
+  "packageManager": "pnpm@11.24.0",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
@@ -18,27 +18,27 @@
   },
   "dependencies": {
     "@tangle-network/agent-app": "__AGENT_APP_VERSION__",
-    "@tangle-network/agent-interface": "1.6.0",
-    "@tangle-network/agent-runtime": "0.170.0",
-    "@tangle-network/sandbox": "0.31.0",
-    "better-auth": "^1.6.16",
+    "@tangle-network/agent-interface": "1.8.0",
+    "@tangle-network/agent-runtime": "0.178.0",
+    "@tangle-network/sandbox": "0.34.1",
+    "better-auth": "^1.7.2",
     "drizzle-orm": "^0.45.2",
     "viem": "^2.0.0"
   },
   "peerDependencies": {
     "@tangle-network/agent-eval": "0.170.0",
-    "@tangle-network/agent-integrations": ">=0.52.0"
+    "@tangle-network/agent-integrations": ">=0.53.55 <0.54.0"
   },
   "devDependencies": {
     "@tangle-network/agent-eval": "0.170.0",
-    "@tangle-network/agent-integrations": "0.53.54",
+    "@tangle-network/agent-integrations": "0.53.55",
     "@tangle-network/agent-knowledge": "10.8.0",
-    "@cloudflare/workers-types": "^5.20260801.1",
-    "@types/better-sqlite3": "^7.6.13",
+    "@cloudflare/workers-types": "^5.20260828.1",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.20.1",
-    "better-sqlite3": "^12.10.0",
+    "better-sqlite3": "^12.11.1",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.10",
-    "wrangler": "^4.114.0"
+    "vitest": "^4.1.11",
+    "wrangler": "4.126.0"
   }
 }

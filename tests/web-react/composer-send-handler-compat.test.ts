@@ -48,6 +48,7 @@ function compile(name: string, source: string): { ok: boolean; output: string } 
       tsc,
       [
         '--noEmit',
+        '--ignoreConfig',
         '--strict',
         '--skipLibCheck',
         '--jsx',
@@ -91,7 +92,7 @@ describe('ChatComposer send handlers stay assignable from pre-outcome shapes', (
       () => {
         const { ok, output } = compile(label.replace(/\W+/g, '-'), `${preamble}${body}\nexport { h }\n`)
         expect(output).not.toMatch(/TS2322/)
-        expect(ok).toBe(true)
+        expect(ok, output).toBe(true)
       },
       COMPILE_TEST_TIMEOUT_MS,
     )
@@ -105,7 +106,7 @@ describe('ChatComposer send handlers stay assignable from pre-outcome shapes', (
         `${preamble}const h: ChatComposerProps["onSend"] = (m: string) => ({ ok: false as const, error: m })\nexport { h }\n`,
       )
       expect(output).toBe('')
-      expect(ok).toBe(true)
+      expect(ok, output).toBe(true)
     },
     COMPILE_TEST_TIMEOUT_MS,
   )

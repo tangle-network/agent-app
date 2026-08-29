@@ -2,10 +2,8 @@
  * PDF classification and extraction against the REAL wasm engine on real PDFs.
  *
  * The first block re-measures the engine behaviour the module's design rests
- * on — including the panic that makes classify-first mandatory. It is asserted
- * here rather than described in a comment because if a future engine version
- * stops panicking (or starts panicking somewhere new), the module's control
- * flow is wrong and nothing else in the suite would notice.
+ * on. It is asserted here because an engine change can invalidate the wrapper's
+ * control flow without changing its types.
  */
 
 import { extractText } from '@firecrawl/pdf-inspector-wasm'
@@ -43,13 +41,14 @@ describe('engine behaviour the classify-first contract depends on', () => {
     expect(isPdfInspectorReady()).toBe(true)
   })
 
-  it('PANICS in extractText on a page with no text layer — the reason classify runs first', () => {
-    expect(() => extractText(scanned)).toThrow()
-    // …and on a partially scanned document too, where other pages are readable.
-    expect(() => extractText(partiallyScanned)).toThrow()
+  it('returns image placeholders for pages that need OCR, so extraction alone cannot report completeness', () => {
+    expect(extractText(scanned)).toMatch(/^\[Image: .+\]$/)
+    const partial = extractText(partiallyScanned)
+    expect(partial).toContain('Services clause 1.')
+    expect(partial).toMatch(/\[Image: .+\]/)
   })
 
-  it('survives that panic — the same instance still classifies afterwards', () => {
+  it('keeps the same instance ready for classification after extraction', () => {
     const after = engine.classify(textBased)
     expect(after.succeeded).toBe(true)
     if (after.succeeded) expect(after.value.kind).toBe('text-based')

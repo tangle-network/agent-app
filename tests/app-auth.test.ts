@@ -359,6 +359,7 @@ describe('createAppAuth: drizzle db/schema path', () => {
   })
   const accounts = sqliteTable('accounts', {
     id: text('id').primaryKey(),
+    issuer: text('issuer'),
     accountId: text('account_id').notNull(),
     providerId: text('provider_id').notNull(),
     userId: text('user_id').notNull(),
@@ -394,7 +395,7 @@ describe('createAppAuth: drizzle db/schema path', () => {
         ip_address TEXT, user_agent TEXT, user_id TEXT NOT NULL
       );
       CREATE TABLE accounts (
-        id TEXT PRIMARY KEY, account_id TEXT NOT NULL, provider_id TEXT NOT NULL, user_id TEXT NOT NULL,
+        id TEXT PRIMARY KEY, issuer TEXT, account_id TEXT NOT NULL, provider_id TEXT NOT NULL, user_id TEXT NOT NULL,
         access_token TEXT, refresh_token TEXT, id_token TEXT,
         access_token_expires_at INTEGER, refresh_token_expires_at INTEGER,
         scope TEXT, password TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL

@@ -101,7 +101,7 @@ function stubComposerBackend(serverGenerations: Generation[]) {
   const realCrypto = globalThis.crypto
   vi.stubGlobal('crypto', {
     randomUUID: () => 'batch-2',
-    getRandomValues: (array: Uint8Array) => realCrypto.getRandomValues(array),
+    getRandomValues: realCrypto.getRandomValues.bind(realCrypto),
   })
   const catalog: MediaModelCatalogResponse = {
     defaults: { image: 'gpt-image-2', video: '', speech: '', avatar: '', transcription: '' },

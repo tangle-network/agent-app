@@ -5,20 +5,6 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { ComposerModeControls } from './composer-mode-controls'
 import { EntryComposer } from './entry-composer'
 import type { CatalogModel } from '../runtime/model-catalog'
-import type { ComposerFileRejection } from './composer-file-accept'
-import type { ComposerFileRejection as SandboxComposerFileRejection } from '@tangle-network/sandbox-ui/chat'
-
-// Compile-time pin (bites under `pnpm typecheck`, where sandbox-ui is a
-// devDependency): `onRejectFiles` retyped from AgentComposer's rejection to
-// this package's, on the claim the shapes are structurally identical. These
-// two assignments make that claim the compiler's problem — if either side
-// grows a field the other lacks, the typecheck goes red instead of consumer
-// handlers breaking silently. Lives in a test, not shipped source, so the
-// emitted declarations never reference the optional sandbox-ui peer.
-const _rejectionToSandbox: SandboxComposerFileRejection = {} as ComposerFileRejection
-const _rejectionFromSandbox: ComposerFileRejection = {} as SandboxComposerFileRejection
-void _rejectionToSandbox
-void _rejectionFromSandbox
 
 /**
  * These tests guard the exact defects that made three products diverge:

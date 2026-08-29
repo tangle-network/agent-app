@@ -50,9 +50,7 @@ export interface EntryComposerProps {
   uploadUrl?: string
   accept?: string
   onAttachmentError?: (reason: string) => void
-  /** `ComposerFileRejection` is structurally identical to the sandbox-ui type
-   *  this prop used to infer (`{ file: File; reason: string }`), so handlers
-   *  typed against either compile unchanged. */
+  /** Files rejected by this composer's attachment policy. */
   onRejectFiles?: (rejections: ComposerFileRejection[]) => void
   /**
    * `@`-file mentions. The hook itself is shared (`useFileMentions`), but the
