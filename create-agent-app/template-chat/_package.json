@@ -35,7 +35,7 @@
     "@tangle-network/agent-eval": "0.170.0",
     "@tangle-network/agent-integrations": "0.53.55",
     "@tangle-network/agent-knowledge": "10.8.0",
-    "@cloudflare/workers-types": "^5.20260828.1",
+    "@cloudflare/workers-types": "^5.20260826.1",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.20.1",
     "better-sqlite3": "^12.11.1",

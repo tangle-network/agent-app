@@ -203,6 +203,9 @@ function installAndRunScaffolder({
   if (!workspaceBeforeInstall.includes('strictPeerDependencies: true')) {
     throw new Error(`${variant} generated project does not fail installs on incompatible peers`)
   }
+  if (!workspaceBeforeInstall.includes('minimumReleaseAge: 4320')) {
+    throw new Error(`${variant} generated project does not hold external releases for 72 hours`)
+  }
   const generatedPackage = JSON.parse(readFileSync(packagePath, 'utf8'))
   const expectedRange = `^${packedVersion}`
   assertEqual(
