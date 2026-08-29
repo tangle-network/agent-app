@@ -253,7 +253,7 @@ jobs:
           if [[ "${{ steps.release.outputs.mode }}" == 'auto' ]]; then
             ARTIFACT_RUN_ID=$GITHUB_RUN_ID
             ARTIFACT_ID=$UPLOAD_ARTIFACT_ID
-            ARTIFACT_DIGEST=$UPLOAD_ARTIFACT_DIGEST
+            ARTIFACT_DIGEST=sha256:$UPLOAD_ARTIFACT_DIGEST
             SOURCE_SHA=${{ steps.release.outputs.base-sha }}
           else
             ARTIFACT_RUN_ID=$INPUT_RUN_ID
