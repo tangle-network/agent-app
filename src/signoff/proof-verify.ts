@@ -21,7 +21,7 @@ import { createHmac } from 'node:crypto'
  * The steps a repo's sign-off MUST cover, transcribed from each repo's CI job.
  * A runner is free to run more; it may never run fewer.
  *
- *   agent-app     .github/workflows/ci.yml
+ *   agent-app     .github/workflows/publish.yml (source checks)
  *   tax-agent     .github/workflows/deploy.yml (the `ci` job)
  *   legal-agent   .github/workflows/deploy.yml (the `ci` job)
  */

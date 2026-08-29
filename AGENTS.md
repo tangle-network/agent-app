@@ -194,7 +194,10 @@ The test for new code: *"Could the agent in the sandbox do this itself if we tol
 
 ## Merge gate: local sign-off, not CI
 
-The merge gate is `pnpm signoff`, run locally against the commit that will land. `.github/workflows/ci.yml` does not run on `pull_request` any more — it re-runs the same verification on `main` afterwards as a safety net that opens an issue. `publish.yml` is untouched.
+The merge gate is `pnpm signoff`, run locally against the commit that will land.
+`.github/workflows/publish.yml` runs the same verification once on `main` and opens an issue if it fails.
+That run builds the release tarballs.
+The tagged run verifies and publishes those exact tarballs without rebuilding them.
 
 ```bash
 nvm use                      # .nvmrc pins Node 22; another major REFUSES the run
@@ -204,7 +207,9 @@ pnpm signoff --source head   # the mode that authorizes a merge
 - **Attach the proof to the PR.** The report block, or the one-line `signoff PASS <sha> …` summary. A merge whose commit carries no valid proof is a defect.
 - **`--source head`, not the default.** The default verifies your working tree, which cannot catch a file you forgot to `git add`. Only `--source head` binds the proof to a hash someone else can check out.
 - **A red run is a finding, not a step to tune around.** Report it; do not adjust `signoff.config.mjs` to make it green.
-- **If you add a step to `.github/workflows/ci.yml`, add it to `signoff.config.mjs` in the same change.** They are the same command list on purpose; a workflow that checks something the gate does not makes every sign-off proof weaker than it reads.
+- **If you add source verification to `.github/workflows/publish.yml`, add it to `signoff.config.mjs` in the same change.**
+  They are the same command list on purpose.
+  A workflow-only check makes each sign-off proof weaker than it reads.
 
 What it proves, what it cannot prove, and the flags: [`docs/SIGNOFF.md`](./docs/SIGNOFF.md). The doctrine and the measured evidence: [`docs/local-signoff.md`](./docs/local-signoff.md).
 
