@@ -188,6 +188,35 @@ function resolveEmailClient(email: AppAuthEmailConfig): AppAuthEmailClient | nul
   return typeof email.resend === 'function' ? email.resend() : email.resend
 }
 
+type DrizzleAuthAdapter = ReturnType<ReturnType<typeof drizzleAdapter>>
+
+/** Better Auth reads adapter identity during startup, before Workers inject D1.
+ * Build the Drizzle adapter on its first database operation. */
+function deferDrizzleAdapter(
+  db: Record<string, unknown>,
+  config: Parameters<typeof drizzleAdapter>[1],
+): ReturnType<typeof drizzleAdapter> {
+  return (options) => {
+    let adapter: DrizzleAuthAdapter | undefined
+    const resolve = () => (adapter ??= drizzleAdapter(db, config)(options))
+
+    return {
+      id: 'drizzle',
+      create: (data) => resolve().create(data),
+      findOne: (data) => resolve().findOne(data),
+      findMany: (data) => resolve().findMany(data),
+      count: (data) => resolve().count(data),
+      update: (data) => resolve().update(data),
+      updateMany: (data) => resolve().updateMany(data),
+      delete: (data) => resolve().delete(data),
+      deleteMany: (data) => resolve().deleteMany(data),
+      consumeOne: (data) => resolve().consumeOne(data),
+      incrementOne: (data) => resolve().incrementOne(data),
+      transaction: (callback) => resolve().transaction(callback),
+    }
+  }
+}
+
 /** Resend reports failures in the resolved value, not by rejecting — surface
  *  them loud so better-auth's flow (and the caller's logs) see the failure. */
 async function sendEmail(
@@ -203,7 +232,7 @@ async function sendEmail(
 function resolveDatabase(config: AppAuthConfig): NonNullable<BetterAuthOptions['database']> {
   if (config.database) return config.database
   if (config.db && config.schema) {
-    return drizzleAdapter(config.db as Record<string, unknown>, {
+    return deferDrizzleAdapter(config.db as Record<string, unknown>, {
       provider: config.provider ?? 'sqlite',
       schema: {
         user: config.schema.users,
