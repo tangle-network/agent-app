@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest'
 import { memoryAdapter } from 'better-auth/adapters/memory'
 import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
+import { relations } from 'drizzle-orm'
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core'
 import {
   createAppAuth,
@@ -19,6 +20,7 @@ import {
   type AppAuthEmailClient,
 } from '../src/app-auth/index'
 import type { TangleSsoAccountStore, TangleSsoAuthClient } from '../src/platform/index'
+import { createDatabaseProvider } from '../src/store/index'
 
 const SECRET = 'app-auth-factory-contract-test-secret'
 
@@ -381,6 +383,12 @@ describe('createAppAuth: drizzle db/schema path', () => {
     createdAt: integer('created_at', { mode: 'timestamp' }),
     updatedAt: integer('updated_at', { mode: 'timestamp' }),
   })
+  const usersRelations = relations(users, ({ many }) => ({
+    sessions: many(sessions),
+  }))
+  const sessionsRelations = relations(sessions, ({ one }) => ({
+    user: one(users, { fields: [sessions.userId], references: [users.id] }),
+  }))
 
   function sqliteDb() {
     const sqlite = new Database(':memory:')
@@ -405,18 +413,34 @@ describe('createAppAuth: drizzle db/schema path', () => {
         expires_at INTEGER NOT NULL, created_at INTEGER, updated_at INTEGER
       );
     `)
-    return drizzle(sqlite)
+    return drizzle(sqlite, {
+      schema: { users, sessions, accounts, verifications, usersRelations, sessionsRelations },
+    })
   }
 
-  it('db + schema wire the drizzle adapter: sign-up round-trips through real tables', async () => {
-    const appAuth = createAppAuth({
-      appName: 'Legal Agent',
-      baseURL: 'http://localhost:3000',
-      secret: SECRET,
-      db: sqliteDb(),
-      schema: { users, sessions, accounts, verifications },
+  it('defers request-bound Drizzle initialization and preserves relational queries', async () => {
+    const provider = createDatabaseProvider<ReturnType<typeof sqliteDb>>({
+      notReadyMessage: 'D1 not initialized.',
     })
 
+    let appAuth!: AppAuth
+    expect(() => {
+      appAuth = createAppAuth({
+        appName: 'Legal Agent',
+        baseURL: 'http://localhost:3000',
+        secret: SECRET,
+        db: provider.db,
+        schema: { users, sessions, accounts, verifications },
+        sessionCookieCacheSeconds: false,
+        advanced: { database: { joins: true } },
+      })
+    }).not.toThrow()
+
+    expect(provider.isReady()).toBe(false)
+    await expect(appAuth.auth.$context).resolves.toMatchObject({ adapter: { id: 'drizzle' } })
+    expect(() => provider.db.select).toThrow('D1 not initialized.')
+
+    provider.setDatabase(sqliteDb())
     const res = await signUp(appAuth, 'http://localhost:3000', 'ada@example.com')
     expect(res.status).toBe(200)
     expect(res.headers.getSetCookie().some((c) => c.startsWith('legal-agent.session_token='))).toBe(true)
