@@ -2059,6 +2059,41 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     expect(createMock).toHaveBeenCalledOnce()
   })
 
+  it('passes a typed backing-container failure through without a string wrapper', async () => {
+    const error = Object.assign(new Error('Backing container is missing'), {
+      name: 'ServerError',
+      code: 'BACKING_CONTAINER_MISSING',
+      status: 500,
+      origin: 'sandbox-api',
+      endpoint: '/v1/sandboxes/sandbox-stale/resume',
+    })
+    const stopped = fakeBox({
+      id: 'sandbox-stale',
+      name: 'box-w1',
+      resume: vi.fn().mockRejectedValue(error),
+    })
+    const replacement = fakeBox({ id: 'sandbox-new', name: 'box-w1:recovered' })
+    const recoverStoppedSandbox = vi.fn(async () => ({
+      succeeded: true as const,
+      value: { replacementBoxKey: 'box-w1:recovered', restore: null },
+    }))
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      Promise.resolve(status === 'stopped' ? [stopped] : []),
+    )
+    createMock.mockResolvedValue(replacement)
+
+    const box = await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'u' }, {
+      recoverStoppedSandbox,
+    }), { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(box).toBe(replacement)
+    expect(recoverStoppedSandbox).toHaveBeenCalledWith(expect.objectContaining({
+      error,
+    }))
+    expect(stopped.delete).not.toHaveBeenCalled()
+    expect(createMock).toHaveBeenCalledOnce()
+  })
+
   it('lets product recovery choose deletion, restore, and a fresh create identity', async () => {
     const error = new Error('resume unavailable')
     const stopped = fakeBox({

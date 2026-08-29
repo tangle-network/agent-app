@@ -1169,7 +1169,8 @@ export class SandboxEgressPolicyMismatchError extends Error {
 
 import {
   isSandboxApiSandboxMissingFailure,
-  isSandboxBackingContainerMissingMessage,
+  isLegacySandboxBackingContainerMissingMessage,
+  SANDBOX_BACKING_CONTAINER_MISSING_CODE,
   isSandboxBoxConfigFailure,
   isSandboxHostCapacityFailure,
   serializeSandboxProvisioningError,
@@ -1184,6 +1185,7 @@ export {
   isSandboxAuthFailure,
   isSandboxApiBearerAuthFailure,
   isSandboxApiSandboxMissingFailure,
+  SANDBOX_BACKING_CONTAINER_MISSING_CODE,
   isSandboxHostCapacityFailure,
   type SafeSandboxErrorCause,
   type SafeSandboxErrorDiagnostics,
@@ -1937,13 +1939,15 @@ async function isReusableBox(
 // Resume a stopped box and wait for it to reach running.
 function stoppedBoxResumeError(box: SandboxInstance, cause: unknown): unknown {
   const error = cause instanceof Error ? cause : new Error(String(cause))
-  if (!isSandboxBackingContainerMissingMessage(error.message)) return cause
+  const code = (error as { code?: unknown }).code
+  if (code === SANDBOX_BACKING_CONTAINER_MISSING_CODE) return cause
+  if (code !== undefined && code !== 'SERVER_ERROR') return cause
+  if (!isLegacySandboxBackingContainerMissingMessage(error.message)) return cause
 
   const status = typeof cause === 'object' && cause !== null
     ? (cause as { status?: unknown }).status
     : undefined
   if (typeof status !== 'number' && typeof status !== 'string') return cause
-  const code = (error as { code?: unknown }).code
   const wrapped = new Error(error.message, { cause: error })
   wrapped.name = error.name
 

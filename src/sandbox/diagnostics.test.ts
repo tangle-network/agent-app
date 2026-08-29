@@ -4,6 +4,7 @@ import {
   formatSandboxProvisioningSupportDetails,
   isSandboxApiBearerAuthFailure,
   isSandboxApiSandboxMissingFailure,
+  SANDBOX_BACKING_CONTAINER_MISSING_CODE,
   isSandboxBoxConfigFailure,
   isSandboxAuthFailure,
   isSandboxHostCapacityFailure,
@@ -634,6 +635,18 @@ describe('sandbox missing failures', () => {
     'Failed to resume project: Failed to start container 0c44dc7e5f62: '
     + 'Host-agent startContainer failed (404): {"error":"Container not found","code":"NOT_FOUND"}'
 
+  it('recognises the typed backing-container code without parsing its message', () => {
+    const diagnostics = serializeSandboxProvisioningError(Object.assign(new Error('Failed to resume project'), {
+      name: 'ServerError',
+      code: SANDBOX_BACKING_CONTAINER_MISSING_CODE,
+      status: 500,
+      endpoint: '/v1/sandboxes/sandbox-stale/resume',
+      origin: 'sandbox-api',
+    }))
+
+    expect(isSandboxApiSandboxMissingFailure(diagnostics)).toBe(true)
+  })
+
   it('recognises a resume whose backing container is missing', () => {
     const diagnostics = serializeSandboxProvisioningError(Object.assign(new Error(missingContainerMessage), {
       name: 'ServerError',
@@ -651,6 +664,17 @@ describe('sandbox missing failures', () => {
       status: 500,
       endpoint: '/v1/sandboxes/sandbox-stale/resume',
       origin: 'vault',
+    }))
+
+    expect(isSandboxApiSandboxMissingFailure(diagnostics)).toBe(false)
+  })
+
+  it('does not let an unrelated typed failure use the legacy message fallback', () => {
+    const diagnostics = serializeSandboxProvisioningError(Object.assign(new Error(missingContainerMessage), {
+      code: 'CONTAINER_START_FAILED',
+      status: 500,
+      endpoint: '/v1/sandboxes/sandbox-stale/resume',
+      origin: 'sandbox-api',
     }))
 
     expect(isSandboxApiSandboxMissingFailure(diagnostics)).toBe(false)
