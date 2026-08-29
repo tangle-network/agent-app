@@ -131,7 +131,7 @@ Fail-fast kills in-flight work through the **process group** — steps run via `
 `--keep-going` runs everything and reports a step whose dependency failed as `blocked`: never as passed, never silently omitted.
 A failed install marks every step unjudged rather than reporting zero failures.
 
-### agent-app (`.github/workflows/ci.yml`)
+### agent-app (`.github/workflows/publish.yml`)
 
 Lives at the repo root as [`signoff.config.mjs`](../signoff.config.mjs).
 `NODE_OPTIONS` is config-level because `prepare` runs the build during install, before any step exists, and it pins the heap ceiling so the gate does not vary with host RAM.
@@ -261,11 +261,14 @@ Three sources, in order:
 3. the `node-version` of every workflow that triggers on `pull_request` — the pin CI itself runs on.
 
 **The third source exists because the first two were empty on the entire fleet, and that produced a measured false pass** (calibration 1 above).
-No `.nvmrc` exists in tax-agent, legal-agent or agent-app; all three pin `node-version: 22` in the workflow the gate replaces.
-Reading it is the difference between refusing legal-agent `4c0d688` and signing it off green.
+At measurement time, tax-agent, legal-agent, and agent-app had no `.nvmrc`.
+Each workflow pinned `node-version: 22`.
+Agent App now also has an `.nvmrc`, which the source check reads through `node-version-file`.
+Reading the workflow pin was the difference between refusing legal-agent `4c0d688` and signing it off green.
 
 Scope is deliberate: only `pull_request` workflows, because those are the merge gate.
-agent-app's `publish.yml` runs Node 24.18.0 for its release jobs and triggers on push; reading it would put the gate in permanent conflict with `ci.yml`'s Node 22.
+Agent App uses Node 22 for source checks and Node 24.18.0 only to pack and publish.
+The local gate reads `.nvmrc`, so it does not confuse the npm runtime with the source runtime.
 
 Nothing in that path guesses.
 A `${{ matrix.node }}` expression is not a version, a `node-version-file` that does not exist is an error rather than a shrug, `lts/*` is reported as no pin, and two merge-gate workflows on different majors is a refusal naming both files.

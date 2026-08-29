@@ -30,7 +30,7 @@ Attach the proof — the report block, or the one-line `signoff PASS <sha> …` 
 
 ## What a green run proves
 
-The same commands `.github/workflows/ci.yml` runs, in a clean `git worktree` with a `--frozen-lockfile` install into a pristine store:
+The same source checks `.github/workflows/publish.yml` runs, in a clean `git worktree` with a `--frozen-lockfile` install into a pristine store:
 
 | step | command |
 |---|---|
@@ -82,10 +82,13 @@ The gate holds no secrets, so every credentialed step is simply absent from the 
 - **The store cache is a speed lever, not a correctness one.** Correctness comes from `--frozen-lockfile` into a fresh `node_modules`; the cache only decides whether the bytes are already on disk.
 - **"Cold" is store-cold, not network-cold in the CI sense.** On a slower connection the cold column grows and the warm column does not.
 
-## What CI is now
+## What the post-merge workflow does
 
-`.github/workflows/ci.yml` no longer runs on `pull_request`. It runs on `main` and re-runs the same verification on a clean runner as a safety net. A failure opens (or appends to) an issue titled *Post-merge safety net is red on main*, naming the commit, the run, and the command that reproduces it locally.
+`.github/workflows/publish.yml` runs the source checks once on `main`.
+A failure updates the rolling *Post-merge safety net is red on main* issue.
+A passing run builds and uploads the exact release tarballs.
+The release tag starts a second, short path that verifies and publishes those same bytes.
+It does not install dependencies, rebuild, or repeat the source checks.
 
-`publish.yml` is untouched. It is the release path, it triggers on push, and it is not a merge gate.
-
-That workflow's step list and `signoff.config.mjs` are meant to stay identical. **Adding a step to one without the other makes the sign-off proof a weaker claim than it reads as** — if the workflow checks something the gate does not, a green sign-off no longer means what this document says it means.
+The source check list and `signoff.config.mjs` must stay identical.
+**Adding a check to one without the other makes the sign-off proof weaker than it reads.**

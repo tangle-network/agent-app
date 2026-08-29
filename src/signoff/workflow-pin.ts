@@ -11,19 +11,20 @@ import { join } from 'node:path'
  * time. The runtime was the whole difference, and the gate never saw it because
  * it looked for a pin in exactly two places the fleet does not keep one.
  *
- * None of tax-agent, legal-agent or agent-app has a `.nvmrc`. All three pin
- * `node-version: 22` in the workflow that IS the merge gate. So the pin the
- * gate is replacing was sitting in the file it is replacing, unread.
+ * At measurement time, none of tax-agent, legal-agent, or agent-app had an
+ * `.nvmrc`.
+ * All three pinned Node 22 in the merge workflow.
+ * Agent App now also pins Node 22 in `.nvmrc`.
  *
- * Scope is deliberate: only workflows that trigger on `pull_request`. Those are
- * the merge gate. agent-app's `publish.yml` runs Node 24.18.0 for its release
- * jobs and triggers on push, and reading it would put the gate in permanent
- * conflict with `ci.yml`'s Node 22.
+ * The workflow fallback reads only `pull_request` checks because those checks
+ * can block a merge.
+ * Agent App uses `.nvmrc` instead of this fallback.
+ * Its publish workflow uses Node 22 for source checks and Node 24 for npm.
  *
  * Nothing here guesses. An expression (`${{ matrix.node }}`) is not a version,
  * a `node-version-file` that does not exist is not a pin, and two merge-gate
- * workflows on different majors is a question this module cannot answer — each
- * one refuses and names the config key that settles it.
+ * workflows on different majors is a question this module cannot answer.
+ * Each one refuses and names the config key that settles it.
  */
 
 export interface WorkflowNodePin {

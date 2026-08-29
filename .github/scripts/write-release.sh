@@ -8,13 +8,18 @@ die() {
 }
 
 ACTION=${1:-release}
-[[ "$ACTION" == 'release' || "$ACTION" == 'validate' ]] || die 'Usage: write-release.sh [release|validate].'
+[[ "$ACTION" == 'release' || "$ACTION" == 'validate' || "$ACTION" == 'prepare' ]] ||
+  die 'Usage: write-release.sh [release|validate|prepare].'
 [[ "${BASE_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || die 'BASE_SHA must be a full commit SHA.'
 [[ "${VERSION:-}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || die 'VERSION must be a stable semantic version.'
 git rev-parse --git-dir >/dev/null 2>&1 || die 'A Git repository is required.'
 if [[ "$ACTION" == 'release' ]]; then
   [[ "${GITHUB_REPOSITORY:-}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || die 'GITHUB_REPOSITORY is invalid.'
   [[ -n "${GITHUB_TOKEN:-}" ]] || die 'GITHUB_TOKEN is required.'
+  [[ "${SOURCE_RUN_ID:-}" =~ ^[1-9][0-9]*$ ]] || die 'SOURCE_RUN_ID must be a positive integer.'
+  [[ "${SOURCE_ARTIFACT_ID:-}" =~ ^[1-9][0-9]*$ ]] || die 'SOURCE_ARTIFACT_ID must be a positive integer.'
+  [[ "${SOURCE_ARTIFACT_DIGEST:-}" =~ ^sha256:[0-9a-f]{64}$ ]] || die 'SOURCE_ARTIFACT_DIGEST must be a SHA-256 digest.'
+  [[ "${SOURCE_SHA:-}" == "$BASE_SHA" ]] || die 'SOURCE_SHA must match BASE_SHA.'
 fi
 
 TAG_REF="refs/tags/v$VERSION"
@@ -110,6 +115,25 @@ create_release() {
   die 'Atomic release push failed 3 times.'
 }
 
+prepare_release_manifests() {
+  local expected_tree
+  local -a changed
+
+  [[ $(git rev-parse HEAD) == "$BASE_SHA" ]] || die 'The checked-out commit does not match BASE_SHA.'
+  git diff --quiet HEAD -- || die 'The source tree has tracked changes before release preparation.'
+  expected_tree=$(build_expected_release_tree "$BASE_SHA")
+  git show "$expected_tree:package.json" > package.json
+  git show "$expected_tree:create-agent-app/package.json" > create-agent-app/package.json
+  mapfile -t changed < <(git diff --name-only HEAD -- | LC_ALL=C sort)
+  [[ ${#changed[@]} -eq 2 && "${changed[0]}" == 'create-agent-app/package.json' && "${changed[1]}" == 'package.json' ]] ||
+    die 'Release preparation changed files other than the two package manifests.'
+  [[ $(git hash-object package.json) == $(git rev-parse "$expected_tree:package.json") ]] ||
+    die 'Prepared Agent App manifest differs from the release tree.'
+  [[ $(git hash-object create-agent-app/package.json) == $(git rev-parse "$expected_tree:create-agent-app/package.json") ]] ||
+    die 'Prepared create-agent-app manifest differs from the release tree.'
+  echo "Prepared package manifests for v$VERSION."
+}
+
 dispatch_release() {
   local response status
   response="$WORK/dispatch-response"
@@ -119,13 +143,18 @@ dispatch_release() {
     --header "Authorization: Bearer $GITHUB_TOKEN" \
     --header 'X-GitHub-Api-Version: 2022-11-28' \
     "${GITHUB_API_URL:-https://api.github.com}/repos/$GITHUB_REPOSITORY/actions/workflows/publish.yml/dispatches" \
-    --data "{\"ref\":\"v$VERSION\"}")
+    --data "{\"ref\":\"v$VERSION\",\"inputs\":{\"source_run_id\":\"$SOURCE_RUN_ID\",\"source_artifact_id\":\"$SOURCE_ARTIFACT_ID\",\"source_artifact_digest\":\"$SOURCE_ARTIFACT_DIGEST\",\"source_sha\":\"$SOURCE_SHA\"}}")
   if [[ "$status" != 204 ]]; then
     cat "$response" >&2
     die "Release dispatch failed with HTTP $status."
   fi
   echo "Dispatched publish.yml at v$VERSION."
 }
+
+if [[ "$ACTION" == 'prepare' ]]; then
+  prepare_release_manifests
+  exit 0
+fi
 
 if [[ "$ACTION" == 'validate' ]]; then
   [[ "${RELEASE_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || die 'RELEASE_SHA must be a full commit SHA.'

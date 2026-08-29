@@ -1,11 +1,10 @@
 /**
- * agent-app's own sign-off gate — the local replacement for
- * `.github/workflows/ci.yml` as the merge gate.
+ * Agent App's local merge gate.
  *
- * Step names and commands mirror that workflow exactly, so a green run here
- * means the same thing a green CI run meant. Two things differ deliberately:
- * the suite runs twice under randomized file order with recorded seeds, and the
- * steps run as a graph instead of a line.
+ * Step names and commands mirror the source checks in
+ * `.github/workflows/publish.yml`.
+ * The suite also runs twice in randomized file order.
+ * The steps run as a graph instead of a line.
  *
  * `NODE_OPTIONS` is set at config level rather than per step because `prepare`
  * runs the build during install, before any step exists. It pins the heap so a
