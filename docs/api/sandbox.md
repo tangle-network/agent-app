@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-170 exports.
+171 exports.
 
 ### `adaptSandboxStream`
 
@@ -740,6 +740,14 @@ interface SafeSandboxErrorCause
 
 ```ts
 interface SafeSandboxErrorDiagnostics
+```
+
+### `SANDBOX_BACKING_CONTAINER_MISSING_CODE`
+
+`const` — Machine-readable code emitted when resume lost the physical box.
+
+```ts
+"BACKING_CONTAINER_MISSING"
 ```
 
 ### `SandboxBuildContext`

@@ -242,7 +242,14 @@ export function isSandboxApiBearerAuthFailure(diagnostics: SafeSandboxErrorDiagn
   })
 }
 
-export function isSandboxBackingContainerMissingMessage(message: string): boolean {
+/** Machine-readable code emitted when resume lost the physical box. */
+export const SANDBOX_BACKING_CONTAINER_MISSING_CODE = 'BACKING_CONTAINER_MISSING' as const
+
+/**
+ * Legacy fallback for Sandbox API releases that only returned the nested host
+ * 404 text. New callers must use `SANDBOX_BACKING_CONTAINER_MISSING_CODE`.
+ */
+export function isLegacySandboxBackingContainerMissingMessage(message: string): boolean {
   return /host-agent startcontainer failed \(404\):/i.test(message)
     && /container not found/i.test(message)
     && /"code"\s*:\s*"not_found"/i.test(message)
@@ -276,8 +283,14 @@ export function isSandboxApiSandboxMissingFailure(diagnostics: SafeSandboxErrorD
     if (status !== 500 || !/^\/v1\/sandboxes\/[^/?#]+\/resume(?:[?#].*)?$/.test(endpointPath)) {
       return false
     }
+    const code = typeof cause.code === 'string' ? cause.code.toUpperCase() : undefined
+    if (code === SANDBOX_BACKING_CONTAINER_MISSING_CODE) return true
+    // Older Sandbox API releases returned only the nested host 404. The SDK
+    // represented that response as SERVER_ERROR, so keep this exact fallback
+    // until those releases are no longer in service.
+    if (code !== undefined && code !== 'SERVER_ERROR') return false
     const message = typeof cause.message === 'string' ? cause.message : ''
-    return isSandboxBackingContainerMissingMessage(message)
+    return isLegacySandboxBackingContainerMissingMessage(message)
   })
 }
 

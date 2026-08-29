@@ -10554,6 +10554,12 @@
           "doc": null
         },
         {
+          "name": "SANDBOX_BACKING_CONTAINER_MISSING_CODE",
+          "kind": "const",
+          "signature": "\"BACKING_CONTAINER_MISSING\"",
+          "doc": "Machine-readable code emitted when resume lost the physical box."
+        },
+        {
           "name": "SandboxBuildContext",
           "kind": "interface",
           "signature": "interface SandboxBuildContext",

@@ -13631,6 +13631,14 @@ interface SafeSandboxErrorCause
 interface SafeSandboxErrorDiagnostics
 ```
 
+### `SANDBOX_BACKING_CONTAINER_MISSING_CODE`
+
+`const` — Machine-readable code emitted when resume lost the physical box.
+
+```ts
+"BACKING_CONTAINER_MISSING"
+```
+
 ### `SandboxBuildContext`
 
 `interface` — Define the context for building a sandbox including workspace, integrations, and optional user ID
