@@ -485,11 +485,11 @@ export interface SandboxRuntimeConfig {
     failure: StoppedSandboxResumeFailure,
   ) => Promise<Outcome<StoppedSandboxResumeRecovery | null>>
   /**
-   * Replace a sandbox that disappears after the platform lists it.
+   * Replace a sandbox resource or backing container that disappears after listing.
    *
-   * The shell calls this only for a sandbox API 404. It does not call this for
-   * a runtime 404 or another reuse failure. Return a fresh key to create a
-   * replacement without deleting the already-missing sandbox.
+   * The shell calls this for a sandbox resource 404 or an exact resume 500 that
+   * wraps a host-agent container 404. It excludes runtime 404 and unrelated
+   * reuse failures. Return a fresh key without deleting the stale sandbox record.
    */
   recoverMissingSandbox?: (
     failure: MissingSandboxFailure,
