@@ -1169,6 +1169,7 @@ export class SandboxEgressPolicyMismatchError extends Error {
 
 import {
   isSandboxApiSandboxMissingFailure,
+  isSandboxBackingContainerMissingMessage,
   isSandboxBoxConfigFailure,
   isSandboxHostCapacityFailure,
   serializeSandboxProvisioningError,
@@ -1934,6 +1935,22 @@ async function isReusableBox(
 }
 
 // Resume a stopped box and wait for it to reach running.
+function stoppedBoxResumeError(box: SandboxInstance, cause: unknown): unknown {
+  const error = cause instanceof Error ? cause : new Error(String(cause))
+  if (!isSandboxBackingContainerMissingMessage(error.message)) return cause
+
+  const status = typeof cause === 'object' && cause !== null
+    ? (cause as { status?: unknown }).status
+    : undefined
+  if (typeof status !== 'number' && typeof status !== 'string') return cause
+
+  return Object.assign(new Error(error.message, { cause: error }), {
+    status,
+    origin: 'sandbox-api',
+    endpoint: `/v1/sandboxes/${encodeURIComponent(box.id)}/resume`,
+  })
+}
+
 async function resumeStoppedBox(
   box: SandboxInstance,
   timeoutMs: number,
@@ -1944,8 +1961,8 @@ async function resumeStoppedBox(
     await box.resume({ timeoutMs })
     await box.waitFor('running', { timeoutMs, ...(onProgress ? { onProgress } : {}) })
     return ok(box)
-  } catch (err) {
-    return fail(err)
+  } catch (cause) {
+    return fail(stoppedBoxResumeError(box, cause))
   }
 }
 

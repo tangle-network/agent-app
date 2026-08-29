@@ -629,6 +629,64 @@ describe('sandbox host capacity failures', () => {
   })
 })
 
+describe('sandbox missing failures', () => {
+  const missingContainerMessage =
+    'Failed to resume project: Failed to start container 0c44dc7e5f62: '
+    + 'Host-agent startContainer failed (404): {"error":"Container not found","code":"NOT_FOUND"}'
+
+  it('recognises a resume whose backing container is missing', () => {
+    const diagnostics = serializeSandboxProvisioningError(Object.assign(new Error(missingContainerMessage), {
+      name: 'ServerError',
+      code: 'SERVER_ERROR',
+      status: 500,
+      endpoint: '/v1/sandboxes/sandbox-stale/resume',
+      origin: 'sandbox-api',
+    }))
+
+    expect(isSandboxApiSandboxMissingFailure(diagnostics)).toBe(true)
+  })
+
+  it('does not trust the same message outside a sandbox API resume', () => {
+    const diagnostics = serializeSandboxProvisioningError(Object.assign(new Error(missingContainerMessage), {
+      status: 500,
+      endpoint: '/v1/sandboxes/sandbox-stale/resume',
+      origin: 'vault',
+    }))
+
+    expect(isSandboxApiSandboxMissingFailure(diagnostics)).toBe(false)
+  })
+
+  it('does not trust the nested 404 on another sandbox API endpoint', () => {
+    const diagnostics = serializeSandboxProvisioningError(Object.assign(new Error(missingContainerMessage), {
+      status: 500,
+      endpoint: '/v1/sandboxes/sandbox-stale/egress',
+      origin: 'sandbox-api',
+    }))
+
+    expect(isSandboxApiSandboxMissingFailure(diagnostics)).toBe(false)
+  })
+
+  it('does not treat a runtime-sidecar 404 as a missing sandbox', () => {
+    const diagnostics = serializeSandboxProvisioningError(Object.assign(new Error('file not found'), {
+      status: 404,
+      endpoint: '/v1/sandboxes/sandbox-live/runtime/files/read',
+      origin: 'sandbox-api',
+    }))
+
+    expect(isSandboxApiSandboxMissingFailure(diagnostics)).toBe(false)
+  })
+
+  it('does not treat a generic resume 500 as a missing sandbox', () => {
+    const diagnostics = serializeSandboxProvisioningError(Object.assign(new Error('Failed to resume project'), {
+      status: 500,
+      endpoint: '/v1/sandboxes/sandbox-stale/resume',
+      origin: 'sandbox-api',
+    }))
+
+    expect(isSandboxApiSandboxMissingFailure(diagnostics)).toBe(false)
+  })
+})
+
 /**
  * The other shape the platform throws when a box cannot be brought up: the
  * resume succeeds, the sidecar never answers, the state-preserving restart does

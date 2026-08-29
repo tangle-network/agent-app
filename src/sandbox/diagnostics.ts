@@ -242,9 +242,15 @@ export function isSandboxApiBearerAuthFailure(diagnostics: SafeSandboxErrorDiagn
   })
 }
 
+export function isSandboxBackingContainerMissingMessage(message: string): boolean {
+  return /host-agent startcontainer failed \(404\):/i.test(message)
+    && /container not found/i.test(message)
+    && /"code"\s*:\s*"not_found"/i.test(message)
+}
+
 /**
- * True when the sandbox API answered 404 for a specific sandbox resource — the
- * box behind a persisted sandbox id no longer exists.
+ * True when the sandbox API cannot find a sandbox resource or its backing
+ * container. The latter arrives as a 500 from resume with a nested host 404.
  *
  * A sandbox id is a cache of where a workspace's box lives, not the workspace's
  * identity: the platform reaps, suspends, and loses boxes as ordinary lifecycle
@@ -259,12 +265,19 @@ export function isSandboxApiSandboxMissingFailure(diagnostics: SafeSandboxErrorD
       : typeof cause.status === 'string'
         ? Number.parseInt(cause.status, 10)
         : undefined
-    if (status !== 404) return false
     if (cause.origin !== 'sandbox-api') return false
     if (typeof cause.endpoint !== 'string') return false
     const endpointPath = sandboxApiEndpointPath(cause.endpoint)
     if (!endpointPath) return false
-    return /^\/v1\/sandboxes\/[^/?#]+(?:\/(?!runtime(?:[/?#]|$))[^?#]*)?(?:[?#].*)?$/.test(endpointPath)
+    const sandboxResource = /^\/v1\/sandboxes\/[^/?#]+(?:\/(?!runtime(?:[/?#]|$))[^?#]*)?(?:[?#].*)?$/.test(endpointPath)
+    if (!sandboxResource) return false
+    if (status === 404) return true
+
+    if (status !== 500 || !/^\/v1\/sandboxes\/[^/?#]+\/resume(?:[?#].*)?$/.test(endpointPath)) {
+      return false
+    }
+    const message = typeof cause.message === 'string' ? cause.message : ''
+    return isSandboxBackingContainerMissingMessage(message)
   })
 }
 
