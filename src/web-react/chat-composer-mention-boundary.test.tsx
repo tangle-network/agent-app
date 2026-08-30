@@ -8,30 +8,23 @@ interface LoadedEditorProps {
   onSubmit: () => void
 }
 
-// The mention editor's loader rejects on the FIRST load the way a consumer
-// without the `@tiptap/*` optional peers sees it (the bundler stub throws),
-// then resolves — the transient-failure shape Retry exists for. Own file:
+// This loader isolates hard failure and delayed success in one file.
 // `vi.mock` is module-wide, and every other composer test needs the real
 // editor.
 const loader = vi.hoisted(() => ({
-  calls: 0,
-  mode: 'reject-once' as 'reject-once' | 'deferred',
+  mode: 'reject' as 'reject' | 'deferred',
   resolve: null as null | ((value: { default: ComponentType<LoadedEditorProps> }) => void),
 }))
 vi.mock('./mention-editor', () => ({
   loadMentionEditor: () => {
-    loader.calls += 1
     if (loader.mode === 'deferred') {
       return new Promise<{ default: ComponentType<LoadedEditorProps> }>((resolve) => {
         loader.resolve = resolve
       })
     }
-    if (loader.calls === 1) {
-      return Promise.reject(new Error('needs the @tiptap/* optional peers'))
-    }
-    return Promise.resolve({
-      default: () => <div data-testid="mention-editor-loaded" />,
-    })
+    return Promise.reject(
+      new Error('Failed to fetch dynamically imported module: https://app.example/chunk.js'),
+    )
   },
 }))
 
@@ -39,34 +32,38 @@ import { ChatComposer } from './chat-composer'
 
 describe('ChatComposer — mention editor load failure', () => {
   beforeEach(() => {
-    loader.calls = 0
-    loader.mode = 'reject-once'
+    loader.mode = 'reject'
     loader.resolve = null
   })
 
-  it('contains a failed load, holds the draft visibly, gates Send, and Retry recovers', async () => {
+  it('keeps one basic input usable after the rich editor fails to load', async () => {
+    const onSend = vi.fn()
     render(
       <ChatComposer
-        onSend={() => {}}
+        onSend={onSend}
         initialValue="draft written before the failure"
         mention={{ fetchItems: async () => [] }}
       />,
     )
 
-    const alert = await screen.findByTestId('composer-mention-editor-error')
-    expect(alert.textContent).toContain('needs the @tiptap/* optional peers')
-    // The rest of the composer survives: the failure replaces the input, not
-    // the region. The draft stays visible read-only, and Send is gated — a
-    // message the user can no longer see or edit must not be dispatchable.
-    const heldDraft = screen.getByTestId('composer-error-held-draft')
-    expect(heldDraft.textContent).toBe('draft written before the failure')
-    expect((screen.getByLabelText('Send') as HTMLButtonElement).disabled).toBe(true)
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('Mentions are unavailable')
+    expect(alert.textContent).not.toContain('app.example')
+    expect(screen.queryByRole('button', { name: /retry loading mentions/i })).toBeNull()
 
-    fireEvent.click(screen.getByLabelText('Retry loading the mention input'))
-    expect(await screen.findByTestId('mention-editor-loaded')).toBeTruthy()
-    expect(screen.queryByTestId('composer-mention-editor-error')).toBeNull()
-    // The draft survived the failure and Send is live again.
-    expect((screen.getByLabelText('Send') as HTMLButtonElement).disabled).toBe(false)
+    const input = screen.getByLabelText('Message input') as HTMLTextAreaElement
+    expect(screen.getAllByRole('textbox', { name: 'Message input' })).toHaveLength(1)
+    expect(input.disabled).toBe(false)
+    expect(input.readOnly).toBe(false)
+    expect(input.value).toBe('draft written before the failure')
+    input.blur()
+    fireEvent.keyDown(document, { key: 'l', ctrlKey: true })
+    expect(document.activeElement).toBe(input)
+
+    fireEvent.change(input, { target: { value: 'send after failure' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onSend).toHaveBeenCalledExactlyOnceWith('send after failure')
+    expect(input.value).toBe('')
   })
 
   it('keeps the basic input usable and preserves its draft when the rich editor loads', async () => {

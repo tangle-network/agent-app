@@ -67,82 +67,40 @@ import type { ComposerMentionProp } from './use-file-mentions'
  * the editor stack into their bundle, and only when the mention path renders.
  * The `@tiptap/*` packages behind it are OPTIONAL peers reached only
  * through `loadMentionEditor`'s dynamic imports — a bundler replaces a missing
- * one with a runtime-throwing stub, so a consumer without them still builds
- * and fails loudly only if the editor actually loads (see mention-editor.tsx,
- * whose loader error names the complete install set).
- *
- * Built per retry rather than once at module scope: `lazy` caches a rejected
- * load forever, so recovering from a transient chunk-fetch failure needs a
- * fresh `lazy` identity (see `MentionEditorBoundary`).
+ * one with a runtime-throwing stub, so a consumer without them still builds.
  */
 function createLazyMentionEditor() {
   return lazy(() => import('./mention-editor').then((m) => m.loadMentionEditor()))
 }
 
 /**
- * Contains a mention-editor failure to the input area. A rejected lazy chunk
- * (most likely the named missing-`@tiptap/*` error from `loadTiptapModules`)
- * would otherwise unwind past the composer and unmount the host's whole
- * region. This is containment, not a silent fallback: the error renders as a
- * visible alert naming the cause where the input would be — a misconfigured
- * consumer cannot mistake it for a working composer. Retry re-imports through
- * a fresh `lazy` identity — it recovers a transient fetch failure (a deploy
- * that invalidated chunk hashes, a network blip), while a missing peer just
- * fails loudly again.
+ * Contains a mention-editor failure without removing the basic input.
  */
 class MentionEditorBoundary extends Component<
   {
-    onRetry: () => void
-    /** Reported once per failure so the composer can gate Send — a draft the
-     *  user can no longer see or edit must not stay dispatchable. */
-    onFailed: () => void
-    /** The current draft, shown read-only in the error state so its content
-     *  is never invisible while it exists. */
-    draft: string
+    fallback: ReactNode
     children: ReactNode
   },
-  { error: unknown | null }
+  { failed: boolean }
 > {
-  state: { error: unknown | null } = { error: null }
+  state = { failed: false }
 
-  static getDerivedStateFromError(error: unknown) {
-    return { error }
-  }
-
-  componentDidCatch() {
-    this.props.onFailed()
+  static getDerivedStateFromError() {
+    return { failed: true }
   }
 
   render() {
-    if (this.state.error === null) return this.props.children
-    const message =
-      this.state.error instanceof Error ? this.state.error.message : String(this.state.error)
+    if (!this.state.failed) return this.props.children
     return (
-      <div
-        role="alert"
-        data-testid="composer-mention-editor-error"
-        className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
-      >
-        <div className="flex items-start gap-2">
-          <span className="min-w-0 flex-1">The mention input failed to load: {message}</span>
-          <button
-            type="button"
-            aria-label="Retry loading the mention input"
-            onClick={this.props.onRetry}
-            className="shrink-0 font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
-          >
-            Retry
-          </button>
+      <>
+        {this.props.fallback}
+        <div
+          role="alert"
+          className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+        >
+          Mentions are unavailable. You can still send.
         </div>
-        {this.props.draft.trim() !== '' && (
-          <p
-            data-testid="composer-error-held-draft"
-            className="mt-1.5 max-h-20 overflow-y-auto whitespace-pre-wrap rounded-lg border border-destructive/30 bg-card px-2 py-1 text-foreground"
-          >
-            {this.props.draft}
-          </p>
-        )}
-      </div>
+      </>
     )
   }
 }
@@ -615,6 +573,7 @@ export function ChatComposer({
   const isControlled = value !== undefined
   const [internal, setInternal] = useState(initialValue ?? '')
   const text = isControlled ? value : internal
+  const MentionEditor = useMemo(createLazyMentionEditor, [])
   // A send outcome arrives after the render that dispatched it, so the restore
   // decision must read the LIVE draft, not the one captured in that closure.
   const textRef = useRef(text)
@@ -631,15 +590,6 @@ export function ChatComposer({
   const registerRichFocus = useCallback((focus: (() => void) | null) => {
     richFocusRef.current = focus
   }, [])
-  // Bumped by the boundary's Retry: a new epoch mints a fresh `lazy` identity
-  // (a rejected lazy caches its failure forever) and re-keys the boundary so
-  // its error state clears.
-  const [editorEpoch, setEditorEpoch] = useState(0)
-  const MentionEditor = useMemo(createLazyMentionEditor, [editorEpoch])
-  // While the mention editor is failed, the draft is visible only in the
-  // boundary's read-only block — Send must not dispatch what the user cannot
-  // edit.
-  const [editorFailed, setEditorFailed] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -784,8 +734,7 @@ export function ChatComposer({
   // shows Stop while streaming, so `canSubmitWhileBusy` opens Enter, not a
   // second visible control.
   const sendBlockedByStream = isStreaming && !canSubmitWhileBusy
-  const editorInputLost = mention != null && editorFailed
-  const canSend = hasSendable && !sendBlockedByStream && !disabled && !editorInputLost
+  const canSend = hasSendable && !sendBlockedByStream && !disabled
 
   const [failedSend, setFailedSend] = useState<FailedSend | null>(null)
 
@@ -844,7 +793,7 @@ export function ChatComposer({
 
   const send = useCallback(() => {
     const trimmed = text.trim()
-    if (sendBlockedByStream || disabled || editorInputLost) return
+    if (sendBlockedByStream || disabled) return
     const readyFiles = pendingFiles.filter((f) => f.status === 'ready')
     const sendable = canSubmitAttachmentsOnly ? pendingFiles : readyFiles
     if (!trimmed && sendable.length === 0) return
@@ -879,7 +828,6 @@ export function ChatComposer({
     text,
     sendBlockedByStream,
     disabled,
-    editorInputLost,
     canSubmitAttachmentsOnly,
     attachmentsNotReadyMessage,
     onSendParts,
@@ -1312,17 +1260,10 @@ export function ChatComposer({
         }`}
       >
         {mention ? (
-          // The editor arrives as a lazy chunk. The basic textarea stays usable
-          // through its download and initialization. The boundary contains a
-          // failed load instead of unmounting the host's region.
+          // The basic textarea stays usable through download, initialization,
+          // and failure.
           <MentionEditorBoundary
-            key={editorEpoch}
-            onRetry={() => {
-              setEditorFailed(false)
-              setEditorEpoch((epoch) => epoch + 1)
-            }}
-            onFailed={() => setEditorFailed(true)}
-            draft={text}
+            fallback={textareaInput}
           >
             <Suspense fallback={textareaInput}>
               <MentionEditor
