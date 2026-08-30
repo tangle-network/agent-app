@@ -78,6 +78,8 @@ export function StudioToastProvider({ children }: { children: ReactNode }): JSX.
   const sequence = useRef(0)
   const dismissed = useRef(new Set<string>())
   const records = useRef(new Map<string, ToastRecord>())
+  const removalTimers = useRef(new Set<number>())
+  const active = useRef(true)
 
   const leave = useCallback((id: string, reason: DismissReason) => {
     if (dismissed.current.has(id)) return
@@ -86,14 +88,17 @@ export function StudioToastProvider({ children }: { children: ReactNode }): JSX.
     dismissed.current.add(id)
     record.onDismiss?.(reason)
     setToasts((current) => current.map((toast) => toast.id === id ? { ...toast, leaving: true } : toast))
-    window.setTimeout(() => {
+    const timer = window.setTimeout(() => {
+      removalTimers.current.delete(timer)
       records.current.delete(id)
       setToasts((current) => current.filter((toast) => toast.id !== id))
     }, 180)
+    removalTimers.current.add(timer)
   }, [])
 
   const toast = useCallback((input: StudioToastInput) => {
     const id = `studio-toast-${++sequence.current}`
+    if (!active.current) return id
     const record: ToastRecord = { ...input, id, leaving: false }
     records.current.set(id, record)
     setToasts((current) => [...current, record])
@@ -104,7 +109,16 @@ export function StudioToastProvider({ children }: { children: ReactNode }): JSX.
   const value = useMemo(() => ({ toast, dismiss, setDockLift }), [dismiss, toast])
 
   // Match the server and first client render to avoid an SSR hydration mismatch (#465).
-  useEffect(() => setMounted(true), [])
+  useEffect(() => {
+    setMounted(true)
+    return () => {
+      active.current = false
+      for (const timer of removalTimers.current) window.clearTimeout(timer)
+      removalTimers.current.clear()
+      records.current.clear()
+      dismissed.current.clear()
+    }
+  }, [])
 
   return (
     <StudioToastContext.Provider value={value}>
