@@ -47,9 +47,9 @@ const PEERS_MISSING_MESSAGE =
 
 /** The rejection shapes bundlers produce for an UNINSTALLED module. Only
  *  these get enriched with the install-set message — a transient chunk-fetch
- *  failure must surface its own cause, or Retry sits next to a misleading
- *  "install the peers" diagnosis. An unmatched resolution error still fails
- *  loud with its raw message, so the classifier can only under-enrich. */
+ *  failure keeps its own cause so diagnostics do not mislabel it as a missing
+ *  dependency. An unmatched resolution error stays unchanged, so the
+ *  classifier can only under-enrich. */
 const RESOLUTION_FAILURE = /could not resolve|cannot find module|failed to resolve/i
 
 /** Resolve the optional peers, or throw naming every one of them. */
@@ -432,7 +432,7 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
       return () => clearTimeout(timer)
     }, [open, query])
 
-    // Programmatic `value` changes (queued-turn restore, retry refill)
+    // Programmatic `value` changes
     // re-parse into the document; `@<id>` runs come back as pills only for
     // ids already in `knownRef` at parse time. That conservatism is the
     // contract, not a gap: the serialized form cannot distinguish a PICKED
