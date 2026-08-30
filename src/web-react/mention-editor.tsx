@@ -20,7 +20,7 @@ import type * as TiptapExtensionMention from '@tiptap/extension-mention'
 import type * as TiptapReact from '@tiptap/react'
 import type * as TiptapStarterKit from '@tiptap/starter-kit'
 import type * as TiptapSuggestion from '@tiptap/suggestion'
-import { useEffect, useId, useRef, useState, type ComponentType } from 'react'
+import { useEffect, useId, useRef, useState, type ComponentType, type ReactNode } from 'react'
 
 import { PopoverSurface } from './controls'
 import { MENTION_PILL_CLASS } from './mention-pill'
@@ -101,6 +101,8 @@ export interface MentionEditorProps {
   /** Pixel height the input grows to before it scrolls. */
   maxHeight: number
   mention: ComposerMentionProp
+  /** Basic input shown during server rendering and editor initialization. */
+  fallback: ReactNode
   /** Registers a focus callback the composer wires to Cmd/Ctrl+L; called with
    *  `null` on unmount so the composer never focuses a destroyed editor. */
   registerFocus?: (focus: (() => void) | null) => void
@@ -239,6 +241,7 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
     minHeight,
     maxHeight,
     mention,
+    fallback,
     registerFocus,
     onPasteFiles,
   }: MentionEditorProps) {
@@ -484,6 +487,8 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
       // into a destroyed editor.
       return () => registerFocus(null)
     }, [editor, registerFocus])
+
+    if (!editor) return fallback
 
     return (
       <div className="relative">
