@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, fireEvent, render, screen } from '@testing-library/react'
+import { useEffect } from 'react'
 import { hydrateRoot, type Root } from 'react-dom/client'
 import { renderToString } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -12,8 +13,17 @@ function Harness() {
   return null
 }
 
+function DismissOnUnmount() {
+  const { dismiss, toast } = useStudioToast()
+  useEffect(() => {
+    const id = toast({ message: 'Ready', durationMs: 0 })
+    return () => dismiss(id)
+  }, [dismiss, toast])
+  return null
+}
+
 function mount() {
-  render(<StudioToastProvider><Harness /></StudioToastProvider>)
+  return render(<StudioToastProvider><Harness /></StudioToastProvider>)
 }
 
 function publish(input: StudioToastInput) {
@@ -48,6 +58,26 @@ describe('StudioToastProvider', () => {
     fireEvent.click(close)
     expect(onDismiss).toHaveBeenCalledOnce()
     expect(onDismiss).toHaveBeenCalledWith('dismissed')
+  })
+
+  it('cancels a pending removal when the provider unmounts', () => {
+    const { unmount } = mount()
+    publish({ message: 'Ready', durationMs: 0 })
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+
+    expect(vi.getTimerCount()).toBe(1)
+    unmount()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('does not schedule removal from a child unmount cleanup', () => {
+    const { unmount } = render(
+      <StudioToastProvider><DismissOnUnmount /></StudioToastProvider>,
+    )
+
+    expect(screen.getByRole('status')).toBeTruthy()
+    unmount()
+    expect(vi.getTimerCount()).toBe(0)
   })
 
   it('times out after the default 3500ms', () => {
