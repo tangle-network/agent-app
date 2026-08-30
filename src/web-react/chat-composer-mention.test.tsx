@@ -1,12 +1,18 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
+import { renderToString } from 'react-dom/server'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Editor } from '@tiptap/core'
 
 import { ChatComposer, type ChatComposerProps } from './chat-composer'
-import { buildComposerStarterKit, buildMentionExtension, loadTiptapModules } from './mention-editor'
+import {
+  buildComposerStarterKit,
+  buildMentionExtension,
+  loadMentionEditor,
+  loadTiptapModules,
+} from './mention-editor'
 import { serializeMentionDoc, type MentionDocNode } from './mention-serialize'
 import type { ComposerMentionProp, MentionItem } from './use-file-mentions'
 
@@ -48,6 +54,25 @@ async function renderMentionComposer(props: Partial<ChatComposerProps> = {}) {
 }
 
 describe('ChatComposer — mention path', () => {
+  it('renders an input while the server-side editor instance is unavailable', async () => {
+    const { default: MentionEditor } = await loadMentionEditor()
+    const html = renderToString(
+      <MentionEditor
+        value=""
+        onChange={() => {}}
+        onSubmit={() => {}}
+        placeholder="Write a message"
+        minHeight={56}
+        maxHeight={168}
+        mention={mentionProp()}
+        fallback={<textarea aria-label="Message input" />}
+      />,
+    )
+
+    expect(html).toContain('<textarea')
+    expect(html).toContain('aria-label="Message input"')
+  })
+
   it('lazily mounts the rich editor when the mention prop is set', async () => {
     const { editor } = await renderMentionComposer()
     expect(editor.getAttribute('aria-label')).toBe('Message input')

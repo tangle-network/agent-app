@@ -756,13 +756,10 @@ export function ChatComposer({
     function onKeyDown(e: globalThis.KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'l') {
         if (mentionEnabled) {
-          // No live editor yet (still loading, or failed): leave the
-          // browser's own shortcut alone rather than swallowing it for
-          // nothing.
           const focus = richFocusRef.current
-          if (!focus) return
           e.preventDefault()
-          focus()
+          if (focus) focus()
+          else textareaRef.current?.focus()
         } else {
           e.preventDefault()
           textareaRef.current?.focus()
@@ -1114,6 +1111,26 @@ export function ChatComposer({
   // One floor for both input modes, so the mention editor and the textarea
   // cannot disagree about the empty-composer height.
   const inputMinHeight = minRows * LINE_HEIGHT + TEXTAREA_PADDING_Y
+  // Keep one basic input for textarea mode and the rich editor's loading
+  // state. A slow or hung lazy chunk must not leave a visible dead composer.
+  // The controlled draft transfers into the rich editor when it loads.
+  // Both render sites stay inside the card's `focus-within:ring-2` indicator.
+  const textareaInput = (
+    <textarea
+      ref={textareaRef}
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onKeyDown={handleKeyDown}
+      onPaste={onAttach ? handlePaste : undefined}
+      placeholder={placeholder}
+      disabled={disabled}
+      autoFocus={autoFocus}
+      rows={minRows}
+      style={{ minHeight: inputMinHeight, maxHeight }}
+      aria-label="Message input"
+      className="w-full resize-none bg-transparent px-1.5 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
+    />
+  )
 
   return (
     <div
@@ -1295,11 +1312,9 @@ export function ChatComposer({
         }`}
       >
         {mention ? (
-          // The editor arrives as a lazy chunk; until it lands, a read-only
-          // textarea with the same metrics holds the layout so the card
-          // doesn't jump. The boundary contains a failed load (e.g. the
-          // missing-peer error) to the input area instead of unmounting the
-          // host's region.
+          // The editor arrives as a lazy chunk. The basic textarea stays usable
+          // through its download and initialization. The boundary contains a
+          // failed load instead of unmounting the host's region.
           <MentionEditorBoundary
             key={editorEpoch}
             onRetry={() => {
@@ -1309,20 +1324,7 @@ export function ChatComposer({
             onFailed={() => setEditorFailed(true)}
             draft={text}
           >
-            <Suspense
-              fallback={
-                <textarea
-                  rows={minRows}
-                  value={text}
-                  readOnly
-                  disabled
-                  placeholder={placeholder}
-                  aria-label="Message input"
-                  style={{ minHeight: inputMinHeight, maxHeight }}
-                  className="w-full resize-none bg-transparent px-1.5 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
-                />
-              }
-            >
+            <Suspense fallback={textareaInput}>
               <MentionEditor
                 value={text}
                 onChange={setText}
@@ -1333,39 +1335,16 @@ export function ChatComposer({
                 minHeight={inputMinHeight}
                 maxHeight={maxHeight}
                 mention={mention}
+                fallback={textareaInput}
                 registerFocus={registerRichFocus}
                 onPasteFiles={onAttach ? ingestPastedFiles : undefined}
               />
             </Suspense>
           </MentionEditorBoundary>
         ) : (
-          // Focus: `outline-none` is safe because the card above draws the
-          // keyboard indicator through `focus-within:` — one ring for
-          // whichever input mode is mounted.
-          <textarea
-            ref={textareaRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onPaste={onAttach ? handlePaste : undefined}
-            placeholder={placeholder}
-            disabled={disabled}
-            autoFocus={autoFocus}
-            // `minRows` lines before it grows. `rows` is what actually holds the
-            // floor: the autosize measures `scrollHeight` against `height: auto`,
-            // which a textarea resolves through `rows`, so the measurement cannot
-            // come back shorter. The paired `minHeight` is those same lines in CSS
-            // (`box-sizing: border-box` puts the padding inside it), computed from
-            // the same row count so the two cannot disagree. It sits exactly AT
-            // the natural height on purpose: a floor is meant to be inert until
-            // something tries to go under it, which here means an inline height
-            // arriving from anywhere but the autosize. Setting it higher would buy
-            // no protection and cost permanent dead space under the caret.
-            rows={minRows}
-            style={{ minHeight: inputMinHeight, maxHeight }}
-            aria-label="Message input"
-            className="w-full resize-none bg-transparent px-1.5 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-50"
-          />
+          // The card draws the keyboard indicator through `focus-within:`, so
+          // the input does not need a second outline.
+          textareaInput
         )}
 
         <div className="flex items-end gap-2">
