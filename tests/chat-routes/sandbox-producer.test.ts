@@ -248,6 +248,46 @@ describe('createSandboxChatProducer', () => {
     expect(parts[0]).toMatchObject({ type: 'tool', id: 'call-1', tool: 'search', state: { status: 'completed', output: '3 hits' } })
   })
 
+  it('reports a nonzero shell exit as failed while retaining stdout, stderr, and exit code', async () => {
+    const output = {
+      stdout: '',
+      stderr: 'ls: cannot access /home/agent/code/bdr-agent: No such file or directory\n',
+      exitCode: 2,
+    }
+    const producer = createSandboxChatProducer({
+      events: feed([
+        partUpdated({
+          type: 'tool',
+          id: 'call-bash',
+          tool: 'bash',
+          state: {
+            status: 'completed',
+            input: { command: 'ls -la /home/agent/code/bdr-agent' },
+            output,
+          },
+        }),
+      ]),
+    })
+
+    expect(await drain(producer.stream)).toEqual([
+      { type: 'tool_call', call: { toolCallId: 'call-bash', toolName: 'bash', args: { command: 'ls -la /home/agent/code/bdr-agent' } } },
+      {
+        type: 'tool_result',
+        toolCallId: 'call-bash',
+        toolName: 'bash',
+        outcome: { ok: false, result: output, message: output.stderr },
+      },
+    ])
+    expect(producer.assistantParts?.()).toEqual([
+      expect.objectContaining({
+        type: 'tool',
+        id: 'call-bash',
+        tool: 'bash',
+        state: { status: 'error', input: { command: 'ls -la /home/agent/code/bdr-agent' }, output, error: output.stderr },
+      }),
+    ])
+  })
+
   it('re-announces a tool once when its input arrives after the pending frame', async () => {
     const producer = createSandboxChatProducer({
       events: feed([

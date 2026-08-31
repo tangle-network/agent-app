@@ -9,6 +9,7 @@ import {
   MISSING_TOOL_TERMINAL_REASON,
   mergePersistedPart,
   normalizePersistedPart,
+  normalizeToolEvent,
   terminalizeDanglingAssistantToolUpdates,
   terminalizeDanglingToolPart,
   terminalizeDanglingToolParts,
@@ -91,6 +92,75 @@ describe('normalizePersistedPart', () => {
         status: 'error',
         input: { command: 'exit 1' },
         error: 'exit 1',
+      },
+    })
+  })
+
+  it('normalizes nonzero shell exits as errors without dropping command output', () => {
+    const output = {
+      stdout: '',
+      stderr: 'ls: cannot access /missing: No such file or directory\n',
+      exitCode: 2,
+    }
+    expect(normalizePersistedPart({
+      type: 'tool',
+      id: 'prt_shell',
+      tool: 'bash',
+      state: {
+        status: 'completed',
+        input: { command: 'ls -la /missing' },
+        output,
+      },
+    })).toMatchObject({
+      type: 'tool',
+      id: 'prt_shell',
+      tool: 'bash',
+      state: {
+        status: 'error',
+        input: { command: 'ls -la /missing' },
+        output,
+        error: output.stderr,
+      },
+    })
+
+    expect(normalizePersistedPart({
+      type: 'tool',
+      id: 'prt_open_code',
+      tool: 'bash',
+      state: { status: 'completed', output: { output: 'command failed', exit: 1 } },
+    })).toMatchObject({
+      state: { status: 'error', output: { output: 'command failed', exit: 1 }, error: 'Command exited with code 1.' },
+    })
+  })
+
+  it('keeps a zero shell exit successful even when stderr is non-empty', () => {
+    const output = { stdout: 'ok\n', stderr: 'warning\n', exitCode: 0 }
+    expect(normalizePersistedPart({
+      type: 'tool',
+      id: 'prt_shell_ok',
+      tool: 'bash',
+      state: { status: 'completed', output },
+    })).toMatchObject({ state: { status: 'completed', output, error: undefined } })
+  })
+})
+
+describe('normalizeToolEvent', () => {
+  it('normalizes a raw nonzero shell result as an error and preserves its result', () => {
+    const output = { stdout: '', stderr: 'command not found\n', exitCode: 127 }
+    expect(normalizeToolEvent({
+      type: 'tool_result',
+      data: { id: 'call_shell', name: 'bash', output },
+    })).toEqual({
+      type: 'message.part.updated',
+      data: {
+        part: {
+          type: 'tool',
+          id: 'call_shell',
+          tool: 'bash',
+          output,
+          error: output.stderr,
+          status: 'error',
+        },
       },
     })
   })
