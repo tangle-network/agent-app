@@ -289,6 +289,25 @@ describe('upsert_evidence — span citation', () => {
     expect((outcome as { code: string }).code).toBe('span_unsupported')
   })
 
+  it('refuses a find locator when the product wired no way to read sources', async () => {
+    const { dispatch } = harness({ readSourceText: undefined })
+    const outcome = await dispatch('upsert_evidence', {
+      scopeKey: SCOPE,
+      entries: [
+        {
+          id: 'ev_find',
+          sourceRef: 'vault/w2.pdf',
+          locator: { find: '128,450.00' },
+          target: 'line_1a',
+          claim: '128450.00',
+        },
+      ],
+    })
+    expect(outcome.ok).toBe(false)
+    expect((outcome as { code: string }).code).toBe('span_unsupported')
+    expect((outcome as { message: string }).message).toContain('entries[0].locator.find')
+  })
+
   it('discards a model-supplied quoteBasis — a model may not label its own quote verified', async () => {
     const { dispatch, store } = harness()
     const outcome = await dispatch('upsert_evidence', {
