@@ -42,6 +42,16 @@ function memoryMessageStore() {
       rows.push(row)
       return row
     },
+    async updateMessage(id, patch) {
+      const row = rows.find((candidate) => candidate.id === id)
+      if (row) Object.assign(row, patch)
+      return row ?? null
+    },
+    async deleteMessage(id) {
+      const index = rows.findIndex((candidate) => candidate.id === id)
+      if (index >= 0) rows.splice(index, 1)
+      return null
+    },
   }
   return { store, rows }
 }
@@ -138,6 +148,92 @@ describe('createChatTurnRoutes — turn', () => {
       costUsd: 0.01,
     })
     expect(rows[1]!.parts).toEqual([{ type: 'text', text: 'answer' }])
+  })
+
+  it('cancelOnDisconnect aborts the producer before persistence and billing', async () => {
+    const requestAbort = new AbortController()
+    let producerStarted!: () => void
+    let producerClosed = false
+    const completionStates: boolean[] = []
+    const started = new Promise<void>((resolve) => { producerStarted = resolve })
+    const { routes, rows, ctx, pending } = makeRoutes({
+      incrementalPersistence: { intervalMs: 1 },
+      produce: (args) => ({
+        stream: (async function* () {
+          try {
+            yield { type: 'text', text: 'partial' }
+            producerStarted()
+            await new Promise<void>((resolve) => {
+              args.request.signal.addEventListener('abort', () => resolve(), { once: true })
+            })
+          } finally {
+            producerClosed = true
+          }
+        })(),
+        finalText: () => 'partial',
+      }),
+      onTurnComplete: async ({ failed }) => { completionStates.push(failed) },
+    })
+    const response = await routes.turn(
+      new Request('http://app.test/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId: 't-cancel', content: 'stop' }),
+        signal: requestAbort.signal,
+      }),
+      { ...ctx, cancelOnDisconnect: true },
+    )
+    const reader = response.body!.getReader()
+    await reader.read() // turn marker
+    await reader.read() // session.run.started
+    await reader.read() // partial text
+    await started
+
+    requestAbort.abort()
+    await Promise.all(pending)
+    await reader.cancel()
+
+    expect(producerClosed).toBe(true)
+    expect(rows.filter((row) => row.role === 'assistant')).toHaveLength(0)
+    expect(completionStates).toEqual([])
+  })
+
+  it('keeps the durable browser drain when cancelOnDisconnect is omitted', async () => {
+    const requestAbort = new AbortController()
+    let releaseProducer!: () => void
+    let completed = 0
+    const producerReleased = new Promise<void>((resolve) => { releaseProducer = resolve })
+    const { routes, rows, ctx, pending } = makeRoutes({
+      produce: () => ({
+        stream: (async function* () {
+          yield { type: 'text', text: 'first' }
+          await producerReleased
+          yield { type: 'text', text: 'second' }
+        })(),
+        finalText: () => 'firstsecond',
+      }),
+      onTurnComplete: async () => { completed += 1 },
+    })
+    const response = await routes.turn(
+      new Request('http://app.test/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId: 't-browser', content: 'continue' }),
+        signal: requestAbort.signal,
+      }),
+      ctx,
+    )
+    const reader = response.body!.getReader()
+    await reader.read() // turn marker
+    await reader.read() // session.run.started
+    await reader.read() // first text
+    requestAbort.abort()
+    releaseProducer()
+    await Promise.all(pending)
+    await reader.cancel()
+
+    expect(rows.filter((row) => row.role === 'assistant')).toHaveLength(1)
+    expect(completed).toBe(1)
   })
 
   it('persists and reports requested-versus-served sandbox attribution', async () => {
