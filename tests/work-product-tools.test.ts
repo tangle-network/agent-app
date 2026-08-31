@@ -46,10 +46,41 @@ const EVIDENCE = (id: string, target: string, sourceRef = 'vault/w2.pdf') => ({
   claim: '$85,000',
 })
 
+type EvidenceToolParameters = {
+  properties: {
+    entries: {
+      items: {
+        properties: {
+          locator: {
+            properties: Record<string, unknown>
+            additionalProperties: boolean
+          }
+        }
+      }
+    }
+  }
+}
+
+function evidenceLocatorSchema(tools: ReturnType<typeof harness>['tools']): EvidenceToolParameters['properties']['entries']['items']['properties']['locator'] {
+  const tool = tools.find((candidate) => candidate.name === 'upsert_evidence')
+  if (!tool) throw new Error('upsert_evidence tool is not registered')
+  return (tool.parameters as EvidenceToolParameters).properties.entries.items.properties.locator
+}
+
 describe('work-product tools — the three-registry side channel', () => {
   it('advertises exactly upsert_evidence / flag_exception / submit_work_product', () => {
     const { tools } = harness()
     expect(tools.map((tool) => tool.name)).toEqual(['upsert_evidence', 'flag_exception', 'submit_work_product'])
+  })
+
+  it('advertises only locator fields supported by the configured source reader', () => {
+    const withoutReader = evidenceLocatorSchema(harness().tools)
+    expect(Object.keys(withoutReader.properties)).toEqual(['page', 'range', 'quote'])
+    expect(withoutReader.additionalProperties).toBe(false)
+
+    const withReader = evidenceLocatorSchema(harness({ readSourceText: async () => 'source' }).tools)
+    expect(Object.keys(withReader.properties)).toEqual(['page', 'range', 'find', 'findOccurrence', 'span', 'quote'])
+    expect(withReader.additionalProperties).toBe(false)
   })
 
   it('upsert_evidence creates the draft on first call and upserts by entry id', async () => {

@@ -644,11 +644,46 @@ export function buildWorkProductTools(config: WorkProductToolConfig): AppToolDef
     ...(config.now ? { now: config.now } : {}),
     ...(config.generateId ? { generateId: config.generateId } : {}),
   })
+  const canResolveTextLocators = config.readSourceText !== undefined
+  const locatorProperties = {
+    page: { type: 'number' },
+    range: { type: 'string', description: "Free-form location: 'L120-L134' | 'B7' | '¶4'." },
+    ...(canResolveTextLocators ? {
+      find: {
+        type: 'string',
+        description:
+          'PREFERRED — use this whenever the value was READ from a document. The value exactly as it appears in the source (for example "128,450.00"), or a short distinctive phrase from the supporting line. The platform LOCATES it, cites the whole line it sits on, and returns that line to you. You do not retype the quote and you do not compute character offsets — so the citation can neither be invented nor land on the wrong line. If the value is not in the document, the entry is refused.',
+      },
+      findOccurrence: {
+        type: 'integer',
+        minimum: 1,
+        description: 'Which occurrence of `find` to cite when the value appears more than once. Defaults to the first.',
+      },
+      span: {
+        type: 'object',
+        description:
+          'Only when you have exact character offsets from a tool that computed them. Absolute offsets into the whole document: start is the first character, end is one past the last. Prefer `find` — offsets computed by hand land on the wrong line.',
+        properties: {
+          start: { type: 'integer', minimum: 0 },
+          end: { type: 'integer', minimum: 1 },
+        },
+        required: ['start', 'end'],
+        additionalProperties: false,
+      },
+    } : {}),
+    quote: {
+      type: 'string',
+      description: canResolveTextLocators
+        ? 'Fallback for sources that cannot give you character offsets: the supporting text copied character-for-character. The platform checks it occurs in the document and REFUSES the entry if it does not. Prefer span. For a value you COMPUTED rather than read, omit both and state the computation in claim.'
+        : 'Supporting text copied character-for-character from the source. This deployment cannot locate values or resolve character spans. For a value you COMPUTED rather than read, omit the locator and state the computation in claim.',
+    },
+  }
 
   const upsertEvidence = defineAppTool({
     name: 'upsert_evidence',
-    description:
-      'Record source→field lineage for the current work product, incrementally as you find it. Each entry links a source document (sourceRef + locator) to one artifact target and states the claim it supports. Cite by locator.find — the value exactly as it appears in the document — and the platform locates it and writes the supporting quote for you. Re-emitting an entry id replaces that entry. Address the work product by scopeKey; the first call creates the draft.',
+    description: canResolveTextLocators
+      ? 'Record source→field lineage for the current work product, incrementally as you find it. Each entry links a source document (sourceRef + locator) to one artifact target and states the claim it supports. Cite by locator.find — the value exactly as it appears in the document — and the platform locates it and writes the supporting quote for you. Re-emitting an entry id replaces that entry. Address the work product by scopeKey; the first call creates the draft.'
+      : 'Record source→field lineage for the current work product, incrementally as you find it. Each entry links a source document (sourceRef + locator) to one artifact target and states the claim it supports. Cite with locator.quote when the source states the claim. This deployment cannot locate values or resolve character spans. Re-emitting an entry id replaces that entry. Address the work product by scopeKey; the first call creates the draft.',
     parameters: {
       type: 'object',
       properties: {
@@ -664,35 +699,8 @@ export function buildWorkProductTools(config: WorkProductToolConfig): AppToolDef
               sourceRef: { type: 'string', description: 'Vault path / attachment id of the SOURCE document.' },
               locator: {
                 type: 'object',
-                properties: {
-                  page: { type: 'number' },
-                  range: { type: 'string', description: "Free-form location: 'L120-L134' | 'B7' | '¶4'." },
-                  find: {
-                    type: 'string',
-                    description:
-                      'PREFERRED — use this whenever the value was READ from a document. The value exactly as it appears in the source (for example "128,450.00"), or a short distinctive phrase from the supporting line. The platform LOCATES it, cites the whole line it sits on, and returns that line to you. You do not retype the quote and you do not compute character offsets — so the citation can neither be invented nor land on the wrong line. If the value is not in the document, the entry is refused.',
-                  },
-                  findOccurrence: {
-                    type: 'integer',
-                    minimum: 1,
-                    description: 'Which occurrence of `find` to cite when the value appears more than once. Defaults to the first.',
-                  },
-                  span: {
-                    type: 'object',
-                    description:
-                      'Only when you have exact character offsets from a tool that computed them. Absolute offsets into the whole document: start is the first character, end is one past the last. Prefer `find` — offsets computed by hand land on the wrong line.',
-                    properties: {
-                      start: { type: 'integer', minimum: 0 },
-                      end: { type: 'integer', minimum: 1 },
-                    },
-                    required: ['start', 'end'],
-                  },
-                  quote: {
-                    type: 'string',
-                    description:
-                      'Fallback for sources that cannot give you character offsets: the supporting text copied character-for-character. The platform checks it occurs in the document and REFUSES the entry if it does not. Prefer span. For a value you COMPUTED rather than read, omit both and state the computation in claim.',
-                  },
-                },
+                properties: locatorProperties,
+                additionalProperties: false,
               },
               target: { type: 'string', description: 'Artifact field/claim this evidence supports.' },
               claim: { type: 'string', description: 'The value/assertion at the target.' },
