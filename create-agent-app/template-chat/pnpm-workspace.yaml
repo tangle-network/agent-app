@@ -10,6 +10,9 @@ minimumReleaseAgeIgnoreMissingTime: false
 minimumReleaseAgeExclude:
   - '@tangle-network/*'
 
+overrides:
+  zod: 4.4.3
+
 allowBuilds:
   '@ax-llm/ax': false
   better-sqlite3: true
