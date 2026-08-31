@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-193 exports.
+195 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -1476,6 +1476,22 @@ type StaleTurnLockSessionProbeResult
 
 ```ts
 (store: AssistantDraftStore) => boolean
+```
+
+### `streamChatRouteAsSandboxEvents`
+
+`function` — Drive the normal persisted chat route and expose its events to an agent-gateway sandbox adapter.
+
+```ts
+(options: StreamChatRouteAsSandboxOptions) => AsyncGenerator<SandboxStreamEvent, any, any>
+```
+
+### `StreamChatRouteAsSandboxOptions`
+
+`interface`
+
+```ts
+interface StreamChatRouteAsSandboxOptions
 ```
 
 ### `streamWithModelFailover`

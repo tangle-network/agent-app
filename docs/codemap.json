@@ -2243,6 +2243,18 @@
           "doc": "True when a store can support incremental persistence at all."
         },
         {
+          "name": "streamChatRouteAsSandboxEvents",
+          "kind": "function",
+          "signature": "(options: StreamChatRouteAsSandboxOptions) => AsyncGenerator<SandboxStreamEvent, any, any>",
+          "doc": "Drive the normal persisted chat route and expose its events to an agent-gateway sandbox adapter."
+        },
+        {
+          "name": "StreamChatRouteAsSandboxOptions",
+          "kind": "interface",
+          "signature": "interface StreamChatRouteAsSandboxOptions",
+          "doc": null
+        },
+        {
           "name": "streamWithModelFailover",
           "kind": "function",
           "signature": "(options: ModelFailoverStreamOptions) => ModelFailoverStreamHandle",

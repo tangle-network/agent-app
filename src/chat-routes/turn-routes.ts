@@ -562,7 +562,14 @@ export interface ChatTurnRoutes {
    *  `{type:'turn', turnId}` (the replay handle); the rest is the engine's
    *  event protocol. Pass the platform's `waitUntil` so the turn keeps
    *  running (and buffering) after a client disconnect. */
-  turn(request: Request, ctx?: { waitUntil?(p: Promise<unknown>): void }): Promise<Response>
+  turn(request: Request, ctx?: {
+    waitUntil?(p: Promise<unknown>): void
+    /**
+     * Abort this turn when the caller disconnects. Gateway adapters set this
+     * explicitly; browser callers omit it so the durable drain continues.
+     */
+    cancelOnDisconnect?: boolean
+  }): Promise<Response>
   /** GET — replay a buffered turn from `?fromSeq=` (0 = everything), then
    *  follow it live until it completes. */
   replay(request: Request, params: { turnId: string }): Promise<Response>
@@ -734,7 +741,10 @@ export function createChatTurnRoutes<TContext = void>(
       ? null
       : (options.incrementalPersistence ?? {})
 
-  async function turn(request: Request, ctx?: { waitUntil?(p: Promise<unknown>): void }): Promise<Response> {
+  async function turn(request: Request, ctx?: {
+    waitUntil?(p: Promise<unknown>): void
+    cancelOnDisconnect?: boolean
+  }): Promise<Response> {
     const [rawBody, badBody] = await parseJsonObjectBody(request)
     if (badBody) return badBody
 
@@ -1034,6 +1044,9 @@ export function createChatTurnRoutes<TContext = void>(
             stream: (async function* () {
               producer = await options.produce(produceArgs)
               let source: AsyncIterable<ChatRouteEvent> = producer.stream
+              if (ctx?.cancelOnDisconnect) {
+                source = abortOnSignal(source, request.signal)
+              }
               if (options.onRawEvent) {
                 source = tapRawEvents(source, (event) => options.onRawEvent!(event, context), log)
               }
@@ -1057,6 +1070,11 @@ export function createChatTurnRoutes<TContext = void>(
           },
           ...(options.transformFinalText ? { transformFinalText: options.transformFinalText } : {}),
           persistAssistantMessage: async ({ finalText }) => {
+            if (ctx?.cancelOnDisconnect && request.signal.aborted) {
+              await draft?.discard()
+              assistantMessageId = null
+              return
+            }
             // The typed boundary: stream-normalizer records → stored vocabulary
             // (validating projection owned by /chat-store — no cast here). The
             // scalar `finalText` arrives already transformed by the engine; the
@@ -1178,7 +1196,11 @@ export function createChatTurnRoutes<TContext = void>(
         // to close the writer, and an unawaited write would race the isolate's
         // teardown — leaving a torn row instead of a clean partial one for a
         // re-entered turn to adopt.
-        await draft?.close()
+        if (ctx?.cancelOnDisconnect && request.signal.aborted) {
+          await draft?.discard()
+        } else {
+          await draft?.close()
+        }
         try {
           await tap.done(failed ? 'error' : 'complete')
         } catch (err) {
@@ -1310,4 +1332,87 @@ function concatStreams(streams: ReadableStream<Uint8Array>[]): ReadableStream<Ui
       for (const stream of streams.slice(index)) await stream.cancel(reason)
     },
   })
+}
+
+/**
+ * Stop a producer pull as soon as an opted-in caller disconnects.
+ * `AsyncIterator.return()` alone cannot interrupt a pending `next()` call, so
+ * race each pull with the request signal and close the source in `finally`.
+ */
+async function* abortOnSignal<T>(
+  source: AsyncIterable<T>,
+  signal: AbortSignal,
+): AsyncGenerator<T, void, unknown> {
+  const iterator = source[Symbol.asyncIterator]()
+  try {
+    for (;;) {
+      const next = await nextWithAbort(iterator, signal)
+      if (next.done) return
+      yield next.value
+    }
+  } finally {
+    await closeIteratorAfterAbort(iterator)
+  }
+}
+
+function nextWithAbort<T>(
+  iterator: AsyncIterator<T>,
+  signal: AbortSignal,
+): Promise<IteratorResult<T>> {
+  if (signal.aborted) return Promise.reject(new Error('chat turn cancelled'))
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const cleanup = () => signal.removeEventListener('abort', onAbort)
+    const onAbort = () => {
+      if (settled) return
+      settled = true
+      cleanup()
+      reject(new Error('chat turn cancelled'))
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    if (signal.aborted) {
+      onAbort()
+      return
+    }
+    Promise.resolve()
+      .then(() => iterator.next())
+      .then(
+        (result) => {
+          if (settled) return
+          settled = true
+          cleanup()
+          resolve(result)
+        },
+        (error: unknown) => {
+          if (settled) return
+          settled = true
+          cleanup()
+          reject(error)
+        },
+      )
+  })
+}
+
+const ABORT_CLEANUP_TIMEOUT_MS = 50
+
+async function closeIteratorAfterAbort<T>(iterator: AsyncIterator<T>): Promise<void> {
+  let closing: PromiseLike<unknown> | undefined
+  try {
+    const result = iterator.return?.()
+    if (result) closing = Promise.resolve(result)
+  } catch {
+    return
+  }
+  if (!closing) return
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([
+      Promise.resolve(closing).catch(() => undefined),
+      new Promise<void>((resolve) => {
+        timeout = setTimeout(resolve, ABORT_CLEANUP_TIMEOUT_MS)
+      }),
+    ])
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout)
+  }
 }

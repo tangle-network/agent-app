@@ -2909,6 +2909,22 @@ type StaleTurnLockSessionProbeResult
 (store: AssistantDraftStore) => boolean
 ```
 
+### `streamChatRouteAsSandboxEvents`
+
+`function` — Drive the normal persisted chat route and expose its events to an agent-gateway sandbox adapter.
+
+```ts
+(options: StreamChatRouteAsSandboxOptions) => AsyncGenerator<SandboxStreamEvent, any, any>
+```
+
+### `StreamChatRouteAsSandboxOptions`
+
+`interface`
+
+```ts
+interface StreamChatRouteAsSandboxOptions
+```
+
 ### `streamWithModelFailover`
 
 `function` — Wrap `open` in reactive model failover, streaming from the first model in `models` that reaches its commit point.
