@@ -403,6 +403,7 @@ describe('the money guards — what the rescue must NOT do', () => {
       { waitUntil: (p: Promise<unknown>) => void pending.push(p) },
     )
     const wire = await new Response(res.body!).text()
+    const wireEvents = wire.trim().split('\n').map((line) => JSON.parse(line) as Record<string, unknown>)
     await Promise.all(pending)
 
     // The turn completed on the fallback.
@@ -414,15 +415,13 @@ describe('the money guards — what the rescue must NOT do', () => {
     expect(assistant?.inputTokens).toBe(1144)
     expect(assistant?.outputTokens).toBe(10)
     expect(receipt?.model).toBe('gemini-2.5-flash-lite')
-    expect(JSON.stringify(receipt)).not.toContain('9999')
-    expect(JSON.stringify(receipt)).not.toContain('8888')
-    expect(JSON.stringify(receipt)).not.toContain('0.42')
     // And the dead attempt's own events never reached the client either — not
     // its execution, not its tokens, not its cost.
     expect(wire).not.toContain('dead-exec')
-    expect(wire).not.toContain('9999')
-    expect(wire).not.toContain('8888')
-    expect(wire).not.toContain('0.42')
+    expect(wireEvents.filter((event) => event.type === 'usage').map((event) => event.usage)).toEqual([
+      { promptTokens: 1144, completionTokens: 10 },
+      { promptTokens: 1144, completionTokens: 10 },
+    ])
     // What DOES reach the client is the notice, and it carries the cause: the
     // edge 502 is named, so a downgrade is never mistaken for a normal turn.
     expect(wire).toContain('gemini-2.5-flash was unavailable')
