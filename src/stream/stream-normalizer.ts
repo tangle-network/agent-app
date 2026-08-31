@@ -66,6 +66,27 @@ export function normalizeTime(value: unknown): JsonRecord | undefined {
   }
 }
 
+// Sandbox uses `exitCode`; OpenCode's structured shell output uses `exit`.
+// Keep this explicit so stderr alone never turns a successful command into an error.
+const TOOL_EXIT_KEYS = ['exitCode', 'exit'] as const
+
+function toolExitCode(...values: unknown[]): number | undefined {
+  for (const value of values) {
+    const record = asRecord(value)
+    if (!record) continue
+    for (const key of TOOL_EXIT_KEYS) {
+      const exitCode = record[key]
+      if (typeof exitCode === 'number' && Number.isInteger(exitCode)) return exitCode
+    }
+  }
+  return undefined
+}
+
+function toolExitError(output: unknown, exitCode: number | undefined): string | undefined {
+  if (exitCode === undefined || exitCode === 0) return undefined
+  return asString(asRecord(output)?.stderr) ?? `Command exited with code ${exitCode}.`
+}
+
 /** Normalize tool-related events into a standardized message.part.updated format */
 export function normalizeToolEvent(event: StreamEvent): StreamEvent {
   if (event.type === 'tool_call' || event.type === 'tool.call') {
@@ -86,7 +107,14 @@ export function normalizeToolEvent(event: StreamEvent): StreamEvent {
 
   if (event.type === 'tool_result' || event.type === 'tool.result') {
     const data = event.data ?? {}
-    const error = asString(data.error)
+    const output = data.output
+    const exitCode = toolExitCode(output, data)
+    const error = asString(data.error) ?? toolExitError(output, exitCode)
+    const terminalError =
+      data.status === 'error' ||
+      data.status === 'failed' ||
+      Boolean(error) ||
+      (exitCode !== undefined && exitCode !== 0)
     return {
       type: 'message.part.updated',
       data: {
@@ -94,9 +122,9 @@ export function normalizeToolEvent(event: StreamEvent): StreamEvent {
           type: 'tool',
           id: data.id ?? data.callId ?? data.callID ?? data.name,
           tool: data.name ?? data.tool ?? 'tool',
-          output: data.output,
+          output,
           error,
-          status: error ? 'error' : 'completed',
+          status: terminalError ? 'error' : 'completed',
         },
       },
     }
@@ -194,18 +222,20 @@ export function normalizePersistedPart(rawPart: JsonRecord): JsonRecord | null {
   if (type === 'tool') {
     const state = asRecord(rawPart.state)
     const output = state?.output ?? rawPart.output
-    const error = asString(state?.error ?? rawPart.error)
+    const exitCode = toolExitCode(output, state, rawPart)
+    const error = asString(state?.error ?? rawPart.error) ?? toolExitError(output, exitCode)
     const terminalError =
       state?.status === 'error' ||
       state?.status === 'failed' ||
       rawPart.status === 'error' ||
       rawPart.status === 'failed' ||
-      Boolean(error)
+      Boolean(error) ||
+      (exitCode !== undefined && exitCode !== 0)
     const status =
-      state?.status === 'completed' || rawPart.status === 'completed'
-        ? 'completed'
-        : terminalError
-          ? 'error'
+      terminalError
+        ? 'error'
+        : state?.status === 'completed' || rawPart.status === 'completed'
+          ? 'completed'
           : output !== undefined
             ? 'completed'
             : 'running'
