@@ -420,6 +420,14 @@ export interface SandboxRuntimeConfig {
   provider?: ProviderResolutionConfig
 
   /**
+   * Portable directory where the sandbox starts its agent processes.
+   *
+   * The value is relative to the sandbox workspace. The sandbox platform
+   * validates it and applies it when the box is created.
+   */
+  cwd?: string
+
+  /**
    * Product-declared outbound network policy. Applied when a sandbox is
    * created. A reused or resumed sandbox is returned only when its explicit
    * policy already matches; existing mismatches are rejected without updating
@@ -2528,6 +2536,7 @@ async function provisionWorkspaceSandbox(
     ...(storage ? { storage } : {}),
     ...(restore ? restore : {}),
     ...(shell.egressPolicy ? { egressPolicy: shell.egressPolicy } : {}),
+    ...(shell.cwd !== undefined ? { cwd: shell.cwd } : {}),
     ...(shell.webTerminalEnabled ? { webTerminalEnabled: true } : {}),
     maxLifetimeSeconds: resources.maxLifetimeSeconds,
     idleTimeoutSeconds: resources.idleTimeoutSeconds,

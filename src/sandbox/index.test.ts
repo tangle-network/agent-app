@@ -358,6 +358,17 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     expect(createMock.mock.calls[0]![0].webTerminalEnabled).toBe(true)
   })
 
+  it('passes the product working directory to sandbox creation', async () => {
+    listMock.mockResolvedValue([])
+    createMock.mockResolvedValue(fakeBox())
+
+    await ensureWorkspaceSandbox(shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
+      cwd: 'vault',
+    }), { workspaceId: 'w1', harness: 'opencode' })
+
+    expect(createMock.mock.calls[0]![0].cwd).toBe('vault')
+  })
+
   it('declares the product egress policy on a newly created sandbox', async () => {
     listMock.mockResolvedValue([])
     createMock.mockResolvedValue(fakeBox())
