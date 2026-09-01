@@ -3,6 +3,7 @@ import { assetCreateJsonSchema } from './index'
 
 type JsonSchemaNode = {
   $id?: string
+  const?: string
   anyOf?: JsonSchemaNode[]
   required?: string[]
   properties?: Record<string, JsonSchemaNode>
