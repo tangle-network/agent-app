@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 import { AgentSessionControls } from './agent-session-controls'
 import type { CatalogModel } from '../runtime/model-catalog'
@@ -269,5 +269,74 @@ describe('AgentSessionControls locked harness', () => {
     fireEvent.click(trigger)
     fireEvent.click(screen.getByText('OpenCode (any model)'))
     expect(onHarnessChange).toHaveBeenCalledWith('opencode')
+  })
+})
+
+/**
+ * The trigger VARIANT threads to every child. `chip` (default) keeps the
+ * bordered pills every consumer renders today; `quiet` strips the border from
+ * the model, harness, AND effort triggers — a variant that reached two of the
+ * three would put a lone pill on a row of text buttons, the exact "pile of
+ * unrelated widgets" the shared geometry exists to prevent. Pinned per trigger
+ * and per layout, because the compact panel mounts its own instances.
+ */
+function modelTrigger(): HTMLElement {
+  const trigger = screen.getByText('Claude Opus 4.8').closest('button')
+  if (!trigger) throw new Error('model trigger did not render')
+  return trigger
+}
+
+const classesOf = (el: HTMLElement) => el.className.split(/\s+/).filter(Boolean)
+const borderClasses = (el: HTMLElement) => classesOf(el).filter((c) => /^border(-|$)/.test(c))
+
+describe('AgentSessionControls trigger variant', () => {
+  it('defaults every trigger to the bordered chip', () => {
+    renderControls()
+    for (const trigger of [modelTrigger(), harnessTrigger(), effortTrigger()]) {
+      expect(classesOf(trigger)).toContain('border')
+      expect(classesOf(trigger)).toContain('border-border')
+      expect(classesOf(trigger)).toContain('rounded-full')
+    }
+  })
+
+  it('quiet strips the border and pill radius from all three inline triggers', () => {
+    renderControls({ variant: 'quiet' })
+    for (const trigger of [modelTrigger(), harnessTrigger(), effortTrigger()]) {
+      expect(borderClasses(trigger)).toEqual([])
+      expect(classesOf(trigger)).not.toContain('rounded-full')
+      expect(classesOf(trigger)).not.toContain('bg-card')
+      expect(classesOf(trigger)).toContain('h-7')
+      expect(classesOf(trigger)).toContain('font-normal')
+    }
+  })
+
+  it('quiet reaches the compact panel controls and keeps them full width', () => {
+    renderControls({ layout: 'compact', variant: 'quiet' })
+    expect(borderClasses(modelTrigger())).toEqual([])
+    openGear()
+    for (const trigger of [harnessTrigger(), effortTrigger()]) {
+      expect(borderClasses(trigger)).toEqual([])
+      expect(classesOf(trigger)).toContain('w-full')
+    }
+  })
+
+  it('a pinned quiet harness draws no hover or open fill', () => {
+    renderControls({ variant: 'quiet', harnessLockReason: LOCK_REASON })
+    const classes = classesOf(harnessTrigger())
+    expect(classes).toContain('cursor-default')
+    expect(classes).not.toContain('hover:bg-accent')
+    expect(classes).not.toContain('data-[state=open]:bg-accent')
+    // and the unpinned one does
+    cleanup()
+    renderControls({ variant: 'quiet' })
+    expect(classesOf(harnessTrigger())).toContain('hover:bg-accent')
+  })
+
+  it('quiet changes the triggers only — the coherence policy still runs', () => {
+    const { onModelChange, onHarnessChange } = renderControls({ variant: 'quiet' })
+    fireEvent.click(harnessTrigger())
+    fireEvent.click(screen.getByText('Codex (OpenAI)'))
+    expect(onHarnessChange).toHaveBeenCalledWith('codex')
+    expect(onModelChange).toHaveBeenCalledWith('openai/gpt-5.2')
   })
 })

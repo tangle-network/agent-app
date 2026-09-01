@@ -88,6 +88,7 @@ export {
   type ModelPickerProps,
   type EffortPickerProps,
   type EffortLevel,
+  type PickerVariant,
   type PopoverSurfaceProps,
 } from './controls'
 export {

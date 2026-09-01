@@ -312,3 +312,99 @@ describe('EffortPicker width', () => {
     expect(screen.getByRole('menu').getAttribute('style')).not.toContain('min-width')
   })
 })
+
+/**
+ * The trigger VARIANT. `chip` is the shipped 36px bordered pill and the
+ * default, so a consumer that names no variant renders the trigger it rendered
+ * before the prop existed; `quiet` is the borderless 28px text button a
+ * composer whose card already draws the border opts into. jsdom paints
+ * nothing, so what is pinned is the class contract: the border, the card fill,
+ * and the pill radius are what the quiet trigger must NOT carry and the chip
+ * must — and the menu behind either trigger is the same menu.
+ */
+describe('picker trigger variant', () => {
+  const classesOf = (el: HTMLElement) => el.className.split(/\s+/).filter(Boolean)
+  const borderClasses = (el: HTMLElement) => classesOf(el).filter((c) => /^border(-|$)/.test(c))
+
+  function trigger(): HTMLElement {
+    return screen.getByRole('button', { expanded: false })
+  }
+
+  it('ModelPicker defaults to the bordered chip', () => {
+    render(<ModelPicker value="gpt-4" onChange={() => {}} models={[model('gpt-4', { name: 'GPT-4' })]} />)
+    const classes = classesOf(trigger())
+    expect(classes).toContain('border')
+    expect(classes).toContain('border-border')
+    expect(classes).toContain('bg-card')
+    expect(classes).toContain('rounded-full')
+    expect(classes).toContain('font-medium')
+  })
+
+  it('ModelPicker quiet draws no border, no card fill, no pill radius', () => {
+    render(<ModelPicker value="gpt-4" onChange={() => {}} models={[model('gpt-4', { name: 'GPT-4' })]} variant="quiet" />)
+    const classes = classesOf(trigger())
+    expect(borderClasses(trigger())).toEqual([])
+    expect(classes).not.toContain('bg-card')
+    expect(classes).not.toContain('rounded-full')
+    expect(classes).not.toContain('font-medium')
+    expect(classes).toContain('h-7')
+    expect(classes).toContain('rounded-md')
+    expect(classes).toContain('font-normal')
+    expect(classes).toContain('text-muted-foreground')
+    expect(classes).toContain('hover:bg-accent')
+  })
+
+  it('EffortPicker defaults to the bordered chip', () => {
+    render(<EffortPicker value="medium" onChange={() => {}} />)
+    const classes = classesOf(trigger())
+    expect(classes).toContain('border')
+    expect(classes).toContain('border-border')
+    expect(classes).toContain('bg-card')
+    expect(classes).toContain('rounded-full')
+    expect(classes).toContain('min-h-[36px]')
+  })
+
+  it('EffortPicker quiet draws no border, no card fill, no pill radius', () => {
+    render(<EffortPicker value="medium" onChange={() => {}} variant="quiet" />)
+    const classes = classesOf(trigger())
+    expect(borderClasses(trigger())).toEqual([])
+    expect(classes).not.toContain('bg-card')
+    expect(classes).not.toContain('rounded-full')
+    expect(classes).not.toContain('min-h-[36px]')
+    expect(classes).toContain('h-7')
+    expect(classes).toContain('font-normal')
+    expect(classes).toContain('text-muted-foreground')
+  })
+
+  it('quiet keeps the width switch the compact panel relies on', () => {
+    render(<EffortPicker value="medium" onChange={() => {}} variant="quiet" fullWidth />)
+    expect(classesOf(trigger())).toContain('w-full')
+  })
+
+  it('quiet answers keyboard focus with the same ring as the composer buttons', () => {
+    render(<EffortPicker value="medium" onChange={() => {}} variant="quiet" />)
+    const classes = classesOf(trigger())
+    expect(classes).toContain('focus-visible:ring-2')
+    expect(classes).toContain('focus-visible:ring-ring')
+  })
+
+  it('stamps the open state on the trigger so the quiet fill can read it', () => {
+    render(<EffortPicker value="medium" onChange={() => {}} variant="quiet" />)
+    const el = trigger()
+    expect(el.getAttribute('data-state')).toBe('closed')
+    expect(classesOf(el)).toContain('data-[state=open]:bg-accent')
+    fireEvent.click(el)
+    expect(el.getAttribute('data-state')).toBe('open')
+  })
+
+  it('opens the same menu behind a quiet trigger as behind a chip', () => {
+    const { unmount } = render(<EffortPicker value="medium" onChange={() => {}} />)
+    openPicker()
+    const chipRows = screen.getAllByRole('menuitemradio').map((r) => r.textContent)
+    unmount()
+
+    render(<EffortPicker value="medium" onChange={() => {}} variant="quiet" />)
+    openPicker()
+    expect(screen.getAllByRole('menuitemradio').map((r) => r.textContent)).toEqual(chipRows)
+  })
+})

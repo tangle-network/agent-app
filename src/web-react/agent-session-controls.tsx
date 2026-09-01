@@ -25,6 +25,11 @@
  *    backend ("harness") and reasoning-effort controls — internal jargon a user
  *    rarely needs — tuck behind a single gear popover with plain-English copy.
  *
+ * Two trigger treatments, also additive (`variant`, see `PickerVariant` in
+ * `./controls`): `chip` (default) is the bordered pill every child draws
+ * today; `quiet` is the borderless text button, for a composer whose card
+ * already draws the border. The variant reaches every child in both layouts.
+ *
  * Harness ↔ model coherence is identical in both layouts, via the substrate's
  * snap helpers (`@tangle-network/agent-app/harness`): changing the harness snaps
  * an incompatible model to that harness's best catalog option; changing the
@@ -44,8 +49,8 @@ import {
   type Harness,
 } from '../harness'
 import type { CatalogModel } from '../runtime/model-catalog'
-import { ModelPicker, EffortPicker, CheckGlyph, OVERLAY_SHADOW, pickerRootClass, PopoverSurface, usePopover } from './controls'
-import type { EffortLevel } from './controls'
+import { ModelPicker, EffortPicker, CheckGlyph, OVERLAY_SHADOW, pickerRootClass, PopoverSurface, quietPickerTriggerClass, usePopover } from './controls'
+import type { EffortLevel, PickerVariant } from './controls'
 import { HarnessGlyph } from './harness-glyphs'
 
 /** Plain-English labels for the harnesses a product is likely to expose. Unknown
@@ -110,7 +115,9 @@ const FOCUS_RING =
  * padding gives: this pill sits beside `ModelPicker` and `EffortPicker` in
  * both layouts, and both of those are 36px pills. A single odd-shaped control
  * is what made the compact popover read as a pile of unrelated widgets rather
- * than one selector stack.
+ * than one selector stack. The `quiet` variant holds the same rule the other
+ * way: its 28px text-button geometry comes from the one
+ * `quietPickerTriggerClass` the other two triggers use.
  *
  * `fullWidth` is opt-in and means what it means on `EffortPicker` — see
  * {@link pickerRootClass}.
@@ -136,12 +143,14 @@ function HarnessPicker({
   available,
   fullWidth = false,
   lockReason,
+  variant = 'chip',
 }: {
   value: Harness
   onChange: (h: Harness) => void
   available?: ReadonlyArray<Harness>
   fullWidth?: boolean
   lockReason?: string
+  variant?: PickerVariant
 }) {
   const [open, setOpen] = useState(false)
   const [hintOpen, setHintOpen] = useState(false)
@@ -169,12 +178,19 @@ function HarnessPicker({
         onFocus={locked ? showHint : undefined}
         onBlur={locked ? hideHint : undefined}
         title="Agent backend"
-        className={`inline-flex min-h-[36px] w-full items-center justify-between gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition ${
-          locked ? 'cursor-default' : 'hover:bg-accent'
-        } ${FOCUS_RING}`}
+        data-state={!locked && open ? 'open' : 'closed'}
+        className={
+          variant === 'quiet'
+            ? `${quietPickerTriggerClass({ interactive: !locked })} w-full justify-between`
+            : `inline-flex min-h-[36px] w-full items-center justify-between gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition ${
+                locked ? 'cursor-default' : 'hover:bg-accent'
+              } ${FOCUS_RING}`
+        }
       >
         <span className="flex min-w-0 items-center gap-1.5">
-          <HarnessGlyph harness={value} className="h-4 w-4 shrink-0 text-foreground" />
+          {/* Quiet inherits the trigger's tone, so the mark lifts with the
+              label on hover instead of staying at full foreground. */}
+          <HarnessGlyph harness={value} className={variant === 'quiet' ? 'h-4 w-4 shrink-0' : 'h-4 w-4 shrink-0 text-foreground'} />
           <span className="truncate">{harnessLabel(value)}</span>
         </span>
         {locked ? (
@@ -292,6 +308,11 @@ export interface AgentSessionControlsProps {
    * {@link useCoherentHandlers}.
    */
   harnessLockReason?: string
+  /**
+   * Trigger treatment for every child — `chip` (default) is the bordered pill,
+   * `quiet` the borderless text button. See `PickerVariant` in `./controls`.
+   */
+  variant?: PickerVariant
   renderProviderBadge?: (provider: string) => ReactNode
   className?: string
 }
@@ -340,6 +361,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
     layout = 'inline',
     showHarness = true,
     harnessLockReason,
+    variant = 'chip',
     renderProviderBadge,
     className,
   } = props
@@ -358,6 +380,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
       models={models}
       loading={modelsLoading}
       renderProviderBadge={renderProviderBadge}
+      variant={variant}
     />
   )
 
@@ -366,9 +389,15 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
       <div className={`flex items-center gap-1.5 ${className ?? ''}`}>
         {modelPicker}
         {showHarness && (
-          <HarnessPicker value={harness} onChange={onHarness} available={availableHarnesses} lockReason={harnessLockReason} />
+          <HarnessPicker
+            value={harness}
+            onChange={onHarness}
+            available={availableHarnesses}
+            lockReason={harnessLockReason}
+            variant={variant}
+          />
         )}
-        {showEffort && <EffortPicker value={effort} onChange={onEffortChange} levels={effortLevels} />}
+        {showEffort && <EffortPicker value={effort} onChange={onEffortChange} levels={effortLevels} variant={variant} />}
       </div>
     )
   }
@@ -407,6 +436,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
                     available={availableHarnesses}
                     fullWidth
                     lockReason={harnessLockReason}
+                    variant={variant}
                   />
                   <p className="text-xs leading-snug text-muted-foreground">
                     The engine that runs the agent. Switching it keeps your model choice compatible.
@@ -416,7 +446,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
               {showEffort && (
                 <div className="space-y-1.5">
                   <p className="text-xs font-medium text-foreground">Thinking</p>
-                  <EffortPicker value={effort} onChange={onEffortChange} levels={effortLevels} label="" fullWidth />
+                  <EffortPicker value={effort} onChange={onEffortChange} levels={effortLevels} label="" fullWidth variant={variant} />
                   <p className="text-xs leading-snug text-muted-foreground">
                     How hard the agent thinks before answering. Higher is slower but more thorough.
                   </p>

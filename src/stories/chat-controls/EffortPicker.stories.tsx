@@ -60,6 +60,21 @@ export const CustomLabels: Story = {
   },
 }
 
+/** `variant="quiet"`: the borderless text-button trigger, beside the default
+ *  chip for comparison. The meter inherits the muted tone and lifts on hover. */
+export const Quiet: Story = {
+  decorators: [withPopoverHeadroom],
+  render: () => {
+    const [effort, setEffort] = useState('medium')
+    return (
+      <div className="flex items-center gap-4">
+        <EffortPicker value={effort} onChange={setEffort} />
+        <EffortPicker value={effort} onChange={setEffort} variant="quiet" />
+      </div>
+    )
+  },
+}
+
 /** No prefix label — just the level name on the pill. */
 export const NoLabel: Story = {
   name: 'No label',

@@ -356,6 +356,50 @@ export function pickerRootClass(fullWidth: boolean): string {
 }
 
 /**
+ * How a picker's TRIGGER is drawn. The menu it opens is the same either way.
+ *
+ *  - `chip` (default): the 36px bordered pill — `rounded-full border
+ *    border-border bg-card font-medium`. A consumer that names no variant
+ *    renders exactly what it rendered before this prop existed.
+ *  - `quiet`: a 28px borderless text button — muted label, small glyph, a
+ *    surface fill on hover and while the menu is open, nothing else. For a
+ *    composer whose card already draws the border: three pills docked under
+ *    the input there read as three more cards, not as the input's controls.
+ */
+export type PickerVariant = 'chip' | 'quiet'
+
+/** The quiet trigger at rest: geometry, type, and keyboard focus. */
+const QUIET_PICKER_TRIGGER_BASE =
+  'inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-transparent px-2 text-sm font-normal text-muted-foreground transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+
+/** The fills a quiet trigger shows on hover and while its menu is open — the
+ *  only two states it draws. Reads `data-state`, which every picker trigger
+ *  in this family stamps. */
+const QUIET_PICKER_TRIGGER_INTERACTIVE =
+  'hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground'
+
+/**
+ * Trigger classes for a `quiet` picker. Height, padding, radius, and type are
+ * fixed here so the triggers on one composer row agree; a caller adds only
+ * width (`w-full`) and alignment (`justify-between`).
+ *
+ * The focus ring is drawn on the element rather than left to the tokens.css
+ * `:focus-visible` floor: a quiet trigger sits beside the composer's own action
+ * buttons (attach, dictate, send), which draw `focus-visible:ring-2
+ * focus-visible:ring-ring`, and a row whose controls answer keyboard focus two
+ * different ways reads as two families.
+ *
+ * `interactive: false` is for a PINNED control (see `HarnessPicker`'s
+ * `lockReason`): it keeps the resting treatment and draws no hover or open
+ * fill, because a fill promises a menu the control will not open.
+ */
+export function quietPickerTriggerClass({ interactive = true }: { interactive?: boolean } = {}): string {
+  return interactive
+    ? `${QUIET_PICKER_TRIGGER_BASE} ${QUIET_PICKER_TRIGGER_INTERACTIVE}`
+    : `${QUIET_PICKER_TRIGGER_BASE} cursor-default`
+}
+
+/**
  * Guard an async action against double-submit. `run` ignores re-entrant calls
  * while a promise is in flight and flips `pending` so the caller can disable
  * the control — the fix for double-charge / double-approve on a slow network.
@@ -412,6 +456,8 @@ export interface ModelPickerProps {
     label: string
     match: (model: CatalogModel) => boolean
   }
+  /** Trigger treatment — see {@link PickerVariant}. Default `chip`. */
+  variant?: PickerVariant
 }
 
 function formatPrice(p?: string): string | undefined {
@@ -483,7 +529,7 @@ function ModelRow({
  * legacy — deprecated, frozen, removed at sandbox-ui's next major; new code
  * belongs here.
  */
-export function ModelPicker({ value, onChange, models, loading, renderProviderBadge, recommendedLabel = 'Recommended', priorityGroup }: ModelPickerProps) {
+export function ModelPicker({ value, onChange, models, loading, renderProviderBadge, recommendedLabel = 'Recommended', priorityGroup, variant = 'chip' }: ModelPickerProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
@@ -535,7 +581,12 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
         {...triggerProps}
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen(!open)}
-        className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent"
+        data-state={open ? 'open' : 'closed'}
+        className={
+          variant === 'quiet'
+            ? quietPickerTriggerClass()
+            : 'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent'
+        }
       >
         {selected ? (renderProviderBadge ? renderProviderBadge(selected.provider) : <ProviderLogo provider={selected.provider} size={16} />) : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}
         <span className="max-w-[160px] truncate">{selected?.name ?? value}</span>
@@ -788,6 +839,8 @@ export interface EffortPickerProps {
   /** Fill the container instead of shrink-wrapping — opt-in, default `false`;
    *  see {@link pickerRootClass} for when and why. */
   fullWidth?: boolean
+  /** Trigger treatment — see {@link PickerVariant}. Default `chip`. */
+  variant?: PickerVariant
 }
 
 /** Thinking-budget selector pill, styled to match {@link ModelPicker}. Show
@@ -796,7 +849,7 @@ export interface EffortPickerProps {
  *
  *  The CANONICAL ecosystem effort picker — sandbox-ui's reasoning menu (inside
  *  its `chat/AgentSessionControls`) is legacy and frozen. */
-export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, label = 'Thinking', fullWidth = false }: EffortPickerProps) {
+export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, label = 'Thinking', fullWidth = false, variant = 'chip' }: EffortPickerProps) {
   const [open, setOpen] = useState(false)
   const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
   const panelId = useId()
@@ -817,7 +870,12 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen(!open)}
         title={label ? `${label} — how hard the agent reasons before answering` : 'Reasoning effort'}
-        className={`inline-flex min-h-[36px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent ${fullWidth ? 'w-full' : ''}`}
+        data-state={open ? 'open' : 'closed'}
+        className={`${
+          variant === 'quiet'
+            ? quietPickerTriggerClass()
+            : 'inline-flex min-h-[36px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent'
+        } ${fullWidth ? 'w-full' : ''}`}
       >
         <BrainGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         {/* Full width gives the label the slack, so the meter and chevron park
@@ -826,8 +884,13 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
           {label ? <span className="text-muted-foreground">{label}: </span> : null}
           {selected ? selected.label : '—'}
         </span>
+        {/* Quiet inherits the trigger's tone, so the meter is muted at rest
+            and lifts with the label on hover. */}
         {selected && isDeclared(selected.id) && (
-          <EffortMeter fill={effortMeterFill(selected.id, levels)} className="shrink-0 text-foreground" />
+          <EffortMeter
+            fill={effortMeterFill(selected.id, levels)}
+            className={variant === 'quiet' ? 'shrink-0' : 'shrink-0 text-foreground'}
+          />
         )}
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       </button>

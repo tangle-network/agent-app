@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-422 exports.
+423 exports.
 
 ### `acceptRejectionReason`
 
@@ -987,7 +987,7 @@ interface EffortLevel
 `function` — Thinking-budget selector pill, styled to match {@link ModelPicker}.
 
 ```ts
-({ value, onChange, levels, label, fullWidth }: EffortPickerProps) => Element
+({ value, onChange, levels, label, fullWidth, variant }: EffortPickerProps) => Element
 ```
 
 ### `EffortPickerProps`
@@ -1835,7 +1835,7 @@ interface MissionActivityLaneProps
 `function` — Searchable model picker pill + popover: a featured/recommended section first, then per-provider groups in catalogue order (the server already sorts providers by tier).
 
 ```ts
-({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup }: ModelPickerProps) => Eleme…
+({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup, variant }: ModelPickerProps)…
 ```
 
 ### `ModelPickerProps`
@@ -1972,6 +1972,14 @@ type ParseInteractionResult
 
 ```ts
 () => string | undefined
+```
+
+### `PickerVariant`
+
+`type` — How a picker's TRIGGER is drawn.
+
+```ts
+type PickerVariant
 ```
 
 ### `POPOVER_SURFACE_ATTR`

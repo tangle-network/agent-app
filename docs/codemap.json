@@ -17943,7 +17943,7 @@
         {
           "name": "EffortPicker",
           "kind": "function",
-          "signature": "({ value, onChange, levels, label, fullWidth }: EffortPickerProps) => Element",
+          "signature": "({ value, onChange, levels, label, fullWidth, variant }: EffortPickerProps) => Element",
           "doc": "Thinking-budget selector pill, styled to match {@link ModelPicker}."
         },
         {
@@ -18579,7 +18579,7 @@
         {
           "name": "ModelPicker",
           "kind": "function",
-          "signature": "({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup }: ModelPickerProps) => Eleme…",
+          "signature": "({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup, variant }: ModelPickerProps)…",
           "doc": "Searchable model picker pill + popover: a featured/recommended section first, then per-provider groups in catalogue order (the server already sorts providers by tier)."
         },
         {
@@ -18683,6 +18683,12 @@
           "kind": "function",
           "signature": "() => string | undefined",
           "doc": "The mime to ask the recorder for, or `undefined` to take the UA default."
+        },
+        {
+          "name": "PickerVariant",
+          "kind": "type",
+          "signature": "type PickerVariant",
+          "doc": "How a picker's TRIGGER is drawn."
         },
         {
           "name": "POPOVER_SURFACE_ATTR",
