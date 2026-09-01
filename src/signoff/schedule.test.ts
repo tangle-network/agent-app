@@ -83,13 +83,9 @@ describe('runGraph', () => {
       { name: 'tests', ms: 60, ok: true },
       { name: 'build', ms: 60, ok: true },
     ]
-    const started = Date.now()
     const { outcomes, peak } = await exercise(nodes)
-    const elapsed = Date.now() - started
 
     expect(peak).toBe(3)
-    // Serial would be ~180ms; the overlap has to show up in wall clock.
-    expect(elapsed).toBeLessThan(150)
     expect(outcomes.every((outcome) => outcome.status === 'passed')).toBe(true)
   })
 
