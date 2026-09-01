@@ -1,3 +1,9 @@
+import type {
+  FencedPrewarmClaimStore,
+  PrewarmClaimLease,
+  PrewarmClaimState,
+} from './prewarm'
+
 /**
  * `createD1PrewarmClaimStore` — the cross-isolate half of
  * `createSandboxPrewarmer`'s single-flight, implemented once.
@@ -26,6 +32,15 @@
  * winner. `RETURNING` is used rather than `meta.changes` because a no-op upsert
  * reporting `changes: 0` is a SQLite detail, whereas "no row came back" is the
  * statement telling you directly.
+ *
+ * Foreground provisioning uses `acquireLease`/`releaseLease`. The lease's
+ * returned `expiresAt` is a fencing value: takeover writes a value strictly
+ * greater than the expired value, and release changes only the matching value
+ * into a signed tombstone. A later acquire advances the absolute value, so a
+ * stale release cannot collide even after a same-clock release and reacquire.
+ * `inspect` hides the tombstone as `absent`. This uses the published two-column
+ * table without changing the legacy `PrewarmClaimStore` methods or requiring a
+ * migration.
  *
  * ── STRUCTURAL, NOT A DEPENDENCY ───────────────────────────────────────────
  * The binding is taken as the narrow shape actually used (`prepare().bind()`,
@@ -64,8 +79,9 @@ export interface D1PrewarmClaimStoreOptions {
 
 export const DEFAULT_PREWARM_CLAIM_TABLE = 'sandbox_prewarm_claims'
 
-/** Paste into a migration. `expires_at` is epoch MILLISECONDS, matching
- *  `Date.now()`, so no unit conversion sits between the lease and its clock. */
+/** Paste into a migration. Positive `expires_at` values are epoch MILLISECONDS,
+ * matching `Date.now()`. A released fenced claim keeps a negative tombstone so
+ * a later lease can advance its fencing value without adding a column. */
 export const PREWARM_CLAIM_TABLE_DDL = `CREATE TABLE IF NOT EXISTS ${DEFAULT_PREWARM_CLAIM_TABLE} (
   key TEXT PRIMARY KEY,
   expires_at INTEGER NOT NULL
@@ -74,7 +90,7 @@ export const PREWARM_CLAIM_TABLE_DDL = `CREATE TABLE IF NOT EXISTS ${DEFAULT_PRE
 const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/
 
 /**
- * A `PrewarmClaimStore` backed by one D1 table.
+ * A fenced `PrewarmClaimStore` backed by one D1 table.
  *
  * ```ts
  * const prewarmer = createSandboxPrewarmer(shell, {
@@ -86,7 +102,7 @@ const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/
 export function createD1PrewarmClaimStore(
   db: PrewarmClaimD1Like,
   options: D1PrewarmClaimStoreOptions = {},
-) {
+): FencedPrewarmClaimStore {
   const table = options.table ?? DEFAULT_PREWARM_CLAIM_TABLE
   // A table name cannot be bound, so it is interpolated — which makes it the
   // one injection surface here. Reject anything that is not a bare identifier
@@ -99,8 +115,26 @@ export function createD1PrewarmClaimStore(
   const acquireSql = `INSERT INTO ${table} (key, expires_at) VALUES (?1, ?2)
 ON CONFLICT(key) DO UPDATE SET expires_at = ?2 WHERE ${table}.expires_at <= ?3
 RETURNING key`
+  const acquireLeaseSql = `INSERT INTO ${table} (key, expires_at) VALUES (?1, ?2)
+ON CONFLICT(key) DO UPDATE SET expires_at = MAX(?2, ABS(${table}.expires_at) + 1)
+WHERE ${table}.expires_at <= ?3
+RETURNING key, expires_at`
   const releaseSql = `DELETE FROM ${table} WHERE key = ?1`
-  const isHeldSql = `SELECT 1 AS held FROM ${table} WHERE key = ?1 AND expires_at > ?2`
+  const releaseLeaseSql = `UPDATE ${table}
+SET expires_at = CASE WHEN expires_at = 0 THEN -1 ELSE -expires_at END
+WHERE key = ?1 AND expires_at = ?2`
+  const inspectSql = `SELECT expires_at FROM ${table} WHERE key = ?1`
+
+  async function inspect(key: string): Promise<PrewarmClaimState> {
+    const row = await db
+      .prepare(inspectSql)
+      .bind(key)
+      .first<{ expires_at: number }>()
+    if (!row || row.expires_at < 0) return { status: 'absent' }
+    return row.expires_at > now()
+      ? { status: 'held', expiresAt: row.expires_at }
+      : { status: 'expired', expiresAt: row.expires_at }
+  }
 
   return {
     async acquire(key: string, ttlSeconds: number): Promise<boolean> {
@@ -112,15 +146,31 @@ RETURNING key`
       return row != null
     },
 
+    async acquireLease(key: string, ttlSeconds: number): Promise<PrewarmClaimLease | null> {
+      const at = now()
+      const requestedExpiry = Math.max(1, at + ttlSeconds * 1000)
+      const row = await db
+        .prepare(acquireLeaseSql)
+        .bind(key, requestedExpiry, at)
+        .first<{ key: string; expires_at: number }>()
+      if (!row) return null
+      return Object.freeze({ key: row.key, expiresAt: row.expires_at })
+    },
+
     async release(key: string): Promise<void> {
       // Best effort by the `PrewarmClaimStore` contract: the prewarmer swallows
       // a throw here because the TTL is what actually guarantees release.
       await db.prepare(releaseSql).bind(key).run()
     },
 
-    async isHeld(key: string): Promise<boolean> {
-      const row = await db.prepare(isHeldSql).bind(key, now()).first<{ held: number }>()
-      return row != null
+    async releaseLease(lease: PrewarmClaimLease): Promise<void> {
+      await db.prepare(releaseLeaseSql).bind(lease.key, lease.expiresAt).run()
     },
+
+    async isHeld(key: string): Promise<boolean> {
+      return (await inspect(key)).status === 'held'
+    },
+
+    inspect,
   }
 }

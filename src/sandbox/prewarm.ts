@@ -112,6 +112,46 @@ export interface PrewarmClaimStore {
   isHeld?(key: string): Promise<boolean>
 }
 
+/**
+ * The ownership proof for one foreground provisioning attempt.
+ *
+ * `expiresAt` is both the lease deadline and its fencing value. The D1 store
+ * advances it when a takeover succeeds, so an expired owner cannot release a
+ * successor's lease. Keep this object and pass it back unchanged to
+ * `FencedPrewarmClaimStore.releaseLease`.
+ */
+export interface PrewarmClaimLease {
+  readonly key: string
+  readonly expiresAt: number
+}
+
+/** State needed by a foreground caller that waits for another isolate. */
+export type PrewarmClaimState =
+  | { status: 'held'; expiresAt: number }
+  | { status: 'expired'; expiresAt: number }
+  | { status: 'absent' }
+
+/** A claim store that can distinguish a completed owner from a crashed owner. */
+export interface InspectablePrewarmClaimStore extends PrewarmClaimStore {
+  isHeld(key: string): Promise<boolean>
+  inspect(key: string): Promise<PrewarmClaimState>
+}
+
+/**
+ * Fenced claim operations for foreground provisioning.
+ *
+ * This is separate from `PrewarmClaimStore` so the published boolean
+ * `acquire` and key-only `release` methods remain source-compatible. A
+ * foreground caller must use the lease returned here and release that lease,
+ * not the legacy key-only method.
+ */
+export interface FencedPrewarmClaimStore extends InspectablePrewarmClaimStore {
+  /** Atomically acquire a lease or return null when another live lease wins. */
+  acquireLease(key: string, ttlSeconds: number): Promise<PrewarmClaimLease | null>
+  /** Conditionally release only this lease. A stale lease is a no-op. */
+  releaseLease(lease: PrewarmClaimLease): Promise<void>
+}
+
 /** What `prewarm()` decided. Every value except `started` means no box was
  *  created and nothing was spent on this call. */
 export type PrewarmOutcome =
@@ -191,7 +231,9 @@ export interface SandboxPrewarmer {
 
 /** Identity of a warm. Harness is part of it because `ensureWorkspaceSandbox`
  *  destroys and rebuilds a box whose harness does not match. */
-function prewarmKey(scope: SandboxPrewarmScope): string {
+export function sandboxPrewarmClaimKey(
+  scope: Pick<SandboxPrewarmScope, 'workspaceId' | 'harness'>,
+): string {
   return `${scope.workspaceId}::${scope.harness}`
 }
 
@@ -274,7 +316,7 @@ export function createSandboxPrewarmer(
 
   return {
     async prewarm(scope: SandboxPrewarmScope): Promise<PrewarmDecision> {
-      const key = prewarmKey(scope)
+      const key = sandboxPrewarmClaimKey(scope)
 
       // Synchronous guards first — these run before any `await`, so two calls
       // in one isolate cannot both get past this point.
@@ -346,7 +388,7 @@ export function createSandboxPrewarmer(
     },
 
     async readiness(scope: SandboxPrewarmScope): Promise<SandboxReadiness> {
-      const key = prewarmKey(scope)
+      const key = sandboxPrewarmClaimKey(scope)
       // A running box outranks a recorded failure: the failure may be stale
       // (a later warm, or the lazy path, may have succeeded since).
       const peek = await peekWorkspaceSandbox(shell, {
@@ -377,7 +419,7 @@ export function createSandboxPrewarmer(
     },
 
     clearFailure(scope: SandboxPrewarmScope): void {
-      failures.delete(prewarmKey(scope))
+      failures.delete(sandboxPrewarmClaimKey(scope))
     },
   }
 }

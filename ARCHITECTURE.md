@@ -94,6 +94,7 @@ consumer of L0/L1 installs none of them): `konva`/`react-konva` → only
 | A bounded turn tool-loop or model/stream adapter | `runtime` |
 | Durable multi-step work (gates, budgets, schedules) | `missions` |
 | Per-turn sandbox streaming / question detection | `sandbox` |
+| Preventing two requests from provisioning the same workspace box | `sandbox` — `runForegroundSandboxSingleFlight` over an inspectable claim store |
 | Completion checks / produced-state / eval bridge | `eval` (+ peer `agent-eval`) |
 | Integration-hub `/exec` calls | `integrations` |
 | Per-workspace key mint/rotate/budget | `billing` |

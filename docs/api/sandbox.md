@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-171 exports.
+184 exports.
 
 ### `adaptSandboxStream`
 
@@ -136,10 +136,10 @@ interface BuildSandboxToolFileMountsOptions
 
 ### `createD1PrewarmClaimStore`
 
-`function` — A `PrewarmClaimStore` backed by one D1 table.
+`function` — A fenced `PrewarmClaimStore` backed by one D1 table.
 
 ```ts
-(db: PrewarmClaimD1Like, options?: D1PrewarmClaimStoreOptions) => { acquire(key: string, ttlSeconds: number): Promise<b…
+(db: PrewarmClaimD1Like, options?: D1PrewarmClaimStoreOptions) => FencedPrewarmClaimStore
 ```
 
 ### `createSandboxPrewarmer`
@@ -180,6 +180,22 @@ interface BuildSandboxToolFileMountsOptions
 
 ```ts
 interface D1PrewarmClaimStoreOptions
+```
+
+### `DEFAULT_FOREGROUND_PROVISION_CLAIM_TTL_SECONDS`
+
+`const`
+
+```ts
+180
+```
+
+### `DEFAULT_FOREGROUND_PROVISION_POLL_INTERVAL_MS`
+
+`const`
+
+```ts
+5000
 ```
 
 ### `DEFAULT_PREWARM_CLAIM_TABLE`
@@ -310,12 +326,36 @@ interface EnsureWorkspaceSandboxOptions
 120000
 ```
 
+### `FencedPrewarmClaimStore`
+
+`interface` — Fenced claim operations for foreground provisioning.
+
+```ts
+interface FencedPrewarmClaimStore
+```
+
 ### `flattenHistory`
 
 `function` — Build a single string combining conversation history and the current user message
 
 ```ts
 (message: string, history?: { role: "user" | "assistant"; content: string; }[] | undefined) => string
+```
+
+### `ForegroundSandboxSingleFlightEvent`
+
+`type`
+
+```ts
+type ForegroundSandboxSingleFlightEvent
+```
+
+### `ForegroundSandboxSingleFlightOptions`
+
+`interface`
+
+```ts
+interface ForegroundSandboxSingleFlightOptions
 ```
 
 ### `formatSandboxProvisioningSupportDetails`
@@ -340,6 +380,14 @@ interface EnsureWorkspaceSandboxOptions
 
 ```ts
 (shell: SandboxRuntimeConfig) => Sandbox
+```
+
+### `InspectablePrewarmClaimStore`
+
+`interface` — A claim store that can distinguish a completed owner from a crashed owner.
+
+```ts
+interface InspectablePrewarmClaimStore
 ```
 
 ### `isEgressProxyRecoveryRequiredError`
@@ -550,6 +598,22 @@ type PeekWorkspaceSandboxOutcome
 interface PrewarmClaimD1Like
 ```
 
+### `PrewarmClaimLease`
+
+`interface` — The ownership proof for one foreground provisioning attempt.
+
+```ts
+interface PrewarmClaimLease
+```
+
+### `PrewarmClaimState`
+
+`type` — State needed by a foreground caller that waits for another isolate.
+
+```ts
+type PrewarmClaimState
+```
+
 ### `PrewarmClaimStore`
 
 `interface` — Cross-isolate claim.
@@ -654,6 +718,14 @@ readonly ["pypi.org", "files.pythonhosted.org", "pypi.python.org"]
 (box: SandboxExecChannel, absolutePath: string, expectedSize: number, options?: SandboxExecOptions | undefined) => Prom…
 ```
 
+### `ReadyRunningSandboxOutcome`
+
+`type`
+
+```ts
+type ReadyRunningSandboxOutcome
+```
+
 ### `requireTransportableModel`
 
 `function` — Shared fail-loud policy for the sandbox platform's three internal model callers (`ensureWorkspaceSandbox`'s `backendModelAtCreate`, `streamSandboxPrompt`, `driveSandboxTurn`): a `ModelSelection` in,…
@@ -708,6 +780,14 @@ interface ResolvedModel
 
 ```ts
 interface ResolveSandboxClientCredentialsOptions
+```
+
+### `runForegroundSandboxSingleFlight`
+
+`function` — Run one foreground provision or adopt the ready result from its current owner.
+
+```ts
+<T>(options: ForegroundSandboxSingleFlightOptions<T>) => Promise<T>
 ```
 
 ### `runSandboxPrompt`
@@ -830,6 +910,14 @@ type SandboxFileBytesOutcome
 type SandboxFileSizeOutcome
 ```
 
+### `SandboxFilesystemNotReadyError`
+
+`class`
+
+```ts
+class SandboxFilesystemNotReadyError
+```
+
 ### `SandboxModelResolutionError`
 
 `class` — Thrown by {@link requireTransportableModel} when a model that was EXPLICITLY requested via a per-turn `{ model }` override cannot be transported to the sandbox platform.
@@ -844,6 +932,14 @@ class SandboxModelResolutionError
 
 ```ts
 type SandboxPermissionLevel
+```
+
+### `sandboxPrewarmClaimKey`
+
+`function` — Identity of a warm.
+
+```ts
+(scope: Pick<SandboxPrewarmScope, "workspaceId" | "harness">) => string
 ```
 
 ### `SandboxPrewarmer`
@@ -876,6 +972,14 @@ interface SandboxPrewarmScope
 
 ```ts
 interface SandboxProvisionedObservation
+```
+
+### `SandboxProvisioningFailedElsewhereError`
+
+`class`
+
+```ts
+class SandboxProvisioningFailedElsewhereError
 ```
 
 ### `SandboxReadiness`

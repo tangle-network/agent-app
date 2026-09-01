@@ -3344,3 +3344,4 @@ export * from './terminal-connection'
 export * from './prewarm'
 
 export * from './prewarm-claim-d1'
+export * from './foreground-single-flight'
