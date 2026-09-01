@@ -274,6 +274,8 @@ for (const [name, block] of [
   ['publish_agent_app', agentPublishJob],
   ['publish_create_agent_app', createPublishJob],
 ]) {
+  check(block.includes('always()'), `${name} inherits the skipped Node 22 tag check`)
+  check(block.includes("needs.package_release.result == 'success'"), `${name} can run after packaging fails`)
   check(block.includes("needs.package_release.outputs.mode == 'tag'"), `${name} can publish outside a tagged run`)
   check(block.includes('actions: read'), `${name} cannot download the source artifact`)
   check(block.includes('node-version: 24.18.0'), `${name} runtime is not exact`)
