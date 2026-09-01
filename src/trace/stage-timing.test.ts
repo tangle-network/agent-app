@@ -148,11 +148,25 @@ describe('stage timing', () => {
     await expect(result).rejects.toBe(failure)
   })
 
+  it('supports measure as a detached callback', async () => {
+    const emit = vi.fn()
+    const { measure } = createStageTiming({
+      context: { runId: 'run-detached' },
+      emit,
+      now: () => 10,
+    })
+
+    await expect(measure('turn.detached', {}, async () => 42)).resolves.toBe(42)
+    expect(emit).toHaveBeenCalledOnce()
+  })
+
   it('drops credential-shaped and unsupported detail values', () => {
     const detail = {
       safe: 'ok',
       header: 'Bearer do-not-leak',
       nested: { token: 'do-not-leak' },
+      email: 'person@example.com',
+      ssn: '000-00-0000',
       unsupported: BigInt(1),
     } as unknown as StageTimingRecord['detail']
     const record = buildStageTimingRecord(
@@ -166,6 +180,8 @@ describe('stage timing', () => {
     expect(record?.detail).toEqual({ safe: 'ok' })
     expect(JSON.stringify(record)).not.toContain('Bearer')
     expect(JSON.stringify(record)).not.toContain('do-not-leak')
+    expect(JSON.stringify(record)).not.toContain('person@example.com')
+    expect(JSON.stringify(record)).not.toContain('000-00-0000')
   })
 
   it('rejects runtime-invalid outcome and kind values', () => {

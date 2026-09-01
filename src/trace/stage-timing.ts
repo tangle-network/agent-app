@@ -76,7 +76,7 @@ const MAX_DETAIL_KEYS = 8
 const MAX_DETAIL_KEY_LENGTH = 64
 const MAX_DETAIL_STRING_LENGTH = 64
 const SENSITIVE_KEY =
-  /(?:api|auth|access|refresh|session|private|secret|password|credential|cookie|bearer|token)[_-]?(?:key|token|secret)?/iu
+  /(?:api|auth|access|refresh|session|private|secret|password|credential|cookie|bearer|token|ssn|ein|email|phone)[_-]?(?:key|token|secret)?/iu
 const CREDENTIAL_VALUE =
   /\b(?:bearer|basic|digest|token)\s+\S+|\bapi[-_ ]?key\s*[:=]\s*\S+/iu
 
@@ -320,6 +320,40 @@ export function createStageTiming(options: CreateStageTimingOptions): StageTimin
     }
   }
 
+  const start = (
+    stage: string,
+    input: StageTimingRecordInput = {},
+  ): StageTimingHandle => {
+    const observedStart = safeClock(now)
+    const startedAt = observedStart ?? 0
+    let emitted = false
+    const finish = (extra: StageTimingRecordInput = {}) => {
+      if (emitted) return
+      emitted = true
+      if (observedStart === undefined) return
+      const observedEnd = safeClock(now)
+      if (observedEnd === undefined) return
+      try {
+        emit(stage, observedStart, observedEnd - observedStart, mergeInputs(input, extra))
+      } catch {
+        // A timer must never change the measured operation.
+      }
+    }
+    return {
+      startedAt,
+      done: finish,
+      fail(error, extra = {}) {
+        let outcome: StageTimingOutcome = 'error'
+        try {
+          outcome = outcomeForError(error)
+        } catch {
+          // Keep the fallback error outcome when classification is hostile.
+        }
+        finish(withOutcome(extra, outcome))
+      },
+    }
+  }
+
   return {
     context,
     setContext(input) {
@@ -332,38 +366,9 @@ export function createStageTiming(options: CreateStageTimingOptions): StageTimin
     recordDuration(stage, startedAt, durationMs, input = {}) {
       emit(stage, startedAt, durationMs, input)
     },
-    start(stage, input = {}) {
-      const observedStart = safeClock(now)
-      const startedAt = observedStart ?? 0
-      let emitted = false
-      const finish = (extra: StageTimingRecordInput = {}) => {
-        if (emitted) return
-        emitted = true
-        if (observedStart === undefined) return
-        const observedEnd = safeClock(now)
-        if (observedEnd === undefined) return
-        try {
-          emit(stage, observedStart, observedEnd - observedStart, mergeInputs(input, extra))
-        } catch {
-          // A timer must never change the measured operation.
-        }
-      }
-      return {
-        startedAt,
-        done: finish,
-        fail(error, extra = {}) {
-          let outcome: StageTimingOutcome = 'error'
-          try {
-            outcome = outcomeForError(error)
-          } catch {
-            // Keep the fallback error outcome when classification is hostile.
-          }
-          finish(withOutcome(extra, outcome))
-        },
-      }
-    },
+    start,
     async measure(stage, input, operation) {
-      const handle = this.start(stage, input)
+      const handle = start(stage, input)
       try {
         const value = await operation()
         handle.done()
