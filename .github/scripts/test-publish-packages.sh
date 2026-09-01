@@ -113,9 +113,9 @@ fails 'not visible after 2 registry checks' run env REGISTRY_VERIFY_ATTEMPTS=2 R
 [[ $(grep -c '^publish|' "$TMP/npm.log") -eq 1 ]]
 
 reset
-run env CREATE_AGENT_APP_NPM_TOKEN=scaffold-token bash "$SCRIPT" publish create-agent-app "$CREATE_TGZ" >/dev/null
+run bash "$SCRIPT" publish create-agent-app "$CREATE_TGZ" >/dev/null
 [[ $(grep -c '^publish|' "$TMP/npm.log") -eq 1 ]]
-grep -Fq "publish|@tangle-network/create-agent-app@1.2.3|$CREATE_TGZ|scaffold-token||" "$TMP/npm.log"
+grep -Fq "publish|@tangle-network/create-agent-app@1.2.3|$CREATE_TGZ|||" "$TMP/npm.log"
 grep '^publish|' "$TMP/npm.log" | grep -Fq -- '--provenance'
 grep '^publish|' "$TMP/npm.log" | grep -Fq -- '--ignore-scripts'
 grep '^view|' "$TMP/npm.log" | grep -Eq '\|\|$'
@@ -124,13 +124,13 @@ reset
 sri "$ROOT_TGZ" > "$TMP/state/root.integrity"
 sri "$CREATE_TGZ" > "$TMP/state/create.integrity"
 run bash "$SCRIPT" publish agent-app "$ROOT_TGZ" > "$TMP/rerun.log"
-run env CREATE_AGENT_APP_NPM_TOKEN=scaffold-token bash "$SCRIPT" publish create-agent-app "$CREATE_TGZ" >> "$TMP/rerun.log"
+run bash "$SCRIPT" publish create-agent-app "$CREATE_TGZ" >> "$TMP/rerun.log"
 no_publish
 [[ $(grep -c 'already on registry; skipping publish' "$TMP/rerun.log") -eq 2 ]]
 
 reset
 sri "$ROOT_TGZ" > "$TMP/state/root.integrity"
-run env CREATE_AGENT_APP_NPM_TOKEN=scaffold-token bash "$SCRIPT" publish create-agent-app "$CREATE_TGZ" >/dev/null
+run bash "$SCRIPT" publish create-agent-app "$CREATE_TGZ" >/dev/null
 [[ $(grep -c '^publish|' "$TMP/npm.log") -eq 1 ]]
 grep -Fq 'publish|@tangle-network/create-agent-app@1.2.3' "$TMP/npm.log"
 
@@ -164,7 +164,7 @@ fails 'registry tarball mismatch' run bash "$SCRIPT" publish agent-app "$ROOT_TG
 no_publish
 
 reset
-fails 'CREATE_AGENT_APP_NPM_TOKEN is required' run bash "$SCRIPT" publish create-agent-app "$CREATE_TGZ"
+fails 'must not be exposed' run env CREATE_AGENT_APP_NPM_TOKEN=wrong-job bash "$SCRIPT" publish create-agent-app "$CREATE_TGZ"
 no_publish
 
 reset

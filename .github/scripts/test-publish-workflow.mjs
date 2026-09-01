@@ -269,8 +269,8 @@ check(!agentPublishJob.includes('secrets.') && !agentPublishJob.includes('CREATE
 check(!agentPublishJob.includes('registry-url:'), 'Agent App publisher receives token npm configuration')
 check(agentPublishJob.includes('publish agent-app agent-app.tgz') && !agentPublishJob.includes('create-agent-app.tgz'), 'Agent App publisher can publish the wrong tarball')
 check(createPublishJob.includes('id-token: write') && !createPublishJob.includes('contents: write'), 'create-agent-app publisher permissions are wrong')
-check(createPublishJob.includes('CREATE_AGENT_APP_NPM_TOKEN: ${{ secrets.CREATE_AGENT_APP_NPM_TOKEN }}'), 'create-agent-app publisher lacks its token')
-check(createPublishJob.includes('registry-url: https://registry.npmjs.org'), 'create-agent-app publisher lacks npm token configuration')
+check(!createPublishJob.includes('secrets.') && !createPublishJob.includes('CREATE_AGENT_APP_NPM_TOKEN'), 'create-agent-app publisher receives a long-lived secret')
+check(createPublishJob.includes('registry-url: https://registry.npmjs.org'), 'create-agent-app publisher lacks npm registry configuration')
 check(createPublishJob.includes('publish create-agent-app create-agent-app.tgz') && !createPublishJob.includes('publish agent-app '), 'create-agent-app publisher can publish the wrong tarball')
 
 for (const [name, block] of [['safety_net_issue', safetyIssueJob], ['safety_net_clear', safetyClearJob]]) {
