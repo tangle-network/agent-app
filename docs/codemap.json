@@ -16207,6 +16207,12 @@
           "doc": "Derive a span trace from timestamped turn events."
         },
         {
+          "name": "buildStageTimingRecord",
+          "kind": "function",
+          "signature": "(context: StageTimingContext, stage: string, startedAt: number, durationMs: number, input?: StageTimingRecordInput) =>…",
+          "doc": "Build one safe record, or return null when its required fields are invalid."
+        },
+        {
           "name": "childSpanContext",
           "kind": "function",
           "signature": "(parent: MissionTraceContext | StepSpanContext, seed?: string | undefined) => StepSpanContext",
@@ -16223,6 +16229,18 @@
           "kind": "function",
           "signature": "(missionId?: string | undefined) => MissionTraceContext",
           "doc": "Mint a mission's trace context."
+        },
+        {
+          "name": "createStageTiming",
+          "kind": "function",
+          "signature": "(options: CreateStageTimingOptions) => StageTiming",
+          "doc": "Create a stage timer with an injected carrier."
+        },
+        {
+          "name": "CreateStageTimingOptions",
+          "kind": "interface",
+          "signature": "interface CreateStageTimingOptions",
+          "doc": null
         },
         {
           "name": "delegationActivityToFlowSpans",
@@ -16283,6 +16301,66 @@
           "kind": "function",
           "signature": "(trace: FlowTrace, opts?: { width?: number | undefined; } | undefined) => string",
           "doc": "ASCII waterfall cascade — the default artifact for explaining a flow."
+        },
+        {
+          "name": "STAGE_TIMING_EVENT",
+          "kind": "const",
+          "signature": "\"stage_timing\"",
+          "doc": "Structured, bounded latency records for one request or agent turn."
+        },
+        {
+          "name": "STAGE_TIMING_VERSION",
+          "kind": "const",
+          "signature": "1",
+          "doc": null
+        },
+        {
+          "name": "StageTiming",
+          "kind": "interface",
+          "signature": "interface StageTiming",
+          "doc": null
+        },
+        {
+          "name": "StageTimingContext",
+          "kind": "interface",
+          "signature": "interface StageTimingContext",
+          "doc": null
+        },
+        {
+          "name": "StageTimingDetailValue",
+          "kind": "type",
+          "signature": "type StageTimingDetailValue",
+          "doc": null
+        },
+        {
+          "name": "StageTimingHandle",
+          "kind": "interface",
+          "signature": "interface StageTimingHandle",
+          "doc": null
+        },
+        {
+          "name": "StageTimingKind",
+          "kind": "type",
+          "signature": "type StageTimingKind",
+          "doc": null
+        },
+        {
+          "name": "StageTimingOutcome",
+          "kind": "type",
+          "signature": "type StageTimingOutcome",
+          "doc": null
+        },
+        {
+          "name": "StageTimingRecord",
+          "kind": "interface",
+          "signature": "interface StageTimingRecord",
+          "doc": null
+        },
+        {
+          "name": "StageTimingRecordInput",
+          "kind": "interface",
+          "signature": "interface StageTimingRecordInput",
+          "doc": null
         },
         {
           "name": "stepActivityFlowTrace",
