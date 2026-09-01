@@ -248,6 +248,35 @@ const ContentSchemaByFormat = {
   'copy:sms': CopyContentSchema,
 } as const
 
+// Model-facing create payload. Keep this union derived from the same schemas
+// as parseAssetSpec so prompt and tool authors cannot invent a second shape.
+const AssetCreatePayloadSchema = z.union([
+  z.object({ format: z.literal('email'), campaignId: z.string().optional(), brand: BrandTokensSchema, content: EmailContentSchema }),
+  z.object({ format: z.literal('image:feed'), campaignId: z.string().optional(), brand: BrandTokensSchema, content: ImageContentSchema }),
+  z.object({ format: z.literal('image:story'), campaignId: z.string().optional(), brand: BrandTokensSchema, content: ImageContentSchema }),
+  z.object({ format: z.literal('image:carousel'), campaignId: z.string().optional(), brand: BrandTokensSchema, content: ImageContentSchema }),
+  z.object({ format: z.literal('video:reel'), campaignId: z.string().optional(), brand: BrandTokensSchema, content: VideoContentSchema }),
+  z.object({ format: z.literal('video:feed'), campaignId: z.string().optional(), brand: BrandTokensSchema, content: VideoContentSchema }),
+  z.object({ format: z.literal('copy:caption'), campaignId: z.string().optional(), brand: BrandTokensSchema, content: CopyContentSchema }),
+  z.object({ format: z.literal('copy:headline'), campaignId: z.string().optional(), brand: BrandTokensSchema, content: CopyContentSchema }),
+  z.object({ format: z.literal('copy:sms'), campaignId: z.string().optional(), brand: BrandTokensSchema, content: CopyContentSchema }),
+])
+
+/**
+ * JSON Schema for the model-facing asset-create payload.
+ *
+ * `format`, `brand`, and `content` are required. `campaignId` is optional.
+ * The host assigns `id`, `workspaceId`, `status`, and timestamps before it
+ * calls {@link parseAssetSpec}; every content branch comes from its parser
+ * schema, so this is the one reference products should mount in prompts.
+ */
+export const assetCreateJsonSchema = {
+  ...z.toJSONSchema(AssetCreatePayloadSchema),
+  $id: 'https://tangle.tools/schemas/asset-create.json',
+  title: 'AssetCreate',
+  description: 'A model-produced marketing asset payload before host metadata is assigned.',
+} as const
+
 const AssetSpecBaseSchema = z.object({
   id: z.string(),
   workspaceId: z.string(),

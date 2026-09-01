@@ -161,6 +161,12 @@
           "doc": "Map asset keys to their corresponding content types for various media and copy formats"
         },
         {
+          "name": "assetCreateJsonSchema",
+          "kind": "const",
+          "signature": "{ readonly $id: \"https://tangle.tools/schemas/asset-create.json\"; readonly title: \"AssetCreate\"; readonly description:…",
+          "doc": "JSON Schema for the model-facing asset-create payload."
+        },
+        {
           "name": "AssetFormat",
           "kind": "type",
           "signature": "type AssetFormat",

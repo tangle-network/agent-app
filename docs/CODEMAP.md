@@ -8,7 +8,7 @@ _97 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 |---|---|---|
 | [`./alerting`](api/alerting.md) | 8 | — |
 | [`./app-auth`](api/app-auth.md) | 11 | `platform` |
-| [`./assets`](api/assets.md) | 43 | — |
+| [`./assets`](api/assets.md) | 44 | — |
 | [`./assistant`](api/assistant.md) | 56 | `runtime`, `web-react` |
 | [`./billing`](api/billing.md) | 19 | — |
 | [`./brand`](api/brand.md) | 5 | — |
@@ -126,9 +126,9 @@ Depends on: `platform`
 
 ## `./assets`
 
-Source: `src/assets/index.ts` · 43 exports
+Source: `src/assets/index.ts` · 44 exports
 
-`ApprovalEvent`, `ApprovalEventSchema`, `AssetContentMap`, `AssetFormat`, `AssetSpec`, `AssetStatus`, `AssetVariant`, `BrandTokens`, `BrandTokensSchema`, `ConversionMetrics`, `ConversionMetricsSchema`, `CopyContent`, `CopyContentSchema`, `CopyPlatform`, `EmailBodySection`, `EmailContent`, `EmailContentSchema`, `EmailCtaSection`, `EmailDividerSection`, `EmailFeatureSection`, `EmailHeroSection`, `EmailSection`, `EmailTestimonialSection`, `ImageBackground`, `ImageContent`, `ImageContentSchema`, `ImageImageLayer`, `ImageLayer`, `ImageLayerType`, `ImageLogoLayer`, `ImageShapeLayer`, `ImageSlide`, `ImageTextLayer`, `parseAssetSpec`, `safeParseAssetSpec`, `VideoCaption`, `VideoContent`, `VideoContentSchema`, `VideoCountdownScene`, `VideoImageRevealScene`, `VideoScene`, `VideoSlideScene`, `VideoTextAnimationScene`
+`ApprovalEvent`, `ApprovalEventSchema`, `AssetContentMap`, `assetCreateJsonSchema`, `AssetFormat`, `AssetSpec`, `AssetStatus`, `AssetVariant`, `BrandTokens`, `BrandTokensSchema`, `ConversionMetrics`, `ConversionMetricsSchema`, `CopyContent`, `CopyContentSchema`, `CopyPlatform`, `EmailBodySection`, `EmailContent`, `EmailContentSchema`, `EmailCtaSection`, `EmailDividerSection`, `EmailFeatureSection`, `EmailHeroSection`, `EmailSection`, `EmailTestimonialSection`, `ImageBackground`, `ImageContent`, `ImageContentSchema`, `ImageImageLayer`, `ImageLayer`, `ImageLayerType`, `ImageLogoLayer`, `ImageShapeLayer`, `ImageSlide`, `ImageTextLayer`, `parseAssetSpec`, `safeParseAssetSpec`, `VideoCaption`, `VideoContent`, `VideoContentSchema`, `VideoCountdownScene`, `VideoImageRevealScene`, `VideoScene`, `VideoSlideScene`, `VideoTextAnimationScene`
 
 [Full API →](api/assets.md)
 

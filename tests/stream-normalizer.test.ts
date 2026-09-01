@@ -127,9 +127,13 @@ describe('normalizePersistedPart', () => {
       type: 'tool',
       id: 'prt_open_code',
       tool: 'bash',
-      state: { status: 'completed', output: { output: 'command failed', exit: 1 } },
+      state: {
+        status: 'completed',
+        output: 'command failed',
+        metadata: { output: 'command failed', exit: 1, truncated: false },
+      },
     })).toMatchObject({
-      state: { status: 'error', output: { output: 'command failed', exit: 1 }, error: 'Command exited with code 1.' },
+      state: { status: 'error', output: 'command failed', error: 'Command exited with code 1.' },
     })
   })
 
@@ -159,6 +163,33 @@ describe('normalizeToolEvent', () => {
           tool: 'bash',
           output,
           error: output.stderr,
+          status: 'error',
+        },
+      },
+    })
+  })
+
+  it('surfaces a nonzero exit from nested tool state metadata', () => {
+    expect(normalizeToolEvent({
+      type: 'tool_result',
+      data: {
+        id: 'call_open_code',
+        name: 'bash',
+        output: 'command failed',
+        state: {
+          status: 'completed',
+          metadata: { output: 'command failed', exit: 1, truncated: false },
+        },
+      },
+    })).toMatchObject({
+      type: 'message.part.updated',
+      data: {
+        part: {
+          type: 'tool',
+          id: 'call_open_code',
+          tool: 'bash',
+          output: 'command failed',
+          error: 'Command exited with code 1.',
           status: 'error',
         },
       },

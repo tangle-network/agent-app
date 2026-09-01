@@ -4,7 +4,7 @@
 
 Source: `src/assets/index.ts`
 
-43 exports.
+44 exports.
 
 ### `ApprovalEvent`
 
@@ -28,6 +28,14 @@ ZodObject<{ assetId: ZodString; variantId: ZodOptional<ZodString>; action: ZodEn
 
 ```ts
 type AssetContentMap
+```
+
+### `assetCreateJsonSchema`
+
+`const` — JSON Schema for the model-facing asset-create payload.
+
+```ts
+{ readonly $id: "https://tangle.tools/schemas/asset-create.json"; readonly title: "AssetCreate"; readonly description:…
 ```
 
 ### `AssetFormat`
