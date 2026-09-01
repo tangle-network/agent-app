@@ -35,9 +35,12 @@ import type {
  *
  * Foreground provisioning uses `acquireLease`/`releaseLease`. The lease's
  * returned `expiresAt` is a fencing value: takeover writes a value strictly
- * greater than the expired value, and release deletes only the matching value.
- * This uses the published two-column table without changing the legacy
- * `PrewarmClaimStore` methods or requiring a migration.
+ * greater than the expired value, and release changes only the matching value
+ * into a signed tombstone. A later acquire advances the absolute value, so a
+ * stale release cannot collide even after a same-clock release and reacquire.
+ * `inspect` hides the tombstone as `absent`. This uses the published two-column
+ * table without changing the legacy `PrewarmClaimStore` methods or requiring a
+ * migration.
  *
  * ── STRUCTURAL, NOT A DEPENDENCY ───────────────────────────────────────────
  * The binding is taken as the narrow shape actually used (`prepare().bind()`,
@@ -76,8 +79,9 @@ export interface D1PrewarmClaimStoreOptions {
 
 export const DEFAULT_PREWARM_CLAIM_TABLE = 'sandbox_prewarm_claims'
 
-/** Paste into a migration. `expires_at` is epoch MILLISECONDS, matching
- *  `Date.now()`, so no unit conversion sits between the lease and its clock. */
+/** Paste into a migration. Positive `expires_at` values are epoch MILLISECONDS,
+ * matching `Date.now()`. A released fenced claim keeps a negative tombstone so
+ * a later lease can advance its fencing value without adding a column. */
 export const PREWARM_CLAIM_TABLE_DDL = `CREATE TABLE IF NOT EXISTS ${DEFAULT_PREWARM_CLAIM_TABLE} (
   key TEXT PRIMARY KEY,
   expires_at INTEGER NOT NULL
@@ -112,11 +116,13 @@ export function createD1PrewarmClaimStore(
 ON CONFLICT(key) DO UPDATE SET expires_at = ?2 WHERE ${table}.expires_at <= ?3
 RETURNING key`
   const acquireLeaseSql = `INSERT INTO ${table} (key, expires_at) VALUES (?1, ?2)
-ON CONFLICT(key) DO UPDATE SET expires_at = MAX(?2, ${table}.expires_at + 1)
+ON CONFLICT(key) DO UPDATE SET expires_at = MAX(?2, ABS(${table}.expires_at) + 1)
 WHERE ${table}.expires_at <= ?3
 RETURNING key, expires_at`
   const releaseSql = `DELETE FROM ${table} WHERE key = ?1`
-  const releaseLeaseSql = `DELETE FROM ${table} WHERE key = ?1 AND expires_at = ?2`
+  const releaseLeaseSql = `UPDATE ${table}
+SET expires_at = CASE WHEN expires_at = 0 THEN -1 ELSE -expires_at END
+WHERE key = ?1 AND expires_at = ?2`
   const inspectSql = `SELECT expires_at FROM ${table} WHERE key = ?1`
 
   async function inspect(key: string): Promise<PrewarmClaimState> {
@@ -124,7 +130,7 @@ RETURNING key, expires_at`
       .prepare(inspectSql)
       .bind(key)
       .first<{ expires_at: number }>()
-    if (!row) return { status: 'absent' }
+    if (!row || row.expires_at < 0) return { status: 'absent' }
     return row.expires_at > now()
       ? { status: 'held', expiresAt: row.expires_at }
       : { status: 'expired', expiresAt: row.expires_at }
@@ -142,9 +148,10 @@ RETURNING key, expires_at`
 
     async acquireLease(key: string, ttlSeconds: number): Promise<PrewarmClaimLease | null> {
       const at = now()
+      const requestedExpiry = Math.max(1, at + ttlSeconds * 1000)
       const row = await db
         .prepare(acquireLeaseSql)
-        .bind(key, at + ttlSeconds * 1000, at)
+        .bind(key, requestedExpiry, at)
         .first<{ key: string; expires_at: number }>()
       if (!row) return null
       return Object.freeze({ key: row.key, expiresAt: row.expires_at })

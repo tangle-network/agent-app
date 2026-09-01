@@ -162,6 +162,22 @@ describe('createD1PrewarmClaimStore', () => {
     expect(await store.inspect('k')).toEqual({ status: 'absent' })
   })
 
+  it('retains the fence across a release and same-clock reacquire', async () => {
+    const db = freshDb()
+    const store = createD1PrewarmClaimStore(d1(db), { now: () => 1_000 })
+
+    const leaseA = await store.acquireLease('k', 1)
+    await store.releaseLease(leaseA!)
+    const leaseB = await store.acquireLease('k', 1)
+
+    expect(leaseB?.expiresAt).toBeGreaterThan(leaseA?.expiresAt ?? 0)
+    await store.releaseLease(leaseA!)
+    expect(await store.inspect('k')).toEqual({ status: 'held', expiresAt: leaseB!.expiresAt })
+
+    await store.releaseLease(leaseB!)
+    expect(await store.inspect('k')).toEqual({ status: 'absent' })
+  })
+
   it('rejects a table name that is not a bare identifier', () => {
     const db = freshDb()
     expect(() => createD1PrewarmClaimStore(d1(db), { table: 'claims; DROP TABLE users' }))
