@@ -10,7 +10,8 @@ import type { Harness } from '../harness/index'
 import type { PeekWorkspaceSandboxOutcome } from './index'
 import {
   sandboxPrewarmClaimKey,
-  type InspectablePrewarmClaimStore,
+  type FencedPrewarmClaimStore,
+  type PrewarmClaimLease,
 } from './prewarm'
 
 export const DEFAULT_FOREGROUND_PROVISION_CLAIM_TTL_SECONDS = 180
@@ -58,7 +59,7 @@ export type ForegroundSandboxSingleFlightEvent =
   | { type: 'release-failed'; key: string; workspaceId: string; error: string }
 
 export interface ForegroundSandboxSingleFlightOptions<T> {
-  claim: InspectablePrewarmClaimStore
+  claim: FencedPrewarmClaimStore
   workspaceId: string
   harness: Harness
   provision(): Promise<T>
@@ -90,8 +91,31 @@ function positiveNumber(value: number, name: string): number {
   return value
 }
 
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+function safeErrorText(error: unknown): string {
+  try {
+    if (error instanceof Error) {
+      const message = error.message
+      if (typeof message === 'string' && message) return message
+    }
+  } catch {
+    // Error values can be proxies or custom subclasses with hostile getters.
+  }
+
+  try {
+    if (error !== null && (typeof error === 'object' || typeof error === 'function')) {
+      const message = Reflect.get(error, 'message')
+      if (typeof message === 'string' && message) return message
+    }
+  } catch {
+    // A hostile proxy must not replace the successful provision result.
+  }
+
+  try {
+    const text = typeof error === 'string' ? error : String(error)
+    return text || 'unknown error'
+  } catch {
+    return 'unknown error'
+  }
 }
 
 /**
@@ -123,24 +147,25 @@ export async function runForegroundSandboxSingleFlight<T>(
     }
   }
 
-  const provisionAsOwner = async (): Promise<T> => {
+  const provisionAsOwner = async (lease: PrewarmClaimLease): Promise<T> => {
     try {
       return await options.provision()
     } finally {
       try {
-        await options.claim.release(key)
+        await options.claim.releaseLease(lease)
       } catch (error) {
         emit({
           type: 'release-failed',
           key,
           workspaceId: options.workspaceId,
-          error: errorText(error),
+          error: safeErrorText(error),
         })
       }
     }
   }
 
-  if (await options.claim.acquire(key, ttlSeconds)) return provisionAsOwner()
+  const initialLease = await options.claim.acquireLease(key, ttlSeconds)
+  if (initialLease) return provisionAsOwner(initialLease)
 
   emit({ type: 'waiting', key, workspaceId: options.workspaceId })
   while (true) {
@@ -170,6 +195,7 @@ export async function runForegroundSandboxSingleFlight<T>(
         failedState(peek),
       )
     }
-    if (await options.claim.acquire(key, ttlSeconds)) return provisionAsOwner()
+    const takeoverLease = await options.claim.acquireLease(key, ttlSeconds)
+    if (takeoverLease) return provisionAsOwner(takeoverLease)
   }
 }

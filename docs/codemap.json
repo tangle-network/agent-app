@@ -10124,8 +10124,8 @@
         {
           "name": "createD1PrewarmClaimStore",
           "kind": "function",
-          "signature": "(db: PrewarmClaimD1Like, options?: D1PrewarmClaimStoreOptions) => InspectablePrewarmClaimStore",
-          "doc": "A `PrewarmClaimStore` backed by one D1 table."
+          "signature": "(db: PrewarmClaimD1Like, options?: D1PrewarmClaimStoreOptions) => FencedPrewarmClaimStore",
+          "doc": "A fenced `PrewarmClaimStore` backed by one D1 table."
         },
         {
           "name": "createSandboxPrewarmer",
@@ -10264,6 +10264,12 @@
           "kind": "const",
           "signature": "120000",
           "doc": "Per-variable env gate: the kernel rejects any single `NAME=value` env entry over MAX_ARG_STRLEN (131072 bytes) with E2BIG, killing every exec inside the box."
+        },
+        {
+          "name": "FencedPrewarmClaimStore",
+          "kind": "interface",
+          "signature": "interface FencedPrewarmClaimStore",
+          "doc": "Fenced claim operations for foreground provisioning."
         },
         {
           "name": "flattenHistory",
@@ -10462,6 +10468,12 @@
           "kind": "interface",
           "signature": "interface PrewarmClaimD1Like",
           "doc": "The columns and statements this store uses, and nothing else."
+        },
+        {
+          "name": "PrewarmClaimLease",
+          "kind": "interface",
+          "signature": "interface PrewarmClaimLease",
+          "doc": "The ownership proof for one foreground provisioning attempt."
         },
         {
           "name": "PrewarmClaimState",

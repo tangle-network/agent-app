@@ -1,4 +1,8 @@
-import type { InspectablePrewarmClaimStore, PrewarmClaimState } from './prewarm'
+import type {
+  FencedPrewarmClaimStore,
+  PrewarmClaimLease,
+  PrewarmClaimState,
+} from './prewarm'
 
 /**
  * `createD1PrewarmClaimStore` — the cross-isolate half of
@@ -28,6 +32,12 @@ import type { InspectablePrewarmClaimStore, PrewarmClaimState } from './prewarm'
  * winner. `RETURNING` is used rather than `meta.changes` because a no-op upsert
  * reporting `changes: 0` is a SQLite detail, whereas "no row came back" is the
  * statement telling you directly.
+ *
+ * Foreground provisioning uses `acquireLease`/`releaseLease`. The lease's
+ * returned `expiresAt` is a fencing value: takeover writes a value strictly
+ * greater than the expired value, and release deletes only the matching value.
+ * This uses the published two-column table without changing the legacy
+ * `PrewarmClaimStore` methods or requiring a migration.
  *
  * ── STRUCTURAL, NOT A DEPENDENCY ───────────────────────────────────────────
  * The binding is taken as the narrow shape actually used (`prepare().bind()`,
@@ -76,7 +86,7 @@ export const PREWARM_CLAIM_TABLE_DDL = `CREATE TABLE IF NOT EXISTS ${DEFAULT_PRE
 const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/
 
 /**
- * A `PrewarmClaimStore` backed by one D1 table.
+ * A fenced `PrewarmClaimStore` backed by one D1 table.
  *
  * ```ts
  * const prewarmer = createSandboxPrewarmer(shell, {
@@ -88,7 +98,7 @@ const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/
 export function createD1PrewarmClaimStore(
   db: PrewarmClaimD1Like,
   options: D1PrewarmClaimStoreOptions = {},
-): InspectablePrewarmClaimStore {
+): FencedPrewarmClaimStore {
   const table = options.table ?? DEFAULT_PREWARM_CLAIM_TABLE
   // A table name cannot be bound, so it is interpolated — which makes it the
   // one injection surface here. Reject anything that is not a bare identifier
@@ -101,7 +111,12 @@ export function createD1PrewarmClaimStore(
   const acquireSql = `INSERT INTO ${table} (key, expires_at) VALUES (?1, ?2)
 ON CONFLICT(key) DO UPDATE SET expires_at = ?2 WHERE ${table}.expires_at <= ?3
 RETURNING key`
+  const acquireLeaseSql = `INSERT INTO ${table} (key, expires_at) VALUES (?1, ?2)
+ON CONFLICT(key) DO UPDATE SET expires_at = MAX(?2, ${table}.expires_at + 1)
+WHERE ${table}.expires_at <= ?3
+RETURNING key, expires_at`
   const releaseSql = `DELETE FROM ${table} WHERE key = ?1`
+  const releaseLeaseSql = `DELETE FROM ${table} WHERE key = ?1 AND expires_at = ?2`
   const inspectSql = `SELECT expires_at FROM ${table} WHERE key = ?1`
 
   async function inspect(key: string): Promise<PrewarmClaimState> {
@@ -125,10 +140,24 @@ RETURNING key`
       return row != null
     },
 
+    async acquireLease(key: string, ttlSeconds: number): Promise<PrewarmClaimLease | null> {
+      const at = now()
+      const row = await db
+        .prepare(acquireLeaseSql)
+        .bind(key, at + ttlSeconds * 1000, at)
+        .first<{ key: string; expires_at: number }>()
+      if (!row) return null
+      return Object.freeze({ key: row.key, expiresAt: row.expires_at })
+    },
+
     async release(key: string): Promise<void> {
       // Best effort by the `PrewarmClaimStore` contract: the prewarmer swallows
       // a throw here because the TTL is what actually guarantees release.
       await db.prepare(releaseSql).bind(key).run()
+    },
+
+    async releaseLease(lease: PrewarmClaimLease): Promise<void> {
+      await db.prepare(releaseLeaseSql).bind(lease.key, lease.expiresAt).run()
     },
 
     async isHeld(key: string): Promise<boolean> {

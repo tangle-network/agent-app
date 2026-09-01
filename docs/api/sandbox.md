@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-182 exports.
+184 exports.
 
 ### `adaptSandboxStream`
 
@@ -136,10 +136,10 @@ interface BuildSandboxToolFileMountsOptions
 
 ### `createD1PrewarmClaimStore`
 
-`function` — A `PrewarmClaimStore` backed by one D1 table.
+`function` — A fenced `PrewarmClaimStore` backed by one D1 table.
 
 ```ts
-(db: PrewarmClaimD1Like, options?: D1PrewarmClaimStoreOptions) => InspectablePrewarmClaimStore
+(db: PrewarmClaimD1Like, options?: D1PrewarmClaimStoreOptions) => FencedPrewarmClaimStore
 ```
 
 ### `createSandboxPrewarmer`
@@ -324,6 +324,14 @@ interface EnsureWorkspaceSandboxOptions
 
 ```ts
 120000
+```
+
+### `FencedPrewarmClaimStore`
+
+`interface` — Fenced claim operations for foreground provisioning.
+
+```ts
+interface FencedPrewarmClaimStore
 ```
 
 ### `flattenHistory`
@@ -588,6 +596,14 @@ type PeekWorkspaceSandboxOutcome
 
 ```ts
 interface PrewarmClaimD1Like
+```
+
+### `PrewarmClaimLease`
+
+`interface` — The ownership proof for one foreground provisioning attempt.
+
+```ts
+interface PrewarmClaimLease
 ```
 
 ### `PrewarmClaimState`

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { describe, expect, expectTypeOf, it, vi, beforeEach } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 
 const listMock = vi.hoisted(() => vi.fn())
@@ -23,7 +23,12 @@ import {
   PREWARM_CLAIM_TABLE_DDL,
   type PrewarmClaimD1Like,
 } from './prewarm-claim-d1'
-import { createSandboxPrewarmer } from './prewarm'
+import {
+  createSandboxPrewarmer,
+  type FencedPrewarmClaimStore,
+  type InspectablePrewarmClaimStore,
+  type PrewarmClaimStore,
+} from './prewarm'
 import type { SandboxRuntimeConfig } from './index'
 import type { AgentProfile } from '@tangle-network/agent-interface'
 
@@ -63,6 +68,17 @@ function freshDb(): DatabaseSync {
 }
 
 describe('createD1PrewarmClaimStore', () => {
+  it('keeps the published claim methods source-compatible while adding fencing', () => {
+    const legacyStore = {
+      acquire: async (_key: string, _ttlSeconds: number) => true,
+      release: async (_key: string) => undefined,
+    }
+
+    expectTypeOf(legacyStore).toMatchTypeOf<PrewarmClaimStore>()
+    expectTypeOf<FencedPrewarmClaimStore>().toMatchTypeOf<InspectablePrewarmClaimStore>()
+    expectTypeOf(createD1PrewarmClaimStore(d1(freshDb()))).toMatchTypeOf<FencedPrewarmClaimStore>()
+  })
+
   it('gives the claim to exactly one of two racing callers', async () => {
     const db = freshDb()
     const store = createD1PrewarmClaimStore(d1(db), { now: () => 1_000 })
@@ -123,6 +139,26 @@ describe('createD1PrewarmClaimStore', () => {
     clock = 61_001
     expect(await store.inspect('k')).toEqual({ status: 'expired', expiresAt: 61_000 })
     await store.release('k')
+    expect(await store.inspect('k')).toEqual({ status: 'absent' })
+  })
+
+  it('fences a stale release after a takeover', async () => {
+    const db = freshDb()
+    let clock = 1_000
+    const store = createD1PrewarmClaimStore(d1(db), { now: () => clock })
+
+    const leaseA = await store.acquireLease('k', 1)
+    expect(leaseA).not.toBeNull()
+    clock = 2_001
+    const leaseB = await store.acquireLease('k', 1)
+    expect(leaseB).not.toBeNull()
+    expect(leaseB?.expiresAt).toBeGreaterThan(leaseA?.expiresAt ?? 0)
+
+    await store.releaseLease(leaseA!)
+    expect(await store.inspect('k')).toEqual({ status: 'held', expiresAt: leaseB!.expiresAt })
+    expect(await store.acquireLease('k', 1)).toBeNull()
+
+    await store.releaseLease(leaseB!)
     expect(await store.inspect('k')).toEqual({ status: 'absent' })
   })
 

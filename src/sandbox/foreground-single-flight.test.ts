@@ -9,6 +9,7 @@ import {
 } from './prewarm-claim-d1'
 import {
   runForegroundSandboxSingleFlight,
+  type ReadyRunningSandboxOutcome,
   SandboxFilesystemNotReadyError,
   SandboxProvisioningFailedElsewhereError,
 } from './foreground-single-flight'
@@ -59,6 +60,61 @@ function box(
 const harness = 'opencode' as Harness
 
 describe('runForegroundSandboxSingleFlight', () => {
+  it('does not let an expired owner release a successor while it provisions', async () => {
+    const db = freshDb()
+    let clock = 1_000
+    const store = createD1PrewarmClaimStore(d1(db), { now: () => clock })
+    const finishA = deferred<void>()
+    const finishB = deferred<void>()
+    const finishC = deferred<void>()
+    let readyB = false
+    const provision = vi.fn(async (id: string) => {
+      if (id === 'a') await finishA.promise
+      if (id === 'b') {
+        await finishB.promise
+        readyB = true
+      }
+      if (id === 'c') await finishC.promise
+      return box(`box-${id}`)
+    })
+    const options = (id: string) => ({
+      claim: store,
+      workspaceId: 'workspace-1',
+      harness,
+      provision: () => provision(id),
+      peek: async () => readyB
+        ? ({ status: 'running', box: box('box-b') } as const)
+        : ({ status: 'absent' } as const),
+      adopt: (outcome: ReadyRunningSandboxOutcome) => outcome.box,
+      claimTtlSeconds: 1,
+      pollIntervalMs: 1,
+    })
+
+    const ownerA = runForegroundSandboxSingleFlight(options('a'))
+    await vi.waitFor(() => expect(provision).toHaveBeenCalledWith('a'))
+
+    clock = 2_001
+    const ownerB = runForegroundSandboxSingleFlight(options('b'))
+    await vi.waitFor(() => expect(provision).toHaveBeenCalledWith('b'))
+
+    finishA.resolve()
+    await ownerA
+
+    const ownerC = runForegroundSandboxSingleFlight(options('c'))
+    try {
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      expect(provision).toHaveBeenCalledTimes(2)
+
+      finishB.resolve()
+      await ownerB
+      await expect(ownerC).resolves.toMatchObject({ id: 'box-b' })
+    } finally {
+      finishB.resolve()
+      finishC.resolve()
+      await Promise.allSettled([ownerB, ownerC])
+    }
+  })
+
   it('lets one request provision and makes the loser adopt that ready box', async () => {
     const db = freshDb()
     const ownerStarted = deferred<void>()
@@ -197,11 +253,14 @@ describe('runForegroundSandboxSingleFlight', () => {
 
   it('surfaces a release failure as telemetry without replacing the result', async () => {
     const events: unknown[] = []
+    const hostile = Object.create(null)
     const result = await runForegroundSandboxSingleFlight({
       claim: {
         acquire: async () => true,
-        release: async () => {
-          throw new Error('store unavailable')
+        release: async () => undefined,
+        acquireLease: async (key) => ({ key, expiresAt: 1 }),
+        releaseLease: async () => {
+          throw hostile
         },
         isHeld: async () => false,
         inspect: async () => ({ status: 'absent' }),
@@ -216,7 +275,7 @@ describe('runForegroundSandboxSingleFlight', () => {
 
     expect(result).toMatchObject({ id: 'box-1' })
     expect(events).toEqual([
-      expect.objectContaining({ type: 'release-failed', error: 'store unavailable' }),
+      expect.objectContaining({ type: 'release-failed', error: 'unknown error' }),
     ])
   })
 })

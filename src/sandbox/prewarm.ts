@@ -112,6 +112,19 @@ export interface PrewarmClaimStore {
   isHeld?(key: string): Promise<boolean>
 }
 
+/**
+ * The ownership proof for one foreground provisioning attempt.
+ *
+ * `expiresAt` is both the lease deadline and its fencing value. The D1 store
+ * advances it when a takeover succeeds, so an expired owner cannot release a
+ * successor's lease. Keep this object and pass it back unchanged to
+ * `FencedPrewarmClaimStore.releaseLease`.
+ */
+export interface PrewarmClaimLease {
+  readonly key: string
+  readonly expiresAt: number
+}
+
 /** State needed by a foreground caller that waits for another isolate. */
 export type PrewarmClaimState =
   | { status: 'held'; expiresAt: number }
@@ -122,6 +135,21 @@ export type PrewarmClaimState =
 export interface InspectablePrewarmClaimStore extends PrewarmClaimStore {
   isHeld(key: string): Promise<boolean>
   inspect(key: string): Promise<PrewarmClaimState>
+}
+
+/**
+ * Fenced claim operations for foreground provisioning.
+ *
+ * This is separate from `PrewarmClaimStore` so the published boolean
+ * `acquire` and key-only `release` methods remain source-compatible. A
+ * foreground caller must use the lease returned here and release that lease,
+ * not the legacy key-only method.
+ */
+export interface FencedPrewarmClaimStore extends InspectablePrewarmClaimStore {
+  /** Atomically acquire a lease or return null when another live lease wins. */
+  acquireLease(key: string, ttlSeconds: number): Promise<PrewarmClaimLease | null>
+  /** Conditionally release only this lease. A stale lease is a no-op. */
+  releaseLease(lease: PrewarmClaimLease): Promise<void>
 }
 
 /** What `prewarm()` decided. Every value except `started` means no box was
