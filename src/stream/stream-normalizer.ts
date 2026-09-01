@@ -107,12 +107,15 @@ export function normalizeToolEvent(event: StreamEvent): StreamEvent {
 
   if (event.type === 'tool_result' || event.type === 'tool.result') {
     const data = event.data ?? {}
+    const state = asRecord(data.state)
     const output = data.output
-    const exitCode = toolExitCode(output, data)
-    const error = asString(data.error) ?? toolExitError(output, exitCode)
+    const exitCode = toolExitCode(output, data, data.metadata, state, state?.metadata)
+    const error = asString(data.error ?? state?.error) ?? toolExitError(output, exitCode)
     const terminalError =
       data.status === 'error' ||
       data.status === 'failed' ||
+      state?.status === 'error' ||
+      state?.status === 'failed' ||
       Boolean(error) ||
       (exitCode !== undefined && exitCode !== 0)
     return {
@@ -222,7 +225,7 @@ export function normalizePersistedPart(rawPart: JsonRecord): JsonRecord | null {
   if (type === 'tool') {
     const state = asRecord(rawPart.state)
     const output = state?.output ?? rawPart.output
-    const exitCode = toolExitCode(output, state, rawPart)
+    const exitCode = toolExitCode(output, state, state?.metadata, rawPart, rawPart.metadata)
     const error = asString(state?.error ?? rawPart.error) ?? toolExitError(output, exitCode)
     const terminalError =
       state?.status === 'error' ||
