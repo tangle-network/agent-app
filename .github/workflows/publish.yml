@@ -414,7 +414,10 @@ jobs:
 
   publish_agent_app:
     needs: package_release
-    if: needs.package_release.outputs.mode == 'tag'
+    if: >-
+      always() &&
+      needs.package_release.result == 'success' &&
+      needs.package_release.outputs.mode == 'tag'
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -446,7 +449,10 @@ jobs:
 
   publish_create_agent_app:
     needs: package_release
-    if: needs.package_release.outputs.mode == 'tag'
+    if: >-
+      always() &&
+      needs.package_release.result == 'success' &&
+      needs.package_release.outputs.mode == 'tag'
     runs-on: ubuntu-latest
     permissions:
       actions: read
