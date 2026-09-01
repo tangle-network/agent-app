@@ -161,8 +161,8 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/agent-runtime']
 
     expect(range).toBeDefined()
-    expect(satisfiesRange('0.187.9', range!)).toBe(false)
-    expect(satisfiesRange('0.188.0', range!)).toBe(true)
+    expect(satisfiesRange('0.188.0', range!)).toBe(false)
+    expect(satisfiesRange('0.188.1', range!)).toBe(true)
     expect(satisfiesRange('0.188.9', range!)).toBe(true)
     expect(satisfiesRange('0.189.0', range!)).toBe(false)
   })

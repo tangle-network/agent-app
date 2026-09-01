@@ -53,8 +53,8 @@ importers:
         specifier: 0.18.1
         version: 0.18.1(@tangle-network/agent-interface@2.2.0)
       '@tangle-network/agent-runtime':
-        specifier: 0.188.0
-        version: 0.188.0(@tangle-network/agent-eval@0.172.1)(@tangle-network/agent-interface@2.2.0)(@tangle-network/sandbox@0.36.3(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))
+        specifier: 0.188.1
+        version: 0.188.1(@tangle-network/agent-eval@0.172.1)(@tangle-network/agent-interface@2.2.0)(@tangle-network/sandbox@0.36.3(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))
       '@tangle-network/brand':
         specifier: 1.5.0
         version: 1.5.0(react@19.2.8)
@@ -2223,8 +2223,8 @@ packages:
     peerDependencies:
       '@tangle-network/agent-interface': 2.2.0
 
-  '@tangle-network/agent-runtime@0.188.0':
-    resolution: {integrity: sha512-fcuPw1qnziNlbiH8v/ETxtpSOtzU5W3XqbafGQNgAScrA0XMrKHBdMfI9F2qSW9q5Cog/KrE0eZdu5l94iuBIQ==}
+  '@tangle-network/agent-runtime@0.188.1':
+    resolution: {integrity: sha512-4CJOHbayy3CNy54LqR0lt1b249BucPUQLbdqmeq3YEUKNavLkHIMFZ/h3Q9fiPIiiqexpXJV6h+R+FR+WPi8qw==}
     engines: {node: '>=22.13.0'}
     hasBin: true
     peerDependencies:
@@ -7072,7 +7072,7 @@ snapshots:
     dependencies:
       '@tangle-network/agent-interface': 2.2.0
 
-  '@tangle-network/agent-runtime@0.188.0(@tangle-network/agent-eval@0.172.1)(@tangle-network/agent-interface@2.2.0)(@tangle-network/sandbox@0.36.3(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))':
+  '@tangle-network/agent-runtime@0.188.1(@tangle-network/agent-eval@0.172.1)(@tangle-network/agent-interface@2.2.0)(@tangle-network/sandbox@0.36.3(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))':
     dependencies:
       '@tangle-network/agent-core': 0.9.6
       '@tangle-network/agent-eval': 0.172.1
