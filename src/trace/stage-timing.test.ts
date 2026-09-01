@@ -96,6 +96,99 @@ describe('stage timing', () => {
     ])
   })
 
+  it('returns the measured value when the injected clock throws', async () => {
+    const emit = vi.fn()
+    const timing = createStageTiming({
+      context: { runId: 'run-clock' },
+      emit,
+      now: () => {
+        throw new Error('clock unavailable')
+      },
+    })
+
+    await expect(timing.measure('turn.compose', {}, async () => 42)).resolves.toBe(42)
+    expect(emit).not.toHaveBeenCalled()
+  })
+
+  it('contains a clock failure while finishing success or failure', async () => {
+    let calls = 0
+    const emit = vi.fn()
+    const timing = createStageTiming({
+      context: { runId: 'run-finish-clock' },
+      emit,
+      now: () => {
+        calls += 1
+        if (calls % 2 === 0) throw new Error('clock unavailable')
+        return 10
+      },
+    })
+
+    await expect(timing.measure('turn.success', {}, async () => 42)).resolves.toBe(42)
+    const failure = Object.create(null)
+    await expect(
+      timing.measure('turn.failure', {}, async () => {
+        throw failure
+      }),
+    ).rejects.toBe(failure)
+    expect(emit).not.toHaveBeenCalled()
+  })
+
+  it('preserves the identity of a hostile rejected value', async () => {
+    const failure = Object.create(null)
+    const timing = createStageTiming({
+      context: { runId: 'run-hostile-error' },
+      emit: vi.fn(),
+      now: () => 10,
+    })
+
+    const result = timing.measure('turn.first-event', {}, async () => {
+      throw failure
+    })
+
+    await expect(result).rejects.toBe(failure)
+  })
+
+  it('drops credential-shaped and unsupported detail values', () => {
+    const detail = {
+      safe: 'ok',
+      header: 'Bearer do-not-leak',
+      nested: { token: 'do-not-leak' },
+      unsupported: BigInt(1),
+    } as unknown as StageTimingRecord['detail']
+    const record = buildStageTimingRecord(
+      { runId: 'run-detail' },
+      'turn.detail',
+      1,
+      2,
+      { detail },
+    )
+
+    expect(record?.detail).toEqual({ safe: 'ok' })
+    expect(JSON.stringify(record)).not.toContain('Bearer')
+    expect(JSON.stringify(record)).not.toContain('do-not-leak')
+  })
+
+  it('rejects runtime-invalid outcome and kind values', () => {
+    expect(
+      buildStageTimingRecord(
+        { runId: 'run-invalid-outcome' },
+        'turn.invalid-outcome',
+        1,
+        2,
+        { outcome: 'unknown' as never },
+      ),
+    ).toBeNull()
+    expect(
+      buildStageTimingRecord(
+        { runId: 'run-invalid-kind' },
+        'turn.invalid-kind',
+        1,
+        2,
+        { kind: 'branch' as never },
+      ),
+    ).toBeNull()
+  })
+
   it('emits a handle once and merges start and finish detail', () => {
     const records: StageTimingRecord[] = []
     let clock = 10
