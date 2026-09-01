@@ -18,28 +18,16 @@
   },
   "packageRules": [
     {
+      "description": "Tangle-published packages share one compatible release train. Immediate updates are limited to non-breaking releases; majors keep the breaking label and the repository release hold.",
+      "matchPackageNames": ["@tangle-network/**"],
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
-      "groupName": "minor & patch"
+      "groupName": "agent stack cohort",
+      "schedule": ["at any time"],
+      "minimumReleaseAge": null
     },
     {
       "matchUpdateTypes": ["major"],
       "addLabels": ["breaking"]
-    },
-    {
-      "matchPackageNames": [
-        "@tangle-network/agent-app",
-        "@tangle-network/agent-eval",
-        "@tangle-network/agent-integrations",
-        "@tangle-network/agent-interface",
-        "@tangle-network/agent-knowledge",
-        "@tangle-network/agent-profile-materialize",
-        "@tangle-network/agent-runtime",
-        "@tangle-network/sandbox",
-        "@tangle-network/sandbox-ui"
-      ],
-      "groupName": "agent stack cohort",
-      "schedule": ["at any time"],
-      "minimumReleaseAge": null
     },
     {
       "matchPackageNames": ["typescript", "eslint", "@typescript-eslint/**"],
