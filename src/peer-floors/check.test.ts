@@ -143,14 +143,13 @@ describe('this package audits itself', () => {
     ) as { peerDependencies?: Record<string, string> }
     const range = own.peerDependencies?.['@tangle-network/agent-interface']
 
-    // Interface minors are additive. Require the first minor that supplies
-    // this package's APIs, admit later 1.x minors, and reject the next major.
+    // Interface minors are additive. Require the first major that supplies
+    // this package's APIs, admit later 2.x minors, and reject the next major.
     expect(range).toBeDefined()
-    expect(satisfiesRange('0.56.0', range!)).toBe(false)
-    expect(satisfiesRange('1.7.0', range!)).toBe(false)
-    expect(satisfiesRange('1.8.0', range!)).toBe(true)
-    expect(satisfiesRange('1.9.0', range!)).toBe(true)
-    expect(satisfiesRange('2.0.0', range!)).toBe(false)
+    expect(satisfiesRange('1.9.0', range!)).toBe(false)
+    expect(satisfiesRange('2.0.0', range!)).toBe(true)
+    expect(satisfiesRange('2.1.1', range!)).toBe(true)
+    expect(satisfiesRange('3.0.0', range!)).toBe(false)
   })
 
   it('supports the verified Runtime lines without claiming the next one', async () => {
@@ -161,13 +160,10 @@ describe('this package audits itself', () => {
     const range = own.peerDependencies?.['@tangle-network/agent-runtime']
 
     expect(range).toBeDefined()
-    expect(satisfiesRange('0.177.2', range!)).toBe(false)
-    expect(satisfiesRange('0.178.0', range!)).toBe(true)
-    expect(satisfiesRange('0.179.0', range!)).toBe(true)
-    expect(satisfiesRange('0.180.0', range!)).toBe(true)
-    expect(satisfiesRange('0.181.0', range!)).toBe(true)
-    expect(satisfiesRange('0.182.0', range!)).toBe(true)
-    expect(satisfiesRange('0.183.0', range!)).toBe(false)
+    expect(satisfiesRange('0.185.1', range!)).toBe(false)
+    expect(satisfiesRange('0.185.2', range!)).toBe(true)
+    expect(satisfiesRange('0.185.9', range!)).toBe(true)
+    expect(satisfiesRange('0.186.0', range!)).toBe(false)
   })
 
   // The floors this shell PUBLISHES must be satisfiable by the tree it is
