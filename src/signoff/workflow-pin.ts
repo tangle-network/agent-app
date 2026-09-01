@@ -14,12 +14,13 @@ import { join } from 'node:path'
  * At measurement time, none of tax-agent, legal-agent, or agent-app had an
  * `.nvmrc`.
  * All three pinned Node 22 in the merge workflow.
- * Agent App now also pins Node 22 in `.nvmrc`.
+ * Agent App now pins Node 24.18.0 in `.nvmrc`.
  *
  * The workflow fallback reads only `pull_request` checks because those checks
  * can block a merge.
  * Agent App uses `.nvmrc` instead of this fallback.
- * Its publish workflow uses Node 22 for source checks and Node 24 for npm.
+ * Its publish workflow uses Node 24.18.0 for source checks and npm, with a
+ * separate clean-runner Node 22 compatibility job.
  *
  * Nothing here guesses. An expression (`${{ matrix.node }}`) is not a version,
  * a `node-version-file` that does not exist is not a pin, and two merge-gate

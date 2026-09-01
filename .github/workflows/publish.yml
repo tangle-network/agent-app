@@ -27,11 +27,50 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  package_release:
+  node_22_compatibility:
     if: >-
-      (github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-       !contains(github.event.head_commit.message, '[skip release]')) ||
-      github.event_name == 'workflow_dispatch'
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      !contains(github.event.head_commit.message, '[skip release]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      NODE_OPTIONS: --max-old-space-size=12288
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Verify source on Node 22
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile --ignore-scripts=false
+          pnpm run typecheck
+          pnpm run test:gates
+          pnpm run build
+          pnpm run test
+          pnpm run test:generated
+          pnpm run knip
+
+  package_release:
+    needs: node_22_compatibility
+    if: >-
+      always() &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+          !contains(github.event.head_commit.message, '[skip release]') &&
+          needs.node_22_compatibility.result == 'success'
+        )
+      )
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -337,8 +376,11 @@ jobs:
           bash publish-packages.sh validate agent-app.tgz create-agent-app.tgz
 
   write_release:
-    needs: package_release
-    if: needs.package_release.outputs.mode == 'auto'
+    needs: [package_release, node_22_compatibility]
+    if: >-
+      always() &&
+      needs.package_release.outputs.mode == 'auto' &&
+      needs.node_22_compatibility.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       actions: write
@@ -436,10 +478,15 @@ jobs:
           bash publish-packages.sh publish create-agent-app create-agent-app.tgz
 
   safety_net_issue:
-    needs: package_release
+    needs: [package_release, node_22_compatibility]
     if: >-
       always() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-      (needs.package_release.result == 'failure' || needs.package_release.result == 'cancelled')
+      !contains(github.event.head_commit.message, '[skip release]') &&
+      (
+        needs.node_22_compatibility.result != 'success' ||
+        needs.package_release.result == 'failure' ||
+        needs.package_release.result == 'cancelled'
+      )
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -470,10 +517,12 @@ jobs:
           fi
 
   safety_net_clear:
-    needs: package_release
+    needs: [package_release, node_22_compatibility]
     if: >-
       always() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-      needs.package_release.result == 'success' && needs.package_release.outputs.mode == 'auto'
+      needs.package_release.result == 'success' &&
+      needs.package_release.outputs.mode == 'auto' &&
+      needs.node_22_compatibility.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       issues: write
