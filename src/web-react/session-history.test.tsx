@@ -243,6 +243,35 @@ describe('useSessionHistory', () => {
     expect(fetchPage).not.toHaveBeenCalled()
   })
 
+  it('reseeds when loader revalidation changes a row with the same id', async () => {
+    const fetchPage = vi.fn<FetchSessionPage>(async () => EMPTY_SEED)
+    function Reseeding() {
+      const [page, setPage] = useState<SessionPage>({
+        items: [session('a', { title: 'Original title' })],
+        nextCursor: null,
+      })
+      const history = useSessionHistory({ fetchPage, q: '', sort: 'newest', initialPage: page })
+      return (
+        <div>
+          <button
+            type="button"
+            onClick={() => setPage({ items: [session('a', { title: 'Renamed title' })], nextCursor: null })}
+          >
+            revalidate rename
+          </button>
+          <p data-testid="title">{history.items[0]?.title}</p>
+        </div>
+      )
+    }
+    render(<Reseeding />)
+    expect(screen.getByTestId('title').textContent).toBe('Original title')
+    await act(async () => {
+      fireEvent.click(screen.getByText('revalidate rename'))
+    })
+    expect(screen.getByTestId('title').textContent).toBe('Renamed title')
+    expect(fetchPage).not.toHaveBeenCalled()
+  })
+
   it('ignores loadMore with no cursor and does not double-fire while one is in flight', async () => {
     let calls = 0
     const fetchPage = vi.fn<FetchSessionPage>(() => {
