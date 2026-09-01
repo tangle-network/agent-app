@@ -1,3 +1,5 @@
+import type { InspectablePrewarmClaimStore, PrewarmClaimState } from './prewarm'
+
 /**
  * `createD1PrewarmClaimStore` — the cross-isolate half of
  * `createSandboxPrewarmer`'s single-flight, implemented once.
@@ -86,7 +88,7 @@ const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/
 export function createD1PrewarmClaimStore(
   db: PrewarmClaimD1Like,
   options: D1PrewarmClaimStoreOptions = {},
-) {
+): InspectablePrewarmClaimStore {
   const table = options.table ?? DEFAULT_PREWARM_CLAIM_TABLE
   // A table name cannot be bound, so it is interpolated — which makes it the
   // one injection surface here. Reject anything that is not a bare identifier
@@ -100,7 +102,18 @@ export function createD1PrewarmClaimStore(
 ON CONFLICT(key) DO UPDATE SET expires_at = ?2 WHERE ${table}.expires_at <= ?3
 RETURNING key`
   const releaseSql = `DELETE FROM ${table} WHERE key = ?1`
-  const isHeldSql = `SELECT 1 AS held FROM ${table} WHERE key = ?1 AND expires_at > ?2`
+  const inspectSql = `SELECT expires_at FROM ${table} WHERE key = ?1`
+
+  async function inspect(key: string): Promise<PrewarmClaimState> {
+    const row = await db
+      .prepare(inspectSql)
+      .bind(key)
+      .first<{ expires_at: number }>()
+    if (!row) return { status: 'absent' }
+    return row.expires_at > now()
+      ? { status: 'held', expiresAt: row.expires_at }
+      : { status: 'expired', expiresAt: row.expires_at }
+  }
 
   return {
     async acquire(key: string, ttlSeconds: number): Promise<boolean> {
@@ -119,8 +132,9 @@ RETURNING key`
     },
 
     async isHeld(key: string): Promise<boolean> {
-      const row = await db.prepare(isHeldSql).bind(key, now()).first<{ held: number }>()
-      return row != null
+      return (await inspect(key)).status === 'held'
     },
+
+    inspect,
   }
 }

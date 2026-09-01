@@ -152,7 +152,7 @@ The **complete, always-current reference** — every published subpath, its expo
 - [`/chat-store`](src/chat-store) · [`/interactions`](src/interactions) · [`/plans`](src/plans) — persistence, human-in-the-loop asks, and the durable plan projection.
 
 **On the sandbox**
-- [`/sandbox`](src/sandbox) — workspace provisioning + turn streaming.
+- [`/sandbox`](src/sandbox) — workspace provisioning, request-time single-flight, prewarming, and turn streaming.
 - [`/missions`](src/missions) — durable multi-step orchestration: sequencing, budgets, approval gates, schedules.
 
 **React surfaces**

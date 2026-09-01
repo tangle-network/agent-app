@@ -112,6 +112,20 @@ describe('createD1PrewarmClaimStore', () => {
     expect(await store.isHeld('k')).toBe(false)
   })
 
+  it('distinguishes a released claim from one retained past expiry', async () => {
+    const db = freshDb()
+    let clock = 1_000
+    const store = createD1PrewarmClaimStore(d1(db), { now: () => clock })
+
+    expect(await store.inspect('k')).toEqual({ status: 'absent' })
+    await store.acquire('k', 60)
+    expect(await store.inspect('k')).toEqual({ status: 'held', expiresAt: 61_000 })
+    clock = 61_001
+    expect(await store.inspect('k')).toEqual({ status: 'expired', expiresAt: 61_000 })
+    await store.release('k')
+    expect(await store.inspect('k')).toEqual({ status: 'absent' })
+  })
+
   it('rejects a table name that is not a bare identifier', () => {
     const db = freshDb()
     expect(() => createD1PrewarmClaimStore(d1(db), { table: 'claims; DROP TABLE users' }))

@@ -10124,7 +10124,7 @@
         {
           "name": "createD1PrewarmClaimStore",
           "kind": "function",
-          "signature": "(db: PrewarmClaimD1Like, options?: D1PrewarmClaimStoreOptions) => { acquire(key: string, ttlSeconds: number): Promise<b…",
+          "signature": "(db: PrewarmClaimD1Like, options?: D1PrewarmClaimStoreOptions) => InspectablePrewarmClaimStore",
           "doc": "A `PrewarmClaimStore` backed by one D1 table."
         },
         {
@@ -10155,6 +10155,18 @@
           "name": "D1PrewarmClaimStoreOptions",
           "kind": "interface",
           "signature": "interface D1PrewarmClaimStoreOptions",
+          "doc": null
+        },
+        {
+          "name": "DEFAULT_FOREGROUND_PROVISION_CLAIM_TTL_SECONDS",
+          "kind": "const",
+          "signature": "180",
+          "doc": null
+        },
+        {
+          "name": "DEFAULT_FOREGROUND_PROVISION_POLL_INTERVAL_MS",
+          "kind": "const",
+          "signature": "5000",
           "doc": null
         },
         {
@@ -10260,6 +10272,18 @@
           "doc": "Build a single string combining conversation history and the current user message"
         },
         {
+          "name": "ForegroundSandboxSingleFlightEvent",
+          "kind": "type",
+          "signature": "type ForegroundSandboxSingleFlightEvent",
+          "doc": null
+        },
+        {
+          "name": "ForegroundSandboxSingleFlightOptions",
+          "kind": "interface",
+          "signature": "interface ForegroundSandboxSingleFlightOptions",
+          "doc": null
+        },
+        {
           "name": "formatSandboxProvisioningSupportDetails",
           "kind": "function",
           "signature": "(diagnostics: SafeSandboxErrorDiagnostics) => string",
@@ -10276,6 +10300,12 @@
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig) => Sandbox",
           "doc": "Resolve a synchronous sandbox client from provided runtime configuration credentials"
+        },
+        {
+          "name": "InspectablePrewarmClaimStore",
+          "kind": "interface",
+          "signature": "interface InspectablePrewarmClaimStore",
+          "doc": "A claim store that can distinguish a completed owner from a crashed owner."
         },
         {
           "name": "isEgressProxyRecoveryRequiredError",
@@ -10434,6 +10464,12 @@
           "doc": "The columns and statements this store uses, and nothing else."
         },
         {
+          "name": "PrewarmClaimState",
+          "kind": "type",
+          "signature": "type PrewarmClaimState",
+          "doc": "State needed by a foreground caller that waits for another isolate."
+        },
+        {
           "name": "PrewarmClaimStore",
           "kind": "interface",
           "signature": "interface PrewarmClaimStore",
@@ -10512,6 +10548,12 @@
           "doc": "Reads a sandbox file as base64 and decodes it, verifying the decoded byte length against `expectedSize` (from a prior {@link statSandboxFileSize})."
         },
         {
+          "name": "ReadyRunningSandboxOutcome",
+          "kind": "type",
+          "signature": "type ReadyRunningSandboxOutcome",
+          "doc": null
+        },
+        {
           "name": "requireTransportableModel",
           "kind": "function",
           "signature": "(selection: ModelSelection, context: string) => ResolvedModel | undefined",
@@ -10552,6 +10594,12 @@
           "kind": "interface",
           "signature": "interface ResolveSandboxClientCredentialsOptions",
           "doc": "Resolve options for obtaining sandbox client credentials from environment variables and classification"
+        },
+        {
+          "name": "runForegroundSandboxSingleFlight",
+          "kind": "function",
+          "signature": "<T>(options: ForegroundSandboxSingleFlightOptions<T>) => Promise<T>",
+          "doc": "Run one foreground provision or adopt the ready result from its current owner."
         },
         {
           "name": "runSandboxPrompt",
@@ -10644,6 +10692,12 @@
           "doc": "Resolve the outcome of a sandbox file size check with success status and value or error message"
         },
         {
+          "name": "SandboxFilesystemNotReadyError",
+          "kind": "class",
+          "signature": "class SandboxFilesystemNotReadyError",
+          "doc": null
+        },
+        {
           "name": "SandboxModelResolutionError",
           "kind": "class",
           "signature": "class SandboxModelResolutionError",
@@ -10654,6 +10708,12 @@
           "kind": "type",
           "signature": "type SandboxPermissionLevel",
           "doc": "Define permission levels for sandbox access and control"
+        },
+        {
+          "name": "sandboxPrewarmClaimKey",
+          "kind": "function",
+          "signature": "(scope: Pick<SandboxPrewarmScope, \"workspaceId\" | \"harness\">) => string",
+          "doc": "Identity of a warm."
         },
         {
           "name": "SandboxPrewarmer",
@@ -10678,6 +10738,12 @@
           "kind": "interface",
           "signature": "interface SandboxProvisionedObservation",
           "doc": "What `/sandbox` reports once a box is provisioned, reused, or resumed."
+        },
+        {
+          "name": "SandboxProvisioningFailedElsewhereError",
+          "kind": "class",
+          "signature": "class SandboxProvisioningFailedElsewhereError",
+          "doc": null
         },
         {
           "name": "SandboxReadiness",
