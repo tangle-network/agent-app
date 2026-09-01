@@ -8,7 +8,7 @@ This repo also *ships* the gate (`/signoff`, the `agent-app-signoff` bin). The d
 ## Run it
 
 ```bash
-nvm use            # reads .nvmrc — Node 22, and the gate REFUSES another major
+nvm use            # reads .nvmrc — Node 24.18.0, and the gate REFUSES another major
 pnpm signoff --source head
 ```
 
@@ -43,7 +43,7 @@ The same source checks `.github/workflows/publish.yml` runs, in a clean `git wor
 
 Four things it does that CI does not:
 
-- **the runtime is pinned and enforced.** `.nvmrc` says 22; a different major refuses the run rather than reporting a pass it did not earn.
+- **the runtime is pinned and enforced.** `.nvmrc` says 24.18.0; a different major refuses the run rather than reporting a pass it did not earn.
 - **the suite runs under randomized file order**, at least twice, with every seed recorded and a base seed that replays the whole run.
 - **the steps run as a dependency graph**, so typecheck, the suite, the build and knip overlap instead of queueing.
 - **the failure names itself** — step, command, exit code, seed, captured output, and the exact command that reproduces the run.
@@ -84,7 +84,7 @@ The gate holds no secrets, so every credentialed step is simply absent from the 
 
 ## What the post-merge workflow does
 
-`.github/workflows/publish.yml` runs the source checks once on `main`.
+`.github/workflows/publish.yml` runs the source checks on Node 24.18.0 and repeats them on a clean Node 22 runner before release work.
 A failure updates the rolling *Post-merge safety net is red on main* issue.
 A passing run builds and uploads the exact release tarballs.
 The release tag starts a second, short path that verifies and publishes those same bytes.

@@ -263,12 +263,13 @@ Three sources, in order:
 **The third source exists because the first two were empty on the entire fleet, and that produced a measured false pass** (calibration 1 above).
 At measurement time, tax-agent, legal-agent, and agent-app had no `.nvmrc`.
 Each workflow pinned `node-version: 22`.
-Agent App now also has an `.nvmrc`, which the source check reads through `node-version-file`.
+Agent App now has `.nvmrc` set to `24.18.0`, which the source check reads through `node-version-file`.
 Reading the workflow pin was the difference between refusing legal-agent `4c0d688` and signing it off green.
 
 Scope is deliberate: only `pull_request` workflows, because those are the merge gate.
-Agent App uses Node 22 for source checks and Node 24.18.0 only to pack and publish.
-The local gate reads `.nvmrc`, so it does not confuse the npm runtime with the source runtime.
+Agent App uses Node 24.18.0 for source checks and npm packing.
+The publish workflow also runs the source checks on a clean Node 22 runner for compatibility.
+The local gate reads `.nvmrc`, so it verifies the default source runtime.
 
 Nothing in that path guesses.
 A `${{ matrix.node }}` expression is not a version, a `node-version-file` that does not exist is an error rather than a shrug, `lts/*` is reported as no pin, and two merge-gate workflows on different majors is a refusal naming both files.

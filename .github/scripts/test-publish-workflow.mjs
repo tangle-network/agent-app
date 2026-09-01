@@ -74,12 +74,13 @@ const stepWithCommand = (block, command) => {
 }
 
 const packageJob = job('package_release')
+const node22Job = job('node_22_compatibility')
 const writeJob = job('write_release')
 const agentPublishJob = job('publish_agent_app')
 const createPublishJob = job('publish_create_agent_app')
 const safetyIssueJob = job('safety_net_issue')
 const safetyClearJob = job('safety_net_clear')
-check(jobs.size === 6, 'publish workflow must contain exactly six jobs')
+check(jobs.size === 7, 'publish workflow must contain exactly seven jobs')
 check(/concurrency:\s*\n  group: release\s*\n  cancel-in-progress: false/.test(text), 'release concurrency changed')
 check(!/^\s+tags:/m.test(triggerBlock), 'tag pushes duplicate the explicit release dispatch')
 check(
@@ -124,6 +125,22 @@ check(
 check(packageJob.includes('fetch-depth: 0'), 'release history is shallow')
 check(packageJob.includes('persist-credentials: false'), 'package checkout persists credentials')
 check(packageJob.includes('node-version-file: .nvmrc'), 'source verification ignores the Node pin')
+check(node22Job.includes("github.event_name == 'push'"), 'Node 22 compatibility runs outside main pushes')
+check(node22Job.includes("github.ref == 'refs/heads/main'"), 'Node 22 compatibility runs outside main')
+check(node22Job.includes('contents: read'), 'Node 22 compatibility permissions are wrong')
+check(!node22Job.includes('contents: write') && !node22Job.includes('id-token: write'), 'Node 22 compatibility can write release state')
+check(node22Job.includes('persist-credentials: false'), 'Node 22 compatibility checkout persists credentials')
+check(node22Job.includes('node-version: 22'), 'Node 22 compatibility does not pin Node 22')
+check(!node22Job.includes('node-version-file: .nvmrc'), 'Node 22 compatibility follows the Node 24 default pin')
+check(node22Job.includes('pnpm install --frozen-lockfile --ignore-scripts=false'), 'Node 22 compatibility does not install cleanly')
+for (const command of [
+  signoffConfig.install.run,
+  ...signoffConfig.steps.map(({ run }) => run),
+]) {
+  check(node22Job.includes(command), `Node 22 compatibility omits ${command}`)
+}
+check(packageJob.includes('needs: node_22_compatibility'), 'auto release does not wait for Node 22 compatibility')
+check(packageJob.includes('needs.node_22_compatibility.result == \'success\''), 'auto release does not require a passing Node 22 compatibility job')
 
 const autoSteps = [
   ['Prepare release manifests', 'write-release.sh prepare'],
@@ -211,7 +228,9 @@ check(
     !writeJob.includes('id-token: write'),
   'write job permissions are wrong',
 )
-check(writeJob.includes('needs: package_release'), 'write job does not wait for packaging')
+check(/needs:\s*\[package_release, node_22_compatibility\]/.test(writeJob), 'write job does not wait for packaging')
+check(writeJob.includes('needs: [package_release, node_22_compatibility]'), 'write job does not wait for Node 22 compatibility')
+check(writeJob.includes('needs.node_22_compatibility.result == \'success\''), 'write job does not require a passing Node 22 compatibility job')
 check(!writeJob.includes('uses:'), 'write job invokes an action')
 check(writeJob.includes('git init --bare'), 'write job uses a checkout')
 check(writeJob.includes('git show "$BASE_SHA:.github/scripts/write-release.sh"'), 'write job does not load the tested release script')
@@ -276,9 +295,13 @@ check(createPublishJob.includes('publish create-agent-app create-agent-app.tgz')
 for (const [name, block] of [['safety_net_issue', safetyIssueJob], ['safety_net_clear', safetyClearJob]]) {
   check(block.includes('issues: write'), `${name} cannot maintain the rolling issue`)
   check(block.includes("github.event_name == 'push'") && block.includes("github.ref == 'refs/heads/main'"), `${name} can run outside main pushes`)
+  check(block.includes('needs: [package_release, node_22_compatibility]'), `${name} does not wait for Node 22 compatibility`)
 }
 check(safetyIssueJob.includes("needs.package_release.result == 'failure'"), 'failed verification does not open the rolling issue')
 check(safetyClearJob.includes("needs.package_release.result == 'success'"), 'successful verification does not clear the rolling issue')
+check(safetyIssueJob.includes("!contains(github.event.head_commit.message, '[skip release]')"), 'skip-release pushes open the rolling issue')
+check(safetyIssueJob.includes("needs.node_22_compatibility.result != 'success'"), 'Node 22 compatibility failure does not open the rolling issue')
+check(safetyClearJob.includes("needs.node_22_compatibility.result == 'success'"), 'rolling issue clears without Node 22 compatibility')
 
 check(script.includes('--provenance') && script.includes('--ignore-scripts'), 'publish command lacks provenance or allows lifecycle scripts')
 
