@@ -105,7 +105,7 @@ consumer of L0/L1 installs none of them): `konva`/`react-konva` → only
 | Live-viewer fanout for a **sandbox** turn | NOT agent-app. The platform session gateway — `box.mintScopedToken()` + `SessionGatewayClient` (`@tangle-network/sandbox/session-gateway`), browser-direct, replay from `lastEventId`. See [AGENTS.md § Live viewing vs history](./AGENTS.md#live-viewing-vs-history-the-measured-model) |
 | Late viewer, past the gateway's hot-buffer TTL | `chat-routes` — `incrementalPersistence` on `createChatTurnRoutes` (`persist` on `runDetachedTurn`), projecting through `stream`'s `draftAssistantParts`. Serve history from the durable row; raising `bufferTtlMs` is not a scaling answer |
 | The single-flight turn lock, and durable replay on the **sandbox-free** lane (production) | `turn-stream` — re-export `TurnStreamDO` from the worker entry, wire `createDurableObjectTurnEventStore` into `turnStore`, `createDurableTurnLock` into `turnLock`, `createTurnStreamUpgradeHandler` before the router. The lock has no gateway equivalent; the broadcast half does — the per-turn rebroadcast on the thread channel (`broadcastTurnStreamEvent` + the segment functions) is `@deprecated` for sandbox turns |
-| Flow traces / waterfalls | `trace` |
+| Stage timing / flow traces / waterfalls | `trace` — `createStageTiming` emits bounded records through an injected carrier; callers keep user input out |
 | Chat UI + run/observability components | `web-react` |
 | Agent asks a human mid-run (question/plan cards, answer route) | `interactions` (server + contract) + `web-react` (cards/hook) |
 | Canvas editor UI | `design-canvas` (+ `-react`) |

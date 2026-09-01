@@ -4,7 +4,7 @@
 
 Source: `src/trace/index.ts`
 
-20 exports.
+33 exports.
 
 ### `buildFlowTrace`
 
@@ -12,6 +12,14 @@ Source: `src/trace/index.ts`
 
 ```ts
 (events: TimedEvent[], opts?: { pricing?: { prompt?: string | number | undefined; completion?: string | number | undefi…
+```
+
+### `buildStageTimingRecord`
+
+`function` — Build one safe record, or return null when its required fields are invalid.
+
+```ts
+(context: StageTimingContext, stage: string, startedAt: number, durationMs: number, input?: StageTimingRecordInput) =>…
 ```
 
 ### `childSpanContext`
@@ -36,6 +44,22 @@ Source: `src/trace/index.ts`
 
 ```ts
 (missionId?: string | undefined) => MissionTraceContext
+```
+
+### `createStageTiming`
+
+`function` — Create a stage timer with an injected carrier.
+
+```ts
+(options: CreateStageTimingOptions) => StageTiming
+```
+
+### `CreateStageTimingOptions`
+
+`interface`
+
+```ts
+interface CreateStageTimingOptions
 ```
 
 ### `delegationActivityToFlowSpans`
@@ -116,6 +140,86 @@ interface MissionTraceContext
 
 ```ts
 (trace: FlowTrace, opts?: { width?: number | undefined; } | undefined) => string
+```
+
+### `STAGE_TIMING_EVENT`
+
+`const` — Structured, bounded latency records for one request or agent turn.
+
+```ts
+"stage_timing"
+```
+
+### `STAGE_TIMING_VERSION`
+
+`const`
+
+```ts
+1
+```
+
+### `StageTiming`
+
+`interface`
+
+```ts
+interface StageTiming
+```
+
+### `StageTimingContext`
+
+`interface`
+
+```ts
+interface StageTimingContext
+```
+
+### `StageTimingDetailValue`
+
+`type`
+
+```ts
+type StageTimingDetailValue
+```
+
+### `StageTimingHandle`
+
+`interface`
+
+```ts
+interface StageTimingHandle
+```
+
+### `StageTimingKind`
+
+`type`
+
+```ts
+type StageTimingKind
+```
+
+### `StageTimingOutcome`
+
+`type`
+
+```ts
+type StageTimingOutcome
+```
+
+### `StageTimingRecord`
+
+`interface`
+
+```ts
+interface StageTimingRecord
+```
+
+### `StageTimingRecordInput`
+
+`interface`
+
+```ts
+interface StageTimingRecordInput
 ```
 
 ### `stepActivityFlowTrace`
