@@ -78,6 +78,21 @@ export const PriorityGroup: Story = {
   },
 }
 
+/** `variant="quiet"`: the borderless text-button trigger, beside the default
+ *  chip for comparison. Same menu behind both. */
+export const Quiet: Story = {
+  decorators: [withPopoverHeadroom],
+  render: () => {
+    const [model, setModel] = useState(DEFAULT_MODEL_ID)
+    return (
+      <div className="flex items-center gap-4">
+        <ModelPicker value={model} onChange={setModel} models={catalogModels} />
+        <ModelPicker value={model} onChange={setModel} models={catalogModels} variant="quiet" />
+      </div>
+    )
+  },
+}
+
 /** Value with no catalogue match — the pill falls back to the raw id. */
 export const UnknownValue: Story = {
   name: 'Unknown value',

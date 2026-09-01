@@ -89,6 +89,29 @@ export const CompactOpen: Story = {
   ),
 }
 
+/**
+ * `variant="quiet"`: the same three controls as borderless 28px text buttons —
+ * muted label, small glyph, a surface fill on hover and while a menu is open.
+ * For a composer whose card already draws the border, where three pills under
+ * the input read as three more cards. Chip on top for the comparison; both
+ * sit in a composer-shaped card because that is where the difference shows.
+ */
+export const Quiet: Story = {
+  decorators: [withPopoverHeadroom],
+  render: () => (
+    <div className="flex w-fit flex-col gap-4">
+      <div className="rounded-2xl border border-card-edge bg-card px-3 py-2.5">
+        <p className="mb-2 px-1.5 text-base text-muted-foreground">Chip (default)</p>
+        {useSessionControls()}
+      </div>
+      <div className="rounded-2xl border border-card-edge bg-card px-3 py-2.5">
+        <p className="mb-2 px-1.5 text-base text-muted-foreground">Quiet</p>
+        {useSessionControls({ variant: 'quiet' })}
+      </div>
+    </div>
+  ),
+}
+
 /** Single-harness product — the harness pill is hidden entirely. */
 export const HarnessHidden: Story = {
   name: 'Harness hidden',
@@ -172,6 +195,10 @@ export const AllStates: Story = {
         {useSessionControls({
           harnessLockReason: 'This thread already has messages — start a new chat to switch backend.',
         })}
+      </div>
+      <div>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Quiet</p>
+        {useSessionControls({ variant: 'quiet' })}
       </div>
     </div>
   ),

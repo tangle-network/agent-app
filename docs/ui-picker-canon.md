@@ -45,7 +45,7 @@ field, so no harness or effort control belongs there.
 | `loading?: boolean` | `loading?: boolean` | Same. |
 | `recents`, `popular` | `priorityGroup: { label, match }` | The pinned top section is predicate-based instead of id-list-based; `recommendedLabel` renames the featured section. |
 | `excludeProviders`, `modalities` | — | Filter the `models` array before passing it (`/runtime` exports `isChatCapableModel` for the chat-surface trim). |
-| `variant: "field" \| "pill"` | — | The canon is the pill. There is no form-field variant; compose one in the product if a form genuinely needs it. |
+| `variant: "field" \| "pill"` | `variant: "chip" \| "quiet"` | The canon trigger is the pill (`chip`, the default). `quiet` is the borderless 28px text button for a composer whose card already draws the border. There is no form-field variant; compose one in the product if a form genuinely needs it. |
 | `side`, `avoidCollisions`, `label`, `placeholder`, `triggerClassName`, `disabled` | — | No equivalents. The canonical popover opens upward from the composer and clamps itself inside the viewport. |
 | — | `renderProviderBadge(provider)` | agent-app-only hook: override the provider logo/badge (defaults to `/web-react`'s `ProviderLogo`). |
 
@@ -77,6 +77,7 @@ field, so no harness or effort control belongs there.
 | `profile` | — | Agent-profile picking is not part of the canon cluster. |
 | `menuPlacement`, `trailing` | — | Menus open upward; extras dock beside the control in your own row. |
 | `className` | `className` | Same. |
+| — | `variant: "chip" \| "quiet"` | agent-app-only. `chip` (default) is the bordered pill on every child; `quiet` is the borderless text button. Reaches the model, harness, and effort triggers in both layouts. |
 
 ### `reasoning.available` → `effortLevels` — the two lists are not the same thing
 
