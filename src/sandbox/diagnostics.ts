@@ -322,11 +322,9 @@ export function isSandboxHostCapacityFailure(diagnostics: SafeSandboxErrorDiagno
  * True when a resume failed on the box's own configuration rather than on
  * anything a retry can change.
  *
- * These are permanent facts about one box: the platform cannot rebuild its
- * proxy because the egress policy it was created with is no longer recorded, so
- * the box can never start again where it is. The platform says as much in the
- * message — "re-apply the sandbox egress policy and retry" is a description of
- * creating a fresh box, since policy is applied at creation.
+ * These are permanent facts about one box. Its egress policy can be missing,
+ * or its verified Platform lineage can differ from the current caller. Neither
+ * creation-time fact can change on resume, so the box must be replaced.
  *
  * Narrow on purpose. A bare 500 from the sandbox API is transient far more
  * often than not, and treating one as unbringable would delete a healthy box.
@@ -335,6 +333,7 @@ export function isSandboxHostCapacityFailure(diagnostics: SafeSandboxErrorDiagno
 export function isSandboxBoxConfigFailure(diagnostics: SafeSandboxErrorDiagnostics): boolean {
   return diagnostics.causes.some((cause) => {
     if (cause.origin !== 'sandbox-api') return false
+    if (cause.code === 'SANDBOX_ATTRIBUTION_MISMATCH') return true
     if (typeof cause.message !== 'string') return false
     return /has no recorded egress policy|cannot rebuild the proxy config/i.test(cause.message)
   })

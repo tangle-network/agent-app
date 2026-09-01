@@ -780,9 +780,29 @@ function egressPolicyMissingResumeError(): Error {
   )
 }
 
+function attributionMismatchResumeError(): Error {
+  return Object.assign(
+    new Error(
+      'Resume must use the same verified Platform attribution lineage that created this sandbox.',
+    ),
+    {
+      name: 'SandboxError',
+      code: 'SANDBOX_ATTRIBUTION_MISMATCH',
+      status: 403,
+      endpoint: '/v1/sandboxes/sandbox-aba8d1594255/resume',
+      origin: 'sandbox-api',
+    },
+  )
+}
+
 describe('sandbox box-config failures', () => {
   it('recognises a resume that failed because the box has no recorded egress policy', () => {
     const diagnostics = serializeSandboxProvisioningError(egressPolicyMissingResumeError())
+    expect(isSandboxBoxConfigFailure(diagnostics)).toBe(true)
+  })
+
+  it('recognises a resume rejected because the box belongs to an obsolete attribution lineage', () => {
+    const diagnostics = serializeSandboxProvisioningError(attributionMismatchResumeError())
     expect(isSandboxBoxConfigFailure(diagnostics)).toBe(true)
   })
 
