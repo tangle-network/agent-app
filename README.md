@@ -35,13 +35,13 @@ pnpm add @tangle-network/agent-eval @tangle-network/agent-integrations
 
 | Peer | Required by | Range |
 |---|---|---|
-| `@tangle-network/agent-eval` | `/eval`, `/eval-campaign`, `/profile`, `/knowledge` | `>=0.170.0 <0.171.0` |
-| `@tangle-network/agent-runtime` | `/runtime`, `/chat-routes` | `>=0.178.0 <0.183.0` |
+| `@tangle-network/agent-eval` | `/eval`, `/eval-campaign`, `/profile`, `/knowledge` | `>=0.171.0 <0.172.0` |
+| `@tangle-network/agent-runtime` | `/runtime`, `/chat-routes` | `>=0.185.2 <0.186.0` |
 | `@tangle-network/agent-integrations` | `/integrations` | `>=0.53.55 <0.54.0` |
-| `@tangle-network/agent-interface` | `/interactions`, `/chat-store`, `/harness` | `^1.8.0` |
-| `@tangle-network/sandbox` | `/sandbox` | `>=0.34.0 <0.35.0` |
-| `@tangle-network/agent-knowledge` | `/knowledge-loop` | `^10.8.0` |
-| `@tangle-network/agent-profile-materialize` | `/skills-placement` | `>=0.17.1 <0.18.0` |
+| `@tangle-network/agent-interface` | `/interactions`, `/chat-store`, `/harness` | `^2.0.0` |
+| `@tangle-network/sandbox` | `/sandbox` | `>=0.36.1 <0.37.0` |
+| `@tangle-network/agent-knowledge` | `/knowledge-loop` | `^11.0.0` |
+| `@tangle-network/agent-profile-materialize` | `/skills-placement` | `>=0.18.1 <0.19.0` |
 | `@tangle-network/sandbox-ui` | `/brand`, `/work-product-react`, `/workspace-react` | `>=0.111.0 <0.112.0` |
 | `@tangle-network/ui` | `/brand`, `/work-product-react`, `/workspace-react` | `>=11.6.0 <12.0.0` |
 
