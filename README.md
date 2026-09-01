@@ -36,13 +36,13 @@ pnpm add @tangle-network/agent-eval @tangle-network/agent-integrations
 | Peer | Required by | Range |
 |---|---|---|
 | `@tangle-network/agent-eval` | `/eval`, `/eval-campaign`, `/profile`, `/knowledge` | `>=0.172.1 <0.173.0` |
-| `@tangle-network/agent-runtime` | `/runtime`, `/chat-routes` | `>=0.187.1 <0.188.0` |
+| `@tangle-network/agent-runtime` | `/runtime`, `/chat-routes` | `>=0.188.0 <0.189.0` |
 | `@tangle-network/agent-integrations` | `/integrations` | `>=0.53.55 <0.54.0` |
 | `@tangle-network/agent-interface` | `/interactions`, `/chat-store`, `/harness` | `^2.2.0` |
 | `@tangle-network/sandbox` | `/sandbox` | `>=0.36.3 <0.37.0` |
 | `@tangle-network/agent-knowledge` | `/knowledge-loop` | `^13.0.0` |
 | `@tangle-network/agent-profile-materialize` | `/skills-placement` | `>=0.18.1 <0.19.0` |
-| `@tangle-network/sandbox-ui` | `/brand`, `/work-product-react`, `/workspace-react` | `>=0.111.0 <0.112.0` |
+| `@tangle-network/sandbox-ui` | `/brand`, `/work-product-react`, `/workspace-react` | `>=0.111.2 <0.112.0` |
 | `@tangle-network/ui` | `/brand`, `/work-product-react`, `/workspace-react` | `>=11.6.0 <12.0.0` |
 
 All of these except `agent-eval`, `agent-integrations`, and `agent-interface` are declared **optional** peers, so a product that never imports the subpath installs nothing.

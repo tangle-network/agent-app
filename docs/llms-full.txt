@@ -194,6 +194,14 @@ ZodObject<{ assetId: ZodString; variantId: ZodOptional<ZodString>; action: ZodEn
 type AssetContentMap
 ```
 
+### `assetCreateJsonSchema`
+
+`const` — JSON Schema for the model-facing asset-create payload.
+
+```ts
+{ readonly $id: "https://tangle.tools/schemas/asset-create.json"; readonly title: "AssetCreate"; readonly description:…
+```
+
 ### `AssetFormat`
 
 `type` — Define valid asset format strings for various media and copy types
