@@ -311,7 +311,13 @@ export function activeSessionIdFromPath({
   // `/app/settings` under a segment-less route is a sibling page, not a
   // session named "settings".
   if (reserved?.some((name) => stripSlashes(name) === id)) return null
-  return decodeURIComponent(id)
+  try {
+    return decodeURIComponent(id)
+  } catch {
+    // A malformed route is not a session id. Fail closed so a bad URL cannot
+    // take down the shell while it resolves the active row.
+    return null
+  }
 }
 
 /** One rail destination. `path` is relative to the workspace base. */

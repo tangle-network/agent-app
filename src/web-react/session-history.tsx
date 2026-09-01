@@ -142,7 +142,17 @@ export interface SessionHistoryState {
  *  every render does not reseed (and re-render) forever. Identity alone — what
  *  the per-product versions keyed on — makes that an infinite loop. */
 function seedSignature(page: SessionPage): string {
-  return `${page.nextCursor ?? ''}|${page.items.map((item) => item.id).join(',')}`
+  return JSON.stringify({
+    nextCursor: page.nextCursor ?? null,
+    items: page.items.map((item) => ({
+      id: item.id,
+      title: item.title,
+      updatedAt: item.updatedAt,
+      isPinned: Boolean(item.isPinned),
+      unread: Boolean(item.unread),
+      category: item.category ?? null,
+    })),
+  })
 }
 
 /**

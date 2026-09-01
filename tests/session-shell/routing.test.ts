@@ -66,6 +66,11 @@ describe('activeSessionIdFromPath', () => {
     expect(activeSessionIdFromPath({ pathname: `${BASE}/chat/thr%2F9`, base: BASE })).toBe('thr/9')
   })
 
+  it('fails closed when the session id has malformed percent encoding', () => {
+    expect(() => activeSessionIdFromPath({ pathname: `${BASE}/chat/%E0%A4%A`, base: BASE })).not.toThrow()
+    expect(activeSessionIdFromPath({ pathname: `${BASE}/chat/%E0%A4%A`, base: BASE })).toBeNull()
+  })
+
   it('honours a product-specific segment and new-segment', () => {
     expect(
       activeSessionIdFromPath({ pathname: `${BASE}/matters/m_1`, base: BASE, segment: 'matters' }),
