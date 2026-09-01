@@ -63,18 +63,12 @@ NODE
 }
 
 npm_command() {
-  local token=$1
-  shift
-  if [[ -n "$token" ]]; then
-    env -u CREATE_AGENT_APP_NPM_TOKEN NODE_AUTH_TOKEN="$token" npm "$@"
-  else
-    env -u CREATE_AGENT_APP_NPM_TOKEN -u NODE_AUTH_TOKEN npm "$@"
-  fi
+  env -u CREATE_AGENT_APP_NPM_TOKEN -u NODE_AUTH_TOKEN npm "$@"
 }
 
 registry_integrity() {
   local name=$1 version=$2 key=$3 value
-  if value=$(npm_command '' view "$name@$version" dist.integrity --registry="$REGISTRY" --prefer-online 2> "$TMP/$key.stderr"); then
+  if value=$(npm_command view "$name@$version" dist.integrity --registry="$REGISTRY" --prefer-online 2> "$TMP/$key.stderr"); then
     [[ "$value" =~ ^sha512-[A-Za-z0-9+/]+={0,2}$ ]] || die "registry lookup failed for $name@$version: malformed integrity."
     printf '%s' "$value"
     return
@@ -104,7 +98,7 @@ wait_for_registry_integrity() {
 }
 
 publish_one() {
-  local tarball=$1 name=$2 version=$3 key=$4 token=$5
+  local tarball=$1 name=$2 version=$3 key=$4
   local local_sri remote_sri status
   local args=(publish "$tarball" --provenance --access public --ignore-scripts --registry="$REGISTRY")
   local_sri=$(integrity "$tarball")
@@ -118,10 +112,7 @@ publish_one() {
     [[ $status -eq 44 ]] || exit "$status"
   fi
 
-  if [[ "$name" == "$CREATE_NAME" && -z "$token" ]]; then
-    die "CREATE_AGENT_APP_NPM_TOKEN is required to publish $name@$version."
-  fi
-  if ! npm_command "$token" "${args[@]}"; then
+  if ! npm_command "${args[@]}"; then
     if remote_sri=$(registry_integrity "$name" "$version" "$key") && [[ "$remote_sri" == "$local_sri" ]]; then
       echo "$name@$version exact tarball already published by a concurrent run"
       return
@@ -156,17 +147,16 @@ case "$command" in
       agent-app)
         [[ -z "${CREATE_AGENT_APP_NPM_TOKEN:-}" ]] || die 'CREATE_AGENT_APP_NPM_TOKEN must not be exposed to the agent-app publisher.'
         name=$ROOT_NAME
-        token=''
         ;;
       create-agent-app)
+        [[ -z "${CREATE_AGENT_APP_NPM_TOKEN:-}" ]] || die 'CREATE_AGENT_APP_NPM_TOKEN must not be exposed to the OIDC publisher.'
         name=$CREATE_NAME
-        token=${CREATE_AGENT_APP_NPM_TOKEN:-}
         ;;
       *) die "unknown package selector: $1" ;;
     esac
     version=$(tarball_version "$2" "$name" "$1")
     [[ "$version" == "$EXPECTED_VERSION" ]] || die "tarball version mismatch: expected $EXPECTED_VERSION, found $version."
-    publish_one "$2" "$name" "$version" "$1" "$token"
+    publish_one "$2" "$name" "$version" "$1"
     ;;
   *) die "usage: EXPECTED_VERSION=x.y.z $0 <validate|publish> ..." ;;
 esac

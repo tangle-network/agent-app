@@ -427,7 +427,6 @@ jobs:
         env:
           EXPECTED_VERSION: ${{ needs.package_release.outputs.version }}
           CONTROL_SHA: ${{ needs.package_release.outputs.publish-control-sha }}
-          CREATE_AGENT_APP_NPM_TOKEN: ${{ secrets.CREATE_AGENT_APP_NPM_TOKEN }}
           NPM_CONFIG_IGNORE_SCRIPTS: 'true'
         run: |
           set -euo pipefail
