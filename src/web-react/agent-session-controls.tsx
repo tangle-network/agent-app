@@ -385,8 +385,11 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
   )
 
   if (layout === 'inline') {
+    // The composer's controls slot wraps its children; this row must be able
+    // to wrap too, or three pickers at a narrow width run under the Send
+    // button instead of dropping to a second line.
     return (
-      <div className={`flex items-center gap-1.5 ${className ?? ''}`}>
+      <div className={`flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 ${className ?? ''}`}>
         {modelPicker}
         {showHarness && (
           <HarnessPicker
