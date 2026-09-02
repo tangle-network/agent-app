@@ -61,6 +61,18 @@ describe('buildCatalog', () => {
     expect(catalog.models.map((model) => model.id)).toEqual(['claude-opus-5'])
   })
 
+  it('rejects every explicit non-routeable Router status when its boolean is absent', () => {
+    const catalog = buildCatalog([
+      { id: 'works', _provider: 'test', routeability: { status: 'routeable' } },
+      { id: 'legacy-without-metadata', _provider: 'test' },
+      { id: 'missing-price', _provider: 'test', routeability: { status: 'missing_pricing' } },
+      { id: 'bring-your-own-key', _provider: 'test', routeability: { status: 'requires_byok' } },
+      { id: 'cannot-route', _provider: 'test', routeability: { status: 'unrouteable' } },
+    ])
+
+    expect(catalog.models.map((model) => model.id)).toEqual(['legacy-without-metadata', 'works'])
+  })
+
   it('dedupes dated snapshots and :free variants to one representative', () => {
     // gpt-5 and gpt-5-2025-08-07 collapse to the undated id
     expect(ids).toContain('gpt-5')
@@ -75,16 +87,16 @@ describe('buildCatalog', () => {
     expect(ids).toContain('claude-opus-4-6')
   })
 
-  it('features the highest version per family and shows current generations first', () => {
+  it('recommends a bounded current-model shortlist and keeps current generations first', () => {
     const featured = catalog.models.filter((m) => m.featured).map((m) => m.id)
     expect(featured[0]).toBe('claude-opus-4-7') // beats 4-6 and dated 4-5
-    expect(featured[1]).toBe('claude-sonnet-4-6')
     expect(featured).toContain('gpt-5.1') // beats gpt-5
     expect(featured).not.toContain('gpt-5.1-codex') // specialty suffix not featured
     expect(featured).toContain('gemini-3.1-pro-preview') // 3.1 beats 2.5
-    expect(featured).toContain('grok-4.3')
-    expect(featured).toContain('glm-5.1') // beats glm-5
-    expect(featured.length).toBeLessThanOrEqual(12)
+    expect(featured).not.toContain('grok-4.3')
+    expect(featured).not.toContain('glm-5.1')
+    expect(featured).not.toContain('claude-sonnet-4-6')
+    expect(featured.length).toBeLessThanOrEqual(3)
   })
 
   it('keeps the product default independent from display freshness', () => {
@@ -136,6 +148,33 @@ describe('buildCatalog', () => {
       { id: 'kimi-k3', provider: 'moonshot' },
       { id: 'moonshotai/kimi-k2', provider: 'moonshot' },
     ])
+  })
+
+  it('normalizes provider aliases before recommendation and display ordering', () => {
+    const current = buildCatalog([
+      { id: 'grok-4.6', _provider: 'x-ai', routeability: { routeable: true } },
+      { id: 'mistral-medium-2604', _provider: 'mistralai', routeability: { routeable: true } },
+    ])
+
+    expect(current.models.map(({ id, provider, featured }) => ({ id, provider, featured }))).toEqual([
+      { id: 'grok-4.6', provider: 'xai', featured: true },
+      { id: 'mistral-medium-2604', provider: 'mistral', featured: true },
+    ])
+  })
+
+  it('does not turn a large provider inventory into a large recommended section', () => {
+    const providers = [
+      'anthropic', 'openai', 'google', 'x-ai', 'deepseek', 'moonshotai', 'z-ai', 'mistralai',
+      'groq', 'nvidia', 'cohere', 'cerebras', 'vendor-a', 'vendor-b', 'vendor-c',
+    ]
+    const current = buildCatalog(providers.map((provider, index) => ({
+      id: provider === 'anthropic' ? 'claude-fable-5-1' : `${provider}/model-${index + 1}`,
+      _provider: provider,
+      routeability: { routeable: true },
+    })))
+
+    expect(current.models.filter((model) => model.featured)).toHaveLength(3)
+    expect(current.models).toHaveLength(providers.length)
   })
 
   it('picks a tool-capable featured model as default', () => {

@@ -12706,6 +12706,14 @@ type LoopMessage
 interface LoopToolCall
 ```
 
+### `MAX_RECOMMENDED_MODELS`
+
+`const` — A short first screen, not one row for every Router provider.
+
+```ts
+3
+```
+
 ### `mergeSurfaceOverlay`
 
 `function` — Merge one surface overlay into a base profile, returning a new object (the base is never mutated; untouched nested records are shared by reference).

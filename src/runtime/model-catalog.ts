@@ -9,8 +9,8 @@
  * duplicate canonical ones. This module turns that into a product catalogue:
  *
  *   filter (chat-capable, routeable) → dedupe (snapshot/prefix/:free aliases)
- *   → rank (provider tier, current generation) → feature (newest per provider)
- *   → default (env override or first featured)
+ *   → rank (provider tier, current generation) → recommend (bounded shortlist)
+ *   → default (env override or preferred family)
  *
  * Freshness is automatic: everything is derived from the live router response,
  * so new models surface as soon as the router lists them. The only static
@@ -66,10 +66,8 @@ const PROVIDER_TIER: string[] = [
   'google',
   'xai',
   'deepseek',
-  'moonshotai',
   'moonshot',
   'zai',
-  'z-ai',
   'mistral',
   'groq',
   'nvidia',
@@ -82,19 +80,24 @@ function normalizeProvider(provider: string): string {
   const normalized = provider.toLowerCase()
   if (normalized === 'moonshotai') return 'moonshot'
   if (normalized === 'z-ai') return 'zai'
+  if (normalized === 'x-ai') return 'xai'
+  if (normalized === 'mistralai') return 'mistral'
   return normalized
 }
+
+/** A short first screen, not one row for every Router provider. */
+export const MAX_RECOMMENDED_MODELS = 3
 
 /** Non-chat endpoints that pollute the router list (matched on normalized id). */
 const EXCLUDED_ID = /(embedding|tts|transcribe|whisper|audio|realtime|image|lyria|sora|dall-e|moderation|content-safety|search-preview|search-api|deep-research|:batch$)/
 
 /**
- * Featured families, in default-preference order. Each rule surfaces the highest-version
+ * Default families, in preference order. Each rule finds the highest-version
  * routeable model whose normalized id matches. Patterns anchor on the family
  * name and stop before specialty suffixes (codex, nano, lite, …) so the
  * mainline model wins.
  */
-const FEATURED_RULES: Array<{ providers: string[]; match: RegExp }> = [
+const DEFAULT_CANDIDATE_RULES: Array<{ providers: string[]; match: RegExp }> = [
   { providers: ['anthropic'], match: /^claude-sonnet-[\d-]+$/ },
   { providers: ['anthropic'], match: /^claude-opus-[\d-]+$/ },
   { providers: ['anthropic'], match: /^claude-haiku-[\d-]+$/ },
@@ -228,7 +231,11 @@ export function isChatCapableModel(m: RouterModel): boolean {
 const isChatModel = isChatCapableModel
 
 function isRouteable(m: RouterModel): boolean {
-  return m.routeability?.routeable !== false && m.routeability?.status !== 'unavailable'
+  const routeability = m.routeability
+  if (!routeability) return true
+  if (routeability.routeable === true || routeability.status === 'routeable') return true
+  if (routeability.routeable === false) return false
+  return routeability.status === undefined
 }
 
 /**
@@ -264,14 +271,14 @@ export function buildCatalog(raw: RouterModel[], opts?: { preferredDefault?: str
     reps.push({ model: rep, normId: normalizeModelId(rep.id), mergedParams })
   }
 
-  // Featured: best version per family rule. Rule order still chooses the default.
-  const featuredIds: string[] = []
-  for (const rule of FEATURED_RULES) {
+  // Resolve the default independently from menu recommendations.
+  const defaultCandidateIds: string[] = []
+  for (const rule of DEFAULT_CANDIDATE_RULES) {
     const matches = reps.filter(
       (r) =>
         rule.providers.map(normalizeProvider).includes(normalizeProvider(r.model._provider ?? '')) &&
         rule.match.test(r.normId) &&
-        !featuredIds.includes(r.model.id),
+        !defaultCandidateIds.includes(r.model.id),
     )
     if (!matches.length) continue
     matches.sort(
@@ -280,7 +287,7 @@ export function buildCatalog(raw: RouterModel[], opts?: { preferredDefault?: str
         Number(a.normId.includes('preview')) - Number(b.normId.includes('preview')) ||
         a.model.id.length - b.model.id.length,
     )
-    featuredIds.push(matches[0]!.model.id)
+    defaultCandidateIds.push(matches[0]!.model.id)
   }
 
   const toCatalogModel = (r: (typeof reps)[number]): CatalogModel => {
@@ -298,35 +305,35 @@ export function buildCatalog(raw: RouterModel[], opts?: { preferredDefault?: str
           : undefined,
       supportsTools: r.mergedParams.has('tools') || TOOL_CAPABLE_FAMILY.test(r.normId),
       supportsReasoning: r.mergedParams.has('reasoning') || r.mergedParams.has('include_reasoning'),
-      featured: featuredIds.includes(m.id),
+      featured: false,
     }
   }
 
   // Family rules retain the intentional default preference. Display order is
   // independent: every catalogue consumer gets provider-grouped freshness,
   // even when it does not render ModelPicker.
-  const featuredInRuleOrder = featuredIds
+  const defaultCandidatesInRuleOrder = defaultCandidateIds
     .map((id) => reps.find((r) => r.model.id === id)!)
     .map(toCatalogModel)
   const sorted = sortModelsByFreshness(reps.map(toCatalogModel))
-  const newestProviderIds = new Set<string>()
+  const recommendedIds = new Set<string>()
   const seenProviders = new Set<string>()
   for (const model of sorted) {
-    const provider = model.provider.toLowerCase()
+    const provider = normalizeProvider(model.provider)
+    if (providerRank(provider) >= PROVIDER_TIER.length) continue
     if (seenProviders.has(provider)) continue
     seenProviders.add(provider)
-    newestProviderIds.add(model.id)
+    recommendedIds.add(model.id)
+    if (recommendedIds.size >= MAX_RECOMMENDED_MODELS) break
   }
   const models = sorted.map((model) =>
-    newestProviderIds.has(model.id) && !model.featured
-      ? { ...model, featured: true }
-      : model,
+    recommendedIds.has(model.id) ? { ...model, featured: true } : model,
   )
 
   const preferred = opts?.preferredDefault
   const defaultModelId =
     (preferred && models.find((m) => m.id === preferred || normalizeModelId(m.id) === normalizeModelId(preferred))?.id) ||
-    featuredInRuleOrder.find((m) => m.supportsTools)?.id ||
+    defaultCandidatesInRuleOrder.find((m) => m.supportsTools)?.id ||
     models[0]?.id ||
     null
 

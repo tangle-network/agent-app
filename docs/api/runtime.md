@@ -4,7 +4,7 @@
 
 Source: `src/runtime/index.ts`
 
-64 exports.
+65 exports.
 
 ### `AnySurfaceKind`
 
@@ -180,6 +180,14 @@ type LoopMessage
 
 ```ts
 interface LoopToolCall
+```
+
+### `MAX_RECOMMENDED_MODELS`
+
+`const` — A short first screen, not one row for every Router provider.
+
+```ts
+3
 ```
 
 ### `mergeSurfaceOverlay`
