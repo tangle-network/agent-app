@@ -4,7 +4,8 @@ A multimodal chat agent product scaffolded with `create-agent-app --chat`, built
 on [`@tangle-network/agent-app`](https://github.com/tangle-network/agent-app):
 the whole server chat vertical — better-auth sessions, thread/message
 persistence with typed parts + usage receipts, streaming turns with buffered
-replay, file uploads, human-in-the-loop asks — assembled from shell factories.
+replay, file uploads, human-in-the-loop asks, personal API keys, and
+OpenAI-compatible access — assembled from shell factories.
 The agent itself runs in a Tangle sandbox (a full harness: skills, tools, bash,
 MCP); this app coordinates UI, durability, and access around it.
 
@@ -15,9 +16,11 @@ MCP); this app coordinates UI, durability, and access around it.
 | `agent.config.ts` | DATA — name, model default, harness, ask kinds | defining the agent |
 | `prompts/system.md` | DATA — the persona (imported as a Text module) | shaping behavior |
 | `src/chat.ts` | CODE — the composer (factories → the chat vertical) | extending seams |
+| `src/gateway.ts` | CODE — API keys → the same chat vertical | API pricing or publication changes |
 | `src/sandbox.ts` | CODE — the sandbox lane (boxes, credentials, profile) | provisioning changes |
 | `src/worker.ts` | CODE — HTTP routing only | adding an endpoint |
 | `src/db/schema.ts` | CODE — auth tables + `createChatTables()` | schema changes (+ migration) |
+| `migrations/0002_agent_gateway.sql` | CODE — API keys, usage, and request claims | upgrading an existing generated app |
 | `migrations/` | SQL the e2e test executes for real | schema changes |
 | `public/index.html` | the dev chat page (not the product UI) | never — replace it (CUSTOMIZE ⑤) |
 | `tests/` | the e2e turn gate this app ships with | extending coverage |

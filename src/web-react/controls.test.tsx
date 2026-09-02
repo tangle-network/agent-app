@@ -51,6 +51,40 @@ describe('ModelPicker', () => {
     expect(screen.getByText('No models match your search')).toBeTruthy()
     expect(screen.queryByText('No models available')).toBeNull()
   })
+
+  it('shows current models before stale models even when the caller sends stale order', () => {
+    render(<ModelPicker
+      value="gpt-4.1-mini"
+      onChange={() => {}}
+      models={[
+        model('gpt-4.1-mini'),
+        model('gpt-5.5'),
+        model('gpt-5.6-luna'),
+      ]}
+    />)
+    openPicker()
+    const rows = screen.getAllByRole('button').filter(
+      (button) => !button.hasAttribute('aria-expanded') && button.textContent?.startsWith('gpt-'),
+    )
+    expect(rows.map((row) => row.textContent)).toEqual(['gpt-5.6-luna', 'gpt-5.5', 'gpt-4.1-mini'])
+  })
+
+  it('does not promote an old featured model above a newer release', () => {
+    render(<ModelPicker
+      value="gpt-4.1-mini"
+      onChange={() => {}}
+      models={[
+        model('gpt-4.1-mini', { featured: true }),
+        model('gpt-5.6-luna'),
+      ]}
+    />)
+    openPicker()
+    expect(screen.queryByText('Recommended')).toBeNull()
+    const rows = screen.getAllByRole('button').filter(
+      (button) => !button.hasAttribute('aria-expanded') && button.textContent?.startsWith('gpt-'),
+    )
+    expect(rows.map((row) => row.textContent)).toEqual(['gpt-5.6-luna', 'gpt-4.1-mini'])
+  })
 })
 
 describe('effortMeterFill', () => {

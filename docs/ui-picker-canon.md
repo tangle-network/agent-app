@@ -33,6 +33,14 @@ in agent-app. Note the one deliberate asymmetry: the assistant dock composer
 renders a **bare `ModelPicker`** by design — the assistant wire has no harness
 field, so no harness or effort control belongs there.
 
+## Freshness ordering
+
+`ModelPicker` sorts the live catalog by provider and release generation before it renders any section.
+The newest stable release appears before older models, even when a caller sends stale order or stale `featured` flags.
+The product's configured default does not change when display order changes.
+
+![Current models appear before stale models](./assets/model-picker/freshness-ordering.png)
+
 ## Migration: sandbox-ui → agent-app canon
 
 ### `ModelPicker` (sandbox-ui `dashboard/ModelPicker` → `agent-app/web-react` `ModelPicker`)

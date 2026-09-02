@@ -313,6 +313,8 @@ function main(scratch) {
     'template-chat/_package.json',
     'template-chat/_tsconfig.json',
     'template-chat/pnpm-workspace.yaml',
+    'template-chat/migrations/0002_agent_gateway.sql',
+    'template-chat/src/gateway.ts',
     'template-chat/src/worker.ts',
     'template-chat/tests/chat-turn.e2e.test.ts',
   ])

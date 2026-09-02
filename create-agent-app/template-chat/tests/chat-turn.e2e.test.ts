@@ -16,7 +16,7 @@
  * contract (or the migration from the schema). Fix the drift, not the test.
  */
 
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
@@ -26,6 +26,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createSandboxChatProducer,
   normalizeChatPromptForSandbox,
+  type ChatTurnProduceArgs,
   type ChatTurnRouteProducer,
 } from '@tangle-network/agent-app/chat-routes'
 import type { ChatDatabase } from '@tangle-network/agent-app/chat-store'
@@ -34,28 +35,59 @@ import {
   createMemoryTurnEventStore,
   TURN_EVENTS_MIGRATION_SQL,
 } from '@tangle-network/agent-app/stream'
+import {
+  sqlApiKeyStoreSchemaStatements,
+  sqlGatewayUsageStoreSchemaStatements,
+  type SqlAdapter,
+} from '@tangle-network/agent-gateway'
 
 import { config } from '../agent.config'
 import { buildChatApp, type ChatApp } from '../src/chat'
 import type { AppEnv } from '../src/env'
+import { buildGatewayApp } from '../src/gateway'
+import { appSlug } from '../src/sandbox'
+import { createWorker } from '../src/worker'
 
 const BASE = 'http://localhost:8787'
 const MODEL = 'test/model-1'
 
 // ── fixtures ────────────────────────────────────────────────────────────────
 
-const MIGRATION = join(dirname(fileURLToPath(import.meta.url)), '..', 'migrations', '0001_init.sql')
+const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'migrations')
+const MIGRATIONS = readdirSync(MIGRATIONS_DIR)
+  .filter((name) => /^\d+.*\.sql$/.test(name))
+  .sort()
+  .map((name) => join(MIGRATIONS_DIR, name))
+const BASE_MIGRATION = join(MIGRATIONS_DIR, '0001_init.sql')
+const GATEWAY_MIGRATION = join(MIGRATIONS_DIR, '0002_agent_gateway.sql')
 
 /** The real migration, executed against a real SQLite database. Every query
  *  the test makes afterwards runs over THESE tables — schema drift between
  *  `migrations/` and `src/db/schema.ts` fails here, not in production. */
-function openMigratedDb(): ChatDatabase {
+function openMigratedDb(migrations = MIGRATIONS): {
+  db: ChatDatabase
+  sql: SqlAdapter
+  applyMigration(path: string): void
+} {
   const sqlite = new Database(':memory:')
   sqlite.pragma('foreign_keys = ON')
-  sqlite.exec(readFileSync(MIGRATION, 'utf8'))
+  for (const migration of migrations) sqlite.exec(readFileSync(migration, 'utf8'))
   // better-sqlite3's sync drizzle handle narrows the driver generic; the store
   // treats sync and async drivers identically (builders are awaited).
-  return drizzle(sqlite) as unknown as ChatDatabase
+  return {
+    db: drizzle(sqlite) as unknown as ChatDatabase,
+    sql: {
+      async exec(statement, params = []) {
+        return { rowsAffected: sqlite.prepare(statement).run(...params).changes }
+      },
+      async query<TRow>(statement: string, params: readonly unknown[] = []) {
+        return sqlite.prepare(statement).all(...params) as TRow[]
+      },
+    },
+    applyMigration(path) {
+      sqlite.exec(readFileSync(path, 'utf8'))
+    },
+  }
 }
 
 /** Raw sidecar events, exactly as `streamSandboxPrompt` would yield them from
@@ -84,18 +116,28 @@ const env: AppEnv = {
 
 interface Harness {
   app: ChatApp
+  workerFetch(request: Request): Promise<Response>
+  sql: SqlAdapter
   cookie: string
+  gatewayBuilds(): number
   settle(): Promise<unknown>
 }
 
 async function createHarness(
-  produce: () => ChatTurnRouteProducer = () =>
+  produce: (args: ChatTurnProduceArgs<void>) => ChatTurnRouteProducer = () =>
     createSandboxChatProducer({ events: feed(RAW_TURN_EVENTS), model: MODEL }),
 ): Promise<Harness> {
-  const app = buildChatApp(env, {
-    db: openMigratedDb(),
+  const database = openMigratedDb()
+  const pending: Promise<unknown>[] = []
+  let gatewayBuildCount = 0
+  const chatOverrides = {
+    db: database.db,
     turnStore: createMemoryTurnEventStore(),
     produce,
+    uploadSink: async () => null,
+  }
+  const app = buildChatApp(env, {
+    ...chatOverrides,
     uploadSink: async () => null, // inline uploads only; no box in tests
   })
   // Real sign-up through better-auth; the returned cookie is what a browser
@@ -113,11 +155,42 @@ async function createHarness(
     .map((c) => c.split(';')[0]!)
     .join('; ')
 
-  const pending: Promise<unknown>[] = []
   const originalTurn = app.routes.turn
   app.routes.turn = (request) =>
     originalTurn(request, { waitUntil: (p) => void pending.push(p) })
-  return { app, cookie, settle: () => Promise.all(pending) }
+  const worker = createWorker({
+    buildChatApp: () => app,
+    buildGatewayApp: (_env, chatApp, options) => {
+      gatewayBuildCount += 1
+      return buildGatewayApp(env, chatApp, {
+        ...options,
+        sql: database.sql,
+        createTrustedChatApp: (ownerId) => buildChatApp(env, {
+          ...chatOverrides,
+          trustedUserId: ownerId,
+        }),
+      })
+    },
+  })
+  const executionContext = {
+    waitUntil: (promise: Promise<unknown>) => void pending.push(promise),
+    passThroughOnException: () => undefined,
+    props: {},
+  } as ExecutionContext
+  const workerHandler = worker.fetch
+  if (!workerHandler) throw new Error('Generated Worker has no fetch handler')
+  return {
+    app,
+    workerFetch: async (request) => workerHandler(
+      request as Parameters<typeof workerHandler>[0],
+      env,
+      executionContext,
+    ),
+    sql: database.sql,
+    cookie,
+    gatewayBuilds: () => gatewayBuildCount,
+    settle: () => Promise.all(pending),
+  }
 }
 
 function post(path: string, cookie: string, body: unknown): Request {
@@ -140,6 +213,22 @@ async function readLines(res: Response): Promise<Array<Record<string, unknown>>>
  *  same way web-react's `dispatchChatStreamLine` does. */
 function eventsOf(lines: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
   return lines.map((l) => (l.kind === 'event' ? (l.event as Record<string, unknown>) : l))
+}
+
+async function readGatewayText(response: Response): Promise<string> {
+  const body = await response.text()
+  return body
+    .split('\n')
+    .filter((line) => line.startsWith('data: ') && line !== 'data: [DONE]')
+    .map((line) => JSON.parse(line.slice(6)) as {
+      choices?: Array<{ delta?: { content?: string } }>
+      error?: { message?: string }
+    })
+    .map((frame) => {
+      if (frame.error) throw new Error(frame.error.message ?? 'gateway stream failed')
+      return frame.choices?.[0]?.delta?.content ?? ''
+    })
+    .join('')
 }
 
 // ── the gate ────────────────────────────────────────────────────────────────
@@ -215,7 +304,10 @@ describe('e2e: fake sandbox producer → streamed turn → persisted transcript'
       | undefined
     expect(toolCall?.call?.toolName).toBe('record_search')
     expect(events).toContainEqual(
-      expect.objectContaining({ type: 'usage', usage: { promptTokens: 40, completionTokens: 20 } }),
+      expect.objectContaining({
+        type: 'usage',
+        usage: expect.objectContaining({ promptTokens: 40, completionTokens: 20 }),
+      }),
     )
     await settle()
 
@@ -272,12 +364,337 @@ describe('e2e: fake sandbox producer → streamed turn → persisted transcript'
 
   it('the migration carries the turn-buffer DDL the /stream store expects, verbatim', () => {
     const normalize = (sql: string) => sql.replace(/\s+/g, ' ').trim()
-    expect(normalize(readFileSync(MIGRATION, 'utf8'))).toContain(normalize(TURN_EVENTS_MIGRATION_SQL))
+    expect(normalize(readFileSync(BASE_MIGRATION, 'utf8'))).toContain(normalize(TURN_EVENTS_MIGRATION_SQL))
   })
 
   it('the migration carries the fenced sandbox claim table, verbatim', () => {
     const normalize = (sql: string) => sql.replace(/\s+/g, ' ').replace(/;$/, '').trim()
-    expect(normalize(readFileSync(MIGRATION, 'utf8'))).toContain(normalize(PREWARM_CLAIM_TABLE_DDL))
+    expect(normalize(readFileSync(BASE_MIGRATION, 'utf8'))).toContain(normalize(PREWARM_CLAIM_TABLE_DDL))
+  })
+
+  it('the migration carries every agent-gateway SQL store statement', () => {
+    const migration = readFileSync(GATEWAY_MIGRATION, 'utf8')
+    const normalize = (sql: string) => sql.replace(/\s+/g, ' ').replace(/;$/, '').trim()
+    const statements = [
+      ...sqlApiKeyStoreSchemaStatements(),
+      ...sqlGatewayUsageStoreSchemaStatements(),
+    ]
+
+    for (const statement of statements) {
+      expect(normalize(migration)).toContain(normalize(statement))
+    }
+  })
+
+  it('upgrades a database that already applied the original chat migration', async () => {
+    const migrated = openMigratedDb([BASE_MIGRATION])
+    const tableNames = async () => (await migrated.sql.query<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'agent_%' ORDER BY name",
+    )).map((row) => row.name)
+
+    expect(await tableNames()).toEqual([])
+    migrated.applyMigration(GATEWAY_MIGRATION)
+    expect(await tableNames()).toEqual([
+      'agent_api_key',
+      'agent_api_key_request',
+      'agent_api_key_usage',
+      'agent_gateway_usage',
+    ])
+  })
+
+  it('shares one owned thread across OpenAI-compatible API calls', async () => {
+    const { app, workerFetch, sql, cookie, gatewayBuilds, settle } = await createHarness()
+    const cardResponse = await workerFetch(new Request(
+      `${BASE}/v1/agents/${appSlug}/.well-known/agent.json`,
+    ))
+    expect(cardResponse.status).toBe(404)
+
+    const keyResponse = await workerFetch(post('/api/keys', cookie, {
+      name: 'coding agent',
+      rateLimit: 2,
+      dailyLimit: 2,
+    }))
+    expect(keyResponse.status).toBe(201)
+    const { key } = (await keyResponse.json()) as { key: string }
+
+    const openAiResponse = await workerFetch(new Request(
+      `${BASE}/v1/agents/${appSlug}/chat/completions`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: 'File my lease summary' }],
+          stream: true,
+        }),
+      },
+    ))
+    expect(openAiResponse.status).toBe(200)
+    const threadId = openAiResponse.headers.get('X-Tangle-Thread-Id')
+    expect(threadId).toBeTruthy()
+    expect(openAiResponse.headers.get('X-Tangle-Thread-Url')).toBe(
+      `${BASE}/?threadId=${encodeURIComponent(threadId!)}`,
+    )
+    expect(await readGatewayText(openAiResponse)).toBe('Filed the summary.')
+    await settle()
+
+    const thread = await app.store.getThread(threadId!)
+    expect(thread).toMatchObject({ id: threadId, workspaceId: expect.any(String) })
+    expect(await app.store.listMessages(threadId!)).toHaveLength(2)
+    expect(await sql.query(`
+      SELECT input_tokens, output_tokens, reasoning_tokens, tool_tokens,
+        tool_call_count, provider_cost_nanodollars, total_cost_nanodollars,
+        settlement_basis
+      FROM agent_gateway_usage
+    `)).toEqual([{
+      input_tokens: 40,
+      output_tokens: 20,
+      reasoning_tokens: 5,
+      tool_tokens: 0,
+      tool_call_count: 1,
+      provider_cost_nanodollars: 12_300_000,
+      total_cost_nanodollars: 12_300_000,
+      settlement_basis: 'usage-receipt',
+    }])
+    expect(await sql.query('SELECT request_id FROM agent_api_key_usage')).toHaveLength(1)
+    expect(await sql.query('SELECT request_id FROM agent_api_key_request')).toHaveLength(1)
+
+    const continuedResponse = await workerFetch(new Request(
+      `${BASE}/v1/agents/${appSlug}/chat/completions`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json',
+          'X-Tangle-Thread-Id': threadId!,
+        },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: 'Continue the same work' }],
+          stream: true,
+        }),
+      },
+    ))
+    expect(continuedResponse.status).toBe(200)
+    expect(continuedResponse.headers.get('X-Tangle-Thread-Id')).toBe(threadId)
+    expect(await readGatewayText(continuedResponse)).toBe('Filed the summary.')
+    await settle()
+    expect(await app.store.listMessages(threadId!)).toHaveLength(4)
+    expect(await sql.query('SELECT request_id FROM agent_api_key_request')).toHaveLength(2)
+    expect(await sql.query('SELECT request_id FROM agent_gateway_usage')).toHaveLength(2)
+    expect(await sql.query('SELECT request_id FROM agent_api_key_usage')).toHaveLength(2)
+
+    await app.store.createThread({
+      id: 'another-users-thread',
+      workspaceId: 'another-user',
+      title: 'Private',
+    })
+    const probeKeyResponse = await workerFetch(post('/api/keys', cookie, {
+      name: 'thread probe',
+      rateLimit: 1,
+      dailyLimit: 1,
+    }))
+    expect(probeKeyResponse.status).toBe(201)
+    const { key: probeKey } = (await probeKeyResponse.json()) as { key: string }
+    const denied = await workerFetch(new Request(
+      `${BASE}/v1/agents/${appSlug}/chat/completions`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${probeKey}`,
+          'Content-Type': 'application/json',
+          'X-Tangle-Thread-Id': 'another-users-thread',
+        },
+        body: JSON.stringify({ messages: [{ role: 'user', content: 'Open it' }] }),
+      },
+    ))
+    expect(denied.status).toBe(403)
+    expect(await sql.query('SELECT request_id FROM agent_api_key_request')).toHaveLength(2)
+
+    const rateLimited = await workerFetch(new Request(
+      `${BASE}/v1/agents/${appSlug}/chat/completions`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: 'This third turn must not run' }],
+          stream: true,
+        }),
+      },
+    ))
+    expect(rateLimited.status).toBe(429)
+    expect(await app.store.listMessages(threadId!)).toHaveLength(4)
+    expect(await sql.query('SELECT request_id FROM agent_api_key_request')).toHaveLength(2)
+    expect(gatewayBuilds()).toBe(6)
+  })
+
+  it('finishes the linked browser transcript after the API client disconnects', async () => {
+    let releaseTurn = () => {}
+    const canFinish = new Promise<void>((resolve) => {
+      releaseTurn = resolve
+    })
+    async function* delayedEvents(): AsyncGenerator<Record<string, unknown>> {
+      yield {
+        type: 'message.part.updated',
+        data: {
+          part: { type: 'text', id: 'answer', text: 'Started. ' },
+          delta: 'Started. ',
+        },
+      }
+      await canFinish
+      yield {
+        type: 'message.part.updated',
+        data: {
+          part: { type: 'text', id: 'answer', text: 'Started. Finished.' },
+          delta: 'Finished.',
+        },
+      }
+      yield {
+        type: 'message.part.updated',
+        data: {
+          part: {
+            type: 'step-finish',
+            reason: 'stop',
+            tokens: { input: 7, output: 3, reasoning: 1 },
+            cost: 0.00021,
+          },
+        },
+      }
+      yield { type: 'result', data: { finalText: 'Started. Finished.' } }
+    }
+    const { app, workerFetch, sql, cookie, settle } = await createHarness(() =>
+      createSandboxChatProducer({ events: delayedEvents(), model: MODEL }))
+    const keyResponse = await workerFetch(post('/api/keys', cookie, {
+      name: 'disconnect test',
+      rateLimit: 1,
+      dailyLimit: 1,
+    }))
+    const { key } = (await keyResponse.json()) as { key: string }
+
+    const response = await workerFetch(new Request(
+      `${BASE}/v1/agents/${appSlug}/chat/completions`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: 'Complete this after I leave' }],
+          stream: true,
+        }),
+      },
+    ))
+    expect(response.status).toBe(200)
+    const threadId = response.headers.get('X-Tangle-Thread-Id')
+    expect(response.headers.get('X-Tangle-Thread-Url')).toBe(
+      `${BASE}/?threadId=${encodeURIComponent(threadId!)}`,
+    )
+
+    const reader = response.body!.getReader()
+    const decoder = new TextDecoder()
+    let visible = ''
+    while (!visible.includes('Started.')) {
+      const chunk = await reader.read()
+      if (chunk.done) throw new Error('Gateway stream ended before its first answer text')
+      visible += decoder.decode(chunk.value, { stream: true })
+    }
+    await reader.cancel()
+
+    const runningResponse = await app.routes.running(new Request(
+      `${BASE}/api/chat/running?threadId=${encodeURIComponent(threadId!)}`,
+      { headers: { cookie } },
+    ))
+    expect(runningResponse.status).toBe(200)
+    const { running } = (await runningResponse.json()) as { running: string[] }
+    expect(running).toHaveLength(1)
+    const replay = await app.routes.replay(
+      new Request(`${BASE}/api/chat/replay/${running[0]}?fromSeq=0`, { headers: { cookie } }),
+      { turnId: running[0]! },
+    )
+    const replayLines = readLines(replay)
+
+    releaseTurn()
+    await settle()
+
+    const messages = await app.store.listMessages(threadId!)
+    expect(messages).toHaveLength(2)
+    expect(messages[1]).toMatchObject({ role: 'assistant', content: 'Started. Finished.' })
+    const events = eventsOf(await replayLines)
+    expect(events.filter((event) => event.type === 'text').map((event) => event.text).join(''))
+      .toBe('Started. Finished.')
+    expect(events.at(-1)).toMatchObject({ type: 'turn_status', status: 'complete' })
+    expect(await sql.query(`
+      SELECT input_tokens, output_tokens, reasoning_tokens, provider_cost_nanodollars
+      FROM agent_gateway_usage
+    `)).toEqual([{
+      input_tokens: 7,
+      output_tokens: 3,
+      reasoning_tokens: 1,
+      provider_cost_nanodollars: 210_000,
+    }])
+    expect(await sql.query('SELECT request_id FROM agent_api_key_usage')).toHaveLength(1)
+  })
+
+  it('passes the complete provider budget into the shared chat turn', async () => {
+    let receivedLimits: ChatTurnProduceArgs<void>['executionLimits']
+    const { workerFetch, cookie, settle } = await createHarness((args) => {
+      receivedLimits = args.executionLimits
+      return createSandboxChatProducer({ events: feed(RAW_TURN_EVENTS), model: MODEL })
+    })
+    const keyResponse = await workerFetch(post('/api/keys', cookie, {
+      name: 'budget test',
+      rateLimit: 1,
+      dailyLimit: 1,
+    }))
+    const { key } = (await keyResponse.json()) as { key: string }
+
+    const response = await workerFetch(new Request(
+      `${BASE}/v1/agents/${appSlug}/chat/completions`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: 'Use the bounded path' }],
+          max_tokens: 321,
+          stream: true,
+        }),
+      },
+    ))
+
+    expect(response.status).toBe(200)
+    await readGatewayText(response)
+    await settle()
+    expect(receivedLimits).toMatchObject({
+      maxInputTokens: config.gateway.maxProviderInputTokens,
+      maxOutputTokens: 321,
+      maxReasoningTokens: 321,
+      maxToolTokens: 321,
+      maxToolCalls: 8,
+    })
+    expect(receivedLimits?.maxProviderCostUsd).toBeGreaterThan(0)
+  })
+
+  it('does not mount API-key or agent routes when the gateway is disabled', async () => {
+    const database = openMigratedDb()
+    const app = buildChatApp(env, {
+      db: database.db,
+      turnStore: createMemoryTurnEventStore(),
+      produce: () => createSandboxChatProducer({ events: feed(RAW_TURN_EVENTS), model: MODEL }),
+    })
+    const worker = createWorker({
+      buildChatApp: () => app,
+      buildGatewayApp: (_env, chatApp) => buildGatewayApp(env, chatApp, { sql: database.sql }),
+      gatewayEnabled: false,
+    })
+    const fetch = worker.fetch
+    if (!fetch) throw new Error('Generated Worker has no fetch handler')
+    const context = {
+      waitUntil: () => undefined,
+      passThroughOnException: () => undefined,
+      props: {},
+    } as unknown as ExecutionContext
+
+    const [keys, agents] = await Promise.all([
+      fetch(new Request(`${BASE}/api/keys`), env, context),
+      fetch(new Request(`${BASE}/v1/agents/${appSlug}/.well-known/agent.json`), env, context),
+    ])
+    expect(keys.status).toBe(404)
+    expect(agents.status).toBe(404)
   })
 
   it('agent.config carries a real system prompt (prompts/system.md is wired)', () => {

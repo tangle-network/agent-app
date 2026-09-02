@@ -1395,6 +1395,14 @@ interface ModelCatalog
 interface RouterModel
 ```
 
+### `sortModelsByFreshness`
+
+`function` — Return a copy sorted for a model menu.
+
+```ts
+(models: readonly CatalogModel[]) => CatalogModel[]
+```
+
 
 ## `./chat-react`
 
@@ -1821,6 +1829,14 @@ interface ChatTurnAuthorizeArgs
 interface ChatTurnCompleteInput
 ```
 
+### `ChatTurnExecutionLimits`
+
+`interface` — Trusted per-turn limits supplied by a server adapter, never by the body.
+
+```ts
+interface ChatTurnExecutionLimits
+```
+
 ### `ChatTurnFilePartInput`
 
 `interface` — A non-text prompt part the upload route hands back and the client echoes on send.
@@ -1947,6 +1963,14 @@ type ChatTurnPartInput
 
 ```ts
 interface ChatTurnProduceArgs
+```
+
+### `ChatTurnRequestContext`
+
+`interface` — Server-only context for one turn request.
+
+```ts
+interface ChatTurnRequestContext
 ```
 
 ### `chatTurnRequestInit`
@@ -2631,7 +2655,7 @@ interface ProducerToolResultEvent
 
 ### `ProducerUsageEvent`
 
-`interface` — Describe usage event with prompt and completion token counts for a producer
+`interface` — Describe cumulative provider usage reported by a producer.
 
 ```ts
 interface ProducerUsageEvent
@@ -12762,6 +12786,14 @@ interface RouterModel
 (opts: RunToolLoopOptions) => Promise<ToolLoopResult>
 ```
 
+### `sortModelsByFreshness`
+
+`function` — Return a copy sorted for a model menu.
+
+```ts
+(models: readonly CatalogModel[]) => CatalogModel[]
+```
+
 ### `streamAppToolLoop`
 
 `function` — Streaming bounded tool loop: yields each raw turn event (the caller maps + telemetries + re-emits it) and each executed `tool_result`; emits one `capped` if it stops for any non-completed reason with…
@@ -12949,6 +12981,14 @@ Source: `src/sandbox/index.ts` · depends on `harness`, `profile`, `runtime`, `t
 
 ```ts
 (events: AsyncIterable<unknown>) => AsyncGenerator<SandboxStreamEvent, any, any>
+```
+
+### `applyPromptTokenLimits`
+
+`function` — Tighten the profile's provider-enforced token ceilings for one prompt.
+
+```ts
+(profile: AgentProfile, limits: SandboxPromptTokenLimits) => AgentProfile
 ```
 
 ### `AppToolDescriptor`
@@ -13901,6 +13941,14 @@ interface SandboxPrewarmerOptions
 
 ```ts
 interface SandboxPrewarmScope
+```
+
+### `SandboxPromptTokenLimits`
+
+`interface`
+
+```ts
+interface SandboxPromptTokenLimits
 ```
 
 ### `SandboxProvisionedObservation`
@@ -24277,7 +24325,7 @@ interface MissionActivityLaneProps
 
 ### `ModelPicker`
 
-`function` — Searchable model picker pill + popover: a featured/recommended section first, then per-provider groups in catalogue order (the server already sorts providers by tier).
+`function` — Searchable model picker pill + popover.
 
 ```ts
 ({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup, variant }: ModelPickerProps)…
@@ -24517,7 +24565,7 @@ interface ProducerToolResultEvent
 
 ### `ProducerUsageEvent`
 
-`interface` — Describe usage event with prompt and completion token counts for a producer
+`interface` — Describe cumulative provider usage reported by a producer.
 
 ```ts
 interface ProducerUsageEvent

@@ -26,6 +26,8 @@ Discovery: **Whose job does this agent do, in whose voice, under what hard rules
 Discovery: **Which model answers by default, at what effort, on which harness?**
 
 - [ ] Set `model.default` to a model your Tangle Router key can reach.
+- [ ] Set `gateway.maxProviderInputTokens` to that model's full input limit.
+      This covers retained tool and sidecar history that the transcript omits.
 - [ ] Pick `harness` (`opencode` default; vendor-locked harnesses like
       `claude-code` must pair with their own provider's models).
 - [ ] Define the selectable profile catalog for the UI and map each selected
@@ -43,9 +45,11 @@ Discovery: **Where does this app live and what may it spend?**
 - [ ] `wrangler d1 create <name>` → paste `database_id` into `wrangler.toml`.
 - [ ] Copy `.dev.vars.example` → `.dev.vars`; fill `BETTER_AUTH_SECRET`,
       `TANGLE_API_KEY`, `SANDBOX_API_KEY`, `SANDBOX_GATEWAY_URL`.
-- [ ] `pnpm db:migrate:local` — applies `migrations/0001_init.sql` (auth +
-      chat + turn buffer). The e2e test executes this same file, so it cannot
-      silently drift from the schema.
+- [ ] `pnpm db:migrate:local` — applies both migrations (auth, chat, turn
+      buffer, API keys, usage, and request limits).
+      The e2e test executes these same files, so they cannot drift from the schema.
+- [ ] Existing generated app: copy and apply `0002_agent_gateway.sql`.
+      Never edit its already-applied `0001_init.sql`.
 - [ ] Existing app only: add `sandbox_prewarm_claims` in a new migration.
       Do not edit an applied `0001_init.sql`; Wrangler will not run it again.
 - [ ] R2 stays commented out unless the product stores artifacts.
@@ -59,6 +63,9 @@ Discovery: **Does a real message round-trip through a real box?**
       and a usage receipt, and a second turn continues the same agent session.
 - [ ] Kill the tab mid-turn, reopen the thread — the persisted row is intact
       (the turn keeps running server-side and buffers for replay).
+- [ ] Create a key through the signed-in `/api/keys` route.
+- [ ] Call `/v1/agents/<slug>/chat/completions` with that key.
+      Open the returned `X-Tangle-Thread-Url` and confirm it shows the same durable conversation.
 
 ## ⑤ The product UI — replace the dev page
 

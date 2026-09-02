@@ -1832,7 +1832,7 @@ interface MissionActivityLaneProps
 
 ### `ModelPicker`
 
-`function` — Searchable model picker pill + popover: a featured/recommended section first, then per-provider groups in catalogue order (the server already sorts providers by tier).
+`function` — Searchable model picker pill + popover.
 
 ```ts
 ({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup, variant }: ModelPickerProps)…
@@ -2072,7 +2072,7 @@ interface ProducerToolResultEvent
 
 ### `ProducerUsageEvent`
 
-`interface` — Describe usage event with prompt and completion token counts for a producer
+`interface` — Describe cumulative provider usage reported by a producer.
 
 ```ts
 interface ProducerUsageEvent

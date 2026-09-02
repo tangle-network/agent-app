@@ -119,11 +119,13 @@
     "tsc"
   ],
   "ignoreDependencies": [
+    "@tangle-network/agent-gateway",
     "@tangle-network/agent-profile-materialize",
     "@xterm/addon-fit",
     "@xterm/addon-web-links",
     "@xterm/addon-webgl",
-    "@xterm/xterm"
+    "@xterm/xterm",
+    "hono"
   ],
   "rules": {
     "duplicates": "off"

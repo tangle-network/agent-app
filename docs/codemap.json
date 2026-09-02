@@ -1086,6 +1086,12 @@
           "kind": "interface",
           "signature": "interface RouterModel",
           "doc": "Model catalogue — computed live from the Tangle Router, never hand-curated."
+        },
+        {
+          "name": "sortModelsByFreshness",
+          "kind": "function",
+          "signature": "(models: readonly CatalogModel[]) => CatalogModel[]",
+          "doc": "Return a copy sorted for a model menu."
         }
       ]
     },
@@ -1427,6 +1433,12 @@
           "doc": "What a settled turn reports to `onTurnComplete` — the product's post-processing seam (billing, titles, audit)."
         },
         {
+          "name": "ChatTurnExecutionLimits",
+          "kind": "interface",
+          "signature": "interface ChatTurnExecutionLimits",
+          "doc": "Trusted per-turn limits supplied by a server adapter, never by the body."
+        },
+        {
           "name": "ChatTurnFilePartInput",
           "kind": "interface",
           "signature": "interface ChatTurnFilePartInput",
@@ -1521,6 +1533,12 @@
           "kind": "interface",
           "signature": "interface ChatTurnProduceArgs",
           "doc": "Define the arguments required to produce a chat turn with context and messaging details"
+        },
+        {
+          "name": "ChatTurnRequestContext",
+          "kind": "interface",
+          "signature": "interface ChatTurnRequestContext",
+          "doc": "Server-only context for one turn request."
         },
         {
           "name": "chatTurnRequestInit",
@@ -2036,7 +2054,7 @@
           "name": "ProducerUsageEvent",
           "kind": "interface",
           "signature": "interface ProducerUsageEvent",
-          "doc": "Describe usage event with prompt and completion token counts for a producer"
+          "doc": "Describe cumulative provider usage reported by a producer."
         },
         {
           "name": "ProducerWireEvent",
@@ -9893,6 +9911,12 @@
           "doc": "Run the bounded tool loop and return the final text + every executed tool outcome."
         },
         {
+          "name": "sortModelsByFreshness",
+          "kind": "function",
+          "signature": "(models: readonly CatalogModel[]) => CatalogModel[]",
+          "doc": "Return a copy sorted for a model menu."
+        },
+        {
           "name": "streamAppToolLoop",
           "kind": "function",
           "signature": "<Raw>(opts: StreamToolLoopOptions<Raw>) => AsyncGenerator<StreamToolLoopYield<Raw>, void, unknown>",
@@ -10042,6 +10066,12 @@
           "kind": "function",
           "signature": "(events: AsyncIterable<unknown>) => AsyncGenerator<SandboxStreamEvent, any, any>",
           "doc": "Normalize raw sandbox events for shared agent-gateway consumers."
+        },
+        {
+          "name": "applyPromptTokenLimits",
+          "kind": "function",
+          "signature": "(profile: AgentProfile, limits: SandboxPromptTokenLimits) => AgentProfile",
+          "doc": "Tighten the profile's provider-enforced token ceilings for one prompt."
         },
         {
           "name": "AppToolDescriptor",
@@ -10756,6 +10786,12 @@
           "kind": "interface",
           "signature": "interface SandboxPrewarmScope",
           "doc": "The workspace a warm targets."
+        },
+        {
+          "name": "SandboxPromptTokenLimits",
+          "kind": "interface",
+          "signature": "interface SandboxPromptTokenLimits",
+          "doc": null
         },
         {
           "name": "SandboxProvisionedObservation",
@@ -18748,7 +18784,7 @@
           "name": "ModelPicker",
           "kind": "function",
           "signature": "({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup, variant }: ModelPickerProps)…",
-          "doc": "Searchable model picker pill + popover: a featured/recommended section first, then per-provider groups in catalogue order (the server already sorts providers by tier)."
+          "doc": "Searchable model picker pill + popover."
         },
         {
           "name": "ModelPickerProps",
@@ -18928,7 +18964,7 @@
           "name": "ProducerUsageEvent",
           "kind": "interface",
           "signature": "interface ProducerUsageEvent",
-          "doc": "Describe usage event with prompt and completion token counts for a producer"
+          "doc": "Describe cumulative provider usage reported by a producer."
         },
         {
           "name": "ProducerWireEvent",

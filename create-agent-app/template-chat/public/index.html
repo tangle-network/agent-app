@@ -73,6 +73,7 @@
 
 <script type="module">
 const $ = (id) => document.getElementById(id)
+const initialThreadId = new URL(location.href).searchParams.get('threadId')
 const state = { threadId: null, parts: [], signUp: false }
 
 const api = async (path, init) => {
@@ -148,6 +149,9 @@ function renderParts(container, parts = []) {
 
 async function openThread(id) {
   state.threadId = id
+  const url = new URL(location.href)
+  url.searchParams.set('threadId', id)
+  history.replaceState(null, '', url)
   const { messages } = await api(`/api/threads/${id}/messages`)
   $('transcript').replaceChildren()
   for (const m of messages) {
@@ -227,10 +231,25 @@ $('composer').onsubmit = async (e) => {
   await runTurn(content, parts).catch((err) => { $('error').textContent = err.message })
 }
 
-$('new-thread').onclick = () => { state.threadId = null; $('transcript').replaceChildren() }
+$('new-thread').onclick = () => {
+  state.threadId = null
+  const url = new URL(location.href)
+  url.searchParams.delete('threadId')
+  history.replaceState(null, '', url)
+  $('transcript').replaceChildren()
+}
 
 await ensureSession()
 await loadThreads()
+if (initialThreadId) {
+  await openThread(initialThreadId).catch((err) => {
+    state.threadId = null
+    $('error').textContent = err.message
+    const url = new URL(location.href)
+    url.searchParams.delete('threadId')
+    history.replaceState(null, '', url)
+  })
+}
 </script>
 </body>
 </html>

@@ -9,7 +9,7 @@
  * duplicate canonical ones. This module turns that into a product catalogue:
  *
  *   filter (chat-capable, routeable) → dedupe (snapshot/prefix/:free aliases)
- *   → rank (provider tier, family, version) → feature (best model per family)
+ *   → rank (provider tier, current generation) → feature (best model per family)
  *   → default (env override or first featured)
  *
  * Freshness is automatic: everything is derived from the live router response,
@@ -82,7 +82,7 @@ const PROVIDER_TIER: string[] = [
 const EXCLUDED_ID = /(embedding|tts|transcribe|whisper|audio|realtime|image|lyria|sora|dall-e|moderation|content-safety|search-preview|search-api|deep-research)/
 
 /**
- * Featured families, in display order. Each rule surfaces the highest-version
+ * Featured families, in default-preference order. Each rule surfaces the highest-version
  * routeable model whose normalized id matches. Patterns anchor on the family
  * name and stop before specialty suffixes (codex, nano, lite, …) so the
  * mainline model wins.
@@ -129,6 +129,58 @@ function compareVersions(a: number[], b: number[]): number {
   return 0
 }
 
+/**
+ * Read the generation attached to a known model family.
+ *
+ * This deliberately does not read every number in the id. A parameter count
+ * such as `gpt-oss-120b` is not newer than GPT 5.6.
+ */
+function releaseVersion(id: string): number[] {
+  const normalized = normalizeModelId(id).toLowerCase()
+  const patterns = [
+    /^claude-[a-z0-9]+-(\d+(?:[.-]\d+)*)/,
+    /^gpt-(\d+(?:\.\d+)*)/,
+    /^o(\d+(?:\.\d+)*)/,
+    /^gemini-(\d+(?:\.\d+)*)/,
+    /^deepseek-v(\d+(?:\.\d+)*)/,
+    /^kimi-k(\d+(?:\.\d+)*)/,
+    /^glm-(\d+(?:\.\d+)*)/,
+    /^grok-(\d+(?:\.\d+)*)/,
+    /^mistral-(?:large|medium)-?(\d+(?:[.-]\d+)*)/,
+    /^qwen-?(\d+(?:\.\d+)*)/,
+    /^llama-?(\d+(?:\.\d+)*)/,
+  ]
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern)
+    if (match?.[1]) return match[1].split(/[.-]/).map(Number)
+  }
+  return []
+}
+
+/**
+ * Return a copy sorted for a model menu.
+ *
+ * Providers keep the shared display order. Within each provider, current
+ * generations come first across families. Stable ids win ties with previews.
+ * Callers can sort separate sections without changing `featured` or defaults.
+ */
+export function sortModelsByFreshness(models: readonly CatalogModel[]): CatalogModel[] {
+  return [...models].sort((a, b) => {
+    const providerA = a.provider.toLowerCase()
+    const providerB = b.provider.toLowerCase()
+    const providerOrder = providerRank(providerA) - providerRank(providerB)
+    if (providerOrder !== 0) return providerOrder
+    if (providerA !== providerB) return providerA.localeCompare(providerB)
+
+    const generationOrder = compareVersions(releaseVersion(b.id), releaseVersion(a.id))
+    if (generationOrder !== 0) return generationOrder
+
+    const previewOrder = Number(/preview/i.test(a.id)) - Number(/preview/i.test(b.id))
+    if (previewOrder !== 0) return previewOrder
+    return a.id.localeCompare(b.id)
+  })
+}
+
 /** Lower = preferred representative for an alias group. */
 function aliasPenalty(id: string): number {
   let p = 0
@@ -172,10 +224,6 @@ function isRouteable(m: RouterModel): boolean {
   return m.routeability?.routeable !== false && m.routeability?.status !== 'unavailable'
 }
 
-function familyOf(normId: string): string {
-  return normId.replace(/[\d.]+/g, '').replace(/-+/g, '-').replace(/-$/, '')
-}
-
 /**
  * Pure catalogue pipeline. `preferredDefault` (typically the MODEL_NAME env
  * var) wins when it survives filtering; otherwise the first featured model.
@@ -205,7 +253,7 @@ export function buildCatalog(raw: RouterModel[], opts?: { preferredDefault?: str
     reps.push({ model: rep, normId: normalizeModelId(rep.id), mergedParams })
   }
 
-  // Featured: best version per family rule, in rule order
+  // Featured: best version per family rule. Rule order still chooses the default.
   const featuredIds: string[] = []
   for (const rule of FEATURED_RULES) {
     const matches = reps.filter(
@@ -243,29 +291,22 @@ export function buildCatalog(raw: RouterModel[], opts?: { preferredDefault?: str
     }
   }
 
-  // Sort: featured first (rule order), then provider tier → family → version desc
-  const featured = featuredIds
+  // Keep each section provider-grouped, with the newest generation first.
+  const featuredInRuleOrder = featuredIds
     .map((id) => reps.find((r) => r.model.id === id)!)
     .map(toCatalogModel)
+  const featured = sortModelsByFreshness(featuredInRuleOrder)
   const rest = reps
     .filter((r) => !featuredIds.includes(r.model.id))
-    .sort((a, b) => {
-      const pa = providerRank(a.model._provider ?? '')
-      const pb = providerRank(b.model._provider ?? '')
-      if (pa !== pb) return pa - pb
-      const fa = familyOf(a.normId)
-      const fb = familyOf(b.normId)
-      if (fa !== fb) return fa.localeCompare(fb)
-      return compareVersions(versionOf(b.normId), versionOf(a.normId)) || a.model.id.localeCompare(b.model.id)
-    })
     .map(toCatalogModel)
+  const sortedRest = sortModelsByFreshness(rest)
 
-  const models = [...featured, ...rest]
+  const models = [...featured, ...sortedRest]
 
   const preferred = opts?.preferredDefault
   const defaultModelId =
     (preferred && models.find((m) => m.id === preferred || normalizeModelId(m.id) === normalizeModelId(preferred))?.id) ||
-    featured.find((m) => m.supportsTools)?.id ||
+    featuredInRuleOrder.find((m) => m.supportsTools)?.id ||
     models[0]?.id ||
     null
 

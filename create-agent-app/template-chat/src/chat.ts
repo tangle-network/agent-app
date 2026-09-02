@@ -58,6 +58,9 @@ export interface ChatAppOverrides {
   produce?: (args: ChatTurnProduceArgs<void>) => ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>
   /** Test seam: where large uploads land. Default: the workspace box's fs. */
   uploadSink?: (scope: { workspaceId: string; userId: string }) => Promise<SandboxUploadSink | null>
+  /** Server-trusted identity for a private gateway chat assembly. Never read
+   *  this value from a request body or header. */
+  trustedUserId?: string
 }
 
 export interface ChatApp {
@@ -94,6 +97,9 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
   /** Session → identity + thread access, for both routes and seams. Guards
    *  throw JSON Responses; `guardResolution` adapts them to `{ ok, response }`. */
   async function requireUser(request: Request) {
+    if (overrides.trustedUserId) {
+      return { ok: true as const, value: { user: { id: overrides.trustedUserId } } }
+    }
     return guardResolution(() => auth.requireApiUser(request))
   }
 

@@ -4,7 +4,7 @@
 
 Source: `src/runtime/index.ts`
 
-63 exports.
+64 exports.
 
 ### `AnySurfaceKind`
 
@@ -332,6 +332,14 @@ interface RouterModel
 
 ```ts
 (opts: RunToolLoopOptions) => Promise<ToolLoopResult>
+```
+
+### `sortModelsByFreshness`
+
+`function` — Return a copy sorted for a model menu.
+
+```ts
+(models: readonly CatalogModel[]) => CatalogModel[]
 ```
 
 ### `streamAppToolLoop`
