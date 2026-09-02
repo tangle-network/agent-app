@@ -14140,6 +14140,12 @@
           "doc": "In-memory store for tests and keyless local dev."
         },
         {
+          "name": "D1BoundForTurns",
+          "kind": "interface",
+          "signature": "interface D1BoundForTurns",
+          "doc": "A bound D1 statement used by the turn store."
+        },
+        {
           "name": "D1LikeForTurns",
           "kind": "interface",
           "signature": "interface D1LikeForTurns",

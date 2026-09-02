@@ -48,6 +48,13 @@ export interface TurnEventStore {
    *  a row abandoned by a dead process. Optional: a store records it only if
    *  `setStatus` was given a `scopeId`. */
   listRunning?(scopeId: string): Promise<string[]>
+  /** Explicitly remove one turn's events and status. Optional so existing
+   *  custom stores remain source-compatible; the built-in D1 and memory stores
+   *  provide it. */
+  deleteTurn?(turnId: string): Promise<void>
+  /** Remove terminal turns whose status was updated before `before` (Unix
+   *  milliseconds or a Date). Running turns are never eligible. */
+  pruneTerminalTurns?(before: number | Date): Promise<number>
 }
 
 /** Configure running-turn lease evaluation. The clock is injectable so store
@@ -401,15 +408,54 @@ export function stampReplaySeq(row: BufferedTurnEvent): string {
 
 // ── D1 store ──────────────────────────────────────────────────────────────
 
+/** A bound D1 statement used by the turn store. */
+export interface D1BoundForTurns {
+  run(): Promise<unknown>
+  all<T = Record<string, unknown>>(): Promise<{ results: T[] }>
+  first<T = Record<string, unknown>>(): Promise<T | null>
+}
+
 /** Minimal structural D1 contract (Cloudflare `D1Database` satisfies it). */
 export interface D1LikeForTurns {
   prepare(sql: string): {
-    bind(...values: unknown[]): {
-      run(): Promise<unknown>
-      all<T = Record<string, unknown>>(): Promise<{ results: T[] }>
-      first<T = Record<string, unknown>>(): Promise<T | null>
-    }
+    bind(...values: unknown[]): D1BoundForTurns
   }
+  /** D1's only atomic primitive. Retention refuses a driver without it rather
+   *  than deleting events and status in separate, reorderable requests. */
+  batch?(statements: D1BoundForTurns[]): Promise<unknown[]>
+}
+
+function normalizeTurnCutoff(before: number | Date): { milliseconds: number; iso: string } {
+  const milliseconds = before instanceof Date ? before.getTime() : before
+  if (!Number.isFinite(milliseconds)) {
+    throw new RangeError('turn retention cutoff must be a finite Unix-millisecond timestamp or a valid Date')
+  }
+  const date = new Date(milliseconds)
+  if (!Number.isFinite(date.getTime())) {
+    throw new RangeError('turn retention cutoff is outside the supported Date range')
+  }
+  return { milliseconds, iso: date.toISOString() }
+}
+
+async function runAtomicTurnBatch(
+  db: D1LikeForTurns,
+  statements: D1BoundForTurns[],
+): Promise<unknown[]> {
+  if (typeof db.batch !== 'function') {
+    throw new Error('turn retention requires D1 batch() for atomic deletion')
+  }
+  return db.batch(statements)
+}
+
+function changesFromD1Result(result: unknown): number {
+  if (!result || typeof result !== 'object') return 0
+  const meta = (result as { meta?: unknown }).meta
+  if (meta && typeof meta === 'object') {
+    const changes = (meta as { changes?: unknown }).changes
+    if (typeof changes === 'number' && Number.isFinite(changes)) return changes
+  }
+  const changes = (result as { changes?: unknown }).changes
+  return typeof changes === 'number' && Number.isFinite(changes) ? changes : 0
 }
 
 /** Schema for the D1 store — append to the product's migrations. */
@@ -482,6 +528,25 @@ export function createD1TurnEventStore(
         .all<{ turnId: string }>()
       return results.map((r) => r.turnId)
     },
+    async deleteTurn(turnId) {
+      await runAtomicTurnBatch(db, [
+        db.prepare('DELETE FROM turn_events WHERE turnId = ?').bind(turnId),
+        db.prepare('DELETE FROM turn_status WHERE turnId = ?').bind(turnId),
+      ])
+    },
+    async pruneTerminalTurns(before) {
+      const cutoff = normalizeTurnCutoff(before)
+      const terminalBefore = "status IN ('complete', 'error') AND updatedAt < ?"
+      const results = await runAtomicTurnBatch(db, [
+        db
+          .prepare(
+            `DELETE FROM turn_events WHERE turnId IN (SELECT turnId FROM turn_status WHERE ${terminalBefore})`,
+          )
+          .bind(cutoff.iso),
+        db.prepare(`DELETE FROM turn_status WHERE ${terminalBefore}`).bind(cutoff.iso),
+      ])
+      return changesFromD1Result(results[1])
+    },
   }
 }
 
@@ -530,6 +595,34 @@ export function createMemoryTurnEventStore(
           const updatedDelta = (updatedAt.get(right) ?? 0) - (updatedAt.get(left) ?? 0)
           return updatedDelta || order.indexOf(right) - order.indexOf(left)
         })
+    },
+    async deleteTurn(turnId) {
+      events.delete(turnId)
+      status.delete(turnId)
+      scopes.delete(turnId)
+      updatedAt.delete(turnId)
+      const index = order.indexOf(turnId)
+      if (index >= 0) order.splice(index, 1)
+    },
+    async pruneTerminalTurns(before) {
+      const cutoff = normalizeTurnCutoff(before).milliseconds
+      const removable = order.filter((turnId) => {
+        const s = status.get(turnId)
+        return (s === 'complete' || s === 'error') && (updatedAt.get(turnId) ?? Number.POSITIVE_INFINITY) < cutoff
+      })
+      for (const turnId of removable) {
+        events.delete(turnId)
+        status.delete(turnId)
+        scopes.delete(turnId)
+        updatedAt.delete(turnId)
+      }
+      if (removable.length) {
+        const removed = new Set(removable)
+        for (let i = order.length - 1; i >= 0; i--) {
+          if (removed.has(order[i]!)) order.splice(i, 1)
+        }
+      }
+      return removable.length
     },
   }
 }

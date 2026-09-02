@@ -4,7 +4,7 @@
 
 Source: `src/stream/index.ts`
 
-49 exports.
+50 exports.
 
 ### `asRecord`
 
@@ -108,6 +108,14 @@ interface BufferedTurnTap
 
 ```ts
 (options?: TurnEventStoreOptions) => TurnEventStore
+```
+
+### `D1BoundForTurns`
+
+`interface` — A bound D1 statement used by the turn store.
+
+```ts
+interface D1BoundForTurns
 ```
 
 ### `D1LikeForTurns`
