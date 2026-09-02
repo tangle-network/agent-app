@@ -76,12 +76,71 @@ export type DetachedTurnTerminalResult = Exclude<TurnDriveResult, { state: 'runn
 /** A drive call's retryable transport boundary. */
 export type DetachedTurnDriveOutcome = Outcome<TurnDriveResult>
 
-function assertWorkflowTurnIdentity(payload: WorkflowTurnIdentity): void {
-  if (!payload || typeof payload.sessionId !== 'string' || !payload.sessionId.trim()) {
-    throw new Error('Workflow turn payload requires a non-empty sessionId')
+function assertWorkflowTurnIdentity(
+  payload: unknown,
+  label: string,
+): asserts payload is WorkflowTurnIdentity {
+  const record = payload && typeof payload === 'object' && !Array.isArray(payload)
+    ? payload as Record<string, unknown>
+    : null
+  if (!record || typeof record.sessionId !== 'string' || !record.sessionId.trim()) {
+    throw new Error(`${label} requires a non-empty sessionId`)
   }
-  if (typeof payload.turnId !== 'string' || !payload.turnId.trim()) {
-    throw new Error('Workflow turn payload requires a non-empty turnId')
+  if (typeof record.turnId !== 'string' || !record.turnId.trim()) {
+    throw new Error(`${label} requires a non-empty turnId`)
+  }
+}
+
+interface WorkflowTurnStepNames {
+  admit: string
+  poll: (attempt: number) => string
+  wait: (attempt: number) => string
+  settle: string
+}
+
+interface WorkflowTurnLoopOptions<TAdmission, TStatus, TSettled> {
+  step: CloudflareWorkflowStepLike
+  names: WorkflowTurnStepNames
+  delay: CloudflareWorkflowSleepDuration
+  admit: () => Promise<Outcome<TAdmission>>
+  initialStatus?: (admission: TAdmission) => TStatus
+  poll: (admission: TAdmission) => Promise<Outcome<TStatus>>
+  isRunning: (status: TStatus) => boolean
+  settle: (status: TStatus) => Promise<TSettled>
+}
+
+async function resolveWorkflowOutcome<T>(
+  operation: () => Promise<Outcome<T>>,
+): Promise<T> {
+  const outcome = await operation()
+  if (!outcome.succeeded) throw outcome.error
+  return outcome.value
+}
+
+async function runWorkflowTurnLoop<TAdmission, TStatus, TSettled>(
+  options: WorkflowTurnLoopOptions<TAdmission, TStatus, TSettled>,
+): Promise<TSettled> {
+  const admission = await options.step.do(
+    options.names.admit,
+    () => resolveWorkflowOutcome(options.admit),
+  )
+  let hasStatus = options.initialStatus !== undefined
+  let status!: TStatus
+  if (hasStatus) status = options.initialStatus!(admission)
+  let attempt = 0
+  while (true) {
+    if (!hasStatus) {
+      status = await options.step.do(
+        options.names.poll(attempt),
+        () => resolveWorkflowOutcome(() => options.poll(admission)),
+      )
+    }
+    if (!options.isRunning(status)) {
+      return options.step.do(options.names.settle, () => options.settle(status))
+    }
+    await options.step.sleep(options.names.wait(attempt), options.delay)
+    attempt += 1
+    hasStatus = false
   }
 }
 
@@ -98,32 +157,23 @@ export async function runWorkflowTurnTick<
   TSettled,
 >(options: WorkflowTurnTickOptions<TPayload, TAdmission, TStatus, TSettled>): Promise<TSettled> {
   const payload = options.event?.payload
-  assertWorkflowTurnIdentity(payload)
+  assertWorkflowTurnIdentity(payload, 'Workflow turn payload')
   const name = options.stepName ?? 'workflow-turn'
   const delay = options.pollDelay ?? '5 seconds'
-  const admission = await options.step.do(`${name}:admit`, async () => {
-    const outcome = await options.admit(payload)
-    if (!outcome.succeeded) throw outcome.error
-    return outcome.value
+  return runWorkflowTurnLoop({
+    step: options.step,
+    names: {
+      admit: `${name}:admit`,
+      poll: (attempt) => `${name}:poll:${attempt}`,
+      wait: (attempt) => `${name}:wait:${attempt}`,
+      settle: `${name}:settle`,
+    },
+    delay,
+    admit: () => options.admit(payload),
+    poll: (admission) => options.poll(payload, admission),
+    isRunning: options.isRunning,
+    settle: (status) => options.settle(payload, status),
   })
-
-  let attempt = 0
-  let terminal: TStatus
-  while (true) {
-    const status = await options.step.do(`${name}:poll:${attempt}`, async () => {
-      const outcome = await options.poll(payload, admission)
-      if (!outcome.succeeded) throw outcome.error
-      return outcome.value
-    })
-    if (!options.isRunning(status)) {
-      terminal = status
-      break
-    }
-    await options.step.sleep(`${name}:wait:${attempt}`, delay)
-    attempt += 1
-  }
-
-  return options.step.do(`${name}:settle`, () => options.settle(payload, terminal))
 }
 
 /** Options for one durable detached-turn Workflow run. */
@@ -156,15 +206,6 @@ export interface DetachedTurnWorkflowTickOptions<
   stepName?: string
 }
 
-function assertIdentity(payload: DetachedTurnWorkflowIdentity): void {
-  if (!payload || typeof payload.sessionId !== 'string' || !payload.sessionId.trim()) {
-    throw new Error('detached turn Workflow payload requires a non-empty sessionId')
-  }
-  if (typeof payload.turnId !== 'string' || !payload.turnId.trim()) {
-    throw new Error('detached turn Workflow payload requires a non-empty turnId')
-  }
-}
-
 function isKnownDriveState(state: unknown): state is DetachedTurnDriveState {
   return state === 'running'
     || state === 'completed'
@@ -186,29 +227,28 @@ export async function runDetachedTurnWorkflowTick<
   options: DetachedTurnWorkflowTickOptions<TPayload, TSettled>,
 ): Promise<TSettled> {
   const payload = options.event?.payload
-  assertIdentity(payload)
+  assertWorkflowTurnIdentity(payload, 'detached turn Workflow payload')
   const name = options.stepName ?? 'detached-turn'
   const delay = options.pollDelay ?? '5 seconds'
-
-  let attempt = 0
-  let terminalResult: DetachedTurnTerminalResult
-  while (true) {
-    const driveResult = await options.step.do(`${name}:drive:${attempt}`, async () => {
-      const outcome = await options.drive(payload)
-      if (!outcome.succeeded) throw outcome.error
-      return outcome.value
-    })
-    const state = (driveResult as { state?: unknown } | null)?.state
-    if (!isKnownDriveState(state)) {
-      throw new Error(`detached turn drive returned unknown state: ${String(state)}`)
-    }
-    if (state !== 'running') {
-      terminalResult = driveResult as DetachedTurnTerminalResult
-      break
-    }
-    await options.step.sleep(`${name}:wait:${attempt}`, delay)
-    attempt += 1
-  }
-
-  return options.step.do(`${name}:settle`, () => options.settle(payload, terminalResult))
+  return runWorkflowTurnLoop({
+    step: options.step,
+    names: {
+      admit: `${name}:drive:0`,
+      poll: (attempt) => `${name}:drive:${attempt}`,
+      wait: (attempt) => `${name}:wait:${attempt}`,
+      settle: `${name}:settle`,
+    },
+    delay,
+    admit: () => options.drive(payload),
+    initialStatus: (driveResult) => driveResult,
+    poll: () => options.drive(payload),
+    isRunning: (driveResult) => {
+      const state = (driveResult as { state?: unknown } | null)?.state
+      if (!isKnownDriveState(state)) {
+        throw new Error(`detached turn drive returned unknown state: ${String(state)}`)
+      }
+      return state === 'running'
+    },
+    settle: (driveResult) => options.settle(payload, driveResult as DetachedTurnTerminalResult),
+  })
 }
