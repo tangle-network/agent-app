@@ -2777,13 +2777,12 @@ export interface StreamSandboxPromptOptions {
   // session init loudly for unsupported ones; a local matrix would drift. Only honored
   // on the streaming path; the detached driveTurn path (driveSandboxTurn) never sets it.
   interactions?: { question?: boolean; permission?: boolean; plan?: boolean }
-  // Detach the run from THIS stream's lifetime. When true, dropping the stream —
-  // a Worker/isolate restart, a browser refresh, a network blip — does NOT cancel
-  // the run: the platform keeps executing it server-side and buffers its events,
-  // so a later reconnect (same `sessionId` + `lastEventId`) replays the tail and
-  // the run's result survives. This is what makes a WATCHED interactive turn
-  // durable — the run no longer dies with the Worker that opened it — while still
-  // streaming live (unlike the fire-and-forget `dispatchPrompt`/`driveTurn` path).
+  // Detach the run from THIS stream's lifetime. When true, the helper admits the
+  // run through `dispatchPrompt`, then reads its exact execution through the
+  // SDK replay stream. A Worker restart or browser refresh therefore cannot
+  // cancel the server-side run. Reuse `sessionId` + `executionId` + `turnId` on
+  // retries; `lastEventId` resumes the same execution instead of dispatching
+  // another one.
   // Omit for a run where closing the tab should stop burning tokens.
   detach?: boolean
   // Observe the EXACT profile handed to the sandbox SDK for this turn — after
@@ -2799,6 +2798,61 @@ export interface StreamSandboxPromptOptions {
 }
 
 type StreamPromptOptions = Parameters<SandboxInstance['streamPrompt']>[1]
+type DispatchPromptOptions = Parameters<SandboxInstance['dispatchPrompt']>[1]
+
+/**
+ * Open the durable event lane for one detached prompt.
+ *
+ * `dispatchPrompt` is the admission boundary: it returns after the sandbox has
+ * accepted the run and keeps executing it after this Worker disappears. The
+ * SDK's execution replay stream is then the exact execution-scoped surface.
+ * Replaying through `streamPrompt` preserves the direct run-event vocabulary;
+ * the session bus wraps message parts under `data.properties`.
+ */
+async function* detachedSandboxPromptEvents(
+  box: SandboxInstance,
+  prompt: string | PromptInputPart[],
+  options: StreamSandboxPromptOptions,
+  backend: NonNullable<StreamPromptOptions>['backend'],
+): AsyncGenerator<unknown> {
+  const sessionId = options.sessionId?.trim()
+  const executionId = options.executionId?.trim()
+  if (!sessionId || !executionId) {
+    throw new Error('streamSandboxPrompt detach requires stable sessionId and executionId')
+  }
+
+  const lastEventId = options.lastEventId?.trim() || undefined
+  const turnId = options.turnId?.trim() || executionId
+  // A cursor is already proof that this execution was admitted. Re-dispatching
+  // before replay would turn a failed terminal session into a new prompt.
+  const admission = lastEventId
+    ? { sessionId, executionId }
+    : await box.dispatchPrompt(prompt, {
+        sessionId,
+        executionId,
+        turnId,
+        backend,
+        ...(options.requireVisibleAssistantOutput !== undefined
+          ? { requireVisibleAssistantOutput: options.requireVisibleAssistantOutput }
+          : {}),
+        ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+      } as DispatchPromptOptions)
+  const admittedExecutionId = admission.executionId ?? executionId
+  if (!admittedExecutionId) {
+    throw new Error(`detached Sandbox dispatch for ${sessionId} returned no executionId`)
+  }
+
+  // The session bus is a useful observation surface, but its message events
+  // use a different envelope (`data.properties.part`). Use the SDK's exact
+  // execution replay instead so downstream producers receive the same event
+  // vocabulary as a direct prompt stream (`data.part`, terminal `result`, etc.).
+  yield* box.streamPrompt('', {
+    sessionId: admission.sessionId,
+    executionId: admittedExecutionId,
+    lastEventId: lastEventId || '0',
+    ...(options.signal ? { signal: options.signal } : {}),
+  } as StreamPromptOptions)
+}
 
 /**
  * The small event shape consumed by agent-gateway's streaming adapters.
@@ -3021,24 +3075,26 @@ export async function* streamSandboxPrompt(
     )
   }
 
-  const stream = box.streamPrompt(prompt, {
-    sessionId: options?.sessionId,
-    executionId: options?.executionId,
-    turnId: options?.turnId,
-    lastEventId: options?.lastEventId,
-    ...(options?.signal ? { signal: options.signal } : {}),
-    ...(options?.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
-    ...(options?.requireVisibleAssistantOutput !== undefined
-      ? { requireVisibleAssistantOutput: options.requireVisibleAssistantOutput }
-      : {}),
-    ...(options?.detach ? { detach: true } : {}),
-    backend: {
-      type: harness,
-      profile: profileWithLimits,
-      ...(model ? { model } : {}),
-      ...(options?.interactions ? { interactions: options.interactions } : {}),
-    },
-  } as StreamPromptOptions)
+  const backend = {
+    type: harness,
+    profile: profileWithLimits,
+    ...(model ? { model } : {}),
+    ...(options?.interactions ? { interactions: options.interactions } : {}),
+  }
+  const stream = options?.detach
+    ? detachedSandboxPromptEvents(box, prompt, options, backend)
+    : box.streamPrompt(prompt, {
+        sessionId: options?.sessionId,
+        executionId: options?.executionId,
+        turnId: options?.turnId,
+        lastEventId: options?.lastEventId,
+        ...(options?.signal ? { signal: options.signal } : {}),
+        ...(options?.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+        ...(options?.requireVisibleAssistantOutput !== undefined
+          ? { requireVisibleAssistantOutput: options.requireVisibleAssistantOutput }
+          : {}),
+        backend,
+      } as StreamPromptOptions)
 
   emitSandboxActivity(options?.spend, box)
   let severedFinishReason: string | null = null

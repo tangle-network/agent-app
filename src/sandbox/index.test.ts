@@ -1150,6 +1150,75 @@ describe('streamSandboxPrompt seam', () => {
     })
   })
 
+  it('detached mode admits once, then replays the exact session execution', async () => {
+    async function* events() {
+      yield { type: 'execution.started', data: { executionId: 'exec-1', sessionId: 'thread-1' } }
+      yield { type: 'result', data: { finalText: 'done' } }
+      yield { type: 'done', data: { status: 'completed' } }
+    }
+    const dispatchPrompt = vi.fn().mockResolvedValue({
+      sessionId: 'thread-1',
+      executionId: 'exec-1',
+      status: 'running',
+      alreadyExisted: false,
+      dispatched: true,
+    })
+    const box = fakeBox({
+      dispatchPrompt,
+      streamPrompt: vi.fn((_prompt: string, _options: unknown) => events()),
+    })
+
+    const out: unknown[] = []
+    for await (const event of streamSandboxPrompt(shell(), box, 'hello', {
+      sessionId: 'thread-1',
+      executionId: 'exec-1',
+      detach: true,
+    })) {
+      out.push(event)
+    }
+
+    expect(out.map((event) => (event as { type: string }).type)).toEqual([
+      'execution.started',
+      'result',
+      'done',
+    ])
+    expect(dispatchPrompt).toHaveBeenCalledWith('hello', expect.objectContaining({
+      sessionId: 'thread-1',
+      executionId: 'exec-1',
+      turnId: 'exec-1',
+      backend: expect.objectContaining({ type: 'opencode' }),
+    }))
+    expect((box.streamPrompt as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('', {
+      sessionId: 'thread-1',
+      executionId: 'exec-1',
+      lastEventId: '0',
+    })
+  })
+
+  it('detached replay uses the supplied cursor without re-dispatching', async () => {
+    async function* events() {
+      yield { type: 'done', data: { status: 'completed' } }
+    }
+    const dispatchPrompt = vi.fn()
+    const box = fakeBox({
+      dispatchPrompt,
+      streamPrompt: vi.fn((_prompt: string, _options: unknown) => events()),
+    })
+    for await (const _ of streamSandboxPrompt(shell(), box, 'hello', {
+      sessionId: 'thread-1',
+      executionId: 'exec-1',
+      lastEventId: 'event-7',
+      detach: true,
+    })) void _
+
+    expect(dispatchPrompt).not.toHaveBeenCalled()
+    expect((box.streamPrompt as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('', {
+      sessionId: 'thread-1',
+      executionId: 'exec-1',
+      lastEventId: 'event-7',
+    })
+  })
+
   it('omits the model when provider resolution yields nothing', async () => {
     async function* events() {
       yield { type: 'result' }
