@@ -147,6 +147,25 @@ import { TURN_EVENTS_MIGRATION_SQL, TURN_STATUS_SCOPE_MIGRATION_SQL } from '@tan
 No D1? `createMemoryTurnEventStore()` satisfies the same interface for tests and
 keyless local dev.
 
+## Retain only the replay window you need
+
+Turn events are durable until the product removes them. Run the cleanup from a
+scheduled worker after the durable assistant message is available:
+
+```ts
+const cutoff = Date.now() - 24 * 60 * 60 * 1000
+const removed = await store.pruneTerminalTurns?.(cutoff)
+await store.deleteTurn?.(turnId) // Explicit deletion removes events and status.
+```
+
+`pruneTerminalTurns` removes `complete` and `error` turns whose status timestamp
+is strictly before the cutoff. It never removes a `running` turn, and it keeps
+orphaned event rows because no status exists to prove that they are terminal.
+The D1 implementation executes event and status deletion in one `batch()` so a
+partial cleanup cannot be observed. A D1-like test driver without `batch()` is
+rejected when either retention method is called. Both methods are optional on
+`TurnEventStore`, so existing custom stores remain source-compatible.
+
 ## Status today
 
 Shipped and ready, **not yet wired into any product** — adopt it the day you

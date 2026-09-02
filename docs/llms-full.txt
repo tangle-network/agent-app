@@ -18311,6 +18311,14 @@ interface BufferedTurnTap
 (options?: TurnEventStoreOptions) => TurnEventStore
 ```
 
+### `D1BoundForTurns`
+
+`interface` — A bound D1 statement used by the turn store.
+
+```ts
+interface D1BoundForTurns
+```
+
 ### `D1LikeForTurns`
 
 `interface` — Minimal structural D1 contract (Cloudflare `D1Database` satisfies it).

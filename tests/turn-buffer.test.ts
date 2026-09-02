@@ -11,6 +11,7 @@ import {
   stampReplaySeq,
   TURN_EVENTS_MIGRATION_SQL,
   type D1LikeForTurns,
+  type TurnEventStore,
   type TurnEventStoreOptions,
 } from '../src/stream/turn-buffer'
 
@@ -33,8 +34,25 @@ function d1TurnStore(options: TurnEventStoreOptions = {}) {
     },
   })
   sqlite.exec(TURN_EVENTS_MIGRATION_SQL)
+  const db: D1LikeForTurns = {
+    prepare: (query) => prepared(query),
+    batch: async (statements) => {
+      sqlite.exec('BEGIN IMMEDIATE')
+      try {
+        const results: unknown[] = []
+        for (const statement of statements) results.push(await statement.run())
+        sqlite.exec('COMMIT')
+        return results
+      } catch (error) {
+        sqlite.exec('ROLLBACK')
+        throw error
+      }
+    },
+  }
   return {
-    store: createD1TurnEventStore({ prepare: (query) => prepared(query) }, options),
+    store: createD1TurnEventStore(db, options),
+    db,
+    exec: (sql: string) => sqlite.exec(sql),
     close: () => sqlite.close(),
   }
 }
@@ -265,6 +283,132 @@ describe('pumpBufferedTurn + replayTurnEvents', () => {
     expect(await store.getStatus('t5')).toBe('error')
     const rows = await store.read('t5', 0)
     expect(rows.length).toBeGreaterThan(0)
+  })
+})
+
+describe('turn-event retention', () => {
+  async function seed(store: TurnEventStore, now: { value: number }) {
+    now.value = 100
+    await store.setStatus('old-complete', 'complete', 'thread-1')
+    await store.append('old-complete', [{ seq: 1, event: 'old-complete-event' }])
+
+    now.value = 200
+    await store.setStatus('old-error', 'error', 'thread-1')
+    await store.append('old-error', [{ seq: 1, event: 'old-error-event' }])
+
+    now.value = 300
+    await store.setStatus('at-cutoff', 'complete', 'thread-1')
+    await store.append('at-cutoff', [{ seq: 1, event: 'at-cutoff-event' }])
+
+    now.value = 400
+    await store.setStatus('new-complete', 'complete', 'thread-1')
+    await store.append('new-complete', [{ seq: 1, event: 'new-complete-event' }])
+
+    now.value = 0
+    await store.setStatus('old-running', 'running', 'thread-1')
+    await store.append('old-running', [{ seq: 1, event: 'old-running-event' }])
+  }
+
+  it('deletes one turn atomically and leaves its peers untouched', async () => {
+    const memory = createMemoryTurnEventStore()
+    const d1 = d1TurnStore()
+    try {
+      for (const store of [memory, d1.store]) {
+        await store.setStatus('delete-me', 'complete', 'thread-1')
+        await store.append('delete-me', [{ seq: 1, event: 'delete-me-event' }])
+        await store.setStatus('keep-me', 'complete', 'thread-1')
+        await store.append('keep-me', [{ seq: 1, event: 'keep-me-event' }])
+
+        await store.deleteTurn!('delete-me')
+
+        expect(await store.getStatus('delete-me')).toBeNull()
+        expect(await store.read('delete-me', 0)).toEqual([])
+        expect(await store.getStatus('keep-me')).toBe('complete')
+        expect(await store.read('keep-me', 0)).toEqual([{ seq: 1, event: 'keep-me-event' }])
+      }
+    } finally {
+      d1.close()
+    }
+  })
+
+  it('prunes only terminal turns strictly before the cutoff and never a running turn', async () => {
+    const now = { value: 0 }
+    const memory = createMemoryTurnEventStore({ now: () => now.value })
+    const d1 = d1TurnStore({ now: () => now.value })
+    try {
+      for (const store of [memory, d1.store]) {
+        await seed(store, now)
+
+        now.value = 500
+        expect(await store.pruneTerminalTurns!(300)).toBe(2)
+
+        expect(await store.getStatus('old-complete')).toBeNull()
+        expect(await store.read('old-complete', 0)).toEqual([])
+        expect(await store.getStatus('old-error')).toBeNull()
+        expect(await store.read('old-error', 0)).toEqual([])
+        expect(await store.getStatus('at-cutoff')).toBe('complete')
+        expect(await store.read('at-cutoff', 0)).toEqual([{ seq: 1, event: 'at-cutoff-event' }])
+        expect(await store.getStatus('new-complete')).toBe('complete')
+        expect(await store.getStatus('old-running')).toBe('running')
+        expect(await store.read('old-running', 0)).toEqual([{ seq: 1, event: 'old-running-event' }])
+      }
+    } finally {
+      d1.close()
+    }
+  })
+
+  it('uses the D1 batch primitive instead of an unsafe two-request fallback', async () => {
+    const d1 = d1TurnStore()
+    try {
+      const withoutBatch = { prepare: d1.db.prepare }
+      const store = createD1TurnEventStore(withoutBatch)
+      await expect(store.deleteTurn!('turn-1')).rejects.toThrow(/batch/i)
+      await expect(store.pruneTerminalTurns!(0)).rejects.toThrow(/batch/i)
+    } finally {
+      d1.close()
+    }
+  })
+
+  it('rolls back event deletion when the status deletion fails', async () => {
+    const d1 = d1TurnStore()
+    try {
+      await d1.store.setStatus('atomic-turn', 'complete', 'thread-1')
+      await d1.store.append('atomic-turn', [{ seq: 1, event: 'atomic-event' }])
+      d1.exec(`
+        CREATE TRIGGER fail_turn_status_delete
+        BEFORE DELETE ON turn_status
+        BEGIN
+          SELECT RAISE(ABORT, 'retention test failure');
+        END;
+      `)
+
+      await expect(d1.store.deleteTurn!('atomic-turn')).rejects.toThrow('retention test failure')
+      expect(await d1.store.getStatus('atomic-turn')).toBe('complete')
+      expect(await d1.store.read('atomic-turn', 0)).toEqual([{ seq: 1, event: 'atomic-event' }])
+    } finally {
+      d1.close()
+    }
+  })
+
+  it('rolls back pruning when terminal status deletion fails', async () => {
+    const d1 = d1TurnStore()
+    try {
+      await d1.store.setStatus('prune-atomic-turn', 'error', 'thread-1')
+      await d1.store.append('prune-atomic-turn', [{ seq: 1, event: 'prune-atomic-event' }])
+      d1.exec(`
+        CREATE TRIGGER fail_terminal_status_delete
+        BEFORE DELETE ON turn_status
+        BEGIN
+          SELECT RAISE(ABORT, 'prune retention test failure');
+        END;
+      `)
+
+      await expect(d1.store.pruneTerminalTurns!(Date.now() + 1)).rejects.toThrow('prune retention test failure')
+      expect(await d1.store.getStatus('prune-atomic-turn')).toBe('error')
+      expect(await d1.store.read('prune-atomic-turn', 0)).toEqual([{ seq: 1, event: 'prune-atomic-event' }])
+    } finally {
+      d1.close()
+    }
   })
 })
 
