@@ -4,7 +4,7 @@
 
 Source: `src/catalog/index.ts`
 
-8 exports.
+10 exports.
 
 ### `buildCatalog`
 
@@ -20,6 +20,14 @@ Source: `src/catalog/index.ts`
 
 ```ts
 interface CatalogModel
+```
+
+### `catalogModelForId`
+
+`function` — Find a catalogue row by direct or provider-prefixed model id.
+
+```ts
+(models: readonly CatalogModel[], requestedId: string | undefined) => CatalogModel | undefined
 ```
 
 ### `fetchModelCatalog`
@@ -52,6 +60,14 @@ interface ModelCatalog
 
 ```ts
 (id: string) => string
+```
+
+### `resolveCatalogModelId`
+
+`function` — Reconcile a persisted selection against the live catalogue.
+
+```ts
+(models: readonly CatalogModel[], selectedId?: string | undefined, fallbackId?: string | undefined) => string | undefin…
 ```
 
 ### `RouterModel`

@@ -4,7 +4,7 @@
 
 Source: `src/runtime/index.ts`
 
-65 exports.
+67 exports.
 
 ### `AnySurfaceKind`
 
@@ -36,6 +36,14 @@ interface AppToolLoopOptions
 
 ```ts
 interface CatalogModel
+```
+
+### `catalogModelForId`
+
+`function` — Find a catalogue row by direct or provider-prefixed model id.
+
+```ts
+(models: readonly CatalogModel[], requestedId: string | undefined) => CatalogModel | undefined
 ```
 
 ### `CertifiedDelivery`
@@ -236,6 +244,14 @@ interface OpenAICompatStreamTurnOptions
 
 ```ts
 interface OpenAIStreamChunk
+```
+
+### `resolveCatalogModelId`
+
+`function` — Reconcile a persisted selection against the live catalogue.
+
+```ts
+(models: readonly CatalogModel[], selectedId?: string | undefined, fallbackId?: string | undefined) => string | undefin…
 ```
 
 ### `ResolvedAgentProfile`
