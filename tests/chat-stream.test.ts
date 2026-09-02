@@ -196,6 +196,32 @@ describe('streamChatTurn', () => {
     expect(log.filter(([k]) => k === 'text')).toEqual([['text', 'Hello']])
   })
 
+  it('resumes from the response header when the body drops before its marker', async () => {
+    const { log, cb } = recorder()
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.error(new Error('network reset'))
+      },
+    })
+    let didReset = false
+    const result = await streamChatTurn({
+      start: async () => new Response(body, { headers: { 'x-turn-id': 't-1' } }),
+      resume: async (turnId, fromSeq) => {
+        expect(turnId).toBe('t-1')
+        expect(fromSeq).toBe(0)
+        return new Response(ndjsonBody(TURN_LINES))
+      },
+      onResetForResume: () => {
+        didReset = true
+        log.length = 0
+      },
+      callbacks: cb,
+    })
+    expect(didReset).toBe(true)
+    expect(result.turnId).toBe('t-1')
+    expect(log.filter(([k]) => k === 'text')).toEqual([['text', 'Hello']])
+  })
+
   it('throws on a failed start response with the server error message', async () => {
     await expect(
       streamChatTurn({

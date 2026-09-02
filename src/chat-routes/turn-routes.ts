@@ -1227,7 +1227,7 @@ export function createChatTurnRoutes<TContext = void>(
       if (ctx?.waitUntil) ctx.waitUntil(drained)
       else void drained.catch(() => {})
 
-      // Announce the replay handle before the engine's first event.
+      // Announce the replay handle in headers and body before the engine's first event.
       const encoder = new TextEncoder()
       const marker = new ReadableStream<Uint8Array>({
         start(controller) {
@@ -1241,6 +1241,7 @@ export function createChatTurnRoutes<TContext = void>(
         headers: {
           'Content-Type': result.contentType,
           'Cache-Control': 'no-cache',
+          'X-Turn-Id': turnStreamId,
         },
       })
     } catch (err) {

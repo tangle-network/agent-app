@@ -117,6 +117,7 @@ describe('createChatTurnRoutes — turn', () => {
 
     expect(lines[0]).toMatchObject({ type: 'turn' })
     expect(typeof lines[0]!.turnId).toBe('string')
+    expect(res.headers.get('x-turn-id')).toBe(lines[0]!.turnId)
     const textLines = lines.filter((l) => l.type === 'text')
     expect(textLines.map((l) => l.text)).toEqual(['hi ', 'there'])
     // The engine owns the lifecycle envelope.
