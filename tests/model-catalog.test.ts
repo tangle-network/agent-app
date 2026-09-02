@@ -4,7 +4,9 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import {
   buildCatalog,
+  catalogModelForId,
   normalizeModelId,
+  resolveCatalogModelId,
   sortModelsByFreshness,
   type CatalogModel,
   type RouterModel,
@@ -71,6 +73,56 @@ describe('buildCatalog', () => {
     ])
 
     expect(catalog.models.map((model) => model.id)).toEqual(['legacy-without-metadata', 'works'])
+  })
+
+  it('rejects a chat endpoint marked non-routeable even when the model is routeable', () => {
+    const catalog = buildCatalog([
+      {
+        id: 'gpt-5',
+        _provider: 'openai',
+        routeability: {
+          routeable: true,
+          status: 'routeable',
+          endpoints: { chat_completions: { routeable: false, status: 'unrouteable' } },
+        },
+      },
+      {
+        id: 'gpt-5-mini',
+        _provider: 'openai',
+        routeability: {
+          routeable: true,
+          status: 'routeable',
+          endpoints: { chat_completions: { routeable: true, status: 'routeable' } },
+        },
+      },
+    ])
+
+    expect(catalog.models.map((model) => model.id)).toEqual(['gpt-5-mini'])
+  })
+
+  it('uses nested provider metadata when the legacy provider field is absent', () => {
+    const catalog = buildCatalog([
+      { id: 'claude-fable-5-1', routeability: { provider: 'anthropic', routeable: true } },
+      { id: 'claude-fable-5', routeability: { provider: 'anthropic', routeable: true } },
+      { id: 'claude-opus-5', routeability: { provider: 'anthropic', routeable: true } },
+    ])
+
+    expect(catalog.models.map(({ id, provider }) => ({ id, provider }))).toEqual([
+      { id: 'claude-fable-5-1', provider: 'anthropic' },
+      { id: 'claude-fable-5', provider: 'anthropic' },
+      { id: 'claude-opus-5', provider: 'anthropic' },
+    ])
+  })
+
+  it('reconciles direct and provider-prefixed persisted ids to live catalogue ids', () => {
+    const models = buildCatalog([
+      { id: 'gpt-5', _provider: 'openai', routeability: { routeable: true } },
+      { id: 'claude-fable-5-1', _provider: 'anthropic', routeability: { routeable: true } },
+    ]).models
+
+    expect(catalogModelForId(models, 'openai/gpt-5')?.id).toBe('gpt-5')
+    expect(resolveCatalogModelId(models, 'openai/sunset-model', 'anthropic/claude-fable-5-1')).toBe('claude-fable-5-1')
+    expect(resolveCatalogModelId(models, 'sunset-model')).toBe('claude-fable-5-1')
   })
 
   it('dedupes dated snapshots and :free variants to one representative', () => {

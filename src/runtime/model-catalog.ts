@@ -24,6 +24,7 @@ export interface RouterModel {
   name?: string
   description?: string
   _provider?: string
+  provider?: string
   pricing?: { prompt?: string | null; completion?: string | null }
   context_length?: number
   architecture?: {
@@ -36,6 +37,12 @@ export interface RouterModel {
     status?: string
     routeable?: boolean
     provider?: string
+    endpoints?: {
+      chat_completions?: {
+        status?: string
+        routeable?: boolean
+      }
+    }
   }
 }
 
@@ -83,6 +90,23 @@ function normalizeProvider(provider: string): string {
   if (normalized === 'x-ai') return 'xai'
   if (normalized === 'mistralai') return 'mistral'
   return normalized
+}
+
+/** Resolve provider metadata across router response versions. */
+function providerForModel(model: RouterModel): string {
+  const declared = model._provider ?? model.provider ?? model.routeability?.provider
+  if (declared) return normalizeProvider(declared)
+
+  const id = normalizeModelId(model.id).toLowerCase()
+  if (/^claude-/.test(id)) return 'anthropic'
+  if (/^(?:gpt-|o\d)/.test(id)) return 'openai'
+  if (/^gemini-/.test(id)) return 'google'
+  if (/^grok-/.test(id)) return 'xai'
+  if (/^deepseek-/.test(id)) return 'deepseek'
+  if (/^kimi-/.test(id)) return 'moonshot'
+  if (/^glm-/.test(id)) return 'zai'
+  if (/^mistral/.test(id)) return 'mistral'
+  return 'unknown'
 }
 
 /** A short first screen, not one row for every Router provider. */
@@ -233,9 +257,50 @@ const isChatModel = isChatCapableModel
 function isRouteable(m: RouterModel): boolean {
   const routeability = m.routeability
   if (!routeability) return true
+  const chatEndpoint = routeability.endpoints?.chat_completions
+  if (chatEndpoint?.routeable === false) return false
+  if (chatEndpoint?.status !== undefined && chatEndpoint.status !== 'routeable') return false
   if (routeability.routeable === true || routeability.status === 'routeable') return true
   if (routeability.routeable === false) return false
   return routeability.status === undefined
+}
+
+/** Find a catalogue row by direct or provider-prefixed model id. */
+export function catalogModelForId(
+  models: readonly CatalogModel[],
+  requestedId: string | undefined,
+): CatalogModel | undefined {
+  const requested = requestedId?.trim()
+  if (!requested) return undefined
+
+  const exact = models.find((model) => model.id === requested)
+  if (exact) return exact
+
+  const slash = requested.indexOf('/')
+  const requestedProvider = slash > 0 ? normalizeProvider(requested.slice(0, slash)) : undefined
+  const normalized = normalizeModelId(requested)
+  return models.find((model) => {
+    if (normalizeModelId(model.id) !== normalized) return false
+    return requestedProvider === undefined || normalizeProvider(model.provider) === requestedProvider
+  })
+}
+
+/**
+ * Reconcile a persisted selection against the live catalogue.
+ *
+ * The returned id is always a catalogue id once the catalogue has entries.
+ * This keeps a removed model from remaining selected while preserving the
+ * current value during the brief empty/loading state.
+ */
+export function resolveCatalogModelId(
+  models: readonly CatalogModel[],
+  selectedId?: string,
+  fallbackId?: string,
+): string | undefined {
+  if (models.length === 0) return selectedId?.trim() || fallbackId?.trim()
+  return catalogModelForId(models, selectedId)?.id
+    ?? catalogModelForId(models, fallbackId)?.id
+    ?? models[0]?.id
 }
 
 /**
@@ -257,7 +322,7 @@ export function buildCatalog(raw: RouterModel[], opts?: { preferredDefault?: str
   // supported_parameters claim (snapshots often omit what the parent lists).
   const groups = new Map<string, RouterModel[]>()
   for (const m of candidates) {
-    const key = `${normalizeProvider(m._provider ?? 'unknown')}::${normalizeModelId(m.id)}`
+    const key = `${providerForModel(m)}::${normalizeModelId(m.id)}`
     const g = groups.get(key)
     if (g) g.push(m)
     else groups.set(key, [m])
@@ -276,7 +341,7 @@ export function buildCatalog(raw: RouterModel[], opts?: { preferredDefault?: str
   for (const rule of DEFAULT_CANDIDATE_RULES) {
     const matches = reps.filter(
       (r) =>
-        rule.providers.map(normalizeProvider).includes(normalizeProvider(r.model._provider ?? '')) &&
+        rule.providers.map(normalizeProvider).includes(providerForModel(r.model)) &&
         rule.match.test(r.normId) &&
         !defaultCandidateIds.includes(r.model.id),
     )
@@ -292,7 +357,7 @@ export function buildCatalog(raw: RouterModel[], opts?: { preferredDefault?: str
 
   const toCatalogModel = (r: (typeof reps)[number]): CatalogModel => {
     const m = r.model
-    const provider = normalizeProvider(m._provider ?? 'unknown')
+    const provider = providerForModel(m)
     return {
       id: m.id,
       name: m.name ?? m.id,
