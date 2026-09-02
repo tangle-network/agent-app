@@ -546,7 +546,7 @@
     "@tiptap/starter-kit": "^3.30.5",
     "@tiptap/suggestion": "^3.30.5",
     "@types/better-sqlite3": "^9.6.0",
-    "@types/node": "^22.20.1",
+    "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "19.2.5",
     "@types/semver": "^7.8.0",
