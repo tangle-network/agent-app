@@ -67,9 +67,6 @@ export {
   type DetachedTurnTerminalResult,
   type DetachedTurnWorkflowIdentity,
   type DetachedTurnWorkflowTickOptions,
-  runWorkflowTurnTick,
-  type WorkflowTurnIdentity,
-  type WorkflowTurnTickOptions,
 } from './detached-turn-workflow'
 
 export {

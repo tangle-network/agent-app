@@ -39,34 +39,6 @@ export interface CloudflareWorkflowStepLike {
   sleep(name: string, duration: CloudflareWorkflowSleepDuration): Promise<void>
 }
 
-/** Stable identity shared by a Workflow and one Sandbox session turn. */
-export interface WorkflowTurnIdentity {
-  sessionId: string
-  turnId: string
-}
-
-/** Options for a generic admit, poll, and settle Workflow turn. */
-export interface WorkflowTurnTickOptions<
-  TPayload extends WorkflowTurnIdentity,
-  TAdmission,
-  TStatus,
-  TSettled,
-> {
-  /** Keep the payload to stable ids; rebuild Sandbox clients inside callbacks. */
-  event: CloudflareWorkflowEventLike<TPayload>
-  step: CloudflareWorkflowStepLike
-  /** Admit the turn once. The operation must be idempotent for the turn id. */
-  admit: (payload: TPayload) => Promise<Outcome<TAdmission>>
-  /** Read the authoritative status after admission. */
-  poll: (payload: TPayload, admission: TAdmission) => Promise<Outcome<TStatus>>
-  /** Identify whether another durable poll is required. */
-  isRunning: (status: TStatus) => boolean
-  /** Persist the terminal result. This callback must be idempotent. */
-  settle: (payload: TPayload, status: TStatus) => Promise<TSettled>
-  pollDelay?: CloudflareWorkflowSleepDuration
-  stepName?: string
-}
-
 /** The states returned by the Sandbox `driveTurn` primitive. */
 export type DetachedTurnDriveState = TurnDriveResult['state']
 
@@ -75,56 +47,6 @@ export type DetachedTurnTerminalResult = Exclude<TurnDriveResult, { state: 'runn
 
 /** A drive call's retryable transport boundary. */
 export type DetachedTurnDriveOutcome = Outcome<TurnDriveResult>
-
-function assertWorkflowTurnIdentity(payload: WorkflowTurnIdentity): void {
-  if (!payload || typeof payload.sessionId !== 'string' || !payload.sessionId.trim()) {
-    throw new Error('Workflow turn payload requires a non-empty sessionId')
-  }
-  if (typeof payload.turnId !== 'string' || !payload.turnId.trim()) {
-    throw new Error('Workflow turn payload requires a non-empty turnId')
-  }
-}
-
-/**
- * Own one Sandbox turn from a durable Workflow without holding a stream open.
- *
- * Admission is a durable step, so a Workflow replay does not submit it twice.
- * Poll and settlement use only product-supplied authoritative Sandbox reads.
- */
-export async function runWorkflowTurnTick<
-  TPayload extends WorkflowTurnIdentity,
-  TAdmission,
-  TStatus,
-  TSettled,
->(options: WorkflowTurnTickOptions<TPayload, TAdmission, TStatus, TSettled>): Promise<TSettled> {
-  const payload = options.event?.payload
-  assertWorkflowTurnIdentity(payload)
-  const name = options.stepName ?? 'workflow-turn'
-  const delay = options.pollDelay ?? '5 seconds'
-  const admission = await options.step.do(`${name}:admit`, async () => {
-    const outcome = await options.admit(payload)
-    if (!outcome.succeeded) throw outcome.error
-    return outcome.value
-  })
-
-  let attempt = 0
-  let terminal: TStatus
-  while (true) {
-    const status = await options.step.do(`${name}:poll:${attempt}`, async () => {
-      const outcome = await options.poll(payload, admission)
-      if (!outcome.succeeded) throw outcome.error
-      return outcome.value
-    })
-    if (!options.isRunning(status)) {
-      terminal = status
-      break
-    }
-    await options.step.sleep(`${name}:wait:${attempt}`, delay)
-    attempt += 1
-  }
-
-  return options.step.do(`${name}:settle`, () => options.settle(payload, terminal))
-}
 
 /** Options for one durable detached-turn Workflow run. */
 export interface DetachedTurnWorkflowTickOptions<
