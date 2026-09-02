@@ -1355,6 +1355,14 @@ Source: `src/catalog/index.ts` · depends on `runtime`
 interface CatalogModel
 ```
 
+### `catalogModelForId`
+
+`function` — Find a catalogue row by direct or provider-prefixed model id.
+
+```ts
+(models: readonly CatalogModel[], requestedId: string | undefined) => CatalogModel | undefined
+```
+
 ### `fetchModelCatalog`
 
 `function` — Fetch the router model list and build the catalogue, with an in-isolate cache (TTL 5 min).
@@ -1385,6 +1393,14 @@ interface ModelCatalog
 
 ```ts
 (id: string) => string
+```
+
+### `resolveCatalogModelId`
+
+`function` — Reconcile a persisted selection against the live catalogue.
+
+```ts
+(models: readonly CatalogModel[], selectedId?: string | undefined, fallbackId?: string | undefined) => string | undefin…
 ```
 
 ### `RouterModel`
@@ -12562,6 +12578,14 @@ interface AppToolLoopOptions
 interface CatalogModel
 ```
 
+### `catalogModelForId`
+
+`function` — Find a catalogue row by direct or provider-prefixed model id.
+
+```ts
+(models: readonly CatalogModel[], requestedId: string | undefined) => CatalogModel | undefined
+```
+
 ### `CertifiedDelivery`
 
 `interface` — Resolve and manage certified profiles with refresh and composition capabilities
@@ -12760,6 +12784,14 @@ interface OpenAICompatStreamTurnOptions
 
 ```ts
 interface OpenAIStreamChunk
+```
+
+### `resolveCatalogModelId`
+
+`function` — Reconcile a persisted selection against the live catalogue.
+
+```ts
+(models: readonly CatalogModel[], selectedId?: string | undefined, fallbackId?: string | undefined) => string | undefin…
 ```
 
 ### `ResolvedAgentProfile`

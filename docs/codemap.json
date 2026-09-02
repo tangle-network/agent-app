@@ -1058,6 +1058,12 @@
           "doc": "Define the structure and capabilities of a catalog item with optional pricing and feature flags"
         },
         {
+          "name": "catalogModelForId",
+          "kind": "function",
+          "signature": "(models: readonly CatalogModel[], requestedId: string | undefined) => CatalogModel | undefined",
+          "doc": "Find a catalogue row by direct or provider-prefixed model id."
+        },
+        {
           "name": "fetchModelCatalog",
           "kind": "function",
           "signature": "(cfg: { baseUrl: string; apiKey: string; preferredDefault?: string | undefined; }) => Promise<ModelCatalog>",
@@ -1080,6 +1086,12 @@
           "kind": "function",
           "signature": "(id: string) => string",
           "doc": "Strip provider prefix, :free suffix, and trailing date stamps."
+        },
+        {
+          "name": "resolveCatalogModelId",
+          "kind": "function",
+          "signature": "(models: readonly CatalogModel[], selectedId?: string | undefined, fallbackId?: string | undefined) => string | undefin…",
+          "doc": "Reconcile a persisted selection against the live catalogue."
         },
         {
           "name": "RouterModel",
@@ -9744,6 +9756,12 @@
           "doc": "Define the structure and capabilities of a catalog item with optional pricing and feature flags"
         },
         {
+          "name": "catalogModelForId",
+          "kind": "function",
+          "signature": "(models: readonly CatalogModel[], requestedId: string | undefined) => CatalogModel | undefined",
+          "doc": "Find a catalogue row by direct or provider-prefixed model id."
+        },
+        {
           "name": "CertifiedDelivery",
           "kind": "interface",
           "signature": "interface CertifiedDelivery",
@@ -9892,6 +9910,12 @@
           "kind": "interface",
           "signature": "interface OpenAIStreamChunk",
           "doc": "Minimal OpenAI Chat Completions streaming chunk (structural — no `openai` dep)."
+        },
+        {
+          "name": "resolveCatalogModelId",
+          "kind": "function",
+          "signature": "(models: readonly CatalogModel[], selectedId?: string | undefined, fallbackId?: string | undefined) => string | undefin…",
+          "doc": "Reconcile a persisted selection against the live catalogue."
         },
         {
           "name": "ResolvedAgentProfile",
