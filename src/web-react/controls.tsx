@@ -24,7 +24,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { ProviderLogo } from './provider-logo'
-import type { CatalogModel } from '../runtime/model-catalog'
+import { sortModelsByFreshness, type CatalogModel } from '../runtime/model-catalog'
 
 // ── shared glyphs (no icon-library dependency) ────────────────────────────
 
@@ -520,9 +520,9 @@ function ModelRow({
 }
 
 /**
- * Searchable model picker pill + popover: a featured/recommended section
- * first, then per-provider groups in catalogue order (the server already
- * sorts providers by tier).
+ * Searchable model picker pill + popover. A featured model is recommended
+ * only when it is also that provider's newest entry. Older featured models
+ * stay visible in their provider group instead of jumping above new releases.
  *
  * This is the CANONICAL ecosystem model picker (see "UI chrome ownership
  * (picker canon)" in AGENTS.md). sandbox-ui's `dashboard/ModelPicker` is
@@ -535,38 +535,51 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
   const { containerRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
   const inputRef = useRef<HTMLInputElement>(null)
   const panelId = useId()
+  const sortedModels = useMemo(() => sortModelsByFreshness(models), [models])
 
   useEffect(() => {
     if (open) inputRef.current?.focus()
   }, [open])
 
-  const selected = models.find((m) => m.id === value)
+  const selected = sortedModels.find((m) => m.id === value)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return null
-    return models.filter(
+    return sortedModels.filter(
       (m) =>
         m.id.toLowerCase().includes(q) ||
         m.name.toLowerCase().includes(q) ||
         (m.description?.toLowerCase() ?? '').includes(q) ||
         m.provider.toLowerCase().includes(q),
     )
-  }, [models, query])
+  }, [sortedModels, query])
 
   const sections = useMemo(() => {
     const isPriority = priorityGroup ? (m: CatalogModel) => priorityGroup.match(m) : () => false
-    const priority = priorityGroup ? models.filter(isPriority) : []
-    const recommended = models.filter((m) => m.featured && !isPriority(m))
+    const priority = priorityGroup ? sortedModels.filter(isPriority) : []
+    const seenProviders = new Set<string>()
+    const newestIds = new Set<string>()
+    for (const model of sortedModels) {
+      const provider = model.provider.toLowerCase()
+      if (seenProviders.has(provider)) continue
+      seenProviders.add(provider)
+      newestIds.add(model.id)
+    }
+    const recommended = sortedModels.filter((model) => {
+      if (!model.featured || isPriority(model)) return false
+      return newestIds.has(model.id)
+    })
+    const recommendedIds = new Set(recommended.map((model) => model.id))
     const byProvider: Array<{ provider: string; items: CatalogModel[] }> = []
-    for (const m of models) {
-      if (m.featured || isPriority(m)) continue
+    for (const m of sortedModels) {
+      if (recommendedIds.has(m.id) || isPriority(m)) continue
       const last = byProvider[byProvider.length - 1]
       if (last && last.provider === m.provider) last.items.push(m)
       else byProvider.push({ provider: m.provider, items: [m] })
     }
     return { priority, recommended, byProvider }
-  }, [models, priorityGroup])
+  }, [sortedModels, priorityGroup])
 
   const select = (id: string) => {
     onChange(id)

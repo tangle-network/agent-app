@@ -2,7 +2,13 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { buildCatalog, normalizeModelId, type RouterModel } from '../src/runtime/model-catalog'
+import {
+  buildCatalog,
+  normalizeModelId,
+  sortModelsByFreshness,
+  type CatalogModel,
+  type RouterModel,
+} from '../src/runtime/model-catalog'
 
 const fixture = JSON.parse(
   readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures-router-models.json'), 'utf-8'),
@@ -42,16 +48,20 @@ describe('buildCatalog', () => {
     expect(ids).toContain('claude-opus-4-6')
   })
 
-  it('features the highest version per family, in rule order', () => {
+  it('features the highest version per family and shows current generations first', () => {
     const featured = catalog.models.filter((m) => m.featured).map((m) => m.id)
-    expect(featured[0]).toBe('claude-sonnet-4-6')
-    expect(featured[1]).toBe('claude-opus-4-7') // beats 4-6 and dated 4-5
+    expect(featured[0]).toBe('claude-opus-4-7') // beats 4-6 and dated 4-5
+    expect(featured[1]).toBe('claude-sonnet-4-6')
     expect(featured).toContain('gpt-5.1') // beats gpt-5
     expect(featured).not.toContain('gpt-5.1-codex') // specialty suffix not featured
     expect(featured).toContain('gemini-3.1-pro-preview') // 3.1 beats 2.5
     expect(featured).toContain('grok-4.3')
     expect(featured).toContain('glm-5.1') // beats glm-5
     expect(featured.length).toBeLessThanOrEqual(12)
+  })
+
+  it('keeps the product default independent from display freshness', () => {
+    expect(catalog.defaultModelId).toBe('claude-sonnet-4-6')
   })
 
   it('puts featured models first, then provider-tier order', () => {
@@ -81,5 +91,45 @@ describe('buildCatalog', () => {
     // family is known tool-capable
     const haiku = catalog.models.find((m) => normalizeModelId(m.id) === 'claude-haiku-4-5')
     expect(haiku?.supportsTools).toBe(true)
+  })
+})
+
+describe('sortModelsByFreshness', () => {
+  const model = (id: string, provider: string): CatalogModel => ({
+    id,
+    name: id,
+    provider,
+    supportsTools: true,
+    supportsReasoning: false,
+    featured: false,
+  })
+
+  it('puts current generations before stale entries within every provider', () => {
+    const sorted = sortModelsByFreshness([
+      model('gpt-4.1-mini', 'openai'),
+      model('gpt-5.5', 'openai'),
+      model('gpt-5.6-luna', 'openai'),
+      model('gemini-2.5-flash', 'google'),
+      model('gemini-3.7-flash', 'google'),
+      model('claude-opus-4-7', 'anthropic'),
+      model('claude-sonnet-5', 'anthropic'),
+    ])
+
+    expect(sorted.map((entry) => entry.id)).toEqual([
+      'claude-sonnet-5',
+      'claude-opus-4-7',
+      'gpt-5.6-luna',
+      'gpt-5.5',
+      'gpt-4.1-mini',
+      'gemini-3.7-flash',
+      'gemini-2.5-flash',
+    ])
+  })
+
+  it('does not mistake a parameter count for a release generation', () => {
+    expect(sortModelsByFreshness([
+      model('gpt-oss-120b', 'openai'),
+      model('gpt-5.6-sol', 'openai'),
+    ]).map((entry) => entry.id)).toEqual(['gpt-5.6-sol', 'gpt-oss-120b'])
   })
 })

@@ -17,6 +17,7 @@ export {
   fetchModelCatalog,
   isChatCapableModel,
   normalizeModelId,
+  sortModelsByFreshness,
   __resetCatalogCache,
   type CatalogModel,
   type ModelCatalog,
