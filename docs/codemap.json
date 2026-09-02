@@ -8896,28 +8896,10 @@
           "doc": "Drive one detached Sandbox turn from a Cloudflare Workflow."
         },
         {
-          "name": "runWorkflowTurnTick",
-          "kind": "function",
-          "signature": "<TPayload extends WorkflowTurnIdentity, TAdmission, TStatus, TSettled>(options: WorkflowTurnTickOptions<TPayload, TAdmi…",
-          "doc": "Own one Sandbox turn from a durable Workflow without holding a stream open."
-        },
-        {
           "name": "VaultKv",
           "kind": "type",
           "signature": "type VaultKv",
           "doc": "The KV-backed vault."
-        },
-        {
-          "name": "WorkflowTurnIdentity",
-          "kind": "interface",
-          "signature": "interface WorkflowTurnIdentity",
-          "doc": "Stable identity shared by a Workflow and one Sandbox session turn."
-        },
-        {
-          "name": "WorkflowTurnTickOptions",
-          "kind": "interface",
-          "signature": "interface WorkflowTurnTickOptions",
-          "doc": "Options for a generic admit, poll, and settle Workflow turn."
         }
       ]
     },
@@ -10171,18 +10153,6 @@
           "doc": "Normalize raw sandbox events for shared agent-gateway consumers."
         },
         {
-          "name": "admitSandboxSessionTurn",
-          "kind": "function",
-          "signature": "(options: AdmitSandboxSessionTurnOptions) => Promise<SandboxSessionTurnAdmission>",
-          "doc": "Create or reuse one Sandbox session, then admit one stable turn."
-        },
-        {
-          "name": "AdmitSandboxSessionTurnOptions",
-          "kind": "interface",
-          "signature": "interface AdmitSandboxSessionTurnOptions",
-          "doc": "Options for admitting one browser-visible turn on the Sandbox message lane."
-        },
-        {
           "name": "applyPromptTokenLimits",
           "kind": "function",
           "signature": "(profile: AgentProfile, limits: SandboxPromptTokenLimits) => AgentProfile",
@@ -10967,30 +10937,6 @@
           "kind": "interface",
           "signature": "interface SandboxScope",
           "doc": "Define a scope containing workspace and optional user identifiers for sandbox environments"
-        },
-        {
-          "name": "SandboxSessionTurnAdmission",
-          "kind": "interface",
-          "signature": "interface SandboxSessionTurnAdmission",
-          "doc": "Plain result safe to return from a durable admission step."
-        },
-        {
-          "name": "SandboxSessionTurnBackend",
-          "kind": "type",
-          "signature": "type SandboxSessionTurnBackend",
-          "doc": "Backend configuration fixed when the Sandbox session is created."
-        },
-        {
-          "name": "SandboxSessionTurnMessage",
-          "kind": "type",
-          "signature": "type SandboxSessionTurnMessage",
-          "doc": "Message fields forwarded to the Sandbox session lane."
-        },
-        {
-          "name": "SandboxSessionTurnSendOptions",
-          "kind": "type",
-          "signature": "type SandboxSessionTurnSendOptions",
-          "doc": "Request controls forwarded to the Sandbox session lane."
         },
         {
           "name": "SandboxSpendHooks",

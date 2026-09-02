@@ -4,7 +4,7 @@
 
 Source: `src/preset-cloudflare/index.ts`
 
-34 exports.
+31 exports.
 
 ### `CloudflareHeadersRule`
 
@@ -246,34 +246,10 @@ interface PresetToolHandlerOptions
 <TPayload extends DetachedTurnWorkflowIdentity, TSettled>(options: DetachedTurnWorkflowTickOptions<TPayload, TSettled>)…
 ```
 
-### `runWorkflowTurnTick`
-
-`function` — Own one Sandbox turn from a durable Workflow without holding a stream open.
-
-```ts
-<TPayload extends WorkflowTurnIdentity, TAdmission, TStatus, TSettled>(options: WorkflowTurnTickOptions<TPayload, TAdmi…
-```
-
 ### `VaultKv`
 
 `type` — The KV-backed vault.
 
 ```ts
 type VaultKv
-```
-
-### `WorkflowTurnIdentity`
-
-`interface` — Stable identity shared by a Workflow and one Sandbox session turn.
-
-```ts
-interface WorkflowTurnIdentity
-```
-
-### `WorkflowTurnTickOptions`
-
-`interface` — Options for a generic admit, poll, and settle Workflow turn.
-
-```ts
-interface WorkflowTurnTickOptions
 ```
