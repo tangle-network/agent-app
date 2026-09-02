@@ -10,6 +10,7 @@ import {
   createMemoryTurnEventStore,
   stampReplaySeq,
   TURN_EVENTS_MIGRATION_SQL,
+  TURN_STATUS_RETENTION_MIGRATION_SQL,
   type D1LikeForTurns,
   type TurnEventStore,
   type TurnEventStoreOptions,
@@ -287,6 +288,33 @@ describe('pumpBufferedTurn + replayTurnEvents', () => {
 })
 
 describe('turn-event retention', () => {
+  it('ships the retention index in fresh and additive migrations', async () => {
+    const sqlite = new DatabaseSync(':memory:')
+    try {
+      sqlite.exec(TURN_EVENTS_MIGRATION_SQL)
+      const freshIndexes = sqlite.prepare("PRAGMA index_list('turn_status')").all() as Array<{ name: string }>
+      expect(freshIndexes.map((index) => index.name)).toContain('idx_turn_status_retention')
+
+      const legacy = new DatabaseSync(':memory:')
+      try {
+        legacy.exec(`
+          CREATE TABLE turn_status (
+            turnId TEXT PRIMARY KEY,
+            status TEXT NOT NULL,
+            updatedAt TEXT NOT NULL
+          );
+        `)
+        legacy.exec(TURN_STATUS_RETENTION_MIGRATION_SQL)
+        const additiveIndexes = legacy.prepare("PRAGMA index_list('turn_status')").all() as Array<{ name: string }>
+        expect(additiveIndexes.map((index) => index.name)).toContain('idx_turn_status_retention')
+      } finally {
+        legacy.close()
+      }
+    } finally {
+      sqlite.close()
+    }
+  })
+
   async function seed(store: TurnEventStore, now: { value: number }) {
     now.value = 100
     await store.setStatus('old-complete', 'complete', 'thread-1')

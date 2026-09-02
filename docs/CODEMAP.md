@@ -74,7 +74,7 @@ _97 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./spend`](api/spend.md) | 60 | `sandbox` |
 | [`./spend/cli`](api/spend-cli.md) | 0 | `sandbox` |
 | [`./store`](api/store.md) | 16 | — |
-| [`./stream`](api/stream.md) | 50 | `interactions`, `plans` |
+| [`./stream`](api/stream.md) | 51 | `interactions`, `plans` |
 | [`./studio`](api/studio.md) | 70 | — |
 | [`./studio-react`](api/studio-react.md) | 47 | `studio`, `web-react` |
 | [`./tangle`](api/tangle.md) | 7 | — |
@@ -720,11 +720,11 @@ Source: `src/store/index.ts` · 16 exports
 
 ## `./stream`
 
-Source: `src/stream/index.ts` · 50 exports
+Source: `src/stream/index.ts` · 51 exports
 
 Depends on: `interactions`, `plans`
 
-`asRecord`, `asString`, `attachmentPartKey`, `BufferedTurnEvent`, `BufferedTurnOptions`, `BufferedTurnTap`, `buildUserTextParts`, `coalesceChatStreamEvents`, `coalesceDeltas`, `collapseRedundantTextParts`, `createBufferedTurnTap`, `createD1TurnEventStore`, `createMemoryTurnEventStore`, `D1BoundForTurns`, `D1LikeForTurns`, `DEFAULT_RUNNING_TURN_LEASE_MS`, `DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS`, `draftAssistantParts`, `encodeEvent`, `finalizeAssistantParts`, `finalizePendingInteractionParts`, `getPartKey`, `JsonRecord`, `mergePersistedPart`, `messageHasTurnId`, `MISSING_TOOL_TERMINAL_ERROR`, `MISSING_TOOL_TERMINAL_REASON`, `normalizeClientTurnId`, `normalizePersistedPart`, `normalizeTime`, `normalizeToolEvent`, `PersistedChatMessageForTurn`, `pumpBufferedTurn`, `PumpBufferedTurnOptions`, `replayTurnEvents`, `ReplayTurnEventsOptions`, `resolveChatTurn`, `ResolvedChatTurn`, `resolveToolId`, `resolveToolName`, `stampReplaySeq`, `StreamEvent`, `terminalizeDanglingAssistantToolUpdates`, `terminalizeDanglingToolPart`, `terminalizeDanglingToolParts`, `TURN_EVENTS_MIGRATION_SQL`, `TURN_STATUS_SCOPE_MIGRATION_SQL`, `TurnEventStore`, `TurnEventStoreOptions`, `TurnStatus`
+`asRecord`, `asString`, `attachmentPartKey`, `BufferedTurnEvent`, `BufferedTurnOptions`, `BufferedTurnTap`, `buildUserTextParts`, `coalesceChatStreamEvents`, `coalesceDeltas`, `collapseRedundantTextParts`, `createBufferedTurnTap`, `createD1TurnEventStore`, `createMemoryTurnEventStore`, `D1BoundForTurns`, `D1LikeForTurns`, `DEFAULT_RUNNING_TURN_LEASE_MS`, `DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS`, `draftAssistantParts`, `encodeEvent`, `finalizeAssistantParts`, `finalizePendingInteractionParts`, `getPartKey`, `JsonRecord`, `mergePersistedPart`, `messageHasTurnId`, `MISSING_TOOL_TERMINAL_ERROR`, `MISSING_TOOL_TERMINAL_REASON`, `normalizeClientTurnId`, `normalizePersistedPart`, `normalizeTime`, `normalizeToolEvent`, `PersistedChatMessageForTurn`, `pumpBufferedTurn`, `PumpBufferedTurnOptions`, `replayTurnEvents`, `ReplayTurnEventsOptions`, `resolveChatTurn`, `ResolvedChatTurn`, `resolveToolId`, `resolveToolName`, `stampReplaySeq`, `StreamEvent`, `terminalizeDanglingAssistantToolUpdates`, `terminalizeDanglingToolPart`, `terminalizeDanglingToolParts`, `TURN_EVENTS_MIGRATION_SQL`, `TURN_STATUS_RETENTION_MIGRATION_SQL`, `TURN_STATUS_SCOPE_MIGRATION_SQL`, `TurnEventStore`, `TurnEventStoreOptions`, `TurnStatus`
 
 [Full API →](api/stream.md)
 
