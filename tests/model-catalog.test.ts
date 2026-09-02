@@ -34,6 +34,33 @@ describe('buildCatalog', () => {
     expect(ids).not.toContain('chatgpt-image-latest')
   })
 
+  it('excludes batch aliases from the interactive chat picker', () => {
+    const catalog = buildCatalog([
+      {
+        id: 'claude-opus-5',
+        _provider: 'anthropic',
+        routeability: { routeable: true },
+      },
+      {
+        id: 'anthropic/claude-opus-5:batch',
+        _provider: 'anthropic',
+        routeability: { routeable: true },
+      },
+      {
+        id: 'claude-fable-5-1',
+        _provider: 'anthropic',
+        routeability: { routeable: false },
+      },
+      {
+        id: 'anthropic/claude-fable-5-1:batch',
+        _provider: 'anthropic',
+        routeability: { routeable: true },
+      },
+    ])
+
+    expect(catalog.models.map((model) => model.id)).toEqual(['claude-opus-5'])
+  })
+
   it('dedupes dated snapshots and :free variants to one representative', () => {
     // gpt-5 and gpt-5-2025-08-07 collapse to the undated id
     expect(ids).toContain('gpt-5')

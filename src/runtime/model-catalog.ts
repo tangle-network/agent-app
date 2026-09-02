@@ -79,7 +79,7 @@ const PROVIDER_TIER: string[] = [
 ]
 
 /** Non-chat endpoints that pollute the router list (matched on normalized id). */
-const EXCLUDED_ID = /(embedding|tts|transcribe|whisper|audio|realtime|image|lyria|sora|dall-e|moderation|content-safety|search-preview|search-api|deep-research)/
+const EXCLUDED_ID = /(embedding|tts|transcribe|whisper|audio|realtime|image|lyria|sora|dall-e|moderation|content-safety|search-preview|search-api|deep-research|:batch$)/
 
 /**
  * Featured families, in default-preference order. Each rule surfaces the highest-version
