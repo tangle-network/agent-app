@@ -52,7 +52,7 @@ _97 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./platform`](api/platform.md) | 67 | `billing`, `runtime`, `web` |
 | [`./preflight`](api/preflight.md) | 16 | `alerting`, `signoff` |
 | [`./preflight/cli`](api/preflight-cli.md) | 2 | `alerting`, `signoff` |
-| [`./preset-cloudflare`](api/preset-cloudflare.md) | 22 | `billing`, `crypto`, `knowledge`, `tools`, `web` |
+| [`./preset-cloudflare`](api/preset-cloudflare.md) | 31 | `billing`, `crypto`, `knowledge`, `sandbox`, `tools`, `web` |
 | [`./profile`](api/profile.md) | 45 | `skills` |
 | [`./prompt`](api/prompt.md) | 3 | — |
 | [`./record`](api/record.md) | 33 | — |
@@ -526,11 +526,11 @@ Depends on: `alerting`, `signoff`
 
 ## `./preset-cloudflare`
 
-Source: `src/preset-cloudflare/index.ts` · 22 exports
+Source: `src/preset-cloudflare/index.ts` · 31 exports
 
-Depends on: `billing`, `crypto`, `knowledge`, `tools`, `web`
+Depends on: `billing`, `crypto`, `knowledge`, `sandbox`, `tools`, `web`
 
-`CloudflareHeadersRule`, `CloudflareWorkflowBindingLike`, `CloudflareWorkflowInstanceLike`, `createD1KnowledgeStateAccessor`, `createPresetDrizzleSchema`, `createPresetFieldCrypto`, `createPresetToolHandlers`, `createPresetWorkspaceKeyManager`, `createPresetWorkspaceKeyStore`, `D1Like`, `D1PreparedLike`, `DrizzleColumnLike`, `DrizzleSqliteCoreLike`, `ensureCloudflareWorkflowInstance`, `EnsureCloudflareWorkflowInstanceResult`, `PRESET_MIGRATION_SQL`, `PRESET_TABLES`, `PresetBillingOptions`, `PresetKnowledgeAccessorOptions`, `PresetToolHandlerOptions`, `renderCloudflareHeadersFile`, `VaultKv`
+`CloudflareHeadersRule`, `CloudflareWorkflowBindingLike`, `CloudflareWorkflowEventLike`, `CloudflareWorkflowInstanceLike`, `CloudflareWorkflowSleepDuration`, `CloudflareWorkflowStepLike`, `createD1KnowledgeStateAccessor`, `createPresetDrizzleSchema`, `createPresetFieldCrypto`, `createPresetToolHandlers`, `createPresetWorkspaceKeyManager`, `createPresetWorkspaceKeyStore`, `D1Like`, `D1PreparedLike`, `DetachedTurnDriveOutcome`, `DetachedTurnDriveState`, `DetachedTurnTerminalResult`, `DetachedTurnWorkflowIdentity`, `DetachedTurnWorkflowTickOptions`, `DrizzleColumnLike`, `DrizzleSqliteCoreLike`, `ensureCloudflareWorkflowInstance`, `EnsureCloudflareWorkflowInstanceResult`, `PRESET_MIGRATION_SQL`, `PRESET_TABLES`, `PresetBillingOptions`, `PresetKnowledgeAccessorOptions`, `PresetToolHandlerOptions`, `renderCloudflareHeadersFile`, `runDetachedTurnWorkflowTick`, `VaultKv`
 
 [Full API →](api/preset-cloudflare.md)
 

@@ -58,6 +58,18 @@ export {
 } from './workflow-instance'
 
 export {
+  runDetachedTurnWorkflowTick,
+  type CloudflareWorkflowEventLike,
+  type CloudflareWorkflowSleepDuration,
+  type CloudflareWorkflowStepLike,
+  type DetachedTurnDriveOutcome,
+  type DetachedTurnDriveState,
+  type DetachedTurnTerminalResult,
+  type DetachedTurnWorkflowIdentity,
+  type DetachedTurnWorkflowTickOptions,
+} from './detached-turn-workflow'
+
+export {
   renderCloudflareHeadersFile,
   type CloudflareHeadersRule,
 } from './headers'
