@@ -11479,36 +11479,12 @@ interface PresetToolHandlerOptions
 <TPayload extends DetachedTurnWorkflowIdentity, TSettled>(options: DetachedTurnWorkflowTickOptions<TPayload, TSettled>)…
 ```
 
-### `runWorkflowTurnTick`
-
-`function` — Own one Sandbox turn from a durable Workflow without holding a stream open.
-
-```ts
-<TPayload extends WorkflowTurnIdentity, TAdmission, TStatus, TSettled>(options: WorkflowTurnTickOptions<TPayload, TAdmi…
-```
-
 ### `VaultKv`
 
 `type` — The KV-backed vault.
 
 ```ts
 type VaultKv
-```
-
-### `WorkflowTurnIdentity`
-
-`interface` — Stable identity shared by a Workflow and one Sandbox session turn.
-
-```ts
-interface WorkflowTurnIdentity
-```
-
-### `WorkflowTurnTickOptions`
-
-`interface` — Options for a generic admit, poll, and settle Workflow turn.
-
-```ts
-interface WorkflowTurnTickOptions
 ```
 
 
@@ -13119,22 +13095,6 @@ Source: `src/sandbox/index.ts` · depends on `harness`, `profile`, `runtime`, `t
 (events: AsyncIterable<unknown>) => AsyncGenerator<SandboxStreamEvent, any, any>
 ```
 
-### `admitSandboxSessionTurn`
-
-`function` — Create or reuse one Sandbox session, then admit one stable turn.
-
-```ts
-(options: AdmitSandboxSessionTurnOptions) => Promise<SandboxSessionTurnAdmission>
-```
-
-### `AdmitSandboxSessionTurnOptions`
-
-`interface` — Options for admitting one browser-visible turn on the Sandbox message lane.
-
-```ts
-interface AdmitSandboxSessionTurnOptions
-```
-
 ### `applyPromptTokenLimits`
 
 `function` — Tighten the profile's provider-enforced token ceilings for one prompt.
@@ -14181,38 +14141,6 @@ interface SandboxRuntimeConfig
 
 ```ts
 interface SandboxScope
-```
-
-### `SandboxSessionTurnAdmission`
-
-`interface` — Plain result safe to return from a durable admission step.
-
-```ts
-interface SandboxSessionTurnAdmission
-```
-
-### `SandboxSessionTurnBackend`
-
-`type` — Backend configuration fixed when the Sandbox session is created.
-
-```ts
-type SandboxSessionTurnBackend
-```
-
-### `SandboxSessionTurnMessage`
-
-`type` — Message fields forwarded to the Sandbox session lane.
-
-```ts
-type SandboxSessionTurnMessage
-```
-
-### `SandboxSessionTurnSendOptions`
-
-`type` — Request controls forwarded to the Sandbox session lane.
-
-```ts
-type SandboxSessionTurnSendOptions
 ```
 
 ### `SandboxSpendHooks`
