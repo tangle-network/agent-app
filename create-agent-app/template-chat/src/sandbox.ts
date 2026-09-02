@@ -26,7 +26,10 @@ import {
 } from '@tangle-network/agent-app/chat-routes'
 import type { SidecarInteractionsConnection } from '@tangle-network/agent-app/interactions'
 import {
+  createD1PrewarmClaimStore,
   ensureWorkspaceSandbox,
+  peekWorkspaceSandbox,
+  runForegroundSandboxSingleFlight,
   streamSandboxPrompt,
   type SandboxRuntimeConfig,
 } from '@tangle-network/agent-app/sandbox'
@@ -73,6 +76,26 @@ export function createSandboxShell(env: AppEnv): SandboxRuntimeConfig {
 }
 
 /**
+ * Provision once across Worker isolates. A turn, upload, and interaction can
+ * arrive together for one new workspace. They must adopt one box, not create
+ * three boxes with the same name.
+ */
+async function ensureForegroundWorkspaceSandbox(
+  env: AppEnv,
+  shell: SandboxRuntimeConfig,
+  scope: { workspaceId: string; userId: string },
+) {
+  return runForegroundSandboxSingleFlight({
+    claim: createD1PrewarmClaimStore(env.DB),
+    workspaceId: scope.workspaceId,
+    harness: config.harness,
+    provision: () => ensureWorkspaceSandbox(shell, { ...scope, harness: config.harness }),
+    peek: () => peekWorkspaceSandbox(shell, scope),
+    adopt: ({ box }) => box,
+  })
+}
+
+/**
  * The `produce` seam for `createChatTurnRoutes`: one call per turn. The
  * chat thread id doubles as the agent session id, so follow-up turns land in
  * the same sidecar session and keep its context.
@@ -85,10 +108,9 @@ export function createSandboxProduce(env: AppEnv) {
     prompt,
     executionId,
   }: ChatTurnProduceArgs<void>): Promise<ChatTurnRouteProducer> => {
-    const box = await ensureWorkspaceSandbox(shell, {
+    const box = await ensureForegroundWorkspaceSandbox(env, shell, {
       workspaceId: identity.tenantId,
       userId: identity.userId,
-      harness: config.harness,
     })
     const model = body.model ?? env.MODEL_NAME ?? config.model.default
     return createSandboxChatProducer({
@@ -133,7 +155,7 @@ export async function resolveUploadSink(
 ): Promise<SandboxUploadSink | null> {
   if (!env.SANDBOX_API_KEY?.trim() || !env.SANDBOX_GATEWAY_URL?.trim()) return null
   const shell = createSandboxShell(env)
-  const box = await ensureWorkspaceSandbox(shell, { ...scope, harness: config.harness })
+  const box = await ensureForegroundWorkspaceSandbox(env, shell, scope)
   return box.fs
 }
 
@@ -145,10 +167,9 @@ export async function resolveSidecarConnection(
 ): Promise<SidecarInteractionsConnection | null> {
   if (!env.SANDBOX_API_KEY?.trim() || !env.SANDBOX_GATEWAY_URL?.trim()) return null
   const shell = createSandboxShell(env)
-  const box = await ensureWorkspaceSandbox(shell, {
+  const box = await ensureForegroundWorkspaceSandbox(env, shell, {
     workspaceId: scope.workspaceId,
     userId: scope.userId,
-    harness: config.harness,
   })
   const connection = box.connection
   if (!connection?.runtimeUrl) return null

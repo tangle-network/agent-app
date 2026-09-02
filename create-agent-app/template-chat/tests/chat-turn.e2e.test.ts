@@ -29,6 +29,7 @@ import {
   type ChatTurnRouteProducer,
 } from '@tangle-network/agent-app/chat-routes'
 import type { ChatDatabase } from '@tangle-network/agent-app/chat-store'
+import { PREWARM_CLAIM_TABLE_DDL } from '@tangle-network/agent-app/sandbox'
 import {
   createMemoryTurnEventStore,
   TURN_EVENTS_MIGRATION_SQL,
@@ -272,6 +273,11 @@ describe('e2e: fake sandbox producer → streamed turn → persisted transcript'
   it('the migration carries the turn-buffer DDL the /stream store expects, verbatim', () => {
     const normalize = (sql: string) => sql.replace(/\s+/g, ' ').trim()
     expect(normalize(readFileSync(MIGRATION, 'utf8'))).toContain(normalize(TURN_EVENTS_MIGRATION_SQL))
+  })
+
+  it('the migration carries the fenced sandbox claim table, verbatim', () => {
+    const normalize = (sql: string) => sql.replace(/\s+/g, ' ').replace(/;$/, '').trim()
+    expect(normalize(readFileSync(MIGRATION, 'utf8'))).toContain(normalize(PREWARM_CLAIM_TABLE_DDL))
   })
 
   it('agent.config carries a real system prompt (prompts/system.md is wired)', () => {

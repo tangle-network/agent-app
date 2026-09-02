@@ -164,7 +164,9 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.188.0', range!)).toBe(false)
     expect(satisfiesRange('0.188.1', range!)).toBe(true)
     expect(satisfiesRange('0.188.9', range!)).toBe(true)
-    expect(satisfiesRange('0.189.0', range!)).toBe(false)
+    expect(satisfiesRange('0.189.0', range!)).toBe(true)
+    expect(satisfiesRange('0.189.9', range!)).toBe(true)
+    expect(satisfiesRange('0.190.0', range!)).toBe(false)
   })
 
   // The floors this shell PUBLISHES must be satisfiable by the tree it is

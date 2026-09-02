@@ -46,6 +46,8 @@ Discovery: **Where does this app live and what may it spend?**
 - [ ] `pnpm db:migrate:local` — applies `migrations/0001_init.sql` (auth +
       chat + turn buffer). The e2e test executes this same file, so it cannot
       silently drift from the schema.
+- [ ] Existing app only: add `sandbox_prewarm_claims` in a new migration.
+      Do not edit an applied `0001_init.sql`; Wrangler will not run it again.
 - [ ] R2 stays commented out unless the product stores artifacts.
 
 ## ④ Prove the loop — `pnpm dev`

@@ -50,23 +50,23 @@ importers:
         specifier: 13.0.0
         version: 13.0.0(@tangle-network/agent-eval@0.172.1)(@tangle-network/agent-interface@2.2.0)
       '@tangle-network/agent-profile-materialize':
-        specifier: 0.18.1
-        version: 0.18.1(@tangle-network/agent-interface@2.2.0)
+        specifier: 0.19.0
+        version: 0.19.0(@tangle-network/agent-interface@2.2.0)
       '@tangle-network/agent-runtime':
-        specifier: 0.188.1
-        version: 0.188.1(@tangle-network/agent-eval@0.172.1)(@tangle-network/agent-interface@2.2.0)(@tangle-network/sandbox@0.36.3(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))
+        specifier: 0.189.0
+        version: 0.189.0(@tangle-network/agent-eval@0.172.1)(@tangle-network/agent-interface@2.2.0)(@tangle-network/sandbox@0.36.4(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))
       '@tangle-network/brand':
         specifier: 1.5.0
         version: 1.5.0(react@19.2.8)
       '@tangle-network/sandbox':
-        specifier: 0.36.3
-        version: 0.36.3(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
+        specifier: 0.36.4
+        version: 0.36.4(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
       '@tangle-network/sandbox-ui':
-        specifier: 0.111.2
-        version: 0.111.2(043ac48805b1569b085778cc2072f7da)
+        specifier: 0.113.1
+        version: 0.113.1(216fe9d6c3ac5867e262dea5573fb5e7)
       '@tangle-network/ui':
-        specifier: ^11.6.0
-        version: 11.6.0(@hocuspocus/provider@4.6.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@tangle-network/brand@1.5.0(react@19.2.8))(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/react@3.30.5(@floating-ui/dom@1.8.0)(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/pm@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(nanostores@1.5.2)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)
+        specifier: ^11.8.0
+        version: 11.8.0(@hocuspocus/provider@4.6.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@tangle-network/brand@1.5.0(react@19.2.8))(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/react@3.30.5(@floating-ui/dom@1.8.0)(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/pm@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(nanostores@1.5.2)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)
       '@testing-library/dom':
         specifier: ^10.4.1
         version: 10.4.1
@@ -2218,13 +2218,13 @@ packages:
       '@tangle-network/agent-eval': '>=0.172.1 <0.173.0'
       '@tangle-network/agent-interface': 2.2.0
 
-  '@tangle-network/agent-profile-materialize@0.18.1':
-    resolution: {integrity: sha512-SeigOG4FykvTmjMddGfDzHhk80jjdEtp9pfpG1EtshWt9AcjGc+DWMzXqxNEk60/1jJavUjrT/5HrXqJoaR5JA==}
+  '@tangle-network/agent-profile-materialize@0.19.0':
+    resolution: {integrity: sha512-Q4vcsV0s94fwOtSFnaX6nGlpzwip9zDK4PmzECwUnNoyQvmo65KqvrYmPonN4c0we9ZoBkneIgl7jVvi9awjEA==}
     peerDependencies:
       '@tangle-network/agent-interface': 2.2.0
 
-  '@tangle-network/agent-runtime@0.188.1':
-    resolution: {integrity: sha512-4CJOHbayy3CNy54LqR0lt1b249BucPUQLbdqmeq3YEUKNavLkHIMFZ/h3Q9fiPIiiqexpXJV6h+R+FR+WPi8qw==}
+  '@tangle-network/agent-runtime@0.189.0':
+    resolution: {integrity: sha512-OMc9G89ksBr1ztlNG0v2+KcMT0d9QpPmBwZunOAVpNV7OWAUBKdWsOqJgJP9lKsvJSqju8d3QTD0nZjgtDQqkA==}
     engines: {node: '>=22.13.0'}
     hasBin: true
     peerDependencies:
@@ -2243,8 +2243,8 @@ packages:
       react:
         optional: true
 
-  '@tangle-network/sandbox-ui@0.111.2':
-    resolution: {integrity: sha512-h03ImOlakMahNUN7Lz5QO/Ni8h+CRCx7XqGeTJD5+CTfXOu6R5tkzBAWx0LASS8SGcr5X4jRrGhapPIhTibXxQ==}
+  '@tangle-network/sandbox-ui@0.113.1':
+    resolution: {integrity: sha512-WqBKzbT+xpUILwTqZAFV8hRI8/w8hJVmKkJEBDpanNb7U1DPAGlpSp9CE5mbFrQUhzq0lyIEAQt2j6GdqtGuqg==}
     peerDependencies:
       '@hocuspocus/provider': '>=2.15.0 <5.0.0'
       '@nanostores/react': '>=0.8.4 <2.0.0'
@@ -2295,8 +2295,8 @@ packages:
       yjs:
         optional: true
 
-  '@tangle-network/sandbox@0.36.3':
-    resolution: {integrity: sha512-ca6qa2SgyAJZxEQCgcK8PBKF1fV3RqnPI6LDR/cm1b691OUby6kKxCA3kk4LjE8lztpWPkyBx1qQbcVE59Nw4g==}
+  '@tangle-network/sandbox@0.36.4':
+    resolution: {integrity: sha512-1DGBpJPakISy/qe8BZK1m2PL5CrLJJ12apXsDWP/fUC+NjqmiI2fL3A7C2VJiGwYXz8Vz5/qFDW8QivRZCjqFg==}
     peerDependencies:
       '@mastra/core': ^1.36.0
       '@modelcontextprotocol/sdk': ^1.30.0
@@ -2315,8 +2315,8 @@ packages:
       viem:
         optional: true
 
-  '@tangle-network/ui@11.6.0':
-    resolution: {integrity: sha512-yrMUtrk5xqh5Tw3FG7LGiHy+nkE7HXj96Z+3r6ef/DwqL/uP+uEPk+DRgwVIISJWa2hy8vMJsm0YVaKDvo2N2A==}
+  '@tangle-network/ui@11.8.0':
+    resolution: {integrity: sha512-9iHqESgD3UOSHLdHlRXwTroc+z+7tjuVQ9wauFAoCHK4g4BfSABYdCO08fd9QReCZgVDG+cvD1f0MYLNCk8tDA==}
     peerDependencies:
       '@hocuspocus/provider': '>=2.15.0 <5.0.0'
       '@nanostores/react': '>=0.8.4 <2.0.0'
@@ -7068,19 +7068,19 @@ snapshots:
       proper-lockfile: 4.1.2
       zod: 4.5.4
 
-  '@tangle-network/agent-profile-materialize@0.18.1(@tangle-network/agent-interface@2.2.0)':
+  '@tangle-network/agent-profile-materialize@0.19.0(@tangle-network/agent-interface@2.2.0)':
     dependencies:
       '@tangle-network/agent-interface': 2.2.0
 
-  '@tangle-network/agent-runtime@0.188.1(@tangle-network/agent-eval@0.172.1)(@tangle-network/agent-interface@2.2.0)(@tangle-network/sandbox@0.36.3(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))':
+  '@tangle-network/agent-runtime@0.189.0(@tangle-network/agent-eval@0.172.1)(@tangle-network/agent-interface@2.2.0)(@tangle-network/sandbox@0.36.4(viem@2.56.0(typescript@7.0.2)(zod@4.4.3)))':
     dependencies:
       '@tangle-network/agent-core': 0.9.6
       '@tangle-network/agent-eval': 0.172.1
       '@tangle-network/agent-interface': 2.2.0
       '@tangle-network/agent-knowledge': 13.0.0(@tangle-network/agent-eval@0.172.1)(@tangle-network/agent-interface@2.2.0)
-      '@tangle-network/agent-profile-materialize': 0.18.1(@tangle-network/agent-interface@2.2.0)
+      '@tangle-network/agent-profile-materialize': 0.19.0(@tangle-network/agent-interface@2.2.0)
       '@tangle-network/agent-trace-contract': 1.0.2
-      '@tangle-network/sandbox': 0.36.3(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
+      '@tangle-network/sandbox': 0.36.4(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))
       tar-stream: 3.2.1
     transitivePeerDependencies:
       - '@modelcontextprotocol/sdk'
@@ -7094,7 +7094,7 @@ snapshots:
     optionalDependencies:
       react: 19.2.8
 
-  '@tangle-network/sandbox-ui@0.111.2(043ac48805b1569b085778cc2072f7da)':
+  '@tangle-network/sandbox-ui@0.113.1(216fe9d6c3ac5867e262dea5573fb5e7)':
     dependencies:
       '@lobehub/icons-static-svg': 1.94.0
       '@pierre/diffs': 1.3.6(@shikijs/themes@4.4.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -7102,7 +7102,7 @@ snapshots:
       '@radix-ui/react-select': 2.3.7(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@tangle-network/agent-interface': 2.2.0
       '@tangle-network/brand': 1.5.0(react@19.2.8)
-      '@tangle-network/ui': 11.6.0(@hocuspocus/provider@4.6.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@tangle-network/brand@1.5.0(react@19.2.8))(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/react@3.30.5(@floating-ui/dom@1.8.0)(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/pm@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(nanostores@1.5.2)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)
+      '@tangle-network/ui': 11.8.0(@hocuspocus/provider@4.6.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@tangle-network/brand@1.5.0(react@19.2.8))(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/react@3.30.5(@floating-ui/dom@1.8.0)(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/pm@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(nanostores@1.5.2)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)
       diff: 9.0.0
       eventsource-parser: 3.1.0
       lucide-react: 1.35.0(react@19.2.8)
@@ -7126,7 +7126,7 @@ snapshots:
       - '@types/react'
       - '@types/react-dom'
 
-  '@tangle-network/sandbox@0.36.3(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))':
+  '@tangle-network/sandbox@0.36.4(viem@2.56.0(typescript@7.0.2)(zod@4.4.3))':
     dependencies:
       '@tangle-network/agent-core': 0.9.6
       '@tangle-network/agent-interface': 2.2.0
@@ -7134,7 +7134,7 @@ snapshots:
     optionalDependencies:
       viem: 2.56.0(typescript@7.0.2)(zod@4.4.3)
 
-  '@tangle-network/ui@11.6.0(@hocuspocus/provider@4.6.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@tangle-network/brand@1.5.0(react@19.2.8))(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/react@3.30.5(@floating-ui/dom@1.8.0)(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/pm@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(nanostores@1.5.2)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)':
+  '@tangle-network/ui@11.8.0(@hocuspocus/provider@4.6.0(y-protocols@1.0.7(yjs@13.6.32))(yjs@13.6.32))(@tangle-network/brand@1.5.0(react@19.2.8))(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/react@3.30.5(@floating-ui/dom@1.8.0)(@tiptap/core@3.30.5(@tiptap/pm@3.30.5))(@tiptap/pm@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tiptap/starter-kit@3.30.5)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(nanostores@1.5.2)(react-dom@19.2.8(react@19.2.8))(react-router@8.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(yjs@13.6.32)':
     dependencies:
       '@pierre/trees': 1.0.0-beta.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@radix-ui/react-avatar': 1.2.6(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

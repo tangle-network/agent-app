@@ -96,6 +96,16 @@ CREATE TABLE IF NOT EXISTS message (
 CREATE INDEX IF NOT EXISTS idx_message_thread ON message (thread_id);
 CREATE INDEX IF NOT EXISTS idx_message_thread_created ON message (thread_id, created_at);
 
+-- ── sandbox provisioning claim (PREWARM_CLAIM_TABLE_DDL from
+-- @tangle-network/agent-app/sandbox) ──────────────────────────────────────
+-- A positive value is a live fenced lease. A negative value is the retained
+-- release marker that prevents an expired owner from releasing its successor.
+
+CREATE TABLE IF NOT EXISTS sandbox_prewarm_claims (
+  key TEXT PRIMARY KEY,
+  expires_at INTEGER NOT NULL
+);
+
 -- ── turn buffer (TURN_EVENTS_MIGRATION_SQL from @tangle-network/agent-app/stream)
 -- Byte-for-byte the constant the D1 turn-event store expects; the e2e test
 -- asserts this block matches the exported SQL so it cannot drift silently.
