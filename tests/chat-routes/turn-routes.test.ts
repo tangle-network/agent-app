@@ -857,15 +857,29 @@ describe('createChatTurnRoutes — product seams', () => {
     expect(rows.filter((r) => r.role === 'assistant')).toHaveLength(0)
   })
 
-  it('contextGate handoff returns the accepted response and keeps product ownership', async () => {
+  it('contextGate handoff releases the route lock and allows the next same-thread turn', async () => {
     const produce = vi.fn(() => fakeProducer([{ type: 'text', text: 'should not run' }], 'x'))
-    const release = vi.fn()
+    let lockHeld = false
+    const acquire = vi.fn(() => {
+      if (lockHeld) {
+        return { acquired: false as const, response: Response.json({ locked: true }, { status: 409 }) }
+      }
+      lockHeld = true
+      return { acquired: true as const, handle: 'product-owned' }
+    })
+    const release = vi.fn(() => { lockHeld = false })
     const lifecycleEvents: string[] = []
-    const { routes, rows, ctx } = makeRoutes({
+    let gateCalls = 0
+    const { routes, rows, ctx, pending } = makeRoutes({
       produce,
-      contextGate: async () => ({ proceed: 'handoff' as const, response: Response.json({ accepted: true }, { status: 202 }) }),
+      contextGate: async () => {
+        gateCalls += 1
+        return gateCalls === 1
+          ? { proceed: 'handoff' as const, response: Response.json({ accepted: true }, { status: 202 }) }
+          : { proceed: true as const }
+      },
       turnLock: {
-        acquire: () => ({ acquired: true as const, handle: 'product-owned' }),
+        acquire,
         release,
       },
       lifecycle: {
@@ -879,10 +893,18 @@ describe('createChatTurnRoutes — product seams', () => {
     expect(res.status).toBe(202)
     expect(await res.json()).toEqual({ accepted: true })
     expect(produce).not.toHaveBeenCalled()
-    expect(release).not.toHaveBeenCalled()
+    expect(release).toHaveBeenCalledTimes(1)
+    expect(release).toHaveBeenCalledWith('product-owned')
     expect(lifecycleEvents).toEqual([])
     expect(rows.filter((row) => row.role === 'user')).toHaveLength(1)
     expect(rows.filter((row) => row.role === 'assistant')).toHaveLength(0)
+
+    const next = await routes.turn(turnRequest({ threadId: 't-handoff', content: 'run now' }), ctx)
+    expect(next.status).toBe(200)
+    await readLines(next.body!)
+    await Promise.all(pending)
+    expect(acquire).toHaveBeenCalledTimes(2)
+    expect(release).toHaveBeenCalledTimes(2)
   })
 
   it('contextGate: a gated turn is REPORTED to telemetry, stamped so it is not read as a blank turn', async () => {
