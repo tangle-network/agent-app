@@ -2668,6 +2668,81 @@ export function attachReasoningEffort(
   }
 }
 
+export interface SandboxPromptTokenLimits {
+  maxVisibleOutputTokens?: number
+  maxReasoningTokens?: number
+  maxTotalOutputTokens?: number
+}
+
+function positiveSafeInteger(value: number | undefined, field: string): number | undefined {
+  if (value === undefined) return undefined
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${field} must be a positive safe integer`)
+  }
+  return value
+}
+
+function lowerCeiling(current: number | undefined, requested: number | undefined): number | undefined {
+  if (current === undefined) return requested
+  if (requested === undefined) return current
+  return Math.min(current, requested)
+}
+
+/** Tighten the profile's provider-enforced token ceilings for one prompt. */
+export function applyPromptTokenLimits(
+  profile: AgentProfile,
+  limits: SandboxPromptTokenLimits,
+): AgentProfile {
+  const requestedVisible = positiveSafeInteger(
+    limits.maxVisibleOutputTokens,
+    'maxVisibleOutputTokens',
+  )
+  const requestedReasoning = positiveSafeInteger(
+    limits.maxReasoningTokens,
+    'maxReasoningTokens',
+  )
+  const requestedTotal = positiveSafeInteger(
+    limits.maxTotalOutputTokens,
+    'maxTotalOutputTokens',
+  )
+  if (
+    requestedVisible === undefined
+    && requestedReasoning === undefined
+    && requestedTotal === undefined
+  ) return profile
+
+  const maxTotalOutputTokens = lowerCeiling(
+    profile.model?.maxTotalOutputTokens,
+    requestedTotal,
+  )
+  let maxVisibleOutputTokens = lowerCeiling(
+    profile.model?.maxVisibleOutputTokens,
+    requestedVisible,
+  )
+  let maxReasoningTokens = lowerCeiling(
+    profile.model?.maxReasoningTokens,
+    requestedReasoning,
+  )
+  if (maxTotalOutputTokens !== undefined) {
+    if (maxVisibleOutputTokens !== undefined) {
+      maxVisibleOutputTokens = Math.min(maxVisibleOutputTokens, maxTotalOutputTokens)
+    }
+    if (maxReasoningTokens !== undefined) {
+      maxReasoningTokens = Math.min(maxReasoningTokens, maxTotalOutputTokens)
+    }
+  }
+
+  return {
+    ...profile,
+    model: {
+      ...(profile.model ?? {}),
+      ...(maxVisibleOutputTokens !== undefined ? { maxVisibleOutputTokens } : {}),
+      ...(maxReasoningTokens !== undefined ? { maxReasoningTokens } : {}),
+      ...(maxTotalOutputTokens !== undefined ? { maxTotalOutputTokens } : {}),
+    },
+  }
+}
+
 /** Define options for configuring and controlling a streaming sandbox prompt session */
 export interface StreamSandboxPromptOptions {
   sessionId?: string
@@ -2682,6 +2757,12 @@ export interface StreamSandboxPromptOptions {
   history?: Array<{ role: 'user' | 'assistant'; content: string }>
   harness?: Harness
   effort?: 'auto' | ReasoningEffort
+  /** Provider-enforced visible answer ceiling for this turn. */
+  maxOutputTokens?: number
+  /** Provider-enforced hidden reasoning ceiling for this turn. */
+  maxReasoningTokens?: number
+  /** Provider-enforced combined answer and reasoning ceiling for this turn. */
+  maxTotalOutputTokens?: number
   appToolMcp?: Record<string, AgentProfileMcpServer>
   baseProfileMcp?: Record<string, AgentProfileMcpServer>
   extraMcp?: Record<string, AgentProfileMcpServer>
@@ -2732,8 +2813,55 @@ export interface SandboxStreamEvent {
     part?: { type?: string; text?: string }
     delta?: string
     finalText?: string
+    code?: string
+    message?: string
+    details?: Record<string, unknown>
     inputRequired?: { prompt?: string }
+    usage?: {
+      inputTokens?: number
+      outputTokens?: number
+      reasoningTokens?: number
+      toolTokens?: number
+      toolCallCount?: number
+      providerCostUsd?: number
+      budgetEnforced?: boolean
+    }
+    tool?: { name?: string; inputTokens?: number; outputTokens?: number }
+    reasoning?: { tokens?: number }
   }
+}
+
+function optionalNonNegativeNumber(
+  value: unknown,
+  field: string,
+): number | undefined {
+  if (value === undefined) return undefined
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    throw new Error(`sandbox gateway event ${field} is invalid`)
+  }
+  return value
+}
+
+function optionalNonNegativeSafeInteger(
+  value: unknown,
+  field: string,
+): number | undefined {
+  const number = optionalNonNegativeNumber(value, field)
+  if (number !== undefined && !Number.isSafeInteger(number)) {
+    throw new Error(`sandbox gateway event ${field} is invalid`)
+  }
+  return number
+}
+
+function optionalGatewayRecord(
+  value: unknown,
+  field: string,
+): Record<string, unknown> | undefined {
+  if (value === undefined) return undefined
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`sandbox gateway event ${field} is invalid`)
+  }
+  return value as Record<string, unknown>
 }
 
 /** Normalize raw sandbox events for shared agent-gateway consumers. */
@@ -2765,6 +2893,59 @@ export function adaptSandboxStream(
 
       if (typeof dataRecord?.delta === 'string') data.delta = dataRecord.delta
       if (typeof dataRecord?.finalText === 'string') data.finalText = dataRecord.finalText
+      if (typeof dataRecord?.code === 'string') data.code = dataRecord.code
+      if (typeof dataRecord?.message === 'string') data.message = dataRecord.message
+      const rawDetails = dataRecord?.details
+      if (rawDetails && typeof rawDetails === 'object' && !Array.isArray(rawDetails)) {
+        data.details = rawDetails as Record<string, unknown>
+      }
+
+      const usageRecord = optionalGatewayRecord(dataRecord?.usage, 'usage')
+      if (usageRecord) {
+        const usage: NonNullable<NonNullable<SandboxStreamEvent['data']>['usage']> = {}
+        for (const field of [
+          'inputTokens',
+          'outputTokens',
+          'reasoningTokens',
+          'toolTokens',
+          'toolCallCount',
+        ] as const) {
+          const value = optionalNonNegativeSafeInteger(usageRecord[field], `usage.${field}`)
+          if (value !== undefined) usage[field] = value
+        }
+        const providerCostUsd = optionalNonNegativeNumber(
+          usageRecord.providerCostUsd,
+          'usage.providerCostUsd',
+        )
+        if (providerCostUsd !== undefined) usage.providerCostUsd = providerCostUsd
+        if (usageRecord.budgetEnforced !== undefined) {
+          if (typeof usageRecord.budgetEnforced !== 'boolean') {
+            throw new Error('sandbox gateway event usage.budgetEnforced is invalid')
+          }
+          usage.budgetEnforced = usageRecord.budgetEnforced
+        }
+        if (Object.keys(usage).length > 0) data.usage = usage
+      }
+
+      const toolRecord = optionalGatewayRecord(dataRecord?.tool, 'tool')
+      if (toolRecord) {
+        const tool: NonNullable<NonNullable<SandboxStreamEvent['data']>['tool']> = {}
+        if (typeof toolRecord.name === 'string') tool.name = toolRecord.name
+        const inputTokens = optionalNonNegativeSafeInteger(toolRecord.inputTokens, 'tool.inputTokens')
+        const outputTokens = optionalNonNegativeSafeInteger(toolRecord.outputTokens, 'tool.outputTokens')
+        if (inputTokens !== undefined) tool.inputTokens = inputTokens
+        if (outputTokens !== undefined) tool.outputTokens = outputTokens
+        if (Object.keys(tool).length > 0) data.tool = tool
+      }
+
+      const reasoningRecord = optionalGatewayRecord(dataRecord?.reasoning, 'reasoning')
+      if (reasoningRecord) {
+        const tokens = optionalNonNegativeSafeInteger(
+          reasoningRecord.tokens,
+          'reasoning.tokens',
+        )
+        if (tokens !== undefined) data.reasoning = { tokens }
+      }
 
       const rawInputRequired = dataRecord?.inputRequired
       if (
@@ -2814,12 +2995,19 @@ export async function* streamSandboxPrompt(
   const extraMcp = mergeExtraMcp(appToolMcp, options?.baseProfileMcp ?? {}, options?.extraMcp)
 
   const profile = shell.profile({ systemPrompt: options?.systemPrompt, extraMcp, harness })
-  const profileWithEffort = attachReasoningEffort(profile, harness, options?.effort)
+  const profileWithLimits = applyPromptTokenLimits(
+    attachReasoningEffort(profile, harness, options?.effort),
+    {
+      maxVisibleOutputTokens: options?.maxOutputTokens,
+      maxReasoningTokens: options?.maxReasoningTokens,
+      maxTotalOutputTokens: options?.maxTotalOutputTokens,
+    },
+  )
   // The per-turn backend can carry a system prompt the create-time profile
   // never had (creative-agent does exactly that), so the budget is re-checked
   // on the profile this turn actually executes.
   assertProfilePromptWithinBudget(
-    profileWithEffort,
+    profileWithLimits,
     shell.promptBudget ?? {},
     'streamSandboxPrompt profile systemPrompt',
     SHELL_PROMPT_BUDGET_HINT,
@@ -2829,7 +3017,7 @@ export async function* streamSandboxPrompt(
   // observer proves what was executed rather than re-deriving what should be.
   if (options?.onProfileResolved) {
     options.onProfileResolved(
-      await fingerprintAgentProfile(profileWithEffort, { model: model?.model, harness }),
+      await fingerprintAgentProfile(profileWithLimits, { model: model?.model, harness }),
     )
   }
 
@@ -2846,7 +3034,7 @@ export async function* streamSandboxPrompt(
     ...(options?.detach ? { detach: true } : {}),
     backend: {
       type: harness,
-      profile: profileWithEffort,
+      profile: profileWithLimits,
       ...(model ? { model } : {}),
       ...(options?.interactions ? { interactions: options.interactions } : {}),
     },

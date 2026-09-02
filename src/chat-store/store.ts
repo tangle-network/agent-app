@@ -55,6 +55,9 @@ export interface ListThreadsResult<TThread = ChatThreadRow> {
 
 /** Define input parameters required to create a new thread in a workspace */
 export interface CreateThreadInput {
+  /** Caller-assigned primary key. The agent gateway uses its validated
+   *  conversation id so API and browser turns share one durable thread. */
+  id?: string
   workspaceId: string
   /** Title source when `title` is absent: first non-empty line, 80-char cap
    *  (`threadTitleFromMessage`). */
@@ -229,6 +232,7 @@ export function createChatStore<TTables extends ChatTables>(
     async createThread(input) {
       const title = threadTitleFromMessage(input.title ?? input.firstMessage ?? '')
       const values = {
+        ...(input.id !== undefined ? { id: input.id } : {}),
         workspaceId: input.workspaceId,
         title,
         ...(input.category !== undefined ? { category: input.category } : {}),

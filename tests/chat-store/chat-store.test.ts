@@ -56,6 +56,18 @@ describe('createChatStore — threads', () => {
     expect(await store.getThread('nope')).toBeNull()
   })
 
+  it('accepts a caller-assigned thread id', async () => {
+    const { store } = await freshStore()
+    const created = await store.createThread({
+      id: 'gateway-thread-1',
+      workspaceId: 'ws1',
+      firstMessage: 'Continue this API conversation',
+    })
+
+    expect(created.id).toBe('gateway-thread-1')
+    expect(await store.getThread('gateway-thread-1')).toEqual(created)
+  })
+
   it('renameThread trims, rejects empty titles, and returns null for a missing thread', async () => {
     const { store } = await freshStore()
     const created = await store.createThread({ workspaceId: 'ws1', title: 'T' })

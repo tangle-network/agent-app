@@ -148,8 +148,9 @@ describe('this package audits itself', () => {
     expect(range).toBeDefined()
     expect(satisfiesRange('1.9.0', range!)).toBe(false)
     expect(satisfiesRange('2.1.1', range!)).toBe(false)
-    expect(satisfiesRange('2.2.0', range!)).toBe(true)
-    expect(satisfiesRange('2.2.9', range!)).toBe(true)
+    expect(satisfiesRange('2.2.9', range!)).toBe(false)
+    expect(satisfiesRange('2.3.0', range!)).toBe(true)
+    expect(satisfiesRange('2.3.9', range!)).toBe(true)
     expect(satisfiesRange('3.0.0', range!)).toBe(false)
   })
 
@@ -162,11 +163,11 @@ describe('this package audits itself', () => {
 
     expect(range).toBeDefined()
     expect(satisfiesRange('0.188.0', range!)).toBe(false)
-    expect(satisfiesRange('0.188.1', range!)).toBe(true)
-    expect(satisfiesRange('0.188.9', range!)).toBe(true)
-    expect(satisfiesRange('0.189.0', range!)).toBe(true)
-    expect(satisfiesRange('0.189.9', range!)).toBe(true)
-    expect(satisfiesRange('0.190.0', range!)).toBe(false)
+    expect(satisfiesRange('0.188.1', range!)).toBe(false)
+    expect(satisfiesRange('0.190.9', range!)).toBe(false)
+    expect(satisfiesRange('0.191.0', range!)).toBe(true)
+    expect(satisfiesRange('0.191.9', range!)).toBe(true)
+    expect(satisfiesRange('0.192.0', range!)).toBe(false)
   })
 
   // The floors this shell PUBLISHES must be satisfiable by the tree it is

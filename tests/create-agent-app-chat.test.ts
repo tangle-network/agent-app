@@ -96,11 +96,13 @@ describe('create-agent-app --chat scaffolder', () => {
       'prompts/system.md',
       'declarations.d.ts',
       'src/chat.ts',
+      'src/gateway.ts',
       'src/sandbox.ts',
       'src/worker.ts',
       'src/env.ts',
       'src/db/schema.ts',
       'migrations/0001_init.sql',
+      'migrations/0002_agent_gateway.sql',
       'public/index.html',
       'tests/chat-turn.e2e.test.ts',
       'tests/sandbox-fence.test.ts',
@@ -148,8 +150,15 @@ describe('create-agent-app --chat scaffolder', () => {
       ...gen.peerDependencies,
       ...gen.dependencies,
     }
+    // agent-gateway is a sibling app-shell package used by the generated app.
+    // It is not an engine peer of the agent-app library.
+    const directShellDependencies = new Set(['@tangle-network/agent-gateway'])
     for (const [name, range] of Object.entries(declaredEngines)) {
-      if (!name.startsWith('@tangle-network/') || name === '@tangle-network/agent-app') continue
+      if (
+        !name.startsWith('@tangle-network/')
+        || name === '@tangle-network/agent-app'
+        || directShellDependencies.has(name)
+      ) continue
       const floor = appPkg.peerDependencies[name]
       expect(floor, `template declares ${name} but it is not an agent-app peer`).toBeTruthy()
       expect(
@@ -163,6 +172,7 @@ describe('create-agent-app --chat scaffolder', () => {
       '@tangle-network/agent-runtime',
       '@tangle-network/sandbox',
       '@tangle-network/agent-interface',
+      '@tangle-network/agent-gateway',
       'better-auth',
       'drizzle-orm',
       'viem',

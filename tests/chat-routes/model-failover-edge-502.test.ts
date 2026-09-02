@@ -419,8 +419,8 @@ describe('the money guards — what the rescue must NOT do', () => {
     // its execution, not its tokens, not its cost.
     expect(wire).not.toContain('dead-exec')
     expect(wireEvents.filter((event) => event.type === 'usage').map((event) => event.usage)).toEqual([
-      { promptTokens: 1144, completionTokens: 10 },
-      { promptTokens: 1144, completionTokens: 10 },
+      { promptTokens: 1144, completionTokens: 10, reasoningTokens: 0, providerCostUsd: 0 },
+      { promptTokens: 1144, completionTokens: 10, reasoningTokens: 0, providerCostUsd: 0 },
     ])
     // What DOES reach the client is the notice, and it carries the cause: the
     // edge 502 is named, so a downgrade is never mistaken for a normal turn.

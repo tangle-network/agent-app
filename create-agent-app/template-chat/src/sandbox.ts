@@ -107,6 +107,7 @@ export function createSandboxProduce(env: AppEnv) {
     identity,
     prompt,
     executionId,
+    executionLimits,
   }: ChatTurnProduceArgs<void>): Promise<ChatTurnRouteProducer> => {
     const box = await ensureForegroundWorkspaceSandbox(env, shell, {
       workspaceId: identity.tenantId,
@@ -131,7 +132,24 @@ export function createSandboxProduce(env: AppEnv) {
           executionId: attempt === 1 ? executionId : `${executionId}-f${attempt}`,
           model: attemptModel,
           signal,
-          effort: body.effort ?? config.model.effort,
+          // A zero reasoning allowance maps to the profile's supported
+          // no-reasoning control. Positive limits use token ceilings below.
+          effort: executionLimits?.maxReasoningTokens === 0
+            ? 'none'
+            : (body.effort ?? config.model.effort),
+          ...(executionLimits?.maxOutputTokens
+            ? { maxOutputTokens: executionLimits.maxOutputTokens }
+            : {}),
+          ...(executionLimits?.maxReasoningTokens
+            ? { maxReasoningTokens: executionLimits.maxReasoningTokens }
+            : {}),
+          ...(executionLimits?.maxOutputTokens !== undefined
+            && executionLimits.maxReasoningTokens !== undefined
+            ? {
+                maxTotalOutputTokens:
+                  executionLimits.maxOutputTokens + executionLimits.maxReasoningTokens,
+              }
+            : {}),
           harness: config.harness,
           systemPrompt: config.systemPrompt,
           // Durable by default: the run keeps executing server-side if the operator

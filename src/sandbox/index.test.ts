@@ -55,6 +55,7 @@ import {
   mergeHistoryIntoParts,
   mergeExtraMcp,
   attachReasoningEffort,
+  applyPromptTokenLimits,
   syncSandboxMemberAdd,
   storeSecret,
   secretStoreFromClient,
@@ -943,6 +944,30 @@ describe('streamSandboxPrompt seam', () => {
       }
       yield { type: 'result', data: { finalText: 'hello', ignored: true } }
       yield {
+        type: 'usage',
+        data: {
+          usage: {
+            inputTokens: 40,
+            outputTokens: 20,
+            reasoningTokens: 5,
+            toolTokens: 3,
+            toolCallCount: 1,
+            providerCostUsd: 0.0123,
+            budgetEnforced: false,
+            ignored: true,
+          },
+        },
+      }
+      yield {
+        type: 'tool',
+        data: { tool: { name: 'search', inputTokens: 2, outputTokens: 1, ignored: true } },
+      }
+      yield { type: 'reasoning', data: { reasoning: { tokens: 5, ignored: true } } }
+      yield {
+        type: 'error',
+        data: { code: 'provider_down', message: 'Provider unavailable', details: { retry: true } },
+      }
+      yield {
         type: 'input-required',
         data: { inputRequired: { prompt: 'Need more', ignored: true } },
       }
@@ -958,8 +983,54 @@ describe('streamSandboxPrompt seam', () => {
         data: { part: { type: 'text', text: 'hello' }, delta: 'he' },
       },
       { type: 'result', data: { finalText: 'hello' } },
+      {
+        type: 'usage',
+        data: {
+          usage: {
+            inputTokens: 40,
+            outputTokens: 20,
+            reasoningTokens: 5,
+            toolTokens: 3,
+            toolCallCount: 1,
+            providerCostUsd: 0.0123,
+            budgetEnforced: false,
+          },
+        },
+      },
+      { type: 'tool', data: { tool: { name: 'search', inputTokens: 2, outputTokens: 1 } } },
+      { type: 'reasoning', data: { reasoning: { tokens: 5 } } },
+      {
+        type: 'error',
+        data: { code: 'provider_down', message: 'Provider unavailable', details: { retry: true } },
+      },
       { type: 'input-required', data: { inputRequired: { prompt: 'Need more' } } },
     ])
+  })
+
+  it('rejects malformed gateway usage instead of hiding a bad receipt', async () => {
+    async function* rawEvents(): AsyncGenerator<unknown> {
+      yield { type: 'usage', data: { usage: { inputTokens: -1 } } }
+    }
+
+    await expect(async () => {
+      for await (const _ of adaptSandboxStream(rawEvents())) void _
+    }).rejects.toThrow('sandbox gateway event usage.inputTokens is invalid')
+  })
+
+  it('rejects fractional token counts and malformed usage containers', async () => {
+    async function* fractionalEvents(): AsyncGenerator<unknown> {
+      yield { type: 'usage', data: { usage: { reasoningTokens: 1.5 } } }
+    }
+    async function* malformedEvents(): AsyncGenerator<unknown> {
+      yield { type: 'usage', data: { usage: 'unknown' } }
+    }
+
+    await expect(async () => {
+      for await (const _ of adaptSandboxStream(fractionalEvents())) void _
+    }).rejects.toThrow('sandbox gateway event usage.reasoningTokens is invalid')
+    await expect(async () => {
+      for await (const _ of adaptSandboxStream(malformedEvents())) void _
+    }).rejects.toThrow('sandbox gateway event usage is invalid')
   })
 
   it('flattens history, resolves the model, attaches effort, and forwards to box.streamPrompt', async () => {
@@ -999,6 +1070,60 @@ describe('streamSandboxPrompt seam', () => {
       for await (const _ of streamSandboxPrompt(shell(), box, 'hello', { harness: 'claude-code' })) void _
     })()).rejects.toThrow(/provider "openai-compat"/)
     expect(streamPrompt).not.toHaveBeenCalled()
+  })
+
+  it('tightens existing profile token ceilings before dispatch', async () => {
+    async function* events() {
+      yield { type: 'result' }
+    }
+    const box = fakeBox({ streamPrompt: vi.fn().mockReturnValue(events()) })
+    const limitedProfile: AgentProfile = {
+      name: 'limited',
+      model: {
+        maxVisibleOutputTokens: 1_024,
+        maxReasoningTokens: 512,
+        maxTotalOutputTokens: 1_200,
+      },
+    } as AgentProfile
+    const limitedShell = shellFor(
+      { apiKey: 'k', baseUrl: 'https://s' },
+      {
+        provider: {
+          apiKey: 'router-key',
+          providerName: 'openai-compat',
+          defaultModel: 'gpt-x',
+          routerBaseUrl: 'https://router',
+        },
+        profile: () => limitedProfile,
+      },
+    )
+
+    for await (const _ of streamSandboxPrompt(limitedShell, box, 'bounded', {
+      maxOutputTokens: 800,
+      maxReasoningTokens: 600,
+      maxTotalOutputTokens: 900,
+    })) void _
+
+    const [, opts] = (box.streamPrompt as ReturnType<typeof vi.fn>).mock.calls[0]!
+    expect(opts.backend.profile.model).toMatchObject({
+      maxVisibleOutputTokens: 800,
+      maxReasoningTokens: 512,
+      maxTotalOutputTokens: 900,
+    })
+    expect(limitedProfile.model).toEqual({
+      maxVisibleOutputTokens: 1_024,
+      maxReasoningTokens: 512,
+      maxTotalOutputTokens: 1_200,
+    })
+  })
+
+  it('rejects token ceilings the profile contract cannot enforce', async () => {
+    expect(() => applyPromptTokenLimits(PROFILE, { maxVisibleOutputTokens: 0 }))
+      .toThrow('maxVisibleOutputTokens must be a positive safe integer')
+    expect(() => applyPromptTokenLimits(PROFILE, { maxReasoningTokens: 1.5 }))
+      .toThrow('maxReasoningTokens must be a positive safe integer')
+    expect(() => applyPromptTokenLimits(PROFILE, { maxTotalOutputTokens: Number.MAX_VALUE }))
+      .toThrow('maxTotalOutputTokens must be a positive safe integer')
   })
 
   it('forwards execution replay and dispatch idempotency identities to box.streamPrompt', async () => {

@@ -470,7 +470,15 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
     const promptTokens = usage.inputTokens ?? 0
     const completionTokens = usage.outputTokens ?? 0
     if (promptTokens || completionTokens) {
-      yield { type: 'usage', usage: { promptTokens, completionTokens } }
+      yield {
+        type: 'usage',
+        usage: {
+          promptTokens,
+          completionTokens,
+          ...(usage.reasoningTokens !== undefined ? { reasoningTokens: usage.reasoningTokens } : {}),
+          ...(usage.costUsd !== undefined ? { providerCostUsd: usage.costUsd } : {}),
+        },
+      }
     }
   }
 
@@ -565,7 +573,17 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
             const promptTokens = usage.inputTokens ?? 0
             const completionTokens = usage.outputTokens ?? 0
             if (promptTokens || completionTokens) {
-              yield { type: 'usage', usage: { promptTokens, completionTokens } }
+              yield {
+                type: 'usage',
+                usage: {
+                  promptTokens,
+                  completionTokens,
+                  ...(usage.reasoningTokens !== undefined
+                    ? { reasoningTokens: usage.reasoningTokens }
+                    : {}),
+                  ...(usage.costUsd !== undefined ? { providerCostUsd: usage.costUsd } : {}),
+                },
+              }
             }
             continue
           }

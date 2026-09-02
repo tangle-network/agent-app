@@ -70,12 +70,18 @@ export interface ProducerToolResultEvent {
   }
 }
 
-/** Describe usage event with prompt and completion token counts for a producer */
+/** Describe cumulative provider usage reported by a producer. */
 export interface ProducerUsageEvent {
   type: 'usage'
   usage: {
     promptTokens: number
     completionTokens: number
+    reasoningTokens?: number
+    toolTokens?: number
+    toolCallCount?: number
+    providerCostUsd?: number
+    /** Present only when the provider enforced the complete execution budget. */
+    budgetEnforced?: boolean
   }
 }
 

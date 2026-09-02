@@ -412,8 +412,24 @@ describe('createSandboxChatProducer', () => {
     const events = await drain(producer.stream)
 
     expect(events).toEqual([
-      { type: 'usage', usage: { promptTokens: 100, completionTokens: 20 } },
-      { type: 'usage', usage: { promptTokens: 150, completionTokens: 30 } },
+      {
+        type: 'usage',
+        usage: {
+          promptTokens: 100,
+          completionTokens: 20,
+          reasoningTokens: 5,
+          providerCostUsd: 0.02,
+        },
+      },
+      {
+        type: 'usage',
+        usage: {
+          promptTokens: 150,
+          completionTokens: 30,
+          reasoningTokens: 5,
+          providerCostUsd: 0.03,
+        },
+      },
     ])
     expect(producer.usage?.()).toEqual({
       inputTokens: 150,
@@ -448,7 +464,15 @@ describe('createSandboxChatProducer', () => {
     })
 
     expect(await drain(producer.stream)).toEqual([
-      { type: 'usage', usage: { promptTokens: 101, completionTokens: 22 } },
+      {
+        type: 'usage',
+        usage: {
+          promptTokens: 101,
+          completionTokens: 22,
+          reasoningTokens: 7,
+          providerCostUsd: 0.123,
+        },
+      },
       expect.objectContaining({ type: 'done' }),
     ])
     expect(producer.usage?.()).toEqual({
@@ -470,8 +494,14 @@ describe('createSandboxChatProducer', () => {
     })
 
     expect(await drain(producer.stream)).toEqual([
-      { type: 'usage', usage: { promptTokens: 10, completionTokens: 2 } },
-      { type: 'usage', usage: { promptTokens: 20, completionTokens: 5 } },
+      {
+        type: 'usage',
+        usage: { promptTokens: 10, completionTokens: 2, providerCostUsd: 0.01 },
+      },
+      {
+        type: 'usage',
+        usage: { promptTokens: 20, completionTokens: 5, providerCostUsd: 0.02 },
+      },
       expect.objectContaining({ type: 'done' }),
     ])
     expect(producer.usage?.()).toEqual({ inputTokens: 20, outputTokens: 5, costUsd: 0.02 })
@@ -486,7 +516,10 @@ describe('createSandboxChatProducer', () => {
     })
 
     expect(await drain(producer.stream)).toEqual([
-      { type: 'usage', usage: { promptTokens: 8, completionTokens: 3 } },
+      {
+        type: 'usage',
+        usage: { promptTokens: 8, completionTokens: 3, providerCostUsd: 0.04 },
+      },
       expect.objectContaining({ type: 'done' }),
     ])
     expect(producer.usage?.()).toEqual({ inputTokens: 8, outputTokens: 3, costUsd: 0.04 })
@@ -510,7 +543,15 @@ describe('createSandboxChatProducer', () => {
     })
 
     expect(await drain(producer.stream)).toEqual([
-      { type: 'usage', usage: { promptTokens: 44, completionTokens: 12 } },
+      {
+        type: 'usage',
+        usage: {
+          promptTokens: 44,
+          completionTokens: 12,
+          reasoningTokens: 3,
+          providerCostUsd: 0.08,
+        },
+      },
     ])
     expect(producer.usage?.()).toEqual({
       inputTokens: 44,

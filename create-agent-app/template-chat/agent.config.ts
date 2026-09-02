@@ -44,7 +44,7 @@ export const config = {
      * and review it with your default: a stale ladder degrades to today's
      * behavior (the turn fails), never to a silent wrong-model answer.
      */
-    fallbacks: ['gemini-2.5-flash-lite', 'gpt-5-mini'],
+    fallbacks: ['gemini-3.7-flash', 'glm-5.3'],
     /** Default reasoning effort for turns that don't specify one. */
     effort: 'auto',
   },
@@ -62,12 +62,31 @@ export const config = {
    * a card no client will show.
    */
   interactions: { question: true, plan: true },
+
+  /** API-key access to this workspace agent. The browser and API share one
+   *  thread store and one sandbox turn path. */
+  gateway: {
+    enabled: true,
+    description: '__PROJECT_NAME__ workspace agent',
+    pricePerTokenUsd: 0.00002,
+    platformFeePercent: 0.20,
+    defaultOutputTokens: 1024,
+    maxOutputTokens: 4096,
+  },
 } as const satisfies {
   name: string
   systemPrompt: string
   model: { default: string; fallbacks: readonly string[]; effort: 'auto' | 'low' | 'medium' | 'high' }
   harness: Harness
   interactions: { question?: boolean; permission?: boolean; plan?: boolean }
+  gateway: {
+    enabled: boolean
+    description: string
+    pricePerTokenUsd: number
+    platformFeePercent: number
+    defaultOutputTokens: number
+    maxOutputTokens: number
+  }
 }
 
 export type Config = typeof config

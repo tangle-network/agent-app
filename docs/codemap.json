@@ -2036,7 +2036,7 @@
           "name": "ProducerUsageEvent",
           "kind": "interface",
           "signature": "interface ProducerUsageEvent",
-          "doc": "Describe usage event with prompt and completion token counts for a producer"
+          "doc": "Describe cumulative provider usage reported by a producer."
         },
         {
           "name": "ProducerWireEvent",
@@ -18928,7 +18928,7 @@
           "name": "ProducerUsageEvent",
           "kind": "interface",
           "signature": "interface ProducerUsageEvent",
-          "doc": "Describe usage event with prompt and completion token counts for a producer"
+          "doc": "Describe cumulative provider usage reported by a producer."
         },
         {
           "name": "ProducerWireEvent",

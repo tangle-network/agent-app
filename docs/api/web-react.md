@@ -2072,7 +2072,7 @@ interface ProducerToolResultEvent
 
 ### `ProducerUsageEvent`
 
-`interface` — Describe usage event with prompt and completion token counts for a producer
+`interface` — Describe cumulative provider usage reported by a producer.
 
 ```ts
 interface ProducerUsageEvent

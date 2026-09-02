@@ -243,6 +243,25 @@ export interface ChatTurnAuthorizeArgs {
   threadId?: string
 }
 
+/** Trusted per-turn limits supplied by a server adapter, never by the body. */
+export interface ChatTurnExecutionLimits {
+  maxInputTokens?: number
+  maxOutputTokens?: number
+  maxReasoningTokens?: number
+  maxToolTokens?: number
+  maxToolCalls?: number
+  maxProviderCostUsd?: number
+}
+
+/** Server-only context for one turn request. */
+export interface ChatTurnRequestContext {
+  waitUntil?(p: Promise<unknown>): void
+  /** Abort this turn when its HTTP client disconnects. Browser callers omit it. */
+  cancelOnDisconnect?: boolean
+  /** Limits already authenticated by the server adapter. */
+  executionLimits?: ChatTurnExecutionLimits
+}
+
 /** Define the arguments required to produce a chat turn with context and messaging details */
 export interface ChatTurnProduceArgs<TContext> {
   request: Request
@@ -257,6 +276,8 @@ export interface ChatTurnProduceArgs<TContext> {
   /** The turn-buffer id announced to the client for replay. */
   turnStreamId: string
   priorMessages: PersistedChatMessageForTurn[]
+  /** Server-authenticated limits for this turn. Never copied from the body. */
+  executionLimits?: ChatTurnExecutionLimits
   /** The durable `role:'user'` row this turn is anchored to — the row the
    *  factory just inserted, or the one retry-dedup REUSED. Products anchor
    *  optimistic-bubble swaps, retry targeting, and stop-polling to it, and it
@@ -562,14 +583,7 @@ export interface ChatTurnRoutes {
    *  `{type:'turn', turnId}` (the replay handle); the rest is the engine's
    *  event protocol. Pass the platform's `waitUntil` so the turn keeps
    *  running (and buffering) after a client disconnect. */
-  turn(request: Request, ctx?: {
-    waitUntil?(p: Promise<unknown>): void
-    /**
-     * Abort this turn when the caller disconnects. Gateway adapters set this
-     * explicitly; browser callers omit it so the durable drain continues.
-     */
-    cancelOnDisconnect?: boolean
-  }): Promise<Response>
+  turn(request: Request, ctx?: ChatTurnRequestContext): Promise<Response>
   /** GET — replay a buffered turn from `?fromSeq=` (0 = everything), then
    *  follow it live until it completes. */
   replay(request: Request, params: { turnId: string }): Promise<Response>
@@ -741,10 +755,7 @@ export function createChatTurnRoutes<TContext = void>(
       ? null
       : (options.incrementalPersistence ?? {})
 
-  async function turn(request: Request, ctx?: {
-    waitUntil?(p: Promise<unknown>): void
-    cancelOnDisconnect?: boolean
-  }): Promise<Response> {
+  async function turn(request: Request, ctx?: ChatTurnRequestContext): Promise<Response> {
     const [rawBody, badBody] = await parseJsonObjectBody(request)
     if (badBody) return badBody
 
@@ -821,6 +832,7 @@ export function createChatTurnRoutes<TContext = void>(
       executionId,
       turnStreamId,
       priorMessages: chatTurn.priorMessages,
+      ...(ctx?.executionLimits ? { executionLimits: ctx.executionLimits } : {}),
     }
 
     // Single-flight lock: acquire before any side effect. `release` runs
