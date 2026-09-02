@@ -24,11 +24,12 @@ Who owns each hop:
 | Durable plan projection | `/plans` codec + `/chat-routes` `withDurableChatProjection` (structural) |
 | Composer, stream consumption, cards | `/web-react` |
 
-## Schema (drizzle + one migration constant)
+## Schema (Drizzle + shared migration constants)
 
 ```ts
 // db/schema.ts
 import { createChatTables } from '@tangle-network/agent-app/chat-store'
+import { PREWARM_CLAIM_TABLE_DDL } from '@tangle-network/agent-app/sandbox' // append to migrations
 import { TURN_EVENTS_MIGRATION_SQL } from '@tangle-network/agent-app/stream' // append to migrations
 
 export const { threads, messages } = createChatTables({ workspaceTable: workspaces })
@@ -44,7 +45,13 @@ import {
 } from '@tangle-network/agent-app/chat-routes'
 import { createChatStore } from '@tangle-network/agent-app/chat-store'
 import { guardResolution } from '@tangle-network/agent-app/platform'
-import { ensureWorkspaceSandbox, streamSandboxPrompt } from '@tangle-network/agent-app/sandbox'
+import {
+  createD1PrewarmClaimStore,
+  ensureWorkspaceSandbox,
+  peekWorkspaceSandbox,
+  runForegroundSandboxSingleFlight,
+  streamSandboxPrompt,
+} from '@tangle-network/agent-app/sandbox'
 import { createD1TurnEventStore } from '@tangle-network/agent-app/stream'
 import { drizzle } from 'drizzle-orm/d1'
 import { shell } from './sandbox-shell' // your SandboxRuntimeConfig (see build-agent-app)
@@ -56,6 +63,16 @@ export function buildChat(env: Env) {
     appName: 'Acme Agent', baseURL: env.BETTER_AUTH_URL, secret: env.BETTER_AUTH_SECRET,
     db, schema: { users, sessions, accounts, verifications },
   })
+
+  const ensureForegroundBox = (scope: { workspaceId: string; userId?: string }) =>
+    runForegroundSandboxSingleFlight({
+      claim: createD1PrewarmClaimStore(env.DB),
+      workspaceId: scope.workspaceId,
+      harness: 'opencode',
+      provision: () => ensureWorkspaceSandbox(shell, { ...scope, harness: 'opencode' }),
+      peek: () => peekWorkspaceSandbox(shell, scope),
+      adopt: ({ box }) => box,
+    })
 
   // The guard throws a JSON 401; guardResolution adapts it to {ok, response}.
   // A dispatched/synthetic turn (e.g. a follow-up the product raised itself, not
@@ -78,8 +95,8 @@ export function buildChat(env: Env) {
     store: createChatStore(db, { threads, messages }),
     turnStore: createD1TurnEventStore(env.DB),
     produce: async ({ prompt, body, identity, executionId }) => {
-      const box = await ensureWorkspaceSandbox(shell, {
-        workspaceId: identity.tenantId, userId: identity.userId, harness: 'opencode',
+      const box = await ensureForegroundBox({
+        workspaceId: identity.tenantId, userId: identity.userId,
       })
       const planEnabled = body.enablePlans === true
       return createSandboxChatProducer({
@@ -111,7 +128,7 @@ export function buildChat(env: Env) {
         const auth = await authorize({ request })
         if (!auth.ok) return auth
         const threadId = String(body?.threadId ?? new URL(request.url).searchParams.get('threadId') ?? '')
-        const box = await ensureWorkspaceSandbox(shell, { workspaceId: auth.userId, harness: 'opencode' })
+        const box = await ensureForegroundBox({ workspaceId: auth.userId })
         const c = box.connection
         if (!c?.runtimeUrl) return { ok: false as const, unavailable: 'SANDBOX_UNAVAILABLE' }
         // sessionId = the agent session the turn streams under (the thread id).
@@ -124,7 +141,7 @@ export function buildChat(env: Env) {
     authorize: async ({ request }) => {
       const auth = await authorize({ request })
       if (!auth.ok) return auth
-      const box = await ensureWorkspaceSandbox(shell, { workspaceId: auth.userId, harness: 'opencode' })
+      const box = await ensureForegroundBox({ workspaceId: auth.userId })
       return { ok: true as const, sink: box.fs }
     },
   })

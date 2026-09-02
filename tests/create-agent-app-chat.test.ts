@@ -103,6 +103,7 @@ describe('create-agent-app --chat scaffolder', () => {
       'migrations/0001_init.sql',
       'public/index.html',
       'tests/chat-turn.e2e.test.ts',
+      'tests/sandbox-fence.test.ts',
       'package.json',
       'tsconfig.json',
       'vitest.config.ts',
@@ -184,8 +185,8 @@ describe('create-agent-app --chat scaffolder', () => {
     const sandboxSource = readFileSync(join(projectDir, 'src/sandbox.ts'), 'utf8')
     expect(sandboxSource).toContain('runForegroundSandboxSingleFlight({')
     expect(sandboxSource).toContain('claim: createD1PrewarmClaimStore(env.DB)')
-    expect(sandboxSource.match(/await ensureForegroundWorkspaceSandbox\(/g)).toHaveLength(3)
-    expect(sandboxSource.match(/ensureWorkspaceSandbox\(/g)).toHaveLength(1)
+    expect(sandboxSource.match(/await ensureForegroundWorkspaceSandbox\(/g) ?? []).toHaveLength(3)
+    expect(sandboxSource.match(/ensureWorkspaceSandbox\(/g) ?? []).toHaveLength(1)
   })
 
   it('the generated app typechecks against the real agent-app dist types', () => {
