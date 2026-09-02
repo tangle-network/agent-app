@@ -24,7 +24,11 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { ProviderLogo } from './provider-logo'
-import { sortModelsByFreshness, type CatalogModel } from '../runtime/model-catalog'
+import {
+  MAX_RECOMMENDED_MODELS,
+  sortModelsByFreshness,
+  type CatalogModel,
+} from '../runtime/model-catalog'
 
 // ── shared glyphs (no icon-library dependency) ────────────────────────────
 
@@ -566,10 +570,12 @@ export function ModelPicker({ value, onChange, models, loading, renderProviderBa
       seenProviders.add(provider)
       newestIds.add(model.id)
     }
-    const recommended = sortedModels.filter((model) => {
-      if (!model.featured || isPriority(model)) return false
-      return newestIds.has(model.id)
-    })
+    const recommended = sortedModels
+      .filter((model) => {
+        if (!model.featured || isPriority(model)) return false
+        return newestIds.has(model.id)
+      })
+      .slice(0, MAX_RECOMMENDED_MODELS)
     const recommendedIds = new Set(recommended.map((model) => model.id))
     const byProvider: Array<{ provider: string; items: CatalogModel[] }> = []
     for (const m of sortedModels) {

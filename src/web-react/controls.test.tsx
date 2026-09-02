@@ -85,6 +85,30 @@ describe('ModelPicker', () => {
     )
     expect(rows.map((row) => row.textContent)).toEqual(['gpt-5.6-luna', 'gpt-4.1-mini'])
   })
+
+  it('limits recommendations without hiding the remaining providers', () => {
+    const providers = ['anthropic', 'openai', 'google', 'xai', 'deepseek']
+    render(<ModelPicker
+      value="claude-fable-5-1"
+      onChange={() => {}}
+      models={providers.map((provider, index) => model(
+        provider === 'anthropic' ? 'claude-fable-5-1' : `${provider}/model-${index}`,
+        { provider, featured: true },
+      ))}
+    />)
+    openPicker()
+
+    const recommendedHeader = screen.getByText('Recommended')
+    let recommendedCount = 0
+    let sibling = recommendedHeader.nextElementSibling
+    while (sibling?.tagName === 'BUTTON') {
+      recommendedCount += 1
+      sibling = sibling.nextElementSibling
+    }
+    expect(recommendedCount).toBe(3)
+    expect(screen.getByText('xai')).toBeTruthy()
+    expect(screen.getByText('deepseek')).toBeTruthy()
+  })
 })
 
 describe('effortMeterFill', () => {

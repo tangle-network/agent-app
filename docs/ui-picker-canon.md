@@ -37,6 +37,8 @@ field, so no harness or effort control belongs there.
 
 `ModelPicker` sorts the live catalog by provider and release generation before it renders any section.
 The newest stable release appears before older models, even when a caller sends stale order or stale `featured` flags.
+The Recommended section contains at most three current provider leaders.
+Every other routeable chat model remains available in its provider group and through search.
 The product's configured default does not change when display order changes.
 
 ![Current models appear before stale models](./assets/model-picker/freshness-ordering.png)
