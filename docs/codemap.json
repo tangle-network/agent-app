@@ -8697,6 +8697,7 @@
         "billing",
         "crypto",
         "knowledge",
+        "sandbox",
         "tools",
         "web"
       ],
@@ -8715,10 +8716,28 @@
           "doc": "The structural binding implemented by Cloudflare's `Workflow<TParams>`."
         },
         {
+          "name": "CloudflareWorkflowEventLike",
+          "kind": "interface",
+          "signature": "interface CloudflareWorkflowEventLike",
+          "doc": "The part of Cloudflare's Workflow event needed by the tick."
+        },
+        {
           "name": "CloudflareWorkflowInstanceLike",
           "kind": "interface",
           "signature": "interface CloudflareWorkflowInstanceLike",
           "doc": "The structural part of a Cloudflare Workflow instance used to prove that a failed create call actually left an addressable durable instance behind."
+        },
+        {
+          "name": "CloudflareWorkflowSleepDuration",
+          "kind": "type",
+          "signature": "type CloudflareWorkflowSleepDuration",
+          "doc": "A duration accepted by Cloudflare Workflow `step.sleep`."
+        },
+        {
+          "name": "CloudflareWorkflowStepLike",
+          "kind": "interface",
+          "signature": "interface CloudflareWorkflowStepLike",
+          "doc": "The durable Workflow operations used by the tick."
         },
         {
           "name": "createD1KnowledgeStateAccessor",
@@ -8767,6 +8786,36 @@
           "kind": "interface",
           "signature": "interface D1PreparedLike",
           "doc": "A prepared, bound D1 statement."
+        },
+        {
+          "name": "DetachedTurnDriveOutcome",
+          "kind": "type",
+          "signature": "type DetachedTurnDriveOutcome",
+          "doc": "A drive call's retryable transport boundary."
+        },
+        {
+          "name": "DetachedTurnDriveState",
+          "kind": "type",
+          "signature": "type DetachedTurnDriveState",
+          "doc": "The states returned by the Sandbox `driveTurn` primitive."
+        },
+        {
+          "name": "DetachedTurnTerminalResult",
+          "kind": "type",
+          "signature": "type DetachedTurnTerminalResult",
+          "doc": "The terminal result passed to product settlement."
+        },
+        {
+          "name": "DetachedTurnWorkflowIdentity",
+          "kind": "interface",
+          "signature": "interface DetachedTurnWorkflowIdentity",
+          "doc": "The stable identity a Workflow reuses on every retry of one turn."
+        },
+        {
+          "name": "DetachedTurnWorkflowTickOptions",
+          "kind": "interface",
+          "signature": "interface DetachedTurnWorkflowTickOptions",
+          "doc": "Options for one durable detached-turn Workflow run."
         },
         {
           "name": "DrizzleColumnLike",
@@ -8827,6 +8876,12 @@
           "kind": "function",
           "signature": "(rules: readonly CloudflareHeadersRule[]) => string",
           "doc": "Render native Cloudflare static-asset header rules."
+        },
+        {
+          "name": "runDetachedTurnWorkflowTick",
+          "kind": "function",
+          "signature": "<TPayload extends DetachedTurnWorkflowIdentity, TSettled>(options: DetachedTurnWorkflowTickOptions<TPayload, TSettled>)…",
+          "doc": "Drive one detached Sandbox turn from a Cloudflare Workflow."
         },
         {
           "name": "VaultKv",

@@ -4,7 +4,7 @@
 
 Source: `src/preset-cloudflare/index.ts`
 
-22 exports.
+31 exports.
 
 ### `CloudflareHeadersRule`
 
@@ -22,12 +22,36 @@ interface CloudflareHeadersRule
 interface CloudflareWorkflowBindingLike
 ```
 
+### `CloudflareWorkflowEventLike`
+
+`interface` — The part of Cloudflare's Workflow event needed by the tick.
+
+```ts
+interface CloudflareWorkflowEventLike
+```
+
 ### `CloudflareWorkflowInstanceLike`
 
 `interface` — The structural part of a Cloudflare Workflow instance used to prove that a failed create call actually left an addressable durable instance behind.
 
 ```ts
 interface CloudflareWorkflowInstanceLike
+```
+
+### `CloudflareWorkflowSleepDuration`
+
+`type` — A duration accepted by Cloudflare Workflow `step.sleep`.
+
+```ts
+type CloudflareWorkflowSleepDuration
+```
+
+### `CloudflareWorkflowStepLike`
+
+`interface` — The durable Workflow operations used by the tick.
+
+```ts
+interface CloudflareWorkflowStepLike
 ```
 
 ### `createD1KnowledgeStateAccessor`
@@ -92,6 +116,46 @@ interface D1Like
 
 ```ts
 interface D1PreparedLike
+```
+
+### `DetachedTurnDriveOutcome`
+
+`type` — A drive call's retryable transport boundary.
+
+```ts
+type DetachedTurnDriveOutcome
+```
+
+### `DetachedTurnDriveState`
+
+`type` — The states returned by the Sandbox `driveTurn` primitive.
+
+```ts
+type DetachedTurnDriveState
+```
+
+### `DetachedTurnTerminalResult`
+
+`type` — The terminal result passed to product settlement.
+
+```ts
+type DetachedTurnTerminalResult
+```
+
+### `DetachedTurnWorkflowIdentity`
+
+`interface` — The stable identity a Workflow reuses on every retry of one turn.
+
+```ts
+interface DetachedTurnWorkflowIdentity
+```
+
+### `DetachedTurnWorkflowTickOptions`
+
+`interface` — Options for one durable detached-turn Workflow run.
+
+```ts
+interface DetachedTurnWorkflowTickOptions
 ```
 
 ### `DrizzleColumnLike`
@@ -172,6 +236,14 @@ interface PresetToolHandlerOptions
 
 ```ts
 (rules: readonly CloudflareHeadersRule[]) => string
+```
+
+### `runDetachedTurnWorkflowTick`
+
+`function` — Drive one detached Sandbox turn from a Cloudflare Workflow.
+
+```ts
+<TPayload extends DetachedTurnWorkflowIdentity, TSettled>(options: DetachedTurnWorkflowTickOptions<TPayload, TSettled>)…
 ```
 
 ### `VaultKv`
