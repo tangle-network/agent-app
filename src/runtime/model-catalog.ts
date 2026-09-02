@@ -9,15 +9,14 @@
  * duplicate canonical ones. This module turns that into a product catalogue:
  *
  *   filter (chat-capable, routeable) → dedupe (snapshot/prefix/:free aliases)
- *   → rank (provider tier, current generation) → feature (best model per family)
+ *   → rank (provider tier, current generation) → feature (newest per provider)
  *   → default (env override or first featured)
  *
  * Freshness is automatic: everything is derived from the live router response,
  * so new models surface as soon as the router lists them. The only static
  * knowledge here is slow-moving: provider display order and family name
- * patterns (e.g. "claude-sonnet-*", "gpt-N"). A new Sonnet or GPT release
- * outranks its predecessor by version comparison with zero code change; only
- * a brand-new *family name* (rare) needs a one-line rule addition.
+ * patterns (e.g. "claude-sonnet-*", "gpt-N"). A new release and a new family
+ * both reach the first row from their versioned id with no catalogue edit.
  */
 
 export interface RouterModel {
@@ -77,6 +76,14 @@ const PROVIDER_TIER: string[] = [
   'cohere',
   'cerebras',
 ]
+
+/** Router aliases that are one provider in a user-facing catalogue. */
+function normalizeProvider(provider: string): string {
+  const normalized = provider.toLowerCase()
+  if (normalized === 'moonshotai') return 'moonshot'
+  if (normalized === 'z-ai') return 'zai'
+  return normalized
+}
 
 /** Non-chat endpoints that pollute the router list (matched on normalized id). */
 const EXCLUDED_ID = /(embedding|tts|transcribe|whisper|audio|realtime|image|lyria|sora|dall-e|moderation|content-safety|search-preview|search-api|deep-research|:batch$)/
@@ -166,8 +173,8 @@ function releaseVersion(id: string): number[] {
  */
 export function sortModelsByFreshness(models: readonly CatalogModel[]): CatalogModel[] {
   return [...models].sort((a, b) => {
-    const providerA = a.provider.toLowerCase()
-    const providerB = b.provider.toLowerCase()
+    const providerA = normalizeProvider(a.provider)
+    const providerB = normalizeProvider(b.provider)
     const providerOrder = providerRank(providerA) - providerRank(providerB)
     if (providerOrder !== 0) return providerOrder
     if (providerA !== providerB) return providerA.localeCompare(providerB)
@@ -191,7 +198,7 @@ function aliasPenalty(id: string): number {
 }
 
 function providerRank(provider: string): number {
-  const i = PROVIDER_TIER.indexOf(provider)
+  const i = PROVIDER_TIER.indexOf(normalizeProvider(provider))
   return i === -1 ? PROVIDER_TIER.length : i
 }
 
@@ -231,7 +238,11 @@ function isRouteable(m: RouterModel): boolean {
 export function buildCatalog(raw: RouterModel[], opts?: { preferredDefault?: string }): ModelCatalog {
   // Filter to chat-capable, routeable, non-specialty models
   const candidates = raw.filter(
-    (m) => m.id && isRouteable(m) && isChatModel(m) && !EXCLUDED_ID.test(normalizeModelId(m.id)),
+    (m) =>
+      m.id &&
+      isRouteable(m) &&
+      isChatModel(m) &&
+      !EXCLUDED_ID.test(normalizeModelId(m.id)),
   )
 
   // Dedupe alias groups (dated snapshots, provider prefixes, :free variants).
@@ -239,7 +250,7 @@ export function buildCatalog(raw: RouterModel[], opts?: { preferredDefault?: str
   // supported_parameters claim (snapshots often omit what the parent lists).
   const groups = new Map<string, RouterModel[]>()
   for (const m of candidates) {
-    const key = `${m._provider ?? ''}::${normalizeModelId(m.id)}`
+    const key = `${normalizeProvider(m._provider ?? 'unknown')}::${normalizeModelId(m.id)}`
     const g = groups.get(key)
     if (g) g.push(m)
     else groups.set(key, [m])
@@ -258,7 +269,7 @@ export function buildCatalog(raw: RouterModel[], opts?: { preferredDefault?: str
   for (const rule of FEATURED_RULES) {
     const matches = reps.filter(
       (r) =>
-        rule.providers.includes(r.model._provider ?? '') &&
+        rule.providers.map(normalizeProvider).includes(normalizeProvider(r.model._provider ?? '')) &&
         rule.match.test(r.normId) &&
         !featuredIds.includes(r.model.id),
     )
@@ -274,7 +285,7 @@ export function buildCatalog(raw: RouterModel[], opts?: { preferredDefault?: str
 
   const toCatalogModel = (r: (typeof reps)[number]): CatalogModel => {
     const m = r.model
-    const provider = m._provider ?? 'unknown'
+    const provider = normalizeProvider(m._provider ?? 'unknown')
     return {
       id: m.id,
       name: m.name ?? m.id,
@@ -291,17 +302,26 @@ export function buildCatalog(raw: RouterModel[], opts?: { preferredDefault?: str
     }
   }
 
-  // Keep each section provider-grouped, with the newest generation first.
+  // Family rules retain the intentional default preference. Display order is
+  // independent: every catalogue consumer gets provider-grouped freshness,
+  // even when it does not render ModelPicker.
   const featuredInRuleOrder = featuredIds
     .map((id) => reps.find((r) => r.model.id === id)!)
     .map(toCatalogModel)
-  const featured = sortModelsByFreshness(featuredInRuleOrder)
-  const rest = reps
-    .filter((r) => !featuredIds.includes(r.model.id))
-    .map(toCatalogModel)
-  const sortedRest = sortModelsByFreshness(rest)
-
-  const models = [...featured, ...sortedRest]
+  const sorted = sortModelsByFreshness(reps.map(toCatalogModel))
+  const newestProviderIds = new Set<string>()
+  const seenProviders = new Set<string>()
+  for (const model of sorted) {
+    const provider = model.provider.toLowerCase()
+    if (seenProviders.has(provider)) continue
+    seenProviders.add(provider)
+    newestProviderIds.add(model.id)
+  }
+  const models = sorted.map((model) =>
+    newestProviderIds.has(model.id) && !model.featured
+      ? { ...model, featured: true }
+      : model,
+  )
 
   const preferred = opts?.preferredDefault
   const defaultModelId =

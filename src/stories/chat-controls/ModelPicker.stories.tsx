@@ -49,25 +49,27 @@ export const Open: Story = {
   },
 }
 
-const staleFirstModels: CatalogModel[] = [
-  { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', provider: 'anthropic', supportsTools: true, supportsReasoning: true, featured: true },
-  { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', provider: 'openai', supportsTools: true, supportsReasoning: false, featured: true },
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'google', supportsTools: true, supportsReasoning: true, featured: true },
-  { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', provider: 'google', supportsTools: true, supportsReasoning: true, featured: false },
-  { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna', provider: 'openai', supportsTools: true, supportsReasoning: true, featured: false },
-  { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', provider: 'anthropic', supportsTools: true, supportsReasoning: true, featured: false },
+const currentModels: CatalogModel[] = [
+  { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', provider: 'anthropic', supportsTools: true, supportsReasoning: true, featured: false },
+  { id: 'gpt-4.1-mini', name: 'GPT 4.1 Mini', provider: 'openai', supportsTools: true, supportsReasoning: false, featured: false },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'google', supportsTools: true, supportsReasoning: true, featured: false },
+  { id: 'claude-opus-5', name: 'Claude Opus 5', provider: 'anthropic', supportsTools: true, supportsReasoning: true, featured: true },
+  { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', provider: 'google', supportsTools: true, supportsReasoning: true, featured: true },
+  { id: 'gpt-5.6-luna', name: 'GPT 5.6 Luna', provider: 'openai', supportsTools: true, supportsReasoning: true, featured: true },
+  { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', provider: 'anthropic', supportsTools: true, supportsReasoning: true, featured: true },
+  { id: 'claude-fable-5-1', name: 'Claude Fable 5.1', provider: 'anthropic', supportsTools: true, supportsReasoning: true, featured: true },
 ]
 
-/** Even a stale input list and stale featured flags render current-first. */
+/** Current launches render first; old models remain available lower down. */
 export const FreshnessOrdering: Story = {
-  name: 'Freshness ordering',
+  name: 'Current launch ordering',
   decorators: [withPopoverHeadroom],
   render: () => (
     <AutoClick>
       <ModelPicker
         value="claude-sonnet-5"
         onChange={() => {}}
-        models={staleFirstModels}
+        models={currentModels}
       />
     </AutoClick>
   ),
@@ -78,7 +80,7 @@ export const Loading: Story = {
   decorators: [withPopoverHeadroom],
   render: () => (
     <AutoClick>
-      <ModelPicker value="anthropic/claude-opus-4" onChange={() => {}} models={[]} loading />
+      <ModelPicker value="claude-fable-5-1" onChange={() => {}} models={[]} loading />
     </AutoClick>
   ),
 }
@@ -134,11 +136,11 @@ export const AllStates: Story = {
   parameters: { layout: 'padded' },
   render: () => (
     <div className="flex flex-wrap items-center gap-3 p-4">
-      <ModelPicker value="anthropic/claude-opus-4" onChange={() => {}} models={catalogModels} />
-      <ModelPicker value="google/gemini-2.5-pro" onChange={() => {}} models={catalogModels} />
+      <ModelPicker value="claude-fable-5-1" onChange={() => {}} models={catalogModels} />
+      <ModelPicker value="gpt-5.6-luna" onChange={() => {}} models={catalogModels} />
       <ModelPicker value="deepseek/deepseek-chat" onChange={() => {}} models={catalogModels} />
       <ModelPicker value="acme/unreleased-model" onChange={() => {}} models={catalogModels} />
-      <ModelPicker value="anthropic/claude-opus-4" onChange={() => {}} models={[]} loading />
+      <ModelPicker value="claude-fable-5-1" onChange={() => {}} models={[]} loading />
     </div>
   ),
 }

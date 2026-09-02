@@ -33,49 +33,50 @@ import type { ProductSeatOffer } from '../../platform/billing'
 
 // ── model catalog ───────────────────────────────────────────────────────────
 
-/** Same five-model catalogue the playground ships (`makeModels`). */
+/** Current five-model catalogue used across the chat-control stories. */
 export const catalogModels: CatalogModel[] = [
   {
-    id: 'anthropic/claude-opus-4',
-    name: 'Claude Opus 4',
+    id: 'claude-fable-5-1',
+    name: 'Claude Fable 5.1',
     provider: 'anthropic',
     description: 'Most capable Anthropic model',
     contextLength: 1_000_000,
-    pricing: { prompt: '0.000015', completion: '0.000075' },
+    pricing: { prompt: '0.00001', completion: '0.00005' },
     supportsTools: true,
     supportsReasoning: true,
     featured: true,
   },
   {
-    id: 'openai/gpt-5',
-    name: 'GPT-5',
-    provider: 'openai',
-    description: 'OpenAI flagship',
-    contextLength: 400_000,
-    pricing: { prompt: '0.00001', completion: '0.00003' },
-    supportsTools: true,
-    supportsReasoning: true,
-    featured: true,
-  },
-  {
-    id: 'anthropic/claude-haiku-4',
-    name: 'Claude Haiku 4',
+    id: 'claude-opus-5',
+    name: 'Claude Opus 5',
     provider: 'anthropic',
-    contextLength: 200_000,
-    pricing: { prompt: '0.000001', completion: '0.000005' },
+    description: 'Frontier Anthropic model',
+    contextLength: 1_000_000,
+    pricing: { prompt: '0.000005', completion: '0.000025' },
     supportsTools: true,
-    supportsReasoning: false,
-    featured: false,
+    supportsReasoning: true,
+    featured: true,
   },
   {
-    id: 'google/gemini-2.5-pro',
-    name: 'Gemini 2.5 Pro',
+    id: 'gpt-5.6-luna',
+    name: 'GPT 5.6 Luna',
+    provider: 'openai',
+    description: 'Current efficient OpenAI model',
+    contextLength: 400_000,
+    pricing: { prompt: '0.0000002', completion: '0.0000012' },
+    supportsTools: true,
+    supportsReasoning: true,
+    featured: true,
+  },
+  {
+    id: 'gemini-3.7-flash',
+    name: 'Gemini 3.7 Flash',
     provider: 'google',
     contextLength: 2_000_000,
-    pricing: { prompt: '0.0000025', completion: '0.00001' },
+    pricing: { prompt: '0.00000075', completion: '0.00000375' },
     supportsTools: true,
     supportsReasoning: true,
-    featured: false,
+    featured: true,
   },
   {
     id: 'deepseek/deepseek-chat',
@@ -89,7 +90,7 @@ export const catalogModels: CatalogModel[] = [
   },
 ]
 
-export const DEFAULT_MODEL_ID = catalogModels[0]?.id ?? 'anthropic/claude-opus-4'
+export const DEFAULT_MODEL_ID = catalogModels[0]?.id ?? 'claude-fable-5-1'
 /** A model with `supportsReasoning: false` — the effort picker hides for it. */
 export const NON_REASONING_MODEL_ID = 'deepseek/deepseek-chat'
 

@@ -91,10 +91,51 @@ describe('buildCatalog', () => {
     expect(catalog.defaultModelId).toBe('claude-sonnet-4-6')
   })
 
-  it('puts featured models first, then provider-tier order', () => {
-    const featuredCount = catalog.models.filter((m) => m.featured).length
-    const rest = catalog.models.slice(featuredCount)
-    expect(rest.every((m) => !m.featured)).toBe(true)
+  it('returns the catalogue in the same freshness order the picker uses', () => {
+    expect(catalog.models.map((model) => model.id)).toEqual(
+      sortModelsByFreshness(catalog.models).map((model) => model.id),
+    )
+  })
+
+  it('recommends a new versioned family without a family rule', () => {
+    const current = buildCatalog([
+      {
+        id: 'claude-opus-5',
+        _provider: 'anthropic',
+        routeability: { routeable: true },
+      },
+      {
+        id: 'claude-fable-5-1',
+        _provider: 'anthropic',
+        routeability: { routeable: true },
+      },
+    ])
+
+    expect(current.models.map((model) => model.id)).toEqual([
+      'claude-fable-5-1',
+      'claude-opus-5',
+    ])
+    expect(current.models[0]?.featured).toBe(true)
+  })
+
+  it('groups provider aliases so an old alias cannot precede its successor', () => {
+    const current = buildCatalog([
+      {
+        id: 'moonshotai/kimi-k2',
+        _provider: 'moonshotai',
+        routeability: { routeable: true },
+      },
+      {
+        id: 'kimi-k3',
+        _provider: 'moonshot',
+        routeability: { routeable: true },
+      },
+    ])
+
+    expect(current.models.map(({ id, provider }) => ({ id, provider }))).toEqual([
+      { id: 'kimi-k3', provider: 'moonshot' },
+      { id: 'moonshotai/kimi-k2', provider: 'moonshot' },
+    ])
   })
 
   it('picks a tool-capable featured model as default', () => {
@@ -139,10 +180,14 @@ describe('sortModelsByFreshness', () => {
       model('gemini-2.5-flash', 'google'),
       model('gemini-3.7-flash', 'google'),
       model('claude-opus-4-7', 'anthropic'),
+      model('claude-opus-5', 'anthropic'),
       model('claude-sonnet-5', 'anthropic'),
+      model('claude-fable-5-1', 'anthropic'),
     ])
 
     expect(sorted.map((entry) => entry.id)).toEqual([
+      'claude-fable-5-1',
+      'claude-opus-5',
       'claude-sonnet-5',
       'claude-opus-4-7',
       'gpt-5.6-luna',
