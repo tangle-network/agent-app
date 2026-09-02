@@ -1832,7 +1832,7 @@ interface MissionActivityLaneProps
 
 ### `ModelPicker`
 
-`function` — Searchable model picker pill + popover: a featured/recommended section first, then per-provider groups in catalogue order (the server already sorts providers by tier).
+`function` — Searchable model picker pill + popover.
 
 ```ts
 ({ value, onChange, models, loading, renderProviderBadge, recommendedLabel, priorityGroup, variant }: ModelPickerProps)…

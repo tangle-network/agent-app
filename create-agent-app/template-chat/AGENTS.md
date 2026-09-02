@@ -31,8 +31,8 @@ It is a checklist, not prose — follow it in order.
 ## 2. DATA vs CODE — know which file you're in
 
 - [ ] DATA → `agent.config.ts`: name, system prompt, model default + effort,
-      harness, renderable ask kinds. Plain values. If you're writing an `if`,
-      you're in the wrong file.
+      provider input limit, harness, gateway pricing, and renderable ask kinds.
+      Plain values. If you're writing an `if`, you're in the wrong file.
 - [ ] DATA → `prompts/system.md`: the persona. State intents and hard rules,
       never implementations — no shell commands, CLI flags, or install scripts.
       The executing agent chooses tools at execution time.

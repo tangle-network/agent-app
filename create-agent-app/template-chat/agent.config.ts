@@ -70,6 +70,9 @@ export const config = {
     description: '__PROJECT_NAME__ workspace agent',
     pricePerTokenUsd: 0.00002,
     platformFeePercent: 0.20,
+    /** Maximum provider input for the configured model. Include retained
+     *  sidecar history and tool output that is absent from the transcript. */
+    maxProviderInputTokens: 1_000_000,
     defaultOutputTokens: 1024,
     maxOutputTokens: 4096,
   },
@@ -84,6 +87,7 @@ export const config = {
     description: string
     pricePerTokenUsd: number
     platformFeePercent: number
+    maxProviderInputTokens: number
     defaultOutputTokens: number
     maxOutputTokens: number
   }

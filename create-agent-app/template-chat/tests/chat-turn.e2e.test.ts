@@ -26,6 +26,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createSandboxChatProducer,
   normalizeChatPromptForSandbox,
+  type ChatTurnProduceArgs,
   type ChatTurnRouteProducer,
 } from '@tangle-network/agent-app/chat-routes'
 import type { ChatDatabase } from '@tangle-network/agent-app/chat-store'
@@ -123,7 +124,7 @@ interface Harness {
 }
 
 async function createHarness(
-  produce: () => ChatTurnRouteProducer = () =>
+  produce: (args: ChatTurnProduceArgs<void>) => ChatTurnRouteProducer = () =>
     createSandboxChatProducer({ events: feed(RAW_TURN_EVENTS), model: MODEL }),
 ): Promise<Harness> {
   const database = openMigratedDb()
@@ -545,9 +546,20 @@ describe('e2e: fake sandbox producer → streamed turn → persisted transcript'
           delta: 'Finished.',
         },
       }
+      yield {
+        type: 'message.part.updated',
+        data: {
+          part: {
+            type: 'step-finish',
+            reason: 'stop',
+            tokens: { input: 7, output: 3, reasoning: 1 },
+            cost: 0.00021,
+          },
+        },
+      }
       yield { type: 'result', data: { finalText: 'Started. Finished.' } }
     }
-    const { app, workerFetch, cookie, settle } = await createHarness(() =>
+    const { app, workerFetch, sql, cookie, settle } = await createHarness(() =>
       createSandboxChatProducer({ events: delayedEvents(), model: MODEL }))
     const keyResponse = await workerFetch(post('/api/keys', cookie, {
       name: 'disconnect test',
@@ -606,6 +618,55 @@ describe('e2e: fake sandbox producer → streamed turn → persisted transcript'
     expect(events.filter((event) => event.type === 'text').map((event) => event.text).join(''))
       .toBe('Started. Finished.')
     expect(events.at(-1)).toMatchObject({ type: 'turn_status', status: 'complete' })
+    expect(await sql.query(`
+      SELECT input_tokens, output_tokens, reasoning_tokens, provider_cost_nanodollars
+      FROM agent_gateway_usage
+    `)).toEqual([{
+      input_tokens: 7,
+      output_tokens: 3,
+      reasoning_tokens: 1,
+      provider_cost_nanodollars: 210_000,
+    }])
+    expect(await sql.query('SELECT request_id FROM agent_api_key_usage')).toHaveLength(1)
+  })
+
+  it('passes the complete provider budget into the shared chat turn', async () => {
+    let receivedLimits: ChatTurnProduceArgs<void>['executionLimits']
+    const { workerFetch, cookie, settle } = await createHarness((args) => {
+      receivedLimits = args.executionLimits
+      return createSandboxChatProducer({ events: feed(RAW_TURN_EVENTS), model: MODEL })
+    })
+    const keyResponse = await workerFetch(post('/api/keys', cookie, {
+      name: 'budget test',
+      rateLimit: 1,
+      dailyLimit: 1,
+    }))
+    const { key } = (await keyResponse.json()) as { key: string }
+
+    const response = await workerFetch(new Request(
+      `${BASE}/v1/agents/${appSlug}/chat/completions`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: 'Use the bounded path' }],
+          max_tokens: 321,
+          stream: true,
+        }),
+      },
+    ))
+
+    expect(response.status).toBe(200)
+    await readGatewayText(response)
+    await settle()
+    expect(receivedLimits).toMatchObject({
+      maxInputTokens: config.gateway.maxProviderInputTokens,
+      maxOutputTokens: 321,
+      maxReasoningTokens: 321,
+      maxToolTokens: 321,
+      maxToolCalls: 8,
+    })
+    expect(receivedLimits?.maxProviderCostUsd).toBeGreaterThan(0)
   })
 
   it('does not mount API-key or agent routes when the gateway is disabled', async () => {

@@ -26,6 +26,8 @@ Discovery: **Whose job does this agent do, in whose voice, under what hard rules
 Discovery: **Which model answers by default, at what effort, on which harness?**
 
 - [ ] Set `model.default` to a model your Tangle Router key can reach.
+- [ ] Set `gateway.maxProviderInputTokens` to that model's full input limit.
+      This covers retained tool and sidecar history that the transcript omits.
 - [ ] Pick `harness` (`opencode` default; vendor-locked harnesses like
       `claude-code` must pair with their own provider's models).
 - [ ] Define the selectable profile catalog for the UI and map each selected

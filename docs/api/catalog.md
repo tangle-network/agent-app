@@ -4,7 +4,7 @@
 
 Source: `src/catalog/index.ts`
 
-7 exports.
+8 exports.
 
 ### `buildCatalog`
 
@@ -60,4 +60,12 @@ interface ModelCatalog
 
 ```ts
 interface RouterModel
+```
+
+### `sortModelsByFreshness`
+
+`function` — Return a copy sorted for a model menu.
+
+```ts
+(models: readonly CatalogModel[]) => CatalogModel[]
 ```

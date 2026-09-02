@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-195 exports.
+197 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -382,6 +382,14 @@ interface ChatTurnAuthorizeArgs
 interface ChatTurnCompleteInput
 ```
 
+### `ChatTurnExecutionLimits`
+
+`interface` — Trusted per-turn limits supplied by a server adapter, never by the body.
+
+```ts
+interface ChatTurnExecutionLimits
+```
+
 ### `ChatTurnFilePartInput`
 
 `interface` — A non-text prompt part the upload route hands back and the client echoes on send.
@@ -508,6 +516,14 @@ type ChatTurnPartInput
 
 ```ts
 interface ChatTurnProduceArgs
+```
+
+### `ChatTurnRequestContext`
+
+`interface` — Server-only context for one turn request.
+
+```ts
+interface ChatTurnRequestContext
 ```
 
 ### `chatTurnRequestInit`

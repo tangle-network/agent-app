@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-184 exports.
+186 exports.
 
 ### `adaptSandboxStream`
 
@@ -12,6 +12,14 @@ Source: `src/sandbox/index.ts`
 
 ```ts
 (events: AsyncIterable<unknown>) => AsyncGenerator<SandboxStreamEvent, any, any>
+```
+
+### `applyPromptTokenLimits`
+
+`function` — Tighten the profile's provider-enforced token ceilings for one prompt.
+
+```ts
+(profile: AgentProfile, limits: SandboxPromptTokenLimits) => AgentProfile
 ```
 
 ### `AppToolDescriptor`
@@ -964,6 +972,14 @@ interface SandboxPrewarmerOptions
 
 ```ts
 interface SandboxPrewarmScope
+```
+
+### `SandboxPromptTokenLimits`
+
+`interface`
+
+```ts
+interface SandboxPromptTokenLimits
 ```
 
 ### `SandboxProvisionedObservation`

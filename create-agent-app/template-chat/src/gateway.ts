@@ -99,6 +99,9 @@ export function buildGatewayApp(
     claimApiKeyRequest: createApiKeyRequestClaim(apiKeys),
     apiKeyPrefix: 'ak_',
     conversationMode: 'thread',
+    // A2A task control remains off until the shared gateway owns durable
+    // cross-isolate cancel and replay. OpenAI-compatible calls are independent.
+    a2a: false,
     authorizeConsumer: async (_agent, consumer) => {
       if (consumer.method !== 'apikey' || !consumer.ownerId || !consumer.threadId) {
         return { allow: false, reason: 'API key owner is unavailable', code: 'owner_unavailable' }
@@ -109,6 +112,9 @@ export function buildGatewayApp(
       }
       return { allow: true }
     },
+    // A sandbox session can retain private tool output that is absent from the
+    // visible transcript. The model input limit is the only complete bound.
+    unauthenticatedInputTokenBound: config.gateway.maxProviderInputTokens,
     getSandbox: async (_agent, context) => {
       const ownerId = context?.keyInfo?.ownerId
       const threadId = context?.threadId
@@ -134,10 +140,12 @@ export function buildGatewayApp(
           },
           waitUntil: options.waitUntil,
           signal: streamOptions?.signal,
+          executionLimits: streamOptions?.executionBudget,
         }),
       }
     },
     recordUsage: usage.recordUsage,
+    ...(options.waitUntil ? { continueOnDisconnect: options.waitUntil } : {}),
     settlePayment: createApiKeyUsageSettlement(apiKeys),
     defaultOutputTokens: config.gateway.defaultOutputTokens,
     maxOutputTokens: config.gateway.maxOutputTokens,
