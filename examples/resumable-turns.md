@@ -135,7 +135,11 @@ if (running) /* replay it */
 The D1 store needs its tables. Add to your migrations:
 
 ```ts
-import { TURN_EVENTS_MIGRATION_SQL, TURN_STATUS_SCOPE_MIGRATION_SQL } from '@tangle-network/agent-app/stream'
+import {
+  TURN_EVENTS_MIGRATION_SQL,
+  TURN_STATUS_SCOPE_MIGRATION_SQL,
+  TURN_STATUS_RETENTION_MIGRATION_SQL,
+} from '@tangle-network/agent-app/stream'
 ```
 
 - **`TURN_EVENTS_MIGRATION_SQL`** — creates `turn_events` + `turn_status` (with
@@ -143,6 +147,9 @@ import { TURN_EVENTS_MIGRATION_SQL, TURN_STATUS_SCOPE_MIGRATION_SQL } from '@tan
 - **`TURN_STATUS_SCOPE_MIGRATION_SQL`** — `ALTER TABLE turn_status ADD COLUMN
   scopeId TEXT`. Run **only** on a deployment whose `turn_status` predates
   `scopeId`/`listRunning`. New deployments already have the column.
+- **`TURN_STATUS_RETENTION_MIGRATION_SQL`** — adds the `(status, updatedAt)`
+  index for cleanup on a deployment that already has the turn tables. New
+  deployments receive the index from `TURN_EVENTS_MIGRATION_SQL`.
 
 No D1? `createMemoryTurnEventStore()` satisfies the same interface for tests and
 keyless local dev.

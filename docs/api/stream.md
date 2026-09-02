@@ -4,7 +4,7 @@
 
 Source: `src/stream/index.ts`
 
-50 exports.
+51 exports.
 
 ### `asRecord`
 
@@ -372,6 +372,14 @@ interface StreamEvent
 
 ```ts
 "\nCREATE TABLE IF NOT EXISTS turn_events (\n turnId TEXT NOT NULL,\n seq INTEGER NOT NULL,\n event TEXT NOT NULL,\n PR…
+```
+
+### `TURN_STATUS_RETENTION_MIGRATION_SQL`
+
+`const` — For deployments that already have the turn tables, add the index used by terminal-turn retention without rerunning the table migration.
+
+```ts
+"CREATE INDEX IF NOT EXISTS idx_turn_status_retention ON turn_status (status, updatedAt);"
 ```
 
 ### `TURN_STATUS_SCOPE_MIGRATION_SQL`

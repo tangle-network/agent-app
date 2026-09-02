@@ -473,12 +473,17 @@ CREATE TABLE IF NOT EXISTS turn_status (
   updatedAt TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_turn_status_scope ON turn_status (scopeId, status);
+CREATE INDEX IF NOT EXISTS idx_turn_status_retention ON turn_status (status, updatedAt);
 `
 
 /** For deployments whose `turn_status` table predates `scopeId`/`listRunning` —
  *  run once to add the column (the CREATE above already includes it for new
  *  deployments). SQLite ignores a duplicate-add error if already applied. */
 export const TURN_STATUS_SCOPE_MIGRATION_SQL = `ALTER TABLE turn_status ADD COLUMN scopeId TEXT;`
+
+/** For deployments that already have the turn tables, add the index used by
+ *  terminal-turn retention without rerunning the table migration. */
+export const TURN_STATUS_RETENTION_MIGRATION_SQL = 'CREATE INDEX IF NOT EXISTS idx_turn_status_retention ON turn_status (status, updatedAt);'
 
 /** Resolve a TurnEventStore that appends and reads turn events using a D1-like database interface */
 export function createD1TurnEventStore(
