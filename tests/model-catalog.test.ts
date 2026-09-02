@@ -274,11 +274,13 @@ describe('sortModelsByFreshness', () => {
       model('claude-opus-4-7', 'anthropic'),
       model('claude-opus-5', 'anthropic'),
       model('claude-sonnet-5', 'anthropic'),
+      model('claude-fable-5', 'anthropic'),
       model('claude-fable-5-1', 'anthropic'),
     ])
 
     expect(sorted.map((entry) => entry.id)).toEqual([
       'claude-fable-5-1',
+      'claude-fable-5',
       'claude-opus-5',
       'claude-sonnet-5',
       'claude-opus-4-7',

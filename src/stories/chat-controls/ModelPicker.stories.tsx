@@ -57,6 +57,7 @@ const currentModels: CatalogModel[] = [
   { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', provider: 'google', supportsTools: true, supportsReasoning: true, featured: true },
   { id: 'gpt-5.6-luna', name: 'GPT 5.6 Luna', provider: 'openai', supportsTools: true, supportsReasoning: true, featured: true },
   { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', provider: 'anthropic', supportsTools: true, supportsReasoning: true, featured: true },
+  { id: 'claude-fable-5', name: 'Claude Fable 5', provider: 'anthropic', supportsTools: true, supportsReasoning: true, featured: true },
   { id: 'claude-fable-5-1', name: 'Claude Fable 5.1', provider: 'anthropic', supportsTools: true, supportsReasoning: true, featured: true },
 ]
 
@@ -67,7 +68,7 @@ export const FreshnessOrdering: Story = {
   render: () => (
     <AutoClick>
       <ModelPicker
-        value="claude-sonnet-5"
+        value="claude-fable-5-1"
         onChange={() => {}}
         models={currentModels}
       />
