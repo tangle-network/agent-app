@@ -13,7 +13,7 @@ _97 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./billing`](api/billing.md) | 19 | — |
 | [`./brand`](api/brand.md) | 5 | — |
 | [`./brand-extraction`](api/brand-extraction.md) | 19 | — |
-| [`./catalog`](api/catalog.md) | 8 | `runtime` |
+| [`./catalog`](api/catalog.md) | 10 | `runtime` |
 | [`./chat-react`](api/chat-react.md) | 5 | `web-react` |
 | [`./chat-routes`](api/chat-routes.md) | 197 | `chat-store`, `interactions`, `model-resolution`, `plans`, `redact`, `sandbox`, `stream`, `web` |
 | [`./chat-store`](api/chat-store.md) | 64 | `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product` |
@@ -59,7 +59,7 @@ _97 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./record/drizzle`](api/record-drizzle.md) | 22 | — |
 | [`./redact`](api/redact.md) | 15 | — |
 | [`./run`](api/run.md) | 10 | `harness` |
-| [`./runtime`](api/runtime.md) | 65 | `tools` |
+| [`./runtime`](api/runtime.md) | 67 | `tools` |
 | [`./sandbox`](api/sandbox.md) | 186 | `harness`, `profile`, `runtime`, `tools` |
 | [`./sequences`](api/sequences.md) | 113 | `tools`, `web` |
 | [`./sequences-react`](api/sequences-react.md) | 108 | `brand`, `sequences` |
@@ -168,11 +168,11 @@ Source: `src/brand-extraction/index.ts` · 19 exports
 
 ## `./catalog`
 
-Source: `src/catalog/index.ts` · 8 exports
+Source: `src/catalog/index.ts` · 10 exports
 
 Depends on: `runtime`
 
-`buildCatalog`, `CatalogModel`, `fetchModelCatalog`, `isChatCapableModel`, `ModelCatalog`, `normalizeModelId`, `RouterModel`, `sortModelsByFreshness`
+`buildCatalog`, `CatalogModel`, `catalogModelForId`, `fetchModelCatalog`, `isChatCapableModel`, `ModelCatalog`, `normalizeModelId`, `resolveCatalogModelId`, `RouterModel`, `sortModelsByFreshness`
 
 [Full API →](api/catalog.md)
 
@@ -588,11 +588,11 @@ Depends on: `harness`
 
 ## `./runtime`
 
-Source: `src/runtime/index.ts` · 65 exports
+Source: `src/runtime/index.ts` · 67 exports
 
 Depends on: `tools`
 
-`AnySurfaceKind`, `AppToolLoopOptions`, `buildCatalog`, `CatalogModel`, `CertifiedDelivery`, `CertifiedDeliveryConfig`, `createCertifiedDelivery`, `createOpenAICompatStreamTurn`, `createSurfaceRegistry`, `createTangleRouterModelConfig`, `CreateTangleRouterModelConfigOptions`, `DEFAULT_TANGLE_BILLING_ENFORCEMENT_ENV_VAR`, `DEFAULT_TANGLE_ROUTER_BASE_URL`, `defineSurfaceKind`, `fetchModelCatalog`, `isChatCapableModel`, `isTangleBillingEnforcementDisabled`, `isTangleExecutionKeyError`, `LoopAssistantToolCall`, `LoopEvent`, `LoopMessage`, `LoopToolCall`, `MAX_RECOMMENDED_MODELS`, `mergeSurfaceOverlay`, `ModelCatalog`, `normalizeModelId`, `OpenAICompatServedModel`, `OpenAICompatStreamTurnOptions`, `OpenAIStreamChunk`, `ResolvedAgentProfile`, `ResolvedTangleExecutionKey`, `ResolveModelOptions`, `resolveTangleDevOrUserKey`, `ResolveTangleDevOrUserKeyOptions`, `resolveTangleExecutionEnvironment`, `resolveTangleModelConfig`, `resolveUserTangleExecutionKey`, `resolveUserTangleExecutionKeyForUser`, `ResolveUserTangleExecutionKeyForUserOptions`, `ResolveUserTangleExecutionKeyOptions`, `RouterModel`, `runAppToolLoop`, `sortModelsByFreshness`, `streamAppToolLoop`, `StreamAppToolLoopOptions`, `StreamLoopYield`, `SurfaceKindDefinition`, `SurfaceMcpServer`, `SurfaceMergeBase`, `SurfaceOverlay`, `SurfacePermissionValue`, `SurfaceRegistry`, `TangleBillingEnforcementOptions`, `TangleExecutionEnvironment`, `TangleExecutionKeyError`, `TangleExecutionKeyErrorCode`, `tangleExecutionKeyHttpError`, `TangleExecutionKeyHttpError`, `TangleExecutionKeySource`, `TangleModelConfig`, `toLoopEvents`, `ToolLoopEvent`, `ToolLoopResult`, `ToolLoopStopReason`, `trimOrNull`
+`AnySurfaceKind`, `AppToolLoopOptions`, `buildCatalog`, `CatalogModel`, `catalogModelForId`, `CertifiedDelivery`, `CertifiedDeliveryConfig`, `createCertifiedDelivery`, `createOpenAICompatStreamTurn`, `createSurfaceRegistry`, `createTangleRouterModelConfig`, `CreateTangleRouterModelConfigOptions`, `DEFAULT_TANGLE_BILLING_ENFORCEMENT_ENV_VAR`, `DEFAULT_TANGLE_ROUTER_BASE_URL`, `defineSurfaceKind`, `fetchModelCatalog`, `isChatCapableModel`, `isTangleBillingEnforcementDisabled`, `isTangleExecutionKeyError`, `LoopAssistantToolCall`, `LoopEvent`, `LoopMessage`, `LoopToolCall`, `MAX_RECOMMENDED_MODELS`, `mergeSurfaceOverlay`, `ModelCatalog`, `normalizeModelId`, `OpenAICompatServedModel`, `OpenAICompatStreamTurnOptions`, `OpenAIStreamChunk`, `resolveCatalogModelId`, `ResolvedAgentProfile`, `ResolvedTangleExecutionKey`, `ResolveModelOptions`, `resolveTangleDevOrUserKey`, `ResolveTangleDevOrUserKeyOptions`, `resolveTangleExecutionEnvironment`, `resolveTangleModelConfig`, `resolveUserTangleExecutionKey`, `resolveUserTangleExecutionKeyForUser`, `ResolveUserTangleExecutionKeyForUserOptions`, `ResolveUserTangleExecutionKeyOptions`, `RouterModel`, `runAppToolLoop`, `sortModelsByFreshness`, `streamAppToolLoop`, `StreamAppToolLoopOptions`, `StreamLoopYield`, `SurfaceKindDefinition`, `SurfaceMcpServer`, `SurfaceMergeBase`, `SurfaceOverlay`, `SurfacePermissionValue`, `SurfaceRegistry`, `TangleBillingEnforcementOptions`, `TangleExecutionEnvironment`, `TangleExecutionKeyError`, `TangleExecutionKeyErrorCode`, `tangleExecutionKeyHttpError`, `TangleExecutionKeyHttpError`, `TangleExecutionKeySource`, `TangleModelConfig`, `toLoopEvents`, `ToolLoopEvent`, `ToolLoopResult`, `ToolLoopStopReason`, `trimOrNull`
 
 [Full API →](api/runtime.md)
 
