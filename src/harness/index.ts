@@ -16,10 +16,11 @@
  * Harness↔model COMPATIBILITY (which models a harness can run, snapping) is NOT defined here — it
  * comes from `@tangle-network/agent-interface`, the single source of truth shared with the
  * sandbox-ui pickers and the cli-bridge backends. This module owns the harness TAXONOMY + the
- * session lock.
+ * session lock, and its server assertion also checks resolved transport-provider evidence.
  */
 
 import {
+  harnessProviders,
   harnessSupportsModel,
   harnessTypeSchema,
   modelProvider,
@@ -121,6 +122,12 @@ export function resolveSessionHarness(input: ResolveSessionHarnessInput = {}): R
 
 export { modelProvider }
 
+/** A resolved model and the transport provider that will execute it. */
+export interface HarnessModelSelection {
+  model: string
+  provider?: string
+}
+
 /** Provider-less ids (sentinels like "default", or a session's own config) are
  *  compatible everywhere — every harness honors its own configuration. */
 export function isModelCompatibleWithHarness(harness: Harness, modelId: string): boolean {
@@ -147,14 +154,30 @@ export function snapHarnessToModel(harness: Harness, modelId: string): Harness {
 }
 
 /** Fail-loud server guard: throw when a harness is asked to run a model it can't.
- *  Call before dispatching a sandbox turn so a bypassed UI can't reach the sidecar
- *  with an incompatible pair. */
-export function assertHarnessModelCompatible(harness: Harness, modelId: string): void {
-  if (!isModelCompatibleWithHarness(harness, modelId)) {
-    const provider = modelProvider(modelId)
+ *  A resolved model tuple supplies provider evidence when its id is unqualified.
+ *  Call before dispatching a sandbox turn so a bypassed UI cannot reach the
+ *  sidecar with an incompatible or unproven pair. */
+export function assertHarnessModelCompatible(
+  harness: Harness,
+  selection: string | HarnessModelSelection,
+): void {
+  const modelId = typeof selection === 'string' ? selection : selection.model
+  const transportProvider = typeof selection === 'string' ? undefined : selection.provider
+  const providers = harnessProviders(harness)
+  const provider = modelProvider(modelId) ?? transportProvider ?? null
+  // An omitted/default model is deliberately left to the harness. Once a
+  // caller names a model, however, a vendor-locked harness must have provider
+  // evidence. Treating a router provider as compatible with every native CLI
+  // is how a bare Gemini model reached Claude Code and produced "Not logged in".
+  const isDefaultSentinel = modelId.trim() === '' || modelId.trim() === 'default'
+  const compatible = isDefaultSentinel
+    || providers === null
+    || (provider !== null && providers.includes(provider))
+  if (!compatible) {
     const native = preferredHarnessForModel(modelId)
+    const providerDescription = provider ?? 'unqualified'
     throw new Error(
-      `Harness "${harness}" cannot run model "${modelId}" (provider "${provider}"). ` +
+      `Harness "${harness}" cannot run model "${modelId}" (provider "${providerDescription}"). ` +
         `Use ${native ?? 'a router-backed harness (opencode)'} or an allowed model.`,
     )
   }

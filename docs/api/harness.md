@@ -4,14 +4,14 @@
 
 Source: `src/harness/index.ts`
 
-13 exports.
+14 exports.
 
 ### `assertHarnessModelCompatible`
 
 `function` — Fail-loud server guard: throw when a harness is asked to run a model it can't.
 
 ```ts
-(harness: Harness, modelId: string) => void
+(harness: Harness, selection: string | HarnessModelSelection) => void
 ```
 
 ### `coerceHarness`
@@ -36,6 +36,14 @@ Harness
 
 ```ts
 type Harness
+```
+
+### `HarnessModelSelection`
+
+`interface` — A resolved model and the transport provider that will execute it.
+
+```ts
+interface HarnessModelSelection
 ```
 
 ### `isHarness`
