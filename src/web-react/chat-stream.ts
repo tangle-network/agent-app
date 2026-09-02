@@ -335,7 +335,9 @@ export async function streamChatTurn(opts: StreamChatOptions): Promise<ConsumeCh
     const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` })) as { error?: string }
     throw new Error(err.error ?? `HTTP ${res.status}`)
   }
-  let turnId: string | null = null
+  // Headers arrive before the body, so a reset before the marker still has a
+  // replay id. The body marker remains authoritative when it arrives.
+  let turnId: string | null = res.headers.get('x-turn-id')?.trim() || null
   const cb: ChatStreamCallbacks = {
     ...opts.callbacks,
     onTurnId: (id) => {
