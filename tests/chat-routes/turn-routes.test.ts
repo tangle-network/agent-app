@@ -857,6 +857,34 @@ describe('createChatTurnRoutes — product seams', () => {
     expect(rows.filter((r) => r.role === 'assistant')).toHaveLength(0)
   })
 
+  it('contextGate handoff returns the accepted response and keeps product ownership', async () => {
+    const produce = vi.fn(() => fakeProducer([{ type: 'text', text: 'should not run' }], 'x'))
+    const release = vi.fn()
+    const lifecycleEvents: string[] = []
+    const { routes, rows, ctx } = makeRoutes({
+      produce,
+      contextGate: async () => ({ proceed: 'handoff' as const, response: Response.json({ accepted: true }, { status: 202 }) }),
+      turnLock: {
+        acquire: () => ({ acquired: true as const, handle: 'product-owned' }),
+        release,
+      },
+      lifecycle: {
+        onTurnStart: () => { lifecycleEvents.push('start') },
+        onTurnComplete: () => { lifecycleEvents.push('complete') },
+        onTurnError: () => { lifecycleEvents.push('error') },
+      },
+    })
+
+    const res = await routes.turn(turnRequest({ threadId: 't-handoff', content: 'run later' }), ctx)
+    expect(res.status).toBe(202)
+    expect(await res.json()).toEqual({ accepted: true })
+    expect(produce).not.toHaveBeenCalled()
+    expect(release).not.toHaveBeenCalled()
+    expect(lifecycleEvents).toEqual([])
+    expect(rows.filter((row) => row.role === 'user')).toHaveLength(1)
+    expect(rows.filter((row) => row.role === 'assistant')).toHaveLength(0)
+  })
+
   it('contextGate: a gated turn is REPORTED to telemetry, stamped so it is not read as a blank turn', async () => {
     // Until this fired, the gate was the one answer path that produced no
     // lifecycle event at all: the early return happens before `turnStarted`, so
