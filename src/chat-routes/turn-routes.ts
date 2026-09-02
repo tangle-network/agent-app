@@ -336,7 +336,8 @@ export interface ChatTurnInputPatch {
 export type ChatTurnGateResult =
   | { proceed: true }
   | { proceed: false; response: Response }
-  /** The product has accepted the turn and owns its lock and lifecycle. */
+  /** The product has accepted the turn and owns execution and lifecycle after
+   *  the route releases its lock. */
   | { proceed: 'handoff'; response: Response }
 
 /** Single-flight lock verdict — acquired (with an opaque handle passed back to
@@ -483,10 +484,10 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
    *    verbatim: `beforeTurn` and `produce` never run, no assistant row is
    *    written, and the user row already inserted is KEPT — a real user turn
    *    whose assistant side is the gate's own response.
-   *  - `{proceed:'handoff'}` returns the product's accepted `Response` and
-   *    transfers lock and lifecycle ownership to the product's durable owner.
-   *    The route runs no producer or lifecycle hook and does not release the
-   *    lock; the product MUST release it after its owner settles the turn.
+   *  - `{proceed:'handoff'}` releases the route-acquired lock, returns the
+   *    product's accepted `Response`, and transfers execution and lifecycle
+   *    ownership to the product's durable owner. The route runs no producer
+   *    or lifecycle hook.
    *  - Always returning `{proceed:true}` is supported, not a misuse: the seam
    *    doubles as the one place that runs after the user row exists and before
    *    the producer, which is where per-turn analytics and readiness
@@ -957,7 +958,10 @@ export function createChatTurnRoutes<TContext = void>(
       // user turn); the gate's response is the assistant side of it.
       if (options.contextGate) {
         const gate = await options.contextGate(produceArgs)
-        if (gate.proceed === 'handoff') return gate.response
+        if (gate.proceed === 'handoff') {
+          await releaseLock()
+          return gate.response
+        }
         if (!gate.proceed) {
           await releaseLock()
           // A gated turn is still a TURN, and until now it was the one answer

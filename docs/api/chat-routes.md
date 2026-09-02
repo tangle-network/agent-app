@@ -400,7 +400,7 @@ interface ChatTurnFilePartInput
 
 ### `ChatTurnGateResult`
 
-`type` — Pre-turn readiness verdict — proceed, or short-circuit with the product's own `Response` (e.g.
+`type` — Pre-turn readiness verdict — proceed, short-circuit, or hand off to a product-owned durable turn.
 
 ```ts
 type ChatTurnGateResult

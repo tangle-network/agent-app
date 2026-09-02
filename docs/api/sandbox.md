@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-186 exports.
+192 exports.
 
 ### `adaptSandboxStream`
 
@@ -12,6 +12,22 @@ Source: `src/sandbox/index.ts`
 
 ```ts
 (events: AsyncIterable<unknown>) => AsyncGenerator<SandboxStreamEvent, any, any>
+```
+
+### `admitSandboxSessionTurn`
+
+`function` — Create or reuse one Sandbox session, then admit one stable turn.
+
+```ts
+(options: AdmitSandboxSessionTurnOptions) => Promise<SandboxSessionTurnAdmission>
+```
+
+### `AdmitSandboxSessionTurnOptions`
+
+`interface` — Options for admitting one browser-visible turn on the Sandbox message lane.
+
+```ts
+interface AdmitSandboxSessionTurnOptions
 ```
 
 ### `applyPromptTokenLimits`
@@ -1060,6 +1076,38 @@ interface SandboxRuntimeConfig
 
 ```ts
 interface SandboxScope
+```
+
+### `SandboxSessionTurnAdmission`
+
+`interface` — Plain result safe to return from a durable admission step.
+
+```ts
+interface SandboxSessionTurnAdmission
+```
+
+### `SandboxSessionTurnBackend`
+
+`type` — Backend configuration fixed when the Sandbox session is created.
+
+```ts
+type SandboxSessionTurnBackend
+```
+
+### `SandboxSessionTurnMessage`
+
+`type` — Message fields forwarded to the Sandbox session lane.
+
+```ts
+type SandboxSessionTurnMessage
+```
+
+### `SandboxSessionTurnSendOptions`
+
+`type` — Request controls forwarded to the Sandbox session lane.
+
+```ts
+type SandboxSessionTurnSendOptions
 ```
 
 ### `SandboxSpendHooks`
