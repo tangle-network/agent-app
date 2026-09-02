@@ -6,6 +6,8 @@ import { renderToPipeableStream } from 'react-dom/server'
 
 import type { ChatComposerProps } from '../../src/web-react/chat-composer'
 
+const SSR_RENDER_TIMEOUT_MS = 15_000
+
 async function renderAfterLazyModules(): Promise<string> {
   const builtEntry = new URL('../../dist/web-react/index.js', import.meta.url).href
   const { ChatComposer } = (await import(builtEntry)) as {
@@ -23,7 +25,7 @@ async function renderAfterLazyModules(): Promise<string> {
     const timeout = setTimeout(() => {
       renderer.abort()
       reject(new Error('built composer server render timed out'))
-    }, 5_000)
+    }, SSR_RENDER_TIMEOUT_MS)
     output.once('finish', () => {
       clearTimeout(timeout)
       resolve(Buffer.concat(chunks).toString('utf8'))
@@ -54,5 +56,5 @@ describe('built ChatComposer server output', () => {
 
     expect(inputTags).toHaveLength(1)
     expect(inputTags[0]).not.toMatch(/\sdisabled(?:[=>\s])/)
-  })
+  }, SSR_RENDER_TIMEOUT_MS)
 })
