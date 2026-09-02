@@ -14,9 +14,11 @@
  */
 export {
   buildCatalog,
+  catalogModelForId,
   fetchModelCatalog,
   isChatCapableModel,
   normalizeModelId,
+  resolveCatalogModelId,
   sortModelsByFreshness,
   __resetCatalogCache,
   type CatalogModel,
