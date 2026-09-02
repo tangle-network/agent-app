@@ -53,6 +53,14 @@ import {
 export type { Outcome } from './outcome'
 export * from './binary-read'
 export {
+  admitSandboxSessionTurn,
+  type AdmitSandboxSessionTurnOptions,
+  type SandboxSessionTurnAdmission,
+  type SandboxSessionTurnBackend,
+  type SandboxSessionTurnMessage,
+  type SandboxSessionTurnSendOptions,
+} from './session-turn'
+export {
   resolveModel,
   resolveModelSelection,
   requireTransportableModel,
