@@ -123,3 +123,4 @@ CREATE TABLE IF NOT EXISTS turn_status (
   updatedAt TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_turn_status_scope ON turn_status (scopeId, status);
+CREATE INDEX IF NOT EXISTS idx_turn_status_retention ON turn_status (status, updatedAt);
