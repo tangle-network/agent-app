@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import { useState } from 'react'
 
-import { ModelPicker } from '../../web-react'
+import { ModelPicker, type CatalogModel } from '../../web-react'
 import { AutoClick, catalogModels, DEFAULT_MODEL_ID, withPopoverHeadroom } from './fixtures'
 
 /**
@@ -47,6 +47,30 @@ export const Open: Story = {
       </AutoClick>
     )
   },
+}
+
+const staleFirstModels: CatalogModel[] = [
+  { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', provider: 'anthropic', supportsTools: true, supportsReasoning: true, featured: true },
+  { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', provider: 'openai', supportsTools: true, supportsReasoning: false, featured: true },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'google', supportsTools: true, supportsReasoning: true, featured: true },
+  { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', provider: 'google', supportsTools: true, supportsReasoning: true, featured: false },
+  { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna', provider: 'openai', supportsTools: true, supportsReasoning: true, featured: false },
+  { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', provider: 'anthropic', supportsTools: true, supportsReasoning: true, featured: false },
+]
+
+/** Even a stale input list and stale featured flags render current-first. */
+export const FreshnessOrdering: Story = {
+  name: 'Freshness ordering',
+  decorators: [withPopoverHeadroom],
+  render: () => (
+    <AutoClick>
+      <ModelPicker
+        value="claude-sonnet-5"
+        onChange={() => {}}
+        models={staleFirstModels}
+      />
+    </AutoClick>
+  ),
 }
 
 /** Catalogue still loading — the popover shows its loading line. */
