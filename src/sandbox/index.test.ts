@@ -2709,7 +2709,7 @@ describe('driveSandboxTurn', () => {
     expect(prompt).not.toHaveBeenCalled()
     expect(drive).toHaveBeenCalledTimes(1)
   })
-  it('forwards turnId + wallCapMs to box.driveTurn but never leaks interactions into the backend', async () => {
+  it('forwards turnId + wallCapMs + interactions to box.driveTurn', async () => {
     const shell = shellFor({ apiKey: 'k', baseUrl: 'u' })
     const box = fakeBox({
       driveTurn: vi.fn().mockResolvedValue({ state: 'running', elapsedMs: 1 }),
@@ -2718,12 +2718,23 @@ describe('driveSandboxTurn', () => {
       sessionId: 'sess1',
       turnId: 'turn-42',
       wallCapMs: 60_000,
-      interactions: { question: true },
+      executionId: 'stale-execution',
+      interactions: { question: true, permission: true, plan: true },
     })
     const [, opts] = (box.driveTurn as ReturnType<typeof vi.fn>).mock.calls[0]!
     expect(opts.sessionId).toBe('sess1')
     expect(opts.turnId).toBe('turn-42')
     expect(opts.wallCapMs).toBe(60_000)
+    expect(opts).not.toHaveProperty('executionId')
+    expect(opts.backend.interactions).toEqual({ question: true, permission: true, plan: true })
+  })
+  it('omits interactions from the driveTurn backend when not set', async () => {
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' })
+    const box = fakeBox({
+      driveTurn: vi.fn().mockResolvedValue({ state: 'running', elapsedMs: 1 }),
+    })
+    await driveSandboxTurn(shell, box, 'go', { sessionId: 'sess1' })
+    const [, opts] = (box.driveTurn as ReturnType<typeof vi.fn>).mock.calls[0]!
     expect(opts.backend.interactions).toBeUndefined()
   })
 })

@@ -2769,13 +2769,13 @@ export interface StreamSandboxPromptOptions {
   signal?: AbortSignal
   timeoutMs?: number
   requireVisibleAssistantOutput?: boolean
-  // When true, an interactive question event throws instead of yielding —
-  // detached (cron/mission-step) runs have no consumer to answer it.
+  // When true, an interactive question event throws instead of yielding.
+  // Use this for detached runs whose caller has no consumer to answer it.
   disallowQuestions?: boolean
   // Per-turn question/permission/plan channel toggles, forwarded VERBATIM into the
   // backend config. agent-app does not validate kinds per harness — the sidecar fails
-  // session init loudly for unsupported ones; a local matrix would drift. Only honored
-  // on the streaming path; the detached driveTurn path (driveSandboxTurn) never sets it.
+  // session init loudly for unsupported ones; a local matrix would drift. Honored on
+  // both streaming and driveTurn paths.
   interactions?: { question?: boolean; permission?: boolean; plan?: boolean }
   // Detach the run from THIS stream's lifetime. When true, the helper admits the
   // run through `dispatchPrompt`, then reads its exact execution through the
@@ -3536,12 +3536,16 @@ export async function driveSandboxTurn(
       sessionId: options.sessionId,
       ...(options.turnId ? { turnId: options.turnId } : {}),
       ...(options.wallCapMs !== undefined ? { wallCapMs: options.wallCapMs } : {}),
-      ...(options.executionId ? { executionId: options.executionId } : {}),
       ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
       ...(options.signal ? { signal: options.signal } : {}),
-      // Deliberately NO `interactions` here: detached turns (cron / mission steps) have
-      // no consumer to answer a question. Interactive Q&A is streaming-path only.
-      backend: { type: harness, profile, ...(model ? { model } : {}) },
+      // A durable caller with a session-gateway consumer can handle these events;
+      // callers without one should omit interactions so the run stays unattended.
+      backend: {
+        type: harness,
+        profile,
+        ...(model ? { model } : {}),
+        ...(options.interactions ? { interactions: options.interactions } : {}),
+      },
     } as Parameters<SandboxInstance['driveTurn']>[1])
     // The autonomous lane needs this most: a detached turn keeps the box
     // billable with nobody watching, and every tick that reports `running` is
