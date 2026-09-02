@@ -29,7 +29,7 @@ _97 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./eval`](api/eval.md) | 21 | `tools` |
 | [`./eval-campaign`](api/eval-campaign.md) | 37 | — |
 | [`./forms`](api/forms.md) | 29 | — |
-| [`./harness`](api/harness.md) | 13 | — |
+| [`./harness`](api/harness.md) | 14 | — |
 | [`./intakes`](api/intakes.md) | 29 | — |
 | [`./intakes-react`](api/intakes-react.md) | 3 | `brand`, `intakes` |
 | [`./intakes-react/lazy`](api/intakes-react-lazy.md) | 2 | `brand`, `intakes` |
@@ -320,9 +320,9 @@ Source: `src/forms/index.ts` · 29 exports
 
 ## `./harness`
 
-Source: `src/harness/index.ts` · 13 exports
+Source: `src/harness/index.ts` · 14 exports
 
-`assertHarnessModelCompatible`, `coerceHarness`, `DEFAULT_HARNESS`, `Harness`, `isHarness`, `isModelCompatibleWithHarness`, `KNOWN_HARNESSES`, `modelProvider`, `ResolvedSessionHarness`, `resolveSessionHarness`, `ResolveSessionHarnessInput`, `snapHarnessToModel`, `snapModelToHarness`
+`assertHarnessModelCompatible`, `coerceHarness`, `DEFAULT_HARNESS`, `Harness`, `HarnessModelSelection`, `isHarness`, `isModelCompatibleWithHarness`, `KNOWN_HARNESSES`, `modelProvider`, `ResolvedSessionHarness`, `resolveSessionHarness`, `ResolveSessionHarnessInput`, `snapHarnessToModel`, `snapModelToHarness`
 
 [Full API →](api/harness.md)
 

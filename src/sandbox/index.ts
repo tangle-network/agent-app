@@ -2803,7 +2803,7 @@ export async function* streamSandboxPrompt(
   // Server-side enforcement of the harness↔model policy: a vendor-locked harness
   // (claude-code/codex/kimi-code) must not be sent a foreign-provider model, even
   // if the UI snap was bypassed. Provider-less ids pass (session's own config).
-  if (model?.model) assertHarnessModelCompatible(harness, model.model)
+  if (model?.model) assertHarnessModelCompatible(harness, model)
 
   const prompt =
     typeof message === 'string'
@@ -3217,7 +3217,7 @@ export async function driveSandboxTurn(
     }),
     'driveSandboxTurn',
   )
-  if (model?.model) assertHarnessModelCompatible(harness, model.model)
+  if (model?.model) assertHarnessModelCompatible(harness, model)
   const prompt =
     typeof message === 'string'
       ? flattenHistory(message, options.history)

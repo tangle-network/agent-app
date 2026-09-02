@@ -5702,7 +5702,7 @@
         {
           "name": "assertHarnessModelCompatible",
           "kind": "function",
-          "signature": "(harness: Harness, modelId: string) => void",
+          "signature": "(harness: Harness, selection: string | HarnessModelSelection) => void",
           "doc": "Fail-loud server guard: throw when a harness is asked to run a model it can't."
         },
         {
@@ -5722,6 +5722,12 @@
           "kind": "type",
           "signature": "type Harness",
           "doc": "A coding-agent backend this shell can dispatch a session onto."
+        },
+        {
+          "name": "HarnessModelSelection",
+          "kind": "interface",
+          "signature": "interface HarnessModelSelection",
+          "doc": "A resolved model and the transport provider that will execute it."
         },
         {
           "name": "isHarness",

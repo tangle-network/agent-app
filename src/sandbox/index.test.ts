@@ -992,6 +992,15 @@ describe('streamSandboxPrompt seam', () => {
     expect(opts.requireVisibleAssistantOutput).toBe(true)
   })
 
+  it('rejects a named router model before a vendor-locked dispatch', async () => {
+    const streamPrompt = vi.fn()
+    const box = fakeBox({ streamPrompt })
+    await expect((async () => {
+      for await (const _ of streamSandboxPrompt(shell(), box, 'hello', { harness: 'claude-code' })) void _
+    })()).rejects.toThrow(/provider "openai-compat"/)
+    expect(streamPrompt).not.toHaveBeenCalled()
+  })
+
   it('forwards execution replay and dispatch idempotency identities to box.streamPrompt', async () => {
     async function* events() {
       yield { type: 'result' }
@@ -4125,6 +4134,19 @@ describe('requireTransportableModel + SandboxModelResolutionError callers', () =
     await expect(
       driveSandboxTurn(shell, box, 'go', { sessionId: 's1', model: 'user-picked' }),
     ).rejects.toBeInstanceOf(SandboxModelResolutionError)
+    expect(driveTurn).not.toHaveBeenCalled()
+  })
+
+  it('driveSandboxTurn rejects a named router model before a vendor-locked dispatch', async () => {
+    const driveTurn = vi.fn()
+    const box = fakeBox({ driveTurn })
+    const shell = shellFor(
+      { apiKey: 'k', baseUrl: 'https://s' },
+      { provider: { providerName: 'openai-compat', modelName: 'gemini-3.7-flash', apiKey: 'router-key' } },
+    )
+    await expect(
+      driveSandboxTurn(shell, box, 'go', { sessionId: 's1', harness: 'claude-code' }),
+    ).rejects.toThrow(/provider "openai-compat"/)
     expect(driveTurn).not.toHaveBeenCalled()
   })
 

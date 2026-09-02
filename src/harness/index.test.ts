@@ -133,4 +133,15 @@ describe('harness ↔ model compatibility (server-enforced)', () => {
     expect(() => assertHarnessModelCompatible('opencode', 'openai/gpt-5')).not.toThrow()
     expect(() => assertHarnessModelCompatible('claude-code', 'default')).not.toThrow()
   })
+
+  it('rejects a named router model on a vendor-locked harness', () => {
+    expect(() => assertHarnessModelCompatible('claude-code', {
+      model: 'gemini-3.7-flash',
+      provider: 'openai-compat',
+    })).toThrow(/provider "openai-compat"/)
+    expect(() => assertHarnessModelCompatible('claude-code', {
+      model: 'claude-sonnet-4-6',
+      provider: 'anthropic',
+    })).not.toThrow()
+  })
 })
