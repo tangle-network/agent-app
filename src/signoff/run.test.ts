@@ -127,6 +127,68 @@ describe('runSignoff (end to end)', { timeout: E2E_TIMEOUT_MS }, () => {
     }
   })
 
+  it('source: head loads a file config from the selected clean tree', async () => {
+    const repo = fixtureRepo({
+      steps: `[
+        { name: 'committed config', run: "node -e \\"process.exit(0)\\"" },
+      ]`,
+    })
+    const configPath = join(repo, 'signoff.config.mjs')
+    writeFileSync(configPath, readFileSync(configPath, 'utf8').replace('committed config', 'working-tree config'))
+
+    const report = await runSignoff({ repoDir: repo, cacheDir: temp('signoff-cache-'), source: 'head' })
+
+    expect(report.ok).toBe(true)
+    expect(report.steps.map((step) => step.name)).toEqual(['committed config'])
+    expect(report.configOrigin).toEqual({ kind: 'file', path: join(report.workspace, 'signoff.config.mjs') })
+  })
+
+  it('source: head derives package.json config from the selected clean tree', async () => {
+    const repo = fixtureRepo({ steps: `[{ name: 'unused file config', run: "node -e \\"process.exit(0)\\"" }]` })
+    rmSync(join(repo, 'signoff.config.mjs'))
+    const packagePath = join(repo, 'package.json')
+    const packageConfig = (name: string) => ({
+      name: 'fixture',
+      private: true,
+      signoff: {
+        install: { run: INSTALL, storeDirFlag: null, storeEnv: 'SIGNOFF_TEST_STORE' },
+        steps: [{ name, run: 'node -e "process.exit(0)"' }],
+      },
+    })
+    writeFileSync(packagePath, `${JSON.stringify(packageConfig('committed package config'))}\n`)
+    git(['add', '-A'], repo)
+    git(['commit', '--quiet', '-m', 'use package signoff config'], repo)
+    writeFileSync(packagePath, `${JSON.stringify(packageConfig('working-tree package config'))}\n`)
+
+    const report = await runSignoff({ repoDir: repo, cacheDir: temp('signoff-cache-'), source: 'head' })
+
+    expect(report.ok).toBe(true)
+    expect(report.steps.map((step) => step.name)).toEqual(['committed package config'])
+    expect(report.configOrigin).toEqual({ kind: 'package-json', path: join(report.workspace, 'package.json') })
+  })
+
+  it('source: head applies carryFiles declared by the selected config', async () => {
+    const repo = fixtureRepo({
+      steps: `[
+        { name: 'reads carried file', run: ${JSON.stringify(
+          `node -e "if (require('fs').readFileSync('.npmrc', 'utf8') !== 'registry=https://example.invalid\\n') process.exit(1)"`,
+        )} },
+      ]`,
+    })
+    writeFileSync(join(repo, '.gitignore'), 'node_modules\n.vite\ninstalled.txt\nout\n.npmrc\n')
+    writeFileSync(join(repo, '.npmrc'), 'registry=https://example.invalid\n')
+    const configPath = join(repo, 'signoff.config.mjs')
+    writeFileSync(configPath, readFileSync(configPath, 'utf8').replace('steps: [', "carryFiles: ['.npmrc'],\n  steps: ["))
+    git(['add', '.gitignore', 'signoff.config.mjs'], repo)
+    git(['commit', '--quiet', '-m', 'declare registry carry file'], repo)
+
+    const report = await runSignoff({ repoDir: repo, cacheDir: temp('signoff-cache-'), source: 'head' })
+
+    expect(report.ok).toBe(true)
+    expect(report.repo.carriedFiles).toEqual(['.npmrc'])
+    expect(report.configOrigin).toEqual({ kind: 'file', path: join(report.workspace, 'signoff.config.mjs') })
+  })
+
   it('the one-line summary carries the verdict, the commit it judged, and the step tally', async () => {
     // CLAUDE.md accepts this line as PR proof in place of the report block, and
     // `--quiet` prints it. Both readings depend on the sha and the tally being
