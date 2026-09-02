@@ -2799,6 +2799,45 @@ export interface StreamSandboxPromptOptions {
 
 type StreamPromptOptions = Parameters<SandboxInstance['streamPrompt']>[1]
 type DispatchPromptOptions = Parameters<SandboxInstance['dispatchPrompt']>[1]
+type CompletedTurn = NonNullable<Awaited<ReturnType<SandboxInstance['findCompletedTurn']>>>
+
+function cachedSandboxPromptEvents(
+  cached: CompletedTurn,
+  fallbackExecutionId: string,
+): Array<Record<string, unknown>> {
+  const cachedResult = cached.result
+  const executionId = typeof cachedResult.executionId === 'string' && cachedResult.executionId.trim()
+    ? cachedResult.executionId
+    : fallbackExecutionId
+  const finalText = typeof cachedResult.finalText === 'string'
+    ? cachedResult.finalText
+    : typeof cachedResult.response === 'string'
+      ? cachedResult.response
+      : typeof cachedResult.text === 'string'
+        ? cachedResult.text
+        : undefined
+
+  return [
+    {
+      type: 'result',
+      data: {
+        ...cachedResult,
+        ...(finalText !== undefined && cachedResult.finalText === undefined ? { finalText } : {}),
+        sessionId: cached.sessionId,
+        executionId,
+      },
+    },
+    {
+      type: 'done',
+      data: {
+        sessionId: cached.sessionId,
+        executionId,
+        status: 'completed',
+        outcome: { type: 'completed' },
+      },
+    },
+  ]
+}
 
 /**
  * Open the durable event lane for one detached prompt.
@@ -2826,7 +2865,7 @@ async function* detachedSandboxPromptEvents(
   // A cursor is already proof that this execution was admitted. Re-dispatching
   // before replay would turn a failed terminal session into a new prompt.
   const admission = lastEventId
-    ? { sessionId, executionId }
+    ? null
     : await box.dispatchPrompt(prompt, {
         sessionId,
         executionId,
@@ -2837,9 +2876,20 @@ async function* detachedSandboxPromptEvents(
           : {}),
         ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
       } as DispatchPromptOptions)
-  const admittedExecutionId = admission.executionId ?? executionId
+  const admittedExecutionId = admission?.executionId ?? executionId
   if (!admittedExecutionId) {
     throw new Error(`detached Sandbox dispatch for ${sessionId} returned no executionId`)
+  }
+
+  // A completed-turn cache hit deliberately returns `dispatched: false` and
+  // emits no new stream events. Yield its public result directly; the replay
+  // buffer may already have aged out by the time a retry reaches this helper.
+  if (admission?.dispatched === false) {
+    const cached = await box.findCompletedTurn(turnId, { sessionId })
+    if (cached) {
+      yield* cachedSandboxPromptEvents(cached, admittedExecutionId)
+      return
+    }
   }
 
   // The session bus is a useful observation surface, but its message events
@@ -2847,7 +2897,7 @@ async function* detachedSandboxPromptEvents(
   // execution replay instead so downstream producers receive the same event
   // vocabulary as a direct prompt stream (`data.part`, terminal `result`, etc.).
   yield* box.streamPrompt('', {
-    sessionId: admission.sessionId,
+    sessionId: admission?.sessionId ?? sessionId,
     executionId: admittedExecutionId,
     lastEventId: lastEventId || '0',
     ...(options.signal ? { signal: options.signal } : {}),
