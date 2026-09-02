@@ -1150,6 +1150,132 @@ describe('streamSandboxPrompt seam', () => {
     })
   })
 
+  it('detached mode admits once, then replays the exact session execution', async () => {
+    async function* events() {
+      yield { type: 'execution.started', data: { executionId: 'exec-1', sessionId: 'thread-1' } }
+      yield { type: 'result', data: { finalText: 'done' } }
+      yield { type: 'done', data: { status: 'completed' } }
+    }
+    const dispatchPrompt = vi.fn().mockResolvedValue({
+      sessionId: 'thread-1',
+      executionId: 'exec-1',
+      status: 'running',
+      alreadyExisted: false,
+      dispatched: true,
+    })
+    const box = fakeBox({
+      dispatchPrompt,
+      streamPrompt: vi.fn((_prompt: string, _options: unknown) => events()),
+    })
+
+    const out: unknown[] = []
+    for await (const event of streamSandboxPrompt(shell(), box, 'hello', {
+      sessionId: 'thread-1',
+      executionId: 'exec-1',
+      detach: true,
+    })) {
+      out.push(event)
+    }
+
+    expect(out.map((event) => (event as { type: string }).type)).toEqual([
+      'execution.started',
+      'result',
+      'done',
+    ])
+    expect(dispatchPrompt).toHaveBeenCalledWith('hello', expect.objectContaining({
+      sessionId: 'thread-1',
+      executionId: 'exec-1',
+      turnId: 'exec-1',
+      backend: expect.objectContaining({ type: 'opencode' }),
+    }))
+    expect((box.streamPrompt as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('', {
+      sessionId: 'thread-1',
+      executionId: 'exec-1',
+      lastEventId: '0',
+    })
+  })
+
+  it('detached replay uses the supplied cursor without re-dispatching', async () => {
+    async function* events() {
+      yield { type: 'done', data: { status: 'completed' } }
+    }
+    const dispatchPrompt = vi.fn()
+    const box = fakeBox({
+      dispatchPrompt,
+      streamPrompt: vi.fn((_prompt: string, _options: unknown) => events()),
+    })
+    for await (const _ of streamSandboxPrompt(shell(), box, 'hello', {
+      sessionId: 'thread-1',
+      executionId: 'exec-1',
+      lastEventId: 'event-7',
+      detach: true,
+    })) void _
+
+    expect(dispatchPrompt).not.toHaveBeenCalled()
+    expect((box.streamPrompt as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('', {
+      sessionId: 'thread-1',
+      executionId: 'exec-1',
+      lastEventId: 'event-7',
+    })
+  })
+
+  it('detached cache hits yield the completed result without opening an aged replay', async () => {
+    const dispatchPrompt = vi.fn().mockResolvedValue({
+      sessionId: 'thread-1',
+      executionId: 'exec-1',
+      status: 'completed',
+      alreadyExisted: true,
+      dispatched: false,
+    })
+    const findCompletedTurn = vi.fn().mockResolvedValue({
+      turnId: 'exec-1',
+      sessionId: 'thread-1',
+      completedAt: '2026-09-02T00:00:00.000Z',
+      result: {
+        response: 'cached answer',
+        tokenUsage: { inputTokens: 21, outputTokens: 4 },
+      },
+    })
+    const box = fakeBox({
+      dispatchPrompt,
+      findCompletedTurn,
+      streamPrompt: vi.fn(),
+    })
+
+    const out: unknown[] = []
+    for await (const event of streamSandboxPrompt(shell(), box, 'hello', {
+      sessionId: 'thread-1',
+      executionId: 'exec-1',
+      detach: true,
+    })) {
+      out.push(event)
+    }
+
+    expect(out).toEqual([
+      {
+        type: 'result',
+        data: {
+          response: 'cached answer',
+          tokenUsage: { inputTokens: 21, outputTokens: 4 },
+          finalText: 'cached answer',
+          sessionId: 'thread-1',
+          executionId: 'exec-1',
+        },
+      },
+      {
+        type: 'done',
+        data: {
+          sessionId: 'thread-1',
+          executionId: 'exec-1',
+          status: 'completed',
+          outcome: { type: 'completed' },
+        },
+      },
+    ])
+    expect(findCompletedTurn).toHaveBeenCalledWith('exec-1', { sessionId: 'thread-1' })
+    expect(box.streamPrompt).not.toHaveBeenCalled()
+  })
+
   it('omits the model when provider resolution yields nothing', async () => {
     async function* events() {
       yield { type: 'result' }

@@ -123,13 +123,15 @@ export function createSandboxProduce(env: AppEnv) {
       // that actually served, and the transcript gets a visible notice.
       // Opt out with `modelFailover: false` (or empty `fallbacks`).
       fallbackModels: config.model.fallbacks,
-      openEvents: ({ model: attemptModel, attempt, signal }) =>
-        streamSandboxPrompt(shell, box, normalizeChatPromptForSandbox(prompt), {
+      openEvents: ({ model: attemptModel, attempt, signal }) => {
+        // A failover attempt is a NEW dispatch, not a reconnect to the dead
+        // one — it needs its own execution identity or the platform would
+        // resume the failed execution instead of starting a fresh run.
+        const attemptExecutionId = attempt === 1 ? executionId : `${executionId}-f${attempt}`
+        return streamSandboxPrompt(shell, box, normalizeChatPromptForSandbox(prompt), {
           sessionId: identity.sessionId,
-          // A failover attempt is a NEW dispatch, not a reconnect to the dead
-          // one — it needs its own execution identity or the platform would
-          // resume the failed execution instead of starting a fresh run.
-          executionId: attempt === 1 ? executionId : `${executionId}-f${attempt}`,
+          executionId: attemptExecutionId,
+          turnId: attemptExecutionId,
           model: attemptModel,
           signal,
           // A zero reasoning allowance maps to the profile's supported
@@ -159,7 +161,8 @@ export function createSandboxProduce(env: AppEnv) {
           // closes (e.g. a throwaway preview).
           detach: true,
           interactions: config.interactions,
-        }),
+        })
+      },
     })
   }
 }
