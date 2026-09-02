@@ -121,6 +121,7 @@ describe('buildCatalog', () => {
     ]).models
 
     expect(catalogModelForId(models, 'openai/gpt-5')?.id).toBe('gpt-5')
+    expect(catalogModelForId(models, 'opencode/zai-coding-plan/glm-5.3')).toBeUndefined()
     expect(resolveCatalogModelId(models, 'openai/sunset-model', 'anthropic/claude-fable-5-1')).toBe('claude-fable-5-1')
     expect(resolveCatalogModelId(models, 'sunset-model')).toBe('claude-fable-5-1')
   })
