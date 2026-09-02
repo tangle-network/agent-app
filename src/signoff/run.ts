@@ -115,25 +115,37 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
   const wallStart = Date.now()
   const repoDir = resolve(options.repoDir ?? process.cwd())
   const repoRoot = repoRootOf(repoDir)
-  const { config, origin } = await loadSignoffConfig({ repoRoot, configPath: options.configPath })
-
-  // Fail before materializing anything: a bad graph is a config error, and
-  // paying for an install to learn that is a waste of the speed this exists for.
-  validateGraph(config.steps.map((step) => ({ name: step.name, needs: step.needs })))
-  assertShuffleArgsReachTheRunner(config.steps)
-  const nodeRequirement = resolveNodeRequirement(repoRoot, config.nodeVersion)
-  assertNodeVersion(nodeRequirement)
-
   const source = options.source ?? 'working-tree'
-  const cacheDir = resolve(options.cacheDir ?? config.cacheDir ?? DEFAULT_CACHE_DIR)
+  // The config must come from the same selected bytes as the steps. The cache
+  // option can be declared in that config, so bootstrap under the explicit
+  // option or the default, then move the tree if the selected config says so.
+  let cacheDir = resolve(options.cacheDir ?? DEFAULT_CACHE_DIR)
   // The tree lives under the same root as the stores on purpose: pnpm hardlinks
   // from the store into `node_modules`, and a store on another filesystem
   // silently degrades to a full copy.
-  const treePath = join(cacheDir, 'trees', `${basename(repoRoot)}-${process.pid}`)
+  const treePath = (): string => join(cacheDir, 'trees', `${basename(repoRoot)}-${process.pid}`)
 
   let tree: CleanTree | null = null
   try {
-    tree = materializeCleanTree({ repoDir: repoRoot, dest: treePath, source, carryFiles: config.carryFiles })
+    tree = materializeCleanTree({ repoDir: repoRoot, dest: treePath(), source })
+    let loaded = await loadSignoffConfig({ repoRoot: tree.path, configPath: options.configPath })
+
+    cacheDir = resolve(options.cacheDir ?? loaded.config.cacheDir ?? DEFAULT_CACHE_DIR)
+    if (tree.path !== treePath() || (loaded.config.carryFiles?.length ?? 0) > 0) {
+      removeCleanTree(tree)
+      tree = materializeCleanTree({ repoDir: repoRoot, dest: treePath(), source, carryFiles: loaded.config.carryFiles })
+      // The second load gives the report an origin inside the final selected
+      // tree, and keeps config-derived values tied to that same path.
+      loaded = await loadSignoffConfig({ repoRoot: tree.path, configPath: options.configPath })
+    }
+
+    const { config, origin } = loaded
+    // Validate after loading from the selected tree, before paying for install.
+    validateGraph(config.steps.map((step) => ({ name: step.name, needs: step.needs })))
+    assertShuffleArgsReachTheRunner(config.steps)
+    const nodeRequirement = resolveNodeRequirement(tree.path, config.nodeVersion)
+    assertNodeVersion(nodeRequirement)
+
     options.onEvent?.({ kind: 'tree', path: tree.path, head: tree.head, dirty: tree.dirty })
 
     const store = resolveStore({ treePath: tree.path, cacheDir, generations: config.storeGenerations })
