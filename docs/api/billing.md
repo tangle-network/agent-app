@@ -4,7 +4,7 @@
 
 Source: `src/billing/index.ts`
 
-32 exports.
+34 exports.
 
 ### `createIdentityBoundWorkspaceKeyManager`
 
@@ -36,6 +36,22 @@ Source: `src/billing/index.ts`
 
 ```ts
 (opts: WorkspaceKeyManagerOptions) => WorkspaceKeyManager
+```
+
+### `DurableWorkspaceKeyConditionalWrites`
+
+`interface` — Optional compare-and-set lifecycle writes for stores that support fencing.
+
+```ts
+interface DurableWorkspaceKeyConditionalWrites
+```
+
+### `DurableWorkspaceKeyCreateInput`
+
+`interface` — The exact request identity that must be reused when recovering a create.
+
+```ts
+interface DurableWorkspaceKeyCreateInput
 ```
 
 ### `DurableWorkspaceKeyManager`

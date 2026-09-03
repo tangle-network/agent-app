@@ -403,6 +403,8 @@ export {
   createIdentityBoundWorkspaceKeyManager,
   type DurableWorkspaceKeyManager,
   type DurableWorkspaceKeyManagerOptions,
+  type DurableWorkspaceKeyCreateInput,
+  type DurableWorkspaceKeyConditionalWrites,
   type DurableWorkspaceKeyProvisioner,
   type DurableWorkspaceKeyProvisioningRecord,
   type DurableWorkspaceKeyRecord,

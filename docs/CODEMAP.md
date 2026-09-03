@@ -10,7 +10,7 @@ _97 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./app-auth`](api/app-auth.md) | 11 | `platform` |
 | [`./assets`](api/assets.md) | 44 | — |
 | [`./assistant`](api/assistant.md) | 56 | `runtime`, `web-react` |
-| [`./billing`](api/billing.md) | 32 | — |
+| [`./billing`](api/billing.md) | 34 | — |
 | [`./brand`](api/brand.md) | 5 | — |
 | [`./brand-extraction`](api/brand-extraction.md) | 19 | — |
 | [`./catalog`](api/catalog.md) | 10 | `runtime` |
@@ -144,9 +144,9 @@ Depends on: `runtime`, `web-react`
 
 ## `./billing`
 
-Source: `src/billing/index.ts` · 32 exports
+Source: `src/billing/index.ts` · 34 exports
 
-`createIdentityBoundWorkspaceKeyManager`, `createPlatformBalanceManager`, `createTcloudKeyProvisioner`, `createWorkspaceKeyManager`, `DurableWorkspaceKeyManager`, `DurableWorkspaceKeyManagerOptions`, `DurableWorkspaceKeyProvisioner`, `DurableWorkspaceKeyProvisioningRecord`, `DurableWorkspaceKeyRecord`, `DurableWorkspaceKeyScope`, `DurableWorkspaceKeyStore`, `KeyCrypto`, `KeyProvisioner`, `PlanLimit`, `PlatformBalanceInfo`, `PlatformBalanceManager`, `PlatformBalanceManagerOptions`, `PlatformBillingClient`, `PlatformIdentity`, `PlatformProductUsage`, `SharedBillingState`, `TcloudKeyClient`, `WorkspaceKeyIdentity`, `WorkspaceKeyManager`, `WorkspaceKeyManagerOptions`, `WorkspaceKeyProduct`, `WorkspaceKeyRecord`, `WorkspaceKeyStatus`, `WorkspaceKeyStore`, `WorkspaceKeyUsage`, `WorkspaceModelKeyUsage`, `WorkspaceRuntimeKey`
+`createIdentityBoundWorkspaceKeyManager`, `createPlatformBalanceManager`, `createTcloudKeyProvisioner`, `createWorkspaceKeyManager`, `DurableWorkspaceKeyConditionalWrites`, `DurableWorkspaceKeyCreateInput`, `DurableWorkspaceKeyManager`, `DurableWorkspaceKeyManagerOptions`, `DurableWorkspaceKeyProvisioner`, `DurableWorkspaceKeyProvisioningRecord`, `DurableWorkspaceKeyRecord`, `DurableWorkspaceKeyScope`, `DurableWorkspaceKeyStore`, `KeyCrypto`, `KeyProvisioner`, `PlanLimit`, `PlatformBalanceInfo`, `PlatformBalanceManager`, `PlatformBalanceManagerOptions`, `PlatformBillingClient`, `PlatformIdentity`, `PlatformProductUsage`, `SharedBillingState`, `TcloudKeyClient`, `WorkspaceKeyIdentity`, `WorkspaceKeyManager`, `WorkspaceKeyManagerOptions`, `WorkspaceKeyProduct`, `WorkspaceKeyRecord`, `WorkspaceKeyStatus`, `WorkspaceKeyStore`, `WorkspaceKeyUsage`, `WorkspaceModelKeyUsage`, `WorkspaceRuntimeKey`
 
 [Full API →](api/billing.md)
 
