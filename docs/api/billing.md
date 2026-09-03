@@ -4,7 +4,15 @@
 
 Source: `src/billing/index.ts`
 
-19 exports.
+32 exports.
+
+### `createIdentityBoundWorkspaceKeyManager`
+
+`function` — Create a product-neutral manager for child-key issuance and cleanup.
+
+```ts
+(options: DurableWorkspaceKeyManagerOptions) => DurableWorkspaceKeyManager
+```
 
 ### `createPlatformBalanceManager`
 
@@ -28,6 +36,62 @@ Source: `src/billing/index.ts`
 
 ```ts
 (opts: WorkspaceKeyManagerOptions) => WorkspaceKeyManager
+```
+
+### `DurableWorkspaceKeyManager`
+
+`interface` — Identity-bound durable key manager API.
+
+```ts
+interface DurableWorkspaceKeyManager
+```
+
+### `DurableWorkspaceKeyManagerOptions`
+
+`interface` — Configuration for {@link createIdentityBoundWorkspaceKeyManager}.
+
+```ts
+interface DurableWorkspaceKeyManagerOptions
+```
+
+### `DurableWorkspaceKeyProvisioner`
+
+`interface` — The remote operations required by the durable manager.
+
+```ts
+interface DurableWorkspaceKeyProvisioner
+```
+
+### `DurableWorkspaceKeyProvisioningRecord`
+
+`interface` — A row that has been written before its remote child key exists.
+
+```ts
+interface DurableWorkspaceKeyProvisioningRecord
+```
+
+### `DurableWorkspaceKeyRecord`
+
+`interface` — A persisted child-key row owned by this manager.
+
+```ts
+interface DurableWorkspaceKeyRecord
+```
+
+### `DurableWorkspaceKeyScope`
+
+`interface` — A product/workspace/owner lookup scope.
+
+```ts
+interface DurableWorkspaceKeyScope
+```
+
+### `DurableWorkspaceKeyStore`
+
+`interface` — Persistence operations for identity-bound key lifecycle state.
+
+```ts
+interface DurableWorkspaceKeyStore
 ```
 
 ### `KeyCrypto`
@@ -118,6 +182,14 @@ interface SharedBillingState
 interface TcloudKeyClient
 ```
 
+### `WorkspaceKeyIdentity`
+
+`interface` — The identity fields that bind a child key to its paying owner and source.
+
+```ts
+interface WorkspaceKeyIdentity
+```
+
 ### `WorkspaceKeyManager`
 
 `interface` — Manage workspace keys by ensuring, rotating, and tracking usage of active child-key secrets
@@ -134,12 +206,28 @@ interface WorkspaceKeyManager
 interface WorkspaceKeyManagerOptions
 ```
 
+### `WorkspaceKeyProduct`
+
+`type` — Product partition used by the key store and remote provisioner.
+
+```ts
+type WorkspaceKeyProduct
+```
+
 ### `WorkspaceKeyRecord`
 
 `interface` — A stored child-key record (the app's row, shape-normalized).
 
 ```ts
 interface WorkspaceKeyRecord
+```
+
+### `WorkspaceKeyStatus`
+
+`type` — Lifecycle state for a durable delegated key row.
+
+```ts
+type WorkspaceKeyStatus
 ```
 
 ### `WorkspaceKeyStore`
@@ -150,10 +238,26 @@ interface WorkspaceKeyRecord
 interface WorkspaceKeyStore
 ```
 
+### `WorkspaceKeyUsage`
+
+`interface` — Live budget information for a child key.
+
+```ts
+interface WorkspaceKeyUsage
+```
+
 ### `WorkspaceModelKeyUsage`
 
 `interface` — Describe usage and budget details for a workspace model key including expiration and exhaustion status
 
 ```ts
 interface WorkspaceModelKeyUsage
+```
+
+### `WorkspaceRuntimeKey`
+
+`interface` — The decrypted key plus the usage snapshot used to issue it.
+
+```ts
+interface WorkspaceRuntimeKey
 ```
