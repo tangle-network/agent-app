@@ -27,11 +27,11 @@ So:
   `box.streamPrompt('', { executionId, lastEventId })`: it replays strictly
   after the cursor and does not re-dispatch (measured over a SIGKILL: 0 lost,
   0 duplicated, 0 out-of-order, ids 1..517 contiguous). Still no buffer needed.
-- **DETACHED / autonomous run a browser must tail** — you DO need this module.
-  `dispatchPrompt({ detach: true })` and `driveTurn` call `streamPrompt`
-  internally, so the run never reaches the gateway and no SDK primitive can
-  show it to a tab. Use `runDetachedTurn` (`/chat-routes`) over a
-  `TurnEventStore`.
+- **DETACHED / autonomous run a browser must tail** — you DO need this module
+  for a run driven through `dispatchPrompt({ detach: true })` or `streamPrompt`.
+  Sandbox 0.37 `driveTurn` uses the message lane, so a browser can use the
+  session gateway instead. Use `runDetachedTurn` (`/chat-routes`) over a
+  `TurnEventStore` for the stream/dispatch paths.
 
 **This module has exactly two niches**: the SANDBOX-FREE path (a browser or
 edge copilot streaming the Tangle Router, or any OpenAI-compatible endpoint,
@@ -53,7 +53,7 @@ It is pure mechanism behind a storage seam — no peers. Storage is a
 | **Interactive sandbox turn, browser attaching** | **No** — drive it on the message lane (`box.session(id).sendMessage()`) and attach the tab with `box.mintScopedToken()` + `SessionGatewayClient`. The gateway delivered 297/297 frames on that lane. |
 | **Interactive sandbox turn, worker consumes it** | **No** — `box.streamPrompt()` + `box.streamPrompt('', { executionId, lastEventId })` resumes losslessly. (A gateway client sees nothing on this lane, so if a second viewer must watch, move the turn to the message lane rather than buffering it.) |
 | **Sandbox-free interactive turn** (browser/edge copilot on the Router directly) | **Yes** — there's no gateway; this is your resume mechanism. |
-| **Autonomous / detached turn a browser must tail** (mission, queue, cron, inbound email) | **Yes** — `dispatchPrompt({ detach: true })` and `driveTurn` run on the lane the gateway cannot see, so the buffer is the only live path. Use `runDetachedTurn` (`/chat-routes`), which does exactly that bridge. |
+| **Autonomous / detached turn a browser must tail** (mission, queue, cron, inbound email) | **Yes** for `dispatchPrompt({ detach: true })` / `streamPrompt`, whose run/stream lane is not visible on the measured gateway path. Sandbox 0.37 `driveTurn` uses the message lane, so attach through the session gateway instead. Use `runDetachedTurn` (`/chat-routes`) for stream/dispatch runs. |
 | **Autonomous turn nobody watches** | **No** — `box.driveTurn()` (agent-app's `driveSandboxTurn`) ticked from a durable driver, or raw `dispatchPrompt({ detach: true })` + poll. Nothing to stream. |
 | **Eval / CI** (long-lived process) | **No** — the harness is the consumer and outlives the run; a failed run is re-run, not resumed. |
 

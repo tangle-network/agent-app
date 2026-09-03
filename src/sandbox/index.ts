@@ -3538,8 +3538,9 @@ export async function driveSandboxTurn(
       ...(options.wallCapMs !== undefined ? { wallCapMs: options.wallCapMs } : {}),
       ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
       ...(options.signal ? { signal: options.signal } : {}),
-      // A durable caller with a session-gateway consumer can handle these events;
-      // callers without one should omit interactions so the run stays unattended.
+      // Sandbox 0.37 drives through the session message lane, so a gateway
+      // consumer can handle these events. Callers without one should omit
+      // interactions so the run stays unattended.
       backend: {
         type: harness,
         profile,
