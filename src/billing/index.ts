@@ -1,3 +1,5 @@
+import { assertWorkspaceKeyCryptoUsable } from './crypto-probe'
+
 /**
  * Per-workspace budget-capped model keys — app-owned billing, metered on Tangle.
  *
@@ -136,30 +138,6 @@ export interface WorkspaceKeyManager {
  *  boundary so a forgotten rotation fails closed rather than running free. */
 function nextPeriodEnd(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0))
-}
-
-/** A round-trip probe through the at-rest crypto seam (no platform key needed).
- *  Runs BEFORE minting so a consumer with a missing/invalid FIELD_ENCRYPTION_KEY
- *  fails loud with zero platform spend instead of orphaning a freshly minted key
- *  when encrypt later throws. The probe never touches the real secret. */
-async function assertCryptoUsable(crypto: KeyCrypto): Promise<void> {
-  const probe = 'agent-app:key-manager:crypto-probe'
-  let roundTripped: string
-  try {
-    roundTripped = await crypto.decrypt(await crypto.encrypt(probe))
-  } catch (err) {
-    throw new Error(
-      'Key encryption is misconfigured: the crypto seam threw before minting. ' +
-        'Validate FIELD_ENCRYPTION_KEY (64-char hex) at startup. No platform key was minted.',
-      { cause: err },
-    )
-  }
-  if (roundTripped !== probe) {
-    throw new Error(
-      'Key encryption is misconfigured: encrypt/decrypt round-trip did not preserve the plaintext. ' +
-        'No platform key was minted.',
-    )
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -362,7 +340,7 @@ export function createWorkspaceKeyManager(opts: WorkspaceKeyManagerOptions): Wor
     // that is empty/invalid and only throws at encrypt time — after the mint —
     // orphaning the child key. A round-trip probe makes a misconfigured consumer
     // fail loud with ZERO platform spend.
-    await assertCryptoUsable(opts.crypto)
+    await assertWorkspaceKeyCryptoUsable(opts.crypto)
 
     const expiresAt = nextPeriodEnd(now)
     const created = await opts.provisioner.createKey({ name: `ws:${workspaceId}`, product, budgetUsd, expiresAt: expiresAt.toISOString() })
@@ -420,3 +398,19 @@ export function createWorkspaceKeyManager(opts: WorkspaceKeyManagerOptions): Wor
 
   return { ensureKey, rotateKey, getUsage }
 }
+
+export {
+  createIdentityBoundWorkspaceKeyManager,
+  type DurableWorkspaceKeyManager,
+  type DurableWorkspaceKeyManagerOptions,
+  type DurableWorkspaceKeyProvisioner,
+  type DurableWorkspaceKeyProvisioningRecord,
+  type DurableWorkspaceKeyRecord,
+  type DurableWorkspaceKeyScope,
+  type DurableWorkspaceKeyStore,
+  type WorkspaceKeyIdentity,
+  type WorkspaceKeyProduct,
+  type WorkspaceKeyStatus,
+  type WorkspaceKeyUsage,
+  type WorkspaceRuntimeKey,
+} from './identity-bound'

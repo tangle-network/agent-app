@@ -762,6 +762,12 @@
       "error": null,
       "exports": [
         {
+          "name": "createIdentityBoundWorkspaceKeyManager",
+          "kind": "function",
+          "signature": "(options: DurableWorkspaceKeyManagerOptions) => DurableWorkspaceKeyManager",
+          "doc": "Create a product-neutral manager for child-key issuance and cleanup."
+        },
+        {
           "name": "createPlatformBalanceManager",
           "kind": "function",
           "signature": "<Plan extends string>(opts: PlatformBalanceManagerOptions<Plan>) => PlatformBalanceManager<Plan>",
@@ -778,6 +784,48 @@
           "kind": "function",
           "signature": "(opts: WorkspaceKeyManagerOptions) => WorkspaceKeyManager",
           "doc": "Create a workspace key manager that handles key provisioning and budget tracking"
+        },
+        {
+          "name": "DurableWorkspaceKeyManager",
+          "kind": "interface",
+          "signature": "interface DurableWorkspaceKeyManager",
+          "doc": "Identity-bound durable key manager API."
+        },
+        {
+          "name": "DurableWorkspaceKeyManagerOptions",
+          "kind": "interface",
+          "signature": "interface DurableWorkspaceKeyManagerOptions",
+          "doc": "Configuration for {@link createIdentityBoundWorkspaceKeyManager}."
+        },
+        {
+          "name": "DurableWorkspaceKeyProvisioner",
+          "kind": "interface",
+          "signature": "interface DurableWorkspaceKeyProvisioner",
+          "doc": "The remote operations required by the durable manager."
+        },
+        {
+          "name": "DurableWorkspaceKeyProvisioningRecord",
+          "kind": "interface",
+          "signature": "interface DurableWorkspaceKeyProvisioningRecord",
+          "doc": "A row that has been written before its remote child key exists."
+        },
+        {
+          "name": "DurableWorkspaceKeyRecord",
+          "kind": "interface",
+          "signature": "interface DurableWorkspaceKeyRecord",
+          "doc": "A persisted child-key row owned by this manager."
+        },
+        {
+          "name": "DurableWorkspaceKeyScope",
+          "kind": "interface",
+          "signature": "interface DurableWorkspaceKeyScope",
+          "doc": "A product/workspace/owner lookup scope."
+        },
+        {
+          "name": "DurableWorkspaceKeyStore",
+          "kind": "interface",
+          "signature": "interface DurableWorkspaceKeyStore",
+          "doc": "Persistence operations for identity-bound key lifecycle state."
         },
         {
           "name": "KeyCrypto",
@@ -846,6 +894,12 @@
           "doc": "The subset of the `@tangle-network/tcloud` `TCloudClient` the provisioner uses — declared with METHOD syntax so the real client (whose `product` is a narrow union and whose budgets are `number | null…"
         },
         {
+          "name": "WorkspaceKeyIdentity",
+          "kind": "interface",
+          "signature": "interface WorkspaceKeyIdentity",
+          "doc": "The identity fields that bind a child key to its paying owner and source."
+        },
+        {
           "name": "WorkspaceKeyManager",
           "kind": "interface",
           "signature": "interface WorkspaceKeyManager",
@@ -858,10 +912,22 @@
           "doc": "Define configuration options for managing workspace keys including provisioning, storage, and cryptography"
         },
         {
+          "name": "WorkspaceKeyProduct",
+          "kind": "type",
+          "signature": "type WorkspaceKeyProduct",
+          "doc": "Product partition used by the key store and remote provisioner."
+        },
+        {
           "name": "WorkspaceKeyRecord",
           "kind": "interface",
           "signature": "interface WorkspaceKeyRecord",
           "doc": "A stored child-key record (the app's row, shape-normalized)."
+        },
+        {
+          "name": "WorkspaceKeyStatus",
+          "kind": "type",
+          "signature": "type WorkspaceKeyStatus",
+          "doc": "Lifecycle state for a durable delegated key row."
         },
         {
           "name": "WorkspaceKeyStore",
@@ -870,10 +936,22 @@
           "doc": "Persistence seam — the product implements this against its own D1 table."
         },
         {
+          "name": "WorkspaceKeyUsage",
+          "kind": "interface",
+          "signature": "interface WorkspaceKeyUsage",
+          "doc": "Live budget information for a child key."
+        },
+        {
           "name": "WorkspaceModelKeyUsage",
           "kind": "interface",
           "signature": "interface WorkspaceModelKeyUsage",
           "doc": "Describe usage and budget details for a workspace model key including expiration and exhaustion status"
+        },
+        {
+          "name": "WorkspaceRuntimeKey",
+          "kind": "interface",
+          "signature": "interface WorkspaceRuntimeKey",
+          "doc": "The decrypted key plus the usage snapshot used to issue it."
         }
       ]
     },
