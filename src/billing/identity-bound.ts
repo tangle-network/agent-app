@@ -105,16 +105,24 @@ export interface DurableWorkspaceKeyStore {
   listProvisioning(scope: DurableWorkspaceKeyScope): Promise<DurableWorkspaceKeyProvisioningRecord[]>
   /** Insert before the remote create so a crashed create can be recovered. */
   insertProvisioning(record: DurableWorkspaceKeyProvisioningRecord): Promise<void>
-  /** Save the remote id only while the row remains in provisioning state. */
-  markProvisioningRemote(input: { id: string; keyId: string }): Promise<boolean>
-  /** Promote a fully encrypted row only from provisioning state. */
+  /**
+   * Save the remote id only while the row remains in provisioning state.
+   * Return false when the conditional update matched no provisioning row.
+   * Legacy stores may return undefined after a successful write.
+   */
+  markProvisioningRemote(input: { id: string; keyId: string }): Promise<boolean | void>
+  /**
+   * Promote a fully encrypted row only from provisioning state.
+   * Return false when the conditional update matched no provisioning row.
+   * Legacy stores may return undefined after a successful write.
+   */
   markActive(input: {
     id: string
     keyId: string
     keyEncrypted: string
     expiresAt: Date
     budgetUsd: number
-  }): Promise<boolean>
+  }): Promise<boolean | void>
   /** Keep a failed cleanup visible and schedule a later retry. Terminal rows are immutable. */
   markRevocationPending(input: {
     id: string
@@ -307,6 +315,10 @@ function isProvisioningId(value: string): boolean {
 function idempotencyKeyForRecord(row: Pick<DurableWorkspaceKeyRecord, 'id' | 'idempotencyKey'>): string {
   const value = row.idempotencyKey?.trim()
   return value || `workspace-key:${row.id}`
+}
+
+function lifecycleWriteSucceeded(result: boolean | void): boolean {
+  return result !== false
 }
 
 function usageFromRemote(
@@ -815,7 +827,9 @@ export function createIdentityBoundWorkspaceKeyManager(
 
     try {
       const recorded = await options.store.markProvisioningRemote({ id: rowId, keyId: remoteId })
-      if (!recorded) throw new Error('workspace child-key provisioning row was retired before the remote id was recorded')
+      if (!lifecycleWriteSucceeded(recorded)) {
+        throw new Error('workspace child-key provisioning row was retired before the remote id was recorded')
+      }
       const keyEncrypted = await options.crypto.encrypt(secret)
       const remoteExpiresAt = created.expiresAt?.trim()
       const activeExpiresAt = remoteExpiresAt ? new Date(remoteExpiresAt) : expiresAt
@@ -829,7 +843,9 @@ export function createIdentityBoundWorkspaceKeyManager(
         expiresAt: activeExpiresAt,
         budgetUsd: activeBudgetUsd,
       })
-      if (!activated) throw new Error('workspace child-key provisioning row was retired before activation')
+      if (!lifecycleWriteSucceeded(activated)) {
+        throw new Error('workspace child-key provisioning row was retired before activation')
+      }
     } catch (error) {
       // A persistence failure must not strand the already-created remote key.
       try {

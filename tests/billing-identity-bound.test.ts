@@ -284,6 +284,36 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     expect([...h.rows.values()].filter((row) => row.status === 'active')).toHaveLength(2)
   })
 
+  it('keeps legacy void lifecycle stores compatible', async () => {
+    const h = makeHarness()
+    const legacyStore: DurableWorkspaceKeyStore = {
+      ...h.store,
+      async markProvisioningRemote(input) {
+        await h.store.markProvisioningRemote(input)
+      },
+      async markActive(input) {
+        await h.store.markActive(input)
+      },
+    }
+    const manager = createIdentityBoundWorkspaceKeyManager({
+      store: legacyStore,
+      provisioner: h.provisioner,
+      crypto: {
+        async encrypt(value) { return `encrypted:${value}` },
+        async decrypt(value) { return value.slice('encrypted:'.length) },
+      },
+      product: 'router',
+      defaultBudgetUsd: 25,
+      now: () => new Date(START),
+    })
+
+    const result = await manager.ensureKey(h.identity())
+
+    expect(result.usage.keyId).toBe('remote-1')
+    expect([...h.rows.values()].find((row) => row.keyId === 'remote-1')?.status).toBe('active')
+    expect(h.remote.get('remote-1')?.revoked).toBe(false)
+  })
+
   it('uses the durable lease across manager instances', async () => {
     const h = makeHarness()
     h.setCreateDelay(25)
