@@ -41,8 +41,8 @@ export interface DurableWorkspaceKeyRecord {
   sourceKeyFingerprint: string
   /** The persisted name used to recover a remote create after a crash. Null only for pre-name rows. */
   name: string | null
-  /** The persisted retry identity for the remote create. Null only for pre-identity rows. */
-  idempotencyKey: string | null
+  /** The persisted retry identity for the remote create. Missing on rows written before 0.46.55. */
+  idempotencyKey?: string | null
   keyId: string
   keyEncrypted: string
   budgetUsd: number

@@ -415,9 +415,10 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     expect(result.usage.keyId).toBe('remote-2')
   })
 
-  it('recovers a legacy empty row when the probe returns no remote id', async () => {
+  it('recovers a legacy empty row without a persisted retry identity', async () => {
     const h = makeHarness()
-    const row = h.insertProvisioning({ idempotencyKey: null })
+    const row = h.insertProvisioning()
+    delete row.idempotencyKey
     h.setReturnMissingId(true)
 
     const result = await h.manager('router').ensureKey(h.identity())
