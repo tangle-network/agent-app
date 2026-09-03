@@ -97,6 +97,7 @@
     "src/vault/server.ts",
     "src/web-react/async/index.ts",
     "src/web-react/index.tsx",
+    "src/web-react/session-gateway.ts",
     "src/web-react/terminal.ts",
     "src/web/index.ts",
     "src/work-product-react/index.tsx",
