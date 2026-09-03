@@ -2777,7 +2777,7 @@ export interface StreamSandboxPromptOptions {
   // session init loudly for unsupported ones; a local matrix would drift. Honored on
   // both streaming and driveTurn paths.
   interactions?: { question?: boolean; permission?: boolean; plan?: boolean }
-  // Detach the run from THIS stream's lifetime. When true, the helper admits the
+  // Streaming helper only: detach the run from THIS stream's lifetime. When true, the helper admits the
   // run through `dispatchPrompt`, then reads its exact execution through the
   // SDK replay stream. A Worker restart or browser refresh therefore cannot
   // cancel the server-side run. Reuse `sessionId` + `executionId` + `turnId` on
@@ -3469,15 +3469,16 @@ export interface DriveSandboxTurnOptions extends StreamSandboxPromptOptions {
    * starting a second agent run. */
   sessionId: string
   /** Wall-clock cap in ms from the session's start. A still-running session past
-   * the cap is cancelled and reported `failed` — bounds an unattended run (e.g. a
-   * turn that stalled on an interactive question nothing will answer). Omit for no cap. */
+   * the cap is cancelled and reported `failed` — bounds an unattended run, such as
+   * a turn stalled on an interactive question with no consumer. Omit for no cap. */
   wallCapMs?: number
 }
 
 // One settle → poll → dispatch pass over a detached turn. Delegates to the SDK's
-// `box.driveTurn` (@tangle-network/sandbox ≥ 0.10.5) — the turn runs
-// fire-and-detached server-side and ONE invocation returns immediately with where
-// it stands. It never awaits the whole turn in-process, so it does not hold the
+// `box.driveTurn` (@tangle-network/sandbox ≥ 0.10.5). Sandbox 0.37 admits the
+// turn through the session message lane, so a SessionGateway consumer can observe it.
+// The turn runs fire-and-detached server-side. ONE invocation returns its current
+// state immediately. It never awaits the whole turn in-process, so it does not hold the
 // worker alive for the run's duration (the durability trap the older box.prompt
 // implementation quietly caused).
 //
@@ -3538,8 +3539,9 @@ export async function driveSandboxTurn(
       ...(options.wallCapMs !== undefined ? { wallCapMs: options.wallCapMs } : {}),
       ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
       ...(options.signal ? { signal: options.signal } : {}),
-      // A durable caller with a session-gateway consumer can handle these events;
-      // callers without one should omit interactions so the run stays unattended.
+      // Sandbox 0.37 drives through the session message lane, so a gateway
+      // consumer can handle these events. Callers without one should omit
+      // interactions so the run stays unattended.
       backend: {
         type: harness,
         profile,
