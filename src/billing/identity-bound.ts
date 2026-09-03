@@ -106,7 +106,7 @@ export interface DurableWorkspaceKeyStore {
   /** Insert before the remote create so a crashed create can be recovered. */
   insertProvisioning(record: DurableWorkspaceKeyProvisioningRecord): Promise<void>
   /** Save the remote id only while the row remains in provisioning state. */
-  markProvisioningRemote(input: { id: string; keyId: string }): Promise<void>
+  markProvisioningRemote(input: { id: string; keyId: string }): Promise<boolean>
   /** Promote a fully encrypted row only from provisioning state. */
   markActive(input: {
     id: string
@@ -114,7 +114,7 @@ export interface DurableWorkspaceKeyStore {
     keyEncrypted: string
     expiresAt: Date
     budgetUsd: number
-  }): Promise<void>
+  }): Promise<boolean>
   /** Keep a failed cleanup visible and schedule a later retry. Terminal rows are immutable. */
   markRevocationPending(input: {
     id: string
@@ -168,8 +168,15 @@ export interface DurableWorkspaceKeyManager {
   ensureKey(identity: WorkspaceKeyIdentity, options?: { budgetUsd?: number }): Promise<WorkspaceRuntimeKey>
   /** Read usage without returning the child secret. */
   getUsage(identity: WorkspaceKeyIdentity): Promise<WorkspaceKeyUsage | null>
-  /** Retry due cleanup rows. A supplied owner/workspace limits the retry to its scope. */
-  retryPendingRevocations(scope?: Pick<WorkspaceKeyIdentity, 'ownerUserId' | 'workspaceId'>): Promise<number>
+  /**
+   * Retry due cleanup rows. A supplied owner/workspace limits the retry to its
+   * scope. Empty provisioning rows also require the full identity so a retry
+   * can use the original source binding safely.
+   */
+  retryPendingRevocations(
+    scope?: Pick<WorkspaceKeyIdentity, 'ownerUserId' | 'workspaceId'>,
+    identity?: WorkspaceKeyIdentity,
+  ): Promise<number>
 }
 
 /** Configuration for {@link createIdentityBoundWorkspaceKeyManager}. */
@@ -648,14 +655,29 @@ export function createIdentityBoundWorkspaceKeyManager(
     }
   }
 
-  async function retryPendingRevocations(scopeInput?: Pick<WorkspaceKeyIdentity, 'ownerUserId' | 'workspaceId'>): Promise<number> {
+  async function retryPendingRevocations(
+    scopeInput?: Pick<WorkspaceKeyIdentity, 'ownerUserId' | 'workspaceId'>,
+    identityInput?: WorkspaceKeyIdentity,
+  ): Promise<number> {
+    const identity = identityInput ? normalizeIdentity(identityInput) : undefined
+    if (identity && scopeInput
+      && (identity.workspaceId !== scopeInput.workspaceId || identity.ownerUserId !== scopeInput.ownerUserId)) {
+      throw new Error('workspace child key retry identity does not match its scope')
+    }
+    const activeIdentity = identity
     if (scopeInput) {
       const workspaceId = scopeInput.workspaceId.trim()
       const ownerUserId = scopeInput.ownerUserId.trim()
       if (!workspaceId || !ownerUserId) throw new Error('workspace child key retry scope is incomplete')
       const scope = scopeKey({ workspaceId, ownerUserId, product })
       return withLocalLock(scope, () => withDurableLease(scope, async () => (
-        await retryPendingRevocationsUnlocked({ workspaceId, ownerUserId })).completed))
+        await retryPendingRevocationsUnlocked({ workspaceId, ownerUserId }, activeIdentity)).completed))
+    }
+
+    if (identity) {
+      const scope = scopeKey(scopeFor(identity, product))
+      return withLocalLock(scope, () => withDurableLease(scope, async () => (
+        await retryPendingRevocationsUnlocked({ workspaceId: identity.workspaceId, ownerUserId: identity.ownerUserId }, identity)).completed))
     }
 
     const rows = await options.store.listPendingRevocations({ product, now: now(), limit: PENDING_REVOCATION_BATCH_SIZE })
@@ -792,20 +814,22 @@ export function createIdentityBoundWorkspaceKeyManager(
     onRemoteKey?.(provisioningRow, remoteId)
 
     try {
-      await options.store.markProvisioningRemote({ id: rowId, keyId: remoteId })
+      const recorded = await options.store.markProvisioningRemote({ id: rowId, keyId: remoteId })
+      if (!recorded) throw new Error('workspace child-key provisioning row was retired before the remote id was recorded')
       const keyEncrypted = await options.crypto.encrypt(secret)
       const remoteExpiresAt = created.expiresAt?.trim()
       const activeExpiresAt = remoteExpiresAt ? new Date(remoteExpiresAt) : expiresAt
       if (!Number.isFinite(activeExpiresAt.getTime())) throw new Error('remote child key expiry is malformed')
       const activeBudgetUsd = created.budgetUsd ?? budgetUsd
       if (!Number.isFinite(activeBudgetUsd) || activeBudgetUsd < 0) throw new Error('remote child key budget is malformed')
-      await options.store.markActive({
+      const activated = await options.store.markActive({
         id: rowId,
         keyId: remoteId,
         keyEncrypted,
         expiresAt: activeExpiresAt,
         budgetUsd: activeBudgetUsd,
       })
+      if (!activated) throw new Error('workspace child-key provisioning row was retired before activation')
     } catch (error) {
       // A persistence failure must not strand the already-created remote key.
       try {

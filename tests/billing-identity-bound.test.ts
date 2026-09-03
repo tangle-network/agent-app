@@ -71,18 +71,20 @@ function makeHarness() {
     async markProvisioningRemote(input) {
       const row = rows.get(input.id)
       if (!row) throw new Error(`unknown row ${input.id}`)
-      if (row.status !== 'provisioning') return
+      if (row.status !== 'provisioning') return false
       row.keyId = input.keyId
+      return true
     },
     async markActive(input) {
       const row = rows.get(input.id)
       if (!row) throw new Error(`unknown row ${input.id}`)
-      if (row.status !== 'provisioning') return
+      if (row.status !== 'provisioning') return false
       row.keyId = input.keyId
       row.keyEncrypted = input.keyEncrypted
       row.expiresAt = input.expiresAt
       row.budgetUsd = input.budgetUsd
       row.status = 'active'
+      return true
     },
     async markRevocationPending(input) {
       if (failMarkPending) throw new Error('state store unavailable')
@@ -361,6 +363,19 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     expect(h.remote.get('remote-1')?.revoked).toBe(true)
     expect(row.status).toBe('revoked')
     expect(result.usage.keyId).toBe('remote-2')
+  })
+
+  it('retries an empty pending row when the caller supplies its full identity', async () => {
+    const h = makeHarness()
+    const row = h.insertProvisioning()
+    h.rows.set(row.id, { ...row, status: 'revocation_pending', nextRevocationAt: new Date(START) })
+
+    expect(await h.manager('router').retryPendingRevocations({
+      workspaceId: 'workspace-1',
+      ownerUserId: 'owner-1',
+    }, h.identity())).toBe(1)
+    expect(h.rows.get(row.id)?.status).toBe('revoked')
+    expect(h.remote.get('remote-1')?.revoked).toBe(true)
   })
 
   it('keeps a source-mismatched empty provisioning row pending instead of orphaning it', async () => {
@@ -642,7 +657,7 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     expect(row).toBeDefined()
     row!.status = 'revoked'
 
-    await expect(inFlight).rejects.toThrow('not persisted as active')
+    await expect(inFlight).rejects.toThrow('retired before the remote id was recorded')
     expect([...h.rows.values()].some((candidate) => candidate.status === 'active')).toBe(false)
     expect([...h.remote.values()][0]?.revoked).toBe(true)
   })
