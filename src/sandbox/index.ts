@@ -3535,6 +3535,7 @@ export async function driveSandboxTurn(
   try {
     const drive = await box.driveTurn(prompt, {
       sessionId: options.sessionId,
+      ...(options.executionId ? { executionId: options.executionId } : {}),
       ...(options.turnId ? { turnId: options.turnId } : {}),
       ...(options.wallCapMs !== undefined ? { wallCapMs: options.wallCapMs } : {}),
       ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
