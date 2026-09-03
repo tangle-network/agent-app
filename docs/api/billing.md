@@ -4,7 +4,7 @@
 
 Source: `src/billing/index.ts`
 
-32 exports.
+33 exports.
 
 ### `createIdentityBoundWorkspaceKeyManager`
 
@@ -36,6 +36,14 @@ Source: `src/billing/index.ts`
 
 ```ts
 (opts: WorkspaceKeyManagerOptions) => WorkspaceKeyManager
+```
+
+### `DurableWorkspaceKeyCreateInput`
+
+`interface` — The exact request identity that must be reused when recovering a create.
+
+```ts
+interface DurableWorkspaceKeyCreateInput
 ```
 
 ### `DurableWorkspaceKeyManager`

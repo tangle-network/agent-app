@@ -786,6 +786,12 @@
           "doc": "Create a workspace key manager that handles key provisioning and budget tracking"
         },
         {
+          "name": "DurableWorkspaceKeyCreateInput",
+          "kind": "interface",
+          "signature": "interface DurableWorkspaceKeyCreateInput",
+          "doc": "The exact request identity that must be reused when recovering a create."
+        },
+        {
           "name": "DurableWorkspaceKeyManager",
           "kind": "interface",
           "signature": "interface DurableWorkspaceKeyManager",

@@ -1012,6 +1012,14 @@ Source: `src/billing/index.ts`
 (opts: WorkspaceKeyManagerOptions) => WorkspaceKeyManager
 ```
 
+### `DurableWorkspaceKeyCreateInput`
+
+`interface` — The exact request identity that must be reused when recovering a create.
+
+```ts
+interface DurableWorkspaceKeyCreateInput
+```
+
 ### `DurableWorkspaceKeyManager`
 
 `interface` — Identity-bound durable key manager API.
