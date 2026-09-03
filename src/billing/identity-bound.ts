@@ -97,6 +97,20 @@ export interface DurableWorkspaceKeyProvisioner {
   }): Promise<Array<{ id: string }>>
 }
 
+/** Optional compare-and-set lifecycle writes for stores that support fencing. */
+export interface DurableWorkspaceKeyConditionalWrites {
+  /** Return false when the row was no longer provisioning. */
+  markProvisioningRemote(input: { id: string; keyId: string }): Promise<boolean>
+  /** Return false when the row was no longer provisioning. */
+  markActive(input: {
+    id: string
+    keyId: string
+    keyEncrypted: string
+    expiresAt: Date
+    budgetUsd: number
+  }): Promise<boolean>
+}
+
 /** Persistence operations for identity-bound key lifecycle state. */
 export interface DurableWorkspaceKeyStore {
   /** Return the active row for this exact product scope. */
@@ -105,24 +119,21 @@ export interface DurableWorkspaceKeyStore {
   listProvisioning(scope: DurableWorkspaceKeyScope): Promise<DurableWorkspaceKeyProvisioningRecord[]>
   /** Insert before the remote create so a crashed create can be recovered. */
   insertProvisioning(record: DurableWorkspaceKeyProvisioningRecord): Promise<void>
-  /**
-   * Save the remote id only while the row remains in provisioning state.
-   * Return false when the conditional update matched no provisioning row.
-   * Legacy stores may return undefined after a successful write.
-   */
-  markProvisioningRemote(input: { id: string; keyId: string }): Promise<boolean | void>
-  /**
-   * Promote a fully encrypted row only from provisioning state.
-   * Return false when the conditional update matched no provisioning row.
-   * Legacy stores may return undefined after a successful write.
-   */
+  /** Save the remote id while the row remains in provisioning state. */
+  markProvisioningRemote(input: { id: string; keyId: string }): Promise<void>
+  /** Promote a fully encrypted row to active state. */
   markActive(input: {
     id: string
     keyId: string
     keyEncrypted: string
     expiresAt: Date
     budgetUsd: number
-  }): Promise<boolean | void>
+  }): Promise<void>
+  /**
+   * Optional fenced writes. The manager uses false to compensate a stale
+   * creator. Stores without this field retain the pre-fence behavior.
+   */
+  conditionalWrites?: DurableWorkspaceKeyConditionalWrites
   /** Keep a failed cleanup visible and schedule a later retry. Terminal rows are immutable. */
   markRevocationPending(input: {
     id: string
@@ -317,8 +328,28 @@ function idempotencyKeyForRecord(row: Pick<DurableWorkspaceKeyRecord, 'id' | 'id
   return value || `workspace-key:${row.id}`
 }
 
-function lifecycleWriteSucceeded(result: boolean | void): boolean {
-  return result !== false
+async function markProvisioningRemote(
+  store: DurableWorkspaceKeyStore,
+  input: { id: string; keyId: string },
+): Promise<boolean> {
+  if (store.conditionalWrites) return store.conditionalWrites.markProvisioningRemote(input)
+  await store.markProvisioningRemote(input)
+  return true
+}
+
+async function markActive(
+  store: DurableWorkspaceKeyStore,
+  input: {
+    id: string
+    keyId: string
+    keyEncrypted: string
+    expiresAt: Date
+    budgetUsd: number
+  },
+): Promise<boolean> {
+  if (store.conditionalWrites) return store.conditionalWrites.markActive(input)
+  await store.markActive(input)
+  return true
 }
 
 function usageFromRemote(
@@ -808,7 +839,7 @@ export function createIdentityBoundWorkspaceKeyManager(
     if (!remoteId || !secret) {
       if (remoteId) {
         try {
-          await options.store.markProvisioningRemote({ id: rowId, keyId: remoteId })
+          await markProvisioningRemote(options.store, { id: rowId, keyId: remoteId })
         } catch {
           // revokePending uses the returned id even when this state write fails.
         }
@@ -826,8 +857,8 @@ export function createIdentityBoundWorkspaceKeyManager(
     onRemoteKey?.(provisioningRow, remoteId)
 
     try {
-      const recorded = await options.store.markProvisioningRemote({ id: rowId, keyId: remoteId })
-      if (!lifecycleWriteSucceeded(recorded)) {
+      const recorded = await markProvisioningRemote(options.store, { id: rowId, keyId: remoteId })
+      if (!recorded) {
         throw new Error('workspace child-key provisioning row was retired before the remote id was recorded')
       }
       const keyEncrypted = await options.crypto.encrypt(secret)
@@ -836,14 +867,14 @@ export function createIdentityBoundWorkspaceKeyManager(
       if (!Number.isFinite(activeExpiresAt.getTime())) throw new Error('remote child key expiry is malformed')
       const activeBudgetUsd = created.budgetUsd ?? budgetUsd
       if (!Number.isFinite(activeBudgetUsd) || activeBudgetUsd < 0) throw new Error('remote child key budget is malformed')
-      const activated = await options.store.markActive({
+      const activated = await markActive(options.store, {
         id: rowId,
         keyId: remoteId,
         keyEncrypted,
         expiresAt: activeExpiresAt,
         budgetUsd: activeBudgetUsd,
       })
-      if (!lifecycleWriteSucceeded(activated)) {
+      if (!activated) {
         throw new Error('workspace child-key provisioning row was retired before activation')
       }
     } catch (error) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   createIdentityBoundWorkspaceKeyManager,
+  type DurableWorkspaceKeyConditionalWrites,
   type DurableWorkspaceKeyManager,
   type DurableWorkspaceKeyProvisioner,
   type DurableWorkspaceKeyRecord,
@@ -49,6 +50,35 @@ function makeHarness() {
   let createStartedResolve: (() => void) | null = null
   const createInputs: Array<{ name: string; product: string; budgetUsd: number; expiresAt: string; idempotencyKey: string }> = []
 
+  const markProvisioningRemote = async (input: { id: string; keyId: string }): Promise<boolean> => {
+    const row = rows.get(input.id)
+    if (!row) throw new Error(`unknown row ${input.id}`)
+    if (row.status !== 'provisioning') return false
+    row.keyId = input.keyId
+    return true
+  }
+  const markActive = async (input: {
+    id: string
+    keyId: string
+    keyEncrypted: string
+    expiresAt: Date
+    budgetUsd: number
+  }): Promise<boolean> => {
+    const row = rows.get(input.id)
+    if (!row) throw new Error(`unknown row ${input.id}`)
+    if (row.status !== 'provisioning') return false
+    row.keyId = input.keyId
+    row.keyEncrypted = input.keyEncrypted
+    row.expiresAt = input.expiresAt
+    row.budgetUsd = input.budgetUsd
+    row.status = 'active'
+    return true
+  }
+  const conditionalWrites: DurableWorkspaceKeyConditionalWrites = {
+    markProvisioningRemote,
+    markActive,
+  }
+
   const store: DurableWorkspaceKeyStore = {
     async getActive(scope) {
       return [...rows.values()]
@@ -69,23 +99,12 @@ function makeHarness() {
       rows.set(record.id, { ...record })
     },
     async markProvisioningRemote(input) {
-      const row = rows.get(input.id)
-      if (!row) throw new Error(`unknown row ${input.id}`)
-      if (row.status !== 'provisioning') return false
-      row.keyId = input.keyId
-      return true
+      await markProvisioningRemote(input)
     },
     async markActive(input) {
-      const row = rows.get(input.id)
-      if (!row) throw new Error(`unknown row ${input.id}`)
-      if (row.status !== 'provisioning') return false
-      row.keyId = input.keyId
-      row.keyEncrypted = input.keyEncrypted
-      row.expiresAt = input.expiresAt
-      row.budgetUsd = input.budgetUsd
-      row.status = 'active'
-      return true
+      await markActive(input)
     },
+    conditionalWrites,
     async markRevocationPending(input) {
       if (failMarkPending) throw new Error('state store unavailable')
       const row = rows.get(input.id)
@@ -286,8 +305,9 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
 
   it('keeps legacy void lifecycle stores compatible', async () => {
     const h = makeHarness()
+    const { conditionalWrites: _conditionalWrites, ...legacyMethods } = h.store
     const legacyStore: DurableWorkspaceKeyStore = {
-      ...h.store,
+      ...legacyMethods,
       async markProvisioningRemote(input) {
         await h.store.markProvisioningRemote(input)
       },

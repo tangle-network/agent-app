@@ -4,7 +4,7 @@
 
 Source: `src/billing/index.ts`
 
-33 exports.
+34 exports.
 
 ### `createIdentityBoundWorkspaceKeyManager`
 
@@ -36,6 +36,14 @@ Source: `src/billing/index.ts`
 
 ```ts
 (opts: WorkspaceKeyManagerOptions) => WorkspaceKeyManager
+```
+
+### `DurableWorkspaceKeyConditionalWrites`
+
+`interface` — Optional compare-and-set lifecycle writes for stores that support fencing.
+
+```ts
+interface DurableWorkspaceKeyConditionalWrites
 ```
 
 ### `DurableWorkspaceKeyCreateInput`
