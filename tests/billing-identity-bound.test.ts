@@ -427,6 +427,7 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
       name: row.name,
       idempotencyKey: `workspace-key:${row.id}`,
     })
+    expect(inputs[1]?.idempotencyKey).not.toBe(inputs[0]?.idempotencyKey)
     expect(h.remote.get('orphan-1')?.revoked).toBe(true)
     expect(h.rows.get(row.id)?.status).toBe('revoked')
     expect(result.usage.keyId).toBe('remote-2')
