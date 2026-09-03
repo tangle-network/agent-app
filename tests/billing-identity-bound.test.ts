@@ -415,6 +415,23 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     expect(result.usage.keyId).toBe('remote-2')
   })
 
+  it('recovers a legacy empty row when the probe returns no remote id', async () => {
+    const h = makeHarness()
+    const row = h.insertProvisioning({ idempotencyKey: null })
+    h.setReturnMissingId(true)
+
+    const result = await h.manager('router').ensureKey(h.identity())
+    const inputs = h.getCreateInputs()
+
+    expect(inputs[0]).toMatchObject({
+      name: row.name,
+      idempotencyKey: `workspace-key:${row.id}`,
+    })
+    expect(h.remote.get('orphan-1')?.revoked).toBe(true)
+    expect(h.rows.get(row.id)?.status).toBe('revoked')
+    expect(result.usage.keyId).toBe('remote-2')
+  })
+
   it('retries an empty pending row when the caller supplies its full identity', async () => {
     const h = makeHarness()
     const row = h.insertProvisioning()
