@@ -36,10 +36,10 @@ pnpm add @tangle-network/agent-eval @tangle-network/agent-integrations
 | Peer | Required by | Range |
 |---|---|---|
 | `@tangle-network/agent-eval` | `/eval`, `/eval-campaign`, `/profile`, `/knowledge` | `>=0.172.1 <0.174.0` |
-| `@tangle-network/agent-runtime` | `/runtime`, `/chat-routes` | `>=0.188.1 <0.192.0` |
+| `@tangle-network/agent-runtime` | `/runtime`, `/chat-routes` | `>=0.191.0 <0.193.0` |
 | `@tangle-network/agent-integrations` | `/integrations` | `>=0.53.55 <0.54.0` |
 | `@tangle-network/agent-interface` | `/interactions`, `/chat-store`, `/harness` | `^2.2.0` |
-| `@tangle-network/sandbox` | `/sandbox` | `>=0.36.3 <0.37.0` |
+| `@tangle-network/sandbox` | `/sandbox` | `>=0.36.4 <0.38.0` |
 | `@tangle-network/agent-knowledge` | `/knowledge-loop` | `^13.0.0` |
 | `@tangle-network/agent-profile-materialize` | `/skills-placement` | `>=0.18.1 <0.20.0` |
 | `@tangle-network/sandbox-ui` | `/brand`, `/work-product-react`, `/workspace-react` | `>=0.111.2 <0.114.0` |
