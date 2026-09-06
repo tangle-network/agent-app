@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_97 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_98 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -99,6 +99,7 @@ _97 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./web`](api/web.md) | 32 | — |
 | [`./web-react`](api/web-react.md) | 423 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./web-react/async`](api/web-react-async.md) | 35 | — |
+| [`./web-react/session-gateway`](api/web-react-session-gateway.md) | 22 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./web-react/terminal`](api/web-react-terminal.md) | 6 | `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product` |
 | [`./work-product`](api/work-product.md) | 90 | `eval-campaign`, `tools` |
 | [`./work-product-react`](api/work-product-react.md) | 3 | `web-react`, `work-product` |
@@ -935,6 +936,16 @@ Source: `src/web-react/async/index.ts` · 35 exports
 `AsyncEmptyAction`, `AsyncEmptySpec`, `asyncErrorMessage`, `AsyncErrorRenderProps`, `AsyncLoadContext`, `AsyncRequestError`, `AsyncResolution`, `AsyncResourceState`, `AsyncResourceStatus`, `AsyncRetryable`, `AsyncView`, `AsyncViewProps`, `CONFIRMED_WRITE`, `ConfirmedMutation`, `confirmJson`, `confirmResponse`, `confirmWrite`, `DEFAULT_ASYNC_ERROR_MESSAGE`, `defaultIsEmpty`, `isConfirmedWrite`, `MutationConfirmed`, `MutationOutcome`, `MutationRejected`, `MutationState`, `MutationStatus`, `MutationStatusLabels`, `MutationStatusProps`, `readOkJson`, `rejectWrite`, `requireOk`, `resolveAsyncValue`, `useAsyncResource`, `UseAsyncResourceOptions`, `useConfirmedMutation`, `UseConfirmedMutationOptions`
 
 [Full API →](api/web-react-async.md)
+
+## `./web-react/session-gateway`
+
+Source: `src/web-react/session-gateway.ts` · 22 exports
+
+Depends on: `brand`, `chat-routes`, `chat-store`, `harness`, `interactions`, `missions`, `plans`, `platform`, `runtime`, `session-shell`, `trace`, `work-product`
+
+`APPLIED_SEQ_CAP`, `createSessionGatewayLane`, `createSessionStreamGrantFetcher`, `GATEWAY_TERMINAL_EVENT_TYPES`, `GATEWAY_TRANSPORT_NOTICE_TYPES`, `gatewayFrameToTurnEvent`, `GatewayTurnEvent`, `isGatewayTransportNotice`, `isTerminalGatewayEvent`, `parseSessionStreamGrant`, `ReplayCursorStorage`, `SessionGatewayClientConfigLike`, `SessionGatewayClientFactory`, `SessionGatewayClientLike`, `SessionGatewayLaneOptions`, `SessionGatewayLiveViewAttachment`, `SessionGatewayLiveViewConnector`, `SessionGatewayLiveViewHandlers`, `SessionGrantUnavailableReason`, `SessionStreamGrant`, `SessionStreamGrantFetcherOptions`, `SessionStreamGrantResponse`
+
+[Full API →](api/web-react-session-gateway.md)
 
 ## `./web-react/terminal`
 
