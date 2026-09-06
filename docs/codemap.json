@@ -20346,6 +20346,159 @@
       ]
     },
     {
+      "id": "./web-react/session-gateway",
+      "source": "src/web-react/session-gateway.ts",
+      "dependsOn": [
+        "brand",
+        "chat-routes",
+        "chat-store",
+        "harness",
+        "interactions",
+        "missions",
+        "plans",
+        "platform",
+        "runtime",
+        "session-shell",
+        "trace",
+        "work-product"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "APPLIED_SEQ_CAP",
+          "kind": "const",
+          "signature": "100000",
+          "doc": "Default bound on applied sequence ids retained by one attachment."
+        },
+        {
+          "name": "createSessionGatewayLane",
+          "kind": "function",
+          "signature": "(options: SessionGatewayLaneOptions) => SessionGatewayLiveViewConnector",
+          "doc": "Build a browser-direct Sandbox live-view connector."
+        },
+        {
+          "name": "createSessionStreamGrantFetcher",
+          "kind": "function",
+          "signature": "(options: SessionStreamGrantFetcherOptions) => (signal: AbortSignal) => Promise<SessionStreamGrant | null>",
+          "doc": "Build a grant fetcher that never throws."
+        },
+        {
+          "name": "GATEWAY_TERMINAL_EVENT_TYPES",
+          "kind": "const",
+          "signature": "ReadonlySet<string>",
+          "doc": "Event types that terminate a Sandbox execution."
+        },
+        {
+          "name": "GATEWAY_TRANSPORT_NOTICE_TYPES",
+          "kind": "const",
+          "signature": "ReadonlySet<string>",
+          "doc": "Gateway bookkeeping events that are not turn feedback."
+        },
+        {
+          "name": "gatewayFrameToTurnEvent",
+          "kind": "function",
+          "signature": "(raw: unknown) => GatewayTurnEvent | null",
+          "doc": "Decode one raw `onAgentEvent` payload into the event shape a turn reducer consumes."
+        },
+        {
+          "name": "GatewayTurnEvent",
+          "kind": "interface",
+          "signature": "interface GatewayTurnEvent",
+          "doc": "A decoded event from the raw Sandbox gateway payload."
+        },
+        {
+          "name": "isGatewayTransportNotice",
+          "kind": "function",
+          "signature": "(type: string) => boolean",
+          "doc": "Report whether a decoded event is gateway bookkeeping."
+        },
+        {
+          "name": "isTerminalGatewayEvent",
+          "kind": "function",
+          "signature": "(type: string) => boolean",
+          "doc": "Report whether a decoded event ends the execution."
+        },
+        {
+          "name": "parseSessionStreamGrant",
+          "kind": "function",
+          "signature": "(body: unknown) => SessionStreamGrant | null",
+          "doc": "Parse a grant response."
+        },
+        {
+          "name": "ReplayCursorStorage",
+          "kind": "interface",
+          "signature": "interface ReplayCursorStorage",
+          "doc": "Structural replay storage accepted by the SDK client."
+        },
+        {
+          "name": "SessionGatewayClientConfigLike",
+          "kind": "interface",
+          "signature": "interface SessionGatewayClientConfigLike",
+          "doc": "Subset of the SDK client configuration used by this adapter."
+        },
+        {
+          "name": "SessionGatewayClientFactory",
+          "kind": "type",
+          "signature": "type SessionGatewayClientFactory",
+          "doc": "Injectable SDK-client constructor, used for tests and alternate transports."
+        },
+        {
+          "name": "SessionGatewayClientLike",
+          "kind": "interface",
+          "signature": "interface SessionGatewayClientLike",
+          "doc": "Minimal structural surface of the SDK session gateway client."
+        },
+        {
+          "name": "SessionGatewayLaneOptions",
+          "kind": "interface",
+          "signature": "interface SessionGatewayLaneOptions",
+          "doc": "Options for {@link createSessionGatewayLane}."
+        },
+        {
+          "name": "SessionGatewayLiveViewAttachment",
+          "kind": "interface",
+          "signature": "interface SessionGatewayLiveViewAttachment",
+          "doc": "A handle that stops one gateway attachment."
+        },
+        {
+          "name": "SessionGatewayLiveViewConnector",
+          "kind": "type",
+          "signature": "type SessionGatewayLiveViewConnector",
+          "doc": "Structural connector returned by {@link createSessionGatewayLane}."
+        },
+        {
+          "name": "SessionGatewayLiveViewHandlers",
+          "kind": "interface",
+          "signature": "interface SessionGatewayLiveViewHandlers",
+          "doc": "Callbacks driven by one live gateway attachment."
+        },
+        {
+          "name": "SessionGrantUnavailableReason",
+          "kind": "type",
+          "signature": "type SessionGrantUnavailableReason",
+          "doc": "Common soft-miss reasons a product grant route may report."
+        },
+        {
+          "name": "SessionStreamGrant",
+          "kind": "interface",
+          "signature": "interface SessionStreamGrant",
+          "doc": "A short-lived, read-only grant for one session's gateway stream."
+        },
+        {
+          "name": "SessionStreamGrantFetcherOptions",
+          "kind": "interface",
+          "signature": "interface SessionStreamGrantFetcherOptions",
+          "doc": "Options for a product-owned grant fetcher."
+        },
+        {
+          "name": "SessionStreamGrantResponse",
+          "kind": "type",
+          "signature": "type SessionStreamGrantResponse",
+          "doc": "The grant endpoint response accepted by {@link parseSessionStreamGrant}."
+        }
+      ]
+    },
+    {
       "id": "./web-react/terminal",
       "source": "src/web-react/terminal.ts",
       "dependsOn": [
