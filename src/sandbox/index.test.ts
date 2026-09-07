@@ -2766,6 +2766,39 @@ describe('deferred profile files', () => {
     ...(executable !== undefined ? { executable } : {}),
   })
 
+  it.each([
+    ['stream', true], ['stream', false], ['stream', undefined],
+    ['drive', true], ['drive', false], ['drive', undefined],
+  ] as const)('%s honors deferred-file ownership when enabled=%s', async (lane, deferProfileFiles) => {
+    const files: AgentProfileFileMount[] = [
+      inlineMount('/home/agent/doctrine/PROCESS.md', 'Managed instructions'),
+      { path: 'reference.md', resource: { kind: 'github', repository: 'example/docs', path: 'reference.md' } },
+    ]
+    const profile: AgentProfile = {
+      name: 'owned-files',
+      resources: { files, failOnError: true, skills: [{ kind: 'inline', name: 'kept-skill', content: '# Skill' }] },
+    }
+    const config = shellFor(null, { deferProfileFiles, profile: () => profile })
+    const streamPrompt = vi.fn().mockReturnValue((async function* () { yield { type: 'text', text: 'done' } })())
+    const driveTurn = vi.fn().mockResolvedValue({ state: 'completed', text: 'done' })
+    const onProfileResolved = vi.fn()
+    const box = fakeBox({ streamPrompt, driveTurn })
+    if (lane === 'stream') {
+      for await (const _ of streamSandboxPrompt(config, box, 'go', { onProfileResolved })) void _
+    } else {
+      expect(await driveSandboxTurn(config, box, 'go', { sessionId: 'session-1' })).toMatchObject({ succeeded: true })
+    }
+    const sent = (lane === 'stream' ? streamPrompt : driveTurn).mock.calls[0]![1].backend.profile
+    const expectedFiles = deferProfileFiles ? files.slice(1) : files
+    expect(sent.resources).toEqual({ ...profile.resources, files: expectedFiles })
+    expect(profile.resources?.files).toEqual(files)
+    if (lane === 'stream') {
+      expect(onProfileResolved).toHaveBeenCalledWith(expect.objectContaining({
+        fileMountPaths: expectedFiles.map((file) => file.path).sort(),
+      }))
+    }
+  })
+
   async function withShellBackedProfileWriter<T>(
     failAfterSuccessfulCalls: Set<number>,
     run: (ctx: { box: SandboxInstance; cwd: string; exec: ReturnType<typeof vi.fn> }) => Promise<T>,

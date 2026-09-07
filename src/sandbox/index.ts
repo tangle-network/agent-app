@@ -515,7 +515,7 @@ export interface SandboxRuntimeConfig {
   // Only `kind: 'inline'` files are deferred; non-inline refs (e.g. github)
   // stay in the create payload so the orchestrator resolves them. Runs on the
   // create AND resume/reuse paths (idempotent overwrite). Inline files are
-  // STRIPPED from `resources.files` before create when this is set.
+  // Removed from create and per-turn profiles; the deferred writer owns them.
   deferProfileFiles?: boolean
   // Byte budget on the system prompt of the profile this shell actually SENDS
   // (provision + every turn). Defaults to the same 40 KB cap
@@ -3095,7 +3095,9 @@ export async function* streamSandboxPrompt(
   const appToolMcp = options?.appToolMcp ?? {}
   const extraMcp = mergeExtraMcp(appToolMcp, options?.baseProfileMcp ?? {}, options?.extraMcp)
 
-  const profile = shell.profile({ systemPrompt: options?.systemPrompt, extraMcp, harness })
+  const fullProfile = shell.profile({ systemPrompt: options?.systemPrompt, extraMcp, harness })
+  // Deferred inline files already have an app-owned writer; do not rematerialize them per turn.
+  const profile = shell.deferProfileFiles ? splitDeferredProfileFiles(fullProfile).leanProfile : fullProfile
   const profileWithLimits = applyPromptTokenLimits(
     attachReasoningEffort(profile, harness, options?.effort),
     {
@@ -3516,8 +3518,10 @@ export async function driveSandboxTurn(
       : mergeHistoryIntoParts(message, options.history)
   const appToolMcp = options.appToolMcp ?? {}
   const extraMcp = mergeExtraMcp(appToolMcp, options.baseProfileMcp ?? {}, options.extraMcp)
+  const fullProfile = shell.profile({ systemPrompt: options.systemPrompt, extraMcp, harness })
+  const executionProfile = shell.deferProfileFiles ? splitDeferredProfileFiles(fullProfile).leanProfile : fullProfile
   const profile = attachReasoningEffort(
-    shell.profile({ systemPrompt: options.systemPrompt, extraMcp, harness }),
+    executionProfile,
     harness,
     options.effort,
   )
