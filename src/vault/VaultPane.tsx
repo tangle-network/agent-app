@@ -862,6 +862,7 @@ export function VaultPane(props: VaultPaneProps) {
               message={readError}
               retryLabel="Retry file refresh"
               onRetry={() => setReloadNonce((n) => n + 1)}
+              onDismiss={() => setReadError(null)}
             />
           )}
           <div className="flex-1 overflow-hidden">
