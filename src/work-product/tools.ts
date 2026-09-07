@@ -60,7 +60,8 @@ export const EVIDENCE_COVERAGE_CHECK = 'evidence_coverage'
  *  trusting that a quote was checked. */
 export const QUOTE_VERIFICATION_CHECK = 'quote_verification'
 
-/** Platform check: how many quoted evidence entries anchor to text that
+/** Numeric-only platform check, omitted when no entries are checkable.
+ *  Reports how many quoted evidence entries anchor to text that
  *  actually CARRIES the figure the entry claims. Distinct from
  *  `quote_verification`, which only proves the text came from the document —
  *  production row `7256ef49` passed that one on all four entries while
@@ -934,19 +935,14 @@ export function buildWorkProductTools(config: WorkProductToolConfig): AppToolDef
       // least able to catch by eye, because it looks exactly like a good one.
       if (config.verifyClaimSupport !== false) {
         const support = summarizeClaimSupport(draft.evidence)
-        checks.unshift({
+        if (support.checkable > 0) checks.unshift({
           id: CLAIM_SUPPORT_CHECK,
-          name: CLAIM_SUPPORT_CHECK,
+          name: 'Cited numeric values',
           passed: support.unsupported.length === 0,
           detail:
             support.unsupported.length > 0
               ? `Cited text does not contain the claimed figure on: ${support.unsupported.join(', ')}`
-              : support.checkable === 0
-                ? // Honest about a vacuous pass: no entry paired a quote with a
-                  // figure, so nothing was checked. Reporting "0/0 verified"
-                  // would read to a reviewer as assurance that was never earned.
-                  'No citation pairs a quote with a claimed figure — nothing to check'
-                : `${support.supported}/${support.checkable} value-bearing citations anchor to text containing the claimed figure`,
+              : `${support.supported}/${support.checkable} value-bearing citations anchor to text containing the claimed figure; does not verify prose claims`,
           source: 'platform',
         })
         if (support.unsupported.length > 0) {
@@ -1056,7 +1052,7 @@ export function buildWorkProductTools(config: WorkProductToolConfig): AppToolDef
               ? `Missing evidence for: ${missing.join(', ')}`
               : config.requireAnchoredEvidence && unanchored.length > 0
                 ? `No source anchor for: ${unanchored.join(', ')}`
-                : `${targets.length}/${targets.length} material targets evidenced (${breakdown})`,
+              : `${targets.length}/${targets.length} material targets evidenced (${breakdown}); checks declared evidence links, does not verify prose claims or artifact completeness`,
           source: 'platform',
         }
         checks.unshift(coverage)
@@ -1086,7 +1082,7 @@ export function buildWorkProductTools(config: WorkProductToolConfig): AppToolDef
         workProductId: record.id,
         version: record.version,
         status: record.status,
-        checks: record.checks.map((check) => ({ name: check.name, passed: check.passed, source: check.source })),
+        checks: record.checks.map((check) => ({ name: check.name, passed: check.passed, source: check.source, detail: check.detail })),
       }
     },
   })

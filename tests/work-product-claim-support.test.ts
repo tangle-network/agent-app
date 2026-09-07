@@ -264,6 +264,31 @@ describe('verifyClaimSupport', () => {
 // ── the production defect, end to end through the tool ──────────────────────
 
 describe('row 7256ef49 replayed through upsert_evidence', () => {
+  it('does not certify a causal prose claim from a genuine hiring quote', async () => {
+    const { dispatch, store } = harness({
+      artifactKinds: ['outreach_draft'],
+      resolveSourceRef: async () => true,
+      readSourceText: async () => 'Account Executive: build pipeline from zero.',
+      materialTargets: (artifact) => Object.keys(artifact.fields ?? {}),
+    })
+    expect((await dispatch('upsert_evidence', {
+      scopeKey: SCOPE,
+      entries: [{ id: 'vacancy-pain', sourceRef: 'hiring.md', target: 'buyer.pain',
+        claim: 'Pipeline work is going undone every week.', locator: { quote: 'build pipeline from zero' } }],
+    })).ok).toBe(true)
+    const result = await dispatch('submit_work_product', {
+      scopeKey: SCOPE,
+      artifact: { kind: 'outreach_draft', title: 'First touch', fields: { 'buyer.pain': 'Pipeline work is going undone every week.' } },
+    })
+    expect(result.ok).toBe(true)
+    const checks = (await onlyRecord(store)).checks
+    expect(checks.some((check) => check.id === 'claim_support')).toBe(false)
+    expect(checks.find((check) => check.id === 'evidence_coverage')?.detail).toContain('does not verify prose claims')
+    expect(result).toMatchObject({ result: { checks: expect.arrayContaining([
+      expect.objectContaining({ detail: expect.stringContaining('does not verify prose claims') }),
+    ]) } })
+  })
+
   it('BEFORE: all four span citations resolve, and all four are now refused', async () => {
     const { dispatch, store } = harness()
     const refusals: Record<string, string> = {}
@@ -459,7 +484,8 @@ describe('submit_work_product re-checks claim support', () => {
     expect(result.ok).toBe(true)
     const check = (await onlyRecord(store)).checks.find((entry) => entry.id === 'claim_support')
     expect(check?.passed).toBe(true)
-    expect(check?.detail).toBe('4/4 value-bearing citations anchor to text containing the claimed figure')
+    expect(check?.name).toBe('Cited numeric values')
+    expect(check?.detail).toBe('4/4 value-bearing citations anchor to text containing the claimed figure; does not verify prose claims')
   })
 })
 

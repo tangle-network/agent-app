@@ -211,15 +211,11 @@ describe('work-product tools — the three-registry side channel', () => {
     expect(outcome.ok, JSON.stringify(outcome)).toBe(true)
     if (!outcome.ok) return
     expect(outcome.result).toMatchObject({ status: 'ready', version: 1 })
-    expect((outcome.result as { checks: unknown[] }).checks).toEqual([
+    expect((outcome.result as { checks: unknown[] }).checks).toMatchObject([
       { name: 'evidence_coverage', passed: true, source: 'platform' },
       // Nothing here claims a figure the artifact also states, so agreement
       // has nothing to compare — recorded as such, not as a passing count.
       { name: 'artifact_agreement', passed: true, source: 'platform' },
-      // These entries carry no quote, so no citation pairs text with a figure
-      // and the claim-support check has nothing to verify — recorded as such
-      // rather than as a passing count that was never earned.
-      { name: 'claim_support', passed: true, source: 'platform' },
       { name: 'totals_reconcile', passed: true, source: 'agent' },
     ])
     expect(ready).toHaveLength(1)

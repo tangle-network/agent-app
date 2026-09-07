@@ -397,7 +397,7 @@ describe('submit_work_product — what the recorded checks say', () => {
     const record = await onlyRecord(store)
     const coverage = record.checks.find((check) => check.name === 'evidence_coverage')!
     expect(coverage.passed).toBe(true)
-    expect(coverage.detail).toBe('2/2 material targets evidenced (1 span-anchored, 1 quote-verified, 0 claim-only)')
+    expect(coverage.detail).toBe('2/2 material targets evidenced (1 span-anchored, 1 quote-verified, 0 claim-only); checks declared evidence links, does not verify prose claims or artifact completeness')
     const quotes = record.checks.find((check) => check.name === 'quote_verification')!
     expect(quotes.passed).toBe(true)
     expect(quotes.detail).toContain('2/2 quoted evidence entries verified')
@@ -420,7 +420,7 @@ describe('submit_work_product — what the recorded checks say', () => {
     expect(outcome.ok).toBe(true)
     const record = await onlyRecord(store)
     const coverage = record.checks.find((check) => check.name === 'evidence_coverage')!
-    expect(coverage.detail).toBe('2/2 material targets evidenced (1 span-anchored, 0 quote-verified, 1 claim-only)')
+    expect(coverage.detail).toBe('2/2 material targets evidenced (1 span-anchored, 0 quote-verified, 1 claim-only); checks declared evidence links, does not verify prose claims or artifact completeness')
   })
 
   it('refuses a bare assertion when the product requires source anchors', async () => {
