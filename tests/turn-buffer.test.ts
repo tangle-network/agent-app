@@ -253,6 +253,32 @@ describe('pumpBufferedTurn + replayTurnEvents', () => {
     expect(tail.filter((r) => r.seq > 0).map((r) => r.seq)).toEqual(dataRows.slice(2).map((r) => r.seq))
   })
 
+  it.each(['complete', 'error'] as const)('drains final events committed between the batch read and %s status', async (status) => {
+    const store = createMemoryTurnEventStore()
+    await store.setStatus('terminal-race', 'running')
+    const initial = { seq: 1, event: JSON.stringify(text('partial')) }
+    const finalText = { seq: 2, event: JSON.stringify(text(' final')) }
+    const terminal = { seq: 3, event: JSON.stringify({ type: status === 'complete' ? 'session.run.completed' : 'session.run.failed' }) }
+    await store.append('terminal-race', [initial])
+    const read = store.read.bind(store)
+    let firstRead = true
+    store.read = async (turnId, fromSeq) => {
+      const batch = await read(turnId, fromSeq)
+      if (firstRead) {
+        firstRead = false
+        await store.append(turnId, [finalText, terminal])
+        await store.setStatus(turnId, status)
+      }
+      return batch
+    }
+
+    const rows = await collect(replayTurnEvents({ store, turnId: 'terminal-race' }))
+    expect(rows).toEqual([
+      initial, finalText, terminal,
+      { seq: -1, event: JSON.stringify({ type: 'turn_status', status }) },
+    ])
+  })
+
   it('follows a still-running turn until it completes', async () => {
     const store = createMemoryTurnEventStore()
     await store.setStatus('t4', 'running')

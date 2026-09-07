@@ -363,6 +363,8 @@ export async function* replayTurnEvents(opts: ReplayTurnEventsOptions): AsyncGen
     }
     const status = await opts.store.getStatus(opts.turnId)
     if (status !== 'running') {
+      // Writers flush before publishing terminal status; include rows committed after the first read.
+      yield* await opts.store.read(opts.turnId, cursor)
       yield { seq: -1, event: JSON.stringify({ type: 'turn_status', status: status ?? 'unknown' }) }
       return
     }
