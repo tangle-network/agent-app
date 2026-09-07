@@ -880,3 +880,126 @@ describe('VaultPane — folder clicks', () => {
     )
   })
 })
+
+describe('VaultPane — background refresh continuity', () => {
+  it('keeps the tree and document mounted and reads once after the refreshed listing', async () => {
+    let finishTree!: (tree: VaultTreeNode[]) => void
+    let finishRead!: (file: VaultFile) => void
+    const port = fakePort()
+    const view = (key: number) => createElement(VaultPane, { port, renderTree, renderArtifact, codec: fmCodec, canWrite: true, refreshKey: key })
+    const { rerender } = render(view(0))
+    await openFile('a.md')
+    const artifact = screen.getByTestId('artifact')
+    const tree = screen.getByTestId('tree')
+    const reads = vi.mocked(port.readFile).mock.calls.length
+    vi.mocked(port.listTree).mockImplementationOnce(() => new Promise((resolve) => { finishTree = resolve }))
+    vi.mocked(port.readFile).mockImplementationOnce(() => new Promise((resolve) => { finishRead = resolve }))
+    rerender(view(1))
+    await waitFor(() => expect(finishTree).toBeDefined())
+    expect(screen.getByTestId('tree')).toBe(tree)
+    expect(screen.getByTestId('artifact')).toBe(artifact)
+    expect(port.readFile).toHaveBeenCalledTimes(reads)
+    await act(async () => finishTree(TREE))
+    await waitFor(() => expect(finishRead).toBeDefined())
+    expect(screen.getByTestId('artifact')).toBe(artifact)
+    await act(async () => finishRead({ path: 'a.md', content: '---\ntitle: A\n---\nbody A' }))
+    expect(screen.getByTestId('artifact')).toBe(artifact)
+    expect(port.readFile).toHaveBeenCalledTimes(reads + 1)
+  })
+
+  it('preserves fresh source edits when an in-flight refresh finishes', async () => {
+    let finishRead!: (file: VaultFile) => void
+    const port = fakePort()
+    const view = (key: number) => createElement(VaultPane, { port, renderTree, renderArtifact, codec: fmCodec, canWrite: true, refreshKey: key })
+    const { rerender } = render(view(0))
+    await openFile('a.md')
+    fireEvent.click(screen.getByLabelText('Edit as source'))
+    vi.mocked(port.readFile).mockImplementation(() => new Promise((resolve) => { finishRead = resolve }))
+    rerender(view(1))
+    await waitFor(() => expect(finishRead).toBeDefined())
+    const editor = screen.getByRole('textbox', { name: 'Source editor' })
+    fireEvent.change(editor, { target: { value: 'my unsaved work' } })
+    await act(async () => finishRead({ path: 'a.md', content: 'new agent version' }))
+    expect(screen.getByRole('textbox', { name: 'Source editor' })).toBe(editor)
+    expect((editor as HTMLTextAreaElement).value).toBe('my unsaved work')
+  })
+})
+
+describe('VaultPane — refresh races', () => {
+  it('ignores an older listing that finishes after the latest refresh', async () => {
+    let finishOld!: (tree: VaultTreeNode[]) => void
+    const port = fakePort()
+    const view = (key: number) => createElement(VaultPane, { port, renderTree, renderArtifact, refreshKey: key })
+    const { rerender } = render(view(0))
+    await openFile('a.md')
+    vi.mocked(port.listTree).mockImplementationOnce(() => new Promise((resolve) => { finishOld = resolve }))
+    rerender(view(1))
+    await waitFor(() => expect(finishOld).toBeDefined())
+    rerender(view(2))
+    await waitFor(() => expect(port.listTree).toHaveBeenCalledTimes(3))
+    await act(async () => finishOld([]))
+    expect(screen.getByTestId('tree-a.md')).toBeTruthy()
+    expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('a.md')
+  })
+
+  it('keeps loading explicit for a new selection and ignores the prior file response', async () => {
+    let finishA!: (file: VaultFile) => void
+    let finishB!: (file: VaultFile) => void
+    const port = fakePort()
+    const view = (key: number) => createElement(VaultPane, { port, renderTree, renderArtifact, refreshKey: key })
+    const { rerender } = render(view(0))
+    await openFile('a.md')
+    vi.mocked(port.readFile).mockImplementation((path) => new Promise((resolve) => {
+      if (path === 'a.md') finishA = resolve
+      else finishB = resolve
+    }))
+    rerender(view(1))
+    await waitFor(() => expect(finishA).toBeDefined())
+    fireEvent.click(screen.getByTestId('tree-b.md'))
+    await waitFor(() => expect(finishB).toBeDefined())
+    expect(screen.queryByTestId('artifact')).toBeNull()
+    await act(async () => finishB({ path: 'b.md', content: 'B current' }))
+    await act(async () => finishA({ path: 'a.md', content: 'A late' }))
+    expect(screen.getByTestId('artifact').textContent).toBe('B current')
+  })
+
+  it('discloses a failed background read while preserving the loaded document', async () => {
+    const port = fakePort()
+    const view = (key: number) => createElement(VaultPane, { port, renderTree, renderArtifact, refreshKey: key })
+    const { rerender } = render(view(0))
+    await openFile('a.md')
+    vi.mocked(port.readFile).mockRejectedValueOnce(new Error('refresh read failed'))
+    rerender(view(1))
+    await waitFor(() => expect(screen.getByText('refresh read failed')).toBeTruthy())
+    expect(screen.getByTestId('artifact').getAttribute('data-path')).toBe('a.md')
+    fireEvent.click(screen.getByRole('button', { name: 'Retry file refresh' }))
+    await waitFor(() => expect(screen.queryByText('refresh read failed')).toBeNull())
+  })
+})
+
+it('coalesces a refresh with a pending save into one read after both settle', async () => {
+  let finishTree!: (tree: VaultTreeNode[]) => void
+  let finishSave!: () => void
+  let saved = '---\ntitle: A\n---\nbody A'
+  const port = fakePort({
+    readFile: vi.fn(async (path) => ({ path, content: saved })),
+    writeFile: vi.fn((_path, content) => new Promise<void>((resolve) => {
+      finishSave = () => { saved = content; resolve() }
+    })),
+  })
+  const view = (key: number) => createElement(VaultPane, { port, renderTree, renderArtifact, codec: fmCodec, refreshKey: key })
+  const { rerender } = render(view(0))
+  await openFile('a.md')
+  const reads = vi.mocked(port.readFile).mock.calls.length
+  fireEvent.click(screen.getByLabelText('Edit as source'))
+  await typeSource('saved new draft')
+  fireEvent.click(screen.getByRole('button', { name: /^Save/ }))
+  vi.mocked(port.listTree).mockImplementationOnce(() => new Promise((resolve) => { finishTree = resolve }))
+  rerender(view(1))
+  await waitFor(() => expect(finishTree).toBeDefined())
+  await act(async () => finishTree(TREE))
+  expect(port.readFile).toHaveBeenCalledTimes(reads)
+  await act(async () => finishSave())
+  await waitFor(() => expect(port.readFile).toHaveBeenCalledTimes(reads + 1))
+  expect((screen.getByRole('textbox', { name: 'Source editor' }) as HTMLTextAreaElement).value).toBe('saved new draft')
+})
