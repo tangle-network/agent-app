@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { agentProfileSchema } from '@tangle-network/agent-interface'
+import { materializeProfile } from '@tangle-network/agent-profile-materialize'
 
 const execFileAsync = promisify(execFile)
 
@@ -1059,7 +1060,7 @@ describe('streamSandboxPrompt seam', () => {
       apiKey: 'router-key',
       baseUrl: 'https://router',
     })
-    expect(opts.backend.profile.extensions.opencode.reasoningEffort).toBe('high')
+    expect(opts.backend.profile.model.reasoningEffort).toBe('high')
     expect(opts.requireVisibleAssistantOutput).toBe(true)
   })
 
@@ -1567,11 +1568,30 @@ describe('pure seam helpers', () => {
     'attachReasoningEffort preserves the canonical %s level',
     (effort) => {
       expect(
-        attachReasoningEffort(PROFILE, 'opencode', effort).extensions?.opencode
-          ?.reasoningEffort,
+        attachReasoningEffort(PROFILE, 'opencode', effort).model?.reasoningEffort,
       ).toBe(effort)
     },
   )
+
+  it.each(['none', 'high'] as const)('materializes explicit %s effort through the OpenCode boundary', (effort) => {
+    const profile: AgentProfile = { model: { provider: 'openai-compat', default: 'gpt-5.6-sol', reasoningEffort: 'low' } }
+    const selected = attachReasoningEffort(profile, 'opencode', effort)
+    expect(selected.model).toEqual({ ...profile.model, reasoningEffort: effort })
+    expect(selected.extensions).toBeUndefined()
+    expect(profile.model?.reasoningEffort).toBe('low')
+    expect(materializeProfile(selected, 'opencode').unsupported).toEqual([])
+  })
+
+  it('preserves unrelated native extensions and their materializer rejection', () => {
+    const profile: AgentProfile = { name: 'native', extensions: { opencode: { unsupportedNativeSetting: true } } }
+    const selected = attachReasoningEffort(profile, 'opencode', 'none')
+    expect(selected.extensions).toEqual(profile.extensions)
+    expect(selected.name).toBe('native')
+    expect(materializeProfile(selected, 'opencode').unsupported).toContainEqual({
+      dimension: 'extensions',
+      reason: 'opencode: extension namespace "opencode" requires provider-native handling',
+    })
+  })
 
   it('resolveModel precedence: explicit override beats env defaults', () => {
     const m = resolveModel(

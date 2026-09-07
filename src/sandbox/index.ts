@@ -2649,21 +2649,18 @@ export function mergeExtraMcp(
   return { ...appToolMcp, ...(extra ?? {}) }
 }
 
-/** Attach a specified reasoning effort level to an agent profile for a given harness */
+/** Attach explicit effort through the portable model contract consumed by providers. */
 export function attachReasoningEffort(
   profile: AgentProfile,
-  harness: Harness,
+  _harness: Harness,
   effort: 'auto' | ReasoningEffort | undefined,
 ): AgentProfile {
   if (!effort || effort === 'auto') return profile
   return {
     ...profile,
-    extensions: {
-      ...(profile.extensions ?? {}),
-      [harness]: {
-        ...(profile.extensions?.[harness] ?? {}),
-        reasoningEffort: effort,
-      },
+    model: {
+      ...profile.model,
+      reasoningEffort: effort,
     },
   }
 }
