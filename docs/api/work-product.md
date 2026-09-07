@@ -2,6 +2,11 @@
 
 # `./work-product`
 
+Platform checks verify declared evidence links, quoted source text when configured, and numeric values.
+They do not verify prose claims or the completeness of an artifact's declared fields.
+The numeric check is omitted when no citation contains a checkable figure.
+Tool results retain each check's detail so callers can see its scope.
+
 Source: `src/work-product/index.ts`
 
 90 exports.
