@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { agentProfileSchema } from '@tangle-network/agent-interface'
+import { materializeProfile } from '@tangle-network/agent-profile-materialize'
 
 const execFileAsync = promisify(execFile)
 
@@ -1059,7 +1060,7 @@ describe('streamSandboxPrompt seam', () => {
       apiKey: 'router-key',
       baseUrl: 'https://router',
     })
-    expect(opts.backend.profile.extensions.opencode.reasoningEffort).toBe('high')
+    expect(opts.backend.profile.model.reasoningEffort).toBe('high')
     expect(opts.requireVisibleAssistantOutput).toBe(true)
   })
 
@@ -1567,11 +1568,30 @@ describe('pure seam helpers', () => {
     'attachReasoningEffort preserves the canonical %s level',
     (effort) => {
       expect(
-        attachReasoningEffort(PROFILE, 'opencode', effort).extensions?.opencode
-          ?.reasoningEffort,
+        attachReasoningEffort(PROFILE, 'opencode', effort).model?.reasoningEffort,
       ).toBe(effort)
     },
   )
+
+  it.each(['none', 'high'] as const)('materializes explicit %s effort through the OpenCode boundary', (effort) => {
+    const profile: AgentProfile = { model: { provider: 'openai-compat', default: 'gpt-5.6-sol', reasoningEffort: 'low' } }
+    const selected = attachReasoningEffort(profile, 'opencode', effort)
+    expect(selected.model).toEqual({ ...profile.model, reasoningEffort: effort })
+    expect(selected.extensions).toBeUndefined()
+    expect(profile.model?.reasoningEffort).toBe('low')
+    expect(materializeProfile(selected, 'opencode').unsupported).toEqual([])
+  })
+
+  it('preserves unrelated native extensions and their materializer rejection', () => {
+    const profile: AgentProfile = { name: 'native', extensions: { opencode: { unsupportedNativeSetting: true } } }
+    const selected = attachReasoningEffort(profile, 'opencode', 'none')
+    expect(selected.extensions).toEqual(profile.extensions)
+    expect(selected.name).toBe('native')
+    expect(materializeProfile(selected, 'opencode').unsupported).toContainEqual({
+      dimension: 'extensions',
+      reason: 'opencode: extension namespace "opencode" requires provider-native handling',
+    })
+  })
 
   it('resolveModel precedence: explicit override beats env defaults', () => {
     const m = resolveModel(
@@ -2744,6 +2764,39 @@ describe('deferred profile files', () => {
     path,
     resource: { kind: 'inline', name: path, content },
     ...(executable !== undefined ? { executable } : {}),
+  })
+
+  it.each([
+    ['stream', true], ['stream', false], ['stream', undefined],
+    ['drive', true], ['drive', false], ['drive', undefined],
+  ] as const)('%s honors deferred-file ownership when enabled=%s', async (lane, deferProfileFiles) => {
+    const files: AgentProfileFileMount[] = [
+      inlineMount('/home/agent/doctrine/PROCESS.md', 'Managed instructions'),
+      { path: 'reference.md', resource: { kind: 'github', repository: 'example/docs', path: 'reference.md' } },
+    ]
+    const profile: AgentProfile = {
+      name: 'owned-files',
+      resources: { files, failOnError: true, skills: [{ kind: 'inline', name: 'kept-skill', content: '# Skill' }] },
+    }
+    const config = shellFor(null, { deferProfileFiles, profile: () => profile })
+    const streamPrompt = vi.fn().mockReturnValue((async function* () { yield { type: 'text', text: 'done' } })())
+    const driveTurn = vi.fn().mockResolvedValue({ state: 'completed', text: 'done' })
+    const onProfileResolved = vi.fn()
+    const box = fakeBox({ streamPrompt, driveTurn })
+    if (lane === 'stream') {
+      for await (const _ of streamSandboxPrompt(config, box, 'go', { onProfileResolved })) void _
+    } else {
+      expect(await driveSandboxTurn(config, box, 'go', { sessionId: 'session-1' })).toMatchObject({ succeeded: true })
+    }
+    const sent = (lane === 'stream' ? streamPrompt : driveTurn).mock.calls[0]![1].backend.profile
+    const expectedFiles = deferProfileFiles ? files.slice(1) : files
+    expect(sent.resources).toEqual({ ...profile.resources, files: expectedFiles })
+    expect(profile.resources?.files).toEqual(files)
+    if (lane === 'stream') {
+      expect(onProfileResolved).toHaveBeenCalledWith(expect.objectContaining({
+        fileMountPaths: expectedFiles.map((file) => file.path).sort(),
+      }))
+    }
   })
 
   async function withShellBackedProfileWriter<T>(

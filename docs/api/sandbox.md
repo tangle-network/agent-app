@@ -56,10 +56,10 @@ interface AppToolDescriptor
 
 ### `attachReasoningEffort`
 
-`function` — Attach a specified reasoning effort level to an agent profile for a given harness
+`function` — Attach explicit effort through the portable model contract consumed by providers.
 
 ```ts
-(profile: AgentProfile, harness: Harness, effort: "auto" | "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "…
+(profile: AgentProfile, _harness: Harness, effort: "auto" | "none" | "minimal" | "low" | "medium" | "high" | "xhigh" |…
 ```
 
 ### `buildAppToolMcpServers`

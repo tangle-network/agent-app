@@ -10263,8 +10263,8 @@
         {
           "name": "attachReasoningEffort",
           "kind": "function",
-          "signature": "(profile: AgentProfile, harness: Harness, effort: \"auto\" | \"none\" | \"minimal\" | \"low\" | \"medium\" | \"high\" | \"xhigh\" | \"…",
-          "doc": "Attach a specified reasoning effort level to an agent profile for a given harness"
+          "signature": "(profile: AgentProfile, _harness: Harness, effort: \"auto\" | \"none\" | \"minimal\" | \"low\" | \"medium\" | \"high\" | \"xhigh\" |…",
+          "doc": "Attach explicit effort through the portable model contract consumed by providers."
         },
         {
           "name": "buildAppToolMcpServers",

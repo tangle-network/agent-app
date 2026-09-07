@@ -33,6 +33,10 @@ in agent-app. Note the one deliberate asymmetry: the assistant dock composer
 renders a **bare `ModelPicker`** by design — the assistant wire has no harness
 field, so no harness or effort control belongs there.
 
+Explicit effort selections travel in `AgentProfile.model.reasoningEffort`.
+`attachReasoningEffort` preserves other model hints and leaves Auto or omitted selections unchanged.
+Harness extensions remain reserved for native controls that their provider explicitly handles.
+
 ## Freshness ordering
 
 `ModelPicker` sorts the live catalog by provider and release generation before it renders any section.
