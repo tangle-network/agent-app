@@ -350,6 +350,9 @@ export function VaultPane(props: VaultPaneProps) {
   const [query, setQuery] = useState('')
   const [folderPath, setFolderPath] = useState<string | null>(null)
 
+  const dirtyRef = useRef(isDirty)
+  dirtyRef.current = isDirty
+  const treeRequestRef = useRef(0)
   const savedContentRef = useRef('')
   const loadedPathRef = useRef<string | null>(null)
   const onOperationErrorRef = useRef(onOperationError)
@@ -419,13 +422,17 @@ export function VaultPane(props: VaultPaneProps) {
   }, [])
 
   const refresh = useCallback(async (context: TreeRefreshContext = LIST_CONTEXT): Promise<boolean> => {
+    const request = ++treeRequestRef.current
     setTreeLoading(true)
     setTreeError(null)
     try {
-      setTree(await port.listTree())
+      const nextTree = await port.listTree()
+      if (request !== treeRequestRef.current) return false
+      setTree(nextTree)
       setTreeLoaded(true)
       return true
     } catch (error) {
+      if (request !== treeRequestRef.current) return false
       const failure = reportFailure(
         context.operation,
         context.phase,
@@ -436,7 +443,7 @@ export function VaultPane(props: VaultPaneProps) {
       setTreeError({ failure, context })
       return false
     } finally {
-      setTreeLoading(false)
+      if (request === treeRequestRef.current) setTreeLoading(false)
     }
   }, [port, reportFailure])
 
@@ -444,10 +451,12 @@ export function VaultPane(props: VaultPaneProps) {
     setTree([])
     setTreeLoaded(false)
     setTreeError(null)
+    setSelectedFile(null)
   }, [port])
 
   useEffect(() => {
     void refresh()
+    return () => { treeRequestRef.current += 1 }
   }, [refresh, refreshKey])
 
   const retryTree = useCallback(async () => {
@@ -465,7 +474,7 @@ export function VaultPane(props: VaultPaneProps) {
       loadedPathRef.current = null
       return
     }
-    if (treeLoading || !treeLoaded) return
+    if (treeLoading || !treeLoaded || isDirty || saving) return
     if (!resolvedSelectedPath) {
       commitPath(null)
       setSelectedFile(null)
@@ -482,13 +491,13 @@ export function VaultPane(props: VaultPaneProps) {
     void (async () => {
       try {
         const file = await port.readFile(path)
-        if (!cancelled) setSelectedFile(file)
+        if (!cancelled && !dirtyRef.current) setSelectedFile(file)
       } catch (err) {
         // Surface read failures instead of making them indistinguishable from
         // the intentionally empty "no file selected" state.
         if (!cancelled) {
           const failure = reportFailure('read', 'operation', err, 'Failed to read file', path)
-          setSelectedFile(null)
+          setSelectedFile((current) => current?.path === path ? current : null)
           setReadError(failure.message)
         }
       } finally {
@@ -498,7 +507,7 @@ export function VaultPane(props: VaultPaneProps) {
     return () => {
       cancelled = true
     }
-  }, [port, selectedPath, resolvedSelectedPath, treeLoading, treeLoaded, refreshKey, reloadNonce, commitPath, reportFailure])
+  }, [port, selectedPath, resolvedSelectedPath, treeLoading, treeLoaded, isDirty, saving, reloadNonce, commitPath, reportFailure])
 
   useEffect(() => {
     if (!selectedFile) {
@@ -520,7 +529,7 @@ export function VaultPane(props: VaultPaneProps) {
     setIsDirty(false)
     setSaveError(null)
     setDockOpen(false)
-  }, [selectedFile, activeCodec])
+  }, [selectedFile?.path, selectedFile?.content, activeCodec])
 
   const guardedOpen = useCallback(
     (path: string) => {
@@ -598,13 +607,15 @@ export function VaultPane(props: VaultPaneProps) {
   }, [activeCodec, isDirty, richDraft])
 
   const onSourceChange = useCallback((next: string) => {
+    dirtyRef.current = next !== savedContentRef.current
     setSourceDraft(next)
-    setIsDirty(next !== savedContentRef.current)
+    setIsDirty(dirtyRef.current)
   }, [])
 
   const onRichChange = useCallback((next: VaultRichParts) => {
+    dirtyRef.current = activeCodec.serialize(next) !== savedContentRef.current
     setRichDraft(next)
-    setIsDirty(activeCodec.serialize(next) !== savedContentRef.current)
+    setIsDirty(dirtyRef.current)
   }, [activeCodec])
 
   const saveCurrent = useCallback(async () => {
@@ -673,7 +684,7 @@ export function VaultPane(props: VaultPaneProps) {
   const createFileName = newPath.trim().split('/').pop()?.trim() ?? ''
 
   let treeContent: ReactNode
-  if (treeLoading || (!treeLoaded && !treeError)) {
+  if (!treeLoaded && (treeLoading || !treeError)) {
     treeContent = <TreeSkeleton />
   } else if (!treeLoaded && treeError) {
     treeContent = <TreeErrorState message={treeFailureMessage(treeError.failure)} onRetry={() => void retryTree()} />
@@ -846,10 +857,18 @@ export function VaultPane(props: VaultPaneProps) {
               onDismiss={() => setSaveError(null)}
             />
           )}
+          {readError && selectedFile?.path === resolvedSelectedPath && (
+            <OperationErrorAlert
+              message={readError}
+              retryLabel="Retry file refresh"
+              onRetry={() => setReloadNonce((n) => n + 1)}
+              onDismiss={() => setReadError(null)}
+            />
+          )}
           <div className="flex-1 overflow-hidden">
-            {fileLoading ? (
+            {fileLoading && selectedFile?.path !== resolvedSelectedPath ? (
               <EditorSkeleton />
-            ) : readError ? (
+            ) : readError && selectedFile?.path !== resolvedSelectedPath ? (
               <ReadErrorState message={readError} onRetry={() => setReloadNonce((n) => n + 1)} />
             ) : selectedFile && canWrite && isMarkdownCapable && editorMode === 'source' ? (
               <SourceEditor
