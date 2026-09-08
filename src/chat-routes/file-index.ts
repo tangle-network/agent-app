@@ -131,6 +131,7 @@ const DEFAULT_IGNORE_SEGMENTS = [
  *  always ignored — this single rule covers most dot-prefixed VCS/tooling
  *  dirs and dotfiles without enumerating them. */
 function isIgnored(relPath: string, ignoreSegments: ReadonlySet<string>): boolean {
+  if (!relPath || relPath.startsWith('/') || relPath.includes('\\')) return true
   for (const segment of relPath.split('/')) {
     if (!segment) continue
     if (segment.startsWith('.')) return true
@@ -225,10 +226,10 @@ export function createSandboxFileIndexRoute(
       if (!isMissingRootError(err, auth.root)) throw err
       return Response.json({ status: 'warming' } satisfies FileIndexWarmingResponse)
     }
-    const filtered = scan.files.filter((f) => !isIgnored(relativeTo(scan.root, f.path), ignoreSegments))
+    const filtered = scan.files.filter((f) => !isIgnored(relativeTo(auth.root, f.path), ignoreSegments))
     const truncated = scan.stats.truncated || filtered.length > maxEntries
     const files: FileMention[] = filtered.slice(0, maxEntries).map((f) => {
-      const path = relativeTo(scan.root, f.path)
+      const path = relativeTo(auth.root, f.path)
       const entry: FileMention = { path, name: basename(path) }
       if (typeof f.size === 'number') entry.size = f.size
       return entry

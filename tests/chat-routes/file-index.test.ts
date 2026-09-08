@@ -20,6 +20,21 @@ function indexRequest(): Request {
 }
 
 describe('createSandboxFileIndexRoute', () => {
+  it('rejects paths outside the authorized root even when the scan echoes another root', async () => {
+    const route = createSandboxFileIndexRoute({
+      authorize: async () => ({ status: 'ready', root: '/home/agent/artifacts', fs: {
+        tree: async () => ({ root: '/home/agent', stats: { truncated: false }, files: [
+          { path: '/home/agent/private.txt', size: 1 },
+          { path: '../private.txt', size: 1 },
+          { path: '/home/agent/artifacts/report.txt', size: 2 },
+        ] }),
+      } }),
+    })
+    expect(await (await route(indexRequest())).json()).toMatchObject({ files: [
+      { path: 'report.txt', name: 'report.txt', size: 2 },
+    ] })
+  })
+
   it('returns workspace-relative files with default ignores applied', async () => {
     const fs = fakeFs([
       { path: '/home/agent/src/index.ts', size: 120 },
