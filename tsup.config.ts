@@ -8,6 +8,7 @@ export default defineConfig({
     'catalog/index': 'src/catalog/index.ts',
     'eval/index': 'src/eval/index.ts',
     'eval-campaign/index': 'src/eval-campaign/index.ts',
+    'public-consultation/index': 'src/public-consultation/index.ts',
     'knowledge/index': 'src/knowledge/index.ts',
     'knowledge-loop/index': 'src/knowledge-loop/index.ts',
     'skills/index': 'src/skills/index.ts',

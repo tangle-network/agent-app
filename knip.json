@@ -103,7 +103,8 @@
     "src/work-product-react/index.tsx",
     "src/work-product/index.ts",
     "src/workspace-react/index.tsx",
-    "tests/**/*.test.{ts,tsx}"
+    "tests/**/*.test.{ts,tsx}",
+    "src/public-consultation/index.ts"
   ],
   "project": [
     "src/**/*.{ts,tsx}",

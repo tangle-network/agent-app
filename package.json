@@ -504,6 +504,11 @@
       "types": "./dist/spend/index.d.ts",
       "import": "./dist/spend/index.js",
       "default": "./dist/spend/index.js"
+    },
+    "./public-consultation": {
+      "types": "./dist/public-consultation/index.d.ts",
+      "import": "./dist/public-consultation/index.js",
+      "default": "./dist/public-consultation/index.js"
     }
   },
   "scripts": {
