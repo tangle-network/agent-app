@@ -331,27 +331,16 @@ export interface StoppedSandboxResumeRecovery {
   restore?: SandboxRestoreSpec | null
 }
 
-/**
- * Default ERE passed to `pgrep -f` when a liveness probe does not override the
- * harness-process matcher. It covers the platform process names used by the
- * fleet's shared OpenCode, Claude Code, and Codex terminal path; products with
- * another harness can override it.
- */
-export const DEFAULT_SIDECAR_PROCESS_PATTERN = 'opencode|claude|codex'
-
-// Reuse health gate + sidecar liveness. The exec+timeout-race is generic; a
-// product with a custom harness can override the default process matcher.
-// Absent livenessProbe => no probe (reuse on metadata.harness match).
-/** Define configuration for liveness probes including sidecar process pattern and optional timeouts */
+/** Configure runtime exec verification before reusing a sandbox. */
 export interface LivenessProbeConfig {
-  sidecarProcessPattern?: (harness: Harness) => string
+  /** Process timeout passed to the Sandbox SDK. Defaults to 5 seconds.
+   * SDK readiness and transport deadlines also apply. */
   execTimeoutMs?: number
-  psTimeoutMs?: number
   /**
    * Reuse a successful liveness result for this many milliseconds for the
    * same box id. Defaults to 5 seconds; set to 0 to probe on every reuse.
    *
-   * Only the exec/sidecar probe is cached. Runtime readiness, egress policy,
+   * Only the exec probe is cached. Runtime readiness, egress policy,
    * deferred-file materialization, and bootstrap still run on every reuse.
    * A box that dies during this window is surfaced by the next dispatch and
    * is probed again after the TTL; the cache never triggers box deletion.
@@ -1662,57 +1651,21 @@ export function assertEnvWithinLimits(env: Record<string, string>): void {
   }
 }
 
-function resolveSidecarProcessPattern(
-  probe: LivenessProbeConfig,
-  harness: Harness,
-): string {
-  const pattern =
-    probe.sidecarProcessPattern?.(harness) ?? DEFAULT_SIDECAR_PROCESS_PATTERN
-  if (pattern.includes('\\|')) {
-    throw new Error(
-      'Invalid livenessProbe.sidecarProcessPattern: pgrep -f uses extended regular expressions; ' +
-        'use a bare "|" for alternation, not "\\|".',
-    )
-  }
-  return pattern
-}
-
-// Generic exec+sidecar liveness probe. Absent probe => always alive (the prior
-// reuse-on-metadata-match behavior). With a probe: the container must answer an
-// `echo alive` exec within execTimeoutMs, and the harness process must be found
-// by pgrep within psTimeoutMs (an inconclusive pgrep is treated as reusable).
+// The SDK owns the exec deadline. Await settlement before starting recovery;
+// an application timeout race would leave the original request in flight.
 async function isBoxAlive(
   box: SandboxInstance,
-  harness: Harness,
   probe: LivenessProbeConfig | undefined,
-): Promise<boolean> {
-  if (!probe) return true
-  const execTimeout = probe.execTimeoutMs ?? 5000
-  const psTimeout = probe.psTimeoutMs ?? 3000
-  // Resolve and validate configuration before entering the operational catch:
-  // a bad ERE is a caller bug, not evidence that the box needs a restart.
-  const pattern = resolveSidecarProcessPattern(probe, harness)
-  const race = <T>(p: Promise<T>, ms: number, label: string): Promise<T> =>
-    Promise.race([
-      p,
-      new Promise<T>((_, reject) => setTimeout(() => reject(new Error(label)), ms)),
-    ])
+): Promise<Outcome<void>> {
+  if (!probe) return ok(undefined)
   try {
-    const alive = await race(box.exec('echo alive'), execTimeout, 'alive check timeout')
-    if (!alive.stdout.includes('alive')) return false
-    try {
-      const ps = await race(
-        box.exec(`pgrep -f ${shellSingleQuote(pattern)} || echo no-sidecar`),
-        psTimeout,
-        'ps check timeout',
-      )
-      if (ps.stdout.includes('no-sidecar')) return false
-    } catch {
-      // sidecar probe inconclusive — container is alive, treat as reusable
+    const alive = await box.exec('echo alive', { timeoutMs: probe.execTimeoutMs ?? 5000 })
+    if (alive.exitCode !== 0 || alive.stdout.trim() !== 'alive') {
+      return fail(new Error('alive check did not return a successful alive marker'))
     }
-    return true
-  } catch {
-    return false
+    return ok(undefined)
+  } catch (cause) {
+    return fail(new Error('alive check failed', { cause }))
   }
 }
 
@@ -1929,17 +1882,16 @@ async function writeDeferredFilesWithRuntimeAuthRefresh(
 // RECOVERED (stop→resume, workspace intact) or fails loud — never deleted.
 async function isReusableBox(
   box: SandboxInstance,
-  harness: Harness,
   probe: LivenessProbeConfig | undefined,
-): Promise<boolean> {
+): Promise<Outcome<void>> {
   if (sandboxEdgeFailed(box) || !sandboxRuntimeUrl(box)) {
     livenessVerifiedAt.delete(box.id)
-    return false
+    return fail(new Error(sandboxEdgeFailed(box) ? 'runtime edge readiness failed' : 'runtime URL is missing'))
   }
-  if (!probe) return true
-  if (hasRecentLivenessVerification(box, probe)) return true
-  const alive = await isBoxAlive(box, harness, probe)
-  if (alive) livenessVerifiedAt.set(box.id, Date.now())
+  if (!probe) return ok(undefined)
+  if (hasRecentLivenessVerification(box, probe)) return ok(undefined)
+  const alive = await isBoxAlive(box, probe)
+  if (alive.succeeded) livenessVerifiedAt.set(box.id, Date.now())
   else livenessVerifiedAt.delete(box.id)
   return alive
 }
@@ -1995,7 +1947,6 @@ async function resumeStoppedBox(
 async function recoverUnresponsiveBox(
   client: Sandbox,
   box: SandboxInstance,
-  harness: Harness,
   probe: LivenessProbeConfig | undefined,
   stage: SandboxExistingBoxStage,
   name: string,
@@ -2024,12 +1975,14 @@ async function recoverUnresponsiveBox(
     )
   }
   const recovered = await refreshRuntimeConnection(client, resumed.value)
-  if (!(await isReusableBox(recovered, harness, probe))) {
+  const reusable = await isReusableBox(recovered, probe)
+  if (!reusable.succeeded) {
     throw new SandboxRecoveryFailedError(
       stage,
       name,
       'probe',
-      'the box is still unresponsive after a state-preserving restart',
+      `the box is still unresponsive after a state-preserving restart: ${reusable.error.message}`,
+      reusable.error,
     )
   }
   return recovered
@@ -2346,6 +2299,10 @@ async function requestMissingSandboxReplacement(
   shell: SandboxRuntimeConfig,
   failure: MissingSandboxFailure,
 ): Promise<StoppedSandboxResumeRecovery> {
+  // Probe causes diagnose failed liveness; they do not authorize replacement.
+  if (failure.error instanceof SandboxRecoveryFailedError && failure.error.phase === 'probe') {
+    throw failure.error
+  }
   const diagnostics = serializeSandboxProvisioningError(failure.error)
   if (!isSandboxApiSandboxMissingFailure(diagnostics)) throw failure.error
   return requestSandboxReplacement(
@@ -2359,6 +2316,13 @@ async function provisionWorkspaceSandbox(
   shell: SandboxRuntimeConfig,
   options: EnsureWorkspaceSandboxOptions,
 ): Promise<SandboxInstance> {
+  const execTimeoutMs = shell.livenessProbe?.execTimeoutMs
+  // Match the supported SDK command-timeout range before any lifecycle mutation.
+  if (execTimeoutMs !== undefined && (
+    !Number.isInteger(execTimeoutMs) || execTimeoutMs < 100 || execTimeoutMs > 600_000
+  )) {
+    throw new Error('livenessProbe.execTimeoutMs must be an integer between 100 and 600000')
+  }
   const { workspaceId, userId, harness, forceNew, onProgress, billingOwnerId } = options
   const resolved = await resolveWorkspaceSandboxClient(shell, workspaceId, userId)
   const { scope, client } = resolved
@@ -2380,7 +2344,7 @@ async function provisionWorkspaceSandbox(
     } else if (found.metadata?.harness === harness) {
       try {
         const ready = await refreshRuntimeConnection(client, found)
-        if (await isReusableBox(ready, harness, shell.livenessProbe)) {
+        if ((await isReusableBox(ready, shell.livenessProbe)).succeeded) {
           return await finalizeExistingBox(shell, client, ready, 'reused', name, workspaceId, userId, harness, scope)
         }
         // Unresponsive (or never-connectable) box with the RIGHT harness: recover
@@ -2390,7 +2354,6 @@ async function provisionWorkspaceSandbox(
         const recovered = await recoverUnresponsiveBox(
           client,
           ready,
-          harness,
           shell.livenessProbe,
           'reused',
           name,
@@ -2441,7 +2404,7 @@ async function provisionWorkspaceSandbox(
       } else {
         try {
           const box = await refreshRuntimeConnection(client, resumed.value)
-          if (await isReusableBox(box, harness, shell.livenessProbe)) {
+          if ((await isReusableBox(box, shell.livenessProbe)).succeeded) {
             return await finalizeExistingBox(shell, client, box, 'resumed', name, workspaceId, userId, harness, scope)
           }
           // The box resumed but is unresponsive: one full stop→resume cycle is
@@ -2450,7 +2413,6 @@ async function provisionWorkspaceSandbox(
           const recovered = await recoverUnresponsiveBox(
             client,
             box,
-            harness,
             shell.livenessProbe,
             'resumed',
             name,

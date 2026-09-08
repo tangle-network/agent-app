@@ -10393,12 +10393,6 @@
           "doc": "Define default resource limits and settings for sandbox environments"
         },
         {
-          "name": "DEFAULT_SIDECAR_PROCESS_PATTERN",
-          "kind": "const",
-          "signature": "\"opencode|claude|codex\"",
-          "doc": "Default ERE passed to `pgrep -f` when a liveness probe does not override the harness-process matcher."
-        },
-        {
           "name": "deferredCorpusHash",
           "kind": "function",
           "signature": "(files: AgentProfileFileMount[]) => string",
@@ -10582,7 +10576,7 @@
           "name": "LivenessProbeConfig",
           "kind": "interface",
           "signature": "interface LivenessProbeConfig",
-          "doc": "Define configuration for liveness probes including sidecar process pattern and optional timeouts"
+          "doc": "Configure runtime exec verification before reusing a sandbox."
         },
         {
           "name": "MemberSyncSeam",

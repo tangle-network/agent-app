@@ -173,6 +173,18 @@ Two `createMissionService` seams adopters hit on day one:
 - **`generateId`** (on `MissionServiceOptions`) defaults to `crypto.randomUUID()` — a 36-char dashed UUID. If your mission table has an existing id shape (e.g. 32-hex to match D1 row defaults), inject your own generator; the service stamps it verbatim on the inserted record.
 - **`CreateMissionInput.extras`** carries opaque product-column values (a `workflowId` FK, a source-turn pointer) verbatim to `MissionStorePort.insert(record, extras)`, so creation is a single write — no post-insert stamp. The service never reads them.
 
+### Sandbox reuse
+
+Set `livenessProbe: {}` to verify a reused runtime with `echo alive`.
+The command must exit successfully and return only `alive`, allowing surrounding whitespace.
+A healthy idle runtime does not need a running CLI process.
+Remove `sidecarProcessPattern`, `psTimeoutMs`, and imports of `DEFAULT_SIDECAR_PROCESS_PATTERN` when upgrading.
+
+`execTimeoutMs` sets the SDK command timeout, from 100 to 600,000 milliseconds; the default is 5,000.
+SDK readiness and transport deadlines apply separately, so this value is not an end-to-end provisioning deadline.
+Recovery waits for the SDK request to settle before restarting the sandbox.
+Failures retain their SDK cause for the redacted diagnostic serializer and preserve the workspace.
+
 ## Compatibility
 
 - **ESM only.** Ships `import` + `types` conditions per subpath.
