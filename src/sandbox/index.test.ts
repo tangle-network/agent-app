@@ -89,6 +89,7 @@ import {
   SandboxRuntimeAuthRefreshError,
   SandboxEgressPolicyMismatchError,
   SandboxRecoveryFailedError,
+  serializeSandboxProvisioningError,
   resolveModelSelection,
   requireTransportableModel,
   SandboxModelResolutionError,
@@ -796,11 +797,15 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
 
   it('surfaces a typed error (no delete) when the box is still dead after recovery', async () => {
     const del = vi.fn().mockResolvedValue(undefined)
+    const sdkCause = Object.assign(new Error('exec timed out'), {
+      status: 502, code: 'RUNTIME_PROXY_FAILED', origin: 'sandbox-api',
+      endpoint: '/v1/sandboxes/test/runtime/process/spawn',
+    })
     const dead = fakeBox({
       name: 'box-w1',
       metadata: { harness: 'opencode' },
       delete: del,
-      exec: vi.fn().mockRejectedValue(new Error('exec timed out')),
+      exec: vi.fn().mockRejectedValue(sdkCause),
     } as Partial<SandboxInstance>)
     listMock.mockImplementation(({ status }: { status: string }) =>
       status === 'running' ? Promise.resolve([dead]) : Promise.resolve([]),
@@ -813,8 +818,37 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
       .then(() => null, (err: unknown) => err)
 
     expect(rejection).toBeInstanceOf(SandboxRecoveryFailedError)
-    expect(rejection).toMatchObject({ phase: 'probe', stage: 'reused', boxKey: 'box-w1' })
+    expect(rejection).toMatchObject({ phase: 'probe', stage: 'reused', boxKey: 'box-w1',
+      cause: { message: 'alive check failed', cause: { message: 'exec timed out' } },
+    })
+    expect(serializeSandboxProvisioningError(rejection).causes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ status: 502, code: 'RUNTIME_PROXY_FAILED', origin: 'sandbox-api',
+        endpoint: '/v1/sandboxes/test/runtime/process/spawn' }),
+    ]))
     expect(del).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['missing alive marker', async () => ({ stdout: 'unexpected private output' }), 'alive check returned no alive marker'],
+    ['missing process', async (command: string) => ({ stdout: command === 'echo alive' ? 'alive' : 'no-sidecar' }), 'process check found no sidecar'],
+    ['exec deadline', () => new Promise<never>(() => {}), 'alive check failed'],
+  ])('retains the failed liveness step after recovery: %s', async (scenario, exec, message) => {
+    const dead = fakeBox({ name: 'box-w1', metadata: { harness: 'opencode' }, exec: vi.fn(exec) } as Partial<SandboxInstance>)
+    listMock.mockImplementation(({ status }: { status: string }) =>
+      status === 'running' ? Promise.resolve([dead]) : Promise.resolve([]),
+    )
+    const probed = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
+      livenessProbe: { sidecarProcessPattern: () => 'sidecar', execTimeoutMs: 1 },
+    })
+    const rejection = await ensureWorkspaceSandbox(probed, { workspaceId: 'w1', harness: 'opencode' })
+      .then(() => null, (err: unknown) => err)
+    expect(rejection).toMatchObject({ phase: 'probe', cause: { message } })
+    if (scenario === 'exec deadline') {
+      expect(rejection).toMatchObject({ cause: { cause: { message: 'alive check timed out after 1ms' } } })
+    }
+    expect(String(rejection)).not.toContain('unexpected private output')
+    expect(dead.delete).not.toHaveBeenCalled()
     expect(createMock).not.toHaveBeenCalled()
   })
 

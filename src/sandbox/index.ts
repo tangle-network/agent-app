@@ -1685,8 +1685,8 @@ async function isBoxAlive(
   box: SandboxInstance,
   harness: Harness,
   probe: LivenessProbeConfig | undefined,
-): Promise<boolean> {
-  if (!probe) return true
+): Promise<Outcome<void>> {
+  if (!probe) return ok(undefined)
   const execTimeout = probe.execTimeoutMs ?? 5000
   const psTimeout = probe.psTimeoutMs ?? 3000
   // Resolve and validate configuration before entering the operational catch:
@@ -1698,21 +1698,21 @@ async function isBoxAlive(
       new Promise<T>((_, reject) => setTimeout(() => reject(new Error(label)), ms)),
     ])
   try {
-    const alive = await race(box.exec('echo alive'), execTimeout, 'alive check timeout')
-    if (!alive.stdout.includes('alive')) return false
+    const alive = await race(box.exec('echo alive'), execTimeout, `alive check timed out after ${execTimeout}ms`)
+    if (!alive.stdout.includes('alive')) return fail(new Error('alive check returned no alive marker'))
     try {
       const ps = await race(
         box.exec(`pgrep -f ${shellSingleQuote(pattern)} || echo no-sidecar`),
         psTimeout,
         'ps check timeout',
       )
-      if (ps.stdout.includes('no-sidecar')) return false
+      if (ps.stdout.includes('no-sidecar')) return fail(new Error('process check found no sidecar'))
     } catch {
       // sidecar probe inconclusive — container is alive, treat as reusable
     }
-    return true
-  } catch {
-    return false
+    return ok(undefined)
+  } catch (cause) {
+    return fail(new Error('alive check failed', { cause }))
   }
 }
 
@@ -1931,15 +1931,15 @@ async function isReusableBox(
   box: SandboxInstance,
   harness: Harness,
   probe: LivenessProbeConfig | undefined,
-): Promise<boolean> {
+): Promise<Outcome<void>> {
   if (sandboxEdgeFailed(box) || !sandboxRuntimeUrl(box)) {
     livenessVerifiedAt.delete(box.id)
-    return false
+    return fail(new Error(sandboxEdgeFailed(box) ? 'runtime edge readiness failed' : 'runtime URL is missing'))
   }
-  if (!probe) return true
-  if (hasRecentLivenessVerification(box, probe)) return true
+  if (!probe) return ok(undefined)
+  if (hasRecentLivenessVerification(box, probe)) return ok(undefined)
   const alive = await isBoxAlive(box, harness, probe)
-  if (alive) livenessVerifiedAt.set(box.id, Date.now())
+  if (alive.succeeded) livenessVerifiedAt.set(box.id, Date.now())
   else livenessVerifiedAt.delete(box.id)
   return alive
 }
@@ -2024,12 +2024,14 @@ async function recoverUnresponsiveBox(
     )
   }
   const recovered = await refreshRuntimeConnection(client, resumed.value)
-  if (!(await isReusableBox(recovered, harness, probe))) {
+  const reusable = await isReusableBox(recovered, harness, probe)
+  if (!reusable.succeeded) {
     throw new SandboxRecoveryFailedError(
       stage,
       name,
       'probe',
-      'the box is still unresponsive after a state-preserving restart',
+      `the box is still unresponsive after a state-preserving restart: ${reusable.error.message}`,
+      reusable.error,
     )
   }
   return recovered
@@ -2380,7 +2382,7 @@ async function provisionWorkspaceSandbox(
     } else if (found.metadata?.harness === harness) {
       try {
         const ready = await refreshRuntimeConnection(client, found)
-        if (await isReusableBox(ready, harness, shell.livenessProbe)) {
+        if ((await isReusableBox(ready, harness, shell.livenessProbe)).succeeded) {
           return await finalizeExistingBox(shell, client, ready, 'reused', name, workspaceId, userId, harness, scope)
         }
         // Unresponsive (or never-connectable) box with the RIGHT harness: recover
@@ -2441,7 +2443,7 @@ async function provisionWorkspaceSandbox(
       } else {
         try {
           const box = await refreshRuntimeConnection(client, resumed.value)
-          if (await isReusableBox(box, harness, shell.livenessProbe)) {
+          if ((await isReusableBox(box, harness, shell.livenessProbe)).succeeded) {
             return await finalizeExistingBox(shell, client, box, 'resumed', name, workspaceId, userId, harness, scope)
           }
           // The box resumed but is unresponsive: one full stop→resume cycle is
