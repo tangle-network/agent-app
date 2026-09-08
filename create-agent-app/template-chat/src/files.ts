@@ -4,7 +4,7 @@ import type { ChatApp } from './chat'
 import type { AppEnv } from './env'
 import { createSandboxShell } from './sandbox'
 
-/** Only explicitly published artifacts are indexed, not configuration or private workspace files. */
+/** Agent output directory; configuration and other workspace files are excluded. */
 export const ARTIFACT_ROOT = '/home/agent/artifacts'
 
 export function createArtifactIndex(

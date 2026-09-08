@@ -55,7 +55,7 @@ read as 404. No mock agent — missing sandbox credentials fail loud. See
 ## Artifact index
 
 `GET /api/files` lists files under `/home/agent/artifacts` for the signed-in user's workspace.
-Write user-facing outputs there explicitly; other workspace files are not indexed.
+The default prompt directs the agent to save user-facing outputs there; other workspace files are not indexed.
 The route returns `ready` with filtered metadata or `warming` when no ready sandbox exists.
 It never provisions or resumes a sandbox, and it does not provide file downloads.
 Hidden files and paths outside the artifact root are excluded.

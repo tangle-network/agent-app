@@ -46,6 +46,7 @@ import { buildChatApp, type ChatApp } from '../src/chat'
 import type { AppEnv } from '../src/env'
 import { buildGatewayApp } from '../src/gateway'
 import { appSlug } from '../src/sandbox'
+import { ARTIFACT_ROOT } from '../src/files'
 import { createWorker, type WorkerAssembly } from '../src/worker'
 
 const BASE = 'http://localhost:8787'
@@ -237,6 +238,7 @@ async function readGatewayText(response: Response): Promise<string> {
 
 describe('e2e: fake sandbox producer → streamed turn → persisted transcript', () => {
   it('indexes only owned artifacts through the real authenticated Worker route', async () => {
+    expect(config.systemPrompt).toContain(ARTIFACT_ROOT)
     const tree = vi.fn(async () => ({
       root: '/home/agent/artifacts',
       files: [
